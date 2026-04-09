@@ -33,16 +33,17 @@ import {
 } from './constants';
 import {
   DEFAULT_TABLE_DATA,
-  addCol,
-  addRow,
-  delCol,
-  delRow,
+  deleteColAt,
+  deleteRowAt,
+  insertCol,
+  insertRow,
   setBorderPreset,
 } from './tableOps';
 import { CITATION_STYLES, SORT_MODE_LABELS, type CitationStyleKey, type SortMode } from './citations';
 import { LAYOUT_TEMPLATES, type LayoutKey } from './templates';
 import { parseBibtex, parseRis } from './parsers';
 import { AuthorLine } from './blocks';
+import { SmartTextarea } from './SmartTextarea';
 
 export type SidebarTab = 'layout' | 'authors' | 'refs' | 'style' | 'edit';
 
@@ -98,6 +99,9 @@ interface SidebarProps {
   savedPresets: StylePreset[];
   onSavePreset: (name: string) => void;
   onLoadPreset: (preset: StylePreset) => void;
+
+  // sidebar visibility (Notion-style collapse toggle)
+  onToggleSidebar?: () => void;
 }
 
 // Shared inline styles for the dark sidebar UI chrome.
@@ -189,10 +193,11 @@ export function Sidebar(props: SidebarProps) {
     <div
       data-postr-sidebar
       style={{
-        // Sidebar widened again to accommodate the vertical tab rail
-        // on the left (100 px) plus the panel content (280 px).
-        width: 380,
-        minWidth: 380,
+        // Wider sidebar — 460 px total (100 px rail + 360 px panel) —
+        // so inputs, table editors, and the SmartTextarea have room
+        // without the tab rail compressing everything on the right.
+        width: 460,
+        minWidth: 460,
         background: '#111118',
         color: '#c8cad0',
         display: 'flex',
@@ -201,8 +206,49 @@ export function Sidebar(props: SidebarProps) {
         fontSize: 17,
         borderRight: '1px solid #1e1e2e',
         overflow: 'hidden',
+        position: 'relative',
       }}
     >
+      {/* Hide-sidebar toggle, floats in the top-right corner.
+          Notion-style: one click to collapse, and a reveal tab is
+          rendered in PosterEditor when sidebarOpen is false. */}
+      {props.onToggleSidebar && (
+        <button
+          aria-label="Hide sidebar"
+          title="Hide sidebar (⌘/)"
+          onClick={props.onToggleSidebar}
+          style={{
+            all: 'unset',
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            width: 32,
+            height: 32,
+            borderRadius: 6,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#6b7280',
+            background: 'transparent',
+            border: '1px solid transparent',
+            zIndex: 5,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = '#1a1a26';
+            e.currentTarget.style.color = '#c8cad0';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'transparent';
+            e.currentTarget.style.color = '#6b7280';
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M4 6h16M4 12h16M4 18h16" transform="rotate(90 12 12)" />
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+        </button>
+      )}
       <div style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 14 }}>
         <div
           style={{
@@ -1123,26 +1169,12 @@ function EditTab(props: {
           <div style={{ fontSize: 12, fontWeight: 700, color: '#555', textTransform: 'uppercase' }}>
             Editing: {sb.type}
           </div>
-          <textarea
+          <SmartTextarea
             value={sb.content}
-            onChange={(e) => props.onUpdateBlock(sb.id, { content: e.target.value })}
-            style={{
-              all: 'unset',
-              background: '#1a1a26',
-              border: '1px solid #2a2a3a',
-              borderRadius: 5,
-              padding: '12px 14px',
-              color: '#ddd',
-              fontSize: 15,
-              minHeight: 60,
-              maxHeight: 120,
-              overflow: 'auto',
-              resize: 'vertical',
-              fontFamily: 'inherit',
-              lineHeight: 1.5,
-              width: '100%',
-              boxSizing: 'border-box',
-            }}
+            onChange={(v) => props.onUpdateBlock(sb.id, { content: v })}
+            placeholder="Type here… (type / for symbols)"
+            rows={5}
+            style={{ minHeight: 120, maxHeight: 240 }}
           />
           <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
             <label style={{ fontSize: 12, color: '#666' }}>Size</label>
@@ -1282,26 +1314,103 @@ function TableEditor(props: {
 
   const commit = (next: TableData) => onUpdateBlock(block.id, { tableData: next });
 
-  const rowColBtn: CSSProperties = {
+  const iconBtn: CSSProperties = {
     all: 'unset',
     cursor: 'pointer',
-    flex: 1,
-    padding: '10px 0',
-    textAlign: 'center',
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     fontSize: 13,
-    fontWeight: 600,
+    fontWeight: 700,
     background: '#1a1a26',
     border: '1px solid #2a2a3a',
-    borderRadius: 6,
     color: '#c8cad0',
+    flexShrink: 0,
   };
-  const dangerBtn: CSSProperties = {
-    ...rowColBtn,
+  const dangerIconBtn: CSSProperties = {
+    ...iconBtn,
     color: '#f87171',
     borderColor: '#3a1f20',
   };
+  const disabledBtn: CSSProperties = {
+    opacity: 0.35,
+    cursor: 'not-allowed',
+  };
 
-  const presetRow = (k: string, name: string) => {
+  const indexLabel: CSSProperties = {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#9ca3af',
+    minWidth: 48,
+    flexShrink: 0,
+  };
+
+  const rowControlRow = (rowIndex: number) => (
+    <div
+      key={`row-${rowIndex}`}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}
+    >
+      <span style={indexLabel}>Row {rowIndex + 1}</span>
+      <button
+        title="Insert row above"
+        onClick={() => commit(insertRow(data, rowIndex, 'above'))}
+        style={iconBtn}
+      >
+        ↑+
+      </button>
+      <button
+        title="Insert row below"
+        onClick={() => commit(insertRow(data, rowIndex, 'below'))}
+        style={iconBtn}
+      >
+        ↓+
+      </button>
+      <button
+        title="Delete this row"
+        onClick={() => commit(deleteRowAt(data, rowIndex))}
+        disabled={data.rows <= 1}
+        style={data.rows <= 1 ? { ...dangerIconBtn, ...disabledBtn } : dangerIconBtn}
+      >
+        ×
+      </button>
+    </div>
+  );
+
+  const colControlRow = (colIndex: number) => (
+    <div
+      key={`col-${colIndex}`}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}
+    >
+      <span style={indexLabel}>Col {colIndex + 1}</span>
+      <button
+        title="Insert column to the left"
+        onClick={() => commit(insertCol(data, colIndex, 'left'))}
+        style={iconBtn}
+      >
+        ←+
+      </button>
+      <button
+        title="Insert column to the right"
+        onClick={() => commit(insertCol(data, colIndex, 'right'))}
+        style={iconBtn}
+      >
+        →+
+      </button>
+      <button
+        title="Delete this column"
+        onClick={() => commit(deleteColAt(data, colIndex))}
+        disabled={data.cols <= 1}
+        style={data.cols <= 1 ? { ...dangerIconBtn, ...disabledBtn } : dangerIconBtn}
+      >
+        ×
+      </button>
+    </div>
+  );
+
+  const presetButton = (k: string, name: string) => {
     const active = data.borderPreset === k;
     return (
       <button
@@ -1310,9 +1419,9 @@ function TableEditor(props: {
         style={{
           all: 'unset',
           cursor: 'pointer',
-          padding: '10px 14px',
+          padding: '12px 16px',
           borderRadius: 6,
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 600,
           background: active ? '#7c6aed22' : '#1a1a26',
           border: `1px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
@@ -1325,39 +1434,66 @@ function TableEditor(props: {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#555', textTransform: 'uppercase' }}>
-        Editing: table · {data.rows}×{data.cols}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        Editing: table · {data.rows} × {data.cols}
       </div>
 
       <div>
-        <div style={{ fontSize: 11, color: '#666', marginBottom: 6 }}>Rows</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => commit(addRow(data))} style={rowColBtn}>+ Row</button>
-          <button onClick={() => commit(delRow(data))} style={dangerBtn} disabled={data.rows <= 1}>
-            − Row
-          </button>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: '#9ca3af',
+            marginBottom: 8,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          Rows
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {Array.from({ length: data.rows }).map((_, i) => rowControlRow(i))}
         </div>
       </div>
 
       <div>
-        <div style={{ fontSize: 11, color: '#666', marginBottom: 6 }}>Columns</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => commit(addCol(data))} style={rowColBtn}>+ Col</button>
-          <button onClick={() => commit(delCol(data))} style={dangerBtn} disabled={data.cols <= 1}>
-            − Col
-          </button>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: '#9ca3af',
+            marginBottom: 8,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          Columns
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {Array.from({ length: data.cols }).map((_, i) => colControlRow(i))}
         </div>
       </div>
 
       <div>
-        <div style={{ fontSize: 11, color: '#666', marginBottom: 6 }}>Border style</div>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 700,
+            color: '#9ca3af',
+            marginBottom: 8,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          Border style
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {Object.entries(TABLE_BORDER_PRESETS).map(([k, v]) => presetRow(k, v.name))}
+          {Object.entries(TABLE_BORDER_PRESETS).map(([k, v]) => presetButton(k, v.name))}
         </div>
       </div>
 
-      <p style={{ fontSize: 11, color: '#555', lineHeight: 1.5, marginTop: 4 }}>
+      <p style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>
         Tip: paste a table from Word or Excel straight into a cell — rows and
         columns are re-created automatically.
       </p>

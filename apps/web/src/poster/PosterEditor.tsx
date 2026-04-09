@@ -258,6 +258,19 @@ export function PosterEditor() {
   const [sortMode, setSortMode] = useState<SortMode>('none');
   const [citationStyle, setCitationStyle] = useState<CitationStyleKey>(DEFAULT_CITATION_STYLE);
   const [savedPresets, setSavedPresets] = useState<StylePreset[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // ⌘/ or Ctrl+/ toggles the sidebar (Notion shortcut).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+        e.preventDefault();
+        setSidebarOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -437,7 +450,9 @@ export function PosterEditor() {
         overflow: 'hidden',
       }}
     >
-      <Sidebar
+      {sidebarOpen && (
+        <Sidebar
+          onToggleSidebar={() => setSidebarOpen(false)}
         posterSizeKey={sizeKey}
         onChangePosterSize={changeSize}
         showGrid={showGrid}
@@ -471,6 +486,46 @@ export function PosterEditor() {
         onSavePreset={savePreset}
         onLoadPreset={loadPreset}
       />
+      )}
+
+      {/* Notion-style reveal tab when the sidebar is hidden. */}
+      {!sidebarOpen && (
+        <button
+          aria-label="Show sidebar"
+          title="Show sidebar (⌘/)"
+          onClick={() => setSidebarOpen(true)}
+          style={{
+            all: 'unset',
+            position: 'fixed',
+            top: 16,
+            left: 16,
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#9ca3af',
+            background: '#1a1a26',
+            border: '1px solid #2a2a3a',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            zIndex: 20,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.borderColor = '#7c6aed';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = '#9ca3af';
+            e.currentTarget.style.borderColor = '#2a2a3a';
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 6h18M3 12h18M3 18h18" />
+          </svg>
+        </button>
+      )}
 
       <div
         ref={canvasRef}

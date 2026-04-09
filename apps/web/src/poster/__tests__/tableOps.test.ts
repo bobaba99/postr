@@ -11,6 +11,10 @@ import {
   addRow,
   delCol,
   delRow,
+  deleteColAt,
+  deleteRowAt,
+  insertCol,
+  insertRow,
   parseTablePaste,
   setBorderPreset,
   updateCell,
@@ -80,6 +84,105 @@ describe('tableOps', () => {
   it('delCol is a no-op at 1 column', () => {
     const t = makeTable(2, 1, () => 'a');
     expect(delCol(t)).toBe(t);
+  });
+
+  describe('insertRow', () => {
+    it('inserts above the given index', () => {
+      const t = makeTable(2, 2, (r, c) => `${r}${c}`);
+      const next = insertRow(t, 1, 'above');
+      expect(next.rows).toBe(3);
+      // Row order: [0,0/0,1] [blank] [1,0/1,1]
+      expect(next.cells).toEqual(['00', '01', '', '', '10', '11']);
+    });
+
+    it('inserts below the given index', () => {
+      const t = makeTable(2, 2, (r, c) => `${r}${c}`);
+      const next = insertRow(t, 0, 'below');
+      expect(next.rows).toBe(3);
+      expect(next.cells).toEqual(['00', '01', '', '', '10', '11']);
+    });
+
+    it('appends when inserting below the last row', () => {
+      const t = makeTable(2, 2, (r, c) => `${r}${c}`);
+      const next = insertRow(t, 1, 'below');
+      expect(next.cells).toEqual(['00', '01', '10', '11', '', '']);
+    });
+
+    it('clamps out-of-range indices', () => {
+      const t = makeTable(2, 2, (r, c) => `${r}${c}`);
+      const next = insertRow(t, 99, 'below');
+      expect(next.rows).toBe(3);
+      expect(next.cells.slice(4)).toEqual(['', '']);
+    });
+  });
+
+  describe('insertCol', () => {
+    it('inserts to the left of the given index', () => {
+      const t = makeTable(2, 2, (r, c) => `${r}${c}`);
+      const next = insertCol(t, 0, 'left');
+      expect(next.cols).toBe(3);
+      // Row 0: '', 00, 01   Row 1: '', 10, 11
+      expect(next.cells).toEqual(['', '00', '01', '', '10', '11']);
+    });
+
+    it('inserts to the right of the given index', () => {
+      const t = makeTable(2, 2, (r, c) => `${r}${c}`);
+      const next = insertCol(t, 0, 'right');
+      expect(next.cols).toBe(3);
+      expect(next.cells).toEqual(['00', '', '01', '10', '', '11']);
+    });
+
+    it('equalizes colWidths after insert', () => {
+      const t = makeTable(1, 2, () => 'x');
+      const next = insertCol(t, 0, 'right');
+      expect(next.colWidths).toEqual([100 / 3, 100 / 3, 100 / 3]);
+    });
+  });
+
+  describe('deleteRowAt', () => {
+    it('removes an interior row', () => {
+      const t = makeTable(3, 2, (r, c) => `${r}${c}`);
+      const next = deleteRowAt(t, 1);
+      expect(next.rows).toBe(2);
+      expect(next.cells).toEqual(['00', '01', '20', '21']);
+    });
+
+    it('removes the first row', () => {
+      const t = makeTable(3, 2, (r, c) => `${r}${c}`);
+      const next = deleteRowAt(t, 0);
+      expect(next.cells).toEqual(['10', '11', '20', '21']);
+    });
+
+    it('is a no-op for out-of-range indices', () => {
+      const t = makeTable(2, 2, () => 'a');
+      expect(deleteRowAt(t, -1)).toBe(t);
+      expect(deleteRowAt(t, 99)).toBe(t);
+    });
+
+    it('is a no-op when only one row remains', () => {
+      const t = makeTable(1, 2, () => 'a');
+      expect(deleteRowAt(t, 0)).toBe(t);
+    });
+  });
+
+  describe('deleteColAt', () => {
+    it('removes an interior column', () => {
+      const t = makeTable(2, 3, (r, c) => `${r}${c}`);
+      const next = deleteColAt(t, 1);
+      expect(next.cols).toBe(2);
+      expect(next.cells).toEqual(['00', '02', '10', '12']);
+    });
+
+    it('removes the first column', () => {
+      const t = makeTable(2, 3, (r, c) => `${r}${c}`);
+      const next = deleteColAt(t, 0);
+      expect(next.cells).toEqual(['01', '02', '11', '12']);
+    });
+
+    it('is a no-op when only one column remains', () => {
+      const t = makeTable(2, 1, () => 'a');
+      expect(deleteColAt(t, 0)).toBe(t);
+    });
   });
 
   it('setBorderPreset updates the preset key only', () => {

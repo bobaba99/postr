@@ -34,15 +34,18 @@ export function SmartText({ value, onChange, style, placeholder, multiline }: Sm
   const [menuFilter, setMenuFilter] = useState('');
   const [menuPos, setMenuPos] = useState<MenuPosition>({ top: 0, left: 0 });
 
-  // Sync external value into the contentEditable on first mount only.
-  // We don't want to fight the DOM on every parent re-render — the
-  // contentEditable is the source of truth while the user types.
+  // Sync external value into the contentEditable whenever it changes
+  // from OUTSIDE this element — e.g. the sidebar edit panel rewriting
+  // the same block's content. We skip the sync when this element is
+  // the focused document.activeElement, so we don't clobber the
+  // user's caret / composition while they're actively typing inline.
   useEffect(() => {
-    if (ref.current && ref.current.textContent !== value) {
+    if (!ref.current) return;
+    if (document.activeElement === ref.current) return;
+    if (ref.current.textContent !== value) {
       ref.current.textContent = value || '';
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [value]);
 
   const getTextAndCursor = (): { text: string; pos: number } => {
     if (!ref.current) return { text: '', pos: 0 };
