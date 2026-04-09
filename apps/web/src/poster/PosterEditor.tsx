@@ -74,11 +74,41 @@ function paletteNameFor(palette: Palette): string {
 // Drag/resize hook (ported from prototype useDrag)
 // =========================================================================
 
+/**
+ * Drag + resize hook with click-vs-drag disambiguation.
+ *
+ * Does NOT call preventDefault() on pointerdown — if we did, the
+ * browser would refuse to move focus into any contentEditable we
+ * clicked, which is why users couldn't see a caret in text blocks
+ * (issue #4). Instead:
+ *
+ *   - We attach window listeners on pointermove/pointerup.
+ *   - The first move beyond DRAG_THRESHOLD px flips didDragRef to
+ *     true. From that moment on we apply userSelect: none to the
+ *     body so dragging over text doesn't ghost-highlight it.
+ *   - On pointerup we leave didDragRef set exactly long enough for
+ *     BlockFrame's onClick handler to read it (React fires click
+ *     right after pointerup) and swallow the click. BlockFrame
+ *     clears the ref after reading. This kills the "drag the empty
+ *     image block always opens file picker" bug (issue #3) because
+ *     the drag swallows the synthetic click that would have reached
+ *     the image's upload handler.
+ *
+ * Returns both the pointerdown handler and didDragRef so call sites
+ * can consult "did the user just drag?" in their own click handlers.
+ */
+const DRAG_THRESHOLD_PX = 4;
+
+export interface UseBlockDragResult {
+  onPointerDown: (e: React.PointerEvent, id: string, mode: 'move' | 'resize') => void;
+  didDragRef: React.MutableRefObject<boolean>;
+}
+
 function useBlockDrag(
   blocks: Block[],
   setBlocks: (b: Block[]) => void,
   scale: number,
-) {
+): UseBlockDragResult {
   const sessionRef = useRef<{
     id: string;
     mode: 'move' | 'resize';
@@ -89,12 +119,19 @@ function useBlockDrag(
     ow: number;
     oh: number;
     isHeading: boolean;
+    active: boolean; // flipped true once movement passes threshold
   } | null>(null);
+  const didDragRef = useRef(false);
+  const prevUserSelectRef = useRef<string>('');
 
-  return useCallback(
+  const onPointerDown = useCallback(
     (e: React.PointerEvent, id: string, mode: 'move' | 'resize') => {
+      // stopPropagation keeps the canvas backdrop's "deselect on click"
+      // from firing. We intentionally do NOT call preventDefault — we
+      // want the natural click/focus flow to happen when the user
+      // doesn't actually drag. See block comment above.
       e.stopPropagation();
-      e.preventDefault();
+
       const b = blocks.find((x) => x.id === id);
       if (!b) return;
 
@@ -108,6 +145,7 @@ function useBlockDrag(
         ow: b.w,
         oh: b.h,
         isHeading: b.type === 'heading',
+        active: false,
       };
 
       const onMove = (ev: PointerEvent) => {
@@ -115,6 +153,20 @@ function useBlockDrag(
         if (!s) return;
         const dx = (ev.clientX - s.sx) / scale;
         const dy = (ev.clientY - s.sy) / scale;
+
+        // Cheap px-space distance check against the raw (unscaled)
+        // pointer deltas — we need the absolute movement the user
+        // made, not the zoom-scaled equivalent.
+        if (!s.active) {
+          const rawDx = ev.clientX - s.sx;
+          const rawDy = ev.clientY - s.sy;
+          if (Math.hypot(rawDx, rawDy) < DRAG_THRESHOLD_PX) return;
+          s.active = true;
+          didDragRef.current = true;
+          // Disable text selection body-wide for the duration of the drag.
+          prevUserSelectRef.current = document.body.style.userSelect;
+          document.body.style.userSelect = 'none';
+        }
 
         const nextBlocks = blocks.map((blk) => {
           if (blk.id !== s.id) return blk;
@@ -134,6 +186,7 @@ function useBlockDrag(
 
       const onUp = () => {
         sessionRef.current = null;
+        document.body.style.userSelect = prevUserSelectRef.current;
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
       };
@@ -143,6 +196,8 @@ function useBlockDrag(
     },
     [blocks, setBlocks, scale],
   );
+
+  return { onPointerDown, didDragRef };
 }
 
 // =========================================================================
@@ -236,7 +291,7 @@ export function PosterEditor() {
   // Helper: replace blocks immutably
   const setBlocks = (next: Block[]) => setPoster(posterId, { ...doc, blocks: next });
 
-  const onPointerDown = useBlockDrag(doc.blocks, setBlocks, zoom);
+  const { onPointerDown, didDragRef } = useBlockDrag(doc.blocks, setBlocks, zoom);
 
   // Heading auto-numbering: index by reading order (y then x).
   const headingNumbers = useMemo(() => {
@@ -499,6 +554,7 @@ export function PosterEditor() {
                   selected={selectedId === b.id}
                   onSelect={setSelectedId}
                   onPointerDown={onPointerDown}
+                  didDragRef={didDragRef}
                   onUpdate={updateBlock}
                   onDelete={deleteBlock}
                 />

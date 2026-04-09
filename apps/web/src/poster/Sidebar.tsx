@@ -8,7 +8,7 @@
  * later). PosterEditor is the single place that wires the store
  * actions in.
  */
-import { useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type {
   Author,
   Block,
@@ -17,6 +17,7 @@ import type {
   Palette,
   Reference,
   Styles,
+  TableData,
 } from '@postr/shared';
 import { nanoid } from 'nanoid';
 import {
@@ -25,10 +26,19 @@ import {
   HIGHLIGHT_PRESETS,
   PALETTES,
   POSTER_SIZES,
+  TABLE_BORDER_PRESETS,
   ptToUnits,
   unitsToPt,
   type PosterSizeKey,
 } from './constants';
+import {
+  DEFAULT_TABLE_DATA,
+  addCol,
+  addRow,
+  delCol,
+  delRow,
+  setBorderPreset,
+} from './tableOps';
 import { CITATION_STYLES, SORT_MODE_LABELS, type CitationStyleKey, type SortMode } from './citations';
 import { LAYOUT_TEMPLATES, type LayoutKey } from './templates';
 import { parseBibtex, parseRis } from './parsers';
@@ -143,32 +153,42 @@ const buttonStyle = (active: boolean): CSSProperties => ({
 export function Sidebar(props: SidebarProps) {
   const [tab, setTab] = useState<SidebarTab>('layout');
   const [presetName, setPresetName] = useState('');
+  const [hoveredTab, setHoveredTab] = useState<SidebarTab | null>(null);
 
-  const tabStyle = (active: boolean): CSSProperties => ({
-    flex: 1,
-    padding: '14px 0',
-    textAlign: 'center',
+  // Auto-switch to the EDIT tab whenever a block becomes selected on
+  // the canvas. If the user deselects (click empty canvas), we DON'T
+  // auto-switch back — they can stay on whichever tab they were on.
+  useEffect(() => {
+    if (props.selectedBlock) setTab('edit');
+  }, [props.selectedBlock?.id]);
+
+  const tabStyle = (active: boolean, hovered: boolean): CSSProperties => ({
+    padding: '14px 16px',
+    textAlign: 'left',
     cursor: 'pointer',
     fontWeight: 600,
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: '0.7px',
-    color: active ? '#fff' : '#555',
-    borderBottom: active ? '2px solid #7c6aed' : '2px solid transparent',
-    background: 'none',
+    color: active ? '#fff' : hovered ? '#c8cad0' : '#555',
+    background: active ? '#1e1e2e' : hovered ? '#17171f' : 'transparent',
+    borderLeft: active ? '3px solid #7c6aed' : '3px solid transparent',
     border: 'none',
-    borderBottomWidth: 2,
-    borderBottomStyle: 'solid',
+    borderLeftWidth: 3,
+    borderLeftStyle: 'solid',
+    display: 'block',
+    width: '100%',
+    transition: 'background-color 120ms ease, color 120ms ease',
   });
 
   return (
     <div
       data-postr-sidebar
       style={{
-        // Sidebar widened from 280→360 so the 2x-enlarged labels and
-        // inputs don't crowd each other.
-        width: 360,
-        minWidth: 360,
+        // Sidebar widened again to accommodate the vertical tab rail
+        // on the left (100 px) plus the panel content (280 px).
+        width: 380,
+        minWidth: 380,
         background: '#111118',
         color: '#c8cad0',
         display: 'flex',
@@ -199,15 +219,35 @@ export function Sidebar(props: SidebarProps) {
         <div style={{ fontWeight: 800, fontSize: 20, color: '#fff' }}>Postr</div>
       </div>
 
-      <div style={{ display: 'flex', margin: '16px 24px 0', borderBottom: '1px solid #1e1e2e' }}>
-        {(['layout', 'authors', 'refs', 'style', 'edit'] as SidebarTab[]).map((t) => (
-          <button key={t} onClick={() => setTab(t)} style={tabStyle(tab === t)}>
-            {t}
-          </button>
-        ))}
-      </div>
+      {/* Body: vertical tab rail on the left + panel content on the right */}
+      <div style={{ flex: 1, display: 'flex', marginTop: 16, minHeight: 0 }}>
+        {/* Vertical tab rail */}
+        <nav
+          aria-label="Sidebar sections"
+          style={{
+            width: 100,
+            minWidth: 100,
+            display: 'flex',
+            flexDirection: 'column',
+            borderRight: '1px solid #1e1e2e',
+            paddingTop: 4,
+          }}
+        >
+          {(['layout', 'authors', 'refs', 'style', 'edit'] as SidebarTab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              onMouseEnter={() => setHoveredTab(t)}
+              onMouseLeave={() => setHoveredTab(null)}
+              style={tabStyle(tab === t, hoveredTab === t)}
+            >
+              {t}
+            </button>
+          ))}
+        </nav>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 24px' }}>
+        {/* Panel content */}
+        <div style={{ flex: 1, overflow: 'auto', padding: '4px 20px 24px', minWidth: 0 }}>
         {tab === 'layout' && (
           <LayoutTab
             posterSizeKey={props.posterSizeKey}
@@ -272,6 +312,7 @@ export function Sidebar(props: SidebarProps) {
             onAddBlock={props.onAddBlock}
           />
         )}
+        </div>
       </div>
     </div>
   );
@@ -1077,7 +1118,9 @@ function EditTab(props: {
   return (
     <>
       <div style={labelStyle}>Selected Block</div>
-      {sb && isTextLike && styleLevel ? (
+      {sb && sb.type === 'table' ? (
+        <TableEditor block={sb} onUpdateBlock={props.onUpdateBlock} />
+      ) : sb && isTextLike && styleLevel ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#555', textTransform: 'uppercase' }}>
             Editing: {sb.type}
@@ -1220,5 +1263,106 @@ function EditTab(props: {
         Stats: /p → 𝑝 · /F → 𝐹 · /t → 𝑡 · /d → 𝑑 · /SD · /SE · /CI · /df → 𝑑𝑓
       </div>
     </>
+  );
+}
+
+// =========================================================================
+// TableEditor — sidebar panel for the selected table block
+// =========================================================================
+//
+// Replaces the inline toolbar that used to live under every table on the
+// canvas (border preset buttons, +Row / +Col / −Row / −Col). Same set of
+// operations, same underlying helpers — just relocated so selecting a
+// table always routes its controls through the sidebar.
+
+function TableEditor(props: {
+  block: Block;
+  onUpdateBlock: (id: string, patch: Partial<Block>) => void;
+}) {
+  const { block, onUpdateBlock } = props;
+  const data: TableData = block.tableData ?? DEFAULT_TABLE_DATA;
+
+  const commit = (next: TableData) => onUpdateBlock(block.id, { tableData: next });
+
+  const rowColBtn: CSSProperties = {
+    all: 'unset',
+    cursor: 'pointer',
+    flex: 1,
+    padding: '10px 0',
+    textAlign: 'center',
+    fontSize: 13,
+    fontWeight: 600,
+    background: '#1a1a26',
+    border: '1px solid #2a2a3a',
+    borderRadius: 6,
+    color: '#c8cad0',
+  };
+  const dangerBtn: CSSProperties = {
+    ...rowColBtn,
+    color: '#f87171',
+    borderColor: '#3a1f20',
+  };
+
+  const presetRow = (k: string, name: string) => {
+    const active = data.borderPreset === k;
+    return (
+      <button
+        key={k}
+        onClick={() => commit(setBorderPreset(data, k))}
+        style={{
+          all: 'unset',
+          cursor: 'pointer',
+          padding: '10px 14px',
+          borderRadius: 6,
+          fontSize: 13,
+          fontWeight: 600,
+          background: active ? '#7c6aed22' : '#1a1a26',
+          border: `1px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
+          color: active ? '#c8b6ff' : '#c8cad0',
+        }}
+      >
+        {name}
+      </button>
+    );
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#555', textTransform: 'uppercase' }}>
+        Editing: table · {data.rows}×{data.cols}
+      </div>
+
+      <div>
+        <div style={{ fontSize: 11, color: '#666', marginBottom: 6 }}>Rows</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => commit(addRow(data))} style={rowColBtn}>+ Row</button>
+          <button onClick={() => commit(delRow(data))} style={dangerBtn} disabled={data.rows <= 1}>
+            − Row
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 11, color: '#666', marginBottom: 6 }}>Columns</div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={() => commit(addCol(data))} style={rowColBtn}>+ Col</button>
+          <button onClick={() => commit(delCol(data))} style={dangerBtn} disabled={data.cols <= 1}>
+            − Col
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 11, color: '#666', marginBottom: 6 }}>Border style</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {Object.entries(TABLE_BORDER_PRESETS).map(([k, v]) => presetRow(k, v.name))}
+        </div>
+      </div>
+
+      <p style={{ fontSize: 11, color: '#555', lineHeight: 1.5, marginTop: 4 }}>
+        Tip: paste a table from Word or Excel straight into a cell — rows and
+        columns are re-created automatically.
+      </p>
+    </div>
   );
 }

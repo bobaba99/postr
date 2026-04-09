@@ -22,6 +22,7 @@ import type {
 import { TABLE_BORDER_PRESETS } from './constants';
 import { CITATION_STYLES, type CitationStyleKey } from './citations';
 import { SmartText } from './SmartText';
+import { DEFAULT_TABLE_DATA, parseTablePaste, updateCell } from './tableOps';
 
 // =========================================================================
 // LogoBlock
@@ -172,77 +173,20 @@ interface TableBlockProps {
 }
 
 export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: TableBlockProps) {
-  const data: TableData = block.tableData ?? {
-    rows: 3,
-    cols: 3,
-    cells: Array(9).fill(''),
-    colWidths: null,
-    borderPreset: 'apa',
-  };
+  const data: TableData = block.tableData ?? DEFAULT_TABLE_DATA;
   const preset = TABLE_BORDER_PRESETS[data.borderPreset] ?? TABLE_BORDER_PRESETS.apa!;
   const colWidths = data.colWidths ?? Array(data.cols).fill(100 / data.cols);
 
-  const updateCell = (r: number, c: number, v: string) => {
-    const cells = [...data.cells];
-    cells[r * data.cols + c] = v;
-    onUpdate({ tableData: { ...data, cells } });
-  };
-
-  const addRow = () =>
-    onUpdate({ tableData: { ...data, rows: data.rows + 1, cells: [...data.cells, ...Array(data.cols).fill('')] } });
-
-  const addCol = () => {
-    const cells: string[] = [];
-    for (let r = 0; r < data.rows; r++) {
-      for (let c = 0; c < data.cols; c++) cells.push(data.cells[r * data.cols + c] ?? '');
-      cells.push('');
-    }
-    onUpdate({
-      tableData: { ...data, cols: data.cols + 1, cells, colWidths: Array(data.cols + 1).fill(100 / (data.cols + 1)) },
-    });
-  };
-
-  const delRow = () => {
-    if (data.rows <= 1) return;
-    onUpdate({ tableData: { ...data, rows: data.rows - 1, cells: data.cells.slice(0, (data.rows - 1) * data.cols) } });
-  };
-
-  const delCol = () => {
-    if (data.cols <= 1) return;
-    const cells: string[] = [];
-    for (let r = 0; r < data.rows; r++) {
-      for (let c = 0; c < data.cols - 1; c++) cells.push(data.cells[r * data.cols + c] ?? '');
-    }
-    onUpdate({ tableData: { ...data, cols: data.cols - 1, cells, colWidths: null } });
-  };
+  const commit = (next: TableData) => onUpdate({ tableData: next });
+  const updateCellValue = (r: number, c: number, v: string) => commit(updateCell(data, r, c, v));
 
   const onPaste = (e: React.ClipboardEvent) => {
     const html = e.clipboardData.getData('text/html');
     const txt = e.clipboardData.getData('text/plain');
-    let rows: string[][] = [];
-    if (html?.includes('<tr')) {
-      new DOMParser()
-        .parseFromString(html, 'text/html')
-        .querySelectorAll('tr')
-        .forEach((tr) => {
-          const c: string[] = [];
-          tr.querySelectorAll('td,th').forEach((td) => c.push((td.textContent ?? '').trim()));
-          if (c.length) rows.push(c);
-        });
-    } else if (txt) {
-      rows = txt
-        .split('\n')
-        .filter((l) => l.trim())
-        .map((l) => l.split('\t'));
-    }
-    if (rows.length) {
+    const next = parseTablePaste(html, txt);
+    if (next) {
       e.preventDefault();
-      const maxCols = Math.max(...rows.map((r) => r.length));
-      const cells: string[] = [];
-      rows.forEach((r) => {
-        for (let i = 0; i < maxCols; i++) cells.push(r[i] ?? '');
-      });
-      onUpdate({ tableData: { ...data, rows: rows.length, cols: maxCols, cells, colWidths: null } });
+      commit(next);
     }
   };
 
@@ -273,84 +217,52 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
 
   return (
     <div
-      style={{ width: '100%', height: '100%', overflow: 'auto', padding: 2, display: 'flex', flexDirection: 'column' }}
+      style={{ width: '100%', height: '100%', overflow: 'auto', padding: 2 }}
       onPaste={onPaste}
     >
-      <div style={{ flex: 1, overflow: 'auto' }}>
-        <table
-          style={{ width: '100%', borderCollapse: 'collapse', fontFamily, fontSize: styles.body.size, tableLayout: 'fixed' }}
-        >
-          <colgroup>
-            {colWidths.map((w, i) => (
-              <col key={i} style={{ width: `${w}%` }} />
-            ))}
-          </colgroup>
-          <tbody>
-            {Array.from({ length: data.rows }).map((_, r) => (
-              <tr key={r}>
-                {Array.from({ length: data.cols }).map((_, c) => (
-                  <td
-                    key={c}
+      <table
+        style={{ width: '100%', borderCollapse: 'collapse', fontFamily, fontSize: styles.body.size, tableLayout: 'fixed' }}
+      >
+        <colgroup>
+          {colWidths.map((w, i) => (
+            <col key={i} style={{ width: `${w}%` }} />
+          ))}
+        </colgroup>
+        <tbody>
+          {Array.from({ length: data.rows }).map((_, r) => (
+            <tr key={r}>
+              {Array.from({ length: data.cols }).map((_, c) => (
+                <td
+                  key={c}
+                  style={{
+                    ...cellBorder(r, c),
+                    padding: '2px 4px',
+                    background: r === 0 ? palette.accent + '0a' : 'transparent',
+                    fontWeight: r === 0 ? 700 : 400,
+                    color: palette.primary,
+                  }}
+                >
+                  <input
+                    value={data.cells[r * data.cols + c] ?? ''}
+                    onChange={(e) => updateCellValue(r, c, e.target.value)}
+                    onPointerDown={(e) => e.stopPropagation()}
                     style={{
-                      ...cellBorder(r, c),
-                      padding: '2px 4px',
-                      background: r === 0 ? palette.accent + '0a' : 'transparent',
-                      fontWeight: r === 0 ? 700 : 400,
+                      all: 'unset',
+                      width: '100%',
+                      fontFamily,
+                      fontSize: styles.body.size,
                       color: palette.primary,
                     }}
-                  >
-                    <input
-                      value={data.cells[r * data.cols + c] ?? ''}
-                      onChange={(e) => updateCell(r, c, e.target.value)}
-                      style={{
-                        all: 'unset',
-                        width: '100%',
-                        fontFamily,
-                        fontSize: styles.body.size,
-                        color: palette.primary,
-                      }}
-                    />
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div style={{ display: 'flex', gap: 3, marginTop: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button onClick={addRow} style={tblBtn(palette.accent)}>+Row</button>
-        <button onClick={addCol} style={tblBtn(palette.accent)}>+Col</button>
-        <button onClick={delRow} style={tblBtn('#c55')}>−Row</button>
-        <button onClick={delCol} style={tblBtn('#c55')}>−Col</button>
-        <span style={{ fontSize: 6, color: '#555' }}>│</span>
-        {Object.entries(TABLE_BORDER_PRESETS).map(([k, v]) => (
-          <button
-            key={k}
-            onClick={() => onUpdate({ tableData: { ...data, borderPreset: k } })}
-            style={{
-              all: 'unset',
-              cursor: 'pointer',
-              fontSize: 7,
-              padding: '1px 3px',
-              borderRadius: 2,
-              color: data.borderPreset === k ? '#7c6aed' : '#666',
-              background: data.borderPreset === k ? '#7c6aed18' : 'transparent',
-            }}
-          >
-            {v.name}
-          </button>
-        ))}
-      </div>
+                  />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
-
-const tblBtn = (color: string): CSSProperties => ({
-  all: 'unset',
-  cursor: 'pointer',
-  fontSize: 7,
-  color,
-});
 
 // =========================================================================
 // AuthorLine — renders the author + affiliation footer
@@ -485,6 +397,14 @@ interface BlockFrameProps {
   selected: boolean;
   onSelect: (id: string) => void;
   onPointerDown: (e: React.PointerEvent, id: string, mode: 'move' | 'resize') => void;
+  /**
+   * Shared ref from useBlockDrag — true when the user's most recent
+   * pointerdown → pointerup sequence actually moved the block.
+   * BlockFrame's onClick consults this to decide whether a synthetic
+   * click (e.g. from a drag that ended on an image upload div)
+   * should be swallowed or forwarded to children.
+   */
+  didDragRef: React.MutableRefObject<boolean>;
   onUpdate: (id: string, patch: Partial<Block>) => void;
   onDelete: (id: string) => void;
 }
@@ -504,6 +424,7 @@ export function BlockFrame(props: BlockFrameProps) {
     selected,
     onSelect,
     onPointerDown,
+    didDragRef,
     onUpdate,
     onDelete,
   } = props;
@@ -547,15 +468,39 @@ export function BlockFrame(props: BlockFrameProps) {
 
   const update = (patch: Partial<Block>) => onUpdate(b.id, patch);
 
+  const isTextLike = b.type === 'title' || b.type === 'heading' || b.type === 'text';
+
   return (
     <div
       ref={frameRef}
+      // onClickCapture runs BEFORE the bubbling onClick chain, so if
+      // the user just finished a drag we can swallow the synthetic
+      // click before it reaches child elements (e.g. the empty
+      // ImageBlock's file-picker handler).
+      onClickCapture={(e) => {
+        if (didDragRef.current) {
+          e.stopPropagation();
+          didDragRef.current = false;
+        }
+      }}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect(b.id);
+        // Nothing to do if the click is actually the tail of a drag
+        // — onClickCapture already reset the ref.
+        if (!selected) {
+          onSelect(b.id);
+          return;
+        }
+        // Already selected + text-like → focus the inner contentEditable
+        // so the caret blinks on the next click. Without this users
+        // reported "no blinker until I arrow-key the selection".
+        if (isTextLike) {
+          const ce = frameRef.current?.querySelector<HTMLElement>('[contenteditable="true"]');
+          ce?.focus();
+        }
       }}
       onPointerDown={(e) => {
-        if (b.type !== 'table') onPointerDown(e, b.id, 'move');
+        onPointerDown(e, b.id, 'move');
       }}
       style={{
         position: 'absolute',
@@ -647,26 +592,7 @@ export function BlockFrame(props: BlockFrameProps) {
         {b.type === 'logo' && <LogoBlock block={b} onUpdate={update} />}
 
         {b.type === 'table' && (
-          <>
-            <div
-              onPointerDown={(e) => onPointerDown(e, b.id, 'move')}
-              style={{
-                cursor: 'move',
-                height: 10,
-                background: p.accent + '08',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <svg width="16" height="4" viewBox="0 0 16 4">
-                <circle cx="4" cy="2" r="1" fill={p.muted} />
-                <circle cx="8" cy="2" r="1" fill={p.muted} />
-                <circle cx="12" cy="2" r="1" fill={p.muted} />
-              </svg>
-            </div>
-            <TableBlock block={b} palette={p} fontFamily={ff} styles={st} onUpdate={update} />
-          </>
+          <TableBlock block={b} palette={p} fontFamily={ff} styles={st} onUpdate={update} />
         )}
       </div>
 
