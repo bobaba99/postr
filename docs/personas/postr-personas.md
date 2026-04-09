@@ -194,6 +194,190 @@ Update this file whenever the PRD's target users, features, or friction principl
 
 ---
 
+## 6. Dr. Naomi — Clinical Psychiatrist Running a Phase-2 Psilocybin RCT
+
+**Bio.** Assistant professor of psychiatry at an academic medical center. PI on a Phase-2 RCT of single-dose psilocybin for treatment-resistant depression. Presenting interim safety + efficacy data at the ACNP annual meeting. Reports to an IRB and an FDA IND.
+
+**Job-to-be-done.** Present interim Week-3 MADRS results, response/remission rates, and the adverse-event profile in a poster that her PharmD collaborators and a skeptical reviewer can both audit. Every number has to be traceable to a source table.
+
+**Motivations.**
+
+- Correctness — the P-values, confidence intervals, and adverse-event counts **must** be accurate.
+- Clean statistical notation: MADRS, 95% CI, Cohen d, η², χ², N =, df.
+- Conservative design — she distrusts loud accents on clinical posters.
+
+**Frustrations.**
+
+- Citation managers that silently truncate DOIs.
+- Forced autoformatting of numerical tables (ranges becoming dates in Excel).
+- Font-size controls that are imprecise in points.
+
+**Visual / style preferences.**
+
+- Medical/Clinical palette (navy + cyan).
+- Source Sans 3 or Source Serif 4.
+- APA 3-Line table borders for the efficacy table.
+- Heading numbers off — she wants clean section headers.
+
+**Test flow:**
+
+1. Navigate to `/`, create a new poster.
+2. Title: "Single-Dose Psilocybin for Treatment-Resistant Depression: Interim Phase-2 Results".
+3. Authors: 4 authors across 2 institutions. One corresponding, one with equal-contrib mark.
+4. Intro: 1-paragraph summary with `/MADRS` symbol inline where a lowercase p is needed (use `/p`).
+5. Methods: N = 233, three arms (25 mg / 10 mg / 1 mg), MADRS as primary, psychological support.
+6. Results table (5 rows × 4 cols): Measure · Δ MADRS · 95% CI · p — fill with the numeric values from Goodwin 2022.
+7. Conclusions: 25 mg significantly reduced depression scores, no sustained 12-week effect — cautious language.
+8. Style tab → Medical/Clinical palette → APA 3-Line table border.
+9. Save to PDF.
+10. **Naomi test passes only if** every cell in the results table round-trips through the sidebar edit panel without mangling decimal points or losing "95% CI" in the header.
+
+---
+
+## 7. Anika — Developmental Psychology PhD Running an Infant EEG Study
+
+**Bio.** 4th-year PhD student studying early attention development via infant EEG (6–12 mo). Submitting her first-author poster to the International Congress on Infant Studies. Dataset: 42 infants, mixed methods (gaze fixation + ERP components N170 and Nc).
+
+**Job-to-be-done.** Walk a reviewer through her ERP findings without losing the non-specialists who wander past her poster.
+
+**Motivations.**
+
+- Visual clarity — one hero figure (the grand-average ERP waveform) must dominate.
+- Hierarchical reasoning: hypothesis → methods → result → interpretation.
+- Credit her 2 undergrad RAs as authors with equal contribution.
+
+**Frustrations.**
+
+- Editors that can't handle Greek letters or superscripts without LaTeX.
+- Image placeholders that auto-crop her carefully-plotted waveforms.
+
+**Visual / style preferences.**
+
+- Psychology/Neuro palette.
+- IBM Plex Sans for modern-academic feel.
+- Billboard layout — big assertion up top, hero ERP figure in the middle, 3-col bottom for Background/Methods/Interpretation.
+- Heading fill on.
+
+**Test flow:**
+
+1. Create new poster → Layout tab → Billboard template.
+2. Title: "Attentional Capture by Socially Salient Faces Elicits an Enhanced Nc at 7 Months".
+3. Authors: PI + Anika + 2 undergrads (one corresponding on PI, 2 equal-contrib on undergrads).
+4. Replace Billboard's claim text with her key finding.
+5. Click image placeholder → upload a waveform PNG.
+6. Add text block under the figure with `/mu` V amplitude, `/eta2` effect sizes.
+7. Style tab → Psychology/Neuro palette + IBM Plex Sans + heading fill.
+8. **Anika test passes only if** the hero figure never clips under her one-sentence claim and her Greek notation survives palette switches.
+
+---
+
+## 8. Dr. Marcus — Social Psychology Postdoc Replicating a Classic
+
+**Bio.** Social psychology postdoc at a European lab, part of the Many Labs consortium. Running a pre-registered replication of a 1998 social-priming study across 8 sites, presenting the aggregate results at SPSP.
+
+**Job-to-be-done.** Present a forest plot of effect sizes across sites, the original effect, and the replication estimate. Defend nuance in a hostile Q&A.
+
+**Motivations.**
+
+- Methodological transparency — OSF links, pre-registration statements, Bayes factors.
+- Enough space for a small-text "Methods" section that lists every deviation from the original.
+- Vancouver citation style for the meta-analytic references.
+
+**Frustrations.**
+
+- Tools that don't render Unicode italic math (𝑝, 𝑑) correctly.
+- Software that fails to copy-paste a Word table without mangling the decimals.
+
+**Visual / style preferences.**
+
+- Clean Minimal palette.
+- Charter serif.
+- 2-Col Wide Figure layout — forest plot as the hero.
+- Heading border "bottom" thin, no fill.
+
+**Test flow:**
+
+1. New poster → 2-Col Wide Figure template.
+2. Title: "Social Priming Replication Across 8 Sites: A Preregistered Multi-Lab Report".
+3. Authors: Marcus + 8 site leads with distinct affiliations.
+4. Paste a Word table with 8 rows (site × effect size × SE × 95% CI) into the table cell — verify paste works.
+5. `/d`, `/p`, `/eta2` inline in the Methods + Results prose.
+6. Refs tab → switch to Vancouver → import a `.bib` with the 12 papers he cites.
+7. Style tab → Clean Minimal + Charter + heading border "Bottom".
+8. **Marcus test passes only if** the 8-row table pasted cleanly, every decimal preserved, and his Vancouver citations are numbered inline.
+
+---
+
+## 9. Dr. Kenji — Psychopharmacology PI with a Tight Visual Sense
+
+**Bio.** Associate professor of psychopharmacology. 20 years of posters. Known for dense, data-forward designs. Running a mouse model of SSRI pharmacokinetics. His lab produces 6 posters a year — he wants to save his style as a preset.
+
+**Job-to-be-done.** Produce his lab's signature "Kenji Green" poster in under 20 minutes, because he's using Postr for the first time and has already rendered the figures in R.
+
+**Motivations.**
+
+- Speed.
+- Reusability — he's going to use Postr for every lab poster henceforth if the preset feature works.
+- Precise font-size control.
+
+**Frustrations.**
+
+- Presets that don't round-trip — "it looked different when I applied it to the next poster".
+- Any tool that forces a specific color palette.
+
+**Visual / style preferences.**
+
+- Custom green palette (he'll override Nature/Biology base).
+- Libre Franklin.
+- 3-Column Classic with a custom twist — bolder heading borders.
+- Title font 150 pt exactly.
+
+**Test flow:**
+
+1. Open editor, Style tab → set title to exactly 150 pt via the numeric input.
+2. Override palette accent color to #008060 via the text color picker on a heading.
+3. Save current style as preset "Kenji Lab Green".
+4. Create a NEW poster, apply the "Kenji Lab Green" preset.
+5. **Kenji test passes only if** the new poster looks identical to the one where the preset was saved — same title pt, same accent, same heading border.
+
+---
+
+## 10. Dr. Sofia — Clinical Psychology Assistant Professor Presenting a Meta-Analysis
+
+**Bio.** Clinical psychology assistant professor. Running a meta-analysis of CBT for generalized anxiety disorder across 24 RCTs. Her last poster had a cluttered forest plot she's still embarrassed about.
+
+**Job-to-be-done.** Present a clean forest plot + summary statistics without over-crowding the canvas. The results table must accommodate per-study effect sizes for 24 trials — small table, lots of rows.
+
+**Motivations.**
+
+- Avoiding clutter.
+- Per-row control on the results table — she needs to insert/delete specific rows, not just append.
+- Highlighting statistically significant rows inline (she'll use the inline highlight feature).
+
+**Frustrations.**
+
+- Tables with fixed row counts.
+- Highlight tools that apply to the whole block rather than a selection.
+
+**Visual / style preferences.**
+
+- Humanities/Arts palette (warm earth) — she likes the contrast.
+- Source Serif 4.
+- Sidebar + Focus layout — narrow text left, wide forest plot right.
+- Inline highlight on the significant-result rows.
+
+**Test flow:**
+
+1. New poster → Sidebar + Focus template.
+2. Add a table block, expand to 25 rows × 5 cols (24 trials + header).
+3. Use the sidebar table editor to insert rows at the top without deleting existing content.
+4. Select the text in specific "significant" cells → use the floating format toolbar to apply a yellow highlight and bold.
+5. Refs tab → manual entry of 3 key citations.
+6. Style tab → Humanities/Arts + Source Serif 4.
+7. **Sofia test passes only if** the per-row insert works, inline highlight applies only to the selected cells (not the whole table), and bold survives the autosave round trip.
+
+---
+
 ## How to use these personas
 
 - **Before a release:** walk through every persona's test flow manually in the live app.

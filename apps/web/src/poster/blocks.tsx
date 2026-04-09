@@ -23,7 +23,15 @@ import { TABLE_BORDER_PRESETS } from './constants';
 import { CITATION_STYLES, type CitationStyleKey } from './citations';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
-import { DEFAULT_TABLE_DATA, parseTablePaste, updateCell } from './tableOps';
+import {
+  DEFAULT_TABLE_DATA,
+  deleteColAt,
+  deleteRowAt,
+  insertCol,
+  insertRow,
+  parseTablePaste,
+  updateCell,
+} from './tableOps';
 
 // =========================================================================
 // LogoBlock
@@ -186,6 +194,17 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
   const preset = TABLE_BORDER_PRESETS[data.borderPreset] ?? TABLE_BORDER_PRESETS.apa!;
   const colWidths = data.colWidths ?? Array(data.cols).fill(100 / data.cols);
 
+  // Hover state for Notion/Canva-style inline row/column controls.
+  // hoveredRow/Col track which cell the pointer is currently over so
+  // we can render insert/delete handles on that row's left margin and
+  // that column's top margin.
+  const [hoveredRow, setHoveredRow] = useState<number | null>(null);
+  const [hoveredCol, setHoveredCol] = useState<number | null>(null);
+  const clearHover = () => {
+    setHoveredRow(null);
+    setHoveredCol(null);
+  };
+
   const commit = (next: TableData) => onUpdate({ tableData: next });
   const updateCellValue = (r: number, c: number, v: string) => commit(updateCell(data, r, c, v));
 
@@ -224,10 +243,30 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
     return { borderTop: t, borderRight: ri, borderBottom: b, borderLeft: l };
   };
 
+  // Shared handle button style (circle with + or ×).
+  const handleBtn = (variant: 'plus' | 'minus'): CSSProperties => ({
+    all: 'unset',
+    cursor: 'pointer',
+    width: 14,
+    height: 14,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '50%',
+    background: variant === 'plus' ? palette.accent : '#c55',
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 800,
+    lineHeight: 1,
+    boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+    pointerEvents: 'auto',
+  });
+
   return (
     <div
-      style={{ width: '100%', height: '100%', overflow: 'auto', padding: 2 }}
+      style={{ width: '100%', height: '100%', overflow: 'visible', padding: 2, position: 'relative' }}
       onPaste={onPaste}
+      onMouseLeave={clearHover}
     >
       <table
         style={{ width: '100%', borderCollapse: 'collapse', fontFamily, fontSize: styles.body.size, tableLayout: 'fixed' }}
@@ -243,12 +282,17 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
               {Array.from({ length: data.cols }).map((_, c) => (
                 <td
                   key={c}
+                  onMouseEnter={() => {
+                    setHoveredRow(r);
+                    setHoveredCol(c);
+                  }}
                   style={{
                     ...cellBorder(r, c),
                     padding: '2px 4px',
                     background: r === 0 ? palette.accent + '0a' : 'transparent',
                     fontWeight: r === 0 ? 700 : 400,
                     color: palette.primary,
+                    position: 'relative',
                   }}
                 >
                   <input
@@ -269,6 +313,173 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
           ))}
         </tbody>
       </table>
+
+      {/*
+        Notion/Canva-style inline row/column handles. Absolute-
+        positioned over the table. Each handle is a small circle
+        with + (insert) or × (delete).
+
+        Row handles: left side of the hovered row.
+          - "+" adds a row below (Notion behavior)
+          - "×" deletes the hovered row
+        Column handles: top side of the hovered column.
+          - "+" adds a column to the right
+          - "×" deletes the hovered column
+
+        Uses percentage positioning based on colWidths + uniform row
+        height so it survives column resizing and row-count changes.
+      */}
+      {hoveredRow !== null && (
+        <div
+          style={{
+            position: 'absolute',
+            left: -24,
+            top: `calc(${(hoveredRow / data.rows) * 100}% + ${(100 / data.rows) / 2}%)`,
+            transform: 'translateY(-50%)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 3,
+            pointerEvents: 'none',
+          }}
+        >
+          <button
+            type="button"
+            title="Insert row below"
+            style={handleBtn('plus')}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              commit(insertRow(data, hoveredRow, 'below'));
+            }}
+          >
+            +
+          </button>
+          {data.rows > 1 && (
+            <button
+              type="button"
+              title="Delete row"
+              style={handleBtn('minus')}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                commit(deleteRowAt(data, hoveredRow));
+                clearHover();
+              }}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
+      {hoveredCol !== null && (
+        <div
+          style={{
+            position: 'absolute',
+            top: -24,
+            left: `calc(${colWidths.slice(0, hoveredCol).reduce((s, w) => s + w, 0)}% + ${
+              (colWidths[hoveredCol] ?? 0) / 2
+            }%)`,
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            gap: 3,
+            pointerEvents: 'none',
+          }}
+        >
+          <button
+            type="button"
+            title="Insert column right"
+            style={handleBtn('plus')}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              commit(insertCol(data, hoveredCol, 'right'));
+            }}
+          >
+            +
+          </button>
+          {data.cols > 1 && (
+            <button
+              type="button"
+              title="Delete column"
+              style={handleBtn('minus')}
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                commit(deleteColAt(data, hoveredCol));
+                clearHover();
+              }}
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
+      {/*
+        Permanent "add row below" and "add column right" buttons,
+        anchored at the bottom-center and right-center of the table.
+        Always visible so users discover the append affordance even
+        if they never hover the exact row/column they want to modify.
+      */}
+      <button
+        type="button"
+        title="Add row at bottom"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          commit(insertRow(data, data.rows - 1, 'below'));
+        }}
+        style={{
+          all: 'unset',
+          cursor: 'pointer',
+          position: 'absolute',
+          bottom: -12,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 16,
+          height: 16,
+          borderRadius: '50%',
+          background: palette.accent + 'cc',
+          color: '#fff',
+          fontSize: 11,
+          fontWeight: 800,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+        }}
+      >
+        +
+      </button>
+      <button
+        type="button"
+        title="Add column at right"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          commit(insertCol(data, data.cols - 1, 'right'));
+        }}
+        style={{
+          all: 'unset',
+          cursor: 'pointer',
+          position: 'absolute',
+          right: -12,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 16,
+          height: 16,
+          borderRadius: '50%',
+          background: palette.accent + 'cc',
+          color: '#fff',
+          fontSize: 11,
+          fontWeight: 800,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+        }}
+      >
+        +
+      </button>
     </div>
   );
 }
