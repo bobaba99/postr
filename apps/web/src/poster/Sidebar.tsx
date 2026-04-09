@@ -44,7 +44,8 @@ import { CITATION_STYLES, SORT_MODE_LABELS, type CitationStyleKey, type SortMode
 import { LAYOUT_TEMPLATES, type LayoutKey } from './templates';
 import { parseBibtex, parseRis } from './parsers';
 import { AuthorLine } from './blocks';
-import { SmartTextarea } from './SmartTextarea';
+import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
+import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 
 export type SidebarTab = 'layout' | 'authors' | 'refs' | 'style' | 'edit' | 'insert';
 
@@ -1516,6 +1517,7 @@ function TextBlockEditor(props: {
   onUpdateStyle: (field: string, value: number | boolean | string | null) => void;
 }) {
   const { block, styleLevel, palette, onUpdateBlock, onUpdateStyle } = props;
+  const [sidebarSelection, setSidebarSelection] = useState<SelectionInfo | null>(null);
 
   const fieldLabel: CSSProperties = {
     fontSize: 11,
@@ -1539,16 +1541,35 @@ function TextBlockEditor(props: {
         Editing: {block.type}
       </div>
 
-      {/* Content */}
+      {/* Content — shared RichTextEditor. Text typed here supports the
+          same bold/italic/underline/strike/highlight/color/slash
+          commands as the canvas inline editor. */}
       <div>
         <label style={fieldLabel}>Content</label>
-        <SmartTextarea
-          value={block.content}
-          onChange={(v) => onUpdateBlock(block.id, { content: v })}
-          placeholder="Type here… (type / for symbols)"
-          rows={5}
-          style={{ minHeight: 120, maxHeight: 260, fontSize: 16 }}
-        />
+        <div
+          style={{
+            background: '#1a1a26',
+            border: '1px solid #2a2a3a',
+            borderRadius: 6,
+            padding: '12px 14px',
+            minHeight: 120,
+            maxHeight: 260,
+            overflow: 'auto',
+            color: '#ddd',
+            fontSize: 16,
+            lineHeight: 1.5,
+          }}
+        >
+          <RichTextEditor
+            value={block.content}
+            onChange={(v) => onUpdateBlock(block.id, { content: v })}
+            placeholder="Type here… (type / for symbols)"
+            multiline
+            onSelectionChange={setSidebarSelection}
+            style={{ fontFamily: 'inherit', fontSize: 16, lineHeight: 1.5 }}
+          />
+        </div>
+        <FloatingFormatToolbar info={sidebarSelection} />
       </div>
 
       {/* Size · Weight · Italic */}

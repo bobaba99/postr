@@ -7,7 +7,7 @@
  * conventions and porting them as separate modules would scatter the
  * coupling. Re-split if any one of them grows past ~150 lines.
  */
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { blockSelection } from '@/motion/timelines/blockSelection';
 import type {
   Author,
@@ -21,7 +21,8 @@ import type {
 } from '@postr/shared';
 import { TABLE_BORDER_PRESETS } from './constants';
 import { CITATION_STYLES, type CitationStyleKey } from './citations';
-import { SmartText } from './SmartText';
+import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
+import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { DEFAULT_TABLE_DATA, parseTablePaste, updateCell } from './tableOps';
 
 // =========================================================================
@@ -432,6 +433,10 @@ export function BlockFrame(props: BlockFrameProps) {
   const isHeading = b.type === 'heading';
   const level = b.type === 'title' ? st.title : b.type === 'authors' ? st.authors : isHeading ? st.heading : st.body;
   const frameRef = useRef<HTMLDivElement | null>(null);
+  // Selection info for the floating format toolbar — populated by
+  // the RichTextEditor inside this block when the user highlights
+  // a range. null = no selection, toolbar hidden.
+  const [selectionInfo, setSelectionInfo] = useState<SelectionInfo | null>(null);
 
   // Pop the selection ring when this block becomes selected.
   useEffect(() => {
@@ -519,10 +524,13 @@ export function BlockFrame(props: BlockFrameProps) {
     >
       <div style={{ width: '100%', height: isHeading ? 'auto' : '100%', overflow: isHeading ? 'visible' : 'hidden' }}>
         {b.type === 'title' && (
-          <SmartText
+          <RichTextEditor
             value={b.content}
             onChange={(v) => update({ content: v })}
             placeholder="Poster Title"
+            multiline={false}
+            stopPointerDown
+            onSelectionChange={setSelectionInfo}
             style={{
               ...txtStyle,
               fontSize: st.title.size,
@@ -554,10 +562,13 @@ export function BlockFrame(props: BlockFrameProps) {
             }}
           >
             {headingNumber > 0 && <span>{headingNumber}.</span>}
-            <SmartText
+            <RichTextEditor
               value={b.content}
               onChange={(v) => update({ content: v })}
               placeholder="Section Heading"
+              multiline={false}
+              stopPointerDown
+              onSelectionChange={setSelectionInfo}
               style={{
                 fontSize: st.heading.size,
                 fontWeight: st.heading.weight,
@@ -569,10 +580,12 @@ export function BlockFrame(props: BlockFrameProps) {
         )}
 
         {b.type === 'text' && (
-          <SmartText
+          <RichTextEditor
             value={b.content}
             onChange={(v) => update({ content: v })}
             multiline
+            stopPointerDown
+            onSelectionChange={setSelectionInfo}
             placeholder="Type here… (type / for symbols)"
             style={txtStyle}
           />
@@ -674,6 +687,12 @@ export function BlockFrame(props: BlockFrameProps) {
           {b.type}
         </div>
       )}
+
+      {/* Floating format toolbar for text-like blocks. Mounted at the
+          BlockFrame level (not inside RichTextEditor) so it's
+          positioned relative to the viewport via portal and doesn't
+          get clipped by the poster canvas's overflow. */}
+      <FloatingFormatToolbar info={selectionInfo} />
     </div>
   );
 }
