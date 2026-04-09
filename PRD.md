@@ -23,7 +23,7 @@
 | Database | Supabase Postgres with RLS on every table |
 | Storage | Supabase Storage (poster assets, thumbnails) |
 | Backend API | Express + TypeScript on Render (only for LLM proxying / scan feature) |
-| LLM (scan) | OpenAI GPT-4o vision (via backend, never exposed to browser) |
+| LLM (scan) | Anthropic Claude Sonnet 4.6 with vision (via backend, never exposed to browser) |
 | Export | Browser `window.print()` (v1) → html2canvas + jsPDF (v2) |
 | Hosting | Vercel (frontend), Render (API), Supabase (data) |
 | Analytics | PostHog (product) + GA4 (acquisition) — gated by consent |
@@ -46,8 +46,9 @@
          │ LLM scan only
          ▼
 ┌──────────────────┐      ┌────────────────────┐
-│ Render (Express) │◄────►│   OpenAI GPT-4o    │
-│ /api/scan        │      │       vision       │
+│ Render (Express) │◄────►│  Anthropic Claude  │
+│ /api/scan        │      │   Sonnet 4.6 +     │
+│                  │      │       vision       │
 └──────────────────┘      └────────────────────┘
 ```
 
@@ -467,7 +468,7 @@ Upload a photo or PDF of an existing poster — the system extracts its layout s
 1. User clicks **Scan poster** in the Style tab.
 2. Drop one or more images / PDFs.
 3. Upload → Supabase Storage (temp path).
-4. Backend `/api/scan` receives `{ imageUrl }`, calls GPT-4o vision with a structured-output prompt, returns a preset JSON.
+4. Backend `/api/scan` receives `{ imageUrl }`, calls Claude Sonnet 4.6 with vision and tool-use-based structured output, returns a preset JSON.
 5. Frontend saves result as a new preset in `presets` (source = `"scanned"`) and shows "Apply to current poster?" one-click option.
 
 **Extracted preset shape (matches manual preset):**
@@ -497,11 +498,11 @@ interface ScannedPreset {
 
 **Guardrails:**
 
-- LLM must pick `fontFamily` from the 10 curated families (enum constraint in JSON schema).
+- Claude must pick `fontFamily` from the 10 curated families (enum constraint in the tool-use input schema).
 - Palette values clamped to print-safe (no pure black bg, no neon).
 - Rate-limited per user (in-memory sliding window on Render) — free users capped at 10 scans / day.
 - Image auto-deleted from storage after 24 h if not saved.
-- OpenAI API key lives **only** in Render env; never shipped to browser.
+- Anthropic API key lives **only** in Render env; never shipped to browser.
 
 **Backend endpoint:**
 
