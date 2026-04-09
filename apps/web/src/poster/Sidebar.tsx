@@ -452,12 +452,13 @@ function LayoutTab(props: {
       </button>
 
       <div style={labelStyle}>Templates</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {(Object.keys(LAYOUT_TEMPLATES) as LayoutKey[]).map((k) => {
           const t = LAYOUT_TEMPLATES[k];
           return (
             <button
               key={k}
+              type="button"
               onClick={() => props.onApplyTemplate(k)}
               style={{
                 all: 'unset',
@@ -465,14 +466,15 @@ function LayoutTab(props: {
                 padding: '14px 18px',
                 background: '#1a1a26',
                 border: '1px solid #2a2a3a',
-                borderRadius: 5,
+                borderRadius: 8,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 1,
+                gap: 4,
+                boxSizing: 'border-box',
               }}
             >
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#ddd' }}>{t.name}</span>
-              <span style={{ fontSize: 12, color: '#555' }}>{t.description}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#e2e2e8' }}>{t.name}</span>
+              <span style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.4 }}>{t.description}</span>
             </button>
           );
         })}
@@ -511,14 +513,14 @@ function AuthorsTab(props: {
       {props.authors.filter((a) => a.name).length > 0 && (
         <div
           style={{
-            marginTop: 10,
-            padding: '12px 14px',
+            marginTop: 16,
+            padding: '16px 18px',
             background: '#14141e',
             border: '1px solid #222',
-            borderRadius: 5,
+            borderRadius: 8,
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#555', marginBottom: 3 }}>PREVIEW</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, letterSpacing: 0.5, textTransform: 'uppercase' }}>Preview</div>
           <AuthorLine
             authors={props.authors}
             institutions={props.institutions}
@@ -547,7 +549,7 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {props.institutions.map((inst, i) => (
-        <div key={inst.id} style={{ background: '#14141e', border: '1px solid #222', borderRadius: 5, padding: '12px 14px' }}>
+        <div key={inst.id} style={{ background: '#14141e', border: '1px solid #222', borderRadius: 8, padding: '14px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
             <div
               style={{
@@ -635,7 +637,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       {props.authors.map((a, i) => (
-        <div key={a.id} style={{ background: '#14141e', border: '1px solid #222', borderRadius: 5, padding: '12px 14px' }}>
+        <div key={a.id} style={{ background: '#14141e', border: '1px solid #222', borderRadius: 8, padding: '14px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
             <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
               <button
@@ -706,24 +708,24 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
               })}
             </div>
           )}
-          <div style={{ display: 'flex', gap: 6, marginTop: 4, paddingLeft: 16 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 14, color: '#666', cursor: 'pointer' }}>
+          <div style={{ display: 'flex', gap: 14, marginTop: 10, paddingLeft: 20 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#9ca3af', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={a.isCorresponding}
                 onChange={(e) => update(a.id, { isCorresponding: e.target.checked })}
-                style={{ width: 10, height: 10, accentColor: '#7c6aed' }}
+                style={{ width: 14, height: 14, accentColor: '#7c6aed' }}
               />
-              Corr.
+              Corresponding
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 14, color: '#666', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#9ca3af', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={a.equalContrib}
                 onChange={(e) => update(a.id, { equalContrib: e.target.checked })}
-                style={{ width: 10, height: 10, accentColor: '#7c6aed' }}
+                style={{ width: 14, height: 14, accentColor: '#7c6aed' }}
               />
-              Equal
+              Equal contrib.
             </label>
           </div>
         </div>
@@ -792,98 +794,120 @@ function RefsTab(props: {
     setManual({ authors: '', year: '', title: '', journal: '' });
   };
 
-  const sel: CSSProperties = { ...inputBase, appearance: 'auto', padding: '8px 12px' };
+  const sel: CSSProperties = { ...inputBase, appearance: 'auto', padding: '10px 14px' };
+  const miniLabel: CSSProperties = {
+    fontSize: 12,
+    color: '#9ca3af',
+    whiteSpace: 'nowrap',
+    fontWeight: 600,
+  };
 
   return (
     <>
-      <div style={labelStyle}>References</div>
+      <div style={labelStyle}>Import</div>
       <button
+        type="button"
         onClick={() => fileRef.current?.click()}
         style={{
-          padding: '12px 18px',
+          all: 'unset',
+          cursor: 'pointer',
+          display: 'block',
+          width: '100%',
+          boxSizing: 'border-box',
+          padding: '14px 18px',
           background: '#7c6aed',
           color: '#fff',
           border: 'none',
-          borderRadius: 5,
-          cursor: 'pointer',
-          fontSize: 15,
+          borderRadius: 8,
+          fontSize: 14,
           fontWeight: 600,
+          textAlign: 'center',
         }}
       >
         Import .bib / .ris / .enw
       </button>
       <input ref={fileRef} type="file" accept=".bib,.bibtex,.ris,.enw" onChange={handleImport} style={{ display: 'none' }} />
 
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 6 }}>
-        <label style={{ fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>Style</label>
-        <select
-          value={props.citationStyle}
-          onChange={(e) => props.onChangeCitationStyle(e.target.value as CitationStyleKey)}
-          style={sel}
-        >
-          {(Object.keys(CITATION_STYLES) as CitationStyleKey[]).map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4 }}>
-        <label style={{ fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>Sort</label>
-        <select
-          value={props.sortMode}
-          onChange={(e) => props.onChangeSortMode(e.target.value as SortMode)}
-          style={sel}
-        >
-          {Object.entries(SORT_MODE_LABELS).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </select>
+      <div style={{ ...labelStyle, marginTop: 28 }}>Display</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <label style={{ ...miniLabel, width: 48 }}>Style</label>
+          <select
+            value={props.citationStyle}
+            onChange={(e) => props.onChangeCitationStyle(e.target.value as CitationStyleKey)}
+            style={{ ...sel, flex: 1 }}
+          >
+            {(Object.keys(CITATION_STYLES) as CitationStyleKey[]).map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <label style={{ ...miniLabel, width: 48 }}>Sort</label>
+          <select
+            value={props.sortMode}
+            onChange={(e) => props.onChangeSortMode(e.target.value as SortMode)}
+            style={{ ...sel, flex: 1 }}
+          >
+            {Object.entries(SORT_MODE_LABELS).map(([k, v]) => (
+              <option key={k} value={k}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
-        {props.references.map((r, i) => (
-          <div
-            key={r.id ?? i}
-            style={{
-              display: 'flex',
-              gap: 3,
-              alignItems: 'flex-start',
-              padding: '8px 12px',
-              background: '#14141e',
-              border: '1px solid #222',
-              borderRadius: 4,
-            }}
-          >
-            <span style={{ fontSize: 14, color: '#aaa', flex: 1, lineHeight: 1.4 }}>
-              {CITATION_STYLES[props.citationStyle](r, i)}
-            </span>
-            <button
-              onClick={() => props.onChangeReferences(props.references.filter((_, j) => j !== i))}
-              style={{ all: 'unset', cursor: 'pointer', fontSize: 14, color: '#c55' }}
-            >
-              ×
-            </button>
+      {props.references.length > 0 && (
+        <>
+          <div style={{ ...labelStyle, marginTop: 28 }}>References ({props.references.length})</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {props.references.map((r, i) => (
+              <div
+                key={r.id ?? i}
+                style={{
+                  display: 'flex',
+                  gap: 10,
+                  alignItems: 'flex-start',
+                  padding: '12px 14px',
+                  background: '#14141e',
+                  border: '1px solid #222',
+                  borderRadius: 8,
+                }}
+              >
+                <span style={{ fontSize: 13, color: '#c8cad0', flex: 1, lineHeight: 1.5 }}>
+                  {CITATION_STYLES[props.citationStyle](r, i)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => props.onChangeReferences(props.references.filter((_, j) => j !== i))}
+                  style={{ all: 'unset', cursor: 'pointer', fontSize: 18, color: '#c55', lineHeight: 1, padding: 2 }}
+                  aria-label="Remove reference"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
 
       <div style={{ ...labelStyle, marginTop: 28 }}>Manual Entry</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <input
           value={manual.authors}
           onChange={(e) => setManual({ ...manual, authors: e.target.value })}
           placeholder="Authors (Last, F., comma-separated)"
           style={inputBase}
         />
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: 'flex', gap: 10 }}>
           <input
             value={manual.year}
             onChange={(e) => setManual({ ...manual, year: e.target.value })}
             placeholder="Year"
-            style={{ ...inputBase, width: '30%' }}
+            style={{ ...inputBase, width: '32%' }}
           />
           <input
             value={manual.journal}
@@ -899,16 +923,20 @@ function RefsTab(props: {
           style={inputBase}
         />
         <button
+          type="button"
           onClick={addManual}
           style={{
-            padding: '5px',
-            background: '#1a1a26',
-            color: '#7c6aed',
-            border: '1px solid #333',
-            borderRadius: 4,
+            all: 'unset',
             cursor: 'pointer',
+            padding: '12px 0',
+            background: '#1a1a26',
+            color: '#c8b6ff',
+            border: '1px dashed #7c6aed55',
+            borderRadius: 8,
             fontSize: 14,
             fontWeight: 600,
+            textAlign: 'center',
+            display: 'block',
           }}
         >
           + Add Reference
@@ -940,36 +968,42 @@ function StyleTab(props: {
   return (
     <>
       <div style={labelStyle}>Palette</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {PALETTES.map((p) => (
-          <div
-            key={p.name}
-            onClick={() => {
-              const { name, ...palette } = p;
-              props.onChangePalette(palette, name);
-            }}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              padding: '8px 12px',
-              borderRadius: 4,
-              cursor: 'pointer',
-              background: props.paletteName === p.name ? '#7c6aed18' : 'transparent',
-              border: props.paletteName === p.name ? '1px solid #7c6aed44' : '1px solid transparent',
-            }}
-          >
-            <div style={{ display: 'flex', gap: 1.5 }}>
-              {[p.bg, p.primary, p.accent, p.accent2].map((c, j) => (
-                <div
-                  key={j}
-                  style={{ width: 11, height: 11, borderRadius: 2, background: c, border: '1px solid #2a2a3a' }}
-                />
-              ))}
-            </div>
-            <span style={{ fontSize: 14, color: '#aaa' }}>{p.name}</span>
-          </div>
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {PALETTES.map((p) => {
+          const active = props.paletteName === p.name;
+          return (
+            <button
+              type="button"
+              key={p.name}
+              onClick={() => {
+                const { name, ...palette } = p;
+                props.onChangePalette(palette, name);
+              }}
+              style={{
+                all: 'unset',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                padding: '12px 14px',
+                borderRadius: 8,
+                cursor: 'pointer',
+                background: active ? '#7c6aed18' : '#1a1a26',
+                border: `1px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
+                boxSizing: 'border-box',
+              }}
+            >
+              <div style={{ display: 'flex', gap: 3 }}>
+                {[p.bg, p.primary, p.accent, p.accent2].map((c, j) => (
+                  <div
+                    key={j}
+                    style={{ width: 16, height: 16, borderRadius: 3, background: c, border: '1px solid #2a2a3a' }}
+                  />
+                ))}
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 600, color: active ? '#c8b6ff' : '#e2e2e8' }}>{p.name}</span>
+            </button>
+          );
+        })}
       </div>
 
       <div style={labelStyle}>Font</div>
@@ -1001,32 +1035,34 @@ function StyleTab(props: {
       <HeadingEditor headingStyle={props.headingStyle} onChange={props.onChangeHeadingStyle} />
 
       <div style={labelStyle}>Presets</div>
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
         <input
           value={props.presetName}
           onChange={(e) => props.setPresetName(e.target.value)}
-          placeholder="Name"
-          style={{ ...selectStyle, flex: 1, padding: '8px 12px', fontSize: 15 }}
+          placeholder="Preset name"
+          style={{ ...inputBase, flex: 1, padding: '12px 14px', fontSize: 14 }}
         />
         <button
+          type="button"
           onClick={() => {
             if (props.presetName.trim()) {
               props.onSavePreset(props.presetName.trim());
               props.setPresetName('');
             }
           }}
-          style={{ ...buttonStyle(true), width: 'auto', padding: '8px 16px', fontSize: 14 }}
+          style={{ ...buttonStyle(true), width: 'auto', padding: '12px 18px', fontSize: 14 }}
         >
           Save
         </button>
       </div>
       {props.savedPresets.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
           {props.savedPresets.map((p, i) => (
             <button
               key={i}
+              type="button"
               onClick={() => props.onLoadPreset(p)}
-              style={{ ...buttonStyle(false), fontSize: 14, textAlign: 'left', padding: '8px 14px' }}
+              style={{ ...buttonStyle(false), fontSize: 14, textAlign: 'left', padding: '12px 16px' }}
             >
               {p.name}
             </button>
@@ -1047,30 +1083,43 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
   const update = (k: keyof Styles, field: string, value: number | boolean) =>
     props.onChange({ ...props.styles, [k]: { ...props.styles[k], [field]: value } });
 
-  const inp: CSSProperties = { ...inputBase, width: 44, textAlign: 'center', padding: '3px 6px' };
+  const inp: CSSProperties = {
+    ...inputBase,
+    width: 60,
+    textAlign: 'center',
+    padding: '10px 10px',
+    fontSize: 14,
+  };
+  const miniLabel: CSSProperties = {
+    fontSize: 11,
+    color: '#9ca3af',
+    fontWeight: 600,
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {levels.map((t) => (
         <div key={t.k}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#999', textTransform: 'uppercase' }}>{t.l}</div>
-          <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
-            <input
-              type="number"
-              // Show/accept POINTS in the UI; store poster units underneath.
-              value={Math.round(unitsToPt(props.styles[t.k].size))}
-              onChange={(e) => update(t.k, 'size', ptToUnits(+e.target.value))}
-              min={12}
-              max={200}
-              step={2}
-              style={inp}
-              title="Font size (points)"
-            />
-            <span style={{ fontSize: 12, color: '#555' }}>pt</span>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>{t.l}</div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <input
+                type="number"
+                // Show/accept POINTS in the UI; store poster units underneath.
+                value={Math.round(unitsToPt(props.styles[t.k].size))}
+                onChange={(e) => update(t.k, 'size', ptToUnits(+e.target.value))}
+                min={12}
+                max={200}
+                step={2}
+                style={inp}
+                title="Font size (points)"
+              />
+              <span style={miniLabel}>pt</span>
+            </div>
             <select
               value={props.styles[t.k].weight}
               onChange={(e) => update(t.k, 'weight', +e.target.value)}
-              style={{ ...inp, width: 50, appearance: 'auto' }}
+              style={{ ...inp, width: 80, appearance: 'auto' }}
             >
               {FONT_WEIGHTS.map((w) => (
                 <option key={w} value={w}>
@@ -1079,31 +1128,46 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
               ))}
             </select>
             <button
+              type="button"
               onClick={() => update(t.k, 'italic', !props.styles[t.k].italic)}
+              aria-pressed={props.styles[t.k].italic}
               style={{
                 all: 'unset',
                 cursor: 'pointer',
-                padding: '2px 5px',
-                borderRadius: 3,
-                fontSize: 15,
+                width: 36,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 6,
+                fontSize: 17,
+                fontWeight: 700,
                 fontStyle: 'italic',
-                background: props.styles[t.k].italic ? '#7c6aed33' : '#1a1a26',
+                fontFamily: 'Georgia, serif',
+                background: props.styles[t.k].italic ? '#7c6aed22' : '#1a1a26',
                 border: `1px solid ${props.styles[t.k].italic ? '#7c6aed' : '#2a2a3a'}`,
-                color: props.styles[t.k].italic ? '#b8a8ff' : '#666',
+                color: props.styles[t.k].italic ? '#c8b6ff' : '#9ca3af',
+                boxSizing: 'border-box',
               }}
             >
               I
             </button>
-            <span style={{ fontSize: 12, color: '#555' }}>LH</span>
-            <input
-              type="number"
-              value={props.styles[t.k].lineHeight}
-              onChange={(e) => update(t.k, 'lineHeight', +e.target.value)}
-              min={1}
-              max={3}
-              step={0.05}
-              style={{ ...inp, width: 36 }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <span style={miniLabel}>LH</span>
+              <input
+                type="number"
+                value={props.styles[t.k].lineHeight.toFixed(2)}
+                onChange={(e) => {
+                  const v = Math.max(1, Math.min(3, +e.target.value || 1));
+                  update(t.k, 'lineHeight', v);
+                }}
+                min={1}
+                max={3}
+                step={0.05}
+                style={{ ...inp, width: 66 }}
+                title="Line height (1.0–3.0)"
+              />
+            </div>
           </div>
         </div>
       ))}
@@ -1113,62 +1177,66 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
 
 function HeadingEditor(props: { headingStyle: HeadingStyle; onChange: (hs: HeadingStyle) => void }) {
   const update = (patch: Partial<HeadingStyle>) => props.onChange({ ...props.headingStyle, ...patch });
+
+  const pillBtn = (active: boolean): CSSProperties => ({
+    all: 'unset',
+    cursor: 'pointer',
+    padding: '10px 14px',
+    borderRadius: 6,
+    fontSize: 13,
+    fontWeight: 600,
+    background: active ? '#7c6aed22' : '#1a1a26',
+    border: `1px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
+    color: active ? '#c8b6ff' : '#9ca3af',
+    boxSizing: 'border-box',
+    textAlign: 'center',
+  });
+
   const borderBtn = (v: HeadingStyle['border'], label: string) => (
-    <button
-      key={v}
-      onClick={() => update({ border: v })}
-      style={{
-        all: 'unset',
-        cursor: 'pointer',
-        padding: '3px 7px',
-        borderRadius: 3,
-        fontSize: 14,
-        background: props.headingStyle.border === v ? '#7c6aed22' : '#1a1a26',
-        border: `1px solid ${props.headingStyle.border === v ? '#7c6aed66' : '#2a2a3a'}`,
-        color: props.headingStyle.border === v ? '#b8a8ff' : '#888',
-      }}
-    >
+    <button key={v} type="button" onClick={() => update({ border: v })} style={pillBtn(props.headingStyle.border === v)}>
       {label}
     </button>
   );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-        {borderBtn('none', 'None')}
-        {borderBtn('bottom', 'Bottom')}
-        {borderBtn('left', 'Left')}
-        {borderBtn('box', 'Box')}
-        {borderBtn('thick', 'Thick')}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+          Border
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {borderBtn('none', 'None')}
+          {borderBtn('bottom', 'Bottom')}
+          {borderBtn('left', 'Left')}
+          {borderBtn('box', 'Box')}
+          {borderBtn('thick', 'Thick')}
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 14, color: '#888', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={props.headingStyle.fill}
-            onChange={(e) => update({ fill: e.target.checked })}
-            style={{ accentColor: '#7c6aed' }}
-          />
-          Fill
-        </label>
-        {(['left', 'center'] as const).map((a) => (
-          <button
-            key={a}
-            onClick={() => update({ align: a })}
-            style={{
-              all: 'unset',
-              cursor: 'pointer',
-              padding: '2px 8px',
-              borderRadius: 3,
-              fontSize: 14,
-              background: props.headingStyle.align === a ? '#7c6aed22' : '#1a1a26',
-              border: `1px solid ${props.headingStyle.align === a ? '#7c6aed66' : '#2a2a3a'}`,
-              color: props.headingStyle.align === a ? '#b8a8ff' : '#888',
-              textTransform: 'capitalize',
-            }}
-          >
-            {a}
-          </button>
-        ))}
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+          Alignment
+        </div>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {(['left', 'center'] as const).map((a) => (
+            <button
+              key={a}
+              type="button"
+              onClick={() => update({ align: a })}
+              style={{ ...pillBtn(props.headingStyle.align === a), textTransform: 'capitalize' }}
+            >
+              {a}
+            </button>
+          ))}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#9ca3af', cursor: 'pointer', marginLeft: 'auto' }}>
+            <input
+              type="checkbox"
+              checked={props.headingStyle.fill}
+              onChange={(e) => update({ fill: e.target.checked })}
+              style={{ accentColor: '#7c6aed', width: 14, height: 14 }}
+            />
+            Fill
+          </label>
+        </div>
       </div>
     </div>
   );
@@ -1552,20 +1620,40 @@ function TextBlockEditor(props: {
         </div>
       </div>
 
-      {/* Line spacing */}
+      {/* Line spacing — slider + custom number entry so users can
+          type an exact value instead of dragging to approximate. */}
       <div>
-        <label style={fieldLabel}>
-          Line spacing · <span style={{ color: '#c8b6ff' }}>{styleLevel.lineHeight.toFixed(2)}</span>
-        </label>
-        <input
-          type="range"
-          min={1}
-          max={2.5}
-          step={0.05}
-          value={styleLevel.lineHeight}
-          onChange={(e) => onUpdateStyle('lineHeight', +e.target.value)}
-          style={{ width: '100%', accentColor: '#7c6aed' }}
-        />
+        <label style={fieldLabel}>Line spacing</label>
+        <div style={{ ...row, gap: 14 }}>
+          <input
+            type="range"
+            min={1}
+            max={3}
+            step={0.05}
+            value={styleLevel.lineHeight}
+            onChange={(e) => onUpdateStyle('lineHeight', +e.target.value)}
+            style={{ flex: 1, accentColor: '#7c6aed' }}
+          />
+          <input
+            type="number"
+            value={styleLevel.lineHeight.toFixed(2)}
+            onChange={(e) => {
+              const v = Math.max(1, Math.min(3, +e.target.value || 1));
+              onUpdateStyle('lineHeight', v);
+            }}
+            min={1}
+            max={3}
+            step={0.05}
+            style={{
+              ...inputBase,
+              width: 72,
+              textAlign: 'center',
+              padding: '10px 10px',
+              fontSize: 15,
+            }}
+            title="Line height (1.0–3.0)"
+          />
+        </div>
       </div>
 
       {/* Color */}
@@ -1606,42 +1694,15 @@ function TextBlockEditor(props: {
         </div>
       </div>
 
-      {/* Highlight */}
-      <div>
-        <label style={fieldLabel}>Highlight</label>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {HIGHLIGHT_PRESETS.map((h, i) => {
-            const isNone = h === null;
-            const active = styleLevel.highlight === h;
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => onUpdateStyle('highlight', h)}
-                aria-pressed={active}
-                title={isNone ? 'None' : h ?? ''}
-                style={{
-                  all: 'unset',
-                  cursor: 'pointer',
-                  width: 32,
-                  height: 32,
-                  borderRadius: 6,
-                  background: h ?? 'transparent',
-                  border: `2px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#6b7280',
-                  fontSize: 14,
-                  boxSizing: 'border-box',
-                }}
-              >
-                {isNone ? '∅' : ''}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      {/*
+        Block-level highlight swatches removed in favor of inline
+        per-selection highlight (Notion-style). Inline highlight is
+        applied via the floating formatting toolbar on the canvas
+        when the user selects a text range. The TypeStyle.highlight
+        field stays in the data model for backwards compatibility —
+        any existing posters with block-level highlight still render
+        correctly — but new highlights must be inline.
+      */}
     </div>
   );
 }
