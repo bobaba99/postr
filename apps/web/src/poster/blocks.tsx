@@ -208,6 +208,45 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
   const commit = (next: TableData) => onUpdate({ tableData: next });
   const updateCellValue = (r: number, c: number, v: string) => commit(updateCell(data, r, c, v));
 
+  // Notion/Canva parity: drag-to-resize column borders. Capture the
+  // pointer on mousedown over a border handle, track horizontal delta
+  // in table-percentage units, and redistribute between the column
+  // being dragged and the column to its right. Ships with a minimum
+  // column width of 8% so users can't accidentally collapse a cell
+  // to zero. The final colWidths is normalised so it always sums to
+  // 100%.
+  const tableContainerRef = useRef<HTMLDivElement | null>(null);
+  const onColResizeStart = (colIdx: number, e: React.PointerEvent) => {
+    if (colIdx < 0 || colIdx >= data.cols - 1) return;
+    e.stopPropagation();
+    e.preventDefault();
+    const startX = e.clientX;
+    const tableEl = tableContainerRef.current?.querySelector('table');
+    if (!tableEl) return;
+    const tableWidthPx = tableEl.getBoundingClientRect().width;
+    if (tableWidthPx <= 0) return;
+    const startWidths = [...colWidths];
+    const MIN = 8;
+    const onMove = (ev: PointerEvent) => {
+      const dxPct = ((ev.clientX - startX) / tableWidthPx) * 100;
+      const next = [...startWidths];
+      let delta = dxPct;
+      if (next[colIdx]! + delta < MIN) delta = MIN - next[colIdx]!;
+      if (next[colIdx + 1]! - delta < MIN) delta = next[colIdx + 1]! - MIN;
+      next[colIdx] = next[colIdx]! + delta;
+      next[colIdx + 1] = next[colIdx + 1]! - delta;
+      commit({ ...data, colWidths: next });
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
   const onPaste = (e: React.ClipboardEvent) => {
     const html = e.clipboardData.getData('text/html');
     const txt = e.clipboardData.getData('text/plain');
@@ -268,6 +307,44 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
       onPaste={onPaste}
       onMouseLeave={clearHover}
     >
+      {/*
+        B4 fix: the bottom/right append "+" handles were positioned
+        against the BlockFrame's declared `h`, not the table's actual
+        height. Small tables (e.g. the default 3×3 placeholder) left
+        the bottom "+" floating far below the table in empty space.
+        Wrap the table + all handles in a relative container that
+        shrinks to the table's intrinsic size, so "+ bottom" really
+        sits on the table's bottom edge.
+      */}
+      <div
+        ref={tableContainerRef}
+        style={{ position: 'relative', display: 'inline-block', width: '100%' }}
+      >
+      {/*
+        Column resize handles — one thin vertical stripe on every
+        border EXCEPT the rightmost. Starts a drag that redistributes
+        percentage width between this column and the one to its right.
+        Semi-transparent by default, darkens on hover for discovery.
+      */}
+      {colWidths.slice(0, -1).map((_, i) => {
+        const leftPct = colWidths.slice(0, i + 1).reduce((s, w) => s + w, 0);
+        return (
+          <div
+            key={`col-resize-${i}`}
+            title="Drag to resize column"
+            onPointerDown={(e) => onColResizeStart(i, e)}
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: `calc(${leftPct}% - 3px)`,
+              width: 6,
+              cursor: 'col-resize',
+              zIndex: 2,
+            }}
+          />
+        );
+      })}
       <table
         style={{ width: '100%', borderCollapse: 'collapse', fontFamily, fontSize: styles.body.size, tableLayout: 'fixed' }}
       >
@@ -450,6 +527,12 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
       >
         +
       </button>
+      {/*
+        B3 fix: the right-append "+" was previously at right: -12 which
+        bled past the block frame into the adjacent column gutter. Pull
+        it in to right: -6 so the affordance is still discoverable and
+        clickable but stays inside the block's visual footprint.
+      */}
       <button
         type="button"
         title="Add column at right"
@@ -462,7 +545,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
           all: 'unset',
           cursor: 'pointer',
           position: 'absolute',
-          right: -12,
+          right: -6,
           top: '50%',
           transform: 'translateY(-50%)',
           width: 16,
@@ -480,6 +563,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
       >
         +
       </button>
+      </div>
     </div>
   );
 }
@@ -627,6 +711,16 @@ interface BlockFrameProps {
   didDragRef: React.MutableRefObject<boolean>;
   onUpdate: (id: string, patch: Partial<Block>) => void;
   onDelete: (id: string) => void;
+  /**
+   * B1 fix — when the title block grows past its declared h (e.g.
+   * multi-line wrap), every non-title block needs to shift DOWN by
+   * the overflow amount, otherwise authors/headings/body all end up
+   * visually on top of the wrapped title lines. PosterEditor measures
+   * the title's actual rendered height and passes the overflow
+   * in pre-transform pixels; BlockFrame applies it to `top` for
+   * every non-title block.
+   */
+  titleOverflowPx?: number;
 }
 
 export function BlockFrame(props: BlockFrameProps) {
@@ -647,7 +741,16 @@ export function BlockFrame(props: BlockFrameProps) {
     didDragRef,
     onUpdate,
     onDelete,
+    titleOverflowPx,
   } = props;
+
+  // B1 fix: every non-title block shifts DOWN by the title's overflow
+  // amount so wrapped title lines no longer collide with the authors
+  // row / body blocks.
+  const effectiveTop =
+    b.type !== 'title' && typeof titleOverflowPx === 'number' && titleOverflowPx > 0
+      ? b.y + titleOverflowPx
+      : b.y;
 
   const isHeading = b.type === 'heading';
   // Blocks that grow with their text content (B1 fix). These use
@@ -655,7 +758,10 @@ export function BlockFrame(props: BlockFrameProps) {
   // expands as the user adds more text. Prevents the "title
   // clipped mid-word when too long" bug where the second line
   // disappeared behind the block's fixed bottom edge.
-  const growsWithContent = b.type === 'title' || b.type === 'text';
+  //
+  // B2 fix: `references` added — a poster with many refs was
+  // clipping the last entry below the declared block height.
+  const growsWithContent = b.type === 'title' || b.type === 'text' || b.type === 'references';
   const level = b.type === 'title' ? st.title : b.type === 'authors' ? st.authors : isHeading ? st.heading : st.body;
   const frameRef = useRef<HTMLDivElement | null>(null);
   // Selection info for the floating format toolbar — populated by
@@ -732,10 +838,12 @@ export function BlockFrame(props: BlockFrameProps) {
       onPointerDown={(e) => {
         onPointerDown(e, b.id, 'move');
       }}
+      data-block-id={b.id}
+      data-block-type={b.type}
       style={{
         position: 'absolute',
         left: b.x,
-        top: b.y,
+        top: effectiveTop,
         width: b.w,
         // Headings + title/text grow with content. Everything else
         // (image, logo, table, references, authors) stays at its

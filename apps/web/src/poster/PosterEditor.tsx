@@ -6,7 +6,7 @@
  * after fetching from Supabase). Mutations dispatch back into the
  * store; Phase 4 layers autosave on top by subscribing to changes.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type {
   Block,
   HeadingStyle,
@@ -263,8 +263,31 @@ export function PosterEditor() {
   const [showGrid, setShowGrid] = useState(true);
   const [sortMode, setSortMode] = useState<SortMode>('none');
   const [citationStyle, setCitationStyle] = useState<CitationStyleKey>(DEFAULT_CITATION_STYLE);
-  const [savedPresets, setSavedPresets] = useState<StylePreset[]>([]);
+  // K1 fix: presets persist across posters via localStorage (not
+  // component state). Previously useState — lost on every poster open.
+  const [savedPresets, setSavedPresets] = useState<StylePreset[]>(() => {
+    try {
+      const raw = localStorage.getItem('postr.style-presets');
+      return raw ? (JSON.parse(raw) as StylePreset[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem('postr.style-presets', JSON.stringify(savedPresets));
+    } catch {
+      // Quota / private mode — silently drop; presets only live in-session.
+    }
+  }, [savedPresets]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // B1 fix: measure how much the title block's rendered content
+  // OVERRAN its declared height. When a long title wraps to multiple
+  // lines, titleOverflowPx becomes positive and every non-title block
+  // gets shifted down by that amount (via BlockFrame) so wrapped
+  // title lines don't collide with the authors row / body blocks.
+  const [titleOverflowPx, setTitleOverflowPx] = useState(0);
 
   // ⌘/ or Ctrl+/ toggles the sidebar (Notion shortcut).
   useEffect(() => {
@@ -285,6 +308,38 @@ export function PosterEditor() {
   useGsapContext(() => {
     editorEntrance();
   }, rootRef);
+
+  // B1 fix: observe the title block's actual rendered height. The
+  // block's DOM frame has `height: auto; minHeight: b.h`, so its
+  // offsetHeight reflects content growth (including wrapping). The
+  // canvas div has `transform: scale(z)` but offset metrics are
+  // in pre-transform (poster-unit) space, so no scale math needed.
+  const titleBlockId = useMemo(
+    () => doc?.blocks.find((b) => b.type === 'title')?.id ?? null,
+    [doc?.blocks],
+  );
+  const titleBlockH = useMemo(
+    () => doc?.blocks.find((b) => b.type === 'title')?.h ?? 0,
+    [doc?.blocks],
+  );
+  useLayoutEffect(() => {
+    if (!titleBlockId || !canvasRef.current || titleBlockH <= 0) {
+      setTitleOverflowPx(0);
+      return;
+    }
+    const el = canvasRef.current.querySelector<HTMLElement>(
+      `[data-block-id="${titleBlockId}"]`,
+    );
+    if (!el) return;
+    const measure = () => {
+      const rendered = el.offsetHeight;
+      setTitleOverflowPx(Math.max(0, rendered - titleBlockH));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [titleBlockId, titleBlockH]);
 
   // Autosave — debounces doc changes and persists via upsertPoster.
   // Status drives the pill rendered in the top-right overlay.
@@ -349,13 +404,38 @@ export function PosterEditor() {
   };
 
   const addBlock = (type: Block['type']) => {
+    const w = type === 'logo' ? 50 : 155;
+    const h = type === 'logo' ? 40 : type === 'heading' ? 22 : type === 'references' ? 120 : 140;
+
+    // M1/S2 fix: find the first non-colliding (x, y) so an inserted
+    // block doesn't render on top of existing ones. Scan down in
+    // 20-unit increments from the default y=80, keeping x=20. If the
+    // poster's left column is full top-to-bottom, fall back to the
+    // far right. Stops as soon as no overlap with any existing block.
+    const overlaps = (ax: number, ay: number) =>
+      doc.blocks.some((b) => {
+        if (b.type === 'title' || b.type === 'authors') return false;
+        return !(ax + w <= b.x || b.x + b.w <= ax || ay + h <= b.y || b.y + b.h <= ay);
+      });
+
+    let nx = 20;
+    let ny = 80;
+    for (let i = 0; i < 60 && overlaps(nx, ny); i++) {
+      ny += 20;
+      if (ny + h > ph - 20) {
+        // wrapped past the bottom of the poster — jump to next column
+        ny = 80;
+        nx += w + 20;
+      }
+    }
+
     const newBlock: Block = {
       id: `b${nanoid(6)}`,
       type,
-      x: 20,
-      y: 80,
-      w: type === 'logo' ? 50 : 155,
-      h: type === 'logo' ? 40 : type === 'heading' ? 22 : type === 'references' ? 120 : 140,
+      x: nx,
+      y: ny,
+      w,
+      h,
       content: type === 'heading' ? 'Section Title' : type === 'text' ? 'Enter your text here.' : '',
       imageSrc: null,
       imageFit: 'contain',
@@ -698,6 +778,7 @@ export function PosterEditor() {
                   didDragRef={didDragRef}
                   onUpdate={updateBlock}
                   onDelete={deleteBlock}
+                  titleOverflowPx={titleOverflowPx}
                 />
               ))}
             </div>
