@@ -433,6 +433,7 @@ export function PosterEditor() {
       >
         <div style={{ position: 'relative' }}>
           <div
+            data-postr-canvas-frame
             style={{
               width: cW * zoom,
               height: cH * zoom,
