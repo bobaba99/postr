@@ -91,12 +91,15 @@ interface SidebarProps {
 }
 
 // Shared inline styles for the dark sidebar UI chrome.
+//
+// Padding, margins, gaps, and radii were doubled alongside the 2x
+// font-size bump so controls breathe correctly at the larger type.
 const inputBase: CSSProperties = {
   all: 'unset',
   background: '#1a1a26',
   border: '1px solid #2a2a3a',
-  borderRadius: 4,
-  padding: '4px 6px',
+  borderRadius: 6,
+  padding: '8px 12px',
   color: '#ddd',
   fontSize: 20,
   width: '100%',
@@ -109,27 +112,27 @@ const labelStyle: CSSProperties = {
   textTransform: 'uppercase',
   letterSpacing: '1.2px',
   color: '#555',
-  marginBottom: 4,
-  marginTop: 14,
+  marginBottom: 8,
+  marginTop: 28,
 };
 
 const selectStyle: CSSProperties = {
   width: '100%',
-  padding: '6px 7px',
+  padding: '12px 14px',
   background: '#1a1a26',
   border: '1px solid #2a2a3a',
-  borderRadius: 5,
+  borderRadius: 8,
   color: '#ddd',
   fontSize: 22,
   outline: 'none',
 };
 
 const buttonStyle = (active: boolean): CSSProperties => ({
-  padding: '7px 10px',
+  padding: '14px 20px',
   background: active ? '#7c6aed' : '#1a1a26',
   color: '#fff',
   border: active ? 'none' : '1px solid #2a2a3a',
-  borderRadius: 5,
+  borderRadius: 8,
   cursor: 'pointer',
   fontSize: 20,
   fontWeight: 600,
@@ -143,7 +146,7 @@ export function Sidebar(props: SidebarProps) {
 
   const tabStyle = (active: boolean): CSSProperties => ({
     flex: 1,
-    padding: '8px 0',
+    padding: '14px 0',
     textAlign: 'center',
     cursor: 'pointer',
     fontWeight: 600,
@@ -176,19 +179,19 @@ export function Sidebar(props: SidebarProps) {
         overflow: 'hidden',
       }}
     >
-      <div style={{ padding: '12px 14px 0', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 14 }}>
         <div
           style={{
-            width: 24,
-            height: 24,
-            borderRadius: 5,
+            width: 40,
+            height: 40,
+            borderRadius: 8,
             background: 'linear-gradient(135deg,#7c6aed,#06d6a0)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
             <rect x="3" y="3" width="18" height="18" rx="2" />
             <path d="M3 9h18M9 3v18" />
           </svg>
@@ -196,7 +199,7 @@ export function Sidebar(props: SidebarProps) {
         <div style={{ fontWeight: 800, fontSize: 26, color: '#fff' }}>Postr</div>
       </div>
 
-      <div style={{ display: 'flex', margin: '8px 12px 0', borderBottom: '1px solid #1e1e2e' }}>
+      <div style={{ display: 'flex', margin: '16px 24px 0', borderBottom: '1px solid #1e1e2e' }}>
         {(['layout', 'authors', 'refs', 'style', 'edit'] as SidebarTab[]).map((t) => (
           <button key={t} onClick={() => setTab(t)} style={tabStyle(tab === t)}>
             {t}
@@ -204,7 +207,7 @@ export function Sidebar(props: SidebarProps) {
         ))}
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '0 12px 12px' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '0 24px 24px' }}>
         {tab === 'layout' && (
           <LayoutTab
             posterSizeKey={props.posterSizeKey}
@@ -329,7 +332,7 @@ function LayoutTab(props: {
               style={{
                 all: 'unset',
                 cursor: 'pointer',
-                padding: '7px 9px',
+                padding: '14px 18px',
                 background: '#1a1a26',
                 border: '1px solid #2a2a3a',
                 borderRadius: 5,
@@ -372,14 +375,14 @@ function AuthorsTab(props: {
       <div style={labelStyle}>① Institutions</div>
       <InstitutionManager institutions={props.institutions} onChange={props.onChangeInstitutions} />
 
-      <div style={{ ...labelStyle, marginTop: 14 }}>② Authors</div>
+      <div style={{ ...labelStyle, marginTop: 28 }}>② Authors</div>
       <AuthorManager authors={props.authors} onChange={props.onChangeAuthors} institutions={props.institutions} />
 
       {props.authors.filter((a) => a.name).length > 0 && (
         <div
           style={{
             marginTop: 10,
-            padding: '6px 8px',
+            padding: '12px 14px',
             background: '#14141e',
             border: '1px solid #222',
             borderRadius: 5,
@@ -396,7 +399,7 @@ function AuthorsTab(props: {
         </div>
       )}
 
-      <div style={{ ...labelStyle, marginTop: 14 }}>Logos</div>
+      <div style={{ ...labelStyle, marginTop: 28 }}>Logos</div>
       <button onClick={props.onAddLogo} style={buttonStyle(false)}>
         + Logo
       </button>
@@ -414,7 +417,7 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       {props.institutions.map((inst, i) => (
-        <div key={inst.id} style={{ background: '#14141e', border: '1px solid #222', borderRadius: 5, padding: '6px 8px' }}>
+        <div key={inst.id} style={{ background: '#14141e', border: '1px solid #222', borderRadius: 5, padding: '12px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
             <div
               style={{
@@ -468,7 +471,7 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
         style={{
           all: 'unset',
           cursor: 'pointer',
-          padding: '5px 0',
+          padding: '10px 0',
           fontSize: 20,
           color: '#7c6aed',
           fontWeight: 600,
@@ -502,7 +505,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       {props.authors.map((a, i) => (
-        <div key={a.id} style={{ background: '#14141e', border: '1px solid #222', borderRadius: 5, padding: '6px 8px' }}>
+        <div key={a.id} style={{ background: '#14141e', border: '1px solid #222', borderRadius: 5, padding: '12px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
             <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
               <button
@@ -600,7 +603,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
         style={{
           all: 'unset',
           cursor: 'pointer',
-          padding: '5px 0',
+          padding: '10px 0',
           fontSize: 20,
           color: '#7c6aed',
           fontWeight: 600,
@@ -659,7 +662,7 @@ function RefsTab(props: {
     setManual({ authors: '', year: '', title: '', journal: '' });
   };
 
-  const sel: CSSProperties = { ...inputBase, appearance: 'auto', padding: '4px 6px' };
+  const sel: CSSProperties = { ...inputBase, appearance: 'auto', padding: '8px 12px' };
 
   return (
     <>
@@ -667,7 +670,7 @@ function RefsTab(props: {
       <button
         onClick={() => fileRef.current?.click()}
         style={{
-          padding: '6px 10px',
+          padding: '12px 18px',
           background: '#7c6aed',
           color: '#fff',
           border: 'none',
@@ -718,7 +721,7 @@ function RefsTab(props: {
               display: 'flex',
               gap: 3,
               alignItems: 'flex-start',
-              padding: '4px 6px',
+              padding: '8px 12px',
               background: '#14141e',
               border: '1px solid #222',
               borderRadius: 4,
@@ -737,7 +740,7 @@ function RefsTab(props: {
         ))}
       </div>
 
-      <div style={{ ...labelStyle, marginTop: 14 }}>Manual Entry</div>
+      <div style={{ ...labelStyle, marginTop: 28 }}>Manual Entry</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <input
           value={manual.authors}
@@ -819,7 +822,7 @@ function StyleTab(props: {
               display: 'flex',
               alignItems: 'center',
               gap: 5,
-              padding: '4px 6px',
+              padding: '8px 12px',
               borderRadius: 4,
               cursor: 'pointer',
               background: props.paletteName === p.name ? '#7c6aed18' : 'transparent',
@@ -873,7 +876,7 @@ function StyleTab(props: {
           value={props.presetName}
           onChange={(e) => props.setPresetName(e.target.value)}
           placeholder="Name"
-          style={{ ...selectStyle, flex: 1, padding: '4px 6px', fontSize: 20 }}
+          style={{ ...selectStyle, flex: 1, padding: '8px 12px', fontSize: 20 }}
         />
         <button
           onClick={() => {
@@ -882,7 +885,7 @@ function StyleTab(props: {
               props.setPresetName('');
             }
           }}
-          style={{ ...buttonStyle(true), width: 'auto', padding: '4px 10px', fontSize: 18 }}
+          style={{ ...buttonStyle(true), width: 'auto', padding: '8px 16px', fontSize: 18 }}
         >
           Save
         </button>
@@ -893,7 +896,7 @@ function StyleTab(props: {
             <button
               key={i}
               onClick={() => props.onLoadPreset(p)}
-              style={{ ...buttonStyle(false), fontSize: 18, textAlign: 'left', padding: '4px 8px' }}
+              style={{ ...buttonStyle(false), fontSize: 18, textAlign: 'left', padding: '8px 14px' }}
             >
               {p.name}
             </button>
@@ -1087,7 +1090,7 @@ function EditTab(props: {
               background: '#1a1a26',
               border: '1px solid #2a2a3a',
               borderRadius: 5,
-              padding: '6px 8px',
+              padding: '12px 14px',
               color: '#ddd',
               fontSize: 20,
               minHeight: 60,
@@ -1210,7 +1213,7 @@ function EditTab(props: {
         ))}
       </div>
 
-      <div style={{ ...labelStyle, marginTop: 14 }}>Symbols (type / in text)</div>
+      <div style={{ ...labelStyle, marginTop: 28 }}>Symbols (type / in text)</div>
       <div style={{ fontSize: 18, color: '#666', lineHeight: 1.5 }}>
         /alpha → α · /beta → β · /eta2 → η² · /chi2 → χ² · /leq → ≤ · /geq → ≥ · /pm → ± · /arrow → →
         <br />

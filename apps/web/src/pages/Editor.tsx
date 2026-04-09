@@ -14,8 +14,8 @@ import { loadOrCreateMostRecentPoster, loadPoster } from '@/data/posters';
 import { usePosterStore } from '@/stores/posterStore';
 import { PosterEditor } from '@/poster/PosterEditor';
 import { makeBlocks } from '@/poster/templates';
-import { PALETTES } from '@/poster/constants';
-import type { PosterDoc } from '@postr/shared';
+import { DEFAULT_STYLES, PALETTES } from '@/poster/constants';
+import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
 
 /**
  * Posters can arrive here empty — either from the handle_new_user
@@ -38,6 +38,42 @@ function hydrateIfEmpty(doc: PosterDoc): PosterDoc {
     blocks: makeBlocks('3col', doc.widthIn, doc.heightIn),
     palette,
   };
+}
+
+/**
+ * Print-readability sanity limits for each style level, in poster
+ * units (1 unit = 7.2 points). Anything above these clearly violates
+ * the guideline — older documents written before the calibration fix
+ * saved sizes like title:60 / heading:28 / body:18, which rendered as
+ * 432pt / 202pt / 130pt and crammed the layout. If we detect any
+ * level above its ceiling, we replace JUST that level with the
+ * default — preserving user-tweaked colors, weights, and italics on
+ * any level that's already within the sane range.
+ *
+ * Ceilings are deliberately generous so users can still crank a
+ * title to ~200pt if they want; only clearly-broken old defaults
+ * get replaced.
+ */
+const STYLE_SIZE_CEILING_UNITS: Record<keyof Styles, number> = {
+  title: 30, // ~216pt
+  heading: 14, // ~100pt
+  authors: 10, // ~72pt
+  body: 10, // ~72pt
+};
+
+function normalizeStaleStyles(doc: PosterDoc): PosterDoc {
+  const levels: Array<keyof Styles> = ['title', 'heading', 'authors', 'body'];
+  let mutated = false;
+  const next: Styles = { ...doc.styles };
+  for (const level of levels) {
+    const current: TypeStyle | undefined = doc.styles[level];
+    if (!current || current.size > STYLE_SIZE_CEILING_UNITS[level]) {
+      next[level] = DEFAULT_STYLES[level];
+      mutated = true;
+    }
+  }
+  if (!mutated) return doc;
+  return { ...doc, styles: next };
 }
 
 type Status = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string };
@@ -65,7 +101,12 @@ export default function Editor() {
         }
 
         if (cancelled) return;
-        setPoster(row.id, hydrateIfEmpty(row.data as PosterDoc));
+        // normalizeStaleStyles runs first so that docs saved before
+        // the typography calibration fix (title:60, heading:28, etc.)
+        // self-heal on load without needing a db reset.
+        const raw = row.data as PosterDoc;
+        const hydrated = hydrateIfEmpty(normalizeStaleStyles(raw));
+        setPoster(row.id, hydrated);
         // Normalize the URL so refreshes land on the real id, not "/p/new"
         if (posterId !== row.id) {
           navigate(`/p/${row.id}`, { replace: true });

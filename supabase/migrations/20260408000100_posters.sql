@@ -19,6 +19,17 @@ create table if not exists public.posters (
   height_in numeric not null default 36,
   -- Self-contained snapshot: blocks, style, palette, font, institutions,
   -- authors, references. Shape defined by PosterDoc in @postr/shared.
+  --
+  -- Style sizes are in poster units (1 unit = 1/10 inch = 7.2 points).
+  -- These defaults are calibrated to the print-readability guideline:
+  --   title 22u ≈ 158pt (guideline: 72–158pt)
+  --   heading 8u ≈ 58pt (guideline: 42–56pt)
+  --   body 5u ≈ 36pt    (guideline: 24–36pt)
+  --   authors 5u ≈ 36pt
+  -- Keep these in sync with DEFAULT_STYLES in apps/web/src/poster/constants.ts.
+  --
+  -- blocks is empty on purpose — the client hydrates it into the 3-col
+  -- default template on first load (see Editor.tsx hydrateIfEmpty).
   data jsonb not null default '{
     "version": 1,
     "widthIn": 48,
@@ -26,19 +37,19 @@ create table if not exists public.posters (
     "blocks": [],
     "fontFamily": "Source Sans 3",
     "palette": {
-      "bg": "#ffffff",
-      "primary": "#1a1a26",
-      "accent": "#7c6aed",
-      "accent2": "#4a6cf7",
-      "muted": "#6b7280",
-      "headerBg": "#f3f4f6",
-      "headerFg": "#1a1a26"
+      "bg": "#FFFFFF",
+      "primary": "#1a1a2e",
+      "accent": "#0f4c75",
+      "accent2": "#3282b8",
+      "muted": "#6c757d",
+      "headerBg": "#0f4c75",
+      "headerFg": "#fff"
     },
     "styles": {
-      "title":   {"size": 60, "weight": 700, "italic": false, "lineHeight": 1.1, "color": null, "highlight": null},
-      "heading": {"size": 28, "weight": 700, "italic": false, "lineHeight": 1.2, "color": null, "highlight": null},
-      "authors": {"size": 22, "weight": 400, "italic": false, "lineHeight": 1.3, "color": null, "highlight": null},
-      "body":    {"size": 18, "weight": 400, "italic": false, "lineHeight": 1.4, "color": null, "highlight": null}
+      "title":   {"size": 22, "weight": 800, "italic": false, "lineHeight": 1.15, "color": null, "highlight": null},
+      "heading": {"size": 8,  "weight": 700, "italic": false, "lineHeight": 1.3,  "color": null, "highlight": null},
+      "authors": {"size": 5,  "weight": 400, "italic": false, "lineHeight": 1.5,  "color": null, "highlight": null},
+      "body":    {"size": 5,  "weight": 400, "italic": false, "lineHeight": 1.55, "color": null, "highlight": null}
     },
     "headingStyle": {"border": "bottom", "fill": false, "align": "left"},
     "institutions": [],
