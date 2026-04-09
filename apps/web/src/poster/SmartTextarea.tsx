@@ -18,7 +18,8 @@
  *      with the symbol and commits via onChange.
  */
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { SYMBOLS, filterSymbols } from './symbols';
+import { filterSymbols } from './symbols';
+import { applySymbolInsertion, matchSlashAtCaret } from './slashCommand';
 
 export interface SmartTextareaProps {
   value: string;
@@ -119,9 +120,8 @@ export function SmartTextarea({ value, onChange, placeholder, style, rows = 4 }:
   const [menu, setMenu] = useState<MenuState>(INITIAL_MENU);
 
   const recomputeMenu = (text: string, caret: number) => {
-    const before = text.substring(0, caret);
-    const m = before.match(/\/([a-zA-Z0-9]*)$/);
-    if (!m || m[0].length < 1) {
+    const match = matchSlashAtCaret(text.substring(0, caret));
+    if (!match) {
       setMenu((prev) => (prev.open ? INITIAL_MENU : prev));
       return;
     }
@@ -129,14 +129,12 @@ export function SmartTextarea({ value, onChange, placeholder, style, rows = 4 }:
     if (!textarea) return;
     // Anchor the dropdown at the position of the slash itself so it
     // grows downward from the trigger, not from the cursor tail.
-    const slashIdx = caret - m[0].length;
+    const slashIdx = match.before.length;
     const pos = measureCaretPosition(textarea, slashIdx);
-    // Offset by the line height so the dropdown sits on the line BELOW
-    // the caret rather than covering the text the user is typing.
     const lineHeight = parseFloat(window.getComputedStyle(textarea).lineHeight) || 20;
     setMenu({
       open: true,
-      prefix: m[1] ?? '',
+      prefix: match.prefix,
       x: pos.x,
       y: pos.y + lineHeight + 2,
     });
@@ -165,25 +163,18 @@ export function SmartTextarea({ value, onChange, placeholder, style, rows = 4 }:
   };
 
   const insertSymbol = (key: string) => {
-    const sym = SYMBOLS[key];
     const ta = textareaRef.current;
-    if (!sym || !ta) return;
-    const caret = ta.selectionStart;
-    const before = ta.value.substring(0, caret);
-    const after = ta.value.substring(caret);
-    const m = before.match(/\/([a-zA-Z0-9]*)$/);
-    if (!m) return;
-    const trimmed = before.substring(0, before.length - m[0].length);
-    const next = trimmed + sym + after;
-    onChange(next);
+    if (!ta) return;
+    const result = applySymbolInsertion(ta.value, ta.selectionStart, key);
+    if (!result) return;
+    onChange(result.text);
     setMenu(INITIAL_MENU);
     // Restore caret position just after the inserted symbol on the
     // next tick, once React has flushed the new value.
-    const newCaret = trimmed.length + sym.length;
     requestAnimationFrame(() => {
       if (textareaRef.current) {
         textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(newCaret, newCaret);
+        textareaRef.current.setSelectionRange(result.caret, result.caret);
       }
     });
   };

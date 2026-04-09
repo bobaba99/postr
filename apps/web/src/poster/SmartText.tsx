@@ -1,202 +1,260 @@
 /**
- * SmartText — contentEditable block with slash-command autocomplete.
+ * SmartText — inline canvas text editor for title / heading / text
+ * blocks. Wraps a plain <textarea> styled to look like the surrounding
+ * poster content. Uses the same shared slash-command logic as the
+ * sidebar SmartTextarea, so the two surfaces behave identically.
  *
- * The user types `/foo` and a dropdown surfaces matching symbols
- * from the SYMBOLS map. Selecting one (click, Tab, or Enter)
- * replaces the `/foo` literal with the symbol character.
+ * Why a textarea and not contentEditable:
+ *   - The caret is drawn natively. No "type something, then arrow-
+ *     key, then caret appears" bug.
+ *   - selectionStart / selectionEnd are reliable for slash-command
+ *     positioning, unlike the Range walking contentEditable requires.
+ *   - Focus transfer works with React's default event flow — no
+ *     preventDefault fights with the block drag handler.
  *
- * Cursor position is computed by walking the DOM range — see the
- * `getTextAndCursor` helper. The dropdown is anchored to the
- * caret rectangle, not the block, so it follows the cursor.
- *
- * Ported from prototype.js. The logic is fiddly because
- * contentEditable is fiddly; resist refactoring without tests.
+ * We autosize the textarea to its content so it visually matches
+ * the rendered block area and doesn't introduce a stray scrollbar.
  */
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { SYMBOLS, filterSymbols } from './symbols';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { filterSymbols } from './symbols';
+import { applySymbolInsertion, matchSlashAtCaret } from './slashCommand';
 
 interface SmartTextProps {
   value: string;
   onChange: (value: string) => void;
   style?: CSSProperties;
   placeholder?: string;
+  /** Allows newlines + wraps; falsy = single-line title/heading style. */
   multiline?: boolean;
 }
 
-interface MenuPosition {
-  top: number;
-  left: number;
+interface MenuState {
+  open: boolean;
+  prefix: string;
+  x: number;
+  y: number;
 }
 
+const INITIAL_MENU: MenuState = { open: false, prefix: '', x: 0, y: 0 };
+
 export function SmartText({ value, onChange, style, placeholder, multiline }: SmartTextProps) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [showMenu, setShowMenu] = useState(false);
-  const [menuFilter, setMenuFilter] = useState('');
-  const [menuPos, setMenuPos] = useState<MenuPosition>({ top: 0, left: 0 });
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const [menu, setMenu] = useState<MenuState>(INITIAL_MENU);
+  const [focused, setFocused] = useState(false);
 
-  // Sync external value into the contentEditable whenever it changes
-  // from OUTSIDE this element — e.g. the sidebar edit panel rewriting
-  // the same block's content. We skip the sync when this element is
-  // the focused document.activeElement, so we don't clobber the
-  // user's caret / composition while they're actively typing inline.
-  useEffect(() => {
-    if (!ref.current) return;
-    if (document.activeElement === ref.current) return;
-    if (ref.current.textContent !== value) {
-      ref.current.textContent = value || '';
-    }
-  }, [value]);
-
-  const getTextAndCursor = (): { text: string; pos: number } => {
-    if (!ref.current) return { text: '', pos: 0 };
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) {
-      return { text: ref.current.textContent ?? '', pos: 0 };
-    }
-    const range = sel.getRangeAt(0).cloneRange();
-    range.selectNodeContents(ref.current);
-    range.setEnd(sel.getRangeAt(0).startContainer, sel.getRangeAt(0).startOffset);
-    return { text: ref.current.textContent ?? '', pos: range.toString().length };
+  // Autosize: set the textarea height to match its scrollHeight so
+  // the editor stretches with the user's content rather than showing
+  // an internal scrollbar.
+  const autosize = () => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = `${ta.scrollHeight}px`;
   };
 
-  const checkSlash = () => {
-    const { text, pos } = getTextAndCursor();
-    const before = text.substring(0, pos);
-    const m = before.match(/\/([a-zA-Z0-9]*)$/);
-    if (m && m[0].length >= 2) {
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount && ref.current) {
-        const rect = sel.getRangeAt(0).getBoundingClientRect();
-        const pr = ref.current.getBoundingClientRect();
-        setMenuFilter(m[1] ?? '');
-        setMenuPos({ top: rect.bottom - pr.top + 2, left: Math.max(0, rect.left - pr.left) });
-        setShowMenu(true);
-      }
-    } else {
-      setShowMenu(false);
+  useLayoutEffect(() => {
+    autosize();
+  }, [value]);
+
+  // Recompute the slash-command menu based on the caret position.
+  const recomputeMenu = () => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const caret = ta.selectionStart;
+    const match = matchSlashAtCaret(ta.value.substring(0, caret));
+    if (!match) {
+      setMenu((prev) => (prev.open ? INITIAL_MENU : prev));
+      return;
+    }
+    // Anchor below the caret using getBoundingClientRect + a rough
+    // estimate. For the canvas, positioning precision is less
+    // important than for the sidebar because the menu floats at a
+    // high z-index and the user can always click an option visually.
+    const rect = ta.getBoundingClientRect();
+    const lh = parseFloat(window.getComputedStyle(ta).lineHeight) || 20;
+    // Place the menu near the top-left of the textarea for simplicity.
+    // The canvas scale makes pixel-perfect caret tracking unreliable.
+    setMenu({ open: true, prefix: match.prefix, x: 0, y: lh + 4 });
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    onChange(e.target.value);
+    // Defer to the next tick so selectionStart reflects the post-
+    // change caret, not the pre-change one.
+    requestAnimationFrame(recomputeMenu);
+  };
+
+  const handleKeyUp = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (
+      e.key === 'ArrowLeft' ||
+      e.key === 'ArrowRight' ||
+      e.key === 'ArrowUp' ||
+      e.key === 'ArrowDown' ||
+      e.key === 'Home' ||
+      e.key === 'End'
+    ) {
+      recomputeMenu();
     }
   };
 
   const insertSymbol = (key: string) => {
-    const sym = SYMBOLS[key];
-    if (!sym || !ref.current) return;
-    const { text, pos } = getTextAndCursor();
-    const before = text.substring(0, pos);
-    const slashIdx = before.lastIndexOf('/');
-    if (slashIdx < 0) return;
-
-    const newText = text.substring(0, slashIdx) + sym + text.substring(pos);
-    ref.current.textContent = newText;
-    onChange(newText);
-
-    // Restore caret to just after the inserted symbol.
-    try {
-      const newPos = slashIdx + sym.length;
-      const walker = document.createTreeWalker(ref.current, NodeFilter.SHOW_TEXT);
-      let node = walker.nextNode() as Text | null;
-      let offset = 0;
-      while (node) {
-        if (offset + node.length >= newPos) {
-          const rng = document.createRange();
-          rng.setStart(node, newPos - offset);
-          rng.collapse(true);
-          const sel = window.getSelection();
-          sel?.removeAllRanges();
-          sel?.addRange(rng);
-          break;
-        }
-        offset += node.length;
-        node = walker.nextNode() as Text | null;
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const result = applySymbolInsertion(ta.value, ta.selectionStart, key);
+    if (!result) return;
+    onChange(result.text);
+    setMenu(INITIAL_MENU);
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(result.caret, result.caret);
       }
-    } catch {
-      /* swallow — selection APIs are flaky cross-browser */
-    }
-    setShowMenu(false);
+    });
   };
 
-  const handleInput = () => {
-    if (!ref.current) return;
-    onChange(ref.current.textContent ?? '');
-    checkSlash();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Escape') {
-      setShowMenu(false);
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape' && menu.open) {
+      e.preventDefault();
+      setMenu(INITIAL_MENU);
       return;
     }
-    if (showMenu && (e.key === 'Tab' || e.key === 'Enter')) {
-      e.preventDefault();
-      const filtered = filterSymbols(menuFilter, 1);
-      if (filtered.length > 0 && filtered[0]) {
-        insertSymbol(filtered[0][0]);
+    if (menu.open && (e.key === 'Tab' || e.key === 'Enter')) {
+      const items = filterSymbols(menu.prefix, 1);
+      if (items.length > 0 && items[0]) {
+        e.preventDefault();
+        insertSymbol(items[0][0]);
+        return;
       }
+    }
+    // Single-line mode: swallow Enter so the title/heading stays
+    // on one line (unless the user explicitly wants multiline).
+    if (!multiline && e.key === 'Enter' && !menu.open) {
+      e.preventDefault();
     }
   };
 
-  const dropdownItems = showMenu ? filterSymbols(menuFilter, 8) : [];
+  const handleFocus = () => {
+    setFocused(true);
+  };
+
+  const handleBlur = () => {
+    setFocused(false);
+    window.setTimeout(() => setMenu(INITIAL_MENU), 120);
+  };
+
+  // Stop pointer events from bubbling up to the BlockFrame drag
+  // handler — clicking inside the textarea should position the caret,
+  // not start a block drag. Drag still works from the block frame
+  // outside the textarea's bounds.
+  const stopDrag = (e: React.PointerEvent) => {
+    e.stopPropagation();
+  };
+
+  const items = menu.open ? filterSymbols(menu.prefix, 8) : [];
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <div
-        ref={ref}
-        contentEditable
-        suppressContentEditableWarning
-        onInput={handleInput}
+      <textarea
+        ref={textareaRef}
+        value={value}
+        placeholder={placeholder}
+        onChange={handleChange}
         onKeyDown={handleKeyDown}
-        data-placeholder={placeholder}
+        onKeyUp={handleKeyUp}
+        onClick={recomputeMenu}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        onPointerDown={stopDrag}
+        rows={1}
         style={{
-          outline: 'none',
-          minHeight: '1em',
-          cursor: 'text',
-          wordWrap: 'break-word',
-          whiteSpace: multiline ? 'pre-wrap' : 'normal',
+          all: 'unset',
+          display: 'block',
           width: '100%',
-          height: '100%',
+          minHeight: '1em',
+          boxSizing: 'border-box',
+          resize: 'none',
+          overflow: 'hidden',
+          wordWrap: 'break-word',
+          whiteSpace: multiline ? 'pre-wrap' : 'nowrap',
+          cursor: 'text',
           ...style,
         }}
       />
 
-      {showMenu && dropdownItems.length > 0 && (
+      {/*
+        Focus hint — small floating badge that appears while the
+        textarea is focused and no slash menu is open. Tells users
+        that slash symbols are available even though the dropdown
+        only shows after they start typing a prefix.
+      */}
+      {focused && !menu.open && (
         <div
+          aria-hidden
           style={{
             position: 'absolute',
-            top: menuPos.top,
-            left: menuPos.left,
-            background: '#1a1a2e',
-            border: '1px solid #444',
-            borderRadius: 5,
-            padding: 3,
-            zIndex: 200,
-            maxHeight: 140,
-            overflow: 'auto',
-            boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
-            minWidth: 120,
+            bottom: -24,
+            left: 0,
+            fontSize: 10,
+            fontFamily: 'system-ui',
+            fontWeight: 600,
+            color: '#9ca3af',
+            background: '#1a1a26ee',
+            border: '1px solid #2a2a3a',
+            borderRadius: 4,
+            padding: '3px 8px',
+            letterSpacing: 0.3,
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            zIndex: 150,
           }}
         >
-          {dropdownItems.map(([k, sym]) => (
+          Type <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/</span> for symbols · <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/alpha</span>, <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/leq</span>, <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/pm</span>…
+        </div>
+      )}
+
+      {menu.open && items.length > 0 && (
+        <div
+          role="listbox"
+          style={{
+            position: 'absolute',
+            top: menu.y,
+            left: menu.x,
+            background: '#1a1a2e',
+            border: '1px solid #3a3a4a',
+            borderRadius: 6,
+            padding: 4,
+            zIndex: 200,
+            maxHeight: 180,
+            overflow: 'auto',
+            boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
+            minWidth: 160,
+          }}
+        >
+          {items.map(([k, sym]) => (
             <div
               key={k}
+              role="option"
+              aria-selected={false}
               onMouseDown={(e) => {
                 e.preventDefault();
                 insertSymbol(k);
               }}
               style={{
-                padding: '4px 10px',
+                padding: '6px 10px',
                 cursor: 'pointer',
-                fontSize: 11,
+                fontSize: 12,
                 color: '#ddd',
                 display: 'flex',
                 justifyContent: 'space-between',
                 gap: 16,
-                borderRadius: 3,
+                borderRadius: 4,
               }}
             >
-              <span style={{ color: '#7c6aed', fontFamily: 'monospace', fontSize: 10 }}>/{k}</span>
-              <span style={{ fontSize: 13 }}>{sym}</span>
+              <span style={{ color: '#7c6aed', fontFamily: 'monospace', fontSize: 11 }}>/{k}</span>
+              <span style={{ fontSize: 14 }}>{sym}</span>
             </div>
           ))}
-          <div style={{ fontSize: 8, color: '#555', padding: '3px 10px', borderTop: '1px solid #333' }}>
+          <div style={{ fontSize: 10, color: '#666', padding: '4px 10px', borderTop: '1px solid #333' }}>
             Tab or Enter to insert
           </div>
         </div>

@@ -18,6 +18,7 @@ import type {
   Reference,
   Styles,
   TableData,
+  TypeStyle,
 } from '@postr/shared';
 import { nanoid } from 'nanoid';
 import {
@@ -45,7 +46,7 @@ import { parseBibtex, parseRis } from './parsers';
 import { AuthorLine } from './blocks';
 import { SmartTextarea } from './SmartTextarea';
 
-export type SidebarTab = 'layout' | 'authors' | 'refs' | 'style' | 'edit';
+export type SidebarTab = 'layout' | 'authors' | 'refs' | 'style' | 'edit' | 'insert';
 
 export interface StylePreset {
   name: string;
@@ -320,7 +321,7 @@ export function Sidebar(props: SidebarProps) {
             paddingTop: 4,
           }}
         >
-          {(['layout', 'authors', 'refs', 'style', 'edit'] as SidebarTab[]).map((t) => (
+          {(['layout', 'insert', 'edit', 'style', 'authors', 'refs'] as SidebarTab[]).map((t) => (
             <button
               key={t}
               data-postr-tab
@@ -396,9 +397,10 @@ export function Sidebar(props: SidebarProps) {
             palette={props.palette}
             styles={props.styles}
             onChangeStyles={props.onChangeStyles}
-            onAddBlock={props.onAddBlock}
           />
         )}
+
+        {tab === 'insert' && <AddBlockPanel onAddBlock={props.onAddBlock} />}
         </div>
       </div>
     </div>
@@ -1182,7 +1184,6 @@ function EditTab(props: {
   palette: Palette;
   styles: Styles;
   onChangeStyles: (s: Styles) => void;
-  onAddBlock: (t: Block['type']) => void;
 }) {
   const sb = props.selectedBlock;
   const isTextLike = sb && ['text', 'heading', 'title'].includes(sb.type);
@@ -1204,137 +1205,22 @@ function EditTab(props: {
 
   return (
     <>
-      <div style={labelStyle}>Selected Block</div>
       {sb && sb.type === 'table' ? (
         <TableEditor block={sb} onUpdateBlock={props.onUpdateBlock} />
       ) : sb && isTextLike && styleLevel ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#555', textTransform: 'uppercase' }}>
-            Editing: {sb.type}
-          </div>
-          <SmartTextarea
-            value={sb.content}
-            onChange={(v) => props.onUpdateBlock(sb.id, { content: v })}
-            placeholder="Type here… (type / for symbols)"
-            rows={5}
-            style={{ minHeight: 120, maxHeight: 240 }}
-          />
-          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: 12, color: '#666' }}>Size</label>
-            <input
-              type="number"
-              value={Math.round(unitsToPt(styleLevel.size))}
-              onChange={(e) => updateStyle('size', ptToUnits(+e.target.value))}
-              min={12}
-              max={200}
-              step={2}
-              style={{ ...inputBase, width: 44, textAlign: 'center' }}
-              title="Font size (points)"
-            />
-            <span style={{ fontSize: 12, color: '#555' }}>pt</span>
-            <label style={{ fontSize: 12, color: '#666' }}>Wt</label>
-            <select
-              value={styleLevel.weight}
-              onChange={(e) => updateStyle('weight', +e.target.value)}
-              style={{ ...inputBase, width: 50, appearance: 'auto' }}
-            >
-              {FONT_WEIGHTS.map((w) => (
-                <option key={w} value={w}>
-                  {w}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => updateStyle('italic', !styleLevel.italic)}
-              style={{
-                all: 'unset',
-                cursor: 'pointer',
-                padding: '2px 6px',
-                borderRadius: 3,
-                fontSize: 15,
-                fontStyle: 'italic',
-                background: styleLevel.italic ? '#7c6aed33' : '#1a1a26',
-                border: `1px solid ${styleLevel.italic ? '#7c6aed' : '#2a2a3a'}`,
-                color: styleLevel.italic ? '#b8a8ff' : '#666',
-              }}
-            >
-              I
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <label style={{ fontSize: 12, color: '#666', whiteSpace: 'nowrap' }}>Line spacing</label>
-            <input
-              type="range"
-              min={1}
-              max={2.5}
-              step={0.05}
-              value={styleLevel.lineHeight}
-              onChange={(e) => updateStyle('lineHeight', +e.target.value)}
-              style={{ flex: 1, accentColor: '#7c6aed' }}
-            />
-            <span style={{ fontSize: 14, color: '#888', minWidth: 24 }}>{styleLevel.lineHeight.toFixed(2)}</span>
-          </div>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <label style={{ fontSize: 12, color: '#666' }}>Color</label>
-            <input
-              type="color"
-              value={styleLevel.color || props.palette.primary}
-              onChange={(e) => updateStyle('color', e.target.value)}
-              style={{ width: 22, height: 22, border: '1px solid #333', borderRadius: 3, cursor: 'pointer', padding: 0 }}
-            />
-            <button
-              onClick={() => updateStyle('color', null)}
-              style={{ all: 'unset', cursor: 'pointer', fontSize: 12, color: '#666' }}
-            >
-              Reset
-            </button>
-          </div>
-          <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <label style={{ fontSize: 12, color: '#666' }}>Highlight</label>
-            {HIGHLIGHT_PRESETS.map((h, i) => (
-              <div
-                key={i}
-                onClick={() => updateStyle('highlight', h)}
-                style={{
-                  width: 16,
-                  height: 16,
-                  borderRadius: 3,
-                  background: h ?? '#1a1a26',
-                  border: `1.5px solid ${styleLevel.highlight === h ? '#7c6aed' : '#333'}`,
-                  cursor: 'pointer',
-                }}
-              />
-            ))}
-          </div>
-        </div>
+        <TextBlockEditor
+          block={sb}
+          styleLevel={styleLevel}
+          palette={props.palette}
+          onUpdateBlock={props.onUpdateBlock}
+          onUpdateStyle={updateStyle}
+        />
       ) : (
-        <div style={{ fontSize: 15, color: '#555', padding: '8px 0' }}>Click a block on the poster to edit it here.</div>
+        <div style={{ fontSize: 14, color: '#555', padding: '16px 0', lineHeight: 1.5 }}>
+          Click a block on the canvas to edit it here, or switch to the{' '}
+          <span style={{ color: '#c8b6ff' }}>Insert</span> tab to add a new one.
+        </div>
       )}
-
-      <div style={labelStyle}>Add Block</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-        {(
-          [
-            ['heading', 'Heading'],
-            ['text', 'Text'],
-            ['image', 'Image'],
-            ['table', 'Table'],
-            ['references', 'References'],
-            ['logo', 'Logo'],
-          ] as Array<[Block['type'], string]>
-        ).map(([t, l]) => (
-          <button key={t} onClick={() => props.onAddBlock(t)} style={buttonStyle(false)}>
-            + {l}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ ...labelStyle, marginTop: 28 }}>Symbols (type / in text)</div>
-      <div style={{ fontSize: 14, color: '#666', lineHeight: 1.5 }}>
-        /alpha → α · /beta → β · /eta2 → η² · /chi2 → χ² · /leq → ≤ · /geq → ≥ · /pm → ± · /arrow → →
-        <br />
-        Stats: /p → 𝑝 · /F → 𝐹 · /t → 𝑡 · /d → 𝑑 · /SD · /SE · /CI · /df → 𝑑𝑓
-      </div>
     </>
   );
 }
@@ -1540,6 +1426,285 @@ function TableEditor(props: {
         Tip: paste a table from Word or Excel straight into a cell — rows and
         columns are re-created automatically.
       </p>
+    </div>
+  );
+}
+
+// =========================================================================
+// TextBlockEditor — sidebar panel for the selected text / heading / title
+// =========================================================================
+//
+// Every control gets its own labeled row with consistent spacing, so the
+// Size input, weight select, italic toggle, line-spacing slider, color
+// picker, and highlight swatches are all immediately visible rather than
+// crammed into a wrap-flex row. Labels are left-aligned block headings
+// rather than inline hints so screen readers associate them correctly.
+
+function TextBlockEditor(props: {
+  block: Block;
+  styleLevel: TypeStyle;
+  palette: Palette;
+  onUpdateBlock: (id: string, patch: Partial<Block>) => void;
+  onUpdateStyle: (field: string, value: number | boolean | string | null) => void;
+}) {
+  const { block, styleLevel, palette, onUpdateBlock, onUpdateStyle } = props;
+
+  const fieldLabel: CSSProperties = {
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#9ca3af',
+    textTransform: 'uppercase',
+    letterSpacing: '0.6px',
+    marginBottom: 8,
+    display: 'block',
+  };
+
+  const row: CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        Editing: {block.type}
+      </div>
+
+      {/* Content */}
+      <div>
+        <label style={fieldLabel}>Content</label>
+        <SmartTextarea
+          value={block.content}
+          onChange={(v) => onUpdateBlock(block.id, { content: v })}
+          placeholder="Type here… (type / for symbols)"
+          rows={5}
+          style={{ minHeight: 120, maxHeight: 260, fontSize: 16 }}
+        />
+      </div>
+
+      {/* Size · Weight · Italic */}
+      <div>
+        <label style={fieldLabel}>Font</label>
+        <div style={row}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="number"
+              value={Math.round(unitsToPt(styleLevel.size))}
+              onChange={(e) => onUpdateStyle('size', ptToUnits(+e.target.value))}
+              min={12}
+              max={200}
+              step={2}
+              style={{
+                ...inputBase,
+                width: 64,
+                textAlign: 'center',
+                padding: '10px 10px',
+                fontSize: 15,
+              }}
+              title="Font size (points)"
+            />
+            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>pt</span>
+          </div>
+          <select
+            value={styleLevel.weight}
+            onChange={(e) => onUpdateStyle('weight', +e.target.value)}
+            style={{
+              ...inputBase,
+              width: 90,
+              appearance: 'auto',
+              padding: '10px 12px',
+              fontSize: 14,
+            }}
+          >
+            {FONT_WEIGHTS.map((w) => (
+              <option key={w} value={w}>
+                {w}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => onUpdateStyle('italic', !styleLevel.italic)}
+            aria-pressed={styleLevel.italic}
+            title="Italic"
+            style={{
+              all: 'unset',
+              cursor: 'pointer',
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 6,
+              fontSize: 18,
+              fontWeight: 700,
+              fontStyle: 'italic',
+              fontFamily: 'Georgia, serif',
+              background: styleLevel.italic ? '#7c6aed22' : '#1a1a26',
+              border: `1px solid ${styleLevel.italic ? '#7c6aed' : '#2a2a3a'}`,
+              color: styleLevel.italic ? '#c8b6ff' : '#9ca3af',
+              boxSizing: 'border-box',
+            }}
+          >
+            I
+          </button>
+        </div>
+      </div>
+
+      {/* Line spacing */}
+      <div>
+        <label style={fieldLabel}>
+          Line spacing · <span style={{ color: '#c8b6ff' }}>{styleLevel.lineHeight.toFixed(2)}</span>
+        </label>
+        <input
+          type="range"
+          min={1}
+          max={2.5}
+          step={0.05}
+          value={styleLevel.lineHeight}
+          onChange={(e) => onUpdateStyle('lineHeight', +e.target.value)}
+          style={{ width: '100%', accentColor: '#7c6aed' }}
+        />
+      </div>
+
+      {/* Color */}
+      <div>
+        <label style={fieldLabel}>Text color</label>
+        <div style={row}>
+          <input
+            type="color"
+            value={styleLevel.color || palette.primary}
+            onChange={(e) => onUpdateStyle('color', e.target.value)}
+            style={{
+              width: 40,
+              height: 40,
+              border: '1px solid #2a2a3a',
+              borderRadius: 6,
+              cursor: 'pointer',
+              padding: 0,
+              background: '#1a1a26',
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => onUpdateStyle('color', null)}
+            style={{
+              all: 'unset',
+              cursor: 'pointer',
+              padding: '10px 14px',
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#9ca3af',
+              background: '#1a1a26',
+              border: '1px solid #2a2a3a',
+            }}
+          >
+            Reset to palette
+          </button>
+        </div>
+      </div>
+
+      {/* Highlight */}
+      <div>
+        <label style={fieldLabel}>Highlight</label>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {HIGHLIGHT_PRESETS.map((h, i) => {
+            const isNone = h === null;
+            const active = styleLevel.highlight === h;
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onUpdateStyle('highlight', h)}
+                aria-pressed={active}
+                title={isNone ? 'None' : h ?? ''}
+                style={{
+                  all: 'unset',
+                  cursor: 'pointer',
+                  width: 32,
+                  height: 32,
+                  borderRadius: 6,
+                  background: h ?? 'transparent',
+                  border: `2px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#6b7280',
+                  fontSize: 14,
+                  boxSizing: 'border-box',
+                }}
+              >
+                {isNone ? '∅' : ''}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// AddBlockPanel — the Insert tab's block-type picker
+// =========================================================================
+
+function AddBlockPanel(props: { onAddBlock: (t: Block['type']) => void }) {
+  const blocks: Array<[Block['type'], string, string]> = [
+    ['heading', 'Heading', 'Section title with auto-numbering'],
+    ['text', 'Text', 'Paragraph with slash-command symbols'],
+    ['image', 'Image', 'Figure or photo upload'],
+    ['table', 'Table', 'Data table with border presets'],
+    ['references', 'References', 'Auto-formatted from Refs tab'],
+    ['logo', 'Logo', 'Institution or sponsor mark'],
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        Add a block
+      </div>
+      {blocks.map(([type, label, desc]) => (
+        <button
+          key={type}
+          type="button"
+          onClick={() => props.onAddBlock(type)}
+          style={{
+            all: 'unset',
+            cursor: 'pointer',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            gap: 4,
+            padding: '14px 16px',
+            background: '#1a1a26',
+            border: '1px solid #2a2a3a',
+            borderRadius: 8,
+            boxSizing: 'border-box',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#7c6aed';
+            e.currentTarget.style.background = '#7c6aed11';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = '#2a2a3a';
+            e.currentTarget.style.background = '#1a1a26';
+          }}
+        >
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#e2e2e8' }}>+ {label}</span>
+          <span style={{ fontSize: 12, color: '#6b7280' }}>{desc}</span>
+        </button>
+      ))}
+
+      <div style={{ marginTop: 12, padding: '14px 16px', background: '#0f0f17', borderRadius: 8, border: '1px solid #1e1e2e' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+          Slash symbols
+        </div>
+        <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+          Inside a text block type <code style={{ color: '#c8b6ff' }}>/alpha</code>, <code style={{ color: '#c8b6ff' }}>/beta</code>, <code style={{ color: '#c8b6ff' }}>/leq</code>, <code style={{ color: '#c8b6ff' }}>/pm</code>, or stats shortcuts like <code style={{ color: '#c8b6ff' }}>/p</code>, <code style={{ color: '#c8b6ff' }}>/SD</code>, <code style={{ color: '#c8b6ff' }}>/df</code>.
+        </div>
+      </div>
     </div>
   );
 }
