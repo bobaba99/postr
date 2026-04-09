@@ -17,6 +17,8 @@ import type {
 } from '@postr/shared';
 import { nanoid } from 'nanoid';
 import { usePosterStore } from '@/stores/posterStore';
+import { useGsapContext } from '@/motion';
+import { editorEntrance } from '@/motion/timelines/editorEntrance';
 import { BlockFrame } from './blocks';
 import { Sidebar, type StylePreset } from './Sidebar';
 import {
@@ -182,6 +184,12 @@ export function PosterEditor() {
   const [savedPresets, setSavedPresets] = useState<StylePreset[]>([]);
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  // Editor entrance animation — runs once on mount, scoped to root.
+  useGsapContext(() => {
+    editorEntrance();
+  }, rootRef);
 
   if (!doc || !posterId) {
     return (
@@ -339,6 +347,7 @@ export function PosterEditor() {
 
   return (
     <div
+      ref={rootRef}
       style={{
         display: 'flex',
         height: '100vh',

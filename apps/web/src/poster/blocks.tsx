@@ -7,7 +7,8 @@
  * conventions and porting them as separate modules would scatter the
  * coupling. Re-split if any one of them grows past ~150 lines.
  */
-import { useRef, type CSSProperties } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
+import { blockSelection } from '@/motion/timelines/blockSelection';
 import type {
   Author,
   Block,
@@ -509,6 +510,14 @@ export function BlockFrame(props: BlockFrameProps) {
 
   const isHeading = b.type === 'heading';
   const level = b.type === 'title' ? st.title : b.type === 'authors' ? st.authors : isHeading ? st.heading : st.body;
+  const frameRef = useRef<HTMLDivElement | null>(null);
+
+  // Pop the selection ring when this block becomes selected.
+  useEffect(() => {
+    if (selected && frameRef.current) {
+      blockSelection(frameRef.current);
+    }
+  }, [selected]);
 
   const headingBorderStyle = (): CSSProperties => {
     if (hs.border === 'bottom') return { borderBottom: `1.5px solid ${p.accent}44`, paddingBottom: 2 };
@@ -540,6 +549,7 @@ export function BlockFrame(props: BlockFrameProps) {
 
   return (
     <div
+      ref={frameRef}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(b.id);
