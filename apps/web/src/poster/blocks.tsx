@@ -138,13 +138,21 @@ export function ImageBlock({ block, palette, onUpdate }: ImageBlockProps) {
         justifyContent: 'center',
         border: `1.5px dashed ${palette.muted}44`,
         borderRadius: 4,
-        cursor: 'pointer',
+        // Inherit the BlockFrame's cursor: move so the user sees
+        // the block is draggable. The click-to-upload path still
+        // fires through the onClick handler — drag-vs-click
+        // disambiguation is handled by the BlockFrame's
+        // didDragRef in onClickCapture.
+        cursor: 'inherit',
         color: palette.muted,
         fontSize: 9,
         gap: 3,
+        textAlign: 'center',
+        padding: '0 8px',
       }}
     >
-      <span>Upload figure</span>
+      <span style={{ fontWeight: 600 }}>+ Upload figure</span>
+      <span style={{ fontSize: 7, opacity: 0.7 }}>click to browse · drag to move</span>
       <input ref={ref} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
     </div>
   );
@@ -431,6 +439,12 @@ export function BlockFrame(props: BlockFrameProps) {
   } = props;
 
   const isHeading = b.type === 'heading';
+  // Blocks that grow with their text content (B1 fix). These use
+  // minHeight: b.h as a floor, height: auto so the visible area
+  // expands as the user adds more text. Prevents the "title
+  // clipped mid-word when too long" bug where the second line
+  // disappeared behind the block's fixed bottom edge.
+  const growsWithContent = b.type === 'title' || b.type === 'text';
   const level = b.type === 'title' ? st.title : b.type === 'authors' ? st.authors : isHeading ? st.heading : st.body;
   const frameRef = useRef<HTMLDivElement | null>(null);
   // Selection info for the floating format toolbar — populated by
@@ -512,7 +526,12 @@ export function BlockFrame(props: BlockFrameProps) {
         left: b.x,
         top: b.y,
         width: b.w,
-        height: isHeading ? 'auto' : b.h,
+        // Headings + title/text grow with content. Everything else
+        // (image, logo, table, references, authors) stays at its
+        // declared h. growsWithContent blocks use minHeight as the
+        // floor so they never shrink below the user's resize.
+        height: isHeading || growsWithContent ? 'auto' : b.h,
+        minHeight: growsWithContent ? b.h : undefined,
         background: bg,
         border: selected ? `1.5px solid ${p.accent}88` : '1px solid transparent',
         borderRadius: 2,
@@ -522,7 +541,16 @@ export function BlockFrame(props: BlockFrameProps) {
         overflow: 'visible',
       }}
     >
-      <div style={{ width: '100%', height: isHeading ? 'auto' : '100%', overflow: isHeading ? 'visible' : 'hidden' }}>
+      <div
+        style={{
+          width: '100%',
+          height: isHeading || growsWithContent ? 'auto' : '100%',
+          // Text/title blocks no longer clip — content overflow is
+          // visible so the user sees everything they typed. Image /
+          // table / references still clip since they're constrained.
+          overflow: isHeading || growsWithContent ? 'visible' : 'hidden',
+        }}
+      >
         {b.type === 'title' && (
           <RichTextEditor
             value={b.content}

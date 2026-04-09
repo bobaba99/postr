@@ -127,7 +127,11 @@ const labelStyle: CSSProperties = {
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '1.2px',
-  color: '#555',
+  // Bumped from #555 (near-invisible on dark bg) to #9ca3af so
+  // section headings are legible across every tab. Audit flagged
+  // this on the AUTHORS tab where ① INSTITUTIONS / ② AUTHORS
+  // looked like placeholder text.
+  color: '#9ca3af',
   marginBottom: 8,
   marginTop: 28,
 };

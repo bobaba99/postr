@@ -1,0 +1,88 @@
+- generic [ref=e5]:
+  - button "Show sidebar" [ref=e412] [cursor=pointer]:
+    - img [ref=e413]
+  - generic [ref=e52]:
+    - generic [ref=e53]:
+      - generic [ref=e55]:
+        - img
+        - generic [ref=e56]:
+          - generic [ref=e58]: Your Poster Title α
+          - img [ref=e60]
+        - generic [ref=e62]:
+          - generic [ref=e63]: Add authors in sidebar →
+          - img [ref=e65]
+        - generic [ref=e69]:
+          - generic [ref=e70]: "1."
+          - generic [ref=e71]: Introduction
+        - generic [ref=e72]:
+          - generic [ref=e74]: Background and research question. Provide context, motivation, and the gap your work addresses.
+          - img [ref=e76]
+        - generic [ref=e80]:
+          - generic [ref=e81]: "5."
+          - generic [ref=e82]: Hypotheses
+        - generic [ref=e83]:
+          - generic [ref=e85]: State your specific hypotheses or research aims here.
+          - img [ref=e87]
+        - generic [ref=e91]:
+          - generic [ref=e92]: "2."
+          - generic [ref=e93]: Methods
+        - generic [ref=e94]:
+          - generic [ref=e96]: Participants, design, materials, procedure, and analysis approach.
+          - img [ref=e98]
+        - generic [ref=e100]:
+          - generic [ref=e103] [cursor=pointer]: Upload figure
+          - img [ref=e105]
+        - generic [ref=e109]:
+          - generic [ref=e110]: "3."
+          - generic [ref=e111]: Results
+        - generic [ref=e112]:
+          - table [ref=e115]:
+            - rowgroup [ref=e120]:
+              - row "Measure M (SD) 𝑝" [ref=e121]:
+                - cell "Measure" [ref=e122]:
+                  - textbox [ref=e123]: Measure
+                - cell "M (SD)" [ref=e124]:
+                  - textbox [ref=e125]: M (SD)
+                - cell "𝑝" [ref=e126]:
+                  - textbox [ref=e127]: 𝑝
+              - row "DV 1 4.2 (0.8) < .01" [ref=e128]:
+                - cell "DV 1" [ref=e129]:
+                  - textbox [ref=e130]: DV 1
+                - cell "4.2 (0.8)" [ref=e131]:
+                  - textbox [ref=e132]: 4.2 (0.8)
+                - cell "< .01" [ref=e133]:
+                  - textbox [ref=e134]: < .01
+              - row "DV 2 3.1 (1.1) .03" [ref=e135]:
+                - cell "DV 2" [ref=e136]:
+                  - textbox [ref=e137]: DV 2
+                - cell "3.1 (1.1)" [ref=e138]:
+                  - textbox [ref=e139]: 3.1 (1.1)
+                - cell ".03" [ref=e140]:
+                  - textbox [ref=e141]: ".03"
+              - row "DV 3 2.8 (0.6) .12" [ref=e142]:
+                - cell "DV 3" [ref=e143]:
+                  - textbox [ref=e144]: DV 3
+                - cell "2.8 (0.6)" [ref=e145]:
+                  - textbox [ref=e146]: 2.8 (0.6)
+                - cell ".12" [ref=e147]:
+                  - textbox [ref=e148]: ".12"
+          - img [ref=e150]
+          - button "×" [ref=e411] [cursor=pointer]
+          - generic: table
+        - generic [ref=e154]:
+          - generic [ref=e155]: "4."
+          - generic [ref=e156]: Conclusions
+        - generic [ref=e157]:
+          - generic [ref=e159]: Low-WM participants showed a reliable ACR bias that the control primer significantly reduced. High-WM participants showed weak baseline ACR and no primer effect, consistent with a dynamic control-capture account.
+          - img [ref=e161]
+        - generic [ref=e163]:
+          - generic [ref=e165]: Add references in Refs tab →
+          - img [ref=e167]
+      - generic [ref=e169]: 48"×36" Landscape · Source Sans 3 · Classic Academic
+    - generic [ref=e170]:
+      - button "−" [ref=e171] [cursor=pointer]
+      - button "233%" [ref=e415] [cursor=pointer]
+      - button "+" [ref=e173] [cursor=pointer]
+      - button "FIT" [ref=e175] [cursor=pointer]
+    - status "4/9/2026, 4:24:05 AM":
+      - generic: Saved · 3m ago
