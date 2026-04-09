@@ -158,11 +158,30 @@ function useZoom(canvasRef: React.RefObject<HTMLDivElement>, sizeKey: PosterSize
       if (!canvasRef.current) return;
       const r = canvasRef.current.getBoundingClientRect();
       const sz = POSTER_SIZES[sizeKey]!;
-      setFit(Math.min((r.width - 60) / (sz.w * PX), (r.height - 60) / (sz.h * PX), 2));
+      // Fit-to-viewport picks the tighter of width vs height ratio
+      // minus 60 px of canvas padding. The 5× upper bound is a
+      // safety net for pathological cases (canvas not yet measured,
+      // offscreen, etc.) — it's not a "sensible max zoom", auto-fit
+      // on a large monitor should happily go to 3–4×.
+      const wRatio = (r.width - 60) / (sz.w * PX);
+      const hRatio = (r.height - 60) / (sz.h * PX);
+      const ratio = Math.min(wRatio, hRatio, 5);
+      // Guard against NaN / negative when the container hasn't laid
+      // out yet (width < 60).
+      setFit(ratio > 0 && Number.isFinite(ratio) ? ratio : 1);
     };
     compute();
+
+    // Re-fit when the canvas element itself resizes (sidebar changes
+    // width, devtools open/close, etc.) not just the window.
+    const ro = new ResizeObserver(compute);
+    if (canvasRef.current) ro.observe(canvasRef.current);
+
     window.addEventListener('resize', compute);
-    return () => window.removeEventListener('resize', compute);
+    return () => {
+      window.removeEventListener('resize', compute);
+      ro.disconnect();
+    };
   }, [sizeKey, canvasRef]);
 
   return { zoom: manual ?? fit, setZoom: setManual };
