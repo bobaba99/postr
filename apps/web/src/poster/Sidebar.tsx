@@ -165,28 +165,41 @@ export function Sidebar(props: SidebarProps) {
     if (props.selectedBlock) setTab('edit');
   }, [props.selectedBlock?.id]);
 
-  // Two states only: deselected (dark gray) and selected (white).
-  // No hover color change — previously we had a lighter hover shade
-  // (#c8cad0) but that created a visibly "stuck" bright state on
-  // whichever tab the pointer happened to land on last, which users
-  // read as the light state being the default. One-shade, no flicker.
+  // Two states only: deselected (dark gray) and selected (white +
+  // purple left bar + dark fill).
+  //
+  // Why `all: unset` and why no transitions:
+  //   1. Native <button> leaks default :focus outline, :hover bg,
+  //      user-agent padding, font, appearance, and user-select.
+  //      Without `all: unset` Chrome draws a faint focus ring on top
+  //      of our own active indicator — users read that as a phantom
+  //      "light gray" state that lingers after clicking a tab.
+  //   2. Transitioning color + background-color interpolates RGB
+  //      between active and inactive when switching tabs. Mid-fade,
+  //      the tab you just left reads as a distinct third color
+  //      (neither bright white nor dim #6b7280) — that's the
+  //      "third state" users kept seeing. We need instant snaps.
+  //   3. outline: none is REQUIRED even with `all: unset` because
+  //      some browsers re-apply focus outline via :focus-visible
+  //      at the user-agent level.
   const tabStyle = (active: boolean): CSSProperties => ({
+    all: 'unset',
+    boxSizing: 'border-box',
+    display: 'block',
+    width: '100%',
     padding: '14px 16px',
     textAlign: 'left',
     cursor: 'pointer',
+    fontFamily: 'inherit',
     fontWeight: 600,
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: '0.7px',
-    color: active ? '#fff' : '#6b7280',
-    background: active ? '#1e1e2e' : 'transparent',
-    borderLeft: active ? '3px solid #7c6aed' : '3px solid transparent',
-    border: 'none',
-    borderLeftWidth: 3,
-    borderLeftStyle: 'solid',
-    display: 'block',
-    width: '100%',
-    transition: 'background-color 120ms ease, color 120ms ease',
+    userSelect: 'none',
+    outline: 'none',
+    color: active ? '#ffffff' : '#6b7280',
+    backgroundColor: active ? '#1e1e2e' : 'transparent',
+    borderLeft: `3px solid ${active ? '#7c6aed' : 'transparent'}`,
   });
 
   return (
@@ -209,6 +222,19 @@ export function Sidebar(props: SidebarProps) {
         position: 'relative',
       }}
     >
+      {/*
+        Keyboard focus-visible indicator for the tab rail. Inline
+        styles can't express pseudo-classes, so we scope a tiny
+        stylesheet here. Only :focus-visible is targeted, not :focus,
+        so click-focus stays invisible (no ghost ring) while keyboard
+        Tab/Arrow navigation still shows where focus landed.
+      */}
+      <style>{`
+        button[data-postr-tab]:focus-visible {
+          box-shadow: inset 0 0 0 1px #7c6aed;
+        }
+      `}</style>
+
       {/* Hide-sidebar toggle, floats in the top-right corner.
           Notion-style: one click to collapse, and a reveal tab is
           rendered in PosterEditor when sidebarOpen is false. */}
@@ -284,7 +310,13 @@ export function Sidebar(props: SidebarProps) {
           }}
         >
           {(['layout', 'authors', 'refs', 'style', 'edit'] as SidebarTab[]).map((t) => (
-            <button key={t} onClick={() => setTab(t)} style={tabStyle(tab === t)}>
+            <button
+              key={t}
+              data-postr-tab
+              type="button"
+              onClick={() => setTab(t)}
+              style={tabStyle(tab === t)}
+            >
               {t}
             </button>
           ))}
