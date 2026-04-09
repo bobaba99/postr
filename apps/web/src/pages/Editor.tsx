@@ -13,7 +13,32 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { loadOrCreateMostRecentPoster, loadPoster } from '@/data/posters';
 import { usePosterStore } from '@/stores/posterStore';
 import { PosterEditor } from '@/poster/PosterEditor';
+import { makeBlocks } from '@/poster/templates';
+import { PALETTES } from '@/poster/constants';
 import type { PosterDoc } from '@postr/shared';
+
+/**
+ * Posters can arrive here empty — either from the handle_new_user
+ * trigger (which inserts with the migration's default data) or from
+ * the client createPoster() fallback. Both paths leave `blocks: []`
+ * and a palette that doesn't exactly match the Classic Academic
+ * catalog entry. Hydrate the doc so the user always lands on a
+ * populated 3-column template with a real catalog palette.
+ *
+ * This is in-memory only — Phase 4 autosave will persist the
+ * hydrated doc the moment the user touches anything.
+ */
+function hydrateIfEmpty(doc: PosterDoc): PosterDoc {
+  if (doc.blocks.length > 0) return doc;
+  const classic = PALETTES[0]!;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { name: _name, ...palette } = classic;
+  return {
+    ...doc,
+    blocks: makeBlocks('3col', doc.widthIn, doc.heightIn),
+    palette,
+  };
+}
 
 type Status = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string };
 
@@ -40,7 +65,7 @@ export default function Editor() {
         }
 
         if (cancelled) return;
-        setPoster(row.id, row.data as PosterDoc);
+        setPoster(row.id, hydrateIfEmpty(row.data as PosterDoc));
         // Normalize the URL so refreshes land on the real id, not "/p/new"
         if (posterId !== row.id) {
           navigate(`/p/${row.id}`, { replace: true });
