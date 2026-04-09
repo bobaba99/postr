@@ -16,6 +16,7 @@
 |-------|--------|
 | Frontend | Vite + React 18 + TypeScript (SPA) |
 | Styling | Tailwind CSS + CSS variables for poster palette |
+| Motion | GSAP 3 (premium micro-interactions, sidebar transitions, selection feedback) |
 | State | Zustand (client store) + React Query (server cache) |
 | Routing | React Router v6 (`/`, `/p/:id`, `/s/:slug`) |
 | Fonts | Google Fonts via CDN (10 curated families) |
@@ -549,7 +550,80 @@ Images and logos are uploaded to Supabase Storage rather than embedded as base64
 - Scanned presets show the source image as the thumbnail.
 - `presets.data` is the single source of truth — same shape as the in-memory preset used by the prototype.
 
-### 21. Reusable Author / Institution / Reference Library
+### 21. Motion & Animation (GSAP)
+
+Postr uses **GSAP 3** for premium micro-interactions throughout the editor and landing surfaces. Animation is the cheapest "premium feel" lever — done well it makes the same feature set feel more polished without changing functionality.
+
+**Principles:**
+
+- **Friction principle still wins.** Animations are short (150–350 ms), interruptible, and never block input. If a user clicks a second thing while the first is animating, the new action wins.
+- **Respect `prefers-reduced-motion`.** All non-essential animations are gated by `gsap.matchMedia()` so users with the OS-level reduced-motion setting see instant transitions.
+- **No animation on data correctness.** Autosave indicators, RLS errors, and form validation show state immediately — no fade-in delay before the user sees a problem.
+- **One reusable module.** All timelines/eases live in `apps/web/src/motion/` so the surface area is auditable and styles stay consistent.
+
+**Library scope:**
+
+- **GSAP core only** (free) — no paid plugins. Specifically uses `gsap`, `gsap/ScrollTrigger` is NOT used yet.
+- Bundle impact target: < 60 kB gzipped over the React+Supabase baseline.
+
+**Animated moments:**
+
+| Moment | Animation | Trigger |
+|---|---|---|
+| Auth bootstrap → editor | Sidebar slides in from left, canvas fades + scales from 0.96 → 1 | When `<AuthBootstrap>` resolves and editor first paints |
+| Sidebar tab switch | Tab content cross-fades (180ms) | Tab button click |
+| Block selection | Selection ring scales from 1.04 → 1, soft glow pulse on the accent border | `setSelectedId` resolves to a new id |
+| Block insert | New block scales from 0.85 → 1 with overshoot ease | `addBlock()` |
+| Block delete | Old block fades + scales to 0.85 before removal | `deleteBlock()` (350ms before store mutation) |
+| Template apply / auto-layout | Stagger reposition: each block tweens from old → new (x, y, w, h) over 400ms | `applyTemplate()`, `autoLayout()` |
+| Zoom bar buttons | Subtle nudge on +/− press | Button click |
+| Scan modal | Drop-zone pulse on dragover; success checkmark draw-on | File enters / scan completes |
+| Save indicator pill | Crossfade between "Saving…" and "Saved · 2s ago" | Autosave tick |
+
+**Module layout:**
+
+```
+apps/web/src/motion/
+├── index.ts             // public exports
+├── eases.ts             // shared ease curves (smooth, overshoot, snap)
+├── presets.ts           // duration constants
+├── useGsapContext.ts    // wraps gsap.context() for React 18 cleanup
+└── timelines/
+    ├── editorEntrance.ts
+    ├── blockSelection.ts
+    ├── blockInsert.ts
+    ├── blockDelete.ts
+    ├── layoutReflow.ts
+    └── tabSwitch.ts
+```
+
+**`useGsapContext` hook:** wraps `gsap.context(scope)` to bind animations to a component subtree, then auto-reverts on unmount. This is the React 18 / Strict Mode-safe pattern for GSAP cleanup and is the **only** sanctioned way to fire GSAP timelines from a component.
+
+**Reduced motion fallback:**
+
+```ts
+// motion/index.ts
+import { gsap } from 'gsap';
+
+export const mm = gsap.matchMedia();
+
+mm.add(
+  {
+    isFull:   '(prefers-reduced-motion: no-preference)',
+    isReduced: '(prefers-reduced-motion: reduce)',
+  },
+  (ctx) => {
+    const { isReduced } = ctx.conditions ?? {};
+    if (isReduced) {
+      gsap.defaults({ duration: 0.001 }); // collapse to "instant"
+    }
+  },
+);
+```
+
+**Testing:** GSAP timelines are not unit-tested directly (animation correctness is visual). Each timeline is wrapped in a tiny factory that returns the configured `gsap.timeline()`, and the factories are smoke-tested to assert they call `gsap` with the expected arguments using `vi.mock('gsap')`. Visual verification happens in Playwright via `prefers-reduced-motion` toggling.
+
+### 22. Reusable Author / Institution / Reference Library
 
 Stored separately from posters so a user can reuse them across projects.
 
