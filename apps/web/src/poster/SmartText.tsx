@@ -12,10 +12,18 @@
  *   - Focus transfer works with React's default event flow — no
  *     preventDefault fights with the block drag handler.
  *
- * We autosize the textarea to its content so it visually matches
- * the rendered block area and doesn't introduce a stray scrollbar.
+ * IMPORTANT: the surrounding block lives inside a #poster-canvas
+ * element with `transform: scale(zoom)` applied for the fit-to-
+ * viewport zoom. Any element rendered as a DIRECT child of the
+ * textarea is scaled by that same transform — so a 12px dropdown
+ * font would render at 12 × 2.59 ≈ 31px on a typical screen.
+ * Dropdown AND focus-hint are rendered via React portals to
+ * document.body to escape the scale. Their positions are computed
+ * with getBoundingClientRect (which returns post-transform screen
+ * coordinates) and anchored with position: fixed.
  */
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { filterSymbols } from './symbols';
 import { applySymbolInsertion, matchSlashAtCaret } from './slashCommand';
 
@@ -37,10 +45,38 @@ interface MenuState {
 
 const INITIAL_MENU: MenuState = { open: false, prefix: '', x: 0, y: 0 };
 
+interface ViewportRect {
+  left: number;
+  bottom: number;
+  width: number;
+}
+
 export function SmartText({ value, onChange, style, placeholder, multiline }: SmartTextProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [menu, setMenu] = useState<MenuState>(INITIAL_MENU);
   const [focused, setFocused] = useState(false);
+  // Post-transform screen rect of the textarea, refreshed every
+  // animation frame while focused so portal overlays track the
+  // block if the user drags or the canvas zoom changes.
+  const [overlayRect, setOverlayRect] = useState<ViewportRect | null>(null);
+
+  useLayoutEffect(() => {
+    if (!focused) {
+      setOverlayRect(null);
+      return;
+    }
+    let rafId = 0;
+    const tick = () => {
+      const ta = textareaRef.current;
+      if (ta) {
+        const r = ta.getBoundingClientRect();
+        setOverlayRect({ left: r.left, bottom: r.bottom, width: r.width });
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [focused]);
 
   // Autosize: set the textarea height to match its scrollHeight so
   // the editor stretches with the user's content rather than showing
@@ -182,83 +218,94 @@ export function SmartText({ value, onChange, style, placeholder, multiline }: Sm
       />
 
       {/*
-        Focus hint — small floating badge that appears while the
-        textarea is focused and no slash menu is open. Tells users
-        that slash symbols are available even though the dropdown
-        only shows after they start typing a prefix.
+        Focus hint + slash menu live in a portal on document.body so
+        they render at TRUE pixel size — otherwise the parent canvas
+        transform: scale(zoom) would blow them up to ~30px fonts on
+        a typical 2.5× zoom. overlayRect is refreshed per-frame while
+        focused so the overlays follow the block if it's dragged.
       */}
-      {focused && !menu.open && (
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            bottom: -24,
-            left: 0,
-            fontSize: 10,
-            fontFamily: 'system-ui',
-            fontWeight: 600,
-            color: '#9ca3af',
-            background: '#1a1a26ee',
-            border: '1px solid #2a2a3a',
-            borderRadius: 4,
-            padding: '3px 8px',
-            letterSpacing: 0.3,
-            whiteSpace: 'nowrap',
-            pointerEvents: 'none',
-            zIndex: 150,
-          }}
-        >
-          Type <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/</span> for symbols · <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/alpha</span>, <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/leq</span>, <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/pm</span>…
-        </div>
-      )}
+      {overlayRect &&
+        focused &&
+        !menu.open &&
+        createPortal(
+          <div
+            aria-hidden
+            style={{
+              position: 'fixed',
+              left: overlayRect.left,
+              top: overlayRect.bottom + 4,
+              fontSize: 11,
+              fontFamily: 'system-ui',
+              fontWeight: 500,
+              color: '#9ca3af',
+              background: '#1a1a26ee',
+              border: '1px solid #2a2a3a',
+              borderRadius: 4,
+              padding: '3px 7px',
+              letterSpacing: 0.2,
+              whiteSpace: 'nowrap',
+              pointerEvents: 'none',
+              zIndex: 9500,
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            <span style={{ color: '#c8b6ff', fontFamily: 'monospace' }}>/</span> for symbols
+          </div>,
+          document.body,
+        )}
 
-      {menu.open && items.length > 0 && (
-        <div
-          role="listbox"
-          style={{
-            position: 'absolute',
-            top: menu.y,
-            left: menu.x,
-            background: '#1a1a2e',
-            border: '1px solid #3a3a4a',
-            borderRadius: 6,
-            padding: 4,
-            zIndex: 200,
-            maxHeight: 180,
-            overflow: 'auto',
-            boxShadow: '0 6px 20px rgba(0,0,0,0.5)',
-            minWidth: 160,
-          }}
-        >
-          {items.map(([k, sym]) => (
-            <div
-              key={k}
-              role="option"
-              aria-selected={false}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                insertSymbol(k);
-              }}
-              style={{
-                padding: '6px 10px',
-                cursor: 'pointer',
-                fontSize: 12,
-                color: '#ddd',
-                display: 'flex',
-                justifyContent: 'space-between',
-                gap: 16,
-                borderRadius: 4,
-              }}
-            >
-              <span style={{ color: '#7c6aed', fontFamily: 'monospace', fontSize: 11 }}>/{k}</span>
-              <span style={{ fontSize: 14 }}>{sym}</span>
+      {overlayRect &&
+        menu.open &&
+        items.length > 0 &&
+        createPortal(
+          <div
+            role="listbox"
+            style={{
+              position: 'fixed',
+              left: overlayRect.left,
+              top: overlayRect.bottom + 4,
+              background: '#1a1a2e',
+              border: '1px solid #3a3a4a',
+              borderRadius: 6,
+              padding: 4,
+              zIndex: 9600,
+              maxHeight: 220,
+              overflow: 'auto',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+              minWidth: 180,
+              fontFamily: 'system-ui',
+            }}
+          >
+            {items.map(([k, sym]) => (
+              <div
+                key={k}
+                role="option"
+                aria-selected={false}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  insertSymbol(k);
+                }}
+                style={{
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  color: '#ddd',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                  borderRadius: 4,
+                }}
+              >
+                <span style={{ color: '#7c6aed', fontFamily: 'monospace', fontSize: 12 }}>/{k}</span>
+                <span style={{ fontSize: 15 }}>{sym}</span>
+              </div>
+            ))}
+            <div style={{ fontSize: 10, color: '#666', padding: '4px 10px', borderTop: '1px solid #333' }}>
+              Tab or Enter to insert
             </div>
-          ))}
-          <div style={{ fontSize: 10, color: '#666', padding: '4px 10px', borderTop: '1px solid #333' }}>
-            Tab or Enter to insert
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
