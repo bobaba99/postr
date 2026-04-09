@@ -153,7 +153,6 @@ const buttonStyle = (active: boolean): CSSProperties => ({
 export function Sidebar(props: SidebarProps) {
   const [tab, setTab] = useState<SidebarTab>('layout');
   const [presetName, setPresetName] = useState('');
-  const [hoveredTab, setHoveredTab] = useState<SidebarTab | null>(null);
 
   // Auto-switch to the EDIT tab whenever a block becomes selected on
   // the canvas. If the user deselects (click empty canvas), we DON'T
@@ -162,7 +161,12 @@ export function Sidebar(props: SidebarProps) {
     if (props.selectedBlock) setTab('edit');
   }, [props.selectedBlock?.id]);
 
-  const tabStyle = (active: boolean, hovered: boolean): CSSProperties => ({
+  // Two states only: deselected (dark gray) and selected (white).
+  // No hover color change — previously we had a lighter hover shade
+  // (#c8cad0) but that created a visibly "stuck" bright state on
+  // whichever tab the pointer happened to land on last, which users
+  // read as the light state being the default. One-shade, no flicker.
+  const tabStyle = (active: boolean): CSSProperties => ({
     padding: '14px 16px',
     textAlign: 'left',
     cursor: 'pointer',
@@ -170,8 +174,8 @@ export function Sidebar(props: SidebarProps) {
     fontSize: 11,
     textTransform: 'uppercase',
     letterSpacing: '0.7px',
-    color: active ? '#fff' : hovered ? '#c8cad0' : '#555',
-    background: active ? '#1e1e2e' : hovered ? '#17171f' : 'transparent',
+    color: active ? '#fff' : '#6b7280',
+    background: active ? '#1e1e2e' : 'transparent',
     borderLeft: active ? '3px solid #7c6aed' : '3px solid transparent',
     border: 'none',
     borderLeftWidth: 3,
@@ -234,13 +238,7 @@ export function Sidebar(props: SidebarProps) {
           }}
         >
           {(['layout', 'authors', 'refs', 'style', 'edit'] as SidebarTab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              onMouseEnter={() => setHoveredTab(t)}
-              onMouseLeave={() => setHoveredTab(null)}
-              style={tabStyle(tab === t, hoveredTab === t)}
-            >
+            <button key={t} onClick={() => setTab(t)} style={tabStyle(tab === t)}>
               {t}
             </button>
           ))}
