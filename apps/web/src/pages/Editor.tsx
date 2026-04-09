@@ -10,7 +10,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { loadMostRecentPoster, loadPoster } from '@/data/posters';
+import { loadOrCreateMostRecentPoster, loadPoster } from '@/data/posters';
 import { usePosterStore } from '@/stores/posterStore';
 import { PosterEditor } from '@/poster/PosterEditor';
 import type { PosterDoc } from '@postr/shared';
@@ -28,18 +28,15 @@ export default function Editor() {
 
     (async () => {
       try {
+        // Try the URL id first. If that fails (unknown id, RLS miss,
+        // or the "/p/new" sentinel) fall through to load-or-create.
         let row =
           posterId && posterId !== 'new'
             ? await loadPoster(posterId)
             : null;
 
         if (!row) {
-          row = await loadMostRecentPoster();
-        }
-
-        if (!row) {
-          if (!cancelled) setStatus({ kind: 'error', message: 'No poster found for this account.' });
-          return;
+          row = await loadOrCreateMostRecentPoster();
         }
 
         if (cancelled) return;
