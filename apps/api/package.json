@@ -1,0 +1,10 @@
+{
+  "name": "@postr/api",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "echo 'scaffolded in task 0.3'",
+    "build": "echo 'scaffolded in task 0.3'",
+    "test": "echo 'scaffolded in task 0.3'"
+  }
+}

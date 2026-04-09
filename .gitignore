@@ -1,0 +1,10 @@
+node_modules
+dist
+.env*
+!.env.example
+.vercel
+.turbo
+supabase/.temp
+coverage
+*.log
+.DS_Store

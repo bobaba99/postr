@@ -1,0 +1,11 @@
+{
+  "name": "@postr/web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'scaffolded in task 0.2'",
+    "build": "echo 'scaffolded in task 0.2'",
+    "test": "echo 'scaffolded in task 0.2'"
+  }
+}
