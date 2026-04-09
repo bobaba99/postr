@@ -98,13 +98,13 @@ const inputBase: CSSProperties = {
   borderRadius: 4,
   padding: '4px 6px',
   color: '#ddd',
-  fontSize: 10,
+  fontSize: 20,
   width: '100%',
   boxSizing: 'border-box',
 };
 
 const labelStyle: CSSProperties = {
-  fontSize: 8,
+  fontSize: 16,
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '1.2px',
@@ -120,7 +120,7 @@ const selectStyle: CSSProperties = {
   border: '1px solid #2a2a3a',
   borderRadius: 5,
   color: '#ddd',
-  fontSize: 11,
+  fontSize: 22,
   outline: 'none',
 };
 
@@ -131,7 +131,7 @@ const buttonStyle = (active: boolean): CSSProperties => ({
   border: active ? 'none' : '1px solid #2a2a3a',
   borderRadius: 5,
   cursor: 'pointer',
-  fontSize: 10,
+  fontSize: 20,
   fontWeight: 600,
   textAlign: 'center',
   width: '100%',
@@ -147,7 +147,7 @@ export function Sidebar(props: SidebarProps) {
     textAlign: 'center',
     cursor: 'pointer',
     fontWeight: 600,
-    fontSize: 7,
+    fontSize: 14,
     textTransform: 'uppercase',
     letterSpacing: '0.7px',
     color: active ? '#fff' : '#555',
@@ -162,14 +162,16 @@ export function Sidebar(props: SidebarProps) {
     <div
       data-postr-sidebar
       style={{
-        width: 280,
-        minWidth: 280,
+        // Sidebar widened from 280→360 so the 2x-enlarged labels and
+        // inputs don't crowd each other.
+        width: 360,
+        minWidth: 360,
         background: '#111118',
         color: '#c8cad0',
         display: 'flex',
         flexDirection: 'column',
         fontFamily: "'DM Sans',system-ui,sans-serif",
-        fontSize: 11,
+        fontSize: 22,
         borderRight: '1px solid #1e1e2e',
         overflow: 'hidden',
       }}
@@ -191,7 +193,7 @@ export function Sidebar(props: SidebarProps) {
             <path d="M3 9h18M9 3v18" />
           </svg>
         </div>
-        <div style={{ fontWeight: 800, fontSize: 13, color: '#fff' }}>Postr</div>
+        <div style={{ fontWeight: 800, fontSize: 26, color: '#fff' }}>Postr</div>
       </div>
 
       <div style={{ display: 'flex', margin: '8px 12px 0', borderBottom: '1px solid #1e1e2e' }}>
@@ -301,7 +303,7 @@ function LayoutTab(props: {
       </select>
 
       <div style={labelStyle}>Grid</div>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: '#888', cursor: 'pointer' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 20, color: '#888', cursor: 'pointer' }}>
         <input
           type="checkbox"
           checked={props.showGrid}
@@ -312,7 +314,7 @@ function LayoutTab(props: {
       </label>
 
       <div style={labelStyle}>Auto Layout</div>
-      <button onClick={props.onAutoLayout} style={{ ...buttonStyle(false), fontSize: 9 }}>
+      <button onClick={props.onAutoLayout} style={{ ...buttonStyle(false), fontSize: 18 }}>
         ⬡ Auto-Arrange
       </button>
 
@@ -336,8 +338,8 @@ function LayoutTab(props: {
                 gap: 1,
               }}
             >
-              <span style={{ fontSize: 10, fontWeight: 700, color: '#ddd' }}>{t.name}</span>
-              <span style={{ fontSize: 8, color: '#555' }}>{t.description}</span>
+              <span style={{ fontSize: 20, fontWeight: 700, color: '#ddd' }}>{t.name}</span>
+              <span style={{ fontSize: 16, color: '#555' }}>{t.description}</span>
             </button>
           );
         })}
@@ -383,7 +385,7 @@ function AuthorsTab(props: {
             borderRadius: 5,
           }}
         >
-          <div style={{ fontSize: 8, fontWeight: 700, color: '#555', marginBottom: 3 }}>PREVIEW</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#555', marginBottom: 3 }}>PREVIEW</div>
           <AuthorLine
             authors={props.authors}
             institutions={props.institutions}
@@ -424,7 +426,7 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 9,
+                fontSize: 18,
                 fontWeight: 800,
                 color: '#7c6aed',
                 flexShrink: 0,
@@ -436,11 +438,11 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
               value={inst.name}
               onChange={(e) => update(inst.id, { name: e.target.value })}
               placeholder="University"
-              style={{ ...inputBase, fontSize: 11, fontWeight: 600, color: '#eee' }}
+              style={{ ...inputBase, fontSize: 22, fontWeight: 600, color: '#eee' }}
             />
             <button
               onClick={() => remove(inst.id)}
-              style={{ all: 'unset', cursor: 'pointer', color: '#c55', fontSize: 12, fontWeight: 700 }}
+              style={{ all: 'unset', cursor: 'pointer', color: '#c55', fontSize: 24, fontWeight: 700 }}
             >
               ×
             </button>
@@ -467,7 +469,7 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
           all: 'unset',
           cursor: 'pointer',
           padding: '5px 0',
-          fontSize: 10,
+          fontSize: 20,
           color: '#7c6aed',
           fontWeight: 600,
           textAlign: 'center',
@@ -505,7 +507,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
             <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
               <button
                 onClick={() => swap(i - 1, i)}
-                style={{ all: 'unset', cursor: 'pointer', color: i > 0 ? '#666' : '#2a2a3a', fontSize: 8 }}
+                style={{ all: 'unset', cursor: 'pointer', color: i > 0 ? '#666' : '#2a2a3a', fontSize: 16 }}
               >
                 ▲
               </button>
@@ -515,7 +517,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
                   all: 'unset',
                   cursor: 'pointer',
                   color: i < props.authors.length - 1 ? '#666' : '#2a2a3a',
-                  fontSize: 8,
+                  fontSize: 16,
                 }}
               >
                 ▼
@@ -525,11 +527,11 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
               value={a.name}
               onChange={(e) => update(a.id, { name: e.target.value })}
               placeholder="Author name"
-              style={{ ...inputBase, flex: 1, fontSize: 11 }}
+              style={{ ...inputBase, flex: 1, fontSize: 22 }}
             />
             <button
               onClick={() => remove(a.id)}
-              style={{ all: 'unset', cursor: 'pointer', color: '#c55', fontSize: 12, fontWeight: 700 }}
+              style={{ all: 'unset', cursor: 'pointer', color: '#c55', fontSize: 24, fontWeight: 700 }}
             >
               ×
             </button>
@@ -556,13 +558,13 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
                       gap: 3,
                       padding: '2px 6px',
                       borderRadius: 3,
-                      fontSize: 9,
+                      fontSize: 18,
                       background: checked ? '#7c6aed22' : '#1a1a26',
                       border: `1px solid ${checked ? '#7c6aed66' : '#2a2a3a'}`,
                       color: checked ? '#b8a8ff' : '#666',
                     }}
                   >
-                    <span style={{ fontSize: 8, fontWeight: 800 }}>{idx + 1}</span>
+                    <span style={{ fontSize: 16, fontWeight: 800 }}>{idx + 1}</span>
                     <span style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {inst.name || '?'}
                     </span>
@@ -572,7 +574,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
             </div>
           )}
           <div style={{ display: 'flex', gap: 6, marginTop: 4, paddingLeft: 16 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, color: '#666', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 18, color: '#666', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={a.isCorresponding}
@@ -581,7 +583,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
               />
               Corr.
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, color: '#666', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 18, color: '#666', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={a.equalContrib}
@@ -599,7 +601,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
           all: 'unset',
           cursor: 'pointer',
           padding: '5px 0',
-          fontSize: 10,
+          fontSize: 20,
           color: '#7c6aed',
           fontWeight: 600,
           textAlign: 'center',
@@ -671,7 +673,7 @@ function RefsTab(props: {
           border: 'none',
           borderRadius: 5,
           cursor: 'pointer',
-          fontSize: 10,
+          fontSize: 20,
           fontWeight: 600,
         }}
       >
@@ -680,7 +682,7 @@ function RefsTab(props: {
       <input ref={fileRef} type="file" accept=".bib,.bibtex,.ris,.enw" onChange={handleImport} style={{ display: 'none' }} />
 
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 6 }}>
-        <label style={{ fontSize: 8, color: '#666', whiteSpace: 'nowrap' }}>Style</label>
+        <label style={{ fontSize: 16, color: '#666', whiteSpace: 'nowrap' }}>Style</label>
         <select
           value={props.citationStyle}
           onChange={(e) => props.onChangeCitationStyle(e.target.value as CitationStyleKey)}
@@ -694,7 +696,7 @@ function RefsTab(props: {
         </select>
       </div>
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4 }}>
-        <label style={{ fontSize: 8, color: '#666', whiteSpace: 'nowrap' }}>Sort</label>
+        <label style={{ fontSize: 16, color: '#666', whiteSpace: 'nowrap' }}>Sort</label>
         <select
           value={props.sortMode}
           onChange={(e) => props.onChangeSortMode(e.target.value as SortMode)}
@@ -722,12 +724,12 @@ function RefsTab(props: {
               borderRadius: 4,
             }}
           >
-            <span style={{ fontSize: 9, color: '#aaa', flex: 1, lineHeight: 1.4 }}>
+            <span style={{ fontSize: 18, color: '#aaa', flex: 1, lineHeight: 1.4 }}>
               {CITATION_STYLES[props.citationStyle](r, i)}
             </span>
             <button
               onClick={() => props.onChangeReferences(props.references.filter((_, j) => j !== i))}
-              style={{ all: 'unset', cursor: 'pointer', fontSize: 9, color: '#c55' }}
+              style={{ all: 'unset', cursor: 'pointer', fontSize: 18, color: '#c55' }}
             >
               ×
             </button>
@@ -772,7 +774,7 @@ function RefsTab(props: {
             border: '1px solid #333',
             borderRadius: 4,
             cursor: 'pointer',
-            fontSize: 9,
+            fontSize: 18,
             fontWeight: 600,
           }}
         >
@@ -832,7 +834,7 @@ function StyleTab(props: {
                 />
               ))}
             </div>
-            <span style={{ fontSize: 9, color: '#aaa' }}>{p.name}</span>
+            <span style={{ fontSize: 18, color: '#aaa' }}>{p.name}</span>
           </div>
         ))}
       </div>
@@ -871,7 +873,7 @@ function StyleTab(props: {
           value={props.presetName}
           onChange={(e) => props.setPresetName(e.target.value)}
           placeholder="Name"
-          style={{ ...selectStyle, flex: 1, padding: '4px 6px', fontSize: 10 }}
+          style={{ ...selectStyle, flex: 1, padding: '4px 6px', fontSize: 20 }}
         />
         <button
           onClick={() => {
@@ -880,7 +882,7 @@ function StyleTab(props: {
               props.setPresetName('');
             }
           }}
-          style={{ ...buttonStyle(true), width: 'auto', padding: '4px 10px', fontSize: 9 }}
+          style={{ ...buttonStyle(true), width: 'auto', padding: '4px 10px', fontSize: 18 }}
         >
           Save
         </button>
@@ -891,7 +893,7 @@ function StyleTab(props: {
             <button
               key={i}
               onClick={() => props.onLoadPreset(p)}
-              style={{ ...buttonStyle(false), fontSize: 9, textAlign: 'left', padding: '4px 8px' }}
+              style={{ ...buttonStyle(false), fontSize: 18, textAlign: 'left', padding: '4px 8px' }}
             >
               {p.name}
             </button>
@@ -918,7 +920,7 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {levels.map((t) => (
         <div key={t.k}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: '#999', textTransform: 'uppercase' }}>{t.l}</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#999', textTransform: 'uppercase' }}>{t.l}</div>
           <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
             <input
               type="number"
@@ -931,7 +933,7 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
               style={inp}
               title="Font size (points)"
             />
-            <span style={{ fontSize: 8, color: '#555' }}>pt</span>
+            <span style={{ fontSize: 16, color: '#555' }}>pt</span>
             <select
               value={props.styles[t.k].weight}
               onChange={(e) => update(t.k, 'weight', +e.target.value)}
@@ -950,7 +952,7 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
                 cursor: 'pointer',
                 padding: '2px 5px',
                 borderRadius: 3,
-                fontSize: 10,
+                fontSize: 20,
                 fontStyle: 'italic',
                 background: props.styles[t.k].italic ? '#7c6aed33' : '#1a1a26',
                 border: `1px solid ${props.styles[t.k].italic ? '#7c6aed' : '#2a2a3a'}`,
@@ -959,7 +961,7 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
             >
               I
             </button>
-            <span style={{ fontSize: 8, color: '#555' }}>LH</span>
+            <span style={{ fontSize: 16, color: '#555' }}>LH</span>
             <input
               type="number"
               value={props.styles[t.k].lineHeight}
@@ -987,7 +989,7 @@ function HeadingEditor(props: { headingStyle: HeadingStyle; onChange: (hs: Headi
         cursor: 'pointer',
         padding: '3px 7px',
         borderRadius: 3,
-        fontSize: 9,
+        fontSize: 18,
         background: props.headingStyle.border === v ? '#7c6aed22' : '#1a1a26',
         border: `1px solid ${props.headingStyle.border === v ? '#7c6aed66' : '#2a2a3a'}`,
         color: props.headingStyle.border === v ? '#b8a8ff' : '#888',
@@ -1006,7 +1008,7 @@ function HeadingEditor(props: { headingStyle: HeadingStyle; onChange: (hs: Headi
         {borderBtn('thick', 'Thick')}
       </div>
       <div style={{ display: 'flex', gap: 6 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, color: '#888', cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 18, color: '#888', cursor: 'pointer' }}>
           <input
             type="checkbox"
             checked={props.headingStyle.fill}
@@ -1024,7 +1026,7 @@ function HeadingEditor(props: { headingStyle: HeadingStyle; onChange: (hs: Headi
               cursor: 'pointer',
               padding: '2px 8px',
               borderRadius: 3,
-              fontSize: 9,
+              fontSize: 18,
               background: props.headingStyle.align === a ? '#7c6aed22' : '#1a1a26',
               border: `1px solid ${props.headingStyle.align === a ? '#7c6aed66' : '#2a2a3a'}`,
               color: props.headingStyle.align === a ? '#b8a8ff' : '#888',
@@ -1074,7 +1076,7 @@ function EditTab(props: {
       <div style={labelStyle}>Selected Block</div>
       {sb && isTextLike && styleLevel ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ fontSize: 8, fontWeight: 700, color: '#555', textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#555', textTransform: 'uppercase' }}>
             Editing: {sb.type}
           </div>
           <textarea
@@ -1087,7 +1089,7 @@ function EditTab(props: {
               borderRadius: 5,
               padding: '6px 8px',
               color: '#ddd',
-              fontSize: 10,
+              fontSize: 20,
               minHeight: 60,
               maxHeight: 120,
               overflow: 'auto',
@@ -1099,7 +1101,7 @@ function EditTab(props: {
             }}
           />
           <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-            <label style={{ fontSize: 8, color: '#666' }}>Size</label>
+            <label style={{ fontSize: 16, color: '#666' }}>Size</label>
             <input
               type="number"
               value={Math.round(unitsToPt(styleLevel.size))}
@@ -1110,8 +1112,8 @@ function EditTab(props: {
               style={{ ...inputBase, width: 44, textAlign: 'center' }}
               title="Font size (points)"
             />
-            <span style={{ fontSize: 8, color: '#555' }}>pt</span>
-            <label style={{ fontSize: 8, color: '#666' }}>Wt</label>
+            <span style={{ fontSize: 16, color: '#555' }}>pt</span>
+            <label style={{ fontSize: 16, color: '#666' }}>Wt</label>
             <select
               value={styleLevel.weight}
               onChange={(e) => updateStyle('weight', +e.target.value)}
@@ -1130,7 +1132,7 @@ function EditTab(props: {
                 cursor: 'pointer',
                 padding: '2px 6px',
                 borderRadius: 3,
-                fontSize: 10,
+                fontSize: 20,
                 fontStyle: 'italic',
                 background: styleLevel.italic ? '#7c6aed33' : '#1a1a26',
                 border: `1px solid ${styleLevel.italic ? '#7c6aed' : '#2a2a3a'}`,
@@ -1141,7 +1143,7 @@ function EditTab(props: {
             </button>
           </div>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <label style={{ fontSize: 8, color: '#666', whiteSpace: 'nowrap' }}>Line spacing</label>
+            <label style={{ fontSize: 16, color: '#666', whiteSpace: 'nowrap' }}>Line spacing</label>
             <input
               type="range"
               min={1}
@@ -1151,10 +1153,10 @@ function EditTab(props: {
               onChange={(e) => updateStyle('lineHeight', +e.target.value)}
               style={{ flex: 1, accentColor: '#7c6aed' }}
             />
-            <span style={{ fontSize: 9, color: '#888', minWidth: 24 }}>{styleLevel.lineHeight.toFixed(2)}</span>
+            <span style={{ fontSize: 18, color: '#888', minWidth: 24 }}>{styleLevel.lineHeight.toFixed(2)}</span>
           </div>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <label style={{ fontSize: 8, color: '#666' }}>Color</label>
+            <label style={{ fontSize: 16, color: '#666' }}>Color</label>
             <input
               type="color"
               value={styleLevel.color || props.palette.primary}
@@ -1163,13 +1165,13 @@ function EditTab(props: {
             />
             <button
               onClick={() => updateStyle('color', null)}
-              style={{ all: 'unset', cursor: 'pointer', fontSize: 8, color: '#666' }}
+              style={{ all: 'unset', cursor: 'pointer', fontSize: 16, color: '#666' }}
             >
               Reset
             </button>
           </div>
           <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
-            <label style={{ fontSize: 8, color: '#666' }}>Highlight</label>
+            <label style={{ fontSize: 16, color: '#666' }}>Highlight</label>
             {HIGHLIGHT_PRESETS.map((h, i) => (
               <div
                 key={i}
@@ -1187,7 +1189,7 @@ function EditTab(props: {
           </div>
         </div>
       ) : (
-        <div style={{ fontSize: 10, color: '#555', padding: '8px 0' }}>Click a block on the poster to edit it here.</div>
+        <div style={{ fontSize: 20, color: '#555', padding: '8px 0' }}>Click a block on the poster to edit it here.</div>
       )}
 
       <div style={labelStyle}>Add Block</div>
@@ -1209,7 +1211,7 @@ function EditTab(props: {
       </div>
 
       <div style={{ ...labelStyle, marginTop: 14 }}>Symbols (type / in text)</div>
-      <div style={{ fontSize: 9, color: '#666', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 18, color: '#666', lineHeight: 1.5 }}>
         /alpha → α · /beta → β · /eta2 → η² · /chi2 → χ² · /leq → ≤ · /geq → ≥ · /pm → ± · /arrow → →
         <br />
         Stats: /p → 𝑝 · /F → 𝐹 · /t → 𝑡 · /d → 𝑑 · /SD · /SE · /CI · /df → 𝑑𝑓
