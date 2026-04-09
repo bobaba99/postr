@@ -94,8 +94,8 @@ export interface Institution {
 export interface Author {
   id: string;
   name: string;
-  /** Indices into institutions array */
-  affiliations: number[];
+  /** References to Institution.id values (multi-affiliation supported) */
+  affiliationIds: string[];
   isCorresponding: boolean;
   equalContrib: boolean;
 }
