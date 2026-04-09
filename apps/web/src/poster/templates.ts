@@ -45,26 +45,28 @@ const threeCol: LayoutTemplate = {
   build: (pw, ph) => {
     const { W, bodyTop, bodyHeight } = bodyMetrics(pw, ph);
     const c = (W - M * 2 - GAP * 2) / 3;
+    // Column ratios sum to ≤ 0.80 to leave room for headings + gaps
+    // within bodyHeight. See "Layout math" note at bottom of file.
     return [
       { type: 'title', x: M, y: M, w: W - M * 2, h: 45 },
       { type: 'authors', x: M, y: 57, w: W - M * 2, h: 22 },
-      // Column 1
+      // Column 1 — Intro + Hypotheses
       { type: 'heading', x: M, y: bodyTop, w: c, h: 20, content: 'Introduction' },
-      { type: 'text', x: M, y: bodyTop + 22, w: c, h: bodyHeight * 0.42, content: 'Background and research question. Provide context, motivation, and the gap your work addresses.' },
-      { type: 'heading', x: M, y: bodyTop + 24 + bodyHeight * 0.42, w: c, h: 20, content: 'Hypotheses' },
-      { type: 'text', x: M, y: bodyTop + 46 + bodyHeight * 0.42, w: c, h: bodyHeight * 0.42, content: 'State your specific hypotheses or research aims here.' },
-      // Column 2
+      { type: 'text', x: M, y: bodyTop + 22, w: c, h: bodyHeight * 0.40, content: 'Background and research question. Provide context, motivation, and the gap your work addresses.' },
+      { type: 'heading', x: M, y: bodyTop + 24 + bodyHeight * 0.40, w: c, h: 20, content: 'Hypotheses' },
+      { type: 'text', x: M, y: bodyTop + 46 + bodyHeight * 0.40, w: c, h: bodyHeight * 0.40, content: 'State your specific hypotheses or research aims here.' },
+      // Column 2 — Methods + Figure
       { type: 'heading', x: M + c + GAP, y: bodyTop, w: c, h: 20, content: 'Methods' },
-      { type: 'text', x: M + c + GAP, y: bodyTop + 22, w: c, h: bodyHeight * 0.35, content: 'Participants, design, materials, procedure, and analysis approach.' },
-      { type: 'image', x: M + c + GAP, y: bodyTop + 24 + bodyHeight * 0.35, w: c, h: bodyHeight * 0.55 },
-      // Column 3
+      { type: 'text', x: M + c + GAP, y: bodyTop + 22, w: c, h: bodyHeight * 0.32, content: 'Participants, design, materials, procedure, and analysis approach.' },
+      { type: 'image', x: M + c + GAP, y: bodyTop + 24 + bodyHeight * 0.32, w: c, h: bodyHeight * 0.55 },
+      // Column 3 — Results table + Conclusions + References
       { type: 'heading', x: M + (c + GAP) * 2, y: bodyTop, w: c, h: 20, content: 'Results' },
       {
         type: 'table',
         x: M + (c + GAP) * 2,
         y: bodyTop + 22,
         w: c,
-        h: bodyHeight * 0.32,
+        h: bodyHeight * 0.28,
         tableData: {
           rows: 4,
           cols: 3,
@@ -73,9 +75,9 @@ const threeCol: LayoutTemplate = {
           borderPreset: 'apa',
         },
       },
-      { type: 'heading', x: M + (c + GAP) * 2, y: bodyTop + 24 + bodyHeight * 0.32, w: c, h: 20, content: 'Conclusions' },
-      { type: 'text', x: M + (c + GAP) * 2, y: bodyTop + 46 + bodyHeight * 0.32, w: c, h: bodyHeight * 0.25, content: 'Key findings, implications, and future directions.' },
-      { type: 'references', x: M + (c + GAP) * 2, y: bodyTop + 48 + bodyHeight * 0.59, w: c, h: bodyHeight * 0.32 },
+      { type: 'heading', x: M + (c + GAP) * 2, y: bodyTop + 24 + bodyHeight * 0.28, w: c, h: 20, content: 'Conclusions' },
+      { type: 'text', x: M + (c + GAP) * 2, y: bodyTop + 46 + bodyHeight * 0.28, w: c, h: bodyHeight * 0.22, content: 'Key findings, implications, and future directions.' },
+      { type: 'references', x: M + (c + GAP) * 2, y: bodyTop + 48 + bodyHeight * 0.50, w: c, h: bodyHeight * 0.28 },
     ];
   },
 };

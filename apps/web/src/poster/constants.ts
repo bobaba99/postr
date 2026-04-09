@@ -14,6 +14,27 @@ import type { Palette, Styles, HeadingStyle, FontWeight } from '@postr/shared';
 /** Internal coordinate scale: 1 unit = 1/10 inch. */
 export const PX = 10;
 
+/**
+ * Points per poster unit — 1 unit = 1/10 inch = 7.2 points.
+ *
+ * The editor canvas renders 1 poster unit as 1 CSS pixel at zoom = 1.
+ * This means a CSS `font-size: 10` on the canvas prints at 72 points
+ * (10 units × 7.2 pt/unit). Typography defaults and the Style tab
+ * inputs use these to stay calibrated to the actual printed size.
+ *
+ * Readability guideline (NYU, APA, Better Posters):
+ *   - Main title:       72pt min   /  158pt ideal
+ *   - Section headings: 42pt min   /   56pt ideal
+ *   - Body text:        24pt min   /   36pt ideal
+ *   - Captions:         18pt min   /   24pt ideal
+ *
+ * `ptToUnits(56)` returns 7.78, which is the default heading size.
+ */
+export const POINTS_PER_UNIT = 72 / PX; // 7.2
+
+export const ptToUnits = (points: number): number => points / POINTS_PER_UNIT;
+export const unitsToPt = (units: number): number => units * POINTS_PER_UNIT;
+
 /** Margin (poster units) used by all layout templates. */
 export const M = 10;
 
@@ -106,11 +127,21 @@ export const PALETTES: NamedPalette[] = [
 // Default typography
 // =========================================================================
 
+/**
+ * Default typography — calibrated to the print-readability guideline
+ * above. Sizes are in poster units; multiply by POINTS_PER_UNIT (7.2)
+ * to see the printed point size.
+ *
+ *   title    22  ≈ 158pt  (ideal title)
+ *   heading   8  ≈  58pt  (just above 56pt ideal section heading)
+ *   body      5  ≈  36pt  (ideal body text)
+ *   authors   5  ≈  36pt  (treated as prominent supporting text)
+ */
 export const DEFAULT_STYLES: Styles = {
-  title: { size: 24, weight: 800, italic: false, lineHeight: 1.15, color: null, highlight: null },
-  authors: { size: 11, weight: 400, italic: false, lineHeight: 1.5, color: null, highlight: null },
-  heading: { size: 13, weight: 700, italic: false, lineHeight: 1.3, color: null, highlight: null },
-  body: { size: 9, weight: 400, italic: false, lineHeight: 1.55, color: null, highlight: null },
+  title: { size: 22, weight: 800, italic: false, lineHeight: 1.15, color: null, highlight: null },
+  authors: { size: 5, weight: 400, italic: false, lineHeight: 1.5, color: null, highlight: null },
+  heading: { size: 8, weight: 700, italic: false, lineHeight: 1.3, color: null, highlight: null },
+  body: { size: 5, weight: 400, italic: false, lineHeight: 1.55, color: null, highlight: null },
 };
 
 export const DEFAULT_HEADING_STYLE: HeadingStyle = {

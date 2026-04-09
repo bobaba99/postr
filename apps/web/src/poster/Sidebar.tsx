@@ -25,6 +25,8 @@ import {
   HIGHLIGHT_PRESETS,
   PALETTES,
   POSTER_SIZES,
+  ptToUnits,
+  unitsToPt,
   type PosterSizeKey,
 } from './constants';
 import { CITATION_STYLES, SORT_MODE_LABELS, type CitationStyleKey, type SortMode } from './citations';
@@ -910,7 +912,7 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
   const update = (k: keyof Styles, field: string, value: number | boolean) =>
     props.onChange({ ...props.styles, [k]: { ...props.styles[k], [field]: value } });
 
-  const inp: CSSProperties = { ...inputBase, width: 40, textAlign: 'center', padding: '3px 6px' };
+  const inp: CSSProperties = { ...inputBase, width: 44, textAlign: 'center', padding: '3px 6px' };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -920,12 +922,16 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
           <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap', marginTop: 2 }}>
             <input
               type="number"
-              value={props.styles[t.k].size}
-              onChange={(e) => update(t.k, 'size', +e.target.value)}
-              min={5}
-              max={60}
+              // Show/accept POINTS in the UI; store poster units underneath.
+              value={Math.round(unitsToPt(props.styles[t.k].size))}
+              onChange={(e) => update(t.k, 'size', ptToUnits(+e.target.value))}
+              min={12}
+              max={200}
+              step={2}
               style={inp}
+              title="Font size (points)"
             />
+            <span style={{ fontSize: 8, color: '#555' }}>pt</span>
             <select
               value={props.styles[t.k].weight}
               onChange={(e) => update(t.k, 'weight', +e.target.value)}
@@ -1096,12 +1102,15 @@ function EditTab(props: {
             <label style={{ fontSize: 8, color: '#666' }}>Size</label>
             <input
               type="number"
-              value={styleLevel.size}
-              onChange={(e) => updateStyle('size', +e.target.value)}
-              min={5}
-              max={60}
-              style={{ ...inputBase, width: 38, textAlign: 'center' }}
+              value={Math.round(unitsToPt(styleLevel.size))}
+              onChange={(e) => updateStyle('size', ptToUnits(+e.target.value))}
+              min={12}
+              max={200}
+              step={2}
+              style={{ ...inputBase, width: 44, textAlign: 'center' }}
+              title="Font size (points)"
             />
+            <span style={{ fontSize: 8, color: '#555' }}>pt</span>
             <label style={{ fontSize: 8, color: '#666' }}>Wt</label>
             <select
               value={styleLevel.weight}
