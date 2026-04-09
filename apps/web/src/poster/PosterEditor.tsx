@@ -29,6 +29,7 @@ import {
   PALETTES,
   POSTER_SIZES,
   PX,
+  SNAP_GRID,
   type PosterSizeKey,
 } from './constants';
 import {
@@ -102,6 +103,8 @@ const DRAG_THRESHOLD_PX = 4;
 export interface UseBlockDragResult {
   onPointerDown: (e: React.PointerEvent, id: string, mode: 'move' | 'resize') => void;
   didDragRef: React.MutableRefObject<boolean>;
+  /** Id of the block currently being moved/resized, null otherwise. */
+  draggingId: string | null;
 }
 
 function useBlockDrag(
@@ -123,6 +126,7 @@ function useBlockDrag(
   } | null>(null);
   const didDragRef = useRef(false);
   const prevUserSelectRef = useRef<string>('');
+  const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent, id: string, mode: 'move' | 'resize') => {
@@ -163,6 +167,7 @@ function useBlockDrag(
           if (Math.hypot(rawDx, rawDy) < DRAG_THRESHOLD_PX) return;
           s.active = true;
           didDragRef.current = true;
+          setDraggingId(s.id);
           // Disable text selection body-wide for the duration of the drag.
           prevUserSelectRef.current = document.body.style.userSelect;
           document.body.style.userSelect = 'none';
@@ -186,6 +191,7 @@ function useBlockDrag(
 
       const onUp = () => {
         sessionRef.current = null;
+        setDraggingId(null);
         document.body.style.userSelect = prevUserSelectRef.current;
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
@@ -197,7 +203,7 @@ function useBlockDrag(
     [blocks, setBlocks, scale],
   );
 
-  return { onPointerDown, didDragRef };
+  return { onPointerDown, didDragRef, draggingId };
 }
 
 // =========================================================================
@@ -304,7 +310,8 @@ export function PosterEditor() {
   // Helper: replace blocks immutably
   const setBlocks = (next: Block[]) => setPoster(posterId, { ...doc, blocks: next });
 
-  const { onPointerDown, didDragRef } = useBlockDrag(doc.blocks, setBlocks, zoom);
+  const { onPointerDown, didDragRef, draggingId } = useBlockDrag(doc.blocks, setBlocks, zoom);
+  const draggingBlock = draggingId ? doc.blocks.find((x) => x.id === draggingId) ?? null : null;
 
   // Heading auto-numbering: index by reading order (y then x).
   const headingNumbers = useMemo(() => {
@@ -564,33 +571,112 @@ export function PosterEditor() {
               }}
             >
               {showGrid && (
+                // Grid cell size equals SNAP_GRID (5 units = 1/2 inch
+                // printed), so every visible line is a valid snap
+                // target. The denser grid is drawn faintly and with
+                // every 10th line slightly brighter for orientation.
                 <svg
                   width={cW}
                   height={cH}
-                  style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', opacity: 0.03 }}
+                  style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
                 >
-                  {Array.from({ length: Math.ceil(cW / 40) + 1 }).map((_, i) => (
+                  {Array.from({ length: Math.ceil(cW / SNAP_GRID) + 1 }).map((_, i) => (
                     <line
                       key={`v${i}`}
-                      x1={i * 40}
+                      x1={i * SNAP_GRID}
                       y1={0}
-                      x2={i * 40}
+                      x2={i * SNAP_GRID}
                       y2={cH}
                       stroke={doc.palette.primary}
-                      strokeWidth=".5"
+                      strokeWidth={0.4}
+                      opacity={i % 10 === 0 ? 0.08 : 0.03}
                     />
                   ))}
-                  {Array.from({ length: Math.ceil(cH / 40) + 1 }).map((_, i) => (
+                  {Array.from({ length: Math.ceil(cH / SNAP_GRID) + 1 }).map((_, i) => (
                     <line
                       key={`h${i}`}
                       x1={0}
-                      y1={i * 40}
+                      y1={i * SNAP_GRID}
                       x2={cW}
-                      y2={i * 40}
+                      y2={i * SNAP_GRID}
                       stroke={doc.palette.primary}
-                      strokeWidth=".5"
+                      strokeWidth={0.4}
+                      opacity={i % 10 === 0 ? 0.08 : 0.03}
                     />
                   ))}
+                </svg>
+              )}
+
+              {/*
+                Drag guides — dotted edge / centerline overlay rendered
+                while a block is actively being moved or resized.
+                Shows:
+                  · the 4 edges of the dragged block (full canvas)
+                  · the dragged block's horizontal + vertical centers
+                  · an accent tick where an edge matches the canvas
+                    centerlines (indicates centered alignment)
+                All lines use the palette accent color so they
+                contrast with the body text and disappear the moment
+                the drag ends.
+              */}
+              {draggingBlock && (
+                <svg
+                  width={cW}
+                  height={cH}
+                  style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 5 }}
+                >
+                  {(() => {
+                    const b = draggingBlock;
+                    const left = b.x;
+                    const right = b.x + b.w;
+                    const top = b.y;
+                    const bottom = b.y + b.h;
+                    const cx = b.x + b.w / 2;
+                    const cy = b.y + b.h / 2;
+                    const canvasCx = cW / 2;
+                    const canvasCy = cH / 2;
+                    const accent = doc.palette.accent;
+                    const centered = (a: number, b: number) => Math.abs(a - b) < 0.5;
+                    const vMatchesCenter = centered(cx, canvasCx);
+                    const hMatchesCenter = centered(cy, canvasCy);
+                    const line = (
+                      x1: number,
+                      y1: number,
+                      x2: number,
+                      y2: number,
+                      key: string,
+                      opacity = 0.5,
+                      strokeWidth = 0.8,
+                    ) => (
+                      <line
+                        key={key}
+                        x1={x1}
+                        y1={y1}
+                        x2={x2}
+                        y2={y2}
+                        stroke={accent}
+                        strokeWidth={strokeWidth}
+                        strokeDasharray="3,2"
+                        opacity={opacity}
+                      />
+                    );
+                    return (
+                      <>
+                        {/* Block edges */}
+                        {line(left, 0, left, cH, 'edge-l')}
+                        {line(right, 0, right, cH, 'edge-r')}
+                        {line(0, top, cW, top, 'edge-t')}
+                        {line(0, bottom, cW, bottom, 'edge-b')}
+                        {/* Block centerlines */}
+                        {line(cx, 0, cx, cH, 'center-v', 0.3, 0.5)}
+                        {line(0, cy, cW, cy, 'center-h', 0.3, 0.5)}
+                        {/* Canvas centerline matches — brighter when the
+                            block is perfectly centered on that axis */}
+                        {vMatchesCenter && line(canvasCx, 0, canvasCx, cH, 'cv-match', 0.9, 1.2)}
+                        {hMatchesCenter && line(0, canvasCy, cW, canvasCy, 'ch-match', 0.9, 1.2)}
+                      </>
+                    );
+                  })()}
                 </svg>
               )}
               {doc.blocks.map((b) => (
