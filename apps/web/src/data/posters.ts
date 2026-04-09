@@ -1,12 +1,21 @@
 /**
  * Poster repository — Supabase reads/writes for the `posters` table.
  *
- * Phase 3 only needs `loadPoster` + `loadMostRecentPoster` so the
- * Editor route can mount immediately. Phase 4 layers `upsertPoster`,
- * `listPosters`, `duplicatePoster`, `deletePoster` on top.
+ * Scope:
+ *   - loadPoster / loadMostRecentPoster — single-row reads
+ *   - createPoster / loadOrCreateMostRecentPoster — editor landing path
+ *   - upsertPoster — autosave target (Task 4.2)
+ *   - listPosters — Home page grid (Task 4.3)
+ *   - duplicatePoster / deletePoster — Home page row actions
+ *
+ * Every function converts a Supabase `error` into a thrown `Error` with
+ * a descriptive message. Callers never have to inspect `{ data, error }`
+ * tuples themselves.
  */
 import { supabase } from '@/lib/supabase';
-import type { PosterDoc } from '@postr/shared';
+import type { Database, Json, PosterDoc } from '@postr/shared';
+
+type PosterUpdateRow = Database['public']['Tables']['posters']['Update'];
 
 export interface PosterRow {
   id: string;
@@ -21,6 +30,19 @@ export interface PosterRow {
   created_at: string;
   updated_at: string;
 }
+
+/** Fields that autosave + rename flows are allowed to write. */
+export interface PosterUpdate {
+  title?: string;
+  widthIn?: number;
+  heightIn?: number;
+  data?: PosterDoc;
+  thumbnailPath?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Reads
+// ---------------------------------------------------------------------------
 
 /**
  * Load a single poster by id. Returns null if the row doesn't exist
@@ -61,6 +83,27 @@ export async function loadMostRecentPoster(): Promise<PosterRow | null> {
 }
 
 /**
+ * Lists every poster the current user can see, newest first.
+ * RLS scopes the result set server-side — no need to filter by
+ * user_id on the client.
+ */
+export async function listPosters(): Promise<PosterRow[]> {
+  const { data, error } = await supabase
+    .from('posters')
+    .select('*')
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to list posters: ${error.message}`);
+  }
+  return (data ?? []) as unknown as PosterRow[];
+}
+
+// ---------------------------------------------------------------------------
+// Writes
+// ---------------------------------------------------------------------------
+
+/**
  * Inserts a new poster row for the current user. The database has
  * a default value for `data` (a seeded empty PosterDoc), so the only
  * required field is `user_id`. We read it from the session rather
@@ -68,7 +111,8 @@ export async function loadMostRecentPoster(): Promise<PosterRow | null> {
  *
  * Used as a self-healing fallback when the editor expected an
  * Untitled Poster but none was found (e.g. after a local Supabase
- * reset that wiped auth.users while the browser still held a JWT).
+ * reset that wiped auth.users while the browser still held a JWT),
+ * and as the "+ New poster" button handler on the Home page.
  */
 export async function createPoster(): Promise<PosterRow> {
   const {
@@ -101,4 +145,82 @@ export async function loadOrCreateMostRecentPoster(): Promise<PosterRow> {
   const existing = await loadMostRecentPoster();
   if (existing) return existing;
   return createPoster();
+}
+
+/**
+ * Patches a poster row. Used by:
+ *   - the autosave hook (passes `data`)
+ *   - the rename action (passes `title`)
+ *   - size-change actions (passes `widthIn` / `heightIn`)
+ *   - thumbnail capture (passes `thumbnailPath`)
+ *
+ * Always bumps `updated_at` so the Home page ordering reflects the
+ * most recent edit.
+ */
+export async function upsertPoster(id: string, update: PosterUpdate): Promise<PosterRow> {
+  const payload: PosterUpdateRow = {
+    updated_at: new Date().toISOString(),
+  };
+  if (update.title !== undefined) payload.title = update.title;
+  if (update.widthIn !== undefined) payload.width_in = update.widthIn;
+  if (update.heightIn !== undefined) payload.height_in = update.heightIn;
+  if (update.data !== undefined) payload.data = update.data as unknown as Json;
+  if (update.thumbnailPath !== undefined) payload.thumbnail_path = update.thumbnailPath;
+
+  const { data, error } = await supabase
+    .from('posters')
+    .update(payload)
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to save poster: ${error.message}`);
+  }
+  return data as unknown as PosterRow;
+}
+
+/**
+ * Clones an existing poster into a new row owned by the same user.
+ * The copy gets "(copy)" appended to the title, inherits the `data`
+ * snapshot verbatim, and starts with `share_slug = null` /
+ * `is_public = false` so duplicates are never accidentally public.
+ */
+export async function duplicatePoster(id: string): Promise<PosterRow> {
+  const source = await loadPoster(id);
+  if (!source) {
+    throw new Error(`Cannot duplicate poster ${id}: not found`);
+  }
+
+  const { data, error } = await supabase
+    .from('posters')
+    .insert({
+      user_id: source.user_id,
+      title: `${source.title} (copy)`,
+      width_in: source.width_in,
+      height_in: source.height_in,
+      data: source.data as unknown as Json,
+    })
+    .select('*')
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to duplicate poster: ${error.message}`);
+  }
+  return data as unknown as PosterRow;
+}
+
+/**
+ * Hard-deletes a poster row. The `assets` and `presets` tables
+ * cascade through foreign keys, so the row deletion is sufficient
+ * to drop the entire poster + its related rows.
+ *
+ * Orphaned storage objects are swept by the nightly cron (Task 10.2).
+ */
+export async function deletePoster(id: string): Promise<void> {
+  const { error } = await supabase.from('posters').delete().eq('id', id);
+
+  if (error) {
+    throw new Error(`Failed to delete poster: ${error.message}`);
+  }
 }
