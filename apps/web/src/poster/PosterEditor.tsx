@@ -17,6 +17,8 @@ import type {
 } from '@postr/shared';
 import { nanoid } from 'nanoid';
 import { usePosterStore } from '@/stores/posterStore';
+import { useAutosave } from '@/hooks/useAutosave';
+import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
 import { useGsapContext } from '@/motion';
 import { editorEntrance } from '@/motion/timelines/editorEntrance';
 import { BlockFrame } from './blocks';
@@ -190,6 +192,10 @@ export function PosterEditor() {
   useGsapContext(() => {
     editorEntrance();
   }, rootRef);
+
+  // Autosave — debounces doc changes and persists via upsertPoster.
+  // Status drives the pill rendered in the top-right overlay.
+  const autosave = useAutosave(posterId, doc);
 
   if (!doc || !posterId) {
     return (
@@ -493,6 +499,11 @@ export function PosterEditor() {
         </div>
 
         <ZoomBar zoom={zoom} setZoom={setZoom} />
+        <AutosaveStatusPill
+          status={autosave.status}
+          lastSavedAt={autosave.lastSavedAt}
+          error={autosave.error}
+        />
       </div>
     </div>
   );
