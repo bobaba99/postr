@@ -269,9 +269,20 @@ export function Sidebar(props: SidebarProps) {
             e.currentTarget.style.color = '#6b7280';
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M4 6h16M4 12h16M4 18h16" transform="rotate(90 12 12)" />
-            <path d="M15 18l-6-6 6-6" />
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            {/* Sidebar-collapse icon: panel with a left-pointing chevron. */}
+            <rect x="3" y="4" width="18" height="16" rx="2" />
+            <line x1="9" y1="4" x2="9" y2="20" />
+            <path d="M16 10l-2 2 2 2" />
           </svg>
         </button>
       )}
