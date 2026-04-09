@@ -13,9 +13,28 @@
  * tuples themselves.
  */
 import { supabase } from '@/lib/supabase';
+import { isStaleJwtError } from '@/lib/auth';
 import type { Database, Json, PosterDoc } from '@postr/shared';
 
 type PosterUpdateRow = Database['public']['Tables']['posters']['Update'];
+
+/**
+ * Wipes the local session and bootstraps a fresh anonymous one.
+ * Used when a Supabase call fails with "User from sub claim in JWT
+ * does not exist" — typically after a `supabase db reset` on a tab
+ * that still holds the old JWT in localStorage.
+ */
+async function reboostrapAnonymous(): Promise<void> {
+  try {
+    await supabase.auth.signOut({ scope: 'local' });
+  } catch {
+    // ignore — nothing to sign out of is fine
+  }
+  const { error } = await supabase.auth.signInAnonymously();
+  if (error) {
+    throw new Error(`Anonymous re-sign-in failed: ${error.message}`);
+  }
+}
 
 export interface PosterRow {
   id: string;
@@ -115,25 +134,44 @@ export async function listPosters(): Promise<PosterRow[]> {
  * and as the "+ New poster" button handler on the Home page.
  */
 export async function createPoster(): Promise<PosterRow> {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  // One self-healing retry: if the cached JWT is for a user that no
+  // longer exists (post `supabase db reset`), wipe + re-bootstrap
+  // and try again once.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-  if (authError || !user) {
-    throw new Error(`Cannot create poster — no active user: ${authError?.message ?? 'unknown'}`);
+    if (authError && isStaleJwtError(authError.message)) {
+      await reboostrapAnonymous();
+      continue;
+    }
+
+    if (authError || !user) {
+      throw new Error(
+        `Cannot create poster — no active user: ${authError?.message ?? 'unknown'}`,
+      );
+    }
+
+    const { data, error } = await supabase
+      .from('posters')
+      .insert({ user_id: user.id })
+      .select('*')
+      .single();
+
+    if (error && isStaleJwtError(error.message)) {
+      await reboostrapAnonymous();
+      continue;
+    }
+
+    if (error) {
+      throw new Error(`Failed to create poster: ${error.message}`);
+    }
+    return data as unknown as PosterRow;
   }
 
-  const { data, error } = await supabase
-    .from('posters')
-    .insert({ user_id: user.id })
-    .select('*')
-    .single();
-
-  if (error) {
-    throw new Error(`Failed to create poster: ${error.message}`);
-  }
-  return data as unknown as PosterRow;
+  throw new Error('Failed to create poster after re-authenticating');
 }
 
 /**

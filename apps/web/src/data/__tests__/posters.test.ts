@@ -72,6 +72,16 @@ function makeQuery(table: string) {
   return thenable;
 }
 
+// vi.mock is hoisted, so any vars it references have to live inside
+// a vi.hoisted() block or they'll be temporal-dead-zone undefined.
+const { signInAnonymouslyMock, signOutMock } = vi.hoisted(() => ({
+  signInAnonymouslyMock: vi.fn(async () => ({
+    data: { session: { user: { id: 'user-1' } }, user: { id: 'user-1' } },
+    error: null,
+  })),
+  signOutMock: vi.fn(async () => ({ error: null })),
+}));
+
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: (table: string) => makeQuery(table),
@@ -80,6 +90,8 @@ vi.mock('@/lib/supabase', () => ({
         data: { user: fakeUser },
         error: getUserError,
       })),
+      signInAnonymously: signInAnonymouslyMock,
+      signOut: signOutMock,
     },
   },
 }));
@@ -229,6 +241,27 @@ describe('createPoster', () => {
   it('throws when Supabase insert fails', async () => {
     setResponses({ data: null, error: { message: 'constraint violation' } });
     await expect(createPoster()).rejects.toThrow(/constraint violation/);
+  });
+
+  // Regression: after `supabase db reset` the browser holds a JWT for
+  // a user that no longer exists. The first insert fails with
+  // "User from sub claim in JWT does not exist"; createPoster should
+  // wipe the local session, sign in anonymously again, and retry.
+  it('re-bootstraps on a stale JWT and retries the insert', async () => {
+    signInAnonymouslyMock.mockClear();
+    signOutMock.mockClear();
+
+    const row = makeRow({ id: 'healed' });
+    setResponses(
+      { data: null, error: { message: 'User from sub claim in JWT does not exist' } },
+      { data: row, error: null },
+    );
+
+    const result = await createPoster();
+
+    expect(result.id).toBe('healed');
+    expect(signOutMock).toHaveBeenCalledWith({ scope: 'local' });
+    expect(signInAnonymouslyMock).toHaveBeenCalledTimes(1);
   });
 });
 
