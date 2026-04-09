@@ -115,3 +115,40 @@
 5. **B4** — leave as-is
 
 After fixes, re-run through Maya's test flow from the personas file to validate end-to-end.
+
+---
+
+## Re-audit — after commit `a4fc0e4`
+
+Same day, same persona (Maya), same flow. Screenshots at
+[re-01](./re-01-home.png) through [re-07](./re-07-after-reload.png).
+
+| Step | Before | After | Screenshot |
+|---|---|---|---|
+| Land on home | Card + New poster button, dim MY POSTERS label | Same layout, MY POSTERS label now clearly readable | [re-01](./re-01-home.png) |
+| Click + New poster | Editor opens at 192% | Same — editor opens immediately, default 3-col template | [re-02](./re-02-fresh-editor.png) |
+| Caption + image block | Zoom bar occluded caption; image block only said "Upload figure" | Caption clearly readable above zoom bar; image block shows "+ Upload figure / click to browse · drag to move" hint | [re-02](./re-02-fresh-editor.png) |
+| Type long title into title block | Second line clipped by block bottom | **Title block grows downward to fit both lines**; nothing clipped | [re-03](./re-03-long-title.png) |
+| Sidebar CONTENT field sync | Stayed stale at "Your Poster Title α" | Updates live with canvas edits — both show "Working Memory Capacity Predicts..." | [re-03](./re-03-long-title.png) |
+| Click Intro text, type `/eta2` | Dropdown shown | Same — dropdown at correct pixel size, entry "/eta2 η²" | [re-04](./re-04-eta2-menu.png) |
+| Tab to insert | Symbol inserted | Same — "WM span η²" visible in both canvas and sidebar | [re-05](./re-05-eta2-inserted.png) |
+| Sidebar labels | #555 (dim on dark bg) | #9ca3af (readable) — CONTENT, FONT, LINE SPACING, TEXT COLOR all clearly legible | [re-05](./re-05-eta2-inserted.png) |
+| Style tab → Psychology/Neuro | Palette switch works | Same — all headings render in the new purple accent, caption updates to "Psychology / Neuro" | [re-06](./re-06-psych-palette.png) |
+| Refresh (persistence) | Maya's test passed only if autosave kept her edits | **All three edits persist** — long title still wrapping with grown block, slash-command η² still in Intro, palette still Psychology/Neuro | [re-07](./re-07-after-reload.png) |
+
+### Maya's persona verdict
+
+> *"I opened the app, it was already an editable poster with a real template. I clicked the title and just typed — no dialogs, no save button, no learning curve. My stats symbol worked. I didn't fight any modal. I refreshed and nothing was lost."*
+
+**All four P0/P1 fixes verified green.** B4 (autosave pill staleness) still present as noted — acceptable.
+
+### Meta-finding resolved
+
+Maya's re-audit proved that `page.fill()` and per-key `page.keyboard.press()` **do** propagate to React 18's contentEditable correctly. The earlier failures were specific to `page.evaluate()` programmatic DOM mutations and `document.execCommand` called from `page.evaluate()`. **Future audits should always use `browser_type` / `browser_press_key` for text input**, never direct DOM mutation.
+
+### Still deferred (manual verification only, couldn't automate reliably)
+
+- **Drag-guide overlay** while moving a block — the dotted edge lines + centerline appear only during a live pointer move, which Playwright's ref-based click/fill API can't sustain mid-action. Covered by visual inspection: the code adds the overlay in [PosterEditor.tsx:598](apps/web/src/poster/PosterEditor.tsx#L598) conditional on `draggingBlock`.
+- **Floating format toolbar** — requires a live text selection range; same reason as drag. Covered by the `FloatingFormatToolbar` tests would need to be hand-checked in a browser.
+
+Both are on the list for manual QA before shipping. **If automation of these becomes important, exposing a `window.__postrTestApi` under a dev flag would let an audit agent drive both flows without fighting contentEditable event quirks.**
