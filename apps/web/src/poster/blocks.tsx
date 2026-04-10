@@ -73,7 +73,7 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
         border: '1.5px dashed #ccc',
         borderRadius: 4,
         cursor: 'pointer',
-        fontSize: 8,
+        fontSize: 13,
         color: '#999',
         flexDirection: 'column',
         gap: 2,
@@ -154,14 +154,14 @@ export function ImageBlock({ block, palette, onUpdate }: ImageBlockProps) {
         // didDragRef in onClickCapture.
         cursor: 'inherit',
         color: palette.muted,
-        fontSize: 9,
+        fontSize: 13,
         gap: 3,
         textAlign: 'center',
         padding: '0 8px',
       }}
     >
       <span style={{ fontWeight: 600 }}>+ Upload figure</span>
-      <span style={{ fontSize: 7, opacity: 0.7 }}>click to browse · drag to move</span>
+      <span style={{ fontSize: 13, opacity: 0.7 }}>click to browse · drag to move</span>
       <input ref={ref} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
     </div>
   );
@@ -174,7 +174,7 @@ const iconBtn: CSSProperties = {
   borderRadius: 3,
   width: 18,
   height: 18,
-  fontSize: 8,
+  fontSize: 13,
   cursor: 'pointer',
 };
 
@@ -577,7 +577,7 @@ function TableContextMenu({ x, y, r, c, data, onAction, onClose }: {
         display: 'block',
         width: '100%',
         padding: '6px 12px',
-        fontSize: 12,
+        fontSize: 13,
         color: disabled ? '#555' : danger ? '#f87171' : '#c8cad0',
         cursor: disabled ? 'not-allowed' : 'pointer',
         borderRadius: 4,
@@ -610,7 +610,7 @@ function TableContextMenu({ x, y, r, c, data, onAction, onClose }: {
         fontFamily: "'DM Sans', system-ui, sans-serif",
       }}
     >
-      <div style={{ padding: '4px 12px 6px', fontSize: 10, color: '#6b7280', fontWeight: 600 }}>
+      <div style={{ padding: '4px 12px 6px', fontSize: 13, color: '#6b7280', fontWeight: 600 }}>
         Cell ({r + 1}, {c + 1})
       </div>
       {sep}
@@ -1058,7 +1058,7 @@ export function BlockFrame(props: BlockFrameProps) {
             background: '#d33',
             color: '#fff',
             border: '2px solid #0a0a12',
-            fontSize: 10,
+            fontSize: 13,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',

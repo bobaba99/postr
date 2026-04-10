@@ -282,7 +282,7 @@ export function OnboardingTour() {
           <span style={{ fontSize: 15, fontWeight: 600, color: '#e2e2e8' }}>
             {current.title}
           </span>
-          <span style={{ fontSize: 11, color: '#7c6aed', fontWeight: 600 }}>
+          <span style={{ fontSize: 13, color: '#7c6aed', fontWeight: 600 }}>
             {step + 1}/{STEPS.length}
           </span>
         </div>
@@ -312,13 +312,13 @@ export function resetOnboarding(): void {
 }
 
 const skipBtnStyle: CSSProperties = {
-  all: 'unset', cursor: 'pointer', fontSize: 12, color: '#6b7280',
+  all: 'unset', cursor: 'pointer', fontSize: 13, color: '#6b7280',
 };
 const navBtnStyle: CSSProperties = {
-  cursor: 'pointer', padding: '6px 14px', fontSize: 12, fontWeight: 500,
+  cursor: 'pointer', padding: '6px 14px', fontSize: 13, fontWeight: 500,
   color: '#c8cad0', background: '#1a1a26', border: '1px solid #2a2a3a', borderRadius: 6,
 };
 const primaryBtnStyle: CSSProperties = {
-  cursor: 'pointer', padding: '6px 14px', fontSize: 12, fontWeight: 600,
+  cursor: 'pointer', padding: '6px 14px', fontSize: 13, fontWeight: 600,
   color: '#fff', background: '#7c6aed', border: 'none', borderRadius: 6,
 };

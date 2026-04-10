@@ -5,6 +5,7 @@ import {
   parseRCode,
   parsePythonCode,
   computeReadability,
+  detectLanguage,
   type ReadabilityResult,
   type FigureParams,
 } from './readability';
@@ -22,7 +23,7 @@ const textareaStyle: CSSProperties = {
   borderRadius: 6, padding: 10, resize: 'vertical',
 };
 const labelStyle: CSSProperties = {
-  fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' as const,
+  fontSize: 13, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' as const,
   letterSpacing: 1.2,
 };
 const copyBtnStyle: CSSProperties = {
@@ -85,46 +86,7 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
 
   const detectedLang = useMemo(() => {
     if (lang !== 'auto') return lang;
-    // Score-based detection — R and Python patterns both checked,
-    // highest score wins. Prevents false positives when code has
-    // ambiguous tokens (e.g. "plot" exists in both languages).
-    let rScore = 0;
-    let pyScore = 0;
-
-    // Strong R signals
-    if (/ggplot\s*\(/.test(code)) rScore += 5;
-    if (/geom_\w+/.test(code)) rScore += 5;
-    if (/theme_\w+/.test(code)) rScore += 4;
-    if (/ggsave\s*\(/.test(code)) rScore += 5;
-    if (/aes\s*\(/.test(code)) rScore += 4;
-    if (/<-/.test(code)) rScore += 3;
-    if (/library\s*\(/.test(code)) rScore += 3;
-    if (/\b(cowplot|patchwork|ggpubr|gridExtra|lattice)\b/.test(code)) rScore += 4;
-    if (/%>%|%\+%|\|>/.test(code)) rScore += 3;
-    if (/\bc\s*\(/.test(code)) rScore += 1;
-    if (/element_text|element_blank|element_rect/.test(code)) rScore += 4;
-    if (/facet_wrap|facet_grid/.test(code)) rScore += 4;
-    if (/scale_\w+/.test(code)) rScore += 2;
-    if (/labs\s*\(/.test(code)) rScore += 2;
-
-    // Strong Python signals
-    if (/plt\./.test(code)) pyScore += 5;
-    if (/matplotlib/.test(code)) pyScore += 5;
-    if (/import\s+\w+/.test(code)) pyScore += 3;
-    if (/seaborn|sns\./.test(code)) pyScore += 5;
-    if (/figsize\s*=/.test(code)) pyScore += 4;
-    if (/subplots\s*\(/.test(code)) pyScore += 4;
-    if (/ax\.\w+/.test(code)) pyScore += 3;
-    if (/rcParams/.test(code)) pyScore += 4;
-    if (/set_xlabel|set_ylabel|set_title/.test(code)) pyScore += 3;
-    if (/savefig\s*\(/.test(code)) pyScore += 4;
-    if (/def\s+\w+|class\s+\w+/.test(code)) pyScore += 2;
-    if (/fig,\s*ax/.test(code)) pyScore += 3;
-
-    if (rScore === 0 && pyScore === 0) return null;
-    if (rScore > pyScore) return 'r';
-    if (pyScore > rScore) return 'python';
-    return null; // tie — ask user to pick
+    return detectLanguage(code);
   }, [code, lang]);
 
   // Use image block dimensions if available, otherwise use a standard 10×7 default
@@ -252,7 +214,7 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
                 </button>
               </div>
               <pre style={{
-                fontSize: 12, color: '#a6e3a1', fontFamily: 'monospace',
+                fontSize: 13, color: '#a6e3a1', fontFamily: 'monospace',
                 background: '#1e1e2e', borderRadius: 4, padding: 8,
                 whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                 maxHeight: 200, overflow: 'auto',
@@ -264,7 +226,7 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
           )}
 
           {result.elements.every((e) => e.status === 'pass') && (
-            <div style={{ background: '#1a3a2a', borderRadius: 6, padding: 10, fontSize: 12, color: '#a6e3a1' }}>
+            <div style={{ background: '#1a3a2a', borderRadius: 6, padding: 10, fontSize: 13, color: '#a6e3a1' }}>
               All elements pass readability thresholds at this poster size.
             </div>
           )}
@@ -290,7 +252,7 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
           >
             Scan Image (coming soon)
           </button>
-          <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>
+          <div style={{ fontSize: 13, color: '#555', marginTop: 4 }}>
             Phase 2 — local Ollama or Claude Vision
           </div>
         </div>

@@ -125,7 +125,7 @@ export default function Home() {
         </h2>
 
         {actionError && (
-          <div className="mb-4 rounded-md border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-xs text-[#f87171]">
+          <div className="mb-4 rounded-md border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-[13px] text-[#f87171]">
             {actionError}
           </div>
         )}
@@ -155,15 +155,15 @@ export default function Home() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
               <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
                 <div className="text-sm font-semibold text-[#c8cad0] mb-1">Pick a template</div>
-                <div className="text-xs text-[#6b7280] leading-relaxed">5 layouts — 3-column classic, billboard, sidebar + focus, and more. Start with structure, not a blank page.</div>
+                <div className="text-[13px] text-[#6b7280] leading-relaxed">5 layouts — 3-column classic, billboard, sidebar + focus, and more. Start with structure, not a blank page.</div>
               </div>
               <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
                 <div className="text-sm font-semibold text-[#c8cad0] mb-1">Write with guidance</div>
-                <div className="text-xs text-[#6b7280] leading-relaxed">Built-in writing guide, conference size specs, and a checklist to keep you on track from intro to references.</div>
+                <div className="text-[13px] text-[#6b7280] leading-relaxed">Built-in writing guide, conference size specs, and a checklist to keep you on track from intro to references.</div>
               </div>
               <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
                 <div className="text-sm font-semibold text-[#c8cad0] mb-1">Check before you print</div>
-                <div className="text-xs text-[#6b7280] leading-relaxed">Paste your R or Python code to verify figure text is readable at poster size. Out-of-bounds warnings catch layout issues.</div>
+                <div className="text-[13px] text-[#6b7280] leading-relaxed">Paste your R or Python code to verify figure text is readable at poster size. Out-of-bounds warnings catch layout issues.</div>
               </div>
             </div>
             <div className="mt-6">

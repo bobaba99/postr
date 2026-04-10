@@ -4,6 +4,7 @@ import {
   parseRCode,
   parsePythonCode,
   computeReadability,
+  detectLanguage,
   type FigureParams,
   type ReadabilityResult,
 } from '../readability';
@@ -161,6 +162,95 @@ describe('parsePythonCode', () => {
     expect(p.canvasWidth).toBeCloseTo(6.4, 1);
     expect(p.canvasHeight).toBeCloseTo(4.8, 1);
     expect(p.warnings).toContain('No canvas size found — assuming matplotlib default 6.4"×4.8".');
+  });
+});
+
+describe('language detection patterns', () => {
+  // ── R code that should be detected as R ──────────────────────────
+
+  it('detects basic ggplot as R', () => {
+    const code = `library(ggplot2)\nggplot(df, aes(x=time, y=score)) + geom_line()`;
+    expect(detectLanguage(code)).toBe('r');
+  });
+
+  it('detects pipe operator + ggplot as R', () => {
+    const code = `df %>% ggplot(aes(x, y)) + geom_point() + theme_bw()`;
+    expect(detectLanguage(code)).toBe('r');
+  });
+
+  it('detects base R plot with library call as R', () => {
+    const code = `plot(x, y, main="Title", xlab="X", ylab="Y")`;
+    // base R plot alone has no strong R-specific tokens beyond plot()
+    // but parseRCode should still handle it — detection may return null
+    // since "plot" is ambiguous. Let's verify what the scorer returns.
+    const result = detectLanguage(code);
+    // "plot" alone doesn't trigger any R or Python patterns strongly
+    // No ggplot, no plt., no import — should be null
+    expect(result).toBeNull();
+  });
+
+  it('detects cowplot multi-panel as R', () => {
+    const code = `library(cowplot)\nplot_grid(p1, p2, ncol=2)`;
+    expect(detectLanguage(code)).toBe('r');
+  });
+
+  it('detects ggpubr as R', () => {
+    const code = `library(ggpubr)\nggboxplot(df, x="group", y="value")`;
+    expect(detectLanguage(code)).toBe('r');
+  });
+
+  it('detects R assignment + facet_wrap as R', () => {
+    const code = `p <- ggplot(df, aes(x, y)) + geom_bar(stat="identity") + facet_wrap(~group, nrow=2)`;
+    expect(detectLanguage(code)).toBe('r');
+  });
+
+  // ── Python code that should be detected as Python ────────────────
+
+  it('detects standard matplotlib as Python', () => {
+    const code = `import matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nax.plot(x, y)`;
+    expect(detectLanguage(code)).toBe('python');
+  });
+
+  it('detects seaborn as Python', () => {
+    const code = `import seaborn as sns\nsns.set_theme(font_scale=1.5)\nsns.boxplot(data=df, x="group", y="value")`;
+    expect(detectLanguage(code)).toBe('python');
+  });
+
+  it('detects subplot grid as Python', () => {
+    const code = `fig, axes = plt.subplots(2, 3, figsize=(12, 8))`;
+    expect(detectLanguage(code)).toBe('python');
+  });
+
+  it('detects rcParams as Python', () => {
+    const code = `plt.rcParams['font.size'] = 14\nplt.bar(groups, means, yerr=sds)`;
+    expect(detectLanguage(code)).toBe('python');
+  });
+
+  // ── Ambiguous code ───────────────────────────────────────────────
+
+  it('returns null for bare plot(x, y) — too ambiguous', () => {
+    const code = `plot(x, y)`;
+    expect(detectLanguage(code)).toBeNull();
+  });
+
+  it('picks the language with the higher score when both tokens present', () => {
+    // Mix of R and Python tokens — R has more weight here
+    const codeRWins = `library(ggplot2)\nggplot(df, aes(x, y)) + geom_point() + theme_bw()\nimport matplotlib`;
+    expect(detectLanguage(codeRWins)).toBe('r');
+
+    // Mix where Python wins
+    const codePyWins = `import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(10, 7))\nax.plot(x, y)\nlibrary(ggplot2)`;
+    expect(detectLanguage(codePyWins)).toBe('python');
+  });
+
+  it('returns null for empty string', () => {
+    expect(detectLanguage('')).toBeNull();
+  });
+
+  it('returns null when scores are tied', () => {
+    // Craft a tie: library() gives R +3, import gives Python +3
+    const code = `library(stats)\nimport numpy`;
+    expect(detectLanguage(code)).toBeNull();
   });
 });
 

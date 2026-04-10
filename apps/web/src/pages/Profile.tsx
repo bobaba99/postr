@@ -127,12 +127,12 @@ export default function Profile() {
 
       <div className="mx-auto max-w-2xl px-8 py-8">
         {actionStatus && (
-          <div className="mb-4 rounded-md border border-[#a6e3a1]/40 bg-[#a6e3a1]/10 px-3 py-2 text-xs text-[#a6e3a1]">
+          <div className="mb-4 rounded-md border border-[#a6e3a1]/40 bg-[#a6e3a1]/10 px-3 py-2 text-[13px] text-[#a6e3a1]">
             {actionStatus}
           </div>
         )}
         {actionError && (
-          <div className="mb-4 rounded-md border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-xs text-[#f87171]">
+          <div className="mb-4 rounded-md border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-[13px] text-[#f87171]">
             {actionError}
           </div>
         )}
@@ -149,7 +149,7 @@ export default function Profile() {
         {/* Link Account */}
         {isAnonymous && (
           <Section title="Link Your Account">
-            <p className="mb-3 text-xs text-[#6b7280]">
+            <p className="mb-3 text-[13px] text-[#6b7280]">
               You're using a guest account. Link with Google to preserve your posters
               across devices and prevent data loss if your browser clears storage.
             </p>
@@ -164,7 +164,7 @@ export default function Profile() {
           <div className="flex items-center justify-between py-2">
             <div>
               <div className="text-sm text-[#c8cad0]">Saved style presets</div>
-              <div className="text-xs text-[#6b7280]">
+              <div className="text-[13px] text-[#6b7280]">
                 {(() => {
                   try {
                     const raw = localStorage.getItem('postr.style-presets');
@@ -183,7 +183,7 @@ export default function Profile() {
           <div className="flex items-center justify-between py-2 border-t border-[#1f1f2e]">
             <div>
               <div className="text-sm text-[#c8cad0]">Onboarding tour</div>
-              <div className="text-xs text-[#6b7280]">
+              <div className="text-[13px] text-[#6b7280]">
                 Click-through tutorial of the editor interface
               </div>
             </div>
@@ -200,7 +200,7 @@ export default function Profile() {
           </div>
           <div className="py-2 border-t border-[#1f1f2e]">
             <div className="text-sm text-[#c8cad0] mb-2">Checklist templates</div>
-            <div className="text-xs text-[#6b7280] mb-3">
+            <div className="text-[13px] text-[#6b7280] mb-3">
               Custom templates you saved from the Scratch Pad. Built-in templates cannot be deleted.
             </div>
             {(() => {
@@ -211,11 +211,11 @@ export default function Profile() {
                   {templates.map((t) => (
                     <div key={t.name} className="flex items-center justify-between rounded-md border border-[#1f1f2e] bg-[#0a0a12] px-3 py-2">
                       <div>
-                        <div className="text-xs font-medium text-[#c8cad0]">
+                        <div className="text-[13px] font-medium text-[#c8cad0]">
                           {t.name}
-                          {t.builtIn && <span className="ml-2 text-[10px] text-[#6b7280]">(built-in)</span>}
+                          {t.builtIn && <span className="ml-2 text-[13px] text-[#6b7280]">(built-in)</span>}
                         </div>
-                        <div className="text-[10px] text-[#6b7280]">{t.items.length} items</div>
+                        <div className="text-[13px] text-[#6b7280]">{t.items.length} items</div>
                       </div>
                       {!t.builtIn && (
                         <button
@@ -233,7 +233,7 @@ export default function Profile() {
                     </div>
                   ))}
                   {custom.length === 0 && (
-                    <div className="text-xs text-[#6b7280]">
+                    <div className="text-[13px] text-[#6b7280]">
                       No custom templates yet. Use "Save as..." in the editor's Scratch Pad to create one.
                     </div>
                   )}
@@ -306,7 +306,7 @@ function Section({ title, children, danger }: { title: string; children: React.R
   return (
     <section className="mb-8">
       <h2
-        className={`mb-4 text-xs font-semibold uppercase tracking-widest ${
+        className={`mb-4 text-[13px] font-semibold uppercase tracking-widest ${
           danger ? 'text-[#f87171]' : 'text-[#6b7280]'
         }`}
       >
@@ -345,7 +345,7 @@ function DangerAction({
     <div className="flex items-start justify-between gap-4">
       <div>
         <div className="text-sm font-medium text-[#c8cad0]">{title}</div>
-        <div className="text-xs text-[#6b7280] mt-1">{description}</div>
+        <div className="text-[13px] text-[#6b7280] mt-1">{description}</div>
       </div>
       <button onClick={onClick} disabled={disabled} className={btnDanger}>
         {buttonText}
@@ -360,7 +360,7 @@ const btnPrimary =
   'cursor-pointer rounded-md bg-[#7c6aed] px-4 py-2 text-sm font-medium text-white hover:bg-[#6c5ce7] disabled:opacity-50 disabled:cursor-not-allowed';
 
 const btnSecondary =
-  'cursor-pointer rounded-md border border-[#2a2a3a] bg-[#1a1a26] px-3 py-1.5 text-xs text-[#c8cad0] hover:bg-[#1e1e2e] disabled:opacity-50 disabled:cursor-not-allowed';
+  'cursor-pointer rounded-md border border-[#2a2a3a] bg-[#1a1a26] px-3 py-1.5 text-[13px] text-[#c8cad0] hover:bg-[#1e1e2e] disabled:opacity-50 disabled:cursor-not-allowed';
 
 const btnDanger =
-  'cursor-pointer whitespace-nowrap rounded-md border border-[#f87171]/40 bg-transparent px-3 py-1.5 text-xs text-[#f87171] hover:bg-[#f87171]/10 disabled:opacity-30 disabled:cursor-not-allowed';
+  'cursor-pointer whitespace-nowrap rounded-md border border-[#f87171]/40 bg-transparent px-3 py-1.5 text-[13px] text-[#f87171] hover:bg-[#f87171]/10 disabled:opacity-30 disabled:cursor-not-allowed';

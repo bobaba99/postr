@@ -224,7 +224,7 @@ export function PosterCard({ row, onDuplicate, onDelete }: PosterCardProps) {
         </div>
         <div className="flex items-baseline justify-between gap-2 px-3 py-2">
           <span className="truncate text-sm font-medium text-[#e2e2e8]">{title}</span>
-          <span className="shrink-0 text-[10px] text-[#6b7280]">
+          <span className="shrink-0 text-[13px] text-[#6b7280]">
             {formatLastEdited(row.updated_at)}
           </span>
         </div>
@@ -239,7 +239,7 @@ export function PosterCard({ row, onDuplicate, onDelete }: PosterCardProps) {
             e.preventDefault();
             onDuplicate(row);
           }}
-          className="rounded-md border border-[#2a2a3a] bg-[#1a1a26]/90 px-2 py-1 text-[10px] font-semibold text-[#c8cad0] backdrop-blur hover:border-[#7c6aed]"
+          className="rounded-md border border-[#2a2a3a] bg-[#1a1a26]/90 px-2 py-1 text-[13px] font-semibold text-[#c8cad0] backdrop-blur hover:border-[#7c6aed]"
         >
           Duplicate
         </button>
@@ -250,7 +250,7 @@ export function PosterCard({ row, onDuplicate, onDelete }: PosterCardProps) {
             e.preventDefault();
             onDelete(row);
           }}
-          className="rounded-md border border-[#2a2a3a] bg-[#1a1a26]/90 px-2 py-1 text-[10px] font-semibold text-[#f87171] backdrop-blur hover:border-[#f87171]"
+          className="rounded-md border border-[#2a2a3a] bg-[#1a1a26]/90 px-2 py-1 text-[13px] font-semibold text-[#f87171] backdrop-blur hover:border-[#f87171]"
         >
           Delete
         </button>
