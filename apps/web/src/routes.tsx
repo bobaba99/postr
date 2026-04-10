@@ -13,6 +13,7 @@
 import { Routes, Route } from 'react-router-dom';
 import Home from '@/pages/Home';
 import Editor from '@/pages/Editor';
+import Profile from '@/pages/Profile';
 import Share from '@/pages/Share';
 import NotFound from '@/pages/NotFound';
 
@@ -21,6 +22,7 @@ export function AppRoutes() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/p/:posterId" element={<Editor />} />
+      <Route path="/profile" element={<Profile />} />
       <Route path="/s/:slug" element={<Share />} />
       <Route path="*" element={<NotFound />} />
     </Routes>

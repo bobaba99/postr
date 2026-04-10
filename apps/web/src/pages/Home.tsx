@@ -17,6 +17,7 @@ import {
   listPosters,
   type PosterRow,
 } from '@/data/posters';
+import { Link } from 'react-router-dom';
 import { PosterCard } from '@/components/PosterCard';
 import { NewPosterButton } from '@/components/NewPosterButton';
 
@@ -91,7 +92,19 @@ export default function Home() {
     <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#1f1f2e] bg-[#0a0a12]/95 px-8 py-5 backdrop-blur">
         <h1 className="text-xl font-semibold tracking-tight">Postr</h1>
-        <NewPosterButton />
+        <div className="flex items-center gap-4">
+          <NewPosterButton />
+          <Link
+            to="/profile"
+            className="flex h-8 w-8 items-center justify-center rounded-full border border-[#2a2a3a] text-[#6b7280] hover:border-[#7c6aed] hover:text-[#c8cad0]"
+            title="Profile & Settings"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </Link>
+        </div>
       </header>
 
       <section className="mx-auto max-w-6xl px-8 py-8">
