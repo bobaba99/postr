@@ -17,6 +17,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { listPosters, deletePoster } from '@/data/posters';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { resetOnboarding } from '@/components/OnboardingTour';
 import type { User } from '@supabase/supabase-js';
 
 type ConfirmAction = 'deletePosters' | 'deleteAccount' | null;
@@ -176,6 +177,24 @@ export default function Profile() {
             </div>
             <button onClick={clearPresets} className={btnSecondary}>
               Clear presets
+            </button>
+          </div>
+          <div className="flex items-center justify-between py-2 border-t border-[#1f1f2e]">
+            <div>
+              <div className="text-sm text-[#c8cad0]">Onboarding tour</div>
+              <div className="text-xs text-[#6b7280]">
+                Click-through tutorial of the editor interface
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                resetOnboarding();
+                setActionStatus('Tour reset — it will play next time you open a poster.');
+                setTimeout(() => setActionStatus(null), 3000);
+              }}
+              className={btnSecondary}
+            >
+              Replay tour
             </button>
           </div>
         </Section>

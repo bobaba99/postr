@@ -23,6 +23,7 @@ import { useGsapContext } from '@/motion';
 import { editorEntrance } from '@/motion/timelines/editorEntrance';
 import { BlockFrame } from './blocks';
 import { GuidelinesPanel } from './GuidelinesPanel';
+import { OnboardingTour } from '@/components/OnboardingTour';
 import { Sidebar, type StylePreset } from './Sidebar';
 import {
   DEFAULT_POSTER_SIZE_KEY,
@@ -830,6 +831,7 @@ export function PosterEditor() {
       </div>
 
       <GuidelinesPanel />
+      <OnboardingTour />
     </div>
   );
 }
