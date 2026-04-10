@@ -106,7 +106,7 @@ export default function Editor() {
         // self-heal on load without needing a db reset.
         const raw = row.data as PosterDoc;
         const hydrated = hydrateIfEmpty(normalizeStaleStyles(raw));
-        setPoster(row.id, hydrated);
+        setPoster(row.id, hydrated, row.title);
         // Normalize the URL so refreshes land on the real id, not "/p/new"
         if (posterId !== row.id) {
           navigate(`/p/${row.id}`, { replace: true });

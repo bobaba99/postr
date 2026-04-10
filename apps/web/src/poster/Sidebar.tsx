@@ -60,6 +60,8 @@ export interface StylePreset {
 
 interface SidebarProps {
   // poster meta
+  posterTitle: string;
+  onChangePosterTitle: (title: string) => void;
   posterSizeKey: PosterSizeKey;
   onChangePosterSize: (key: PosterSizeKey) => void;
   showGrid: boolean;
@@ -344,6 +346,8 @@ export function Sidebar(props: SidebarProps) {
         <div style={{ flex: 1, overflow: 'auto', padding: '4px 20px 24px', minWidth: 0 }}>
         {tab === 'layout' && (
           <LayoutTab
+            posterTitle={props.posterTitle}
+            onChangePosterTitle={props.onChangePosterTitle}
             posterSizeKey={props.posterSizeKey}
             onChangePosterSize={props.onChangePosterSize}
             showGrid={props.showGrid}
@@ -422,6 +426,8 @@ export function Sidebar(props: SidebarProps) {
 // =========================================================================
 
 function LayoutTab(props: {
+  posterTitle: string;
+  onChangePosterTitle: (title: string) => void;
   posterSizeKey: PosterSizeKey;
   onChangePosterSize: (k: PosterSizeKey) => void;
   showGrid: boolean;
@@ -430,8 +436,34 @@ function LayoutTab(props: {
   onAutoLayout: () => void;
   onPrint: () => void;
 }) {
+  const titleLen = props.posterTitle.length;
+  const titleTip =
+    !props.posterTitle.trim()
+      ? 'Name your poster for the dashboard. Try: presenter, event, date (e.g. "Maya — APA 2026").'
+      : titleLen < 10
+        ? 'Tip: Add the conference name or date for quick identification (e.g. "Kenji — SfN Nov 2026").'
+        : titleLen > 80
+          ? 'Consider shortening — this name is for the dashboard, not the poster itself.'
+          : null;
+
   return (
     <>
+      <div style={labelStyle}>Poster Name</div>
+      <input
+        value={props.posterTitle}
+        onChange={(e) => props.onChangePosterTitle(e.target.value)}
+        placeholder="e.g. Maya — APA 2026"
+        style={inputBase}
+      />
+      <div style={{ fontSize: 9, color: '#6b7280', marginTop: 2, marginBottom: titleTip ? 0 : 8, lineHeight: 1.4 }}>
+        Dashboard label — separate from the poster&apos;s main title on the canvas.
+      </div>
+      {titleTip && (
+        <div style={{ fontSize: 10, color: '#89b4fa', lineHeight: 1.4, marginTop: 4, marginBottom: 8 }}>
+          {titleTip}
+        </div>
+      )}
+
       <div style={labelStyle}>Poster Size</div>
       <select
         value={props.posterSizeKey}

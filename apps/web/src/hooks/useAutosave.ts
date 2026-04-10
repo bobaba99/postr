@@ -38,7 +38,7 @@ function stripHtml(html: string): string {
   return div.textContent ?? '';
 }
 
-export function useAutosave(posterId: string | null, doc: PosterDoc | null): AutosaveState {
+export function useAutosave(posterId: string | null, doc: PosterDoc | null, displayTitle?: string): AutosaveState {
   const [state, setState] = useState<AutosaveState>({
     status: 'idle',
     lastSavedAt: null,
@@ -49,8 +49,12 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null): Aut
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingDocRef = useRef<PosterDoc | null>(null);
   const pendingIdRef = useRef<string | null>(null);
+  const pendingTitleRef = useRef<string | undefined>(displayTitle);
   const firstRenderRef = useRef(true);
   const lastPosterIdRef = useRef<string | null>(posterId);
+
+  // Keep the title ref in sync without re-triggering the effect.
+  pendingTitleRef.current = displayTitle;
 
   // Actual save — runs at the tail of the debounce window or on unmount.
   const flush = async () => {
@@ -62,13 +66,14 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null): Aut
 
     setState((s) => ({ ...s, status: 'saving', error: null }));
     try {
-      // Extract the title block's plain-text content and sync it to
-      // the posters.title column so the Home page grid shows the
-      // actual poster title instead of "Untitled Poster".
-      const titleBlock = data.blocks.find((b) => b.type === 'title');
-      const titleText = titleBlock?.content
-        ? stripHtml(titleBlock.content).trim()
-        : '';
+      // Sync the display title (sidebar "Poster Title" field) to the
+      // posters.title column. Falls back to extracting the title
+      // block's content if no display title is set.
+      let titleText = pendingTitleRef.current?.trim() ?? '';
+      if (!titleText) {
+        const titleBlock = data.blocks.find((b) => b.type === 'title');
+        titleText = titleBlock?.content ? stripHtml(titleBlock.content).trim() : '';
+      }
       await upsertPoster(id, { data, ...(titleText ? { title: titleText } : {}) });
       setState({ status: 'saved', lastSavedAt: new Date(), error: null });
     } catch (err) {

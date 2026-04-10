@@ -20,10 +20,13 @@ import type {
 export interface PosterStoreState {
   /** UUID of the poster row in Supabase, or null when nothing loaded. */
   posterId: string | null;
+  /** Display name shown in the dashboard — separate from the title block. */
+  posterTitle: string;
   /** Current in-memory document, or null when nothing loaded. */
   doc: PosterDoc | null;
 
-  setPoster: (posterId: string, doc: PosterDoc) => void;
+  setPoster: (posterId: string, doc: PosterDoc, title?: string) => void;
+  setPosterTitle: (title: string) => void;
   addBlock: (block: Block) => void;
   updateBlock: (id: string, patch: Partial<Block>) => void;
   removeBlock: (id: string) => void;
@@ -43,9 +46,11 @@ function withDoc(
 
 export const usePosterStore = create<PosterStoreState>((set) => ({
   posterId: null,
+  posterTitle: '',
   doc: null,
 
-  setPoster: (posterId, doc) => set({ posterId, doc }),
+  setPoster: (posterId, doc, title) => set({ posterId, doc, posterTitle: title ?? '' }),
+  setPosterTitle: (posterTitle) => set({ posterTitle }),
 
   addBlock: (block) =>
     set((state) =>
