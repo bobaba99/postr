@@ -7,6 +7,7 @@
  * The panel is collapsible via a bookmark-style toggle on the right edge.
  */
 import { useState, type CSSProperties } from 'react';
+import { InputModal } from '@/components/InputModal';
 
 // ── Guidelines Data ──────────────────────────────────────────────────
 
@@ -431,14 +432,15 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
     if (t) updateScratch(templateToItems(t));
   };
 
-  const saveCurrentAsTemplate = () => {
-    const name = prompt('Template name:');
-    if (!name?.trim()) return;
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
+  const saveCurrentAsTemplate = (name: string) => {
     const items = scratchItems.filter((i) => i.text.trim()).map((i) => i.text);
     if (!items.length) return;
-    const next = [...customTemplates, { name: name.trim(), items }];
+    const next = [...customTemplates, { name, items }];
     setCustomTemplates(next);
     saveCustomTemplates(next);
+    setShowSaveModal(false);
   };
 
   const deleteCustomTemplate = (name: string) => {
@@ -521,7 +523,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                     )}
                   </select>
                   <button
-                    onClick={saveCurrentAsTemplate}
+                    onClick={() => setShowSaveModal(true)}
                     title="Save current checklist as a reusable template"
                     style={{ all: 'unset', cursor: 'pointer', fontSize: 12, color: '#7c6aed', fontWeight: 600, whiteSpace: 'nowrap', padding: '4px 0' }}
                   >
@@ -653,6 +655,16 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
               </div>
             </SectionDropdown>
           </div>
+
+      <InputModal
+        open={showSaveModal}
+        title="Save as template"
+        message="Give your checklist template a name so you can reuse it on future posters."
+        placeholder="e.g. My Meta-Analysis Checklist"
+        confirmLabel="Save template"
+        onConfirm={saveCurrentAsTemplate}
+        onCancel={() => setShowSaveModal(false)}
+      />
     </div>
   );
 }
