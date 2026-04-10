@@ -283,24 +283,6 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
   };
 
   // Shared handle button style (circle with + or ×).
-  const handleBtn = (variant: 'plus' | 'minus'): CSSProperties => ({
-    all: 'unset',
-    cursor: 'pointer',
-    width: 14,
-    height: 14,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: '50%',
-    background: variant === 'plus' ? palette.accent : '#c55',
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 800,
-    lineHeight: 1,
-    boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
-    pointerEvents: 'auto',
-  });
-
   return (
     <div
       style={{ width: '100%', height: '100%', overflow: 'visible', padding: 2, position: 'relative' }}
@@ -407,177 +389,60 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
       </table>
 
       {/*
-        Notion/Canva-style inline row/column handles. Absolute-
-        positioned over the table. Each handle is a small circle
-        with + (insert) or × (delete).
-
-        Row handles: left side of the hovered row.
-          - "+" adds a row below (Notion behavior)
-          - "×" deletes the hovered row
-        Column handles: top side of the hovered column.
-          - "+" adds a column to the right
-          - "×" deletes the hovered column
-
-        Uses percentage positioning based on colWidths + uniform row
-        height so it survives column resizing and row-count changes.
+        Hover-only "+" at bottom and right edges (Notion pattern).
+        Only visible when the mouse is over the table — not permanent.
+        Single append action, no delete buttons on the canvas.
+        All structural edits (insert-at-position, delete) live in the
+        sidebar TableEditor stepper.
       */}
-      {hoveredRow !== null && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 2,
-            top: `calc(${(hoveredRow / data.rows) * 100}% + ${(100 / data.rows) / 2}%)`,
-            transform: 'translateY(-50%)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 3,
-            pointerEvents: 'none',
+      {hoveredRow !== null && hoveredRow === data.rows - 1 && (
+        <button
+          type="button"
+          title="Add row"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            commit(insertRow(data, data.rows - 1, 'below'));
           }}
-        >
-          <button
-            type="button"
-            title="Insert row below"
-            style={handleBtn('plus')}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              commit(insertRow(data, hoveredRow, 'below'));
-            }}
-          >
-            +
-          </button>
-          {data.rows > 1 && (
-            <button
-              type="button"
-              title="Delete row"
-              style={handleBtn('minus')}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                commit(deleteRowAt(data, hoveredRow));
-                clearHover();
-              }}
-            >
-              ×
-            </button>
-          )}
-        </div>
-      )}
-      {hoveredCol !== null && (
-        <div
           style={{
+            all: 'unset',
+            cursor: 'pointer',
             position: 'absolute',
-            top: 2,
-            left: `calc(${colWidths.slice(0, hoveredCol).reduce((s, w) => s + w, 0)}% + ${
-              (colWidths[hoveredCol] ?? 0) / 2
-            }%)`,
-            transform: 'translateX(-50%)',
-            display: 'flex',
-            gap: 3,
-            pointerEvents: 'none',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: palette.accent,
+            opacity: 0.7,
+            borderRadius: 1,
+            zIndex: 2,
           }}
-        >
-          <button
-            type="button"
-            title="Insert column right"
-            style={handleBtn('plus')}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              commit(insertCol(data, hoveredCol, 'right'));
-            }}
-          >
-            +
-          </button>
-          {data.cols > 1 && (
-            <button
-              type="button"
-              title="Delete column"
-              style={handleBtn('minus')}
-              onMouseDown={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                commit(deleteColAt(data, hoveredCol));
-                clearHover();
-              }}
-            >
-              ×
-            </button>
-          )}
-        </div>
+        />
       )}
-      {/*
-        Permanent "add row below" and "add column right" buttons,
-        anchored at the bottom-center and right-center of the table.
-        Always visible so users discover the append affordance even
-        if they never hover the exact row/column they want to modify.
-      */}
-      <button
-        type="button"
-        title="Add row at bottom"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          commit(insertRow(data, data.rows - 1, 'below'));
-        }}
-        style={{
-          all: 'unset',
-          cursor: 'pointer',
-          position: 'absolute',
-          bottom: 2,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: 16,
-          height: 16,
-          borderRadius: '50%',
-          background: palette.accent + 'cc',
-          color: '#fff',
-          fontSize: 11,
-          fontWeight: 800,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-        }}
-      >
-        +
-      </button>
-      {/*
-        B3 fix: the right-append "+" was previously at right: -12 which
-        bled past the block frame into the adjacent column gutter. Pull
-        it in to right: -6 so the affordance is still discoverable and
-        clickable but stays inside the block's visual footprint.
-      */}
-      <button
-        type="button"
-        title="Add column at right"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => {
-          e.stopPropagation();
-          commit(insertCol(data, data.cols - 1, 'right'));
-        }}
-        style={{
-          all: 'unset',
-          cursor: 'pointer',
-          position: 'absolute',
-          right: 2,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          width: 16,
-          height: 16,
-          borderRadius: '50%',
-          background: palette.accent + 'cc',
-          color: '#fff',
-          fontSize: 11,
-          fontWeight: 800,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-        }}
-      >
-        +
-      </button>
+      {hoveredCol !== null && hoveredCol === data.cols - 1 && (
+        <button
+          type="button"
+          title="Add column"
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            commit(insertCol(data, data.cols - 1, 'right'));
+          }}
+          style={{
+            all: 'unset',
+            cursor: 'pointer',
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            right: 0,
+            width: 3,
+            background: palette.accent,
+            opacity: 0.7,
+            borderRadius: 1,
+            zIndex: 2,
+          }}
+        />
+      )}
       </div>
     </div>
   );
