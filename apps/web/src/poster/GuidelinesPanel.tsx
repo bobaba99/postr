@@ -393,12 +393,12 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
             >
               <div style={{ padding: '4px 16px 12px' }}>
                 {scratchItems.map((item) => (
-                  <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0', borderBottom: '1px solid #1a1a26' }}>
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', borderBottom: '1px solid #1a1a26' }}>
                     <input
                       type="checkbox"
                       checked={item.done}
                       onChange={() => toggleItem(item.id)}
-                      style={{ accentColor: '#7c6aed', marginTop: 3, flexShrink: 0, width: 14, height: 14, cursor: 'pointer' }}
+                      style={{ accentColor: '#7c6aed', marginTop: 2, flexShrink: 0, width: 20, height: 20, cursor: 'pointer' }}
                     />
                     <input
                       value={item.text}
@@ -407,7 +407,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                       style={{
                         all: 'unset',
                         flex: 1,
-                        fontSize: 12,
+                        fontSize: 13,
                         color: item.done ? '#555' : '#c8cad0',
                         textDecoration: item.done ? 'line-through' : 'none',
                         lineHeight: 1.5,
@@ -415,24 +415,24 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                     />
                     <button
                       onClick={() => removeItem(item.id)}
-                      style={{ all: 'unset', cursor: 'pointer', fontSize: 10, color: '#555', padding: '2px 4px' }}
+                      style={{ all: 'unset', cursor: 'pointer', fontSize: 16, color: '#555', padding: '2px 6px' }}
                       title="Remove"
                     >
                       ×
                     </button>
                   </div>
                 ))}
-                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
                   <button
                     onClick={addItem}
-                    style={{ all: 'unset', cursor: 'pointer', fontSize: 11, color: '#7c6aed', fontWeight: 600 }}
+                    style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: '#7c6aed', fontWeight: 600, padding: '4px 0' }}
                   >
                     + Add item
                   </button>
                   <span style={{ color: '#2a2a3a' }}>·</span>
                   <button
                     onClick={resetChecklist}
-                    style={{ all: 'unset', cursor: 'pointer', fontSize: 11, color: '#6b7280' }}
+                    style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: '#6b7280', padding: '4px 0' }}
                   >
                     Reset defaults
                   </button>
@@ -611,16 +611,16 @@ function SectionDropdown({ title, open, onToggle, children }: {
     <div style={{ borderBottom: '1px solid #1a1a26' }}>
       <button
         onClick={onToggle}
-        style={{ ...cardHeaderStyle, padding: '10px 20px' }}
+        style={{ ...cardHeaderStyle, padding: '16px 20px' }}
         onMouseEnter={(e) => { e.currentTarget.style.background = '#1a1a26'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af' }}>
             {title}
           </div>
         </div>
-        <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none' }}>
+        <span style={{ fontSize: 16, color: '#6b7280', transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none' }}>
           ▸
         </span>
       </button>
