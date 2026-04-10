@@ -455,10 +455,10 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
     <div data-postr-guidelines style={panelStyle}>
       <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid #1f1f2e', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#9ca3af' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#9ca3af' }}>
             Poster Guidelines
           </div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
             Official requirements from major conferences. Click to expand.
           </div>
         </div>
@@ -504,7 +504,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                       border: '1px solid #2a2a3a',
                       borderRadius: 6,
                       color: '#c8cad0',
-                      fontSize: 12,
+                      fontSize: 13,
                       outline: 'none',
                     }}
                   >
@@ -525,7 +525,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                   <button
                     onClick={() => setShowSaveModal(true)}
                     title="Save current checklist as a reusable template"
-                    style={{ all: 'unset', cursor: 'pointer', fontSize: 12, color: '#7c6aed', fontWeight: 600, whiteSpace: 'nowrap', padding: '4px 0' }}
+                    style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: '#7c6aed', fontWeight: 600, whiteSpace: 'nowrap', padding: '4px 0' }}
                   >
                     Save as...
                   </button>
@@ -571,7 +571,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                 </div>
                 {/* Notes area */}
                 <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     Notes
                   </div>
                   <textarea
@@ -583,7 +583,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                       display: 'block',
                       width: '100%',
                       minHeight: 60,
-                      fontSize: 12,
+                      fontSize: 13,
                       color: '#c8cad0',
                       background: '#1a1a26',
                       border: '1px solid #2a2a3a',
@@ -649,7 +649,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                     style={resourceLinkStyle}
                   >
                     <div style={{ fontSize: 13, color: '#89b4fa', fontWeight: 500 }}>{r.name}</div>
-                    <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4, marginTop: 2 }}>{r.description}</div>
+                    <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.4, marginTop: 2 }}>{r.description}</div>
                   </a>
                 ))}
               </div>
@@ -686,9 +686,9 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
       >
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>{g.conference}</div>
-          <div style={{ fontSize: 12, color: '#6b7280' }}>{g.field} — {g.size}</div>
+          <div style={{ fontSize: 13, color: '#6b7280' }}>{g.field} — {g.size}</div>
         </div>
-        <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
+        <span style={{ fontSize: 13, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
           ▸
         </span>
       </button>
@@ -696,12 +696,12 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
       {expanded && (
         <div style={{ padding: '0 20px 12px' }}>
           {g.sizeNote && (
-            <div style={{ fontSize: 12, color: '#f9e2af', marginBottom: 6, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 13, color: '#f9e2af', marginBottom: 6, lineHeight: 1.4 }}>
               Note: {g.sizeNote}
             </div>
           )}
 
-          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginBottom: 8 }}>
+          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', marginBottom: 8 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
                 <th style={thStyle}>Element</th>
@@ -722,7 +722,7 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
             {g.tips.map((tip, i) => (
-              <div key={i} style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.4, paddingLeft: 10, borderLeft: '2px solid #2a2a3a' }}>
+              <div key={i} style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.4, paddingLeft: 10, borderLeft: '2px solid #2a2a3a' }}>
                 {tip}
               </div>
             ))}
@@ -732,7 +732,7 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
             href={g.url}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontSize: 12, color: '#89b4fa', textDecoration: 'none' }}
+            style={{ fontSize: 13, color: '#89b4fa', textDecoration: 'none' }}
           >
             {g.urlLabel} ↗
           </a>
@@ -786,10 +786,10 @@ function WritingTipCard({ section: s, index, expanded, onToggle }: {
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 700, color: '#7c6aed', minWidth: 18 }}>{index}.</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: '#7c6aed', minWidth: 18 }}>{index}.</span>
           <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>{s.title}</span>
         </div>
-        <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
+        <span style={{ fontSize: 13, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
           ▸
         </span>
       </button>
@@ -823,7 +823,7 @@ function WritingTipCard({ section: s, index, expanded, onToggle }: {
               href={s.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: 12, color: '#89b4fa', textDecoration: 'none', display: 'block', marginTop: 10 }}
+              style={{ fontSize: 13, color: '#89b4fa', textDecoration: 'none', display: 'block', marginTop: 10 }}
             >
               Source: {s.source} ↗
             </a>

@@ -1,4 +1,7 @@
 /**
+ * @vitest-environment jsdom
+ */
+/**
  * Sanitizer contract tests.
  *
  * The sanitizer is the last line of defense against stored XSS in

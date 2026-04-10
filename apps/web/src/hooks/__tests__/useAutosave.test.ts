@@ -1,4 +1,7 @@
 /**
+ * @vitest-environment jsdom
+ */
+/**
  * Tests for the autosave hook.
  *
  * useAutosave(posterId, doc) must:

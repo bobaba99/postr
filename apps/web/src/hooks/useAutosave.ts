@@ -33,6 +33,7 @@ const DEBOUNCE_MS = 800;
 
 /** Strip HTML tags to get plain text for the poster title column. */
 function stripHtml(html: string): string {
+  if (typeof document === 'undefined') return html.replace(/<[^>]+>/g, '');
   const div = document.createElement('div');
   div.innerHTML = html;
   return div.textContent ?? '';

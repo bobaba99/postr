@@ -127,7 +127,7 @@ const inputBase: CSSProperties = {
 };
 
 const labelStyle: CSSProperties = {
-  fontSize: 12,
+  fontSize: 13,
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '1.2px',
@@ -208,7 +208,7 @@ export function Sidebar(props: SidebarProps) {
     cursor: 'pointer',
     fontFamily: 'inherit',
     fontWeight: 600,
-    fontSize: 11,
+    fontSize: 13,
     textTransform: 'uppercase',
     letterSpacing: '0.7px',
     userSelect: 'none',
@@ -498,15 +498,15 @@ function LayoutTab(props: {
         </button>
       </div>
       {!localTitle.trim() && (
-        <div style={{ fontSize: 11, color: '#f87171', lineHeight: 1.4, marginTop: 4 }}>
+        <div style={{ fontSize: 13, color: '#f87171', lineHeight: 1.4, marginTop: 4 }}>
           A poster name is required for dashboard identification.
         </div>
       )}
-      <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2, marginBottom: titleTip ? 0 : 8, lineHeight: 1.4 }}>
+      <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2, marginBottom: titleTip ? 0 : 8, lineHeight: 1.4 }}>
         Dashboard label — separate from the poster&apos;s main title on the canvas.
       </div>
       {titleTip && (
-        <div style={{ fontSize: 11, color: '#89b4fa', lineHeight: 1.4, marginTop: 4, marginBottom: 8 }}>
+        <div style={{ fontSize: 13, color: '#89b4fa', lineHeight: 1.4, marginTop: 4, marginBottom: 8 }}>
           {titleTip}
         </div>
       )}
@@ -563,7 +563,7 @@ function LayoutTab(props: {
               }}
             >
               <span style={{ fontSize: 15, fontWeight: 700, color: '#e2e2e8' }}>{t.name}</span>
-              <span style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.4 }}>{t.description}</span>
+              <span style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.4 }}>{t.description}</span>
             </button>
           );
         })}
@@ -612,7 +612,7 @@ function AuthorsTab(props: {
             borderRadius: 8,
           }}
         >
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', marginBottom: 8, letterSpacing: 0.5, textTransform: 'uppercase' }}>Preview</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af', marginBottom: 8, letterSpacing: 0.5, textTransform: 'uppercase' }}>Preview</div>
           <AuthorLine
             authors={props.authors}
             institutions={props.institutions}
@@ -734,7 +734,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
             <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
               <button
                 onClick={() => swap(i - 1, i)}
-                style={{ all: 'unset', cursor: 'pointer', color: i > 0 ? '#666' : '#2a2a3a', fontSize: 12 }}
+                style={{ all: 'unset', cursor: 'pointer', color: i > 0 ? '#666' : '#2a2a3a', fontSize: 13 }}
               >
                 ▲
               </button>
@@ -744,7 +744,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
                   all: 'unset',
                   cursor: 'pointer',
                   color: i < props.authors.length - 1 ? '#666' : '#2a2a3a',
-                  fontSize: 12,
+                  fontSize: 13,
                 }}
               >
                 ▼
@@ -791,7 +791,7 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
                       color: checked ? '#b8a8ff' : '#666',
                     }}
                   >
-                    <span style={{ fontSize: 12, fontWeight: 800 }}>{idx + 1}</span>
+                    <span style={{ fontSize: 13, fontWeight: 800 }}>{idx + 1}</span>
                     <span style={{ maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {inst.name || '?'}
                     </span>
@@ -888,7 +888,7 @@ function RefsTab(props: {
 
   const sel: CSSProperties = { ...inputBase, appearance: 'auto', padding: '10px 14px' };
   const miniLabel: CSSProperties = {
-    fontSize: 12,
+    fontSize: 13,
     color: '#9ca3af',
     whiteSpace: 'nowrap',
     fontWeight: 600,
@@ -1183,7 +1183,7 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
     fontSize: 14,
   };
   const miniLabel: CSSProperties = {
-    fontSize: 11,
+    fontSize: 13,
     color: '#9ca3af',
     fontWeight: 600,
   };
@@ -1192,7 +1192,7 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
       {levels.map((t) => (
         <div key={t.k}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>{t.l}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>{t.l}</div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <input
@@ -1293,7 +1293,7 @@ function HeadingEditor(props: { headingStyle: HeadingStyle; onChange: (hs: Headi
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
           Border
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -1305,7 +1305,7 @@ function HeadingEditor(props: { headingStyle: HeadingStyle; onChange: (hs: Headi
         </div>
       </div>
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
           Alignment
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -1433,7 +1433,7 @@ function TableEditor(props: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
         Editing: table · {data.rows} × {data.cols}
       </div>
 
@@ -1463,7 +1463,7 @@ function TableEditor(props: {
                 style={{
                   background: r === 0 ? '#1e1e2e' : '#111118',
                   padding: 2,
-                  fontSize: 7,
+                  fontSize: 13,
                   color: hasContent ? '#6b7280' : 'transparent',
                   overflow: 'hidden',
                   whiteSpace: 'nowrap',
@@ -1476,7 +1476,7 @@ function TableEditor(props: {
           })}
         </div>
         {(data.rows > 8 || data.cols > 8) && (
-          <div style={{ fontSize: 9, color: '#6b7280', marginTop: 4, textAlign: 'center' }}>
+          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, textAlign: 'center' }}>
             Showing first 8×8 of {data.rows}×{data.cols}
           </div>
         )}
@@ -1546,7 +1546,7 @@ function TableEditor(props: {
                   cursor: 'pointer',
                   padding: '8px 14px',
                   borderRadius: 6,
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: 600,
                   background: active ? '#7c6aed22' : '#1a1a26',
                   border: `1px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
@@ -1560,7 +1560,7 @@ function TableEditor(props: {
         </div>
       </div>
 
-      <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
         <strong style={{ color: '#9ca3af' }}>Tips:</strong> Click cells on the canvas to type directly.
         Hover a row or column edge for insert/delete controls.
         Paste from Excel or Google Sheets into a cell to import data.
@@ -1591,7 +1591,7 @@ function TextBlockEditor(props: {
   const [sidebarSelection, setSidebarSelection] = useState<SelectionInfo | null>(null);
 
   const fieldLabel: CSSProperties = {
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: 700,
     color: '#9ca3af',
     textTransform: 'uppercase',
@@ -1608,7 +1608,7 @@ function TextBlockEditor(props: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
         Editing: {block.type}
       </div>
 
@@ -1664,7 +1664,7 @@ function TextBlockEditor(props: {
               }}
               title="Font size (points)"
             />
-            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600 }}>pt</span>
+            <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 600 }}>pt</span>
           </div>
           <select
             value={styleLevel.weight}
@@ -1815,7 +1815,7 @@ function AddBlockPanel(props: { onAddBlock: (t: Block['type']) => void }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
         Add a block
       </div>
       {blocks.map(([type, label, desc]) => (
@@ -1846,15 +1846,15 @@ function AddBlockPanel(props: { onAddBlock: (t: Block['type']) => void }) {
           }}
         >
           <span style={{ fontSize: 15, fontWeight: 600, color: '#e2e2e8' }}>+ {label}</span>
-          <span style={{ fontSize: 12, color: '#6b7280' }}>{desc}</span>
+          <span style={{ fontSize: 13, color: '#6b7280' }}>{desc}</span>
         </button>
       ))}
 
       <div style={{ marginTop: 12, padding: '14px 16px', background: '#0f0f17', borderRadius: 8, border: '1px solid #1e1e2e' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
           Slash symbols
         </div>
-        <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
           Inside a text block type <code style={{ color: '#c8b6ff' }}>/alpha</code>, <code style={{ color: '#c8b6ff' }}>/beta</code>, <code style={{ color: '#c8b6ff' }}>/leq</code>, <code style={{ color: '#c8b6ff' }}>/pm</code>, or stats shortcuts like <code style={{ color: '#c8b6ff' }}>/p</code>, <code style={{ color: '#c8b6ff' }}>/SD</code>, <code style={{ color: '#c8b6ff' }}>/df</code>.
         </div>
       </div>
