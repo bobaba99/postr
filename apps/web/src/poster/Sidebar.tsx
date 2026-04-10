@@ -436,9 +436,25 @@ function LayoutTab(props: {
   onAutoLayout: () => void;
   onPrint: () => void;
 }) {
-  const titleLen = props.posterTitle.length;
+  const [localTitle, setLocalTitle] = useState(props.posterTitle);
+  const [titleSaved, setTitleSaved] = useState(!!props.posterTitle.trim());
+  const titleDirty = localTitle !== props.posterTitle;
+
+  // Sync from parent when the poster changes (e.g. navigating to a different poster)
+  useEffect(() => {
+    setLocalTitle(props.posterTitle);
+    setTitleSaved(!!props.posterTitle.trim());
+  }, [props.posterTitle]);
+
+  const saveTitle = () => {
+    props.onChangePosterTitle(localTitle);
+    setTitleSaved(true);
+    setTimeout(() => setTitleSaved(true), 0); // ensure re-render
+  };
+
+  const titleLen = localTitle.length;
   const titleTip =
-    !props.posterTitle.trim()
+    !localTitle.trim()
       ? 'Name your poster for the dashboard. Try: presenter, event, date (e.g. "Maya — APA 2026").'
       : titleLen < 10
         ? 'Tip: Add the conference name or date for quick identification (e.g. "Kenji — SfN Nov 2026").'
@@ -449,17 +465,49 @@ function LayoutTab(props: {
   return (
     <>
       <div style={labelStyle}>Poster Name</div>
-      <input
-        value={props.posterTitle}
-        onChange={(e) => props.onChangePosterTitle(e.target.value)}
-        placeholder="e.g. Maya — APA 2026"
-        style={inputBase}
-      />
-      <div style={{ fontSize: 9, color: '#6b7280', marginTop: 2, marginBottom: titleTip ? 0 : 8, lineHeight: 1.4 }}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+        <input
+          value={localTitle}
+          onChange={(e) => {
+            setLocalTitle(e.target.value);
+            setTitleSaved(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') saveTitle();
+          }}
+          placeholder="e.g. Maya — APA 2026"
+          style={{ ...inputBase, flex: 1, borderColor: !localTitle.trim() ? '#f87171' : titleDirty ? '#f9e2af' : '#2a2a3a' }}
+        />
+        <button
+          onClick={saveTitle}
+          disabled={!localTitle.trim()}
+          style={{
+            all: 'unset',
+            cursor: localTitle.trim() ? 'pointer' : 'not-allowed',
+            padding: '8px 14px',
+            borderRadius: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            background: titleSaved && !titleDirty ? '#2d6a4f' : '#7c6aed',
+            color: '#fff',
+            opacity: localTitle.trim() ? 1 : 0.4,
+            whiteSpace: 'nowrap',
+            transition: 'background 0.2s',
+          }}
+        >
+          {titleSaved && !titleDirty ? '✓ Saved' : 'Save'}
+        </button>
+      </div>
+      {!localTitle.trim() && (
+        <div style={{ fontSize: 11, color: '#f87171', lineHeight: 1.4, marginTop: 4 }}>
+          A poster name is required for dashboard identification.
+        </div>
+      )}
+      <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2, marginBottom: titleTip ? 0 : 8, lineHeight: 1.4 }}>
         Dashboard label — separate from the poster&apos;s main title on the canvas.
       </div>
       {titleTip && (
-        <div style={{ fontSize: 10, color: '#89b4fa', lineHeight: 1.4, marginTop: 4, marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: '#89b4fa', lineHeight: 1.4, marginTop: 4, marginBottom: 8 }}>
           {titleTip}
         </div>
       )}

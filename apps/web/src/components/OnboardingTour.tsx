@@ -195,17 +195,43 @@ export function OnboardingTour() {
     return { ...base, bottom: window.innerHeight - rect.top + gap, left: rect.left + rect.width / 2, transform: 'translateX(-50%)' };
   })();
 
+  // Build 4 overlay rects that darken everything EXCEPT the target
+  const pad = 6;
+  const sr = rect ? {
+    top: rect.top - pad,
+    left: rect.left - pad,
+    width: rect.width + pad * 2,
+    height: rect.height + pad * 2,
+  } : null;
+  const overlayColor = 'rgba(0, 0, 0, 0.5)';
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+
   return (
     <>
-      {/* Pulsing highlight border around the target element — no dark overlay */}
+      {/* 4-rect overlay: darkens everything except the highlighted element */}
+      {sr && (
+        <>
+          {/* Top */}
+          <div style={{ position: 'fixed', top: 0, left: 0, width: vw, height: sr.top, background: overlayColor, zIndex: 10000, pointerEvents: 'none' }} />
+          {/* Bottom */}
+          <div style={{ position: 'fixed', top: sr.top + sr.height, left: 0, width: vw, height: vh - sr.top - sr.height, background: overlayColor, zIndex: 10000, pointerEvents: 'none' }} />
+          {/* Left */}
+          <div style={{ position: 'fixed', top: sr.top, left: 0, width: sr.left, height: sr.height, background: overlayColor, zIndex: 10000, pointerEvents: 'none' }} />
+          {/* Right */}
+          <div style={{ position: 'fixed', top: sr.top, left: sr.left + sr.width, width: vw - sr.left - sr.width, height: sr.height, background: overlayColor, zIndex: 10000, pointerEvents: 'none' }} />
+        </>
+      )}
+
+      {/* Pulsing highlight border around the target element */}
       {rect && (
         <div
           style={{
             position: 'fixed',
-            top: rect.top - 3,
-            left: rect.left - 3,
-            width: rect.width + 6,
-            height: rect.height + 6,
+            top: rect.top - pad,
+            left: rect.left - pad,
+            width: rect.width + pad * 2,
+            height: rect.height + pad * 2,
             border: '2.5px solid #7c6aed',
             borderRadius: 8,
             zIndex: 10001,
