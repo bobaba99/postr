@@ -1,0 +1,14 @@
+node_modules
+dist
+*.tsbuildinfo
+.env*
+!.env.example
+.vercel
+.turbo
+supabase/.temp
+coverage
+*.log
+.DS_Store
+# Playwright MCP session cache — transient, shouldn't be tracked.
+.playwright-mcp/
+ux-audit/

@@ -1,0 +1,134 @@
+- generic [ref=e20]:
+  - generic [ref=e21]:
+    - button "Hide sidebar" [ref=e22] [cursor=pointer]:
+      - img [ref=e23]
+    - generic [ref=e26]:
+      - img [ref=e28]
+      - generic [ref=e31]: Postr
+    - generic [ref=e32]:
+      - navigation "Sidebar sections" [ref=e33]:
+        - button "layout" [ref=e34] [cursor=pointer]
+        - button "insert" [ref=e35] [cursor=pointer]
+        - button "edit" [ref=e36] [cursor=pointer]
+        - button "style" [ref=e37] [cursor=pointer]
+        - button "authors" [ref=e38] [cursor=pointer]
+        - button "refs" [ref=e39] [cursor=pointer]
+      - generic [ref=e40]:
+        - generic [ref=e41]: Poster Size
+        - combobox [ref=e42]:
+          - option "48\"×36\" Landscape" [selected]
+          - option "36\"×48\" Portrait"
+          - option "42\"×36\" Landscape"
+          - option "36\"×42\" Portrait"
+          - option "42\"×42\" Square"
+          - option "24\"×36\" Small"
+          - option "A0 Landscape"
+          - option "A0 Portrait"
+        - generic [ref=e43]: Grid
+        - generic [ref=e44] [cursor=pointer]:
+          - checkbox "Show grid" [checked] [ref=e45]
+          - text: Show grid
+        - generic [ref=e46]: Auto Layout
+        - button "⬡ Auto-Arrange" [ref=e47] [cursor=pointer]
+        - generic [ref=e48]: Templates
+        - generic [ref=e49]:
+          - button "3-Column Classic Traditional conference layout." [ref=e50] [cursor=pointer]:
+            - generic [ref=e51]: 3-Column Classic
+            - generic [ref=e52]: Traditional conference layout.
+          - button "2-Col Wide Figure Full-width figure zone." [ref=e53] [cursor=pointer]:
+            - generic [ref=e54]: 2-Col Wide Figure
+            - generic [ref=e55]: Full-width figure zone.
+          - button "Billboard Award-winning assertion-evidence." [ref=e56] [cursor=pointer]:
+            - generic [ref=e57]: Billboard
+            - generic [ref=e58]: Award-winning assertion-evidence.
+          - button "Sidebar + Focus Narrow text, wide visuals." [ref=e59] [cursor=pointer]:
+            - generic [ref=e60]: Sidebar + Focus
+            - generic [ref=e61]: Narrow text, wide visuals.
+          - button "Blank Title + authors only." [ref=e62] [cursor=pointer]:
+            - generic [ref=e63]: Blank
+            - generic [ref=e64]: Title + authors only.
+        - generic [ref=e65]: Print
+        - button "⎙ Save PDF" [ref=e66] [cursor=pointer]
+  - generic [ref=e67]:
+    - generic [ref=e68]:
+      - generic [ref=e70]:
+        - img
+        - generic [ref=e71]:
+          - generic [ref=e73]: Your Poster Title
+          - img [ref=e75]
+        - generic [ref=e77]:
+          - generic [ref=e78]: Add authors in sidebar →
+          - img [ref=e80]
+        - generic [ref=e84]:
+          - generic [ref=e85]: "1."
+          - generic [ref=e86]: Introduction
+        - generic [ref=e87]:
+          - generic [ref=e89]: Background and research question. Provide context, motivation, and the gap your work addresses.
+          - img [ref=e91]
+        - generic [ref=e95]:
+          - generic [ref=e96]: "5."
+          - generic [ref=e97]: Hypotheses
+        - generic [ref=e98]:
+          - generic [ref=e100]: State your specific hypotheses or research aims here.
+          - img [ref=e102]
+        - generic [ref=e106]:
+          - generic [ref=e107]: "2."
+          - generic [ref=e108]: Methods
+        - generic [ref=e109]:
+          - generic [ref=e111]: Participants, design, materials, procedure, and analysis approach.
+          - img [ref=e113]
+        - generic [ref=e115]:
+          - generic [ref=e118] [cursor=pointer]: Upload figure
+          - img [ref=e120]
+        - generic [ref=e124]:
+          - generic [ref=e125]: "3."
+          - generic [ref=e126]: Results
+        - generic [ref=e127]:
+          - table [ref=e130]:
+            - rowgroup [ref=e135]:
+              - row "Measure M (SD) 𝑝" [ref=e136]:
+                - cell "Measure" [ref=e137]:
+                  - textbox [ref=e138]: Measure
+                - cell "M (SD)" [ref=e139]:
+                  - textbox [ref=e140]: M (SD)
+                - cell "𝑝" [ref=e141]:
+                  - textbox [ref=e142]: 𝑝
+              - row "DV 1 4.2 (0.8) < .01" [ref=e143]:
+                - cell "DV 1" [ref=e144]:
+                  - textbox [ref=e145]: DV 1
+                - cell "4.2 (0.8)" [ref=e146]:
+                  - textbox [ref=e147]: 4.2 (0.8)
+                - cell "< .01" [ref=e148]:
+                  - textbox [ref=e149]: < .01
+              - row "DV 2 3.1 (1.1) .03" [ref=e150]:
+                - cell "DV 2" [ref=e151]:
+                  - textbox [ref=e152]: DV 2
+                - cell "3.1 (1.1)" [ref=e153]:
+                  - textbox [ref=e154]: 3.1 (1.1)
+                - cell ".03" [ref=e155]:
+                  - textbox [ref=e156]: ".03"
+              - row "DV 3 2.8 (0.6) .12" [ref=e157]:
+                - cell "DV 3" [ref=e158]:
+                  - textbox [ref=e159]: DV 3
+                - cell "2.8 (0.6)" [ref=e160]:
+                  - textbox [ref=e161]: 2.8 (0.6)
+                - cell ".12" [ref=e162]:
+                  - textbox [ref=e163]: ".12"
+          - img [ref=e165]
+        - generic [ref=e169]:
+          - generic [ref=e170]: "4."
+          - generic [ref=e171]: Conclusions
+        - generic [ref=e172]:
+          - generic [ref=e174]: Key findings, implications, and future directions.
+          - img [ref=e176]
+        - generic [ref=e178]:
+          - generic [ref=e180]: Add references in Refs tab →
+          - img [ref=e182]
+      - generic [ref=e184]: 48"×36" Landscape · Source Sans 3 · Classic Academic
+    - generic [ref=e185]:
+      - button "−" [ref=e186] [cursor=pointer]
+      - button "192%" [ref=e187] [cursor=pointer]
+      - button "+" [ref=e188] [cursor=pointer]
+      - button "FIT" [ref=e190] [cursor=pointer]
+    - status "4/9/2026, 4:16:36 AM":
+      - generic: Saved · just now

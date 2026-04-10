@@ -699,6 +699,9 @@ PosterForge (root)
 7. **Poster score/lint**: Check design rules (font size minimums for readability at 3 feet, margin compliance, contrast ratios, text density warnings)
 8. **Zotero API integration**: Direct library connection instead of file import only
 9. **Accessibility**: Keyboard navigation for all block operations, screen reader labels
+10. **Comment/annotation system**: Inline comments on blocks for advisor feedback. Threaded replies, resolve/unresolve states, comment indicators on the canvas. Enable a "share for review" mode where advisors can comment without editing. Store comments in a `poster_comments` table with `block_id`, `user_id`, `content`, `resolved_at`, `parent_comment_id`.
+11. **Poster gallery / inspiration board**: Users can submit their past successful conference posters (with consent) as public examples. Gallery page with filtering by field (psychology, neuroscience, psychiatry), conference (APA, SfN), and layout type (3-column, billboard). Each submission includes: poster image, field, conference, year, and optional "what worked" notes. Helps beginners see real examples before starting. Moderation via admin review before publishing. Store in `poster_gallery` table with `submitted_by`, `field`, `conference`, `year`, `image_url`, `notes`, `approved`.
+12. **OCR-based figure readability**: Upload-only path for users without plotting code. Local Ollama (llava/moondream) or Claude Vision to detect text regions in images, measure pixel heights, compute effective print size. Phase 2 PRD exists at `docs/plans/2026-04-10-figure-readability-ocr-phase2.md`.
 
 ---
 
