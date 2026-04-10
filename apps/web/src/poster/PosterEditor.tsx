@@ -22,6 +22,7 @@ import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
 import { useGsapContext } from '@/motion';
 import { editorEntrance } from '@/motion/timelines/editorEntrance';
 import { BlockFrame } from './blocks';
+import { checkBounds, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import { Sidebar, type StylePreset } from './Sidebar';
@@ -400,6 +401,16 @@ export function PosterEditor() {
   );
 
   const selectedBlock = doc.blocks.find((b) => b.id === selectedId) ?? null;
+
+  // Out-of-bounds detection — warns when blocks extend past the poster canvas
+  const oobWarnings = useMemo(
+    () => checkBounds(doc.blocks, cW, cH),
+    [doc.blocks, cW, cH],
+  );
+  const oobBlockIds = useMemo(
+    () => new Set(oobWarnings.map((w) => w.blockId)),
+    [oobWarnings],
+  );
 
   // -----------------------------------------------------------------------
   // Mutators (all push back through setPoster for store immutability)
@@ -793,6 +804,7 @@ export function PosterEditor() {
                   onUpdate={updateBlock}
                   onDelete={deleteBlock}
                   titleOverflowPx={titleOverflowPx}
+                  isOutOfBounds={oobBlockIds.has(b.id)}
                 />
               ))}
             </div>
@@ -822,6 +834,43 @@ export function PosterEditor() {
         >
           {POSTER_SIZES[sizeKey]!.label} · {doc.fontFamily} · {palName || 'Custom'}
         </div>
+
+        {/* OOB warning banner */}
+        {oobWarnings.length > 0 && (
+          <div
+            style={{
+              position: 'absolute',
+              top: 12,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              background: '#7f1d1d',
+              border: '1px solid #f87171',
+              borderRadius: 8,
+              padding: '8px 16px',
+              fontSize: 11,
+              color: '#fca5a5',
+              fontFamily: 'system-ui',
+              maxWidth: 400,
+              zIndex: 15,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              lineHeight: 1.4,
+            }}
+          >
+            <strong style={{ color: '#f87171' }}>
+              {oobWarnings.length} block{oobWarnings.length > 1 ? 's' : ''} outside poster bounds
+            </strong>
+            {oobWarnings.slice(0, 3).map((w) => (
+              <div key={w.blockId} style={{ marginTop: 2 }}>
+                {w.severity === 'full' ? '⛔' : '⚠️'} {w.message}
+              </div>
+            ))}
+            {oobWarnings.length > 3 && (
+              <div style={{ marginTop: 2, color: '#f8717188' }}>
+                +{oobWarnings.length - 3} more…
+              </div>
+            )}
+          </div>
+        )}
 
         <ZoomBar zoom={zoom} setZoom={setZoom} />
         <AutosaveStatusPill

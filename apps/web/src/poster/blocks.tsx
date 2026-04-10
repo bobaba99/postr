@@ -760,16 +760,9 @@ interface BlockFrameProps {
   didDragRef: React.MutableRefObject<boolean>;
   onUpdate: (id: string, patch: Partial<Block>) => void;
   onDelete: (id: string) => void;
-  /**
-   * B1 fix — when the title block grows past its declared h (e.g.
-   * multi-line wrap), every non-title block needs to shift DOWN by
-   * the overflow amount, otherwise authors/headings/body all end up
-   * visually on top of the wrapped title lines. PosterEditor measures
-   * the title's actual rendered height and passes the overflow
-   * in pre-transform pixels; BlockFrame applies it to `top` for
-   * every non-title block.
-   */
   titleOverflowPx?: number;
+  /** True if this block extends outside the poster canvas bounds. */
+  isOutOfBounds?: boolean;
 }
 
 export function BlockFrame(props: BlockFrameProps) {
@@ -791,6 +784,7 @@ export function BlockFrame(props: BlockFrameProps) {
     onUpdate,
     onDelete,
     titleOverflowPx,
+    isOutOfBounds,
   } = props;
 
   // B1 fix: every non-title block shifts DOWN by the title's overflow
@@ -901,7 +895,11 @@ export function BlockFrame(props: BlockFrameProps) {
         height: isHeading || growsWithContent ? 'auto' : b.h,
         minHeight: growsWithContent ? b.h : undefined,
         background: bg,
-        border: selected ? `1.5px solid ${p.accent}88` : '1px solid transparent',
+        border: isOutOfBounds
+          ? '1.5px dashed #f87171'
+          : selected
+            ? `1.5px solid ${p.accent}88`
+            : '1px solid transparent',
         borderRadius: 2,
         cursor: b.type === 'table' ? 'default' : 'move',
         padding: ['table', 'image', 'logo'].includes(b.type) ? 0 : '4px 6px',
