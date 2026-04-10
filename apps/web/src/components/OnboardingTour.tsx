@@ -113,6 +113,18 @@ export function OnboardingTour() {
     return () => { style.remove(); };
   }, []);
 
+  // Track the currently boosted element so we can restore its z-index
+  const boostedRef = useRef<HTMLElement | null>(null);
+  const boostedOriginalZ = useRef<string>('');
+
+  const clearBoost = () => {
+    if (boostedRef.current) {
+      boostedRef.current.style.zIndex = boostedOriginalZ.current;
+      boostedRef.current.style.position = boostedRef.current.style.position === 'relative' ? '' : boostedRef.current.style.position;
+      boostedRef.current = null;
+    }
+  };
+
   const measureStep = useCallback((idx: number) => {
     if (idx < 0 || idx >= STEPS.length) return;
     const s = STEPS[idx]!;
@@ -129,9 +141,19 @@ export function OnboardingTour() {
     }
 
     requestAnimationFrame(() => {
-      const el = document.querySelector(s.selector);
+      // Restore previous element
+      clearBoost();
+
+      const el = document.querySelector<HTMLElement>(s.selector);
       if (el) {
         setRect(el.getBoundingClientRect());
+        // Boost the target element above the overlay (z-index 10000)
+        boostedOriginalZ.current = el.style.zIndex;
+        el.style.zIndex = '10001';
+        if (getComputedStyle(el).position === 'static') {
+          el.style.position = 'relative';
+        }
+        boostedRef.current = el;
       } else {
         setRect(null);
       }
@@ -150,6 +172,7 @@ export function OnboardingTour() {
   }, [step, measureStep]);
 
   const finish = useCallback(() => {
+    clearBoost();
     localStorage.setItem(STORAGE_KEY, 'true');
     setStep(-1);
   }, []);
