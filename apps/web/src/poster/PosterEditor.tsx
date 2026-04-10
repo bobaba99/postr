@@ -292,6 +292,7 @@ export function PosterEditor() {
     }
   }, [savedPresets]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [guidelinesOpen, setGuidelinesOpen] = useState(true);
 
   // B1 fix: measure how much the title block's rendered content
   // OVERRAN its declared height. When a long title wraps to multiple
@@ -830,7 +831,39 @@ export function PosterEditor() {
         />
       </div>
 
-      <GuidelinesPanel />
+      <GuidelinesPanel open={guidelinesOpen} onToggle={() => setGuidelinesOpen((v) => !v)} />
+
+      {/* Show guidelines toggle when panel is closed */}
+      {!guidelinesOpen && (
+        <button
+          title="Show poster guidelines"
+          onClick={() => setGuidelinesOpen(true)}
+          style={{
+            all: 'unset',
+            position: 'fixed',
+            top: 16,
+            right: 16,
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#9ca3af',
+            background: '#1a1a26',
+            border: '1px solid #2a2a3a',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            zIndex: 20,
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+          </svg>
+        </button>
+      )}
+
       <OnboardingTour />
     </div>
   );

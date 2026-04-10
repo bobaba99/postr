@@ -187,43 +187,43 @@ const GENERAL_RESOURCES: { name: string; url: string; description: string }[] = 
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function GuidelinesPanel({ defaultOpen = true }: { defaultOpen?: boolean }) {
-  const [open, setOpen] = useState(defaultOpen);
+export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  return (
-    <>
-      {/* Toggle tab — always visible on the right edge */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        title={open ? 'Hide guidelines' : 'Show poster guidelines'}
-        style={toggleStyle}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = '#7c6aed';
-          e.currentTarget.style.color = '#fff';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = open ? '#1e1e2e' : '#1a1a26';
-          e.currentTarget.style.color = '#9ca3af';
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
-        </svg>
-      </button>
+  if (!open) return null;
 
-      {/* Panel */}
-      {open && (
-        <div style={panelStyle}>
-          <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid #1f1f2e' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#9ca3af' }}>
-              Poster Guidelines
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
-              Official requirements from major conferences. Click to expand.
-            </div>
+  return (
+    <div data-postr-guidelines style={panelStyle}>
+      <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid #1f1f2e', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#9ca3af' }}>
+            Poster Guidelines
           </div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
+            Official requirements from major conferences. Click to expand.
+          </div>
+        </div>
+        <button
+          onClick={onToggle}
+          title="Hide guidelines"
+          style={{
+            all: 'unset',
+            cursor: 'pointer',
+            width: 28,
+            height: 28,
+            borderRadius: 6,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#6b7280',
+            flexShrink: 0,
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
 
           <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
             {GUIDELINES.map((g) => (
@@ -253,9 +253,7 @@ export function GuidelinesPanel({ defaultOpen = true }: { defaultOpen?: boolean 
               ))}
             </div>
           </div>
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 
@@ -334,38 +332,15 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
 
 // ── Styles ───────────────────────────────────────────────────────────
 
-const toggleStyle: CSSProperties = {
-  all: 'unset',
-  position: 'fixed',
-  top: 16,
-  right: 16,
-  width: 32,
-  height: 32,
-  borderRadius: 6,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#9ca3af',
-  background: '#1a1a26',
-  border: '1px solid #2a2a3a',
-  boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-  zIndex: 30,
-  transition: 'background 0.15s, color 0.15s',
-};
-
 const panelStyle: CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  right: 0,
   width: 320,
+  minWidth: 320,
   height: '100vh',
   background: '#111118',
   borderLeft: '1px solid #1f1f2e',
   display: 'flex',
   flexDirection: 'column',
-  zIndex: 25,
-  boxShadow: '-4px 0 24px rgba(0,0,0,0.3)',
+  overflow: 'hidden',
 };
 
 const cardHeaderStyle: CSSProperties = {

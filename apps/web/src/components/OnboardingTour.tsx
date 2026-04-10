@@ -79,9 +79,9 @@ const STEPS: TourStep[] = [
     position: 'right',
   },
   {
-    selector: 'button[title="Hide guidelines"]',
+    selector: '[data-postr-guidelines]',
     title: 'Conference guidelines',
-    body: 'Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more.',
+    body: 'Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Close it to give the canvas more room.',
     position: 'left',
   },
 ];
