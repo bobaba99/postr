@@ -117,6 +117,15 @@ function useBlockDrag(
   setBlocks: (b: Block[]) => void,
   scale: number,
 ): UseBlockDragResult {
+  // Keep a ref to blocks so the pointermove handler always reads the
+  // latest positions. Previously the handler closed over a stale
+  // blocks snapshot from when onPointerDown was created, causing
+  // image blocks to "snap back" on drag because React re-renders
+  // between pointer events updated the blocks array but the handler
+  // still mapped over the old one.
+  const blocksRef = useRef(blocks);
+  blocksRef.current = blocks;
+
   const sessionRef = useRef<{
     id: string;
     mode: 'move' | 'resize';
@@ -127,7 +136,7 @@ function useBlockDrag(
     ow: number;
     oh: number;
     isHeading: boolean;
-    active: boolean; // flipped true once movement passes threshold
+    active: boolean;
   } | null>(null);
   const didDragRef = useRef(false);
   const prevUserSelectRef = useRef<string>('');
@@ -135,13 +144,9 @@ function useBlockDrag(
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent, id: string, mode: 'move' | 'resize') => {
-      // stopPropagation keeps the canvas backdrop's "deselect on click"
-      // from firing. We intentionally do NOT call preventDefault — we
-      // want the natural click/focus flow to happen when the user
-      // doesn't actually drag. See block comment above.
       e.stopPropagation();
 
-      const b = blocks.find((x) => x.id === id);
+      const b = blocksRef.current.find((x) => x.id === id);
       if (!b) return;
 
       sessionRef.current = {
@@ -163,9 +168,6 @@ function useBlockDrag(
         const dx = (ev.clientX - s.sx) / scale;
         const dy = (ev.clientY - s.sy) / scale;
 
-        // Cheap px-space distance check against the raw (unscaled)
-        // pointer deltas — we need the absolute movement the user
-        // made, not the zoom-scaled equivalent.
         if (!s.active) {
           const rawDx = ev.clientX - s.sx;
           const rawDy = ev.clientY - s.sy;
@@ -173,12 +175,13 @@ function useBlockDrag(
           s.active = true;
           didDragRef.current = true;
           setDraggingId(s.id);
-          // Disable text selection body-wide for the duration of the drag.
           prevUserSelectRef.current = document.body.style.userSelect;
           document.body.style.userSelect = 'none';
         }
 
-        const nextBlocks = blocks.map((blk) => {
+        // Use blocksRef.current to read the latest block positions,
+        // not the stale closure from onPointerDown creation time.
+        const nextBlocks = blocksRef.current.map((blk) => {
           if (blk.id !== s.id) return blk;
           if (s.mode === 'move') {
             return {
@@ -205,7 +208,7 @@ function useBlockDrag(
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
     },
-    [blocks, setBlocks, scale],
+    [setBlocks, scale],
   );
 
   return { onPointerDown, didDragRef, draggingId };
