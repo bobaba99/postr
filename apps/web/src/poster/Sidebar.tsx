@@ -46,8 +46,9 @@ import { parseBibtex, parseRis } from './parsers';
 import { AuthorLine } from './blocks';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
+import { ReadabilityPanel } from './ReadabilityPanel';
 
-export type SidebarTab = 'layout' | 'authors' | 'refs' | 'style' | 'edit' | 'insert';
+export type SidebarTab = 'layout' | 'authors' | 'refs' | 'style' | 'edit' | 'insert' | 'figure';
 
 export interface StylePreset {
   name: string;
@@ -292,7 +293,7 @@ export function Sidebar(props: SidebarProps) {
           </svg>
         </button>
       )}
-      <div style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 14 }}>
+      <a href="/" style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', cursor: 'pointer' }}>
         <div
           style={{
             width: 40,
@@ -310,7 +311,7 @@ export function Sidebar(props: SidebarProps) {
           </svg>
         </div>
         <div style={{ fontWeight: 800, fontSize: 20, color: '#fff' }}>Postr</div>
-      </div>
+      </a>
 
       {/* Body: vertical tab rail on the left + panel content on the right */}
       <div style={{ flex: 1, display: 'flex', marginTop: 16, minHeight: 0 }}>
@@ -326,7 +327,7 @@ export function Sidebar(props: SidebarProps) {
             paddingTop: 4,
           }}
         >
-          {(['layout', 'insert', 'edit', 'style', 'authors', 'refs'] as SidebarTab[]).map((t) => (
+          {(['layout', 'insert', 'edit', 'style', 'authors', 'refs', 'figure'] as SidebarTab[]).map((t) => (
             <button
               key={t}
               data-postr-tab
@@ -406,6 +407,10 @@ export function Sidebar(props: SidebarProps) {
         )}
 
         {tab === 'insert' && <AddBlockPanel onAddBlock={props.onAddBlock} />}
+
+        {tab === 'figure' && (
+          <ReadabilityPanel selectedBlock={props.selectedBlock} />
+        )}
         </div>
       </div>
     </div>
