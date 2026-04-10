@@ -187,8 +187,8 @@ const GENERAL_RESOURCES: { name: string; url: string; description: string }[] = 
 
 // ── Component ────────────────────────────────────────────────────────
 
-export function GuidelinesPanel() {
-  const [open, setOpen] = useState(false);
+export function GuidelinesPanel({ defaultOpen = true }: { defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
@@ -216,11 +216,11 @@ export function GuidelinesPanel() {
       {/* Panel */}
       {open && (
         <div style={panelStyle}>
-          <div style={{ padding: '16px 16px 8px', borderBottom: '1px solid #1f1f2e' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#9ca3af' }}>
+          <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid #1f1f2e' }}>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#9ca3af' }}>
               Poster Guidelines
             </div>
-            <div style={{ fontSize: 9, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
               Official requirements from major conferences. Click to expand.
             </div>
           </div>
@@ -235,8 +235,8 @@ export function GuidelinesPanel() {
               />
             ))}
 
-            <div style={{ padding: '12px 16px 4px' }}>
-              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af', marginBottom: 8 }}>
+            <div style={{ padding: '12px 20px 4px' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af', marginBottom: 8 }}>
                 General Resources
               </div>
               {GENERAL_RESOURCES.map((r) => (
@@ -247,8 +247,8 @@ export function GuidelinesPanel() {
                   rel="noopener noreferrer"
                   style={resourceLinkStyle}
                 >
-                  <div style={{ fontSize: 11, color: '#89b4fa', fontWeight: 500 }}>{r.name}</div>
-                  <div style={{ fontSize: 9, color: '#6b7280', lineHeight: 1.3, marginTop: 2 }}>{r.description}</div>
+                  <div style={{ fontSize: 13, color: '#89b4fa', fontWeight: 500 }}>{r.name}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4, marginTop: 2 }}>{r.description}</div>
                 </a>
               ))}
             </div>
@@ -275,23 +275,23 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e2e8' }}>{g.conference}</div>
-          <div style={{ fontSize: 9, color: '#6b7280' }}>{g.field} — {g.size}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>{g.conference}</div>
+          <div style={{ fontSize: 11, color: '#6b7280' }}>{g.field} — {g.size}</div>
         </div>
-        <span style={{ fontSize: 10, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
+        <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
           ▸
         </span>
       </button>
 
       {expanded && (
-        <div style={{ padding: '0 16px 12px' }}>
+        <div style={{ padding: '0 20px 12px' }}>
           {g.sizeNote && (
-            <div style={{ fontSize: 9, color: '#f9e2af', marginBottom: 6 }}>
+            <div style={{ fontSize: 11, color: '#f9e2af', marginBottom: 6, lineHeight: 1.4 }}>
               Note: {g.sizeNote}
             </div>
           )}
 
-          <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse', marginBottom: 8 }}>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginBottom: 8 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
                 <th style={thStyle}>Element</th>
@@ -310,9 +310,9 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
             </tbody>
           </table>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginBottom: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
             {g.tips.map((tip, i) => (
-              <div key={i} style={{ fontSize: 9, color: '#9ca3af', lineHeight: 1.3, paddingLeft: 8, borderLeft: '2px solid #2a2a3a' }}>
+              <div key={i} style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.4, paddingLeft: 10, borderLeft: '2px solid #2a2a3a' }}>
                 {tip}
               </div>
             ))}
@@ -322,7 +322,7 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
             href={g.url}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontSize: 9, color: '#89b4fa', textDecoration: 'none' }}
+            style={{ fontSize: 12, color: '#89b4fa', textDecoration: 'none' }}
           >
             {g.urlLabel} ↗
           </a>
@@ -358,7 +358,7 @@ const panelStyle: CSSProperties = {
   position: 'fixed',
   top: 0,
   right: 0,
-  width: 280,
+  width: 320,
   height: '100vh',
   background: '#111118',
   borderLeft: '1px solid #1f1f2e',
