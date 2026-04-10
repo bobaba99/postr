@@ -277,34 +277,110 @@ interface ScratchItem {
   done: boolean;
 }
 
+interface ChecklistTemplate {
+  name: string;
+  items: string[];
+  builtIn?: boolean;
+}
+
 const SCRATCH_KEY = 'postr.scratch-pad';
+const TEMPLATES_KEY = 'postr.checklist-templates';
+
+// Built-in templates
+const BUILT_IN_TEMPLATES: ChecklistTemplate[] = [
+  {
+    name: 'Standard Poster',
+    builtIn: true,
+    items: [
+      'Draft title + key finding sentence',
+      'Write Introduction (~200 words)',
+      'Write Methods (~200 words)',
+      'Create results figure + table',
+      'Write Conclusions (~200 words)',
+      'Add references (3-5 key citations)',
+      'Add authors + affiliations',
+      'Check figure readability (paste R/Python code)',
+      'Review against conference size requirements',
+      'Proofread — total under 1000 words?',
+    ],
+  },
+  {
+    name: 'Quick Poster (Minimal)',
+    builtIn: true,
+    items: [
+      'Title + one-sentence finding',
+      'Background (3 bullet points)',
+      'Method (1 paragraph)',
+      'Key result figure',
+      'Conclusion + future directions',
+      'References (3 max)',
+    ],
+  },
+  {
+    name: 'Meta-Analysis',
+    builtIn: true,
+    items: [
+      'PRISMA flow diagram',
+      'Search strategy description',
+      'Inclusion/exclusion criteria table',
+      'Forest plot (main outcome)',
+      'Heterogeneity stats (I², Q)',
+      'Sensitivity/subgroup analyses',
+      'Funnel plot for publication bias',
+      'Summary of findings table',
+      'Limitations + future directions',
+      'PROSPERO registration number',
+    ],
+  },
+  {
+    name: 'RCT / Clinical Trial',
+    builtIn: true,
+    items: [
+      'CONSORT flow diagram',
+      'Primary + secondary outcomes defined',
+      'Participant demographics table',
+      'Intervention description',
+      'Results table (effect sizes + CIs)',
+      'Adverse events summary',
+      'Clinical significance statement',
+      'Trial registration number',
+      'Funding + COI disclosure',
+    ],
+  },
+];
+
+function loadCustomTemplates(): ChecklistTemplate[] {
+  try {
+    const raw = localStorage.getItem(TEMPLATES_KEY);
+    return raw ? (JSON.parse(raw) as ChecklistTemplate[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveCustomTemplates(templates: ChecklistTemplate[]) {
+  try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates)); } catch { /* quota */ }
+}
+
+export function getAllTemplates(): ChecklistTemplate[] {
+  return [...BUILT_IN_TEMPLATES, ...loadCustomTemplates()];
+}
+
+function templateToItems(t: ChecklistTemplate): ScratchItem[] {
+  return t.items.map((text, i) => ({ id: `s${Date.now()}-${i}`, text, done: false }));
+}
 
 function loadScratch(): ScratchItem[] {
   try {
     const raw = localStorage.getItem(SCRATCH_KEY);
-    return raw ? (JSON.parse(raw) as ScratchItem[]) : defaultChecklist();
+    return raw ? (JSON.parse(raw) as ScratchItem[]) : templateToItems(BUILT_IN_TEMPLATES[0]!);
   } catch {
-    return defaultChecklist();
+    return templateToItems(BUILT_IN_TEMPLATES[0]!);
   }
 }
 
 function saveScratch(items: ScratchItem[]) {
   try { localStorage.setItem(SCRATCH_KEY, JSON.stringify(items)); } catch { /* quota */ }
-}
-
-function defaultChecklist(): ScratchItem[] {
-  return [
-    { id: 's1', text: 'Draft title + key finding sentence', done: false },
-    { id: 's2', text: 'Write Introduction (~200 words)', done: false },
-    { id: 's3', text: 'Write Methods (~200 words)', done: false },
-    { id: 's4', text: 'Create results figure + table', done: false },
-    { id: 's5', text: 'Write Conclusions (~200 words)', done: false },
-    { id: 's6', text: 'Add references (3-5 key citations)', done: false },
-    { id: 's7', text: 'Add authors + affiliations', done: false },
-    { id: 's8', text: 'Check figure readability (paste R/Python code)', done: false },
-    { id: 's9', text: 'Review against conference size requirements', done: false },
-    { id: 's10', text: 'Proofread — total under 1000 words?', done: false },
-  ];
 }
 
 export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: () => void }) {
@@ -347,7 +423,29 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
     try { localStorage.setItem('postr.scratch-note', val); } catch { /* quota */ }
   };
 
-  const resetChecklist = () => updateScratch(defaultChecklist());
+  const [customTemplates, setCustomTemplates] = useState<ChecklistTemplate[]>(loadCustomTemplates);
+  const allTemplates = [...BUILT_IN_TEMPLATES, ...customTemplates];
+
+  const applyTemplate = (name: string) => {
+    const t = allTemplates.find((tpl) => tpl.name === name);
+    if (t) updateScratch(templateToItems(t));
+  };
+
+  const saveCurrentAsTemplate = () => {
+    const name = prompt('Template name:');
+    if (!name?.trim()) return;
+    const items = scratchItems.filter((i) => i.text.trim()).map((i) => i.text);
+    if (!items.length) return;
+    const next = [...customTemplates, { name: name.trim(), items }];
+    setCustomTemplates(next);
+    saveCustomTemplates(next);
+  };
+
+  const deleteCustomTemplate = (name: string) => {
+    const next = customTemplates.filter((t) => t.name !== name);
+    setCustomTemplates(next);
+    saveCustomTemplates(next);
+  };
 
   if (!open) return null;
 
@@ -392,6 +490,45 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
               onToggle={() => toggleSection('scratch')}
             >
               <div style={{ padding: '4px 16px 12px' }}>
+                {/* Template selector */}
+                <div style={{ marginBottom: 10, display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <select
+                    onChange={(e) => { if (e.target.value) applyTemplate(e.target.value); e.target.value = ''; }}
+                    defaultValue=""
+                    style={{
+                      flex: 1,
+                      padding: '6px 10px',
+                      background: '#1a1a26',
+                      border: '1px solid #2a2a3a',
+                      borderRadius: 6,
+                      color: '#c8cad0',
+                      fontSize: 12,
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="" disabled>Load template...</option>
+                    <optgroup label="Built-in">
+                      {BUILT_IN_TEMPLATES.map((t) => (
+                        <option key={t.name} value={t.name}>{t.name} ({t.items.length})</option>
+                      ))}
+                    </optgroup>
+                    {customTemplates.length > 0 && (
+                      <optgroup label="Custom">
+                        {customTemplates.map((t) => (
+                          <option key={t.name} value={t.name}>{t.name} ({t.items.length})</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+                  <button
+                    onClick={saveCurrentAsTemplate}
+                    title="Save current checklist as a reusable template"
+                    style={{ all: 'unset', cursor: 'pointer', fontSize: 12, color: '#7c6aed', fontWeight: 600, whiteSpace: 'nowrap', padding: '4px 0' }}
+                  >
+                    Save as...
+                  </button>
+                </div>
+
                 {scratchItems.map((item) => (
                   <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', borderBottom: '1px solid #1a1a26' }}>
                     <input
@@ -428,13 +565,6 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                     style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: '#7c6aed', fontWeight: 600, padding: '4px 0' }}
                   >
                     + Add item
-                  </button>
-                  <span style={{ color: '#2a2a3a' }}>·</span>
-                  <button
-                    onClick={resetChecklist}
-                    style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: '#6b7280', padding: '4px 0' }}
-                  >
-                    Reset defaults
                   </button>
                 </div>
                 {/* Notes area */}

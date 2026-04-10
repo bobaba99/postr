@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { listPosters, deletePoster } from '@/data/posters';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { resetOnboarding } from '@/components/OnboardingTour';
+import { getAllTemplates, saveCustomTemplates } from '@/poster/GuidelinesPanel';
 import type { User } from '@supabase/supabase-js';
 
 type ConfirmAction = 'deletePosters' | 'deleteAccount' | null;
@@ -196,6 +197,49 @@ export default function Profile() {
             >
               Replay tour
             </button>
+          </div>
+          <div className="py-2 border-t border-[#1f1f2e]">
+            <div className="text-sm text-[#c8cad0] mb-2">Checklist templates</div>
+            <div className="text-xs text-[#6b7280] mb-3">
+              Custom templates you saved from the Scratch Pad. Built-in templates cannot be deleted.
+            </div>
+            {(() => {
+              const templates = getAllTemplates();
+              const custom = templates.filter((t) => !t.builtIn);
+              return (
+                <div className="space-y-2">
+                  {templates.map((t) => (
+                    <div key={t.name} className="flex items-center justify-between rounded-md border border-[#1f1f2e] bg-[#0a0a12] px-3 py-2">
+                      <div>
+                        <div className="text-xs font-medium text-[#c8cad0]">
+                          {t.name}
+                          {t.builtIn && <span className="ml-2 text-[10px] text-[#6b7280]">(built-in)</span>}
+                        </div>
+                        <div className="text-[10px] text-[#6b7280]">{t.items.length} items</div>
+                      </div>
+                      {!t.builtIn && (
+                        <button
+                          onClick={() => {
+                            const next = custom.filter((c) => c.name !== t.name);
+                            saveCustomTemplates(next);
+                            setActionStatus(`Deleted template "${t.name}".`);
+                            setTimeout(() => setActionStatus(null), 3000);
+                          }}
+                          className={btnDanger}
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {custom.length === 0 && (
+                    <div className="text-xs text-[#6b7280]">
+                      No custom templates yet. Use "Save as..." in the editor's Scratch Pad to create one.
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </Section>
 
