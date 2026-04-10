@@ -271,6 +271,7 @@ const GENERAL_RESOURCES: { name: string; url: string; description: string }[] = 
 
 export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [guidelinesExpanded, setGuidelinesExpanded] = useState(false);
 
   if (!open) return null;
 
@@ -308,18 +309,39 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
       </div>
 
           <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
-            {GUIDELINES.map((g) => (
-              <ConferenceCard
-                key={g.conference}
-                guideline={g}
-                expanded={expanded === g.conference}
-                onToggle={() => setExpanded(expanded === g.conference ? null : g.conference)}
-              />
-            ))}
+            {/* Conference Guidelines — collapsible section */}
+            <div style={{ borderBottom: '1px solid #1a1a26' }}>
+              <button
+                onClick={() => setGuidelinesExpanded((prev) => !prev)}
+                style={{
+                  ...cardHeaderStyle,
+                  padding: '10px 20px',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#1a1a26'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              >
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af' }}>
+                    Conference Guidelines ({GUIDELINES.length})
+                  </div>
+                </div>
+                <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: guidelinesExpanded ? 'rotate(90deg)' : 'none' }}>
+                  ▸
+                </span>
+              </button>
+              {guidelinesExpanded && GUIDELINES.map((g) => (
+                <ConferenceCard
+                  key={g.conference}
+                  guideline={g}
+                  expanded={expanded === g.conference}
+                  onToggle={() => setExpanded(expanded === g.conference ? null : g.conference)}
+                />
+              ))}
+            </div>
 
             {/* Writing Tips */}
             <div style={{ padding: '12px 20px 4px' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af', marginBottom: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af', marginBottom: 8, marginTop: 20 }}>
                 Writing Guide
               </div>
               {WRITING_TIPS.map((section) => (
@@ -441,7 +463,7 @@ function WritingTipCard({ section: s, expanded, onToggle }: {
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e2e8' }}>{s.title}</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>{s.title}</div>
         </div>
         <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
           ▸
@@ -449,9 +471,9 @@ function WritingTipCard({ section: s, expanded, onToggle }: {
       </button>
       {expanded && (
         <div style={{ padding: '0 16px 12px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {s.tips.map((tip, i) => (
-              <div key={i} style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5, paddingLeft: 10, borderLeft: '2px solid #2a2a3a' }}>
+              <div key={i} style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.6, paddingLeft: 12, paddingTop: 2, paddingBottom: 2, borderLeft: '2px solid #2a2a3a' }}>
                 {tip}
               </div>
             ))}
@@ -461,7 +483,7 @@ function WritingTipCard({ section: s, expanded, onToggle }: {
               href={s.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: 11, color: '#89b4fa', textDecoration: 'none', display: 'block', marginTop: 8 }}
+              style={{ fontSize: 12, color: '#89b4fa', textDecoration: 'none', display: 'block', marginTop: 8 }}
             >
               Source: {s.source} ↗
             </a>
