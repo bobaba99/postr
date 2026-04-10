@@ -269,16 +269,85 @@ const GENERAL_RESOURCES: { name: string; url: string; description: string }[] = 
 
 // ── Component ────────────────────────────────────────────────────────
 
+// ── Scratch Pad types + persistence ──────────────────────────────────
+
+interface ScratchItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+const SCRATCH_KEY = 'postr.scratch-pad';
+
+function loadScratch(): ScratchItem[] {
+  try {
+    const raw = localStorage.getItem(SCRATCH_KEY);
+    return raw ? (JSON.parse(raw) as ScratchItem[]) : defaultChecklist();
+  } catch {
+    return defaultChecklist();
+  }
+}
+
+function saveScratch(items: ScratchItem[]) {
+  try { localStorage.setItem(SCRATCH_KEY, JSON.stringify(items)); } catch { /* quota */ }
+}
+
+function defaultChecklist(): ScratchItem[] {
+  return [
+    { id: 's1', text: 'Draft title + key finding sentence', done: false },
+    { id: 's2', text: 'Write Introduction (~200 words)', done: false },
+    { id: 's3', text: 'Write Methods (~200 words)', done: false },
+    { id: 's4', text: 'Create results figure + table', done: false },
+    { id: 's5', text: 'Write Conclusions (~200 words)', done: false },
+    { id: 's6', text: 'Add references (3-5 key citations)', done: false },
+    { id: 's7', text: 'Add authors + affiliations', done: false },
+    { id: 's8', text: 'Check figure readability (paste R/Python code)', done: false },
+    { id: 's9', text: 'Review against conference size requirements', done: false },
+    { id: 's10', text: 'Proofread — total under 1000 words?', done: false },
+  ];
+}
+
 export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  // Track which top-level sections are open (conferences, writing, resources)
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['writing']));
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['scratch']));
   const toggleSection = (key: string) =>
     setOpenSections((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+
+  // Scratch pad state
+  const [scratchItems, setScratchItems] = useState<ScratchItem[]>(loadScratch);
+  const [scratchNote, setScratchNote] = useState(() => {
+    try { return localStorage.getItem('postr.scratch-note') ?? ''; } catch { return ''; }
+  });
+
+  const updateScratch = (items: ScratchItem[]) => {
+    setScratchItems(items);
+    saveScratch(items);
+  };
+
+  const toggleItem = (id: string) =>
+    updateScratch(scratchItems.map((it) => it.id === id ? { ...it, done: !it.done } : it));
+
+  const addItem = () => {
+    const next = [...scratchItems, { id: `s${Date.now()}`, text: '', done: false }];
+    updateScratch(next);
+  };
+
+  const updateItemText = (id: string, text: string) =>
+    updateScratch(scratchItems.map((it) => it.id === id ? { ...it, text } : it));
+
+  const removeItem = (id: string) =>
+    updateScratch(scratchItems.filter((it) => it.id !== id));
+
+  const updateNote = (val: string) => {
+    setScratchNote(val);
+    try { localStorage.setItem('postr.scratch-note', val); } catch { /* quota */ }
+  };
+
+  const resetChecklist = () => updateScratch(defaultChecklist());
 
   if (!open) return null;
 
@@ -316,6 +385,87 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
       </div>
 
           <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
+            {/* Scratch Pad — checklist + notes */}
+            <SectionDropdown
+              title={`Scratch Pad (${scratchItems.filter((i) => i.done).length}/${scratchItems.length})`}
+              open={openSections.has('scratch')}
+              onToggle={() => toggleSection('scratch')}
+            >
+              <div style={{ padding: '4px 16px 12px' }}>
+                {scratchItems.map((item) => (
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '4px 0', borderBottom: '1px solid #1a1a26' }}>
+                    <input
+                      type="checkbox"
+                      checked={item.done}
+                      onChange={() => toggleItem(item.id)}
+                      style={{ accentColor: '#7c6aed', marginTop: 3, flexShrink: 0, width: 14, height: 14, cursor: 'pointer' }}
+                    />
+                    <input
+                      value={item.text}
+                      onChange={(e) => updateItemText(item.id, e.target.value)}
+                      placeholder="New item..."
+                      style={{
+                        all: 'unset',
+                        flex: 1,
+                        fontSize: 12,
+                        color: item.done ? '#555' : '#c8cad0',
+                        textDecoration: item.done ? 'line-through' : 'none',
+                        lineHeight: 1.5,
+                      }}
+                    />
+                    <button
+                      onClick={() => removeItem(item.id)}
+                      style={{ all: 'unset', cursor: 'pointer', fontSize: 10, color: '#555', padding: '2px 4px' }}
+                      title="Remove"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button
+                    onClick={addItem}
+                    style={{ all: 'unset', cursor: 'pointer', fontSize: 11, color: '#7c6aed', fontWeight: 600 }}
+                  >
+                    + Add item
+                  </button>
+                  <span style={{ color: '#2a2a3a' }}>·</span>
+                  <button
+                    onClick={resetChecklist}
+                    style={{ all: 'unset', cursor: 'pointer', fontSize: 11, color: '#6b7280' }}
+                  >
+                    Reset defaults
+                  </button>
+                </div>
+                {/* Notes area */}
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Notes
+                  </div>
+                  <textarea
+                    value={scratchNote}
+                    onChange={(e) => updateNote(e.target.value)}
+                    placeholder="Reminders, talking points, reviewer feedback..."
+                    style={{
+                      all: 'unset',
+                      display: 'block',
+                      width: '100%',
+                      minHeight: 60,
+                      fontSize: 12,
+                      color: '#c8cad0',
+                      background: '#1a1a26',
+                      border: '1px solid #2a2a3a',
+                      borderRadius: 6,
+                      padding: 8,
+                      boxSizing: 'border-box',
+                      resize: 'vertical',
+                      lineHeight: 1.5,
+                    }}
+                  />
+                </div>
+              </div>
+            </SectionDropdown>
+
             {/* Conference Guidelines */}
             <SectionDropdown
               title={`Conference Guidelines (${GUIDELINES.length})`}
