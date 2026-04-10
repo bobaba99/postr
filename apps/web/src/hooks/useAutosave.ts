@@ -53,7 +53,7 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
   const firstRenderRef = useRef(true);
   const lastPosterIdRef = useRef<string | null>(posterId);
 
-  // Keep the title ref in sync without re-triggering the effect.
+  // Keep the title ref in sync (also read inside the effect below).
   pendingTitleRef.current = displayTitle;
 
   // Actual save — runs at the tail of the debounce window or on unmount.
@@ -115,6 +115,8 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
 
     // 4. Schedule a debounced save. Replacing the pending doc each
     //    time means only the newest snapshot is ever written.
+    //    For title-only changes the doc reference is unchanged, but
+    //    we still need it in the ref so flush() has data to write.
     pendingIdRef.current = posterId;
     pendingDocRef.current = doc;
 
@@ -129,7 +131,7 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
       // supersedes the old one) or by the unmount effect below.
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [doc, posterId]);
+  }, [doc, posterId, displayTitle]);
 
   // Unmount: flush any pending save so nothing is lost.
   useEffect(() => {
