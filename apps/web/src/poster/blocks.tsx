@@ -425,7 +425,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
         <div
           style={{
             position: 'absolute',
-            left: -24,
+            left: 2,
             top: `calc(${(hoveredRow / data.rows) * 100}% + ${(100 / data.rows) / 2}%)`,
             transform: 'translateY(-50%)',
             display: 'flex',
@@ -467,7 +467,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
         <div
           style={{
             position: 'absolute',
-            top: -24,
+            top: 2,
             left: `calc(${colWidths.slice(0, hoveredCol).reduce((s, w) => s + w, 0)}% + ${
               (colWidths[hoveredCol] ?? 0) / 2
             }%)`,
@@ -524,7 +524,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
           all: 'unset',
           cursor: 'pointer',
           position: 'absolute',
-          bottom: -12,
+          bottom: 2,
           left: '50%',
           transform: 'translateX(-50%)',
           width: 16,
@@ -560,7 +560,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
           all: 'unset',
           cursor: 'pointer',
           position: 'absolute',
-          right: -6,
+          right: 2,
           top: '50%',
           transform: 'translateY(-50%)',
           width: 16,
@@ -993,7 +993,7 @@ export function BlockFrame(props: BlockFrameProps) {
       {isHeading && selected && (
         <div
           onPointerDown={(e) => onPointerDown(e, b.id, 'resize')}
-          style={{ position: 'absolute', right: -3, top: 0, width: 6, height: '100%', cursor: 'ew-resize' }}
+          style={{ position: 'absolute', right: 0, top: 0, width: 6, height: '100%', cursor: 'ew-resize' }}
         >
           <div style={{ width: 2, height: '100%', background: p.accent, borderRadius: 1, margin: '0 auto', opacity: 0.5 }} />
         </div>
@@ -1007,8 +1007,8 @@ export function BlockFrame(props: BlockFrameProps) {
           }}
           style={{
             position: 'absolute',
-            top: -9,
-            right: -9,
+            top: -2,
+            right: -2,
             width: 18,
             height: 18,
             borderRadius: '50%',
@@ -1031,7 +1031,7 @@ export function BlockFrame(props: BlockFrameProps) {
         <div
           style={{
             position: 'absolute',
-            top: -9,
+            top: -1,
             left: 3,
             fontSize: 6,
             background: p.accent,
