@@ -569,7 +569,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                 </div>
                 {/* Notes area */}
                 <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     Notes
                   </div>
                   <textarea
@@ -647,7 +647,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                     style={resourceLinkStyle}
                   >
                     <div style={{ fontSize: 13, color: '#89b4fa', fontWeight: 500 }}>{r.name}</div>
-                    <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4, marginTop: 2 }}>{r.description}</div>
+                    <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4, marginTop: 2 }}>{r.description}</div>
                   </a>
                 ))}
               </div>
@@ -674,7 +674,7 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
       >
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>{g.conference}</div>
-          <div style={{ fontSize: 11, color: '#6b7280' }}>{g.field} — {g.size}</div>
+          <div style={{ fontSize: 12, color: '#6b7280' }}>{g.field} — {g.size}</div>
         </div>
         <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
           ▸
@@ -684,7 +684,7 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
       {expanded && (
         <div style={{ padding: '0 20px 12px' }}>
           {g.sizeNote && (
-            <div style={{ fontSize: 11, color: '#f9e2af', marginBottom: 6, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 12, color: '#f9e2af', marginBottom: 6, lineHeight: 1.4 }}>
               Note: {g.sizeNote}
             </div>
           )}
@@ -774,7 +774,7 @@ function WritingTipCard({ section: s, index, expanded, onToggle }: {
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: '#7c6aed', minWidth: 18 }}>{index}.</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: '#7c6aed', minWidth: 18 }}>{index}.</span>
           <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>{s.title}</span>
         </div>
         <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
