@@ -99,6 +99,18 @@ export function OnboardingTour() {
     return () => clearTimeout(t);
   }, []);
 
+  // If the user navigates away mid-tour, mark as done so it doesn't
+  // restart on the next poster open.
+  useEffect(() => {
+    return () => {
+      if (step >= 0) {
+        clearBoost();
+        localStorage.setItem(STORAGE_KEY, 'true');
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Inject pulse animation once
   useEffect(() => {
     const style = document.createElement('style');

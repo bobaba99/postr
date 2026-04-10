@@ -595,7 +595,7 @@ function TableContextMenu({ x, y, r, c, data, onAction, onClose }: {
         borderRadius: 8,
         padding: '4px 0',
         boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
-        zIndex: 99999,
+        zIndex: 10003,
         fontFamily: "'DM Sans', system-ui, sans-serif",
       }}
     >

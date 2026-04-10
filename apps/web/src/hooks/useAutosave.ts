@@ -69,10 +69,16 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
       // Sync the display title (sidebar "Poster Title" field) to the
       // posters.title column. Falls back to extracting the title
       // block's content if no display title is set.
+      // Use display name if set, otherwise auto-fill from the title block
       let titleText = pendingTitleRef.current?.trim() ?? '';
       if (!titleText) {
         const titleBlock = data.blocks.find((b) => b.type === 'title');
         titleText = titleBlock?.content ? stripHtml(titleBlock.content).trim() : '';
+      }
+      // If title block content was used, also push it back to the store
+      // so the sidebar Poster Name field shows the auto-filled value
+      if (titleText && !pendingTitleRef.current?.trim()) {
+        pendingTitleRef.current = titleText;
       }
       await upsertPoster(id, { data, ...(titleText ? { title: titleText } : {}) });
       setState({ status: 'saved', lastSavedAt: new Date(), error: null });
