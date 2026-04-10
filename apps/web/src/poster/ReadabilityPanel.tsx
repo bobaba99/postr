@@ -14,21 +14,21 @@ interface Props {
 }
 
 const panelStyle: CSSProperties = {
-  display: 'flex', flexDirection: 'column', gap: 12, fontSize: 12,
+  display: 'flex', flexDirection: 'column', gap: 14, fontSize: 14,
 };
 const textareaStyle: CSSProperties = {
-  width: '100%', minHeight: 120, fontFamily: 'monospace', fontSize: 11,
+  width: '100%', minHeight: 120, fontFamily: 'monospace', fontSize: 13,
   background: '#1e1e2e', color: '#cdd6f4', border: '1px solid #45475a',
-  borderRadius: 4, padding: 8, resize: 'vertical',
+  borderRadius: 6, padding: 10, resize: 'vertical',
 };
 const labelStyle: CSSProperties = {
   fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase' as const,
-  letterSpacing: 1,
+  letterSpacing: 1.2,
 };
 const copyBtnStyle: CSSProperties = {
   cursor: 'pointer', background: '#313244', color: '#cdd6f4',
-  border: '1px solid #45475a', borderRadius: 4, padding: '4px 10px',
-  fontSize: 11, fontFamily: 'monospace',
+  border: '1px solid #45475a', borderRadius: 6, padding: '6px 12px',
+  fontSize: 13, fontFamily: 'monospace',
 };
 
 /**
@@ -113,7 +113,7 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
     <div style={panelStyle}>
       {/* Code checker — always available */}
       <div style={labelStyle}>Code Readability Check</div>
-      <p style={{ color: '#6b7280', fontSize: 11, lineHeight: 1.5, margin: 0 }}>
+      <p style={{ color: '#6b7280', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
         Paste your R or Python plotting code to check if figure text will be readable at poster print size.
         {isImage
           ? ` Using selected image block (${(blockWidthIn).toFixed(1)}" × ${(blockHeightIn).toFixed(1)}").`
@@ -146,7 +146,7 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
       />
 
       {detectedLang && (
-        <div style={{ fontSize: 10, color: '#89b4fa' }}>
+        <div style={{ fontSize: 13, color: '#89b4fa' }}>
           Detected: {detectedLang === 'r' ? 'R / ggplot2' : 'Python / matplotlib'}
         </div>
       )}
@@ -154,17 +154,17 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
       {result && (
         <>
           {result.warnings.map((w, i) => (
-            <div key={i} style={{ fontSize: 11, color: '#f9e2af', display: 'flex', gap: 4 }}>
+            <div key={i} style={{ fontSize: 13, color: '#f9e2af', display: 'flex', gap: 4 }}>
               <span>&#9888;</span> {w}
             </div>
           ))}
 
-          <div style={{ fontSize: 11, color: '#6b7280' }}>
+          <div style={{ fontSize: 13, color: '#6b7280' }}>
             Scale factor: {result.scale.toFixed(2)}x
             {!isImage && ' (default block size)'}
           </div>
 
-          <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #45475a', color: '#9ca3af' }}>
                 <th style={{ textAlign: 'left', padding: '4px 0' }}>Element</th>
@@ -197,13 +197,13 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
 
           {result.elements.some((e) => e.status !== 'pass') && (
             <div style={{ background: '#313244', borderRadius: 6, padding: 10 }}>
-              <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 6 }}>
+              <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 6 }}>
                 Recommended fix (base_size = {result.suggestedBaseSize}):
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <button
                   onClick={() => setShowFullCode(!showFullCode)}
-                  style={{ ...copyBtnStyle, fontFamily: 'system-ui', fontSize: 11 }}
+                  style={{ ...copyBtnStyle, fontFamily: 'system-ui', fontSize: 13 }}
                 >
                   {showFullCode ? 'Show snippet' : 'Show full code'}
                 </button>
@@ -215,7 +215,7 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
                 </button>
               </div>
               <pre style={{
-                fontSize: 10, color: '#a6e3a1', fontFamily: 'monospace',
+                fontSize: 12, color: '#a6e3a1', fontFamily: 'monospace',
                 background: '#1e1e2e', borderRadius: 4, padding: 8,
                 whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                 maxHeight: 200, overflow: 'auto',
@@ -238,7 +238,7 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
       {isImage && (
         <div style={{ borderTop: '1px solid #45475a', paddingTop: 12, marginTop: 4 }}>
           <div style={labelStyle}>Image OCR Analysis</div>
-          <p style={{ color: '#6b7280', fontSize: 11, lineHeight: 1.5, margin: 0 }}>
+          <p style={{ color: '#6b7280', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
             Scan the uploaded figure for text and check readability directly from the image — no code needed.
           </p>
           <button
@@ -253,7 +253,7 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
           >
             Scan Image (coming soon)
           </button>
-          <div style={{ fontSize: 10, color: '#555', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: '#555', marginTop: 4 }}>
             Phase 2 — local Ollama or Claude Vision
           </div>
         </div>
