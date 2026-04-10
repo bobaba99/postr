@@ -63,7 +63,10 @@ interface SidebarProps {
   posterTitle: string;
   onChangePosterTitle: (title: string) => void;
   posterSizeKey: PosterSizeKey;
+  posterWidthIn: number;
+  posterHeightIn: number;
   onChangePosterSize: (key: PosterSizeKey) => void;
+  onChangeCustomSize: (w: number, h: number) => void;
   showGrid: boolean;
   onToggleGrid: (show: boolean) => void;
 
@@ -346,7 +349,10 @@ export function Sidebar(props: SidebarProps) {
             posterTitle={props.posterTitle}
             onChangePosterTitle={props.onChangePosterTitle}
             posterSizeKey={props.posterSizeKey}
+            posterWidthIn={props.posterWidthIn}
+            posterHeightIn={props.posterHeightIn}
             onChangePosterSize={props.onChangePosterSize}
+            onChangeCustomSize={props.onChangeCustomSize}
             showGrid={props.showGrid}
             onToggleGrid={props.onToggleGrid}
             onApplyTemplate={props.onApplyTemplate}
@@ -427,7 +433,10 @@ function LayoutTab(props: {
   posterTitle: string;
   onChangePosterTitle: (title: string) => void;
   posterSizeKey: PosterSizeKey;
+  posterWidthIn: number;
+  posterHeightIn: number;
   onChangePosterSize: (k: PosterSizeKey) => void;
+  onChangeCustomSize: (w: number, h: number) => void;
   showGrid: boolean;
   onToggleGrid: (show: boolean) => void;
   onApplyTemplate: (k: LayoutKey) => void;
@@ -514,7 +523,10 @@ function LayoutTab(props: {
       <div style={labelStyle}>Poster Size</div>
       <select
         value={props.posterSizeKey}
-        onChange={(e) => props.onChangePosterSize(e.target.value as PosterSizeKey)}
+        onChange={(e) => {
+          const k = e.target.value;
+          if (k !== 'custom') props.onChangePosterSize(k as PosterSizeKey);
+        }}
         style={selectStyle}
       >
         {Object.entries(POSTER_SIZES).map(([k, v]) => (
@@ -522,7 +534,41 @@ function LayoutTab(props: {
             {v.label}
           </option>
         ))}
+        <option value="custom">Custom Size</option>
       </select>
+      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>Width (in)</div>
+          <input
+            type="number"
+            value={props.posterWidthIn}
+            onChange={(e) => {
+              const w = parseFloat(e.target.value);
+              if (w > 0) props.onChangeCustomSize(w, props.posterHeightIn);
+            }}
+            min={10}
+            max={100}
+            step={0.1}
+            style={{ ...inputBase, fontSize: 14, width: '100%' }}
+          />
+        </div>
+        <div style={{ fontSize: 14, color: '#6b7280', marginTop: 16 }}>×</div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>Height (in)</div>
+          <input
+            type="number"
+            value={props.posterHeightIn}
+            onChange={(e) => {
+              const h = parseFloat(e.target.value);
+              if (h > 0) props.onChangeCustomSize(props.posterWidthIn, h);
+            }}
+            min={10}
+            max={100}
+            step={0.1}
+            style={{ ...inputBase, fontSize: 14, width: '100%' }}
+          />
+        </div>
+      </div>
 
       <div style={labelStyle}>Grid</div>
       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer' }}>
@@ -576,6 +622,17 @@ function LayoutTab(props: {
       <button onClick={props.onPrint} style={{ ...buttonStyle(true), marginTop: 8 }}>
         ⎙ Save PDF
       </button>
+      <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginTop: 8, background: '#1a1a26', padding: 10, borderRadius: 6, border: '1px solid #2a2a3a' }}>
+        <strong style={{ color: '#9ca3af' }}>How to save as PDF:</strong>
+        <ol style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+          <li>Click "Save PDF" or press Ctrl+P / Cmd+P</li>
+          <li>Set destination to <strong style={{ color: '#c8cad0' }}>"Save as PDF"</strong></li>
+          <li>Set layout to <strong style={{ color: '#c8cad0' }}>Landscape</strong> (for landscape posters)</li>
+          <li>Set margins to <strong style={{ color: '#c8cad0' }}>None</strong></li>
+          <li>Check <strong style={{ color: '#c8cad0' }}>"Background graphics"</strong> is enabled</li>
+          <li>Click Save</li>
+        </ol>
+      </div>
     </>
   );
 }

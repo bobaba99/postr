@@ -673,7 +673,13 @@ export function PosterEditor() {
         posterTitle={posterDisplayName}
         onChangePosterTitle={setPosterDisplayName}
         posterSizeKey={sizeKey}
+        posterWidthIn={doc.widthIn}
+        posterHeightIn={doc.heightIn}
         onChangePosterSize={changeSize}
+        onChangeCustomSize={(w, h) => {
+          updateDoc({ widthIn: w, heightIn: h });
+          setZoom(null);
+        }}
         showGrid={showGrid}
         onToggleGrid={setShowGrid}
         fontFamily={doc.fontFamily}
