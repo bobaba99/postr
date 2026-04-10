@@ -16,7 +16,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { listPosters, deletePoster } from '@/data/posters';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import type { User } from '@supabase/supabase-js';
+
+type ConfirmAction = 'deletePosters' | 'deleteAccount' | null;
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -25,6 +28,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
 
   useEffect(() => {
     (async () => {
@@ -56,58 +60,45 @@ export default function Profile() {
     setTimeout(() => setActionStatus(null), 3000);
   }, []);
 
-  const deleteAllPosters = useCallback(async () => {
-    const confirmed = window.confirm(
-      `Delete ALL ${posterCount} poster(s)? This cannot be undone.`,
-    );
-    if (!confirmed) return;
+  const handleConfirm = useCallback(async () => {
+    const action = confirmAction;
+    setConfirmAction(null);
+    if (!action) return;
 
     setActionError(null);
-    setActionStatus('Deleting posters…');
-    try {
-      const posters = await listPosters();
-      for (const p of posters) {
-        await deletePoster(p.id);
+
+    if (action === 'deletePosters') {
+      setActionStatus('Deleting posters…');
+      try {
+        const posters = await listPosters();
+        for (const p of posters) {
+          await deletePoster(p.id);
+        }
+        setPosterCount(0);
+        setActionStatus(`Deleted ${posters.length} poster(s).`);
+        setTimeout(() => setActionStatus(null), 3000);
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Failed to delete posters');
+        setActionStatus(null);
       }
-      setPosterCount(0);
-      setActionStatus(`Deleted ${posters.length} poster(s).`);
-      setTimeout(() => setActionStatus(null), 3000);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to delete posters');
-      setActionStatus(null);
     }
-  }, [posterCount]);
 
-  const deleteAccount = useCallback(async () => {
-    const confirmed = window.confirm(
-      'Delete your account and ALL data? This is permanent and cannot be undone.',
-    );
-    if (!confirmed) return;
-
-    const doubleConfirm = window.confirm(
-      'Are you absolutely sure? All posters, preferences, and account data will be permanently deleted.',
-    );
-    if (!doubleConfirm) return;
-
-    setActionError(null);
-    setActionStatus('Deleting account…');
-    try {
-      // Delete all posters first
-      const posters = await listPosters();
-      for (const p of posters) {
-        await deletePoster(p.id);
+    if (action === 'deleteAccount') {
+      setActionStatus('Deleting account…');
+      try {
+        const posters = await listPosters();
+        for (const p of posters) {
+          await deletePoster(p.id);
+        }
+        localStorage.removeItem('postr.style-presets');
+        await supabase.auth.signOut({ scope: 'local' });
+        navigate('/');
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Failed to delete account');
+        setActionStatus(null);
       }
-      // Clear local storage
-      localStorage.removeItem('postr.style-presets');
-      // Sign out (wipes session)
-      await supabase.auth.signOut({ scope: 'local' });
-      // Navigate to home — AuthBootstrap will create a fresh anonymous session
-      navigate('/');
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'Failed to delete account');
-      setActionStatus(null);
     }
-  }, [navigate]);
+  }, [confirmAction, navigate]);
 
   const signInWithGoogle = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -196,7 +187,7 @@ export default function Profile() {
               title="Delete all posters"
               description={`Permanently delete all ${posterCount} poster(s). This cannot be undone.`}
               buttonText="Delete all posters"
-              onClick={deleteAllPosters}
+              onClick={() => setConfirmAction('deletePosters')}
               disabled={posterCount === 0}
             />
             <div className="border-t border-[#2a2a3a]" />
@@ -204,11 +195,25 @@ export default function Profile() {
               title="Delete account"
               description="Permanently delete your account and all associated data. You will be signed out and a new guest account will be created."
               buttonText="Delete account"
-              onClick={deleteAccount}
+              onClick={() => setConfirmAction('deleteAccount')}
             />
           </div>
         </Section>
       </div>
+
+      <ConfirmModal
+        open={confirmAction !== null}
+        title={confirmAction === 'deleteAccount' ? 'Delete account' : 'Delete all posters'}
+        message={
+          confirmAction === 'deleteAccount'
+            ? 'This will permanently delete your account, all posters, and all preferences. You will be signed out and a new guest session will be created. This cannot be undone.'
+            : `Permanently delete all ${posterCount} poster(s)? This cannot be undone.`
+        }
+        confirmLabel={confirmAction === 'deleteAccount' ? 'Delete account' : 'Delete all'}
+        danger
+        onConfirm={handleConfirm}
+        onCancel={() => setConfirmAction(null)}
+      />
     </main>
   );
 }

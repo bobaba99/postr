@@ -20,6 +20,7 @@ import {
 import { Link } from 'react-router-dom';
 import { PosterCard } from '@/components/PosterCard';
 import { NewPosterButton } from '@/components/NewPosterButton';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 type Status =
   | { kind: 'loading' }
@@ -29,6 +30,7 @@ type Status =
 export default function Home() {
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [actionError, setActionError] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PosterRow | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,14 +63,16 @@ export default function Home() {
     }
   }, []);
 
-  const handleDelete = useCallback(async (row: PosterRow) => {
-    const confirmed = window.confirm(
-      `Delete "${row.title || 'Untitled Poster'}"? This cannot be undone.`,
-    );
-    if (!confirmed) return;
+  const handleDeleteRequest = useCallback((row: PosterRow) => {
+    setDeleteTarget(row);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    const row = deleteTarget;
+    setDeleteTarget(null);
+    if (!row) return;
 
     setActionError(null);
-    // Optimistic removal
     let rollback: PosterRow[] | null = null;
     setStatus((s) => {
       if (s.kind !== 'ready') return s;
@@ -86,7 +90,7 @@ export default function Home() {
         setStatus({ kind: 'ready', rows });
       }
     }
-  }, []);
+  }, [deleteTarget]);
 
   return (
     <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
@@ -139,12 +143,22 @@ export default function Home() {
                 key={row.id}
                 row={row}
                 onDuplicate={handleDuplicate}
-                onDelete={handleDelete}
+                onDelete={handleDeleteRequest}
               />
             ))}
           </div>
         )}
       </section>
+
+      <ConfirmModal
+        open={deleteTarget !== null}
+        title="Delete poster"
+        message={`Permanently delete "${deleteTarget?.title?.trim() || 'Untitled Poster'}"? This cannot be undone.`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </main>
   );
 }
