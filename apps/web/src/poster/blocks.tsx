@@ -7,6 +7,7 @@
  * conventions and porting them as separate modules would scatter the
  * coupling. Re-split if any one of them grows past ~150 lines.
  */
+import ReactDOM from 'react-dom';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { blockSelection } from '@/motion/timelines/blockSelection';
 import type {
@@ -194,19 +195,71 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
   const preset = TABLE_BORDER_PRESETS[data.borderPreset] ?? TABLE_BORDER_PRESETS.apa!;
   const colWidths = data.colWidths ?? Array(data.cols).fill(100 / data.cols);
 
-  // Hover state for Notion/Canva-style inline row/column controls.
-  // hoveredRow/Col track which cell the pointer is currently over so
-  // we can render insert/delete handles on that row's left margin and
-  // that column's top margin.
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const [hoveredCol, setHoveredCol] = useState<number | null>(null);
-  const clearHover = () => {
-    setHoveredRow(null);
-    setHoveredCol(null);
-  };
+  // Active (focused) cell for highlight + keyboard navigation
+  const [activeCell, setActiveCell] = useState<{ r: number; c: number } | null>(null);
+  // Right-click context menu
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; r: number; c: number } | null>(null);
+
+  const clearHover = () => { setHoveredRow(null); setHoveredCol(null); };
 
   const commit = (next: TableData) => onUpdate({ tableData: next });
   const updateCellValue = (r: number, c: number, v: string) => commit(updateCell(data, r, c, v));
+
+  // Focus a cell's contentEditable div by (row, col)
+  const focusCell = (r: number, c: number) => {
+    if (r < 0 || r >= data.rows || c < 0 || c >= data.cols) return;
+    setActiveCell({ r, c });
+    const container = tableContainerRef.current;
+    if (!container) return;
+    const cells = container.querySelectorAll<HTMLElement>('td [contenteditable]');
+    const idx = r * data.cols + c;
+    cells[idx]?.focus();
+  };
+
+  // Keyboard navigation: Tab, Shift+Tab, Arrow keys at content edges
+  const onCellKeyDown = (e: React.KeyboardEvent, r: number, c: number) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        // Previous cell
+        if (c > 0) focusCell(r, c - 1);
+        else if (r > 0) focusCell(r - 1, data.cols - 1);
+      } else {
+        // Next cell
+        if (c < data.cols - 1) focusCell(r, c + 1);
+        else if (r < data.rows - 1) focusCell(r + 1, 0);
+      }
+      return;
+    }
+    // Arrow keys — only navigate when cursor is at the edge of content
+    const el = e.currentTarget;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    const atStart = range.startOffset === 0 && range.collapsed;
+    const atEnd = range.collapsed && range.endOffset === (range.endContainer.textContent?.length ?? 0);
+
+    if (e.key === 'ArrowUp' && atStart && r > 0) { e.preventDefault(); focusCell(r - 1, c); }
+    if (e.key === 'ArrowDown' && atEnd && r < data.rows - 1) { e.preventDefault(); focusCell(r + 1, c); }
+    if (e.key === 'ArrowLeft' && atStart && c > 0) { e.preventDefault(); focusCell(r, c - 1); }
+    if (e.key === 'ArrowRight' && atEnd && c < data.cols - 1) { e.preventDefault(); focusCell(r, c + 1); }
+    // Escape closes context menu
+    if (e.key === 'Escape') setCtxMenu(null);
+  };
+
+  // Close context menu on any click outside
+  useEffect(() => {
+    if (!ctxMenu) return;
+    const close = () => setCtxMenu(null);
+    window.addEventListener('click', close);
+    window.addEventListener('contextmenu', close);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('contextmenu', close);
+    };
+  }, [ctxMenu]);
 
   // Notion/Canva parity: drag-to-resize column borders. Capture the
   // pointer on mousedown over a border handle, track horizontal delta
@@ -338,12 +391,19 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
         <tbody>
           {Array.from({ length: data.rows }).map((_, r) => (
             <tr key={r}>
-              {Array.from({ length: data.cols }).map((_, c) => (
+              {Array.from({ length: data.cols }).map((_, c) => {
+                const isActive = activeCell?.r === r && activeCell?.c === c;
+                return (
                 <td
                   key={c}
                   onMouseEnter={() => {
                     setHoveredRow(r);
                     setHoveredCol(c);
+                  }}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCtxMenu({ x: e.clientX, y: e.clientY, r, c });
                   }}
                   style={{
                     ...cellBorder(r, c),
@@ -352,23 +412,18 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
                     fontWeight: r === 0 ? 700 : 400,
                     color: palette.primary,
                     position: 'relative',
+                    // Active cell highlight — subtle accent border
+                    boxShadow: isActive ? `inset 0 0 0 1.5px ${palette.accent}88` : 'none',
                   }}
                 >
-                  {/*
-                    S1 fix: cells are now contentEditable divs instead
-                    of <input>. This allows rich inline marks (bold,
-                    highlight, italic) via the floating format toolbar
-                    — the same one used on text blocks. The cell stores
-                    its innerHTML as a string in TableData.cells[].
-                  */}
                   <div
                     contentEditable
                     suppressContentEditableWarning
                     dangerouslySetInnerHTML={{ __html: data.cells[r * data.cols + c] ?? '' }}
-                    onInput={(e) => {
-                      const el = e.currentTarget;
-                      updateCellValue(r, c, el.innerHTML);
-                    }}
+                    onInput={(e) => updateCellValue(r, c, e.currentTarget.innerHTML)}
+                    onFocus={() => setActiveCell({ r, c })}
+                    onBlur={() => setActiveCell((prev) => prev?.r === r && prev?.c === c ? null : prev)}
+                    onKeyDown={(e) => onCellKeyDown(e, r, c)}
                     onPointerDown={(e) => e.stopPropagation()}
                     style={{
                       outline: 'none',
@@ -382,7 +437,8 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
                     }}
                   />
                 </td>
-              ))}
+                );
+              })}
             </tr>
           ))}
         </tbody>
@@ -444,6 +500,119 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
         />
       )}
       </div>
+
+      {/* Figma-style right-click context menu */}
+      {ctxMenu && ReactDOM.createPortal(
+        <TableContextMenu
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          r={ctxMenu.r}
+          c={ctxMenu.c}
+          data={data}
+          onAction={(action) => {
+            setCtxMenu(null);
+            switch (action) {
+              case 'insertRowAbove': commit(insertRow(data, ctxMenu.r, 'above')); break;
+              case 'insertRowBelow': commit(insertRow(data, ctxMenu.r, 'below')); break;
+              case 'insertColLeft': commit(insertCol(data, ctxMenu.c, 'left')); break;
+              case 'insertColRight': commit(insertCol(data, ctxMenu.c, 'right')); break;
+              case 'deleteRow': if (data.rows > 1) commit(deleteRowAt(data, ctxMenu.r)); break;
+              case 'deleteCol': if (data.cols > 1) commit(deleteColAt(data, ctxMenu.c)); break;
+              case 'clearCell': commit(updateCell(data, ctxMenu.r, ctxMenu.c, '')); break;
+            }
+          }}
+          onClose={() => setCtxMenu(null)}
+        />,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+// ── TableContextMenu — Figma-style right-click menu ────────────────
+
+type CtxAction = 'insertRowAbove' | 'insertRowBelow' | 'insertColLeft' | 'insertColRight' | 'deleteRow' | 'deleteCol' | 'clearCell';
+
+function TableContextMenu({ x, y, r, c, data, onAction, onClose }: {
+  x: number;
+  y: number;
+  r: number;
+  c: number;
+  data: TableData;
+  onAction: (a: CtxAction) => void;
+  onClose: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Adjust position so menu doesn't overflow viewport
+  const adjX = Math.min(x, window.innerWidth - 200);
+  const adjY = Math.min(y, window.innerHeight - 260);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const item = (label: string, action: CtxAction, danger?: boolean, disabled?: boolean) => (
+    <button
+      key={action}
+      onClick={(e) => { e.stopPropagation(); onAction(action); }}
+      disabled={disabled}
+      style={{
+        all: 'unset',
+        display: 'block',
+        width: '100%',
+        padding: '6px 12px',
+        fontSize: 12,
+        color: disabled ? '#555' : danger ? '#f87171' : '#c8cad0',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        borderRadius: 4,
+        boxSizing: 'border-box',
+      }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = '#1e1e2e'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+    >
+      {label}
+    </button>
+  );
+
+  const sep = <div style={{ height: 1, background: '#2a2a3a', margin: '4px 0' }} />;
+
+  return (
+    <div
+      ref={menuRef}
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: 'fixed',
+        top: adjY,
+        left: adjX,
+        width: 180,
+        background: '#111118',
+        border: '1px solid #2a2a3a',
+        borderRadius: 8,
+        padding: '4px 0',
+        boxShadow: '0 8px 30px rgba(0,0,0,0.5)',
+        zIndex: 99999,
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+      }}
+    >
+      <div style={{ padding: '4px 12px 6px', fontSize: 10, color: '#6b7280', fontWeight: 600 }}>
+        Cell ({r + 1}, {c + 1})
+      </div>
+      {sep}
+      {item('Insert row above', 'insertRowAbove')}
+      {item('Insert row below', 'insertRowBelow')}
+      {sep}
+      {item('Insert column left', 'insertColLeft')}
+      {item('Insert column right', 'insertColRight')}
+      {sep}
+      {item('Clear cell', 'clearCell')}
+      {sep}
+      {item('Delete row', 'deleteRow', true, data.rows <= 1)}
+      {item('Delete column', 'deleteCol', true, data.cols <= 1)}
     </div>
   );
 }
