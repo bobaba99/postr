@@ -304,7 +304,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
   return (
     <div
       style={{ width: '100%', height: '100%', overflow: 'visible', padding: 2, position: 'relative' }}
-      onPaste={onPaste}
+      onPasteCapture={onPaste}
       onMouseLeave={clearHover}
     >
       {/*
@@ -372,16 +372,31 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
                     position: 'relative',
                   }}
                 >
-                  <input
-                    value={data.cells[r * data.cols + c] ?? ''}
-                    onChange={(e) => updateCellValue(r, c, e.target.value)}
+                  {/*
+                    S1 fix: cells are now contentEditable divs instead
+                    of <input>. This allows rich inline marks (bold,
+                    highlight, italic) via the floating format toolbar
+                    — the same one used on text blocks. The cell stores
+                    its innerHTML as a string in TableData.cells[].
+                  */}
+                  <div
+                    contentEditable
+                    suppressContentEditableWarning
+                    dangerouslySetInnerHTML={{ __html: data.cells[r * data.cols + c] ?? '' }}
+                    onInput={(e) => {
+                      const el = e.currentTarget;
+                      updateCellValue(r, c, el.innerHTML);
+                    }}
                     onPointerDown={(e) => e.stopPropagation()}
                     style={{
-                      all: 'unset',
+                      outline: 'none',
                       width: '100%',
+                      minHeight: '1em',
                       fontFamily,
                       fontSize: styles.body.size,
                       color: palette.primary,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
                     }}
                   />
                 </td>

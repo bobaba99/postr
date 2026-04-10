@@ -57,15 +57,17 @@ function findSizeKey(widthIn: number, heightIn: number): PosterSizeKey {
 }
 
 /** Resolve a Palette object to its catalog name (or empty string). */
+/** Match a Palette to its catalog name by comparing all color fields. */
 function paletteNameFor(palette: Palette): string {
   for (const named of PALETTES) {
-    const { name, ...rest } = named;
     if (
-      rest.bg === palette.bg &&
-      rest.primary === palette.primary &&
-      rest.accent === palette.accent
+      named.bg === palette.bg &&
+      named.primary === palette.primary &&
+      named.accent === palette.accent &&
+      named.accent2 === palette.accent2 &&
+      named.muted === palette.muted
     ) {
-      return name;
+      return named.name;
     }
   }
   return '';
