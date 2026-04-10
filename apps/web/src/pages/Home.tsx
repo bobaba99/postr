@@ -95,7 +95,15 @@ export default function Home() {
   return (
     <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#1f1f2e] bg-[#0a0a12]/95 px-8 py-5 backdrop-blur">
-        <h1 className="text-xl font-semibold tracking-tight">Postr</h1>
+        <div className="flex items-center gap-3">
+          <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
+            <rect width="64" height="64" rx="12" fill="#7c6aed" />
+            <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
+            <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
+            <circle cx="32" cy="32" r="5" fill="white" />
+          </svg>
+          <h1 className="text-xl font-semibold tracking-tight">Postr</h1>
+        </div>
         <div className="flex items-center gap-4">
           <NewPosterButton />
           <Link

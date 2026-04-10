@@ -296,22 +296,12 @@ export function Sidebar(props: SidebarProps) {
         </button>
       )}
       <a href="/" style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', cursor: 'pointer' }}>
-        <div
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 8,
-            background: 'linear-gradient(135deg,#7c6aed,#06d6a0)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
-            <rect x="3" y="3" width="18" height="18" rx="2" />
-            <path d="M3 9h18M9 3v18" />
-          </svg>
-        </div>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect width="64" height="64" rx="12" fill="#7c6aed" />
+          <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
+          <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
+          <circle cx="32" cy="32" r="5" fill="white" />
+        </svg>
         <div style={{ fontWeight: 800, fontSize: 20, color: '#fff' }}>Postr</div>
       </a>
 
