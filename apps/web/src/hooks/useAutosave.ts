@@ -31,6 +31,13 @@ export interface AutosaveState {
 
 const DEBOUNCE_MS = 800;
 
+/** Strip HTML tags to get plain text for the poster title column. */
+function stripHtml(html: string): string {
+  const div = document.createElement('div');
+  div.innerHTML = html;
+  return div.textContent ?? '';
+}
+
 export function useAutosave(posterId: string | null, doc: PosterDoc | null): AutosaveState {
   const [state, setState] = useState<AutosaveState>({
     status: 'idle',
@@ -55,7 +62,14 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null): Aut
 
     setState((s) => ({ ...s, status: 'saving', error: null }));
     try {
-      await upsertPoster(id, { data });
+      // Extract the title block's plain-text content and sync it to
+      // the posters.title column so the Home page grid shows the
+      // actual poster title instead of "Untitled Poster".
+      const titleBlock = data.blocks.find((b) => b.type === 'title');
+      const titleText = titleBlock?.content
+        ? stripHtml(titleBlock.content).trim()
+        : '';
+      await upsertPoster(id, { data, ...(titleText ? { title: titleText } : {}) });
       setState({ status: 'saved', lastSavedAt: new Date(), error: null });
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
