@@ -115,6 +115,7 @@ export interface UseBlockDragResult {
 function useBlockDrag(
   blocks: Block[],
   setBlocks: (b: Block[]) => void,
+  setBlocksSilent: (b: Block[]) => void,
   scale: number,
 ): UseBlockDragResult {
   // Keep a ref to blocks so the pointermove handler always reads the
@@ -194,10 +195,15 @@ function useBlockDrag(
           if (s.isHeading) return { ...blk, w: snap(nw) };
           return { ...blk, w: snap(nw), h: snap(Math.max(20, s.oh + dy)) };
         });
-        setBlocks(nextBlocks);
+        // Use silent setter during drag to avoid flooding the undo stack
+        setBlocksSilent(nextBlocks);
       };
 
       const onUp = () => {
+        // Push one undo entry for the entire drag operation
+        if (sessionRef.current?.active) {
+          setBlocks(blocksRef.current);
+        }
         sessionRef.current = null;
         setDraggingId(null);
         document.body.style.userSelect = prevUserSelectRef.current;
@@ -208,7 +214,7 @@ function useBlockDrag(
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp);
     },
-    [setBlocks, scale],
+    [setBlocks, setBlocksSilent, scale],
   );
 
   return { onPointerDown, didDragRef, draggingId };
@@ -306,12 +312,36 @@ export function PosterEditor() {
   // title lines don't collide with the authors row / body blocks.
   const [titleOverflowPx, setTitleOverflowPx] = useState(0);
 
+  // Undo/redo keyboard shortcuts
+  const undo = usePosterStore((s) => s.undo);
+  const redo = usePosterStore((s) => s.redo);
+
   // ⌘/ or Ctrl+/ toggles the sidebar (Notion shortcut).
+  // ⌘Z / Ctrl+Z = undo, ⌘⇧Z / Ctrl+Y = redo.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === '/') {
         e.preventDefault();
         setSidebarOpen((v) => !v);
+      }
+      // Undo: Ctrl+Z / Cmd+Z (not in a contentEditable or input)
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        const isEditable = (e.target as HTMLElement)?.isContentEditable;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || isEditable) return;
+        e.preventDefault();
+        undo();
+      }
+      // Redo: Ctrl+Y or Cmd+Shift+Z
+      if (
+        ((e.metaKey || e.ctrlKey) && e.key === 'y') ||
+        ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z')
+      ) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        const isEditable = (e.target as HTMLElement)?.isContentEditable;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || isEditable) return;
+        e.preventDefault();
+        redo();
       }
     };
     window.addEventListener('keydown', handler);
@@ -483,9 +513,11 @@ export function PosterEditor() {
   const { zoom, setZoom } = useZoom(canvasRef, sizeKey);
 
   // Helper: replace blocks immutably
-  const setBlocks = (next: Block[]) => setPoster(posterId, { ...doc, blocks: next });
+  const storeSetBlocks = usePosterStore((s) => s.setBlocks);
+  const storeSetBlocksSilent = usePosterStore((s) => s.setBlocksSilent);
+  const setBlocks = (next: Block[]) => storeSetBlocks(next);
 
-  const { onPointerDown, didDragRef, draggingId } = useBlockDrag(doc.blocks, setBlocks, zoom);
+  const { onPointerDown, didDragRef, draggingId } = useBlockDrag(doc.blocks, setBlocks, storeSetBlocksSilent, zoom);
   const draggingBlock = draggingId ? doc.blocks.find((x) => x.id === draggingId) ?? null : null;
 
   // Heading auto-numbering: index by reading order (y then x).

@@ -120,6 +120,11 @@ export default function Home() {
       </header>
 
       <section className="mx-auto max-w-6xl px-8 py-8">
+        {/* Mobile notice */}
+        <div className="mb-6 rounded-lg border border-[#2a2a3a] bg-[#111118] px-4 py-3 text-[13px] text-[#6b7280] sm:hidden">
+          Postr is designed for desktop browsers. For the best editing experience, please use a laptop or desktop computer.
+        </div>
+
         <h2 className="mb-6 text-sm font-semibold uppercase tracking-widest text-[#6b7280]">
           My posters
         </h2>
