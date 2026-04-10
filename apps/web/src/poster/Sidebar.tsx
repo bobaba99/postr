@@ -1398,192 +1398,172 @@ function TableEditor(props: {
 }) {
   const { block, onUpdateBlock } = props;
   const data: TableData = block.tableData ?? DEFAULT_TABLE_DATA;
-
   const commit = (next: TableData) => onUpdateBlock(block.id, { tableData: next });
 
-  const iconBtn: CSSProperties = {
+  const tblBtn: CSSProperties = {
     all: 'unset',
     cursor: 'pointer',
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 6,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: 13,
+    fontSize: 16,
     fontWeight: 700,
     background: '#1a1a26',
     border: '1px solid #2a2a3a',
     color: '#c8cad0',
-    flexShrink: 0,
   };
-  const dangerIconBtn: CSSProperties = {
-    ...iconBtn,
+
+  const tblBtnDanger: CSSProperties = {
+    ...tblBtn,
     color: '#f87171',
     borderColor: '#3a1f20',
+    fontSize: 14,
   };
-  const disabledBtn: CSSProperties = {
-    opacity: 0.35,
+
+  const tblBtnDisabled: CSSProperties = {
+    ...tblBtnDanger,
+    opacity: 0.3,
     cursor: 'not-allowed',
   };
 
-  const indexLabel: CSSProperties = {
-    fontSize: 13,
-    fontWeight: 600,
-    color: '#9ca3af',
-    minWidth: 48,
-    flexShrink: 0,
-  };
-
-  const rowControlRow = (rowIndex: number) => (
-    <div
-      key={`row-${rowIndex}`}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}
-    >
-      <span style={indexLabel}>Row {rowIndex + 1}</span>
-      <button
-        title="Insert row above"
-        onClick={() => commit(insertRow(data, rowIndex, 'above'))}
-        style={iconBtn}
-      >
-        ↑+
-      </button>
-      <button
-        title="Insert row below"
-        onClick={() => commit(insertRow(data, rowIndex, 'below'))}
-        style={iconBtn}
-      >
-        ↓+
-      </button>
-      <button
-        title="Delete this row"
-        onClick={() => commit(deleteRowAt(data, rowIndex))}
-        disabled={data.rows <= 1}
-        style={data.rows <= 1 ? { ...dangerIconBtn, ...disabledBtn } : dangerIconBtn}
-      >
-        ×
-      </button>
-    </div>
-  );
-
-  const colControlRow = (colIndex: number) => (
-    <div
-      key={`col-${colIndex}`}
-      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}
-    >
-      <span style={indexLabel}>Col {colIndex + 1}</span>
-      <button
-        title="Insert column to the left"
-        onClick={() => commit(insertCol(data, colIndex, 'left'))}
-        style={iconBtn}
-      >
-        ←+
-      </button>
-      <button
-        title="Insert column to the right"
-        onClick={() => commit(insertCol(data, colIndex, 'right'))}
-        style={iconBtn}
-      >
-        →+
-      </button>
-      <button
-        title="Delete this column"
-        onClick={() => commit(deleteColAt(data, colIndex))}
-        disabled={data.cols <= 1}
-        style={data.cols <= 1 ? { ...dangerIconBtn, ...disabledBtn } : dangerIconBtn}
-      >
-        ×
-      </button>
-    </div>
-  );
-
-  const presetButton = (k: string, name: string) => {
-    const active = data.borderPreset === k;
-    return (
-      <button
-        key={k}
-        onClick={() => commit(setBorderPreset(data, k))}
-        style={{
-          all: 'unset',
-          cursor: 'pointer',
-          padding: '12px 16px',
-          borderRadius: 6,
-          fontSize: 14,
-          fontWeight: 600,
-          background: active ? '#7c6aed22' : '#1a1a26',
-          border: `1px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
-          color: active ? '#c8b6ff' : '#c8cad0',
-        }}
-      >
-        {name}
-      </button>
-    );
-  };
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
         Editing: table · {data.rows} × {data.cols}
       </div>
 
-      <div>
+      {/* Mini cell preview — shows the table structure with light borders */}
+      <div style={{ background: '#1a1a26', borderRadius: 6, padding: 8, border: '1px solid #2a2a3a' }}>
         <div
           style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: '#9ca3af',
-            marginBottom: 8,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${Math.min(data.cols, 8)}, 1fr)`,
+            gridTemplateRows: `repeat(${Math.min(data.rows, 8)}, 1fr)`,
+            gap: 1,
+            background: '#2a2a3a',
+            border: '1px solid #2a2a3a',
+            borderRadius: 3,
+            overflow: 'hidden',
+            maxHeight: 120,
           }}
         >
-          Rows
+          {Array.from({ length: Math.min(data.rows, 8) * Math.min(data.cols, 8) }).map((_, i) => {
+            const r = Math.floor(i / Math.min(data.cols, 8));
+            const c = i % Math.min(data.cols, 8);
+            const cellIdx = r * data.cols + c;
+            const hasContent = !!(data.cells[cellIdx]?.trim());
+            return (
+              <div
+                key={i}
+                style={{
+                  background: r === 0 ? '#1e1e2e' : '#111118',
+                  padding: 2,
+                  fontSize: 7,
+                  color: hasContent ? '#6b7280' : 'transparent',
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                  minHeight: 12,
+                }}
+              >
+                {hasContent ? '···' : '\u00A0'}
+              </div>
+            );
+          })}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {Array.from({ length: data.rows }).map((_, i) => rowControlRow(i))}
+        {(data.rows > 8 || data.cols > 8) && (
+          <div style={{ fontSize: 9, color: '#6b7280', marginTop: 4, textAlign: 'center' }}>
+            Showing first 8×8 of {data.rows}×{data.cols}
+          </div>
+        )}
+      </div>
+
+      {/* Simplified row/column controls: +/- buttons with count */}
+      <div>
+        <div style={labelStyle}>Rows</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            title="Remove last row"
+            onClick={() => commit(deleteRowAt(data, data.rows - 1))}
+            disabled={data.rows <= 1}
+            style={data.rows <= 1 ? tblBtnDisabled : tblBtnDanger}
+          >
+            −
+          </button>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e2e8', minWidth: 36, textAlign: 'center' }}>
+            {data.rows}
+          </div>
+          <button
+            title="Add row at bottom"
+            onClick={() => commit(insertRow(data, data.rows - 1, 'below'))}
+            style={tblBtn}
+          >
+            +
+          </button>
         </div>
       </div>
 
       <div>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: '#9ca3af',
-            marginBottom: 8,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
-          }}
-        >
-          Columns
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {Array.from({ length: data.cols }).map((_, i) => colControlRow(i))}
+        <div style={labelStyle}>Columns</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            title="Remove last column"
+            onClick={() => commit(deleteColAt(data, data.cols - 1))}
+            disabled={data.cols <= 1}
+            style={data.cols <= 1 ? tblBtnDisabled : tblBtnDanger}
+          >
+            −
+          </button>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e2e8', minWidth: 36, textAlign: 'center' }}>
+            {data.cols}
+          </div>
+          <button
+            title="Add column at right"
+            onClick={() => commit(insertCol(data, data.cols - 1, 'right'))}
+            style={tblBtn}
+          >
+            +
+          </button>
         </div>
       </div>
 
+      {/* Border style presets */}
       <div>
-        <div
-          style={{
-            fontSize: 11,
-            fontWeight: 700,
-            color: '#9ca3af',
-            marginBottom: 8,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
-          }}
-        >
-          Border style
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {Object.entries(TABLE_BORDER_PRESETS).map(([k, v]) => presetButton(k, v.name))}
+        <div style={labelStyle}>Border Style</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {Object.entries(TABLE_BORDER_PRESETS).map(([k, v]) => {
+            const active = data.borderPreset === k;
+            return (
+              <button
+                key={k}
+                onClick={() => commit(setBorderPreset(data, k))}
+                style={{
+                  all: 'unset',
+                  cursor: 'pointer',
+                  padding: '8px 14px',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  background: active ? '#7c6aed22' : '#1a1a26',
+                  border: `1px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
+                  color: active ? '#c8b6ff' : '#c8cad0',
+                }}
+              >
+                {v.name}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      <p style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>
-        Tip: paste a table from Word or Excel straight into a cell — rows and
-        columns are re-created automatically.
-      </p>
+      <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.5 }}>
+        <strong style={{ color: '#9ca3af' }}>Tips:</strong> Click cells on the canvas to type directly.
+        Hover a row or column edge for insert/delete controls.
+        Paste from Excel or Google Sheets into a cell to import data.
+        Drag column borders to resize.
+      </div>
     </div>
   );
 }
