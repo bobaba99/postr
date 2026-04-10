@@ -85,9 +85,46 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
 
   const detectedLang = useMemo(() => {
     if (lang !== 'auto') return lang;
-    if (/ggplot|geom_|theme_|ggsave|aes\s*\(/.test(code)) return 'r';
-    if (/plt\.|matplotlib|seaborn|sns\.|figsize|subplots/.test(code)) return 'python';
-    return null;
+    // Score-based detection — R and Python patterns both checked,
+    // highest score wins. Prevents false positives when code has
+    // ambiguous tokens (e.g. "plot" exists in both languages).
+    let rScore = 0;
+    let pyScore = 0;
+
+    // Strong R signals
+    if (/ggplot\s*\(/.test(code)) rScore += 5;
+    if (/geom_\w+/.test(code)) rScore += 5;
+    if (/theme_\w+/.test(code)) rScore += 4;
+    if (/ggsave\s*\(/.test(code)) rScore += 5;
+    if (/aes\s*\(/.test(code)) rScore += 4;
+    if (/<-/.test(code)) rScore += 3;
+    if (/library\s*\(/.test(code)) rScore += 3;
+    if (/\b(cowplot|patchwork|ggpubr|gridExtra|lattice)\b/.test(code)) rScore += 4;
+    if (/%>%|%\+%|\|>/.test(code)) rScore += 3;
+    if (/\bc\s*\(/.test(code)) rScore += 1;
+    if (/element_text|element_blank|element_rect/.test(code)) rScore += 4;
+    if (/facet_wrap|facet_grid/.test(code)) rScore += 4;
+    if (/scale_\w+/.test(code)) rScore += 2;
+    if (/labs\s*\(/.test(code)) rScore += 2;
+
+    // Strong Python signals
+    if (/plt\./.test(code)) pyScore += 5;
+    if (/matplotlib/.test(code)) pyScore += 5;
+    if (/import\s+\w+/.test(code)) pyScore += 3;
+    if (/seaborn|sns\./.test(code)) pyScore += 5;
+    if (/figsize\s*=/.test(code)) pyScore += 4;
+    if (/subplots\s*\(/.test(code)) pyScore += 4;
+    if (/ax\.\w+/.test(code)) pyScore += 3;
+    if (/rcParams/.test(code)) pyScore += 4;
+    if (/set_xlabel|set_ylabel|set_title/.test(code)) pyScore += 3;
+    if (/savefig\s*\(/.test(code)) pyScore += 4;
+    if (/def\s+\w+|class\s+\w+/.test(code)) pyScore += 2;
+    if (/fig,\s*ax/.test(code)) pyScore += 3;
+
+    if (rScore === 0 && pyScore === 0) return null;
+    if (rScore > pyScore) return 'r';
+    if (pyScore > rScore) return 'python';
+    return null; // tie — ask user to pick
   }, [code, lang]);
 
   // Use image block dimensions if available, otherwise use a standard 10×7 default
