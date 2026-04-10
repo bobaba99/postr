@@ -157,6 +157,88 @@ const GUIDELINES: Guideline[] = [
   },
 ];
 
+// ── Writing Tips ─────────────────────────────────────────────────────
+
+interface TipSection {
+  title: string;
+  tips: string[];
+  source?: string;
+  sourceUrl?: string;
+}
+
+const WRITING_TIPS: TipSection[] = [
+  {
+    title: 'Section Structure',
+    tips: [
+      'Introduction (~200 words): Why it matters → brief background → the gap → your hypothesis.',
+      'Methods (~200 words): Equipment + procedure. Use flowcharts instead of paragraphs. Mention stats.',
+      'Results (~200 words + legends): State if procedures worked, then data. Figures > tables.',
+      'Conclusions (~200 words): Restate key result → why it matters → future directions.',
+      'Total target: under 800–1000 words. More than 1000 is "problematic".',
+    ],
+    source: 'Colin Purrington',
+    sourceUrl: 'https://colinpurrington.com/tips/poster-design/',
+  },
+  {
+    title: 'Saving Space',
+    tips: [
+      'Aim for 20% text, 40% figures, 40% whitespace.',
+      'Use bullet points, not paragraphs. Lists of sentences, not blocks of prose.',
+      'Only cite key references integral to your study — refs are wordy. Use smaller font for refs.',
+      'Say the rest verbally — the poster is a conversation starter, not a paper.',
+      'Cut every sentence that doesn\'t answer "so what?"',
+    ],
+    source: 'UCLA / Ohio State poster guides',
+    sourceUrl: 'https://ohiostate.pressbooks.pub/scientificposterguide/chapter/figures-tables/',
+  },
+  {
+    title: 'Tables vs. Text',
+    tips: [
+      'Use a table when you have 3+ comparable items with 2+ dimensions (e.g. Study × d × CI).',
+      'Use inline text when comparing just 2 values — "Group A scored higher than B (d = 0.42, p < .01)."',
+      'Bold or highlight the row/column the reader should focus on.',
+      'Figures > tables > text for communicating results. Use tables only when exact numbers matter.',
+      'Min 20pt font in tables. If you can\'t fit it at 20pt, the table has too many columns.',
+    ],
+    source: 'Ohio State Poster Guide',
+    sourceUrl: 'https://ohiostate.pressbooks.pub/scientificposterguide/chapter/figures-tables/',
+  },
+  {
+    title: 'Color Strategy',
+    tips: [
+      'Pick 2–3 colors max. Use them consistently: one for Group A, one for Group B, across ALL figures and tables.',
+      'Same color = same concept throughout the poster. If treatment is blue in Methods, it\'s blue in Results.',
+      'Don\'t rely on color alone to distinguish groups — add patterns, labels, or shapes as fallback.',
+      'Test contrast with WebAIM\'s free checker. Dark text on light bg, or light on dark — never mid-tones on mid-tones.',
+      'Print a small test page — screen colors ≠ printed colors.',
+    ],
+    source: 'UChicago Library',
+    sourceUrl: 'https://guides.lib.uchicago.edu/c.php?g=1438839&p=10695527',
+  },
+  {
+    title: 'Text Formatting to Highlight',
+    tips: [
+      'Bold your key statistics (p-values, effect sizes, CIs) so skimmers can find them instantly.',
+      'Use italic for emphasis within sentences, not for entire paragraphs.',
+      'Color a key result (e.g. significant p-value in your accent color) — but sparingly.',
+      'Left-align body text. Never center body paragraphs — it\'s harder to read.',
+      'Add breathing room: line spacing 1.3–1.5× for body text.',
+    ],
+  },
+  {
+    title: 'Common Beginner Mistakes',
+    tips: [
+      'Too much text — the #1 mistake. If your poster reads like a paper, cut 60%.',
+      'Unreadable figure legends — they must stand alone without the presenter explaining.',
+      'No clear "take-home message" — add one sentence in the title or conclusion that a passerby can grasp.',
+      'Using the poster as a teleprompter — don\'t read from it. Talk naturally, point at figures.',
+      'Forgetting to include your email / QR code — the poster lives on after you leave.',
+    ],
+    source: 'Better Posters / Purrington',
+    sourceUrl: 'https://betterposters.blogspot.com/',
+  },
+];
+
 const GENERAL_RESOURCES: { name: string; url: string; description: string }[] = [
   {
     name: 'Colin Purrington — Designing Conference Posters',
@@ -234,6 +316,21 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                 onToggle={() => setExpanded(expanded === g.conference ? null : g.conference)}
               />
             ))}
+
+            {/* Writing Tips */}
+            <div style={{ padding: '12px 20px 4px' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af', marginBottom: 8 }}>
+                Writing Guide
+              </div>
+              {WRITING_TIPS.map((section) => (
+                <WritingTipCard
+                  key={section.title}
+                  section={section}
+                  expanded={expanded === `tip-${section.title}`}
+                  onToggle={() => setExpanded(expanded === `tip-${section.title}` ? null : `tip-${section.title}`)}
+                />
+              ))}
+            </div>
 
             <div style={{ padding: '12px 20px 4px' }}>
               <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af', marginBottom: 8 }}>
@@ -324,6 +421,51 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
           >
             {g.urlLabel} ↗
           </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function WritingTipCard({ section: s, expanded, onToggle }: {
+  section: TipSection;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div style={{ borderBottom: '1px solid #1a1a26', marginBottom: 2 }}>
+      <button
+        onClick={onToggle}
+        style={cardHeaderStyle}
+        onMouseEnter={(e) => { e.currentTarget.style.background = '#1a1a26'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#e2e2e8' }}>{s.title}</div>
+        </div>
+        <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
+          ▸
+        </span>
+      </button>
+      {expanded && (
+        <div style={{ padding: '0 16px 12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {s.tips.map((tip, i) => (
+              <div key={i} style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5, paddingLeft: 10, borderLeft: '2px solid #2a2a3a' }}>
+                {tip}
+              </div>
+            ))}
+          </div>
+          {s.source && s.sourceUrl && (
+            <a
+              href={s.sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ fontSize: 11, color: '#89b4fa', textDecoration: 'none', display: 'block', marginTop: 8 }}
+            >
+              Source: {s.source} ↗
+            </a>
+          )}
         </div>
       )}
     </div>
