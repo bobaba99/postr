@@ -297,6 +297,7 @@ export function PosterEditor() {
   }, [savedPresets]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [guidelinesOpen, setGuidelinesOpen] = useState(true);
+  const [previewMode, setPreviewMode] = useState(false);
 
   // B1 fix: measure how much the title block's rendered content
   // OVERRAN its declared height. When a long title wraps to multiple
@@ -375,6 +376,109 @@ export function PosterEditor() {
   const cH = ph * PX;
   const ffc = FONTS[doc.fontFamily]?.css ?? doc.fontFamily;
   const palName = paletteNameFor(doc.palette);
+
+  // Preview mode — full-screen poster, no UI chrome
+  if (previewMode) {
+    // Compute scale to fit the viewport with padding
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1440;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
+    const previewScale = Math.min((vw - 80) / cW, (vh - 80) / cH);
+
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 50000,
+          background: '#0a0a12',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: 16,
+        }}
+      >
+        <div
+          style={{
+            width: cW * previewScale,
+            height: cH * previewScale,
+            boxShadow: '0 8px 60px rgba(0,0,0,0.6)',
+            borderRadius: 2,
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              width: cW,
+              height: cH,
+              transform: `scale(${previewScale})`,
+              transformOrigin: 'top left',
+              background: doc.palette.bg,
+              position: 'relative',
+            }}
+          >
+            {doc.blocks.map((b) => (
+              <BlockFrame
+                key={b.id}
+                block={b}
+                palette={doc.palette}
+                fontFamily={ffc}
+                styles={doc.styles}
+                headingStyle={doc.headingStyle}
+                authors={doc.authors}
+                institutions={doc.institutions}
+                references={sortedRefs}
+                citationStyle={citationStyle}
+                headingNumber={headingNumbers[b.id] ?? 0}
+                selected={false}
+                onSelect={() => {}}
+                onPointerDown={() => {}}
+                didDragRef={didDragRef}
+                onUpdate={() => {}}
+                onDelete={() => {}}
+                titleOverflowPx={titleOverflowPx}
+              />
+            ))}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <button
+            onClick={() => setPreviewMode(false)}
+            style={{
+              cursor: 'pointer',
+              padding: '10px 24px',
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#fff',
+              background: '#7c6aed',
+              border: 'none',
+              borderRadius: 8,
+            }}
+          >
+            Back to Editor
+          </button>
+          <button
+            onClick={() => { setPreviewMode(false); window.print(); }}
+            style={{
+              cursor: 'pointer',
+              padding: '10px 24px',
+              fontSize: 14,
+              fontWeight: 600,
+              color: '#c8cad0',
+              background: '#1a1a26',
+              border: '1px solid #2a2a3a',
+              borderRadius: 8,
+            }}
+          >
+            Print / Save PDF
+          </button>
+          <span style={{ fontSize: 12, color: '#6b7280' }}>
+            {POSTER_SIZES[sizeKey]!.label} · {doc.fontFamily} · {palName || 'Custom'}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   const { zoom, setZoom } = useZoom(canvasRef, sizeKey);
 
@@ -597,6 +701,7 @@ export function PosterEditor() {
         onApplyTemplate={applyTemplate}
         onAutoLayout={onAutoLayout}
         onPrint={() => window.print()}
+        onPreview={() => setPreviewMode(true)}
         savedPresets={savedPresets}
         onSavePreset={savePreset}
         onLoadPreset={loadPreset}

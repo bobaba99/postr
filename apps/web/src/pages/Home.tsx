@@ -138,9 +138,37 @@ export default function Home() {
           <p className="text-sm text-[#f87171]">Couldn’t load posters: {status.message}</p>
         )}
 
-        {status.kind === 'ready' && status.rows.length === 0 && (
-          <div className="rounded-lg border border-dashed border-[#2a2a3a] p-8 text-center text-sm text-[#6b7280]">
-            No posters yet. Click <span className="text-[#c8b6ff]">+ New poster</span> to start.
+        {status.kind === 'ready' && status.rows.length <= 1 && (
+          <div className="mb-8 rounded-xl border border-[#2a2a3a] bg-[#111118] p-8">
+            <div className="flex items-center gap-4 mb-4">
+              <svg width="48" height="48" viewBox="0 0 64 64" fill="none">
+                <rect width="64" height="64" rx="14" fill="#7c6aed" />
+                <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
+                <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
+                <circle cx="32" cy="32" r="5" fill="white" />
+              </svg>
+              <div>
+                <h3 className="text-lg font-bold text-[#e2e2e8]">Welcome to Postr</h3>
+                <p className="text-sm text-[#6b7280]">Create conference-quality research posters in minutes, not hours.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
+              <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
+                <div className="text-sm font-semibold text-[#c8cad0] mb-1">Pick a template</div>
+                <div className="text-xs text-[#6b7280] leading-relaxed">5 layouts — 3-column classic, billboard, sidebar + focus, and more. Start with structure, not a blank page.</div>
+              </div>
+              <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
+                <div className="text-sm font-semibold text-[#c8cad0] mb-1">Write with guidance</div>
+                <div className="text-xs text-[#6b7280] leading-relaxed">Built-in writing guide, conference size specs, and a checklist to keep you on track from intro to references.</div>
+              </div>
+              <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
+                <div className="text-sm font-semibold text-[#c8cad0] mb-1">Check before you print</div>
+                <div className="text-xs text-[#6b7280] leading-relaxed">Paste your R or Python code to verify figure text is readable at poster size. Out-of-bounds warnings catch layout issues.</div>
+              </div>
+            </div>
+            <div className="mt-6">
+              <NewPosterButton />
+            </div>
           </div>
         )}
 

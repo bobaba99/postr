@@ -99,6 +99,7 @@ interface SidebarProps {
   onApplyTemplate: (key: LayoutKey) => void;
   onAutoLayout: () => void;
   onPrint: () => void;
+  onPreview: () => void;
 
   // presets
   savedPresets: StylePreset[];
@@ -167,11 +168,17 @@ export function Sidebar(props: SidebarProps) {
   const [tab, setTab] = useState<SidebarTab>('layout');
   const [presetName, setPresetName] = useState('');
 
-  // Auto-switch to the EDIT tab whenever a block becomes selected on
-  // the canvas. If the user deselects (click empty canvas), we DON'T
-  // auto-switch back — they can stay on whichever tab they were on.
+  // Auto-switch tabs when a block is selected:
+  //   - Image blocks → figure tab (for readability check + OCR)
+  //   - All other blocks → edit tab
+  // If the user deselects (click empty canvas), stay on current tab.
   useEffect(() => {
-    if (props.selectedBlock) setTab('edit');
+    if (!props.selectedBlock) return;
+    if (props.selectedBlock.type === 'image') {
+      setTab('figure');
+    } else {
+      setTab('edit');
+    }
   }, [props.selectedBlock?.id]);
 
   // Two states only: deselected (dark gray) and selected (white +
@@ -345,6 +352,7 @@ export function Sidebar(props: SidebarProps) {
             onApplyTemplate={props.onApplyTemplate}
             onAutoLayout={props.onAutoLayout}
             onPrint={props.onPrint}
+            onPreview={props.onPreview}
           />
         )}
 
@@ -425,6 +433,7 @@ function LayoutTab(props: {
   onApplyTemplate: (k: LayoutKey) => void;
   onAutoLayout: () => void;
   onPrint: () => void;
+  onPreview: () => void;
 }) {
   const [localTitle, setLocalTitle] = useState(props.posterTitle);
   const [titleSaved, setTitleSaved] = useState(!!props.posterTitle.trim());
@@ -560,8 +569,11 @@ function LayoutTab(props: {
         })}
       </div>
 
-      <div style={labelStyle}>Print</div>
-      <button onClick={props.onPrint} style={buttonStyle(true)}>
+      <div style={labelStyle}>Preview & Print</div>
+      <button onClick={props.onPreview} style={buttonStyle(false)}>
+        Preview Poster
+      </button>
+      <button onClick={props.onPrint} style={{ ...buttonStyle(true), marginTop: 8 }}>
         ⎙ Save PDF
       </button>
     </>
