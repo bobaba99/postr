@@ -271,7 +271,14 @@ const GENERAL_RESOURCES: { name: string; url: string; description: string }[] = 
 
 export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: () => void }) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [guidelinesExpanded, setGuidelinesExpanded] = useState(false);
+  // Track which top-level sections are open (conferences, writing, resources)
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(['writing']));
+  const toggleSection = (key: string) =>
+    setOpenSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
 
   if (!open) return null;
 
@@ -309,27 +316,13 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
       </div>
 
           <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
-            {/* Conference Guidelines — collapsible section */}
-            <div style={{ borderBottom: '1px solid #1a1a26' }}>
-              <button
-                onClick={() => setGuidelinesExpanded((prev) => !prev)}
-                style={{
-                  ...cardHeaderStyle,
-                  padding: '10px 20px',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = '#1a1a26'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af' }}>
-                    Conference Guidelines ({GUIDELINES.length})
-                  </div>
-                </div>
-                <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: guidelinesExpanded ? 'rotate(90deg)' : 'none' }}>
-                  ▸
-                </span>
-              </button>
-              {guidelinesExpanded && GUIDELINES.map((g) => (
+            {/* Conference Guidelines */}
+            <SectionDropdown
+              title={`Conference Guidelines (${GUIDELINES.length})`}
+              open={openSections.has('conferences')}
+              onToggle={() => toggleSection('conferences')}
+            >
+              {GUIDELINES.map((g) => (
                 <ConferenceCard
                   key={g.conference}
                   guideline={g}
@@ -337,40 +330,48 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                   onToggle={() => setExpanded(expanded === g.conference ? null : g.conference)}
                 />
               ))}
-            </div>
+            </SectionDropdown>
 
-            {/* Writing Tips */}
-            <div style={{ padding: '12px 20px 4px' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af', marginBottom: 8, marginTop: 20 }}>
-                Writing Guide
+            {/* Writing Guide */}
+            <SectionDropdown
+              title={`Writing Guide (${WRITING_TIPS.length})`}
+              open={openSections.has('writing')}
+              onToggle={() => toggleSection('writing')}
+            >
+              <div style={{ padding: '4px 16px 8px' }}>
+                {WRITING_TIPS.map((section, idx) => (
+                  <WritingTipCard
+                    key={section.title}
+                    section={section}
+                    index={idx + 1}
+                    expanded={expanded === `tip-${section.title}`}
+                    onToggle={() => setExpanded(expanded === `tip-${section.title}` ? null : `tip-${section.title}`)}
+                  />
+                ))}
               </div>
-              {WRITING_TIPS.map((section) => (
-                <WritingTipCard
-                  key={section.title}
-                  section={section}
-                  expanded={expanded === `tip-${section.title}`}
-                  onToggle={() => setExpanded(expanded === `tip-${section.title}` ? null : `tip-${section.title}`)}
-                />
-              ))}
-            </div>
+            </SectionDropdown>
 
-            <div style={{ padding: '12px 20px 4px' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af', marginBottom: 8 }}>
-                General Resources
+            {/* General Resources */}
+            <SectionDropdown
+              title={`General Resources (${GENERAL_RESOURCES.length})`}
+              open={openSections.has('resources')}
+              onToggle={() => toggleSection('resources')}
+            >
+              <div style={{ padding: '4px 16px 8px' }}>
+                {GENERAL_RESOURCES.map((r) => (
+                  <a
+                    key={r.name}
+                    href={r.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={resourceLinkStyle}
+                  >
+                    <div style={{ fontSize: 13, color: '#89b4fa', fontWeight: 500 }}>{r.name}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4, marginTop: 2 }}>{r.description}</div>
+                  </a>
+                ))}
               </div>
-              {GENERAL_RESOURCES.map((r) => (
-                <a
-                  key={r.name}
-                  href={r.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={resourceLinkStyle}
-                >
-                  <div style={{ fontSize: 13, color: '#89b4fa', fontWeight: 500 }}>{r.name}</div>
-                  <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4, marginTop: 2 }}>{r.description}</div>
-                </a>
-              ))}
-            </div>
+            </SectionDropdown>
           </div>
     </div>
   );
@@ -449,8 +450,38 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
   );
 }
 
-function WritingTipCard({ section: s, expanded, onToggle }: {
+/** Reusable collapsible section header for the guidelines panel. */
+function SectionDropdown({ title, open, onToggle, children }: {
+  title: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div style={{ borderBottom: '1px solid #1a1a26' }}>
+      <button
+        onClick={onToggle}
+        style={{ ...cardHeaderStyle, padding: '10px 20px' }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = '#1a1a26'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+      >
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: '#9ca3af' }}>
+            {title}
+          </div>
+        </div>
+        <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none' }}>
+          ▸
+        </span>
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
+function WritingTipCard({ section: s, index, expanded, onToggle }: {
   section: TipSection;
+  index: number;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -462,28 +493,45 @@ function WritingTipCard({ section: s, expanded, onToggle }: {
         onMouseEnter={(e) => { e.currentTarget.style.background = '#1a1a26'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
       >
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>{s.title}</div>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: '#7c6aed', minWidth: 18 }}>{index}.</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>{s.title}</span>
         </div>
         <span style={{ fontSize: 12, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
           ▸
         </span>
       </button>
       {expanded && (
-        <div style={{ padding: '0 16px 12px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {s.tips.map((tip, i) => (
-              <div key={i} style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.6, paddingLeft: 12, paddingTop: 2, paddingBottom: 2, borderLeft: '2px solid #2a2a3a' }}>
-                {tip}
-              </div>
-            ))}
-          </div>
+        <div style={{ padding: '4px 16px 12px' }}>
+          <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {s.tips.map((tip, i) => {
+              // Bold text before the first — or : as the key phrase
+              const sepIdx = tip.indexOf(' — ');
+              const colonIdx = tip.indexOf(': ');
+              const splitAt = sepIdx > 0 ? sepIdx : colonIdx > 0 && colonIdx < 40 ? colonIdx : -1;
+              const keyPhrase = splitAt > 0 ? tip.slice(0, splitAt) : null;
+              const rest = splitAt > 0 ? tip.slice(splitAt) : tip;
+
+              return (
+                <li key={i} style={{ fontSize: 13, color: '#c8cad0', lineHeight: 1.6, paddingTop: 2, paddingBottom: 2 }}>
+                  {keyPhrase ? (
+                    <>
+                      <strong style={{ color: '#e2e2e8' }}>{keyPhrase}</strong>
+                      <span style={{ color: '#9ca3af' }}>{rest}</span>
+                    </>
+                  ) : (
+                    <span style={{ color: '#9ca3af' }}>{tip}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
           {s.source && s.sourceUrl && (
             <a
               href={s.sourceUrl}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ fontSize: 12, color: '#89b4fa', textDecoration: 'none', display: 'block', marginTop: 8 }}
+              style={{ fontSize: 12, color: '#89b4fa', textDecoration: 'none', display: 'block', marginTop: 10 }}
             >
               Source: {s.source} ↗
             </a>
