@@ -233,13 +233,24 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
       }
       return;
     }
-    // Arrow keys — only navigate when cursor is at the edge of content
+    // Arrow keys — only navigate when cursor is at the edge of content.
+    // Use a range-based check that works with nested rich-text nodes
+    // (e.g. <b>text</b>) by comparing the caret position against the
+    // cell's full text length rather than the current text node.
     const el = e.currentTarget;
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    const atStart = range.startOffset === 0 && range.collapsed;
-    const atEnd = range.collapsed && range.endOffset === (range.endContainer.textContent?.length ?? 0);
+    if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
+
+    // Compute caret offset relative to the entire cell, not just the
+    // current text node. This handles <b>, <i>, <mark> wrappers.
+    const caretRange = sel.getRangeAt(0);
+    const preRange = document.createRange();
+    preRange.selectNodeContents(el);
+    preRange.setEnd(caretRange.startContainer, caretRange.startOffset);
+    const caretOffset = preRange.toString().length;
+    const totalLen = (el.textContent ?? '').length;
+    const atStart = caretOffset === 0;
+    const atEnd = caretOffset >= totalLen;
 
     if (e.key === 'ArrowUp' && atStart && r > 0) { e.preventDefault(); focusCell(r - 1, c); }
     if (e.key === 'ArrowDown' && atEnd && r < data.rows - 1) { e.preventDefault(); focusCell(r + 1, c); }
