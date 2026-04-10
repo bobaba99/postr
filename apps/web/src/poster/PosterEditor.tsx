@@ -22,6 +22,7 @@ import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
 import { useGsapContext } from '@/motion';
 import { editorEntrance } from '@/motion/timelines/editorEntrance';
 import { BlockFrame } from './blocks';
+import { GuidelinesPanel } from './GuidelinesPanel';
 import { Sidebar, type StylePreset } from './Sidebar';
 import {
   DEFAULT_POSTER_SIZE_KEY,
@@ -827,6 +828,8 @@ export function PosterEditor() {
           error={autosave.error}
         />
       </div>
+
+      <GuidelinesPanel />
     </div>
   );
 }
