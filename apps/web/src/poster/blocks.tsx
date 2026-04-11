@@ -1343,7 +1343,15 @@ export function BlockFrame(props: BlockFrameProps) {
         // declared h. growsWithContent blocks use minHeight as the
         // floor so they never shrink below the user's resize.
         height: isHeading || growsWithContent ? 'auto' : b.h,
-        minHeight: growsWithContent ? b.h : undefined,
+        // Text-like blocks (title / text / heading / authors /
+        // references) snap to their natural content height instead
+        // of a `minHeight: b.h` floor. Prior behavior left blank
+        // padding below short text when the user dragged the block
+        // taller — users expected the frame to track the typed
+        // content exactly. A small 12 px floor keeps empty blocks
+        // grabbable; resizing to taller is handled by Auto-Arrange
+        // + re-measuring on content change.
+        minHeight: growsWithContent ? 12 : undefined,
         background: bg,
         border: isOutOfBounds
           ? '1.5px dashed #f87171'

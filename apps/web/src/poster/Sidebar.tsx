@@ -57,7 +57,22 @@ export type SidebarTab =
   | 'edit'
   | 'insert'
   | 'check'
+  | 'issues'
   | 'export';
+
+/**
+ * A single lint/validation issue surfaced in the Issues sidebar tab.
+ * Covers both hard errors (block outside canvas, image missing) and
+ * soft warnings (empty authors list, very long title, etc.). The
+ * `blockId` hook lets the tab click-jump to the offending block.
+ */
+export interface PosterIssue {
+  id: string;
+  severity: 'error' | 'warning' | 'info';
+  category: string;
+  message: string;
+  blockId?: string;
+}
 
 export interface StylePreset {
   name: string;
@@ -149,6 +164,11 @@ interface SidebarProps {
   // them as the "default" figure size instead of a hardcoded 10×7.
   checkFigureWidthIn: number;
   checkFigureHeightIn: number;
+
+  // Pre-computed validation issues for the Issues tab. Shared with
+  // the in-canvas warning banner so both surfaces stay in sync.
+  issues: PosterIssue[];
+  onJumpToBlock?: (blockId: string) => void;
 }
 
 // Shared inline styles for the dark sidebar UI chrome.
@@ -466,19 +486,45 @@ export function Sidebar(props: SidebarProps) {
               ['edit', 'edit block'],
               ['refs', 'references'],
               ['check', 'plot code check'],
+              ['issues', 'issues'],
               ['export', 'export'],
             ] as Array<[SidebarTab, string]>
-          ).map(([t, label]) => (
-            <button
-              key={t}
-              data-postr-tab
-              type="button"
-              onClick={() => setTab(t)}
-              style={tabStyle(tab === t)}
-            >
-              {label}
-            </button>
-          ))}
+          ).map(([t, label]) => {
+            const issueCount = props.issues.length;
+            const errorCount = props.issues.filter((i) => i.severity === 'error').length;
+            return (
+              <button
+                key={t}
+                data-postr-tab
+                type="button"
+                onClick={() => setTab(t)}
+                style={tabStyle(tab === t)}
+              >
+                {label}
+                {t === 'issues' && issueCount > 0 && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginLeft: 6,
+                      minWidth: 16,
+                      height: 16,
+                      padding: '0 5px',
+                      borderRadius: 999,
+                      background: errorCount > 0 ? '#f38ba8' : '#f9e2af',
+                      color: '#1e1e2e',
+                      fontSize: 10,
+                      fontWeight: 800,
+                      letterSpacing: 0,
+                    }}
+                  >
+                    {issueCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Panel content — keyed on `tab` so every switch re-triggers
@@ -575,6 +621,13 @@ export function Sidebar(props: SidebarProps) {
             }
             defaultFigureWidthIn={props.checkFigureWidthIn}
             defaultFigureHeightIn={props.checkFigureHeightIn}
+          />
+        )}
+
+        {tab === 'issues' && (
+          <IssuesTab
+            issues={props.issues}
+            onJumpToBlock={props.onJumpToBlock}
           />
         )}
 
@@ -2463,6 +2516,140 @@ function AddBlockPanel(props: { onAddBlock: (t: Block['type']) => void }) {
           <strong style={{ color: '#c8b6ff' }}>Google Sheets</strong>, add a table block, then paste into any cell — Postr will expand the grid and fill every cell for you. No need to retype.
         </div>
       </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// Issues tab — aggregated validation surface
+// =========================================================================
+
+function IssuesTab(props: {
+  issues: PosterIssue[];
+  onJumpToBlock?: (blockId: string) => void;
+}) {
+  const { issues, onJumpToBlock } = props;
+  const errors = issues.filter((i) => i.severity === 'error');
+  const warnings = issues.filter((i) => i.severity === 'warning');
+  const infos = issues.filter((i) => i.severity === 'info');
+
+  if (issues.length === 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={labelStyle}>Issues</div>
+        <div
+          style={{
+            background: '#1a3a2a',
+            border: '1px solid #2d6a4f',
+            borderRadius: 8,
+            padding: 16,
+            fontSize: 14,
+            color: '#a6e3a1',
+            lineHeight: 1.5,
+          }}
+        >
+          ✓ No issues detected. Your poster passes all automated checks
+          — ready to export.
+        </div>
+        <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.55 }}>
+          This tab scans for common pre-flight problems: blocks outside
+          the canvas, missing authors or institutions, empty image
+          blocks, very long titles, overlapping blocks, and references
+          missing key fields. Issues refresh automatically as you edit.
+        </div>
+      </div>
+    );
+  }
+
+  const renderSection = (
+    label: string,
+    items: PosterIssue[],
+    color: string,
+    bg: string,
+    icon: string,
+  ) => {
+    if (items.length === 0) return null;
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 800,
+            color,
+            textTransform: 'uppercase',
+            letterSpacing: 0.8,
+          }}
+        >
+          {icon} {label} ({items.length})
+        </div>
+        {items.map((issue) => (
+          <button
+            key={issue.id}
+            type="button"
+            onClick={
+              issue.blockId && onJumpToBlock
+                ? () => onJumpToBlock(issue.blockId!)
+                : undefined
+            }
+            style={{
+              all: 'unset',
+              cursor: issue.blockId ? 'pointer' : 'default',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
+              padding: '10px 12px',
+              background: bg,
+              border: `1px solid ${color}55`,
+              borderRadius: 8,
+              transition: 'background 150ms ease, border-color 150ms ease',
+            }}
+            onMouseEnter={(e) => {
+              if (!issue.blockId) return;
+              e.currentTarget.style.borderColor = color;
+            }}
+            onMouseLeave={(e) => {
+              if (!issue.blockId) return;
+              e.currentTarget.style.borderColor = `${color}55`;
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color,
+                textTransform: 'uppercase',
+                letterSpacing: 0.6,
+              }}
+            >
+              {issue.category}
+            </div>
+            <div style={{ fontSize: 13, color: '#e2e2e8', lineHeight: 1.45 }}>
+              {issue.message}
+            </div>
+            {issue.blockId && onJumpToBlock && (
+              <div style={{ fontSize: 11, color: '#6b7280' }}>
+                → click to jump to this block
+              </div>
+            )}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <div style={labelStyle}>
+        Issues ({issues.length})
+      </div>
+      <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5, margin: 0 }}>
+        Pre-flight checks scan for blocks outside the canvas, missing
+        required content, empty figures, and other common problems.
+        Click any issue to jump to the block it affects.
+      </p>
+      {renderSection('Errors', errors, '#f38ba8', '#2b1820', '⛔')}
+      {renderSection('Warnings', warnings, '#f9e2af', '#2b2418', '⚠')}
+      {renderSection('Suggestions', infos, '#89b4fa', '#182028', 'ℹ')}
     </div>
   );
 }

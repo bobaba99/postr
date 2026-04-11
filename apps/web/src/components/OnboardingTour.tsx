@@ -31,25 +31,19 @@ const STEPS: TourStep[] = [
     body: 'Click any block to select it, drag to move, and resize from the corner handle.',
     position: 'left',
   },
+  // NOTE on tabName: we match against the button's visible label text
+  // (the sidebar's display label), NOT the internal SidebarTab key.
+  // When a label is renamed in Sidebar.tsx (e.g. "refs" →
+  // "references", "edit" → "edit block", "check" → "plot code check"),
+  // the corresponding `tabName` here has to be updated to the new
+  // display label or the tour silently skips clicking the tab.
+  // Order below mirrors the sidebar's current top-to-bottom order
+  // so the tour walks the rail naturally.
   {
     selector: '[data-postr-sidebar]',
     tabName: 'layout',
     title: 'Layout tab',
     body: 'Set your poster name, choose a size, pick a template, and auto-arrange blocks.',
-    position: 'right',
-  },
-  {
-    selector: '[data-postr-sidebar]',
-    tabName: 'insert',
-    title: 'Insert blocks',
-    body: 'Add headings, text, images, tables, and references. Each block snaps to the grid.',
-    position: 'right',
-  },
-  {
-    selector: '[data-postr-sidebar]',
-    tabName: 'edit',
-    title: 'Edit selected block',
-    body: 'Click a block on the canvas first, then use this tab to fine-tune it — table rows, border presets, etc.',
     position: 'right',
   },
   {
@@ -68,16 +62,37 @@ const STEPS: TourStep[] = [
   },
   {
     selector: '[data-postr-sidebar]',
-    tabName: 'refs',
-    title: 'References',
-    body: 'Add citations manually or import a .bib file. Choose APA, Vancouver, IEEE, or Harvard style.',
+    tabName: 'insert',
+    title: 'Insert blocks',
+    body: 'Add headings, text, images, tables, and references. Each block appears at the center of the canvas with a purple pulse. Logos are limited to one per poster.',
     position: 'right',
   },
   {
     selector: '[data-postr-sidebar]',
-    tabName: 'edit',
-    title: 'Figure readability',
-    body: 'Select any image block and the Edit tab shows a readability analyzer — paste your R or Python plotting code to check whether figure text will be legible at print size.',
+    tabName: 'edit block',
+    title: 'Edit selected block',
+    body: 'Click a block on the canvas first, then use this tab to fine-tune it — table rows, border presets, per-element font sizing, etc.',
+    position: 'right',
+  },
+  {
+    selector: '[data-postr-sidebar]',
+    tabName: 'references',
+    title: 'References',
+    body: 'Import a .bib / .ris file, add citations manually, or paste a block of already-formatted references straight from your manuscript. Supports APA, Vancouver, IEEE, and Harvard styles.',
+    position: 'right',
+  },
+  {
+    selector: '[data-postr-sidebar]',
+    tabName: 'plot code check',
+    title: 'Plot code check',
+    body: 'Paste your R or Python plotting code to check whether figure text will be legible at print size. Drag the gray figure-preview rectangle on the canvas to match your target block, or select an image block to lock to its exact dimensions — the purple pill always shows the current size.',
+    position: 'right',
+  },
+  {
+    selector: '[data-postr-sidebar]',
+    tabName: 'issues',
+    title: 'Pre-flight issues',
+    body: 'Automated lint that scans for blocks outside the canvas, empty figures, missing authors, placeholder text still on the poster, and more. A red badge on the tab shows how many problems are pending — click any issue to jump straight to the offending block.',
     position: 'right',
   },
   {

@@ -7,6 +7,7 @@
  * store; Phase 4 layers autosave on top by subscribing to changes.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import type {
   Block,
@@ -27,7 +28,12 @@ import { BlockFrame } from './blocks';
 import { checkBounds, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
-import { Sidebar, type SidebarTab, type StylePreset } from './Sidebar';
+import {
+  Sidebar,
+  type PosterIssue,
+  type SidebarTab,
+  type StylePreset,
+} from './Sidebar';
 import {
   DEFAULT_POSTER_SIZE_KEY,
   FONTS,
@@ -660,35 +666,37 @@ export function PosterEditor() {
 
   const { zoom, setZoom } = useZoom(canvasRef, sizeKey);
 
-  // ── Touchpad pinch-to-zoom ─────────────────────────────────────────
+  // ── Touchpad pinch-to-zoom + pan ───────────────────────────────────
   //
-  // Trackpad pinch gestures (macOS + Windows precision drivers) fire
-  // `wheel` events with `ctrlKey: true` even though the user isn't
-  // holding Ctrl — the browser synthesizes the flag so sites can
-  // intercept the gesture. Same convention Figma, Excalidraw, tldraw,
-  // and Google Docs all use. Catching it here lets us:
+  // Industry-standard canvas zoom, modeled on Figma / Excalidraw /
+  // tldraw:
   //
-  //   1. Call `preventDefault()` to stop the browser from zooming
-  //      the whole webpage (which would include the sidebar, toolbars,
-  //      etc. — terrible UX for an editor).
-  //   2. Apply the delta to the poster's `zoom` state instead, so the
-  //      gesture zooms the canvas content alone.
+  // * Pinch (ctrlKey wheel) → zoom ANCHORED AT THE CURSOR. The
+  //   canvas content under the pointer stays fixed in screen space
+  //   while the rest of the canvas scales around it — the only way
+  //   pinch feels natural. Center-anchored zoom is the "weird"
+  //   sensation the previous commit shipped: users pinched over a
+  //   spot in the corner of the poster and the center leapt away.
+  // * Pinch zoom uses `preventDefault()` on a non-passive listener
+  //   to block the browser's default "zoom the whole webpage" path.
+  // * Plain two-finger scroll (no ctrlKey) is left alone — the
+  //   outer wrapper's native `overflow: auto` handles panning a
+  //   zoomed-in poster.
+  // * Mouse-wheel + Cmd/Ctrl also sets ctrlKey, so desktop users
+  //   get zoom via the same keyboard shortcut.
   //
-  // Mouse-wheel + Cmd/Ctrl also fires `ctrlKey: true` and triggers
-  // the same path — which is actually what a desktop user expects.
-  // Plain two-finger trackpad scroll (no pinch, no Ctrl) skips this
-  // branch and falls through to the wrapper's native `overflow:
-  // auto` behavior, so panning around a zoomed-in poster still works.
-  //
-  // Listener is attached with `{ passive: false }` because
-  // `preventDefault()` doesn't work on passive listeners — modern
-  // browsers default wheel listeners to passive for scroll perf, so
-  // you have to opt out explicitly.
-  //
-  // `zoomRef` mirrors the live zoom into a ref so the handler reads
-  // the freshest value across many rapid wheel events without having
-  // to tear down and re-attach the listener every tick (which could
-  // drop events mid-gesture).
+  // Math:
+  //   Before zoom, measure the cursor's position relative to the
+  //   canvas frame in SCREEN pixels (`cursorInFrameX/Y`). Convert
+  //   to content-space coords via `/ oldZoom`. After applying the
+  //   new zoom, compute where that same content-space point now
+  //   renders in screen pixels: it's `contentX * newZoom`. The
+  //   difference between the old and new on-screen position is
+  //   the amount we need to scroll `el` to keep the cursor locked.
+  //   `flushSync` forces React to apply the zoom state change to
+  //   the DOM immediately so we can read the post-zoom frame rect
+  //   on the very next line — otherwise the adjustment lags by one
+  //   frame and the cursor visibly drifts.
   const zoomRef = useRef(zoom);
   useEffect(() => {
     zoomRef.current = zoom;
@@ -704,18 +712,53 @@ export function PosterEditor() {
       if (!e.ctrlKey) return; // not a pinch / Cmd+wheel — let it scroll
       e.preventDefault();
 
-      // Pinch deltas are small pixel values (~1–20 per tick). An
-      // exponential factor `exp(-deltaY / 220)` turns each delta into
-      // a multiplicative zoom step — zoom in on negative deltas, out
-      // on positive — that composes smoothly across a 60-event
-      // gesture without any linear "jump" feel.
-      const factor = Math.exp(-e.deltaY / 220);
-      const next = Math.min(
+      const frame = el.querySelector(
+        '[data-postr-canvas-frame]',
+      ) as HTMLElement | null;
+      if (!frame) return;
+
+      // Pre-zoom state — captured BEFORE the setZoom call so the
+      // math runs against the values the user actually sees on
+      // screen at the moment of the gesture tick.
+      const oldZoom = zoomRef.current;
+      const frameRect = frame.getBoundingClientRect();
+      // Cursor in screen pixels relative to the frame's top-left.
+      const cursorInFrameX = e.clientX - frameRect.left;
+      const cursorInFrameY = e.clientY - frameRect.top;
+
+      // Exponential factor. Dividing deltaY by 240 tunes the
+      // sensitivity: a 12 px trackpad pinch tick → ~5 % zoom
+      // change, which composes smoothly across a 60-event gesture
+      // without feeling sluggish or runaway. Figma uses roughly
+      // the same range.
+      const factor = Math.exp(-e.deltaY / 240);
+      const newZoom = Math.min(
         ZOOM_MAX,
-        Math.max(ZOOM_MIN, zoomRef.current * factor),
+        Math.max(ZOOM_MIN, oldZoom * factor),
       );
-      zoomRef.current = next; // optimistic update for back-to-back ticks
-      setZoom(next);
+      if (newZoom === oldZoom) return;
+
+      // Synchronously commit the zoom so the following scroll math
+      // reads the post-zoom layout (not the stale one).
+      zoomRef.current = newZoom;
+      flushSync(() => setZoom(newZoom));
+
+      // The frame just resized around its top-left (the sibling
+      // outer wrapper uses flex centering, so top-left may have
+      // also shifted if the frame still fits in the viewport).
+      // Recompute the cursor's position on the NEW frame and
+      // scroll `el` by the delta to keep the same content point
+      // under the pointer.
+      const newFrameRect = frame.getBoundingClientRect();
+      const scale = newZoom / oldZoom;
+      const newCursorInFrameX = cursorInFrameX * scale;
+      const newCursorInFrameY = cursorInFrameY * scale;
+      const dx =
+        newCursorInFrameX - (e.clientX - newFrameRect.left);
+      const dy =
+        newCursorInFrameY - (e.clientY - newFrameRect.top);
+      el.scrollLeft += dx;
+      el.scrollTop += dy;
     };
 
     el.addEventListener('wheel', onWheel, { passive: false });
@@ -801,6 +844,131 @@ export function PosterEditor() {
     [oobWarnings],
   );
 
+  // Aggregated pre-flight issues surfaced in the Issues sidebar tab.
+  // Combines OOB detection with a handful of other "did you forget X"
+  // validations so the user has one place to look before exporting.
+  const posterIssues = useMemo<PosterIssue[]>(() => {
+    const out: PosterIssue[] = [];
+
+    // OOB — translate the `checkBounds` output. `severity: 'full'`
+    // means the block is 100 % off-canvas (hard error); `partial`
+    // means it clips the edge (warning).
+    for (const w of oobWarnings) {
+      out.push({
+        id: `oob-${w.blockId}`,
+        severity: w.severity === 'full' ? 'error' : 'warning',
+        category: `${w.blockType} out of bounds`,
+        message: w.message,
+        blockId: w.blockId,
+      });
+    }
+
+    // Block-level checks
+    for (const b of doc.blocks) {
+      if (b.type === 'image' && !b.imageSrc) {
+        out.push({
+          id: `empty-image-${b.id}`,
+          severity: 'warning',
+          category: 'Empty figure',
+          message:
+            'Image block has no file attached — it will export as a dashed placeholder.',
+          blockId: b.id,
+        });
+      }
+      if (
+        b.type === 'title' &&
+        (!b.content || b.content.trim().length === 0 || /Your Poster Title/i.test(b.content))
+      ) {
+        out.push({
+          id: `empty-title-${b.id}`,
+          severity: 'warning',
+          category: 'Default title',
+          message: 'Poster title is still the default placeholder.',
+          blockId: b.id,
+        });
+      }
+      if (
+        b.type === 'text' &&
+        b.content &&
+        /Enter your text here/i.test(b.content)
+      ) {
+        out.push({
+          id: `placeholder-text-${b.id}`,
+          severity: 'info',
+          category: 'Placeholder text',
+          message: 'A text block still contains "Enter your text here."',
+          blockId: b.id,
+        });
+      }
+      if (b.type === 'title' && b.content && b.content.length > 180) {
+        out.push({
+          id: `long-title-${b.id}`,
+          severity: 'info',
+          category: 'Long title',
+          message: `Poster title is ${b.content.length} characters — may wrap to 3+ lines at typical poster sizes.`,
+          blockId: b.id,
+        });
+      }
+    }
+
+    // Document-level checks
+    if (doc.authors.length === 0) {
+      out.push({
+        id: 'no-authors',
+        severity: 'warning',
+        category: 'Missing authors',
+        message:
+          'No authors have been added yet. Use the Authors tab to add them.',
+      });
+    }
+    if (doc.institutions.length === 0 && doc.authors.length > 0) {
+      out.push({
+        id: 'no-institutions',
+        severity: 'info',
+        category: 'Missing institutions',
+        message:
+          'Authors are listed but no institution affiliations are set.',
+      });
+    }
+    const hasRefBlock = doc.blocks.some((b) => b.type === 'references');
+    if (hasRefBlock && doc.references.length === 0) {
+      out.push({
+        id: 'empty-refs',
+        severity: 'warning',
+        category: 'Empty references',
+        message:
+          'References block is on the canvas but the Refs tab is empty.',
+      });
+    }
+    for (const r of doc.references) {
+      if (r.rawText) continue; // pre-formatted paste — skip field checks
+      if (!r.title || !r.title.trim()) {
+        out.push({
+          id: `ref-no-title-${r.id}`,
+          severity: 'warning',
+          category: 'Reference missing title',
+          message: `Reference "${(r.authors[0] ?? 'Unknown').slice(0, 40)} ${r.year ?? ''}" has no title.`,
+        });
+      }
+      if (!r.authors.length) {
+        out.push({
+          id: `ref-no-authors-${r.id}`,
+          severity: 'info',
+          category: 'Reference missing authors',
+          message: `Reference "${(r.title ?? 'Untitled').slice(0, 40)}" has no authors listed.`,
+        });
+      }
+    }
+
+    return out;
+  }, [
+    doc.blocks,
+    doc.authors,
+    doc.institutions,
+    doc.references,
+    oobWarnings,
+  ]);
+
   // -----------------------------------------------------------------------
   // Mutators (all push back through setPoster for store immutability)
   // -----------------------------------------------------------------------
@@ -816,6 +984,19 @@ export function PosterEditor() {
   };
 
   const addBlock = (type: Block['type']) => {
+    // Logo is limited to ONE per poster. Multiple logos stack at
+    // the top-center and their external handles collide (both
+    // occupy top: -26, so move/delete/rotate controls end up
+    // overlapping with each other and the title's handles).
+    // Selecting the existing logo instead of adding a duplicate
+    // matches user intent: "I want to edit the logo" → jump to it.
+    if (type === 'logo') {
+      const existing = doc.blocks.find((b) => b.type === 'logo');
+      if (existing) {
+        setSelectedId(existing.id);
+        return;
+      }
+    }
     const w = type === 'logo' ? 50 : 155;
     const h = type === 'logo' ? 40 : type === 'heading' ? 22 : type === 'references' ? 120 : 140;
 
@@ -1487,6 +1668,14 @@ export function PosterEditor() {
         onChangeTab={setSidebarTab}
         checkFigureWidthIn={checkFigureRect.w / PX}
         checkFigureHeightIn={checkFigureRect.h / PX}
+        issues={posterIssues}
+        onJumpToBlock={(id) => {
+          setSelectedId(id);
+          const el = document.querySelector(
+            `[data-block-id="${id}"]`,
+          ) as HTMLElement | null;
+          el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }}
       />
       </div>
 
@@ -1573,7 +1762,15 @@ export function PosterEditor() {
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'auto',
-          padding: 30,
+          // Extra padding creates a "working area" gutter around the
+          // canvas. Blocks dragged past the canvas edge (or whose
+          // handles sit at top: -26) remain visible in this gutter
+          // instead of getting clipped — same idea as Figma's dark
+          // workspace outside the page, or Illustrator's pasteboard.
+          // 96 px is enough room for the top/left block handles
+          // plus ~60 px of drag overshoot before the scroll
+          // container takes over.
+          padding: 96,
           background: '#0a0a12',
         }}
       >
@@ -1585,7 +1782,14 @@ export function PosterEditor() {
               height: cH * zoom,
               boxShadow: '0 4px 40px rgba(0,0,0,.5)',
               borderRadius: 3,
-              overflow: 'hidden',
+              // Deliberately NOT overflow:hidden — handles that sit
+              // at top: -26 above the block, out-of-bounds blocks
+              // dragged past the canvas edge, and rotation corners
+              // all need to render into the working-area gutter.
+              // The canvas visual boundary is preserved by the drop
+              // shadow + border-radius on this div; anything past
+              // the bounds floats freely over the workspace.
+              overflow: 'visible',
               // Smooth the canvas frame's width/height changes when
               // zoom ticks up or down so the drop shadow glides
               // instead of snapping between sizes.
