@@ -707,6 +707,58 @@ PosterForge (root)
 
 ---
 
+## Operational Conventions
+
+### CI environment variables (GitHub Actions)
+
+The `web` job in `.github/workflows/ci.yml` must inject **dummy
+placeholder values** for `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`,
+and `VITE_API_BASE_URL`. **Never paste real production credentials
+into CI.**
+
+```yaml
+env:
+  VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
+  VITE_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+  VITE_API_BASE_URL: http://localhost:8787
+```
+
+**Why the throw exists.** `apps/web/src/lib/supabase.ts` throws at
+module load time if the env vars are missing. This is a production
+safety net — if someone deploys to Vercel without setting env vars,
+the landing page crashes immediately with a clear error instead of
+silently shipping a broken app. It was never meant as a test check.
+
+**Why dummy values (not real ones).** Our 220 unit tests all mock
+Supabase via `vi.mock()` and never make real network calls. Using
+real credentials would:
+
+1. **Normalize secret-in-CI patterns.** Once prod creds live in the
+   workflow, it's easy to add more dangerous ones (`SUPABASE_SECRET_KEY`,
+   `ANTHROPIC_API_KEY`) later. Any workflow step that echoes env
+   leaks them to job logs forever.
+2. **Risk silent prod-DB contamination.** If a test ever forgets to
+   mock Supabase, dummy values fail loudly (DNS error at
+   `ci-placeholder.supabase.co`). Real values would silently
+   read/write production data.
+3. **Couple CI uptime to Supabase uptime.** A Supabase outage would
+   turn all CI red.
+4. **Expand the compliance footprint.** CI logs become an in-scope
+   system for data retention policy.
+
+**When real values ARE appropriate.** Only in a dedicated E2E /
+integration tier against a **staging** Supabase project (never prod),
+gated by GitHub Environments with required reviewers so fork PRs
+can't exfiltrate secrets. Postr has no such tier today.
+
+**Long-term cleanup (deferred).** Refactor `supabase.ts` to lazy-init
+via a `getSupabase()` getter so the throw fires on first use, not
+import. Then CI needs zero env vars at all. It's a ~40-file
+find-and-replace touching every `import { supabase }` site — worth
+doing post-v1 if the current approach ever gets in the way.
+
+---
+
 ## Design Tokens
 
 ### UI Chrome (sidebar + controls, NOT the poster itself)
