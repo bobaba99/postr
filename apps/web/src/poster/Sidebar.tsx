@@ -56,6 +56,7 @@ export type SidebarTab =
   | 'style'
   | 'edit'
   | 'insert'
+  | 'check'
   | 'export';
 
 export interface StylePreset {
@@ -218,16 +219,19 @@ export function Sidebar(props: SidebarProps) {
     return () => clearTimeout(t);
   }, [presetJustSaved]);
 
-  // Auto-switch to the Edit tab whenever a block is selected. The
-  // Edit tab routes each block type to the appropriate editor and
-  // shows the ReadabilityPanel when an image block is selected — so
-  // there's only one place users need to look after clicking on the
-  // canvas. If the user deselects (click empty canvas), stay on the
-  // current tab rather than jumping back to Layout.
+  // Auto-switch to the Edit tab whenever a block is selected. There
+  // is one exception: image blocks. Clicking an image shouldn't
+  // yank the user away from whichever tab they were on — most of
+  // the time that's the Check tab, where the selected image's
+  // dimensions feed the readability analyzer. Keeping the user's
+  // current tab lets them select-an-image-then-recheck without a
+  // jarring reroute. If the user deselects (clicks empty canvas),
+  // we also stay put rather than jumping back to Layout.
   useEffect(() => {
     if (!props.selectedBlock) return;
+    if (props.selectedBlock.type === 'image') return;
     setTab('edit');
-  }, [props.selectedBlock?.id]);
+  }, [props.selectedBlock?.id, props.selectedBlock?.type]);
 
   // Two states only: deselected (dark gray) and selected (white +
   // purple left bar + dark fill).
@@ -412,7 +416,7 @@ export function Sidebar(props: SidebarProps) {
             paddingTop: 4,
           }}
         >
-          {(['layout', 'insert', 'edit', 'style', 'authors', 'refs', 'export'] as SidebarTab[]).map((t) => (
+          {(['layout', 'insert', 'edit', 'style', 'authors', 'refs', 'check', 'export'] as SidebarTab[]).map((t) => (
             <button
               key={t}
               data-postr-tab
@@ -502,6 +506,16 @@ export function Sidebar(props: SidebarProps) {
             palette={props.palette}
             styles={props.styles}
             onChangeStyles={props.onChangeStyles}
+          />
+        )}
+
+        {tab === 'check' && (
+          <ReadabilityPanel
+            selectedBlock={
+              props.selectedBlock && props.selectedBlock.type === 'image'
+                ? props.selectedBlock
+                : null
+            }
           />
         )}
 
@@ -1793,10 +1807,14 @@ function EditTab(props: {
           onUpdateStyle={updateStyle}
         />
       ) : (
-        // Code readability analyzer — always available. When an image
-        // block is selected it uses that block's exact dimensions;
-        // otherwise it falls back to a standard 10" × 7" figure size.
-        <ReadabilityPanel selectedBlock={sb && sb.type === 'image' ? sb : null} />
+        <div style={{ fontSize: 14, color: '#555', padding: '16px 0', lineHeight: 1.5 }}>
+          Click a text or table block on the canvas to edit it here, or
+          switch to the{' '}
+          <span style={{ color: '#c8b6ff' }}>Insert</span> tab to add a new
+          one. Image blocks don't have edit controls — open the{' '}
+          <span style={{ color: '#c8b6ff' }}>Check</span> tab to analyze
+          figure readability.
+        </div>
       )}
     </>
   );
