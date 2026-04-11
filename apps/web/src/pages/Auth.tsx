@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
+import { PasswordStrength, isPasswordValid } from '@/components/PasswordStrength';
 
 type Mode = 'signin' | 'signup';
 
@@ -176,18 +177,21 @@ export default function Auth() {
               required
               className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
             />
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              required
-              minLength={6}
-              className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
-            />
+            <div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === 'signup' ? 'Create password' : 'Password'}
+                required
+                minLength={8}
+                className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
+              />
+              {mode === 'signup' && <PasswordStrength password={password} />}
+            </div>
             <button
               type="submit"
-              disabled={loading || !email.trim() || !password}
+              disabled={loading || !email.trim() || !password || (mode === 'signup' && !isPasswordValid(password))}
               className="w-full rounded-lg border border-[#7c6aed] bg-transparent px-4 py-3 text-sm font-semibold text-[#7c6aed] hover:bg-[#7c6aed] hover:text-white transition-colors disabled:opacity-50"
             >
               {loading ? 'Loading…' : mode === 'signin' ? 'Sign in' : 'Create account'}
