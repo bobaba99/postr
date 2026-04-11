@@ -1,15 +1,13 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { AuthBootstrap } from './components/AuthBootstrap';
 import './index.css';
 
-// AuthBootstrap is wired in main.tsx (not App.tsx) so App stays
-// testable in isolation without needing Supabase env vars at module load.
+// Auth is handled per-route via AuthGuard, not globally.
+// Landing and Auth pages are public; Dashboard/Editor/Profile
+// redirect to /auth if no session exists.
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <AuthBootstrap>
-      <App />
-    </AuthBootstrap>
+    <App />
   </React.StrictMode>,
 );
