@@ -751,25 +751,52 @@ export function PosterEditor() {
     const w = type === 'logo' ? 50 : 155;
     const h = type === 'logo' ? 40 : type === 'heading' ? 22 : type === 'references' ? 120 : 140;
 
-    // M1/S2 fix: find the first non-colliding (x, y) so an inserted
-    // block doesn't render on top of existing ones. Scan down in
-    // 20-unit increments from the default y=80, keeping x=20. If the
-    // poster's left column is full top-to-bottom, fall back to the
-    // far right. Stops as soon as no overlap with any existing block.
+    // Place new blocks centered on the canvas. If the dead-center
+    // slot collides with an existing non-header block, spiral outward
+    // in 20-unit steps (right, down, left, up, repeat with a larger
+    // radius) until a clear slot is found — this keeps fresh blocks
+    // near the middle of the user's working area instead of dumping
+    // them top-left. Headers (title/authors) are still ignored for
+    // collision since they're pinned to the top anyway.
     const overlaps = (ax: number, ay: number) =>
       doc.blocks.some((b) => {
         if (b.type === 'title' || b.type === 'authors') return false;
         return !(ax + w <= b.x || b.x + b.w <= ax || ay + h <= b.y || b.y + b.h <= ay);
       });
 
-    let nx = 20;
-    let ny = 80;
-    for (let i = 0; i < 60 && overlaps(nx, ny); i++) {
-      ny += 20;
-      if (ny + h > ph - 20) {
-        // wrapped past the bottom of the poster — jump to next column
-        ny = 80;
-        nx += w + 20;
+    const clampX = (x: number) => Math.max(10, Math.min(pw - w - 10, x));
+    const clampY = (y: number) => Math.max(10, Math.min(ph - h - 10, y));
+
+    const centerX = clampX(Math.round(pw / 2 - w / 2));
+    const centerY = clampY(Math.round(ph / 2 - h / 2));
+
+    // Outward spiral offset table: no-op, right, down, left, up,
+    // right×2, down×2, left×2, up×2, ... up to 8 rings.
+    let nx = centerX;
+    let ny = centerY;
+    const STEP = 20;
+    outer: for (let ring = 0; ring <= 8; ring++) {
+      const offsets: Array<[number, number]> =
+        ring === 0
+          ? [[0, 0]]
+          : [
+              [ring, 0],
+              [0, ring],
+              [-ring, 0],
+              [0, -ring],
+              [ring, ring],
+              [-ring, ring],
+              [-ring, -ring],
+              [ring, -ring],
+            ];
+      for (const [dx, dy] of offsets) {
+        const tx = clampX(centerX + dx * STEP);
+        const ty = clampY(centerY + dy * STEP);
+        if (!overlaps(tx, ty)) {
+          nx = tx;
+          ny = ty;
+          break outer;
+        }
       }
     }
 
