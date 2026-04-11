@@ -28,18 +28,23 @@ export default function Privacy() {
 
         <SectionHeading n="1" title="Who we are" />
         <Body>
-          Postr (“we”, “us”) is an academic poster editor operated by [Legal entity name
-          and registered address — to be completed before launch]. If you have any
-          question about how we handle your personal data, contact us at{' '}
+          Postr (“we”, “us”) is an academic poster editor operated by{' '}
+          <strong className="text-[#e2e2e8]">Resila Technologies Inc.</strong>, a
+          corporation registered in the Province of Quebec, Canada. If you have any
+          question about how we handle your personal data — or want to exercise any
+          of the rights described in Section 7 — contact us at{' '}
           <a className="text-[#7c6aed] underline" href={`mailto:${CONTACT_EMAIL}`}>
             {CONTACT_EMAIL}
           </a>
           .
         </Body>
         <Body>
-          We act as the <em>data controller</em> for the personal data described in this
-          notice. No Data Protection Officer is currently appointed; we will designate
-          one if required by law once the service grows.
+          We act as the <em>data controller</em> (the “enterprise” under Quebec
+          law). Under Quebec’s Act respecting the protection of personal information
+          in the private sector (the “Law 25” reform), the person responsible for
+          the protection of personal information within Resila Technologies Inc. is
+          reachable at the same address above. We will name a dedicated Data
+          Protection Officer if and when legal thresholds require it.
         </Body>
 
         <SectionHeading n="2" title="What data we collect" />
@@ -209,21 +214,37 @@ export default function Privacy() {
 
         <SectionHeading n="7" title="Your rights" />
         <Body>
-          Under the GDPR and similar laws (including the UK GDPR and the California
-          Consumer Privacy Act) you have the following rights over your personal data:
+          Several privacy laws may apply to you depending on where you live. Postr
+          is operated from Quebec, Canada, so the federal Personal Information
+          Protection and Electronic Documents Act (PIPEDA) and Quebec’s Act
+          respecting the protection of personal information in the private sector
+          (“Law 25”) apply. If you are in the European Economic Area or the United
+          Kingdom, the EU/UK GDPR applies. If you are in California, the California
+          Consumer Privacy Act (CCPA) applies. Across these regimes you have the
+          following rights over your personal data:
         </Body>
         <List
           items={[
-            'Access — ask for a copy of the data we hold about you.',
-            'Rectification — ask us to correct inaccurate or incomplete data.',
-            'Erasure — ask us to delete your data, subject to legal exceptions.',
+            'Access — ask for a copy of the personal information we hold about you and the categories of people it has been shared with.',
+            'Rectification — ask us to correct inaccurate or incomplete information.',
+            'Erasure / de-indexing — ask us to delete your data or stop disseminating it, subject to legal exceptions.',
             'Restriction — ask us to pause processing while a dispute is resolved.',
-            'Portability — ask for your data in a structured, machine-readable format.',
+            'Portability — ask for your data in a structured, commonly used, machine-readable format (GDPR and, since September 2024, Quebec Law 25).',
             'Objection — object to processing based on our legitimate interest.',
             'Withdraw consent — where processing is based on consent, withdraw it at any time without affecting processing already carried out.',
-            'Lodge a complaint — with your local data-protection supervisory authority.',
+            'Non-discrimination (CCPA) — we will not treat you differently for exercising your CCPA rights.',
+            'Lodge a complaint — with the appropriate regulator (see below).',
           ]}
         />
+        <Body>
+          You can file a complaint with the <strong>Commission d’accès à
+          l’information du Québec (CAI)</strong> if you are a Quebec resident, the{' '}
+          <strong>Office of the Privacy Commissioner of Canada (OPC)</strong> for
+          matters under PIPEDA, your local EU data-protection authority under
+          GDPR, the <strong>UK Information Commissioner’s Office (ICO)</strong>{' '}
+          under UK GDPR, or the{' '}
+          <strong>California Privacy Protection Agency (CPPA)</strong> under CCPA.
+        </Body>
         <CalloutBox>
           <strong className="text-[#e2e2e8]">Right to object (Art. 21 GDPR).</strong>
           <br />
@@ -360,6 +381,9 @@ function PublicFooter() {
         <Link to="/privacy" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
           Privacy
         </Link>
+        <Link to="/cookies" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
+          Cookies
+        </Link>
         <Link to="/terms" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
           Terms
         </Link>
@@ -437,11 +461,12 @@ function CalloutBox({ children }: { children: React.ReactNode }) {
 function Disclaimer() {
   return (
     <div className="mt-6 rounded-lg border border-[#f59e0b]/30 bg-[#f59e0b]/5 p-5 text-[13px] leading-relaxed text-[#f59e0b]">
-      <strong>Draft — not yet legal advice.</strong> This document is a starting draft
-      using standard GDPR disclosures and has not yet been reviewed by qualified
-      counsel. Before Postr launches publicly, the items marked in brackets below must
-      be filled in, and the full notice should be reviewed by a data-protection
-      lawyer. If you’re seeing this text on a production site, please email{' '}
+      <strong>Draft — pending legal review.</strong> This notice was drafted using
+      standard GDPR Art. 13/14 disclosures and adapted for Canadian privacy law
+      (PIPEDA + Quebec Law 25). It should still be reviewed by qualified
+      data-protection counsel before Postr launches to paying users, and a French
+      version must be provided to Quebec residents under the Charter of the
+      French language. Questions:{' '}
       <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>
         {CONTACT_EMAIL}
       </a>

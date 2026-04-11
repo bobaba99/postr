@@ -4,6 +4,7 @@
  *   /              → Landing (public)
  *   /about         → About (public, feature tour)
  *   /privacy       → Privacy Policy (public)
+ *   /cookies       → Cookies Policy (public)
  *   /terms         → Terms of Service (public)
  *   /auth          → Auth (sign in / sign up / guest)
  *   /dashboard     → My Posters (auth-gated)
@@ -17,6 +18,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import Landing from '@/pages/Landing';
 import About from '@/pages/About';
 import Privacy from '@/pages/Privacy';
+import Cookies from '@/pages/Cookies';
 import Terms from '@/pages/Terms';
 import Auth from '@/pages/Auth';
 import Home from '@/pages/Home';
@@ -32,6 +34,7 @@ export function AppRoutes() {
       <Route path="/" element={<Landing />} />
       <Route path="/about" element={<About />} />
       <Route path="/privacy" element={<Privacy />} />
+      <Route path="/cookies" element={<Cookies />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/s/:slug" element={<Share />} />

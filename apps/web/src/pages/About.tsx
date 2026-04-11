@@ -202,6 +202,9 @@ export default function About() {
           <Link to="/privacy" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
             Privacy
           </Link>
+          <Link to="/cookies" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
+            Cookies
+          </Link>
           <Link to="/terms" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
             Terms
           </Link>

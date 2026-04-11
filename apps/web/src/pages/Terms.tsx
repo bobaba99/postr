@@ -33,10 +33,11 @@ export default function Terms() {
         <SectionHeading n="1" title="Agreement" />
         <Body>
           These Terms of Service (“Terms”) form a legal agreement between you and
-          Postr (“we”, “us”), operated by [Legal entity name and registered address —
-          to be completed before launch]. By creating an account, signing in, or
-          otherwise using Postr — including browsing the public gallery without an
-          account — you agree to these Terms and to our{' '}
+          Postr (“we”, “us”), operated by{' '}
+          <strong className="text-[#e2e2e8]">Resila Technologies Inc.</strong>, a
+          corporation registered in the Province of Quebec, Canada. By creating an
+          account, signing in, or otherwise using Postr — including browsing the
+          public gallery without an account — you agree to these Terms and to our{' '}
           <Link to="/privacy" className="text-[#7c6aed] underline">
             Privacy Policy
           </Link>
@@ -246,12 +247,13 @@ export default function Terms() {
 
         <SectionHeading n="12" title="Governing law and disputes" />
         <Body>
-          These Terms are governed by the laws of [Governing jurisdiction — to be
-          completed before launch], without regard to conflict-of-laws rules. Any
-          dispute arising from these Terms or your use of Postr will be resolved in
-          the courts of [Jurisdiction — to be completed before launch], except where
-          mandatory consumer-protection laws in your country of residence grant you
-          the right to bring proceedings locally.
+          These Terms are governed by the laws of the Province of Quebec and the
+          federal laws of Canada applicable therein, without regard to
+          conflict-of-laws rules. Any dispute arising from these Terms or your use
+          of Postr will be brought exclusively before the courts sitting in the
+          judicial district of Montréal, Quebec, except where mandatory
+          consumer-protection laws in your country of residence grant you the
+          right to bring proceedings locally.
         </Body>
 
         <SectionHeading n="13" title="Changes to these Terms" />
@@ -320,6 +322,9 @@ function PublicFooter() {
         <Link to="/privacy" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
           Privacy
         </Link>
+        <Link to="/cookies" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
+          Cookies
+        </Link>
         <Link to="/terms" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
           Terms
         </Link>
@@ -368,10 +373,10 @@ function CalloutBox({ children }: { children: React.ReactNode }) {
 function Disclaimer() {
   return (
     <div className="mt-6 rounded-lg border border-[#f59e0b]/30 bg-[#f59e0b]/5 p-5 text-[13px] leading-relaxed text-[#f59e0b]">
-      <strong>Draft — not yet legal advice.</strong> This document is a starting draft
-      and has not yet been reviewed by qualified counsel. The bracketed items
-      (governing law, legal entity, jurisdiction) must be filled in, and the full
-      document should be reviewed by a lawyer before Postr launches publicly.
+      <strong>Draft — pending legal review.</strong> This document should still be
+      reviewed by qualified counsel before Postr launches to paying users, and a
+      French version must be provided to Quebec residents under the Charter of
+      the French language.
     </div>
   );
 }
