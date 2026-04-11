@@ -1165,7 +1165,18 @@ export function BlockFrame(props: BlockFrameProps) {
   //
   // B2 fix: `references` added — a poster with many refs was
   // clipping the last entry below the declared block height.
-  const growsWithContent = b.type === 'title' || b.type === 'text' || b.type === 'references';
+  //
+  // 2026-04-11: `authors` added — the default h:22 was too tight
+  // for two-line author lists (authors on line 1, institution
+  // affiliations on line 2), plus the placeholder "Add authors in
+  // sidebar →" was getting partially clipped even as single-line
+  // content because of padding + line-height combo. Auto-grow is
+  // safer than bumping the declared h and reflowing every template.
+  const growsWithContent =
+    b.type === 'title' ||
+    b.type === 'text' ||
+    b.type === 'references' ||
+    b.type === 'authors';
   const level = b.type === 'title' ? st.title : b.type === 'authors' ? st.authors : isHeading ? st.heading : st.body;
   const frameRef = useRef<HTMLDivElement | null>(null);
   // Selection info for the floating format toolbar — populated by
@@ -1489,7 +1500,7 @@ export function BlockFrame(props: BlockFrameProps) {
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.75"
+              strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden
@@ -1562,24 +1573,28 @@ export function BlockFrame(props: BlockFrameProps) {
             title="Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)"
           >
             {/*
-              Clockwise rotation icon — thin stroke SVG instead of
-              the old Unicode ↻ character which rendered as a heavy
-              decorative glyph. SVG gives us a clean 270° arc with
-              a single arrowhead, readable at 20×20.
+              Clockwise rotation icon — Feather's "rotate-cw" design.
+              The key property: the arc's endpoint (23, 10) is also
+              the corner of the arrowhead polyline, so the two paths
+              visually connect into a single continuous shape. My
+              earlier version had the arc ending at (12, 3) while the
+              arrowhead started at (21, 3), leaving a gap the user
+              correctly flagged as "separated".
+              https://feathericons.com/?query=rotate
             */}
             <svg
-              width="12"
-              height="12"
+              width="13"
+              height="13"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.75"
+              strokeWidth="2.75"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden
             >
-              <path d="M21 12a9 9 0 1 1-9-9" />
-              <polyline points="21 3 21 9 15 9" />
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
             </svg>
           </button>
 
@@ -1588,10 +1603,14 @@ export function BlockFrame(props: BlockFrameProps) {
               e.stopPropagation();
               onDelete(b.id);
             }}
-            // Positioned OUTSIDE the block bounds (above the top edge)
-            // so it doesn't cover any content at the top of the block.
-            // Now one of a row of three external handles: move (left),
-            // rotate (center), delete (right).
+            // Positioned OUTSIDE the block bounds (above the top
+            // edge) so it doesn't cover any content at the top of
+            // the block. Part of the top handle row: move (left),
+            // label (center), delete (right). Using SVG for the X
+            // instead of a Unicode `×` character because `×` has
+            // inconsistent glyph metrics across fonts and wasn't
+            // visually centered inside the button — flagged by the
+            // user on 2026-04-11.
             style={{
               position: 'absolute',
               top: -26,
@@ -1602,13 +1621,10 @@ export function BlockFrame(props: BlockFrameProps) {
               background: '#d33',
               color: '#fff',
               border: '2px solid #0a0a12',
-              fontSize: 14,
-              lineHeight: 1,
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: 700,
               zIndex: 10,
               boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
               padding: 0,
@@ -1616,37 +1632,62 @@ export function BlockFrame(props: BlockFrameProps) {
             }}
             title="Delete block"
           >
-            ×
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="18" y1="6" x2="6" y2="18" />
+            </svg>
           </button>
         </>
       )}
       {selected && (
         <div
-          // Positioned at TOP-CENTER of the block, above the frame.
-          // The rotate handle moved to the bottom on 2026-04-11, so
-          // the top row now has move (left), delete (right), and
-          // empty middle — the block-type label fills that empty
-          // middle so users see at-a-glance what type of block they
-          // have selected. Centered horizontally via left: 50% +
-          // translateX(-50%). The counter-rotate keeps the label
-          // readable when the block itself is rotated.
+          // Positioned at TOP-CENTER of the block, above the frame,
+          // on the SAME baseline as the move + delete handles. The
+          // three siblings — move (left), label (center), delete
+          // (right) — all share:
+          //   - top: -26          (identical vertical offset)
+          //   - height: 20        (identical outer height with border-box)
+          //   - boxSizing: border-box
+          // so their centerlines and edges line up precisely. This
+          // was a user-reported inconsistency: the label used to
+          // have no explicit height + sit at top: -22, making it
+          // look ~4px lower than the circles around it.
+          //
+          // The counter-rotate keeps the label readable + horizontal
+          // when the block itself is rotated.
           style={{
             position: 'absolute',
-            top: -22,
+            top: -26,
             left: '50%',
+            height: 20,
+            boxSizing: 'border-box',
+            display: 'flex',
+            alignItems: 'center',
             fontSize: 9,
             background: p.accent,
             color: '#fff',
-            padding: '2px 6px',
-            borderRadius: 3,
+            padding: '0 8px',
+            borderRadius: 10,
+            border: '2px solid #0a0a12',
             fontFamily: 'system-ui',
             fontWeight: 700,
             letterSpacing: 0.5,
             textTransform: 'uppercase',
+            lineHeight: 1,
             zIndex: 10,
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
             transform: b.rotation
               ? `translateX(-50%) rotate(${-b.rotation}deg)`
               : 'translateX(-50%)',

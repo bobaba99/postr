@@ -986,10 +986,12 @@ function BadgeIconSvg({ icon }: { icon: BadgeIcon }) {
     );
   }
   if (icon === 'rotate') {
+    // Feather "rotate-cw" — arc terminates at the arrowhead corner
+    // (23, 10), so the two shapes read as one continuous path.
     return (
-      <svg {...common}>
-        <path d="M21 12a9 9 0 1 1-9-9" />
-        <polyline points="21 3 21 9 15 9" />
+      <svg {...common} strokeWidth={2}>
+        <polyline points="23 4 23 10 17 10" />
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
       </svg>
     );
   }
