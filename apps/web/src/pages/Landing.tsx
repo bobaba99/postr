@@ -1,11 +1,34 @@
 /**
  * Landing page — public, no auth required.
  * Explains what Postr is and directs to /auth.
+ *
+ * If a user with an existing session lands here (typically by
+ * clicking the Postr logo on a public page like /gallery), we
+ * silently redirect them to /dashboard. The marketing page is for
+ * unauthenticated visitors only — anyone already signed in should
+ * skip past it. Without this redirect, the user can click "Try as
+ * guest" again and accidentally create a duplicate anonymous
+ * account that orphans their existing posters.
  */
-import { Link } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import { PublicFooter } from '@/components/PublicFooter';
 
 export default function Landing() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (data.session) navigate('/dashboard', { replace: true });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
+
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <header className="flex items-center justify-between px-8 py-5">

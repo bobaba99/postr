@@ -47,6 +47,19 @@ export default function Auth() {
   const handleGuest = useCallback(async () => {
     setLoading(true);
     setError(null);
+    // Defensive check: if a session already exists, NEVER call
+    // signInAnonymously() — that would replace the user's existing
+    // anonymous account with a fresh one and orphan all of their
+    // posters. This was the root cause of the 2026-04-11 audit's
+    // "I had to create a second guest" report: a signed-in guest
+    // who clicked the Postr logo on /gallery → / → "Try as guest"
+    // landed back on /auth?guest=1, which triggered handleGuest in
+    // a useEffect that raced the existing-session redirect below.
+    const { data: existing } = await supabase.auth.getSession();
+    if (existing.session) {
+      navigate('/dashboard', { replace: true });
+      return;
+    }
     const { error: err } = await supabase.auth.signInAnonymously();
     if (err) {
       setError(err.message);
