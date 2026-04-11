@@ -27,7 +27,7 @@ import { BlockFrame } from './blocks';
 import { checkBounds, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
-import { Sidebar, type StylePreset } from './Sidebar';
+import { Sidebar, type SidebarTab, type StylePreset } from './Sidebar';
 import {
   DEFAULT_POSTER_SIZE_KEY,
   FONTS,
@@ -419,6 +419,20 @@ export function PosterEditor() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [guidelinesOpen, setGuidelinesOpen] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
+  // Lifted from Sidebar so the Check tab can render a draggable
+  // figure-size overlay on the canvas — needs to know which tab
+  // is active, and needs to share the tab setter with Sidebar.
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('layout');
+  // Gray figure-size preview rectangle on the canvas, only rendered
+  // while the Check tab is active AND no image block is selected.
+  // Default: 10"×7" placed roughly center-ish on a standard 48×36
+  // canvas (190, 145, 100, 70 in poster units = center of 480×360).
+  const [checkFigureRect, setCheckFigureRect] = useState({
+    x: 190,
+    y: 145,
+    w: 100,
+    h: 70,
+  });
 
   // Custom palettes persist via localStorage (postr.custom-palettes).
   // They appear in the Style tab beneath the curated catalog and can
@@ -1334,6 +1348,10 @@ export function PosterEditor() {
           setPaletteDesignerOpen(true);
         }}
         onDeleteCustomPalette={handleDeleteCustomPalette}
+        activeTab={sidebarTab}
+        onChangeTab={setSidebarTab}
+        checkFigureWidthIn={checkFigureRect.w / PX}
+        checkFigureHeightIn={checkFigureRect.h / PX}
       />
       )}
 
@@ -1685,6 +1703,15 @@ export function PosterEditor() {
                   isOutOfBounds={oobBlockIds.has(b.id)}
                 />
               ))}
+              {sidebarTab === 'check' && selectedBlock?.type !== 'image' && (
+                <FigureSizeOverlay
+                  rect={checkFigureRect}
+                  onChange={setCheckFigureRect}
+                  canvasWidth={cW}
+                  canvasHeight={cH}
+                  zoom={zoom}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1834,6 +1861,161 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (z: number | null) 
       >
         FIT
       </button>
+    </div>
+  );
+}
+
+// =========================================================================
+// FigureSizeOverlay — gray draggable/resizable rectangle on the canvas
+// =========================================================================
+//
+// Rendered inside #poster-canvas while the Check tab is active and no
+// image block is selected. Lets the user see and adjust the figure
+// dimensions the readability analyzer is computing against, instead of
+// staring at an invisible hardcoded 10"×7" default.
+//
+// The rect is stored in poster units (same coordinate system as blocks).
+// Drag converts screen pixel deltas to poster units via `/ zoom` just
+// like `useBlockDrag` does, then snaps to the grid so the overlay lines
+// up with the rest of the canvas. Resize is only enabled from the
+// bottom-right corner — a full 8-handle resize would add UI noise for
+// a feature whose only job is "give me a ballpark figure size".
+
+interface FigureSizeOverlayProps {
+  rect: { x: number; y: number; w: number; h: number };
+  onChange: (rect: { x: number; y: number; w: number; h: number }) => void;
+  canvasWidth: number;
+  canvasHeight: number;
+  zoom: number;
+}
+
+function FigureSizeOverlay({
+  rect,
+  onChange,
+  canvasWidth,
+  canvasHeight,
+  zoom,
+}: FigureSizeOverlayProps) {
+  // Share drag state across pointer handlers via a ref — same pattern
+  // useBlockDrag uses. Avoids the re-render thrash that state-driven
+  // pointer tracking would introduce.
+  const dragRef = useRef<{
+    mode: 'move' | 'resize';
+    sx: number;
+    sy: number;
+    orig: { x: number; y: number; w: number; h: number };
+  } | null>(null);
+
+  const startDrag = (e: React.PointerEvent, mode: 'move' | 'resize') => {
+    e.stopPropagation();
+    e.preventDefault();
+    dragRef.current = {
+      mode,
+      sx: e.clientX,
+      sy: e.clientY,
+      orig: { ...rect },
+    };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const s = dragRef.current;
+    if (!s) return;
+    const dx = (e.clientX - s.sx) / zoom;
+    const dy = (e.clientY - s.sy) / zoom;
+    if (s.mode === 'move') {
+      const nx = snap(Math.max(0, Math.min(canvasWidth - s.orig.w, s.orig.x + dx)));
+      const ny = snap(Math.max(0, Math.min(canvasHeight - s.orig.h, s.orig.y + dy)));
+      onChange({ ...s.orig, x: nx, y: ny });
+    } else {
+      // Enforce minimum 20×20 (2"×2") so the overlay can't collapse
+      // into an un-grabbable sliver. Also clamp to canvas right/bottom.
+      const nw = snap(Math.max(20, Math.min(canvasWidth - s.orig.x, s.orig.w + dx)));
+      const nh = snap(Math.max(20, Math.min(canvasHeight - s.orig.y, s.orig.h + dy)));
+      onChange({ ...s.orig, w: nw, h: nh });
+    }
+  };
+
+  const endDrag = (e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore — pointer may have already been released
+    }
+  };
+
+  const widthIn = (rect.w / PX).toFixed(1);
+  const heightIn = (rect.h / PX).toFixed(1);
+
+  return (
+    <div
+      data-postr-figure-size-overlay
+      onPointerDown={(e) => startDrag(e, 'move')}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      style={{
+        position: 'absolute',
+        left: rect.x,
+        top: rect.y,
+        width: rect.w,
+        height: rect.h,
+        // Translucent gray fill + dashed accent border so it's
+        // obviously *temporary UI*, distinct from a real block.
+        background: 'rgba(100, 110, 130, 0.18)',
+        border: '2px dashed #7c6aed',
+        borderRadius: 3,
+        cursor: 'move',
+        boxSizing: 'border-box',
+        zIndex: 6,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        touchAction: 'none',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'system-ui, -apple-system, sans-serif',
+          fontSize: 9,
+          fontWeight: 700,
+          color: '#fff',
+          background: 'rgba(30, 30, 46, 0.88)',
+          padding: '4px 8px',
+          borderRadius: 4,
+          border: '1px solid #7c6aed',
+          pointerEvents: 'none',
+          textAlign: 'center',
+          lineHeight: 1.3,
+          letterSpacing: 0.3,
+        }}
+      >
+        FIGURE PREVIEW
+        <div style={{ fontSize: 11, fontWeight: 800, marginTop: 1 }}>
+          {widthIn}&quot; × {heightIn}&quot;
+        </div>
+        <div style={{ fontSize: 7, fontWeight: 400, marginTop: 2, opacity: 0.7 }}>
+          drag to move · corner to resize
+        </div>
+      </div>
+      {/* Bottom-right resize handle */}
+      <div
+        onPointerDown={(e) => startDrag(e, 'resize')}
+        style={{
+          position: 'absolute',
+          right: -1,
+          bottom: -1,
+          width: 14,
+          height: 14,
+          background: '#7c6aed',
+          border: '1.5px solid #fff',
+          borderRadius: 2,
+          cursor: 'nwse-resize',
+          touchAction: 'none',
+        }}
+      />
     </div>
   );
 }

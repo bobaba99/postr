@@ -20,6 +20,15 @@ import {
 
 interface Props {
   selectedBlock: Block | null;
+  /**
+   * Default figure dimensions when no image block is selected.
+   * Driven by a draggable/resizable gray "figure size" overlay
+   * on the canvas that's only active while the Check tab is
+   * open — lets users see and tweak the size the analyzer is
+   * computing against instead of staring at a hardcoded 10×7.
+   */
+  defaultFigureWidthIn?: number;
+  defaultFigureHeightIn?: number;
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -426,7 +435,11 @@ function FullCodeModal({ open, code, onClose, onCopied }: FullCodeModalProps) {
 // Main panel
 // ──────────────────────────────────────────────────────────────────────
 
-export function ReadabilityPanel({ selectedBlock }: Props) {
+export function ReadabilityPanel({
+  selectedBlock,
+  defaultFigureWidthIn = 10,
+  defaultFigureHeightIn = 7,
+}: Props) {
   const [code, setCode] = useState('');
   const [lang, setLang] = useState<'auto' | 'r' | 'python'>('auto');
   const [fullCodeOpen, setFullCodeOpen] = useState(false);
@@ -450,8 +463,8 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
   }, [copiedBannerOpen]);
 
   const isImage = selectedBlock?.type === 'image';
-  const blockWidthIn = isImage ? selectedBlock.w / PX : 10;
-  const blockHeightIn = isImage ? selectedBlock.h / PX : 7;
+  const blockWidthIn = isImage ? selectedBlock.w / PX : defaultFigureWidthIn;
+  const blockHeightIn = isImage ? selectedBlock.h / PX : defaultFigureHeightIn;
 
   const detectedLang = useMemo(() => {
     if (lang !== 'auto') return lang;
@@ -485,9 +498,19 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
       <p style={{ color: '#6b7280', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
         Paste your R or Python plotting code, then click <b>Check</b> to see
         if figure text will be readable at poster print size.
-        {isImage
-          ? ` Using selected image block (${blockWidthIn.toFixed(1)}" × ${blockHeightIn.toFixed(1)}").`
-          : ' Select an image block on the canvas for exact sizing, or the default 10" × 7" is used.'}
+        {isImage ? (
+          <>
+            {' '}Using selected image block (<b>{blockWidthIn.toFixed(1)}" ×{' '}
+            {blockHeightIn.toFixed(1)}"</b>).
+          </>
+        ) : (
+          <>
+            {' '}Sizing against the gray <b>figure preview</b> on the canvas
+            (<b>{blockWidthIn.toFixed(1)}" × {blockHeightIn.toFixed(1)}"</b>) —
+            drag or resize it to match your real figure, or click an existing
+            image block to use its exact dimensions.
+          </>
+        )}
       </p>
 
       <div style={{ display: 'flex', gap: 6 }}>

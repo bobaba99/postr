@@ -137,6 +137,18 @@ interface SidebarProps {
 
   // sidebar visibility (Notion-style collapse toggle)
   onToggleSidebar?: () => void;
+
+  // active sidebar tab — lifted to PosterEditor so the Check tab
+  // can render a draggable "figure size" overlay on the canvas
+  // when it's the active tab.
+  activeTab: SidebarTab;
+  onChangeTab: (tab: SidebarTab) => void;
+
+  // When the Check tab is active and no image block is selected,
+  // these come from the draggable canvas overlay. The panel uses
+  // them as the "default" figure size instead of a hardcoded 10×7.
+  checkFigureWidthIn: number;
+  checkFigureHeightIn: number;
 }
 
 // Shared inline styles for the dark sidebar UI chrome.
@@ -206,7 +218,8 @@ const iconBtnStyle: CSSProperties = {
 };
 
 export function Sidebar(props: SidebarProps) {
-  const [tab, setTab] = useState<SidebarTab>('layout');
+  const tab = props.activeTab;
+  const setTab = props.onChangeTab;
   const [presetName, setPresetName] = useState('');
   // Transient "just saved" flash on the Save-as-preset button so
   // users get an explicit confirmation instead of having to spot the
@@ -516,6 +529,8 @@ export function Sidebar(props: SidebarProps) {
                 ? props.selectedBlock
                 : null
             }
+            defaultFigureWidthIn={props.checkFigureWidthIn}
+            defaultFigureHeightIn={props.checkFigureHeightIn}
           />
         )}
 
