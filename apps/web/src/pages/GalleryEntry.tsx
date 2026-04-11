@@ -45,36 +45,38 @@ export default function GalleryEntryPage() {
   }, [entryId]);
 
   return (
-    <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
+    <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <Header />
 
-      {status.kind === 'loading' && (
-        <p className="py-24 text-center text-sm text-[#6b7280]">Loading…</p>
-      )}
+      <div className="flex-1">
+        {status.kind === 'loading' && (
+          <p className="py-24 text-center text-sm text-[#6b7280]">Loading…</p>
+        )}
 
-      {status.kind === 'error' && (
-        <p className="py-24 text-center text-sm text-[#f87171]">
-          Couldn’t load the entry: {status.message}
-        </p>
-      )}
-
-      {status.kind === 'not_found' && (
-        <section className="mx-auto max-w-xl px-8 py-24 text-center">
-          <h1 className="text-3xl font-bold text-[#e2e2e8]">This entry is unavailable.</h1>
-          <p className="mt-4 text-[14px] leading-relaxed text-[#6b7280]">
-            It may have been retracted by its author, or the link is wrong. Browse
-            the rest of the gallery below.
+        {status.kind === 'error' && (
+          <p className="py-24 text-center text-sm text-[#f87171]">
+            Couldn’t load the entry: {status.message}
           </p>
-          <Link
-            to="/gallery"
-            className="mt-8 inline-block rounded-lg bg-[#7c6aed] px-6 py-3 text-sm font-semibold text-white no-underline hover:bg-[#6c5ce7]"
-          >
-            Back to the gallery
-          </Link>
-        </section>
-      )}
+        )}
 
-      {status.kind === 'ready' && <Detail entry={status.entry} />}
+        {status.kind === 'not_found' && (
+          <section className="mx-auto max-w-xl px-8 py-24 text-center">
+            <h1 className="text-3xl font-bold text-[#e2e2e8]">This entry is unavailable.</h1>
+            <p className="mt-4 text-[14px] leading-relaxed text-[#6b7280]">
+              It may have been retracted by its author, or the link is wrong. Browse
+              the rest of the gallery below.
+            </p>
+            <Link
+              to="/gallery"
+              className="mt-8 inline-block rounded-lg bg-[#7c6aed] px-6 py-3 text-sm font-semibold text-white no-underline hover:bg-[#6c5ce7]"
+            >
+              Back to the gallery
+            </Link>
+          </section>
+        )}
+
+        {status.kind === 'ready' && <Detail entry={status.entry} />}
+      </div>
 
       <PublicFooter />
     </main>

@@ -62,7 +62,7 @@ export default function About() {
   const openFeedback = useFeedbackStore((s) => s.open);
 
   return (
-    <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
+    <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <Header />
 
       {/* Hero */}
@@ -134,7 +134,7 @@ export default function About() {
       </section>
 
       {/* Final stop — feedback CTA */}
-      <section className="mx-auto max-w-3xl px-8 pb-24">
+      <section className="mx-auto w-full max-w-3xl flex-1 px-8 pb-24">
         <div className="relative overflow-hidden rounded-2xl border border-[#2a2a3a] bg-[#111118] p-10">
           {/* Decorative route squiggle in the background */}
           <svg

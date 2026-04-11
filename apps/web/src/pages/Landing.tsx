@@ -7,7 +7,7 @@ import { PublicFooter } from '@/components/PublicFooter';
 
 export default function Landing() {
   return (
-    <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
+    <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <header className="flex items-center justify-between px-8 py-5">
         <div className="flex items-center gap-3">
           <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
@@ -66,7 +66,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-4xl px-8 pb-24">
+      <section className="mx-auto w-full max-w-4xl flex-1 px-8 pb-24">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
           <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
             <div className="text-2xl mb-3">📐</div>

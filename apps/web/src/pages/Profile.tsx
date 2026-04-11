@@ -217,10 +217,10 @@ export default function Profile() {
   }
 
   return (
-    <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
+    <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <Header />
 
-      <div className="mx-auto max-w-2xl px-8 py-8">
+      <div className="mx-auto w-full max-w-2xl flex-1 px-8 py-8">
         {actionStatus && (
           <div className="mb-4 rounded-md border border-[#a6e3a1]/40 bg-[#a6e3a1]/10 px-3 py-2 text-[13px] text-[#a6e3a1]">
             {actionStatus}

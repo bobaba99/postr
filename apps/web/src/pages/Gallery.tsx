@@ -43,7 +43,7 @@ export default function Gallery() {
   }, [load]);
 
   return (
-    <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
+    <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <Header />
 
       <section className="mx-auto max-w-3xl px-8 pt-16 pb-8 text-center">
@@ -95,7 +95,7 @@ export default function Gallery() {
       </section>
 
       {/* Grid */}
-      <section className="mx-auto max-w-6xl px-8 pb-24">
+      <section className="mx-auto w-full max-w-6xl flex-1 px-8 pb-24">
         {status.kind === 'loading' && (
           <p className="py-12 text-center text-sm text-[#6b7280]">Loading gallery…</p>
         )}
