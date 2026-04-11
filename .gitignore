@@ -12,3 +12,10 @@ coverage
 # Playwright MCP session cache — transient, shouldn't be tracked.
 .playwright-mcp/
 ux-audit/supabase/.env
+# Claude Code per-project config / agents / skills — machine-specific.
+.claude/
+# One-off UX audit screenshots dropped at repo root. Curated captures
+# belong in docs/ux-audit/<date>/.
+/ux-audit-*.png
+/page-*.png
+/screenshot-*.png

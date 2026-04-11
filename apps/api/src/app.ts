@@ -1,5 +1,6 @@
 import express, { type Express } from 'express';
 import cors from 'cors';
+import { createCronRouter } from './cron.js';
 
 export function createApp(): Express {
   const app = express();
@@ -15,6 +16,10 @@ export function createApp(): Express {
   app.get('/health', (_req, res) => {
     res.json({ ok: true });
   });
+
+  // Scheduled jobs (invoked by GitHub Actions cron). Auth lives
+  // inside the router via CRON_SECRET bearer check.
+  app.use(createCronRouter());
 
   return app;
 }

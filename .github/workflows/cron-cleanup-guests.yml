@@ -1,0 +1,64 @@
+name: cron-cleanup-guests
+
+# Weekly anonymous user cleanup — deletes Supabase guest accounts
+# that haven't signed in for 14 days. The API endpoint lives at
+# `/cron/cleanup-anonymous-users` on the Render service and is
+# gated by CRON_SECRET (matching the Authorization: Bearer header).
+#
+# Schedule: Sunday 03:00 UTC. Deliberately off-peak to minimize
+# contention with live traffic, and weekly (not daily) because
+# guest pruning isn't time-sensitive and each run wakes a
+# potentially-sleeping Render service.
+#
+# Secrets required:
+#   CRON_SECRET        — shared secret matching the API's env var
+#   API_BASE_URL       — https://api.postr.sh (or whatever Render hostname)
+
+on:
+  schedule:
+    # min hour dom month dow
+    - cron: '0 3 * * 0'
+  # Allow manual triggers from the Actions tab for ad-hoc cleanup runs.
+  workflow_dispatch:
+
+concurrency:
+  group: cron-cleanup-guests
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: Delete stale anonymous users
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call cleanup endpoint
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        run: |
+          if [ -z "$CRON_SECRET" ] || [ -z "$API_BASE_URL" ]; then
+            echo "Missing CRON_SECRET or API_BASE_URL secret. Aborting."
+            exit 1
+          fi
+
+          # Render services sleep after inactivity on the free tier —
+          # curl's retry flags handle the cold-start 502/connection-reset.
+          # --retry-connrefused covers the case where the service is
+          # literally not listening yet. Total budget: ~45s.
+          response=$(curl --silent --show-error \
+            --retry 3 \
+            --retry-connrefused \
+            --retry-delay 10 \
+            --connect-timeout 30 \
+            --max-time 120 \
+            --write-out "\nHTTP_STATUS:%{http_code}" \
+            -X POST "$API_BASE_URL/cron/cleanup-anonymous-users" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "Content-Type: application/json")
+
+          echo "$response"
+          status=$(echo "$response" | tail -n1 | sed 's/HTTP_STATUS://')
+          if [ "$status" != "200" ]; then
+            echo "Cleanup failed with status $status"
+            exit 1
+          fi

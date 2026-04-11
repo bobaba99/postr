@@ -1,0 +1,63 @@
+name: ci
+
+# Run on every push and pull request. Keeps the matrix tiny — one
+# Node version — because builds are fast enough that slicing across
+# versions isn't worth the cache churn yet. Bump to a matrix when we
+# start pinning engines in package.json.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel stale runs on the same ref so a force-push doesn't leave
+# ghost builds burning minutes.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: web (typecheck + test + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm -w @postr/shared run build --if-present
+
+      - name: Typecheck web
+        run: npm -w @postr/web run build
+
+      - name: Test web
+        run: npm -w @postr/web run test
+
+  api:
+    name: api (typecheck + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm -w @postr/shared run build --if-present
+
+      - name: Build API
+        run: npm -w @postr/api run build
