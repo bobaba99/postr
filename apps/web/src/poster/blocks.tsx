@@ -206,6 +206,15 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
   // activeCell (selecting a row clears cell focus and vice versa).
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
   const [selectedCol, setSelectedCol] = useState<number | null>(null);
+  // Rectangular cell-range selection (drag-select). `rangeStart` and
+  // `rangeEnd` are the two corners; normalize via min/max to compute
+  // the rectangle. While dragging, `dragRangeRef` holds the start
+  // cell and serves as the "drag in progress" flag — we use a ref
+  // instead of state so mouseenter handlers see the latest value
+  // without waiting for a re-render.
+  const [rangeStart, setRangeStart] = useState<{ r: number; c: number } | null>(null);
+  const [rangeEnd, setRangeEnd] = useState<{ r: number; c: number } | null>(null);
+  const dragRangeRef = useRef<{ start: { r: number; c: number } } | null>(null);
   // Right-click context menu
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; r: number; c: number } | null>(null);
 
@@ -267,15 +276,21 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
     if (e.key === 'Escape') setCtxMenu(null);
   };
 
-  // Close context menu on any click outside
+  // Close context menu on any click or right-click outside. We listen
+  // on `mousedown` instead of `click` and in the CAPTURE phase so the
+  // handler fires BEFORE any stopPropagation in the canvas/block/
+  // sidebar event tree can swallow it. The menu itself stops
+  // propagation on mousedown (see TableContextMenu) so internal
+  // clicks on menu items don't trigger dismissal before the button's
+  // own onClick fires.
   useEffect(() => {
     if (!ctxMenu) return;
     const close = () => setCtxMenu(null);
-    window.addEventListener('click', close);
-    window.addEventListener('contextmenu', close);
+    document.addEventListener('mousedown', close, { capture: true });
+    document.addEventListener('contextmenu', close, { capture: true });
     return () => {
-      window.removeEventListener('click', close);
-      window.removeEventListener('contextmenu', close);
+      document.removeEventListener('mousedown', close, { capture: true } as AddEventListenerOptions);
+      document.removeEventListener('contextmenu', close, { capture: true } as AddEventListenerOptions);
     };
   }, [ctxMenu]);
 
@@ -301,6 +316,62 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selectedRow, selectedCol, data, commit]);
+
+  // Range cell-content clear via Delete/Backspace. Fires only when a
+  // multi-cell range is selected and no editable target has focus.
+  useEffect(() => {
+    if (!rangeStart || !rangeEnd) return;
+    // Skip if the range is just a single cell — single-cell work
+    // goes through normal contentEditable editing.
+    const single = rangeStart.r === rangeEnd.r && rangeStart.c === rangeEnd.c;
+    if (single) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      const r0 = Math.min(rangeStart.r, rangeEnd.r);
+      const r1 = Math.max(rangeStart.r, rangeEnd.r);
+      const c0 = Math.min(rangeStart.c, rangeEnd.c);
+      const c1 = Math.max(rangeStart.c, rangeEnd.c);
+      let next = data;
+      for (let r = r0; r <= r1; r++) {
+        for (let c = c0; c <= c1; c++) {
+          next = updateCell(next, r, c, '');
+        }
+      }
+      commit(next);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [rangeStart, rangeEnd, data, commit]);
+
+  // Document-level mouseup to flip off the drag-in-progress flag.
+  // The range state itself stays as-is — a single-cell range (no
+  // drag) will be cleared when that cell's contentEditable gains
+  // focus in the onFocus handler below.
+  useEffect(() => {
+    const onUp = () => {
+      dragRangeRef.current = null;
+    };
+    document.addEventListener('mouseup', onUp);
+    return () => document.removeEventListener('mouseup', onUp);
+  }, []);
+
+  // Helpers for the cell-in-range check used by the highlight logic.
+  const inRange = (r: number, c: number) => {
+    if (!rangeStart || !rangeEnd) return false;
+    const r0 = Math.min(rangeStart.r, rangeEnd.r);
+    const r1 = Math.max(rangeStart.r, rangeEnd.r);
+    const c0 = Math.min(rangeStart.c, rangeEnd.c);
+    const c1 = Math.max(rangeStart.c, rangeEnd.c);
+    return r >= r0 && r <= r1 && c >= c0 && c <= c1;
+  };
+  const isMultiCellRange = !!(
+    rangeStart &&
+    rangeEnd &&
+    (rangeStart.r !== rangeEnd.r || rangeStart.c !== rangeEnd.c)
+  );
 
   // Click anywhere outside the table container clears row/col selection.
   useEffect(() => {
@@ -416,6 +487,49 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
         percentage width between this column and the one to its right.
         Semi-transparent by default, darkens on hover for discovery.
       */}
+      {/*
+        Active-cell row + column guide overlay. When a cell is focused,
+        draw a faint gray band spanning the whole row and another
+        spanning the whole column, so the user can see which row/col
+        they're typing in at a glance (Excel / Numbers pattern). Uses
+        percentage-based positioning so it survives column resize.
+      */}
+      {activeCell && (
+        <>
+          {/* Row band — full width, positioned at the active row's vertical slot */}
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: `${(activeCell.r / data.rows) * 100}%`,
+              height: `${100 / data.rows}%`,
+              background: '#9ca3af18',
+              borderTop: '1px solid #9ca3af66',
+              borderBottom: '1px solid #9ca3af66',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          />
+          {/* Column band — full height, positioned at the active col's horizontal slot */}
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: `${colWidths.slice(0, activeCell.c).reduce((s, w) => s + w, 0)}%`,
+              width: `${colWidths[activeCell.c] ?? 100 / data.cols}%`,
+              background: '#9ca3af18',
+              borderLeft: '1px solid #9ca3af66',
+              borderRight: '1px solid #9ca3af66',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+          />
+        </>
+      )}
       {colWidths.slice(0, -1).map((_, i) => {
         const leftPct = colWidths.slice(0, i + 1).reduce((s, w) => s + w, 0);
         return (
@@ -450,13 +564,41 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
                 const isActive = activeCell?.r === r && activeCell?.c === c;
                 const inSelectedRow = selectedRow === r;
                 const inSelectedCol = selectedCol === c;
-                const inSelection = inSelectedRow || inSelectedCol;
+                const inRangeCell = inRange(r, c);
+                const inSelection = inSelectedRow || inSelectedCol || inRangeCell;
                 return (
                 <td
                   key={c}
+                  onMouseDown={(e) => {
+                    // Left button only; ignore right-click.
+                    if (e.button !== 0) return;
+                    // Seed the drag-range at this cell. If the user
+                    // releases without moving, this ends up being a
+                    // no-op — the contentEditable inside focuses
+                    // normally and the onFocus handler clears the
+                    // range. If they drag into another cell, the
+                    // onMouseEnter below extends the range.
+                    dragRangeRef.current = { start: { r, c } };
+                    setRangeStart({ r, c });
+                    setRangeEnd({ r, c });
+                    // Also clear whole-row/col selection.
+                    setSelectedRow(null);
+                    setSelectedCol(null);
+                  }}
                   onMouseEnter={() => {
                     setHoveredRow(r);
                     setHoveredCol(c);
+                    // If a drag is in progress, extend the range to
+                    // this cell. Also blur whatever contentEditable
+                    // the drag started in so its caret doesn't
+                    // stutter during the drag.
+                    if (dragRangeRef.current) {
+                      const start = dragRangeRef.current.start;
+                      if (start.r !== r || start.c !== c) {
+                        (document.activeElement as HTMLElement | null)?.blur?.();
+                      }
+                      setRangeEnd({ r, c });
+                    }
                   }}
                   onContextMenu={(e) => {
                     e.preventDefault();
@@ -466,8 +608,9 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
                   style={{
                     ...cellBorder(r, c),
                     padding: '2px 4px',
-                    // Selected row/col tints the whole cell; header row
-                    // keeps its faint accent underlay otherwise.
+                    // Selected row/col/range tints the whole cell;
+                    // header row keeps its faint accent underlay
+                    // otherwise.
                     background: inSelection
                       ? palette.accent + '22'
                       : r === 0
@@ -477,12 +620,14 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
                     color: palette.primary,
                     position: 'relative',
                     // Active cell highlight — subtle accent border.
-                    // Selected row/col overrides with a stronger border.
+                    // Selected row/col/range overrides with a stronger
+                    // border on every cell in the selection.
                     boxShadow: inSelection
                       ? `inset 0 0 0 1.5px ${palette.accent}`
                       : isActive
                         ? `inset 0 0 0 1.5px ${palette.accent}88`
                         : 'none',
+                    userSelect: isMultiCellRange ? 'none' : 'auto',
                   }}
                 >
                   <div
@@ -492,9 +637,18 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
                     onInput={(e) => updateCellValue(r, c, e.currentTarget.innerHTML)}
                     onFocus={() => {
                       setActiveCell({ r, c });
-                      // Focusing a cell clears any whole-row/col selection.
+                      // Focusing a cell clears any whole-row/col
+                      // selection AND any multi-cell range. If a
+                      // range drag is still in progress (ref is set)
+                      // we leave the range state alone so the drag
+                      // can continue — focus-clear only wins on a
+                      // completed click.
                       setSelectedRow(null);
                       setSelectedCol(null);
+                      if (!dragRangeRef.current) {
+                        setRangeStart(null);
+                        setRangeEnd(null);
+                      }
                     }}
                     onBlur={() => setActiveCell((prev) => prev?.r === r && prev?.c === c ? null : prev)}
                     onKeyDown={(e) => onCellKeyDown(e, r, c)}
@@ -754,7 +908,14 @@ function TableContextMenu({ x, y, r, c, data, onAction, onClose }: {
   return (
     <div
       ref={menuRef}
+      // Stop both click AND mousedown so the window-level close
+      // listener below (which listens on mousedown to dodge
+      // stopPropagation on button clicks elsewhere in the tree)
+      // doesn't dismiss the menu while the user is trying to click
+      // one of its items.
       onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}
       style={{
         position: 'fixed',
         top: adjY,
@@ -1238,21 +1399,29 @@ export function BlockFrame(props: BlockFrameProps) {
       )}
       {selected && (
         <div
+          // Positioned ABOVE the block like the delete button so it
+          // doesn't sit on top of the first line of content. Moved
+          // from top:-1 left:3 (which put the label inside the
+          // block's top-left corner, covering headings and title
+          // text) to top:-22 left:0 with slightly larger font so
+          // it's legible at normal zoom without blocking anything.
           style={{
             position: 'absolute',
-            top: -1,
-            left: 3,
-            fontSize: 6,
+            top: -22,
+            left: 0,
+            fontSize: 9,
             background: p.accent,
             color: '#fff',
-            padding: '1px 5px',
-            borderRadius: 2,
+            padding: '2px 6px',
+            borderRadius: 3,
             fontFamily: 'system-ui',
             fontWeight: 700,
+            letterSpacing: 0.5,
             textTransform: 'uppercase',
             zIndex: 10,
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
           }}
         >
           {b.type}
