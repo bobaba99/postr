@@ -660,6 +660,68 @@ export function PosterEditor() {
 
   const { zoom, setZoom } = useZoom(canvasRef, sizeKey);
 
+  // ── Touchpad pinch-to-zoom ─────────────────────────────────────────
+  //
+  // Trackpad pinch gestures (macOS + Windows precision drivers) fire
+  // `wheel` events with `ctrlKey: true` even though the user isn't
+  // holding Ctrl — the browser synthesizes the flag so sites can
+  // intercept the gesture. Same convention Figma, Excalidraw, tldraw,
+  // and Google Docs all use. Catching it here lets us:
+  //
+  //   1. Call `preventDefault()` to stop the browser from zooming
+  //      the whole webpage (which would include the sidebar, toolbars,
+  //      etc. — terrible UX for an editor).
+  //   2. Apply the delta to the poster's `zoom` state instead, so the
+  //      gesture zooms the canvas content alone.
+  //
+  // Mouse-wheel + Cmd/Ctrl also fires `ctrlKey: true` and triggers
+  // the same path — which is actually what a desktop user expects.
+  // Plain two-finger trackpad scroll (no pinch, no Ctrl) skips this
+  // branch and falls through to the wrapper's native `overflow:
+  // auto` behavior, so panning around a zoomed-in poster still works.
+  //
+  // Listener is attached with `{ passive: false }` because
+  // `preventDefault()` doesn't work on passive listeners — modern
+  // browsers default wheel listeners to passive for scroll perf, so
+  // you have to opt out explicitly.
+  //
+  // `zoomRef` mirrors the live zoom into a ref so the handler reads
+  // the freshest value across many rapid wheel events without having
+  // to tear down and re-attach the listener every tick (which could
+  // drop events mid-gesture).
+  const zoomRef = useRef(zoom);
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+
+    const ZOOM_MIN = 0.2;
+    const ZOOM_MAX = 5;
+
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return; // not a pinch / Cmd+wheel — let it scroll
+      e.preventDefault();
+
+      // Pinch deltas are small pixel values (~1–20 per tick). An
+      // exponential factor `exp(-deltaY / 220)` turns each delta into
+      // a multiplicative zoom step — zoom in on negative deltas, out
+      // on positive — that composes smoothly across a 60-event
+      // gesture without any linear "jump" feel.
+      const factor = Math.exp(-e.deltaY / 220);
+      const next = Math.min(
+        ZOOM_MAX,
+        Math.max(ZOOM_MIN, zoomRef.current * factor),
+      );
+      zoomRef.current = next; // optimistic update for back-to-back ticks
+      setZoom(next);
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [canvasRef, setZoom]);
+
   // ── Publish-to-gallery flow ────────────────────────────────────────
   // `handlePublish` opens the consent→metadata sequence managed by
   // usePublishFlowStore. If the user arrived with ?publish=1 (from the
