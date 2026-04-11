@@ -64,12 +64,20 @@ export interface Block {
   caption?: string;
   /**
    * Where the caption renders relative to the block frame.
-   * - `bottom` (default) — classic figure caption placement
-   * - `top` — placement above the block
+   * - `top` (default) — title-over-figure layout, the convention
+   *   most academic poster designers reach for first
+   * - `bottom` — classic figure caption placement
    * - `left` / `right` — side captions for portrait figures
    * - `none` — hide the caption + number entirely
    */
   captionPosition?: 'top' | 'bottom' | 'left' | 'right' | 'none';
+  /**
+   * Pixel gap between the caption and the block's content. Applied
+   * as a flex `gap` on the CaptionWrapper so it works for all four
+   * positions (top/bottom/left/right) with no extra math. Defaults
+   * to 6 px; the editor slider clamps to 0–24.
+   */
+  captionGap?: number;
 }
 
 export type FontWeight = 300 | 400 | 500 | 600 | 700 | 800;

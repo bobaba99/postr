@@ -1243,7 +1243,7 @@ function CaptionWrapper({
   label,
   children,
 }: CaptionWrapperProps) {
-  const position = block.captionPosition ?? 'bottom';
+  const position = block.captionPosition ?? 'top';
   // Even an empty caption gets the auto-numbered prefix so users can
   // see "Figure 1." immediately after placing a figure. Setting
   // `captionPosition: 'none'` opts out entirely.
@@ -1270,12 +1270,6 @@ function CaptionWrapper({
     lineHeight: 1.35,
     color: palette.muted || '#6b7280',
     fontStyle: 'italic',
-    padding:
-      position === 'top'
-        ? '0 4px 4px'
-        : position === 'bottom'
-          ? '4px 4px 0'
-          : '0 6px',
     flex: '0 0 auto',
     // Side captions get a fixed width so the image doesn't collapse.
     width: position === 'left' || position === 'right' ? '35%' : undefined,
@@ -1292,6 +1286,9 @@ function CaptionWrapper({
         display: 'flex',
         flexDirection,
         boxSizing: 'border-box',
+        // User-controlled caption gap. Clamped at render time so a
+        // corrupted stored value can't break layout.
+        gap: Math.max(0, Math.min(24, block.captionGap ?? 6)),
       }}
     >
       <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
@@ -1728,72 +1725,167 @@ export function BlockFrame(props: BlockFrameProps) {
       {selected && (
         <>
           {/*
-            External MOVE handle — top-left, outside the frame.
-            Added 2026-04-11 because image and logo blocks couldn't
-            be reliably dragged from their content area: the
-            browser's native image-drag behavior hijacked the
-            pointer events even with draggable={false} on the <img>.
-            Routing move through a dedicated handle side-steps the
-            conflict entirely. Text and table blocks ALSO get the
-            handle (for consistency) but can still be dragged from
-            anywhere in the frame.
+            Top handle row — move + label + delete laid out in a
+            single flex container positioned above the block.
+            Rewritten 2026-04-11 because narrow blocks (logo at 50
+            poster units) ended up with the label pill visually
+            covering the move and delete buttons. The flex container
+            has a `minWidth` that guarantees enough room for all
+            three children + two gaps, and since it's centered via
+            `left: 50%; translate(-50%)`, the row extends beyond
+            the block's bounds symmetrically on narrow blocks — no
+            more button overlap. Wider blocks grow the container via
+            `width: 100%` so the three items still span the block's
+            full width when there's room.
           */}
-          <button
-            type="button"
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              onPointerDown(e, b.id, 'move');
-            }}
+          <div
             style={{
               position: 'absolute',
               top: -26,
-              left: 0,
-              width: 20,
+              left: '50%',
+              // Row stays glued to the block's horizontal center no
+              // matter how the block is sized or rotated. The
+              // rotation is cancelled so the handles stay upright.
+              transform: b.rotation
+                ? `translateX(-50%) rotate(${-b.rotation}deg)`
+                : 'translateX(-50%)',
+              transformOrigin: 'center center',
+              width: '100%',
+              // 110 px guarantees enough room for the 20 px move
+              // button + 20 px delete button + the label pill's
+              // minimum width + the two 6 px gaps between them.
+              // Narrow blocks (< 110 units wide) let the row
+              // overflow both sides symmetrically instead of
+              // clipping or overlapping.
+              minWidth: 110,
               height: 20,
-              borderRadius: '50%',
-              background: p.accent,
-              color: '#fff',
-              border: '2px solid #0a0a12',
-              cursor: 'move',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
+              justifyContent: 'space-between',
+              gap: 6,
+              boxSizing: 'border-box',
+              pointerEvents: 'none',
               zIndex: 10,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-              padding: 0,
-              // Counter-rotate so the icon stays readable even when
-              // the block itself is rotated. Without this, the move
-              // handle icon spins with the block.
-              transform: b.rotation ? `rotate(${-b.rotation}deg)` : undefined,
             }}
-            title="Drag to move (or use arrow keys)"
           >
-            {/*
-              4-way move icon — thin stroke SVG instead of the old
-              Unicode ✥ character, which rendered as a heavy
-              decorative glyph that was hard to read at 20×20. SVG
-              gives consistent cross-platform rendering at exactly
-              the stroke width we want.
-            */}
-            <svg
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
+            <button
+              type="button"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                onPointerDown(e, b.id, 'move');
+              }}
+              style={{
+                flex: '0 0 20px',
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                background: p.accent,
+                color: '#fff',
+                border: '2px solid #0a0a12',
+                cursor: 'move',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                padding: 0,
+                pointerEvents: 'auto',
+              }}
+              title="Drag to move (or use arrow keys)"
             >
-              <polyline points="5 9 2 12 5 15" />
-              <polyline points="9 5 12 2 15 5" />
-              <polyline points="15 19 12 22 9 19" />
-              <polyline points="19 9 22 12 19 15" />
-              <line x1="2" y1="12" x2="22" y2="12" />
-              <line x1="12" y1="2" x2="12" y2="22" />
-            </svg>
-          </button>
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <polyline points="5 9 2 12 5 15" />
+                <polyline points="9 5 12 2 15 5" />
+                <polyline points="15 19 12 22 9 19" />
+                <polyline points="19 9 22 12 19 15" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <line x1="12" y1="2" x2="12" y2="22" />
+              </svg>
+            </button>
+
+            <div
+              style={{
+                flex: '1 1 auto',
+                minWidth: 0,
+                height: 20,
+                boxSizing: 'border-box',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 9,
+                background: p.accent,
+                color: '#fff',
+                padding: '0 8px',
+                borderRadius: 10,
+                border: '2px solid #0a0a12',
+                fontFamily: 'system-ui',
+                fontWeight: 700,
+                letterSpacing: 0.5,
+                textTransform: 'uppercase',
+                lineHeight: 1,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                pointerEvents: 'none',
+              }}
+            >
+              {b.type}
+              {typeof b.rotation === 'number' && b.rotation !== 0 && (
+                <span style={{ marginLeft: 6, opacity: 0.8 }}>
+                  {Math.round(b.rotation)}°
+                </span>
+              )}
+            </div>
+
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(b.id);
+              }}
+              style={{
+                flex: '0 0 20px',
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                background: '#d33',
+                color: '#fff',
+                border: '2px solid #0a0a12',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                padding: 0,
+                pointerEvents: 'auto',
+              }}
+              title="Delete block"
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+              >
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="18" y1="6" x2="6" y2="18" />
+              </svg>
+            </button>
+          </div>
 
           {/*
             External ROTATE handle — BELOW the block, centered.
@@ -1864,110 +1956,7 @@ export function BlockFrame(props: BlockFrameProps) {
           >
             ↻
           </button>
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(b.id);
-            }}
-            // Positioned OUTSIDE the block bounds (above the top
-            // edge) so it doesn't cover any content at the top of
-            // the block. Part of the top handle row: move (left),
-            // label (center), delete (right). Using SVG for the X
-            // instead of a Unicode `×` character because `×` has
-            // inconsistent glyph metrics across fonts and wasn't
-            // visually centered inside the button — flagged by the
-            // user on 2026-04-11.
-            style={{
-              position: 'absolute',
-              top: -26,
-              right: 0,
-              width: 20,
-              height: 20,
-              borderRadius: '50%',
-              background: '#d33',
-              color: '#fff',
-              border: '2px solid #0a0a12',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 10,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-              padding: 0,
-              transform: b.rotation ? `rotate(${-b.rotation}deg)` : undefined,
-            }}
-            title="Delete block"
-          >
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <line x1="6" y1="6" x2="18" y2="18" />
-              <line x1="18" y1="6" x2="6" y2="18" />
-            </svg>
-          </button>
         </>
-      )}
-      {selected && (
-        <div
-          // Positioned at TOP-CENTER of the block, above the frame,
-          // on the SAME baseline as the move + delete handles. The
-          // three siblings — move (left), label (center), delete
-          // (right) — all share:
-          //   - top: -26          (identical vertical offset)
-          //   - height: 20        (identical outer height with border-box)
-          //   - boxSizing: border-box
-          // so their centerlines and edges line up precisely. This
-          // was a user-reported inconsistency: the label used to
-          // have no explicit height + sit at top: -22, making it
-          // look ~4px lower than the circles around it.
-          //
-          // The counter-rotate keeps the label readable + horizontal
-          // when the block itself is rotated.
-          style={{
-            position: 'absolute',
-            top: -26,
-            left: '50%',
-            height: 20,
-            boxSizing: 'border-box',
-            display: 'flex',
-            alignItems: 'center',
-            fontSize: 9,
-            background: p.accent,
-            color: '#fff',
-            padding: '0 8px',
-            borderRadius: 10,
-            border: '2px solid #0a0a12',
-            fontFamily: 'system-ui',
-            fontWeight: 700,
-            letterSpacing: 0.5,
-            textTransform: 'uppercase',
-            lineHeight: 1,
-            zIndex: 10,
-            whiteSpace: 'nowrap',
-            pointerEvents: 'none',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-            transform: b.rotation
-              ? `translateX(-50%) rotate(${-b.rotation}deg)`
-              : 'translateX(-50%)',
-            transformOrigin: 'center center',
-          }}
-        >
-          {b.type}
-          {typeof b.rotation === 'number' && b.rotation !== 0 && (
-            <span style={{ marginLeft: 6, opacity: 0.8 }}>
-              {Math.round(b.rotation)}°
-            </span>
-          )}
-        </div>
       )}
 
       {/* Floating format toolbar for text-like blocks. Mounted at the

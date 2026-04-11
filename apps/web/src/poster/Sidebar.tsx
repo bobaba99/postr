@@ -2120,6 +2120,42 @@ function CaptionEditor(props: {
           </button>
         ))}
       </div>
+      {/* Caption gap slider — lets the user tighten or loosen the
+          breathing room between the caption and the figure/table
+          content without touching any other spacing. Only relevant
+          when a caption is actually visible, so we hide the row
+          entirely when position === 'none'. */}
+      {position !== 'none' && (
+        <>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: 13,
+              color: '#8a8a95',
+            }}
+          >
+            <span>Caption spacing</span>
+            <span style={{ color: '#c8cad0', fontWeight: 600 }}>
+              {block.captionGap ?? 6} px
+            </span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={24}
+            step={1}
+            value={block.captionGap ?? 6}
+            onChange={(e) =>
+              onUpdateBlock(block.id, {
+                captionGap: Number(e.target.value),
+              })
+            }
+            style={{ width: '100%' }}
+          />
+        </>
+      )}
     </div>
   );
 }
