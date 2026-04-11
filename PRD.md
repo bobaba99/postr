@@ -680,7 +680,6 @@ PosterForge (root)
 
 ### Remaining Limitations (not in v1 scope)
 
-- **No undo/redo** — would need command pattern or state history stack
 - **No multi-select** — can only select and operate on one block at a time
 - **No rich text** — text blocks are plain text (no inline bold/italic/mixed formatting within a single block)
 - **No PNG/PPTX export** — only browser print-to-PDF in v1 (html2canvas + jsPDF in v2)
@@ -690,18 +689,18 @@ PosterForge (root)
 
 ### Future Work (post-v1)
 
-1. **Undo/redo stack**: Track state diffs, Ctrl+Z/Ctrl+Y
-2. **Rich text editing**: Integrate TipTap or Slate.js for inline formatting within text blocks
-3. **PDF export via html2canvas + jsPDF**: Client-side PDF generation without browser print dialog
-4. **LaTeX math via KaTeX**: Inline math rendering for STEM posters
-5. **Real-time collaboration**: WebSocket + CRDT (e.g., Yjs) for multi-user editing
-6. **Template gallery**: User-submitted templates with thumbnails
-7. **Poster score/lint**: Check design rules (font size minimums for readability at 3 feet, margin compliance, contrast ratios, text density warnings)
-8. **Zotero API integration**: Direct library connection instead of file import only
-9. **Accessibility**: Keyboard navigation for all block operations, screen reader labels
-10. **Comment/annotation system**: Inline comments on blocks for advisor feedback. Threaded replies, resolve/unresolve states, comment indicators on the canvas. Enable a "share for review" mode where advisors can comment without editing. Store comments in a `poster_comments` table with `block_id`, `user_id`, `content`, `resolved_at`, `parent_comment_id`.
-11. **Poster gallery / inspiration board**: Users can submit their past successful conference posters (with consent) as public examples. Gallery page with filtering by field (psychology, neuroscience, psychiatry), conference (APA, SfN), and layout type (3-column, billboard). Each submission includes: poster image, field, conference, year, and optional "what worked" notes. Helps beginners see real examples before starting. Moderation via admin review before publishing. Store in `poster_gallery` table with `submitted_by`, `field`, `conference`, `year`, `image_url`, `notes`, `approved`.
-12. **OCR-based figure readability**: Upload-only path for users without plotting code. Local Ollama (llava/moondream) or Claude Vision to detect text regions in images, measure pixel heights, compute effective print size. Phase 2 PRD exists at `docs/plans/2026-04-10-figure-readability-ocr-phase2.md`.
+1. **Rich text editing**: Integrate TipTap or Slate.js for inline formatting within text blocks
+2. **PDF export via html2canvas + jsPDF**: Client-side PDF generation without browser print dialog
+3. **LaTeX math via KaTeX**: Inline math rendering for STEM posters
+4. **Real-time collaboration**: WebSocket + CRDT (e.g., Yjs) for multi-user editing
+5. **Template gallery**: User-submitted templates with thumbnails
+6. **Poster score/lint**: Check design rules (font size minimums for readability at 3 feet, margin compliance, contrast ratios, text density warnings)
+7. **Zotero API integration**: Direct library connection instead of file import only
+8. **Accessibility**: Keyboard navigation for all block operations, screen reader labels
+9. **Comment/annotation system**: Inline comments on blocks for advisor feedback. Threaded replies, resolve/unresolve states, comment indicators on the canvas. Enable a "share for review" mode where advisors can comment without editing. Store comments in a `poster_comments` table with `block_id`, `user_id`, `content`, `resolved_at`, `parent_comment_id`.
+10. **Poster gallery / inspiration board**: Users can submit their past successful conference posters (with consent) as public examples. Gallery page with filtering by field (psychology, neuroscience, psychiatry), conference (APA, SfN), and layout type (3-column, billboard). Each submission includes: poster image, field, conference, year, and optional "what worked" notes. Helps beginners see real examples before starting. Moderation via admin review before publishing. Store in `poster_gallery` table with `submitted_by`, `field`, `conference`, `year`, `image_url`, `notes`, `approved`.
+11. **OCR-based figure readability**: Upload-only path for users without plotting code. Local Ollama (llava/moondream) or Claude Vision to detect text regions in images, measure pixel heights, compute effective print size. Phase 2 PRD exists at `docs/plans/2026-04-10-figure-readability-ocr-phase2.md`.
+12. **Telemetry & analytics**: Wire up PostHog (product analytics — funnels, session recordings, feature usage) and GA4 (acquisition — SEO, marketing attribution). Both gated behind cookie consent banner per GDPR/ePrivacy; Supabase auth tokens are essential and exempt. Key events to instrument: `poster_created`, `block_added` (with `block_type`), `export_pdf`, `signup_completed` (with `provider`), `anonymous_to_permanent_conversion`, `template_applied`. Error tracking via PostHog exceptions or Sentry. Add server-side telemetry on API for LLM cost/latency per endpoint. Environment vars: `VITE_POSTHOG_KEY`, `VITE_GA4_MEASUREMENT_ID`.
 
 ---
 
