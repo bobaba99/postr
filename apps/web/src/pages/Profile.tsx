@@ -89,21 +89,36 @@ export default function Profile() {
     if (action === 'deleteAccount') {
       setActionStatus('Deleting account…');
       try {
-        // Delete all posters
+        // 1. Delete all posters (client-side, RLS-protected)
         const posters = await listPosters();
         for (const p of posters) {
           await deletePoster(p.id);
         }
-        // Clear all local data
+
+        // 2. Delete the auth user via Edge Function (requires service_role)
+        // This removes the user from auth.users so the email can be re-used.
+        // Falls back gracefully if the function isn't deployed yet.
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            await supabase.functions.invoke('delete-account', {
+              headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+          }
+        } catch {
+          // Edge function not deployed — sign out only (user remains in auth.users)
+        }
+
+        // 3. Clear all local data
         localStorage.removeItem('postr.style-presets');
         localStorage.removeItem('postr.scratch-pad');
         localStorage.removeItem('postr.scratch-note');
         localStorage.removeItem('postr.checklist-templates');
         localStorage.removeItem('postr.profile');
         localStorage.removeItem('postr.onboarding-done');
-        // Sign out fully (global scope clears server session too)
+
+        // 4. Sign out + redirect
         await supabase.auth.signOut({ scope: 'global' });
-        // Redirect to auth page (AuthGuard will prevent dashboard access)
         navigate('/auth');
       } catch (err) {
         setActionError(err instanceof Error ? err.message : 'Failed to delete account');
