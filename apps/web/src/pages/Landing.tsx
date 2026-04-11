@@ -17,12 +17,20 @@ export default function Landing() {
           </svg>
           <span className="text-xl font-bold">Postr</span>
         </div>
-        <Link
-          to="/auth"
-          className="rounded-lg border border-[#7c6aed] px-5 py-2 text-sm font-semibold text-[#7c6aed] no-underline hover:bg-[#7c6aed] hover:text-white transition-colors"
-        >
-          Sign in
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link
+            to="/about"
+            className="text-sm text-[#6b7280] no-underline hover:text-[#c8cad0]"
+          >
+            About
+          </Link>
+          <Link
+            to="/auth"
+            className="rounded-lg border border-[#7c6aed] px-5 py-2 text-sm font-semibold text-[#7c6aed] no-underline hover:bg-[#7c6aed] hover:text-white transition-colors"
+          >
+            Sign in
+          </Link>
+        </div>
       </header>
 
       <section className="mx-auto max-w-3xl px-8 py-24 text-center">
@@ -81,7 +89,15 @@ export default function Landing() {
       </section>
 
       <footer className="border-t border-[#1f1f2e] px-8 py-6 text-center text-sm text-[#555]">
-        Postr is free and open source. Built for students and researchers.
+        <div className="mb-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+          <Link to="/about" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
+            About
+          </Link>
+          <Link to="/auth" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
+            Sign in
+          </Link>
+        </div>
+        Built for students and researchers.
       </footer>
     </main>
   );

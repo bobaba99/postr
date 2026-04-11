@@ -2,6 +2,7 @@
  * App routes.
  *
  *   /              → Landing (public)
+ *   /about         → About (public, timeline narrative)
  *   /auth          → Auth (sign in / sign up / guest)
  *   /dashboard     → My Posters (auth-gated)
  *   /p/:posterId   → Editor (auth-gated)
@@ -12,6 +13,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import Landing from '@/pages/Landing';
+import About from '@/pages/About';
 import Auth from '@/pages/Auth';
 import Home from '@/pages/Home';
 import Editor from '@/pages/Editor';
@@ -24,6 +26,7 @@ export function AppRoutes() {
     <Routes>
       {/* Public routes */}
       <Route path="/" element={<Landing />} />
+      <Route path="/about" element={<About />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/s/:slug" element={<Share />} />
 
