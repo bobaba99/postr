@@ -76,7 +76,20 @@ const SEABORN_CONTEXTS: Record<string, number> = {
 
 // ── R Parser ─────────────────────────────────────────────────────────
 
-export function parseRCode(code: string): FigureParams {
+/**
+ * Optional hint the caller can pass when the user's code doesn't
+ * include a `ggsave()` / `plt.savefig()` call: treat THIS size as the
+ * canvas default instead of the hardcoded library default (R = 7×7,
+ * matplotlib = 6.4×4.8). Used by the Check tab's figure-preview
+ * overlay — whatever box the user dragged on the canvas is the size
+ * they plan to render at, so parsing should honor it as the default.
+ */
+export interface ParseOptions {
+  defaultWidthIn?: number;
+  defaultHeightIn?: number;
+}
+
+export function parseRCode(code: string, options: ParseOptions = {}): FigureParams {
   const warnings: string[] = [];
 
   // base_size from theme_*()
@@ -112,9 +125,14 @@ export function parseRCode(code: string): FigureParams {
     }
   }
 
-  // Canvas from ggsave()
-  let width = R_DEFAULTS.width;
-  let height = R_DEFAULTS.height;
+  // Canvas from ggsave() — if missing, fall back to the caller-
+  // provided default (e.g. the figure-preview overlay's dimensions
+  // from the Check tab) instead of R's built-in 7×7. That way
+  // the source size the analyzer scores against matches what the
+  // user can SEE on the canvas, rather than a hidden library
+  // constant they'd have to guess at.
+  let width = options.defaultWidthIn ?? R_DEFAULTS.width;
+  let height = options.defaultHeightIn ?? R_DEFAULTS.height;
   let units = 'in';
   let dpi = 300;
   const ggsave = code.match(/ggsave\s*\([^)]*\)/s);
@@ -131,6 +149,10 @@ export function parseRCode(code: string): FigureParams {
     if (units === 'cm') { width /= 2.54; height /= 2.54; }
     else if (units === 'mm') { width /= 25.4; height /= 25.4; }
     else if (units === 'px') { width /= dpi; height /= dpi; }
+  } else if (options.defaultWidthIn !== undefined) {
+    warnings.push(
+      `No ggsave() found — using figure preview size ${width.toFixed(1)}"×${height.toFixed(1)}" as the source canvas.`,
+    );
   } else {
     warnings.push('No canvas size found — assuming R default 7"×7" (ggsave).');
   }
@@ -161,7 +183,7 @@ export function parseRCode(code: string): FigureParams {
 
 // ── Python Parser ────────────────────────────────────────────────────
 
-export function parsePythonCode(code: string): FigureParams {
+export function parsePythonCode(code: string, options: ParseOptions = {}): FigureParams {
   const warnings: string[] = [];
 
   let baseSize = PY_DEFAULTS.baseSize;
@@ -197,15 +219,22 @@ export function parsePythonCode(code: string): FigureParams {
   if (ticks) overrides.axisText = parseFloat(ticks[1]!);
   if (title) overrides.plotTitle = parseFloat(title[1]!);
 
-  // figsize
-  let width = PY_DEFAULTS.width;
-  let height = PY_DEFAULTS.height;
+  // figsize — same overlay-default override pattern as parseRCode.
+  // If the user's Python code doesn't set figsize=(w,h) we prefer
+  // the figure-preview overlay's dimensions over matplotlib's
+  // 6.4×4.8 built-in so the analyzer and the UI agree on scale.
+  let width = options.defaultWidthIn ?? PY_DEFAULTS.width;
+  let height = options.defaultHeightIn ?? PY_DEFAULTS.height;
   const figsize = code.match(/figsize\s*=\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
   const pltFig = code.match(/plt\.figure\s*\(\s*figsize\s*=\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
   const fs = figsize ?? pltFig;
   if (fs) {
     width = parseFloat(fs[1]!);
     height = parseFloat(fs[2]!);
+  } else if (options.defaultWidthIn !== undefined) {
+    warnings.push(
+      `No figsize=(w,h) found — using figure preview size ${width.toFixed(1)}"×${height.toFixed(1)}" as the source canvas.`,
+    );
   } else {
     warnings.push('No canvas size found — assuming matplotlib default 6.4"×4.8".');
   }

@@ -304,6 +304,14 @@ export function Sidebar(props: SidebarProps) {
         // don't need to reflow.
         width: 484,
         minWidth: 484,
+        // `height: 100%` + `minHeight: 0` so the sidebar always fills
+        // its (now animated) wrapper and its inner panel-content div
+        // with `overflow: auto` has a bounded parent to scroll within.
+        // Without these, the wrapper's content-driven height let the
+        // panel grow unbounded and users couldn't scroll tall tabs
+        // like Plot Code Check.
+        height: '100%',
+        minHeight: 0,
         background: '#111118',
         color: '#c8cad0',
         display: 'flex',
@@ -1197,6 +1205,49 @@ function RefsTab(props: {
 }) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [manual, setManual] = useState({ authors: '', year: '', title: '', journal: '' });
+  const [pasteText, setPasteText] = useState('');
+  const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
+
+  /**
+   * Split a pasted references block into individual citation strings.
+   * Handles two common cases users paste from manuscripts:
+   *   1. Blank line separated — `a.\n\nb.\n\nc.` → ['a.', 'b.', 'c.']
+   *   2. One ref per line   — `a.\nb.\nc.`      → ['a.', 'b.', 'c.']
+   * If there are blank lines anywhere, we use those as the delimiter
+   * (preserves multi-line refs). Otherwise every non-empty line
+   * becomes its own reference.
+   */
+  const splitPastedRefs = (text: string): string[] => {
+    const trimmed = text.trim();
+    if (!trimmed) return [];
+    const hasBlankLines = /\n\s*\n/.test(trimmed);
+    const raw = hasBlankLines
+      ? trimmed.split(/\n\s*\n+/)
+      : trimmed.split(/\n+/);
+    return raw
+      .map((s) => s.trim().replace(/^\d+[.)]\s*/, '')) // strip "1." or "1)" prefixes
+      .filter((s) => s.length > 0);
+  };
+
+  const addPasted = () => {
+    const chunks = splitPastedRefs(pasteText);
+    if (!chunks.length) {
+      setPasteFeedback('Paste some references first.');
+      setTimeout(() => setPasteFeedback(null), 2500);
+      return;
+    }
+    const added: Reference[] = chunks.map((raw) => ({
+      id: nanoid(8),
+      authors: [],
+      rawText: raw,
+    }));
+    props.onChangeReferences([...props.references, ...added]);
+    setPasteText('');
+    setPasteFeedback(
+      `✓ Added ${added.length} reference${added.length === 1 ? '' : 's'}.`,
+    );
+    setTimeout(() => setPasteFeedback(null), 2500);
+  };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -1326,6 +1377,57 @@ function RefsTab(props: {
           </div>
         </>
       )}
+
+      <div style={{ ...labelStyle, marginTop: 28 }}>Paste from Manuscript</div>
+      <p style={{ fontSize: 13, color: '#6b7280', margin: 0, lineHeight: 1.5 }}>
+        Already have your references formatted in a paper? Paste the whole
+        block here — one per line, or separated by blank lines. Each
+        entry is stored verbatim and rendered exactly as pasted, so your
+        existing APA / Vancouver / in-house formatting is preserved.
+      </p>
+      <textarea
+        value={pasteText}
+        onChange={(e) => setPasteText(e.target.value)}
+        placeholder={
+          'Smith, J. (2023). Example paper title. Journal of Examples, 12(3), 42–69.\nDoe, A., & Roe, B. (2024). Another paper title. Journal of Samples, 8(1), 1–14.'
+        }
+        spellCheck={false}
+        style={{
+          ...inputBase,
+          minHeight: 120,
+          resize: 'vertical',
+          fontFamily:
+            'ui-monospace, "SF Mono", Menlo, Monaco, monospace',
+          fontSize: 12,
+          lineHeight: 1.55,
+          whiteSpace: 'pre',
+        }}
+      />
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <button
+          type="button"
+          onClick={addPasted}
+          disabled={!pasteText.trim()}
+          style={{
+            all: 'unset',
+            cursor: pasteText.trim() ? 'pointer' : 'not-allowed',
+            padding: '10px 16px',
+            background: pasteText.trim() ? '#7c6aed' : '#2a2a3a',
+            color: pasteText.trim() ? '#fff' : '#6b7280',
+            border: 'none',
+            borderRadius: 8,
+            fontSize: 13,
+            fontWeight: 700,
+            textAlign: 'center',
+            opacity: pasteText.trim() ? 1 : 0.6,
+          }}
+        >
+          Parse & add
+        </button>
+        {pasteFeedback && (
+          <span style={{ fontSize: 13, color: '#a6e3a1' }}>{pasteFeedback}</span>
+        )}
+      </div>
 
       <div style={{ ...labelStyle, marginTop: 28 }}>Manual Entry</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

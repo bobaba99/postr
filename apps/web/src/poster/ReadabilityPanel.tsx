@@ -476,8 +476,19 @@ export function ReadabilityPanel({
       setChecked(null);
       return;
     }
+    // Pass the current figure-preview overlay (or selected image
+    // block) dimensions to the parser as the canvas default —
+    // that way a user whose code doesn't contain ggsave() /
+    // plt.savefig() still gets their analysis scored against the
+    // exact dimensions they see highlighted in the description pill.
+    const parseOpts = {
+      defaultWidthIn: blockWidthIn,
+      defaultHeightIn: blockHeightIn,
+    };
     const params =
-      detectedLang === 'r' ? parseRCode(code) : parsePythonCode(code);
+      detectedLang === 'r'
+        ? parseRCode(code, parseOpts)
+        : parsePythonCode(code, parseOpts);
     const result = computeReadability(params, blockHeightIn, blockWidthIn);
     const fullFix = generateFullFix(code, params, result.suggestedBaseSize);
     setChecked({ code, result, params, fullFix });

@@ -1149,7 +1149,14 @@ function WritingTipCard({ section: s, index, expanded, onToggle }: {
 const panelStyle: CSSProperties = {
   width: 320,
   minWidth: 320,
-  height: '100vh',
+  // `height: 100%` instead of `100vh`: the panel now lives inside
+  // an animated width wrapper that fills its flex row, so using
+  // the wrapper's height prevents a mismatch with the sidebar
+  // height (which is the canvas minus header/footer, not vh).
+  // `minHeight: 0` is load-bearing: without it the inner
+  // overflow:auto scroll container grows unbounded.
+  height: '100%',
+  minHeight: 0,
   background: '#111118',
   borderLeft: '1px solid #1f1f2e',
   display: 'flex',

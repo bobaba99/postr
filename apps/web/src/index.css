@@ -103,3 +103,124 @@ body {
   animation: postr-dimension-pulse 2200ms cubic-bezier(0.4, 0, 0.6, 1) infinite;
   will-change: transform, box-shadow;
 }
+
+/* ===================================================================
+ * Premium scrollbars
+ * ===================================================================
+ *
+ * Thin, semi-transparent, rounded scrollbars that match the dark
+ * chrome palette. Two variants:
+ *
+ *   data-postr-sidebar, data-postr-guidelines
+ *     → 8 px wide, purple accent thumb, dim when idle, brighter on
+ *       hover. Applied to the whole panel tree so inner scroll
+ *       containers (tab content, tables, editors) all inherit the
+ *       same styling.
+ *
+ *   The main canvas-wrapper area
+ *     → 10 px wide, neutral gray thumb, slightly more prominent
+ *       because the canvas area has more real estate.
+ *
+ * Firefox uses `scrollbar-color` + `scrollbar-width`. WebKit needs
+ * the nested pseudo-elements. Both sets are set so every browser
+ * gets the upgrade.
+ */
+
+[data-postr-sidebar],
+[data-postr-sidebar] *,
+[data-postr-guidelines],
+[data-postr-guidelines] * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 106, 237, 0.35) transparent;
+}
+
+[data-postr-sidebar] *::-webkit-scrollbar,
+[data-postr-guidelines] *::-webkit-scrollbar,
+[data-postr-sidebar]::-webkit-scrollbar,
+[data-postr-guidelines]::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+[data-postr-sidebar] *::-webkit-scrollbar-track,
+[data-postr-guidelines] *::-webkit-scrollbar-track,
+[data-postr-sidebar]::-webkit-scrollbar-track,
+[data-postr-guidelines]::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 999px;
+}
+
+[data-postr-sidebar] *::-webkit-scrollbar-thumb,
+[data-postr-guidelines] *::-webkit-scrollbar-thumb,
+[data-postr-sidebar]::-webkit-scrollbar-thumb,
+[data-postr-guidelines]::-webkit-scrollbar-thumb {
+  background: linear-gradient(
+    180deg,
+    rgba(124, 106, 237, 0.35) 0%,
+    rgba(157, 135, 255, 0.35) 100%
+  );
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 200ms ease;
+}
+
+[data-postr-sidebar] *::-webkit-scrollbar-thumb:hover,
+[data-postr-guidelines] *::-webkit-scrollbar-thumb:hover,
+[data-postr-sidebar]::-webkit-scrollbar-thumb:hover,
+[data-postr-guidelines]::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(124, 106, 237, 0.75) 0%,
+    rgba(157, 135, 255, 0.75) 100%
+  );
+  background-clip: padding-box;
+}
+
+[data-postr-sidebar]::-webkit-scrollbar-corner,
+[data-postr-guidelines]::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Canvas-wrapper scroll (the outer dark area around the poster).
+ * Slightly thicker (10 px) + neutral gray so it doesn't fight
+ * the purple sidebar scrollbars visually. */
+
+[data-postr-canvas-outer] {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(170, 175, 200, 0.25) transparent;
+}
+
+[data-postr-canvas-outer]::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+
+[data-postr-canvas-outer]::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+[data-postr-canvas-outer]::-webkit-scrollbar-thumb {
+  background: rgba(170, 175, 200, 0.25);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background 200ms ease;
+}
+
+[data-postr-canvas-outer]::-webkit-scrollbar-thumb:hover {
+  background: rgba(170, 175, 200, 0.55);
+  background-clip: padding-box;
+}
+
+/* Also style scrollbars inside the CodeEditor + CodeView in the
+ * Check tab — they're nested deep enough that the [data-postr-
+ * sidebar] * selector already covers them, but pinning the width
+ * slightly smaller keeps the code area feeling tight. */
+[data-postr-sidebar] textarea::-webkit-scrollbar,
+[data-postr-sidebar] pre::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}

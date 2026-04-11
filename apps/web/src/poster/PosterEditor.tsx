@@ -1293,12 +1293,19 @@ export function PosterEditor() {
       {/* Animated sidebar wrapper — the inner Sidebar stays mounted
           always so collapse/expand can fade+slide via width transition
           rather than popping. `overflow: hidden` clips the 484-wide
-          Sidebar while the wrapper is animating to width 0. */}
+          Sidebar while the wrapper is animating to width 0. The
+          `display: flex` + `minHeight: 0` combo is load-bearing: it
+          lets the inner Sidebar's own `overflow: auto` panel children
+          bound their height against the wrapper, so the panel scrolls
+          instead of growing unbounded and clipping the bottom. */}
       <div
         style={{
           flex: '0 0 auto',
           width: sidebarOpen ? 484 : 0,
           minWidth: sidebarOpen ? 484 : 0,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
           overflow: 'hidden',
           transition:
             'width 280ms cubic-bezier(0.22, 1, 0.36, 1), min-width 280ms cubic-bezier(0.22, 1, 0.36, 1)',
@@ -1786,12 +1793,17 @@ export function PosterEditor() {
       {/* Animated guidelines wrapper — mirrors the Sidebar pattern so
           the right-side panel collapses with the same width transition
           instead of unmounting abruptly. The inner GuidelinesPanel no
-          longer early-returns on !open. */}
+          longer early-returns on !open. Same `display: flex` +
+          `minHeight: 0` load-bearing combo as the sidebar wrapper so
+          the inside panel's own scroll container bounds correctly. */}
       <div
         style={{
           flex: '0 0 auto',
           width: guidelinesOpen ? 320 : 0,
           minWidth: guidelinesOpen ? 320 : 0,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
           overflow: 'hidden',
           transition:
             'width 280ms cubic-bezier(0.22, 1, 0.36, 1), min-width 280ms cubic-bezier(0.22, 1, 0.36, 1)',

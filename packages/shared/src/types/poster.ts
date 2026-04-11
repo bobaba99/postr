@@ -117,6 +117,14 @@ export interface Reference {
   title?: string;
   journal?: string;
   doi?: string;
+  /**
+   * Pre-formatted citation string — set when the user pasted a
+   * fully-formatted reference block from a manuscript. When this
+   * is present, citation formatters render it verbatim instead of
+   * composing fields, so the user's existing APA / Vancouver /
+   * custom format stays intact.
+   */
+  rawText?: string;
 }
 
 /** Snapshot persisted in `posters.data` — self-contained. */
