@@ -321,11 +321,12 @@ export default function Profile() {
         title={confirmAction === 'deleteAccount' ? 'Delete account' : 'Delete all posters'}
         message={
           confirmAction === 'deleteAccount'
-            ? 'This will permanently delete your account, all posters, and all preferences. You will be signed out and a new guest session will be created. This cannot be undone.'
+            ? 'This will permanently delete your account, all posters, and all preferences. You will be signed out. This action cannot be undone.'
             : `Permanently delete all ${posterCount} poster(s)? This cannot be undone.`
         }
-        confirmLabel={confirmAction === 'deleteAccount' ? 'Delete account' : 'Delete all'}
+        confirmLabel={confirmAction === 'deleteAccount' ? 'Delete my account' : 'Delete all'}
         danger
+        typedConfirmation={confirmAction === 'deleteAccount' ? 'I confirm the deletion of my account' : undefined}
         onConfirm={handleConfirm}
         onCancel={() => setConfirmAction(null)}
       />
