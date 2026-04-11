@@ -69,6 +69,8 @@ interface SidebarProps {
   onChangeCustomSize: (w: number, h: number) => void;
   showGrid: boolean;
   onToggleGrid: (show: boolean) => void;
+  showRuler: boolean;
+  onToggleRuler: (show: boolean) => void;
 
   // typography + palette
   fontFamily: string;
@@ -356,6 +358,8 @@ export function Sidebar(props: SidebarProps) {
             onChangeCustomSize={props.onChangeCustomSize}
             showGrid={props.showGrid}
             onToggleGrid={props.onToggleGrid}
+            showRuler={props.showRuler}
+            onToggleRuler={props.onToggleRuler}
             onApplyTemplate={props.onApplyTemplate}
             onAutoLayout={props.onAutoLayout}
             onPrint={props.onPrint}
@@ -441,6 +445,8 @@ function LayoutTab(props: {
   onChangeCustomSize: (w: number, h: number) => void;
   showGrid: boolean;
   onToggleGrid: (show: boolean) => void;
+  showRuler: boolean;
+  onToggleRuler: (show: boolean) => void;
   onApplyTemplate: (k: LayoutKey) => void;
   onAutoLayout: () => void;
   onPrint: () => void;
@@ -573,7 +579,7 @@ function LayoutTab(props: {
         </div>
       </div>
 
-      <div style={labelStyle}>Grid</div>
+      <div style={labelStyle}>📐 Canvas overlays</div>
       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer' }}>
         <input
           type="checkbox"
@@ -582,6 +588,15 @@ function LayoutTab(props: {
           style={{ accentColor: '#7c6aed' }}
         />
         Show grid
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer', marginTop: 4 }}>
+        <input
+          type="checkbox"
+          checked={props.showRuler}
+          onChange={(e) => props.onToggleRuler(e.target.checked)}
+          style={{ accentColor: '#7c6aed' }}
+        />
+        Show ruler
       </label>
 
       <div style={labelStyle}>Auto Layout</div>
@@ -637,7 +652,7 @@ function LayoutTab(props: {
         ↗ Publish to gallery
       </button>
       <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginTop: 8, background: '#1a1a26', padding: 10, borderRadius: 6, border: '1px solid #2a2a3a' }}>
-        <strong style={{ color: '#9ca3af' }}>How to save as PDF:</strong>
+        <strong style={{ color: '#9ca3af' }}>🖨️ How to save as PDF:</strong>
         <ol style={{ margin: '4px 0 0', paddingLeft: 18 }}>
           <li>Click "Save PDF" or press Ctrl+P / Cmd+P</li>
           <li>Set destination to <strong style={{ color: '#c8cad0' }}>"Save as PDF"</strong></li>
@@ -1632,10 +1647,15 @@ function TableEditor(props: {
       </div>
 
       <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
-        <strong style={{ color: '#9ca3af' }}>Tips:</strong> Click cells on the canvas to type directly.
-        Hover a row or column edge for insert/delete controls.
-        Paste from Excel or Google Sheets into a cell to import data.
-        Drag column borders to resize.
+        <strong style={{ color: '#9ca3af' }}>💡 Tips:</strong>
+        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+          <li>✏️ Click any cell on the canvas to type directly.</li>
+          <li>🖱️ Click a row/column header strip to select the whole row or column.</li>
+          <li>📋 Paste from Word, Excel, or Google Sheets into any cell — the grid auto-grows.</li>
+          <li>↔️ Drag column borders to resize.</li>
+          <li>🗑️ Select a row/column and press Delete to remove it.</li>
+          <li>⌨️ Tab / Shift+Tab to jump between cells.</li>
+        </ul>
       </div>
     </div>
   );
@@ -1923,10 +1943,21 @@ function AddBlockPanel(props: { onAddBlock: (t: Block['type']) => void }) {
 
       <div style={{ marginTop: 12, padding: '14px 16px', background: '#0f0f17', borderRadius: 8, border: '1px solid #1e1e2e' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-          Slash symbols
+          ✨ Slash symbols
         </div>
         <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
           Inside a text block type <code style={{ color: '#c8b6ff' }}>/alpha</code>, <code style={{ color: '#c8b6ff' }}>/beta</code>, <code style={{ color: '#c8b6ff' }}>/leq</code>, <code style={{ color: '#c8b6ff' }}>/pm</code>, or stats shortcuts like <code style={{ color: '#c8b6ff' }}>/p</code>, <code style={{ color: '#c8b6ff' }}>/SD</code>, <code style={{ color: '#c8b6ff' }}>/df</code>.
+        </div>
+      </div>
+
+      <div style={{ marginTop: 4, padding: '14px 16px', background: '#0f0f17', borderRadius: 8, border: '1px solid #1e1e2e' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+          📋 Pasting tables
+        </div>
+        <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
+          Copy a table from <strong style={{ color: '#c8b6ff' }}>Word</strong>,{' '}
+          <strong style={{ color: '#c8b6ff' }}>Excel</strong>, or{' '}
+          <strong style={{ color: '#c8b6ff' }}>Google Sheets</strong>, add a table block, then paste into any cell — Postr will expand the grid and fill every cell for you. No need to retype.
         </div>
       </div>
     </div>

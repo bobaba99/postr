@@ -139,16 +139,19 @@ const sidebar: LayoutTemplate = {
     return [
       { type: 'title', x: M, y: M, w: W - M * 2, h: 45 },
       { type: 'authors', x: M, y: 57, w: W - M * 2, h: 22 },
+      // Sidebar (30% left) — context stuff: Background, Methods, References
       { type: 'heading', x: M, y: bodyTop, w: sW, h: 20, content: 'Background' },
-      { type: 'text', x: M, y: bodyTop + 22, w: sW, h: bodyHeight * 0.22, content: 'Context and aims.' },
-      { type: 'heading', x: M, y: bodyTop + 24 + bodyHeight * 0.22, w: sW, h: 20, content: 'Methods' },
-      { type: 'text', x: M, y: bodyTop + 46 + bodyHeight * 0.22, w: sW, h: bodyHeight * 0.22, content: 'Design and analysis.' },
-      { type: 'heading', x: M, y: bodyTop + 48 + bodyHeight * 0.44, w: sW, h: 20, content: 'Conclusions' },
-      { type: 'text', x: M, y: bodyTop + 70 + bodyHeight * 0.44, w: sW, h: bodyHeight * 0.18, content: 'Key findings.' },
-      { type: 'references', x: M, y: bodyTop + 72 + bodyHeight * 0.64, w: sW, h: bodyHeight * 0.28 },
+      { type: 'text', x: M, y: bodyTop + 22, w: sW, h: bodyHeight * 0.30, content: 'Context and aims.' },
+      { type: 'heading', x: M, y: bodyTop + 24 + bodyHeight * 0.30, w: sW, h: 20, content: 'Methods' },
+      { type: 'text', x: M, y: bodyTop + 46 + bodyHeight * 0.30, w: sW, h: bodyHeight * 0.28, content: 'Design and analysis.' },
+      { type: 'references', x: M, y: bodyTop + 48 + bodyHeight * 0.58, w: sW, h: bodyHeight * 0.40 },
+      // Main area (70% right) — the showcase: Results then Conclusions.
+      // Array order matters for heading numbering: Background(1),
+      // Methods(2), Results(3), Conclusions(4).
       { type: 'heading', x: mX, y: bodyTop, w: mW, h: 20, content: 'Results' },
-      { type: 'image', x: mX, y: bodyTop + 22, w: mW, h: bodyHeight * 0.47 },
-      { type: 'image', x: mX, y: bodyTop + 24 + bodyHeight * 0.47, w: mW, h: bodyHeight * 0.45 },
+      { type: 'image', x: mX, y: bodyTop + 22, w: mW, h: bodyHeight * 0.52 },
+      { type: 'heading', x: mX, y: bodyTop + 24 + bodyHeight * 0.52, w: mW, h: 20, content: 'Conclusions' },
+      { type: 'text', x: mX, y: bodyTop + 46 + bodyHeight * 0.52, w: mW, h: bodyHeight * 0.38, content: 'Key findings and implications.' },
     ];
   },
 };

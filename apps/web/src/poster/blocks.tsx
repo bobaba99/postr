@@ -199,6 +199,13 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
   const [hoveredCol, setHoveredCol] = useState<number | null>(null);
   // Active (focused) cell for highlight + keyboard navigation
   const [activeCell, setActiveCell] = useState<{ r: number; c: number } | null>(null);
+  // Whole-row / whole-column selection — set when the user clicks
+  // the narrow header strip on the left (rows) or top (cols) of the
+  // table. Pressing Delete or Backspace while one of these is set
+  // removes the whole row or column. Mutually exclusive with
+  // activeCell (selecting a row clears cell focus and vice versa).
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const [selectedCol, setSelectedCol] = useState<number | null>(null);
   // Right-click context menu
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; r: number; c: number } | null>(null);
 
@@ -271,6 +278,43 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
       window.removeEventListener('contextmenu', close);
     };
   }, [ctxMenu]);
+
+  // Whole-row / whole-column delete via the Delete key. Scoped to a
+  // window-level listener so it works when focus is on the header
+  // strip (which is NOT contentEditable) rather than a cell.
+  useEffect(() => {
+    if (selectedRow === null && selectedCol === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+      // Don't hijack keystrokes aimed at an editable element
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      if (selectedRow !== null && data.rows > 1) {
+        commit(deleteRowAt(data, selectedRow));
+        setSelectedRow(null);
+      } else if (selectedCol !== null && data.cols > 1) {
+        commit(deleteColAt(data, selectedCol));
+        setSelectedCol(null);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedRow, selectedCol, data, commit]);
+
+  // Click anywhere outside the table container clears row/col selection.
+  useEffect(() => {
+    if (selectedRow === null && selectedCol === null) return;
+    const onClick = (e: MouseEvent) => {
+      const el = tableContainerRef.current;
+      if (!el) return;
+      if (el.contains(e.target as Node)) return;
+      setSelectedRow(null);
+      setSelectedCol(null);
+    };
+    window.addEventListener('click', onClick);
+    return () => window.removeEventListener('click', onClick);
+  }, [selectedRow, selectedCol]);
 
   // Notion/Canva parity: drag-to-resize column borders. Capture the
   // pointer on mousedown over a border handle, track horizontal delta
@@ -404,6 +448,9 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
             <tr key={r}>
               {Array.from({ length: data.cols }).map((_, c) => {
                 const isActive = activeCell?.r === r && activeCell?.c === c;
+                const inSelectedRow = selectedRow === r;
+                const inSelectedCol = selectedCol === c;
+                const inSelection = inSelectedRow || inSelectedCol;
                 return (
                 <td
                   key={c}
@@ -419,12 +466,23 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
                   style={{
                     ...cellBorder(r, c),
                     padding: '2px 4px',
-                    background: r === 0 ? palette.accent + '0a' : 'transparent',
+                    // Selected row/col tints the whole cell; header row
+                    // keeps its faint accent underlay otherwise.
+                    background: inSelection
+                      ? palette.accent + '22'
+                      : r === 0
+                        ? palette.accent + '0a'
+                        : 'transparent',
                     fontWeight: r === 0 ? 700 : 400,
                     color: palette.primary,
                     position: 'relative',
-                    // Active cell highlight — subtle accent border
-                    boxShadow: isActive ? `inset 0 0 0 1.5px ${palette.accent}88` : 'none',
+                    // Active cell highlight — subtle accent border.
+                    // Selected row/col overrides with a stronger border.
+                    boxShadow: inSelection
+                      ? `inset 0 0 0 1.5px ${palette.accent}`
+                      : isActive
+                        ? `inset 0 0 0 1.5px ${palette.accent}88`
+                        : 'none',
                   }}
                 >
                   <div
@@ -432,7 +490,12 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
                     suppressContentEditableWarning
                     dangerouslySetInnerHTML={{ __html: data.cells[r * data.cols + c] ?? '' }}
                     onInput={(e) => updateCellValue(r, c, e.currentTarget.innerHTML)}
-                    onFocus={() => setActiveCell({ r, c })}
+                    onFocus={() => {
+                      setActiveCell({ r, c });
+                      // Focusing a cell clears any whole-row/col selection.
+                      setSelectedRow(null);
+                      setSelectedCol(null);
+                    }}
                     onBlur={() => setActiveCell((prev) => prev?.r === r && prev?.c === c ? null : prev)}
                     onKeyDown={(e) => onCellKeyDown(e, r, c)}
                     onPointerDown={(e) => e.stopPropagation()}
@@ -454,6 +517,102 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
           ))}
         </tbody>
       </table>
+
+      {/*
+        Row selector strip — narrow clickable band along the left edge.
+        Each row gets one strip; clicking it selects the whole row and
+        highlights every cell in that row. Pressing Delete (handled by
+        the window listener above) removes the row. Header row 0 is
+        included so users can delete it if they don't want a header.
+      */}
+      {Array.from({ length: data.rows }).map((_, r) => {
+        // Row height is 100% / rows — use flex spacing via top %.
+        const topPct = (r / data.rows) * 100;
+        const heightPct = 100 / data.rows;
+        const isSel = selectedRow === r;
+        return (
+          <div
+            key={`row-sel-${r}`}
+            role="button"
+            aria-label={`Select row ${r + 1}`}
+            title={`Select row ${r + 1} (Delete to remove)`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedRow((prev) => (prev === r ? null : r));
+              setSelectedCol(null);
+              setActiveCell(null);
+            }}
+            style={{
+              position: 'absolute',
+              top: `${topPct}%`,
+              height: `${heightPct}%`,
+              left: -10,
+              width: 8,
+              cursor: 'pointer',
+              background: isSel ? palette.accent : 'transparent',
+              borderRadius: 2,
+              opacity: isSel ? 0.9 : 0.2,
+              transition: 'opacity 100ms, background 100ms',
+              zIndex: 3,
+            }}
+            onMouseEnter={(e) => {
+              if (!isSel) e.currentTarget.style.background = palette.accent + '55';
+              e.currentTarget.style.opacity = '1';
+            }}
+            onMouseLeave={(e) => {
+              if (!isSel) e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.opacity = isSel ? '0.9' : '0.2';
+            }}
+          />
+        );
+      })}
+
+      {/*
+        Column selector strip — narrow clickable band along the top
+        edge. Same pattern as rows.
+      */}
+      {Array.from({ length: data.cols }).map((_, c) => {
+        const leftPct = colWidths.slice(0, c).reduce((s, w) => s + w, 0);
+        const widthPct = colWidths[c] ?? 100 / data.cols;
+        const isSel = selectedCol === c;
+        return (
+          <div
+            key={`col-sel-${c}`}
+            role="button"
+            aria-label={`Select column ${c + 1}`}
+            title={`Select column ${c + 1} (Delete to remove)`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedCol((prev) => (prev === c ? null : c));
+              setSelectedRow(null);
+              setActiveCell(null);
+            }}
+            style={{
+              position: 'absolute',
+              top: -10,
+              height: 8,
+              left: `${leftPct}%`,
+              width: `${widthPct}%`,
+              cursor: 'pointer',
+              background: isSel ? palette.accent : 'transparent',
+              borderRadius: 2,
+              opacity: isSel ? 0.9 : 0.2,
+              transition: 'opacity 100ms, background 100ms',
+              zIndex: 3,
+            }}
+            onMouseEnter={(e) => {
+              if (!isSel) e.currentTarget.style.background = palette.accent + '55';
+              e.currentTarget.style.opacity = '1';
+            }}
+            onMouseLeave={(e) => {
+              if (!isSel) e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.opacity = isSel ? '0.9' : '0.2';
+            }}
+          />
+        );
+      })}
 
       {/*
         Hover-only "+" at bottom and right edges (Notion pattern).
@@ -1048,24 +1207,31 @@ export function BlockFrame(props: BlockFrameProps) {
             e.stopPropagation();
             onDelete(b.id);
           }}
+          // Positioned OUTSIDE the block bounds (above the top edge)
+          // so it doesn't cover any content at the top of the block.
+          // Previously at top:-2 right:-2 which left 16px of the
+          // 18px circle sitting on top of the block's first line.
           style={{
             position: 'absolute',
-            top: -2,
-            right: -2,
-            width: 18,
-            height: 18,
+            top: -26,
+            right: 0,
+            width: 20,
+            height: 20,
             borderRadius: '50%',
             background: '#d33',
             color: '#fff',
             border: '2px solid #0a0a12',
-            fontSize: 13,
+            fontSize: 14,
+            lineHeight: 1,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontWeight: 700,
             zIndex: 10,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
           }}
+          title="Delete block"
         >
           ×
         </button>

@@ -284,6 +284,7 @@ export function PosterEditor() {
   const setPosterDisplayName = usePosterStore((s) => s.setPosterTitle);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(true);
+  const [showRuler, setShowRuler] = useState(true);
   const [sortMode, setSortMode] = useState<SortMode>('none');
   const [citationStyle, setCitationStyle] = useState<CitationStyleKey>(DEFAULT_CITATION_STYLE);
   // K1 fix: presets persist across posters via localStorage (not
@@ -552,17 +553,27 @@ export function PosterEditor() {
   const { onPointerDown, didDragRef, draggingId } = useBlockDrag(doc.blocks, setBlocks, storeSetBlocksSilent, zoom);
   const draggingBlock = draggingId ? doc.blocks.find((x) => x.id === draggingId) ?? null : null;
 
-  // Heading auto-numbering: index by reading order (y then x).
+  // Heading auto-numbering: use the block ARRAY ORDER as the source
+  // of truth, not geometry. Every previous attempt (row-first, then
+  // column-first with a bucket tolerance) broke on at least one
+  // template — row-first numbered Hypotheses as #5 in a 3-column
+  // poster, column-first mis-ordered 2-column-wide-figure layouts
+  // whose full-width heading spans all columns. The array order in
+  // doc.blocks is authored by each template to match the intended
+  // reading flow, and new headings append to the end which naturally
+  // gives them the next number. Drag-to-reorder on the canvas
+  // doesn't change array position, so numbers stay stable while
+  // the user fine-tunes layout — exactly what you'd expect from
+  // an "auto-number" feature.
   const headingNumbers = useMemo(() => {
     const m: Record<string, number> = {};
     let counter = 0;
-    [...doc.blocks]
-      .filter((b) => b.type === 'heading')
-      .sort((a, b) => a.y - b.y || a.x - b.x)
-      .forEach((b) => {
+    for (const b of doc.blocks) {
+      if (b.type === 'heading') {
         counter++;
         m[b.id] = counter;
-      });
+      }
+    }
     return m;
   }, [doc.blocks]);
 
@@ -746,6 +757,8 @@ export function PosterEditor() {
         }}
         showGrid={showGrid}
         onToggleGrid={setShowGrid}
+        showRuler={showRuler}
+        onToggleRuler={setShowRuler}
         fontFamily={doc.fontFamily}
         onChangeFont={(font) => updateDoc({ fontFamily: font })}
         palette={doc.palette}
@@ -888,6 +901,111 @@ export function PosterEditor() {
                       opacity={i % 10 === 0 ? 0.08 : 0.03}
                     />
                   ))}
+                </svg>
+              )}
+              {showRuler && (
+                // Ruler overlay — inch marks along the top and left
+                // edges of the canvas. Major tick every inch, labeled;
+                // minor tick every half-inch. PX = 10, so 1 inch = 10
+                // units. Sits above the grid with pointerEvents:none
+                // so it never steals clicks from blocks underneath.
+                <svg
+                  width={cW}
+                  height={cH}
+                  style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+                >
+                  {/* Top ruler — horizontal inch marks */}
+                  {Array.from({ length: Math.ceil(doc.widthIn) + 1 }).map((_, i) => {
+                    const x = i * PX;
+                    return (
+                      <g key={`rt${i}`}>
+                        <line
+                          x1={x}
+                          y1={0}
+                          x2={x}
+                          y2={i % 5 === 0 ? 6 : 3}
+                          stroke={doc.palette.primary}
+                          strokeWidth={0.5}
+                          opacity={0.55}
+                        />
+                        {i % 5 === 0 && i > 0 && i < doc.widthIn && (
+                          <text
+                            x={x + 1}
+                            y={10}
+                            fontSize={4}
+                            fill={doc.palette.primary}
+                            opacity={0.55}
+                            fontFamily="ui-monospace, monospace"
+                          >
+                            {i}"
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                  {/* Half-inch minor ticks along top */}
+                  {Array.from({ length: Math.ceil(doc.widthIn * 2) + 1 }).map((_, i) => {
+                    if (i % 2 === 0) return null;
+                    const x = (i * PX) / 2;
+                    return (
+                      <line
+                        key={`rth${i}`}
+                        x1={x}
+                        y1={0}
+                        x2={x}
+                        y2={2}
+                        stroke={doc.palette.primary}
+                        strokeWidth={0.4}
+                        opacity={0.35}
+                      />
+                    );
+                  })}
+                  {/* Left ruler — vertical inch marks */}
+                  {Array.from({ length: Math.ceil(doc.heightIn) + 1 }).map((_, i) => {
+                    const y = i * PX;
+                    return (
+                      <g key={`rl${i}`}>
+                        <line
+                          x1={0}
+                          y1={y}
+                          x2={i % 5 === 0 ? 6 : 3}
+                          y2={y}
+                          stroke={doc.palette.primary}
+                          strokeWidth={0.5}
+                          opacity={0.55}
+                        />
+                        {i % 5 === 0 && i > 0 && i < doc.heightIn && (
+                          <text
+                            x={1}
+                            y={y + 3}
+                            fontSize={4}
+                            fill={doc.palette.primary}
+                            opacity={0.55}
+                            fontFamily="ui-monospace, monospace"
+                          >
+                            {i}"
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                  {/* Half-inch minor ticks along left */}
+                  {Array.from({ length: Math.ceil(doc.heightIn * 2) + 1 }).map((_, i) => {
+                    if (i % 2 === 0) return null;
+                    const y = (i * PX) / 2;
+                    return (
+                      <line
+                        key={`rlh${i}`}
+                        x1={0}
+                        y1={y}
+                        x2={2}
+                        y2={y}
+                        stroke={doc.palette.primary}
+                        strokeWidth={0.4}
+                        opacity={0.35}
+                      />
+                    );
+                  })}
                 </svg>
               )}
 
