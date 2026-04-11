@@ -25,6 +25,8 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetSent, setResetSent] = useState(false);
+  const [confirmEmail, setConfirmEmail] = useState(false);
 
   // If ?guest=1, auto-trigger guest login
   useEffect(() => {
@@ -60,7 +62,7 @@ export default function Auth() {
     setError(null);
 
     if (mode === 'signup') {
-      const { error: err } = await supabase.auth.signUp({
+      const { data, error: err } = await supabase.auth.signUp({
         email: email.trim(),
         password,
       });
@@ -69,9 +71,12 @@ export default function Auth() {
         setLoading(false);
         return;
       }
-      // Supabase may require email confirmation — show message
-      setError(null);
       setLoading(false);
+      // If no session, email confirmation is required
+      if (!data.session) {
+        setConfirmEmail(true);
+        return;
+      }
       navigate('/dashboard', { replace: true });
     } else {
       const { error: err } = await supabase.auth.signInWithPassword({
@@ -87,8 +92,23 @@ export default function Auth() {
     }
   }, [email, password, mode, navigate]);
 
+  const handleForgotPassword = useCallback(async () => {
+    if (!email.trim()) {
+      setError('Enter your email address first.');
+      return;
+    }
+    setError(null);
+    const { error: err } = await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+    );
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    setResetSent(true);
+  }, [email]);
+
   const handleGoogle = useCallback(async () => {
-    setLoading(true);
     setError(null);
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -96,7 +116,6 @@ export default function Auth() {
     });
     if (err) {
       setError(err.message);
-      setLoading(false);
     }
   }, []);
 
@@ -139,6 +158,12 @@ export default function Auth() {
               ? 'Access your posters from any device.'
               : 'Save your work across devices.'}
           </p>
+
+          {confirmEmail && (
+            <div className="mb-4 rounded-md border border-[#34d399]/40 bg-[#34d399]/10 px-3 py-2 text-[13px] text-[#34d399]">
+              Check your email to confirm your account.
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 rounded-md border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-[13px] text-[#f87171]">
@@ -188,6 +213,23 @@ export default function Auth() {
                 className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
               />
               {mode === 'signup' && <PasswordStrength password={password} />}
+              {mode === 'signin' && (
+                <div className="mt-1.5 text-right">
+                  {resetSent ? (
+                    <span className="text-[13px] text-[#34d399]">
+                      Password reset email sent to {email}.
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      className="text-[13px] text-[#7c6aed] bg-transparent border-none cursor-pointer hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
             <button
               type="submit"
@@ -202,14 +244,14 @@ export default function Auth() {
             {mode === 'signin' ? (
               <>
                 Don't have an account?{' '}
-                <button onClick={() => setMode('signup')} className="text-[#7c6aed] font-semibold bg-transparent border-none cursor-pointer">
+                <button onClick={() => { setMode('signup'); setResetSent(false); setConfirmEmail(false); setError(null); }} className="text-[#7c6aed] font-semibold bg-transparent border-none cursor-pointer">
                   Sign up
                 </button>
               </>
             ) : (
               <>
                 Already have an account?{' '}
-                <button onClick={() => setMode('signin')} className="text-[#7c6aed] font-semibold bg-transparent border-none cursor-pointer">
+                <button onClick={() => { setMode('signin'); setResetSent(false); setConfirmEmail(false); setError(null); }} className="text-[#7c6aed] font-semibold bg-transparent border-none cursor-pointer">
                   Sign in
                 </button>
               </>

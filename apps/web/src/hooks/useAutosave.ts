@@ -146,5 +146,21 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Tab close: flush any pending save. The unmount effect above only
+  // fires when React unmounts the component, but closing the tab
+  // bypasses React lifecycle entirely.
+  useEffect(() => {
+    const handler = () => {
+      if (timerRef.current && pendingDocRef.current && pendingIdRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+        void flush();
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return state;
 }

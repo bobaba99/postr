@@ -76,7 +76,11 @@ function normalizeStaleStyles(doc: PosterDoc): PosterDoc {
   return { ...doc, styles: next };
 }
 
-type Status = { kind: 'loading' } | { kind: 'ready' } | { kind: 'error'; message: string };
+type Status =
+  | { kind: 'loading' }
+  | { kind: 'ready' }
+  | { kind: 'not-found' }
+  | { kind: 'error'; message: string };
 
 export default function Editor() {
   const { posterId } = useParams<{ posterId: string }>();
@@ -95,6 +99,14 @@ export default function Editor() {
           posterId && posterId !== 'new'
             ? await loadPoster(posterId)
             : null;
+
+        // If an explicit poster id was provided but doesn't exist,
+        // show a not-found message instead of silently loading a
+        // different poster. Only fall back for the `/p/new` case.
+        if (!row && posterId && posterId !== 'new') {
+          if (!cancelled) setStatus({ kind: 'not-found' });
+          return;
+        }
 
         if (!row) {
           row = await loadOrCreateMostRecentPoster();
@@ -128,6 +140,25 @@ export default function Editor() {
     return (
       <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
         <div className="animate-pulse text-sm tracking-wide">Loading poster…</div>
+      </main>
+    );
+  }
+
+  if (status.kind === 'not-found') {
+    return (
+      <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
+        <div className="max-w-md space-y-3 text-center">
+          <p className="text-base font-medium">Poster not found</p>
+          <p className="text-xs text-[#888]">
+            The poster you're looking for doesn't exist or you don't have access to it.
+          </p>
+          <a
+            href="/dashboard"
+            className="mt-4 inline-block rounded-md bg-[#2a2a3a] px-4 py-2 text-xs font-medium text-[#c8cad0] hover:bg-[#3a3a4a]"
+          >
+            Back to Dashboard
+          </a>
+        </div>
       </main>
     );
   }
