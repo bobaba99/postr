@@ -15,6 +15,7 @@ import { usePosterStore } from '@/stores/posterStore';
 import { PosterEditor } from '@/poster/PosterEditor';
 import { makeBlocks } from '@/poster/templates';
 import { DEFAULT_STYLES, PALETTES } from '@/poster/constants';
+import { useTwoTabGuard } from '@/hooks/useTwoTabGuard';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
 
 /**
@@ -174,5 +175,66 @@ export default function Editor() {
     );
   }
 
-  return <PosterEditor />;
+  return <EditorWithGuards posterId={posterId ?? null} />;
+}
+
+function EditorWithGuards({ posterId }: { posterId: string | null }) {
+  const { collision, dismiss } = useTwoTabGuard(posterId);
+  return (
+    <>
+      {collision && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            top: 16,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10000,
+            maxWidth: 520,
+            padding: '12px 18px',
+            background: '#7f1d1d',
+            border: '1px solid #f87171',
+            borderRadius: 10,
+            color: '#fecaca',
+            fontSize: 13,
+            fontFamily: "'DM Sans', system-ui, sans-serif",
+            lineHeight: 1.5,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 12,
+          }}
+        >
+          <span aria-hidden style={{ flex: '0 0 auto', fontSize: 18 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <b style={{ color: '#fef2f2' }}>
+              This poster is already open in another tab.
+            </b>
+            <br />
+            Postr autosave is last-write-wins, so edits in one tab can
+            silently overwrite the other. Close the duplicate tab to
+            avoid losing work.
+          </div>
+          <button
+            type="button"
+            onClick={dismiss}
+            aria-label="Dismiss warning"
+            style={{
+              all: 'unset',
+              cursor: 'pointer',
+              padding: '2px 8px',
+              color: '#fecaca',
+              fontSize: 18,
+              fontWeight: 700,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+      )}
+      <PosterEditor />
+    </>
+  );
 }
