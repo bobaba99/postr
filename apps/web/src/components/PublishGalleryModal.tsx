@@ -14,7 +14,7 @@
  * can navigate to /gallery/:id.
  */
 import { useEffect, useRef, useState } from 'react';
-import { toBlob } from 'html-to-image';
+import { toCanvas } from 'html-to-image';
 import {
   createGalleryEntry,
   FIELD_OPTIONS,
@@ -30,11 +30,13 @@ interface Props {
   onCancel: () => void;
 }
 
+type ImageExt = 'png' | 'jpg' | 'jpeg' | 'webp';
+
 type CaptureState =
   | { kind: 'idle' }
   | { kind: 'capturing' }
-  | { kind: 'ready'; blob: Blob; previewUrl: string; ext: 'png' }
-  | { kind: 'uploaded'; blob: Blob; previewUrl: string; ext: 'png' | 'jpg' | 'jpeg' | 'webp' }
+  | { kind: 'ready'; blob: Blob; previewUrl: string; ext: ImageExt }
+  | { kind: 'uploaded'; blob: Blob; previewUrl: string; ext: ImageExt }
   | { kind: 'error'; message: string };
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -79,7 +81,7 @@ export function PublishGalleryModal({
     captureCanvas(canvas as HTMLElement)
       .then((blob) => {
         const previewUrl = URL.createObjectURL(blob);
-        setCapture({ kind: 'ready', blob, previewUrl, ext: 'png' });
+        setCapture({ kind: 'ready', blob, previewUrl, ext: 'jpg' });
       })
       .catch((err) => {
         setCapture({
@@ -451,7 +453,9 @@ function PreviewArea({
             }}
           >
             <span>
-              {capture.kind === 'ready' ? 'Auto-captured from editor' : 'Uploaded image'}
+              {capture.kind === 'ready'
+                ? `Auto-captured from editor · ${(capture.blob.size / 1024 / 1024).toFixed(1)} MB`
+                : 'Uploaded image'}
             </span>
             <button type="button" onClick={onPickFile} style={linkButtonStyle}>
               Replace
@@ -517,6 +521,21 @@ const linkButtonStyle: React.CSSProperties = {
 
 // ── Capture helper ───────────────────────────────────────────────────
 
+const MAX_BYTES = 14 * 1024 * 1024; // 14 MB, just under the 15 MB bucket cap
+
+/**
+ * Capture the #poster-canvas at high resolution.
+ *
+ * Uses html-to-image's toCanvas + canvas.toBlob('image/jpeg') so we can
+ * control both pixel density and JPEG quality — critical for keeping
+ * a 48×36" poster at ~300 DPI under the 15 MB storage cap.
+ *
+ * The CSS baseline is typically 96 px/inch. At pixelRatio 3 we land at
+ * ≈288 DPI, which is sharp enough for conference print quality while
+ * keeping file sizes manageable for photo-light posters. If the first
+ * try produces a blob larger than MAX_BYTES we step the ratio down and
+ * try again until the file fits.
+ */
 async function captureCanvas(el: HTMLElement): Promise<Blob> {
   // Temporarily neutralize the CSS zoom transform so html-to-image
   // captures the poster at its true dimensions. Save and restore.
@@ -526,17 +545,52 @@ async function captureCanvas(el: HTMLElement): Promise<Blob> {
   el.style.transformOrigin = 'top left';
 
   try {
-    const blob = await toBlob(el, {
-      cacheBust: true,
-      pixelRatio: 1,
-      backgroundColor: '#ffffff',
-    });
-    if (!blob) throw new Error('Capture returned no data.');
-    return blob;
+    // Try progressively lower resolutions until the file fits. The
+    // first step (3.0) targets ~288 DPI; later steps still beat the
+    // previous 96 DPI default by 2-2.5x.
+    const attempts: Array<{ ratio: number; quality: number }> = [
+      { ratio: 3.0, quality: 0.9 },
+      { ratio: 2.5, quality: 0.88 },
+      { ratio: 2.0, quality: 0.85 },
+    ];
+
+    let lastError: unknown = null;
+    for (const attempt of attempts) {
+      try {
+        const blob = await captureAt(el, attempt.ratio, attempt.quality);
+        if (blob.size <= MAX_BYTES) return blob;
+        // Too big — fall through to the next, lower-resolution attempt.
+        lastError = new Error(
+          `Capture too large at ratio ${attempt.ratio} (${(blob.size / 1024 / 1024).toFixed(1)} MB)`,
+        );
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError instanceof Error
+      ? lastError
+      : new Error('Capture failed at every resolution.');
   } finally {
     el.style.transform = prevTransform;
     el.style.transformOrigin = prevTransformOrigin;
   }
+}
+
+async function captureAt(
+  el: HTMLElement,
+  pixelRatio: number,
+  quality: number,
+): Promise<Blob> {
+  const canvas = await toCanvas(el, {
+    cacheBust: true,
+    pixelRatio,
+    backgroundColor: '#ffffff',
+  });
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((b) => resolve(b), 'image/jpeg', quality);
+  });
+  if (!blob) throw new Error('Capture returned no data.');
+  return blob;
 }
 
 function inferExtFromFile(file: File): 'png' | 'jpg' | 'jpeg' | 'webp' | null {

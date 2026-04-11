@@ -108,6 +108,18 @@ export default function Home() {
         </Link>
         <div className="flex items-center gap-4">
           <NewPosterButton />
+          <Link
+            to="/gallery"
+            className="hidden text-[12px] font-medium text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+          >
+            Gallery
+          </Link>
+          <Link
+            to="/about"
+            className="hidden text-[12px] font-medium text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+          >
+            About
+          </Link>
           <button
             type="button"
             onClick={() => openFeedback('feature')}
