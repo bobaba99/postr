@@ -51,11 +51,11 @@ export default function GalleryEntryPage() {
 
       <div className="flex-1">
         {status.kind === 'loading' && (
-          <p className="py-24 text-center text-sm text-[#6b7280]">Loading…</p>
+          <p className="py-24 text-center text-[14pt] text-[#6b7280]">Loading…</p>
         )}
 
         {status.kind === 'error' && (
-          <p className="py-24 text-center text-sm text-[#f87171]">
+          <p className="py-24 text-center text-[14pt] text-[#f87171]">
             Couldn’t load the entry: {status.message}
           </p>
         )}
@@ -63,7 +63,7 @@ export default function GalleryEntryPage() {
         {status.kind === 'not_found' && (
           <section className="mx-auto max-w-xl px-8 py-24 text-center">
             <h1 className="text-3xl font-bold text-[#e2e2e8]">This entry is unavailable.</h1>
-            <p className="mt-4 text-[14px] leading-relaxed text-[#6b7280]">
+            <p className="mt-4 text-[14pt] leading-relaxed text-[#6b7280]">
               It may have been retracted by its author, or the link is wrong. Browse
               the rest of the gallery below.
             </p>
@@ -141,13 +141,13 @@ function Detail({ entry }: { entry: GalleryEntryWithUrls }) {
           <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-[#6b7280]">
             Notes from the author
           </h2>
-          <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-[#9ca3af]">
+          <p className="whitespace-pre-wrap text-[14pt] leading-relaxed text-[#9ca3af]">
             {entry.notes}
           </p>
         </section>
       )}
 
-      <div className="mt-12 rounded-lg border-l-4 border-[#7c6aed] bg-[#111118] p-5 text-[13px] leading-relaxed text-[#9ca3af]">
+      <div className="mt-12 rounded-lg border-l-4 border-[#7c6aed] bg-[#111118] p-5 text-[14pt] leading-relaxed text-[#9ca3af]">
         Postr is a sharing platform, not a publisher. This poster was uploaded by
         its author, who confirmed they own or have permission to share everything
         on it. If you believe it infringes your rights,{' '}

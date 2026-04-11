@@ -16,7 +16,6 @@ import { PublicHeader } from '@/components/PublicHeader';
 
 interface Milestone {
   id: string;
-  chapter: string;
   title: string;
   body: string;
 }
@@ -24,35 +23,30 @@ interface Milestone {
 const MILESTONES: Milestone[] = [
   {
     id: 'anonymous',
-    chapter: 'Feature 01',
     title: 'Start anywhere, save nothing',
     body:
       "Anonymous session on first click — no sign-up wall. Every keystroke autosaves from before you've even named the poster. When you sign up later, your drafts follow you across devices without a single \"export and re-import\".",
   },
   {
     id: 'templates',
-    chapter: 'Feature 02',
     title: 'Templates tuned for conferences',
     body:
       'Five layouts — three-column classic, billboard, sidebar + focus, and more. Discipline-appropriate palettes instead of freeform color pickers. APA, SfN, and ECNP size presets ship built-in so your dimensions are never a guess.',
   },
   {
     id: 'writing',
-    chapter: 'Feature 03',
     title: 'Writing guidance, not a blank page',
     body:
       'Each section comes with concrete prompts, word-count targets, and a built-in checklist from intro to conclusion. Rich text for emphasis, Greek-symbol shortcuts for STEM, and a reference manager with citation-style support.',
   },
   {
     id: 'readability',
-    chapter: 'Feature 04',
     title: 'Figures readable from three feet',
     body:
       'Paste your R or Python plotting code and Postr checks whether axis labels will actually be legible at print size. Out-of-bounds warnings catch layout slips. No more discovering typography problems at the FedEx counter.',
   },
   {
     id: 'ship',
-    chapter: 'Feature 05',
     title: 'Share, iterate, print',
     body:
       "Read-only share links for advisors and co-authors. Undo and redo through the entire session. Asset uploads with per-user storage. Browser print-to-PDF turns a finished draft into a conference-ready sheet — everything you need between \"first draft\" and \"it's on the wall\".",
@@ -75,7 +69,7 @@ export default function About() {
           Everything you need<br />
           <span className="text-[#7c6aed]">to ship a great poster.</span>
         </h1>
-        <p className="mt-6 text-base text-[#9ca3af] leading-relaxed max-w-xl mx-auto">
+        <p className="mt-6 text-[14pt] text-[#9ca3af] leading-relaxed max-w-xl mx-auto">
           Postr is an opinionated poster editor built around one idea: constraint is
           a feature. Every default is tuned to produce something print-ready — you
           just fill in the science.
@@ -164,7 +158,7 @@ export default function About() {
             <h2 className="mb-4 text-2xl font-bold text-white sm:text-3xl">
               Tell us what's missing.
             </h2>
-            <p className="mb-8 max-w-xl text-[15px] leading-relaxed text-[#9ca3af]">
+            <p className="mb-8 max-w-xl text-[14pt] leading-relaxed text-[#9ca3af]">
               Every bug report and feature request lands in the developer's queue.
               The loudest feedback wins the most attention — so if something's
               broken, missing, or could be better, say so.
@@ -261,11 +255,10 @@ function Card({ milestone, align }: { milestone: Milestone; align: 'left' | 'rig
         align === 'right' ? 'sm:text-right' : 'sm:text-left'
       }`}
     >
-      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.25em] text-[#7c6aed]">
-        {milestone.chapter}
-      </div>
-      <h3 className="mb-2 text-lg font-bold text-[#e2e2e8]">{milestone.title}</h3>
-      <p className="text-[13px] leading-relaxed text-[#9ca3af]">{milestone.body}</p>
+      <h3 className="mb-3 text-[18pt] font-semibold leading-tight text-[#7c6aed]">
+        {milestone.title}
+      </h3>
+      <p className="text-[14pt] leading-relaxed text-white">{milestone.body}</p>
     </div>
   );
 }

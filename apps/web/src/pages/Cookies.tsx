@@ -204,12 +204,12 @@ function SectionHeading({ n, title }: { n: string; title: string }) {
 }
 
 function Body({ children }: { children: React.ReactNode }) {
-  return <p className="mb-4 text-[15px] leading-relaxed text-[#9ca3af]">{children}</p>;
+  return <p className="mb-4 text-[14pt] leading-relaxed text-[#9ca3af]">{children}</p>;
 }
 
 function List({ items }: { items: string[] }) {
   return (
-    <ul className="mb-4 list-disc space-y-2 pl-6 text-[15px] leading-relaxed text-[#9ca3af] marker:text-[#7c6aed]">
+    <ul className="mb-4 list-disc space-y-2 pl-6 text-[14pt] leading-relaxed text-[#9ca3af] marker:text-[#7c6aed]">
       {items.map((item, i) => (
         <li key={i}>{item}</li>
       ))}
@@ -220,7 +220,7 @@ function List({ items }: { items: string[] }) {
 function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
   return (
     <div className="mb-4 overflow-x-auto rounded-lg border border-[#1f1f2e]">
-      <table className="w-full border-collapse text-[13px]">
+      <table className="w-full border-collapse text-[14pt]">
         <thead>
           <tr className="bg-[#111118]">
             {headers.map((h, i) => (
@@ -254,7 +254,7 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
 
 function CalloutBox({ children }: { children: React.ReactNode }) {
   return (
-    <div className="my-6 rounded-lg border-l-4 border-[#7c6aed] bg-[#111118] p-5 text-[14px] leading-relaxed text-[#9ca3af]">
+    <div className="my-6 rounded-lg border-l-4 border-[#7c6aed] bg-[#111118] p-5 text-[14pt] leading-relaxed text-[#9ca3af]">
       {children}
     </div>
   );
@@ -262,7 +262,7 @@ function CalloutBox({ children }: { children: React.ReactNode }) {
 
 function Disclaimer() {
   return (
-    <div className="mt-6 rounded-lg border border-[#f59e0b]/30 bg-[#f59e0b]/5 p-5 text-[13px] leading-relaxed text-[#f59e0b]">
+    <div className="mt-6 rounded-lg border border-[#f59e0b]/30 bg-[#f59e0b]/5 p-5 text-[14pt] leading-relaxed text-[#f59e0b]">
       <strong>Draft — pending legal review.</strong> This policy describes what
       Postr actually stores today (strictly-necessary entries only). It should be
       reviewed by qualified counsel before launch, and a French version must be

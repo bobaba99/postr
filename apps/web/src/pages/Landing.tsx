@@ -65,7 +65,7 @@ export default function Landing() {
           <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
             <div className="text-2xl mb-3">📐</div>
             <h3 className="text-base font-bold text-[#e2e2e8] mb-2">Smart templates</h3>
-            <p className="text-sm text-[#6b7280] leading-relaxed">
+            <p className="text-[14pt] text-[#6b7280] leading-relaxed">
               5 conference-ready layouts with discipline-specific palettes.
               APA, SfN, ECNP size presets built in.
             </p>
@@ -73,7 +73,7 @@ export default function Landing() {
           <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
             <div className="text-2xl mb-3">📊</div>
             <h3 className="text-base font-bold text-[#e2e2e8] mb-2">Figure readability</h3>
-            <p className="text-sm text-[#6b7280] leading-relaxed">
+            <p className="text-[14pt] text-[#6b7280] leading-relaxed">
               Paste your R or Python code. See if axis labels will be readable
               at print size. Get a copy-ready fix.
             </p>
@@ -81,7 +81,7 @@ export default function Landing() {
           <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
             <div className="text-2xl mb-3">✍️</div>
             <h3 className="text-base font-bold text-[#e2e2e8] mb-2">Writing guide</h3>
-            <p className="text-sm text-[#6b7280] leading-relaxed">
+            <p className="text-[14pt] text-[#6b7280] leading-relaxed">
               Section-by-section tips, word count targets, and a checklist
               to follow from intro to conclusion.
             </p>

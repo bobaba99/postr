@@ -23,15 +23,15 @@ export function PublicFooter() {
           {/* Brand column */}
           <div className="col-span-2 sm:col-span-1">
             <Link to="/" className="flex items-center gap-3 no-underline">
-              <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
+              <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
                 <rect width="64" height="64" rx="12" fill="#7c6aed" />
                 <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
                 <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
                 <circle cx="32" cy="32" r="5" fill="white" />
               </svg>
-              <span className="text-lg font-bold text-[#c8cad0]">Postr</span>
+              <span className="text-[18pt] font-medium text-[#c8cad0]">Postr</span>
             </Link>
-            <p className="mt-3 max-w-xs text-[12px] leading-relaxed">
+            <p className="mt-3 max-w-xs text-[14pt] leading-relaxed">
               Built by researchers. Built for researchers.
             </p>
           </div>
@@ -61,7 +61,7 @@ export function PublicFooter() {
           </FooterColumn>
         </div>
 
-        <div className="mt-10 border-t border-[#1f1f2e] pt-6 text-[12px]">
+        <div className="mt-10 border-t border-[#1f1f2e] pt-6 text-[14pt]">
           <span>© {CURRENT_YEAR} Resila Technologies Inc.</span>
         </div>
       </div>
@@ -78,10 +78,10 @@ function FooterColumn({
 }) {
   return (
     <div>
-      <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.15em] text-[#7c6aed]">
+      <h3 className="mb-3 text-[12pt] font-semibold uppercase tracking-[0.15em] text-[#7c6aed]">
         {title}
       </h3>
-      <ul className="flex flex-col gap-2 text-[13px]">{children}</ul>
+      <ul className="flex flex-col gap-2 text-[14pt]">{children}</ul>
     </div>
   );
 }
@@ -89,7 +89,7 @@ function FooterColumn({
 function FooterLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
     <li>
-      <Link to={to} className="text-[#9ca3af] no-underline hover:text-white">
+      <Link to={to} className="text-[14pt] text-[#9ca3af] no-underline hover:text-white">
         {children}
       </Link>
     </li>
@@ -108,7 +108,7 @@ function FooterButton({
       <button
         type="button"
         onClick={onClick}
-        className="cursor-pointer border-0 bg-transparent p-0 text-left text-[13px] text-[#9ca3af] hover:text-white"
+        className="cursor-pointer border-0 bg-transparent p-0 text-left text-[14pt] text-[#9ca3af] hover:text-white"
       >
         {children}
       </button>

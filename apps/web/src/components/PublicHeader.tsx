@@ -75,7 +75,7 @@ export function PublicHeader({ highlightGallery = false }: Props) {
           <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
           <circle cx="32" cy="32" r="5" fill="white" />
         </svg>
-        <span className="text-[20pt] font-semibold tracking-tight text-[#c8cad0]">
+        <span className="text-[20pt] font-medium tracking-tight text-[#c8cad0]">
           Postr
         </span>
       </Link>
@@ -83,7 +83,7 @@ export function PublicHeader({ highlightGallery = false }: Props) {
       <div className="flex items-center gap-5">
         <Link
           to="/gallery"
-          className={`hidden text-[14pt] font-medium no-underline sm:inline ${
+          className={`hidden text-[14pt] font-normal no-underline sm:inline ${
             highlightGallery
               ? 'text-[#7c6aed] hover:text-white'
               : 'text-[#6b7280] hover:text-[#c8cad0]'
@@ -93,7 +93,7 @@ export function PublicHeader({ highlightGallery = false }: Props) {
         </Link>
         <Link
           to="/about"
-          className="hidden text-[14pt] font-medium text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+          className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
         >
           About
         </Link>
@@ -103,7 +103,7 @@ export function PublicHeader({ highlightGallery = false }: Props) {
             <button
               type="button"
               onClick={() => openFeedback('feature')}
-              className="hidden h-10 items-center gap-2 rounded-md border border-[#2a2a3a] bg-[#111118] px-4 text-[14pt] font-medium text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] sm:flex"
+              className="hidden h-10 items-center gap-2 rounded-md border border-[#2a2a3a] bg-[#111118] px-4 text-[14pt] font-normal text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] sm:flex"
               title="Send feedback"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

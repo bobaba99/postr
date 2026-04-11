@@ -157,7 +157,7 @@ export default function Auth() {
           >
             {loading ? 'Loading…' : 'Start creating — no account needed'}
           </button>
-          <p className="mt-3 text-[13px] text-[#6b7280] text-center leading-relaxed">
+          <p className="mt-3 text-[14pt] text-[#6b7280] text-center leading-relaxed">
             Jump straight into the editor as a guest. Your work saves in this browser.
             Link an account anytime to sync across devices.
           </p>
@@ -168,7 +168,7 @@ export default function Auth() {
           <h2 className="text-base font-bold text-[#e2e2e8] mb-1">
             {mode === 'signin' ? 'Or sign in' : 'Or create an account'}
           </h2>
-          <p className="text-sm text-[#6b7280] mb-5">
+          <p className="text-[14pt] text-[#6b7280] mb-5">
             {mode === 'signin'
               ? 'Access your posters from any device.'
               : 'Save your work across devices.'}
@@ -255,7 +255,7 @@ export default function Auth() {
             </button>
           </form>
 
-          <div className="mt-4 text-center text-[13px] text-[#6b7280]">
+          <div className="mt-4 text-center text-[14pt] text-[#6b7280]">
             {mode === 'signin' ? (
               <>
                 Don't have an account?{' '}

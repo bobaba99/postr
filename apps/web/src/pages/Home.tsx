@@ -117,25 +117,25 @@ export default function Home() {
             <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
             <circle cx="32" cy="32" r="5" fill="white" />
           </svg>
-          <h1 className="text-[20pt] font-semibold tracking-tight">Postr</h1>
+          <h1 className="text-[20pt] font-medium tracking-tight">Postr</h1>
         </Link>
         <div className="flex items-center gap-5">
           <Link
             to="/gallery"
-            className="hidden text-[14pt] font-medium text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
           >
             Gallery
           </Link>
           <Link
             to="/about"
-            className="hidden text-[14pt] font-medium text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
           >
             About
           </Link>
           {isAdmin && (
             <Link
               to="/admin/gallery"
-              className="hidden text-[14pt] font-semibold text-[#7c6aed] no-underline hover:text-white sm:inline"
+              className="hidden text-[14pt] font-medium text-[#7c6aed] no-underline hover:text-white sm:inline"
             >
               Admin
             </Link>
@@ -143,7 +143,7 @@ export default function Home() {
           <button
             type="button"
             onClick={() => openFeedback('feature')}
-            className="hidden h-10 items-center gap-2 rounded-md border border-[#2a2a3a] bg-[#111118] px-4 text-[14pt] font-medium text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] sm:flex"
+            className="hidden h-10 items-center gap-2 rounded-md border border-[#2a2a3a] bg-[#111118] px-4 text-[14pt] font-normal text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] sm:flex"
             title="Send feedback"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -166,29 +166,29 @@ export default function Home() {
 
       <section className="mx-auto w-full max-w-6xl flex-1 px-8 py-8">
         {/* Mobile notice */}
-        <div className="mb-6 rounded-lg border border-[#2a2a3a] bg-[#111118] px-4 py-3 text-[13px] text-[#6b7280] sm:hidden">
+        <div className="mb-6 rounded-lg border border-[#2a2a3a] bg-[#111118] px-4 py-3 text-[14pt] text-[#6b7280] sm:hidden">
           Postr is designed for desktop browsers. For the best editing experience, please use a laptop or desktop computer.
         </div>
 
         <div className="mb-6 flex items-center justify-between gap-4">
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-[#6b7280]">
+          <h2 className="text-[12pt] font-semibold uppercase tracking-widest text-[#6b7280]">
             My posters
           </h2>
           <NewPosterButton />
         </div>
 
         {actionError && (
-          <div className="mb-4 rounded-md border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-[13px] text-[#f87171]">
+          <div className="mb-4 rounded-md border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-[14pt] text-[#f87171]">
             {actionError}
           </div>
         )}
 
         {status.kind === 'loading' && (
-          <p className="text-sm text-[#6b7280]">Loading…</p>
+          <p className="text-[14pt] text-[#6b7280]">Loading…</p>
         )}
 
         {status.kind === 'error' && (
-          <p className="text-sm text-[#f87171]">Couldn’t load posters: {status.message}</p>
+          <p className="text-[14pt] text-[#f87171]">Couldn’t load posters: {status.message}</p>
         )}
 
         {status.kind === 'ready' && status.rows.length <= 1 && (
@@ -202,21 +202,21 @@ export default function Home() {
               </svg>
               <div>
                 <h3 className="text-lg font-bold text-[#e2e2e8]">Welcome to Postr</h3>
-                <p className="text-sm text-[#6b7280]">Create conference-quality research posters in minutes, not hours.</p>
+                <p className="text-[14pt] text-[#6b7280]">Create conference-quality research posters in minutes, not hours.</p>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
               <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
-                <div className="text-sm font-semibold text-[#c8cad0] mb-1">Pick a template</div>
-                <div className="text-[13px] text-[#6b7280] leading-relaxed">5 layouts — 3-column classic, billboard, sidebar + focus, and more. Start with structure, not a blank page.</div>
+                <div className="text-[14pt] font-semibold text-[#c8cad0] mb-1">Pick a template</div>
+                <div className="text-[14pt] text-[#6b7280] leading-relaxed">5 layouts — 3-column classic, billboard, sidebar + focus, and more. Start with structure, not a blank page.</div>
               </div>
               <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
-                <div className="text-sm font-semibold text-[#c8cad0] mb-1">Write with guidance</div>
-                <div className="text-[13px] text-[#6b7280] leading-relaxed">Built-in writing guide, conference size specs, and a checklist to keep you on track from intro to references.</div>
+                <div className="text-[14pt] font-semibold text-[#c8cad0] mb-1">Write with guidance</div>
+                <div className="text-[14pt] text-[#6b7280] leading-relaxed">Built-in writing guide, conference size specs, and a checklist to keep you on track from intro to references.</div>
               </div>
               <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
-                <div className="text-sm font-semibold text-[#c8cad0] mb-1">Check before you print</div>
-                <div className="text-[13px] text-[#6b7280] leading-relaxed">Paste your R or Python code to verify figure text is readable at poster size. Out-of-bounds warnings catch layout issues.</div>
+                <div className="text-[14pt] font-semibold text-[#c8cad0] mb-1">Check before you print</div>
+                <div className="text-[14pt] text-[#6b7280] leading-relaxed">Paste your R or Python code to verify figure text is readable at poster size. Out-of-bounds warnings catch layout issues.</div>
               </div>
             </div>
             <div className="mt-6">

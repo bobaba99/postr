@@ -210,7 +210,7 @@ export default function Profile() {
       <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
         <Header />
         <div className="mx-auto max-w-2xl px-8 py-12">
-          <p className="text-sm text-[#6b7280]">Loading…</p>
+          <p className="text-[14pt] text-[#6b7280]">Loading…</p>
         </div>
       </main>
     );
@@ -242,7 +242,7 @@ export default function Profile() {
         {/* Link Account / Sign Up */}
         {isAnonymous && (
           <Section title="Create an Account">
-            <p className="mb-4 text-[13px] text-[#6b7280] leading-relaxed">
+            <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
               You're using a guest account. Sign up to preserve your posters across devices
               and prevent data loss if your browser clears storage. All your current work
               will be linked to your new account automatically.
@@ -370,7 +370,7 @@ export default function Profile() {
 
         {/* Gallery submissions */}
         <Section title="Gallery submissions">
-          <p className="mb-4 text-[13px] text-[#6b7280] leading-relaxed">
+          <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
             Posters you have published to the{' '}
             <Link to="/gallery" className="text-[#7c6aed] underline">
               public gallery
@@ -407,7 +407,7 @@ export default function Profile() {
 
         {/* Feedback */}
         <Section title="Feedback">
-          <p className="mb-4 text-[13px] text-[#6b7280] leading-relaxed">
+          <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
             Found a bug? Have an idea? Send it in — everything lands in the developer's
             queue and shapes what ships next.
           </p>
@@ -661,8 +661,8 @@ function Section({ title, children, danger }: { title: string; children: React.R
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-center justify-between py-2 border-b border-[#1f1f2e] last:border-0">
-      <span className="text-sm text-[#9ca3af]">{label}</span>
-      <span className={`text-sm ${mono ? 'font-mono text-[#89b4fa]' : 'text-[#c8cad0]'}`}>{value}</span>
+      <span className="text-[14pt] text-[#9ca3af]">{label}</span>
+      <span className={`text-[14pt] ${mono ? 'font-mono text-[#89b4fa]' : 'text-[#c8cad0]'}`}>{value}</span>
     </div>
   );
 }
@@ -683,8 +683,8 @@ function DangerAction({
   return (
     <div className="flex items-start justify-between gap-4">
       <div>
-        <div className="text-sm font-medium text-[#c8cad0]">{title}</div>
-        <div className="text-[13px] text-[#6b7280] mt-1">{description}</div>
+        <div className="text-[14pt] font-medium text-[#c8cad0]">{title}</div>
+        <div className="text-[14pt] text-[#6b7280] mt-1">{description}</div>
       </div>
       <button onClick={onClick} disabled={disabled} className={btnDanger}>
         {buttonText}

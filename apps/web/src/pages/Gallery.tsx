@@ -55,7 +55,7 @@ export default function Gallery() {
           Real posters,<br />
           <span className="text-[#7c6aed]">from real researchers.</span>
         </h1>
-        <p className="mt-6 text-base text-[#9ca3af] leading-relaxed max-w-xl mx-auto">
+        <p className="mt-6 text-[14pt] text-[#9ca3af] leading-relaxed max-w-xl mx-auto">
           Browse posters published by the Postr community. Everything here was
           uploaded by its author, who confirmed they hold the rights to share it.
           Found something off?{' '}
@@ -98,17 +98,17 @@ export default function Gallery() {
       {/* Grid */}
       <section className="mx-auto w-full max-w-6xl flex-1 px-8 pb-24">
         {status.kind === 'loading' && (
-          <p className="py-12 text-center text-sm text-[#6b7280]">Loading gallery…</p>
+          <p className="py-12 text-center text-[14pt] text-[#6b7280]">Loading gallery…</p>
         )}
         {status.kind === 'error' && (
-          <p className="py-12 text-center text-sm text-[#f87171]">
+          <p className="py-12 text-center text-[14pt] text-[#f87171]">
             Couldn’t load gallery: {status.message}
           </p>
         )}
         {status.kind === 'ready' && status.rows.length === 0 && (
           <div className="mx-auto max-w-md rounded-xl border border-[#1f1f2e] bg-[#111118] p-10 text-center">
             <h3 className="text-lg font-semibold text-[#e2e2e8]">Nothing here yet.</h3>
-            <p className="mt-2 text-[13px] leading-relaxed text-[#6b7280]">
+            <p className="mt-2 text-[14pt] leading-relaxed text-[#6b7280]">
               {field === 'all'
                 ? 'Be the first to publish a poster. Sign in and look for the "Publish" button on the dashboard or in the editor.'
                 : `No posters have been published under ${labelForField(field).toLowerCase()} yet. Try a different field.`}
@@ -152,11 +152,11 @@ function GalleryCard({ row }: { row: GalleryEntryWithUrls }) {
             <span className="text-[11px] text-[#6b7280]">{row.year}</span>
           )}
         </div>
-        <h3 className="line-clamp-2 text-[14px] font-semibold leading-snug text-[#e2e2e8] group-hover:text-white">
+        <h3 className="line-clamp-2 text-[14pt] font-semibold leading-snug text-[#e2e2e8] group-hover:text-white">
           {row.title}
         </h3>
         {row.conference && (
-          <p className="mt-1 truncate text-[12px] text-[#6b7280]">{row.conference}</p>
+          <p className="mt-1 truncate text-[12pt] text-[#6b7280]">{row.conference}</p>
         )}
       </div>
     </Link>
