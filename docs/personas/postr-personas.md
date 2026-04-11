@@ -378,6 +378,119 @@ Update this file whenever the PRD's target users, features, or friction principl
 
 ---
 
+## 11. Tomás — Anonymous Visitor Landing on the Public Gallery
+
+**Bio.** Third-year biology PhD student at a Spanish university. A friend posted a link to `/gallery` in a Slack channel. He has no Postr account and no intention of making one *yet* — he just wants to see if other people have used it for posters that look serious.
+
+**Job-to-be-done.** Browse the gallery anonymously, judge the quality of what's there, and decide whether Postr is worth signing up for.
+
+**Motivations.**
+
+- Curiosity, not commitment.
+- Wants to see real, finished examples — not screenshots in a marketing page.
+- Wants to filter by his field (biology) so he doesn't have to wade through neuroscience and physics.
+
+**Frustrations.**
+
+- Sign-up walls for read-only browsing.
+- Empty galleries with placeholder copy.
+- Filters that pretend to work but don't actually narrow the list.
+- Copy that talks about "communities" he hasn't joined yet.
+
+**Visual / style preferences.**
+
+- Cares about thumbnail quality. Blurry thumbnails make him close the tab.
+- Wants to click an entry and see the full image, not a tiny modal.
+
+**Test flow:**
+
+1. Navigate to `/gallery` with no auth cookies → page should render without redirect to `/auth`.
+2. Verify the field-dropdown filter exists and includes "Biology".
+3. If the gallery is empty, the empty state should not say "sign up to publish" — it should not pressure him.
+4. Click the field filter → "Biology" → confirm grid filters or shows the empty-for-this-field message.
+5. Click into an entry detail page → confirm full image loads, retraction disclaimer is visible, takedown contact email is present.
+6. Open the public footer → click Privacy / Cookies / Terms → each loads without auth.
+7. **Tomás test passes only if** the entire gallery + legal flow is reachable without authentication, and no part of the experience nags him to sign up.
+
+---
+
+## 12. Hannah — Recent Graduate Publishing Her Defense Poster
+
+**Bio.** Just defended her MSc thesis in social psychology. Wants to publish her poster as a portfolio piece on the public gallery so it shows up in her CV link. Already has a Postr account from drafting earlier.
+
+**Job-to-be-done.** Take her completed poster from the editor, push the Publish button, accept whatever consent the system needs, and end up with a stable URL she can paste into her CV.
+
+**Motivations.**
+
+- A canonical link she can share publicly.
+- Pride — she wants her name and her university on a real page indexed by search engines.
+- Confidence that she can pull it down later if her advisor objects.
+
+**Frustrations.**
+
+- Multi-step modals where she loses her place.
+- Consent screens that feel like terms-of-service ambush.
+- A "publish" button that produces a blurry low-res image of her work.
+- No way to retract if her advisor or co-authors push back.
+
+**Visual / style preferences.**
+
+- Polished metadata form: title pre-filled, field dropdown sensible, year defaulted to current.
+- Sharp captured image — print-DPI quality.
+
+**Test flow:**
+
+1. Sign in → land on `/dashboard` → confirm her existing posters are listed.
+2. Verify a "Publish" button is reachable on each poster card AND on the editor sidebar.
+3. From dashboard card → click Publish → confirm she lands in the editor with the poster fully rendered before any modal opens (so the canvas can be captured).
+4. Consent modal: confirm 4 required tick-boxes (rightful owner, co-authors agreed, no confidential material, retract-on-ownership-change) and confirm the Publish button stays disabled until all four are ticked.
+5. Metadata modal: title pre-filled with poster name, field dropdown defaults to a sensible option, year input defaults to current year, capture preview shows a sharp image (not blurry), file size badge visible.
+6. Submit → land on `/gallery/:id` → confirm the entry is publicly viewable, full image loads, footer disclaimer present.
+7. Navigate to `/profile` → "Gallery submissions" section → confirm her new entry is listed with a Retract button.
+8. Click Retract → ConfirmModal → confirm → confirm the entry disappears from `/gallery` immediately.
+9. **Hannah test passes only if** the publish round-trip from dashboard → gallery URL takes fewer than 8 clicks, the captured image is print-readable quality, and retraction is one button press from her Profile page.
+
+---
+
+## 13. Gavin — Solo Founder Acting as Gallery Moderator
+
+**Bio.** Solo dev who built Postr. Email is on the `admin_emails` allowlist. Needs to scan new gallery submissions every couple of days and pull down anything that's clearly copyrighted, confidential, or junk — without context-switching out of the app into Supabase Studio.
+
+**Job-to-be-done.** Triage the gallery from a dedicated admin page, force-retract problem entries with a reason, occasionally undo a mistaken retraction.
+
+**Motivations.**
+
+- Speed — moderation should not interrupt his coding flow.
+- Audit trail — when he retracts something, his reason should be visible to the author so they understand.
+- Reversibility — he wants to be able to unretract if he was wrong, without restoring from a backup.
+
+**Frustrations.**
+
+- Going to Supabase Studio for moderation actions.
+- Hidden admin pages he can't link from a normal nav.
+- Force-retract without a reason field — leaves him no way to communicate with the author.
+- Permanent deletes that lose the audit trail.
+
+**Visual / style preferences.**
+
+- Compact admin layout — many entries visible without scrolling.
+- Clear visual difference between active and retracted rows.
+- Filter buttons (All / Active / Retracted) so he can do a "show me retracted" pass before walking away.
+
+**Test flow:**
+
+1. Sign in as the admin email → land on `/dashboard` → confirm the "Admin" link appears in the header (and only for him).
+2. Click Admin → land on `/admin/gallery` → confirm the page loads with every entry visible (his own AND other users').
+3. Test the All / Active / Retracted filter buttons → counts update.
+4. Click Retract on an active entry → inline reason textarea appears → try to submit empty → button should be disabled.
+5. Type a reason → click Retract → confirm row gets the "Retracted" badge and the reason shows below the title.
+6. Switch to the Retracted filter → confirm the row appears there.
+7. Click Unretract on the row → confirm it returns to active state.
+8. Sign out → sign in with a non-admin account → confirm the Admin link is hidden in the dashboard header AND `/admin/gallery` redirects to `/dashboard`.
+9. **Gavin test passes only if** the full retract → unretract loop happens inside `/admin/gallery` without any Studio detour, and the access gate works for non-admins.
+
+---
+
 ## How to use these personas
 
 - **Before a release:** walk through every persona's test flow manually in the live app.
