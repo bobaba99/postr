@@ -128,10 +128,12 @@ function paletteNameFor(
  */
 const DRAG_THRESHOLD_PX = 4;
 
+export type BlockDragMode = 'move' | 'resize' | 'rotate';
+
 export interface UseBlockDragResult {
-  onPointerDown: (e: React.PointerEvent, id: string, mode: 'move' | 'resize') => void;
+  onPointerDown: (e: React.PointerEvent, id: string, mode: BlockDragMode) => void;
   didDragRef: React.MutableRefObject<boolean>;
-  /** Id of the block currently being moved/resized, null otherwise. */
+  /** Id of the block currently being moved/resized/rotated, null otherwise. */
   draggingId: string | null;
 }
 
@@ -152,13 +154,25 @@ function useBlockDrag(
 
   const sessionRef = useRef<{
     id: string;
-    mode: 'move' | 'resize';
+    mode: BlockDragMode;
     sx: number;
     sy: number;
     ox: number;
     oy: number;
     ow: number;
     oh: number;
+    // Rotation state (only used when mode === 'rotate'):
+    // - cx/cy: block center in CLIENT coordinates (screen px), read
+    //   from getBoundingClientRect() at pointerdown time. The BCR of
+    //   a CSS-rotated element gives its axis-aligned bounding box,
+    //   so its center IS the rotation pivot (rotate() defaults to
+    //   50% 50% which matches).
+    // - startAngle: atan2 from center to pointer at pointerdown.
+    // - oRot: block.rotation at pointerdown time (degrees).
+    cx: number;
+    cy: number;
+    startAngle: number;
+    oRot: number;
     isHeading: boolean;
     active: boolean;
   } | null>(null);
@@ -167,11 +181,29 @@ function useBlockDrag(
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const onPointerDown = useCallback(
-    (e: React.PointerEvent, id: string, mode: 'move' | 'resize') => {
+    (e: React.PointerEvent, id: string, mode: BlockDragMode) => {
       e.stopPropagation();
 
       const b = blocksRef.current.find((x) => x.id === id);
       if (!b) return;
+
+      // For rotate, look up the block's DOM element so we can read
+      // its center. BCR returns the axis-aligned bounding box of the
+      // visually-rendered (possibly rotated) element, so its center
+      // is the rotation pivot.
+      let cx = 0;
+      let cy = 0;
+      let startAngle = 0;
+      if (mode === 'rotate') {
+        const target = e.currentTarget as HTMLElement;
+        const frame = target.closest<HTMLElement>('[data-block-id]');
+        if (frame) {
+          const r = frame.getBoundingClientRect();
+          cx = r.left + r.width / 2;
+          cy = r.top + r.height / 2;
+          startAngle = Math.atan2(e.clientY - cy, e.clientX - cx);
+        }
+      }
 
       sessionRef.current = {
         id,
@@ -182,6 +214,10 @@ function useBlockDrag(
         oy: b.y,
         ow: b.w,
         oh: b.h,
+        cx,
+        cy,
+        startAngle,
+        oRot: b.rotation ?? 0,
         isHeading: b.type === 'heading',
         active: false,
       };
@@ -208,15 +244,69 @@ function useBlockDrag(
         const nextBlocks = blocksRef.current.map((blk) => {
           if (blk.id !== s.id) return blk;
           if (s.mode === 'move') {
+            // Move is rotation-invariant: screen-space delta maps
+            // directly to canvas-space (x, y). The block's bounding
+            // box in poster coords stays axis-aligned; the rotation
+            // is purely a render-time decoration.
             return {
               ...blk,
               x: snap(Math.max(0, s.ox + dx)),
               y: snap(Math.max(0, s.oy + dy)),
             };
           }
-          const nw = Math.max(40, s.ow + dx);
+          if (s.mode === 'rotate') {
+            // atan2 delta → rotation delta in degrees.
+            const angle = Math.atan2(ev.clientY - s.cy, ev.clientX - s.cx);
+            const deltaRad = angle - s.startAngle;
+            const deltaDeg = (deltaRad * 180) / Math.PI;
+            let nextRot = s.oRot + deltaDeg;
+            // Normalize to [-180, 180] so the stored value doesn't
+            // drift unbounded across multiple spin-arounds.
+            nextRot = ((nextRot + 180) % 360 + 360) % 360 - 180;
+
+            // Magnetic snap at common angles. Always-on — users
+            // expect rotations to "stick" at 0/45/90/135/180 etc.
+            // without holding a modifier. The 4° catch radius is
+            // tight enough that intentional non-aligned rotations
+            // still work (you can rotate to 43° and it won't yank
+            // you to 45°), but loose enough that you feel the pull
+            // when you're nearby.
+            //
+            // Shift key switches to hard 15° steps instead — for
+            // when the user explicitly wants every rotation to
+            // land on a clean multiple.
+            if (ev.shiftKey) {
+              nextRot = Math.round(nextRot / 15) * 15;
+            } else {
+              const SNAP_ANGLES = [
+                -180, -135, -90, -45, 0, 45, 90, 135, 180,
+              ];
+              const SNAP_THRESHOLD = 4;
+              for (const target of SNAP_ANGLES) {
+                if (Math.abs(nextRot - target) < SNAP_THRESHOLD) {
+                  nextRot = target === -180 ? 180 : target;
+                  break;
+                }
+              }
+            }
+            return { ...blk, rotation: nextRot };
+          }
+          // mode === 'resize' — transform the screen-space delta
+          // into the block's LOCAL rotated frame so dragging the
+          // bottom-right handle always grows the block in its own
+          // "right" / "down" direction, even when rotated 45° or 90°.
+          const rot = ((s.oRot ?? 0) * Math.PI) / 180;
+          const cos = Math.cos(rot);
+          const sin = Math.sin(rot);
+          const localDx = dx * cos + dy * sin;
+          const localDy = -dx * sin + dy * cos;
+          const nw = Math.max(40, s.ow + localDx);
           if (s.isHeading) return { ...blk, w: snap(nw) };
-          return { ...blk, w: snap(nw), h: snap(Math.max(20, s.oh + dy)) };
+          return {
+            ...blk,
+            w: snap(nw),
+            h: snap(Math.max(20, s.oh + localDy)),
+          };
         });
         // Use silent setter during drag to avoid flooding the undo stack
         setBlocksSilent(nextBlocks);
@@ -765,16 +855,59 @@ export function PosterEditor() {
     setCustomPalettes(next);
   };
 
-  // Delete key support (ignored when typing in inputs / contentEditable)
+  // Delete key + arrow-key nudge — both gated on the canvas, not
+  // on input fields. When a block is selected AND the user isn't
+  // typing:
+  //
+  //   Arrow key         → nudge by SNAP_GRID (5 units = half-inch,
+  //                       one grid cell). Default respects grid so
+  //                       blocks stay aligned with the canvas
+  //                       overlay + other blocks that were placed
+  //                       via drag (which also snaps to SNAP_GRID).
+  //   Shift + Arrow     → nudge by 1 unit (1/10 inch) for fine
+  //                       sub-grid adjustment. Reverses the usual
+  //                       Figma/Sketch convention (fine default,
+  //                       shift for coarse) because Postr's whole
+  //                       "constraint as feature" philosophy says
+  //                       on-grid should be the easy path.
+  //
+  //   Delete / Backspace → remove the selected block.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key !== 'Delete' || !selectedId) return;
+      if (!selectedId) return;
       const target = document.activeElement as HTMLElement | null;
       const isInput =
         target?.tagName === 'INPUT' ||
         target?.tagName === 'TEXTAREA' ||
         target?.getAttribute('contenteditable') === 'true';
-      if (!isInput) deleteBlock(selectedId);
+      if (isInput) return;
+
+      // Delete / Backspace → remove the selected block.
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        deleteBlock(selectedId);
+        return;
+      }
+
+      // Arrow keys → nudge.
+      const nudge = e.shiftKey ? 1 : SNAP_GRID;
+      const arrowMap: Record<string, [number, number] | undefined> = {
+        ArrowLeft: [-nudge, 0],
+        ArrowRight: [nudge, 0],
+        ArrowUp: [0, -nudge],
+        ArrowDown: [0, nudge],
+      };
+      const delta = arrowMap[e.key];
+      if (!delta) return;
+
+      e.preventDefault();
+      const blk = doc.blocks.find((b) => b.id === selectedId);
+      if (!blk) return;
+      const [dx, dy] = delta;
+      updateBlock(selectedId, {
+        x: Math.max(0, blk.x + dx),
+        y: Math.max(0, blk.y + dy),
+      });
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);

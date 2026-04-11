@@ -44,6 +44,16 @@ export interface Block {
   imageSrc: string | null;
   imageFit: ImageFit;
   tableData: TableData | null;
+  /**
+   * Rotation in degrees, clockwise, around the block's center.
+   * Optional — undefined or 0 means axis-aligned (the default for
+   * every block created before this field existed). Applied as a
+   * CSS `transform: rotate()` on the BlockFrame and does NOT change
+   * the block's (x, y, w, h) bounding box in poster coordinates.
+   * Resize handles transform the screen-space pointer delta into
+   * the block's local rotated frame so drag math stays intuitive.
+   */
+  rotation?: number;
 }
 
 export type FontWeight = 300 | 400 | 500 | 600 | 700 | 800;

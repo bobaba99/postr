@@ -114,10 +114,36 @@ export function ImageBlock({ block, palette, onUpdate }: ImageBlockProps) {
   if (block.imageSrc) {
     return (
       <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+        {/*
+          `draggable={false}` + `onDragStart preventDefault` + CSS
+          user-drag:none all three together are required to kill the
+          browser's native image-drag ghost. Without them, pointerdown
+          on the <img> hands over to the browser's drag-to-desktop
+          behavior and the app's pointermove handler never fires,
+          leaving the block "stuck". Issue reported 2026-04-11 — the
+          user couldn't move image blocks because the browser
+          intercepted every drag as an image drag.
+          `WebkitUserDrag` covers Safari, `userSelect: none` blocks
+          text-selection on decorative image alt text, and
+          `pointerEvents: none` would break our own drag handler, so
+          we don't use it — instead we rely on the outer frame's
+          onPointerDown bubbling up from the image container div.
+        */}
         <img
           src={block.imageSrc}
           alt=""
-          style={{ width: '100%', height: '100%', objectFit: block.imageFit ?? 'contain' }}
+          draggable={false}
+          onDragStart={(e) => e.preventDefault()}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: block.imageFit ?? 'contain',
+            userSelect: 'none',
+            WebkitUserDrag: 'none',
+            KhtmlUserDrag: 'none',
+            MozUserDrag: 'none',
+            OUserDrag: 'none',
+          } as CSSProperties}
         />
         <div style={{ position: 'absolute', top: 2, right: 2, display: 'flex', gap: 2 }}>
           <button onClick={toggleFit} style={iconBtn}>
@@ -1080,7 +1106,11 @@ interface BlockFrameProps {
   headingNumber: number;
   selected: boolean;
   onSelect: (id: string) => void;
-  onPointerDown: (e: React.PointerEvent, id: string, mode: 'move' | 'resize') => void;
+  onPointerDown: (
+    e: React.PointerEvent,
+    id: string,
+    mode: 'move' | 'resize' | 'rotate',
+  ) => void;
   /**
    * Shared ref from useBlockDrag — true when the user's most recent
    * pointerdown → pointerup sequence actually moved the block.
@@ -1210,6 +1240,16 @@ export function BlockFrame(props: BlockFrameProps) {
         }
       }}
       onPointerDown={(e) => {
+        // For image + logo blocks, require the user to use the
+        // external move handle above the block. The browser's native
+        // image-drag behavior is aggressive (even with
+        // draggable=false there are residual cases on Firefox /
+        // Safari where pointerdown on an <img> can still produce
+        // weird selection states), so routing every move through the
+        // dedicated handle eliminates the edge cases entirely. Text
+        // and table blocks still support drag-from-anywhere because
+        // there's no competing native behavior there.
+        if (b.type === 'image' || b.type === 'logo') return;
         onPointerDown(e, b.id, 'move');
       }}
       data-block-id={b.id}
@@ -1232,10 +1272,24 @@ export function BlockFrame(props: BlockFrameProps) {
             ? `1.5px solid ${p.accent}88`
             : '1px solid transparent',
         borderRadius: 2,
-        cursor: b.type === 'table' ? 'default' : 'move',
+        // Image + logo blocks get `default` cursor because drag is
+        // only available from the move handle. Tables also use
+        // default because they have their own inner interactions.
+        // Everything else gets the `move` cursor as a hint.
+        cursor:
+          b.type === 'table' || b.type === 'image' || b.type === 'logo'
+            ? 'default'
+            : 'move',
         padding: ['table', 'image', 'logo'].includes(b.type) ? 0 : '4px 6px',
         boxSizing: 'border-box',
         overflow: 'visible',
+        // Apply user-defined rotation around the block's center.
+        // This is purely a render transform — the block's bounding
+        // box in poster coords (x, y, w, h) stays axis-aligned, and
+        // the drag math transforms screen-space deltas into the
+        // rotated local frame for resize.
+        transform: b.rotation ? `rotate(${b.rotation}deg)` : undefined,
+        transformOrigin: 'center center',
       }}
     >
       <div
@@ -1363,52 +1417,169 @@ export function BlockFrame(props: BlockFrameProps) {
       )}
 
       {selected && (
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(b.id);
-          }}
-          // Positioned OUTSIDE the block bounds (above the top edge)
-          // so it doesn't cover any content at the top of the block.
-          // Previously at top:-2 right:-2 which left 16px of the
-          // 18px circle sitting on top of the block's first line.
-          style={{
-            position: 'absolute',
-            top: -26,
-            right: 0,
-            width: 20,
-            height: 20,
-            borderRadius: '50%',
-            background: '#d33',
-            color: '#fff',
-            border: '2px solid #0a0a12',
-            fontSize: 14,
-            lineHeight: 1,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            zIndex: 10,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
-          }}
-          title="Delete block"
-        >
-          ×
-        </button>
+        <>
+          {/*
+            External MOVE handle — top-left, outside the frame.
+            Added 2026-04-11 because image and logo blocks couldn't
+            be reliably dragged from their content area: the
+            browser's native image-drag behavior hijacked the
+            pointer events even with draggable={false} on the <img>.
+            Routing move through a dedicated handle side-steps the
+            conflict entirely. Text and table blocks ALSO get the
+            handle (for consistency) but can still be dragged from
+            anywhere in the frame.
+          */}
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onPointerDown(e, b.id, 'move');
+            }}
+            style={{
+              position: 'absolute',
+              top: -26,
+              left: 0,
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              background: p.accent,
+              color: '#fff',
+              border: '2px solid #0a0a12',
+              fontSize: 11,
+              lineHeight: 1,
+              cursor: 'move',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              padding: 0,
+              // Counter-rotate so the icon stays readable even when
+              // the block itself is rotated. Without this, the move
+              // handle icon spins with the block.
+              transform: b.rotation ? `rotate(${-b.rotation}deg)` : undefined,
+            }}
+            title="Drag to move (or use arrow keys)"
+          >
+            ✥
+          </button>
+
+          {/*
+            External ROTATE handle — BELOW the block, centered.
+            Moved from top-center to bottom-center on 2026-04-11 so
+            the top row is just move + delete (no three-button
+            crowding). The handle sits 26px below the block's
+            bottom edge with a short visual stem connecting it
+            back to the block — standard rotation-handle UX from
+            design tools.
+
+            Drag in a circle around the block's center to rotate.
+            Magnetic snap at 0/45/90/135/180/270° with a 4° catch
+            radius (always on). Hold Shift for harder 15° snaps.
+          */}
+          <div
+            // Stem connecting the handle to the block. `pointerEvents:
+            // none` so clicks pass through to the handle below it.
+            style={{
+              position: 'absolute',
+              bottom: -18,
+              left: '50%',
+              marginLeft: -1,
+              width: 2,
+              height: 18,
+              background: p.accent,
+              opacity: 0.5,
+              pointerEvents: 'none',
+            }}
+          />
+          <button
+            type="button"
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onPointerDown(e, b.id, 'rotate');
+            }}
+            style={{
+              position: 'absolute',
+              bottom: -36,
+              left: '50%',
+              marginLeft: -10,
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              background: '#1a1a26',
+              color: '#c8b6ff',
+              border: `2px solid ${p.accent}`,
+              fontSize: 13,
+              lineHeight: 1,
+              cursor: 'grab',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              padding: 0,
+              // Counter-rotate so the ↻ icon stays upright even
+              // when the block is rotated.
+              transform: b.rotation ? `rotate(${-b.rotation}deg)` : undefined,
+            }}
+            title="Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)"
+          >
+            ↻
+          </button>
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(b.id);
+            }}
+            // Positioned OUTSIDE the block bounds (above the top edge)
+            // so it doesn't cover any content at the top of the block.
+            // Now one of a row of three external handles: move (left),
+            // rotate (center), delete (right).
+            style={{
+              position: 'absolute',
+              top: -26,
+              right: 0,
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              background: '#d33',
+              color: '#fff',
+              border: '2px solid #0a0a12',
+              fontSize: 14,
+              lineHeight: 1,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              zIndex: 10,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              padding: 0,
+              transform: b.rotation ? `rotate(${-b.rotation}deg)` : undefined,
+            }}
+            title="Delete block"
+          >
+            ×
+          </button>
+        </>
       )}
       {selected && (
         <div
-          // Positioned ABOVE the block like the delete button so it
-          // doesn't sit on top of the first line of content. Moved
-          // from top:-1 left:3 (which put the label inside the
-          // block's top-left corner, covering headings and title
-          // text) to top:-22 left:0 with slightly larger font so
-          // it's legible at normal zoom without blocking anything.
+          // Positioned at TOP-CENTER of the block, above the frame.
+          // The rotate handle moved to the bottom on 2026-04-11, so
+          // the top row now has move (left), delete (right), and
+          // empty middle — the block-type label fills that empty
+          // middle so users see at-a-glance what type of block they
+          // have selected. Centered horizontally via left: 50% +
+          // translateX(-50%). The counter-rotate keeps the label
+          // readable when the block itself is rotated.
           style={{
             position: 'absolute',
             top: -22,
-            left: 0,
+            left: '50%',
             fontSize: 9,
             background: p.accent,
             color: '#fff',
@@ -1422,9 +1593,18 @@ export function BlockFrame(props: BlockFrameProps) {
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
             boxShadow: '0 2px 6px rgba(0,0,0,0.35)',
+            transform: b.rotation
+              ? `translateX(-50%) rotate(${-b.rotation}deg)`
+              : 'translateX(-50%)',
+            transformOrigin: 'center center',
           }}
         >
           {b.type}
+          {typeof b.rotation === 'number' && b.rotation !== 0 && (
+            <span style={{ marginLeft: 6, opacity: 0.8 }}>
+              {Math.round(b.rotation)}°
+            </span>
+          )}
         </div>
       )}
 
