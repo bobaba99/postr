@@ -1751,6 +1751,21 @@ export function PosterEditor() {
         </button>
       )}
 
+      {/* Canvas stage — wraps the scroll container + floating
+          chrome (ZoomBar, AutosaveStatusPill, OOB banner) so the
+          chrome stays fixed in viewport space regardless of the
+          inner scroll position. Previously the chrome was nested
+          inside the scroll container and moved with scrollLeft
+          during pinch-zoom. */}
+      <div
+        style={{
+          flex: 1,
+          position: 'relative',
+          display: 'flex',
+          minWidth: 0,
+          minHeight: 0,
+        }}
+      >
       <div
         ref={canvasRef}
         data-postr-canvas-outer
@@ -1758,22 +1773,51 @@ export function PosterEditor() {
         style={{
           flex: 1,
           position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          // IMPORTANT: this div is purely a scroll container. It
+          // does NOT flex-center its children. Flex centering
+          // breaks cursor-anchored pinch-to-zoom because when the
+          // frame is larger than the wrapper, `justify-content:
+          // center` pushes half the frame off each side and
+          // `scrollLeft` starts from a center-based origin that
+          // the zoom math can't predict. Centering is instead
+          // handled by an inner `data-postr-canvas-workarea` div
+          // that grows with the frame via `minWidth/minHeight:
+          // 100%` — flex centering still applies but always from
+          // a scroll origin of 0.
+          display: 'block',
           overflow: 'auto',
-          // Extra padding creates a "working area" gutter around the
-          // canvas. Blocks dragged past the canvas edge (or whose
-          // handles sit at top: -26) remain visible in this gutter
-          // instead of getting clipped — same idea as Figma's dark
-          // workspace outside the page, or Illustrator's pasteboard.
-          // 96 px is enough room for the top/left block handles
-          // plus ~60 px of drag overshoot before the scroll
-          // container takes over.
-          padding: 96,
           background: '#0a0a12',
+          minWidth: 0,
+          minHeight: 0,
         }}
       >
+        <div
+          data-postr-canvas-workarea
+          style={{
+            // This div is the "pasteboard" — it must grow both
+            // with the outer scroll container (so flex centering
+            // fills the viewport when the frame is small) AND
+            // with its own content (so scroll bars appear when
+            // the frame zooms past the viewport). `width:
+            // max-content` lets it size to content, while
+            // `min-width / min-height: 100%` floors it to the
+            // scroll container's content box. A plain
+            // `min-width: 100%` alone would clamp the div to the
+            // parent because its parent is `display: block` — so
+            // the frame would overflow visually but the work-area
+            // wouldn't grow, and `scrollLeft` would be pinned at
+            // zero. That's the "horizontal always resets" bug.
+            width: 'max-content',
+            height: 'max-content',
+            minWidth: '100%',
+            minHeight: '100%',
+            boxSizing: 'border-box',
+            padding: 96,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
         <div style={{ position: 'relative' }}>
           <div
             data-postr-canvas-frame
@@ -1790,11 +1834,14 @@ export function PosterEditor() {
               // shadow + border-radius on this div; anything past
               // the bounds floats freely over the workspace.
               overflow: 'visible',
-              // Smooth the canvas frame's width/height changes when
-              // zoom ticks up or down so the drop shadow glides
-              // instead of snapping between sizes.
-              transition:
-                'width 220ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+              // NO transition on width/height. An earlier commit
+              // added a 220 ms cubic-bezier to smooth zoom-button
+              // clicks, but during a pinch gesture that transition
+              // causes getBoundingClientRect() to return the
+              // mid-animation size, and the scroll adjustment in
+              // the wheel handler uses stale values → lag + drift.
+              // Zoom-button clicks still feel fine without the
+              // transition because they only fire once per click.
             }}
           >
             <div
@@ -1806,10 +1853,9 @@ export function PosterEditor() {
                 transformOrigin: 'top left',
                 background: doc.palette.bg,
                 position: 'relative',
-                // Match the frame's easing so the inner transform
-                // stays in sync with the outer size change.
-                transition:
-                  'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
+                // Same no-transition rationale as the frame above —
+                // `transform: scale` animations fight the wheel
+                // handler's scroll math and produce lag.
               }}
             >
               {showGrid && (
@@ -2064,8 +2110,12 @@ export function PosterEditor() {
             </div>
           </div>
         </div>
+        </div>
+      </div>
 
-        {/* OOB warning banner */}
+        {/* OOB warning banner — outside the scroll container so it
+            stays anchored to the visible viewport even when the
+            user has scrolled the pasteboard. */}
         {oobWarnings.length > 0 && (
           <div
             style={{
@@ -2084,6 +2134,7 @@ export function PosterEditor() {
               zIndex: 15,
               boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
               lineHeight: 1.4,
+              pointerEvents: 'none',
             }}
           >
             <strong style={{ color: '#f87171' }}>
