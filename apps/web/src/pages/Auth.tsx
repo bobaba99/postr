@@ -113,15 +113,30 @@ export default function Auth() {
           <span className="text-2xl font-bold text-white">Postr</span>
         </Link>
 
-        {/* Card */}
+        {/* Guest — most prominent, top of card */}
+        <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 mb-4">
+          <button
+            onClick={handleGuest}
+            disabled={loading}
+            className="w-full rounded-lg bg-[#7c6aed] px-4 py-3.5 text-base font-semibold text-white hover:bg-[#6c5ce7] transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Loading…' : 'Start creating — no account needed'}
+          </button>
+          <p className="mt-3 text-[13px] text-[#6b7280] text-center leading-relaxed">
+            Jump straight into the editor as a guest. Your work saves in this browser.
+            Link an account anytime to sync across devices.
+          </p>
+        </div>
+
+        {/* Sign in / Sign up card */}
         <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
-          <h2 className="text-lg font-bold text-[#e2e2e8] mb-1">
-            {mode === 'signin' ? 'Welcome back' : 'Create an account'}
+          <h2 className="text-base font-bold text-[#e2e2e8] mb-1">
+            {mode === 'signin' ? 'Or sign in' : 'Or create an account'}
           </h2>
-          <p className="text-sm text-[#6b7280] mb-6">
+          <p className="text-sm text-[#6b7280] mb-5">
             {mode === 'signin'
-              ? 'Sign in to access your posters.'
-              : 'Sign up to save your work across devices.'}
+              ? 'Access your posters from any device.'
+              : 'Save your work across devices.'}
           </p>
 
           {error && (
@@ -145,9 +160,9 @@ export default function Auth() {
             Continue with Google
           </button>
 
-          <div className="my-5 flex items-center gap-3">
+          <div className="my-4 flex items-center gap-3">
             <div className="h-px flex-1 bg-[#2a2a3a]" />
-            <span className="text-[13px] text-[#555]">or</span>
+            <span className="text-[13px] text-[#555]">or use email</span>
             <div className="h-px flex-1 bg-[#2a2a3a]" />
           </div>
 
@@ -173,7 +188,7 @@ export default function Auth() {
             <button
               type="submit"
               disabled={loading || !email.trim() || !password}
-              className="w-full rounded-lg bg-[#7c6aed] px-4 py-3 text-sm font-semibold text-white hover:bg-[#6c5ce7] transition-colors disabled:opacity-50"
+              className="w-full rounded-lg border border-[#7c6aed] bg-transparent px-4 py-3 text-sm font-semibold text-[#7c6aed] hover:bg-[#7c6aed] hover:text-white transition-colors disabled:opacity-50"
             >
               {loading ? 'Loading…' : mode === 'signin' ? 'Sign in' : 'Create account'}
             </button>
@@ -196,20 +211,6 @@ export default function Auth() {
               </>
             )}
           </div>
-        </div>
-
-        {/* Guest option */}
-        <div className="mt-4 text-center">
-          <button
-            onClick={handleGuest}
-            disabled={loading}
-            className="text-sm text-[#6b7280] bg-transparent border-none cursor-pointer hover:text-[#c8cad0] transition-colors disabled:opacity-50"
-          >
-            Continue as guest — no account needed
-          </button>
-          <p className="mt-2 text-[13px] text-[#555]">
-            Guest data stays in your browser. Link an account later to sync across devices.
-          </p>
         </div>
       </div>
     </main>
