@@ -95,18 +95,13 @@ export default function Profile() {
           await deletePoster(p.id);
         }
 
-        // 2. Delete the auth user via Edge Function (requires service_role)
+        // 2. Delete the auth user via Postgres RPC (security definer)
         // This removes the user from auth.users so the email can be re-used.
-        // Falls back gracefully if the function isn't deployed yet.
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.access_token) {
-            await supabase.functions.invoke('delete-account', {
-              headers: { Authorization: `Bearer ${session.access_token}` },
-            });
-          }
-        } catch {
-          // Edge function not deployed — sign out only (user remains in auth.users)
+        // The function uses auth.uid() so users can only delete themselves.
+        const { error: rpcError } = await supabase.rpc('delete_own_account' as never);
+        if (rpcError) {
+          // Non-fatal — user data is already deleted, just the auth record remains
+          console.warn('Could not delete auth user:', rpcError.message);
         }
 
         // 3. Clear all local data
