@@ -230,7 +230,7 @@ export default function Profile() {
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <Header />
 
-      <div className="mx-auto w-full max-w-6xl flex-1 px-8 py-8">
+      <div className="mx-auto w-full max-w-5xl flex-1 px-8 py-8">
         {actionStatus && (
           <div className="mb-4 rounded-md border border-[#a6e3a1]/40 bg-[#a6e3a1]/10 px-3 py-2 text-[14pt] text-[#a6e3a1]">
             {actionStatus}
@@ -243,23 +243,22 @@ export default function Profile() {
         )}
 
         {/*
-          Bento grid — 6-column base so cards can take 2, 3, 4, or 6
-          of them. Account (compact) sits next to Profile Details
-          (tall), Preferences next to Gallery submissions, Feedback
-          next to Danger Zone, etc. Collapses to a single column on
-          mobile.
+          Bento grid — two equal columns, no wide boxes. Collapses to
+          a single column on mobile. The Create Account banner (shown
+          only to guests) is the one exception and spans the full row.
         */}
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-6">
-        {/* Account — compact 2-col */}
-        <Section title="Account" span={2}>
-          <Row label="Email" value={email ?? 'Not linked'} />
-          <Row label="Member since" value={createdAt} />
-          <Row label="Posters" value={String(posterCount)} />
-        </Section>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Account — celebratory stats card */}
+        <AccountCelebrationCard
+          email={email}
+          createdAt={createdAt}
+          posterCount={posterCount}
+          user={user}
+        />
 
-        {/* Link Account / Sign Up — full row when anonymous */}
+        {/* Link Account / Sign Up — shown only to guests */}
         {isAnonymous && (
-          <Section title="Create an Account" span={6}>
+          <Section title="Create an Account">
             <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
               You're using a guest account. Sign up to preserve your posters across devices
               and prevent data loss if your browser clears storage. All your current work
@@ -291,8 +290,8 @@ export default function Profile() {
           </Section>
         )}
 
-        {/* Profile Details — 4-col wide to give the form breathing room */}
-        <Section title="Profile Details" span={4}>
+        {/* Profile Details */}
+        <Section title="Profile Details">
           <p className="mb-3 text-[14pt] text-[#6b7280] leading-relaxed">
             Optional — helps identify your posters and auto-fill author info.
           </p>
@@ -302,8 +301,8 @@ export default function Profile() {
           }} />
         </Section>
 
-        {/* Preferences — 3-col */}
-        <Section title="Preferences" span={3}>
+        {/* Preferences */}
+        <Section title="Preferences">
           <div className="flex items-start justify-between py-2 gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-[14pt] text-[#c8cad0]">🎨 Saved style presets</div>
@@ -398,8 +397,8 @@ export default function Profile() {
           </div>
         </Section>
 
-        {/* Gallery submissions — full-width when there are entries */}
-        <Section title="Gallery submissions" span={6}>
+        {/* Gallery submissions */}
+        <Section title="Gallery submissions">
           <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
             Posters you have published to the{' '}
             <Link to="/gallery" className="text-[#7c6aed] underline">
@@ -435,8 +434,8 @@ export default function Profile() {
           )}
         </Section>
 
-        {/* Feedback — 3-col */}
-        <Section title="Feedback" span={3}>
+        {/* Feedback */}
+        <Section title="Feedback">
           <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
             Found a bug? Have an idea? Send it in — everything lands in the developer's
             queue and shapes what ships next.
@@ -467,8 +466,8 @@ export default function Profile() {
           )}
         </Section>
 
-        {/* Danger Zone — 3-col, sits next to Feedback */}
-        <Section title="Danger Zone" danger span={3}>
+        {/* Danger Zone */}
+        <Section title="Danger Zone" danger>
           <div className="space-y-4">
             <DangerAction
               title="Delete all posters"
@@ -682,31 +681,13 @@ function Section({
   title,
   children,
   danger,
-  span = 2,
 }: {
   title: string;
   children: React.ReactNode;
   danger?: boolean;
-  /**
-   * How many of the 6 bento grid columns this card spans on medium+
-   * screens. Default 2 = half a row alongside another 2-wide card.
-   * Use 3 for wider cards (Profile Details, Gallery), 6 for full-width
-   * (Danger Zone, Sign-up banner).
-   */
-  span?: 2 | 3 | 4 | 6;
 }) {
-  // Tailwind purges classes it doesn't see literally in source, so
-  // enumerate the spans explicitly instead of templating them.
-  const spanClass =
-    span === 6
-      ? 'md:col-span-6'
-      : span === 4
-        ? 'md:col-span-4'
-        : span === 3
-          ? 'md:col-span-3'
-          : 'md:col-span-2';
   return (
-    <section className={`flex flex-col ${spanClass}`}>
+    <section className="flex flex-col">
       <h2
         className={`mb-3 text-[12pt] font-semibold uppercase tracking-widest ${
           danger ? 'text-[#f87171]' : 'text-[#6b7280]'
@@ -725,12 +706,94 @@ function Section({
   );
 }
 
-function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+// ── AccountCelebrationCard — exciting stats-style intro card ───────
+
+function AccountCelebrationCard({
+  email,
+  createdAt,
+  posterCount,
+  user,
+}: {
+  email: string | null;
+  createdAt: string;
+  posterCount: number;
+  user: User | null;
+}) {
+  // Days since the account was created — used for the supporting
+  // "crafting for N days" line. Guests usually see 0 or 1.
+  const daysActive = (() => {
+    if (!user?.created_at) return 0;
+    const ms = Date.now() - new Date(user.created_at).getTime();
+    return Math.max(0, Math.floor(ms / (1000 * 60 * 60 * 24)));
+  })();
+
+  const message = (() => {
+    if (posterCount === 0)
+      return 'Your canvas is waiting — start your first poster! ✨';
+    if (posterCount === 1) return 'Welcome to the club! 🎉';
+    if (posterCount <= 3) return "You're getting the hang of it! 🌱";
+    if (posterCount <= 7) return "You're on a roll! 🚀";
+    if (posterCount <= 15) return 'Power user in training ⚡';
+    return 'Certified poster pro 🏆';
+  })();
+
+  const label = posterCount === 1 ? 'poster crafted' : 'posters crafted';
+
   return (
-    <div className="flex items-center justify-between py-2 border-b border-[#1f1f2e] last:border-0">
-      <span className="text-[14pt] text-[#9ca3af]">{label}</span>
-      <span className={`text-[14pt] ${mono ? 'font-mono text-[#89b4fa]' : 'text-[#c8cad0]'}`}>{value}</span>
-    </div>
+    <section className="flex flex-col">
+      <h2 className="mb-3 text-[12pt] font-semibold uppercase tracking-widest text-[#6b7280]">
+        Account
+      </h2>
+      <div
+        className="relative flex-1 overflow-hidden rounded-xl border border-[#7c6aed]/30 bg-gradient-to-br from-[#1a1530] via-[#15131f] to-[#111118] p-6"
+      >
+        {/* Decorative sparkle blobs in the background */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(124,106,237,0.25) 0%, rgba(124,106,237,0) 70%)',
+          }}
+        />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute -bottom-8 -left-8 h-32 w-32 rounded-full"
+          style={{
+            background:
+              'radial-gradient(circle, rgba(162,89,247,0.18) 0%, rgba(162,89,247,0) 70%)',
+          }}
+        />
+
+        <div className="relative flex items-baseline gap-3">
+          <span
+            className="font-bold leading-none text-[#c9bfff]"
+            style={{ fontSize: '72px', letterSpacing: '-0.02em' }}
+          >
+            {posterCount}
+          </span>
+          <span className="text-[14pt] text-[#c8cad0]">{label}</span>
+        </div>
+
+        <div className="relative mt-3 text-[14pt] font-medium text-[#e2e2e8]">
+          {message}
+        </div>
+
+        <div className="relative mt-5 space-y-1.5 text-[14pt] leading-relaxed text-[#9ca3af]">
+          <div>
+            <span className="text-[#6b7280]">📧 </span>
+            {email ?? 'Guest (no email linked yet)'}
+          </div>
+          <div>
+            <span className="text-[#6b7280]">📅 </span>
+            Member since {createdAt}
+            {daysActive > 0 && (
+              <span className="text-[#6b7280]"> · {daysActive}d</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

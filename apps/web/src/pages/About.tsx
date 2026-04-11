@@ -63,7 +63,7 @@ export default function About() {
       {/* Hero */}
       <section className="mx-auto max-w-3xl px-8 pt-20 pb-12 text-center">
         <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.3em] text-[#7c6aed]">
-          What Postr does
+          Postr by Resila
         </div>
         <h1 className="text-4xl font-bold leading-tight text-white sm:text-5xl">
           Everything you need<br />
@@ -73,6 +73,18 @@ export default function About() {
           Postr is an opinionated poster editor built around one idea: constraint is
           a feature. Every default is tuned to produce something print-ready — you
           just fill in the science.
+        </p>
+        <p className="mt-4 text-[12pt] text-[#6b7280] leading-relaxed max-w-xl mx-auto">
+          Built and maintained by{' '}
+          <span className="font-semibold text-[#c8cad0]">Resila Technologies Inc.</span>{' '}
+          in Quebec, Canada. Questions or bug reports land at{' '}
+          <a
+            className="text-[#7c6aed] underline"
+            href="mailto:support@resila.ai"
+          >
+            support@resila.ai
+          </a>
+          .
         </p>
       </section>
 

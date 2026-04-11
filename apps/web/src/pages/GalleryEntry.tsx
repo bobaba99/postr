@@ -151,8 +151,11 @@ function Detail({ entry }: { entry: GalleryEntryWithUrls }) {
         Postr is a sharing platform, not a publisher. This poster was uploaded by
         its author, who confirmed they own or have permission to share everything
         on it. If you believe it infringes your rights,{' '}
-        <a className="text-[#7c6aed] underline" href="mailto:hello@postr.sh">
-          email us
+        <a
+          className="text-[#7c6aed] underline"
+          href="mailto:support@resila.ai"
+        >
+          email us at support@resila.ai
         </a>{' '}
         — see Section 5.4 of the{' '}
         <Link to="/terms" className="text-[#7c6aed] underline">

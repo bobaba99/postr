@@ -12,7 +12,7 @@ import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
 
 const LAST_UPDATED = 'April 10, 2026';
-const CONTACT_EMAIL = 'hello@postr.sh';
+const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Privacy() {
   return (

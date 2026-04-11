@@ -61,9 +61,9 @@ export default function Gallery() {
           Found something off?{' '}
           <a
             className="text-[#7c6aed] underline"
-            href="mailto:hello@postr.sh"
+            href="mailto:support@resila.ai"
           >
-            Let us know
+            Let us know at support@resila.ai
           </a>
           .
         </p>
