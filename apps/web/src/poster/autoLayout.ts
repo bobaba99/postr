@@ -19,7 +19,6 @@ import { M, GAP } from './constants';
 import { snap } from './snap';
 
 const COLUMN_CLUSTER_THRESHOLD = 30;
-const HEADER_BOTTOM = 81; // y where the body should start (header_height + small pad)
 
 interface Cluster {
   center: number;
@@ -41,11 +40,26 @@ export function autoLayout(
     return [...blocks];
   }
 
-  // Step 1: pin headers
+  // Step 1: pin headers using the title's measured content height
+  // (the caller's probe may have grown it to accommodate a multi-line
+  // title). Authors sits directly under the title — not at a hardcoded
+  // y — so long titles no longer collide with the authors line.
+  const titleBlk = headers.find((b) => b.type === 'title');
+  const titleH = titleBlk ? titleBlk.h : 45;
+  const HEADER_GAP = 5; // breathing room between title and authors
+  const authorsY = snap(M + titleH + HEADER_GAP);
   const pinnedHeaders = headers.map((b) => {
     if (b.type === 'title') return { ...b, x: M, y: M, w: canvasWidth - M * 2 };
-    return { ...b, x: M, y: snap(57), w: canvasWidth - M * 2 };
+    return { ...b, x: M, y: authorsY, w: canvasWidth - M * 2 };
   });
+
+  // Body starts below the full header stack (title + gap + authors
+  // + small pad). We compute this dynamically instead of the old
+  // hardcoded `HEADER_BOTTOM = 81` so long titles push everything
+  // else down together.
+  const authorsBlk = headers.find((b) => b.type === 'authors');
+  const authorsH = authorsBlk ? authorsBlk.h : 20;
+  const headerBottom = authorsY + authorsH + HEADER_GAP;
 
   // Step 2: cluster body block x positions
   const uniqueXs = [...new Set(body.map((b) => b.x))].sort((a, b) => a - b);
@@ -79,7 +93,7 @@ export function autoLayout(
   }
 
   // Step 4: within each column, sort by y and restack
-  const bodyTop = HEADER_BOTTOM + M;
+  const bodyTop = headerBottom + M;
   const repositionedBody: Block[] = [];
   buckets.forEach((column, columnIndex) => {
     const sorted = [...column].sort((a, b) => a.y - b.y);

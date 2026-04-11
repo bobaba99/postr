@@ -1792,15 +1792,11 @@ function EditTab(props: {
           onUpdateBlock={props.onUpdateBlock}
           onUpdateStyle={updateStyle}
         />
-      ) : sb && sb.type === 'image' ? (
-        // Image blocks: show the readability analyzer inline instead of
-        // shunting users off to a dedicated "figure" tab.
-        <ReadabilityPanel selectedBlock={sb} />
       ) : (
-        <div style={{ fontSize: 14, color: '#555', padding: '16px 0', lineHeight: 1.5 }}>
-          Click a block on the canvas to edit it here, or switch to the{' '}
-          <span style={{ color: '#c8b6ff' }}>Insert</span> tab to add a new one.
-        </div>
+        // Code readability analyzer — always available. When an image
+        // block is selected it uses that block's exact dimensions;
+        // otherwise it falls back to a standard 10" × 7" figure size.
+        <ReadabilityPanel selectedBlock={sb && sb.type === 'image' ? sb : null} />
       )}
     </>
   );

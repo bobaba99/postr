@@ -243,31 +243,6 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
           )}
         </>
       )}
-
-      {/* OCR section — only when image selected */}
-      {isImage && (
-        <div style={{ borderTop: '1px solid #45475a', paddingTop: 12, marginTop: 4 }}>
-          <div style={labelStyle}>Image OCR Analysis</div>
-          <p style={{ color: '#6b7280', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
-            Scan the uploaded figure for text and check readability directly from the image — no code needed.
-          </p>
-          <button
-            disabled
-            style={{
-              ...copyBtnStyle,
-              marginTop: 8,
-              opacity: 0.4,
-              cursor: 'not-allowed',
-              fontFamily: 'system-ui',
-            }}
-          >
-            Scan Image (coming soon)
-          </button>
-          <div style={{ fontSize: 13, color: '#555', marginTop: 4 }}>
-            Phase 2 — local Ollama or Claude Vision
-          </div>
-        </div>
-      )}
     </div>
   );
 }
