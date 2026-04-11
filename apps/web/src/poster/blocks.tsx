@@ -1558,7 +1558,11 @@ export function BlockFrame(props: BlockFrameProps) {
               borderRadius: '50%',
               background: '#1a1a26',
               color: '#c8b6ff',
-              border: `2px solid ${p.accent}`,
+              // Black border matching move + delete for visual
+              // consistency across the handle row. Previous purple
+              // border made this button look like a different
+              // element class, flagged by user on 2026-04-11.
+              border: '2px solid #0a0a12',
               cursor: 'grab',
               display: 'flex',
               alignItems: 'center',
@@ -1576,11 +1580,17 @@ export function BlockFrame(props: BlockFrameProps) {
               Clockwise rotation icon — Feather's "rotate-cw" design.
               The key property: the arc's endpoint (23, 10) is also
               the corner of the arrowhead polyline, so the two paths
-              visually connect into a single continuous shape. My
-              earlier version had the arc ending at (12, 3) while the
-              arrowhead started at (21, 3), leaving a gap the user
-              correctly flagged as "separated".
+              visually connect into a single continuous shape.
               https://feathericons.com/?query=rotate
+
+              Visual centering: Feather's 24x24 viewBox isn't
+              content-centered — the arc spans ~3→21 and the
+              arrowhead extends to (23, 4), so the content centroid
+              is at roughly (13, 12) instead of (12, 12). Inside a
+              small 20x20 button this makes the icon look ~1 px
+              shifted right. The `<g transform="translate(-1, 0)">`
+              wrapper shifts the entire path one user-unit left,
+              putting the visual centroid back on (12, 12).
             */}
             <svg
               width="13"
@@ -1593,8 +1603,10 @@ export function BlockFrame(props: BlockFrameProps) {
               strokeLinejoin="round"
               aria-hidden
             >
-              <polyline points="23 4 23 10 17 10" />
-              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              <g transform="translate(-1, 0)">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </g>
             </svg>
           </button>
 
