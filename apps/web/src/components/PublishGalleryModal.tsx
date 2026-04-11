@@ -318,15 +318,67 @@ export function PublishGalleryModal({
             role="alert"
             style={{
               marginTop: 16,
-              padding: '10px 12px',
-              background: 'rgba(220, 38, 38, 0.1)',
-              border: '1px solid rgba(220, 38, 38, 0.3)',
-              borderRadius: 6,
+              padding: '12px 14px',
+              background: 'rgba(220, 38, 38, 0.12)',
+              border: '1px solid rgba(220, 38, 38, 0.4)',
+              borderRadius: 8,
               color: '#f87171',
               fontSize: 13,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
             }}
           >
-            {submitError}
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <span aria-hidden style={{ flex: '0 0 auto' }}>⚠️</span>
+              <div style={{ flex: 1, lineHeight: 1.5 }}>
+                <b style={{ color: '#fca5a5' }}>Publish failed.</b>{' '}
+                {submitError} Your poster is still safe — you can try
+                again or copy the error above to share with support.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmitError(null);
+                  void handleSubmit();
+                }}
+                disabled={submitting}
+                style={{
+                  all: 'unset',
+                  cursor: submitting ? 'not-allowed' : 'pointer',
+                  padding: '6px 12px',
+                  background: '#7c6aed',
+                  color: '#fff',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  opacity: submitting ? 0.6 : 1,
+                }}
+              >
+                {submitting ? 'Retrying…' : '↻ Retry'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard.writeText(submitError || '');
+                }}
+                style={{
+                  all: 'unset',
+                  cursor: 'pointer',
+                  padding: '6px 12px',
+                  background: '#1a1a26',
+                  color: '#c8cad0',
+                  border: '1px solid #2a2a3a',
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                Copy error
+              </button>
+            </div>
           </div>
         )}
 

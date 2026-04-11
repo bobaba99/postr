@@ -44,20 +44,81 @@ interface LogoBlockProps {
   onUpdate: (patch: Partial<Block>) => void;
 }
 
+// =========================================================================
+// readImageFile — validated image upload helper
+// =========================================================================
+//
+// Called by both LogoBlock and ImageBlock before handing a File off
+// to FileReader. Rejects:
+//
+//   1. Anything whose MIME type doesn't start with `image/` — users
+//      occasionally drop PDFs or zip files here and the previous
+//      implementation happily stuffed them into the block as raw
+//      base64, then the `<img src>` went blank on load with no
+//      feedback.
+//   2. Files larger than MAX_BYTES (10 MB). Base64 encoding inflates
+//      ~33 %, so a 15 MB PNG becomes a 20 MB string in the poster
+//      JSONB column. Supabase enforces its own row-size limits and
+//      editors grind to a halt measuring +20 MB strings on every
+//      autosave.
+//
+// On success, calls `onLoad(dataUrl)`. On failure, pops a browser
+// alert with a human-readable reason. `alert()` is blunt but
+// matches the app's existing error-feedback pattern for other
+// file-level errors (e.g. parseBibtex) and avoids adding a new
+// toast system just for this.
+
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB pre-encoding
+
+function readImageFile(
+  file: File | undefined,
+  onLoad: (dataUrl: string) => void,
+) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    window.alert(
+      `"${file.name}" doesn't look like an image (got ${file.type || 'unknown type'}).\n\n` +
+        'Upload PNG, JPEG, GIF, WebP, or SVG instead.',
+    );
+    return;
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    window.alert(
+      `"${file.name}" is ${mb} MB — too large.\n\n` +
+        'Images must be under 10 MB. Try compressing the PNG/JPEG in Preview (macOS) or an online tool.',
+    );
+    return;
+  }
+  const r = new FileReader();
+  r.onload = (ev) => onLoad(ev.target?.result as string);
+  r.onerror = () => {
+    window.alert(
+      `Couldn't read "${file.name}". The file may be corrupted or unreadable.`,
+    );
+  };
+  r.readAsDataURL(file);
+}
+
 export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
   const ref = useRef<HTMLInputElement | null>(null);
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = (ev) => onUpdate({ imageSrc: ev.target?.result as string });
-    r.readAsDataURL(f);
+    readImageFile(e.target.files?.[0], (dataUrl) =>
+      onUpdate({ imageSrc: dataUrl }),
+    );
+    // Reset the input so selecting the same file twice still fires
+    // onChange (browsers dedupe otherwise).
+    e.target.value = '';
   };
 
   if (block.imageSrc) {
     return (
       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <img src={block.imageSrc} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+        <img
+          src={block.imageSrc}
+          alt="Poster logo"
+          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+        />
       </div>
     );
   }
@@ -106,11 +167,10 @@ interface ImageBlockProps {
 export function ImageBlock({ block, palette, onUpdate, selected = false }: ImageBlockProps) {
   const ref = useRef<HTMLInputElement | null>(null);
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = (ev) => onUpdate({ imageSrc: ev.target?.result as string });
-    r.readAsDataURL(f);
+    readImageFile(e.target.files?.[0], (dataUrl) =>
+      onUpdate({ imageSrc: dataUrl }),
+    );
+    e.target.value = '';
   };
 
   // Fit mode cycle: contain → cover → fill → contain. Labels use
@@ -160,7 +220,7 @@ export function ImageBlock({ block, palette, onUpdate, selected = false }: Image
         */}
         <img
           src={block.imageSrc}
-          alt=""
+          alt={block.caption || 'Figure'}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
           style={{

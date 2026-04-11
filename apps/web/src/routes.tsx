@@ -32,6 +32,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AuthGuard } from '@/components/AuthGuard';
+import { EditorErrorBoundary } from '@/components/EditorErrorBoundary';
 import Landing from '@/pages/Landing';
 import About from '@/pages/About';
 import Gallery from '@/pages/Gallery';
@@ -76,7 +77,16 @@ export function AppRoutes() {
 
         {/* Protected routes */}
         <Route path="/dashboard" element={<AuthGuard><Home /></AuthGuard>} />
-        <Route path="/p/:posterId" element={<AuthGuard><Editor /></AuthGuard>} />
+        <Route
+          path="/p/:posterId"
+          element={
+            <AuthGuard>
+              <EditorErrorBoundary>
+                <Editor />
+              </EditorErrorBoundary>
+            </AuthGuard>
+          }
+        />
         <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />
         <Route
           path="/admin/gallery"

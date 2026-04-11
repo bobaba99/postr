@@ -146,16 +146,39 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Tab close: flush any pending save. The unmount effect above only
-  // fires when React unmounts the component, but closing the tab
-  // bypasses React lifecycle entirely.
+  // Tab close: flush any pending save AND show the browser's native
+  // "leave site?" confirmation dialog if there are un-flushed edits
+  // or a save is currently in flight. Browsers ignore custom messages
+  // for this dialog (shows their own localized "Changes you made may
+  // not be saved." text) — the trick is to call preventDefault() AND
+  // set returnValue on the event. Both are required because older
+  // WebKit releases only honor one or the other.
+  //
+  // We don't gate on `state.status === 'saving'` because the
+  // BeforeUnloadEvent handler runs synchronously and can't await
+  // the in-flight PATCH anyway — instead we trust the pending
+  // timer + dirty ref as the "are there unsaved edits?" signal,
+  // fire flush() optimistically, and let the browser decide
+  // whether to hold the tab open.
   useEffect(() => {
-    const handler = () => {
-      if (timerRef.current && pendingDocRef.current && pendingIdRef.current) {
-        clearTimeout(timerRef.current);
+    const handler = (e: BeforeUnloadEvent) => {
+      const hasPendingEdits =
+        timerRef.current !== null &&
+        pendingDocRef.current !== null &&
+        pendingIdRef.current !== null;
+      if (hasPendingEdits) {
+        clearTimeout(timerRef.current!);
         timerRef.current = null;
         void flush();
+        // Trigger the browser confirmation dialog. The exact string
+        // is ignored by every modern browser — they show their own
+        // localized message — but `returnValue` + `preventDefault`
+        // are the documented cross-browser incantation.
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
       }
+      return undefined;
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
