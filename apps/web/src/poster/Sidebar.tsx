@@ -308,7 +308,45 @@ export function Sidebar(props: SidebarProps) {
           </svg>
         </button>
       )}
-      <a href="/dashboard" style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', cursor: 'pointer' }}>
+      {/* Prominent "back to dashboard" button — the logo below also
+          links to /dashboard but users don't reliably recognize a logo
+          as a back affordance. This button makes the exit path
+          unambiguous. */}
+      <a
+        href="/dashboard"
+        title="Back to My Posters"
+        style={{
+          margin: '16px 24px 0',
+          padding: '8px 12px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          background: '#1a1a26',
+          border: '1px solid #2a2a3a',
+          borderRadius: 6,
+          textDecoration: 'none',
+          color: '#c8cad0',
+          fontSize: 13,
+          fontWeight: 500,
+          width: 'fit-content',
+          transition: 'border-color 120ms, color 120ms',
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.borderColor = '#7c6aed';
+          e.currentTarget.style.color = '#fff';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.borderColor = '#2a2a3a';
+          e.currentTarget.style.color = '#c8cad0';
+        }}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 12H5" />
+          <path d="M12 19l-7-7 7-7" />
+        </svg>
+        Back to My Posters
+      </a>
+      <a href="/dashboard" style={{ padding: '16px 24px 0', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', cursor: 'pointer' }}>
         <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
           <rect width="64" height="64" rx="12" fill="#7c6aed" />
           <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
