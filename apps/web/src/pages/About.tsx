@@ -12,6 +12,7 @@
 import { Link } from 'react-router-dom';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { PublicFooter } from '@/components/PublicFooter';
+import { PublicHeader } from '@/components/PublicHeader';
 
 interface Milestone {
   id: string;
@@ -63,7 +64,7 @@ export default function About() {
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
-      <Header />
+      <PublicHeader />
 
       {/* Hero */}
       <section className="mx-auto max-w-3xl px-8 pt-20 pb-12 text-center">
@@ -194,36 +195,6 @@ export default function About() {
 
       <PublicFooter />
     </main>
-  );
-}
-
-function Header() {
-  return (
-    <header className="flex items-center justify-between px-8 py-5">
-      <Link to="/" className="flex items-center gap-3 no-underline">
-        <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
-          <rect width="64" height="64" rx="12" fill="#7c6aed" />
-          <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
-          <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
-          <circle cx="32" cy="32" r="5" fill="white" />
-        </svg>
-        <span className="text-xl font-bold text-[#c8cad0]">Postr</span>
-      </Link>
-      <div className="flex items-center gap-4">
-        <Link
-          to="/"
-          className="text-sm text-[#6b7280] no-underline hover:text-[#c8cad0]"
-        >
-          Home
-        </Link>
-        <Link
-          to="/auth"
-          className="rounded-lg border border-[#7c6aed] px-5 py-2 text-sm font-semibold text-[#7c6aed] no-underline hover:bg-[#7c6aed] hover:text-white transition-colors"
-        >
-          Sign in
-        </Link>
-      </div>
-    </header>
   );
 }
 

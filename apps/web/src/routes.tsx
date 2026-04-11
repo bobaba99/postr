@@ -26,6 +26,7 @@ import AdminGallery from '@/pages/AdminGallery';
 import Privacy from '@/pages/Privacy';
 import Cookies from '@/pages/Cookies';
 import Terms from '@/pages/Terms';
+import Debug from '@/pages/Debug';
 import Auth from '@/pages/Auth';
 import Home from '@/pages/Home';
 import Editor from '@/pages/Editor';
@@ -44,6 +45,7 @@ export function AppRoutes() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/cookies" element={<Cookies />} />
       <Route path="/terms" element={<Terms />} />
+      <Route path="/debug" element={<Debug />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/s/:slug" element={<Share />} />
 
