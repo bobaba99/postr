@@ -45,7 +45,7 @@ export function AutosaveStatusPill({ status, lastSavedAt, error }: AutosaveStatu
     }
     if (status === 'error') {
       return {
-        label: 'Save failed',
+        label: 'Save failed — check your connection',
         color: '#f87171',
         title: error?.message ?? 'Unknown error',
       };
