@@ -35,8 +35,16 @@ import {
   POSTER_SIZES,
   PX,
   SNAP_GRID,
+  type NamedPalette,
   type PosterSizeKey,
 } from './constants';
+import {
+  deleteCustomPalette,
+  loadCustomPalettes,
+  upsertCustomPalette,
+} from './customPalettes';
+import { PaletteDesigner } from '@/components/PaletteDesigner';
+import { StaplesPrintModal } from '@/components/StaplesPrintModal';
 import {
   DEFAULT_CITATION_STYLE,
   sortReferences,
@@ -51,6 +59,15 @@ import { snap } from './snap';
 // Helpers
 // =========================================================================
 
+/**
+ * Google Fonts stylesheet URL covering all curated font families.
+ * Shared by the main editor window (on mount) and the print window
+ * (written into the new-tab HTML shell so printed posters render
+ * with the correct typeface instead of a system fallback).
+ */
+const GOOGLE_FONTS_URL =
+  'https://fonts.googleapis.com/css2?family=Charter:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600;700;800&family=Fira+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Libre+Franklin:wght@300;400;500;600;700;800&family=Literata:wght@400;500;600;700;800&family=Lora:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700;800&family=Source+Serif+4:wght@400;500;600;700;800&display=swap';
+
 /** Find the closest poster-size key that matches the doc's dimensions. */
 function findSizeKey(widthIn: number, heightIn: number): PosterSizeKey {
   for (const [key, value] of Object.entries(POSTER_SIZES)) {
@@ -63,8 +80,12 @@ function findSizeKey(widthIn: number, heightIn: number): PosterSizeKey {
 
 /** Resolve a Palette object to its catalog name (or empty string). */
 /** Match a Palette to its catalog name by comparing all color fields. */
-function paletteNameFor(palette: Palette): string {
-  for (const named of PALETTES) {
+function paletteNameFor(
+  palette: Palette,
+  customPalettes: NamedPalette[] = [],
+): string {
+  const all: NamedPalette[] = [...PALETTES, ...customPalettes];
+  for (const named of all) {
     if (
       named.bg === palette.bg &&
       named.primary === palette.primary &&
@@ -308,6 +329,19 @@ export function PosterEditor() {
   const [guidelinesOpen, setGuidelinesOpen] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
 
+  // Custom palettes persist via localStorage (postr.custom-palettes).
+  // They appear in the Style tab beneath the curated catalog and can
+  // be embedded in saved style presets so they survive even if the
+  // user later deletes the custom palette from their catalog.
+  const [customPalettes, setCustomPalettes] = useState<NamedPalette[]>(() =>
+    loadCustomPalettes(),
+  );
+  const [paletteDesignerOpen, setPaletteDesignerOpen] = useState(false);
+  const [editingPaletteName, setEditingPaletteName] = useState<string | null>(
+    null,
+  );
+  const [staplesPrintOpen, setStaplesPrintOpen] = useState(false);
+
   // B1 fix: measure how much the title block's rendered content
   // OVERRAN its declared height. When a long title wraps to multiple
   // lines, titleOverflowPx becomes positive and every non-title block
@@ -408,7 +442,7 @@ export function PosterEditor() {
   const cW = pw * PX;
   const cH = ph * PX;
   const ffc = FONTS[doc.fontFamily]?.css ?? doc.fontFamily;
-  const palName = paletteNameFor(doc.palette);
+  const palName = paletteNameFor(doc.palette, customPalettes);
 
   // Preview mode — full-screen poster, no UI chrome
   if (previewMode) {
@@ -491,7 +525,7 @@ export function PosterEditor() {
             Back to Editor
           </button>
           <button
-            onClick={() => { setPreviewMode(false); window.print(); }}
+            onClick={() => { setPreviewMode(false); printPoster(); }}
             style={{
               cursor: 'pointer',
               padding: '10px 24px',
@@ -680,7 +714,10 @@ export function PosterEditor() {
       {
         name,
         fontFamily: doc.fontFamily,
-        paletteName: palName,
+        paletteName: palName || name,
+        // Embed the full palette so custom palettes survive even
+        // if the user later deletes them from their catalog.
+        palette: doc.palette,
         styles: doc.styles,
         headingStyle: doc.headingStyle,
       },
@@ -688,17 +725,44 @@ export function PosterEditor() {
   };
 
   const loadPreset = (preset: StylePreset) => {
-    const matched = PALETTES.find((p) => p.name === preset.paletteName);
-    const palette = matched ? (() => {
-      const { name, ...rest } = matched;
-      return rest;
-    })() : doc.palette;
+    // Prefer the embedded palette (post-2026-04-11 presets). For older
+    // presets that only have `paletteName`, look up by name in both the
+    // curated catalog and the user's custom palettes.
+    const palette: Palette = (() => {
+      if (preset.palette) return preset.palette;
+      const builtIn = PALETTES.find((p) => p.name === preset.paletteName);
+      if (builtIn) {
+        const { name: _n, ...rest } = builtIn;
+        return rest;
+      }
+      const custom = customPalettes.find((p) => p.name === preset.paletteName);
+      if (custom) {
+        const { name: _n, ...rest } = custom;
+        return rest;
+      }
+      return doc.palette;
+    })();
     updateDoc({
       fontFamily: preset.fontFamily,
       palette,
       styles: preset.styles,
       headingStyle: preset.headingStyle,
     });
+  };
+
+  const handleSavePaletteDesign = (named: NamedPalette) => {
+    const next = upsertCustomPalette(named);
+    setCustomPalettes(next);
+    setPaletteDesignerOpen(false);
+    setEditingPaletteName(null);
+    // Apply the new/updated palette to the current poster immediately.
+    const { name: _name, ...palette } = named;
+    updateDoc({ palette });
+  };
+
+  const handleDeleteCustomPalette = (name: string) => {
+    const next = deleteCustomPalette(name);
+    setCustomPalettes(next);
   };
 
   // Delete key support (ignored when typing in inputs / contentEditable)
@@ -717,18 +781,261 @@ export function PosterEditor() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, doc.blocks]);
 
-  // Inject Google Fonts + print CSS once on mount.
+  // Inject Google Fonts once on mount.
   useEffect(() => {
     const link = document.createElement('link');
-    link.href =
-      'https://fonts.googleapis.com/css2?family=Charter:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600;700;800&family=Fira+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Libre+Franklin:wght@300;400;500;600;700;800&family=Literata:wght@400;500;600;700;800&family=Lora:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700;800&family=Source+Serif+4:wght@400;500;600;700;800&display=swap';
+    link.href = GOOGLE_FONTS_URL;
     link.rel = 'stylesheet';
     document.head.appendChild(link);
-
-    const style = document.createElement('style');
-    style.textContent = `@media print{body *{visibility:hidden!important}#poster-canvas,#poster-canvas *{visibility:visible!important}#poster-canvas{position:fixed!important;left:0!important;top:0!important;width:100vw!important;height:100vh!important;transform:none!important;box-shadow:none!important}}`;
-    document.head.appendChild(style);
   }, []);
+
+  // ── Print flow ─────────────────────────────────────────────────
+  //
+  // Industry-standard approach used by Google Docs, Canva, Figma,
+  // and similar editors: instead of trying to coerce the live editor
+  // DOM into looking right under `@media print`, open a brand-new
+  // browser window containing a bare HTML shell with nothing but the
+  // poster content. That window has no sidebar, no toolbar, no
+  // transforms, no overflow-hidden parents — so the browser's print
+  // pipeline gets a pristine page to work with.
+  //
+  // Flow:
+  //   1. Clone #poster-canvas (so we don't touch the live DOM)
+  //   2. Strip editor-only overlays (grid, ruler) from the clone
+  //   3. Open a new window via `window.open('', '_blank')`
+  //   4. Write a minimal HTML document with:
+  //        • Google Fonts <link>
+  //        • `@page { size: WxH in; margin: 0 }`
+  //        • A <div> that holds the cloned canvas at its natural
+  //          pixel dimensions (cW × cH) with `zoom: 96/PX` so it
+  //          scales up to true print size (96 CSS-px per inch)
+  //   5. Wait for fonts to load via `document.fonts.ready`
+  //   6. Call `window.print()` inside the new window
+  //   7. Auto-close on `afterprint` so the tab doesn't linger
+  //
+  // If the user's browser blocks popups, we fall back to in-window
+  // print with a warning — better than silent failure.
+  const printPoster = useCallback(() => {
+    const canvas = document.getElementById('poster-canvas');
+    if (!canvas) return;
+
+    // Deep-clone and strip editor overlays. Grid and ruler are marked
+    // with `data-postr-overlay` so we can pull them out cleanly
+    // without touching user-added SVG content inside blocks.
+    const clone = canvas.cloneNode(true) as HTMLElement;
+    clone.querySelectorAll('[data-postr-overlay]').forEach((el) => {
+      el.parentNode?.removeChild(el);
+    });
+    // Reset the editor's zoom-slider transform on the clone itself —
+    // we scale via `zoom` in the print window instead.
+    clone.style.transform = '';
+    clone.style.transformOrigin = '';
+    clone.style.position = 'relative';
+
+    const w = doc.widthIn;
+    const h = doc.heightIn;
+    const naturalW = w * PX;
+    const naturalH = h * PX;
+    const printZoom = 96 / PX; // 9.6 at PX=10 → true 96 CSS-px/inch
+
+    const printWin = window.open('', '_blank', 'width=900,height=700');
+    if (!printWin) {
+      alert(
+        'Popup blocked. Please allow popups for this site to use "Save PDF", or press Ctrl/⌘+P directly from the editor as a fallback.',
+      );
+      return;
+    }
+
+    const title = (posterDisplayName || 'Poster').replace(/[<>]/g, '');
+    const bgColor = doc.palette.bg;
+
+    printWin.document.open();
+    printWin.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>${title} — Print</title>
+<link href="${GOOGLE_FONTS_URL}" rel="stylesheet" />
+<style>
+  @page {
+    size: ${w}in ${h}in;
+    margin: 0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #0a0a12;
+    font-family: '${doc.fontFamily}', system-ui, -apple-system, sans-serif;
+  }
+
+  /* ── Screen view ─────────────────────────────────────────── */
+  /* The user lands on this tab with a live preview of the
+     poster at its natural pixel size, plus a top toolbar with a
+     Print button and instructions. Close-tab reminder sits at
+     the far right so they can dismiss the tab cleanly after
+     printing. */
+  .print-toolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 20px;
+    background: rgba(17, 17, 24, 0.96);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid #2a2a3a;
+    color: #c8cad0;
+    font-family: 'DM Sans', system-ui, sans-serif;
+    font-size: 13px;
+  }
+  .print-toolbar-title {
+    font-weight: 700;
+    color: #e2e2e8;
+    font-size: 14px;
+  }
+  .print-toolbar-size {
+    color: #9ca3af;
+    font-size: 12px;
+  }
+  .print-toolbar-spacer { flex: 1; }
+  .print-toolbar button {
+    cursor: pointer;
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    background: #7c6aed;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+  }
+  .print-toolbar button.secondary {
+    background: transparent;
+    color: #9ca3af;
+    border: 1px solid #2a2a3a;
+  }
+  .print-toolbar button:hover { filter: brightness(1.1); }
+  .print-toolbar-hint {
+    color: #6b7280;
+    font-size: 11px;
+    padding: 10px 20px;
+    background: rgba(124, 106, 237, 0.06);
+    border-bottom: 1px solid #1f1f2e;
+  }
+  .print-toolbar-hint strong { color: #c8b6ff; }
+
+  .print-stage {
+    padding: 120px 30px 60px;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+
+  /* Screen-only: natural pixel size with shadow, wrapped in a
+     flex container so posters much larger than the viewport
+     stay centered horizontally and scroll vertically. */
+  #poster-print-root {
+    width: ${naturalW}px;
+    height: ${naturalH}px;
+    background: ${bgColor};
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 12px 60px rgba(0, 0, 0, 0.6);
+  }
+  #poster-print-root #poster-canvas {
+    width: 100% !important;
+    height: 100% !important;
+    transform: none !important;
+    position: relative !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  /* ── Print view ──────────────────────────────────────────── */
+  @media print {
+    html, body {
+      background: white !important;
+      width: ${w}in !important;
+      height: ${h}in !important;
+    }
+    .print-toolbar, .print-toolbar-hint { display: none !important; }
+    .print-stage {
+      padding: 0 !important;
+      display: block !important;
+      min-height: 0 !important;
+    }
+    #poster-print-root {
+      position: fixed !important;
+      left: 0 !important;
+      top: 0 !important;
+      zoom: ${printZoom};
+      box-shadow: none !important;
+      margin: 0 !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="print-toolbar">
+  <div>
+    <div class="print-toolbar-title">${title}</div>
+    <div class="print-toolbar-size">${w} × ${h} in</div>
+  </div>
+  <div class="print-toolbar-spacer"></div>
+  <button id="postr-print-btn" type="button">🖨 Print / Save as PDF</button>
+  <button class="secondary" id="postr-close-btn" type="button">Close tab</button>
+</div>
+<div class="print-toolbar-hint">
+  💡 <strong>Before printing:</strong> in the Print dialog, set Destination to
+  <strong>Save as PDF</strong>, Paper size to <strong>${w} × ${h} in</strong>,
+  Margins = <strong>None</strong>, and enable <strong>Background graphics</strong>.
+  The page will auto-open the Print dialog once the fonts finish loading.
+</div>
+<div class="print-stage">
+  <div id="poster-print-root">${clone.outerHTML}</div>
+</div>
+<script>
+(function(){
+  var printed = false;
+  function doPrint() {
+    if (printed) return;
+    printed = true;
+    try { window.focus(); } catch (e) {}
+    setTimeout(function(){ window.print(); }, 150);
+  }
+
+  // Auto-trigger print as soon as fonts are ready, mimicking the
+  // one-click UX of Google Docs / Canva print flow.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(doPrint).catch(doPrint);
+  } else if (document.readyState === 'complete') {
+    setTimeout(doPrint, 500);
+  } else {
+    window.addEventListener('load', function(){ setTimeout(doPrint, 500); });
+  }
+
+  // Manual retry — if the user dismisses the auto-opened dialog
+  // and wants another go without reloading the tab.
+  var btn = document.getElementById('postr-print-btn');
+  if (btn) btn.addEventListener('click', function(){
+    printed = false;
+    doPrint();
+  });
+  var closeBtn = document.getElementById('postr-close-btn');
+  if (closeBtn) closeBtn.addEventListener('click', function(){
+    window.close();
+  });
+})();
+</script>
+</body>
+</html>`);
+    printWin.document.close();
+  }, [doc.widthIn, doc.heightIn, doc.fontFamily, doc.palette.bg, posterDisplayName]);
 
   return (
     <div
@@ -783,14 +1090,58 @@ export function PosterEditor() {
         onAddBlock={addBlock}
         onApplyTemplate={applyTemplate}
         onAutoLayout={onAutoLayout}
-        onPrint={() => window.print()}
+        onPrint={printPoster}
+        onPrintAtStaples={() => setStaplesPrintOpen(true)}
         onPreview={() => setPreviewMode(true)}
         onPublish={handlePublish}
         savedPresets={savedPresets}
         onSavePreset={savePreset}
         onLoadPreset={loadPreset}
+        customPalettes={customPalettes}
+        onCreateCustomPalette={() => {
+          setEditingPaletteName(null);
+          setPaletteDesignerOpen(true);
+        }}
+        onEditCustomPalette={(name) => {
+          setEditingPaletteName(name);
+          setPaletteDesignerOpen(true);
+        }}
+        onDeleteCustomPalette={handleDeleteCustomPalette}
       />
       )}
+
+      {/* Palette Designer — create or edit a custom palette */}
+      <PaletteDesigner
+        open={paletteDesignerOpen}
+        initialName={editingPaletteName ?? undefined}
+        initialPalette={(() => {
+          if (!editingPaletteName) return doc.palette;
+          const existing = customPalettes.find(
+            (p) => p.name === editingPaletteName,
+          );
+          if (existing) {
+            const { name: _n, ...rest } = existing;
+            return rest;
+          }
+          return doc.palette;
+        })()}
+        onSave={handleSavePaletteDesign}
+        onCancel={() => {
+          setPaletteDesignerOpen(false);
+          setEditingPaletteName(null);
+        }}
+      />
+
+      {/* Staples Print & Go walkthrough */}
+      <StaplesPrintModal
+        open={staplesPrintOpen}
+        posterTitle={posterDisplayName}
+        onClose={() => setStaplesPrintOpen(false)}
+        onSavePdf={() => {
+          setStaplesPrintOpen(false);
+          printPoster();
+        }}
+      />
 
       {/* Notion-style reveal tab when the sidebar is hidden. */}
       {!sidebarOpen && (
@@ -873,6 +1224,7 @@ export function PosterEditor() {
                 // target. The denser grid is drawn faintly and with
                 // every 10th line slightly brighter for orientation.
                 <svg
+                  data-postr-overlay="grid"
                   width={cW}
                   height={cH}
                   style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
@@ -910,6 +1262,7 @@ export function PosterEditor() {
                 // units. Sits above the grid with pointerEvents:none
                 // so it never steals clicks from blocks underneath.
                 <svg
+                  data-postr-overlay="ruler"
                   width={cW}
                   height={cH}
                   style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}

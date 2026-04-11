@@ -207,7 +207,18 @@ export function ReadabilityPanel({ selectedBlock }: Props) {
                   {showFullCode ? 'Show snippet' : 'Show full code'}
                 </button>
                 <button
-                  style={{ ...copyBtnStyle, minWidth: 60, textAlign: 'center' }}
+                  style={{
+                    ...copyBtnStyle,
+                    minWidth: 80,
+                    textAlign: 'center',
+                    // Distinct copied state — green fill + green border + light
+                    // green text so users get unambiguous confirmation that
+                    // their click landed. Reverts after 2s via handleCopy.
+                    background: copied ? '#0f3f2a' : copyBtnStyle.background,
+                    color: copied ? '#a6e3a1' : copyBtnStyle.color,
+                    borderColor: copied ? '#2d6a4f' : '#45475a',
+                    transition: 'background 200ms ease, color 200ms ease, border-color 200ms ease',
+                  }}
                   onClick={() => handleCopy(showFullCode ? fullFixedCode : result.copySnippet)}
                 >
                   {copied ? '✓ Copied' : 'Copy'}

@@ -30,6 +30,7 @@ import {
   TABLE_BORDER_PRESETS,
   ptToUnits,
   unitsToPt,
+  type NamedPalette,
   type PosterSizeKey,
 } from './constants';
 import {
@@ -48,7 +49,14 @@ import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { ReadabilityPanel } from './ReadabilityPanel';
 
-export type SidebarTab = 'layout' | 'authors' | 'refs' | 'style' | 'edit' | 'insert' | 'figure';
+export type SidebarTab =
+  | 'layout'
+  | 'authors'
+  | 'refs'
+  | 'style'
+  | 'edit'
+  | 'insert'
+  | 'export';
 
 export interface StylePreset {
   name: string;
@@ -56,6 +64,13 @@ export interface StylePreset {
   paletteName: string;
   styles: Styles;
   headingStyle: HeadingStyle;
+  /**
+   * Full palette colors. Added after 2026-04-11 so custom palettes
+   * survive in presets even when the referenced custom palette is
+   * deleted from the user's local catalog. Legacy presets without
+   * this field fall back to looking up `paletteName` in PALETTES.
+   */
+  palette?: Palette;
 }
 
 interface SidebarProps {
@@ -104,6 +119,7 @@ interface SidebarProps {
   onApplyTemplate: (key: LayoutKey) => void;
   onAutoLayout: () => void;
   onPrint: () => void;
+  onPrintAtStaples: () => void;
   onPreview: () => void;
   onPublish: () => void;
 
@@ -111,6 +127,12 @@ interface SidebarProps {
   savedPresets: StylePreset[];
   onSavePreset: (name: string) => void;
   onLoadPreset: (preset: StylePreset) => void;
+
+  // custom palettes
+  customPalettes: NamedPalette[];
+  onCreateCustomPalette: () => void;
+  onEditCustomPalette: (name: string) => void;
+  onDeleteCustomPalette: (name: string) => void;
 
   // sidebar visibility (Notion-style collapse toggle)
   onToggleSidebar?: () => void;
@@ -170,21 +192,41 @@ const buttonStyle = (active: boolean): CSSProperties => ({
   width: '100%',
 });
 
+const iconBtnStyle: CSSProperties = {
+  all: 'unset',
+  cursor: 'pointer',
+  width: 28,
+  height: 28,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 4,
+  fontSize: 12,
+};
+
 export function Sidebar(props: SidebarProps) {
   const [tab, setTab] = useState<SidebarTab>('layout');
   const [presetName, setPresetName] = useState('');
+  // Transient "just saved" flash on the Save-as-preset button so
+  // users get an explicit confirmation instead of having to spot the
+  // new row appearing in the list below. Cleared by a timer 1.6s
+  // after save.
+  const [presetJustSaved, setPresetJustSaved] = useState(false);
+  useEffect(() => {
+    if (!presetJustSaved) return;
+    const t = setTimeout(() => setPresetJustSaved(false), 1600);
+    return () => clearTimeout(t);
+  }, [presetJustSaved]);
 
-  // Auto-switch tabs when a block is selected:
-  //   - Image blocks → figure tab (for readability check + OCR)
-  //   - All other blocks → edit tab
-  // If the user deselects (click empty canvas), stay on current tab.
+  // Auto-switch to the Edit tab whenever a block is selected. The
+  // Edit tab routes each block type to the appropriate editor and
+  // shows the ReadabilityPanel when an image block is selected — so
+  // there's only one place users need to look after clicking on the
+  // canvas. If the user deselects (click empty canvas), stay on the
+  // current tab rather than jumping back to Layout.
   useEffect(() => {
     if (!props.selectedBlock) return;
-    if (props.selectedBlock.type === 'image') {
-      setTab('figure');
-    } else {
-      setTab('edit');
-    }
+    setTab('edit');
   }, [props.selectedBlock?.id]);
 
   // Two states only: deselected (dark gray) and selected (white +
@@ -370,7 +412,7 @@ export function Sidebar(props: SidebarProps) {
             paddingTop: 4,
           }}
         >
-          {(['layout', 'insert', 'edit', 'style', 'authors', 'refs', 'figure'] as SidebarTab[]).map((t) => (
+          {(['layout', 'insert', 'edit', 'style', 'authors', 'refs', 'export'] as SidebarTab[]).map((t) => (
             <button
               key={t}
               data-postr-tab
@@ -400,9 +442,6 @@ export function Sidebar(props: SidebarProps) {
             onToggleRuler={props.onToggleRuler}
             onApplyTemplate={props.onApplyTemplate}
             onAutoLayout={props.onAutoLayout}
-            onPrint={props.onPrint}
-            onPreview={props.onPreview}
-            onPublish={props.onPublish}
           />
         )}
 
@@ -441,10 +480,18 @@ export function Sidebar(props: SidebarProps) {
             headingStyle={props.headingStyle}
             onChangeHeadingStyle={props.onChangeHeadingStyle}
             savedPresets={props.savedPresets}
-            onSavePreset={(n) => props.onSavePreset(n)}
+            onSavePreset={(n) => {
+              props.onSavePreset(n);
+              setPresetJustSaved(true);
+            }}
             onLoadPreset={props.onLoadPreset}
+            customPalettes={props.customPalettes}
+            onCreateCustomPalette={props.onCreateCustomPalette}
+            onEditCustomPalette={props.onEditCustomPalette}
+            onDeleteCustomPalette={props.onDeleteCustomPalette}
             presetName={presetName}
             setPresetName={setPresetName}
+            presetJustSaved={presetJustSaved}
           />
         )}
 
@@ -460,8 +507,13 @@ export function Sidebar(props: SidebarProps) {
 
         {tab === 'insert' && <AddBlockPanel onAddBlock={props.onAddBlock} />}
 
-        {tab === 'figure' && (
-          <ReadabilityPanel selectedBlock={props.selectedBlock} />
+        {tab === 'export' && (
+          <ExportTab
+            onPrint={props.onPrint}
+            onPrintAtStaples={props.onPrintAtStaples}
+            onPreview={props.onPreview}
+            onPublish={props.onPublish}
+          />
         )}
         </div>
       </div>
@@ -487,9 +539,6 @@ function LayoutTab(props: {
   onToggleRuler: (show: boolean) => void;
   onApplyTemplate: (k: LayoutKey) => void;
   onAutoLayout: () => void;
-  onPrint: () => void;
-  onPreview: () => void;
-  onPublish: () => void;
 }) {
   const [localTitle, setLocalTitle] = useState(props.posterTitle);
   const [titleSaved, setTitleSaved] = useState(!!props.posterTitle.trim());
@@ -617,32 +666,18 @@ function LayoutTab(props: {
         </div>
       </div>
 
-      <div style={labelStyle}>📐 Canvas overlays</div>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={props.showGrid}
-          onChange={(e) => props.onToggleGrid(e.target.checked)}
-          style={{ accentColor: '#7c6aed' }}
-        />
-        Show grid
-      </label>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer', marginTop: 4 }}>
-        <input
-          type="checkbox"
-          checked={props.showRuler}
-          onChange={(e) => props.onToggleRuler(e.target.checked)}
-          style={{ accentColor: '#7c6aed' }}
-        />
-        Show ruler
-      </label>
-
-      <div style={labelStyle}>Auto Layout</div>
-      <button onClick={props.onAutoLayout} style={{ ...buttonStyle(false), fontSize: 14 }}>
-        ⬡ Auto-Arrange
-      </button>
-
       <div style={labelStyle}>Templates</div>
+      <div
+        style={{
+          fontSize: 12,
+          color: '#6b7280',
+          marginBottom: 8,
+          lineHeight: 1.5,
+        }}
+      >
+        Pick a starting column layout. Apply anytime — blocks rearrange
+        without losing their content.
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {(Object.keys(LAYOUT_TEMPLATES) as LayoutKey[]).map((k) => {
           const t = LAYOUT_TEMPLATES[k];
@@ -671,34 +706,149 @@ function LayoutTab(props: {
         })}
       </div>
 
-      <div style={labelStyle}>Preview & Print</div>
-      <button onClick={props.onPreview} style={buttonStyle(false)}>
-        Preview Poster
+      <div style={labelStyle}>Auto Layout</div>
+      <button onClick={props.onAutoLayout} style={{ ...buttonStyle(false), fontSize: 14 }}>
+        ⬡ Auto-Arrange
       </button>
-      <button onClick={props.onPrint} style={{ ...buttonStyle(true), marginTop: 8 }}>
+      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+        Tidy existing blocks into an even grid — useful after dragging things
+        around mid-session.
+      </div>
+
+      <div style={labelStyle}>📐 Canvas overlays</div>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={props.showGrid}
+          onChange={(e) => props.onToggleGrid(e.target.checked)}
+          style={{ accentColor: '#7c6aed' }}
+        />
+        Show grid
+      </label>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer', marginTop: 4 }}>
+        <input
+          type="checkbox"
+          checked={props.showRuler}
+          onChange={(e) => props.onToggleRuler(e.target.checked)}
+          style={{ accentColor: '#7c6aed' }}
+        />
+        Show ruler
+      </label>
+      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+        Visual aids only — they never print or export.
+      </div>
+
+      <div
+        style={{
+          marginTop: 16,
+          padding: '10px 12px',
+          borderRadius: 6,
+          background: 'rgba(124, 106, 237, 0.08)',
+          border: '1px solid rgba(124, 106, 237, 0.25)',
+          fontSize: 12,
+          color: '#9ca3af',
+          lineHeight: 1.55,
+        }}
+      >
+        💡 <strong style={{ color: '#c8b6ff' }}>Done building?</strong> Head to the{' '}
+        <strong style={{ color: '#c8b6ff' }}>Export</strong> tab to preview,
+        save PDF, print at Staples, or publish to the gallery.
+      </div>
+    </>
+  );
+}
+
+// =========================================================================
+// Export tab — preview, save PDF, print at Staples, publish
+// =========================================================================
+
+function ExportTab(props: {
+  onPrint: () => void;
+  onPrintAtStaples: () => void;
+  onPreview: () => void;
+  onPublish: () => void;
+}) {
+  return (
+    <>
+      <div style={labelStyle}>Preview</div>
+      <button onClick={props.onPreview} style={buttonStyle(false)}>
+        👁 Preview poster
+      </button>
+      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+        See the poster at full size without the editor chrome. Great for a
+        final sanity check before exporting.
+      </div>
+
+      <div style={labelStyle}>Save as PDF</div>
+      <button onClick={props.onPrint} style={buttonStyle(true)}>
         ⎙ Save PDF
       </button>
+      <div
+        style={{
+          fontSize: 12,
+          color: '#6b7280',
+          lineHeight: 1.6,
+          marginTop: 8,
+          background: '#1a1a26',
+          padding: 10,
+          borderRadius: 6,
+          border: '1px solid #2a2a3a',
+        }}
+      >
+        <strong style={{ color: '#9ca3af' }}>🖨️ Browser Print dialog steps:</strong>
+        <ol style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+          <li>Click "Save PDF" or press Ctrl+P / Cmd+P</li>
+          <li>
+            Destination ={' '}
+            <strong style={{ color: '#c8cad0' }}>"Save as PDF"</strong>
+          </li>
+          <li>
+            Layout ={' '}
+            <strong style={{ color: '#c8cad0' }}>Landscape</strong>{' '}
+            (for landscape posters)
+          </li>
+          <li>
+            Margins = <strong style={{ color: '#c8cad0' }}>None</strong>
+          </li>
+          <li>
+            Enable{' '}
+            <strong style={{ color: '#c8cad0' }}>"Background graphics"</strong>
+          </li>
+          <li>Click Save</li>
+        </ol>
+      </div>
+
+      <div style={labelStyle}>🏪 Print at Staples</div>
+      <button
+        onClick={props.onPrintAtStaples}
+        style={{
+          ...buttonStyle(false),
+          borderColor: '#cc0000',
+          color: '#ff6b6b',
+        }}
+      >
+        🏪 Email to Staples kiosk
+      </button>
+      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+        Staples' Print &amp; Go flow — email the PDF, get an 8-digit release
+        code, print at any Staples kiosk without a USB drive.
+      </div>
+
+      <div style={labelStyle}>↗ Share to gallery</div>
       <button
         onClick={props.onPublish}
         style={{
           ...buttonStyle(false),
-          marginTop: 8,
           borderColor: '#7c6aed',
           color: '#7c6aed',
         }}
       >
         ↗ Publish to gallery
       </button>
-      <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginTop: 8, background: '#1a1a26', padding: 10, borderRadius: 6, border: '1px solid #2a2a3a' }}>
-        <strong style={{ color: '#9ca3af' }}>🖨️ How to save as PDF:</strong>
-        <ol style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-          <li>Click "Save PDF" or press Ctrl+P / Cmd+P</li>
-          <li>Set destination to <strong style={{ color: '#c8cad0' }}>"Save as PDF"</strong></li>
-          <li>Set layout to <strong style={{ color: '#c8cad0' }}>Landscape</strong> (for landscape posters)</li>
-          <li>Set margins to <strong style={{ color: '#c8cad0' }}>None</strong></li>
-          <li>Check <strong style={{ color: '#c8cad0' }}>"Background graphics"</strong> is enabled</li>
-          <li>Click Save</li>
-        </ol>
+      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+        Publish to the public gallery at{' '}
+        <span style={{ color: '#9ca3af' }}>/gallery</span>. You can retract at
+        any time from your Profile → Gallery submissions.
       </div>
     </>
   );
@@ -1178,48 +1328,180 @@ function StyleTab(props: {
   savedPresets: StylePreset[];
   onSavePreset: (name: string) => void;
   onLoadPreset: (preset: StylePreset) => void;
+  customPalettes: NamedPalette[];
+  onCreateCustomPalette: () => void;
+  onEditCustomPalette: (name: string) => void;
+  onDeleteCustomPalette: (name: string) => void;
   presetName: string;
   setPresetName: (n: string) => void;
+  /** True for ~1.6s after a preset was just saved — flips the Save
+   *  button into a green "✓ Saved!" state so users get explicit
+   *  confirmation that their click worked. */
+  presetJustSaved: boolean;
 }) {
+  const renderPaletteRow = (p: NamedPalette, isCustom: boolean) => {
+    const active = props.paletteName === p.name;
+    return (
+      <div
+        key={`${isCustom ? 'custom-' : 'builtin-'}${p.name}`}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          background: active ? '#7c6aed18' : '#1a1a26',
+          border: `1px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
+          borderRadius: 8,
+          boxSizing: 'border-box',
+          padding: '4px 4px 4px 14px',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            const { name, ...palette } = p;
+            props.onChangePalette(palette, name);
+          }}
+          style={{
+            all: 'unset',
+            cursor: 'pointer',
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            padding: '8px 0',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 3 }}>
+            {[p.bg, p.primary, p.accent, p.accent2].map((c, j) => (
+              <div
+                key={j}
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: 3,
+                  background: c,
+                  border: '1px solid #2a2a3a',
+                }}
+              />
+            ))}
+          </div>
+          <span
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: active ? '#c8b6ff' : '#e2e2e8',
+              flex: 1,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {p.name}
+            {isCustom && (
+              <span
+                style={{
+                  marginLeft: 6,
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: '#a78bfa',
+                  letterSpacing: 0.5,
+                  textTransform: 'uppercase',
+                }}
+              >
+                custom
+              </span>
+            )}
+          </span>
+        </button>
+        {isCustom && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                props.onEditCustomPalette(p.name);
+              }}
+              title="Edit palette"
+              style={iconBtnStyle}
+            >
+              ✏️
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (
+                  confirm(`Delete custom palette "${p.name}"? This cannot be undone.`)
+                ) {
+                  props.onDeleteCustomPalette(p.name);
+                }
+              }}
+              title="Delete palette"
+              style={iconBtnStyle}
+            >
+              🗑️
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
   return (
     <>
       <div style={labelStyle}>Palette</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {PALETTES.map((p) => {
-          const active = props.paletteName === p.name;
-          return (
-            <button
-              type="button"
-              key={p.name}
-              onClick={() => {
-                const { name, ...palette } = p;
-                props.onChangePalette(palette, name);
-              }}
-              style={{
-                all: 'unset',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                padding: '12px 14px',
-                borderRadius: 8,
-                cursor: 'pointer',
-                background: active ? '#7c6aed18' : '#1a1a26',
-                border: `1px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
-                boxSizing: 'border-box',
-              }}
-            >
-              <div style={{ display: 'flex', gap: 3 }}>
-                {[p.bg, p.primary, p.accent, p.accent2].map((c, j) => (
-                  <div
-                    key={j}
-                    style={{ width: 16, height: 16, borderRadius: 3, background: c, border: '1px solid #2a2a3a' }}
-                  />
-                ))}
-              </div>
-              <span style={{ fontSize: 14, fontWeight: 600, color: active ? '#c8b6ff' : '#e2e2e8' }}>{p.name}</span>
-            </button>
-          );
-        })}
+        {PALETTES.map((p) => renderPaletteRow(p, false))}
+
+        {props.customPalettes.length > 0 && (
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: 0.6,
+              color: '#6b7280',
+              marginTop: 6,
+              paddingLeft: 2,
+            }}
+          >
+            Your palettes
+          </div>
+        )}
+        {props.customPalettes.map((p) => renderPaletteRow(p, true))}
+
+        <button
+          type="button"
+          onClick={props.onCreateCustomPalette}
+          style={{
+            all: 'unset',
+            cursor: 'pointer',
+            marginTop: 4,
+            padding: '10px 14px',
+            background: 'linear-gradient(135deg, #7c6aed22 0%, #a855f722 100%)',
+            border: '1px dashed #7c6aed',
+            borderRadius: 8,
+            textAlign: 'center',
+            color: '#c8b6ff',
+            fontSize: 13,
+            fontWeight: 600,
+          }}
+        >
+          ➕ Create custom palette
+        </button>
+        <div
+          style={{
+            fontSize: 11,
+            color: '#6b7280',
+            lineHeight: 1.5,
+            marginTop: 2,
+            paddingLeft: 2,
+          }}
+        >
+          Build your own with color-theory randomizer, paste from Coolors,
+          or extract from an image.
+        </div>
       </div>
 
       <div style={labelStyle}>Font</div>
@@ -1269,9 +1551,16 @@ function StyleTab(props: {
               props.setPresetName('');
             }
           }}
-          style={{ ...buttonStyle(true), width: 'auto', padding: '12px 18px', fontSize: 14 }}
+          style={{
+            ...buttonStyle(true),
+            width: 'auto',
+            padding: '12px 18px',
+            fontSize: 14,
+            background: props.presetJustSaved ? '#2d6a4f' : '#7c6aed',
+            transition: 'background 200ms ease',
+          }}
         >
-          💾 Save
+          {props.presetJustSaved ? '✓ Saved!' : '💾 Save'}
         </button>
       </div>
       {props.savedPresets.length > 0 && (
@@ -1502,6 +1791,10 @@ function EditTab(props: {
           onUpdateBlock={props.onUpdateBlock}
           onUpdateStyle={updateStyle}
         />
+      ) : sb && sb.type === 'image' ? (
+        // Image blocks: show the readability analyzer inline instead of
+        // shunting users off to a dedicated "figure" tab.
+        <ReadabilityPanel selectedBlock={sb} />
       ) : (
         <div style={{ fontSize: 14, color: '#555', padding: '16px 0', lineHeight: 1.5 }}>
           Click a block on the canvas to edit it here, or switch to the{' '}

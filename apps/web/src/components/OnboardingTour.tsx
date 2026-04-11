@@ -75,9 +75,16 @@ const STEPS: TourStep[] = [
   },
   {
     selector: '[data-postr-sidebar]',
-    tabName: 'figure',
+    tabName: 'edit',
     title: 'Figure readability',
-    body: 'Paste your R or Python plotting code to check whether figure text will be readable at print size.',
+    body: 'Select any image block and the Edit tab shows a readability analyzer — paste your R or Python plotting code to check whether figure text will be legible at print size.',
+    position: 'right',
+  },
+  {
+    selector: '[data-postr-sidebar]',
+    tabName: 'export',
+    title: 'Preview, print, publish',
+    body: 'The Export tab collects everything you need to finish: preview fullscreen, save as PDF, email your design to any Staples kiosk, or publish to the public gallery.',
     position: 'right',
   },
   {
