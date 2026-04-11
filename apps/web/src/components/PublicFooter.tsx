@@ -32,8 +32,7 @@ export function PublicFooter() {
               <span className="text-lg font-bold text-[#c8cad0]">Postr</span>
             </Link>
             <p className="mt-3 max-w-xs text-[12px] leading-relaxed">
-              Opinionated poster editor for students and researchers. Built with
-              constraint as a feature.
+              Built by researchers. Built for researchers.
             </p>
           </div>
 
