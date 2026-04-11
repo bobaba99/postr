@@ -21,6 +21,18 @@ jobs:
     name: web (typecheck + test + build)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # Dummy Supabase + API env vars so the browser Supabase client in
+    # apps/web/src/lib/supabase.ts doesn't throw at module load time
+    # during the test suite. The client is never actually called in
+    # tests (Supabase is mocked per-test where needed), but the module
+    # fails fast on missing env, which breaks test file discovery.
+    # These values are NOT secrets — the publishable key is safe to
+    # expose by design, and the URL is a placeholder that never gets
+    # hit during CI test runs.
+    env:
+      VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: ci-placeholder-publishable-key
+      VITE_API_BASE_URL: http://localhost:8787
     steps:
       - uses: actions/checkout@v4
 

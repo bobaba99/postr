@@ -1532,7 +1532,11 @@ export function PosterEditor() {
 
       <GuidelinesPanel open={guidelinesOpen} onToggle={() => setGuidelinesOpen((v) => !v)} />
 
-      {/* Show guidelines toggle when panel is closed */}
+      {/* Show guidelines toggle when panel is closed.
+          Positioned bottom-right instead of top-right so it doesn't
+          collide with the AutosaveStatusPill (which also lives in the
+          top-right corner). The ZoomBar is centered horizontally at
+          the bottom, so bottom-right is free real estate. */}
       {!guidelinesOpen && (
         <button
           title="Show poster guidelines"
@@ -1540,11 +1544,11 @@ export function PosterEditor() {
           style={{
             all: 'unset',
             position: 'fixed',
-            top: 16,
+            bottom: 16,
             right: 16,
-            width: 36,
-            height: 36,
-            borderRadius: 8,
+            width: 40,
+            height: 40,
+            borderRadius: 10,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
@@ -1554,9 +1558,20 @@ export function PosterEditor() {
             border: '1px solid #2a2a3a',
             boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
             zIndex: 20,
+            transition: 'color 120ms, border-color 120ms, background 120ms',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.borderColor = '#7c6aed';
+            e.currentTarget.style.background = '#1e1e2e';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = '#9ca3af';
+            e.currentTarget.style.borderColor = '#2a2a3a';
+            e.currentTarget.style.background = '#1a1a26';
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
           </svg>
