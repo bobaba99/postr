@@ -164,6 +164,62 @@ export type Database = {
         }
         Relationships: []
       }
+      gallery_entries: {
+        Row: {
+          conference: string | null
+          created_at: string
+          field: Database["public"]["Enums"]["gallery_field"]
+          id: string
+          image_path: string
+          notes: string | null
+          pdf_path: string | null
+          poster_id: string | null
+          retracted_at: string | null
+          source: Database["public"]["Enums"]["gallery_source"]
+          title: string
+          user_id: string
+          year: number | null
+        }
+        Insert: {
+          conference?: string | null
+          created_at?: string
+          field: Database["public"]["Enums"]["gallery_field"]
+          id?: string
+          image_path: string
+          notes?: string | null
+          pdf_path?: string | null
+          poster_id?: string | null
+          retracted_at?: string | null
+          source: Database["public"]["Enums"]["gallery_source"]
+          title: string
+          user_id: string
+          year?: number | null
+        }
+        Update: {
+          conference?: string | null
+          created_at?: string
+          field?: Database["public"]["Enums"]["gallery_field"]
+          id?: string
+          image_path?: string
+          notes?: string | null
+          pdf_path?: string | null
+          poster_id?: string | null
+          retracted_at?: string | null
+          source?: Database["public"]["Enums"]["gallery_source"]
+          title?: string
+          user_id?: string
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gallery_entries_poster_id_fkey"
+            columns: ["poster_id"]
+            isOneToOne: false
+            referencedRelation: "posters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       institutions_lib: {
         Row: {
           created_at: string
@@ -363,7 +419,19 @@ export type Database = {
       delete_own_account: { Args: never; Returns: undefined }
     }
     Enums: {
-      [_ in never]: never
+      gallery_field:
+        | "neuroscience"
+        | "psychology"
+        | "medicine"
+        | "biology"
+        | "computer_science"
+        | "physics"
+        | "chemistry"
+        | "engineering"
+        | "social_sciences"
+        | "humanities"
+        | "other"
+      gallery_source: "postr_poster" | "upload"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -493,6 +561,21 @@ export const Constants = {
     Enums: {},
   },
   public: {
-    Enums: {},
+    Enums: {
+      gallery_field: [
+        "neuroscience",
+        "psychology",
+        "medicine",
+        "biology",
+        "computer_science",
+        "physics",
+        "chemistry",
+        "engineering",
+        "social_sciences",
+        "humanities",
+        "other",
+      ],
+      gallery_source: ["postr_poster", "upload"],
+    },
   },
 } as const
