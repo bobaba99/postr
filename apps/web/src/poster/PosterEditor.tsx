@@ -423,6 +423,12 @@ export function PosterEditor() {
   // figure-size overlay on the canvas — needs to know which tab
   // is active, and needs to share the tab setter with Sidebar.
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('layout');
+  // Id of the most recently inserted block. Used by BlockFrame to
+  // play a one-shot `postr-block-insert` CSS animation when the
+  // block mounts. Cleared 700 ms later (slightly longer than the
+  // animation) so re-renders don't re-trigger the animation and
+  // subsequent edits are visually calm.
+  const [justInsertedId, setJustInsertedId] = useState<string | null>(null);
   // Gray figure-size preview rectangle on the canvas, only rendered
   // while the Check tab is active AND no image block is selected.
   // Default: 10"×7" placed roughly center-ish on a standard 48×36
@@ -758,17 +764,30 @@ export function PosterEditor() {
     // near the middle of the user's working area instead of dumping
     // them top-left. Headers (title/authors) are still ignored for
     // collision since they're pinned to the top anyway.
+    //
+    // IMPORTANT: block x/y/w/h live in POSTER UNITS (1 unit = 1/10",
+    // set by the PX constant), not raw inches. `pw` / `ph` here come
+    // from POSTER_SIZES which ARE in inches — we have to multiply by
+    // PX (or use `cW` / `cH` which are already pre-multiplied) or the
+    // center math divides by 10× too many and every new block ends up
+    // clamped to the top-left corner. The 2026-04 regression was
+    // exactly this — `pw/2` computed `24` for a 48" poster, then
+    // subtracting `w/2 = 77.5` gave a negative centerX that clamp
+    // pinned to 10.
+    const posterW = cW; // poster units
+    const posterH = cH; // poster units
+
     const overlaps = (ax: number, ay: number) =>
       doc.blocks.some((b) => {
         if (b.type === 'title' || b.type === 'authors') return false;
         return !(ax + w <= b.x || b.x + b.w <= ax || ay + h <= b.y || b.y + b.h <= ay);
       });
 
-    const clampX = (x: number) => Math.max(10, Math.min(pw - w - 10, x));
-    const clampY = (y: number) => Math.max(10, Math.min(ph - h - 10, y));
+    const clampX = (x: number) => Math.max(10, Math.min(posterW - w - 10, x));
+    const clampY = (y: number) => Math.max(10, Math.min(posterH - h - 10, y));
 
-    const centerX = clampX(Math.round(pw / 2 - w / 2));
-    const centerY = clampY(Math.round(ph / 2 - h / 2));
+    const centerX = clampX(Math.round(posterW / 2 - w / 2));
+    const centerY = clampY(Math.round(posterH / 2 - h / 2));
 
     // Outward spiral offset table: no-op, right, down, left, up,
     // right×2, down×2, left×2, up×2, ... up to 8 rings.
@@ -817,6 +836,13 @@ export function PosterEditor() {
     };
     setBlocks([...doc.blocks, newBlock]);
     setSelectedId(newBlock.id);
+    // Trigger the one-shot insert animation. 700 ms is slightly
+    // longer than the `postr-block-insert` keyframe (~500 ms) so
+    // the browser completes the animation before the flag clears,
+    // which stops the animation from re-firing on subsequent
+    // re-renders.
+    setJustInsertedId(newBlock.id);
+    setTimeout(() => setJustInsertedId((id) => (id === newBlock.id ? null : id)), 700);
   };
 
   const applyTemplate = (key: LayoutKey) => {
@@ -1750,6 +1776,7 @@ export function PosterEditor() {
                   citationStyle={citationStyle}
                   headingNumber={headingNumbers[b.id] ?? 0}
                   selected={selectedId === b.id}
+                  justInserted={justInsertedId === b.id}
                   onSelect={setSelectedId}
                   onPointerDown={onPointerDown}
                   didDragRef={didDragRef}

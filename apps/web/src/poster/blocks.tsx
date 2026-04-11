@@ -1164,6 +1164,14 @@ interface BlockFrameProps {
   citationStyle: CitationStyleKey;
   headingNumber: number;
   selected: boolean;
+  /**
+   * True for ~700 ms after the block was inserted via the Insert
+   * tab. Drives the one-shot `postr-block-insert` CSS mount
+   * animation in index.css — scale-bounce + fade-in + purple
+   * accent glow — so fresh blocks feel "placed" instead of just
+   * popping into existence at the canvas center.
+   */
+  justInserted?: boolean;
   onSelect: (id: string) => void;
   onPointerDown: (
     e: React.PointerEvent,
@@ -1198,6 +1206,7 @@ export function BlockFrame(props: BlockFrameProps) {
     citationStyle,
     headingNumber,
     selected,
+    justInserted,
     onSelect,
     onPointerDown,
     didDragRef,
@@ -1348,6 +1357,18 @@ export function BlockFrame(props: BlockFrameProps) {
         // would interfere with rotation/drag.
         transition:
           'border-color 140ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 140ms cubic-bezier(0.22, 1, 0.36, 1)',
+        // One-shot mount animation for freshly-inserted blocks.
+        // `postr-block-insert` scales 0.78 → 1.04 → 1 with a
+        // purple accent glow, playing once then clearing when the
+        // `justInserted` flag flips back to false 700 ms later.
+        // Combined with the existing `b.rotation` transform via
+        // inline style order — the animation's `transform: scale()`
+        // overrides the rotate during the 500 ms animation window,
+        // which is fine because users can't rotate a block the
+        // same frame they insert it.
+        ...(justInserted && !b.rotation
+          ? { animation: 'postr-block-insert 500ms cubic-bezier(0.34, 1.3, 0.64, 1)' }
+          : {}),
         // Image + logo blocks get `default` cursor because drag is
         // only available from the move handle. Tables also use
         // default because they have their own inner interactions.

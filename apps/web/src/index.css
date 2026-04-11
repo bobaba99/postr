@@ -61,6 +61,36 @@ body {
   }
 }
 
+/* Newly-inserted block mount animation — scale-bounce + fade-in +
+ * purple accent glow. Plays once when the user clicks Insert → type,
+ * gated by a `justInserted` flag in PosterEditor.tsx so existing
+ * blocks don't re-animate on every re-render. Ends with a subtle
+ * fade-out of the glow so the block settles visually before
+ * selection chrome takes over. */
+@keyframes postr-block-insert {
+  0% {
+    opacity: 0;
+    transform: scale(0.78);
+    box-shadow:
+      0 0 0 0 rgba(124, 106, 237, 0),
+      0 0 30px 10px rgba(124, 106, 237, 0.55);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(1.04);
+    box-shadow:
+      0 0 0 4px rgba(124, 106, 237, 0.35),
+      0 0 36px 14px rgba(124, 106, 237, 0.45);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow:
+      0 0 0 0 rgba(124, 106, 237, 0),
+      0 0 0 0 rgba(124, 106, 237, 0);
+  }
+}
+
 /* Pulsing glow used to draw attention to the figure-size readout in
  * the Check tab description. Tighter than the overlay's scale-in —
  * 2.2s loop, purple glow fading on a 50% duty cycle. */
