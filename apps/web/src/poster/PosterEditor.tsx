@@ -7,6 +7,7 @@
  * store; Phase 4 layers autosave on top by subscribing to changes.
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type {
   Block,
   HeadingStyle,
@@ -17,6 +18,7 @@ import type {
 } from '@postr/shared';
 import { nanoid } from 'nanoid';
 import { usePosterStore } from '@/stores/posterStore';
+import { usePublishFlowStore } from '@/stores/publishFlowStore';
 import { useAutosave } from '@/hooks/useAutosave';
 import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
 import { useGsapContext } from '@/motion';
@@ -512,6 +514,36 @@ export function PosterEditor() {
 
   const { zoom, setZoom } = useZoom(canvasRef, sizeKey);
 
+  // ── Publish-to-gallery flow ────────────────────────────────────────
+  // `handlePublish` opens the consent→metadata sequence managed by
+  // usePublishFlowStore. If the user arrived with ?publish=1 (from the
+  // dashboard card), auto-open the flow once the poster has rendered
+  // so html-to-image can capture #poster-canvas.
+  const posterIdFromStore = usePosterStore((s) => s.posterId);
+  const posterTitleFromStore = usePosterStore((s) => s.posterTitle);
+  const openPublishFlow = usePublishFlowStore((s) => s.openForPoster);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const handlePublish = useCallback(() => {
+    if (!posterIdFromStore) return;
+    openPublishFlow(posterIdFromStore, posterTitleFromStore || 'Untitled Poster');
+  }, [posterIdFromStore, posterTitleFromStore, openPublishFlow]);
+
+  useEffect(() => {
+    if (searchParams.get('publish') !== '1') return;
+    if (!posterIdFromStore) return;
+    // Wait one animation frame so the canvas has mounted, then open.
+    const id = requestAnimationFrame(() => {
+      handlePublish();
+      // Strip the query param so a refresh doesn't re-open the flow.
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('publish');
+        return next;
+      }, { replace: true });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [searchParams, posterIdFromStore, handlePublish, setSearchParams]);
+
   // Helper: replace blocks immutably
   const storeSetBlocks = usePosterStore((s) => s.setBlocks);
   const storeSetBlocksSilent = usePosterStore((s) => s.setBlocksSilent);
@@ -740,6 +772,7 @@ export function PosterEditor() {
         onAutoLayout={onAutoLayout}
         onPrint={() => window.print()}
         onPreview={() => setPreviewMode(true)}
+        onPublish={handlePublish}
         savedPresets={savedPresets}
         onSavePreset={savePreset}
         onLoadPreset={loadPreset}

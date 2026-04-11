@@ -103,6 +103,7 @@ interface SidebarProps {
   onAutoLayout: () => void;
   onPrint: () => void;
   onPreview: () => void;
+  onPublish: () => void;
 
   // presets
   savedPresets: StylePreset[];
@@ -359,6 +360,7 @@ export function Sidebar(props: SidebarProps) {
             onAutoLayout={props.onAutoLayout}
             onPrint={props.onPrint}
             onPreview={props.onPreview}
+            onPublish={props.onPublish}
           />
         )}
 
@@ -443,6 +445,7 @@ function LayoutTab(props: {
   onAutoLayout: () => void;
   onPrint: () => void;
   onPreview: () => void;
+  onPublish: () => void;
 }) {
   const [localTitle, setLocalTitle] = useState(props.posterTitle);
   const [titleSaved, setTitleSaved] = useState(!!props.posterTitle.trim());
@@ -621,6 +624,17 @@ function LayoutTab(props: {
       </button>
       <button onClick={props.onPrint} style={{ ...buttonStyle(true), marginTop: 8 }}>
         ⎙ Save PDF
+      </button>
+      <button
+        onClick={props.onPublish}
+        style={{
+          ...buttonStyle(false),
+          marginTop: 8,
+          borderColor: '#7c6aed',
+          color: '#7c6aed',
+        }}
+      >
+        ↗ Publish to gallery
       </button>
       <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, marginTop: 8, background: '#1a1a26', padding: 10, borderRadius: 6, border: '1px solid #2a2a3a' }}>
         <strong style={{ color: '#9ca3af' }}>How to save as PDF:</strong>

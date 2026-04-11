@@ -9,7 +9,7 @@
  * The parent (Home) owns the actual duplicate/delete side effects
  * and the optimistic state updates.
  */
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import type { PosterRow } from '@/data/posters';
 import { PALETTES } from '@/poster/constants';
 
@@ -232,6 +232,7 @@ export function PosterCard({ row, onDuplicate, onDelete }: PosterCardProps) {
 
       {/* Hover actions — positioned absolutely so they never push layout. */}
       <div className="pointer-events-none absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
+        <PublishButton row={row} title={title} />
         <button
           type="button"
           aria-label={`Duplicate ${title}`}
@@ -256,5 +257,27 @@ export function PosterCard({ row, onDuplicate, onDelete }: PosterCardProps) {
         </button>
       </div>
     </div>
+  );
+}
+
+function PublishButton({ row, title }: { row: PosterRow; title: string }) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      aria-label={`Publish ${title}`}
+      // Navigate to the editor with ?publish=1. The editor mounts the
+      // poster, then auto-opens the publish flow so html-to-image can
+      // capture #poster-canvas from the real DOM. Publishing from the
+      // dashboard without first rendering the poster would force the
+      // user to upload a screenshot themselves.
+      onClick={(e) => {
+        e.preventDefault();
+        navigate(`/p/${row.id}?publish=1`);
+      }}
+      className="rounded-md border border-[#2a2a3a] bg-[#1a1a26]/90 px-2 py-1 text-[13px] font-semibold text-[#7c6aed] backdrop-blur hover:border-[#7c6aed]"
+    >
+      Publish
+    </button>
   );
 }
