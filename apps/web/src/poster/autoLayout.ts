@@ -44,22 +44,29 @@ export function autoLayout(
   // (the caller's probe may have grown it to accommodate a multi-line
   // title). Authors sits directly under the title — not at a hardcoded
   // y — so long titles no longer collide with the authors line.
+  //
+  // HEADER_GAP is intentionally tight (2 units ≈ 0.2") so the
+  // title/authors pair visually reads as one unit, matching the
+  // compact spacing of other stacked components. With the old
+  // hardcoded `snap(57)` + default `title.h = 45`, the implied gap
+  // was also 2 — we preserve that default while letting the gap
+  // scale correctly for longer titles.
   const titleBlk = headers.find((b) => b.type === 'title');
   const titleH = titleBlk ? titleBlk.h : 45;
-  const HEADER_GAP = 5; // breathing room between title and authors
+  const HEADER_GAP = 2;
   const authorsY = snap(M + titleH + HEADER_GAP);
   const pinnedHeaders = headers.map((b) => {
     if (b.type === 'title') return { ...b, x: M, y: M, w: canvasWidth - M * 2 };
     return { ...b, x: M, y: authorsY, w: canvasWidth - M * 2 };
   });
 
-  // Body starts below the full header stack (title + gap + authors
-  // + small pad). We compute this dynamically instead of the old
-  // hardcoded `HEADER_BOTTOM = 81` so long titles push everything
-  // else down together.
+  // Body starts below the full header stack (title + gap + authors)
+  // with a standard body margin `M` below the authors block. This
+  // replaces the old hardcoded `HEADER_BOTTOM = 81` so long titles
+  // push the body down in lockstep with the header grow.
   const authorsBlk = headers.find((b) => b.type === 'authors');
   const authorsH = authorsBlk ? authorsBlk.h : 20;
-  const headerBottom = authorsY + authorsH + HEADER_GAP;
+  const headerBottom = authorsY + authorsH;
 
   // Step 2: cluster body block x positions
   const uniqueXs = [...new Set(body.map((b) => b.x))].sort((a, b) => a - b);

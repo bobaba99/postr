@@ -1411,6 +1411,7 @@ export function PosterEditor() {
 
       <div
         ref={canvasRef}
+        data-postr-canvas-outer
         onClick={() => setSelectedId(null)}
         style={{
           flex: 1,
@@ -1686,30 +1687,6 @@ export function PosterEditor() {
               ))}
             </div>
           </div>
-        </div>
-
-        {/*
-          Poster info caption — pinned above the ZoomBar so the two
-          no longer overlap. The previous in-flow placement could be
-          occluded by the ZoomBar when the poster nearly filled the
-          canvas. Now it floats at a fixed 56 px above the bottom
-          (ZoomBar sits at bottom: 12 and is ~40 px tall).
-        */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 56,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            textAlign: 'center',
-            fontSize: 11,
-            color: '#6b7280',
-            fontFamily: 'system-ui',
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {POSTER_SIZES[sizeKey]!.label} · {doc.fontFamily} · {palName || 'Custom'}
         </div>
 
         {/* OOB warning banner */}
