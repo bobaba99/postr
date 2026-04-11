@@ -1,23 +1,11 @@
 /**
- * ConfirmModal — dark-themed confirmation dialog replacing window.confirm.
+ * ConfirmModal — dark-themed confirmation dialog.
  *
- * Renders a centered overlay with title, message, and Cancel/Confirm
- * buttons. Matches the app's dark palette (#0a0a12 bg, #111118 card,
- * #7c6aed accent). Supports a `danger` variant for destructive actions
- * (red confirm button).
- *
- * Usage:
- *   <ConfirmModal
- *     open={showDelete}
- *     title="Delete poster"
- *     message="This cannot be undone."
- *     confirmLabel="Delete"
- *     danger
- *     onConfirm={() => handleDelete()}
- *     onCancel={() => setShowDelete(false)}
- *   />
+ * Supports an optional `typedConfirmation` prop: when set, the user
+ * must type the exact phrase before the confirm button enables.
+ * Used for high-friction destructive actions like account deletion.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface Props {
   open: boolean;
@@ -26,6 +14,8 @@ interface Props {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  /** If set, user must type this exact phrase to enable the confirm button. */
+  typedConfirmation?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -37,15 +27,21 @@ export function ConfirmModal({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   danger = false,
+  typedConfirmation,
   onConfirm,
   onCancel,
 }: Props) {
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const [typed, setTyped] = useState('');
 
-  // Focus the confirm button when the modal opens, and trap Escape.
+  // Reset typed text when modal opens/closes
+  useEffect(() => {
+    if (open) setTyped('');
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
-    confirmRef.current?.focus();
+    if (!typedConfirmation) confirmRef.current?.focus();
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -54,9 +50,13 @@ export function ConfirmModal({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [open, onCancel]);
+  }, [open, onCancel, typedConfirmation]);
 
   if (!open) return null;
+
+  const confirmEnabled = typedConfirmation
+    ? typed.toLowerCase().trim() === typedConfirmation.toLowerCase().trim()
+    : true;
 
   return (
     <div
@@ -76,7 +76,7 @@ export function ConfirmModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: 400,
+          maxWidth: 440,
           background: '#111118',
           border: '1px solid #2a2a3a',
           borderRadius: 12,
@@ -96,7 +96,7 @@ export function ConfirmModal({
         </h3>
         <p
           style={{
-            margin: '0 0 24px',
+            margin: '0 0 20px',
             fontSize: 13,
             lineHeight: 1.5,
             color: '#9ca3af',
@@ -104,6 +104,33 @@ export function ConfirmModal({
         >
           {message}
         </p>
+
+        {typedConfirmation && (
+          <div style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: 13, color: '#9ca3af', marginBottom: 8 }}>
+              Type <strong style={{ color: '#f87171', fontFamily: 'monospace' }}>{typedConfirmation}</strong> to confirm:
+            </p>
+            <input
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={typedConfirmation}
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                fontSize: 14,
+                color: confirmEnabled ? '#a6e3a1' : '#e2e2e8',
+                background: '#1a1a26',
+                border: `1px solid ${confirmEnabled ? '#a6e3a1' : '#2a2a3a'}`,
+                borderRadius: 6,
+                outline: 'none',
+                boxSizing: 'border-box',
+                fontFamily: 'monospace',
+              }}
+            />
+          </div>
+        )}
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button
             onClick={onCancel}
@@ -123,8 +150,9 @@ export function ConfirmModal({
           <button
             ref={confirmRef}
             onClick={onConfirm}
+            disabled={!confirmEnabled}
             style={{
-              cursor: 'pointer',
+              cursor: confirmEnabled ? 'pointer' : 'not-allowed',
               padding: '8px 16px',
               fontSize: 13,
               fontWeight: 600,
@@ -132,6 +160,7 @@ export function ConfirmModal({
               background: danger ? '#dc2626' : '#7c6aed',
               border: 'none',
               borderRadius: 6,
+              opacity: confirmEnabled ? 1 : 0.4,
             }}
           >
             {confirmLabel}
