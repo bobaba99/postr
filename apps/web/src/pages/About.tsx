@@ -1,13 +1,13 @@
 /**
- * About page — a timeline narrative of how Postr came to be.
+ * About page — a feature tour told as a vertical "roadtrip".
  *
- * Visual motif: a vertical "roadtrip" down the page. A dotted SVG path
- * runs from top to bottom; milestones sit along the road, alternating
- * left and right. The design is deliberately abstract — no photos,
- * no illustrations beyond geometric SVG primitives.
+ * A dotted SVG path runs top to bottom; feature waypoints sit along
+ * the road, alternating left and right. The design is deliberately
+ * abstract — no photos, no illustrations beyond geometric primitives.
  *
  * Also serves as a second home for the feedback feature: the final
- * waypoint ("The road ahead") invites users to shape future stops.
+ * card ("Shape what ships next") routes the user straight to the
+ * feedback modal.
  */
 import { Link } from 'react-router-dom';
 import { useFeedbackStore } from '@/stores/feedbackStore';
@@ -21,39 +21,39 @@ interface Milestone {
 
 const MILESTONES: Milestone[] = [
   {
-    id: 'origin',
-    chapter: 'Chapter 01',
-    title: 'The blank-page problem',
+    id: 'anonymous',
+    chapter: 'Feature 01',
+    title: 'Start anywhere, save nothing',
     body:
-      'Every conference season, students stare down a blank slide and ask the same questions: what font size? which palette? how much text is too much? Good posters exist, but the tools don\'t teach. PowerPoint gives you 400 fonts and zero guidance.',
+      "Anonymous session on first click — no sign-up wall. Every keystroke autosaves from before you've even named the poster. When you sign up later, your drafts follow you across devices without a single \"export and re-import\".",
   },
   {
-    id: 'sketch',
-    chapter: 'Chapter 02',
-    title: 'A single-file prototype',
+    id: 'templates',
+    chapter: 'Feature 02',
+    title: 'Templates tuned for conferences',
     body:
-      'The first version was a 600-line React component that fit in one file. Crude, but it proved the thesis: constraint is a feature. Six fonts, five layouts, and discipline-appropriate palettes already produce better posters than most published ones.',
+      'Five layouts — three-column classic, billboard, sidebar + focus, and more. Discipline-appropriate palettes instead of freeform color pickers. APA, SfN, and ECNP size presets ship built-in so your dimensions are never a guess.',
   },
   {
-    id: 'stack',
-    chapter: 'Chapter 03',
-    title: 'Anonymous-first, autosave-always',
+    id: 'writing',
+    chapter: 'Feature 03',
+    title: 'Writing guidance, not a blank page',
     body:
-      'Sign-up walls kill curiosity. Postr creates an anonymous session on first visit — you\'re editing before you know you\'ve started. Every keystroke autosaves. When you\'re ready to sign up, your work follows you in without a single click on "save".',
+      'Each section comes with concrete prompts, word-count targets, and a built-in checklist from intro to conclusion. Rich text for emphasis, Greek-symbol shortcuts for STEM, and a reference manager with citation-style support.',
   },
   {
-    id: 'scan',
-    chapter: 'Chapter 04',
-    title: 'Figures that are actually readable',
+    id: 'readability',
+    chapter: 'Feature 04',
+    title: 'Figures readable from three feet',
     body:
-      'The #1 poster sin: a matplotlib chart with 8pt labels scaled to cover a third of an A0 sheet. Postr reads your R or Python plotting code and tells you — before you print — whether axis labels will be legible from three feet away.',
+      'Paste your R or Python plotting code and Postr checks whether axis labels will actually be legible at print size. Out-of-bounds warnings catch layout slips. No more discovering typography problems at the FedEx counter.',
   },
   {
-    id: 'prelaunch',
-    chapter: 'Chapter 05',
-    title: 'Pre-launch',
+    id: 'ship',
+    chapter: 'Feature 05',
+    title: 'Share, iterate, print',
     body:
-      'The editor, the data model, the anonymous-to-permanent auth flow, undo/redo, rich text, asset uploads, and reference management are all in place. What\'s left is polish — the hundred small details that separate a prototype from a product.',
+      "Read-only share links for advisors and co-authors. Undo and redo through the entire session. Asset uploads with per-user storage. Browser print-to-PDF turns a finished draft into a conference-ready sheet — everything you need between \"first draft\" and \"it's on the wall\".",
   },
 ];
 
@@ -67,16 +67,16 @@ export default function About() {
       {/* Hero */}
       <section className="mx-auto max-w-3xl px-8 pt-20 pb-12 text-center">
         <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.3em] text-[#7c6aed]">
-          A roadtrip, not a roadmap
+          What Postr does
         </div>
         <h1 className="text-4xl font-bold leading-tight text-white sm:text-5xl">
-          How we got here,<br />
-          <span className="text-[#7c6aed]">and where we're headed next.</span>
+          Everything you need<br />
+          <span className="text-[#7c6aed]">to ship a great poster.</span>
         </h1>
         <p className="mt-6 text-base text-[#9ca3af] leading-relaxed max-w-xl mx-auto">
-          Postr started as a frustration and turned into a weekend project that refused
-          to stop. This is the short version of the road so far — and an invitation to
-          help choose the next turn.
+          Postr is an opinionated poster editor built around one idea: constraint is
+          a feature. Every default is tuned to produce something print-ready — you
+          just fill in the science.
         </p>
       </section>
 
@@ -111,20 +111,22 @@ export default function About() {
           ))}
         </div>
 
-        {/* Mountain silhouette — decorative only. */}
+        {/* Mountain silhouette — decorative only. Peaks mirror around
+            center x=140, valleys mirror too, so the ridgeline is exactly
+            symmetric under horizontal flip. */}
         <div className="pointer-events-none mt-8 flex justify-center opacity-40">
-          <svg width="240" height="64" viewBox="0 0 240 64" fill="none" aria-hidden="true">
+          <svg width="280" height="70" viewBox="0 0 280 70" fill="none" aria-hidden="true">
             <path
-              d="M0 60 L38 22 L62 42 L92 10 L128 48 L158 24 L196 52 L240 30 L240 60 Z"
+              d="M0 65 L40 30 L70 48 L100 20 L140 6 L180 20 L210 48 L240 30 L280 65 Z"
+              fill="#7c6aed"
+              opacity="0.08"
+            />
+            <path
+              d="M0 65 L40 30 L70 48 L100 20 L140 6 L180 20 L210 48 L240 30 L280 65"
               fill="none"
               stroke="#7c6aed"
               strokeWidth="1.5"
               strokeLinejoin="round"
-            />
-            <path
-              d="M0 60 L38 22 L62 42 L92 10 L128 48 L158 24 L196 52 L240 30"
-              fill="#7c6aed"
-              opacity="0.08"
             />
           </svg>
         </div>
@@ -155,15 +157,15 @@ export default function About() {
 
           <div className="relative">
             <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-[#7c6aed]">
-              Chapter 06 — unwritten
+              Shape what ships next
             </div>
             <h2 className="mb-4 text-2xl font-bold text-white sm:text-3xl">
-              The road ahead is yours.
+              Tell us what's missing.
             </h2>
             <p className="mb-8 max-w-xl text-[15px] leading-relaxed text-[#9ca3af]">
-              Postr is being built in public, one waypoint at a time. The loudest
-              feedback wins the most attention — so if something's broken, missing, or
-              could be better, say so. Everything goes to the developer's queue.
+              Every bug report and feature request lands in the developer's queue.
+              The loudest feedback wins the most attention — so if something's
+              broken, missing, or could be better, say so.
             </p>
             <div className="flex flex-wrap gap-3">
               <button
