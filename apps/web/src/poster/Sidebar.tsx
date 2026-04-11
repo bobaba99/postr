@@ -666,6 +666,16 @@ function LayoutTab(props: {
         </div>
       </div>
 
+      <div style={labelStyle}>Auto Layout</div>
+      <button onClick={props.onAutoLayout} style={{ ...buttonStyle(false), fontSize: 14 }}>
+        ⬡ Auto-Arrange
+      </button>
+      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+        Tidy existing blocks into an even grid — measures each text block's
+        actual content height so short sections don't leave empty space.
+        Great after dragging things around or after editing a lot of text.
+      </div>
+
       <div style={labelStyle}>Templates</div>
       <div
         style={{
@@ -704,15 +714,6 @@ function LayoutTab(props: {
             </button>
           );
         })}
-      </div>
-
-      <div style={labelStyle}>Auto Layout</div>
-      <button onClick={props.onAutoLayout} style={{ ...buttonStyle(false), fontSize: 14 }}>
-        ⬡ Auto-Arrange
-      </button>
-      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-        Tidy existing blocks into an even grid — useful after dragging things
-        around mid-session.
       </div>
 
       <div style={labelStyle}>📐 Canvas overlays</div>

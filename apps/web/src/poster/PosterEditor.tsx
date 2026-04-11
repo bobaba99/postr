@@ -794,7 +794,88 @@ export function PosterEditor() {
   };
 
   const onAutoLayout = () => {
-    const next = autoLayout(doc.blocks, cW, cH, doc.styles);
+    // Measure the NATURAL content height of every text-like block
+    // BEFORE auto-arrange so the layout packs them tightly.
+    //
+    // The subtlety: we can't measure the outer frame's BCR because
+    // grow-with-content blocks have `minHeight: b.h` set on them,
+    // which means the rendered frame is at LEAST the current b.h
+    // tall regardless of actual content. If auto-arrange previously
+    // committed b.h = 110 but the content is now only 2 lines, the
+    // frame is still 110 tall — so measuring it would never shrink.
+    //
+    // Instead we use a fresh hidden measurement DOM: clone the
+    // block's RichTextEditor content into a detached div at the
+    // block's width, with the same typography, let the browser lay
+    // it out, and read the resulting height. That gives us the
+    // natural content height independent of the current b.h floor.
+    //
+    // Only measures blocks that natively grow with content (title /
+    // text / heading / references / authors); image / logo / table
+    // blocks keep their declared height because their content is
+    // aspect-ratio or grid driven, not text-length driven.
+    const GROW_TYPES = new Set<Block['type']>([
+      'title',
+      'text',
+      'heading',
+      'references',
+      'authors',
+    ]);
+    const HEIGHT_SLACK_UNITS = 4; // padding + line-height slack so nothing clips
+
+    const ffc = FONTS[doc.fontFamily]?.css ?? doc.fontFamily;
+    const styleLevelFor = (t: Block['type']) =>
+      t === 'title' ? doc.styles.title
+      : t === 'authors' ? doc.styles.authors
+      : t === 'heading' ? doc.styles.heading
+      : doc.styles.body;
+
+    // Detached measurement host — positioned offscreen so it never
+    // flashes visually, but still rendered by the layout engine.
+    const host = document.createElement('div');
+    host.style.cssText =
+      'position:absolute;left:-99999px;top:0;visibility:hidden;pointer-events:none;';
+    document.body.appendChild(host);
+
+    const measureContent = (blk: Block): number => {
+      const level = styleLevelFor(blk.type);
+      const probe = document.createElement('div');
+      probe.style.cssText = [
+        `width:${blk.w}px`,
+        'box-sizing:border-box',
+        'padding:4px 6px',
+        `font-family:${ffc}`,
+        `font-size:${level.size}px`,
+        `font-weight:${level.weight}`,
+        `line-height:${level.lineHeight}`,
+        'white-space:pre-wrap',
+        'word-wrap:break-word',
+      ].join(';');
+      // For title/text/heading, use the raw content string
+      // (minus any inline HTML tags from rich text formatting).
+      let text = blk.content || '';
+      // Strip HTML but preserve line breaks
+      text = text.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+      probe.textContent = text || ' ';
+      host.appendChild(probe);
+      const h = probe.offsetHeight;
+      host.removeChild(probe);
+      return h;
+    };
+
+    const measured = doc.blocks.map((blk) => {
+      if (!GROW_TYPES.has(blk.type)) return blk;
+      const naturalH = Math.max(
+        20, // floor — same lower bound autoLayout uses
+        Math.ceil(measureContent(blk)) + HEIGHT_SLACK_UNITS,
+      );
+      if (Math.abs(naturalH - blk.h) < 2) return blk;
+      return { ...blk, h: naturalH };
+    });
+
+    document.body.removeChild(host);
+
+    const next = autoLayout(measured, cW, cH, doc.styles);
     setBlocks(next);
   };
 

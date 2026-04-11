@@ -752,6 +752,8 @@ PosterForge (root)
 
     **Entry point**: the dashboard's "+ New poster" button gets a chevron menu — "Blank", "From template", **"Import PDF / image…"**. The same upload flow is also accessible from the editor's Insert tab as "Replace with upload" for the current poster.
 
+17. **Image cropping inside the block**: Today the image block has three `object-fit` modes (contain / cover / fill) but no way to control WHICH part of the image is visible when `cover` crops overflow or when the user wants to trim an uploaded photo before display. Add an inline cropping tool that activates when the user clicks a dedicated "Crop" button inside the image overlay. Interaction: darkens the overflow area, shows drag handles at the 4 corners + 4 edges of the crop rectangle, with a live-preview of the result as the user drags. Aspect ratio is free by default with optional presets (1:1, 4:3, 16:9, match block). On confirm, the cropped rectangle is either (a) applied as a `clip-path: inset(T R B L)` overlay on the rendered `<img>` — purely visual, original source preserved — or (b) baked into a new canvas-generated base64 data URL that replaces `imageSrc`. Option (a) is reversible and cheaper; option (b) reduces storage if the user cropped a huge photo down to a small region. Ship (a) first, add (b) as a "Bake crop to save storage" menu item later. Expose the crop UI alongside the existing Contain / Cover / Fill toggle. Keyboard: Esc cancels the in-progress crop, Enter commits.
+
 ---
 
 ## Operational Conventions

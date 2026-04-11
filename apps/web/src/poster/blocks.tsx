@@ -94,9 +94,16 @@ interface ImageBlockProps {
   block: Block;
   palette: Palette;
   onUpdate: (patch: Partial<Block>) => void;
+  /**
+   * Gates the in-image overlay (fit toggle + replace + remove).
+   * The overlay only shows while the block is selected so it
+   * doesn't visually clutter the canvas on deselected image blocks.
+   * User-flagged 2026-04-11.
+   */
+  selected?: boolean;
 }
 
-export function ImageBlock({ block, palette, onUpdate }: ImageBlockProps) {
+export function ImageBlock({ block, palette, onUpdate, selected = false }: ImageBlockProps) {
   const ref = useRef<HTMLInputElement | null>(null);
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -167,38 +174,47 @@ export function ImageBlock({ block, palette, onUpdate }: ImageBlockProps) {
             OUserDrag: 'none',
           } as CSSProperties}
         />
-        <div style={{ position: 'absolute', top: 2, right: 2, display: 'flex', gap: 2 }}>
-          <button
-            onClick={toggleFit}
-            title={FIT_HINT[currentFit]}
-            style={{
-              ...iconBtn,
-              width: 'auto',
-              minWidth: 32,
-              padding: '0 6px',
-              fontSize: 9,
-              fontWeight: 700,
-              letterSpacing: 0.4,
-              fontFamily: 'system-ui, -apple-system, sans-serif',
-            }}
-          >
-            {FIT_LABEL[currentFit]}
-          </button>
-          <button
-            onClick={() => ref.current?.click()}
-            title="Replace image — choose a different file"
-            style={iconBtn}
-          >
-            ↻
-          </button>
-          <button
-            onClick={() => onUpdate({ imageSrc: null })}
-            title="Remove image"
-            style={{ ...iconBtn, background: 'rgba(180,30,30,.8)' }}
-          >
-            ×
-          </button>
-        </div>
+        {/*
+          In-image overlay with Contain/Cover/Fill toggle, replace
+          button, and remove button. Only rendered while the block
+          is selected so the canvas stays clean for deselected
+          images. Matches the external-handles pattern above: chrome
+          only appears when you're actively interacting with a block.
+        */}
+        {selected && (
+          <div style={{ position: 'absolute', top: 2, right: 2, display: 'flex', gap: 2 }}>
+            <button
+              onClick={toggleFit}
+              title={FIT_HINT[currentFit]}
+              style={{
+                ...iconBtn,
+                width: 'auto',
+                minWidth: 32,
+                padding: '0 6px',
+                fontSize: 9,
+                fontWeight: 700,
+                letterSpacing: 0.4,
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+              }}
+            >
+              {FIT_LABEL[currentFit]}
+            </button>
+            <button
+              onClick={() => ref.current?.click()}
+              title="Replace image — choose a different file"
+              style={iconBtn}
+            >
+              ↻
+            </button>
+            <button
+              onClick={() => onUpdate({ imageSrc: null })}
+              title="Remove image"
+              style={{ ...iconBtn, background: 'rgba(180,30,30,.8)' }}
+            >
+              ×
+            </button>
+          </div>
+        )}
         <input ref={ref} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
       </div>
     );
@@ -1451,7 +1467,9 @@ export function BlockFrame(props: BlockFrameProps) {
           />
         )}
 
-        {b.type === 'image' && <ImageBlock block={b} palette={p} onUpdate={update} />}
+        {b.type === 'image' && (
+          <ImageBlock block={b} palette={p} onUpdate={update} selected={selected} />
+        )}
         {b.type === 'logo' && <LogoBlock block={b} onUpdate={update} />}
 
         {b.type === 'table' && (
