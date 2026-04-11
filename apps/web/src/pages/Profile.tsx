@@ -234,10 +234,8 @@ export default function Profile() {
 
         {/* Account */}
         <Section title="Account">
-          <Row label="Account type" value={isAnonymous ? 'Guest (anonymous)' : 'Linked account'} />
           <Row label="Email" value={email ?? 'Not linked'} />
           <Row label="Member since" value={createdAt} />
-          <Row label="User ID" value={(user?.id?.slice(0, 8) ?? '—') + '…'} mono />
           <Row label="Posters" value={String(posterCount)} />
         </Section>
 
