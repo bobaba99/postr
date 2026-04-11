@@ -22,9 +22,20 @@ import { getAllTemplates, saveCustomTemplates } from '@/poster/GuidelinesPanel';
 import { PasswordStrength, isPasswordValid } from '@/components/PasswordStrength';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { listMyFeedback, type FeedbackRow } from '@/data/feedback';
+import { usePublishFlowStore } from '@/stores/publishFlowStore';
+import {
+  listMyGallery,
+  retractGalleryEntry,
+  labelForField,
+  type GalleryEntryWithUrls,
+} from '@/data/gallery';
 import type { User } from '@supabase/supabase-js';
 
-type ConfirmAction = 'deletePosters' | 'deleteAccount' | null;
+type ConfirmAction =
+  | 'deletePosters'
+  | 'deleteAccount'
+  | { kind: 'retractGalleryEntry'; entry: GalleryEntryWithUrls }
+  | null;
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -37,6 +48,9 @@ export default function Profile() {
   const [myFeedback, setMyFeedback] = useState<FeedbackRow[]>([]);
   const openFeedback = useFeedbackStore((s) => s.open);
   const feedbackModalOpen = useFeedbackStore((s) => s.isOpen);
+  const [myGallery, setMyGallery] = useState<GalleryEntryWithUrls[]>([]);
+  const openUploadFlow = usePublishFlowStore((s) => s.openForUpload);
+  const publishStep = usePublishFlowStore((s) => s.step);
 
   useEffect(() => {
     (async () => {
@@ -70,6 +84,38 @@ export default function Profile() {
     };
   }, [feedbackModalOpen]);
 
+  // Reload the user's gallery submissions whenever the publish flow
+  // closes. Catches both fresh publishes and retracted entries.
+  useEffect(() => {
+    if (publishStep !== 'closed') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await listMyGallery();
+        if (!cancelled) setMyGallery(rows);
+      } catch {
+        // Non-critical — leave the list as-is
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [publishStep]);
+
+  const handleRetractConfirmed = useCallback(
+    async (entry: GalleryEntryWithUrls) => {
+      try {
+        await retractGalleryEntry(entry);
+        setMyGallery((prev) => prev.filter((e) => e.id !== entry.id));
+        setActionStatus('Gallery entry retracted.');
+        setTimeout(() => setActionStatus(null), 3000);
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : 'Retract failed.');
+      }
+    },
+    [],
+  );
+
   const isAnonymous = user?.is_anonymous ?? true;
   const email = user?.email ?? null;
   const createdAt = user?.created_at
@@ -92,6 +138,11 @@ export default function Profile() {
     if (!action) return;
 
     setActionError(null);
+
+    if (typeof action === 'object' && action.kind === 'retractGalleryEntry') {
+      await handleRetractConfirmed(action.entry);
+      return;
+    }
 
     if (action === 'deletePosters') {
       setActionStatus('Deleting posters…');
@@ -143,7 +194,7 @@ export default function Profile() {
         setActionStatus(null);
       }
     }
-  }, [confirmAction, navigate]);
+  }, [confirmAction, navigate, handleRetractConfirmed]);
 
   const signInWithGoogle = useCallback(async () => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -318,6 +369,43 @@ export default function Profile() {
           </div>
         </Section>
 
+        {/* Gallery submissions */}
+        <Section title="Gallery submissions">
+          <p className="mb-4 text-[13px] text-[#6b7280] leading-relaxed">
+            Posters you have published to the{' '}
+            <Link to="/gallery" className="text-[#7c6aed] underline">
+              public gallery
+            </Link>
+            . You can retract any entry at any time — it disappears from the
+            public listing immediately.
+          </p>
+          <div className="mb-4 flex gap-2">
+            <button onClick={openUploadFlow} className={btnSecondary}>
+              Upload external PDF or image
+            </button>
+          </div>
+
+          {myGallery.length === 0 ? (
+            <div className="rounded-md border border-dashed border-[#2a2a3a] bg-[#0a0a12] p-6 text-center text-[13px] text-[#6b7280]">
+              You haven’t published anything yet. Use the <strong>Publish</strong>{' '}
+              button on a poster card, the Publish button in the editor, or the
+              upload button above.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {myGallery.map((entry) => (
+                <GallerySubmissionRow
+                  key={entry.id}
+                  entry={entry}
+                  onRetract={() =>
+                    setConfirmAction({ kind: 'retractGalleryEntry', entry })
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </Section>
+
         {/* Feedback */}
         <Section title="Feedback">
           <p className="mb-4 text-[13px] text-[#6b7280] leading-relaxed">
@@ -373,13 +461,9 @@ export default function Profile() {
 
       <ConfirmModal
         open={confirmAction !== null}
-        title={confirmAction === 'deleteAccount' ? 'Delete account' : 'Delete all posters'}
-        message={
-          confirmAction === 'deleteAccount'
-            ? 'This will permanently delete your account, all posters, and all preferences. You will be signed out. This action cannot be undone.'
-            : `Permanently delete all ${posterCount} poster(s)? This cannot be undone.`
-        }
-        confirmLabel={confirmAction === 'deleteAccount' ? 'Delete my account' : 'Delete all'}
+        title={confirmModalTitle(confirmAction)}
+        message={confirmModalMessage(confirmAction, posterCount)}
+        confirmLabel={confirmModalLabel(confirmAction)}
         danger
         typedConfirmation={confirmAction === 'deleteAccount' ? 'I confirm the deletion of my account' : undefined}
         onConfirm={handleConfirm}
@@ -390,6 +474,80 @@ export default function Profile() {
 }
 
 // ── Shared sub-components ──────────────────────────────────────────
+
+function confirmModalTitle(action: ConfirmAction): string {
+  if (action && typeof action === 'object' && action.kind === 'retractGalleryEntry') {
+    return 'Retract from gallery';
+  }
+  if (action === 'deleteAccount') return 'Delete account';
+  return 'Delete all posters';
+}
+
+function confirmModalMessage(action: ConfirmAction, posterCount: number): string {
+  if (action && typeof action === 'object' && action.kind === 'retractGalleryEntry') {
+    return `Remove "${action.entry.title}" from the public gallery? The entry row and stored image will be deleted. Third parties may still have cached copies.`;
+  }
+  if (action === 'deleteAccount') {
+    return 'This will permanently delete your account, all posters, and all preferences. You will be signed out. This action cannot be undone.';
+  }
+  return `Permanently delete all ${posterCount} poster(s)? This cannot be undone.`;
+}
+
+function confirmModalLabel(action: ConfirmAction): string {
+  if (action && typeof action === 'object' && action.kind === 'retractGalleryEntry') {
+    return 'Retract';
+  }
+  if (action === 'deleteAccount') return 'Delete my account';
+  return 'Delete all';
+}
+
+function GallerySubmissionRow({
+  entry,
+  onRetract,
+}: {
+  entry: GalleryEntryWithUrls;
+  onRetract: () => void;
+}) {
+  const date = new Date(entry.created_at).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  return (
+    <div className="flex items-start gap-3 rounded-md border border-[#1f1f2e] bg-[#0a0a12] p-3">
+      <img
+        src={entry.image_url}
+        alt={entry.title}
+        className="h-16 w-16 shrink-0 rounded object-cover"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-[#1a1a26] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#7c6aed]">
+            {labelForField(entry.field)}
+          </span>
+          <Link
+            to={`/gallery/${entry.id}`}
+            className="truncate text-[13px] font-medium text-[#c8cad0] no-underline hover:text-white"
+          >
+            {entry.title}
+          </Link>
+        </div>
+        <div className="mt-0.5 text-[11px] text-[#6b7280]">
+          Published {date}
+          {entry.conference && ` · ${entry.conference}`}
+          {entry.year && ` · ${entry.year}`}
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onRetract}
+        className="shrink-0 rounded-md border border-[#2a2a3a] bg-[#1a1a26] px-3 py-1.5 text-[12px] font-medium text-[#f87171] hover:border-[#f87171]"
+      >
+        Retract
+      </button>
+    </div>
+  );
+}
 
 const FEEDBACK_STATUS_LABEL: Record<FeedbackRow['status'], string> = {
   new: 'Received',
