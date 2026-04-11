@@ -13,6 +13,8 @@
  * Stored in localStorage as `postr.onboarding-done`.
  */
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
+import { usePublishFlowStore } from '@/stores/publishFlowStore';
+import { useFeedbackStore } from '@/stores/feedbackStore';
 
 interface TourStep {
   selector: string;
@@ -93,6 +95,16 @@ export function OnboardingTour() {
   const [rect, setRect] = useState<DOMRect | null>(null);
   const pulseRef = useRef<HTMLStyleElement | null>(null);
 
+  // Suspend the tour while a modal that needs full attention is open.
+  // The publish flow (consent → metadata) and the feedback modal both
+  // sit at z-index 9999 and the tour's transparent highlight overlay
+  // would otherwise intercept clicks meant for the modal. We don't
+  // advance or finish the tour — the same step resumes after the
+  // modal closes.
+  const publishStep = usePublishFlowStore((s) => s.step);
+  const feedbackOpen = useFeedbackStore((s) => s.isOpen);
+  const suspended = publishStep !== 'closed' || feedbackOpen;
+
   useEffect(() => {
     if (localStorage.getItem(STORAGE_KEY)) return;
     const t = setTimeout(() => setStep(0), 800);
@@ -172,9 +184,25 @@ export function OnboardingTour() {
     });
   }, []);
 
+  // measureStep boosts the highlighted element to z-index 10001 so
+  // the tour's pulse animation sits above everything else. While a
+  // publish or feedback modal is open we MUST NOT run measureStep at
+  // all — otherwise the boosted element ends up sitting above the
+  // modal and intercepts every click. The suspended flag gates both
+  // the regular step-change effect and the suspend-toggle effect.
   useEffect(() => {
-    if (step >= 0) measureStep(step);
-  }, [step, measureStep]);
+    if (step >= 0 && !suspended) measureStep(step);
+  }, [step, measureStep, suspended]);
+
+  useEffect(() => {
+    if (suspended) {
+      clearBoost();
+      setRect(null);
+    }
+    // No else branch — when suspended flips false, the effect above
+    // will re-fire because `suspended` is in its deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suspended]);
 
   useEffect(() => {
     if (step < 0) return;
@@ -199,6 +227,7 @@ export function OnboardingTour() {
   }, [step]);
 
   if (step < 0 || !STEPS[step]) return null;
+  if (suspended) return null;
 
   const current = STEPS[step]!;
   const isLast = step === STEPS.length - 1;

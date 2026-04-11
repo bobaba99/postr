@@ -585,6 +585,13 @@ async function captureAt(
     cacheBust: true,
     pixelRatio,
     backgroundColor: '#ffffff',
+    // Skip the embedWebFonts step. html-to-image otherwise tries to
+    // read cssRules from every cross-origin <link rel="stylesheet">
+    // (Google Fonts) and throws SecurityError twice per capture. The
+    // visible quality is unaffected — the canvas is rasterized using
+    // the host page's already-loaded fonts at SVG conversion time —
+    // and the console stays clean.
+    skipFonts: true,
   });
   const blob = await new Promise<Blob | null>((resolve) => {
     canvas.toBlob((b) => resolve(b), 'image/jpeg', quality);

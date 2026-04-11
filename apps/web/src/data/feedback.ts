@@ -69,9 +69,25 @@ export async function submitFeedback(input: FeedbackInput): Promise<void> {
     throw new Error(validation.message);
   }
 
-  const { data: userData, error: userError } = await supabase.auth.getUser();
+  // Public pages (Gallery, About, Privacy, etc.) are not wrapped by
+  // AuthGuard, so an anonymous visitor who lands on /gallery and opens
+  // the footer feedback modal has no Supabase session yet. The feedback
+  // table requires user_id = auth.uid() via RLS, so we need *some*
+  // session before insert. signInAnonymously is cheap, idempotent for
+  // the lifetime of the tab, and matches the PRD's anonymous-first
+  // philosophy. We only do it if no session exists — never escalate
+  // an authenticated user to anonymous.
+  let { data: userData, error: userError } = await supabase.auth.getUser();
   if (userError || !userData.user) {
-    throw new Error('You need to be signed in to send feedback. Try refreshing the page.');
+    const { error: signInError } = await supabase.auth.signInAnonymously();
+    if (signInError) {
+      throw new Error(`Could not start a session: ${signInError.message}`);
+    }
+    const refetched = await supabase.auth.getUser();
+    if (refetched.error || !refetched.data.user) {
+      throw new Error('Could not establish a session. Please reload and try again.');
+    }
+    userData = refetched.data;
   }
 
   const pageUrl = typeof window !== 'undefined' ? window.location.href.slice(0, 500) : null;

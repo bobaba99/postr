@@ -62,10 +62,7 @@ export function PublicFooter() {
         </div>
 
         <div className="mt-10 border-t border-[#1f1f2e] pt-6 text-[12px]">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <span>© {CURRENT_YEAR} Resila Technologies Inc.</span>
-            <span className="text-[#555]">Built for researchers.</span>
-          </div>
+          <span>© {CURRENT_YEAR} Resila Technologies Inc.</span>
         </div>
       </div>
     </footer>
