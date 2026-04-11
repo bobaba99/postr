@@ -24,6 +24,7 @@ import { useFeedbackStore } from '@/stores/feedbackStore';
 import { listMyFeedback, type FeedbackRow } from '@/data/feedback';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
 import { PublicFooter } from '@/components/PublicFooter';
+import { PresetEditModal } from '@/components/PresetEditModal';
 import {
   listMyGallery,
   retractGalleryEntry,
@@ -52,6 +53,15 @@ export default function Profile() {
   const [myGallery, setMyGallery] = useState<GalleryEntryWithUrls[]>([]);
   const openUploadFlow = usePublishFlowStore((s) => s.openForUpload);
   const publishStep = usePublishFlowStore((s) => s.step);
+  const [presetModalOpen, setPresetModalOpen] = useState(false);
+  const [presetCount, setPresetCount] = useState<number>(() => {
+    try {
+      const raw = localStorage.getItem('postr.style-presets');
+      return raw ? (JSON.parse(raw) as unknown[]).length : 0;
+    } catch {
+      return 0;
+    }
+  });
 
   useEffect(() => {
     (async () => {
@@ -220,28 +230,36 @@ export default function Profile() {
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <Header />
 
-      <div className="mx-auto w-full max-w-2xl flex-1 px-8 py-8">
+      <div className="mx-auto w-full max-w-6xl flex-1 px-8 py-8">
         {actionStatus && (
-          <div className="mb-4 rounded-md border border-[#a6e3a1]/40 bg-[#a6e3a1]/10 px-3 py-2 text-[13px] text-[#a6e3a1]">
+          <div className="mb-4 rounded-md border border-[#a6e3a1]/40 bg-[#a6e3a1]/10 px-3 py-2 text-[14pt] text-[#a6e3a1]">
             {actionStatus}
           </div>
         )}
         {actionError && (
-          <div className="mb-4 rounded-md border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-[13px] text-[#f87171]">
+          <div className="mb-4 rounded-md border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-[14pt] text-[#f87171]">
             {actionError}
           </div>
         )}
 
-        {/* Account */}
-        <Section title="Account">
+        {/*
+          Bento grid — 6-column base so cards can take 2, 3, 4, or 6
+          of them. Account (compact) sits next to Profile Details
+          (tall), Preferences next to Gallery submissions, Feedback
+          next to Danger Zone, etc. Collapses to a single column on
+          mobile.
+        */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-6">
+        {/* Account — compact 2-col */}
+        <Section title="Account" span={2}>
           <Row label="Email" value={email ?? 'Not linked'} />
           <Row label="Member since" value={createdAt} />
           <Row label="Posters" value={String(posterCount)} />
         </Section>
 
-        {/* Link Account / Sign Up */}
+        {/* Link Account / Sign Up — full row when anonymous */}
         {isAnonymous && (
-          <Section title="Create an Account">
+          <Section title="Create an Account" span={6}>
             <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
               You're using a guest account. Sign up to preserve your posters across devices
               and prevent data loss if your browser clears storage. All your current work
@@ -273,9 +291,9 @@ export default function Profile() {
           </Section>
         )}
 
-        {/* Profile Details */}
-        <Section title="Profile Details">
-          <p className="mb-3 text-[13px] text-[#6b7280]">
+        {/* Profile Details — 4-col wide to give the form breathing room */}
+        <Section title="Profile Details" span={4}>
+          <p className="mb-3 text-[14pt] text-[#6b7280] leading-relaxed">
             Optional — helps identify your posters and auto-fill author info.
           </p>
           <ProfileFields user={user} onStatusMessage={(msg) => {
@@ -284,26 +302,38 @@ export default function Profile() {
           }} />
         </Section>
 
-        {/* Preferences */}
-        <Section title="Preferences">
-          <div className="flex items-center justify-between py-2">
-            <div>
-              <div className="text-sm text-[#c8cad0]">Saved style presets</div>
-              <div className="text-[13px] text-[#6b7280]">
-                {(() => {
-                  try {
-                    const raw = localStorage.getItem('postr.style-presets');
-                    const n = raw ? (JSON.parse(raw) as unknown[]).length : 0;
-                    return `${n} preset(s) saved locally`;
-                  } catch {
-                    return '0 presets';
-                  }
-                })()}
+        {/* Preferences — 3-col */}
+        <Section title="Preferences" span={3}>
+          <div className="flex items-start justify-between py-2 gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="text-[14pt] text-[#c8cad0]">🎨 Saved style presets</div>
+              <div className="mt-1 text-[14pt] text-[#6b7280]">
+                {presetCount} preset{presetCount === 1 ? '' : 's'} saved locally.
+              </div>
+              <div className="mt-1 text-[12pt] text-[#555]">
+                Create new presets from the <strong className="text-[#9ca3af]">Style tab</strong> inside the editor — use the "Save as style preset" row to name your font + palette + typography combo.
               </div>
             </div>
-            <button onClick={clearPresets} className={btnSecondary}>
-              Clear presets
-            </button>
+            <div className="flex shrink-0 flex-col gap-2">
+              <button
+                onClick={() => setPresetModalOpen(true)}
+                className={btnSecondary}
+                disabled={presetCount === 0}
+                title={presetCount === 0 ? 'Save a preset from the editor first' : 'Rename or delete presets'}
+              >
+                Manage
+              </button>
+              <button
+                onClick={() => {
+                  clearPresets();
+                  setPresetCount(0);
+                }}
+                className={btnDanger}
+                disabled={presetCount === 0}
+              >
+                Clear all
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-between py-2 border-t border-[#1f1f2e]">
             <div>
@@ -368,8 +398,8 @@ export default function Profile() {
           </div>
         </Section>
 
-        {/* Gallery submissions */}
-        <Section title="Gallery submissions">
+        {/* Gallery submissions — full-width when there are entries */}
+        <Section title="Gallery submissions" span={6}>
           <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
             Posters you have published to the{' '}
             <Link to="/gallery" className="text-[#7c6aed] underline">
@@ -405,8 +435,8 @@ export default function Profile() {
           )}
         </Section>
 
-        {/* Feedback */}
-        <Section title="Feedback">
+        {/* Feedback — 3-col */}
+        <Section title="Feedback" span={3}>
           <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
             Found a bug? Have an idea? Send it in — everything lands in the developer's
             queue and shapes what ships next.
@@ -437,8 +467,8 @@ export default function Profile() {
           )}
         </Section>
 
-        {/* Danger Zone */}
-        <Section title="Danger Zone" danger>
+        {/* Danger Zone — 3-col, sits next to Feedback */}
+        <Section title="Danger Zone" danger span={3}>
           <div className="space-y-4">
             <DangerAction
               title="Delete all posters"
@@ -456,7 +486,14 @@ export default function Profile() {
             />
           </div>
         </Section>
+        </div>
       </div>
+
+      <PresetEditModal
+        open={presetModalOpen}
+        onClose={() => setPresetModalOpen(false)}
+        onChange={setPresetCount}
+      />
 
       <ConfirmModal
         open={confirmAction !== null}
@@ -641,17 +678,47 @@ function Header() {
   );
 }
 
-function Section({ title, children, danger }: { title: string; children: React.ReactNode; danger?: boolean }) {
+function Section({
+  title,
+  children,
+  danger,
+  span = 2,
+}: {
+  title: string;
+  children: React.ReactNode;
+  danger?: boolean;
+  /**
+   * How many of the 6 bento grid columns this card spans on medium+
+   * screens. Default 2 = half a row alongside another 2-wide card.
+   * Use 3 for wider cards (Profile Details, Gallery), 6 for full-width
+   * (Danger Zone, Sign-up banner).
+   */
+  span?: 2 | 3 | 4 | 6;
+}) {
+  // Tailwind purges classes it doesn't see literally in source, so
+  // enumerate the spans explicitly instead of templating them.
+  const spanClass =
+    span === 6
+      ? 'md:col-span-6'
+      : span === 4
+        ? 'md:col-span-4'
+        : span === 3
+          ? 'md:col-span-3'
+          : 'md:col-span-2';
   return (
-    <section className="mb-8">
+    <section className={`flex flex-col ${spanClass}`}>
       <h2
-        className={`mb-4 text-[13px] font-semibold uppercase tracking-widest ${
+        className={`mb-3 text-[12pt] font-semibold uppercase tracking-widest ${
           danger ? 'text-[#f87171]' : 'text-[#6b7280]'
         }`}
       >
         {title}
       </h2>
-      <div className={`rounded-lg border ${danger ? 'border-[#f87171]/30' : 'border-[#1f1f2e]'} bg-[#111118] p-4`}>
+      <div
+        className={`flex-1 rounded-xl border ${
+          danger ? 'border-[#f87171]/30' : 'border-[#1f1f2e]'
+        } bg-[#111118] p-5`}
+      >
         {children}
       </div>
     </section>

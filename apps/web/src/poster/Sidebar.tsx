@@ -308,15 +308,24 @@ export function Sidebar(props: SidebarProps) {
           </svg>
         </button>
       )}
-      {/* Prominent "back to dashboard" button — the logo below also
-          links to /dashboard but users don't reliably recognize a logo
-          as a back affordance. This button makes the exit path
-          unambiguous. */}
+      <a href="/dashboard" style={{ padding: '24px 24px 0', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', cursor: 'pointer' }}>
+        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+          <rect width="64" height="64" rx="12" fill="#7c6aed" />
+          <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
+          <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
+          <circle cx="32" cy="32" r="5" fill="white" />
+        </svg>
+        <div style={{ fontWeight: 800, fontSize: 20, color: '#fff' }}>Postr</div>
+      </a>
+      {/* Prominent "back to dashboard" button below the logo — the
+          logo itself also links to /dashboard but users don't reliably
+          recognize a logo as a back affordance, so this explicit pill
+          makes the exit path unambiguous. */}
       <a
         href="/dashboard"
         title="Back to My Posters"
         style={{
-          margin: '16px 24px 0',
+          margin: '10px 24px 0',
           padding: '8px 12px',
           display: 'inline-flex',
           alignItems: 'center',
@@ -345,15 +354,6 @@ export function Sidebar(props: SidebarProps) {
           <path d="M12 19l-7-7 7-7" />
         </svg>
         Back to My Posters
-      </a>
-      <a href="/dashboard" style={{ padding: '16px 24px 0', display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none', cursor: 'pointer' }}>
-        <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
-          <rect width="64" height="64" rx="12" fill="#7c6aed" />
-          <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
-          <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
-          <circle cx="32" cy="32" r="5" fill="white" />
-        </svg>
-        <div style={{ fontWeight: 800, fontSize: 20, color: '#fff' }}>Postr</div>
       </a>
 
       {/* Body: vertical tab rail on the left + panel content on the right */}
@@ -1250,12 +1250,15 @@ function StyleTab(props: {
       <div style={labelStyle}>Headings</div>
       <HeadingEditor headingStyle={props.headingStyle} onChange={props.onChangeHeadingStyle} />
 
-      <div style={labelStyle}>Presets</div>
+      <div style={labelStyle}>🎨 Save as style preset</div>
+      <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.55, marginBottom: 8 }}>
+        Name your current font + palette + typography combo to reuse it on your next poster. Manage saved presets from your <strong style={{ color: '#9ca3af' }}>Profile → Preferences</strong>.
+      </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input
           value={props.presetName}
           onChange={(e) => props.setPresetName(e.target.value)}
-          placeholder="Preset name"
+          placeholder="e.g. Kenji Lab Green"
           style={{ ...inputBase, flex: 1, padding: '12px 14px', fontSize: 14 }}
         />
         <button
@@ -1268,7 +1271,7 @@ function StyleTab(props: {
           }}
           style={{ ...buttonStyle(true), width: 'auto', padding: '12px 18px', fontSize: 14 }}
         >
-          Save
+          💾 Save
         </button>
       </div>
       {props.savedPresets.length > 0 && (
