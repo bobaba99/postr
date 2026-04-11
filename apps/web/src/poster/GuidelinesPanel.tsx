@@ -449,7 +449,11 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
     saveCustomTemplates(next);
   };
 
-  if (!open) return null;
+  // `open` is handled by the parent PosterEditor via an outer
+  // width-animating wrapper now, so we don't early-return here —
+  // staying mounted lets the width transition play on close without
+  // the content popping out underneath the shrinking wrapper.
+  void open;
 
   return (
     <div data-postr-guidelines style={panelStyle}>
@@ -1064,11 +1068,15 @@ function SectionDropdown({ title, open, onToggle, children }: {
             {title}
           </div>
         </div>
-        <span style={{ fontSize: 16, color: '#6b7280', transition: 'transform 0.15s', transform: open ? 'rotate(90deg)' : 'none' }}>
+        <span style={{ fontSize: 16, color: '#6b7280', transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)', transform: open ? 'rotate(90deg)' : 'none' }}>
           ▸
         </span>
       </button>
-      {open && children}
+      {open && (
+        <div className="postr-dropdown-enter">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

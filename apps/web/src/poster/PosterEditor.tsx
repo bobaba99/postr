@@ -1290,7 +1290,20 @@ export function PosterEditor() {
         overflow: 'hidden',
       }}
     >
-      {sidebarOpen && (
+      {/* Animated sidebar wrapper — the inner Sidebar stays mounted
+          always so collapse/expand can fade+slide via width transition
+          rather than popping. `overflow: hidden` clips the 484-wide
+          Sidebar while the wrapper is animating to width 0. */}
+      <div
+        style={{
+          flex: '0 0 auto',
+          width: sidebarOpen ? 484 : 0,
+          minWidth: sidebarOpen ? 484 : 0,
+          overflow: 'hidden',
+          transition:
+            'width 280ms cubic-bezier(0.22, 1, 0.36, 1), min-width 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+        }}
+      >
         <Sidebar
           onToggleSidebar={() => setSidebarOpen(false)}
         posterTitle={posterDisplayName}
@@ -1353,7 +1366,7 @@ export function PosterEditor() {
         checkFigureWidthIn={checkFigureRect.w / PX}
         checkFigureHeightIn={checkFigureRect.h / PX}
       />
-      )}
+      </div>
 
       {/* Palette Designer — create or edit a custom palette */}
       <PaletteDesigner
@@ -1451,6 +1464,11 @@ export function PosterEditor() {
               boxShadow: '0 4px 40px rgba(0,0,0,.5)',
               borderRadius: 3,
               overflow: 'hidden',
+              // Smooth the canvas frame's width/height changes when
+              // zoom ticks up or down so the drop shadow glides
+              // instead of snapping between sizes.
+              transition:
+                'width 220ms cubic-bezier(0.22, 1, 0.36, 1), height 220ms cubic-bezier(0.22, 1, 0.36, 1)',
             }}
           >
             <div
@@ -1462,6 +1480,10 @@ export function PosterEditor() {
                 transformOrigin: 'top left',
                 background: doc.palette.bg,
                 position: 'relative',
+                // Match the frame's easing so the inner transform
+                // stays in sync with the outer size change.
+                transition:
+                  'transform 220ms cubic-bezier(0.22, 1, 0.36, 1)',
               }}
             >
               {showGrid && (
@@ -1761,7 +1783,22 @@ export function PosterEditor() {
         />
       </div>
 
-      <GuidelinesPanel open={guidelinesOpen} onToggle={() => setGuidelinesOpen((v) => !v)} />
+      {/* Animated guidelines wrapper — mirrors the Sidebar pattern so
+          the right-side panel collapses with the same width transition
+          instead of unmounting abruptly. The inner GuidelinesPanel no
+          longer early-returns on !open. */}
+      <div
+        style={{
+          flex: '0 0 auto',
+          width: guidelinesOpen ? 320 : 0,
+          minWidth: guidelinesOpen ? 320 : 0,
+          overflow: 'hidden',
+          transition:
+            'width 280ms cubic-bezier(0.22, 1, 0.36, 1), min-width 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+        }}
+      >
+        <GuidelinesPanel open={guidelinesOpen} onToggle={() => setGuidelinesOpen((v) => !v)} />
+      </div>
 
       {/* Show guidelines toggle when panel is closed.
           Positioned bottom-right instead of top-right so it doesn't
@@ -1952,6 +1989,7 @@ function FigureSizeOverlay({
   return (
     <div
       data-postr-figure-size-overlay
+      className="postr-overlay-enter"
       onPointerDown={(e) => startDrag(e, 'move')}
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}

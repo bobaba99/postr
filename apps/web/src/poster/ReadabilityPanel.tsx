@@ -495,20 +495,43 @@ export function ReadabilityPanel({
   return (
     <div style={panelStyle}>
       <div style={labelStyle}>Code Readability Check</div>
-      <p style={{ color: '#6b7280', fontSize: 13, lineHeight: 1.5, margin: 0 }}>
+      <p
+        style={{
+          color: '#6b7280',
+          fontSize: 13,
+          lineHeight: 1.9,
+          margin: 0,
+        }}
+      >
         Paste your R or Python plotting code, then click <b>Check</b> to see
-        if figure text will be readable at poster print size.
+        if figure text will be readable at poster print size.{' '}
         {isImage ? (
           <>
-            {' '}Using selected image block (<b>{blockWidthIn.toFixed(1)}" ×{' '}
-            {blockHeightIn.toFixed(1)}"</b>).
+            Using selected image block{' '}
+            <span
+              // The animated pill — index.css ships the keyframes +
+              // base styling. We re-key it on the current dimensions
+              // so the browser restarts the animation whenever the
+              // user drags/resizes the figure overlay or picks a
+              // different image, drawing the eye to the fresh value.
+              key={`${blockWidthIn.toFixed(1)}-${blockHeightIn.toFixed(1)}`}
+              className="postr-dimension-pill"
+            >
+              {blockWidthIn.toFixed(1)}&quot; × {blockHeightIn.toFixed(1)}&quot;
+            </span>
+            .
           </>
         ) : (
           <>
-            {' '}Sizing against the gray <b>figure preview</b> on the canvas
-            (<b>{blockWidthIn.toFixed(1)}" × {blockHeightIn.toFixed(1)}"</b>) —
-            drag or resize it to match your real figure, or click an existing
-            image block to use its exact dimensions.
+            Sizing against the gray <b>figure preview</b> on the canvas{' '}
+            <span
+              key={`${blockWidthIn.toFixed(1)}-${blockHeightIn.toFixed(1)}`}
+              className="postr-dimension-pill"
+            >
+              {blockWidthIn.toFixed(1)}&quot; × {blockHeightIn.toFixed(1)}&quot;
+            </span>
+            {' '}— drag or resize it to match your real figure, or click an
+            existing image block to use its exact dimensions.
           </>
         )}
       </p>

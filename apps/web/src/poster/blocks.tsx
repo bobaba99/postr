@@ -1342,6 +1342,12 @@ export function BlockFrame(props: BlockFrameProps) {
             ? `1.5px solid ${p.accent}88`
             : '1px solid transparent',
         borderRadius: 2,
+        // Smooth the selection ring so clicking a block fades the
+        // border in over ~140ms instead of snapping. Scoped to
+        // border-color + box-shadow only — transitioning transform
+        // would interfere with rotation/drag.
+        transition:
+          'border-color 140ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 140ms cubic-bezier(0.22, 1, 0.36, 1)',
         // Image + logo blocks get `default` cursor because drag is
         // only available from the move handle. Tables also use
         // default because they have their own inner interactions.

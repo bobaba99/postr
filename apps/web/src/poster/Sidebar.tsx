@@ -266,16 +266,25 @@ export function Sidebar(props: SidebarProps) {
   const tabStyle = (active: boolean): CSSProperties => ({
     all: 'unset',
     boxSizing: 'border-box',
-    display: 'block',
+    display: '-webkit-box',
+    // Allow labels up to two lines — "plot code check" and "edit
+    // block" wrap cleanly at ~1 word per line. Anything longer is
+    // clipped with an ellipsis so the rail stays a predictable
+    // height per row. Everything else uses `width: 100%` of the
+    // 120 px rail so short labels still left-align.
+    WebkitBoxOrient: 'vertical' as const,
+    WebkitLineClamp: 2,
+    overflow: 'hidden',
     width: '100%',
-    padding: '14px 16px',
+    padding: '12px 14px',
     textAlign: 'left',
     cursor: 'pointer',
     fontFamily: 'inherit',
     fontWeight: 600,
-    fontSize: 13,
+    fontSize: 12,
+    lineHeight: 1.25,
     textTransform: 'uppercase',
-    letterSpacing: '0.7px',
+    letterSpacing: '0.6px',
     userSelect: 'none',
     outline: 'none',
     color: active ? '#ffffff' : '#6b7280',
@@ -287,11 +296,14 @@ export function Sidebar(props: SidebarProps) {
     <div
       data-postr-sidebar
       style={{
-        // Wider sidebar — 460 px total (100 px rail + 360 px panel) —
-        // so inputs, table editors, and the SmartTextarea have room
-        // without the tab rail compressing everything on the right.
-        width: 460,
-        minWidth: 460,
+        // Wider sidebar — 484 px total (124 px rail + 360 px panel).
+        // Rail was widened on 2026-04-11 so renamed tabs like "plot
+        // code check" and "edit block" can wrap to max two lines
+        // instead of getting clipped. Panel content width stays 360
+        // so SmartTextarea / TableEditor / RichTextEditor layouts
+        // don't need to reflow.
+        width: 484,
+        minWidth: 484,
         background: '#111118',
         color: '#c8cad0',
         display: 'flex',
@@ -421,15 +433,34 @@ export function Sidebar(props: SidebarProps) {
         <nav
           aria-label="Sidebar sections"
           style={{
-            width: 100,
-            minWidth: 100,
+            // Widened from 100 → 124 px so "plot code check" wraps
+            // to 2 lines ("plot code" / "check") without clipping,
+            // and "edit block" + "references" fit on a single line.
+            width: 124,
+            minWidth: 124,
             display: 'flex',
             flexDirection: 'column',
             borderRight: '1px solid #1e1e2e',
             paddingTop: 4,
           }}
         >
-          {(['layout', 'insert', 'edit', 'style', 'authors', 'refs', 'check', 'export'] as SidebarTab[]).map((t) => (
+          {/* Tab ORDER and DISPLAY LABELS — explicit per user request.
+            * Internal keys (edit / refs / check) are preserved so nothing
+            * downstream breaks; only the top-to-bottom order and the
+            * visible label change. `insert` is grouped with `edit` since
+            * both are block-focused operations. */}
+          {(
+            [
+              ['layout', 'layout'],
+              ['style', 'style'],
+              ['authors', 'authors'],
+              ['insert', 'insert'],
+              ['edit', 'edit block'],
+              ['refs', 'references'],
+              ['check', 'plot code check'],
+              ['export', 'export'],
+            ] as Array<[SidebarTab, string]>
+          ).map(([t, label]) => (
             <button
               key={t}
               data-postr-tab
@@ -437,13 +468,18 @@ export function Sidebar(props: SidebarProps) {
               onClick={() => setTab(t)}
               style={tabStyle(tab === t)}
             >
-              {t}
+              {label}
             </button>
           ))}
         </nav>
 
-        {/* Panel content */}
+        {/* Panel content — keyed on `tab` so every switch re-triggers
+          * the fade-slide enter animation defined in index.css. The
+          * nested wrapper decouples the animation from the scroll
+          * container's own layout so scroll position survives switches
+          * without re-animating. */}
         <div style={{ flex: 1, overflow: 'auto', padding: '4px 20px 24px', minWidth: 0 }}>
+        <div key={tab} className="postr-tab-enter">
         {tab === 'layout' && (
           <LayoutTab
             posterTitle={props.posterTitle}
@@ -544,6 +580,7 @@ export function Sidebar(props: SidebarProps) {
             onPublish={props.onPublish}
           />
         )}
+        </div>
         </div>
       </div>
     </div>
