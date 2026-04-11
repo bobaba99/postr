@@ -1280,7 +1280,15 @@ export function BlockFrame(props: BlockFrameProps) {
           b.type === 'table' || b.type === 'image' || b.type === 'logo'
             ? 'default'
             : 'move',
-        padding: ['table', 'image', 'logo'].includes(b.type) ? 0 : '4px 6px',
+        // Frame has no padding — handles positioned with `top: -26`
+        // are measured from the padding box edge, which means any
+        // padding on the frame would push the handles visually
+        // farther from the block content depending on block type.
+        // Moving padding to the INNER content div keeps the frame's
+        // padding box === border box, so handle positions are
+        // consistent across image/logo/table (which had padding 0)
+        // and text/title/heading/references (which had padding 4 6).
+        padding: 0,
         boxSizing: 'border-box',
         overflow: 'visible',
         // Apply user-defined rotation around the block's center.
@@ -1300,6 +1308,15 @@ export function BlockFrame(props: BlockFrameProps) {
           // visible so the user sees everything they typed. Image /
           // table / references still clip since they're constrained.
           overflow: isHeading || growsWithContent ? 'visible' : 'hidden',
+          // Padding moved here from the outer frame so the frame's
+          // padding box stays flush with its border box — that keeps
+          // external handle positions (top: -26) visually consistent
+          // across all block types. Image / logo / table keep
+          // padding: 0 because they manage their own inner layout.
+          padding: ['image', 'logo', 'table'].includes(b.type)
+            ? 0
+            : '4px 6px',
+          boxSizing: 'border-box',
         }}
       >
         {b.type === 'title' && (
@@ -1445,13 +1462,10 @@ export function BlockFrame(props: BlockFrameProps) {
               background: p.accent,
               color: '#fff',
               border: '2px solid #0a0a12',
-              fontSize: 11,
-              lineHeight: 1,
               cursor: 'move',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: 700,
               zIndex: 10,
               boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
               padding: 0,
@@ -1462,7 +1476,31 @@ export function BlockFrame(props: BlockFrameProps) {
             }}
             title="Drag to move (or use arrow keys)"
           >
-            ✥
+            {/*
+              4-way move icon — thin stroke SVG instead of the old
+              Unicode ✥ character, which rendered as a heavy
+              decorative glyph that was hard to read at 20×20. SVG
+              gives consistent cross-platform rendering at exactly
+              the stroke width we want.
+            */}
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <polyline points="5 9 2 12 5 15" />
+              <polyline points="9 5 12 2 15 5" />
+              <polyline points="15 19 12 22 9 19" />
+              <polyline points="19 9 22 12 19 15" />
+              <line x1="2" y1="12" x2="22" y2="12" />
+              <line x1="12" y1="2" x2="12" y2="22" />
+            </svg>
           </button>
 
           {/*
@@ -1510,23 +1548,39 @@ export function BlockFrame(props: BlockFrameProps) {
               background: '#1a1a26',
               color: '#c8b6ff',
               border: `2px solid ${p.accent}`,
-              fontSize: 13,
-              lineHeight: 1,
               cursor: 'grab',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: 700,
               zIndex: 10,
               boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
               padding: 0,
-              // Counter-rotate so the ↻ icon stays upright even
-              // when the block is rotated.
+              // Counter-rotate so the icon stays upright even when
+              // the block is rotated.
               transform: b.rotation ? `rotate(${-b.rotation}deg)` : undefined,
             }}
             title="Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)"
           >
-            ↻
+            {/*
+              Clockwise rotation icon — thin stroke SVG instead of
+              the old Unicode ↻ character which rendered as a heavy
+              decorative glyph. SVG gives us a clean 270° arc with
+              a single arrowhead, readable at 20×20.
+            */}
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M21 12a9 9 0 1 1-9-9" />
+              <polyline points="21 3 21 9 15 9" />
+            </svg>
           </button>
 
           <button

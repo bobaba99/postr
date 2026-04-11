@@ -633,6 +633,15 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
               </div>
             </SectionDropdown>
 
+            {/* Shortcuts & Manipulations — block-level interactions */}
+            <SectionDropdown
+              title="Shortcuts & Manipulations"
+              open={openSections.has('shortcuts')}
+              onToggle={() => toggleSection('shortcuts')}
+            >
+              <ShortcutsPanel />
+            </SectionDropdown>
+
             {/* General Resources */}
             <SectionDropdown
               title={`General Resources (${GENERAL_RESOURCES.length})`}
@@ -739,6 +748,297 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * ShortcutsPanel — compact cheatsheet for block manipulation.
+ *
+ * Lives inside the right-side guidelines panel as a collapsible
+ * section. Covers four areas the user most commonly forgets:
+ *
+ *   1. Selecting a block (the prerequisite for everything else)
+ *   2. External handles that appear when selected (move / rotate /
+ *      delete) — introduced 2026-04-11 to fix the image-drag bug
+ *   3. Keyboard shortcuts (arrow-key nudge, delete, grid snapping)
+ *   4. Modifier tricks (Shift + arrow = fine, Shift + rotate =
+ *      hard 15° steps, magnetic snap at common angles)
+ *
+ * Stays in sync with the implementation in blocks.tsx /
+ * PosterEditor.tsx — update both when shortcuts change.
+ */
+function ShortcutsPanel() {
+  return (
+    <div style={{ padding: '10px 16px 14px', fontSize: 13, color: '#c8cad0', lineHeight: 1.55 }}>
+      <ShortcutGroup title="Select a block">
+        <ShortcutRow label="Click a block on the canvas">
+          Shows the selection frame, external handles, and the Edit tab in the sidebar.
+        </ShortcutRow>
+        <ShortcutRow label="Click an empty area">
+          Deselects. Arrow keys and Delete only fire while a block is selected.
+        </ShortcutRow>
+      </ShortcutGroup>
+
+      <ShortcutGroup title="External handles (appear when selected)">
+        <ShortcutRow label={<KeyBadge icon="move" />} inline>
+          <strong style={{ color: '#c8b6ff' }}>Move</strong> — top-left, purple.
+          Drag to reposition. Required for image and logo blocks (the
+          browser's native image-drag otherwise hijacks the pointer).
+        </ShortcutRow>
+        <ShortcutRow label={<KeyBadge icon="rotate" />} inline>
+          <strong style={{ color: '#c8b6ff' }}>Rotate</strong> — bottom-center, connected by a stem.
+          Drag in a circle around the block.
+        </ShortcutRow>
+        <ShortcutRow label={<KeyBadge icon="delete" danger />} inline>
+          <strong style={{ color: '#f87171' }}>Delete</strong> — top-right, red. One click removes the block.
+        </ShortcutRow>
+        <ShortcutRow label={<KeyBadge icon="resize" />} inline>
+          <strong>Resize</strong> — bottom-right corner of the frame. Drag to resize.
+          When a block is rotated, resize still follows the block's local "right/down" direction.
+        </ShortcutRow>
+      </ShortcutGroup>
+
+      <ShortcutGroup title="Keyboard">
+        <ShortcutRow label={<KeyCombo keys={['↑', '↓', '←', '→']} />} inline>
+          Nudge by <strong>1/2 inch</strong> (one grid cell) — default respects the grid.
+        </ShortcutRow>
+        <ShortcutRow label={<KeyCombo keys={['Shift', '↑↓←→']} />} inline>
+          Nudge by <strong>1/10 inch</strong> — fine sub-grid adjustment.
+        </ShortcutRow>
+        <ShortcutRow label={<KeyCombo keys={['Delete']} />} inline>
+          Delete the selected block. <KeyCombo keys={['Backspace']} /> works too.
+        </ShortcutRow>
+        <ShortcutRow label={<KeyCombo keys={['⌘', 'Z']} />} inline>
+          Undo. <KeyCombo keys={['⌘', 'Shift', 'Z']} /> or <KeyCombo keys={['⌘', 'Y']} /> to redo.
+        </ShortcutRow>
+        <ShortcutRow label={<KeyCombo keys={['⌘', '/']} />} inline>
+          Toggle the left sidebar (Notion-style).
+        </ShortcutRow>
+      </ShortcutGroup>
+
+      <ShortcutGroup title="Rotation tricks">
+        <ShortcutRow label={<KeyBadge>↻</KeyBadge>} inline>
+          Dragging the rotate handle <strong>magnetically snaps</strong> at 0° / 45° / 90° / 135° / 180°
+          with a 4° catch radius. Loose enough that intentional 43° rotations still work.
+        </ShortcutRow>
+        <ShortcutRow label={<KeyCombo keys={['Shift']} />} inline>
+          Hold while rotating → hard 15° steps instead of magnetic. Useful when you want every
+          rotation to land on a clean multiple.
+        </ShortcutRow>
+      </ShortcutGroup>
+
+      <ShortcutGroup title="Tables">
+        <ShortcutRow label={<KeyCombo keys={['Tab']} />} inline>
+          Move to the next cell. <KeyCombo keys={['Shift', 'Tab']} /> goes backward.
+        </ShortcutRow>
+        <ShortcutRow label="Paste TSV / CSV from Excel or Word" inline>
+          Tabs become columns, newlines become rows. The existing table auto-grows.
+        </ShortcutRow>
+        <ShortcutRow label="Right-click a cell" inline>
+          Custom context menu for insert / delete row + column, table border preset, clear range.
+        </ShortcutRow>
+      </ShortcutGroup>
+
+      <div
+        style={{
+          marginTop: 10,
+          padding: '8px 10px',
+          borderRadius: 6,
+          background: 'rgba(124, 106, 237, 0.08)',
+          border: '1px solid rgba(124, 106, 237, 0.25)',
+          fontSize: 12,
+          color: '#9ca3af',
+          lineHeight: 1.55,
+        }}
+      >
+        💡 <strong style={{ color: '#c8b6ff' }}>Tip:</strong> autosave runs continuously, so you can
+        experiment freely. The autosave pill in the top-right of the canvas shows when the latest
+        change landed on the server.
+      </div>
+    </div>
+  );
+}
+
+function ShortcutGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
+          color: '#6b7280',
+          marginBottom: 6,
+        }}
+      >
+        {title}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>{children}</div>
+    </div>
+  );
+}
+
+function ShortcutRow({
+  label,
+  children,
+  inline,
+}: {
+  label: React.ReactNode;
+  children: React.ReactNode;
+  inline?: boolean;
+}) {
+  if (inline) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div style={{ flexShrink: 0, minWidth: 56, display: 'flex', alignItems: 'center', gap: 4 }}>
+          {label}
+        </div>
+        <div style={{ flex: 1, fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>{children}</div>
+      </div>
+    );
+  }
+  return (
+    <div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#c8cad0', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>{children}</div>
+    </div>
+  );
+}
+
+type BadgeIcon = 'move' | 'rotate' | 'delete' | 'resize';
+
+function KeyBadge({
+  children,
+  danger,
+  icon,
+}: {
+  children?: React.ReactNode;
+  danger?: boolean;
+  /**
+   * Preset icon matching the on-canvas handle icons. When set,
+   * renders a thin-stroke SVG instead of whatever `children` would
+   * show. Keeps the cheatsheet visually identical to what the user
+   * sees on the canvas so the connection is obvious at a glance.
+   */
+  icon?: BadgeIcon;
+}) {
+  const backgroundByIcon: Record<BadgeIcon, string> = {
+    move: '#7c6aed',
+    rotate: '#1a1a26',
+    delete: '#d33',
+    resize: '#1a1a26',
+  };
+  const background = icon
+    ? backgroundByIcon[icon]
+    : danger
+      ? '#d33'
+      : '#7c6aed';
+  const borderColor =
+    icon === 'rotate' || icon === 'resize' ? '#7c6aed' : '#0a0a12';
+  const color =
+    icon === 'rotate' || icon === 'resize' ? '#c8b6ff' : '#fff';
+
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 22,
+        height: 22,
+        borderRadius: '50%',
+        background,
+        color,
+        fontSize: 12,
+        fontWeight: 700,
+        border: `1.5px solid ${borderColor}`,
+        flexShrink: 0,
+      }}
+    >
+      {icon ? <BadgeIconSvg icon={icon} /> : children}
+    </span>
+  );
+}
+
+function BadgeIconSvg({ icon }: { icon: BadgeIcon }) {
+  const common = {
+    width: 12,
+    height: 12,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.75,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+    'aria-hidden': true,
+  };
+  if (icon === 'move') {
+    return (
+      <svg {...common}>
+        <polyline points="5 9 2 12 5 15" />
+        <polyline points="9 5 12 2 15 5" />
+        <polyline points="15 19 12 22 9 19" />
+        <polyline points="19 9 22 12 19 15" />
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <line x1="12" y1="2" x2="12" y2="22" />
+      </svg>
+    );
+  }
+  if (icon === 'rotate') {
+    return (
+      <svg {...common}>
+        <path d="M21 12a9 9 0 1 1-9-9" />
+        <polyline points="21 3 21 9 15 9" />
+      </svg>
+    );
+  }
+  if (icon === 'delete') {
+    return (
+      <svg {...common} strokeWidth={2.25}>
+        <line x1="6" y1="6" x2="18" y2="18" />
+        <line x1="18" y1="6" x2="6" y2="18" />
+      </svg>
+    );
+  }
+  // resize
+  return (
+    <svg {...common}>
+      <line x1="4" y1="20" x2="20" y2="4" />
+      <polyline points="14 4 20 4 20 10" />
+      <polyline points="10 20 4 20 4 14" />
+    </svg>
+  );
+}
+
+function KeyCombo({ keys }: { keys: string[] }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+      {keys.map((k, i) => (
+        <span key={`${k}-${i}`} style={{ display: 'inline-flex', alignItems: 'center' }}>
+          {i > 0 && <span style={{ color: '#6b7280', fontSize: 10, margin: '0 2px' }}>+</span>}
+          <kbd
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: 18,
+              padding: '2px 6px',
+              fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#c8cad0',
+              background: '#1a1a26',
+              border: '1px solid #2a2a3a',
+              borderBottom: '2px solid #2a2a3a',
+              borderRadius: 4,
+            }}
+          >
+            {k}
+          </kbd>
+        </span>
+      ))}
+    </span>
   );
 }
 
