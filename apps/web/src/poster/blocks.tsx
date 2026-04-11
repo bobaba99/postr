@@ -14,6 +14,7 @@ import type {
   Author,
   Block,
   HeadingStyle,
+  ImageFit,
   Institution,
   Palette,
   Reference,
@@ -105,6 +106,26 @@ export function ImageBlock({ block, palette, onUpdate }: ImageBlockProps) {
     r.readAsDataURL(f);
   };
 
+  // Fit mode cycle: contain → cover → fill → contain. Labels use
+  // the FULL word instead of an abbreviation — the original
+  // one-letter "C/C/F" was ambiguous because contain + cover both
+  // start with C, and even the short "FIT/CROP/FILL" was flagged
+  // as confusing by the user. The tooltip carries the full
+  // explanation so tiny blocks that can't afford the label width
+  // can still show meaningful help on hover.
+  const FIT_LABEL: Record<ImageFit, string> = {
+    contain: 'Contain',
+    cover: 'Cover',
+    fill: 'Fill',
+  };
+  const FIT_HINT: Record<ImageFit, string> = {
+    contain:
+      'Contain — image scales to fit entirely inside the block (may leave blank strips if aspect ratios differ). Click to cycle to Cover.',
+    cover:
+      'Cover — image fills the block and overflow is cropped (no blank strips). Click to cycle to Fill.',
+    fill:
+      'Fill — image stretches to fill the block exactly (may distort aspect ratio). Click to cycle to Contain.',
+  };
   const toggleFit = () => {
     const current = block.imageFit ?? 'contain';
     const next = current === 'contain' ? 'cover' : current === 'cover' ? 'fill' : 'contain';
@@ -112,6 +133,7 @@ export function ImageBlock({ block, palette, onUpdate }: ImageBlockProps) {
   };
 
   if (block.imageSrc) {
+    const currentFit = block.imageFit ?? 'contain';
     return (
       <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
         {/*
@@ -137,7 +159,7 @@ export function ImageBlock({ block, palette, onUpdate }: ImageBlockProps) {
           style={{
             width: '100%',
             height: '100%',
-            objectFit: block.imageFit ?? 'contain',
+            objectFit: currentFit,
             userSelect: 'none',
             WebkitUserDrag: 'none',
             KhtmlUserDrag: 'none',
@@ -146,13 +168,34 @@ export function ImageBlock({ block, palette, onUpdate }: ImageBlockProps) {
           } as CSSProperties}
         />
         <div style={{ position: 'absolute', top: 2, right: 2, display: 'flex', gap: 2 }}>
-          <button onClick={toggleFit} style={iconBtn}>
-            {(block.imageFit ?? 'contain')[0]?.toUpperCase()}
+          <button
+            onClick={toggleFit}
+            title={FIT_HINT[currentFit]}
+            style={{
+              ...iconBtn,
+              width: 'auto',
+              minWidth: 32,
+              padding: '0 6px',
+              fontSize: 9,
+              fontWeight: 700,
+              letterSpacing: 0.4,
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+            }}
+          >
+            {FIT_LABEL[currentFit]}
           </button>
-          <button onClick={() => ref.current?.click()} style={iconBtn}>
+          <button
+            onClick={() => ref.current?.click()}
+            title="Replace image — choose a different file"
+            style={iconBtn}
+          >
             ↻
           </button>
-          <button onClick={() => onUpdate({ imageSrc: null })} style={{ ...iconBtn, background: 'rgba(180,30,30,.8)' }}>
+          <button
+            onClick={() => onUpdate({ imageSrc: null })}
+            title="Remove image"
+            style={{ ...iconBtn, background: 'rgba(180,30,30,.8)' }}
+          >
             ×
           </button>
         </div>
@@ -1556,58 +1599,32 @@ export function BlockFrame(props: BlockFrameProps) {
               width: 20,
               height: 20,
               borderRadius: '50%',
-              background: '#1a1a26',
-              color: '#c8b6ff',
-              // Black border matching move + delete for visual
-              // consistency across the handle row. Previous purple
-              // border made this button look like a different
-              // element class, flagged by user on 2026-04-11.
+              // Matches the image-block's inline "replace" button
+              // visual style (gray rgba background + Unicode ↻).
+              // User asked 2026-04-11 to reuse that exact visual
+              // so the rotate handle feels like a sibling of the
+              // image block's internal controls.
+              background: 'rgba(0, 0, 0, 0.6)',
+              color: '#fff',
               border: '2px solid #0a0a12',
               cursor: 'grab',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
+              fontSize: 14,
+              fontWeight: 700,
+              lineHeight: 1,
               zIndex: 10,
               boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
               padding: 0,
+              fontFamily: 'system-ui, -apple-system, sans-serif',
               // Counter-rotate so the icon stays upright even when
               // the block is rotated.
               transform: b.rotation ? `rotate(${-b.rotation}deg)` : undefined,
             }}
             title="Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)"
           >
-            {/*
-              Clockwise rotation icon — Feather's "rotate-cw" design.
-              The key property: the arc's endpoint (23, 10) is also
-              the corner of the arrowhead polyline, so the two paths
-              visually connect into a single continuous shape.
-              https://feathericons.com/?query=rotate
-
-              Visual centering: Feather's 24x24 viewBox isn't
-              content-centered — the arc spans ~3→21 and the
-              arrowhead extends to (23, 4), so the content centroid
-              is at roughly (13, 12) instead of (12, 12). Inside a
-              small 20x20 button this makes the icon look ~1 px
-              shifted right. The `<g transform="translate(-1, 0)">`
-              wrapper shifts the entire path one user-unit left,
-              putting the visual centroid back on (12, 12).
-            */}
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <g transform="translate(-1, 0)">
-                <polyline points="23 4 23 10 17 10" />
-                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
-              </g>
-            </svg>
+            ↻
           </button>
 
           <button
