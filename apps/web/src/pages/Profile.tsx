@@ -47,6 +47,8 @@ export default function Profile() {
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [exportingData, setExportingData] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const [myFeedback, setMyFeedback] = useState<FeedbackRow[]>([]);
   const openFeedback = useFeedbackStore((s) => s.open);
   const feedbackModalOpen = useFeedbackStore((s) => s.isOpen);
@@ -141,6 +143,45 @@ export default function Profile() {
     localStorage.removeItem('postr.style-presets');
     setActionStatus('Style presets cleared.');
     setTimeout(() => setActionStatus(null), 3000);
+  }, []);
+
+  const handleExportData = useCallback(async () => {
+    setExportError(null);
+    setExportingData(true);
+    try {
+      // `export_my_data` is a SECURITY DEFINER RPC that returns the
+      // calling user's full data blob. Supabase types don't know
+      // about it yet (the generated `Database` type lags migrations)
+      // so we use `as never` to bypass the name check — same
+      // pattern already used for `delete_own_account` below.
+      const { data, error } = await supabase.rpc('export_my_data' as never);
+      if (error) throw error;
+      // Prompt a download with the returned JSON. Using a Blob +
+      // object URL keeps the payload entirely client-side; nothing
+      // touches disk until the user confirms the browser dialog.
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: 'application/json',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      a.download = `postr-export-${ts}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setActionStatus('Data export downloaded.');
+      setTimeout(() => setActionStatus(null), 4000);
+    } catch (err) {
+      setExportError(
+        err instanceof Error
+          ? err.message
+          : 'Export failed. Please try again or contact support.',
+      );
+    } finally {
+      setExportingData(false);
+    }
   }, []);
 
   const handleConfirm = useCallback(async () => {
@@ -464,6 +505,35 @@ export default function Profile() {
               </div>
             </>
           )}
+        </Section>
+
+        {/* Data export — GDPR Art. 15 / 20 */}
+        <Section title="Your data">
+          <div className="space-y-3">
+            <p className="text-[14pt] text-[#6b7280]">
+              Download everything Postr has stored for your account as a
+              single JSON file — your posters (with full contents),
+              gallery submissions, feedback you've sent, and your
+              profile. Useful for backups, or to comply with GDPR Art.
+              15 / 20 right-of-access requests.
+            </p>
+            <button
+              type="button"
+              onClick={handleExportData}
+              disabled={exportingData}
+              className="rounded-md border border-[#2a2a3a] bg-[#111118] px-4 py-2 text-[14pt] font-medium text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exportingData ? 'Preparing…' : '↓ Download my data (JSON)'}
+            </button>
+            {exportError && (
+              <div
+                role="alert"
+                className="rounded-md border border-[#f87171] bg-[#7f1d1d33] p-3 text-[13pt] text-[#fecaca]"
+              >
+                {exportError}
+              </div>
+            )}
+          </div>
         </Section>
 
         {/* Danger Zone */}
