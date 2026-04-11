@@ -11,4 +11,4 @@ coverage
 .DS_Store
 # Playwright MCP session cache — transient, shouldn't be tracked.
 .playwright-mcp/
-ux-audit/
+ux-audit/supabase/.env
