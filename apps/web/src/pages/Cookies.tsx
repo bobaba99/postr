@@ -12,6 +12,7 @@
  * appear) the first time we add anything that requires opt-in.
  */
 import { Link } from 'react-router-dom';
+import { PublicFooter } from '@/components/PublicFooter';
 
 const LAST_UPDATED = 'April 10, 2026';
 const CONTACT_EMAIL = 'hello@postr.sh';
@@ -216,30 +217,6 @@ function Header() {
         </Link>
       </div>
     </header>
-  );
-}
-
-function PublicFooter() {
-  return (
-    <footer className="border-t border-[#1f1f2e] px-8 py-6 text-center text-sm text-[#555]">
-      <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2">
-        <Link to="/" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          Home
-        </Link>
-        <Link to="/about" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          About
-        </Link>
-        <Link to="/privacy" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          Privacy
-        </Link>
-        <Link to="/cookies" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          Cookies
-        </Link>
-        <Link to="/terms" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          Terms
-        </Link>
-      </div>
-    </footer>
   );
 }
 

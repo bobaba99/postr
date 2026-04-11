@@ -23,6 +23,7 @@ import { PasswordStrength, isPasswordValid } from '@/components/PasswordStrength
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { listMyFeedback, type FeedbackRow } from '@/data/feedback';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
+import { PublicFooter } from '@/components/PublicFooter';
 import {
   listMyGallery,
   retractGalleryEntry,
@@ -469,6 +470,8 @@ export default function Profile() {
         onConfirm={handleConfirm}
         onCancel={() => setConfirmAction(null)}
       />
+
+      <PublicFooter />
     </main>
   );
 }

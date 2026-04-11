@@ -22,6 +22,7 @@ import { PosterCard } from '@/components/PosterCard';
 import { NewPosterButton } from '@/components/NewPosterButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useFeedbackStore } from '@/stores/feedbackStore';
+import { PublicFooter } from '@/components/PublicFooter';
 
 type Status =
   | { kind: 'loading' }
@@ -107,7 +108,6 @@ export default function Home() {
           <h1 className="text-xl font-semibold tracking-tight">Postr</h1>
         </Link>
         <div className="flex items-center gap-4">
-          <NewPosterButton />
           <Link
             to="/gallery"
             className="hidden text-[12px] font-medium text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
@@ -150,9 +150,12 @@ export default function Home() {
           Postr is designed for desktop browsers. For the best editing experience, please use a laptop or desktop computer.
         </div>
 
-        <h2 className="mb-6 text-sm font-semibold uppercase tracking-widest text-[#6b7280]">
-          My posters
-        </h2>
+        <div className="mb-6 flex items-center justify-between gap-4">
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-[#6b7280]">
+            My posters
+          </h2>
+          <NewPosterButton />
+        </div>
 
         {actionError && (
           <div className="mb-4 rounded-md border border-[#f87171]/40 bg-[#f87171]/10 px-3 py-2 text-[13px] text-[#f87171]">
@@ -225,6 +228,8 @@ export default function Home() {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      <PublicFooter />
     </main>
   );
 }

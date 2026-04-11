@@ -7,6 +7,7 @@
  */
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { PublicFooter } from '@/components/PublicFooter';
 import { getGalleryEntry, labelForField, type GalleryEntryWithUrls } from '@/data/gallery';
 
 type Status =
@@ -190,29 +191,3 @@ function Header() {
   );
 }
 
-function PublicFooter() {
-  return (
-    <footer className="border-t border-[#1f1f2e] px-8 py-6 text-center text-sm text-[#555]">
-      <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2">
-        <Link to="/" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          Home
-        </Link>
-        <Link to="/about" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          About
-        </Link>
-        <Link to="/gallery" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          Gallery
-        </Link>
-        <Link to="/privacy" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          Privacy
-        </Link>
-        <Link to="/cookies" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          Cookies
-        </Link>
-        <Link to="/terms" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-          Terms
-        </Link>
-      </div>
-    </footer>
-  );
-}

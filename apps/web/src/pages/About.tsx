@@ -11,6 +11,7 @@
  */
 import { Link } from 'react-router-dom';
 import { useFeedbackStore } from '@/stores/feedbackStore';
+import { PublicFooter } from '@/components/PublicFooter';
 
 interface Milestone {
   id: string;
@@ -191,35 +192,7 @@ export default function About() {
         </div>
       </section>
 
-      <footer className="border-t border-[#1f1f2e] px-8 py-6 text-center text-sm text-[#555]">
-        <div className="mx-auto flex max-w-3xl flex-wrap items-center justify-center gap-x-6 gap-y-2">
-          <Link to="/" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-            Home
-          </Link>
-          <Link to="/about" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-            About
-          </Link>
-          <Link to="/privacy" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-            Privacy
-          </Link>
-          <Link to="/cookies" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-            Cookies
-          </Link>
-          <Link to="/terms" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-            Terms
-          </Link>
-          <Link to="/auth" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
-            Sign in
-          </Link>
-          <button
-            type="button"
-            onClick={() => openFeedback('other')}
-            className="cursor-pointer border-0 bg-transparent p-0 text-[#6b7280] hover:text-[#c8cad0]"
-          >
-            Feedback
-          </button>
-        </div>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }

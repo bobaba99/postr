@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { PasswordStrength, isPasswordValid } from '@/components/PasswordStrength';
+import { PublicFooter } from '@/components/PublicFooter';
 
 type Mode = 'signin' | 'signup';
 
@@ -120,7 +121,8 @@ export default function Auth() {
   }, []);
 
   return (
-    <main className="flex min-h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
+    <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
+      <div className="flex flex-1 items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center gap-3 mb-8 no-underline">
@@ -259,6 +261,9 @@ export default function Auth() {
           </div>
         </div>
       </div>
+      </div>
+
+      <PublicFooter />
     </main>
   );
 }
