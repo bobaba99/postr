@@ -705,6 +705,53 @@ PosterForge (root)
 14. **User-owned gallery collections**: Let signed-in users save gallery entries into personal collections they curate themselves — "My reference posters", "SfN 2026 favorites", etc. Store in `gallery_collections` (user_id, title, is_public) + `gallery_collection_items` (collection_id, entry_id, position, added_at). Collections can be private (default) or public for sharing. Visible entry points: a "Save to collection" button on each gallery entry and a "My collections" section on the Profile page. This turns the gallery from a passive showcase into an active research tool and creates durable user engagement beyond publishing.
 15. **Sticker insert**: Small decorative / informational overlay elements that sit on top of existing blocks without disrupting the 10-unit layout grid — arrows, callout bubbles, highlight rings, "New!" / "WIP" / "Draft" / method-icon stamps, QR code stickers, and author-uploaded custom sticker packs. Unlike regular blocks, stickers snap to arbitrary positions (no grid), have freeform rotation, live above the block stacking context, and are not counted in `auto-layout`. Storage: extend `Block` with a new `'sticker'` type or introduce a sibling `stickers: Sticker[]` array on `PosterDoc` (keeps block invariants cleaner). Built-in sticker library should cover: arrows (straight / curved / double-ended), callout bubbles (rectangle / cloud / thought), geometric highlights (circle / underline / brace), status stamps ("NEW", "WIP", "DRAFT", "v2"), QR code generator (poster URL / author profile / paper DOI), and Unicode emoji picker for quick annotation. Expose through the Insert tab as a "🏷️ Stickers" section. Free for all users at launch; user-uploaded custom sticker packs become a premium feature later.
 
+16. **Upload-to-editable reverse import (PDF / image)**: Drop an existing poster PDF or image onto the dashboard and have it land on the canvas as **editable blocks** — every text region becomes a `text` / `heading` / `title` block, every figure becomes an `image` block, each placed at its original coordinates. User clicks any block and starts editing immediately. Distinct from §16 "Poster Scan (AI Style Import)", which only extracts palette + fonts + heading treatment and saves a preset; this item reconstructs the full editable document.
+
+    **Ship in three tiers** so we capture the easy 80% first and defer the messy 20%:
+
+    **Tier 1 — "Upload as background layer" (1-2 dev days, ships with v1.1):**
+    New block type `'background-image'` that renders behind every other block, locked in place, non-resizable by default. User uploads a PDF (first page rasterized) or image, it becomes a full-bleed background, and the user drops editable text / sticker / QR blocks on top to overlay. Covers the "I already have a poster, I just want to annotate or republish it" use case without any reverse-engineering. Technically trivial: extend `Block` union, render it at z-index 0, add drop-zone in the Layout tab.
+
+    **Tier 2 — "PDF text extraction" (1-2 weeks, v1.2):**
+    Add `pdfjs-dist` to `apps/web` (~150 KB gzipped, tree-shakeable). On upload:
+    1. Render the first page to a canvas (for palette extraction via existing `paletteTools.extractPaletteFromImage`)
+    2. Extract all `TextItem`s with their `transform` arrays (x, y, scale, font-ref)
+    3. Cluster text runs into logical blocks using DBSCAN on (proximity + font size + font family)
+    4. Infer semantic roles from font size: largest cluster → `title`, next tier → `heading`, body tier → `text`
+    5. Extract embedded images via `page.getOperatorList()` → `OPS.paintImageXObject` → `commonObjs.get()`
+    6. Convert PDF user-space coordinates (72 dpi) to poster units (1 unit = 1/10 inch): `units = pt / 7.2`
+    7. Populate `PosterDoc.blocks` with synthesized blocks, show the user a preview modal with a "Looks right?" confirmation before committing
+
+    **Known limitations to disclose in the UI**:
+    - Tables become disconnected text cells, not `table` blocks (PDF has no table structure)
+    - Multi-column reading order may be wrong; user may need to re-order via Auto-Arrange
+    - Math equations become garbled (rendered as glyph runs, not LaTeX)
+    - Rotated text is placed with rotation dropped (v1.2 ships horizontal-only)
+    - Custom fonts fall back to the nearest curated match in `FONTS`
+    - Figure captions may merge with figures or split into separate blocks depending on spacing
+
+    **Tier 3 — "Image OCR reverse import" (3-4 weeks, v1.3 or v2):**
+    For PNG / JPG uploads (no PDF-side text streams available). Route through `/api/scan` on the Render API with a new prompt that asks Claude Sonnet 4.6 Vision to return **structured block data**, not just style metadata:
+
+    ```json
+    {
+      "blocks": [
+        { "type": "title", "text": "Neural correlates of...", "bbox": [x, y, w, h] },
+        { "type": "heading", "text": "Methods", "bbox": [...] },
+        { "type": "text", "text": "We recruited 42 participants...", "bbox": [...] }
+      ],
+      "palette": { ... },
+      "fontFamily": "Source Sans 3",
+      "confidence": 0.82
+    }
+    ```
+
+    Tool-use-based structured output ensures the response parses. Rate-limit and daily-cap the same way as §16 scan. Much less accurate than PDF path because OCR is inherently lossy — surface the `confidence` field to the user so they know to double-check.
+
+    **Why NOT pursue full pixel-perfect fidelity**: reverse-engineering a rendered poster back into vector primitives is a near-impossible problem. Even commercial tools fail on the edge cases (rotated text, embedded figure captions, gradients, shadows). Postr's "constraint as feature" philosophy cuts the other direction: users who upload a PDF/image are explicitly accepting that the result is a best-effort starting point, not a lossless round-trip. Ship the 80% and let users fix the remaining 20% with the normal editor tools.
+
+    **Entry point**: the dashboard's "+ New poster" button gets a chevron menu — "Blank", "From template", **"Import PDF / image…"**. The same upload flow is also accessible from the editor's Insert tab as "Replace with upload" for the current poster.
+
 ---
 
 ## Operational Conventions
