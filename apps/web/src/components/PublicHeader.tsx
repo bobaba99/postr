@@ -59,27 +59,31 @@ export function PublicHeader({ highlightGallery = false }: Props) {
 
   const signedIn = ready && user !== null;
 
-  // Normalized against the dashboard (Home.tsx) header so moving
-  // between public and auth-gated pages doesn't flicker font sizes.
-  // Brand: 20px semibold. Nav links: 12px medium. Action button: 12px.
+  // Minimum font size for nav chrome is 14pt, matching the design
+  // plan's readability minimum (docs/plans/2026-04-10-figure-
+  // readability-checker.md — "tick labels: min 14pt"). 14pt ≈ 18.67px
+  // in CSS. The brand wordmark is bigger (20px/semibold). Buttons and
+  // profile icon grow to stay visually balanced with the chunkier
+  // links. This header and the dashboard header (Home.tsx) use the
+  // same tokens so nav chrome never flickers between pages.
   return (
     <header className="flex items-center justify-between px-8 py-5">
       <Link to="/" className="flex items-center gap-3 no-underline">
-        <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
+        <svg width="36" height="36" viewBox="0 0 64 64" fill="none">
           <rect width="64" height="64" rx="12" fill="#7c6aed" />
           <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
           <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
           <circle cx="32" cy="32" r="5" fill="white" />
         </svg>
-        <span className="text-xl font-semibold tracking-tight text-[#c8cad0]">
+        <span className="text-[20pt] font-semibold tracking-tight text-[#c8cad0]">
           Postr
         </span>
       </Link>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-5">
         <Link
           to="/gallery"
-          className={`hidden text-[12px] font-medium no-underline sm:inline ${
+          className={`hidden text-[14pt] font-medium no-underline sm:inline ${
             highlightGallery
               ? 'text-[#7c6aed] hover:text-white'
               : 'text-[#6b7280] hover:text-[#c8cad0]'
@@ -89,7 +93,7 @@ export function PublicHeader({ highlightGallery = false }: Props) {
         </Link>
         <Link
           to="/about"
-          className="hidden text-[12px] font-medium text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+          className="hidden text-[14pt] font-medium text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
         >
           About
         </Link>
@@ -99,20 +103,20 @@ export function PublicHeader({ highlightGallery = false }: Props) {
             <button
               type="button"
               onClick={() => openFeedback('feature')}
-              className="hidden h-8 items-center gap-1.5 rounded-md border border-[#2a2a3a] bg-[#111118] px-3 text-[12px] font-medium text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] sm:flex"
+              className="hidden h-10 items-center gap-2 rounded-md border border-[#2a2a3a] bg-[#111118] px-4 text-[14pt] font-medium text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] sm:flex"
               title="Send feedback"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
               Feedback
             </button>
             <Link
               to="/profile"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-[#2a2a3a] text-[#6b7280] hover:border-[#7c6aed] hover:text-[#c8cad0]"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-[#2a2a3a] text-[#6b7280] hover:border-[#7c6aed] hover:text-[#c8cad0]"
               title="Profile & Settings"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
@@ -121,7 +125,7 @@ export function PublicHeader({ highlightGallery = false }: Props) {
         ) : (
           <Link
             to="/auth"
-            className="rounded-md border border-[#7c6aed] px-4 py-1.5 text-[12px] font-semibold text-[#7c6aed] no-underline hover:bg-[#7c6aed] hover:text-white transition-colors"
+            className="rounded-md border border-[#7c6aed] px-5 py-2 text-[14pt] font-semibold text-[#7c6aed] no-underline hover:bg-[#7c6aed] hover:text-white transition-colors"
           >
             Sign in
           </Link>
