@@ -21,6 +21,7 @@ import { Link } from 'react-router-dom';
 import { PosterCard } from '@/components/PosterCard';
 import { NewPosterButton } from '@/components/NewPosterButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { useFeedbackStore } from '@/stores/feedbackStore';
 
 type Status =
   | { kind: 'loading' }
@@ -31,6 +32,7 @@ export default function Home() {
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PosterRow | null>(null);
+  const openFeedback = useFeedbackStore((s) => s.open);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,6 +108,17 @@ export default function Home() {
         </Link>
         <div className="flex items-center gap-4">
           <NewPosterButton />
+          <button
+            type="button"
+            onClick={() => openFeedback('feature')}
+            className="hidden h-8 items-center gap-1.5 rounded-md border border-[#2a2a3a] bg-[#111118] px-3 text-[12px] font-medium text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] sm:flex"
+            title="Send feedback"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            Feedback
+          </button>
           <Link
             to="/profile"
             className="flex h-8 w-8 items-center justify-center rounded-full border border-[#2a2a3a] text-[#6b7280] hover:border-[#7c6aed] hover:text-[#c8cad0]"

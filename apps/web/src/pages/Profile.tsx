@@ -20,6 +20,8 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { resetOnboarding } from '@/components/OnboardingTour';
 import { getAllTemplates, saveCustomTemplates } from '@/poster/GuidelinesPanel';
 import { PasswordStrength, isPasswordValid } from '@/components/PasswordStrength';
+import { useFeedbackStore } from '@/stores/feedbackStore';
+import { listMyFeedback, type FeedbackRow } from '@/data/feedback';
 import type { User } from '@supabase/supabase-js';
 
 type ConfirmAction = 'deletePosters' | 'deleteAccount' | null;
@@ -32,6 +34,9 @@ export default function Profile() {
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [myFeedback, setMyFeedback] = useState<FeedbackRow[]>([]);
+  const openFeedback = useFeedbackStore((s) => s.open);
+  const feedbackModalOpen = useFeedbackStore((s) => s.isOpen);
 
   useEffect(() => {
     (async () => {
@@ -46,6 +51,24 @@ export default function Profile() {
       setLoading(false);
     })();
   }, []);
+
+  // Reload the user's feedback list whenever the modal closes, so a
+  // successful submission immediately appears in "Your submissions".
+  useEffect(() => {
+    if (feedbackModalOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await listMyFeedback();
+        if (!cancelled) setMyFeedback(rows);
+      } catch {
+        // Non-critical — leave the list as-is
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [feedbackModalOpen]);
 
   const isAnonymous = user?.is_anonymous ?? true;
   const email = user?.email ?? null;
@@ -295,6 +318,38 @@ export default function Profile() {
           </div>
         </Section>
 
+        {/* Feedback */}
+        <Section title="Feedback">
+          <p className="mb-4 text-[13px] text-[#6b7280] leading-relaxed">
+            Found a bug? Have an idea? Send it in — everything lands in the developer's
+            queue and shapes what ships next.
+          </p>
+          <div className="mb-4 flex gap-2">
+            <button onClick={() => openFeedback('bug')} className={btnSecondary}>
+              Report a bug
+            </button>
+            <button onClick={() => openFeedback('feature')} className={btnSecondary}>
+              Request a feature
+            </button>
+            <button onClick={() => openFeedback('other')} className={btnSecondary}>
+              Other
+            </button>
+          </div>
+
+          {myFeedback.length > 0 && (
+            <>
+              <div className="mb-2 mt-6 text-[12px] font-semibold uppercase tracking-widest text-[#6b7280]">
+                Your submissions
+              </div>
+              <div className="space-y-2">
+                {myFeedback.map((row) => (
+                  <FeedbackHistoryRow key={row.id} row={row} />
+                ))}
+              </div>
+            </>
+          )}
+        </Section>
+
         {/* Danger Zone */}
         <Section title="Danger Zone" danger>
           <div className="space-y-4">
@@ -335,6 +390,54 @@ export default function Profile() {
 }
 
 // ── Shared sub-components ──────────────────────────────────────────
+
+const FEEDBACK_STATUS_LABEL: Record<FeedbackRow['status'], string> = {
+  new: 'Received',
+  triaged: 'Triaged',
+  in_progress: 'In progress',
+  done: 'Shipped',
+  wontfix: 'Declined',
+};
+
+const FEEDBACK_STATUS_COLOR: Record<FeedbackRow['status'], string> = {
+  new: '#6b7280',
+  triaged: '#7c6aed',
+  in_progress: '#f59e0b',
+  done: '#a6e3a1',
+  wontfix: '#6b7280',
+};
+
+function FeedbackHistoryRow({ row }: { row: FeedbackRow }) {
+  const date = new Date(row.created_at).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+  const kindLabel = row.kind === 'bug' ? 'Bug' : row.kind === 'feature' ? 'Feature' : 'Other';
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-md border border-[#1f1f2e] bg-[#0a0a12] px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-[#1a1a26] px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-[#7c6aed]">
+            {kindLabel}
+          </span>
+          <span className="truncate text-[13px] font-medium text-[#c8cad0]">{row.title}</span>
+        </div>
+        <div className="mt-0.5 text-[11px] text-[#6b7280]">{date}</div>
+      </div>
+      <span
+        className="shrink-0 rounded px-2 py-0.5 text-[11px] font-medium"
+        style={{
+          color: FEEDBACK_STATUS_COLOR[row.status],
+          background: `${FEEDBACK_STATUS_COLOR[row.status]}1a`,
+          border: `1px solid ${FEEDBACK_STATUS_COLOR[row.status]}33`,
+        }}
+      >
+        {FEEDBACK_STATUS_LABEL[row.status]}
+      </span>
+    </div>
+  );
+}
 
 function Header() {
   return (
