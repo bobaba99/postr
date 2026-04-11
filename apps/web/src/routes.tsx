@@ -1,22 +1,26 @@
 /**
  * App routes.
  *
- *   /              → Landing (public)
- *   /about         → About (public, feature tour)
- *   /privacy       → Privacy Policy (public)
- *   /cookies       → Cookies Policy (public)
- *   /terms         → Terms of Service (public)
- *   /auth          → Auth (sign in / sign up / guest)
- *   /dashboard     → My Posters (auth-gated)
- *   /p/:posterId   → Editor (auth-gated)
- *   /profile       → Profile (auth-gated)
- *   /s/:slug       → Share (public read-only)
- *   *              → 404
+ *   /                   → Landing (public)
+ *   /about              → About (public, feature tour)
+ *   /gallery            → Gallery grid (public)
+ *   /gallery/:entryId   → Gallery entry detail (public)
+ *   /privacy            → Privacy Policy (public)
+ *   /cookies            → Cookies Policy (public)
+ *   /terms              → Terms of Service (public)
+ *   /auth               → Auth (sign in / sign up / guest)
+ *   /dashboard          → My Posters (auth-gated)
+ *   /p/:posterId        → Editor (auth-gated)
+ *   /profile            → Profile (auth-gated)
+ *   /s/:slug            → Share (public read-only)
+ *   *                   → 404
  */
 import { Routes, Route } from 'react-router-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import Landing from '@/pages/Landing';
 import About from '@/pages/About';
+import Gallery from '@/pages/Gallery';
+import GalleryEntryPage from '@/pages/GalleryEntry';
 import Privacy from '@/pages/Privacy';
 import Cookies from '@/pages/Cookies';
 import Terms from '@/pages/Terms';
@@ -33,6 +37,8 @@ export function AppRoutes() {
       {/* Public routes */}
       <Route path="/" element={<Landing />} />
       <Route path="/about" element={<About />} />
+      <Route path="/gallery" element={<Gallery />} />
+      <Route path="/gallery/:entryId" element={<GalleryEntryPage />} />
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/cookies" element={<Cookies />} />
       <Route path="/terms" element={<Terms />} />

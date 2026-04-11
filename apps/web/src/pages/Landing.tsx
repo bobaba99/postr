@@ -19,6 +19,12 @@ export default function Landing() {
         </div>
         <div className="flex items-center gap-6">
           <Link
+            to="/gallery"
+            className="text-sm text-[#6b7280] no-underline hover:text-[#c8cad0]"
+          >
+            Gallery
+          </Link>
+          <Link
             to="/about"
             className="text-sm text-[#6b7280] no-underline hover:text-[#c8cad0]"
           >
@@ -92,6 +98,9 @@ export default function Landing() {
         <div className="mb-2 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
           <Link to="/about" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
             About
+          </Link>
+          <Link to="/gallery" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
+            Gallery
           </Link>
           <Link to="/privacy" className="no-underline text-[#6b7280] hover:text-[#c8cad0]">
             Privacy
