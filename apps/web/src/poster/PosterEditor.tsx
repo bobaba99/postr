@@ -839,6 +839,32 @@ export function PosterEditor() {
     () => checkBounds(doc.blocks, cW, cH),
     [doc.blocks, cW, cH],
   );
+
+  // Auto-numbered captions for figure + table blocks. Number is
+  // driven by reading order (top-to-bottom primary, left-to-right
+  // secondary) — dragging a block to a new position on the canvas
+  // re-ranks everything automatically. Users never edit the number
+  // directly, only the descriptive caption text.
+  const captionNumbers = useMemo<Record<string, number>>(() => {
+    const out: Record<string, number> = {};
+    const readingOrder = (a: Block, b: Block) =>
+      a.y - b.y || a.x - b.x;
+    doc.blocks
+      .filter((b) => b.type === 'image')
+      .slice()
+      .sort(readingOrder)
+      .forEach((b, i) => {
+        out[b.id] = i + 1;
+      });
+    doc.blocks
+      .filter((b) => b.type === 'table')
+      .slice()
+      .sort(readingOrder)
+      .forEach((b, i) => {
+        out[b.id] = i + 1;
+      });
+    return out;
+  }, [doc.blocks]);
   const oobBlockIds = useMemo(
     () => new Set(oobWarnings.map((w) => w.blockId)),
     [oobWarnings],
@@ -2096,6 +2122,7 @@ export function PosterEditor() {
                   onDelete={deleteBlock}
                   titleOverflowPx={titleOverflowPx}
                   isOutOfBounds={oobBlockIds.has(b.id)}
+                  captionNumber={captionNumbers[b.id]}
                 />
               ))}
               {sidebarTab === 'check' && selectedBlock?.type !== 'image' && (

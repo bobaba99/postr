@@ -1149,6 +1149,105 @@ export function RefsBlock({ references, palette, fontFamily, styles, citationSty
 }
 
 // =========================================================================
+// CaptionWrapper — renders figure/table caption alongside the content
+// =========================================================================
+//
+// Wraps image and table blocks so their optional caption renders as a
+// flex sibling of the actual content. `captionPosition` controls the
+// flex direction (top → column-reverse, bottom → column, left → row-
+// reverse, right → row); if the position is 'none' or the block has
+// no stored caption + no auto number, the wrapper is a pass-through.
+//
+// The `Figure N.` / `Table N.` numbering prefix is driven entirely by
+// the `captionNumber` prop (auto-computed by PosterEditor based on
+// reading-order rank). Users type only the descriptive text — the
+// number updates automatically whenever they drag the underlying
+// block into a new position on the canvas.
+
+interface CaptionWrapperProps {
+  block: Block;
+  palette: Palette;
+  fontFamily: string;
+  styles: Styles;
+  captionNumber?: number;
+  label: 'Figure' | 'Table';
+  children: React.ReactNode;
+}
+
+function CaptionWrapper({
+  block,
+  palette,
+  fontFamily,
+  styles,
+  captionNumber,
+  label,
+  children,
+}: CaptionWrapperProps) {
+  const position = block.captionPosition ?? 'bottom';
+  // Even an empty caption gets the auto-numbered prefix so users can
+  // see "Figure 1." immediately after placing a figure. Setting
+  // `captionPosition: 'none'` opts out entirely.
+  const shouldRender = position !== 'none' && captionNumber !== undefined;
+  if (!shouldRender) {
+    return <>{children}</>;
+  }
+
+  const flexDirection: React.CSSProperties['flexDirection'] =
+    position === 'top'
+      ? 'column-reverse'
+      : position === 'bottom'
+        ? 'column'
+        : position === 'left'
+          ? 'row-reverse'
+          : 'row';
+
+  // Match the body font size + authors-row weight so the caption
+  // reads as a subtle label under/beside the figure. Italic by
+  // convention in academic publishing; user can type plain text.
+  const captionStyle: React.CSSProperties = {
+    fontFamily,
+    fontSize: Math.round(styles.body.size * 0.85),
+    lineHeight: 1.35,
+    color: palette.muted || '#6b7280',
+    fontStyle: 'italic',
+    padding:
+      position === 'top'
+        ? '0 4px 4px'
+        : position === 'bottom'
+          ? '4px 4px 0'
+          : '0 6px',
+    flex: '0 0 auto',
+    // Side captions get a fixed width so the image doesn't collapse.
+    width: position === 'left' || position === 'right' ? '35%' : undefined,
+    whiteSpace: 'pre-wrap',
+    wordWrap: 'break-word',
+    overflow: 'hidden',
+  };
+
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection,
+        boxSizing: 'border-box',
+      }}
+    >
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
+        {children}
+      </div>
+      <div style={captionStyle}>
+        <b style={{ fontStyle: 'normal', color: palette.primary }}>
+          {label} {captionNumber}.
+        </b>
+        {block.caption ? ` ${block.caption}` : ''}
+      </div>
+    </div>
+  );
+}
+
+// =========================================================================
 // BlockFrame — wraps every block with selection chrome and drag/resize
 // =========================================================================
 
@@ -1191,6 +1290,13 @@ interface BlockFrameProps {
   titleOverflowPx?: number;
   /** True if this block extends outside the poster canvas bounds. */
   isOutOfBounds?: boolean;
+  /**
+   * Auto-computed figure/table index from reading order. 1-based,
+   * undefined for blocks that aren't images or tables. Renders as
+   * "Figure 1." / "Table 1." prefix on the caption — the user
+   * can't edit the number directly, only the order of blocks.
+   */
+  captionNumber?: number;
 }
 
 export function BlockFrame(props: BlockFrameProps) {
@@ -1214,6 +1320,7 @@ export function BlockFrame(props: BlockFrameProps) {
     onDelete,
     titleOverflowPx,
     isOutOfBounds,
+    captionNumber,
   } = props;
 
   // B1 fix: every non-title block shifts DOWN by the title's overflow
@@ -1503,12 +1610,30 @@ export function BlockFrame(props: BlockFrameProps) {
         )}
 
         {b.type === 'image' && (
-          <ImageBlock block={b} palette={p} onUpdate={update} selected={selected} />
+          <CaptionWrapper
+            block={b}
+            palette={p}
+            fontFamily={ff}
+            styles={st}
+            captionNumber={captionNumber}
+            label="Figure"
+          >
+            <ImageBlock block={b} palette={p} onUpdate={update} selected={selected} />
+          </CaptionWrapper>
         )}
         {b.type === 'logo' && <LogoBlock block={b} onUpdate={update} />}
 
         {b.type === 'table' && (
-          <TableBlock block={b} palette={p} fontFamily={ff} styles={st} onUpdate={update} />
+          <CaptionWrapper
+            block={b}
+            palette={p}
+            fontFamily={ff}
+            styles={st}
+            captionNumber={captionNumber}
+            label="Table"
+          >
+            <TableBlock block={b} palette={p} fontFamily={ff} styles={st} onUpdate={update} />
+          </CaptionWrapper>
         )}
       </div>
 

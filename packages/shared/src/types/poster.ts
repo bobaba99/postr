@@ -54,6 +54,22 @@ export interface Block {
    * the block's local rotated frame so drag math stays intuitive.
    */
   rotation?: number;
+  /**
+   * Caption/title text shown alongside image and table blocks. The
+   * number prefix ("Figure 1.", "Table 2.") is auto-computed from
+   * reading order (top-to-bottom, left-to-right) and prepended at
+   * render time, so the user only stores the descriptive text.
+   * Empty string / undefined = no caption rendered.
+   */
+  caption?: string;
+  /**
+   * Where the caption renders relative to the block frame.
+   * - `bottom` (default) — classic figure caption placement
+   * - `top` — placement above the block
+   * - `left` / `right` — side captions for portrait figures
+   * - `none` — hide the caption + number entirely
+   */
+  captionPosition?: 'top' | 'bottom' | 'left' | 'right' | 'none';
 }
 
 export type FontWeight = 300 | 400 | 500 | 600 | 700 | 800;

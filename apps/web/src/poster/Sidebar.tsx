@@ -252,18 +252,18 @@ export function Sidebar(props: SidebarProps) {
     return () => clearTimeout(t);
   }, [presetJustSaved]);
 
-  // Auto-switch to the Edit tab whenever a block is selected. There
-  // is one exception: image blocks. Clicking an image shouldn't
-  // yank the user away from whichever tab they were on — most of
-  // the time that's the Check tab, where the selected image's
-  // dimensions feed the readability analyzer. Keeping the user's
-  // current tab lets them select-an-image-then-recheck without a
-  // jarring reroute. If the user deselects (clicks empty canvas),
-  // we also stay put rather than jumping back to Layout.
+  // Auto-switch to the Edit tab whenever a block is selected. One
+  // exception: if the user is currently on the Plot Code Check tab
+  // and picks an image block, we stay put — the check panel reads
+  // the selected image's dimensions directly and jumping to Edit
+  // would cost them that context. Every other combination jumps
+  // to Edit so the user sees the controls relevant to their new
+  // selection (including the figure-caption editor for images).
   useEffect(() => {
     if (!props.selectedBlock) return;
-    if (props.selectedBlock.type === 'image') return;
+    if (props.selectedBlock.type === 'image' && tab === 'check') return;
     setTab('edit');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.selectedBlock?.id, props.selectedBlock?.type]);
 
   // Two states only: deselected (dark gray) and selected (white +
@@ -2004,7 +2004,21 @@ function EditTab(props: {
   return (
     <>
       {sb && sb.type === 'table' ? (
-        <TableEditor block={sb} onUpdateBlock={props.onUpdateBlock} />
+        <>
+          <CaptionEditor
+            block={sb}
+            label="Table"
+            onUpdateBlock={props.onUpdateBlock}
+          />
+          <div style={{ height: 18 }} />
+          <TableEditor block={sb} onUpdateBlock={props.onUpdateBlock} />
+        </>
+      ) : sb && sb.type === 'image' ? (
+        <CaptionEditor
+          block={sb}
+          label="Figure"
+          onUpdateBlock={props.onUpdateBlock}
+        />
       ) : sb && isTextLike && styleLevel ? (
         <TextBlockEditor
           block={sb}
@@ -2014,16 +2028,99 @@ function EditTab(props: {
           onUpdateStyle={updateStyle}
         />
       ) : (
-        <div style={{ fontSize: 14, color: '#555', padding: '16px 0', lineHeight: 1.5 }}>
-          Click a text or table block on the canvas to edit it here, or
-          switch to the{' '}
-          <span style={{ color: '#c8b6ff' }}>Insert</span> tab to add a new
-          one. Image blocks don't have edit controls — open the{' '}
-          <span style={{ color: '#c8b6ff' }}>Check</span> tab to analyze
-          figure readability.
+        <div style={{ fontSize: 14, color: '#8a8a95', padding: '16px 0', lineHeight: 1.5 }}>
+          Click a text, table, or image block on the canvas to edit it
+          here, or switch to the{' '}
+          <span style={{ color: '#c8b6ff' }}>Insert</span> tab to add a
+          new one. Open the{' '}
+          <span style={{ color: '#c8b6ff' }}>Plot Code Check</span> tab
+          to analyze figure readability.
         </div>
       )}
     </>
+  );
+}
+
+// =========================================================================
+// CaptionEditor — figure/table caption + position controls
+// =========================================================================
+//
+// Rendered in the Edit tab for image and table blocks. The numbering
+// prefix ("Figure 1.", "Table 2.") is auto-computed from the block's
+// reading-order rank and displayed read-only alongside the input.
+// Users only type the descriptive text and pick a position (top /
+// bottom / left / right / none). Dragging blocks on the canvas
+// automatically re-ranks the numbers, so there's no manual reorder
+// list.
+
+function CaptionEditor(props: {
+  block: Block;
+  label: 'Figure' | 'Table';
+  onUpdateBlock: (id: string, patch: Partial<Block>) => void;
+}) {
+  const { block, label, onUpdateBlock } = props;
+  const position = block.captionPosition ?? 'bottom';
+  const positions: Array<{
+    key: NonNullable<Block['captionPosition']>;
+    label: string;
+  }> = [
+    { key: 'top', label: 'Top' },
+    { key: 'bottom', label: 'Bottom' },
+    { key: 'left', label: 'Left' },
+    { key: 'right', label: 'Right' },
+    { key: 'none', label: 'Hide' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={labelStyle}>{label} Caption</div>
+      <p style={{ fontSize: 13, color: '#8a8a95', margin: 0, lineHeight: 1.5 }}>
+        The <b>{label} N.</b> number is assigned automatically from
+        reading order — drag this block on the canvas to renumber.
+        Just type the descriptive text below.
+      </p>
+      <input
+        type="text"
+        value={block.caption ?? ''}
+        onChange={(e) =>
+          onUpdateBlock(block.id, { caption: e.target.value })
+        }
+        placeholder={`${label.toLowerCase()} description…`}
+        style={inputBase}
+      />
+      <div style={{ fontSize: 13, color: '#8a8a95' }}>Caption position</div>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: 6,
+        }}
+      >
+        {positions.map(({ key, label: pLabel }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => onUpdateBlock(block.id, { captionPosition: key })}
+            style={{
+              all: 'unset',
+              cursor: 'pointer',
+              padding: '8px 0',
+              textAlign: 'center',
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: 6,
+              background: position === key ? '#7c6aed' : '#1a1a26',
+              color: position === key ? '#fff' : '#c8cad0',
+              border: `1px solid ${position === key ? '#9d87ff' : '#2a2a3a'}`,
+              transition:
+                'background 150ms ease, border-color 150ms ease, color 150ms ease',
+            }}
+          >
+            {pLabel}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
