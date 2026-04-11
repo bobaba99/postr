@@ -46,6 +46,7 @@ import {
 import { PaletteDesigner } from '@/components/PaletteDesigner';
 import { StaplesPrintModal } from '@/components/StaplesPrintModal';
 import {
+  CITATION_STYLES,
   DEFAULT_CITATION_STYLE,
   sortReferences,
   type CitationStyleKey,
@@ -851,11 +852,23 @@ export function PosterEditor() {
         'white-space:pre-wrap',
         'word-wrap:break-word',
       ].join(';');
-      // For title/text/heading, use the raw content string
-      // (minus any inline HTML tags from rich text formatting).
-      let text = blk.content || '';
-      // Strip HTML but preserve line breaks
-      text = text.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+
+      let text: string;
+      if (blk.type === 'references') {
+        // References don't use blk.content — they render from
+        // doc.references via the selected citation formatter plus a
+        // "References" header line. Reproduce that here so the probe
+        // actually measures the rendered refs block height.
+        const fmt = CITATION_STYLES[citationStyle] ?? CITATION_STYLES[DEFAULT_CITATION_STYLE];
+        const lines = doc.references.map((r, i) =>
+          fmt(r, i).replace(/_([^_]+)_/g, '$1'),
+        );
+        text = ['References', ...lines].join('\n');
+      } else {
+        // For title/text/heading/authors, use the raw content string
+        // (minus any inline HTML tags from rich text formatting).
+        text = (blk.content || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+      }
       probe.textContent = text || ' ';
       host.appendChild(probe);
       const h = probe.offsetHeight;
