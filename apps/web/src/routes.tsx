@@ -1,16 +1,18 @@
 /**
  * App routes.
  *
- *   /              → Home (My Posters)            [auth-gated by AuthBootstrap in main.tsx]
- *   /p/:posterId   → Editor                       [auth-gated]
- *   /s/:slug       → Share (public read-only)     [auth-gated for now; Phase 8 lifts this gate]
+ *   /              → Landing (public)
+ *   /auth          → Auth (sign in / sign up / guest)
+ *   /dashboard     → My Posters (auth-gated)
+ *   /p/:posterId   → Editor (auth-gated)
+ *   /profile       → Profile (auth-gated)
+ *   /s/:slug       → Share (public read-only)
  *   *              → 404
- *
- * Note: Phase 8 will move the /s/:slug route OUT from under AuthBootstrap
- * so anonymous visitors don't need a session at all to view a shared
- * poster — but for the placeholder shells we keep the simple gate.
  */
 import { Routes, Route } from 'react-router-dom';
+import { AuthGuard } from '@/components/AuthGuard';
+import Landing from '@/pages/Landing';
+import Auth from '@/pages/Auth';
 import Home from '@/pages/Home';
 import Editor from '@/pages/Editor';
 import Profile from '@/pages/Profile';
@@ -20,10 +22,16 @@ import NotFound from '@/pages/NotFound';
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/p/:posterId" element={<Editor />} />
-      <Route path="/profile" element={<Profile />} />
+      {/* Public routes */}
+      <Route path="/" element={<Landing />} />
+      <Route path="/auth" element={<Auth />} />
       <Route path="/s/:slug" element={<Share />} />
+
+      {/* Protected routes */}
+      <Route path="/dashboard" element={<AuthGuard><Home /></AuthGuard>} />
+      <Route path="/p/:posterId" element={<AuthGuard><Editor /></AuthGuard>} />
+      <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

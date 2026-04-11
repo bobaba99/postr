@@ -94,7 +94,7 @@ export default function Profile() {
         }
         localStorage.removeItem('postr.style-presets');
         await supabase.auth.signOut({ scope: 'local' });
-        navigate('/');
+        navigate("/dashboard");
       } catch (err) {
         setActionError(err instanceof Error ? err.message : 'Failed to delete account');
         setActionStatus(null);
@@ -286,7 +286,7 @@ export default function Profile() {
 function Header() {
   return (
     <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[#1f1f2e] bg-[#0a0a12]/95 px-8 py-5 backdrop-blur">
-      <Link to="/" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-[#c8cad0] no-underline hover:text-white">
+      <Link to="/dashboard" className="flex items-center gap-3 text-xl font-semibold tracking-tight text-[#c8cad0] no-underline hover:text-white">
         <svg width="28" height="28" viewBox="0 0 64 64" fill="none">
           <rect width="64" height="64" rx="12" fill="#7c6aed" />
           <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
@@ -295,7 +295,7 @@ function Header() {
         </svg>
         Postr
       </Link>
-      <Link to="/" className="text-sm text-[#6b7280] no-underline hover:text-[#c8cad0]">
+      <Link to="/dashboard" className="text-sm text-[#6b7280] no-underline hover:text-[#c8cad0]">
         ← Back to posters
       </Link>
     </header>
