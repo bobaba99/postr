@@ -22,15 +22,14 @@ export function AuthGuard({ children }: { children: ReactNode }) {
       }
     });
 
-    // Listen for auth state changes (e.g. sign out, session expiry,
-    // account deletion). TOKEN_REFRESHED is a no-op — the session is
-    // still valid. SIGNED_OUT and USER_DELETED both mean the user
-    // can no longer edit, so redirect to auth.
+    // Listen for auth state changes. SIGNED_OUT covers both explicit
+    // sign-out and account deletion (the delete-account edge function
+    // signs the user out after deleting, which fires SIGNED_OUT).
+    // TOKEN_REFRESHED is a no-op — the session is still valid.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+      if (event === 'SIGNED_OUT') {
         navigate('/auth', { replace: true });
       }
-      // TOKEN_REFRESHED — session renewed silently, no action needed.
     });
 
     return () => subscription.unsubscribe();
