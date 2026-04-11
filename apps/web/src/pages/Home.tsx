@@ -23,6 +23,7 @@ import { NewPosterButton } from '@/components/NewPosterButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { PublicFooter } from '@/components/PublicFooter';
+import { checkIsGalleryAdmin } from '@/data/gallery';
 
 type Status =
   | { kind: 'loading' }
@@ -33,7 +34,18 @@ export default function Home() {
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PosterRow | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const openFeedback = useFeedbackStore((s) => s.open);
+
+  useEffect(() => {
+    let cancelled = false;
+    checkIsGalleryAdmin().then((ok) => {
+      if (!cancelled) setIsAdmin(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,6 +132,14 @@ export default function Home() {
           >
             About
           </Link>
+          {isAdmin && (
+            <Link
+              to="/admin/gallery"
+              className="hidden text-[12px] font-semibold text-[#7c6aed] no-underline hover:text-white sm:inline"
+            >
+              Admin
+            </Link>
+          )}
           <button
             type="button"
             onClick={() => openFeedback('feature')}

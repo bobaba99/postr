@@ -64,6 +64,12 @@ export interface GalleryEntry {
   notes: string | null;
   created_at: string;
   retracted_at: string | null;
+  // Set when the entry was taken down by a moderator (not the owner).
+  // Null either means the entry is still public or the owner retracted
+  // it themselves (owner retraction hard-deletes the row entirely, so
+  // this column will never be populated for owner actions).
+  retracted_by: string | null;
+  retraction_reason: string | null;
 }
 
 export interface GalleryEntryWithUrls extends GalleryEntry {
@@ -253,7 +259,8 @@ export async function createGalleryEntry(
 }
 
 /**
- * Retract a gallery entry. Deletes the storage files and the row itself.
+ * Owner-initiated retraction — hard-deletes the row and the storage
+ * files. The owner wanted it gone, so the audit trail goes with it.
  * RLS ensures only the owner can reach this.
  */
 export async function retractGalleryEntry(entry: GalleryEntry): Promise<void> {
@@ -264,6 +271,90 @@ export async function retractGalleryEntry(entry: GalleryEntry): Promise<void> {
   const { error } = await db.from('gallery_entries').delete().eq('id', entry.id);
   if (error) {
     throw new Error(`Could not retract entry: ${error.message}`);
+  }
+}
+
+// ── Admin-only operations ────────────────────────────────────────────
+
+/**
+ * Returns true if the currently signed-in user is on the gallery
+ * admin allowlist. Uses the `is_gallery_admin` SECURITY DEFINER RPC
+ * so the client never reads auth.users directly.
+ */
+export async function checkIsGalleryAdmin(): Promise<boolean> {
+  const { data: userData } = await supabase.auth.getUser();
+  const uid = userData.user?.id;
+  if (!uid) return false;
+  const { data, error } = await db.rpc('is_gallery_admin', { uid });
+  if (error) return false;
+  return data === true;
+}
+
+/**
+ * Admin listing — every gallery entry including retracted ones.
+ * RLS allows this only when is_gallery_admin(auth.uid()) returns true;
+ * non-admins will silently get an empty array (RLS filter), so the
+ * caller should always gate navigation through AdminGuard.
+ */
+export async function listAllGalleryAdmin(): Promise<GalleryEntryWithUrls[]> {
+  const { data, error } = await db
+    .from('gallery_entries')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) {
+    throw new Error(`Could not load admin gallery: ${error.message}`);
+  }
+  return ((data ?? []) as unknown as GalleryEntry[]).map(withUrls);
+}
+
+/**
+ * Soft-retract an entry as a moderator. Sets retracted_at +
+ * retracted_by + retraction_reason. Files are left in the bucket so
+ * the action is reversible via adminUnretract().
+ */
+export async function adminRetractEntry(
+  entryId: string,
+  reason: string,
+): Promise<void> {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    throw new Error('You need to be signed in as an admin.');
+  }
+  const trimmed = reason.trim();
+  if (trimmed.length === 0) {
+    throw new Error('A retraction reason is required.');
+  }
+  if (trimmed.length > 500) {
+    throw new Error('Reason is too long (max 500 characters).');
+  }
+  const { error } = await db
+    .from('gallery_entries')
+    .update({
+      retracted_at: new Date().toISOString(),
+      retracted_by: userData.user.id,
+      retraction_reason: trimmed,
+    })
+    .eq('id', entryId);
+  if (error) {
+    throw new Error(`Could not retract entry: ${error.message}`);
+  }
+}
+
+/**
+ * Reverse a moderator retraction. Clears retracted_at / _by / _reason
+ * so the row reappears in the public listing.
+ */
+export async function adminUnretractEntry(entryId: string): Promise<void> {
+  const { error } = await db
+    .from('gallery_entries')
+    .update({
+      retracted_at: null,
+      retracted_by: null,
+      retraction_reason: null,
+    })
+    .eq('id', entryId);
+  if (error) {
+    throw new Error(`Could not unretract entry: ${error.message}`);
   }
 }
 

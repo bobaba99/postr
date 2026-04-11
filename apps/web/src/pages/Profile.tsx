@@ -516,18 +516,35 @@ function GallerySubmissionRow({
     month: 'short',
     day: 'numeric',
   });
+  // An entry with retracted_at + retracted_by populated was taken
+  // down by a moderator. Owner-initiated retraction hard-deletes the
+  // row entirely, so we'll never see both cases on the same row.
+  const moderatorRetracted =
+    entry.retracted_at !== null && entry.retracted_by !== null;
+
   return (
-    <div className="flex items-start gap-3 rounded-md border border-[#1f1f2e] bg-[#0a0a12] p-3">
+    <div
+      className={`flex items-start gap-3 rounded-md border p-3 ${
+        moderatorRetracted
+          ? 'border-[#f87171]/30 bg-[#f87171]/5'
+          : 'border-[#1f1f2e] bg-[#0a0a12]'
+      }`}
+    >
       <img
         src={entry.image_url}
         alt={entry.title}
-        className="h-16 w-16 shrink-0 rounded object-cover"
+        className={`h-16 w-16 shrink-0 rounded object-cover ${moderatorRetracted ? 'opacity-60' : ''}`}
       />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="rounded bg-[#1a1a26] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#7c6aed]">
             {labelForField(entry.field)}
           </span>
+          {moderatorRetracted && (
+            <span className="rounded bg-[#f87171]/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#f87171]">
+              Retracted by moderator
+            </span>
+          )}
           <Link
             to={`/gallery/${entry.id}`}
             className="truncate text-[13px] font-medium text-[#c8cad0] no-underline hover:text-white"
@@ -540,14 +557,21 @@ function GallerySubmissionRow({
           {entry.conference && ` · ${entry.conference}`}
           {entry.year && ` · ${entry.year}`}
         </div>
+        {moderatorRetracted && entry.retraction_reason && (
+          <div className="mt-2 border-l-2 border-[#f87171] bg-[#f87171]/5 px-2 py-1 text-[12px] leading-relaxed text-[#f87171]">
+            <strong>Moderator note:</strong> {entry.retraction_reason}
+          </div>
+        )}
       </div>
-      <button
-        type="button"
-        onClick={onRetract}
-        className="shrink-0 rounded-md border border-[#2a2a3a] bg-[#1a1a26] px-3 py-1.5 text-[12px] font-medium text-[#f87171] hover:border-[#f87171]"
-      >
-        Retract
-      </button>
+      {!moderatorRetracted && (
+        <button
+          type="button"
+          onClick={onRetract}
+          className="shrink-0 rounded-md border border-[#2a2a3a] bg-[#1a1a26] px-3 py-1.5 text-[12px] font-medium text-[#f87171] hover:border-[#f87171]"
+        >
+          Retract
+        </button>
+      )}
     </div>
   );
 }

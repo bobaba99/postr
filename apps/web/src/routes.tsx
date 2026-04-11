@@ -12,6 +12,7 @@
  *   /dashboard          → My Posters (auth-gated)
  *   /p/:posterId        → Editor (auth-gated)
  *   /profile            → Profile (auth-gated)
+ *   /admin/gallery      → Admin gallery moderation (admin-gated)
  *   /s/:slug            → Share (public read-only)
  *   *                   → 404
  */
@@ -21,6 +22,7 @@ import Landing from '@/pages/Landing';
 import About from '@/pages/About';
 import Gallery from '@/pages/Gallery';
 import GalleryEntryPage from '@/pages/GalleryEntry';
+import AdminGallery from '@/pages/AdminGallery';
 import Privacy from '@/pages/Privacy';
 import Cookies from '@/pages/Cookies';
 import Terms from '@/pages/Terms';
@@ -49,6 +51,14 @@ export function AppRoutes() {
       <Route path="/dashboard" element={<AuthGuard><Home /></AuthGuard>} />
       <Route path="/p/:posterId" element={<AuthGuard><Editor /></AuthGuard>} />
       <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />
+      <Route
+        path="/admin/gallery"
+        element={
+          <AuthGuard>
+            <AdminGallery />
+          </AuthGuard>
+        }
+      />
 
       <Route path="*" element={<NotFound />} />
     </Routes>
