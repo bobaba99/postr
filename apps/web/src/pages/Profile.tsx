@@ -19,6 +19,7 @@ import { listPosters, deletePoster } from '@/data/posters';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { resetOnboarding } from '@/components/OnboardingTour';
 import { getAllTemplates, saveCustomTemplates } from '@/poster/GuidelinesPanel';
+import { PasswordStrength, isPasswordValid } from '@/components/PasswordStrength';
 import type { User } from '@supabase/supabase-js';
 
 type ConfirmAction = 'deletePosters' | 'deleteAccount' | null;
@@ -88,13 +89,22 @@ export default function Profile() {
     if (action === 'deleteAccount') {
       setActionStatus('Deleting account…');
       try {
+        // Delete all posters
         const posters = await listPosters();
         for (const p of posters) {
           await deletePoster(p.id);
         }
+        // Clear all local data
         localStorage.removeItem('postr.style-presets');
-        await supabase.auth.signOut({ scope: 'local' });
-        navigate("/dashboard");
+        localStorage.removeItem('postr.scratch-pad');
+        localStorage.removeItem('postr.scratch-note');
+        localStorage.removeItem('postr.checklist-templates');
+        localStorage.removeItem('postr.profile');
+        localStorage.removeItem('postr.onboarding-done');
+        // Sign out fully (global scope clears server session too)
+        await supabase.auth.signOut({ scope: 'global' });
+        // Redirect to auth page (AuthGuard will prevent dashboard access)
+        navigate('/auth');
       } catch (err) {
         setActionError(err instanceof Error ? err.message : 'Failed to delete account');
         setActionStatus(null);
@@ -424,14 +434,15 @@ function EmailSignUp({ onSuccess, onError }: { onSuccess: () => void; onError: (
         type="password"
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        placeholder="Create password (6+ characters)"
+        placeholder="Create password"
         required
-        minLength={6}
+        minLength={8}
         className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
       />
+      <PasswordStrength password={password} />
       <button
         type="submit"
-        disabled={loading || !email.trim() || password.length < 6}
+        disabled={loading || !email.trim() || !isPasswordValid(password)}
         className="w-full cursor-pointer rounded-lg border border-[#7c6aed] bg-transparent px-4 py-3 text-sm font-semibold text-[#7c6aed] hover:bg-[#7c6aed] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Creating account…' : 'Create account with email'}
