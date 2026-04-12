@@ -137,20 +137,43 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
     setError(null);
     setUploading(true);
     try {
-      const logo = await uploadUserLogo(uploadFile, uploadName);
-      // Convert to data URL so the block's imageSrc doesn't depend
-      // on the signed URL expiring — we still save the row for
-      // future re-use from My Logos.
-      const res = await fetch(logo.signedUrl);
-      const blob = await res.blob();
+      // Step 1: read the picked File as a base64 data URL
+      // IMMEDIATELY. This is what the poster block stores —
+      // base64 data URLs are self-contained and survive forever,
+      // so the block doesn't depend on a Supabase signed URL
+      // that expires in an hour or a storage-bucket fetch that
+      // might fail due to CORS / RLS.
+      //
+      // Previous implementation did the upload FIRST, then tried
+      // to re-fetch the signed URL and convert back to a data
+      // URL. Any failure in that second step left the block's
+      // imageSrc unset and the user saw only the placeholder —
+      // the exact bug reported on 2026-04-11.
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();
         r.onload = () => resolve(r.result as string);
-        r.onerror = () => reject(new Error('Read failed.'));
-        r.readAsDataURL(blob);
+        r.onerror = () =>
+          reject(new Error('Could not read the picked file.'));
+        r.readAsDataURL(uploadFile);
       });
+
+      // Step 2: set the block imageSrc + close the modal
+      // IMMEDIATELY so the user gets visual confirmation that
+      // the upload landed. The library persistence happens in
+      // the background — even if it fails the block is already
+      // showing the logo.
       onPick(dataUrl);
       onClose();
+
+      // Step 3: persist to the user's logo library in the
+      // background. Success is nice-to-have; failure is logged
+      // to the console but doesn't block the user.
+      try {
+        await uploadUserLogo(uploadFile, uploadName);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[LogoPicker] background save failed:', err);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
@@ -400,10 +423,25 @@ function PresetsTab(props: {
           </button>
         ))}
       </div>
+      <div
+        style={{
+          fontSize: 12,
+          color: '#fecaca',
+          background: 'rgba(220, 38, 38, 0.1)',
+          border: '1px solid rgba(220, 38, 38, 0.25)',
+          borderRadius: 6,
+          padding: '8px 10px',
+          lineHeight: 1.5,
+        }}
+      >
+        <b>Heads up:</b> preset previews pull 256 × 256 favicons from
+        Google's public service. Some schools (e.g. McGill) return a
+        letter mark instead of their crest, and none are print
+        quality. For your final export, switch to the{' '}
+        <b>Upload</b> tab and use your institution's official logo.
+      </div>
       <div style={{ fontSize: 12, color: '#6b7280' }}>
-        {props.filtered.length} / {LOGO_PRESETS.length} presets. Previews use
-        Google favicons (256 × 256) — upload your own high-res file via the
-        Upload tab before exporting for print.
+        {props.filtered.length} / {LOGO_PRESETS.length} presets
       </div>
       <div
         style={{
