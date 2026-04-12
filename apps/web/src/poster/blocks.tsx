@@ -1497,7 +1497,16 @@ export function BlockFrame(props: BlockFrameProps) {
     b.type === 'title' ||
     b.type === 'text' ||
     b.type === 'references' ||
-    b.type === 'authors';
+    b.type === 'authors' ||
+    // Tables auto-size too — otherwise the user's stored `b.h`
+    // was forcing the frame taller than the grid needed, and
+    // the caption wrapper's `flex: 1 content` stretched to
+    // fill, leaving a blank strip under the table. Growing with
+    // content guarantees the block frame hugs (caption + gap +
+    // grid) exactly. Users can still resize tables — the
+    // resize handle updates b.w for width (fixed) and the drag
+    // math doesn't depend on h.
+    b.type === 'table';
   const level = b.type === 'title' ? st.title : b.type === 'authors' ? st.authors : isHeading ? st.heading : st.body;
   const frameRef = useRef<HTMLDivElement | null>(null);
   // Selection info for the floating format toolbar — populated by
@@ -1678,15 +1687,20 @@ export function BlockFrame(props: BlockFrameProps) {
           // across all block types. Image / logo / table keep
           // padding: 0 because they manage their own inner layout.
           // Authors block also gets zero vertical padding so the
-          // frame wraps the text as tightly as the title does —
-          // any extra top/bottom padding here was stacking on top
-          // of AuthorLine's own line-height and made the block
-          // feel loose compared to the rest of the header.
+          // frame wraps the text as tightly as the title does.
           padding: ['image', 'logo', 'table'].includes(b.type)
             ? 0
             : b.type === 'authors'
               ? '0 6px'
               : '4px 6px',
+          // Let flex children (the CaptionWrapper for image/table
+          // blocks) align to the top of the frame rather than
+          // stretching to fill — this prevents a blank strip
+          // between the content and the bottom border when the
+          // table or image is shorter than the stored `b.h`.
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'stretch',
           boxSizing: 'border-box',
         }}
       >
