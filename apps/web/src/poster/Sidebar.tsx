@@ -2283,7 +2283,10 @@ function TableEditor(props: {
 
   // Default custom border values — starts as an APA-ish 3-line
   // layout so flipping to Custom doesn't wipe visible borders.
-  const customBorder: NonNullable<TableData['customBorder']> =
+  // innerH / innerV are variable-length arrays sized off the
+  // current rows/cols; we pad them with `false` so stored
+  // tables that pre-date this schema still render cleanly.
+  const rawCustomBorder: NonNullable<TableData['customBorder']> =
     data.customBorder ?? {
       topLine: true,
       bottomLine: true,
@@ -2291,18 +2294,117 @@ function TableEditor(props: {
       rightLine: false,
       headerLine: true,
       headerBox: false,
-      horizontalLines: false,
-      verticalLines: false,
+      innerH: [],
+      innerV: [],
     };
+  // Pad / truncate inner arrays so they exactly match the
+  // current dimensions. innerH needs (rows - 2) entries
+  // (gaps below row 1 through row rows-2, with row 0 being
+  // the header and row rows-1 being the last body row).
+  // innerV needs (cols - 1) entries (gaps between columns).
+  const padArr = (arr: boolean[] | undefined, len: number) => {
+    const out = Array(Math.max(0, len)).fill(false) as boolean[];
+    (arr ?? []).slice(0, len).forEach((v, i) => (out[i] = !!v));
+    return out;
+  };
+  const customBorder: NonNullable<TableData['customBorder']> = {
+    ...rawCustomBorder,
+    innerH: padArr(rawCustomBorder.innerH, Math.max(0, data.rows - 2)),
+    innerV: padArr(rawCustomBorder.innerV, Math.max(0, data.cols - 1)),
+  };
   const isCustom = data.borderPreset === 'custom';
-  const toggleCustomEdge = (
-    key: keyof NonNullable<TableData['customBorder']>,
+  const commitCustomBorder = (
+    patch: Partial<NonNullable<TableData['customBorder']>>,
   ) => {
     commit({
       ...data,
       borderPreset: 'custom',
-      customBorder: { ...customBorder, [key]: !customBorder[key] },
+      customBorder: { ...customBorder, ...patch },
     });
+  };
+  const toggleCustomEdge = (
+    key: keyof NonNullable<TableData['customBorder']>,
+  ) => {
+    if (key === 'innerH' || key === 'innerV') return; // handled per-index
+    commitCustomBorder({ [key]: !customBorder[key] });
+  };
+  const toggleInnerH = (i: number) => {
+    const next = [...customBorder.innerH];
+    next[i] = !next[i];
+    commitCustomBorder({ innerH: next });
+  };
+  const toggleInnerV = (i: number) => {
+    const next = [...customBorder.innerV];
+    next[i] = !next[i];
+    commitCustomBorder({ innerV: next });
+  };
+  /**
+   * Bulk-preset helpers for the button row beneath the mockup.
+   * Each button rewrites the full customBorder so the user can
+   * reset to a known baseline without having to click 20 edges.
+   */
+  const applyBulkPreset = (kind: 'all' | 'none' | 'outer' | 'inner' | 'hOnly' | 'vOnly' | 'apa') => {
+    const innerHLen = Math.max(0, data.rows - 2);
+    const innerVLen = Math.max(0, data.cols - 1);
+    const fill = (len: number, v: boolean) => Array(len).fill(v) as boolean[];
+    switch (kind) {
+      case 'all':
+        commitCustomBorder({
+          topLine: true, bottomLine: true, leftLine: true, rightLine: true,
+          headerLine: true, headerBox: false,
+          innerH: fill(innerHLen, true),
+          innerV: fill(innerVLen, true),
+        });
+        return;
+      case 'none':
+        commitCustomBorder({
+          topLine: false, bottomLine: false, leftLine: false, rightLine: false,
+          headerLine: false, headerBox: false,
+          innerH: fill(innerHLen, false),
+          innerV: fill(innerVLen, false),
+        });
+        return;
+      case 'outer':
+        commitCustomBorder({
+          topLine: true, bottomLine: true, leftLine: true, rightLine: true,
+          headerLine: false, headerBox: false,
+          innerH: fill(innerHLen, false),
+          innerV: fill(innerVLen, false),
+        });
+        return;
+      case 'inner':
+        commitCustomBorder({
+          topLine: false, bottomLine: false, leftLine: false, rightLine: false,
+          headerLine: true, headerBox: false,
+          innerH: fill(innerHLen, true),
+          innerV: fill(innerVLen, true),
+        });
+        return;
+      case 'hOnly':
+        commitCustomBorder({
+          topLine: false, bottomLine: false, leftLine: false, rightLine: false,
+          headerLine: true, headerBox: false,
+          innerH: fill(innerHLen, true),
+          innerV: fill(innerVLen, false),
+        });
+        return;
+      case 'vOnly':
+        commitCustomBorder({
+          topLine: false, bottomLine: false, leftLine: false, rightLine: false,
+          headerLine: false, headerBox: false,
+          innerH: fill(innerHLen, false),
+          innerV: fill(innerVLen, true),
+        });
+        return;
+      case 'apa':
+        commitCustomBorder({
+          topLine: true, bottomLine: true, leftLine: false, rightLine: false,
+          headerLine: true, headerBox: false,
+          innerH: fill(innerHLen, false),
+          innerV: fill(innerVLen, false),
+        });
+        return;
+    }
   };
 
   return (
@@ -2458,16 +2560,20 @@ function TableEditor(props: {
         </div>
       </div>
 
-      {/* Visual custom-border editor. Renders a 3×3 mini-table
-          mockup where each edge / gridline is a clickable hit
-          zone. Clicking an edge toggles the corresponding flag
-          on customBorder and commits a new TableData.
-          On = solid purple line, off = faint dashed hint so
-          users can still see where a clickable zone lives. */}
+      {/* Visual custom-border editor. The mockup sizes itself
+          off the real `data.rows` × `data.cols` so users can
+          see every inner gap that they can independently toggle,
+          capped at a sane visual maximum (6×6) for large tables.
+          Bulk preset buttons sit below for one-click resets. */}
       {isCustom && (
         <CustomBorderMockup
           border={customBorder}
-          onToggle={toggleCustomEdge}
+          rows={data.rows}
+          cols={data.cols}
+          onToggleOuter={toggleCustomEdge}
+          onToggleInnerH={toggleInnerH}
+          onToggleInnerV={toggleInnerV}
+          onBulkPreset={applyBulkPreset}
         />
       )}
     </div>
@@ -2478,68 +2584,95 @@ function TableEditor(props: {
 // CustomBorderMockup — clickable mini-table for per-edge toggles
 // =========================================================================
 //
-// Visual replacement for the previous checkbox list. Renders a
-// 3×3 table mockup where each border "zone" is an invisible
-// click target overlaid on the table:
+// Visual editor where EVERY border/gridline is an independent
+// click target. The mockup sizes itself off the actual
+// `data.rows` × `data.cols` so a 4-row table shows 3 distinct
+// inner horizontal gaps the user can toggle one at a time
+// (innerH[0], innerH[1], innerH[2] — NOT a single grouped
+// "horizontalLines" flag).
 //
-//   ┌─────────────┐  ← top edge strip      → topLine
-//   │ ┌─┬─┬─┐ │     ← header row interior  → headerBox
-//   │ ├─┼─┼─┤ │     ← header separator     → headerLine
-//   │ ├─┼─┼─┤ │     ← inter-body row       → horizontalLines
-//   │ └─┴─┴─┘ │
-//   └─────────────┘  ← bottom edge strip   → bottomLine
-//
-// Plus: clicking the left or right edge toggles outerBorder,
-// and clicking a vertical gridline between columns toggles
-// verticalLines. Each edge is drawn solid purple when active
-// and faint dashed when inactive, so the user sees both the
-// current state and the clickable surface.
+// Very large tables are visually capped to 6×6 in the mockup
+// so the clickable zones stay big enough to hit. The user can
+// still fine-tune individual gaps in larger tables, and bulk
+// presets (below the mockup) always apply to the REAL full
+// dimensions, so "all horizontal" on a 12-row table still
+// turns on every single line.
 
 function CustomBorderMockup(props: {
   border: NonNullable<TableData['customBorder']>;
-  onToggle: (key: keyof NonNullable<TableData['customBorder']>) => void;
+  rows: number;
+  cols: number;
+  onToggleOuter: (key: keyof NonNullable<TableData['customBorder']>) => void;
+  onToggleInnerH: (i: number) => void;
+  onToggleInnerV: (i: number) => void;
+  onBulkPreset: (kind: 'all' | 'none' | 'outer' | 'inner' | 'hOnly' | 'vOnly' | 'apa') => void;
 }) {
-  const { border, onToggle } = props;
+  const { border, rows, cols, onToggleOuter, onToggleInnerH, onToggleInnerV, onBulkPreset } = props;
 
   const ACTIVE = '#9d87ff';
-  const HINT = 'rgba(138, 138, 149, 0.3)';
+  const HINT = 'rgba(138, 138, 149, 0.35)';
   const HINT_DASH = `1.5px dashed ${HINT}`;
   const SOLID = `2px solid ${ACTIVE}`;
 
   const line = (on: boolean) => (on ? SOLID : HINT_DASH);
 
-  // Mockup dimensions (px)
-  const W = 280;
-  const H = 140;
-  const ROWS = 3;
-  const COLS = 3;
+  // Mockup dimensions (px). Visual cap keeps the clickable
+  // zones large enough to hit on a 3+ row/col table.
+  const MAX_VISIBLE = 6;
+  const ROWS = Math.min(Math.max(rows, 2), MAX_VISIBLE);
+  const COLS = Math.min(Math.max(cols, 2), MAX_VISIBLE);
+  const W = 300;
+  const H = 40 + ROWS * 30; // grows proportional to row count
+
+  const PAD = 14; // room for outer-edge hit strips
 
   // Hit-zone helper — a transparent clickable overlay.
   const hit = (
     style: React.CSSProperties,
-    key: keyof NonNullable<TableData['customBorder']>,
+    onClick: () => void,
     title: string,
   ) => (
     <button
       type="button"
       title={title}
       aria-label={title}
-      onClick={() => onToggle(key)}
+      onClick={onClick}
       style={{
         all: 'unset',
         cursor: 'pointer',
         position: 'absolute',
+        borderRadius: 2,
         ...style,
       }}
       onMouseEnter={(e) => {
         (e.currentTarget as HTMLElement).style.background =
-          'rgba(157, 135, 255, 0.12)';
+          'rgba(157, 135, 255, 0.18)';
       }}
       onMouseLeave={(e) => {
         (e.currentTarget as HTMLElement).style.background = 'transparent';
       }}
     />
   );
+
+  // Inner cell width / height inside the padded frame
+  const innerW = W - PAD * 2;
+  const innerH = H - PAD * 2;
+  const cellW = innerW / COLS;
+  const cellH = innerH / ROWS;
+
+  // Bulk-preset button styles.
+  const bulkBtn: React.CSSProperties = {
+    all: 'unset',
+    cursor: 'pointer',
+    padding: '6px 10px',
+    borderRadius: 6,
+    fontSize: 11,
+    fontWeight: 600,
+    background: '#1a1a26',
+    color: '#c8cad0',
+    border: '1px solid #2a2a3a',
+    transition: 'all 150ms ease',
+  };
 
   return (
     <div
@@ -2554,8 +2687,8 @@ function CustomBorderMockup(props: {
       }}
     >
       <div style={{ fontSize: 12, color: '#8a8a95', lineHeight: 1.5 }}>
-        Click any edge or gridline to toggle it. Solid purple = on,
-        faint dashed = off.
+        Click any edge, gridline, or header cell to toggle it —
+        each line is independent. Solid purple = on, faint dashed = off.
       </div>
 
       <div
@@ -2564,23 +2697,18 @@ function CustomBorderMockup(props: {
           width: W,
           height: H,
           margin: '0 auto',
-          padding: 14, // gives the top/bottom/left/right hit strips room
           boxSizing: 'border-box',
         }}
       >
         {/* Outer frame — drawn edge by edge. Each of the four
-            outer edges (top / bottom / left / right) is a fully
-            independent flag now, so clicking the left strip only
-            toggles `leftLine` and leaves the other three alone.
-            This replaces the old grouped `outerBorder` flag that
-            fired left + right together. */}
+            outer edges is fully independent. */}
         <div
           style={{
             position: 'absolute',
-            left: 14,
-            right: 14,
-            top: 14,
-            bottom: 14,
+            left: PAD,
+            right: PAD,
+            top: PAD,
+            bottom: PAD,
             borderTop: line(border.topLine),
             borderBottom: line(border.bottomLine),
             borderLeft: line(border.leftLine),
@@ -2588,10 +2716,9 @@ function CustomBorderMockup(props: {
             boxSizing: 'border-box',
           }}
         >
-          {/* Grid of cells, drawn with their own borders so the
-              header separator, body horizontal lines, and vertical
-              lines between columns each have a visible edge that
-              matches the toggle state. */}
+          {/* Cell grid — renders one visible border per inner
+              gap so the user sees exactly which innerH[i] /
+              innerV[i] is on. */}
           <div
             style={{
               width: '100%',
@@ -2606,14 +2733,14 @@ function CustomBorderMockup(props: {
               const r = Math.floor(i / COLS);
               const c = i % COLS;
               const isHeader = r === 0;
-              // Header row box draws ALL 4 sides of the header row.
-              // We paint it on each cell so the appearance survives
-              // across the full header row.
-              const headerBoxTop = isHeader && border.headerBox;
-              const headerBoxBottom = isHeader && border.headerBox;
-              const headerBoxLeft = isHeader && border.headerBox && c === 0;
-              const headerBoxRight =
-                isHeader && border.headerBox && c === COLS - 1;
+              // headerLine = gap below row 0
+              const topLine =
+                r === 1
+                  ? border.headerLine
+                  : r > 1
+                    ? !!border.innerH[r - 2]
+                    : false;
+              const leftLine = c > 0 ? !!border.innerV[c - 1] : false;
               return (
                 <div
                   key={i}
@@ -2622,22 +2749,8 @@ function CustomBorderMockup(props: {
                       ? 'rgba(157, 135, 255, 0.06)'
                       : 'transparent',
                     boxSizing: 'border-box',
-                    borderTop:
-                      r === 1 && border.headerLine
-                        ? line(true)
-                        : r > 1 && border.horizontalLines
-                          ? line(true)
-                          : headerBoxTop
-                            ? line(true)
-                            : 'none',
-                    borderBottom: headerBoxBottom ? line(true) : 'none',
-                    borderLeft:
-                      c > 0 && border.verticalLines
-                        ? line(true)
-                        : headerBoxLeft
-                          ? line(true)
-                          : 'none',
-                    borderRight: headerBoxRight ? line(true) : 'none',
+                    borderTop: topLine ? line(true) : 'none',
+                    borderLeft: leftLine ? line(true) : 'none',
                   }}
                 />
               );
@@ -2645,102 +2758,133 @@ function CustomBorderMockup(props: {
           </div>
         </div>
 
-        {/* ── Clickable hit zones ─────────────────────────── */}
-        {/* Top edge strip */}
+        {/* ── Outer edge hit zones ─────────────────────────── */}
         {hit(
-          { left: 14, right: 14, top: 2, height: 14, zIndex: 2 },
-          'topLine',
+          { left: PAD, right: PAD, top: 0, height: PAD - 2, zIndex: 2 },
+          () => onToggleOuter('topLine'),
           border.topLine ? 'Remove top edge line' : 'Add top edge line',
         )}
-        {/* Bottom edge strip */}
         {hit(
-          { left: 14, right: 14, bottom: 2, height: 14, zIndex: 2 },
-          'bottomLine',
+          { left: PAD, right: PAD, bottom: 0, height: PAD - 2, zIndex: 2 },
+          () => onToggleOuter('bottomLine'),
           border.bottomLine ? 'Remove bottom edge line' : 'Add bottom edge line',
         )}
-        {/* Left edge → leftLine (independent) */}
         {hit(
-          { left: 2, top: 14, bottom: 14, width: 14, zIndex: 2 },
-          'leftLine',
+          { left: 0, top: PAD, bottom: PAD, width: PAD - 2, zIndex: 2 },
+          () => onToggleOuter('leftLine'),
           border.leftLine ? 'Remove left edge line' : 'Add left edge line',
         )}
-        {/* Right edge → rightLine (independent) */}
         {hit(
-          { right: 2, top: 14, bottom: 14, width: 14, zIndex: 2 },
-          'rightLine',
+          { right: 0, top: PAD, bottom: PAD, width: PAD - 2, zIndex: 2 },
+          () => onToggleOuter('rightLine'),
           border.rightLine ? 'Remove right edge line' : 'Add right edge line',
         )}
-        {/* Header row interior — click anywhere on row 0 to toggle header box */}
+
+        {/* Header row — one big hit zone across row 0 for headerBox */}
         {hit(
           {
-            left: 16,
-            right: 16,
-            top: 16,
-            height: (H - 28) / ROWS - 4,
+            left: PAD + 2,
+            top: PAD + 2,
+            width: innerW - 4,
+            height: cellH - 4,
             zIndex: 1,
           },
-          'headerBox',
+          () => onToggleOuter('headerBox'),
           border.headerBox ? 'Remove header row box' : 'Add header row box',
         )}
-        {/* Header separator — strip between row 0 and row 1 */}
+
+        {/* Header separator — the gap below row 0 */}
         {hit(
           {
-            left: 16,
-            right: 16,
-            top: 14 + (H - 28) / ROWS - 4,
+            left: PAD + 2,
+            top: PAD + cellH - 4,
+            width: innerW - 4,
             height: 8,
             zIndex: 3,
           },
-          'headerLine',
+          () => onToggleOuter('headerLine'),
           border.headerLine ? 'Remove header separator' : 'Add header separator',
         )}
-        {/* Body horizontal lines — strip between row 1 and row 2 */}
-        {hit(
-          {
-            left: 16,
-            right: 16,
-            top: 14 + ((H - 28) * 2) / ROWS - 4,
-            height: 8,
-            zIndex: 3,
-          },
-          'horizontalLines',
-          border.horizontalLines
-            ? 'Remove horizontal lines between rows'
-            : 'Add horizontal lines between rows',
-        )}
-        {/* Vertical line between col 0 and col 1 */}
-        {hit(
-          {
-            top: 16,
-            bottom: 16,
-            left: 14 + (W - 28) / COLS - 4,
-            width: 8,
-            zIndex: 3,
-          },
-          'verticalLines',
-          border.verticalLines
-            ? 'Remove vertical lines between columns'
-            : 'Add vertical lines between columns',
-        )}
-        {/* Vertical line between col 1 and col 2 (same toggle) */}
-        {hit(
-          {
-            top: 16,
-            bottom: 16,
-            left: 14 + ((W - 28) * 2) / COLS - 4,
-            width: 8,
-            zIndex: 3,
-          },
-          'verticalLines',
-          border.verticalLines
-            ? 'Remove vertical lines between columns'
-            : 'Add vertical lines between columns',
-        )}
+
+        {/* Inner horizontal gaps — one hit zone per innerH[i]
+            (gap below row 1 through row ROWS-2). Note: uses
+            VISIBLE ROWS for the hit zones, but the underlying
+            innerH index is still r - 2 so it maps to the real
+            row count in the data. */}
+        {Array.from({ length: Math.max(0, ROWS - 2) }).map((_, i) => {
+          // Gap i is below visible row (i + 1), which is
+          // innerH index i in the stored array.
+          const on = !!border.innerH[i];
+          const top = PAD + cellH * (i + 2) - 4;
+          return hit(
+            {
+              left: PAD + 2,
+              top,
+              width: innerW - 4,
+              height: 8,
+              zIndex: 3,
+            },
+            () => onToggleInnerH(i),
+            on
+              ? `Remove line between row ${i + 2} and row ${i + 3}`
+              : `Add line between row ${i + 2} and row ${i + 3}`,
+          );
+        })}
+
+        {/* Inner vertical gaps — one hit zone per innerV[i] */}
+        {Array.from({ length: Math.max(0, COLS - 1) }).map((_, i) => {
+          const on = !!border.innerV[i];
+          const left = PAD + cellW * (i + 1) - 4;
+          return hit(
+            {
+              top: PAD + 2,
+              left,
+              height: innerH - 4,
+              width: 8,
+              zIndex: 3,
+            },
+            () => onToggleInnerV(i),
+            on
+              ? `Remove line between col ${i + 1} and col ${i + 2}`
+              : `Add line between col ${i + 1} and col ${i + 2}`,
+          );
+        })}
       </div>
 
-      <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4, textAlign: 'center' }}>
-        Each outer edge toggles independently · Row 0 → header box ·
-        Between rows → separators · Between columns → verticals
+      {rows > MAX_VISIBLE || cols > MAX_VISIBLE ? (
+        <div style={{ fontSize: 11, color: '#f59e0b', textAlign: 'center', lineHeight: 1.4 }}>
+          Showing a {ROWS}×{COLS} preview of your {rows}×{cols} table — bulk presets below apply to every line.
+        </div>
+      ) : null}
+
+      {/* ── Bulk presets ─────────────────────────────────── */}
+      <div style={{ borderTop: '1px solid #2a2a3a', paddingTop: 10, marginTop: 2 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+          Bulk presets
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <button type="button" style={bulkBtn} onClick={() => onBulkPreset('all')}>
+            All borders
+          </button>
+          <button type="button" style={bulkBtn} onClick={() => onBulkPreset('none')}>
+            No borders
+          </button>
+          <button type="button" style={bulkBtn} onClick={() => onBulkPreset('outer')}>
+            Outer only
+          </button>
+          <button type="button" style={bulkBtn} onClick={() => onBulkPreset('inner')}>
+            Inner only
+          </button>
+          <button type="button" style={bulkBtn} onClick={() => onBulkPreset('hOnly')}>
+            Horizontal only
+          </button>
+          <button type="button" style={bulkBtn} onClick={() => onBulkPreset('vOnly')}>
+            Vertical only
+          </button>
+          <button type="button" style={bulkBtn} onClick={() => onBulkPreset('apa')}>
+            APA 3-line
+          </button>
+        </div>
       </div>
     </div>
   );

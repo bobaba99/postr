@@ -23,12 +23,32 @@ export type ImageFit = 'contain' | 'cover' | 'fill';
  * Stored alongside TableData so the user's custom layout
  * persists independently of the named presets.
  *
- * Each outer edge is an INDEPENDENT flag (top / bottom / left /
- * right) so users can toggle a single line without affecting the
- * other three — matches the visual mockup where clicking the
- * left strip should only toggle the left edge. Named presets
- * (APA, All Lines, etc.) still use a single `outerBorder`
- * boolean on `TableBorderPreset`; the custom schema is richer.
+ * Each outer edge AND each inner gap is an INDEPENDENT flag so
+ * the user can toggle a single line without affecting the
+ * others — matches the visual mockup where clicking any
+ * specific gap should only toggle that one line.
+ *
+ * - `topLine` / `bottomLine` / `leftLine` / `rightLine` — the
+ *   four outer edges.
+ * - `headerLine` — the horizontal rule under the header row
+ *   (row 0 / row 1 separator). Kept as its own flag because
+ *   it's the single most common toggle and the bulk "all
+ *   horizontal" preset should NOT turn it off.
+ * - `innerH[i]` — horizontal rule between row `i` and row
+ *   `i + 1`, for i in [1, rows - 2]. `innerH[0]` corresponds
+ *   to the gap after the header row. Variable-length array so
+ *   tables with 3 or 30 rows both work.
+ * - `innerV[i]` — vertical rule between col `i` and col
+ *   `i + 1`, for i in [0, cols - 2]. Variable-length.
+ *
+ * Missing / short arrays default to `true` (line ON) so adding
+ * a row to an existing custom table doesn't silently drop
+ * previously-visible rules. The TableEditor mockup pads/truncates
+ * these to match the current `rows`/`cols` on every render.
+ *
+ * Named presets (APA, All Lines, etc.) still use a single
+ * `outerBorder` boolean on `TableBorderPreset`; the custom
+ * schema is richer.
  */
 export interface CustomTableBorder {
   topLine: boolean;
@@ -37,8 +57,20 @@ export interface CustomTableBorder {
   rightLine: boolean;
   headerLine: boolean;
   headerBox: boolean;
-  horizontalLines: boolean;
-  verticalLines: boolean;
+  /**
+   * Horizontal inner lines. `innerH[i]` is the rule below the
+   * row with index `i + 1`, so index 0 = the gap below row 1
+   * (under the header row in a header-bearing layout — but
+   * note that the dedicated `headerLine` flag owns that gap
+   * when the header row is row 0. The mockup and renderer
+   * treat `innerH[0]` as the gap under row 1).
+   */
+  innerH: boolean[];
+  /**
+   * Vertical inner lines. `innerV[i]` is the rule to the
+   * right of column `i`, for i in [0, cols - 2].
+   */
+  innerV: boolean[];
 }
 
 export interface TableData {

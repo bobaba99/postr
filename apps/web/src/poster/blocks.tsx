@@ -383,39 +383,72 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
   // Resolve which edge-flag set to use. Named presets come from
   // TABLE_BORDER_PRESETS; the literal 'custom' key reads from
   // `data.customBorder` instead so users can toggle individual
-  // edges via the TableEditor's Custom panel. The custom schema
-  // has per-edge `leftLine` / `rightLine` flags (no grouped
-  // `outerBorder`), so we synthesize the `outerBorder` boolean
-  // from either side being on — existing cell-border rendering
-  // still uses `preset.outerBorder` as a shortcut but would
-  // draw lines we don't want on one side. We fix that by
-  // switching the cell-border logic to check the individual
-  // sides below.
-  const preset =
-    data.borderPreset === 'custom' && data.customBorder
-      ? {
-          name: 'Custom',
-          horizontalLines: data.customBorder.horizontalLines,
-          verticalLines: data.customBorder.verticalLines,
-          outerBorder:
-            data.customBorder.leftLine || data.customBorder.rightLine,
-          headerLine: data.customBorder.headerLine,
-          topLine: data.customBorder.topLine,
-          bottomLine: data.customBorder.bottomLine,
-          headerBox: data.customBorder.headerBox,
-        }
-      : TABLE_BORDER_PRESETS[data.borderPreset] ?? TABLE_BORDER_PRESETS.apa!;
+  // edges via the TableEditor's Custom panel.
+  //
+  // For custom mode the cell-border logic below calls
+  // `customInnerH(r)` and `customInnerV(c)` which consult the
+  // per-line `innerH[]` / `innerV[]` arrays — each inner gap
+  // is independent of the others so a user can toggle only the
+  // line below row 3 without affecting row 2 or row 4.
+  const isCustomBorder = data.borderPreset === 'custom' && !!data.customBorder;
+  const preset = isCustomBorder
+    ? {
+        name: 'Custom',
+        // These grouped flags are no longer consulted by the
+        // cell-border renderer in custom mode (see the
+        // `isCustomBorder` branch in `cellBorder` below), but
+        // they still need to be non-undefined so the rest of
+        // the code that reads `preset.*` shortcircuits cleanly.
+        horizontalLines: false,
+        verticalLines: false,
+        outerBorder:
+          !!data.customBorder!.leftLine || !!data.customBorder!.rightLine,
+        headerLine: !!data.customBorder!.headerLine,
+        topLine: !!data.customBorder!.topLine,
+        bottomLine: !!data.customBorder!.bottomLine,
+        headerBox: !!data.customBorder!.headerBox,
+      }
+    : TABLE_BORDER_PRESETS[data.borderPreset] ?? TABLE_BORDER_PRESETS.apa!;
   // Pull the independent left/right flags when using custom, so
   // cell-border rendering below can paint only the edges the
   // user actually enabled instead of both together.
-  const leftEdge =
-    data.borderPreset === 'custom' && data.customBorder
-      ? data.customBorder.leftLine
-      : preset.outerBorder;
-  const rightEdge =
-    data.borderPreset === 'custom' && data.customBorder
-      ? data.customBorder.rightLine
-      : preset.outerBorder;
+  const leftEdge = isCustomBorder
+    ? !!data.customBorder!.leftLine
+    : preset.outerBorder;
+  const rightEdge = isCustomBorder
+    ? !!data.customBorder!.rightLine
+    : preset.outerBorder;
+  /**
+   * In custom-border mode, drawing the TOP of cell-row `r` means
+   * rendering the gap BELOW row `r - 1`. `innerH[i]` describes
+   * the gap below data row `i + 1`, so "top of row r" maps to
+   * `innerH[r - 2]`:
+   *
+   *   r=2 → innerH[0] (gap below row 1)
+   *   r=3 → innerH[1] (gap below row 2)
+   *   ...
+   *
+   * Row 0 is the header row and row 1's top border is owned by
+   * `headerLine` (handled outside this helper), so this is only
+   * consulted for r ≥ 2. Out-of-range indices return false
+   * (missing / short arrays cleanly default to "no line").
+   */
+  const customInnerH = (r: number): boolean => {
+    if (!isCustomBorder) return false;
+    const arr = data.customBorder!.innerH ?? [];
+    return arr[r - 2] === true;
+  };
+  /**
+   * In custom-border mode, the gap to the LEFT of column `c` is
+   * drawn if `innerV[c - 1]` is true. `innerV[i]` describes the
+   * gap to the RIGHT of col i, so the left border of col c is
+   * innerV[c - 1].
+   */
+  const customInnerV = (c: number): boolean => {
+    if (!isCustomBorder) return false;
+    const arr = data.customBorder!.innerV ?? [];
+    return arr[c - 1] === true;
+  };
   const colWidths = data.colWidths ?? Array(data.cols).fill(100 / data.cols);
 
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
@@ -659,26 +692,38 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
     }
   };
 
-  // Per-cell border CSS based on the active preset. Uses the
-  // resolved `leftEdge` / `rightEdge` flags so custom borders
-  // can toggle one side at a time (left and right are
-  // independent), while named presets still behave as before
-  // via their `outerBorder` flag which sets both sides.
+  // Per-cell border CSS based on the active preset.
+  //
+  // Named presets fall through the legacy path using
+  // `preset.horizontalLines` / `preset.verticalLines` as grouped
+  // flags. Custom mode branches on `isCustomBorder` and calls
+  // `customInnerH(r)` / `customInnerV(c)` so each inner gap is
+  // drawn based on its own per-line flag — toggling innerH[2]
+  // does NOT affect innerH[1] or innerH[3].
   const cellBorder = (r: number, c: number): CSSProperties => {
     const lw = '0.8px';
     const col = palette.muted + '55';
     let t = 'none', ri = 'none', b = 'none', l = 'none';
-    if (preset.outerBorder) {
-      if (r === 0) t = `${lw} solid ${col}`;
-      if (r === data.rows - 1) b = `${lw} solid ${col}`;
-    }
     if (leftEdge && c === 0) l = `${lw} solid ${col}`;
     if (rightEdge && c === data.cols - 1) ri = `${lw} solid ${col}`;
     if (preset.topLine && r === 0) t = `1.5px solid ${palette.primary}`;
     if (preset.headerLine && r === 1) t = `1px solid ${palette.primary}`;
     if (preset.bottomLine && r === data.rows - 1) b = `1.5px solid ${palette.primary}`;
-    if (preset.horizontalLines && r > 0) t = `${lw} solid ${col}`;
-    if (preset.verticalLines && c > 0) l = `${lw} solid ${col}`;
+    if (isCustomBorder) {
+      // Per-line inner flags. Draw the TOP border of a cell
+      // when the gap above it is enabled (innerH[r - 1]) and
+      // the LEFT border when innerV[c - 1] is enabled. The
+      // outer edges are already set above.
+      if (r > 1 && customInnerH(r)) t = `${lw} solid ${col}`;
+      if (c > 0 && customInnerV(c)) l = `${lw} solid ${col}`;
+    } else {
+      if (preset.outerBorder) {
+        if (r === 0) t = `${lw} solid ${col}`;
+        if (r === data.rows - 1) b = `${lw} solid ${col}`;
+      }
+      if (preset.horizontalLines && r > 0) t = `${lw} solid ${col}`;
+      if (preset.verticalLines && c > 0) l = `${lw} solid ${col}`;
+    }
     if (preset.headerBox && r === 0) {
       t = `1.5px solid ${palette.primary}`;
       b = `1px solid ${palette.primary}`;
