@@ -383,12 +383,39 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
   // Resolve which edge-flag set to use. Named presets come from
   // TABLE_BORDER_PRESETS; the literal 'custom' key reads from
   // `data.customBorder` instead so users can toggle individual
-  // edges via the TableEditor's Custom panel. Falls back to the
-  // APA preset if the data is missing both.
+  // edges via the TableEditor's Custom panel. The custom schema
+  // has per-edge `leftLine` / `rightLine` flags (no grouped
+  // `outerBorder`), so we synthesize the `outerBorder` boolean
+  // from either side being on — existing cell-border rendering
+  // still uses `preset.outerBorder` as a shortcut but would
+  // draw lines we don't want on one side. We fix that by
+  // switching the cell-border logic to check the individual
+  // sides below.
   const preset =
     data.borderPreset === 'custom' && data.customBorder
-      ? { name: 'Custom', ...data.customBorder }
+      ? {
+          name: 'Custom',
+          horizontalLines: data.customBorder.horizontalLines,
+          verticalLines: data.customBorder.verticalLines,
+          outerBorder:
+            data.customBorder.leftLine || data.customBorder.rightLine,
+          headerLine: data.customBorder.headerLine,
+          topLine: data.customBorder.topLine,
+          bottomLine: data.customBorder.bottomLine,
+          headerBox: data.customBorder.headerBox,
+        }
       : TABLE_BORDER_PRESETS[data.borderPreset] ?? TABLE_BORDER_PRESETS.apa!;
+  // Pull the independent left/right flags when using custom, so
+  // cell-border rendering below can paint only the edges the
+  // user actually enabled instead of both together.
+  const leftEdge =
+    data.borderPreset === 'custom' && data.customBorder
+      ? data.customBorder.leftLine
+      : preset.outerBorder;
+  const rightEdge =
+    data.borderPreset === 'custom' && data.customBorder
+      ? data.customBorder.rightLine
+      : preset.outerBorder;
   const colWidths = data.colWidths ?? Array(data.cols).fill(100 / data.cols);
 
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
@@ -632,7 +659,11 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
     }
   };
 
-  // Per-cell border CSS based on the active preset.
+  // Per-cell border CSS based on the active preset. Uses the
+  // resolved `leftEdge` / `rightEdge` flags so custom borders
+  // can toggle one side at a time (left and right are
+  // independent), while named presets still behave as before
+  // via their `outerBorder` flag which sets both sides.
   const cellBorder = (r: number, c: number): CSSProperties => {
     const lw = '0.8px';
     const col = palette.muted + '55';
@@ -640,9 +671,9 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
     if (preset.outerBorder) {
       if (r === 0) t = `${lw} solid ${col}`;
       if (r === data.rows - 1) b = `${lw} solid ${col}`;
-      if (c === 0) l = `${lw} solid ${col}`;
-      if (c === data.cols - 1) ri = `${lw} solid ${col}`;
     }
+    if (leftEdge && c === 0) l = `${lw} solid ${col}`;
+    if (rightEdge && c === data.cols - 1) ri = `${lw} solid ${col}`;
     if (preset.topLine && r === 0) t = `1.5px solid ${palette.primary}`;
     if (preset.headerLine && r === 1) t = `1px solid ${palette.primary}`;
     if (preset.bottomLine && r === data.rows - 1) b = `1.5px solid ${palette.primary}`;
@@ -1479,6 +1510,18 @@ interface BlockFrameProps {
   didDragRef: React.MutableRefObject<boolean>;
   onUpdate: (id: string, patch: Partial<Block>) => void;
   onDelete: (id: string) => void;
+  /**
+   * Clone the block at a small position offset. Wired from
+   * PosterEditor's `duplicateBlock`. Used by the ⌘D shortcut
+   * AND the right-click context menu's "Duplicate" entry.
+   */
+  onDuplicate?: (id: string) => void;
+  /**
+   * Move the block +1 / -1 in the document's block array. Later
+   * indices paint on top, so +1 = "bring forward" and -1 =
+   * "send back". Used by the right-click context menu.
+   */
+  onReorder?: (id: string, direction: 1 | -1) => void;
   titleOverflowPx?: number;
   /** True if this block extends outside the poster canvas bounds. */
   isOutOfBounds?: boolean;
@@ -1510,10 +1553,23 @@ export function BlockFrame(props: BlockFrameProps) {
     didDragRef,
     onUpdate,
     onDelete,
+    onDuplicate,
+    onReorder,
     titleOverflowPx,
     isOutOfBounds,
     captionNumber,
   } = props;
+
+  // Block context menu state. Right-clicking a non-table block
+  // pops a small menu with Duplicate / Bring Forward / Send
+  // Back / Delete. Tables have their own richer menu handled
+  // inside TableBlock. Text-like blocks skip this so the
+  // browser's native right-click (copy/paste for
+  // contentEditable) still works.
+  const [blockMenu, setBlockMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   // B1 fix: every non-title block shifts DOWN by the title's overflow
   // amount so wrapped title lines no longer collide with the authors
@@ -1638,6 +1694,26 @@ export function BlockFrame(props: BlockFrameProps) {
         // there's no competing native behavior there.
         if (b.type === 'image' || b.type === 'logo') return;
         onPointerDown(e, b.id, 'move');
+      }}
+      onContextMenu={(e) => {
+        // Right-click → pop our block-level menu. Skip for table
+        // blocks (they have a richer menu managed inside
+        // TableBlock) and for text-like blocks where the user
+        // usually wants the browser's default menu for
+        // cut/copy/paste inside contentEditable.
+        if (
+          b.type === 'table' ||
+          b.type === 'title' ||
+          b.type === 'text' ||
+          b.type === 'heading' ||
+          b.type === 'authors'
+        ) {
+          return;
+        }
+        e.preventDefault();
+        e.stopPropagation();
+        if (!selected) onSelect(b.id);
+        setBlockMenu({ x: e.clientX, y: e.clientY });
       }}
       data-block-id={b.id}
       data-block-type={b.type}
@@ -2129,6 +2205,98 @@ export function BlockFrame(props: BlockFrameProps) {
           positioned relative to the viewport via portal and doesn't
           get clipped by the poster canvas's overflow. */}
       <FloatingFormatToolbar info={selectionInfo} />
+
+      {/* Block-level right-click context menu (non-table, non-text
+          blocks only). Portal to document.body so the canvas
+          transform doesn't scale it, same reason the LogoPicker
+          modal uses a portal. Dismissed by clicking anywhere
+          outside via an overlay backdrop. */}
+      {blockMenu &&
+        ReactDOM.createPortal(
+          <div
+            onClick={() => setBlockMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setBlockMenu(null);
+            }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9998,
+              // No background — just a click-catcher so the menu
+              // closes on any outside click.
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'fixed',
+                left: blockMenu.x,
+                top: blockMenu.y,
+                minWidth: 180,
+                padding: 4,
+                background: '#1a1a26',
+                border: '1px solid #2a2a3a',
+                borderRadius: 8,
+                boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
+                color: '#e2e2e8',
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+                fontSize: 13,
+                zIndex: 9999,
+              }}
+            >
+              {(
+                [
+                  ['Duplicate', 'onDuplicate', '⌘D'],
+                  ['Bring Forward', 'bringForward', ''],
+                  ['Send Back', 'sendBack', ''],
+                  ['Delete', 'delete', '⌫'],
+                ] as const
+              ).map(([label, action, shortcut]) => (
+                <button
+                  key={action}
+                  type="button"
+                  onClick={() => {
+                    setBlockMenu(null);
+                    if (action === 'onDuplicate') onDuplicate?.(b.id);
+                    else if (action === 'bringForward') onReorder?.(b.id, 1);
+                    else if (action === 'sendBack') onReorder?.(b.id, -1);
+                    else if (action === 'delete') onDelete(b.id);
+                  }}
+                  style={{
+                    all: 'unset',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    padding: '8px 12px',
+                    borderRadius: 5,
+                    color: action === 'delete' ? '#f87171' : '#e2e2e8',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background =
+                      action === 'delete'
+                        ? 'rgba(248, 113, 113, 0.12)'
+                        : 'rgba(124, 106, 237, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background =
+                      'transparent';
+                  }}
+                >
+                  <span>{label}</span>
+                  {shortcut && (
+                    <span style={{ fontSize: 11, color: '#6b7280' }}>
+                      {shortcut}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

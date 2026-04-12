@@ -2283,15 +2283,16 @@ function TableEditor(props: {
 
   // Default custom border values — starts as an APA-ish 3-line
   // layout so flipping to Custom doesn't wipe visible borders.
-  const customBorder =
+  const customBorder: NonNullable<TableData['customBorder']> =
     data.customBorder ?? {
-      horizontalLines: false,
-      verticalLines: false,
-      outerBorder: false,
-      headerLine: true,
       topLine: true,
       bottomLine: true,
+      leftLine: false,
+      rightLine: false,
+      headerLine: true,
       headerBox: false,
+      horizontalLines: false,
+      verticalLines: false,
     };
   const isCustom = data.borderPreset === 'custom';
   const toggleCustomEdge = (
@@ -2567,10 +2568,12 @@ function CustomBorderMockup(props: {
           boxSizing: 'border-box',
         }}
       >
-        {/* Outer frame — drawn edge by edge so top / bottom / left /
-            right respect their own toggles independently. outerBorder
-            is treated as "left + right" since top + bottom have
-            their own dedicated flags. */}
+        {/* Outer frame — drawn edge by edge. Each of the four
+            outer edges (top / bottom / left / right) is a fully
+            independent flag now, so clicking the left strip only
+            toggles `leftLine` and leaves the other three alone.
+            This replaces the old grouped `outerBorder` flag that
+            fired left + right together. */}
         <div
           style={{
             position: 'absolute',
@@ -2580,8 +2583,8 @@ function CustomBorderMockup(props: {
             bottom: 14,
             borderTop: line(border.topLine),
             borderBottom: line(border.bottomLine),
-            borderLeft: line(border.outerBorder),
-            borderRight: line(border.outerBorder),
+            borderLeft: line(border.leftLine),
+            borderRight: line(border.rightLine),
             boxSizing: 'border-box',
           }}
         >
@@ -2655,20 +2658,17 @@ function CustomBorderMockup(props: {
           'bottomLine',
           border.bottomLine ? 'Remove bottom edge line' : 'Add bottom edge line',
         )}
-        {/* Left + right edges → outerBorder (both sides, synced) */}
+        {/* Left edge → leftLine (independent) */}
         {hit(
           { left: 2, top: 14, bottom: 14, width: 14, zIndex: 2 },
-          'outerBorder',
-          border.outerBorder
-            ? 'Remove left/right outer borders'
-            : 'Add left/right outer borders',
+          'leftLine',
+          border.leftLine ? 'Remove left edge line' : 'Add left edge line',
         )}
+        {/* Right edge → rightLine (independent) */}
         {hit(
           { right: 2, top: 14, bottom: 14, width: 14, zIndex: 2 },
-          'outerBorder',
-          border.outerBorder
-            ? 'Remove left/right outer borders'
-            : 'Add left/right outer borders',
+          'rightLine',
+          border.rightLine ? 'Remove right edge line' : 'Add right edge line',
         )}
         {/* Header row interior — click anywhere on row 0 to toggle header box */}
         {hit(
@@ -2739,9 +2739,8 @@ function CustomBorderMockup(props: {
       </div>
 
       <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4, textAlign: 'center' }}>
-        Top / bottom strips · Left + right → outer border · Row 0 →
-        header box · Between rows → separators · Between columns →
-        verticals
+        Each outer edge toggles independently · Row 0 → header box ·
+        Between rows → separators · Between columns → verticals
       </div>
     </div>
   );

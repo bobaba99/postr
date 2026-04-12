@@ -22,15 +22,23 @@ export type ImageFit = 'contain' | 'cover' | 'fill';
  * Per-edge border toggles used by the "Custom" border preset.
  * Stored alongside TableData so the user's custom layout
  * persists independently of the named presets.
+ *
+ * Each outer edge is an INDEPENDENT flag (top / bottom / left /
+ * right) so users can toggle a single line without affecting the
+ * other three — matches the visual mockup where clicking the
+ * left strip should only toggle the left edge. Named presets
+ * (APA, All Lines, etc.) still use a single `outerBorder`
+ * boolean on `TableBorderPreset`; the custom schema is richer.
  */
 export interface CustomTableBorder {
-  horizontalLines: boolean;
-  verticalLines: boolean;
-  outerBorder: boolean;
-  headerLine: boolean;
   topLine: boolean;
   bottomLine: boolean;
+  leftLine: boolean;
+  rightLine: boolean;
+  headerLine: boolean;
   headerBox: boolean;
+  horizontalLines: boolean;
+  verticalLines: boolean;
 }
 
 export interface TableData {

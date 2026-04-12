@@ -1009,6 +1009,46 @@ export function PosterEditor() {
     setSelectedId(null);
   };
 
+  // Clone the given block at a small (+10, +10) offset so the
+  // copy is visible next to the original. Used by the ⌘D shortcut
+  // above AND by the right-click "Duplicate" entry on non-table
+  // block context menus. Title and authors are pinned header
+  // blocks — silently refuse to clone them.
+  const duplicateBlock = (id: string) => {
+    const src = doc.blocks.find((b) => b.id === id);
+    if (!src) return;
+    if (src.type === 'title' || src.type === 'authors') return;
+    const clone: Block = {
+      ...src,
+      id: `b${nanoid(6)}`,
+      x: src.x + 10,
+      y: src.y + 10,
+    };
+    setBlocks([...doc.blocks, clone]);
+    setSelectedId(clone.id);
+    setJustInsertedId(clone.id);
+    setTimeout(
+      () => setJustInsertedId((curr) => (curr === clone.id ? null : curr)),
+      700,
+    );
+  };
+
+  // Re-order a block by moving it N positions in the doc.blocks
+  // array. React renders the blocks in array order, so later
+  // indices paint on top → "bring forward" = move toward the
+  // end of the array, "send back" = move toward the start.
+  // Direction = +1 / -1. No-op when already at the edge.
+  const reorderBlock = (id: string, direction: 1 | -1) => {
+    const idx = doc.blocks.findIndex((b) => b.id === id);
+    if (idx < 0) return;
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= doc.blocks.length) return;
+    const next = [...doc.blocks];
+    const [moved] = next.splice(idx, 1);
+    next.splice(newIdx, 0, moved!);
+    setBlocks(next);
+  };
+
   const addBlock = (type: Block['type']) => {
     // Logo is limited to ONE per poster. Multiple logos stack at
     // the top-center and their external handles collide (both
@@ -1316,6 +1356,16 @@ export function PosterEditor() {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         deleteBlock(selectedId);
+        return;
+      }
+
+      // Cmd/Ctrl + D → duplicate the selected block.
+      // Matches the Figma / Canva / Illustrator convention. The
+      // shared helper handles clone id + position offset + mount
+      // animation + header-block guard.
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'd' || e.key === 'D')) {
+        e.preventDefault();
+        duplicateBlock(selectedId);
         return;
       }
 
@@ -2120,6 +2170,8 @@ export function PosterEditor() {
                   didDragRef={didDragRef}
                   onUpdate={updateBlock}
                   onDelete={deleteBlock}
+                  onDuplicate={duplicateBlock}
+                  onReorder={reorderBlock}
                   titleOverflowPx={titleOverflowPx}
                   isOutOfBounds={oobBlockIds.has(b.id)}
                   captionNumber={captionNumbers[b.id]}

@@ -22,6 +22,29 @@ import { useMemo, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import type { SelectionInfo } from './RichTextEditor';
 
+/**
+ * Wrap the current selection in a `<span style="font-size: 1.06em">`
+ * (or 0.94em for shrink) so repeated presses compound smoothly at
+ * ~6% per press. Falls back to `execCommand('fontSize')` for
+ * selections that cross element boundaries — `surroundContents`
+ * throws in that case and we catch it.
+ */
+function bumpFontSize(direction: 1 | -1) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+  const range = selection.getRangeAt(0);
+  if (range.collapsed) return;
+  const span = document.createElement('span');
+  span.style.fontSize = direction > 0 ? '1.06em' : '0.94em';
+  try {
+    range.surroundContents(span);
+  } catch {
+    // Range crosses element boundaries — fall back to the legacy
+    // command. Coarser, but better than nothing.
+    document.execCommand('fontSize', false, direction > 0 ? '4' : '3');
+  }
+}
+
 export interface FloatingFormatToolbarProps {
   /** null = hidden. */
   info: SelectionInfo | null;
@@ -196,6 +219,66 @@ export function FloatingFormatToolbar({ info, onChange }: FloatingFormatToolbarP
         {cmdButton('I', 'italic', formats.italic, onChange, { fontStyle: 'italic' })}
         {cmdButton('U', 'underline', formats.underline, onChange, { textDecoration: 'underline' })}
         {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}
+
+        <div style={divider} />
+
+        {/*
+          Text alignment triad — left / center / right. `justifyLeft`
+          etc. are deprecated execCommand IDs, but along with
+          `bold` / `italic` they're the cross-browser baseline we
+          already depend on. Alignment applies to the block the
+          caret is inside, not the selected span — that's fine for
+          one-line titles, headings, and simple paragraphs (which is
+          what academic posters use these for).
+        */}
+        {cmdButton('⟸', 'justifyLeft', false, onChange, { fontSize: 12 })}
+        {cmdButton('≡', 'justifyCenter', false, onChange, { fontSize: 16 })}
+        {cmdButton('⟹', 'justifyRight', false, onChange, { fontSize: 12 })}
+
+        <div style={divider} />
+
+        {/*
+          Inline font-size bump — small increments (~6 %/press).
+
+          `execCommand('fontSize', …)` takes a 1–7 legacy scale,
+          which jumps ~25 % per step and looks like a different
+          typeface entirely after one click. Instead we grab the
+          current selection range directly, wrap it in a span
+          with `font-size: 1.06em` (or `0.94em` for shrink), and
+          let the browser compose sizes multiplicatively as the
+          user taps. Repeated presses compound smoothly, which
+          matches Figma / Canva's "A+ / A−" feel.
+
+          `surroundContents` throws when the range crosses
+          element boundaries (e.g. the selection starts inside a
+          `<b>` and ends outside it). The catch falls back to
+          `execCommand('fontSize')` for those edge cases so the
+          user still gets SOME effect instead of nothing.
+        */}
+        <button
+          type="button"
+          title="Smaller"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            bumpFontSize(-1);
+            onChange?.();
+          }}
+          style={{ ...btnBase, width: 28, fontSize: 11 }}
+        >
+          A−
+        </button>
+        <button
+          type="button"
+          title="Larger"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            bumpFontSize(1);
+            onChange?.();
+          }}
+          style={{ ...btnBase, width: 28, fontSize: 14 }}
+        >
+          A+
+        </button>
 
         <div style={divider} />
 
