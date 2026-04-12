@@ -34,6 +34,7 @@ import {
   LOGO_PRESETS,
   REGION_LABELS,
   logoPresetUrl,
+  resolvePresetLogo,
   searchLogoPresets,
   type LogoPreset,
 } from '@/poster/logoPresets';
@@ -99,26 +100,26 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
       ? searchLogoPresets(query)
       : searchLogoPresets(query).filter((p) => p.region === region);
 
-  const handlePresetClick = (preset: LogoPreset) => {
+  const handlePresetClick = async (preset: LogoPreset) => {
     setError(null);
-    // Store the URL directly instead of fetching and base64-
-    // encoding the favicon. The original implementation called
-    // `fetch(logoPresetUrl(domain))` so the poster would be
-    // self-contained with a data URL, but Google's s2 favicons
-    // endpoint does NOT send `Access-Control-Allow-Origin`
-    // headers, so the fetch blows up with a CORS error — while
-    // the <img> tag still renders the same URL fine (image
-    // loads aren't subject to CORS for plain display).
-    //
-    // Tradeoff: the poster now has a remote URL in `imageSrc`
-    // and the logo re-fetches at every render. If the user
-    // exports via html-to-image, the logo may be skipped (image
-    // can't be CORS-cloned into a canvas) — that's why the
-    // Presets tab text prompts users to upload their own
-    // high-res file from the Upload tab before print. For
-    // browser-print PDF export the external URL works fine.
-    onPick(logoPresetUrl(preset.domain));
-    onClose();
+    setLoadingPresetId(preset.id);
+    // Resolve the Wikipedia crest / seal first (accurate), and
+    // fall back to the Google favicon if Wikipedia has no
+    // image for this page. The resolver is CORS-friendly so
+    // the <img> tag will still load the URL as plain image
+    // data at render time without needing a proxy.
+    try {
+      const url = await resolvePresetLogo(preset);
+      onPick(url);
+      onClose();
+    } catch (err) {
+      // Belt-and-braces: resolvePresetLogo swallows errors and
+      // returns a fallback URL, so this catch should only fire
+      // if that fallback itself throws (shouldn't happen).
+      setError(err instanceof Error ? err.message : 'Failed to load logo.');
+    } finally {
+      setLoadingPresetId(null);
+    }
   };
 
   const handleMyLogoClick = (logo: UserLogo) => {

@@ -1,31 +1,30 @@
 /**
  * Logo presets — curated North American university catalog.
  *
- * Each preset stores `{ id, name, domain, region }`. At click
- * time the LogoPicker uses Google's s2 favicon service to fetch
- * a 256×256 PNG of the institution's logo by domain:
+ * Each preset stores `{ id, name, domain, wiki, region, location }`.
+ * At click time the LogoPicker first asks Wikipedia's REST API
+ * for the institution's page image (its seal / coat of arms /
+ * crest — far more accurate than a 16×16 favicon), and only
+ * falls back to Google's s2 favicon service if Wikipedia has
+ * no image or the fetch fails.
  *
- *   https://www.google.com/s2/favicons?domain={domain}&sz=256
+ * Wikipedia lookup (`fetchWikiLogoUrl` below):
  *
- * Why Google favicons and not Wikipedia / Clearbit / a bundled
- * binary library:
+ *   GET https://en.wikipedia.org/api/rest_v1/page/summary/{wiki}
+ *   → JSON with `originalimage.source` — usually a full-size
+ *     SVG/PNG of the page's infobox image, which for
+ *     universities is their official seal or crest.
  *
- *   - Google's service is free, stable, auth-free, and works
- *     for literally every valid domain. No TOS concerns for a
- *     user-facing preview.
- *   - Wikipedia's page-image API is hit-or-miss: some university
- *     pages return the logo, others return a building photo or
- *     historical portrait — and we can't verify 80+ entries
- *     without manual inspection.
- *   - Clearbit's logo API was acquired and pulled in 2024.
- *   - Bundling binary logos in the repo is a trademark gray
- *     zone and would add megabytes to every clone / deploy.
+ * This lookup is CORS-enabled by Wikipedia, free, and reflects
+ * updates to the Wikipedia article without redeploys. The
+ * tradeoff is that the URL is REMOTE (not base64) so the block
+ * re-fetches at every render; exports via html-to-image may
+ * skip the image if cross-origin cloning fails. Users are
+ * nudged to upload their own high-res file from the Upload tab
+ * before print.
  *
- * 256 × 256 is print-insufficient (you'd want ~1200 px for a
- * 10 cm logo at 300 DPI), so the UI nudges users to upload their
- * own high-resolution file for the final export. The preset is a
- * "start here, replace before printing" convenience, not a
- * long-term asset.
+ * The `wiki` field is the Wikipedia page title with underscores
+ * (URL form): e.g. "Harvard_University", "Massachusetts_Institute_of_Technology".
  *
  * Coverage: ~80 North American universities biased toward the
  * institutions most likely to produce posters (R1 research, top
@@ -37,7 +36,13 @@ export interface LogoPreset {
   id: string;
   /** Display name shown in the picker */
   name: string;
-  /** Domain used to fetch the favicon */
+  /**
+   * Wikipedia page title (URL form — underscores for spaces).
+   * Used to resolve an accurate crest / seal via the Wikipedia
+   * REST API at click time.
+   */
+  wiki: string;
+  /** Domain used as a fallback favicon source */
   domain: string;
   /** Region for filter buttons + rough grouping */
   region: 'us-ne' | 'us-s' | 'us-mw' | 'us-w' | 'canada';
@@ -47,115 +52,115 @@ export interface LogoPreset {
 
 export const LOGO_PRESETS: readonly LogoPreset[] = [
   // ─── US Northeast ────────────────────────────────────────────
-  { id: 'harvard', name: 'Harvard University', domain: 'harvard.edu', region: 'us-ne', location: 'Cambridge, MA' },
-  { id: 'mit', name: 'Massachusetts Institute of Technology', domain: 'mit.edu', region: 'us-ne', location: 'Cambridge, MA' },
-  { id: 'yale', name: 'Yale University', domain: 'yale.edu', region: 'us-ne', location: 'New Haven, CT' },
-  { id: 'princeton', name: 'Princeton University', domain: 'princeton.edu', region: 'us-ne', location: 'Princeton, NJ' },
-  { id: 'columbia', name: 'Columbia University', domain: 'columbia.edu', region: 'us-ne', location: 'New York, NY' },
-  { id: 'upenn', name: 'University of Pennsylvania', domain: 'upenn.edu', region: 'us-ne', location: 'Philadelphia, PA' },
-  { id: 'cornell', name: 'Cornell University', domain: 'cornell.edu', region: 'us-ne', location: 'Ithaca, NY' },
-  { id: 'brown', name: 'Brown University', domain: 'brown.edu', region: 'us-ne', location: 'Providence, RI' },
-  { id: 'dartmouth', name: 'Dartmouth College', domain: 'dartmouth.edu', region: 'us-ne', location: 'Hanover, NH' },
-  { id: 'nyu', name: 'New York University', domain: 'nyu.edu', region: 'us-ne', location: 'New York, NY' },
-  { id: 'jhu', name: 'Johns Hopkins University', domain: 'jhu.edu', region: 'us-ne', location: 'Baltimore, MD' },
-  { id: 'bu', name: 'Boston University', domain: 'bu.edu', region: 'us-ne', location: 'Boston, MA' },
-  { id: 'bc', name: 'Boston College', domain: 'bc.edu', region: 'us-ne', location: 'Chestnut Hill, MA' },
-  { id: 'tufts', name: 'Tufts University', domain: 'tufts.edu', region: 'us-ne', location: 'Medford, MA' },
-  { id: 'northeastern', name: 'Northeastern University', domain: 'northeastern.edu', region: 'us-ne', location: 'Boston, MA' },
-  { id: 'umd', name: 'University of Maryland', domain: 'umd.edu', region: 'us-ne', location: 'College Park, MD' },
-  { id: 'pitt', name: 'University of Pittsburgh', domain: 'pitt.edu', region: 'us-ne', location: 'Pittsburgh, PA' },
-  { id: 'psu', name: 'Penn State University', domain: 'psu.edu', region: 'us-ne', location: 'University Park, PA' },
-  { id: 'cmu', name: 'Carnegie Mellon University', domain: 'cmu.edu', region: 'us-ne', location: 'Pittsburgh, PA' },
-  { id: 'georgetown', name: 'Georgetown University', domain: 'georgetown.edu', region: 'us-ne', location: 'Washington, DC' },
-  { id: 'rutgers', name: 'Rutgers University', domain: 'rutgers.edu', region: 'us-ne', location: 'New Brunswick, NJ' },
-  { id: 'syracuse', name: 'Syracuse University', domain: 'syracuse.edu', region: 'us-ne', location: 'Syracuse, NY' },
-  { id: 'rpi', name: 'Rensselaer Polytechnic Institute', domain: 'rpi.edu', region: 'us-ne', location: 'Troy, NY' },
+  { id: 'harvard', name: 'Harvard University', wiki: 'Harvard_University', domain: 'harvard.edu', region: 'us-ne', location: 'Cambridge, MA' },
+  { id: 'mit', name: 'Massachusetts Institute of Technology', wiki: 'Massachusetts_Institute_of_Technology', domain: 'mit.edu', region: 'us-ne', location: 'Cambridge, MA' },
+  { id: 'yale', name: 'Yale University', wiki: 'Yale_University', domain: 'yale.edu', region: 'us-ne', location: 'New Haven, CT' },
+  { id: 'princeton', name: 'Princeton University', wiki: 'Princeton_University', domain: 'princeton.edu', region: 'us-ne', location: 'Princeton, NJ' },
+  { id: 'columbia', name: 'Columbia University', wiki: 'Columbia_University', domain: 'columbia.edu', region: 'us-ne', location: 'New York, NY' },
+  { id: 'upenn', name: 'University of Pennsylvania', wiki: 'University_of_Pennsylvania', domain: 'upenn.edu', region: 'us-ne', location: 'Philadelphia, PA' },
+  { id: 'cornell', name: 'Cornell University', wiki: 'Cornell_University', domain: 'cornell.edu', region: 'us-ne', location: 'Ithaca, NY' },
+  { id: 'brown', name: 'Brown University', wiki: 'Brown_University', domain: 'brown.edu', region: 'us-ne', location: 'Providence, RI' },
+  { id: 'dartmouth', name: 'Dartmouth College', wiki: 'Dartmouth_College', domain: 'dartmouth.edu', region: 'us-ne', location: 'Hanover, NH' },
+  { id: 'nyu', name: 'New York University', wiki: 'New_York_University', domain: 'nyu.edu', region: 'us-ne', location: 'New York, NY' },
+  { id: 'jhu', name: 'Johns Hopkins University', wiki: 'Johns_Hopkins_University', domain: 'jhu.edu', region: 'us-ne', location: 'Baltimore, MD' },
+  { id: 'bu', name: 'Boston University', wiki: 'Boston_University', domain: 'bu.edu', region: 'us-ne', location: 'Boston, MA' },
+  { id: 'bc', name: 'Boston College', wiki: 'Boston_College', domain: 'bc.edu', region: 'us-ne', location: 'Chestnut Hill, MA' },
+  { id: 'tufts', name: 'Tufts University', wiki: 'Tufts_University', domain: 'tufts.edu', region: 'us-ne', location: 'Medford, MA' },
+  { id: 'northeastern', name: 'Northeastern University', wiki: 'Northeastern_University', domain: 'northeastern.edu', region: 'us-ne', location: 'Boston, MA' },
+  { id: 'umd', name: 'University of Maryland', wiki: 'University_of_Maryland,_College_Park', domain: 'umd.edu', region: 'us-ne', location: 'College Park, MD' },
+  { id: 'pitt', name: 'University of Pittsburgh', wiki: 'University_of_Pittsburgh', domain: 'pitt.edu', region: 'us-ne', location: 'Pittsburgh, PA' },
+  { id: 'psu', name: 'Penn State University', wiki: 'Pennsylvania_State_University', domain: 'psu.edu', region: 'us-ne', location: 'University Park, PA' },
+  { id: 'cmu', name: 'Carnegie Mellon University', wiki: 'Carnegie_Mellon_University', domain: 'cmu.edu', region: 'us-ne', location: 'Pittsburgh, PA' },
+  { id: 'georgetown', name: 'Georgetown University', wiki: 'Georgetown_University', domain: 'georgetown.edu', region: 'us-ne', location: 'Washington, DC' },
+  { id: 'rutgers', name: 'Rutgers University', wiki: 'Rutgers_University', domain: 'rutgers.edu', region: 'us-ne', location: 'New Brunswick, NJ' },
+  { id: 'syracuse', name: 'Syracuse University', wiki: 'Syracuse_University', domain: 'syracuse.edu', region: 'us-ne', location: 'Syracuse, NY' },
+  { id: 'rpi', name: 'Rensselaer Polytechnic Institute', wiki: 'Rensselaer_Polytechnic_Institute', domain: 'rpi.edu', region: 'us-ne', location: 'Troy, NY' },
 
   // ─── US South ────────────────────────────────────────────────
-  { id: 'duke', name: 'Duke University', domain: 'duke.edu', region: 'us-s', location: 'Durham, NC' },
-  { id: 'unc', name: 'University of North Carolina', domain: 'unc.edu', region: 'us-s', location: 'Chapel Hill, NC' },
-  { id: 'gatech', name: 'Georgia Institute of Technology', domain: 'gatech.edu', region: 'us-s', location: 'Atlanta, GA' },
-  { id: 'emory', name: 'Emory University', domain: 'emory.edu', region: 'us-s', location: 'Atlanta, GA' },
-  { id: 'uga', name: 'University of Georgia', domain: 'uga.edu', region: 'us-s', location: 'Athens, GA' },
-  { id: 'vanderbilt', name: 'Vanderbilt University', domain: 'vanderbilt.edu', region: 'us-s', location: 'Nashville, TN' },
-  { id: 'utk', name: 'University of Tennessee', domain: 'utk.edu', region: 'us-s', location: 'Knoxville, TN' },
-  { id: 'virginia', name: 'University of Virginia', domain: 'virginia.edu', region: 'us-s', location: 'Charlottesville, VA' },
-  { id: 'vt', name: 'Virginia Tech', domain: 'vt.edu', region: 'us-s', location: 'Blacksburg, VA' },
-  { id: 'rice', name: 'Rice University', domain: 'rice.edu', region: 'us-s', location: 'Houston, TX' },
-  { id: 'utexas', name: 'University of Texas at Austin', domain: 'utexas.edu', region: 'us-s', location: 'Austin, TX' },
-  { id: 'tamu', name: 'Texas A&M University', domain: 'tamu.edu', region: 'us-s', location: 'College Station, TX' },
-  { id: 'ufl', name: 'University of Florida', domain: 'ufl.edu', region: 'us-s', location: 'Gainesville, FL' },
-  { id: 'miami', name: 'University of Miami', domain: 'miami.edu', region: 'us-s', location: 'Coral Gables, FL' },
-  { id: 'tulane', name: 'Tulane University', domain: 'tulane.edu', region: 'us-s', location: 'New Orleans, LA' },
-  { id: 'lsu', name: 'Louisiana State University', domain: 'lsu.edu', region: 'us-s', location: 'Baton Rouge, LA' },
-  { id: 'wakeforest', name: 'Wake Forest University', domain: 'wfu.edu', region: 'us-s', location: 'Winston-Salem, NC' },
+  { id: 'duke', name: 'Duke University', wiki: 'Duke_University', domain: 'duke.edu', region: 'us-s', location: 'Durham, NC' },
+  { id: 'unc', name: 'University of North Carolina', wiki: 'University_of_North_Carolina_at_Chapel_Hill', domain: 'unc.edu', region: 'us-s', location: 'Chapel Hill, NC' },
+  { id: 'gatech', name: 'Georgia Institute of Technology', wiki: 'Georgia_Institute_of_Technology', domain: 'gatech.edu', region: 'us-s', location: 'Atlanta, GA' },
+  { id: 'emory', name: 'Emory University', wiki: 'Emory_University', domain: 'emory.edu', region: 'us-s', location: 'Atlanta, GA' },
+  { id: 'uga', name: 'University of Georgia', wiki: 'University_of_Georgia', domain: 'uga.edu', region: 'us-s', location: 'Athens, GA' },
+  { id: 'vanderbilt', name: 'Vanderbilt University', wiki: 'Vanderbilt_University', domain: 'vanderbilt.edu', region: 'us-s', location: 'Nashville, TN' },
+  { id: 'utk', name: 'University of Tennessee', wiki: 'University_of_Tennessee', domain: 'utk.edu', region: 'us-s', location: 'Knoxville, TN' },
+  { id: 'virginia', name: 'University of Virginia', wiki: 'University_of_Virginia', domain: 'virginia.edu', region: 'us-s', location: 'Charlottesville, VA' },
+  { id: 'vt', name: 'Virginia Tech', wiki: 'Virginia_Tech', domain: 'vt.edu', region: 'us-s', location: 'Blacksburg, VA' },
+  { id: 'rice', name: 'Rice University', wiki: 'Rice_University', domain: 'rice.edu', region: 'us-s', location: 'Houston, TX' },
+  { id: 'utexas', name: 'University of Texas at Austin', wiki: 'University_of_Texas_at_Austin', domain: 'utexas.edu', region: 'us-s', location: 'Austin, TX' },
+  { id: 'tamu', name: 'Texas A&M University', wiki: 'Texas_A%26M_University', domain: 'tamu.edu', region: 'us-s', location: 'College Station, TX' },
+  { id: 'ufl', name: 'University of Florida', wiki: 'University_of_Florida', domain: 'ufl.edu', region: 'us-s', location: 'Gainesville, FL' },
+  { id: 'miami', name: 'University of Miami', wiki: 'University_of_Miami', domain: 'miami.edu', region: 'us-s', location: 'Coral Gables, FL' },
+  { id: 'tulane', name: 'Tulane University', wiki: 'Tulane_University', domain: 'tulane.edu', region: 'us-s', location: 'New Orleans, LA' },
+  { id: 'lsu', name: 'Louisiana State University', wiki: 'Louisiana_State_University', domain: 'lsu.edu', region: 'us-s', location: 'Baton Rouge, LA' },
+  { id: 'wakeforest', name: 'Wake Forest University', wiki: 'Wake_Forest_University', domain: 'wfu.edu', region: 'us-s', location: 'Winston-Salem, NC' },
 
   // ─── US Midwest ──────────────────────────────────────────────
-  { id: 'uchicago', name: 'University of Chicago', domain: 'uchicago.edu', region: 'us-mw', location: 'Chicago, IL' },
-  { id: 'northwestern', name: 'Northwestern University', domain: 'northwestern.edu', region: 'us-mw', location: 'Evanston, IL' },
-  { id: 'umich', name: 'University of Michigan', domain: 'umich.edu', region: 'us-mw', location: 'Ann Arbor, MI' },
-  { id: 'msu', name: 'Michigan State University', domain: 'msu.edu', region: 'us-mw', location: 'East Lansing, MI' },
-  { id: 'osu', name: 'Ohio State University', domain: 'osu.edu', region: 'us-mw', location: 'Columbus, OH' },
-  { id: 'wisc', name: 'University of Wisconsin', domain: 'wisc.edu', region: 'us-mw', location: 'Madison, WI' },
-  { id: 'umn', name: 'University of Minnesota', domain: 'umn.edu', region: 'us-mw', location: 'Minneapolis, MN' },
-  { id: 'illinois', name: 'University of Illinois', domain: 'illinois.edu', region: 'us-mw', location: 'Urbana-Champaign, IL' },
-  { id: 'indiana', name: 'Indiana University', domain: 'indiana.edu', region: 'us-mw', location: 'Bloomington, IN' },
-  { id: 'purdue', name: 'Purdue University', domain: 'purdue.edu', region: 'us-mw', location: 'West Lafayette, IN' },
-  { id: 'uiowa', name: 'University of Iowa', domain: 'uiowa.edu', region: 'us-mw', location: 'Iowa City, IA' },
-  { id: 'iastate', name: 'Iowa State University', domain: 'iastate.edu', region: 'us-mw', location: 'Ames, IA' },
-  { id: 'missouri', name: 'University of Missouri', domain: 'missouri.edu', region: 'us-mw', location: 'Columbia, MO' },
-  { id: 'wustl', name: 'Washington University in St. Louis', domain: 'wustl.edu', region: 'us-mw', location: 'St. Louis, MO' },
-  { id: 'nd', name: 'University of Notre Dame', domain: 'nd.edu', region: 'us-mw', location: 'Notre Dame, IN' },
-  { id: 'ku', name: 'University of Kansas', domain: 'ku.edu', region: 'us-mw', location: 'Lawrence, KS' },
-  { id: 'nebraska', name: 'University of Nebraska', domain: 'unl.edu', region: 'us-mw', location: 'Lincoln, NE' },
+  { id: 'uchicago', name: 'University of Chicago', wiki: 'University_of_Chicago', domain: 'uchicago.edu', region: 'us-mw', location: 'Chicago, IL' },
+  { id: 'northwestern', name: 'Northwestern University', wiki: 'Northwestern_University', domain: 'northwestern.edu', region: 'us-mw', location: 'Evanston, IL' },
+  { id: 'umich', name: 'University of Michigan', wiki: 'University_of_Michigan', domain: 'umich.edu', region: 'us-mw', location: 'Ann Arbor, MI' },
+  { id: 'msu', name: 'Michigan State University', wiki: 'Michigan_State_University', domain: 'msu.edu', region: 'us-mw', location: 'East Lansing, MI' },
+  { id: 'osu', name: 'Ohio State University', wiki: 'Ohio_State_University', domain: 'osu.edu', region: 'us-mw', location: 'Columbus, OH' },
+  { id: 'wisc', name: 'University of Wisconsin', wiki: 'University_of_Wisconsin%E2%80%93Madison', domain: 'wisc.edu', region: 'us-mw', location: 'Madison, WI' },
+  { id: 'umn', name: 'University of Minnesota', wiki: 'University_of_Minnesota', domain: 'umn.edu', region: 'us-mw', location: 'Minneapolis, MN' },
+  { id: 'illinois', name: 'University of Illinois', wiki: 'University_of_Illinois_Urbana-Champaign', domain: 'illinois.edu', region: 'us-mw', location: 'Urbana-Champaign, IL' },
+  { id: 'indiana', name: 'Indiana University', wiki: 'Indiana_University_Bloomington', domain: 'indiana.edu', region: 'us-mw', location: 'Bloomington, IN' },
+  { id: 'purdue', name: 'Purdue University', wiki: 'Purdue_University', domain: 'purdue.edu', region: 'us-mw', location: 'West Lafayette, IN' },
+  { id: 'uiowa', name: 'University of Iowa', wiki: 'University_of_Iowa', domain: 'uiowa.edu', region: 'us-mw', location: 'Iowa City, IA' },
+  { id: 'iastate', name: 'Iowa State University', wiki: 'Iowa_State_University', domain: 'iastate.edu', region: 'us-mw', location: 'Ames, IA' },
+  { id: 'missouri', name: 'University of Missouri', wiki: 'University_of_Missouri', domain: 'missouri.edu', region: 'us-mw', location: 'Columbia, MO' },
+  { id: 'wustl', name: 'Washington University in St. Louis', wiki: 'Washington_University_in_St._Louis', domain: 'wustl.edu', region: 'us-mw', location: 'St. Louis, MO' },
+  { id: 'nd', name: 'University of Notre Dame', wiki: 'University_of_Notre_Dame', domain: 'nd.edu', region: 'us-mw', location: 'Notre Dame, IN' },
+  { id: 'ku', name: 'University of Kansas', wiki: 'University_of_Kansas', domain: 'ku.edu', region: 'us-mw', location: 'Lawrence, KS' },
+  { id: 'nebraska', name: 'University of Nebraska', wiki: 'University_of_Nebraska%E2%80%93Lincoln', domain: 'unl.edu', region: 'us-mw', location: 'Lincoln, NE' },
 
   // ─── US West ─────────────────────────────────────────────────
-  { id: 'stanford', name: 'Stanford University', domain: 'stanford.edu', region: 'us-w', location: 'Stanford, CA' },
-  { id: 'caltech', name: 'California Institute of Technology', domain: 'caltech.edu', region: 'us-w', location: 'Pasadena, CA' },
-  { id: 'berkeley', name: 'UC Berkeley', domain: 'berkeley.edu', region: 'us-w', location: 'Berkeley, CA' },
-  { id: 'ucla', name: 'UCLA', domain: 'ucla.edu', region: 'us-w', location: 'Los Angeles, CA' },
-  { id: 'ucsd', name: 'UC San Diego', domain: 'ucsd.edu', region: 'us-w', location: 'La Jolla, CA' },
-  { id: 'ucdavis', name: 'UC Davis', domain: 'ucdavis.edu', region: 'us-w', location: 'Davis, CA' },
-  { id: 'ucsb', name: 'UC Santa Barbara', domain: 'ucsb.edu', region: 'us-w', location: 'Santa Barbara, CA' },
-  { id: 'uci', name: 'UC Irvine', domain: 'uci.edu', region: 'us-w', location: 'Irvine, CA' },
-  { id: 'ucsc', name: 'UC Santa Cruz', domain: 'ucsc.edu', region: 'us-w', location: 'Santa Cruz, CA' },
-  { id: 'ucsf', name: 'UC San Francisco', domain: 'ucsf.edu', region: 'us-w', location: 'San Francisco, CA' },
-  { id: 'ucr', name: 'UC Riverside', domain: 'ucr.edu', region: 'us-w', location: 'Riverside, CA' },
-  { id: 'usc', name: 'University of Southern California', domain: 'usc.edu', region: 'us-w', location: 'Los Angeles, CA' },
-  { id: 'washington', name: 'University of Washington', domain: 'washington.edu', region: 'us-w', location: 'Seattle, WA' },
-  { id: 'oregon', name: 'University of Oregon', domain: 'uoregon.edu', region: 'us-w', location: 'Eugene, OR' },
-  { id: 'oregonstate', name: 'Oregon State University', domain: 'oregonstate.edu', region: 'us-w', location: 'Corvallis, OR' },
-  { id: 'washingtonstate', name: 'Washington State University', domain: 'wsu.edu', region: 'us-w', location: 'Pullman, WA' },
-  { id: 'colorado', name: 'University of Colorado Boulder', domain: 'colorado.edu', region: 'us-w', location: 'Boulder, CO' },
-  { id: 'colostate', name: 'Colorado State University', domain: 'colostate.edu', region: 'us-w', location: 'Fort Collins, CO' },
-  { id: 'asu', name: 'Arizona State University', domain: 'asu.edu', region: 'us-w', location: 'Tempe, AZ' },
-  { id: 'arizona', name: 'University of Arizona', domain: 'arizona.edu', region: 'us-w', location: 'Tucson, AZ' },
-  { id: 'utah', name: 'University of Utah', domain: 'utah.edu', region: 'us-w', location: 'Salt Lake City, UT' },
-  { id: 'byu', name: 'Brigham Young University', domain: 'byu.edu', region: 'us-w', location: 'Provo, UT' },
-  { id: 'unlv', name: 'University of Nevada, Las Vegas', domain: 'unlv.edu', region: 'us-w', location: 'Las Vegas, NV' },
-  { id: 'hawaii', name: 'University of Hawaii at Manoa', domain: 'hawaii.edu', region: 'us-w', location: 'Honolulu, HI' },
+  { id: 'stanford', name: 'Stanford University', wiki: 'Stanford_University', domain: 'stanford.edu', region: 'us-w', location: 'Stanford, CA' },
+  { id: 'caltech', name: 'California Institute of Technology', wiki: 'California_Institute_of_Technology', domain: 'caltech.edu', region: 'us-w', location: 'Pasadena, CA' },
+  { id: 'berkeley', name: 'UC Berkeley', wiki: 'University_of_California,_Berkeley', domain: 'berkeley.edu', region: 'us-w', location: 'Berkeley, CA' },
+  { id: 'ucla', name: 'UCLA', wiki: 'University_of_California,_Los_Angeles', domain: 'ucla.edu', region: 'us-w', location: 'Los Angeles, CA' },
+  { id: 'ucsd', name: 'UC San Diego', wiki: 'University_of_California,_San_Diego', domain: 'ucsd.edu', region: 'us-w', location: 'La Jolla, CA' },
+  { id: 'ucdavis', name: 'UC Davis', wiki: 'University_of_California,_Davis', domain: 'ucdavis.edu', region: 'us-w', location: 'Davis, CA' },
+  { id: 'ucsb', name: 'UC Santa Barbara', wiki: 'University_of_California,_Santa_Barbara', domain: 'ucsb.edu', region: 'us-w', location: 'Santa Barbara, CA' },
+  { id: 'uci', name: 'UC Irvine', wiki: 'University_of_California,_Irvine', domain: 'uci.edu', region: 'us-w', location: 'Irvine, CA' },
+  { id: 'ucsc', name: 'UC Santa Cruz', wiki: 'University_of_California,_Santa_Cruz', domain: 'ucsc.edu', region: 'us-w', location: 'Santa Cruz, CA' },
+  { id: 'ucsf', name: 'UC San Francisco', wiki: 'University_of_California,_San_Francisco', domain: 'ucsf.edu', region: 'us-w', location: 'San Francisco, CA' },
+  { id: 'ucr', name: 'UC Riverside', wiki: 'University_of_California,_Riverside', domain: 'ucr.edu', region: 'us-w', location: 'Riverside, CA' },
+  { id: 'usc', name: 'University of Southern California', wiki: 'University_of_Southern_California', domain: 'usc.edu', region: 'us-w', location: 'Los Angeles, CA' },
+  { id: 'washington', name: 'University of Washington', wiki: 'University_of_Washington', domain: 'washington.edu', region: 'us-w', location: 'Seattle, WA' },
+  { id: 'oregon', name: 'University of Oregon', wiki: 'University_of_Oregon', domain: 'uoregon.edu', region: 'us-w', location: 'Eugene, OR' },
+  { id: 'oregonstate', name: 'Oregon State University', wiki: 'Oregon_State_University', domain: 'oregonstate.edu', region: 'us-w', location: 'Corvallis, OR' },
+  { id: 'washingtonstate', name: 'Washington State University', wiki: 'Washington_State_University', domain: 'wsu.edu', region: 'us-w', location: 'Pullman, WA' },
+  { id: 'colorado', name: 'University of Colorado Boulder', wiki: 'University_of_Colorado_Boulder', domain: 'colorado.edu', region: 'us-w', location: 'Boulder, CO' },
+  { id: 'colostate', name: 'Colorado State University', wiki: 'Colorado_State_University', domain: 'colostate.edu', region: 'us-w', location: 'Fort Collins, CO' },
+  { id: 'asu', name: 'Arizona State University', wiki: 'Arizona_State_University', domain: 'asu.edu', region: 'us-w', location: 'Tempe, AZ' },
+  { id: 'arizona', name: 'University of Arizona', wiki: 'University_of_Arizona', domain: 'arizona.edu', region: 'us-w', location: 'Tucson, AZ' },
+  { id: 'utah', name: 'University of Utah', wiki: 'University_of_Utah', domain: 'utah.edu', region: 'us-w', location: 'Salt Lake City, UT' },
+  { id: 'byu', name: 'Brigham Young University', wiki: 'Brigham_Young_University', domain: 'byu.edu', region: 'us-w', location: 'Provo, UT' },
+  { id: 'unlv', name: 'University of Nevada, Las Vegas', wiki: 'University_of_Nevada,_Las_Vegas', domain: 'unlv.edu', region: 'us-w', location: 'Las Vegas, NV' },
+  { id: 'hawaii', name: 'University of Hawaii at Manoa', wiki: 'University_of_Hawaii_at_Manoa', domain: 'hawaii.edu', region: 'us-w', location: 'Honolulu, HI' },
 
   // ─── Canada ──────────────────────────────────────────────────
-  { id: 'utoronto', name: 'University of Toronto', domain: 'utoronto.ca', region: 'canada', location: 'Toronto, ON' },
-  { id: 'mcgill', name: 'McGill University', domain: 'mcgill.ca', region: 'canada', location: 'Montreal, QC' },
-  { id: 'ubc', name: 'University of British Columbia', domain: 'ubc.ca', region: 'canada', location: 'Vancouver, BC' },
-  { id: 'uwaterloo', name: 'University of Waterloo', domain: 'uwaterloo.ca', region: 'canada', location: 'Waterloo, ON' },
-  { id: 'ualberta', name: 'University of Alberta', domain: 'ualberta.ca', region: 'canada', location: 'Edmonton, AB' },
-  { id: 'ucalgary', name: 'University of Calgary', domain: 'ucalgary.ca', region: 'canada', location: 'Calgary, AB' },
-  { id: 'mcmaster', name: 'McMaster University', domain: 'mcmaster.ca', region: 'canada', location: 'Hamilton, ON' },
-  { id: 'westernu', name: 'Western University', domain: 'uwo.ca', region: 'canada', location: 'London, ON' },
-  { id: 'queensu', name: "Queen's University", domain: 'queensu.ca', region: 'canada', location: 'Kingston, ON' },
-  { id: 'uottawa', name: 'University of Ottawa', domain: 'uottawa.ca', region: 'canada', location: 'Ottawa, ON' },
-  { id: 'umontreal', name: 'Université de Montréal', domain: 'umontreal.ca', region: 'canada', location: 'Montreal, QC' },
-  { id: 'sfu', name: 'Simon Fraser University', domain: 'sfu.ca', region: 'canada', location: 'Burnaby, BC' },
-  { id: 'uvic', name: 'University of Victoria', domain: 'uvic.ca', region: 'canada', location: 'Victoria, BC' },
-  { id: 'yorku', name: 'York University', domain: 'yorku.ca', region: 'canada', location: 'Toronto, ON' },
-  { id: 'concordia', name: 'Concordia University', domain: 'concordia.ca', region: 'canada', location: 'Montreal, QC' },
-  { id: 'dalhousie', name: 'Dalhousie University', domain: 'dal.ca', region: 'canada', location: 'Halifax, NS' },
-  { id: 'laval', name: 'Université Laval', domain: 'ulaval.ca', region: 'canada', location: 'Quebec City, QC' },
-  { id: 'manitoba', name: 'University of Manitoba', domain: 'umanitoba.ca', region: 'canada', location: 'Winnipeg, MB' },
-  { id: 'usask', name: 'University of Saskatchewan', domain: 'usask.ca', region: 'canada', location: 'Saskatoon, SK' },
-  { id: 'guelph', name: 'University of Guelph', domain: 'uoguelph.ca', region: 'canada', location: 'Guelph, ON' },
+  { id: 'utoronto', name: 'University of Toronto', wiki: 'University_of_Toronto', domain: 'utoronto.ca', region: 'canada', location: 'Toronto, ON' },
+  { id: 'mcgill', name: 'McGill University', wiki: 'McGill_University', domain: 'mcgill.ca', region: 'canada', location: 'Montreal, QC' },
+  { id: 'ubc', name: 'University of British Columbia', wiki: 'University_of_British_Columbia', domain: 'ubc.ca', region: 'canada', location: 'Vancouver, BC' },
+  { id: 'uwaterloo', name: 'University of Waterloo', wiki: 'University_of_Waterloo', domain: 'uwaterloo.ca', region: 'canada', location: 'Waterloo, ON' },
+  { id: 'ualberta', name: 'University of Alberta', wiki: 'University_of_Alberta', domain: 'ualberta.ca', region: 'canada', location: 'Edmonton, AB' },
+  { id: 'ucalgary', name: 'University of Calgary', wiki: 'University_of_Calgary', domain: 'ucalgary.ca', region: 'canada', location: 'Calgary, AB' },
+  { id: 'mcmaster', name: 'McMaster University', wiki: 'McMaster_University', domain: 'mcmaster.ca', region: 'canada', location: 'Hamilton, ON' },
+  { id: 'westernu', name: 'Western University', wiki: 'University_of_Western_Ontario', domain: 'uwo.ca', region: 'canada', location: 'London, ON' },
+  { id: 'queensu', name: "Queen's University", wiki: "Queen%27s_University_at_Kingston", domain: 'queensu.ca', region: 'canada', location: 'Kingston, ON' },
+  { id: 'uottawa', name: 'University of Ottawa', wiki: 'University_of_Ottawa', domain: 'uottawa.ca', region: 'canada', location: 'Ottawa, ON' },
+  { id: 'umontreal', name: 'Université de Montréal', wiki: 'Universit%C3%A9_de_Montr%C3%A9al', domain: 'umontreal.ca', region: 'canada', location: 'Montreal, QC' },
+  { id: 'sfu', name: 'Simon Fraser University', wiki: 'Simon_Fraser_University', domain: 'sfu.ca', region: 'canada', location: 'Burnaby, BC' },
+  { id: 'uvic', name: 'University of Victoria', wiki: 'University_of_Victoria', domain: 'uvic.ca', region: 'canada', location: 'Victoria, BC' },
+  { id: 'yorku', name: 'York University', wiki: 'York_University', domain: 'yorku.ca', region: 'canada', location: 'Toronto, ON' },
+  { id: 'concordia', name: 'Concordia University', wiki: 'Concordia_University', domain: 'concordia.ca', region: 'canada', location: 'Montreal, QC' },
+  { id: 'dalhousie', name: 'Dalhousie University', wiki: 'Dalhousie_University', domain: 'dal.ca', region: 'canada', location: 'Halifax, NS' },
+  { id: 'laval', name: 'Université Laval', wiki: 'Universit%C3%A9_Laval', domain: 'ulaval.ca', region: 'canada', location: 'Quebec City, QC' },
+  { id: 'manitoba', name: 'University of Manitoba', wiki: 'University_of_Manitoba', domain: 'umanitoba.ca', region: 'canada', location: 'Winnipeg, MB' },
+  { id: 'usask', name: 'University of Saskatchewan', wiki: 'University_of_Saskatchewan', domain: 'usask.ca', region: 'canada', location: 'Saskatoon, SK' },
+  { id: 'guelph', name: 'University of Guelph', wiki: 'University_of_Guelph', domain: 'uoguelph.ca', region: 'canada', location: 'Guelph, ON' },
 ];
 
 export const REGION_LABELS: Record<LogoPreset['region'], string> = {
@@ -168,13 +173,72 @@ export const REGION_LABELS: Record<LogoPreset['region'], string> = {
 
 /**
  * Build the favicon URL for a preset. `sz=256` is the largest
- * reliable size Google s2 returns for most domains; some
- * universities have larger variants, but 256 is the safe default
- * that always works. The URL is stable and can be embedded in
- * poster documents directly.
+ * reliable size Google s2 returns for most domains. This is the
+ * SYNCHRONOUS fallback used for the grid thumbnails while the
+ * user is browsing presets (no API call per card) and as the
+ * last-resort when Wikipedia has no image for a given page.
  */
 export function logoPresetUrl(domain: string): string {
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=256`;
+}
+
+/**
+ * Resolve the accurate Wikipedia crest / seal for a preset at
+ * click time. Queries the Wikipedia REST API summary endpoint,
+ * which returns `originalimage.source` — usually a rendered
+ * SVG / PNG of the university's infobox image (its official
+ * seal or coat of arms).
+ *
+ * On failure (network error, missing page, no image on page)
+ * returns null so the caller can fall back to the favicon.
+ * The Wikipedia REST API is CORS-enabled — no proxy required.
+ *
+ * Sizing note: `originalimage` can be several MB for some
+ * articles. We request a 512 px thumbnail via the `pithumbsize`
+ * alternative endpoint if available; otherwise the original is
+ * acceptable (browsers scale large images down for <img src>
+ * display and export, just at slightly higher memory cost).
+ */
+export async function fetchWikiLogoUrl(
+  wiki: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${wiki}?redirect=true`,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      },
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      originalimage?: { source?: string };
+      thumbnail?: { source?: string };
+    };
+    // Prefer the original image (full resolution) but fall back
+    // to the thumbnail if the original is missing.
+    return json.originalimage?.source ?? json.thumbnail?.source ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the best available logo URL for a preset, preferring
+ * Wikipedia accuracy over favicon coverage.
+ *
+ *   1. Try the Wikipedia REST API via `fetchWikiLogoUrl(preset.wiki)`.
+ *   2. On failure, fall back to the Google s2 favicon.
+ *
+ * Returns a URL ready to drop into an `<img src>` or an image
+ * block's `imageSrc`. Safe to call concurrently — each call is
+ * an independent fetch.
+ */
+export async function resolvePresetLogo(
+  preset: LogoPreset,
+): Promise<string> {
+  const wikiUrl = await fetchWikiLogoUrl(preset.wiki);
+  return wikiUrl ?? logoPresetUrl(preset.domain);
 }
 
 /**
