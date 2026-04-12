@@ -2174,6 +2174,63 @@ function CaptionEditor(props: {
           />
         </>
       )}
+
+      {/* ── Note (academic markdown) ─────────────────────────── */}
+      <div style={{ ...labelStyle, marginTop: 8 }}>{label} Note</div>
+      <p style={{ fontSize: 13, color: '#8a8a95', margin: 0, lineHeight: 1.5 }}>
+        Longer footnote shown below the {label.toLowerCase()}. Supports{' '}
+        <code>**bold**</code>, <code>*italic*</code>, <code>^super^</code>,
+        and auto-superscript of <code>*</code>, <code>†</code>,{' '}
+        <code>‡</code>, <code>§</code> attached to a word. Click{' '}
+        <b>Format</b> to render the markers.
+      </p>
+      <textarea
+        value={stripHtmlToPlainText(block.note ?? '')}
+        onChange={(e) => onUpdateBlock(block.id, { note: e.target.value })}
+        placeholder={
+          label === 'Figure'
+            ? 'Error bars show 95% CI. **p** < .01.'
+            : '*Note.* *p* < .05. SD in parentheses.'
+        }
+        style={{
+          ...inputBase,
+          minHeight: 72,
+          resize: 'vertical',
+          fontFamily: 'ui-monospace, "SF Mono", Menlo, Monaco, monospace',
+          fontSize: 12,
+          lineHeight: 1.5,
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => {
+          // Format caption + note together. The caption is stored
+          // as plain-ish text (no HTML tags in the `block.caption`
+          // field), but users might type `**bold**` there too —
+          // so we run it through the parser and store the result.
+          // The note field is the primary target of the Format
+          // button. Idempotent via strip-then-reparse.
+          const plainCaption = stripHtmlToPlainText(block.caption ?? '');
+          const plainNote = stripHtmlToPlainText(block.note ?? '');
+          onUpdateBlock(block.id, {
+            caption: academicMarkdownToHtml(plainCaption),
+            note: academicMarkdownToHtml(plainNote),
+          });
+        }}
+        style={{
+          all: 'unset',
+          cursor: 'pointer',
+          alignSelf: 'flex-start',
+          padding: '10px 16px',
+          background: '#7c6aed',
+          color: '#fff',
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: 700,
+        }}
+      >
+        ✨ Format caption & note
+      </button>
     </div>
   );
 }
@@ -2224,58 +2281,50 @@ function TableEditor(props: {
     cursor: 'not-allowed',
   };
 
+  // Default custom border values — starts as an APA-ish 3-line
+  // layout so flipping to Custom doesn't wipe visible borders.
+  const customBorder =
+    data.customBorder ?? {
+      horizontalLines: false,
+      verticalLines: false,
+      outerBorder: false,
+      headerLine: true,
+      topLine: true,
+      bottomLine: true,
+      headerBox: false,
+    };
+  const isCustom = data.borderPreset === 'custom';
+  const toggleCustomEdge = (
+    key: keyof NonNullable<TableData['customBorder']>,
+  ) => {
+    commit({
+      ...data,
+      borderPreset: 'custom',
+      customBorder: { ...customBorder, [key]: !customBorder[key] },
+    });
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5 }}>
         Editing: table · {data.rows} × {data.cols}
       </div>
 
-      {/* Mini cell preview — shows the table structure with light borders */}
-      <div style={{ background: '#1a1a26', borderRadius: 6, padding: 8, border: '1px solid #2a2a3a' }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: `repeat(${Math.min(data.cols, 8)}, 1fr)`,
-            gridTemplateRows: `repeat(${Math.min(data.rows, 8)}, 1fr)`,
-            gap: 1,
-            background: '#2a2a3a',
-            border: '1px solid #2a2a3a',
-            borderRadius: 3,
-            overflow: 'hidden',
-            maxHeight: 120,
-          }}
-        >
-          {Array.from({ length: Math.min(data.rows, 8) * Math.min(data.cols, 8) }).map((_, i) => {
-            const r = Math.floor(i / Math.min(data.cols, 8));
-            const c = i % Math.min(data.cols, 8);
-            const cellIdx = r * data.cols + c;
-            const hasContent = !!(data.cells[cellIdx]?.trim());
-            return (
-              <div
-                key={i}
-                style={{
-                  background: r === 0 ? '#1e1e2e' : '#111118',
-                  padding: 2,
-                  fontSize: 13,
-                  color: hasContent ? '#6b7280' : 'transparent',
-                  overflow: 'hidden',
-                  whiteSpace: 'nowrap',
-                  minHeight: 12,
-                }}
-              >
-                {hasContent ? '···' : '\u00A0'}
-              </div>
-            );
-          })}
-        </div>
-        {(data.rows > 8 || data.cols > 8) && (
-          <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, textAlign: 'center' }}>
-            Showing first 8×8 of {data.rows}×{data.cols}
-          </div>
-        )}
+      {/* ── 1. Tips (on top per user request) ──────────────── */}
+      <div style={{ fontSize: 13, color: '#8a8a95', lineHeight: 1.5 }}>
+        <strong style={{ color: '#c8cad0' }}>💡 Tips</strong>
+        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+          <li>✏️ Click any cell on the canvas to type directly.</li>
+          <li>🖱️ Click a row/column header strip to select the whole row or column.</li>
+          <li>📋 Paste TSV from Word, Excel, or Google Sheets into any cell — the grid auto-grows.</li>
+          <li>↔️ Drag column borders to resize.</li>
+          <li>🗑️ Select a row/column and press Delete to remove it.</li>
+          <li>⌨️ Tab / Shift+Tab to jump between cells.</li>
+          <li>✨ Type <code>**bold**</code>, <code>*italic*</code>, or <code>M (SD)*</code> in a cell, then click <b>Format cells</b> below.</li>
+        </ul>
       </div>
 
-      {/* Simplified row/column controls: +/- buttons with count */}
+      {/* ── 2. Row / column controls ───────────────────────── */}
       <div>
         <div style={labelStyle}>Rows</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2324,12 +2373,42 @@ function TableEditor(props: {
         </div>
       </div>
 
-      {/* Border style presets */}
+      <button
+        type="button"
+        onClick={() => {
+          // Walk every cell, plain-text-strip any prior HTML, and
+          // re-parse with the academic markdown rules. Idempotent
+          // on repeated clicks because the strip step always runs
+          // first — a second press won't nest <sup><sup>*</sup></sup>.
+          // The caption + note are formatted by the Caption
+          // editor's own button so each control owns one surface.
+          const nextCells = data.cells.map((cell) =>
+            academicMarkdownToHtml(stripHtmlToPlainText(cell ?? '')),
+          );
+          commit({ ...data, cells: nextCells });
+        }}
+        style={{
+          all: 'unset',
+          cursor: 'pointer',
+          padding: '10px 16px',
+          background: '#7c6aed',
+          color: '#fff',
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: 700,
+          textAlign: 'center',
+          alignSelf: 'flex-start',
+        }}
+      >
+        ✨ Format cells
+      </button>
+
+      {/* ── 3. Border style (with custom feature) ──────────── */}
       <div>
         <div style={labelStyle}>Border Style</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {Object.entries(TABLE_BORDER_PRESETS).map(([k, v]) => {
-            const active = data.borderPreset === k;
+            const active = !isCustom && data.borderPreset === k;
             return (
               <button
                 key={k}
@@ -2350,90 +2429,93 @@ function TableEditor(props: {
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={() =>
+              commit({
+                ...data,
+                borderPreset: 'custom',
+                customBorder,
+              })
+            }
+            style={{
+              all: 'unset',
+              cursor: 'pointer',
+              padding: '8px 14px',
+              borderRadius: 6,
+              fontSize: 13,
+              fontWeight: 600,
+              background: isCustom ? '#7c6aed22' : '#1a1a26',
+              border: `1px solid ${isCustom ? '#7c6aed' : '#2a2a3a'}`,
+              color: isCustom ? '#c8b6ff' : '#c8cad0',
+            }}
+          >
+            Custom
+          </button>
         </div>
       </div>
 
-      {/*
-        Table note + one-shot Format button.
-
-        Users type plain-text markers (`**bold**`, `*italic*`,
-        `^super^`, `M (SD)*`, etc.) in cells and the note field.
-        Clicking Format walks every cell + the note, runs each
-        through `academicMarkdownToHtml`, and writes the HTML
-        back so the grid + note re-render with real <strong>,
-        <em>, <sup>, <sub> tags. Idempotent: a second press
-        strips the existing HTML to plain text first, so it
-        can't nest `<sup><sup>*</sup></sup>`.
-
-        This mirrors the Plot Code Check tab's Format-on-demand
-        flow — no live parsing, no contentEditable caret fights,
-        safe with paste from Excel / Word / Google Sheets.
-      */}
-      <div>
-        <div style={labelStyle}>Table Note</div>
-        <p style={{ fontSize: 13, color: '#8a8a95', margin: '4px 0 8px', lineHeight: 1.5 }}>
-          Footnote rendered below the grid. Supports <code>**bold**</code>,{' '}
-          <code>*italic*</code>, <code>^super^</code>, and auto-superscript
-          of <code>*</code>, <code>†</code>, <code>‡</code>, <code>§</code>{' '}
-          attached to a word.
-        </p>
-        <textarea
-          value={stripHtmlToPlainText(data.note ?? '')}
-          onChange={(e) => commit({ ...data, note: e.target.value })}
-          placeholder={'*Note.* *p* < .05; **p** < .01. SD in parentheses.'}
+      {/* Per-edge toggles revealed when Custom is picked. Each
+          checkbox maps 1:1 to a boolean flag on the TableBorderPreset
+          interface — flipping one commits a new `customBorder`
+          object and switches `borderPreset` to `'custom'` so the
+          TableBlock renderer reads from customBorder instead of the
+          named preset. */}
+      {isCustom && (
+        <div
           style={{
-            ...inputBase,
-            minHeight: 72,
-            resize: 'vertical',
-            fontFamily: 'ui-monospace, "SF Mono", Menlo, Monaco, monospace',
-            fontSize: 12,
-            lineHeight: 1.5,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+            padding: '12px 14px',
+            background: '#111118',
+            border: '1px solid #2a2a3a',
+            borderRadius: 8,
           }}
-        />
-      </div>
-
-      <button
-        type="button"
-        onClick={() => {
-          // Walk cells + note, plain-text-strip any prior HTML,
-          // re-parse with the academic markdown rules, and write
-          // the output back. Idempotent on repeated clicks.
-          const nextCells = data.cells.map((cell) =>
-            academicMarkdownToHtml(stripHtmlToPlainText(cell ?? '')),
-          );
-          const nextNote = data.note
-            ? academicMarkdownToHtml(stripHtmlToPlainText(data.note))
-            : '';
-          commit({ ...data, cells: nextCells, note: nextNote });
-        }}
-        style={{
-          all: 'unset',
-          cursor: 'pointer',
-          padding: '10px 16px',
-          background: '#7c6aed',
-          color: '#fff',
-          borderRadius: 8,
-          fontSize: 13,
-          fontWeight: 700,
-          textAlign: 'center',
-          alignSelf: 'flex-start',
-        }}
-      >
-        ✨ Format table + note
-      </button>
-
-      <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
-        <strong style={{ color: '#9ca3af' }}>💡 Tips:</strong>
-        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-          <li>✏️ Click any cell on the canvas to type directly.</li>
-          <li>🖱️ Click a row/column header strip to select the whole row or column.</li>
-          <li>📋 Paste from Word, Excel, or Google Sheets into any cell — the grid auto-grows.</li>
-          <li>↔️ Drag column borders to resize.</li>
-          <li>🗑️ Select a row/column and press Delete to remove it.</li>
-          <li>⌨️ Tab / Shift+Tab to jump between cells.</li>
-          <li>✨ Type <code>**bold**</code>, <code>*italic*</code>, or <code>M (SD)*</code> inside cells, then hit <b>Format</b> above.</li>
-        </ul>
-      </div>
+        >
+          <div style={{ fontSize: 12, color: '#8a8a95', lineHeight: 1.5 }}>
+            Toggle each edge independently. The named presets (APA,
+            All Lines, etc.) are left unchanged — Custom stores its
+            own `customBorder` field.
+          </div>
+          {(
+            [
+              ['topLine', 'Top edge line'],
+              ['bottomLine', 'Bottom edge line'],
+              ['outerBorder', 'Outer border (all 4 sides)'],
+              ['headerLine', 'Header separator line'],
+              ['headerBox', 'Header row box (4 sides)'],
+              ['horizontalLines', 'Horizontal lines between rows'],
+              ['verticalLines', 'Vertical lines between cols'],
+            ] as Array<
+              [keyof NonNullable<TableData['customBorder']>, string]
+            >
+          ).map(([key, label]) => {
+            const on = customBorder[key];
+            return (
+              <label
+                key={key}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  fontSize: 13,
+                  color: '#c8cad0',
+                  cursor: 'pointer',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={on}
+                  onChange={() => toggleCustomEdge(key)}
+                  style={{ accentColor: '#7c6aed' }}
+                />
+                {label}
+              </label>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

@@ -18,6 +18,21 @@ export type BlockType =
 
 export type ImageFit = 'contain' | 'cover' | 'fill';
 
+/**
+ * Per-edge border toggles used by the "Custom" border preset.
+ * Stored alongside TableData so the user's custom layout
+ * persists independently of the named presets.
+ */
+export interface CustomTableBorder {
+  horizontalLines: boolean;
+  verticalLines: boolean;
+  outerBorder: boolean;
+  headerLine: boolean;
+  topLine: boolean;
+  bottomLine: boolean;
+  headerBox: boolean;
+}
+
 export interface TableData {
   rows: number;
   cols: number;
@@ -25,17 +40,14 @@ export interface TableData {
   cells: string[];
   /** Percentage widths per column, null = equal */
   colWidths: number[] | null;
-  /** Key into TB_PRESETS */
+  /** Key into TB_PRESETS or the literal string 'custom' */
   borderPreset: string;
   /**
-   * Optional footnote rendered below the table grid. Supports
-   * the same lightweight academic-markdown dialect used by table
-   * cells: `**bold**`, `*italic*`, `^super^`, and standalone
-   * footnote markers (`*`, `†`, `‡`, `§`, `¶`, `#`) next to a
-   * word automatically become superscript. Plain text like
-   * "p < .05" passes through unchanged.
+   * Per-edge overrides used when `borderPreset === 'custom'`.
+   * Ignored for named presets. Defaults to an APA-ish layout
+   * when the user first switches to custom.
    */
-  note?: string;
+  customBorder?: CustomTableBorder;
 }
 
 export interface Block {
@@ -87,6 +99,15 @@ export interface Block {
    * to 6 px; the editor slider clamps to 0–24.
    */
   captionGap?: number;
+  /**
+   * Optional footnote / note rendered below the block content for
+   * figures and tables. Supports the academic-markdown dialect
+   * (`**bold**`, `*italic*`, `^super^`, auto-superscript of `*†‡§¶#`
+   * attached to a word) via the TableEditor / CaptionEditor Format
+   * button. Stored as HTML so the renderer can pass it through
+   * `dangerouslySetInnerHTML` without re-parsing on each frame.
+   */
+  note?: string;
 }
 
 export type FontWeight = 300 | 400 | 500 | 600 | 700 | 800;

@@ -380,7 +380,15 @@ interface TableBlockProps {
 
 export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: TableBlockProps) {
   const data: TableData = block.tableData ?? DEFAULT_TABLE_DATA;
-  const preset = TABLE_BORDER_PRESETS[data.borderPreset] ?? TABLE_BORDER_PRESETS.apa!;
+  // Resolve which edge-flag set to use. Named presets come from
+  // TABLE_BORDER_PRESETS; the literal 'custom' key reads from
+  // `data.customBorder` instead so users can toggle individual
+  // edges via the TableEditor's Custom panel. Falls back to the
+  // APA preset if the data is missing both.
+  const preset =
+    data.borderPreset === 'custom' && data.customBorder
+      ? { name: 'Custom', ...data.customBorder }
+      : TABLE_BORDER_PRESETS[data.borderPreset] ?? TABLE_BORDER_PRESETS.apa!;
   const colWidths = data.colWidths ?? Array(data.cols).fill(100 / data.cols);
 
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
@@ -1015,13 +1023,15 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
 
       {/*
         Table note — optional footnote rendered below the grid.
-        Content is HTML pre-formatted by the "Format" button in
-        TableEditor (academicMarkdownToHtml), so `dangerouslySetInnerHTML`
+        Stored at the block level (`block.note`) so figures and
+        tables share the same field. Content is HTML pre-formatted
+        by the "Format" button in the Caption / Table editor
+        (academicMarkdownToHtml), so `dangerouslySetInnerHTML`
         is safe: the parser HTML-escapes user input and only adds
         strong / em / sup / sub tags. Hidden entirely when the
         note field is empty.
       */}
-      {data.note && (
+      {block.note && (
         <div
           style={{
             fontFamily,
@@ -1032,7 +1042,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
             paddingTop: 4,
             paddingLeft: 2,
           }}
-          dangerouslySetInnerHTML={{ __html: data.note }}
+          dangerouslySetInnerHTML={{ __html: block.note }}
         />
       )}
 
@@ -1411,6 +1421,19 @@ function CaptionWrapper({
           {label} {captionNumber}.
         </b>
         {block.caption ? ` ${block.caption}` : ''}
+        {/*
+          Optional figure note rendered under the caption line.
+          Stored as HTML pre-parsed by the Format button so inline
+          tags (strong / em / sup / sub) survive round-trips
+          through the poster JSONB. Falls back to nothing when
+          the note field is empty.
+        */}
+        {block.note && (
+          <div
+            style={{ marginTop: 2, fontStyle: 'normal' }}
+            dangerouslySetInnerHTML={{ __html: block.note }}
+          />
+        )}
       </div>
     </div>
   );
