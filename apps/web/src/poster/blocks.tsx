@@ -1171,7 +1171,15 @@ export function AuthorLine({ authors, institutions, palette, fontFamily, styles 
         fontSize: styles.authors.size,
         fontWeight: styles.authors.weight,
         color: palette.primary,
-        lineHeight: styles.authors.lineHeight,
+        // Force tight line-height at the component level (was
+        // `styles.authors.lineHeight` which defaults to 1.5 and
+        // left ~50 % blank space above/below each line). The
+        // authors block now wraps as snugly as the title block,
+        // matching the user's expectation that the block frame
+        // track the font size. Users can still override via the
+        // Style tab — we read back from styles.authors.lineHeight
+        // but clamp to a tighter ceiling to avoid the old bloat.
+        lineHeight: Math.min(1.2, styles.authors.lineHeight),
       }}
     >
       <div>
@@ -1195,7 +1203,7 @@ export function AuthorLine({ authors, institutions, palette, fontFamily, styles 
         })}
       </div>
       {used.length > 0 && (
-        <div style={{ fontSize: styles.authors.size * 0.82, color: palette.muted, marginTop: 1 }}>
+        <div style={{ fontSize: styles.authors.size * 0.82, color: palette.muted }}>
           {used.map((inst, i) => (
             <span key={inst.id}>
               {i > 0 ? ' · ' : ''}
@@ -1206,7 +1214,7 @@ export function AuthorLine({ authors, institutions, palette, fontFamily, styles 
         </div>
       )}
       {(hasEqual || hasCorr) && (
-        <div style={{ fontSize: styles.authors.size * 0.72, color: palette.muted, marginTop: 1, fontStyle: 'italic' }}>
+        <div style={{ fontSize: styles.authors.size * 0.72, color: palette.muted, fontStyle: 'italic' }}>
           {hasEqual && '*Equal contribution'}
           {hasEqual && hasCorr && ' · '}
           {hasCorr && '†Corresponding author'}

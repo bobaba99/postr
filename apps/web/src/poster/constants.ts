@@ -139,7 +139,14 @@ export const PALETTES: NamedPalette[] = [
  */
 export const DEFAULT_STYLES: Styles = {
   title: { size: 22, weight: 800, italic: false, lineHeight: 1.15, color: null, highlight: null },
-  authors: { size: 5, weight: 400, italic: false, lineHeight: 1.5, color: null, highlight: null },
+  // Authors uses the same tight line-height as title so the
+  // rendered block wraps snugly around the text. Previous default
+  // of 1.5 produced ~50 % extra vertical space beyond the glyphs
+  // themselves, so the authors block always felt taller than its
+  // font size would suggest — the user reported "extra spacing" in
+  // 2026-04. Matching title at 1.15 puts both header blocks on
+  // the same compact rhythm.
+  authors: { size: 5, weight: 400, italic: false, lineHeight: 1.15, color: null, highlight: null },
   heading: { size: 8, weight: 700, italic: false, lineHeight: 1.3, color: null, highlight: null },
   body: { size: 5, weight: 400, italic: false, lineHeight: 1.55, color: null, highlight: null },
 };
