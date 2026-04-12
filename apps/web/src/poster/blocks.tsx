@@ -1149,14 +1149,52 @@ interface AuthorLineProps {
 }
 
 export function AuthorLine({ authors, institutions, palette, fontFamily, styles }: AuthorLineProps) {
-  const used = institutions.filter((inst) => authors.some((a) => a.affiliationIds.includes(inst.id)));
   const validAuthors = authors.filter((a) => a.name);
+  // Prefer institutions actually referenced by an author's
+  // affiliationIds, but fall back to ALL institutions when no
+  // author has linked one (or when there are no authors yet).
+  // That way users who added institutions in the sidebar still
+  // see them on the canvas even if they haven't wired up the
+  // author→institution mapping — the block reads as a visible
+  // placeholder for the affiliation line rather than vanishing.
+  const linked = institutions.filter((inst) =>
+    authors.some((a) => a.affiliationIds.includes(inst.id)),
+  );
+  const used = linked.length > 0 ? linked : institutions;
 
+  // Empty state: show the appropriate "add X in sidebar" prompt.
+  // If the user has already added institutions, render them even
+  // without authors so their work isn't invisible.
   if (!validAuthors.length) {
+    if (institutions.length === 0) {
+      return (
+        <span style={{ color: palette.muted, fontStyle: 'italic', fontSize: styles.authors.size }}>
+          Add authors in sidebar →
+        </span>
+      );
+    }
     return (
-      <span style={{ color: palette.muted, fontStyle: 'italic', fontSize: styles.authors.size }}>
-        Add authors in sidebar →
-      </span>
+      <div
+        style={{
+          textAlign: 'center',
+          fontFamily,
+          fontSize: styles.authors.size,
+          color: palette.primary,
+          lineHeight: 1.15,
+        }}
+      >
+        <span style={{ color: palette.muted, fontStyle: 'italic' }}>
+          Add authors in sidebar →
+        </span>
+        <div style={{ fontSize: styles.authors.size * 0.82, color: palette.muted }}>
+          {institutions.map((inst, i) => (
+            <span key={inst.id}>
+              {i > 0 ? ' · ' : ''}
+              {[inst.name, inst.dept, inst.location].filter(Boolean).join(', ')}
+            </span>
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -1563,10 +1601,16 @@ export function BlockFrame(props: BlockFrameProps) {
         // of a `minHeight: b.h` floor. Prior behavior left blank
         // padding below short text when the user dragged the block
         // taller — users expected the frame to track the typed
-        // content exactly. A small 12 px floor keeps empty blocks
+        // content exactly. A small floor keeps empty blocks
         // grabbable; resizing to taller is handled by Auto-Arrange
-        // + re-measuring on content change.
-        minHeight: growsWithContent ? 12 : undefined,
+        // + re-measuring on content change. Authors + title get
+        // the tightest floor (6 units) since they should read as
+        // a single line of header text at ~5 units font size.
+        minHeight: growsWithContent
+          ? b.type === 'authors' || b.type === 'title'
+            ? 6
+            : 12
+          : undefined,
         background: bg,
         border: isOutOfBounds
           ? '1.5px dashed #f87171'
@@ -1633,9 +1677,16 @@ export function BlockFrame(props: BlockFrameProps) {
           // external handle positions (top: -26) visually consistent
           // across all block types. Image / logo / table keep
           // padding: 0 because they manage their own inner layout.
+          // Authors block also gets zero vertical padding so the
+          // frame wraps the text as tightly as the title does —
+          // any extra top/bottom padding here was stacking on top
+          // of AuthorLine's own line-height and made the block
+          // feel loose compared to the rest of the header.
           padding: ['image', 'logo', 'table'].includes(b.type)
             ? 0
-            : '4px 6px',
+            : b.type === 'authors'
+              ? '0 6px'
+              : '4px 6px',
           boxSizing: 'border-box',
         }}
       >

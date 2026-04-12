@@ -252,16 +252,30 @@ export function Sidebar(props: SidebarProps) {
     return () => clearTimeout(t);
   }, [presetJustSaved]);
 
-  // Auto-switch to the Edit tab whenever a block is selected. One
-  // exception: if the user is currently on the Plot Code Check tab
-  // and picks an image block, we stay put — the check panel reads
-  // the selected image's dimensions directly and jumping to Edit
-  // would cost them that context. Every other combination jumps
-  // to Edit so the user sees the controls relevant to their new
-  // selection (including the figure-caption editor for images).
+  // Auto-switch tabs based on what kind of block the user just
+  // selected. The routing table:
+  //
+  //   authors block         → Authors tab   (dedicated controls)
+  //   references block      → References tab (same idea)
+  //   image block + check   → stay put (dimensions feed the panel)
+  //   everything else       → Edit tab
+  //
+  // Sending the user to the tab that can actually edit the thing
+  // they just clicked beats the old "always Edit" rule, which
+  // dumped authors selections into the Edit tab's placeholder and
+  // forced a second click to reach the real controls.
   useEffect(() => {
     if (!props.selectedBlock) return;
-    if (props.selectedBlock.type === 'image' && tab === 'check') return;
+    const t = props.selectedBlock.type;
+    if (t === 'image' && tab === 'check') return;
+    if (t === 'authors') {
+      setTab('authors');
+      return;
+    }
+    if (t === 'references') {
+      setTab('refs');
+      return;
+    }
     setTab('edit');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.selectedBlock?.id, props.selectedBlock?.type]);
