@@ -183,40 +183,94 @@ export function logoPresetUrl(domain: string): string {
 }
 
 /**
- * Resolve the accurate Wikipedia crest / seal for a preset at
- * click time. Queries the Wikipedia REST API summary endpoint,
- * which returns `originalimage.source` — usually a rendered
- * SVG / PNG of the university's infobox image (its official
- * seal or coat of arms).
+ * Build a stable Commons image URL from a raw filename. Uses
+ * `Special:FilePath` which 302-redirects to the real canonical
+ * location of the file — saves us from having to MD5-hash the
+ * filename or call the `imageinfo` API for every lookup. Works
+ * directly as an `<img src>`.
+ */
+function commonsFileUrl(filename: string): string {
+  // Wikidata returns filenames with SPACES. Special:FilePath
+  // accepts underscores and spaces equally, but we encode for
+  // safety so weird characters (parentheses, apostrophes,
+  // accented letters) survive.
+  return `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(filename)}`;
+}
+
+/**
+ * Resolve the most brand-accurate image for a university via
+ * Wikidata's structured claims, following a brand-first priority:
  *
- * On failure (network error, missing page, no image on page)
- * returns null so the caller can fall back to the favicon.
- * The Wikipedia REST API is CORS-enabled — no proxy required.
+ *   P154 — logo image         (wordmark / brand mark)
+ *   P94  — coat of arms image (ceremonial crest)
+ *   P158 — seal image         (official seal)
  *
- * Sizing note: `originalimage` can be several MB for some
- * articles. We request a 512 px thumbnail via the `pithumbsize`
- * alternative endpoint if available; otherwise the original is
- * acceptable (browsers scale large images down for <img src>
- * display and export, just at slightly higher memory cost).
+ * P154 is always preferred because that's the university's
+ * current marketing mark — it's what they use on their website,
+ * letterhead, and conference slides. If a university has no
+ * P154 claim (some flagships like UC-system campuses), we drop
+ * down to P94 (crest), then P158 (seal), and finally fall back
+ * to whatever image is on the Wikipedia infobox via the REST
+ * summary endpoint (which was the previous behaviour).
+ *
+ * Returns null on any failure so the caller can chain to the
+ * Google favicon fallback.
  */
 export async function fetchWikiLogoUrl(
   wiki: string,
 ): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${wiki}?redirect=true`,
-      {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      },
+    // Step 1: Wikidata structured claims — the brand-first path
+    const wdRes = await fetch(
+      `https://www.wikidata.org/w/api.php?action=wbgetentities&sites=enwiki&titles=${wiki}&props=claims&languages=en&format=json&origin=*`,
     );
-    if (!res.ok) return null;
-    const json = (await res.json()) as {
+    if (wdRes.ok) {
+      const json = (await wdRes.json()) as {
+        entities?: Record<
+          string,
+          {
+            claims?: Record<
+              string,
+              Array<{ mainsnak?: { datavalue?: { value?: string } } }>
+            >;
+          }
+        >;
+      };
+      const entity = Object.values(json.entities ?? {})[0];
+      const claims = entity?.claims ?? {};
+      // Skip obvious photographs — some Wikidata entries set
+      // P154 to a JPG of a campus sign instead of a real brand
+      // mark (Cornell is a known offender). Prefer vector /
+      // lossless formats which indicate a real logo file.
+      const isQualityLogo = (v: string | undefined): v is string => {
+        if (!v) return false;
+        const lower = v.toLowerCase();
+        // Skip raster photo formats entirely — wordmarks are
+        // always .svg / .png on Commons.
+        if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return false;
+        // Skip filenames that look like photographs of buildings
+        // or signs (heuristic based on observed bad entries).
+        if (/\b(sign|photo|building|campus|panoramio)\b/i.test(lower)) return false;
+        return true;
+      };
+      const candidates = ['P154', 'P94', 'P158']
+        .map((pid) => claims[pid]?.[0]?.mainsnak?.datavalue?.value)
+        .filter(isQualityLogo);
+      if (candidates.length > 0) return commonsFileUrl(candidates[0]!);
+    }
+
+    // Step 2: Fall back to the Wikipedia REST summary — returns
+    // whatever image the page's infobox uses, usually the crest
+    // or a building photo.
+    const sumRes = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${wiki}?redirect=true`,
+      { headers: { Accept: 'application/json' } },
+    );
+    if (!sumRes.ok) return null;
+    const json = (await sumRes.json()) as {
       originalimage?: { source?: string };
       thumbnail?: { source?: string };
     };
-    // Prefer the original image (full resolution) but fall back
-    // to the thumbnail if the original is missing.
     return json.originalimage?.source ?? json.thumbnail?.source ?? null;
   } catch {
     return null;
@@ -224,15 +278,16 @@ export async function fetchWikiLogoUrl(
 }
 
 /**
- * Resolve the best available logo URL for a preset, preferring
- * Wikipedia accuracy over favicon coverage.
+ * Resolve the best available logo URL for a preset.
  *
- *   1. Try the Wikipedia REST API via `fetchWikiLogoUrl(preset.wiki)`.
- *   2. On failure, fall back to the Google s2 favicon.
+ *   1. Wikidata brand mark (P154) — university's modern logo
+ *   2. Wikidata coat of arms (P94) — ceremonial crest
+ *   3. Wikidata seal (P158) — official seal
+ *   4. Wikipedia page infobox image — whatever the article uses
+ *   5. Google s2 favicon — final fallback
  *
  * Returns a URL ready to drop into an `<img src>` or an image
- * block's `imageSrc`. Safe to call concurrently — each call is
- * an independent fetch.
+ * block's `imageSrc`. Safe to call concurrently.
  */
 export async function resolvePresetLogo(
   preset: LogoPreset,
