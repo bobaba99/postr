@@ -27,6 +27,15 @@ export interface TableData {
   colWidths: number[] | null;
   /** Key into TB_PRESETS */
   borderPreset: string;
+  /**
+   * Optional footnote rendered below the table grid. Supports
+   * the same lightweight academic-markdown dialect used by table
+   * cells: `**bold**`, `*italic*`, `^super^`, and standalone
+   * footnote markers (`*`, `†`, `‡`, `§`, `¶`, `#`) next to a
+   * word automatically become superscript. Plain text like
+   * "p < .05" passes through unchanged.
+   */
+  note?: string;
 }
 
 export interface Block {

@@ -45,6 +45,10 @@ import { CITATION_STYLES, SORT_MODE_LABELS, type CitationStyleKey, type SortMode
 import { LAYOUT_TEMPLATES, type LayoutKey } from './templates';
 import { parseBibtex, parseRis } from './parsers';
 import { AuthorLine } from './blocks';
+import {
+  academicMarkdownToHtml,
+  stripHtmlToPlainText,
+} from './academicMarkdown';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { ReadabilityPanel } from './ReadabilityPanel';
@@ -2349,6 +2353,75 @@ function TableEditor(props: {
         </div>
       </div>
 
+      {/*
+        Table note + one-shot Format button.
+
+        Users type plain-text markers (`**bold**`, `*italic*`,
+        `^super^`, `M (SD)*`, etc.) in cells and the note field.
+        Clicking Format walks every cell + the note, runs each
+        through `academicMarkdownToHtml`, and writes the HTML
+        back so the grid + note re-render with real <strong>,
+        <em>, <sup>, <sub> tags. Idempotent: a second press
+        strips the existing HTML to plain text first, so it
+        can't nest `<sup><sup>*</sup></sup>`.
+
+        This mirrors the Plot Code Check tab's Format-on-demand
+        flow — no live parsing, no contentEditable caret fights,
+        safe with paste from Excel / Word / Google Sheets.
+      */}
+      <div>
+        <div style={labelStyle}>Table Note</div>
+        <p style={{ fontSize: 13, color: '#8a8a95', margin: '4px 0 8px', lineHeight: 1.5 }}>
+          Footnote rendered below the grid. Supports <code>**bold**</code>,{' '}
+          <code>*italic*</code>, <code>^super^</code>, and auto-superscript
+          of <code>*</code>, <code>†</code>, <code>‡</code>, <code>§</code>{' '}
+          attached to a word.
+        </p>
+        <textarea
+          value={stripHtmlToPlainText(data.note ?? '')}
+          onChange={(e) => commit({ ...data, note: e.target.value })}
+          placeholder={'*Note.* *p* < .05; **p** < .01. SD in parentheses.'}
+          style={{
+            ...inputBase,
+            minHeight: 72,
+            resize: 'vertical',
+            fontFamily: 'ui-monospace, "SF Mono", Menlo, Monaco, monospace',
+            fontSize: 12,
+            lineHeight: 1.5,
+          }}
+        />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          // Walk cells + note, plain-text-strip any prior HTML,
+          // re-parse with the academic markdown rules, and write
+          // the output back. Idempotent on repeated clicks.
+          const nextCells = data.cells.map((cell) =>
+            academicMarkdownToHtml(stripHtmlToPlainText(cell ?? '')),
+          );
+          const nextNote = data.note
+            ? academicMarkdownToHtml(stripHtmlToPlainText(data.note))
+            : '';
+          commit({ ...data, cells: nextCells, note: nextNote });
+        }}
+        style={{
+          all: 'unset',
+          cursor: 'pointer',
+          padding: '10px 16px',
+          background: '#7c6aed',
+          color: '#fff',
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: 700,
+          textAlign: 'center',
+          alignSelf: 'flex-start',
+        }}
+      >
+        ✨ Format table + note
+      </button>
+
       <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
         <strong style={{ color: '#9ca3af' }}>💡 Tips:</strong>
         <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
@@ -2358,6 +2431,7 @@ function TableEditor(props: {
           <li>↔️ Drag column borders to resize.</li>
           <li>🗑️ Select a row/column and press Delete to remove it.</li>
           <li>⌨️ Tab / Shift+Tab to jump between cells.</li>
+          <li>✨ Type <code>**bold**</code>, <code>*italic*</code>, or <code>M (SD)*</code> inside cells, then hit <b>Format</b> above.</li>
         </ul>
       </div>
     </div>

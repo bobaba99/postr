@@ -1013,6 +1013,29 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
       )}
       </div>
 
+      {/*
+        Table note — optional footnote rendered below the grid.
+        Content is HTML pre-formatted by the "Format" button in
+        TableEditor (academicMarkdownToHtml), so `dangerouslySetInnerHTML`
+        is safe: the parser HTML-escapes user input and only adds
+        strong / em / sup / sub tags. Hidden entirely when the
+        note field is empty.
+      */}
+      {data.note && (
+        <div
+          style={{
+            fontFamily,
+            fontSize: Math.round(styles.body.size * 0.85),
+            lineHeight: 1.35,
+            color: palette.muted || '#6b7280',
+            fontStyle: 'italic',
+            paddingTop: 4,
+            paddingLeft: 2,
+          }}
+          dangerouslySetInnerHTML={{ __html: data.note }}
+        />
+      )}
+
       {/* Figma-style right-click context menu */}
       {ctxMenu && ReactDOM.createPortal(
         <TableContextMenu
