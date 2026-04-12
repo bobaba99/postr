@@ -102,33 +102,26 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
       ? searchLogoPresets(query)
       : searchLogoPresets(query).filter((p) => p.region === region);
 
-  const handlePresetClick = async (preset: LogoPreset) => {
+  const handlePresetClick = (preset: LogoPreset) => {
     setError(null);
-    setLoadingPresetId(preset.id);
-    try {
-      // Fetch the favicon and convert to a base64 data URL so the
-      // poster stays self-contained (no cross-origin render taint
-      // at export time, works offline after save).
-      const res = await fetch(logoPresetUrl(preset.domain));
-      if (!res.ok) throw new Error(`Favicon fetch failed (${res.status}).`);
-      const blob = await res.blob();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read favicon blob.'));
-        reader.readAsDataURL(blob);
-      });
-      onPick(dataUrl);
-      onClose();
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? `${err.message} — try the Upload tab to add your own file instead.`
-          : 'Failed to fetch the preset logo.',
-      );
-    } finally {
-      setLoadingPresetId(null);
-    }
+    // Store the URL directly instead of fetching and base64-
+    // encoding the favicon. The original implementation called
+    // `fetch(logoPresetUrl(domain))` so the poster would be
+    // self-contained with a data URL, but Google's s2 favicons
+    // endpoint does NOT send `Access-Control-Allow-Origin`
+    // headers, so the fetch blows up with a CORS error — while
+    // the <img> tag still renders the same URL fine (image
+    // loads aren't subject to CORS for plain display).
+    //
+    // Tradeoff: the poster now has a remote URL in `imageSrc`
+    // and the logo re-fetches at every render. If the user
+    // exports via html-to-image, the logo may be skipped (image
+    // can't be CORS-cloned into a canvas) — that's why the
+    // Presets tab text prompts users to upload their own
+    // high-res file from the Upload tab before print. For
+    // browser-print PDF export the external URL works fine.
+    onPick(logoPresetUrl(preset.domain));
+    onClose();
   };
 
   const handleMyLogoClick = (logo: UserLogo) => {

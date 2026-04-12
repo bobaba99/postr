@@ -162,16 +162,19 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
           border: '1.5px dashed #ccc',
           borderRadius: 4,
           cursor: 'pointer',
-          fontSize: 13,
+          // Logo blocks are tiny (50 poster units default); the
+          // placeholder font is halved (was 13) so "+ Logo" + the
+          // hint line both fit without wrapping or clipping.
+          fontSize: 7,
           color: '#999',
           flexDirection: 'column',
-          gap: 2,
+          gap: 1,
           textAlign: 'center',
-          padding: '6px 10px',
+          padding: '4px 6px',
         }}
       >
         <span style={{ fontWeight: 600 }}>+ Logo</span>
-        <span style={{ fontSize: 10, opacity: 0.8 }}>
+        <span style={{ fontSize: 5, opacity: 0.8 }}>
           presets · upload · reuse
         </span>
       </div>
@@ -336,14 +339,17 @@ export function ImageBlock({ block, palette, onUpdate, selected = false }: Image
         // didDragRef in onClickCapture.
         cursor: 'inherit',
         color: palette.muted,
-        fontSize: 13,
-        gap: 3,
+        // Placeholder font size halved (was 13) so the "+ Upload
+        // figure" prompt doesn't dominate small image blocks and
+        // the preview reads as subtle chrome rather than content.
+        fontSize: 7,
+        gap: 2,
         textAlign: 'center',
         padding: '0 8px',
       }}
     >
       <span style={{ fontWeight: 600 }}>+ Upload figure</span>
-      <span style={{ fontSize: 13, opacity: 0.7 }}>click to browse · drag to move</span>
+      <span style={{ fontSize: 6, opacity: 0.7 }}>click to browse · drag to move</span>
       <input ref={ref} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
     </div>
   );
@@ -1787,18 +1793,18 @@ export function BlockFrame(props: BlockFrameProps) {
                 ? `translateX(-50%) rotate(${-b.rotation}deg)`
                 : 'translateX(-50%)',
               transformOrigin: 'center center',
-              width: '100%',
-              // 110 px guarantees enough room for the 20 px move
-              // button + 20 px delete button + the label pill's
-              // minimum width + the two 6 px gaps between them.
-              // Narrow blocks (< 110 units wide) let the row
-              // overflow both sides symmetrically instead of
-              // clipping or overlapping.
-              minWidth: 110,
+              // Width is driven by the row's three children — the
+              // two fixed 20 px buttons + the pill sized to its
+              // text content. This makes the total handle row
+              // **independent of the block's own width** so
+              // resizing the block shrinks/grows the block but
+              // leaves the control row the same length. The row
+              // just stays horizontally centered above the block.
+              width: 'fit-content',
               height: 20,
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               gap: 6,
               boxSizing: 'border-box',
               pointerEvents: 'none',
@@ -1851,8 +1857,13 @@ export function BlockFrame(props: BlockFrameProps) {
 
             <div
               style={{
-                flex: '1 1 auto',
-                minWidth: 0,
+                // Pill sizes to its text content — never grows or
+                // shrinks with block width. The outer row is
+                // `width: fit-content` so this intrinsic size
+                // bubbles up and the whole control row stays a
+                // constant length regardless of the block's own
+                // dimensions.
+                flex: '0 0 auto',
                 height: 20,
                 boxSizing: 'border-box',
                 display: 'flex',
@@ -1861,7 +1872,7 @@ export function BlockFrame(props: BlockFrameProps) {
                 fontSize: 9,
                 background: p.accent,
                 color: '#fff',
-                padding: '0 8px',
+                padding: '0 10px',
                 borderRadius: 10,
                 border: '2px solid #0a0a12',
                 fontFamily: 'system-ui',
@@ -1870,8 +1881,6 @@ export function BlockFrame(props: BlockFrameProps) {
                 textTransform: 'uppercase',
                 lineHeight: 1,
                 whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
                 pointerEvents: 'none',
               }}
