@@ -62,8 +62,6 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
   const [myLogos, setMyLogos] = useState<UserLogo[]>([]);
   const [myLoading, setMyLoading] = useState(false);
 
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploadName, setUploadName] = useState('');
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
@@ -72,8 +70,7 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
     // errors / in-flight flags don't carry across sessions.
     setError(null);
     setLoadingPresetId(null);
-    setUploadFile(null);
-    setUploadName('');
+    setUploading(false);
   }, [open]);
 
   useEffect(() => {
@@ -129,47 +126,64 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
     onClose();
   };
 
-  const handleUploadConfirm = async () => {
-    if (!uploadFile) {
-      setError('Pick a file first.');
+  /**
+   * Auto-apply the picked file. Called as soon as the user
+   * selects a file from the OS dialog — no extra "Upload +
+   * insert" button click required.
+   *
+   * The previous UX hid the apply action behind a button the
+   * user frequently missed: they'd pick a file, see the checkmark
+   * on the dropzone, close the modal, and assume nothing
+   * happened. Canva / Figma / Google Docs all apply on pick —
+   * Postr now matches that expectation.
+   *
+   * Flow:
+   *   1. Validate MIME + size locally (quick feedback).
+   *   2. Read as base64 data URL so the poster block stays
+   *      self-contained (no reliance on signed URLs that expire).
+   *   3. onPick(dataUrl) → block imageSrc is set.
+   *   4. onClose() → picker closes immediately.
+   *   5. In the background, persist to `user_logos` so the logo
+   *      becomes reusable from the My Logos tab on future
+   *      posters. Background failure is logged but does NOT
+   *      block the user — the logo is already on the canvas.
+   */
+  const handleFilePicked = async (file: File) => {
+    setError(null);
+
+    // Client-side validation before reading. If we hit this
+    // branch the user sees an inline red banner instead of a
+    // silent no-op.
+    if (!file.type.startsWith('image/')) {
+      setError(`"${file.name}" isn't an image. Upload PNG, JPEG, SVG, or WebP.`);
       return;
     }
-    setError(null);
+    if (file.size > 10 * 1024 * 1024) {
+      setError(
+        `"${file.name}" is ${(file.size / 1024 / 1024).toFixed(1)} MB — logos must be under 10 MB.`,
+      );
+      return;
+    }
+
     setUploading(true);
     try {
-      // Step 1: read the picked File as a base64 data URL
-      // IMMEDIATELY. This is what the poster block stores —
-      // base64 data URLs are self-contained and survive forever,
-      // so the block doesn't depend on a Supabase signed URL
-      // that expires in an hour or a storage-bucket fetch that
-      // might fail due to CORS / RLS.
-      //
-      // Previous implementation did the upload FIRST, then tried
-      // to re-fetch the signed URL and convert back to a data
-      // URL. Any failure in that second step left the block's
-      // imageSrc unset and the user saw only the placeholder —
-      // the exact bug reported on 2026-04-11.
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const r = new FileReader();
         r.onload = () => resolve(r.result as string);
         r.onerror = () =>
           reject(new Error('Could not read the picked file.'));
-        r.readAsDataURL(uploadFile);
+        r.readAsDataURL(file);
       });
 
-      // Step 2: set the block imageSrc + close the modal
-      // IMMEDIATELY so the user gets visual confirmation that
-      // the upload landed. The library persistence happens in
-      // the background — even if it fails the block is already
-      // showing the logo.
       onPick(dataUrl);
       onClose();
 
-      // Step 3: persist to the user's logo library in the
-      // background. Success is nice-to-have; failure is logged
-      // to the console but doesn't block the user.
+      // Background save to the personal logo library. Uses the
+      // file's display name (minus extension) as the default —
+      // users no longer get a "Logo name" textbox in the UI.
+      const defaultName = file.name.replace(/\.[^.]+$/, '');
       try {
-        await uploadUserLogo(uploadFile, uploadName);
+        await uploadUserLogo(file, defaultName);
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn('[LogoPicker] background save failed:', err);
@@ -356,12 +370,8 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
 
           {tab === 'upload' && (
             <UploadTab
-              file={uploadFile}
-              setFile={setUploadFile}
-              name={uploadName}
-              setName={setUploadName}
               uploading={uploading}
-              onConfirm={handleUploadConfirm}
+              onFilePicked={handleFilePicked}
             />
           )}
         </div>
@@ -683,14 +693,17 @@ function MyLogosTab(props: {
 }
 
 // ─── Upload tab ───────────────────────────────────────────────────
+//
+// One-click upload. Picking a file triggers `onFilePicked`
+// immediately — no extra confirmation button to click afterwards
+// (users were frequently missing the old "Upload + insert" button
+// and assuming nothing had happened). Matches Canva / Figma /
+// Google Docs behaviour where "pick a file" and "apply" are the
+// same gesture.
 
 function UploadTab(props: {
-  file: File | null;
-  setFile: (f: File | null) => void;
-  name: string;
-  setName: (n: string) => void;
   uploading: boolean;
-  onConfirm: () => void;
+  onFilePicked: (file: File) => void;
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -702,64 +715,47 @@ function UploadTab(props: {
       <label
         htmlFor="logo-picker-file"
         style={{
-          cursor: 'pointer',
-          padding: '22px 16px',
+          cursor: props.uploading ? 'wait' : 'pointer',
+          padding: '32px 16px',
           textAlign: 'center',
-          fontSize: 13,
-          color: props.file ? '#e2e2e8' : '#8a8a95',
-          background: '#111118',
-          border: `2px dashed ${props.file ? '#7c6aed' : '#2a2a3a'}`,
-          borderRadius: 8,
-          transition: 'border-color 150ms ease, color 150ms ease',
+          fontSize: 14,
+          fontWeight: 600,
+          color: props.uploading ? '#8a8a95' : '#c8b6ff',
+          background: props.uploading ? '#111118' : '#1a1630',
+          border: `2px dashed ${props.uploading ? '#2a2a3a' : '#7c6aed'}`,
+          borderRadius: 10,
+          transition: 'border-color 150ms ease, color 150ms ease, background 150ms ease',
         }}
       >
-        {props.file
-          ? `✓ ${props.file.name} (${(props.file.size / 1024).toFixed(0)} KB)`
-          : 'Click to pick an image file…'}
+        {props.uploading ? (
+          <>Uploading…</>
+        ) : (
+          <>
+            <div style={{ fontSize: 28, marginBottom: 6 }} aria-hidden>
+              📁
+            </div>
+            <div>Click to pick an image file</div>
+            <div style={{ fontSize: 11, marginTop: 4, fontWeight: 400, color: '#8a8a95' }}>
+              It'll be inserted straight into the logo block.
+            </div>
+          </>
+        )}
       </label>
       <input
         id="logo-picker-file"
         type="file"
         accept="image/*"
-        onChange={(e) => props.setFile(e.target.files?.[0] ?? null)}
+        disabled={props.uploading}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          // Reset the input value so picking the SAME file twice
+          // in a row still fires onChange (the browser swallows
+          // duplicate selections otherwise).
+          e.target.value = '';
+          if (f) props.onFilePicked(f);
+        }}
         style={{ display: 'none' }}
       />
-      <div>
-        <label
-          htmlFor="logo-picker-name"
-          style={{ fontSize: 12, color: '#8a8a95', fontWeight: 600 }}
-        >
-          Logo name
-        </label>
-        <input
-          id="logo-picker-name"
-          type="text"
-          value={props.name}
-          onChange={(e) => props.setName(e.target.value)}
-          placeholder="e.g. Smith Lab at Harvard"
-          style={{ ...searchInputStyle, marginTop: 6 }}
-        />
-      </div>
-      <button
-        type="button"
-        onClick={props.onConfirm}
-        disabled={!props.file || props.uploading}
-        style={{
-          all: 'unset',
-          cursor: props.file && !props.uploading ? 'pointer' : 'not-allowed',
-          padding: '12px 18px',
-          background: props.file && !props.uploading ? '#7c6aed' : '#2a2a3a',
-          color: props.file && !props.uploading ? '#fff' : '#6b7280',
-          borderRadius: 8,
-          fontSize: 14,
-          fontWeight: 700,
-          textAlign: 'center',
-          alignSelf: 'flex-start',
-          opacity: props.file && !props.uploading ? 1 : 0.6,
-        }}
-      >
-        {props.uploading ? 'Uploading…' : 'Upload + insert'}
-      </button>
     </div>
   );
 }
