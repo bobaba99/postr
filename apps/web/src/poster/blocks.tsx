@@ -10,6 +10,7 @@
 import ReactDOM from 'react-dom';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { blockSelection } from '@/motion/timelines/blockSelection';
+import { LogoPicker } from '@/components/LogoPicker';
 import type {
   Author,
   Block,
@@ -101,49 +102,85 @@ function readImageFile(
 }
 
 export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
-  const ref = useRef<HTMLInputElement | null>(null);
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    readImageFile(e.target.files?.[0], (dataUrl) =>
-      onUpdate({ imageSrc: dataUrl }),
-    );
-    // Reset the input so selecting the same file twice still fires
-    // onChange (browsers dedupe otherwise).
-    e.target.value = '';
-  };
+  // Clicking the empty placeholder or the "change" overlay opens
+  // the LogoPicker modal, which gives the user three paths:
+  //   1. Search the preset catalog of ~80 NA universities
+  //   2. Pick a previously-uploaded logo from their account library
+  //   3. Upload a new file (saved to library + used immediately)
+  //
+  // The picker calls `onPick(dataUrl)` with a base64 data URL,
+  // which we stash in the block's `imageSrc` field so the logo
+  // travels with the poster JSONB and doesn't rely on remote
+  // fetches at render / export time.
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   if (block.imageSrc) {
     return (
-      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <img
-          src={block.imageSrc}
-          alt="Poster logo"
-          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+      <>
+        <div
+          onClick={() => setPickerOpen(true)}
+          title="Click to change logo"
+          style={{
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+        >
+          <img
+            src={block.imageSrc}
+            alt="Poster logo"
+            style={{
+              maxWidth: '100%',
+              maxHeight: '100%',
+              objectFit: 'contain',
+              pointerEvents: 'none',
+            }}
+          />
+        </div>
+        <LogoPicker
+          open={pickerOpen}
+          onClose={() => setPickerOpen(false)}
+          onPick={(imageSrc) => onUpdate({ imageSrc })}
         />
-      </div>
+      </>
     );
   }
 
   return (
-    <div
-      onClick={() => ref.current?.click()}
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: '1.5px dashed #ccc',
-        borderRadius: 4,
-        cursor: 'pointer',
-        fontSize: 13,
-        color: '#999',
-        flexDirection: 'column',
-        gap: 2,
-      }}
-    >
-      <span>+ Logo</span>
-      <input ref={ref} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
-    </div>
+    <>
+      <div
+        onClick={() => setPickerOpen(true)}
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: '1.5px dashed #ccc',
+          borderRadius: 4,
+          cursor: 'pointer',
+          fontSize: 13,
+          color: '#999',
+          flexDirection: 'column',
+          gap: 2,
+          textAlign: 'center',
+          padding: '6px 10px',
+        }}
+      >
+        <span style={{ fontWeight: 600 }}>+ Logo</span>
+        <span style={{ fontSize: 10, opacity: 0.8 }}>
+          presets · upload · reuse
+        </span>
+      </div>
+      <LogoPicker
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onPick={(imageSrc) => onUpdate({ imageSrc })}
+      />
+    </>
   );
 }
 
