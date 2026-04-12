@@ -2324,52 +2324,54 @@ function TableEditor(props: {
         </ul>
       </div>
 
-      {/* ── 2. Row / column controls ───────────────────────── */}
-      <div>
-        <div style={labelStyle}>Rows</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            title="Remove last row"
-            onClick={() => commit(deleteRowAt(data, data.rows - 1))}
-            disabled={data.rows <= 1}
-            style={data.rows <= 1 ? tblBtnDisabled : tblBtnDanger}
-          >
-            −
-          </button>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e2e8', minWidth: 36, textAlign: 'center' }}>
-            {data.rows}
+      {/* ── 2. Row / column controls — side-by-side ─────────── */}
+      <div style={{ display: 'flex', gap: 16 }}>
+        <div style={{ flex: 1 }}>
+          <div style={labelStyle}>Rows</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              title="Remove last row"
+              onClick={() => commit(deleteRowAt(data, data.rows - 1))}
+              disabled={data.rows <= 1}
+              style={data.rows <= 1 ? tblBtnDisabled : tblBtnDanger}
+            >
+              −
+            </button>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e2e8', minWidth: 30, textAlign: 'center' }}>
+              {data.rows}
+            </div>
+            <button
+              title="Add row at bottom"
+              onClick={() => commit(insertRow(data, data.rows - 1, 'below'))}
+              style={tblBtn}
+            >
+              +
+            </button>
           </div>
-          <button
-            title="Add row at bottom"
-            onClick={() => commit(insertRow(data, data.rows - 1, 'below'))}
-            style={tblBtn}
-          >
-            +
-          </button>
         </div>
-      </div>
 
-      <div>
-        <div style={labelStyle}>Columns</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button
-            title="Remove last column"
-            onClick={() => commit(deleteColAt(data, data.cols - 1))}
-            disabled={data.cols <= 1}
-            style={data.cols <= 1 ? tblBtnDisabled : tblBtnDanger}
-          >
-            −
-          </button>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e2e8', minWidth: 36, textAlign: 'center' }}>
-            {data.cols}
+        <div style={{ flex: 1 }}>
+          <div style={labelStyle}>Columns</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              title="Remove last column"
+              onClick={() => commit(deleteColAt(data, data.cols - 1))}
+              disabled={data.cols <= 1}
+              style={data.cols <= 1 ? tblBtnDisabled : tblBtnDanger}
+            >
+              −
+            </button>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#e2e2e8', minWidth: 30, textAlign: 'center' }}>
+              {data.cols}
+            </div>
+            <button
+              title="Add column at right"
+              onClick={() => commit(insertCol(data, data.cols - 1, 'right'))}
+              style={tblBtn}
+            >
+              +
+            </button>
           </div>
-          <button
-            title="Add column at right"
-            onClick={() => commit(insertCol(data, data.cols - 1, 'right'))}
-            style={tblBtn}
-          >
-            +
-          </button>
         </div>
       </div>
 
@@ -2455,67 +2457,292 @@ function TableEditor(props: {
         </div>
       </div>
 
-      {/* Per-edge toggles revealed when Custom is picked. Each
-          checkbox maps 1:1 to a boolean flag on the TableBorderPreset
-          interface — flipping one commits a new `customBorder`
-          object and switches `borderPreset` to `'custom'` so the
-          TableBlock renderer reads from customBorder instead of the
-          named preset. */}
+      {/* Visual custom-border editor. Renders a 3×3 mini-table
+          mockup where each edge / gridline is a clickable hit
+          zone. Clicking an edge toggles the corresponding flag
+          on customBorder and commits a new TableData.
+          On = solid purple line, off = faint dashed hint so
+          users can still see where a clickable zone lives. */}
       {isCustom && (
+        <CustomBorderMockup
+          border={customBorder}
+          onToggle={toggleCustomEdge}
+        />
+      )}
+    </div>
+  );
+}
+
+// =========================================================================
+// CustomBorderMockup — clickable mini-table for per-edge toggles
+// =========================================================================
+//
+// Visual replacement for the previous checkbox list. Renders a
+// 3×3 table mockup where each border "zone" is an invisible
+// click target overlaid on the table:
+//
+//   ┌─────────────┐  ← top edge strip      → topLine
+//   │ ┌─┬─┬─┐ │     ← header row interior  → headerBox
+//   │ ├─┼─┼─┤ │     ← header separator     → headerLine
+//   │ ├─┼─┼─┤ │     ← inter-body row       → horizontalLines
+//   │ └─┴─┴─┘ │
+//   └─────────────┘  ← bottom edge strip   → bottomLine
+//
+// Plus: clicking the left or right edge toggles outerBorder,
+// and clicking a vertical gridline between columns toggles
+// verticalLines. Each edge is drawn solid purple when active
+// and faint dashed when inactive, so the user sees both the
+// current state and the clickable surface.
+
+function CustomBorderMockup(props: {
+  border: NonNullable<TableData['customBorder']>;
+  onToggle: (key: keyof NonNullable<TableData['customBorder']>) => void;
+}) {
+  const { border, onToggle } = props;
+
+  const ACTIVE = '#9d87ff';
+  const HINT = 'rgba(138, 138, 149, 0.3)';
+  const HINT_DASH = `1.5px dashed ${HINT}`;
+  const SOLID = `2px solid ${ACTIVE}`;
+
+  const line = (on: boolean) => (on ? SOLID : HINT_DASH);
+
+  // Mockup dimensions (px)
+  const W = 280;
+  const H = 140;
+  const ROWS = 3;
+  const COLS = 3;
+
+  // Hit-zone helper — a transparent clickable overlay.
+  const hit = (
+    style: React.CSSProperties,
+    key: keyof NonNullable<TableData['customBorder']>,
+    title: string,
+  ) => (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={() => onToggle(key)}
+      style={{
+        all: 'unset',
+        cursor: 'pointer',
+        position: 'absolute',
+        ...style,
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLElement).style.background =
+          'rgba(157, 135, 255, 0.12)';
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLElement).style.background = 'transparent';
+      }}
+    />
+  );
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        padding: '14px',
+        background: '#111118',
+        border: '1px solid #2a2a3a',
+        borderRadius: 8,
+      }}
+    >
+      <div style={{ fontSize: 12, color: '#8a8a95', lineHeight: 1.5 }}>
+        Click any edge or gridline to toggle it. Solid purple = on,
+        faint dashed = off.
+      </div>
+
+      <div
+        style={{
+          position: 'relative',
+          width: W,
+          height: H,
+          margin: '0 auto',
+          padding: 14, // gives the top/bottom/left/right hit strips room
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* Outer frame — drawn edge by edge so top / bottom / left /
+            right respect their own toggles independently. outerBorder
+            is treated as "left + right" since top + bottom have
+            their own dedicated flags. */}
         <div
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 10,
-            padding: '12px 14px',
-            background: '#111118',
-            border: '1px solid #2a2a3a',
-            borderRadius: 8,
+            position: 'absolute',
+            left: 14,
+            right: 14,
+            top: 14,
+            bottom: 14,
+            borderTop: line(border.topLine),
+            borderBottom: line(border.bottomLine),
+            borderLeft: line(border.outerBorder),
+            borderRight: line(border.outerBorder),
+            boxSizing: 'border-box',
           }}
         >
-          <div style={{ fontSize: 12, color: '#8a8a95', lineHeight: 1.5 }}>
-            Toggle each edge independently. The named presets (APA,
-            All Lines, etc.) are left unchanged — Custom stores its
-            own `customBorder` field.
-          </div>
-          {(
-            [
-              ['topLine', 'Top edge line'],
-              ['bottomLine', 'Bottom edge line'],
-              ['outerBorder', 'Outer border (all 4 sides)'],
-              ['headerLine', 'Header separator line'],
-              ['headerBox', 'Header row box (4 sides)'],
-              ['horizontalLines', 'Horizontal lines between rows'],
-              ['verticalLines', 'Vertical lines between cols'],
-            ] as Array<
-              [keyof NonNullable<TableData['customBorder']>, string]
-            >
-          ).map(([key, label]) => {
-            const on = customBorder[key];
-            return (
-              <label
-                key={key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  fontSize: 13,
-                  color: '#c8cad0',
-                  cursor: 'pointer',
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={on}
-                  onChange={() => toggleCustomEdge(key)}
-                  style={{ accentColor: '#7c6aed' }}
+          {/* Grid of cells, drawn with their own borders so the
+              header separator, body horizontal lines, and vertical
+              lines between columns each have a visible edge that
+              matches the toggle state. */}
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'grid',
+              gridTemplateColumns: `repeat(${COLS}, 1fr)`,
+              gridTemplateRows: `repeat(${ROWS}, 1fr)`,
+              boxSizing: 'border-box',
+            }}
+          >
+            {Array.from({ length: ROWS * COLS }).map((_, i) => {
+              const r = Math.floor(i / COLS);
+              const c = i % COLS;
+              const isHeader = r === 0;
+              // Header row box draws ALL 4 sides of the header row.
+              // We paint it on each cell so the appearance survives
+              // across the full header row.
+              const headerBoxTop = isHeader && border.headerBox;
+              const headerBoxBottom = isHeader && border.headerBox;
+              const headerBoxLeft = isHeader && border.headerBox && c === 0;
+              const headerBoxRight =
+                isHeader && border.headerBox && c === COLS - 1;
+              return (
+                <div
+                  key={i}
+                  style={{
+                    background: isHeader
+                      ? 'rgba(157, 135, 255, 0.06)'
+                      : 'transparent',
+                    boxSizing: 'border-box',
+                    borderTop:
+                      r === 1 && border.headerLine
+                        ? line(true)
+                        : r > 1 && border.horizontalLines
+                          ? line(true)
+                          : headerBoxTop
+                            ? line(true)
+                            : 'none',
+                    borderBottom: headerBoxBottom ? line(true) : 'none',
+                    borderLeft:
+                      c > 0 && border.verticalLines
+                        ? line(true)
+                        : headerBoxLeft
+                          ? line(true)
+                          : 'none',
+                    borderRight: headerBoxRight ? line(true) : 'none',
+                  }}
                 />
-                {label}
-              </label>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      )}
+
+        {/* ── Clickable hit zones ─────────────────────────── */}
+        {/* Top edge strip */}
+        {hit(
+          { left: 14, right: 14, top: 2, height: 14, zIndex: 2 },
+          'topLine',
+          border.topLine ? 'Remove top edge line' : 'Add top edge line',
+        )}
+        {/* Bottom edge strip */}
+        {hit(
+          { left: 14, right: 14, bottom: 2, height: 14, zIndex: 2 },
+          'bottomLine',
+          border.bottomLine ? 'Remove bottom edge line' : 'Add bottom edge line',
+        )}
+        {/* Left + right edges → outerBorder (both sides, synced) */}
+        {hit(
+          { left: 2, top: 14, bottom: 14, width: 14, zIndex: 2 },
+          'outerBorder',
+          border.outerBorder
+            ? 'Remove left/right outer borders'
+            : 'Add left/right outer borders',
+        )}
+        {hit(
+          { right: 2, top: 14, bottom: 14, width: 14, zIndex: 2 },
+          'outerBorder',
+          border.outerBorder
+            ? 'Remove left/right outer borders'
+            : 'Add left/right outer borders',
+        )}
+        {/* Header row interior — click anywhere on row 0 to toggle header box */}
+        {hit(
+          {
+            left: 16,
+            right: 16,
+            top: 16,
+            height: (H - 28) / ROWS - 4,
+            zIndex: 1,
+          },
+          'headerBox',
+          border.headerBox ? 'Remove header row box' : 'Add header row box',
+        )}
+        {/* Header separator — strip between row 0 and row 1 */}
+        {hit(
+          {
+            left: 16,
+            right: 16,
+            top: 14 + (H - 28) / ROWS - 4,
+            height: 8,
+            zIndex: 3,
+          },
+          'headerLine',
+          border.headerLine ? 'Remove header separator' : 'Add header separator',
+        )}
+        {/* Body horizontal lines — strip between row 1 and row 2 */}
+        {hit(
+          {
+            left: 16,
+            right: 16,
+            top: 14 + ((H - 28) * 2) / ROWS - 4,
+            height: 8,
+            zIndex: 3,
+          },
+          'horizontalLines',
+          border.horizontalLines
+            ? 'Remove horizontal lines between rows'
+            : 'Add horizontal lines between rows',
+        )}
+        {/* Vertical line between col 0 and col 1 */}
+        {hit(
+          {
+            top: 16,
+            bottom: 16,
+            left: 14 + (W - 28) / COLS - 4,
+            width: 8,
+            zIndex: 3,
+          },
+          'verticalLines',
+          border.verticalLines
+            ? 'Remove vertical lines between columns'
+            : 'Add vertical lines between columns',
+        )}
+        {/* Vertical line between col 1 and col 2 (same toggle) */}
+        {hit(
+          {
+            top: 16,
+            bottom: 16,
+            left: 14 + ((W - 28) * 2) / COLS - 4,
+            width: 8,
+            zIndex: 3,
+          },
+          'verticalLines',
+          border.verticalLines
+            ? 'Remove vertical lines between columns'
+            : 'Add vertical lines between columns',
+        )}
+      </div>
+
+      <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4, textAlign: 'center' }}>
+        Top / bottom strips · Left + right → outer border · Row 0 →
+        header box · Between rows → separators · Between columns →
+        verticals
+      </div>
     </div>
   );
 }
