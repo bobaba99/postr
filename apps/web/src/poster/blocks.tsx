@@ -365,11 +365,10 @@ const iconBtn: CSSProperties = {
   height: 18,
   fontSize: 13,
   cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
+  display: 'grid',
+  placeItems: 'center',
   padding: 0,
-  lineHeight: 1,
+  lineHeight: 0,
   boxSizing: 'border-box',
 };
 
