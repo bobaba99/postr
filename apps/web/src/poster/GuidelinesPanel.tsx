@@ -706,7 +706,7 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
           <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>{g.conference}</div>
           <div style={{ fontSize: 13, color: '#6b7280' }}>{g.field} — {g.size}</div>
         </div>
-        <span style={{ fontSize: 13, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
+        <span style={{ fontSize: 18, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none', lineHeight: 1 }}>
           ▸
         </span>
       </button>
@@ -1073,7 +1073,7 @@ function SectionDropdown({ title, open, onToggle, children }: {
             {title}
           </div>
         </div>
-        <span style={{ fontSize: 16, color: '#6b7280', transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)', transform: open ? 'rotate(90deg)' : 'none' }}>
+        <span style={{ fontSize: 22, color: '#6b7280', transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)', transform: open ? 'rotate(90deg)' : 'none', lineHeight: 1 }}>
           ▸
         </span>
       </button>
@@ -1104,7 +1104,7 @@ function WritingTipCard({ section: s, index, expanded, onToggle }: {
           <span style={{ fontSize: 13, fontWeight: 700, color: '#7c6aed', minWidth: 18 }}>{index}.</span>
           <span style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>{s.title}</span>
         </div>
-        <span style={{ fontSize: 13, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none' }}>
+        <span style={{ fontSize: 18, color: '#6b7280', transition: 'transform 0.15s', transform: expanded ? 'rotate(90deg)' : 'none', lineHeight: 1 }}>
           ▸
         </span>
       </button>
