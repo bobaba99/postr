@@ -198,3 +198,50 @@ After clicking a table cell, clicking elsewhere (canvas background, another bloc
 **File:** `apps/web/src/poster/blocks.tsx`
 - Added `selected` prop to `TableBlock`
 - `useEffect` clears `activeCell`, `selectedRow`, `selectedCol`, `rangeStart`, `rangeEnd` when `selected` becomes false
+
+---
+
+## Issue 10: Undo Doesn't Work for Block Moves/Resize
+
+### Symptom
+After dragging a block to a new position, Cmd+Z doesn't restore the original position. The block stays where it was dropped.
+
+### Root Cause
+Block moves use `setBlocksSilent()` during the drag (to avoid flooding the undo stack with 60 entries/second). On `pointerup`, `setBlocks(blocksRef.current)` was called to commit — but `setBlocks` uses `withUndo` which snapshots the **current** `doc.blocks` before applying the change. Since `setBlocksSilent` already moved blocks to their final position, the "before" snapshot was identical to the "after" — making the undo entry a no-op.
+
+### Fix Applied
+**File:** `apps/web/src/poster/PosterEditor.tsx`
+- Added `preDragBlocksRef` — captures blocks snapshot when drag crosses the 4px activation threshold
+- On `pointerup`, temporarily restores pre-drag blocks via `setBlocksSilent`, then calls `setBlocks` with post-drag blocks
+- `withUndo` now correctly snapshots the pre-drag state
+
+---
+
+## Issue 11: Phantom Undo Entries from Image onLoad Auto-Sizing
+
+### Symptom
+First Cmd+Z appears to do nothing, second Cmd+Z undoes two steps at once.
+
+### Root Cause
+Image block's `onLoad` handler called `onUpdate({ h: newH })` to auto-size the block to match image aspect ratio. This went through `withUndo`, pushing a phantom undo entry. `onLoad` fired on every render — storage URL resolution, zoom changes, React re-renders — each time creating an invisible undo entry (height change of 0-2px, below visual threshold).
+
+### Fix Applied
+**File:** `apps/web/src/poster/blocks.tsx`
+- Removed `onLoad` auto-sizing handler entirely
+- Auto-sizing only happens at upload time in `handleFile` (one-time, intentional)
+
+---
+
+## Issue 12: Base64 Migration Wipes Undo History
+
+### Symptom
+After loading a poster with base64 images, all previous undo history is lost.
+
+### Root Cause
+`migrateBase64ToStorage()` called `store.setPoster()` after uploading images to Storage. `setPoster` clears both `undoStack` and `redoStack` (by design — it's meant for loading a new poster, not updating the current one).
+
+### Fix Applied
+**File:** `apps/web/src/pages/Editor.tsx`
+- Changed migration to use `store.setBlocksSilent(nextBlocks)` instead of `store.setPoster()`
+- `setBlocksSilent` updates blocks without touching the undo stack
+- Autosave still detects the change via doc reference change
