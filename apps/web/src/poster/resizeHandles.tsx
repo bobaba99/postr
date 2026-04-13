@@ -3,11 +3,9 @@
  * selection) and GroupFrame (multiselect bounding box).
  *
  * Renders 4 corner handles + 4 edge midpoint handles around the
- * parent's border box. Each handle is a 12×12px invisible hit zone
- * with a 6×6px visible square indicator — matching the PowerPoint /
- * Google Slides visual language.
+ * parent's border box. Each handle is a 10×10px invisible hit zone
+ * with a 5×5px visible square indicator.
  */
-import type { Palette } from '@postr/shared';
 
 export type ResizeHandle =
   | 'n' | 's' | 'e' | 'w'
@@ -26,14 +24,14 @@ const CURSORS: Record<ResizeHandle, string> = {
 
 /** Position styles for each handle (centered on the edge/corner). */
 const POSITIONS: Record<ResizeHandle, React.CSSProperties> = {
-  nw: { top: -6, left: -6 },
-  ne: { top: -6, right: -6 },
-  sw: { bottom: -6, left: -6 },
-  se: { bottom: -6, right: -6 },
-  n: { top: -6, left: '50%', transform: 'translateX(-50%)' },
-  s: { bottom: -6, left: '50%', transform: 'translateX(-50%)' },
-  e: { top: '50%', right: -6, transform: 'translateY(-50%)' },
-  w: { top: '50%', left: -6, transform: 'translateY(-50%)' },
+  nw: { top: -5, left: -5 },
+  ne: { top: -5, right: -5 },
+  sw: { bottom: -5, left: -5 },
+  se: { bottom: -5, right: -5 },
+  n: { top: -5, left: '50%', transform: 'translateX(-50%)' },
+  s: { bottom: -5, left: '50%', transform: 'translateX(-50%)' },
+  e: { top: '50%', right: -5, transform: 'translateY(-50%)' },
+  w: { top: '50%', left: -5, transform: 'translateY(-50%)' },
 };
 
 const ALL_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
@@ -56,10 +54,9 @@ export function ResizeHandles({ accent, onPointerDown }: ResizeHandlesProps) {
           style={{
             position: 'absolute',
             ...POSITIONS[h],
-            width: 12,
-            height: 12,
+            width: 10,
+            height: 10,
             cursor: CURSORS[h],
-            // Hit zone is 12×12, visual square is 6×6 centered inside
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -68,8 +65,8 @@ export function ResizeHandles({ accent, onPointerDown }: ResizeHandlesProps) {
         >
           <div
             style={{
-              width: 6,
-              height: 6,
+              width: 5,
+              height: 5,
               border: `1px solid ${accent}`,
               background: '#fff',
               borderRadius: 1,

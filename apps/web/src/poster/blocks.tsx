@@ -1487,7 +1487,7 @@ function CaptionWrapper({
         boxSizing: 'border-box',
         // User-controlled caption gap. Clamped at render time so a
         // corrupted stored value can't break layout.
-        gap: Math.max(0, Math.min(24, block.captionGap ?? 6)),
+        gap: Math.max(0, Math.min(24, block.captionGap ?? 0)),
       }}
     >
       <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
@@ -2002,7 +2002,7 @@ export function BlockFrame(props: BlockFrameProps) {
           <div
             style={{
               position: 'absolute',
-              top: -26,
+              top: -20,
               left: '50%',
               // Row stays glued to the block's horizontal center no
               // matter how the block is sized or rotated. The
@@ -2019,11 +2019,11 @@ export function BlockFrame(props: BlockFrameProps) {
               // leaves the control row the same length. The row
               // just stays horizontally centered above the block.
               width: 'fit-content',
-              height: 20,
+              height: 16,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 6,
+              gap: 4,
               boxSizing: 'border-box',
               pointerEvents: 'none',
               zIndex: 10,
@@ -2036,26 +2036,26 @@ export function BlockFrame(props: BlockFrameProps) {
                 onPointerDown(e, b.id, 'move');
               }}
               style={{
-                flex: '0 0 20px',
-                width: 20,
-                height: 20,
+                flex: '0 0 16px',
+                width: 16,
+                height: 16,
                 borderRadius: '50%',
                 background: p.accent,
                 color: '#fff',
-                border: '2px solid #0a0a12',
+                border: '1.5px solid #0a0a12',
                 cursor: 'move',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
                 padding: 0,
                 pointerEvents: 'auto',
               }}
               title="Drag to move (or use arrow keys)"
             >
               <svg
-                width="12"
-                height="12"
+                width="9"
+                height="9"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -2082,24 +2082,24 @@ export function BlockFrame(props: BlockFrameProps) {
                 // constant length regardless of the block's own
                 // dimensions.
                 flex: '0 0 auto',
-                height: 20,
+                height: 16,
                 boxSizing: 'border-box',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 9,
+                fontSize: 8,
                 background: p.accent,
                 color: '#fff',
-                padding: '0 10px',
-                borderRadius: 10,
-                border: '2px solid #0a0a12',
+                padding: '0 7px',
+                borderRadius: 8,
+                border: '1.5px solid #0a0a12',
                 fontFamily: 'system-ui',
                 fontWeight: 700,
                 letterSpacing: 0.5,
                 textTransform: 'uppercase',
                 lineHeight: 1,
                 whiteSpace: 'nowrap',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
                 pointerEvents: 'none',
               }}
             >
@@ -2117,26 +2117,26 @@ export function BlockFrame(props: BlockFrameProps) {
                 onDelete(b.id);
               }}
               style={{
-                flex: '0 0 20px',
-                width: 20,
-                height: 20,
+                flex: '0 0 16px',
+                width: 16,
+                height: 16,
                 borderRadius: '50%',
                 background: '#d33',
                 color: '#fff',
-                border: '2px solid #0a0a12',
+                border: '1.5px solid #0a0a12',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
                 padding: 0,
                 pointerEvents: 'auto',
               }}
               title="Delete block"
             >
               <svg
-                width="10"
-                height="10"
+                width="8"
+                height="8"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -2169,11 +2169,11 @@ export function BlockFrame(props: BlockFrameProps) {
             // none` so clicks pass through to the handle below it.
             style={{
               position: 'absolute',
-              bottom: -18,
+              bottom: -14,
               left: '50%',
               marginLeft: -1,
-              width: 2,
-              height: 18,
+              width: 1.5,
+              height: 14,
               background: p.accent,
               opacity: 0.5,
               pointerEvents: 'none',
@@ -2187,29 +2187,24 @@ export function BlockFrame(props: BlockFrameProps) {
             }}
             style={{
               position: 'absolute',
-              bottom: -36,
+              bottom: -28,
               left: '50%',
-              marginLeft: -10,
-              width: 20,
-              height: 20,
+              marginLeft: -8,
+              width: 16,
+              height: 16,
               borderRadius: '50%',
-              // Matches the image-block's inline "replace" button
-              // visual style (gray rgba background + Unicode ↻).
-              // User asked 2026-04-11 to reuse that exact visual
-              // so the rotate handle feels like a sibling of the
-              // image block's internal controls.
               background: 'rgba(0, 0, 0, 0.6)',
               color: '#fff',
-              border: '2px solid #0a0a12',
+              border: '1.5px solid #0a0a12',
               cursor: 'grab',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 14,
+              fontSize: 11,
               fontWeight: 700,
               lineHeight: 1,
               zIndex: 10,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
               padding: 0,
               fontFamily: 'system-ui, -apple-system, sans-serif',
               // Counter-rotate so the icon stays upright even when

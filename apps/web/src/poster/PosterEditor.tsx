@@ -154,6 +154,7 @@ function useBlockDrag(
   setBlocks: (b: Block[]) => void,
   setBlocksSilent: (b: Block[]) => void,
   scale: number,
+  onResizeWarning?: (msg: string) => void,
 ): UseBlockDragResult {
   // Keep a ref to blocks so the pointermove handler always reads the
   // latest positions. Previously the handler closed over a stale
@@ -360,8 +361,26 @@ function useBlockDrag(
       };
 
       const onUp = () => {
+        const s = sessionRef.current;
+        // Warn when user tried to vertically resize an auto-height block
+        if (s?.active && s.mode === 'resize' && onResizeWarning) {
+          const handle = s.resizeHandle;
+          const hasVertical = handle.includes('n') || handle.includes('s');
+          if (hasVertical) {
+            const blk = blocksRef.current.find((x) => x.id === s.id);
+            if (blk) {
+              const warnings: Record<string, string> = {
+                heading: 'Heading height is auto-sized from font',
+                authors: 'Authors height adjusts to content',
+                references: 'References height adjusts to content',
+              };
+              const msg = warnings[blk.type];
+              if (msg) onResizeWarning(msg);
+            }
+          }
+        }
         // Push one undo entry for the entire drag operation
-        if (sessionRef.current?.active) {
+        if (s?.active) {
           setBlocks(blocksRef.current);
         }
         sessionRef.current = null;
@@ -870,7 +889,10 @@ export function PosterEditor() {
   const outerBlocksRef = useRef(doc.blocks);
   outerBlocksRef.current = doc.blocks;
 
-  const { onPointerDown, didDragRef, draggingId } = useBlockDrag(doc.blocks, setBlocks, storeSetBlocksSilent, zoom);
+  const { onPointerDown, didDragRef, draggingId } = useBlockDrag(
+    doc.blocks, setBlocks, storeSetBlocksSilent, zoom,
+    (msg) => setUndoToastMsg(msg),
+  );
   const draggingBlock = draggingId ? doc.blocks.find((x) => x.id === draggingId) ?? null : null;
 
   // Group manipulation state — stores the original block positions at
@@ -2016,7 +2038,10 @@ export function PosterEditor() {
             const my = (ev.clientY - canvasRect.top) / zoom;
             const dist = Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY);
             if (dist < DRAG_THRESHOLD_PX && !rubberBandActive.current) return;
-            rubberBandActive.current = true;
+            if (!rubberBandActive.current) {
+              rubberBandActive.current = true;
+              document.body.style.userSelect = 'none';
+            }
             setRubberBand({ startX, startY, currentX: mx, currentY: my });
           };
 
@@ -2052,6 +2077,7 @@ export function PosterEditor() {
               clearSelection();
             }
             rubberBandActive.current = false;
+            document.body.style.userSelect = '';
           };
 
           window.addEventListener('pointermove', onMove);
@@ -2073,7 +2099,26 @@ export function PosterEditor() {
           // a scroll origin of 0.
           display: 'block',
           overflow: 'auto',
-          background: '#0a0a12',
+          // Workspace grid — CSS repeating background that tiles
+          // infinitely across the workspace, scaling with zoom.
+          // Minor grid every SNAP_GRID units, major every 10×SNAP_GRID.
+          ...(showGrid ? {
+            backgroundImage: [
+              `linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)`,
+              `linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)`,
+              `linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px)`,
+              `linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)`,
+            ].join(', '),
+            backgroundSize: [
+              `${SNAP_GRID * 10 * zoom}px ${SNAP_GRID * 10 * zoom}px`,
+              `${SNAP_GRID * 10 * zoom}px ${SNAP_GRID * 10 * zoom}px`,
+              `${SNAP_GRID * zoom}px ${SNAP_GRID * zoom}px`,
+              `${SNAP_GRID * zoom}px ${SNAP_GRID * zoom}px`,
+            ].join(', '),
+            backgroundColor: '#0a0a12',
+          } : {
+            background: '#0a0a12',
+          }),
           minWidth: 0,
           minHeight: 0,
         }}
@@ -2145,149 +2190,8 @@ export function PosterEditor() {
                 // handler's scroll math and produce lag.
               }}
             >
-              {showGrid && (
-                // Grid cell size equals SNAP_GRID (5 units = 1/2 inch
-                // printed), so every visible line is a valid snap
-                // target. The denser grid is drawn faintly and with
-                // every 10th line slightly brighter for orientation.
-                <svg
-                  data-postr-overlay="grid"
-                  width={cW}
-                  height={cH}
-                  style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-                >
-                  {Array.from({ length: Math.ceil(cW / SNAP_GRID) + 1 }).map((_, i) => (
-                    <line
-                      key={`v${i}`}
-                      x1={i * SNAP_GRID}
-                      y1={0}
-                      x2={i * SNAP_GRID}
-                      y2={cH}
-                      stroke={doc.palette.primary}
-                      strokeWidth={0.4}
-                      opacity={i % 10 === 0 ? 0.08 : 0.03}
-                    />
-                  ))}
-                  {Array.from({ length: Math.ceil(cH / SNAP_GRID) + 1 }).map((_, i) => (
-                    <line
-                      key={`h${i}`}
-                      x1={0}
-                      y1={i * SNAP_GRID}
-                      x2={cW}
-                      y2={i * SNAP_GRID}
-                      stroke={doc.palette.primary}
-                      strokeWidth={0.4}
-                      opacity={i % 10 === 0 ? 0.08 : 0.03}
-                    />
-                  ))}
-                </svg>
-              )}
-              {showRuler && (
-                // Ruler overlay — inch marks along the top and left
-                // edges of the canvas. Major tick every inch, labeled;
-                // minor tick every half-inch. PX = 10, so 1 inch = 10
-                // units. Sits above the grid with pointerEvents:none
-                // so it never steals clicks from blocks underneath.
-                <svg
-                  data-postr-overlay="ruler"
-                  width={cW}
-                  height={cH}
-                  style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-                >
-                  {/* Top ruler — horizontal inch marks */}
-                  {Array.from({ length: Math.ceil(doc.widthIn) + 1 }).map((_, i) => {
-                    const x = i * PX;
-                    return (
-                      <g key={`rt${i}`}>
-                        <line
-                          x1={x}
-                          y1={0}
-                          x2={x}
-                          y2={i % 5 === 0 ? 6 : 3}
-                          stroke={doc.palette.primary}
-                          strokeWidth={0.5}
-                          opacity={0.55}
-                        />
-                        {i % 5 === 0 && i > 0 && i < doc.widthIn && (
-                          <text
-                            x={x + 1}
-                            y={10}
-                            fontSize={4}
-                            fill={doc.palette.primary}
-                            opacity={0.55}
-                            fontFamily="ui-monospace, monospace"
-                          >
-                            {i}"
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })}
-                  {/* Half-inch minor ticks along top */}
-                  {Array.from({ length: Math.ceil(doc.widthIn * 2) + 1 }).map((_, i) => {
-                    if (i % 2 === 0) return null;
-                    const x = (i * PX) / 2;
-                    return (
-                      <line
-                        key={`rth${i}`}
-                        x1={x}
-                        y1={0}
-                        x2={x}
-                        y2={2}
-                        stroke={doc.palette.primary}
-                        strokeWidth={0.4}
-                        opacity={0.35}
-                      />
-                    );
-                  })}
-                  {/* Left ruler — vertical inch marks */}
-                  {Array.from({ length: Math.ceil(doc.heightIn) + 1 }).map((_, i) => {
-                    const y = i * PX;
-                    return (
-                      <g key={`rl${i}`}>
-                        <line
-                          x1={0}
-                          y1={y}
-                          x2={i % 5 === 0 ? 6 : 3}
-                          y2={y}
-                          stroke={doc.palette.primary}
-                          strokeWidth={0.5}
-                          opacity={0.55}
-                        />
-                        {i % 5 === 0 && i > 0 && i < doc.heightIn && (
-                          <text
-                            x={1}
-                            y={y + 3}
-                            fontSize={4}
-                            fill={doc.palette.primary}
-                            opacity={0.55}
-                            fontFamily="ui-monospace, monospace"
-                          >
-                            {i}"
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })}
-                  {/* Half-inch minor ticks along left */}
-                  {Array.from({ length: Math.ceil(doc.heightIn * 2) + 1 }).map((_, i) => {
-                    if (i % 2 === 0) return null;
-                    const y = (i * PX) / 2;
-                    return (
-                      <line
-                        key={`rlh${i}`}
-                        x1={0}
-                        y1={y}
-                        x2={2}
-                        y2={y}
-                        stroke={doc.palette.primary}
-                        strokeWidth={0.4}
-                        opacity={0.35}
-                      />
-                    );
-                  })}
-                </svg>
-              )}
+              {/* Grid now rendered on the workspace, not the canvas */}
+              {/* Ruler now rendered on the workspace, not the canvas */}
 
               {/*
                 Drag guides — dotted edge / centerline overlay rendered
@@ -2433,6 +2337,120 @@ export function PosterEditor() {
         </div>
         </div>
       </div>
+
+        {/* Workspace rulers — fixed at viewport edges, Figma-style.
+            Positioned absolutely over the scroll container so they
+            stay visible during scroll/zoom. */}
+        {showRuler && (
+          <>
+            {/* Top ruler bar */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 24,
+                right: 0,
+                height: 24,
+                background: '#12121e',
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                overflow: 'hidden',
+                pointerEvents: 'none',
+                zIndex: 12,
+                display: 'flex',
+                alignItems: 'flex-end',
+              }}
+            >
+              {Array.from({ length: 200 }).map((_, i) => {
+                const spacing = PX * zoom;
+                const offset = canvasRef.current ? -canvasRef.current.scrollLeft : 0;
+                const x = i * spacing + offset + 96 * zoom;
+                if (x < -spacing || x > 3000) return null;
+                const isMajor = i % 5 === 0;
+                return (
+                  <div key={`rt${i}`} style={{ position: 'absolute', left: x, bottom: 0 }}>
+                    <div style={{
+                      width: 1,
+                      height: isMajor ? 10 : 5,
+                      background: 'rgba(255,255,255,0.35)',
+                    }} />
+                    {isMajor && i > 0 && (
+                      <span style={{
+                        position: 'absolute',
+                        left: 3,
+                        bottom: 10,
+                        fontSize: 9,
+                        color: 'rgba(255,255,255,0.4)',
+                        fontFamily: 'ui-monospace, monospace',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {i}"
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Left ruler bar */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 24,
+                left: 0,
+                bottom: 0,
+                width: 24,
+                background: '#12121e',
+                borderRight: '1px solid rgba(255,255,255,0.08)',
+                overflow: 'hidden',
+                pointerEvents: 'none',
+                zIndex: 12,
+              }}
+            >
+              {Array.from({ length: 200 }).map((_, i) => {
+                const spacing = PX * zoom;
+                const offset = canvasRef.current ? -canvasRef.current.scrollTop : 0;
+                const y = i * spacing + offset + 96 * zoom;
+                if (y < -spacing || y > 3000) return null;
+                const isMajor = i % 5 === 0;
+                return (
+                  <div key={`rl${i}`} style={{ position: 'absolute', top: y, left: 0 }}>
+                    <div style={{
+                      height: 1,
+                      width: isMajor ? 10 : 5,
+                      background: 'rgba(255,255,255,0.35)',
+                    }} />
+                    {isMajor && i > 0 && (
+                      <span style={{
+                        position: 'absolute',
+                        top: 3,
+                        left: 10,
+                        fontSize: 9,
+                        color: 'rgba(255,255,255,0.4)',
+                        fontFamily: 'ui-monospace, monospace',
+                        whiteSpace: 'nowrap',
+                        writingMode: 'vertical-lr',
+                      }}>
+                        {i}"
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Corner square where rulers meet */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: 24,
+              height: 24,
+              background: '#12121e',
+              borderRight: '1px solid rgba(255,255,255,0.08)',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              zIndex: 13,
+              pointerEvents: 'none',
+            }} />
+          </>
+        )}
 
         <UndoToast message={undoToastMsg} onDismiss={dismissUndoToast} />
 
