@@ -1568,6 +1568,21 @@ export function PosterEditor() {
     return () => ro.disconnect();
   }, [cH]);
 
+  // Lock body/html scroll while editor is mounted — only the
+  // workspace scroll container and sidebar panels should scroll.
+  // Restored on unmount so other pages (dashboard, gallery) scroll
+  // normally.
+  useEffect(() => {
+    const prevHtml = document.documentElement.style.overflow;
+    const prevBody = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.documentElement.style.overflow = prevHtml;
+      document.body.style.overflow = prevBody;
+    };
+  }, []);
+
   // Inject Google Fonts once on mount.
   useEffect(() => {
     const link = document.createElement('link');
