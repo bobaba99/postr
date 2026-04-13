@@ -15,7 +15,6 @@ import type {
   Author,
   Block,
   HeadingStyle,
-  ImageFit,
   Institution,
   Palette,
   Reference,
@@ -211,9 +210,8 @@ interface ImageBlockProps {
   posterId?: string;
 }
 
-export function ImageBlock({ block, palette, onUpdate, selected = false, userId, posterId }: ImageBlockProps) {
+export function ImageBlock({ block, palette, onUpdate, userId, posterId }: ImageBlockProps) {
   const ref = useRef<HTMLInputElement | null>(null);
-  // Resolve storage:// paths to signed URLs for rendering
   const resolvedSrc = useStorageUrl(block.imageSrc);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -221,7 +219,6 @@ export function ImageBlock({ block, palette, onUpdate, selected = false, userId,
     if (!file) return;
 
     if (userId && posterId) {
-      // Show immediate preview via object URL while uploading
       const previewUrl = URL.createObjectURL(file);
       onUpdate({ imageSrc: previewUrl });
 
@@ -230,58 +227,51 @@ export function ImageBlock({ block, palette, onUpdate, selected = false, userId,
         if (storageSrc) {
           onUpdate({ imageSrc: storageSrc });
         } else {
-          // Upload failed — fall back to base64
           readImageFile(file, (dataUrl) => onUpdate({ imageSrc: dataUrl }));
         }
       });
     } else {
-      // Fallback: no userId/posterId available — use base64
       readImageFile(file, (dataUrl) => onUpdate({ imageSrc: dataUrl }));
     }
+
+    // Auto-size block to match image aspect ratio
+    const img = new Image();
+    img.onload = () => {
+      const aspect = img.naturalWidth / img.naturalHeight;
+      const newH = Math.round(block.w / aspect);
+      if (Math.abs(newH - block.h) > 2) {
+        onUpdate({ h: newH });
+      }
+    };
+    img.src = URL.createObjectURL(file);
+
     e.target.value = '';
   };
 
-  // Fit mode cycle: contain → cover → fill → contain. Labels use
-  // the FULL word instead of an abbreviation — the original
-  // one-letter "C/C/F" was ambiguous because contain + cover both
-  // start with C, and even the short "FIT/CROP/FILL" was flagged
-  // as confusing by the user. The tooltip carries the full
-  // explanation so tiny blocks that can't afford the label width
-  // can still show meaningful help on hover.
-  const FIT_LABEL: Record<ImageFit, string> = {
-    contain: 'Contain',
-    cover: 'Cover',
-    fill: 'Fill',
-  };
-  const FIT_HINT: Record<ImageFit, string> = {
-    contain:
-      'Contain — image scales to fit entirely inside the block (may leave blank strips if aspect ratios differ). Click to cycle to Cover.',
-    cover:
-      'Cover — image fills the block and overflow is cropped (no blank strips). Click to cycle to Fill.',
-    fill:
-      'Fill — image stretches to fill the block exactly (may distort aspect ratio). Click to cycle to Contain.',
-  };
-  const toggleFit = () => {
-    const current = block.imageFit ?? 'contain';
-    const next = current === 'contain' ? 'cover' : current === 'cover' ? 'fill' : 'contain';
-    onUpdate({ imageFit: next });
-  };
-
   if (block.imageSrc) {
-    const currentFit = block.imageFit ?? 'contain';
-    // Use resolved URL (signed URL for storage://, as-is for base64/remote)
     const displaySrc = resolvedSrc ?? block.imageSrc;
     return (
-      <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ width: '100%', height: '100%', position: 'relative' }}>
         <img
           src={displaySrc}
           alt={block.caption || 'Figure'}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
+          onLoad={(e) => {
+            // Auto-size block height to match image aspect ratio
+            const img = e.currentTarget;
+            if (img.naturalWidth && img.naturalHeight) {
+              const aspect = img.naturalWidth / img.naturalHeight;
+              const newH = Math.round(block.w / aspect);
+              if (Math.abs(newH - block.h) > 2) {
+                onUpdate({ h: newH });
+              }
+            }
+          }}
           style={{
             width: '100%',
             height: '100%',
-            objectFit: currentFit,
+            objectFit: 'contain',
             userSelect: 'none',
             WebkitUserDrag: 'none',
             KhtmlUserDrag: 'none',
@@ -289,46 +279,6 @@ export function ImageBlock({ block, palette, onUpdate, selected = false, userId,
             OUserDrag: 'none',
           } as CSSProperties}
         />
-        {/*
-          In-image overlay with Contain/Cover/Fill toggle, replace
-          button, and remove button. Only rendered while the block
-          is selected so the canvas stays clean for deselected
-          images. Matches the external-handles pattern above: chrome
-          only appears when you're actively interacting with a block.
-        */}
-        {selected && (
-          <div style={{ position: 'absolute', top: 2, right: 2, display: 'flex', gap: 2 }}>
-            <button
-              onClick={toggleFit}
-              title={FIT_HINT[currentFit]}
-              style={labelBtn}
-            >
-              {FIT_LABEL[currentFit]}
-            </button>
-            <button
-              onClick={() => ref.current?.click()}
-              title="Replace image — choose a different file"
-              style={iconBtn}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: 'block' }}>
-                <path d="M21 2v6h-6" />
-                <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-                <path d="M3 22v-6h6" />
-                <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-              </svg>
-            </button>
-            <button
-              onClick={() => onUpdate({ imageSrc: null })}
-              title="Remove image"
-              style={{ ...iconBtn, background: 'rgba(180,30,30,.8)' }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: 'block' }}>
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-        )}
         <input ref={ref} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
       </div>
     );
@@ -384,42 +334,6 @@ const circleBtn: CSSProperties = {
   boxSizing: 'border-box',
 };
 
-/** Square icon button — used for image overlay SVG icon controls. */
-const iconBtn: CSSProperties = {
-  background: 'rgba(0,0,0,.6)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 3,
-  width: 18,
-  height: 18,
-  cursor: 'pointer',
-  display: 'grid',
-  placeItems: 'center',
-  placeContent: 'center',
-  padding: 0,
-  boxSizing: 'border-box',
-};
-
-/** Text label button — used for the Contain/Cover/Fill toggle. */
-const labelBtn: CSSProperties = {
-  background: 'rgba(0,0,0,.6)',
-  color: '#fff',
-  border: 'none',
-  borderRadius: 3,
-  height: 18,
-  fontSize: 9,
-  fontWeight: 700,
-  letterSpacing: 0.4,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0 6px',
-  lineHeight: 1,
-  boxSizing: 'border-box',
-  fontFamily: 'system-ui, -apple-system, sans-serif',
-  whiteSpace: 'nowrap',
-};
 
 // =========================================================================
 // TableBlock
