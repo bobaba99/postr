@@ -10,13 +10,13 @@
  * and the optimistic state updates.
  */
 import { Link, useNavigate } from 'react-router-dom';
-import type { PosterRow } from '@/data/posters';
+import type { PosterRow, PosterListRow } from '@/data/posters';
 import { PALETTES } from '@/poster/constants';
 
 export interface PosterCardProps {
-  row: PosterRow;
-  onDuplicate: (row: PosterRow) => void;
-  onDelete: (row: PosterRow) => void;
+  row: PosterListRow;
+  onDuplicate: (row: PosterListRow) => void;
+  onDelete: (row: PosterListRow) => void;
 }
 
 function formatLastEdited(iso: string): string {
@@ -38,12 +38,12 @@ function formatLastEdited(iso: string): string {
  * Tiny poster preview — renders block rectangles at miniature scale
  * so the card shows a recognizable layout instead of "No preview".
  */
-function MiniPreview({ row }: { row: PosterRow }) {
-  const doc = row.data;
+function MiniPreview({ row }: { row: PosterListRow }) {
+  const doc = 'data' in row ? (row as PosterRow).data : null;
   if (!doc?.blocks?.length) {
     return (
       <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-widest text-[#3a3a4a]">
-        Empty
+        {row.title?.trim() ? row.title.trim().charAt(0).toUpperCase() : 'P'}
       </div>
     );
   }
@@ -260,7 +260,7 @@ export function PosterCard({ row, onDuplicate, onDelete }: PosterCardProps) {
   );
 }
 
-function PublishButton({ row, title }: { row: PosterRow; title: string }) {
+function PublishButton({ row, title }: { row: PosterListRow; title: string }) {
   const navigate = useNavigate();
   return (
     <button

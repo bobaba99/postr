@@ -15,7 +15,7 @@ import {
   deletePoster,
   duplicatePoster,
   listPosters,
-  type PosterRow,
+  type PosterListRow,
 } from '@/data/posters';
 import { Link } from 'react-router-dom';
 import { PosterCard } from '@/components/PosterCard';
@@ -27,13 +27,13 @@ import { checkIsGalleryAdmin } from '@/data/gallery';
 
 type Status =
   | { kind: 'loading' }
-  | { kind: 'ready'; rows: PosterRow[] }
+  | { kind: 'ready'; rows: PosterListRow[] }
   | { kind: 'error'; message: string };
 
 export default function Home() {
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [actionError, setActionError] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<PosterRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<PosterListRow | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const openFeedback = useFeedbackStore((s) => s.open);
 
@@ -65,7 +65,7 @@ export default function Home() {
     };
   }, []);
 
-  const handleDuplicate = useCallback(async (row: PosterRow) => {
+  const handleDuplicate = useCallback(async (row: PosterListRow) => {
     setActionError(null);
     try {
       const copy = await duplicatePoster(row.id);
@@ -78,7 +78,7 @@ export default function Home() {
     }
   }, []);
 
-  const handleDeleteRequest = useCallback((row: PosterRow) => {
+  const handleDeleteRequest = useCallback((row: PosterListRow) => {
     setDeleteTarget(row);
   }, []);
 
@@ -88,7 +88,7 @@ export default function Home() {
     if (!row) return;
 
     setActionError(null);
-    let rollback: PosterRow[] | null = null;
+    let rollback: PosterListRow[] | null = null;
     setStatus((s) => {
       if (s.kind !== 'ready') return s;
       rollback = s.rows;

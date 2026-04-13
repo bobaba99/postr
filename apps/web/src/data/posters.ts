@@ -121,21 +121,25 @@ export async function loadMostRecentPoster(): Promise<PosterRow | null> {
   return data as unknown as PosterRow;
 }
 
+/** Lightweight poster row for dashboard listing — no `data` column. */
+export type PosterListRow = Omit<PosterRow, 'data'>;
+
 /**
  * Lists every poster the current user can see, newest first.
- * RLS scopes the result set server-side — no need to filter by
- * user_id on the client.
+ * Excludes the heavy `data` JSONB column (which contains base64
+ * images) to keep the response small and fast (~10ms vs ~900ms+).
+ * RLS scopes the result set server-side.
  */
-export async function listPosters(): Promise<PosterRow[]> {
+export async function listPosters(): Promise<PosterListRow[]> {
   const { data, error } = await supabase
     .from('posters')
-    .select('*')
+    .select('id,user_id,title,width_in,height_in,thumbnail_path,share_slug,is_public,created_at,updated_at')
     .order('updated_at', { ascending: false });
 
   if (error) {
     throw new Error(`Failed to list posters: ${error.message}`);
   }
-  return (data ?? []) as unknown as PosterRow[];
+  return (data ?? []) as unknown as PosterListRow[];
 }
 
 // ---------------------------------------------------------------------------
