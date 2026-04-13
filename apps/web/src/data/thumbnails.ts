@@ -33,16 +33,28 @@ export async function captureThumbnail(
     const el = document.getElementById('poster-canvas');
     if (!el) return null;
 
+    // Temporarily strip the CSS scale transform so html-to-image
+    // captures the poster at its natural size (480×360 poster units)
+    // rather than the zoomed display size. This ensures the thumbnail
+    // shows the full poster, not a cropped corner.
+    const prevTransform = el.style.transform;
+    el.style.transform = 'none';
+
     // Compute pixel ratio to get ~400px wide thumbnail
     const canvasWidth = el.offsetWidth;
-    if (canvasWidth === 0) return null;
+    if (canvasWidth === 0) { el.style.transform = prevTransform; return null; }
     const pixelRatio = THUMB_WIDTH / canvasWidth;
 
-    const canvas = await toCanvas(el, {
-      pixelRatio,
-      backgroundColor: '#ffffff',
-      skipFonts: true,
-    });
+    let canvas: HTMLCanvasElement;
+    try {
+      canvas = await toCanvas(el, {
+        pixelRatio,
+        backgroundColor: '#ffffff',
+        skipFonts: true,
+      });
+    } finally {
+      el.style.transform = prevTransform;
+    }
 
     const blob = await new Promise<Blob | null>((resolve) => {
       canvas.toBlob((b) => resolve(b), 'image/jpeg', JPEG_QUALITY);
