@@ -1687,9 +1687,14 @@ export function BlockFrame(props: BlockFrameProps) {
       // click before it reaches child elements (e.g. the empty
       // ImageBlock's file-picker handler).
       onClickCapture={(e) => {
+        // Swallow synthetic clicks that trail a drag gesture.
+        // Always reset the flag so it never stays stuck — a stuck
+        // didDragRef blocks ALL future clicks on this block (the
+        // root cause of image block buttons not working).
         if (didDragRef.current) {
-          e.stopPropagation();
           didDragRef.current = false;
+          e.stopPropagation();
+          return;
         }
       }}
       onClick={(e) => {
@@ -1959,6 +1964,7 @@ export function BlockFrame(props: BlockFrameProps) {
         <ResizeHandles
           accent={p.accent}
           onPointerDown={(e, handle) => onPointerDown(e, b.id, 'resize', handle)}
+          cornersOnly={b.type === 'image' || b.type === 'logo'}
         />
       )}
 

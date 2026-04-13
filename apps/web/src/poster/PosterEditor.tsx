@@ -377,6 +377,19 @@ function useBlockDrag(
             nh = Math.max(20, s.oh + localDy);
           }
 
+          // Lock aspect ratio for image/logo blocks — width drives
+          // height proportionally. Only corners are shown (cornersOnly
+          // in ResizeHandles), so h always includes both axes.
+          const lockAspect = blk.type === 'image' || blk.type === 'logo';
+          if (lockAspect && s.oh > 0) {
+            const aspect = s.ow / s.oh;
+            nh = nw / aspect;
+            // Recompute vertical shift from the locked height
+            if (h.includes('n')) {
+              localShiftY = s.oh - nh;
+            }
+          }
+
           // Rotate the local-space origin shift back to screen space
           const nx = s.ox + localShiftX * cos - localShiftY * sin;
           const ny = s.oy + localShiftX * sin + localShiftY * cos;

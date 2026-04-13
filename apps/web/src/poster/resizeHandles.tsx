@@ -35,16 +35,20 @@ const POSITIONS: Record<ResizeHandle, React.CSSProperties> = {
 };
 
 const ALL_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+const CORNER_HANDLES: ResizeHandle[] = ['nw', 'ne', 'se', 'sw'];
 
 interface ResizeHandlesProps {
   accent: string;
   onPointerDown: (e: React.PointerEvent, handle: ResizeHandle) => void;
+  /** Show only corner handles (for proportional-only resize). */
+  cornersOnly?: boolean;
 }
 
-export function ResizeHandles({ accent, onPointerDown }: ResizeHandlesProps) {
+export function ResizeHandles({ accent, onPointerDown, cornersOnly }: ResizeHandlesProps) {
+  const handles = cornersOnly ? CORNER_HANDLES : ALL_HANDLES;
   return (
     <>
-      {ALL_HANDLES.map((h) => (
+      {handles.map((h) => (
         <div
           key={h}
           onPointerDown={(e) => {
