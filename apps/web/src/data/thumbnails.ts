@@ -33,27 +33,29 @@ export async function captureThumbnail(
     const el = document.getElementById('poster-canvas');
     if (!el) return null;
 
-    // Temporarily strip the CSS scale transform so html-to-image
-    // captures the poster at its natural size (480×360 poster units)
-    // rather than the zoomed display size. This ensures the thumbnail
-    // shows the full poster, not a cropped corner.
-    const prevTransform = el.style.transform;
-    el.style.transform = 'none';
+    // Clone the element off-screen for capture so the live DOM is
+    // never visually disrupted. Previous approach mutated the live
+    // element's transform, causing visible flicker during autosave.
+    const clone = el.cloneNode(true) as HTMLElement;
+    clone.style.transform = 'none';
+    clone.style.position = 'absolute';
+    clone.style.left = '-9999px';
+    clone.style.top = '-9999px';
+    document.body.appendChild(clone);
 
-    // Compute pixel ratio to get ~400px wide thumbnail
-    const canvasWidth = el.offsetWidth;
-    if (canvasWidth === 0) { el.style.transform = prevTransform; return null; }
+    const canvasWidth = clone.offsetWidth;
+    if (canvasWidth === 0) { document.body.removeChild(clone); return null; }
     const pixelRatio = THUMB_WIDTH / canvasWidth;
 
     let canvas: HTMLCanvasElement;
     try {
-      canvas = await toCanvas(el, {
+      canvas = await toCanvas(clone, {
         pixelRatio,
         backgroundColor: '#ffffff',
         skipFonts: true,
       });
     } finally {
-      el.style.transform = prevTransform;
+      document.body.removeChild(clone);
     }
 
     const blob = await new Promise<Blob | null>((resolve) => {
