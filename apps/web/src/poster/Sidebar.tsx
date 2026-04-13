@@ -205,15 +205,22 @@ const labelStyle: CSSProperties = {
   marginTop: 28,
 };
 
+const SELECT_ARROW = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`;
+
 const selectStyle: CSSProperties = {
   width: '100%',
-  padding: '12px 14px',
+  padding: '12px 36px 12px 14px',
   background: '#1a1a26',
   border: '1px solid #2a2a3a',
   borderRadius: 8,
   color: '#ddd',
   fontSize: 17,
   outline: 'none',
+  appearance: 'none',
+  backgroundImage: SELECT_ARROW,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 10px center',
+  backgroundSize: '18px 18px',
 };
 
 const buttonStyle = (active: boolean): CSSProperties => ({
@@ -1349,7 +1356,15 @@ function RefsTab(props: {
     setManual({ authors: '', year: '', title: '', journal: '' });
   };
 
-  const sel: CSSProperties = { ...inputBase, appearance: 'auto', padding: '10px 14px' };
+  const sel: CSSProperties = {
+    ...inputBase,
+    appearance: 'none',
+    padding: '10px 36px 10px 14px',
+    backgroundImage: SELECT_ARROW,
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 10px center',
+    backgroundSize: '16px 16px',
+  };
   const miniLabel: CSSProperties = {
     fontSize: 13,
     color: '#9ca3af',

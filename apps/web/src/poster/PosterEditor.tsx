@@ -474,9 +474,15 @@ export function PosterEditor() {
   } | null>(null);
   const rubberBandActive = useRef(false);
 
-  // Undo/redo toast notification
-  const [undoToastMsg, setUndoToastMsg] = useState<string | null>(null);
-  const dismissUndoToast = useCallback(() => setUndoToastMsg(null), []);
+  // Undo/redo toast notification. Uses a counter to force re-trigger
+  // when the same message is shown consecutively (e.g. Undo → Undo).
+  const [undoToast, setUndoToast] = useState<{ msg: string; seq: number } | null>(null);
+  const undoSeqRef = useRef(0);
+  const showToast = useCallback((msg: string) => {
+    undoSeqRef.current += 1;
+    setUndoToast({ msg, seq: undoSeqRef.current });
+  }, []);
+  const dismissUndoToast = useCallback(() => setUndoToast(null), []);
 
   // Track when poster content overflows the declared canvas height
   // (e.g. a text block with height:auto grows past cH). Used to
@@ -567,7 +573,7 @@ export function PosterEditor() {
         if (tag === 'INPUT' || tag === 'TEXTAREA' || isEditable) return;
         e.preventDefault();
         undo();
-        setUndoToastMsg('Undo');
+        showToast('Undo');
       }
       // Redo: Ctrl+Y or Cmd+Shift+Z
       if (
@@ -579,7 +585,7 @@ export function PosterEditor() {
         if (tag === 'INPUT' || tag === 'TEXTAREA' || isEditable) return;
         e.preventDefault();
         redo();
-        setUndoToastMsg('Redo');
+        showToast('Redo');
       }
     };
     window.addEventListener('keydown', handler);
@@ -891,7 +897,7 @@ export function PosterEditor() {
 
   const { onPointerDown, didDragRef, draggingId } = useBlockDrag(
     doc.blocks, setBlocks, storeSetBlocksSilent, zoom,
-    (msg) => setUndoToastMsg(msg),
+    (msg) => showToast(msg),
   );
   const draggingBlock = draggingId ? doc.blocks.find((x) => x.id === draggingId) ?? null : null;
 
@@ -2467,7 +2473,11 @@ export function PosterEditor() {
           </>
         )}
 
-        <UndoToast message={undoToastMsg} onDismiss={dismissUndoToast} />
+        <UndoToast
+          key={undoToast?.seq ?? 0}
+          message={undoToast?.msg ?? null}
+          onDismiss={dismissUndoToast}
+        />
 
         {/* OOB warning banner — outside the scroll container so it
             stays anchored to the visible viewport even when the

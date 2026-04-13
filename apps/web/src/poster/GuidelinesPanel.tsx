@@ -503,13 +503,18 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                     defaultValue=""
                     style={{
                       flex: 1,
-                      padding: '8px 12px',
+                      padding: '8px 32px 8px 12px',
                       background: '#1a1a26',
                       border: '1px solid #2a2a3a',
                       borderRadius: 6,
                       color: '#c8cad0',
                       fontSize: 14,
                       outline: 'none',
+                      appearance: 'none',
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 8px center',
+                      backgroundSize: '16px 16px',
                     }}
                   >
                     <option value="" disabled>Load template...</option>
