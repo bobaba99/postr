@@ -64,21 +64,41 @@ export interface PosterUpdate {
 // ---------------------------------------------------------------------------
 
 /**
- * Load a single poster by id. Returns null if the row doesn't exist
- * or the current user can't read it (RLS).
+ * In-flight dedup cache — prevents React 18 StrictMode double-mount
+ * from firing two identical network requests for the same poster.
+ * The promise is cached while in-flight and cleared on resolve/reject.
  */
-export async function loadPoster(id: string): Promise<PosterRow | null> {
-  const { data, error } = await supabase
-    .from('posters')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
+const inflightLoads = new Map<string, Promise<PosterRow | null>>();
 
-  if (error) {
-    throw new Error(`Failed to load poster: ${error.message}`);
-  }
-  if (!data) return null;
-  return data as unknown as PosterRow;
+/**
+ * Load a single poster by id. Returns null if the row doesn't exist
+ * or the current user can't read it (RLS). Deduplicates concurrent
+ * requests for the same id.
+ */
+export function loadPoster(id: string): Promise<PosterRow | null> {
+  const existing = inflightLoads.get(id);
+  if (existing) return existing;
+
+  const promise = (async (): Promise<PosterRow | null> => {
+    const { data, error } = await supabase
+      .from('posters')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to load poster: ${error.message}`);
+    }
+    if (!data) return null;
+    return data as unknown as PosterRow;
+  })();
+
+  inflightLoads.set(id, promise);
+  // Clean up the cache when the request settles. The .catch(noop)
+  // prevents an unhandled rejection from the .finally() chain — the
+  // caller's own .catch() handles the real error.
+  promise.finally(() => inflightLoads.delete(id)).catch(() => {});
+  return promise;
 }
 
 /**

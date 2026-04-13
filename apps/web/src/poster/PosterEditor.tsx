@@ -70,13 +70,45 @@ import { snap } from './snap';
 // =========================================================================
 
 /**
- * Google Fonts stylesheet URL covering all curated font families.
- * Shared by the main editor window (on mount) and the print window
- * (written into the new-tab HTML shell so printed posters render
- * with the correct typeface instead of a system fallback).
+ * Google Fonts URL covering ALL curated fonts — used only by the
+ * print window (which needs every font available since it renders
+ * from a detached document).
  */
-const GOOGLE_FONTS_URL =
+const GOOGLE_FONTS_URL_ALL =
   'https://fonts.googleapis.com/css2?family=Charter:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600;700;800&family=Fira+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Libre+Franklin:wght@300;400;500;600;700;800&family=Literata:wght@400;500;600;700;800&family=Lora:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700;800&family=Source+Serif+4:wght@400;500;600;700;800&display=swap';
+
+/** Per-font Google Fonts URL fragments (family + weights). */
+const FONT_URL_FRAGMENTS: Record<string, string> = {
+  'Source Sans 3': 'Source+Sans+3:wght@300;400;500;600;700;800',
+  'DM Sans': 'DM+Sans:wght@400;500;600;700;800',
+  'IBM Plex Sans': 'IBM+Plex+Sans:wght@300;400;500;600;700',
+  'Fira Sans': 'Fira+Sans:wght@300;400;500;600;700;800',
+  'Libre Franklin': 'Libre+Franklin:wght@300;400;500;600;700;800',
+  Outfit: 'Outfit:wght@300;400;500;600;700;800',
+  Charter: 'Charter:ital,wght@0,400;0,700;1,400',
+  Literata: 'Literata:wght@400;500;600;700;800',
+  'Source Serif 4': 'Source+Serif+4:wght@400;500;600;700;800',
+  Lora: 'Lora:wght@400;500;600;700',
+};
+
+/** Build a Google Fonts URL for a single font family. */
+function googleFontsUrl(fontFamily: string): string {
+  const fragment = FONT_URL_FRAGMENTS[fontFamily] ?? FONT_URL_FRAGMENTS['Source Sans 3'];
+  return `https://fonts.googleapis.com/css2?family=${fragment}&display=swap`;
+}
+
+/** Loaded font families — prevent duplicate link tags. */
+const loadedFonts = new Set<string>();
+
+/** Inject a Google Fonts link tag for the given font (idempotent). */
+function ensureFontLoaded(fontFamily: string) {
+  if (loadedFonts.has(fontFamily)) return;
+  loadedFonts.add(fontFamily);
+  const link = document.createElement('link');
+  link.href = googleFontsUrl(fontFamily);
+  link.rel = 'stylesheet';
+  document.head.appendChild(link);
+}
 
 /** Find the closest poster-size key that matches the doc's dimensions. */
 function findSizeKey(widthIn: number, heightIn: number): PosterSizeKey {
@@ -1599,13 +1631,21 @@ export function PosterEditor() {
     };
   }, []);
 
-  // Inject Google Fonts once on mount.
+  // Load only the font the poster uses (not all 10 families).
+  // Re-runs when the user switches fonts in the Style tab.
   useEffect(() => {
-    const link = document.createElement('link');
-    link.href = GOOGLE_FONTS_URL;
-    link.rel = 'stylesheet';
-    document.head.appendChild(link);
-  }, []);
+    // Preconnect to Google Fonts origins for faster fetch
+    for (const origin of ['https://fonts.googleapis.com', 'https://fonts.gstatic.com']) {
+      if (!document.querySelector(`link[rel="preconnect"][href="${origin}"]`)) {
+        const pc = document.createElement('link');
+        pc.rel = 'preconnect';
+        pc.href = origin;
+        pc.crossOrigin = '';
+        document.head.appendChild(pc);
+      }
+    }
+    ensureFontLoaded(doc.fontFamily);
+  }, [doc.fontFamily]);
 
   // ── Print flow ─────────────────────────────────────────────────
   //
@@ -1673,7 +1713,7 @@ export function PosterEditor() {
 <head>
 <meta charset="utf-8" />
 <title>${title} — Print</title>
-<link href="${GOOGLE_FONTS_URL}" rel="stylesheet" />
+<link href="${GOOGLE_FONTS_URL_ALL}" rel="stylesheet" />
 <style>
   @page {
     size: ${w}in ${h}in;

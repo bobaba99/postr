@@ -1704,7 +1704,13 @@ export function BlockFrame(props: BlockFrameProps) {
   const [selectionInfo, setSelectionInfo] = useState<SelectionInfo | null>(null);
 
   // Pop the selection ring when this block becomes selected.
+  // Skip on initial mount to avoid GSAP forced reflows during page load.
+  const hasMountedRef = useRef(false);
   useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
     if (selected && frameRef.current) {
       blockSelection(frameRef.current);
     }
