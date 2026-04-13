@@ -2042,17 +2042,16 @@ export function BlockFrame(props: BlockFrameProps) {
                 onPointerDown(e, b.id, 'move');
               }}
               style={{
-                flex: '0 0 16px',
-                width: 16,
-                height: 16,
+                flex: '0 0 auto',
+                width: 18,
+                height: 18,
                 borderRadius: '50%',
                 background: p.accent,
                 color: '#fff',
-                border: '1.5px solid #0a0a12',
+                border: 'none',
                 cursor: 'move',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                display: 'grid',
+                placeItems: 'center',
                 boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
                 padding: 0,
                 pointerEvents: 'auto',
@@ -2061,8 +2060,8 @@ export function BlockFrame(props: BlockFrameProps) {
               title="Drag to move (or use arrow keys)"
             >
               <svg
-                width="9"
-                height="9"
+                width="10"
+                height="10"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
