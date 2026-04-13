@@ -68,7 +68,7 @@ export function AutosaveStatusPill({ status, lastSavedAt, error }: AutosaveStatu
       title={title}
       style={{
         position: 'absolute',
-        top: 12,
+        top: 32,
         right: 16,
         display: 'flex',
         alignItems: 'center',
@@ -82,7 +82,7 @@ export function AutosaveStatusPill({ status, lastSavedAt, error }: AutosaveStatu
         fontWeight: 600,
         letterSpacing: 0.2,
         border: '1px solid #2a2a3a',
-        zIndex: 10,
+        zIndex: 14,
         userSelect: 'none',
         pointerEvents: 'none',
       }}
