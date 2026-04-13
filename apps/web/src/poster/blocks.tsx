@@ -35,6 +35,7 @@ import {
   parseTablePaste,
   updateCell,
 } from './tableOps';
+import { ResizeHandles, type ResizeHandle } from './resizeHandles';
 
 // =========================================================================
 // LogoBlock
@@ -1539,11 +1540,12 @@ interface BlockFrameProps {
    * popping into existence at the canvas center.
    */
   justInserted?: boolean;
-  onSelect: (id: string) => void;
+  onSelect: (id: string, additive?: boolean) => void;
   onPointerDown: (
     e: React.PointerEvent,
     id: string,
     mode: 'move' | 'resize' | 'rotate',
+    handle?: import('./resizeHandles').ResizeHandle,
   ) => void;
   /**
    * Shared ref from useBlockDrag — true when the user's most recent
@@ -1713,10 +1715,11 @@ export function BlockFrame(props: BlockFrameProps) {
       }}
       onClick={(e) => {
         e.stopPropagation();
+        const additive = e.shiftKey || e.metaKey || e.ctrlKey;
         // Nothing to do if the click is actually the tail of a drag
         // — onClickCapture already reset the ref.
-        if (!selected) {
-          onSelect(b.id);
+        if (!selected || additive) {
+          onSelect(b.id, additive);
           return;
         }
         // Already selected + text-like → focus the inner contentEditable
@@ -1767,6 +1770,9 @@ export function BlockFrame(props: BlockFrameProps) {
         left: b.x,
         top: effectiveTop,
         width: b.w,
+        // Selected block renders above all unselected blocks so
+        // resize handles are never covered by overlapping siblings.
+        zIndex: selected ? 2 : 0,
         // Headings + title/text grow with content. Everything else
         // (image, logo, table, references, authors) stays at its
         // declared h. growsWithContent blocks use minHeight as the
@@ -1848,18 +1854,11 @@ export function BlockFrame(props: BlockFrameProps) {
           // visible so the user sees everything they typed. Image /
           // table / references still clip since they're constrained.
           overflow: isHeading || growsWithContent ? 'visible' : 'hidden',
-          // Padding moved here from the outer frame so the frame's
-          // padding box stays flush with its border box — that keeps
-          // external handle positions (top: -26) visually consistent
-          // across all block types. Image / logo / table keep
-          // padding: 0 because they manage their own inner layout.
-          // Authors block also gets zero vertical padding so the
-          // frame wraps the text as tightly as the title does.
-          padding: ['image', 'logo', 'table'].includes(b.type)
-            ? 0
-            : b.type === 'authors'
-              ? '0 6px'
-              : '4px 6px',
+          // Zero padding on all block types — content fills the
+          // block edge-to-edge. Users control whitespace by
+          // positioning blocks with gaps between them, matching
+          // PowerPoint/Slides behavior.
+          padding: 0,
           // Let flex children (the CaptionWrapper for image/table
           // blocks) align to the top of the frame rather than
           // stretching to fill — this prevents a blank strip
@@ -1977,32 +1976,11 @@ export function BlockFrame(props: BlockFrameProps) {
         )}
       </div>
 
-      {!isHeading && (
-        <div
-          onPointerDown={(e) => onPointerDown(e, b.id, 'resize')}
-          style={{
-            position: 'absolute',
-            right: 0,
-            bottom: 0,
-            width: 14,
-            height: 14,
-            cursor: 'nwse-resize',
-            opacity: selected ? 0.8 : 0,
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14">
-            <path d="M12 2L2 12M12 7L7 12" stroke={p.accent} strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
-        </div>
-      )}
-
-      {isHeading && selected && (
-        <div
-          onPointerDown={(e) => onPointerDown(e, b.id, 'resize')}
-          style={{ position: 'absolute', right: 0, top: 0, width: 6, height: '100%', cursor: 'ew-resize' }}
-        >
-          <div style={{ width: 2, height: '100%', background: p.accent, borderRadius: 1, margin: '0 auto', opacity: 0.5 }} />
-        </div>
+      {selected && (
+        <ResizeHandles
+          accent={p.accent}
+          onPointerDown={(e, handle) => onPointerDown(e, b.id, 'resize', handle)}
+        />
       )}
 
       {selected && (

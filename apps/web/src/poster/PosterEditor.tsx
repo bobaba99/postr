@@ -25,6 +25,9 @@ import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
 import { useGsapContext } from '@/motion';
 import { editorEntrance } from '@/motion/timelines/editorEntrance';
 import { BlockFrame } from './blocks';
+import { SelectionRect } from './SelectionRect';
+import { GroupFrame, groupBounds } from './GroupFrame';
+import { UndoToast } from './UndoToast';
 import { checkBounds, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
@@ -135,10 +138,12 @@ function paletteNameFor(
  */
 const DRAG_THRESHOLD_PX = 4;
 
+import type { ResizeHandle } from './resizeHandles';
+
 export type BlockDragMode = 'move' | 'resize' | 'rotate';
 
 export interface UseBlockDragResult {
-  onPointerDown: (e: React.PointerEvent, id: string, mode: BlockDragMode) => void;
+  onPointerDown: (e: React.PointerEvent, id: string, mode: BlockDragMode, handle?: ResizeHandle) => void;
   didDragRef: React.MutableRefObject<boolean>;
   /** Id of the block currently being moved/resized/rotated, null otherwise. */
   draggingId: string | null;
@@ -162,6 +167,8 @@ function useBlockDrag(
   const sessionRef = useRef<{
     id: string;
     mode: BlockDragMode;
+    /** Which resize handle was grabbed (only when mode === 'resize'). */
+    resizeHandle: ResizeHandle;
     sx: number;
     sy: number;
     ox: number;
@@ -188,7 +195,7 @@ function useBlockDrag(
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const onPointerDown = useCallback(
-    (e: React.PointerEvent, id: string, mode: BlockDragMode) => {
+    (e: React.PointerEvent, id: string, mode: BlockDragMode, handle?: ResizeHandle) => {
       e.stopPropagation();
 
       const b = blocksRef.current.find((x) => x.id === id);
@@ -215,6 +222,7 @@ function useBlockDrag(
       sessionRef.current = {
         id,
         mode,
+        resizeHandle: handle ?? 'se',
         sx: e.clientX,
         sy: e.clientY,
         ox: b.x,
@@ -299,20 +307,52 @@ function useBlockDrag(
             return { ...blk, rotation: nextRot };
           }
           // mode === 'resize' — transform the screen-space delta
-          // into the block's LOCAL rotated frame so dragging the
-          // bottom-right handle always grows the block in its own
-          // "right" / "down" direction, even when rotated 45° or 90°.
+          // into the block's LOCAL rotated frame so dragging any
+          // handle grows/shrinks the block in its own local axes,
+          // even when rotated 45° or 90°.
           const rot = ((s.oRot ?? 0) * Math.PI) / 180;
           const cos = Math.cos(rot);
           const sin = Math.sin(rot);
           const localDx = dx * cos + dy * sin;
           const localDy = -dx * sin + dy * cos;
-          const nw = Math.max(40, s.ow + localDx);
-          if (s.isHeading) return { ...blk, w: snap(nw) };
+
+          const h = s.resizeHandle;
+          let nw = s.ow;
+          let nh = s.oh;
+          // Track local-space origin shifts, then rotate back to
+          // screen space at the end. This ensures n/w/nw/ne/sw
+          // handles work correctly on rotated blocks.
+          let localShiftX = 0;
+          let localShiftY = 0;
+
+          // Horizontal: 'w' moves left edge → width shrinks
+          //             'e' moves right edge → width grows
+          if (h.includes('w')) {
+            nw = Math.max(40, s.ow - localDx);
+            localShiftX = s.ow - nw;
+          } else if (h.includes('e')) {
+            nw = Math.max(40, s.ow + localDx);
+          }
+
+          // Vertical: 'n' moves top edge → height shrinks
+          //           's' moves bottom edge → height grows
+          if (h.includes('n')) {
+            nh = Math.max(20, s.oh - localDy);
+            localShiftY = s.oh - nh;
+          } else if (h.includes('s')) {
+            nh = Math.max(20, s.oh + localDy);
+          }
+
+          // Rotate the local-space origin shift back to screen space
+          const nx = s.ox + localShiftX * cos - localShiftY * sin;
+          const ny = s.oy + localShiftX * sin + localShiftY * cos;
+
           return {
             ...blk,
+            x: snap(Math.max(0, nx)),
+            y: snap(Math.max(0, ny)),
             w: snap(nw),
-            h: snap(Math.max(20, s.oh + localDy)),
+            h: snap(nh),
           };
         });
         // Use silent setter during drag to avoid flooding the undo stack
@@ -400,7 +440,30 @@ export function PosterEditor() {
   // Depression"). Persisted to posters.title via autosave.
   const posterDisplayName = usePosterStore((s) => s.posterTitle);
   const setPosterDisplayName = usePosterStore((s) => s.setPosterTitle);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Convenience: single selected block (null when 0 or 2+ selected).
+  const selectedId = selectedIds.size === 1 ? [...selectedIds][0]! : null;
+  // Convenience setter for single-select (clears previous selection).
+  const selectOne = (id: string) => setSelectedIds(new Set([id]));
+  const clearSelection = () => setSelectedIds(new Set());
+
+  // Rubber-band selection state. Coordinates are in poster units
+  // (pre-zoom) relative to the poster canvas origin.
+  const [rubberBand, setRubberBand] = useState<{
+    startX: number; startY: number;
+    currentX: number; currentY: number;
+  } | null>(null);
+  const rubberBandActive = useRef(false);
+
+  // Undo/redo toast notification
+  const [undoToastMsg, setUndoToastMsg] = useState<string | null>(null);
+  const dismissUndoToast = useCallback(() => setUndoToastMsg(null), []);
+
+  // Track when poster content overflows the declared canvas height
+  // (e.g. a text block with height:auto grows past cH). Used to
+  // extend the scroll container so users can reach all content.
+  const [canvasOverflow, setCanvasOverflow] = useState(0);
+
   const [showGrid, setShowGrid] = useState(true);
   const [showRuler, setShowRuler] = useState(true);
   const [sortMode, setSortMode] = useState<SortMode>('none');
@@ -485,6 +548,7 @@ export function PosterEditor() {
         if (tag === 'INPUT' || tag === 'TEXTAREA' || isEditable) return;
         e.preventDefault();
         undo();
+        setUndoToastMsg('Undo');
       }
       // Redo: Ctrl+Y or Cmd+Shift+Z
       if (
@@ -496,6 +560,7 @@ export function PosterEditor() {
         if (tag === 'INPUT' || tag === 'TEXTAREA' || isEditable) return;
         e.preventDefault();
         redo();
+        setUndoToastMsg('Redo');
       }
     };
     window.addEventListener('keydown', handler);
@@ -798,10 +863,75 @@ export function PosterEditor() {
   // Helper: replace blocks immutably
   const storeSetBlocks = usePosterStore((s) => s.setBlocks);
   const storeSetBlocksSilent = usePosterStore((s) => s.setBlocksSilent);
+  const setStyle = usePosterStore((s) => s.setStyle);
   const setBlocks = (next: Block[]) => storeSetBlocks(next);
+
+  // Ref to latest blocks for use in pointer event closures (rubber-band).
+  const outerBlocksRef = useRef(doc.blocks);
+  outerBlocksRef.current = doc.blocks;
 
   const { onPointerDown, didDragRef, draggingId } = useBlockDrag(doc.blocks, setBlocks, storeSetBlocksSilent, zoom);
   const draggingBlock = draggingId ? doc.blocks.find((x) => x.id === draggingId) ?? null : null;
+
+  // Group manipulation state — stores the original block positions at
+  // the start of a group drag so deltas can be computed from the origin.
+  const groupDragOrigin = useRef<Block[] | null>(null);
+
+  const handleGroupMove = (dx: number, dy: number) => {
+    if (!groupDragOrigin.current) groupDragOrigin.current = doc.blocks;
+    const origin = groupDragOrigin.current;
+    const next = origin.map((blk) => {
+      if (!selectedIds.has(blk.id)) return blk;
+      return {
+        ...blk,
+        x: snap(Math.max(0, blk.x + dx)),
+        y: snap(Math.max(0, blk.y + dy)),
+      };
+    });
+    storeSetBlocksSilent(next);
+  };
+
+  const handleGroupResize = (handle: import('./resizeHandles').ResizeHandle, dx: number, dy: number) => {
+    if (!groupDragOrigin.current) groupDragOrigin.current = doc.blocks;
+    const origin = groupDragOrigin.current;
+    const gb = groupBounds(origin, selectedIds);
+    if (gb.w === 0 || gb.h === 0) return;
+
+    // Compute new group bounds based on handle direction
+    let ngx = gb.x;
+    let ngy = gb.y;
+    let ngw = gb.w;
+    let ngh = gb.h;
+
+    if (handle.includes('w')) { ngw = Math.max(40, gb.w - dx); ngx = gb.x + (gb.w - ngw); }
+    else if (handle.includes('e')) { ngw = Math.max(40, gb.w + dx); }
+    if (handle.includes('n')) { ngh = Math.max(20, gb.h - dy); ngy = gb.y + (gb.h - ngh); }
+    else if (handle.includes('s')) { ngh = Math.max(20, gb.h + dy); }
+
+    // Proportionally remap each selected block. Guard against
+    // zero-span axes (all blocks collinear) to avoid NaN.
+    const next = origin.map((blk) => {
+      if (!selectedIds.has(blk.id)) return blk;
+      const sx = gb.w > 0 ? (blk.x - gb.x) / gb.w : 0;
+      const sy = gb.h > 0 ? (blk.y - gb.y) / gb.h : 0;
+      const sw = gb.w > 0 ? blk.w / gb.w : 1;
+      const sh = gb.h > 0 ? blk.h / gb.h : 1;
+      return {
+        ...blk,
+        x: snap(ngx + sx * ngw),
+        y: snap(ngy + sy * ngh),
+        w: snap(Math.max(40, sw * ngw)),
+        h: snap(Math.max(20, sh * ngh)),
+      };
+    });
+    storeSetBlocksSilent(next);
+  };
+
+  const handleGroupDragEnd = () => {
+    // Commit the silent changes to the undo stack
+    setBlocks(doc.blocks);
+    groupDragOrigin.current = null;
+  };
 
   // Heading auto-numbering: use the block ARRAY ORDER as the source
   // of truth, not geometry. Every previous attempt (row-first, then
@@ -1006,7 +1136,7 @@ export function PosterEditor() {
 
   const deleteBlock = (id: string) => {
     setBlocks(doc.blocks.filter((b) => b.id !== id));
-    setSelectedId(null);
+    clearSelection();
   };
 
   // Clone the given block at a small (+10, +10) offset so the
@@ -1025,7 +1155,7 @@ export function PosterEditor() {
       y: src.y + 10,
     };
     setBlocks([...doc.blocks, clone]);
-    setSelectedId(clone.id);
+    selectOne(clone.id);
     setJustInsertedId(clone.id);
     setTimeout(
       () => setJustInsertedId((curr) => (curr === clone.id ? null : curr)),
@@ -1059,7 +1189,7 @@ export function PosterEditor() {
     if (type === 'logo') {
       const existing = doc.blocks.find((b) => b.type === 'logo');
       if (existing) {
-        setSelectedId(existing.id);
+        selectOne(existing.id);
         return;
       }
     }
@@ -1144,7 +1274,7 @@ export function PosterEditor() {
           : null,
     };
     setBlocks([...doc.blocks, newBlock]);
-    setSelectedId(newBlock.id);
+    selectOne(newBlock.id);
     // Trigger the one-shot insert animation. 700 ms is slightly
     // longer than the `postr-block-insert` keyframe (~500 ms) so
     // the browser completes the animation before the flag clears,
@@ -1156,7 +1286,7 @@ export function PosterEditor() {
 
   const applyTemplate = (key: LayoutKey) => {
     setBlocks(makeBlocks(key, pw, ph));
-    setSelectedId(null);
+    clearSelection();
   };
 
   const changeSize = (key: PosterSizeKey) => {
@@ -1166,7 +1296,7 @@ export function PosterEditor() {
       heightIn: sz.h,
       blocks: makeBlocks('3col', sz.w, sz.h),
     });
-    setSelectedId(null);
+    clearSelection();
     setZoom(null);
   };
 
@@ -1264,8 +1394,13 @@ export function PosterEditor() {
 
     document.body.removeChild(host);
 
-    const next = autoLayout(measured, cW, cH, doc.styles);
-    setBlocks(next);
+    const result = autoLayout(measured, cW, cH, doc.styles);
+    setBlocks(result.blocks);
+    // If Pass 2 scaled fonts, apply the new styles
+    if (result.scaledStyles) {
+      setStyle('body', { size: result.scaledStyles.body.size });
+      setStyle('heading', { size: result.scaledStyles.heading.size });
+    }
   };
 
   const savePreset = (name: string) => {
@@ -1344,7 +1479,7 @@ export function PosterEditor() {
   //   Delete / Backspace → remove the selected block.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (!selectedId) return;
+      if (selectedIds.size === 0) return;
       const target = document.activeElement as HTMLElement | null;
       const isInput =
         target?.tagName === 'INPUT' ||
@@ -1352,24 +1487,23 @@ export function PosterEditor() {
         target?.getAttribute('contenteditable') === 'true';
       if (isInput) return;
 
-      // Delete / Backspace → remove the selected block.
+      // Delete / Backspace → remove all selected blocks in one batch.
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        deleteBlock(selectedId);
+        const idsToDelete = new Set(selectedIds);
+        setBlocks(doc.blocks.filter((b) => !idsToDelete.has(b.id)));
+        clearSelection();
         return;
       }
 
-      // Cmd/Ctrl + D → duplicate the selected block.
-      // Matches the Figma / Canva / Illustrator convention. The
-      // shared helper handles clone id + position offset + mount
-      // animation + header-block guard.
+      // Cmd/Ctrl + D → duplicate (single selection only).
       if ((e.metaKey || e.ctrlKey) && (e.key === 'd' || e.key === 'D')) {
         e.preventDefault();
-        duplicateBlock(selectedId);
+        if (selectedId) duplicateBlock(selectedId);
         return;
       }
 
-      // Arrow keys → nudge.
+      // Arrow keys → nudge all selected blocks.
       const nudge = e.shiftKey ? 1 : SNAP_GRID;
       const arrowMap: Record<string, [number, number] | undefined> = {
         ArrowLeft: [-nudge, 0],
@@ -1381,18 +1515,36 @@ export function PosterEditor() {
       if (!delta) return;
 
       e.preventDefault();
-      const blk = doc.blocks.find((b) => b.id === selectedId);
-      if (!blk) return;
       const [dx, dy] = delta;
-      updateBlock(selectedId, {
-        x: Math.max(0, blk.x + dx),
-        y: Math.max(0, blk.y + dy),
+      const nextBlocks = doc.blocks.map((blk) => {
+        if (!selectedIds.has(blk.id)) return blk;
+        return {
+          ...blk,
+          x: Math.max(0, blk.x + dx),
+          y: Math.max(0, blk.y + dy),
+        };
       });
+      setBlocks(nextBlocks);
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, doc.blocks]);
+  }, [selectedIds, doc.blocks]);
+
+  // Track canvas overflow — when blocks with height:auto grow past
+  // the declared canvas height, extend the scroll container to match.
+  useEffect(() => {
+    const el = document.getElementById('poster-canvas');
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const painted = entry.borderBoxSize[0]?.blockSize ?? el.scrollHeight;
+      setCanvasOverflow(Math.max(0, painted - cH));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [cH]);
 
   // Inject Google Fonts once on mount.
   useEffect(() => {
@@ -1746,7 +1898,7 @@ export function PosterEditor() {
         checkFigureHeightIn={checkFigureRect.h / PX}
         issues={posterIssues}
         onJumpToBlock={(id) => {
-          setSelectedId(id);
+          selectOne(id);
           const el = document.querySelector(
             `[data-block-id="${id}"]`,
           ) as HTMLElement | null;
@@ -1845,7 +1997,66 @@ export function PosterEditor() {
       <div
         ref={canvasRef}
         data-postr-canvas-outer
-        onClick={() => setSelectedId(null)}
+        onPointerDown={(e) => {
+          // Only start rubber-band on direct clicks on the canvas/workspace
+          // (not on blocks — those bubble with stopPropagation).
+          if (e.button !== 0) return;
+          const canvasEl = document.getElementById('poster-canvas');
+          if (!canvasEl) return;
+          const canvasRect = canvasEl.getBoundingClientRect();
+          // Convert screen coords to poster units
+          const px = (e.clientX - canvasRect.left) / zoom;
+          const py = (e.clientY - canvasRect.top) / zoom;
+          rubberBandActive.current = false;
+          const startX = px;
+          const startY = py;
+
+          const onMove = (ev: PointerEvent) => {
+            const mx = (ev.clientX - canvasRect.left) / zoom;
+            const my = (ev.clientY - canvasRect.top) / zoom;
+            const dist = Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY);
+            if (dist < DRAG_THRESHOLD_PX && !rubberBandActive.current) return;
+            rubberBandActive.current = true;
+            setRubberBand({ startX, startY, currentX: mx, currentY: my });
+          };
+
+          const onUp = () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            if (rubberBandActive.current) {
+              // Compute selection rectangle and find intersecting blocks
+              setRubberBand((rb) => {
+                if (!rb) return null;
+                const rx = Math.min(rb.startX, rb.currentX);
+                const ry = Math.min(rb.startY, rb.currentY);
+                const rw = Math.abs(rb.currentX - rb.startX);
+                const rh = Math.abs(rb.currentY - rb.startY);
+                const hits = new Set<string>();
+                for (const blk of outerBlocksRef.current) {
+                  // Intersection test: block rect vs selection rect
+                  if (
+                    blk.x < rx + rw &&
+                    blk.x + blk.w > rx &&
+                    blk.y < ry + rh &&
+                    blk.y + blk.h > ry
+                  ) {
+                    hits.add(blk.id);
+                  }
+                }
+                if (hits.size > 0) setSelectedIds(hits);
+                else clearSelection();
+                return null;
+              });
+            } else {
+              // Click without drag → deselect
+              clearSelection();
+            }
+            rubberBandActive.current = false;
+          };
+
+          window.addEventListener('pointermove', onMove);
+          window.addEventListener('pointerup', onUp);
+        }}
         style={{
           flex: 1,
           position: 'relative',
@@ -1899,7 +2110,7 @@ export function PosterEditor() {
             data-postr-canvas-frame
             style={{
               width: cW * zoom,
-              height: cH * zoom,
+              height: (cH + canvasOverflow) * zoom,
               boxShadow: '0 4px 40px rgba(0,0,0,.5)',
               borderRadius: 3,
               // Deliberately NOT overflow:hidden — handles that sit
@@ -2163,9 +2374,20 @@ export function PosterEditor() {
                   references={sortedRefs}
                   citationStyle={citationStyle}
                   headingNumber={headingNumbers[b.id] ?? 0}
-                  selected={selectedId === b.id}
+                  selected={selectedIds.has(b.id)}
                   justInserted={justInsertedId === b.id}
-                  onSelect={setSelectedId}
+                  onSelect={(id, additive) => {
+                    if (additive) {
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(id)) next.delete(id);
+                        else next.add(id);
+                        return next;
+                      });
+                    } else {
+                      selectOne(id);
+                    }
+                  }}
                   onPointerDown={onPointerDown}
                   didDragRef={didDragRef}
                   onUpdate={updateBlock}
@@ -2177,6 +2399,26 @@ export function PosterEditor() {
                   captionNumber={captionNumbers[b.id]}
                 />
               ))}
+              {selectedIds.size > 1 && (
+                <GroupFrame
+                  blocks={doc.blocks}
+                  selectedIds={selectedIds}
+                  palette={doc.palette}
+                  zoom={zoom}
+                  onGroupMove={handleGroupMove}
+                  onGroupResize={handleGroupResize}
+                  onGroupDragEnd={handleGroupDragEnd}
+                />
+              )}
+              {rubberBand && (
+                <SelectionRect
+                  x={Math.min(rubberBand.startX, rubberBand.currentX)}
+                  y={Math.min(rubberBand.startY, rubberBand.currentY)}
+                  w={Math.abs(rubberBand.currentX - rubberBand.startX)}
+                  h={Math.abs(rubberBand.currentY - rubberBand.startY)}
+                  accent={doc.palette.accent}
+                />
+              )}
               {sidebarTab === 'check' && selectedBlock?.type !== 'image' && (
                 <FigureSizeOverlay
                   rect={checkFigureRect}
@@ -2191,6 +2433,8 @@ export function PosterEditor() {
         </div>
         </div>
       </div>
+
+        <UndoToast message={undoToastMsg} onDismiss={dismissUndoToast} />
 
         {/* OOB warning banner — outside the scroll container so it
             stays anchored to the visible viewport even when the

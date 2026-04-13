@@ -25,19 +25,25 @@ interface Cluster {
   xs: number[];
 }
 
+export interface AutoLayoutResult {
+  blocks: Block[];
+  /** If Pass 2 scaled fonts, these are the new style values. null = no scaling needed. */
+  scaledStyles: Styles | null;
+}
+
 export function autoLayout(
   blocks: Block[],
   canvasWidth: number,
-  _canvasHeight: number,
+  canvasHeight: number,
   styles: Styles,
-): Block[] {
+): AutoLayoutResult {
   const headers = blocks.filter((b) => b.type === 'title' || b.type === 'authors');
   const body = blocks.filter((b) => b.type !== 'title' && b.type !== 'authors');
 
   if (body.length === 0) {
     // Nothing meaningful to rearrange — return a fresh array (still
     // immutable) but preserve order.
-    return [...blocks];
+    return { blocks: [...blocks], scaledStyles: null };
   }
 
   // Step 1: pin headers using the title's measured content height
@@ -120,5 +126,63 @@ export function autoLayout(
     }
   });
 
-  return [...pinnedHeaders, ...repositionedBody];
+  const pass1Result = [...pinnedHeaders, ...repositionedBody];
+
+  // Pass 2: check if any column overflows. If so, scale body/heading
+  // font sizes uniformly so everything fits within canvasHeight.
+  const bodyBottom = Math.max(
+    ...repositionedBody.map((b) => b.y + b.h),
+    0,
+  );
+  const availableHeight = canvasHeight - M;
+
+  if (bodyBottom <= availableHeight) {
+    return { blocks: pass1Result, scaledStyles: null };
+  }
+
+  // Compute scale factor to fit. Floor body font at 3 units (~22pt).
+  const MIN_BODY_SIZE = 3;
+  const overflowRatio = availableHeight / bodyBottom;
+  const scaleFactor = Math.max(
+    overflowRatio,
+    MIN_BODY_SIZE / styles.body.size,
+  );
+
+  if (scaleFactor >= 1) {
+    return { blocks: pass1Result, scaledStyles: null };
+  }
+
+  // Scale body + heading font sizes, preserve title + authors.
+  const scaledStyles: Styles = {
+    ...styles,
+    body: { ...styles.body, size: Math.max(MIN_BODY_SIZE, Math.round(styles.body.size * scaleFactor * 10) / 10) },
+    heading: { ...styles.heading, size: Math.max(MIN_BODY_SIZE, Math.round(styles.heading.size * scaleFactor * 10) / 10) },
+  };
+
+  // Re-run layout with scaled heading heights
+  const repositionedScaled: Block[] = [];
+  buckets.forEach((column, columnIndex) => {
+    const sorted = [...column].sort((a, b) => a.y - b.y);
+    let cursorY = bodyTop;
+    for (const b of sorted) {
+      const isHeading = b.type === 'heading';
+      const height = isHeading
+        ? Math.round(scaledStyles.heading.size * 1.6 + 8)
+        : snap(Math.max(20, b.h * scaleFactor));
+      const newBlock: Block = {
+        ...b,
+        x: snap(M + columnIndex * (colWidth + GAP)),
+        y: snap(cursorY),
+        w: snap(colWidth),
+        h: snap(height),
+      };
+      repositionedScaled.push(newBlock);
+      cursorY += height + GAP;
+    }
+  });
+
+  return {
+    blocks: [...pinnedHeaders, ...repositionedScaled],
+    scaledStyles,
+  };
 }
