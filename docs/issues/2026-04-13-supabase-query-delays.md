@@ -139,3 +139,62 @@ fetch('/rest/v1/posters?select=*&id=eq.YOUR_ID', {
 // Monitor autosave payload size
 // Network tab → filter PATCH → check Content-Length
 ```
+
+---
+
+## Issue 6: Handle Row pointer-events:none Blocks Button Clicks
+
+### Symptom
+Delete, move, and rotate buttons in the block handle row don't respond to real mouse clicks, but keyboard shortcuts and right-click context menu work.
+
+### Root Cause
+The handle row container had `pointerEvents: 'none'` to prevent its background from stealing clicks. But this prevented real mouse `pointerdown`/`pointerup` from targeting child buttons — the browser synthesized `click` events on the element BELOW the row, never reaching the buttons. `button.click()` in JS worked because it dispatches directly.
+
+### Fix Applied
+**File:** `apps/web/src/poster/blocks.tsx`
+- Removed `pointerEvents: 'none'` from the handle row container
+- Added `onClick` + `onPointerDown` `stopPropagation` on the row div to prevent gap clicks from deselecting
+
+---
+
+## Issue 7: didDragRef Stuck State Blocks Image Block Clicks
+
+### Symptom
+After dragging any block, clicking on image/logo blocks doesn't select them. All buttons inside the block stop working.
+
+### Root Cause
+`didDragRef.current` stays `true` after a drag because image blocks skip `onPointerDown` (to avoid browser image-drag), so the `onUp` handler that resets `didDragRef` never fires. The `onClickCapture` handler checks `didDragRef` and swallows clicks when it's true.
+
+### Fix Applied
+**File:** `apps/web/src/poster/blocks.tsx`
+- `onClickCapture` now always resets `didDragRef.current = false` before calling `stopPropagation`
+
+---
+
+## Issue 8: Thumbnail Capture Causes Visible Flicker
+
+### Symptom
+Poster visually jumps/flickers every ~800ms during active editing.
+
+### Root Cause
+`captureThumbnail()` in `data/thumbnails.ts` set `el.style.transform = 'none'` on the live `#poster-canvas` during `toCanvas()` capture (100-500ms), then restored it. The poster visually jumped to 1x scale and back on every autosave.
+
+### Fix Applied
+**File:** `apps/web/src/data/thumbnails.ts`
+- Clone the element off-screen (`left: -9999px`) and capture the clone
+- Live DOM is never touched during capture
+
+---
+
+## Issue 9: Table Cell Selection Persists After Block Deselection
+
+### Symptom
+After clicking a table cell, clicking elsewhere (canvas background, another block) deselects the table block but the cell remains highlighted/focused.
+
+### Root Cause
+`activeCell` state lives inside `TableBlock` component. When the block is deselected, the component re-renders but `activeCell` state persists (React preserves state across re-renders for the same component instance).
+
+### Fix Applied
+**File:** `apps/web/src/poster/blocks.tsx`
+- Added `selected` prop to `TableBlock`
+- `useEffect` clears `activeCell`, `selectedRow`, `selectedCol`, `rangeStart`, `rangeEnd` when `selected` becomes false

@@ -345,9 +345,10 @@ interface TableBlockProps {
   fontFamily: string;
   styles: Styles;
   onUpdate: (patch: Partial<Block>) => void;
+  selected?: boolean;
 }
 
-export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: TableBlockProps) {
+export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selected = false }: TableBlockProps) {
   const data: TableData = block.tableData ?? DEFAULT_TABLE_DATA;
   // Resolve which edge-flag set to use. Named presets come from
   // TABLE_BORDER_PRESETS; the literal 'custom' key reads from
@@ -424,6 +425,17 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate }: Tab
   const [hoveredCol, setHoveredCol] = useState<number | null>(null);
   // Active (focused) cell for highlight + keyboard navigation
   const [activeCell, setActiveCell] = useState<{ r: number; c: number } | null>(null);
+
+  // Clear cell focus when the block is deselected
+  useEffect(() => {
+    if (!selected) {
+      setActiveCell(null);
+      setSelectedRow(null);
+      setSelectedCol(null);
+      setRangeStart(null);
+      setRangeEnd(null);
+    }
+  }, [selected]);
   // Whole-row / whole-column selection — set when the user clicks
   // the narrow header strip on the left (rows) or top (cols) of the
   // table. Pressing Delete or Backspace while one of these is set
@@ -1955,7 +1967,7 @@ export function BlockFrame(props: BlockFrameProps) {
             captionNumber={captionNumber}
             label="Table"
           >
-            <TableBlock block={b} palette={p} fontFamily={ff} styles={st} onUpdate={update} />
+            <TableBlock block={b} palette={p} fontFamily={ff} styles={st} onUpdate={update} selected={selected} />
           </CaptionWrapper>
         )}
       </div>
