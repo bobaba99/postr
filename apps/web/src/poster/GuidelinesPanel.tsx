@@ -503,12 +503,12 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                     defaultValue=""
                     style={{
                       flex: 1,
-                      padding: '6px 10px',
+                      padding: '8px 12px',
                       background: '#1a1a26',
                       border: '1px solid #2a2a3a',
                       borderRadius: 6,
                       color: '#c8cad0',
-                      fontSize: 13,
+                      fontSize: 14,
                       outline: 'none',
                     }}
                   >
@@ -529,7 +529,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                   <button
                     onClick={() => setShowSaveModal(true)}
                     title="Save current checklist as a reusable template"
-                    style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: '#7c6aed', fontWeight: 600, whiteSpace: 'nowrap', padding: '4px 0' }}
+                    style={{ all: 'unset', cursor: 'pointer', fontSize: 14, color: '#7c6aed', fontWeight: 600, whiteSpace: 'nowrap', padding: '6px 0' }}
                   >
                     Save as...
                   </button>
@@ -550,7 +550,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                       style={{
                         all: 'unset',
                         flex: 1,
-                        fontSize: 13,
+                        fontSize: 14,
                         color: item.done ? '#555' : '#c8cad0',
                         textDecoration: item.done ? 'line-through' : 'none',
                         lineHeight: 1.5,
@@ -558,7 +558,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                     />
                     <button
                       onClick={() => removeItem(item.id)}
-                      style={{ all: 'unset', cursor: 'pointer', fontSize: 16, color: '#555', padding: '2px 6px' }}
+                      style={{ all: 'unset', cursor: 'pointer', fontSize: 20, color: '#555', padding: '2px 8px', lineHeight: 1 }}
                       title="Remove"
                     >
                       ×
@@ -568,7 +568,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                 <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
                   <button
                     onClick={addItem}
-                    style={{ all: 'unset', cursor: 'pointer', fontSize: 13, color: '#7c6aed', fontWeight: 600, padding: '4px 0' }}
+                    style={{ all: 'unset', cursor: 'pointer', fontSize: 14, color: '#7c6aed', fontWeight: 600, padding: '6px 0' }}
                   >
                     + Add item
                   </button>
