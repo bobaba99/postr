@@ -226,6 +226,8 @@ function useBlockDrag(
   } | null>(null);
   const didDragRef = useRef(false);
   const prevUserSelectRef = useRef<string>('');
+  /** Snapshot of blocks before drag started — for correct undo entry. */
+  const preDragBlocksRef = useRef<Block[] | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const onPointerDown = useCallback(
@@ -283,6 +285,9 @@ function useBlockDrag(
           if (Math.hypot(rawDx, rawDy) < DRAG_THRESHOLD_PX) return;
           s.active = true;
           didDragRef.current = true;
+          // Snapshot blocks BEFORE the first silent update so the undo
+          // entry on pointerup points to the pre-drag state.
+          preDragBlocksRef.current = blocksRef.current;
           setDraggingId(s.id);
           prevUserSelectRef.current = document.body.style.userSelect;
           document.body.style.userSelect = 'none';
@@ -425,10 +430,18 @@ function useBlockDrag(
             }
           }
         }
-        // Push one undo entry for the entire drag operation
-        if (s?.active) {
+        // Push the pre-drag snapshot as an undo entry, then commit
+        // the current (post-drag) blocks. setBlocksSilent during the
+        // drag already moved blocks to their final position — we just
+        // need to push the pre-drag state onto the undo stack so
+        // Cmd+Z restores where the block was before the drag.
+        if (s?.active && preDragBlocksRef.current) {
+          // Temporarily restore pre-drag blocks so withUndo snapshots
+          // them, then apply the current (post-drag) blocks.
+          setBlocksSilent(preDragBlocksRef.current);
           setBlocks(blocksRef.current);
         }
+        preDragBlocksRef.current = null;
         sessionRef.current = null;
         setDraggingId(null);
         document.body.style.userSelect = prevUserSelectRef.current;
