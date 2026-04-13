@@ -2063,6 +2063,7 @@ export function BlockFrame(props: BlockFrameProps) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden
+                style={{ display: 'block' }}
               >
                 <polyline points="5 9 2 12 5 15" />
                 <polyline points="9 5 12 2 15 5" />
@@ -2144,6 +2145,7 @@ export function BlockFrame(props: BlockFrameProps) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden
+                style={{ display: 'block' }}
               >
                 <line x1="6" y1="6" x2="18" y2="18" />
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -2202,7 +2204,7 @@ export function BlockFrame(props: BlockFrameProps) {
               justifyContent: 'center',
               fontSize: 11,
               fontWeight: 700,
-              lineHeight: 1,
+              lineHeight: 0,
               zIndex: 10,
               boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
               padding: 0,
@@ -2213,7 +2215,7 @@ export function BlockFrame(props: BlockFrameProps) {
             }}
             title="Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)"
           >
-            ↻
+            <span style={{ display: 'block', marginTop: -1 }}>↻</span>
           </button>
         </>
       )}
