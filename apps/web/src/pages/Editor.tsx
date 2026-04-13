@@ -17,6 +17,8 @@ import { makeBlocks } from '@/poster/templates';
 import { DEFAULT_STYLES, PALETTES } from '@/poster/constants';
 import { useTwoTabGuard } from '@/hooks/useTwoTabGuard';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
+import { uploadBase64Image } from '@/data/posterImages';
+import { supabase } from '@/lib/supabase';
 
 /**
  * Posters can arrive here empty — either from the handle_new_user
@@ -77,6 +79,43 @@ function normalizeStaleStyles(doc: PosterDoc): PosterDoc {
   return { ...doc, styles: next };
 }
 
+/**
+ * One-time background migration: upload base64 imageSrc values to
+ * Supabase Storage and replace them with storage:// paths. Runs
+ * after poster load, fire-and-forget. Triggers a store update on
+ * success so autosave persists the migrated paths.
+ */
+async function migrateBase64ToStorage(posterId: string, doc: PosterDoc) {
+  const base64Blocks = doc.blocks.filter(
+    (b) => b.imageSrc && b.imageSrc.startsWith('data:'),
+  );
+  if (base64Blocks.length === 0) return;
+
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id;
+  if (!userId) return;
+
+  let mutated = false;
+  const nextBlocks = await Promise.all(
+    doc.blocks.map(async (b) => {
+      if (!b.imageSrc || !b.imageSrc.startsWith('data:')) return b;
+      const storageSrc = await uploadBase64Image(userId, posterId, b.id, b.imageSrc);
+      if (!storageSrc) return b;
+      mutated = true;
+      return { ...b, imageSrc: storageSrc };
+    }),
+  );
+
+  if (!mutated) return;
+
+  // Update the store with migrated paths — autosave will persist.
+  const { usePosterStore } = await import('@/stores/posterStore');
+  const store = usePosterStore.getState();
+  if (store.posterId === posterId && store.doc) {
+    store.setPoster(posterId, { ...store.doc, blocks: nextBlocks }, store.posterTitle);
+  }
+}
+
 type Status =
   | { kind: 'loading' }
   | { kind: 'ready' }
@@ -125,6 +164,11 @@ export default function Editor() {
           navigate(`/p/${row.id}`, { replace: true });
         }
         setStatus({ kind: 'ready' });
+
+        // Background migration: upload any base64 images to Storage.
+        // Fire-and-forget — the poster renders immediately with base64,
+        // then autosave picks up the storage:// paths on next change.
+        migrateBase64ToStorage(row.id, hydrated);
       } catch (err: unknown) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : 'Failed to load poster';

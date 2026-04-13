@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { supabase } from '@/lib/supabase';
 import { useSearchParams } from 'react-router-dom';
 import type {
   Block,
@@ -481,6 +482,14 @@ export function PosterEditor() {
   const doc = usePosterStore((s) => s.doc);
   const setPoster = usePosterStore((s) => s.setPoster);
   const posterId = usePosterStore((s) => s.posterId);
+
+  // Current user ID — needed for Storage uploads (image blocks).
+  const [userId, setUserId] = useState<string | null>(null);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.id) setUserId(data.user.id);
+    });
+  }, []);
 
   // Local UI state — selection, grid, sort, citation style, presets.
   // (Style/font/palette/etc live in the doc itself, persisted via store.)
@@ -2407,6 +2416,8 @@ export function PosterEditor() {
                   titleOverflowPx={titleOverflowPx}
                   isOutOfBounds={oobBlockIds.has(b.id)}
                   captionNumber={captionNumbers[b.id]}
+                  userId={userId ?? undefined}
+                  posterId={posterId ?? undefined}
                 />
               ))}
               {selectedIds.size > 1 && (

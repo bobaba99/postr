@@ -36,6 +36,8 @@ import {
   updateCell,
 } from './tableOps';
 import { ResizeHandles, type ResizeHandle } from './resizeHandles';
+import { useStorageUrl } from '@/hooks/useStorageUrl';
+import { uploadPosterImage } from '@/data/posterImages';
 
 // =========================================================================
 // LogoBlock
@@ -114,8 +116,10 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
   // travels with the poster JSONB and doesn't rely on remote
   // fetches at render / export time.
   const [pickerOpen, setPickerOpen] = useState(false);
+  const resolvedLogoSrc = useStorageUrl(block.imageSrc);
 
   if (block.imageSrc) {
+    const displaySrc = resolvedLogoSrc ?? block.imageSrc;
     return (
       <>
         <div
@@ -131,7 +135,7 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
           }}
         >
           <img
-            src={block.imageSrc}
+            src={displaySrc}
             alt="Poster logo"
             style={{
               maxWidth: '100%',
@@ -200,17 +204,40 @@ interface ImageBlockProps {
    * Gates the in-image overlay (fit toggle + replace + remove).
    * The overlay only shows while the block is selected so it
    * doesn't visually clutter the canvas on deselected image blocks.
-   * User-flagged 2026-04-11.
    */
   selected?: boolean;
+  /** Required for uploading images to Supabase Storage. */
+  userId?: string;
+  posterId?: string;
 }
 
-export function ImageBlock({ block, palette, onUpdate, selected = false }: ImageBlockProps) {
+export function ImageBlock({ block, palette, onUpdate, selected = false, userId, posterId }: ImageBlockProps) {
   const ref = useRef<HTMLInputElement | null>(null);
+  // Resolve storage:// paths to signed URLs for rendering
+  const resolvedSrc = useStorageUrl(block.imageSrc);
+
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    readImageFile(e.target.files?.[0], (dataUrl) =>
-      onUpdate({ imageSrc: dataUrl }),
-    );
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (userId && posterId) {
+      // Show immediate preview via object URL while uploading
+      const previewUrl = URL.createObjectURL(file);
+      onUpdate({ imageSrc: previewUrl });
+
+      uploadPosterImage(userId, posterId, block.id, file).then((storageSrc) => {
+        URL.revokeObjectURL(previewUrl);
+        if (storageSrc) {
+          onUpdate({ imageSrc: storageSrc });
+        } else {
+          // Upload failed — fall back to base64
+          readImageFile(file, (dataUrl) => onUpdate({ imageSrc: dataUrl }));
+        }
+      });
+    } else {
+      // Fallback: no userId/posterId available — use base64
+      readImageFile(file, (dataUrl) => onUpdate({ imageSrc: dataUrl }));
+    }
     e.target.value = '';
   };
 
@@ -242,25 +269,12 @@ export function ImageBlock({ block, palette, onUpdate, selected = false }: Image
 
   if (block.imageSrc) {
     const currentFit = block.imageFit ?? 'contain';
+    // Use resolved URL (signed URL for storage://, as-is for base64/remote)
+    const displaySrc = resolvedSrc ?? block.imageSrc;
     return (
       <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-        {/*
-          `draggable={false}` + `onDragStart preventDefault` + CSS
-          user-drag:none all three together are required to kill the
-          browser's native image-drag ghost. Without them, pointerdown
-          on the <img> hands over to the browser's drag-to-desktop
-          behavior and the app's pointermove handler never fires,
-          leaving the block "stuck". Issue reported 2026-04-11 — the
-          user couldn't move image blocks because the browser
-          intercepted every drag as an image drag.
-          `WebkitUserDrag` covers Safari, `userSelect: none` blocks
-          text-selection on decorative image alt text, and
-          `pointerEvents: none` would break our own drag handler, so
-          we don't use it — instead we rely on the outer frame's
-          onPointerDown bubbling up from the image container div.
-        */}
         <img
-          src={block.imageSrc}
+          src={displaySrc}
           alt={block.caption || 'Figure'}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
@@ -1619,6 +1633,9 @@ interface BlockFrameProps {
    * can't edit the number directly, only the order of blocks.
    */
   captionNumber?: number;
+  /** For uploading images to Supabase Storage. */
+  userId?: string;
+  posterId?: string;
 }
 
 export function BlockFrame(props: BlockFrameProps) {
@@ -1645,6 +1662,8 @@ export function BlockFrame(props: BlockFrameProps) {
     titleOverflowPx,
     isOutOfBounds,
     captionNumber,
+    userId,
+    posterId,
   } = props;
 
   // Block context menu state. Right-clicking a non-table block
@@ -2003,7 +2022,7 @@ export function BlockFrame(props: BlockFrameProps) {
             captionNumber={captionNumber}
             label="Figure"
           >
-            <ImageBlock block={b} palette={p} onUpdate={update} selected={selected} />
+            <ImageBlock block={b} palette={p} onUpdate={update} selected={selected} userId={userId} posterId={posterId} />
           </CaptionWrapper>
         )}
         {b.type === 'logo' && <LogoBlock block={b} onUpdate={update} />}
