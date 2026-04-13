@@ -287,16 +287,7 @@ export function ImageBlock({ block, palette, onUpdate, selected = false }: Image
             <button
               onClick={toggleFit}
               title={FIT_HINT[currentFit]}
-              style={{
-                ...iconBtn,
-                width: 'auto',
-                minWidth: 32,
-                padding: '0 6px',
-                fontSize: 9,
-                fontWeight: 700,
-                letterSpacing: 0.4,
-                fontFamily: 'system-ui, -apple-system, sans-serif',
-              }}
+              style={labelBtn}
             >
               {FIT_LABEL[currentFit]}
             </button>
@@ -356,20 +347,62 @@ export function ImageBlock({ block, palette, onUpdate, selected = false }: Image
   );
 }
 
+/** Circular handle button — shared base for move, delete, rotate. */
+const circleBtn: CSSProperties = {
+  width: 18,
+  height: 18,
+  borderRadius: '50%',
+  color: '#fff',
+  border: 'none',
+  display: 'grid',
+  placeItems: 'center',
+  placeContent: 'center',
+  boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
+  padding: 0,
+  boxSizing: 'border-box',
+  lineHeight: 0,
+  fontSize: 11,
+  fontFamily: 'system-ui, -apple-system, sans-serif',
+};
+
+/** Square icon button — used for single-character image overlay controls. */
 const iconBtn: CSSProperties = {
   background: 'rgba(0,0,0,.6)',
   color: '#fff',
   border: 'none',
   borderRadius: 3,
-  width: 18,
-  height: 18,
-  fontSize: 13,
+  width: 20,
+  height: 20,
+  fontSize: 14,
   cursor: 'pointer',
   display: 'grid',
   placeItems: 'center',
+  placeContent: 'center',
   padding: 0,
   lineHeight: 0,
   boxSizing: 'border-box',
+  fontFamily: 'system-ui, -apple-system, sans-serif',
+};
+
+/** Text label button — used for the Contain/Cover/Fill toggle. */
+const labelBtn: CSSProperties = {
+  background: 'rgba(0,0,0,.6)',
+  color: '#fff',
+  border: 'none',
+  borderRadius: 3,
+  height: 20,
+  fontSize: 9,
+  fontWeight: 700,
+  letterSpacing: 0.4,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0 6px',
+  lineHeight: 1,
+  boxSizing: 'border-box',
+  fontFamily: 'system-ui, -apple-system, sans-serif',
+  whiteSpace: 'nowrap',
 };
 
 // =========================================================================
@@ -2007,7 +2040,7 @@ export function BlockFrame(props: BlockFrameProps) {
           <div
             style={{
               position: 'absolute',
-              top: -20,
+              top: -26,
               left: '50%',
               // Row stays glued to the block's horizontal center no
               // matter how the block is sized or rotated. The
@@ -2024,7 +2057,7 @@ export function BlockFrame(props: BlockFrameProps) {
               // leaves the control row the same length. The row
               // just stays horizontally centered above the block.
               width: 'fit-content',
-              height: 16,
+              height: 18,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -2041,20 +2074,10 @@ export function BlockFrame(props: BlockFrameProps) {
                 onPointerDown(e, b.id, 'move');
               }}
               style={{
-                flex: '0 0 auto',
-                width: 18,
-                height: 18,
-                borderRadius: '50%',
+                ...circleBtn,
                 background: p.accent,
-                color: '#fff',
-                border: 'none',
                 cursor: 'move',
-                display: 'grid',
-                placeItems: 'center',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-                padding: 0,
                 pointerEvents: 'auto',
-                boxSizing: 'border-box',
               }}
               title="Drag to move (or use arrow keys)"
             >
@@ -2088,7 +2111,7 @@ export function BlockFrame(props: BlockFrameProps) {
                 // constant length regardless of the block's own
                 // dimensions.
                 flex: '0 0 auto',
-                height: 16,
+                height: 18,
                 boxSizing: 'border-box',
                 display: 'flex',
                 alignItems: 'center',
@@ -2096,9 +2119,9 @@ export function BlockFrame(props: BlockFrameProps) {
                 fontSize: 8,
                 background: p.accent,
                 color: '#fff',
-                padding: '0 7px',
-                borderRadius: 8,
-                border: '1.5px solid #0a0a12',
+                padding: '0 8px',
+                borderRadius: 9,
+                border: 'none',
                 fontFamily: 'system-ui',
                 fontWeight: 700,
                 letterSpacing: 0.5,
@@ -2123,27 +2146,16 @@ export function BlockFrame(props: BlockFrameProps) {
                 onDelete(b.id);
               }}
               style={{
-                flex: '0 0 16px',
-                width: 16,
-                height: 16,
-                borderRadius: '50%',
+                ...circleBtn,
                 background: '#d33',
-                color: '#fff',
-                border: '1.5px solid #0a0a12',
                 cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-                padding: 0,
                 pointerEvents: 'auto',
-                boxSizing: 'border-box',
               }}
               title="Delete block"
             >
               <svg
-                width="8"
-                height="8"
+                width="10"
+                height="10"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -2177,11 +2189,11 @@ export function BlockFrame(props: BlockFrameProps) {
             // none` so clicks pass through to the handle below it.
             style={{
               position: 'absolute',
-              bottom: -14,
+              bottom: -12,
               left: '50%',
               marginLeft: -1,
               width: 1.5,
-              height: 14,
+              height: 12,
               background: p.accent,
               opacity: 0.5,
               pointerEvents: 'none',
@@ -2194,28 +2206,14 @@ export function BlockFrame(props: BlockFrameProps) {
               onPointerDown(e, b.id, 'rotate');
             }}
             style={{
+              ...circleBtn,
               position: 'absolute',
-              bottom: -28,
+              bottom: -30,
               left: '50%',
-              marginLeft: -8,
-              width: 16,
-              height: 16,
-              borderRadius: '50%',
+              marginLeft: -9,
               background: 'rgba(0, 0, 0, 0.6)',
-              color: '#fff',
-              border: '1.5px solid #0a0a12',
               cursor: 'grab',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 11,
-              fontWeight: 700,
-              lineHeight: 0,
               zIndex: 10,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-              padding: 0,
-              boxSizing: 'border-box',
-              fontFamily: 'system-ui, -apple-system, sans-serif',
               // Counter-rotate so the icon stays upright even when
               // the block is rotated.
               transform: b.rotation ? `rotate(${-b.rotation}deg)` : undefined,
