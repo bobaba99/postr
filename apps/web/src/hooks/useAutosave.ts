@@ -19,6 +19,8 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { upsertPoster } from '@/data/posters';
+import { captureThumbnail } from '@/data/thumbnails';
+import { supabase } from '@/lib/supabase';
 import type { PosterDoc } from '@postr/shared';
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -83,6 +85,16 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
       }
       await upsertPoster(id, { data, ...(titleText ? { title: titleText } : {}) });
       setState({ status: 'saved', lastSavedAt: new Date(), error: null });
+
+      // Fire-and-forget thumbnail capture — never blocks editing.
+      // Runs after a successful save so the canvas reflects the latest state.
+      supabase.auth.getUser().then(({ data: userData }) => {
+        const uid = userData?.user?.id;
+        if (!uid) return;
+        captureThumbnail(uid, id).then((path) => {
+          if (path) upsertPoster(id, { thumbnailPath: path });
+        });
+      });
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       setState((s) => ({ ...s, status: 'error', error }));

@@ -9,8 +9,10 @@
  * The parent (Home) owns the actual duplicate/delete side effects
  * and the optimistic state updates.
  */
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { PosterRow, PosterListRow } from '@/data/posters';
+import { getThumbnailUrl } from '@/data/thumbnails';
 import { PALETTES } from '@/poster/constants';
 
 export interface PosterCardProps {
@@ -39,6 +41,25 @@ function formatLastEdited(iso: string): string {
  * so the card shows a recognizable layout instead of "No preview".
  */
 function MiniPreview({ row }: { row: PosterListRow }) {
+  // Use thumbnail image when available — fast, no JSONB needed.
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (row.thumbnail_path) {
+      getThumbnailUrl(row.thumbnail_path).then(setThumbUrl);
+    }
+  }, [row.thumbnail_path]);
+
+  if (thumbUrl) {
+    return (
+      <img
+        src={thumbUrl}
+        alt={row.title || 'Poster preview'}
+        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+      />
+    );
+  }
+
+  // Fallback: letter initial when no thumbnail and no data
   const doc = 'data' in row ? (row as PosterRow).data : null;
   if (!doc?.blocks?.length) {
     return (
