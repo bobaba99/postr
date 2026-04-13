@@ -484,6 +484,16 @@ export function PosterEditor() {
   }, []);
   const dismissUndoToast = useCallback(() => setUndoToast(null), []);
 
+  // Scroll position for ruler rendering — updated on scroll events.
+  const [scrollPos, setScrollPos] = useState({ x: 0, y: 0 });
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const onScroll = () => setScrollPos({ x: el.scrollLeft, y: el.scrollTop });
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
   // Track when poster content overflows the declared canvas height
   // (e.g. a text block with height:auto grows past cH). Used to
   // extend the scroll container so users can reach all content.
@@ -2211,8 +2221,43 @@ export function PosterEditor() {
                 // handler's scroll math and produce lag.
               }}
             >
-              {/* Grid now rendered on the workspace, not the canvas */}
-              {/* Ruler now rendered on the workspace, not the canvas */}
+              {/* Grid overlay on the poster canvas — subtle lines visible
+                  against the white background. The workspace grid (CSS
+                  background on the scroll container) is visible in the
+                  dark area; this SVG grid covers the white poster. */}
+              {showGrid && (
+                <svg
+                  data-postr-overlay="grid"
+                  width={cW}
+                  height={cH}
+                  style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
+                >
+                  {Array.from({ length: Math.ceil(cW / SNAP_GRID) + 1 }).map((_, i) => (
+                    <line
+                      key={`v${i}`}
+                      x1={i * SNAP_GRID}
+                      y1={0}
+                      x2={i * SNAP_GRID}
+                      y2={cH}
+                      stroke="#000"
+                      strokeWidth={0.3}
+                      opacity={i % 10 === 0 ? 0.1 : 0.04}
+                    />
+                  ))}
+                  {Array.from({ length: Math.ceil(cH / SNAP_GRID) + 1 }).map((_, i) => (
+                    <line
+                      key={`h${i}`}
+                      x1={0}
+                      y1={i * SNAP_GRID}
+                      x2={cW}
+                      y2={i * SNAP_GRID}
+                      stroke="#000"
+                      strokeWidth={0.3}
+                      opacity={i % 10 === 0 ? 0.1 : 0.04}
+                    />
+                  ))}
+                </svg>
+              )}
 
               {/*
                 Drag guides — dotted edge / centerline overlay rendered
@@ -2362,116 +2407,96 @@ export function PosterEditor() {
         {/* Workspace rulers — fixed at viewport edges, Figma-style.
             Positioned absolutely over the scroll container so they
             stay visible during scroll/zoom. */}
-        {showRuler && (
-          <>
-            {/* Top ruler bar */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 24,
-                right: 0,
-                height: 24,
-                background: '#12121e',
-                borderBottom: '1px solid rgba(255,255,255,0.08)',
-                overflow: 'hidden',
-                pointerEvents: 'none',
-                zIndex: 12,
-                display: 'flex',
-                alignItems: 'flex-end',
-              }}
-            >
-              {Array.from({ length: 200 }).map((_, i) => {
-                const spacing = PX * zoom;
-                const offset = canvasRef.current ? -canvasRef.current.scrollLeft : 0;
-                const x = i * spacing + offset + 96 * zoom;
-                if (x < -spacing || x > 3000) return null;
-                const isMajor = i % 5 === 0;
-                return (
-                  <div key={`rt${i}`} style={{ position: 'absolute', left: x, bottom: 0 }}>
-                    <div style={{
-                      width: 1,
-                      height: isMajor ? 10 : 5,
-                      background: 'rgba(255,255,255,0.35)',
-                    }} />
-                    {isMajor && i > 0 && (
-                      <span style={{
-                        position: 'absolute',
-                        left: 3,
-                        bottom: 10,
-                        fontSize: 9,
-                        color: 'rgba(255,255,255,0.4)',
-                        fontFamily: 'ui-monospace, monospace',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {i}"
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {/* Left ruler bar */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 24,
-                left: 0,
-                bottom: 0,
-                width: 24,
+        {showRuler && (() => {
+          // Continuous rulers — compute which inch marks are visible
+          // based on scroll position, then render only those ticks.
+          const inchPx = PX * zoom; // pixels per inch at current zoom
+          const pad = 96; // workarea padding in CSS px
+          // Canvas origin in scroll-container space
+          const canvasOriginX = pad - scrollPos.x;
+          const canvasOriginY = pad - scrollPos.y;
+          // Visible range in inches (extend past viewport edges)
+          const viewW = canvasRef.current?.clientWidth ?? 2000;
+          const viewH = canvasRef.current?.clientHeight ?? 1200;
+          const startInchH = Math.floor(-canvasOriginX / inchPx) - 1;
+          const endInchH = Math.ceil((viewW - canvasOriginX) / inchPx) + 1;
+          const startInchV = Math.floor(-canvasOriginY / inchPx) - 1;
+          const endInchV = Math.ceil((viewH - canvasOriginY) / inchPx) + 1;
+
+          const rulerTick = (pos: number, inch: number, major: boolean) => ({
+            pos: canvasOriginX + inch * inchPx,
+            inch,
+            major,
+          });
+
+          return (
+            <>
+              {/* Top ruler bar */}
+              <div style={{
+                position: 'absolute', top: 0, left: 24, right: 0, height: 24,
+                background: '#12121e', borderBottom: '1px solid rgba(255,255,255,0.08)',
+                overflow: 'hidden', pointerEvents: 'none', zIndex: 12,
+              }}>
+                {Array.from({ length: endInchH - startInchH }, (_, i) => {
+                  const inch = startInchH + i;
+                  const x = canvasOriginX + inch * inchPx;
+                  if (x < -inchPx || x > viewW + inchPx) return null;
+                  const isMajor = inch % 5 === 0;
+                  return (
+                    <div key={inch} style={{ position: 'absolute', left: x, bottom: 0 }}>
+                      <div style={{ width: 1, height: isMajor ? 12 : inch % 1 === 0 ? 7 : 4, background: 'rgba(255,255,255,0.35)' }} />
+                      {isMajor && (
+                        <span style={{
+                          position: 'absolute', left: 3, bottom: 12,
+                          fontSize: 9, color: 'rgba(255,255,255,0.45)',
+                          fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap',
+                        }}>
+                          {inch}"
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Left ruler bar */}
+              <div style={{
+                position: 'absolute', top: 24, left: 0, bottom: 0, width: 24,
+                background: '#12121e', borderRight: '1px solid rgba(255,255,255,0.08)',
+                overflow: 'hidden', pointerEvents: 'none', zIndex: 12,
+              }}>
+                {Array.from({ length: endInchV - startInchV }, (_, i) => {
+                  const inch = startInchV + i;
+                  const y = canvasOriginY + inch * inchPx;
+                  if (y < -inchPx || y > viewH + inchPx) return null;
+                  const isMajor = inch % 5 === 0;
+                  return (
+                    <div key={inch} style={{ position: 'absolute', top: y, left: 0 }}>
+                      <div style={{ height: 1, width: isMajor ? 12 : 7, background: 'rgba(255,255,255,0.35)' }} />
+                      {isMajor && (
+                        <span style={{
+                          position: 'absolute', top: 3, left: 12,
+                          fontSize: 9, color: 'rgba(255,255,255,0.45)',
+                          fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap',
+                          writingMode: 'vertical-lr',
+                        }}>
+                          {inch}"
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Corner square */}
+              <div style={{
+                position: 'absolute', top: 0, left: 0, width: 24, height: 24,
                 background: '#12121e',
                 borderRight: '1px solid rgba(255,255,255,0.08)',
-                overflow: 'hidden',
-                pointerEvents: 'none',
-                zIndex: 12,
-              }}
-            >
-              {Array.from({ length: 200 }).map((_, i) => {
-                const spacing = PX * zoom;
-                const offset = canvasRef.current ? -canvasRef.current.scrollTop : 0;
-                const y = i * spacing + offset + 96 * zoom;
-                if (y < -spacing || y > 3000) return null;
-                const isMajor = i % 5 === 0;
-                return (
-                  <div key={`rl${i}`} style={{ position: 'absolute', top: y, left: 0 }}>
-                    <div style={{
-                      height: 1,
-                      width: isMajor ? 10 : 5,
-                      background: 'rgba(255,255,255,0.35)',
-                    }} />
-                    {isMajor && i > 0 && (
-                      <span style={{
-                        position: 'absolute',
-                        top: 3,
-                        left: 10,
-                        fontSize: 9,
-                        color: 'rgba(255,255,255,0.4)',
-                        fontFamily: 'ui-monospace, monospace',
-                        whiteSpace: 'nowrap',
-                        writingMode: 'vertical-lr',
-                      }}>
-                        {i}"
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {/* Corner square where rulers meet */}
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: 24,
-              height: 24,
-              background: '#12121e',
-              borderRight: '1px solid rgba(255,255,255,0.08)',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-              zIndex: 13,
-              pointerEvents: 'none',
-            }} />
-          </>
-        )}
+                borderBottom: '1px solid rgba(255,255,255,0.08)',
+                zIndex: 13, pointerEvents: 'none',
+              }} />
+            </>
+          );
+        })()}
 
         <UndoToast
           key={undoToast?.seq ?? 0}
