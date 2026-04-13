@@ -2010,9 +2010,10 @@ export function BlockFrame(props: BlockFrameProps) {
               justifyContent: 'center',
               gap: 4,
               boxSizing: 'border-box',
-              pointerEvents: 'none',
               zIndex: 10,
             }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
             <button
               type="button"
