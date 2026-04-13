@@ -296,14 +296,22 @@ export function ImageBlock({ block, palette, onUpdate, selected = false }: Image
               title="Replace image — choose a different file"
               style={iconBtn}
             >
-              ↻
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: 'block' }}>
+                <path d="M21 2v6h-6" />
+                <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+                <path d="M3 22v-6h6" />
+                <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+              </svg>
             </button>
             <button
               onClick={() => onUpdate({ imageSrc: null })}
               title="Remove image"
               style={{ ...iconBtn, background: 'rgba(180,30,30,.8)' }}
             >
-              ×
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: 'block' }}>
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
             </button>
           </div>
         )}
@@ -360,12 +368,9 @@ const circleBtn: CSSProperties = {
   boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
   padding: 0,
   boxSizing: 'border-box',
-  lineHeight: 0,
-  fontSize: 11,
-  fontFamily: 'system-ui, -apple-system, sans-serif',
 };
 
-/** Square icon button — used for single-character image overlay controls. */
+/** Square icon button — used for image overlay SVG icon controls. */
 const iconBtn: CSSProperties = {
   background: 'rgba(0,0,0,.6)',
   color: '#fff',
@@ -373,15 +378,12 @@ const iconBtn: CSSProperties = {
   borderRadius: 3,
   width: 20,
   height: 20,
-  fontSize: 14,
   cursor: 'pointer',
   display: 'grid',
   placeItems: 'center',
   placeContent: 'center',
   padding: 0,
-  lineHeight: 0,
   boxSizing: 'border-box',
-  fontFamily: 'system-ui, -apple-system, sans-serif',
 };
 
 /** Text label button — used for the Contain/Cover/Fill toggle. */
@@ -2040,7 +2042,7 @@ export function BlockFrame(props: BlockFrameProps) {
           <div
             style={{
               position: 'absolute',
-              top: -26,
+              top: -24,
               left: '50%',
               // Row stays glued to the block's horizontal center no
               // matter how the block is sized or rotated. The
@@ -2220,7 +2222,10 @@ export function BlockFrame(props: BlockFrameProps) {
             }}
             title="Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)"
           >
-            <span style={{ display: 'block', marginTop: -1 }}>↻</span>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: 'block' }}>
+              <path d="M21 2v6h-6" />
+              <path d="M21 8A9 9 0 1 1 6.7 3.3" />
+            </svg>
           </button>
         </>
       )}
