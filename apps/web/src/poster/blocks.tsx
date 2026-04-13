@@ -257,17 +257,6 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
           alt={block.caption || 'Figure'}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
-          onLoad={(e) => {
-            // Auto-size block height to match image aspect ratio
-            const img = e.currentTarget;
-            if (img.naturalWidth && img.naturalHeight) {
-              const aspect = img.naturalWidth / img.naturalHeight;
-              const newH = Math.round(block.w / aspect);
-              if (Math.abs(newH - block.h) > 2) {
-                onUpdate({ h: newH });
-              }
-            }
-          }}
           style={{
             width: '100%',
             height: '100%',

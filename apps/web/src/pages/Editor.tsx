@@ -108,11 +108,13 @@ async function migrateBase64ToStorage(posterId: string, doc: PosterDoc) {
 
   if (!mutated) return;
 
-  // Update the store with migrated paths — autosave will persist.
+  // Update blocks with migrated paths — use setBlocksSilent to avoid
+  // pushing a phantom entry to the undo stack and wiping undo history.
+  // Autosave will pick up the change on the next debounce cycle.
   const { usePosterStore } = await import('@/stores/posterStore');
   const store = usePosterStore.getState();
   if (store.posterId === posterId && store.doc) {
-    store.setPoster(posterId, { ...store.doc, blocks: nextBlocks }, store.posterTitle);
+    store.setBlocksSilent(nextBlocks);
   }
 }
 
