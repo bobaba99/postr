@@ -365,6 +365,12 @@ const iconBtn: CSSProperties = {
   height: 18,
   fontSize: 13,
   cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 0,
+  lineHeight: 1,
+  boxSizing: 'border-box',
 };
 
 // =========================================================================
@@ -2050,6 +2056,7 @@ export function BlockFrame(props: BlockFrameProps) {
                 boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
                 padding: 0,
                 pointerEvents: 'auto',
+                boxSizing: 'border-box',
               }}
               title="Drag to move (or use arrow keys)"
             >
@@ -2132,6 +2139,7 @@ export function BlockFrame(props: BlockFrameProps) {
                 boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
                 padding: 0,
                 pointerEvents: 'auto',
+                boxSizing: 'border-box',
               }}
               title="Delete block"
             >
@@ -2208,6 +2216,7 @@ export function BlockFrame(props: BlockFrameProps) {
               zIndex: 10,
               boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
               padding: 0,
+              boxSizing: 'border-box',
               fontFamily: 'system-ui, -apple-system, sans-serif',
               // Counter-rotate so the icon stays upright even when
               // the block is rotated.
