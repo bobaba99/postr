@@ -1972,7 +1972,14 @@ export function PosterEditor() {
         <Sidebar
           onToggleSidebar={() => setSidebarOpen(false)}
         posterTitle={posterDisplayName}
-        onChangePosterTitle={setPosterDisplayName}
+        onChangePosterTitle={(title) => {
+          setPosterDisplayName(title);
+          // Persist immediately rather than waiting for the 800ms
+          // autosave debounce — users expect "Save" to survive a
+          // refresh. docRef inside useAutosave stays in sync so
+          // flushNow writes the current doc plus the new title.
+          void autosave.flushNow(title);
+        }}
         posterSizeKey={sizeKey}
         posterWidthIn={doc.widthIn}
         posterHeightIn={doc.heightIn}

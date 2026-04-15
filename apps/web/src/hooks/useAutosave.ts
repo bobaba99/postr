@@ -29,6 +29,13 @@ export interface AutosaveState {
   status: AutosaveStatus;
   lastSavedAt: Date | null;
   error: Error | null;
+  /**
+   * Cancel the debounce and persist the pending doc immediately.
+   * Pass an overrideTitle to commit a title change that hasn't yet
+   * propagated through React render (store update + flush in the
+   * same event handler).
+   */
+  flushNow: (overrideTitle?: string) => Promise<void>;
 }
 
 const DEBOUNCE_MS = 800;
@@ -42,7 +49,7 @@ function stripHtml(html: string): string {
 }
 
 export function useAutosave(posterId: string | null, doc: PosterDoc | null, displayTitle?: string): AutosaveState {
-  const [state, setState] = useState<AutosaveState>({
+  const [state, setState] = useState<Omit<AutosaveState, 'flushNow'>>({
     status: 'idle',
     lastSavedAt: null,
     error: null,
@@ -55,16 +62,32 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
   const pendingTitleRef = useRef<string | undefined>(displayTitle);
   const firstRenderRef = useRef(true);
   const lastPosterIdRef = useRef<string | null>(posterId);
+  // Always-current refs so flushNow() can persist even when the debounce
+  // effect hasn't scheduled yet (e.g. title change → user clicks Save
+  // before React has committed the next render).
+  const posterIdRef = useRef<string | null>(posterId);
+  const docRef = useRef<PosterDoc | null>(doc);
+  posterIdRef.current = posterId;
+  docRef.current = doc;
 
   // Keep the title ref in sync (also read inside the effect below).
   pendingTitleRef.current = displayTitle;
 
-  // Actual save — runs at the tail of the debounce window or on unmount.
-  const flush = async () => {
-    const id = pendingIdRef.current;
-    const data = pendingDocRef.current;
+  // Actual save — runs at the tail of the debounce window, on unmount,
+  // or synchronously when flushNow() is invoked (e.g. the Sidebar "Save"
+  // button needs the write to reach Supabase before a potential refresh).
+  const flush = async (overrideTitle?: string) => {
+    // Cancel any pending debounce — whoever called flush wants this
+    // snapshot persisted now, not after another 800ms window.
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    const id = pendingIdRef.current ?? posterIdRef.current;
+    const data = pendingDocRef.current ?? docRef.current;
     pendingIdRef.current = null;
     pendingDocRef.current = null;
+    if (overrideTitle !== undefined) pendingTitleRef.current = overrideTitle;
     if (!id || !data) return;
 
     setState((s) => ({ ...s, status: 'saving', error: null }));
@@ -197,5 +220,5 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return state;
+  return { ...state, flushNow: flush };
 }
