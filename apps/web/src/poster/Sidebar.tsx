@@ -187,6 +187,9 @@ interface SidebarProps {
   posterId: string | null;
   pendingCommentAnchor: import('@/data/comments').CommentAnchor | null;
   onClearPendingCommentAnchor: () => void;
+
+  /** Read-only mode — share viewer. Hides every tab except Comments. */
+  readOnly?: boolean;
 }
 
 // Shared inline styles for the dark sidebar UI chrome.
@@ -526,18 +529,20 @@ export function Sidebar(props: SidebarProps) {
             * visible label change. `insert` is grouped with `edit` since
             * both are block-focused operations. */}
           {(
-            [
-              ['layout', 'layout'],
-              ['style', 'style'],
-              ['authors', 'authors'],
-              ['insert', 'insert'],
-              ['edit', 'edit block'],
-              ['refs', 'references'],
-              ['check', 'plot code check'],
-              ['issues', 'issues'],
-              ['comments', 'comments'],
-              ['export', 'export'],
-            ] as Array<[SidebarTab, string]>
+            (props.readOnly
+              ? ([['comments', 'comments']] as Array<[SidebarTab, string]>)
+              : ([
+                  ['layout', 'layout'],
+                  ['style', 'style'],
+                  ['authors', 'authors'],
+                  ['insert', 'insert'],
+                  ['edit', 'edit block'],
+                  ['refs', 'references'],
+                  ['check', 'plot code check'],
+                  ['issues', 'issues'],
+                  ['comments', 'comments'],
+                  ['export', 'export'],
+                ] as Array<[SidebarTab, string]>))
           ).map(([t, label]) => {
             const issueCount = props.issues.length;
             const errorCount = props.issues.filter((i) => i.severity === 'error').length;

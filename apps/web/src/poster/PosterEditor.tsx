@@ -505,7 +505,7 @@ function useZoom(canvasRef: React.RefObject<HTMLDivElement>, sizeKey: PosterSize
 // PosterEditor
 // =========================================================================
 
-export function PosterEditor() {
+export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) {
   const doc = usePosterStore((s) => s.doc);
   const setPoster = usePosterStore((s) => s.setPoster);
   const posterId = usePosterStore((s) => s.posterId);
@@ -596,7 +596,10 @@ export function PosterEditor() {
   // Lifted from Sidebar so the Check tab can render a draggable
   // figure-size overlay on the canvas — needs to know which tab
   // is active, and needs to share the tab setter with Sidebar.
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>('layout');
+  const [sidebarTab, setSidebarTab] = useState<SidebarTab>(readOnly ? 'comments' : 'layout');
+  useEffect(() => {
+    if (readOnly && sidebarTab !== 'comments') setSidebarTab('comments');
+  }, [readOnly, sidebarTab]);
   const [pendingCommentAnchor, setPendingCommentAnchor] =
     useState<CommentAnchor | null>(null);
   const [areaCommentMode, setAreaCommentMode] = useState(false);
@@ -859,7 +862,7 @@ export function PosterEditor() {
 
   // Autosave — debounces doc changes and persists via upsertPoster.
   // Status drives the pill rendered in the top-right overlay.
-  const autosave = useAutosave(posterId, doc, posterDisplayName);
+  const autosave = useAutosave(readOnly ? null : posterId, doc, posterDisplayName);
 
   if (!doc || !posterId) {
     return (
@@ -2204,6 +2207,7 @@ export function PosterEditor() {
         posterId={posterId ?? null}
         pendingCommentAnchor={pendingCommentAnchor}
         onClearPendingCommentAnchor={() => setPendingCommentAnchor(null)}
+        readOnly={readOnly}
       />
       </div>
 
