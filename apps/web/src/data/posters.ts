@@ -102,6 +102,24 @@ export function loadPoster(id: string): Promise<PosterRow | null> {
 }
 
 /**
+ * Load a publicly-shared poster by its `share_slug`. Returns null
+ * when the slug doesn't resolve or the poster isn't public. RLS does
+ * the heavy lifting — any anonymous session can read rows where
+ * `is_public = true`.
+ */
+export async function loadPosterBySlug(slug: string): Promise<PosterRow | null> {
+  const { data, error } = await supabase
+    .from('posters')
+    .select('*')
+    .eq('share_slug', slug)
+    .eq('is_public', true)
+    .maybeSingle();
+  if (error) throw new Error(`Failed to load shared poster: ${error.message}`);
+  if (!data) return null;
+  return data as unknown as PosterRow;
+}
+
+/**
  * Returns the most recently updated poster for the current user.
  * Used by the Editor route when the URL contains `/p/new` or any
  * other id we couldn't resolve.
