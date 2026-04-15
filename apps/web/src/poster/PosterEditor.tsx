@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { supabase } from '@/lib/supabase';
+import type { CommentAnchor } from '@/data/comments';
 import { useSearchParams } from 'react-router-dom';
 import type {
   Block,
@@ -596,6 +597,8 @@ export function PosterEditor() {
   // figure-size overlay on the canvas — needs to know which tab
   // is active, and needs to share the tab setter with Sidebar.
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('layout');
+  const [pendingCommentAnchor, setPendingCommentAnchor] =
+    useState<CommentAnchor | null>(null);
   // Id of the most recently inserted block. Used by BlockFrame to
   // play a one-shot `postr-block-insert` CSS animation when the
   // block mounts. Cleared 700 ms later (slightly longer than the
@@ -2043,6 +2046,9 @@ export function PosterEditor() {
           ) as HTMLElement | null;
           el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }}
+        posterId={posterId ?? null}
+        pendingCommentAnchor={pendingCommentAnchor}
+        onClearPendingCommentAnchor={() => setPendingCommentAnchor(null)}
       />
       </div>
 

@@ -50,6 +50,7 @@ import {
   stripHtmlToPlainText,
 } from './academicMarkdown';
 import { auditPaletteCB } from './colorblind';
+import { CommentsPanel } from './CommentsPanel';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { ReadabilityPanel } from './ReadabilityPanel';
@@ -67,6 +68,7 @@ export type SidebarTab =
   | 'insert'
   | 'check'
   | 'issues'
+  | 'comments'
   | 'export';
 
 /**
@@ -176,6 +178,15 @@ interface SidebarProps {
   // the in-canvas warning banner so both surfaces stay in sync.
   issues: PosterIssue[];
   onJumpToBlock?: (blockId: string) => void;
+
+  // Comments tab. posterId is null until the poster has been saved
+  // (CommentsPanel renders an appropriate empty state in that case).
+  // pendingCommentAnchor is populated by the canvas overlay when the
+  // user drags a rectangle in comment mode; CommentsPanel pre-fills
+  // the draft form with the anchor and clears it after submit.
+  posterId: string | null;
+  pendingCommentAnchor: import('@/data/comments').CommentAnchor | null;
+  onClearPendingCommentAnchor: () => void;
 }
 
 // Shared inline styles for the dark sidebar UI chrome.
@@ -524,6 +535,7 @@ export function Sidebar(props: SidebarProps) {
               ['refs', 'references'],
               ['check', 'plot code check'],
               ['issues', 'issues'],
+              ['comments', 'comments'],
               ['export', 'export'],
             ] as Array<[SidebarTab, string]>
           ).map(([t, label]) => {
@@ -663,6 +675,22 @@ export function Sidebar(props: SidebarProps) {
           <IssuesTab
             issues={props.issues}
             onJumpToBlock={props.onJumpToBlock}
+          />
+        )}
+
+        {tab === 'comments' && (
+          <CommentsPanel
+            posterId={props.posterId}
+            pendingAnchor={props.pendingCommentAnchor}
+            onClearPendingAnchor={props.onClearPendingCommentAnchor}
+            onJumpToAnchor={(c) => {
+              if (c.anchor.type === 'block' && props.onJumpToBlock) {
+                props.onJumpToBlock(c.anchor.blockId);
+              } else if (c.anchor.type === 'text' && props.onJumpToBlock) {
+                props.onJumpToBlock(c.anchor.blockId);
+              }
+            }}
+            isOwner={true}
           />
         )}
 
