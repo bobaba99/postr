@@ -381,12 +381,14 @@ export function PaletteDesigner({
               fontFamily: 'inherit',
             }}
           />
-          <button type="button" onClick={onCancel} style={secondaryBtnStyle}>
-            Cancel
-          </button>
-          <button type="button" onClick={commit} style={primaryBtnStyle}>
-            Save palette
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <button type="button" onClick={commit} style={primaryBtnStyle}>
+              Save palette
+            </button>
+            <button type="button" onClick={onCancel} style={secondaryBtnStyle}>
+              Cancel
+            </button>
+          </div>
         </div>
         {nameError && (
           <div

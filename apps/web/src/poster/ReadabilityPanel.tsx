@@ -508,14 +508,18 @@ export function ReadabilityPanel({
       <div style={labelStyle}>Code Readability Check</div>
       <p
         style={{
-          color: '#6b7280',
+          color: '#c8cad0',
           fontSize: 13,
-          lineHeight: 1.9,
+          lineHeight: 1.7,
           margin: 0,
+          background: '#1c1a2e',
+          border: '1px solid #4e3fb4',
+          borderRadius: 8,
+          padding: '10px 12px',
         }}
       >
-        Paste your R or Python plotting code, then click <b>Check</b> to see
-        if figure text will be readable at poster print size.{' '}
+        🔎 Paste your R or Python plotting code, then click <b>Check</b> to
+        see if figure text will be readable at poster print size.{' '}
         {isImage ? (
           <>
             Using selected image block{' '}
