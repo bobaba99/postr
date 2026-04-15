@@ -599,6 +599,32 @@ export function PosterEditor() {
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('layout');
   const [pendingCommentAnchor, setPendingCommentAnchor] =
     useState<CommentAnchor | null>(null);
+
+  // Listen for text-selection comment intents from FloatingFormatToolbar.
+  // The event carries blockId + plain-text offsets + quote; we translate
+  // it into a CommentAnchor and flip the sidebar to the comments tab so
+  // the user sees the draft form.
+  useEffect(() => {
+    function handle(e: Event) {
+      const detail = (e as CustomEvent).detail as {
+        blockId: string;
+        start: number;
+        end: number;
+        quote: string;
+      };
+      if (!detail?.blockId) return;
+      setPendingCommentAnchor({
+        type: 'text',
+        blockId: detail.blockId,
+        start: detail.start,
+        end: detail.end,
+        quote: detail.quote,
+      });
+      setSidebarTab('comments');
+    }
+    window.addEventListener('postr:comment-text', handle);
+    return () => window.removeEventListener('postr:comment-text', handle);
+  }, []);
   // Id of the most recently inserted block. Used by BlockFrame to
   // play a one-shot `postr-block-insert` CSS animation when the
   // block mounts. Cleared 700 ms later (slightly longer than the

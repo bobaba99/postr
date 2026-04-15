@@ -29,6 +29,64 @@ import type { SelectionInfo } from './RichTextEditor';
  * selections that cross element boundaries — `surroundContents`
  * throws in that case and we catch it.
  */
+/**
+ * Compute the plain-text character offset of `node` + `offset` within
+ * `root.textContent`. Used to translate a DOM Range into stable
+ * offsets for comment text anchors. Returns -1 if `node` is outside
+ * `root`.
+ */
+function plainTextOffset(root: Node, node: Node, offset: number): number {
+  if (!root.contains(node)) return -1;
+  let count = 0;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let n = walker.nextNode();
+  while (n) {
+    if (n === node) return count + offset;
+    count += (n.nodeValue ?? '').length;
+    n = walker.nextNode();
+  }
+  // Element nodes: if the range endpoint is an element, offset is a
+  // child index — count textContent of preceding children.
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    count = 0;
+    const w2 = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let t = w2.nextNode();
+    const target = node.childNodes[offset] ?? null;
+    const range = document.createRange();
+    range.selectNodeContents(root);
+    if (target) range.setEndBefore(target);
+    return range.toString().length;
+    void t;
+  }
+  return -1;
+}
+
+/**
+ * Dispatch a global `postr:comment-text` event carrying the current
+ * selection's block id + plain-text offsets + quote. PosterEditor
+ * listens for this and primes the comments sidebar with a text
+ * anchor.
+ */
+function startCommentOnSelection() {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+  const range = sel.getRangeAt(0);
+  const anchorEl = range.startContainer.parentElement;
+  const blockEl = anchorEl?.closest<HTMLElement>('[data-block-id]');
+  if (!blockEl) return;
+  const blockId = blockEl.dataset.blockId;
+  if (!blockId) return;
+  const start = plainTextOffset(blockEl, range.startContainer, range.startOffset);
+  const end = plainTextOffset(blockEl, range.endContainer, range.endOffset);
+  const quote = sel.toString();
+  if (start < 0 || end <= start) return;
+  window.dispatchEvent(
+    new CustomEvent('postr:comment-text', {
+      detail: { blockId, start, end, quote },
+    }),
+  );
+}
+
 function bumpFontSize(direction: 1 | -1) {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return;
@@ -317,6 +375,26 @@ export function FloatingFormatToolbar({ info, onChange }: FloatingFormatToolbarP
           }}
         >
           Clear
+        </button>
+
+        <div style={divider} />
+
+        <button
+          type="button"
+          title="Comment on selection"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            startCommentOnSelection();
+          }}
+          style={{
+            ...btnBase,
+            width: 40,
+            fontSize: 11,
+            fontWeight: 700,
+            color: '#b8a9ff',
+          }}
+        >
+          💬
         </button>
       </div>
     </div>,
