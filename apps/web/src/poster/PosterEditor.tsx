@@ -656,6 +656,13 @@ export function PosterEditor() {
     return () => window.removeEventListener('postr:comment-text', handle);
   }, []);
 
+  // Entering the Comments tab clears any existing block selection so
+  // stray handles/outlines from edit-mode don't linger beside the
+  // review-mode chrome.
+  useEffect(() => {
+    if (sidebarTab === 'comments') setSelectedIds(new Set());
+  }, [sidebarTab]);
+
   // Hover/focus highlight from the comments panel. ThreadCard fires
   // `postr:comment-hover|focus|blur` with the root comment's anchor
   // so the canvas can draw a purple outline over the block / area
@@ -665,6 +672,7 @@ export function PosterEditor() {
     useState<CommentAnchor | null>(null);
   const [focusedCommentAnchor, setFocusedCommentAnchor] =
     useState<CommentAnchor | null>(null);
+  const [focusedCommentId, setFocusedCommentId] = useState<string | null>(null);
   useEffect(() => {
     function onHover(e: Event) {
       const d = (e as CustomEvent).detail as { anchor: CommentAnchor };
@@ -674,8 +682,12 @@ export function PosterEditor() {
       setHoveredCommentAnchor(null);
     }
     function onFocus(e: Event) {
-      const d = (e as CustomEvent).detail as { anchor: CommentAnchor };
+      const d = (e as CustomEvent).detail as {
+        id: string;
+        anchor: CommentAnchor;
+      };
       setFocusedCommentAnchor(d?.anchor ?? null);
+      setFocusedCommentId(d?.id ?? null);
     }
     window.addEventListener('postr:comment-hover', onHover);
     window.addEventListener('postr:comment-blur', onBlur);
@@ -2593,12 +2605,43 @@ export function PosterEditor() {
                 correct text range in a contenteditable that's been
                 re-rendered is involved).
               */}
-              {([hoveredCommentAnchor, focusedCommentAnchor] as (CommentAnchor | null)[])
-                .filter((a): a is CommentAnchor => !!a)
-                .map((anchor, idx) => {
-                  const sticky = idx === 1;
+              {([
+                { anchor: hoveredCommentAnchor, sticky: false, id: null },
+                {
+                  anchor: focusedCommentAnchor,
+                  sticky: true,
+                  id: focusedCommentId,
+                },
+              ] as { anchor: CommentAnchor | null; sticky: boolean; id: string | null }[])
+                .filter((a) => !!a.anchor)
+                .map(({ anchor, sticky, id }, idx) => {
+                  if (!anchor) return null;
                   const glow = sticky ? '#b8a9ff' : '#7c6aed';
                   if (anchor.type === 'area') {
+                    // Focused area anchor: render the full editable
+                    // overlay (move body + 8 resize handles). On
+                    // change, broadcast to CommentsPanel which
+                    // calls updateCommentAnchor. Hover-only gets a
+                    // read-only dashed outline.
+                    if (sticky && id) {
+                      return (
+                        <PendingAreaAnchor
+                          key={`hl-area-${idx}`}
+                          rect={anchor.rect}
+                          zoom={zoom}
+                          onChange={(rect) =>
+                            window.dispatchEvent(
+                              new CustomEvent('postr:comment-edit-anchor', {
+                                detail: {
+                                  id,
+                                  anchor: { type: 'area', rect },
+                                },
+                              }),
+                            )
+                          }
+                        />
+                      );
+                    }
                     return (
                       <div
                         key={`hl-area-${idx}`}
@@ -2660,10 +2703,13 @@ export function PosterEditor() {
                   selected={selectedIds.has(b.id)}
                   justInserted={justInsertedId === b.id}
                   onSelect={(id, additive) => {
-                    // Comments tab: disallow multi-select so reviewers
-                    // don't accidentally grab several blocks while
-                    // trying to click a block to anchor feedback.
-                    if (additive && sidebarTab !== 'comments') {
+                    // Comments tab: block clicks are inert. Selection
+                    // handles, drag handles, and text edit are all
+                    // noise when the user is reviewing — they pick
+                    // an anchor via text highlight or area drag
+                    // instead.
+                    if (sidebarTab === 'comments') return;
+                    if (additive) {
                       setSelectedIds((prev) => {
                         const next = new Set(prev);
                         if (next.has(id)) next.delete(id);
@@ -3233,6 +3279,9 @@ function PendingAreaAnchor({
     window.addEventListener('pointerup', onUp);
   }
 
+  // Match BlockFrame's ResizeHandles dimensions: 10x10 invisible hit
+  // zone with a 5x5 visible indicator square. Gives reviewers the
+  // same muscle memory as editing a normal block.
   const handleStyle = (
     pos: React.CSSProperties,
     cursor: string,
@@ -3244,16 +3293,26 @@ function PendingAreaAnchor({
       data-postr-area-handle=""
       style={{
         position: 'absolute',
-        width: 12,
-        height: 12,
+        width: 10,
+        height: 10,
         cursor,
-        background: '#fff',
-        border: '2px solid #7c6aed',
-        borderRadius: 2,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 1,
         ...pos,
       }}
-    />
+    >
+      <div
+        style={{
+          width: 5,
+          height: 5,
+          border: '1px solid #7c6aed',
+          background: '#fff',
+          borderRadius: 1,
+        }}
+      />
+    </div>
   );
 
   return (
@@ -3273,14 +3332,14 @@ function PendingAreaAnchor({
         zIndex: 9000,
       }}
     >
-      {handleStyle({ top: -7, left: -7 }, 'nwse-resize', 'nw')}
-      {handleStyle({ top: -7, left: '50%', transform: 'translateX(-50%)' }, 'ns-resize', 'n')}
-      {handleStyle({ top: -7, right: -7 }, 'nesw-resize', 'ne')}
-      {handleStyle({ top: '50%', right: -7, transform: 'translateY(-50%)' }, 'ew-resize', 'e')}
-      {handleStyle({ bottom: -7, right: -7 }, 'nwse-resize', 'se')}
-      {handleStyle({ bottom: -7, left: '50%', transform: 'translateX(-50%)' }, 'ns-resize', 's')}
-      {handleStyle({ bottom: -7, left: -7 }, 'nesw-resize', 'sw')}
-      {handleStyle({ top: '50%', left: -7, transform: 'translateY(-50%)' }, 'ew-resize', 'w')}
+      {handleStyle({ top: -5, left: -5 }, 'nwse-resize', 'nw')}
+      {handleStyle({ top: -5, left: '50%', transform: 'translateX(-50%)' }, 'ns-resize', 'n')}
+      {handleStyle({ top: -5, right: -5 }, 'nesw-resize', 'ne')}
+      {handleStyle({ top: '50%', right: -5, transform: 'translateY(-50%)' }, 'ew-resize', 'e')}
+      {handleStyle({ bottom: -5, right: -5 }, 'nwse-resize', 'se')}
+      {handleStyle({ bottom: -5, left: '50%', transform: 'translateX(-50%)' }, 'ns-resize', 's')}
+      {handleStyle({ bottom: -5, left: -5 }, 'nesw-resize', 'sw')}
+      {handleStyle({ top: '50%', left: -5, transform: 'translateY(-50%)' }, 'ew-resize', 'w')}
     </div>
   );
 }

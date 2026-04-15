@@ -197,6 +197,25 @@ export async function listComments(posterId: string): Promise<Comment[]> {
   return (data as CommentRow[]).map(rowToComment);
 }
 
+/** Replace a comment's anchor (author only, enforced by RLS). Used
+ *  when a reviewer fine-tunes the position/size of their area rect
+ *  after posting. Only area anchors are realistically moveable
+ *  today — block/text are pinned to a specific node. */
+export async function updateCommentAnchor(
+  id: string,
+  anchor: CommentAnchor,
+): Promise<Comment> {
+  const { anchorType, anchorJson } = serializeAnchor(anchor);
+  const { data, error } = await db
+    .from('poster_comments')
+    .update({ anchor_type: anchorType, anchor: anchorJson })
+    .eq('id', id)
+    .select('*')
+    .single();
+  if (error) throw new Error(error.message);
+  return rowToComment(data as CommentRow);
+}
+
 /** Update a comment's body (author only, enforced by RLS). */
 export async function editCommentBody(
   id: string,

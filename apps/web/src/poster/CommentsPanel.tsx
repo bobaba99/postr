@@ -71,6 +71,27 @@ export function CommentsPanel({
       window.removeEventListener('postr:cancel-area-comment', off);
     };
   }, []);
+
+  // Listen for anchor edits from the canvas (posted area comments
+  // being dragged/resized by their author). PosterEditor owns the
+  // overlay and fires `postr:comment-edit-anchor` with the new rect;
+  // we forward to the server via the already-loaded useComments
+  // state so optimistic cache updates are shared across all threads.
+  useEffect(() => {
+    function onEdit(e: Event) {
+      const d = (e as CustomEvent).detail as {
+        id: string;
+        anchor: CommentAnchor;
+      };
+      if (!d?.id || !d.anchor) return;
+      state.editAnchor(d.id, d.anchor).catch((err) => {
+        console.error('Failed to update comment anchor', err);
+      });
+    }
+    window.addEventListener('postr:comment-edit-anchor', onEdit);
+    return () =>
+      window.removeEventListener('postr:comment-edit-anchor', onEdit);
+  }, [state]);
   function toggleAreaMode() {
     if (areaMode) {
       setAreaMode(false);

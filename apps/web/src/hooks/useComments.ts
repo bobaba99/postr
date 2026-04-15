@@ -18,6 +18,7 @@ import {
   editCommentBody,
   listComments,
   setCommentResolved,
+  updateCommentAnchor,
   type Comment,
   type CommentAnchor,
 } from '@/data/comments';
@@ -36,6 +37,7 @@ export interface UseCommentsResult {
     parentId?: string | null;
   }) => Promise<Comment>;
   editComment: (id: string, body: string) => Promise<Comment>;
+  editAnchor: (id: string, anchor: CommentAnchor) => Promise<Comment>;
   resolveComment: (id: string, resolved: boolean) => Promise<Comment>;
   removeComment: (id: string) => Promise<void>;
 }
@@ -96,6 +98,26 @@ export function useComments(posterId: string | null | undefined): UseCommentsRes
     [],
   );
 
+  const editAnchor = useCallback<UseCommentsResult['editAnchor']>(
+    async (id, anchor) => {
+      // Optimistic: patch local cache immediately so drag feels
+      // instant; the server round-trip reconciles on response.
+      setComments((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, anchor } : c)),
+      );
+      try {
+        const updated = await updateCommentAnchor(id, anchor);
+        setComments((prev) => prev.map((c) => (c.id === id ? updated : c)));
+        return updated;
+      } catch (e) {
+        // Refetch so cache converges to authoritative server state.
+        void load();
+        throw e;
+      }
+    },
+    [load],
+  );
+
   const resolveComment = useCallback<UseCommentsResult['resolveComment']>(
     async (id, resolved) => {
       const updated = await setCommentResolved(id, resolved);
@@ -120,6 +142,7 @@ export function useComments(posterId: string | null | undefined): UseCommentsRes
     refetch: load,
     addComment,
     editComment,
+    editAnchor,
     resolveComment,
     removeComment,
   };
