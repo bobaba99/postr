@@ -11,6 +11,7 @@ import ReactDOM from 'react-dom';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { blockSelection } from '@/motion/timelines/blockSelection';
 import { LogoPicker } from '@/components/LogoPicker';
+import { stripHtmlToPlainText } from './academicMarkdown';
 import type {
   Author,
   Block,
@@ -254,7 +255,7 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
       <div style={{ width: '100%', height: '100%', position: 'relative' }}>
         <img
           src={displaySrc}
-          alt={block.caption || 'Figure'}
+          alt={stripHtmlToPlainText(block.caption || '') || 'Figure'}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
           style={{
