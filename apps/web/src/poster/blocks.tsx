@@ -1338,7 +1338,7 @@ export function RefsBlock({ references, palette, fontFamily, styles, citationSty
   }
   const fmt = CITATION_STYLES[citationStyle] ?? CITATION_STYLES['APA 7'];
   return (
-    <div style={{ fontFamily, fontSize: styles.body.size * 0.88, color: palette.primary, lineHeight: styles.body.lineHeight }}>
+    <div style={{ fontFamily, fontSize: styles.body.size * 0.88, color: palette.primary, lineHeight: 1.15 }}>
       <div style={{ fontWeight: 700, fontSize: styles.body.size, marginBottom: 3, color: palette.accent }}>
         References
       </div>
