@@ -21,6 +21,7 @@ import {
   writeGuestName,
   type UseCommentsResult,
 } from '@/hooks/useComments';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 interface Props {
   posterId: string | null;
@@ -461,6 +462,7 @@ function CommentBody({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(c.body);
   const [busy, setBusy] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   async function save() {
     setBusy(true);
@@ -567,9 +569,7 @@ function CommentBody({
           {canDelete && (
             <button
               type="button"
-              onClick={() => {
-                if (confirm('Delete this comment?')) onDelete();
-              }}
+              onClick={() => setConfirmingDelete(true)}
               style={linkBtnStyle}
             >
               Delete
@@ -577,6 +577,19 @@ function CommentBody({
           )}
         </div>
       )}
+      <ConfirmModal
+        open={confirmingDelete}
+        title="Delete comment?"
+        message="This will permanently remove the comment and any replies. This can't be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        danger
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={async () => {
+          setConfirmingDelete(false);
+          await onDelete();
+        }}
+      />
     </div>
   );
 }
