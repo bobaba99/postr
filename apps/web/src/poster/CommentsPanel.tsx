@@ -119,6 +119,27 @@ export function CommentsPanel({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <NameField name={name} onChange={setName} />
 
+      {!pendingAnchor && (
+        <button
+          type="button"
+          onClick={() =>
+            window.dispatchEvent(new CustomEvent('postr:start-area-comment'))
+          }
+          style={{
+            alignSelf: 'flex-start',
+            padding: '6px 10px',
+            fontSize: 12,
+            color: '#b8a9ff',
+            background: 'rgba(124, 106, 237, 0.12)',
+            border: '1px solid rgba(124, 106, 237, 0.35)',
+            borderRadius: 6,
+            cursor: 'pointer',
+          }}
+        >
+          ▭ Comment on area
+        </button>
+      )}
+
       <AnchorPreview
         anchor={pendingAnchor}
         onClear={onClearPendingAnchor}

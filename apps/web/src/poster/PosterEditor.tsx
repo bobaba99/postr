@@ -599,6 +599,36 @@ export function PosterEditor() {
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('layout');
   const [pendingCommentAnchor, setPendingCommentAnchor] =
     useState<CommentAnchor | null>(null);
+  const [areaCommentMode, setAreaCommentMode] = useState(false);
+
+  // Listen for area-comment intents from CommentsPanel — flips the
+  // canvas into "drag a rectangle" mode. The drag overlay (rendered
+  // inside #poster-canvas) emits `postr:comment-area` on mouseup.
+  useEffect(() => {
+    function startArea() {
+      setAreaCommentMode(true);
+    }
+    function cancelArea() {
+      setAreaCommentMode(false);
+    }
+    function handleArea(e: Event) {
+      const detail = (e as CustomEvent).detail as {
+        rect: [number, number, number, number];
+      };
+      if (!detail?.rect) return;
+      setPendingCommentAnchor({ type: 'area', rect: detail.rect });
+      setAreaCommentMode(false);
+      setSidebarTab('comments');
+    }
+    window.addEventListener('postr:start-area-comment', startArea);
+    window.addEventListener('postr:cancel-area-comment', cancelArea);
+    window.addEventListener('postr:comment-area', handleArea);
+    return () => {
+      window.removeEventListener('postr:start-area-comment', startArea);
+      window.removeEventListener('postr:cancel-area-comment', cancelArea);
+      window.removeEventListener('postr:comment-area', handleArea);
+    };
+  }, []);
 
   // Listen for text-selection comment intents from FloatingFormatToolbar.
   // The event carries blockId + plain-text offsets + quote; we translate
@@ -2449,6 +2479,9 @@ export function PosterEditor() {
                   })()}
                 </svg>
               )}
+              {areaCommentMode && (
+                <AreaCommentOverlay canvasW={cW} canvasH={cH} />
+              )}
               {doc.blocks.map((b) => (
                 <BlockFrame
                   key={b.id}
@@ -2948,6 +2981,127 @@ function FigureSizeOverlay({
           touchAction: 'none',
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * AreaCommentOverlay — transparent full-canvas layer that captures a
+ * click-and-drag rectangle, then emits `postr:comment-area` with the
+ * rect in poster units (inches × 10). Rendered only while
+ * `areaCommentMode` is on. Escape or right-click cancels.
+ */
+function AreaCommentOverlay({ canvasW, canvasH }: { canvasW: number; canvasH: number }) {
+  const [dragRect, setDragRect] = useState<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } | null>(null);
+  const startRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        window.dispatchEvent(new CustomEvent('postr:cancel-area-comment'));
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  function toLocal(e: React.PointerEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const scaleX = canvasW / rect.width;
+    const scaleY = canvasH / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
+  }
+
+  return (
+    <div
+      data-postr-overlay="area-comment"
+      onPointerDown={(e) => {
+        if (e.button !== 0) {
+          window.dispatchEvent(new CustomEvent('postr:cancel-area-comment'));
+          return;
+        }
+        e.currentTarget.setPointerCapture(e.pointerId);
+        const p = toLocal(e);
+        startRef.current = p;
+        setDragRect({ x: p.x, y: p.y, w: 0, h: 0 });
+      }}
+      onPointerMove={(e) => {
+        if (!startRef.current) return;
+        const p = toLocal(e);
+        const s = startRef.current;
+        setDragRect({
+          x: Math.min(s.x, p.x),
+          y: Math.min(s.y, p.y),
+          w: Math.abs(p.x - s.x),
+          h: Math.abs(p.y - s.y),
+        });
+      }}
+      onPointerUp={(e) => {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+        const r = dragRect;
+        startRef.current = null;
+        setDragRect(null);
+        if (!r || r.w < 8 || r.h < 8) {
+          window.dispatchEvent(new CustomEvent('postr:cancel-area-comment'));
+          return;
+        }
+        // Poster units: 1 unit = 0.1" = 1 px at PX=10.
+        window.dispatchEvent(
+          new CustomEvent('postr:comment-area', {
+            detail: {
+              rect: [r.x / PX, r.y / PX, r.w / PX, r.h / PX] as [number, number, number, number],
+            },
+          }),
+        );
+      }}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        zIndex: 9500,
+        cursor: 'crosshair',
+        background: 'rgba(124, 106, 237, 0.06)',
+        touchAction: 'none',
+      }}
+    >
+      {dragRect && dragRect.w > 0 && dragRect.h > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            left: dragRect.x,
+            top: dragRect.y,
+            width: dragRect.w,
+            height: dragRect.h,
+            border: '2px dashed #7c6aed',
+            background: 'rgba(124, 106, 237, 0.12)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      <div
+        style={{
+          position: 'absolute',
+          top: 12,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '6px 12px',
+          background: 'rgba(17, 17, 24, 0.92)',
+          color: '#e2e2e8',
+          fontSize: 12,
+          borderRadius: 6,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          pointerEvents: 'none',
+        }}
+      >
+        Drag to mark an area · Esc to cancel
+      </div>
     </div>
   );
 }
