@@ -2249,7 +2249,7 @@ function CaptionEditor(props: {
           >
             <span>Caption spacing</span>
             <span style={{ color: '#c8cad0', fontWeight: 600 }}>
-              {block.captionGap ?? 6} px
+              {block.captionGap ?? 0} px
             </span>
           </div>
           <input
@@ -2257,7 +2257,7 @@ function CaptionEditor(props: {
             min={0}
             max={24}
             step={1}
-            value={block.captionGap ?? 6}
+            value={block.captionGap ?? 0}
             onChange={(e) =>
               onUpdateBlock(block.id, {
                 captionGap: Number(e.target.value),
