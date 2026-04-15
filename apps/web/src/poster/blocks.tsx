@@ -1457,7 +1457,11 @@ function CaptionWrapper({
       <b style={{ fontStyle: 'normal', color: palette.primary }}>
         {label} {captionNumber}.
       </b>
-      {block.caption ? ` ${block.caption}` : ''}
+      {block.caption ? (
+        <span
+          dangerouslySetInnerHTML={{ __html: ` ${block.caption}` }}
+        />
+      ) : null}
     </div>
   ) : null;
 

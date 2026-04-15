@@ -46,7 +46,7 @@ import { LAYOUT_TEMPLATES, type LayoutKey } from './templates';
 import { parseBibtex, parseRis } from './parsers';
 import { AuthorLine } from './blocks';
 import {
-  academicMarkdownToHtml,
+  autoFormatAPA,
   stripHtmlToPlainText,
 } from './academicMarkdown';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
@@ -2137,17 +2137,33 @@ function CaptionEditor(props: {
   useEffect(() => () => {
     if (formatPulseTimerRef.current) clearTimeout(formatPulseTimerRef.current);
   }, []);
+  // Compute what each field would become after APA auto-format.
+  // Derived so we always know whether a click would change anything —
+  // drives both the patch (on click) and the "dirty" pulse (on render).
+  const formattedCaption = autoFormatAPA(block.caption ?? '');
+  const formattedNote = autoFormatAPA(block.note ?? '');
+  const formattedCells =
+    block.type === 'table' && block.tableData
+      ? block.tableData.cells.map((cell) => autoFormatAPA(cell ?? ''))
+      : null;
+
+  // Dirty = at least one field would change. `M` → `<em>M</em>` etc.
+  const isDirty =
+    formattedCaption !== (block.caption ?? '') ||
+    formattedNote !== (block.note ?? '') ||
+    (formattedCells != null &&
+      block.tableData != null &&
+      formattedCells.some((c, i) => c !== (block.tableData!.cells[i] ?? '')));
+
   const handleFormat = () => {
-    const plainNote = stripHtmlToPlainText(block.note ?? '');
     const patch: Partial<Block> = {
-      note: academicMarkdownToHtml(plainNote),
+      caption: formattedCaption,
+      note: formattedNote,
     };
-    if (block.type === 'table' && block.tableData) {
+    if (formattedCells && block.tableData) {
       patch.tableData = {
         ...block.tableData,
-        cells: block.tableData.cells.map((cell) =>
-          academicMarkdownToHtml(stripHtmlToPlainText(cell ?? '')),
-        ),
+        cells: formattedCells,
       };
     }
     onUpdateBlock(block.id, patch);
@@ -2176,7 +2192,7 @@ function CaptionEditor(props: {
       </p>
       <input
         type="text"
-        value={block.caption ?? ''}
+        value={stripHtmlToPlainText(block.caption ?? '')}
         onChange={(e) =>
           onUpdateBlock(block.id, { caption: e.target.value })
         }
@@ -2252,13 +2268,16 @@ function CaptionEditor(props: {
         </>
       )}
 
-      {/* ── Note (academic markdown) ─────────────────────────── */}
+      {/* ── Note (plain text — auto-formatter handles italics) ── */}
       <div style={{ ...labelStyle, marginTop: 8 }}>{label} Note</div>
       <p style={{ fontSize: 13, color: '#8a8a95', margin: 0, lineHeight: 1.5 }}>
         Longer footnote shown directly below the {label.toLowerCase()}.
-        Supports <code>**bold**</code>, <code>*italic*</code>,{' '}
-        <code>^super^</code>, and auto-superscript of <code>*</code>,{' '}
-        <code>†</code>, <code>‡</code>, <code>§</code> attached to a word.
+        Just paste or type normally — clicking{' '}
+        <b>✨ Format {label === 'Table' ? 'table' : 'note'}</b> auto-italicizes
+        APA stat symbols (<code>p</code>, <code>t</code>, <code>F</code>,{' '}
+        <code>M</code>, <code>SD</code>, <code>N</code>, <code>r</code>,{' '}
+        <code>df</code>, <code>β</code>, <code>χ²</code>, …) in the caption,
+        note, and every cell.
       </p>
       {/* Button is above the textarea so it's always in view when
           the Edit tab opens — used to live at the bottom below the
@@ -2266,22 +2285,32 @@ function CaptionEditor(props: {
       <button
         type="button"
         onClick={handleFormat}
+        disabled={!isDirty && !justFormatted}
         style={{
           all: 'unset',
-          cursor: 'pointer',
+          cursor: isDirty || justFormatted ? 'pointer' : 'default',
           alignSelf: 'flex-start',
           padding: '10px 16px',
-          background: justFormatted ? '#2ea27a' : '#7c6aed',
-          color: '#fff',
+          background: justFormatted
+            ? '#2ea27a'
+            : isDirty
+              ? '#7c6aed'
+              : '#2a2a3a',
+          color: justFormatted || isDirty ? '#fff' : '#8a8a95',
           borderRadius: 8,
           fontSize: 13,
           fontWeight: 700,
-          transition: 'background 180ms ease',
+          transition: 'background 180ms ease, color 180ms ease',
+          animation: isDirty && !justFormatted
+            ? 'postr-dimension-pulse 1.6s ease-in-out infinite'
+            : 'none',
         }}
       >
         {justFormatted
           ? `✓ Formatted ${label === 'Table' ? 'table' : 'note'}`
-          : `✨ Format ${label === 'Table' ? 'table' : 'note'}`}
+          : isDirty
+            ? `✨ Format ${label === 'Table' ? 'table' : 'note'}`
+            : `✓ ${label === 'Table' ? 'Table' : 'Note'} formatted`}
       </button>
       <textarea
         value={stripHtmlToPlainText(block.note ?? '')}

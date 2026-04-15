@@ -122,3 +122,92 @@ export function stripHtmlToPlainText(html: string): string {
 export function hasAcademicMarkup(html: string): boolean {
   return /<(strong|em|sup|sub)\b/.test(html);
 }
+
+// -----------------------------------------------------------------
+// APA stats auto-italicization
+// -----------------------------------------------------------------
+// APA 7 italicizes statistical symbols when they appear in running
+// text: `p < .05`, `t(29) = 2.4`, `M = 4.1`, `F(2, 30) = 8.2`.
+// We detect the symbol when it's followed by whitespace + an
+// operator (=, <, >, ≤, ≥, ≈) or an opening paren (the df form).
+// Standalone cells that contain *only* a symbol also get italicized
+// — common for table headers like `M`, `SD`, `p`.
+//
+// Multi-char symbols (SD, SE, Mdn, df, R², χ², η², ω²) are sorted
+// longest-first so they win against their single-char prefixes.
+
+const STAT_SYMBOLS = [
+  'Mdn', 'SD', 'SE', 'df',
+  'R²', 'χ²', 'η²', 'ω²',
+  'p', 't', 'F', 'M', 'N', 'n', 'r', 'R', 'z', 'd', 'g', 'β', 'U', 'H', 'Q',
+];
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+const STAT_ALT = STAT_SYMBOLS
+  .slice()
+  .sort((a, b) => b.length - a.length)
+  .map(escapeRegex)
+  .join('|');
+
+// Inline context: symbol followed by (optional space) + operator or (.
+// Runs on PLAIN text (before HTML escape) so `<`, `>` are literal here.
+const STAT_INLINE_RE = new RegExp(
+  `(^|[^A-Za-zα-ωΑ-Ω])(${STAT_ALT})(?=\\s*[=<>≤≥≈~(])`,
+  'g',
+);
+
+// Standalone: the whole trimmed plain-text equals just the symbol.
+const STAT_STANDALONE_RE = new RegExp(`^(${STAT_ALT})$`);
+
+// Placeholder chars — picked from U+0000/U+0001 so they can never
+// appear in user text and they survive HTML-escape unchanged.
+const EM_OPEN = '\u0001';
+const EM_CLOSE = '\u0002';
+
+/**
+ * Wrap APA stat symbols with placeholder tokens in PLAIN text.
+ * Called before HTML escape so angle brackets in `p < .05` are
+ * still literal `<` at match time. Placeholders are swapped for
+ * real `<em>` tags after escape.
+ */
+function italicizeStatsPlain(plain: string): string {
+  if (!plain) return '';
+  return plain.replace(
+    STAT_INLINE_RE,
+    (_m, pre: string, sym: string) => `${pre}${EM_OPEN}${sym}${EM_CLOSE}`,
+  );
+}
+
+/**
+ * Swap placeholder tokens for real `<em>` tags. Safe to run on
+ * already-escaped HTML because the tokens are non-printable and
+ * never appear in HTML escape output.
+ */
+function materializeEmPlaceholders(escaped: string): string {
+  return escaped.split(EM_OPEN).join('<em>').split(EM_CLOSE).join('</em>');
+}
+
+/**
+ * Auto-format a text field for APA style: strip any prior HTML,
+ * tokenize stat symbols, then run the markdown escape+peel pass,
+ * then materialize tokens back into `<em>` tags. Idempotent:
+ * re-running on already-formatted content reproduces the same
+ * output because we strip first.
+ *
+ * Handles the common "cell contains only a stat symbol" case by
+ * wrapping the whole cell.
+ */
+export function autoFormatAPA(raw: string): string {
+  const plain = stripHtmlToPlainText(raw).trim();
+  if (!plain) return '';
+  // Standalone symbol cell — e.g., a column header that's just `M`.
+  if (STAT_STANDALONE_RE.test(plain)) {
+    return `<em>${escapeHtml(plain)}</em>`;
+  }
+  const tokenized = italicizeStatsPlain(stripHtmlToPlainText(raw));
+  const withMarkup = academicMarkdownToHtml(tokenized);
+  return materializeEmPlaceholders(withMarkup);
+}
