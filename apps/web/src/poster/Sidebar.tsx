@@ -49,6 +49,7 @@ import {
   autoFormatAPA,
   stripHtmlToPlainText,
 } from './academicMarkdown';
+import { auditPaletteCB } from './colorblind';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { ReadabilityPanel } from './ReadabilityPanel';
@@ -1589,6 +1590,7 @@ function StyleTab(props: {
 }) {
   const renderPaletteRow = (p: NamedPalette, isCustom: boolean) => {
     const active = props.paletteName === p.name;
+    const cb = auditPaletteCB(p);
     return (
       <div
         key={`${isCustom ? 'custom-' : 'builtin-'}${p.name}`}
@@ -1658,6 +1660,19 @@ function StyleTab(props: {
                 }}
               >
                 custom
+              </span>
+            )}
+            {!cb.safe && (
+              <span
+                title={`Under ${cb.worstPair.type}, "${cb.worstPair.a}" and "${cb.worstPair.b}" may look alike (ΔE ${cb.minDistance.toFixed(0)}).`}
+                style={{
+                  marginLeft: 6,
+                  fontSize: 11,
+                  color: '#e2a550',
+                }}
+                aria-label="Not colorblind-safe"
+              >
+                ◐
               </span>
             )}
           </span>
