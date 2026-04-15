@@ -2574,20 +2574,12 @@ export function PosterEditor() {
                 <AreaCommentOverlay canvasW={cW} canvasH={cH} />
               )}
               {pendingCommentAnchor?.type === 'area' && (
-                <div
-                  data-postr-overlay="pending-area"
-                  style={{
-                    position: 'absolute',
-                    left: pendingCommentAnchor.rect[0] * PX,
-                    top: pendingCommentAnchor.rect[1] * PX,
-                    width: pendingCommentAnchor.rect[2] * PX,
-                    height: pendingCommentAnchor.rect[3] * PX,
-                    border: '2px solid #7c6aed',
-                    background: 'rgba(124, 106, 237, 0.14)',
-                    boxShadow: '0 0 0 1px rgba(255,255,255,0.1) inset',
-                    pointerEvents: 'none',
-                    zIndex: 9000,
-                  }}
+                <PendingAreaAnchor
+                  rect={pendingCommentAnchor.rect}
+                  zoom={zoom}
+                  onChange={(rect) =>
+                    setPendingCommentAnchor({ type: 'area', rect })
+                  }
                 />
               )}
               {/*
@@ -3163,6 +3155,132 @@ function FigureSizeOverlay({
           touchAction: 'none',
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * PendingAreaAnchor — the persistent purple rectangle shown on the
+ * canvas while the reviewer is drafting an area-anchored comment.
+ *
+ * Supports move (drag the body) and 8-point resize (drag a handle)
+ * so the reviewer can fine-tune the rect after the initial sweep,
+ * exactly like BlockFrame. Coordinates are in poster units (× PX for
+ * pixels) and deltas compensate for the canvas zoom.
+ */
+type AreaHandle = 'move' | 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
+function PendingAreaAnchor({
+  rect,
+  zoom,
+  onChange,
+}: {
+  rect: [number, number, number, number];
+  zoom: number;
+  onChange: (rect: [number, number, number, number]) => void;
+}) {
+  const [x, y, w, h] = rect;
+  const rectRef = useRef(rect);
+  rectRef.current = rect;
+  const MIN = 4; // min width/height in poster units (0.4")
+
+  function startDrag(e: React.PointerEvent, handle: AreaHandle) {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origin: [number, number, number, number] = [...rectRef.current];
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const onMove = (ev: PointerEvent) => {
+      const dx = (ev.clientX - startX) / zoom / PX;
+      const dy = (ev.clientY - startY) / zoom / PX;
+      let [nx, ny, nw, nh] = origin;
+      if (handle === 'move') {
+        nx = Math.max(0, origin[0] + dx);
+        ny = Math.max(0, origin[1] + dy);
+      } else {
+        if (handle.includes('w')) {
+          nx = origin[0] + dx;
+          nw = origin[2] - dx;
+        }
+        if (handle.includes('e')) {
+          nw = origin[2] + dx;
+        }
+        if (handle.includes('n')) {
+          ny = origin[1] + dy;
+          nh = origin[3] - dy;
+        }
+        if (handle.includes('s')) {
+          nh = origin[3] + dy;
+        }
+        if (nw < MIN) {
+          if (handle.includes('w')) nx = origin[0] + origin[2] - MIN;
+          nw = MIN;
+        }
+        if (nh < MIN) {
+          if (handle.includes('n')) ny = origin[1] + origin[3] - MIN;
+          nh = MIN;
+        }
+        nx = Math.max(0, nx);
+        ny = Math.max(0, ny);
+      }
+      onChange([nx, ny, nw, nh]);
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  }
+
+  const handleStyle = (
+    pos: React.CSSProperties,
+    cursor: string,
+    h: AreaHandle,
+  ): JSX.Element => (
+    <div
+      key={h}
+      onPointerDown={(e) => startDrag(e, h)}
+      data-postr-area-handle=""
+      style={{
+        position: 'absolute',
+        width: 12,
+        height: 12,
+        cursor,
+        background: '#fff',
+        border: '2px solid #7c6aed',
+        borderRadius: 2,
+        zIndex: 1,
+        ...pos,
+      }}
+    />
+  );
+
+  return (
+    <div
+      data-postr-overlay="pending-area"
+      onPointerDown={(e) => startDrag(e, 'move')}
+      style={{
+        position: 'absolute',
+        left: x * PX,
+        top: y * PX,
+        width: w * PX,
+        height: h * PX,
+        border: '2px solid #7c6aed',
+        background: 'rgba(124, 106, 237, 0.14)',
+        boxShadow: '0 0 0 1px rgba(255,255,255,0.1) inset',
+        cursor: 'move',
+        zIndex: 9000,
+      }}
+    >
+      {handleStyle({ top: -7, left: -7 }, 'nwse-resize', 'nw')}
+      {handleStyle({ top: -7, left: '50%', transform: 'translateX(-50%)' }, 'ns-resize', 'n')}
+      {handleStyle({ top: -7, right: -7 }, 'nesw-resize', 'ne')}
+      {handleStyle({ top: '50%', right: -7, transform: 'translateY(-50%)' }, 'ew-resize', 'e')}
+      {handleStyle({ bottom: -7, right: -7 }, 'nwse-resize', 'se')}
+      {handleStyle({ bottom: -7, left: '50%', transform: 'translateX(-50%)' }, 'ns-resize', 's')}
+      {handleStyle({ bottom: -7, left: -7 }, 'nesw-resize', 'sw')}
+      {handleStyle({ top: '50%', left: -7, transform: 'translateY(-50%)' }, 'ew-resize', 'w')}
     </div>
   );
 }
