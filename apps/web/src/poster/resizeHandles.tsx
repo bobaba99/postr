@@ -51,6 +51,7 @@ export function ResizeHandles({ accent, onPointerDown, cornersOnly }: ResizeHand
       {handles.map((h) => (
         <div
           key={h}
+          data-postr-resize-handle=""
           onPointerDown={(e) => {
             e.stopPropagation();
             onPointerDown(e, h);

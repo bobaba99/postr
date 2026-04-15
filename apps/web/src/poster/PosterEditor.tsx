@@ -655,6 +655,37 @@ export function PosterEditor() {
     window.addEventListener('postr:comment-text', handle);
     return () => window.removeEventListener('postr:comment-text', handle);
   }, []);
+
+  // Hover/focus highlight from the comments panel. ThreadCard fires
+  // `postr:comment-hover|focus|blur` with the root comment's anchor
+  // so the canvas can draw a purple outline over the block / area
+  // the thread is pinned to. Focus sticks until another thread is
+  // clicked; hover is ephemeral and cleared on mouseleave.
+  const [hoveredCommentAnchor, setHoveredCommentAnchor] =
+    useState<CommentAnchor | null>(null);
+  const [focusedCommentAnchor, setFocusedCommentAnchor] =
+    useState<CommentAnchor | null>(null);
+  useEffect(() => {
+    function onHover(e: Event) {
+      const d = (e as CustomEvent).detail as { anchor: CommentAnchor };
+      setHoveredCommentAnchor(d?.anchor ?? null);
+    }
+    function onBlur() {
+      setHoveredCommentAnchor(null);
+    }
+    function onFocus(e: Event) {
+      const d = (e as CustomEvent).detail as { anchor: CommentAnchor };
+      setFocusedCommentAnchor(d?.anchor ?? null);
+    }
+    window.addEventListener('postr:comment-hover', onHover);
+    window.addEventListener('postr:comment-blur', onBlur);
+    window.addEventListener('postr:comment-focus', onFocus);
+    return () => {
+      window.removeEventListener('postr:comment-hover', onHover);
+      window.removeEventListener('postr:comment-blur', onBlur);
+      window.removeEventListener('postr:comment-focus', onFocus);
+    };
+  }, []);
   // Id of the most recently inserted block. Used by BlockFrame to
   // play a one-shot `postr-block-insert` CSS animation when the
   // block mounts. Cleared 700 ms later (slightly longer than the
@@ -695,6 +726,50 @@ export function PosterEditor() {
   // Undo/redo keyboard shortcuts
   const undo = usePosterStore((s) => s.undo);
   const redo = usePosterStore((s) => s.redo);
+
+  // Review mode: when the Comments tab is active, reviewers (owner or
+  // guests via the share link) should be able to *anchor* feedback
+  // onto blocks/text/areas but NEVER mutate the poster. We toggle
+  // `contenteditable="false"` on every canvas descendant while the
+  // tab is active and restore it when it flips away. Text selection
+  // still works on contenteditable=false, so the 💬 floating toolbar
+  // can still harvest a text anchor.
+
+  // Review-mode contenteditable toggle. Scans the canvas for every
+  // `[contenteditable="true"]` descendant and flips it to "false" while
+  // the Comments tab is active. Uses a MutationObserver so newly
+  // rendered blocks (e.g. after a thumbnail reload) pick up the same
+  // treatment. Restores on exit.
+  useEffect(() => {
+    const root = document.getElementById('poster-canvas');
+    if (!root) return;
+    const commentMode = sidebarTab === 'comments';
+    const apply = () => {
+      const nodes = root.querySelectorAll<HTMLElement>('[contenteditable]');
+      nodes.forEach((n) => {
+        const current = n.getAttribute('contenteditable');
+        if (commentMode && current === 'true') {
+          n.dataset.postrCeWas = 'true';
+          n.setAttribute('contenteditable', 'false');
+        } else if (!commentMode && n.dataset.postrCeWas === 'true') {
+          n.setAttribute('contenteditable', 'true');
+          delete n.dataset.postrCeWas;
+        }
+      });
+    };
+    apply();
+    const mo = new MutationObserver(apply);
+    mo.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ['contenteditable'] });
+    return () => {
+      mo.disconnect();
+      // On unmount/transition, always restore.
+      const nodes = root.querySelectorAll<HTMLElement>('[data-postr-ce-was="true"]');
+      nodes.forEach((n) => {
+        n.setAttribute('contenteditable', 'true');
+        delete n.dataset.postrCeWas;
+      });
+    };
+  }, [sidebarTab]);
 
   // ⌘/ or Ctrl+/ toggles the sidebar (Notion shortcut).
   // ⌘Z / Ctrl+Z = undo, ⌘⇧Z / Ctrl+Y = redo.
@@ -1650,6 +1725,9 @@ export function PosterEditor() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (selectedIds.size === 0) return;
+      // Review mode: disallow destructive/structural keyboard actions
+      // (delete, duplicate, nudge) so reviewers can't mutate the poster.
+      if (sidebarTab === 'comments') return;
       const target = document.activeElement as HTMLElement | null;
       const isInput =
         target?.tagName === 'INPUT' ||
@@ -1699,7 +1777,7 @@ export function PosterEditor() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, doc.blocks]);
+  }, [selectedIds, doc.blocks, sidebarTab]);
 
   // Track canvas overflow — when blocks with height:auto grow past
   // the declared canvas height, extend the scroll container to match.
@@ -1998,6 +2076,7 @@ export function PosterEditor() {
   return (
     <div
       ref={rootRef}
+      data-comment-mode={sidebarTab === 'comments' ? 'true' : undefined}
       style={{
         display: 'flex',
         height: '100vh',
@@ -2007,6 +2086,14 @@ export function PosterEditor() {
         overflow: 'hidden',
       }}
     >
+      {/* Review-mode CSS gate — hides resize/rotate handles on both
+          single-block frames and group bounding boxes so reviewers
+          can't resize things while commenting. Single selector, so
+          no per-component prop drilling. */}
+      <style>{`
+        [data-comment-mode="true"] [data-postr-resize-handle] { display: none !important; }
+        [data-comment-mode="true"] [data-postr-rotate-handle] { display: none !important; }
+      `}</style>
       {/* Animated sidebar wrapper — the inner Sidebar stays mounted
           always so collapse/expand can fade+slide via width transition
           rather than popping. `overflow: hidden` clips the 484-wide
@@ -2202,6 +2289,10 @@ export function PosterEditor() {
           // Only start rubber-band on direct clicks on the canvas/workspace
           // (not on blocks — those bubble with stopPropagation).
           if (e.button !== 0) return;
+          // Comments tab: the area-comment overlay owns canvas drags,
+          // and rubber-band multi-select shouldn't compete with
+          // review-mode interactions.
+          if (sidebarTab === 'comments') return;
           const canvasEl = document.getElementById('poster-canvas');
           if (!canvasEl) return;
           const canvasRect = canvasEl.getBoundingClientRect();
@@ -2482,6 +2573,85 @@ export function PosterEditor() {
               {areaCommentMode && (
                 <AreaCommentOverlay canvasW={cW} canvasH={cH} />
               )}
+              {pendingCommentAnchor?.type === 'area' && (
+                <div
+                  data-postr-overlay="pending-area"
+                  style={{
+                    position: 'absolute',
+                    left: pendingCommentAnchor.rect[0] * PX,
+                    top: pendingCommentAnchor.rect[1] * PX,
+                    width: pendingCommentAnchor.rect[2] * PX,
+                    height: pendingCommentAnchor.rect[3] * PX,
+                    border: '2px solid #7c6aed',
+                    background: 'rgba(124, 106, 237, 0.14)',
+                    boxShadow: '0 0 0 1px rgba(255,255,255,0.1) inset',
+                    pointerEvents: 'none',
+                    zIndex: 9000,
+                  }}
+                />
+              )}
+              {/*
+                Posted-comment anchor highlights. Rendered whenever the
+                reviewer hovers a thread in the sidebar (ephemeral
+                outline) or clicks one (sticky focus ring). Area
+                anchors get a filled rectangle; block anchors get a
+                4-sided dashed outline around the block's bounds;
+                text anchors get a soft glow on the host block (full
+                range highlighting is a phase-2 polish — finding the
+                correct text range in a contenteditable that's been
+                re-rendered is involved).
+              */}
+              {([hoveredCommentAnchor, focusedCommentAnchor] as (CommentAnchor | null)[])
+                .filter((a): a is CommentAnchor => !!a)
+                .map((anchor, idx) => {
+                  const sticky = idx === 1;
+                  const glow = sticky ? '#b8a9ff' : '#7c6aed';
+                  if (anchor.type === 'area') {
+                    return (
+                      <div
+                        key={`hl-area-${idx}`}
+                        style={{
+                          position: 'absolute',
+                          left: anchor.rect[0] * PX,
+                          top: anchor.rect[1] * PX,
+                          width: anchor.rect[2] * PX,
+                          height: anchor.rect[3] * PX,
+                          border: `2px ${sticky ? 'solid' : 'dashed'} ${glow}`,
+                          background: sticky
+                            ? 'rgba(184,169,255,0.18)'
+                            : 'rgba(124,106,237,0.12)',
+                          boxShadow: sticky ? `0 0 24px ${glow}80` : 'none',
+                          pointerEvents: 'none',
+                          zIndex: 8800 + idx,
+                        }}
+                      />
+                    );
+                  }
+                  if (anchor.type === 'block' || anchor.type === 'text') {
+                    const blockId =
+                      anchor.type === 'block' ? anchor.blockId : anchor.blockId;
+                    const blk = doc.blocks.find((b) => b.id === blockId);
+                    if (!blk) return null;
+                    return (
+                      <div
+                        key={`hl-block-${idx}`}
+                        style={{
+                          position: 'absolute',
+                          left: blk.x,
+                          top: blk.y,
+                          width: blk.w,
+                          height: blk.h,
+                          border: `2px ${sticky ? 'solid' : 'dashed'} ${glow}`,
+                          borderRadius: 4,
+                          boxShadow: sticky ? `0 0 24px ${glow}80` : 'none',
+                          pointerEvents: 'none',
+                          zIndex: 8800 + idx,
+                        }}
+                      />
+                    );
+                  }
+                  return null;
+                })}
               {doc.blocks.map((b) => (
                 <BlockFrame
                   key={b.id}
@@ -2498,7 +2668,10 @@ export function PosterEditor() {
                   selected={selectedIds.has(b.id)}
                   justInserted={justInsertedId === b.id}
                   onSelect={(id, additive) => {
-                    if (additive) {
+                    // Comments tab: disallow multi-select so reviewers
+                    // don't accidentally grab several blocks while
+                    // trying to click a block to anchor feedback.
+                    if (additive && sidebarTab !== 'comments') {
                       setSelectedIds((prev) => {
                         const next = new Set(prev);
                         if (next.has(id)) next.delete(id);
@@ -2509,7 +2682,16 @@ export function PosterEditor() {
                       selectOne(id);
                     }
                   }}
-                  onPointerDown={onPointerDown}
+                  onPointerDown={
+                    sidebarTab === 'comments'
+                      ? (() => {
+                          /* Review mode: suppress drag + resize + rotate
+                             entirely. Click-to-select still works since
+                             onClick fires independently of pointerdown. */
+                          return () => {};
+                        })()
+                      : onPointerDown
+                  }
                   didDragRef={didDragRef}
                   onUpdate={updateBlock}
                   onDelete={deleteBlock}

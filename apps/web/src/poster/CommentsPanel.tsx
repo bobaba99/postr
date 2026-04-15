@@ -13,7 +13,7 @@
  * Guest name lives in localStorage; the first comment triggers an
  * inline name prompt if none is stored yet.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Comment, CommentAnchor } from '@/data/comments';
 import {
   readGuestName,
@@ -56,6 +56,30 @@ export function CommentsPanel({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [showResolved, setShowResolved] = useState(false);
+  // Tracks whether the canvas is currently in "drag an area" mode, so
+  // the toggle button can render with a glowing active state. PosterEditor
+  // fires `postr:comment-area` on successful drag and
+  // `postr:cancel-area-comment` on Escape/cancel — we listen to both
+  // to flip the toggle back off.
+  const [areaMode, setAreaMode] = useState(false);
+  useEffect(() => {
+    const off = () => setAreaMode(false);
+    window.addEventListener('postr:comment-area', off);
+    window.addEventListener('postr:cancel-area-comment', off);
+    return () => {
+      window.removeEventListener('postr:comment-area', off);
+      window.removeEventListener('postr:cancel-area-comment', off);
+    };
+  }, []);
+  function toggleAreaMode() {
+    if (areaMode) {
+      setAreaMode(false);
+      window.dispatchEvent(new CustomEvent('postr:cancel-area-comment'));
+    } else {
+      setAreaMode(true);
+      window.dispatchEvent(new CustomEvent('postr:start-area-comment'));
+    }
+  }
 
   // Group comments by their root thread: top-level (parent_id null)
   // plus all descendants flattened underneath. Flat replies is enough
@@ -122,21 +146,30 @@ export function CommentsPanel({
       {!pendingAnchor && (
         <button
           type="button"
-          onClick={() =>
-            window.dispatchEvent(new CustomEvent('postr:start-area-comment'))
-          }
+          aria-pressed={areaMode}
+          onClick={toggleAreaMode}
           style={{
             alignSelf: 'flex-start',
             padding: '6px 10px',
             fontSize: 12,
-            color: '#b8a9ff',
-            background: 'rgba(124, 106, 237, 0.12)',
-            border: '1px solid rgba(124, 106, 237, 0.35)',
+            fontWeight: areaMode ? 600 : 500,
+            color: areaMode ? '#ffffff' : '#b8a9ff',
+            background: areaMode
+              ? 'rgba(124, 106, 237, 0.55)'
+              : 'rgba(124, 106, 237, 0.12)',
+            border: `1px solid ${
+              areaMode ? '#b8a9ff' : 'rgba(124, 106, 237, 0.35)'
+            }`,
             borderRadius: 6,
             cursor: 'pointer',
+            boxShadow: areaMode
+              ? '0 0 0 3px rgba(184, 169, 255, 0.25), 0 0 16px rgba(124, 106, 237, 0.65)'
+              : 'none',
+            transition:
+              'background 120ms ease, box-shadow 160ms ease, color 120ms ease',
           }}
         >
-          ▭ Comment on area
+          {areaMode ? '▣ Drag a rectangle on the canvas' : '▭ Comment on area'}
         </button>
       )}
 
@@ -376,14 +409,35 @@ function ThreadCard({
     return isOwner || (!!currentUserId && c.userId === currentUserId);
   }
 
+  // Highlight events — on hover, the poster editor draws a purple
+  // outline/rect over the anchored block/area/text so the reviewer
+  // can see WHERE a thread is pinned without jumping away. On click,
+  // we promote to a "focus" highlight that persists until another
+  // thread is focused or the user clears selection on the canvas.
+  function broadcast(type: 'hover' | 'focus' | 'blur') {
+    window.dispatchEvent(
+      new CustomEvent(`postr:comment-${type}`, {
+        detail: { id: root.id, anchor: root.anchor },
+      }),
+    );
+  }
   return (
     <div
+      onMouseEnter={() => broadcast('hover')}
+      onMouseLeave={() => broadcast('blur')}
+      onClick={(e) => {
+        // Ignore clicks that bubbled from inner inputs/buttons.
+        const tag = (e.target as HTMLElement).tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+        broadcast('focus');
+      }}
       style={{
         padding: 12,
         borderRadius: 8,
         border: `1px solid ${resolved ? '#2a3a2a' : '#2a2a3a'}`,
         background: resolved ? '#0f1a14' : '#13131c',
         opacity: resolved ? 0.7 : 1,
+        cursor: 'pointer',
       }}
     >
       <CommentBody
