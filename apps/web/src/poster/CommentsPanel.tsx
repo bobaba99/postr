@@ -22,6 +22,7 @@ import {
   type UseCommentsResult,
 } from '@/hooks/useComments';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { ensureShareLink } from '@/data/posters';
 
 interface Props {
   posterId: string | null;
@@ -162,6 +163,7 @@ export function CommentsPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {isOwner && <ShareLinkButton posterId={posterId} />}
       <NameField name={name} onChange={setName} />
 
       {!pendingAnchor && (
@@ -268,6 +270,74 @@ export function CommentsPanel({
 }
 
 // ── sub-components ────────────────────────────────────────────────
+
+/**
+ * ShareLinkButton — owner-only control that mints (on first click) a
+ * share slug + flips `is_public = true`, then copies
+ * `<origin>/s/<slug>` to the clipboard. Matches the "✓ Copied"
+ * feedback pattern used by CopyButton in ReadabilityPanel.
+ */
+function ShareLinkButton({ posterId }: { posterId: string }) {
+  const [state, setState] = useState<'idle' | 'loading' | 'copied' | 'error'>('idle');
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (state !== 'copied') return;
+    const t = setTimeout(() => setState('idle'), 2400);
+    return () => clearTimeout(t);
+  }, [state]);
+
+  async function copy() {
+    if (state === 'loading') return;
+    setState('loading');
+    setErrMsg(null);
+    try {
+      const slug = await ensureShareLink(posterId);
+      const url = `${window.location.origin}/s/${slug}`;
+      await navigator.clipboard.writeText(url);
+      setState('copied');
+    } catch (e) {
+      setErrMsg(e instanceof Error ? e.message : String(e));
+      setState('error');
+    }
+  }
+
+  const copied = state === 'copied';
+  const loading = state === 'loading';
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <button
+        type="button"
+        onClick={copy}
+        disabled={loading}
+        style={{
+          alignSelf: 'flex-start',
+          padding: '6px 10px',
+          fontSize: 12,
+          fontWeight: 600,
+          color: copied ? '#ffffff' : '#b8a9ff',
+          background: copied
+            ? 'rgba(124, 106, 237, 0.55)'
+            : 'rgba(124, 106, 237, 0.12)',
+          border: `1px solid ${copied ? '#b8a9ff' : 'rgba(124, 106, 237, 0.35)'}`,
+          borderRadius: 6,
+          cursor: loading ? 'progress' : 'pointer',
+          opacity: loading ? 0.7 : 1,
+          transition:
+            'background 120ms ease, box-shadow 160ms ease, color 120ms ease',
+          boxShadow: copied
+            ? '0 0 0 3px rgba(184, 169, 255, 0.25), 0 0 16px rgba(124, 106, 237, 0.65)'
+            : 'none',
+        }}
+      >
+        {copied ? '✓ Link copied' : loading ? '…' : '🔗 Copy share link'}
+      </button>
+      {state === 'error' && errMsg && (
+        <span style={{ fontSize: 11, color: '#f87171' }}>{errMsg}</span>
+      )}
+    </div>
+  );
+}
 
 function NameField({
   name,

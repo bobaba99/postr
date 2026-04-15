@@ -291,6 +291,45 @@ export async function duplicatePoster(id: string): Promise<PosterRow> {
 }
 
 /**
+ * Make a poster publicly readable and mint a URL slug if one doesn't
+ * already exist. Returns the slug so the caller can build a full
+ * `/s/:slug` URL for the clipboard.
+ *
+ * The slug is a base36 random string — 10 chars is ~50 bits of entropy,
+ * which is far more than enough to keep share URLs unguessable for an
+ * academic-review tool. On the (very rare) unique-index collision we
+ * simply try a fresh slug; three retries covers any realistic clash.
+ */
+export async function ensureShareLink(posterId: string): Promise<string> {
+  const existing = await loadPoster(posterId);
+  if (!existing) throw new Error(`Poster ${posterId} not found`);
+  if (existing.share_slug && existing.is_public) return existing.share_slug;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const slug =
+      existing.share_slug ??
+      Array.from(crypto.getRandomValues(new Uint8Array(8)))
+        .map((b) => b.toString(36).padStart(2, '0'))
+        .join('')
+        .slice(0, 10);
+
+    const { data, error } = await supabase
+      .from('posters')
+      .update({ share_slug: slug, is_public: true })
+      .eq('id', posterId)
+      .select('share_slug')
+      .single();
+
+    // Unique violation (23505) → new slug, try again.
+    if (error && /duplicate key|23505/i.test(error.message)) continue;
+    if (error) throw new Error(`Failed to publish share link: ${error.message}`);
+    return (data as { share_slug: string }).share_slug;
+  }
+
+  throw new Error('Could not mint a unique share link after 3 tries');
+}
+
+/**
  * Hard-deletes a poster row. The `assets` and `presets` tables
  * cascade through foreign keys, so the row deletion is sufficient
  * to drop the entire poster + its related rows.
