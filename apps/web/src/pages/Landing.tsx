@@ -35,14 +35,17 @@ export default function Landing() {
       <PublicHeader />
 
       <section className="mx-auto max-w-3xl px-8 py-24 text-center">
-        <h1 className="text-4xl font-bold leading-tight text-white sm:text-5xl">
+        <span className="inline-block rounded-full border border-[#7c6aed]/40 bg-[#7c6aed]/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-[#b8a9ff]">
+          Free to use
+        </span>
+        <h1 className="mt-5 text-4xl font-bold leading-tight text-white sm:text-5xl">
           Conference posters,<br />
           <span className="text-[#7c6aed]">without the pain.</span>
         </h1>
         <p className="mt-6 text-lg text-[#9ca3af] leading-relaxed max-w-xl mx-auto">
           Postr is a free poster editor built for researchers. Pick a template,
-          write with guidance, check your figures, and export — all in one place.
-          No design skills needed.
+          write with guidance, check your figures, share a link for comments,
+          and export — all in one place. No design skills needed, no paywall.
         </p>
         <div className="mt-10 flex items-center justify-center gap-4">
           <Link
