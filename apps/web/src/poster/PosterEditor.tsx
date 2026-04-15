@@ -1035,8 +1035,12 @@ export function PosterEditor() {
   };
 
   const handleGroupDragEnd = () => {
-    // Commit the silent changes to the undo stack
-    setBlocks(doc.blocks);
+    // Commit the silent changes to the undo stack. Read from the ref
+    // rather than closed-over doc.blocks — GroupFrame's pointerup handler
+    // holds the pointerdown-time callback reference, whose closed-over
+    // doc.blocks is the PRE-drag value. Using it here would overwrite the
+    // silent in-drag updates and snap the group back to its origin.
+    setBlocks(outerBlocksRef.current);
     groupDragOrigin.current = null;
   };
 
