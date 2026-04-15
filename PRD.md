@@ -754,6 +754,34 @@ PosterForge (root)
 
 17. **Image cropping inside the block**: Today the image block has three `object-fit` modes (contain / cover / fill) but no way to control WHICH part of the image is visible when `cover` crops overflow or when the user wants to trim an uploaded photo before display. Add an inline cropping tool that activates when the user clicks a dedicated "Crop" button inside the image overlay. Interaction: darkens the overflow area, shows drag handles at the 4 corners + 4 edges of the crop rectangle, with a live-preview of the result as the user drags. Aspect ratio is free by default with optional presets (1:1, 4:3, 16:9, match block). On confirm, the cropped rectangle is either (a) applied as a `clip-path: inset(T R B L)` overlay on the rendered `<img>` — purely visual, original source preserved — or (b) baked into a new canvas-generated base64 data URL that replaces `imageSrc`. Option (a) is reversible and cheaper; option (b) reduces storage if the user cropped a huge photo down to a small region. Ship (a) first, add (b) as a "Bake crop to save storage" menu item later. Expose the crop UI alongside the existing Contain / Cover / Fill toggle. Keyboard: Esc cancels the in-progress crop, Enter commits.
 
+18. **Conference requirement check (upload / paste guidelines → pass/fail table)**: Let users paste conference-poster guideline text, or upload a Word/PDF from the event organizer, and get a pass/fail checklist cross-referenced against the current poster state. Most conferences ship near-identical rules (dimensions, min font size at 3 ft readability, required sections, citation style, sometimes word count) so a single parse → check pipeline covers ~90% of events.
+
+    **Pipeline**:
+    1. **Ingest** client-side: paste textarea is fastest; file upload parses with `mammoth` (~180 KB) for DOCX and `pdfjs-dist` (already planned for §16 Tier-2 reverse-import, so this piggybacks) for PDF. Strip to plain text before shipping.
+    2. **Extract rules** via the existing Render API under a new route `/api/guideline-rules`, prompting Claude Sonnet 4.6 with **tool-use structured output** to return a fixed-shape payload:
+
+        ```json
+        {
+          "rules": [
+            { "id": "dim",       "kind": "dimensions",        "widthIn": 48, "heightIn": 36 },
+            { "id": "fontmin",   "kind": "min-font-pt",       "value": 24 },
+            { "id": "sections",  "kind": "required-sections", "values": ["Abstract","Methods","Results","References"] },
+            { "id": "refstyle",  "kind": "citation-style",    "value": "APA" },
+            { "id": "wordcount", "kind": "max-words",         "value": 800 },
+            { "id": "logo",      "kind": "manual",            "text": "Conference logo must appear in top-right corner" }
+          ]
+        }
+        ```
+
+        Tool-use guarantees valid JSON; unknown requirement phrasings fall into `kind: "manual"` so the user ticks them off themselves.
+    3. **Auto-check** against `PosterDoc` for the machine-verifiable subset: `widthIn`/`heightIn`, computed font sizes per `StyleLevel`, section presence (heading-text match), citation count, word count. Everything else renders as a manual checkbox row.
+
+    **UI**: new sidebar tab `"Requirements"` alongside `Issues` and `Check`, reusing the `PosterIssue` visual language (severity accent + jump-to-block link). Empty state prompts for paste or upload. Parsed rules persist in `PosterDoc.requirements` (new optional field) so the checklist survives reloads and can be shared via the poster share link.
+
+    **Dependencies**: add `mammoth` (apps/web), new backend route on Render with the same rate-limit / daily-cap middleware as `/api/scan` (see §16), env var `ANTHROPIC_API_KEY` already present.
+
+    **Why not v1**: the LLM-parse quality dominates UX; needs a prompt-iteration pass against 5–10 real guideline PDFs (APA, SfN, APS, ACNP, SOBP, ECNP, SPSP) before shipping. Meanwhile the static `GuidelinesPanel` covers the common cases, and §16 reverse-import unblocks the import side of the problem. Revisit when Tier-2 PDF parsing lands (§16) so we can share the `pdfjs-dist` chunk.
+
 ---
 
 ## Operational Conventions
