@@ -24,10 +24,30 @@ import {
   contrastForeground,
   extractPaletteFromImage,
   generateRandomPalette,
+  generateRandomCBSafePalette,
   hexListToPalette,
   normalizeHex,
   parsePaletteText,
 } from '@/poster/paletteTools';
+import { auditPaletteCB } from '@/poster/colorblind';
+
+const CB_PREF_KEY = 'postr.cb-random-pref';
+
+function readCBPref(): boolean {
+  try {
+    return localStorage.getItem(CB_PREF_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeCBPref(on: boolean) {
+  try {
+    localStorage.setItem(CB_PREF_KEY, on ? '1' : '0');
+  } catch {
+    // localStorage may be disabled — toggle still works in-memory.
+  }
+}
 
 interface Props {
   open: boolean;
@@ -126,6 +146,7 @@ export function PaletteDesigner({
   const [name, setName] = useState('');
   const [palette, setPalette] = useState<Palette>(DEFAULT_PALETTE);
   const [strategy, setStrategy] = useState<ColorStrategy>('complementary');
+  const [cbSafeOnly, setCbSafeOnly] = useState<boolean>(readCBPref);
   const [textInput, setTextInput] = useState('');
   const [textError, setTextError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -187,7 +208,9 @@ export function PaletteDesigner({
   }
 
   function randomize() {
-    const next = generateRandomPalette(strategy);
+    const next = cbSafeOnly
+      ? generateRandomCBSafePalette(strategy, auditPaletteCB)
+      : generateRandomPalette(strategy);
     setPalette(next);
     setName(defaultPaletteName(next));
   }
@@ -331,6 +354,11 @@ export function PaletteDesigner({
               strategy={strategy}
               onStrategyChange={setStrategy}
               onShuffle={randomize}
+              cbSafeOnly={cbSafeOnly}
+              onCbToggle={(on) => {
+                setCbSafeOnly(on);
+                writeCBPref(on);
+              }}
             />
           )}
 
@@ -550,11 +578,15 @@ function RandomPanel({
   strategy,
   onStrategyChange,
   onShuffle,
+  cbSafeOnly,
+  onCbToggle,
 }: {
   palette: Palette;
   strategy: ColorStrategy;
   onStrategyChange: (s: ColorStrategy) => void;
   onShuffle: () => void;
+  cbSafeOnly: boolean;
+  onCbToggle: (on: boolean) => void;
 }) {
   return (
     <div>
@@ -590,6 +622,31 @@ function RandomPanel({
       >
         {strategyHelp(strategy)}
       </div>
+
+      <label
+        style={{
+          marginTop: 14,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 12,
+          color: '#c5c5cc',
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={cbSafeOnly}
+          onChange={(e) => onCbToggle(e.target.checked)}
+          style={{ cursor: 'pointer' }}
+        />
+        Colorblind-friendly only
+        <span style={{ color: '#6b7280', fontSize: 11 }}>
+          — filters out palettes whose accents collapse under red-green
+          or blue-yellow deficiency
+        </span>
+      </label>
 
       <button type="button" onClick={onShuffle} style={shuffleBtnStyle}>
         🎲 Shuffle palette

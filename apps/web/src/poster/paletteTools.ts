@@ -306,6 +306,39 @@ export function generateRandomPalette(
   };
 }
 
+/**
+ * Generate a palette that passes the colorblind audit. Rejection-samples
+ * `generateRandomPalette` up to `maxAttempts` times; returns the first
+ * palette whose worst-case role-pair distance clears the CB threshold.
+ * Falls back to the best-scoring attempt if the budget is exhausted so
+ * the caller always gets something usable.
+ *
+ * Imported lazily (dynamic require) only when the CB toggle is on, to
+ * keep the colorblind module out of the hot path for users who don't
+ * use the feature.
+ */
+export function generateRandomCBSafePalette(
+  strategy: ColorStrategy,
+  auditFn: (p: Palette) => { safe: boolean; minDistance: number },
+  baseHue?: number,
+  baseSat?: number,
+  maxAttempts = 30,
+): Palette {
+  let best: Palette | null = null;
+  let bestScore = -Infinity;
+  for (let i = 0; i < maxAttempts; i += 1) {
+    const p = generateRandomPalette(strategy, baseHue, baseSat);
+    const audit = auditFn(p);
+    if (audit.safe) return p;
+    if (audit.minDistance > bestScore) {
+      bestScore = audit.minDistance;
+      best = p;
+    }
+  }
+  // No attempt cleared the threshold — return the closest-to-safe sample.
+  return best ?? generateRandomPalette(strategy, baseHue, baseSat);
+}
+
 // ── Image → Palette (canvas quantization) ─────────────────────────
 
 /**
