@@ -2633,7 +2633,14 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
                           key={`hl-area-${idx}`}
                           rect={anchor.rect}
                           zoom={zoom}
-                          onChange={(rect) =>
+                          onChange={(rect) => {
+                            // Drive the visible rect from local state
+                            // during drag so it tracks the cursor
+                            // instantly — server persistence lands
+                            // asynchronously and the optimistic cache
+                            // in useComments won't re-emit the focus
+                            // event to refresh our anchor.
+                            setFocusedCommentAnchor({ type: 'area', rect });
                             window.dispatchEvent(
                               new CustomEvent('postr:comment-edit-anchor', {
                                 detail: {
@@ -2641,8 +2648,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
                                   anchor: { type: 'area', rect },
                                 },
                               }),
-                            )
-                          }
+                            );
+                          }}
                         />
                       );
                     }
@@ -3329,7 +3336,12 @@ function PendingAreaAnchor({
         top: y * PX,
         width: w * PX,
         height: h * PX,
-        border: '2px solid #7c6aed',
+        // outline (not border) so the 2px stroke sits OUTSIDE the
+        // element's layout box — otherwise abs-positioned handles at
+        // top/left:-5 would center 2px inside the visible stroke
+        // instead of on it.
+        outline: '2px solid #7c6aed',
+        outlineOffset: 0,
         background: 'rgba(124, 106, 237, 0.14)',
         boxShadow: '0 0 0 1px rgba(255,255,255,0.1) inset',
         cursor: 'move',
