@@ -147,6 +147,7 @@ export function PaletteDesigner({
   const [palette, setPalette] = useState<Palette>(DEFAULT_PALETTE);
   const [strategy, setStrategy] = useState<ColorStrategy>('complementary');
   const [cbSafeOnly, setCbSafeOnly] = useState<boolean>(readCBPref);
+  const [cbWarningDismissed, setCbWarningDismissed] = useState(false);
   const [textInput, setTextInput] = useState('');
   const [textError, setTextError] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -167,7 +168,16 @@ export function PaletteDesigner({
     setImageError(null);
     setImageLoading(false);
     setNameError(null);
+    setCbWarningDismissed(false);
   }, [open, initialPalette, initialName]);
+
+  // Re-show a dismissed CB warning if the user edits roles afterward
+  // — dismiss should only suppress the CURRENT collision, not all
+  // future ones the editor introduces.
+  const cbReport = useMemo(() => auditPaletteCB(palette), [palette]);
+  useEffect(() => {
+    setCbWarningDismissed(false);
+  }, [cbReport.worstPair.a, cbReport.worstPair.b, cbReport.worstPair.type]);
 
   // Escape to cancel.
   useEffect(() => {
@@ -378,6 +388,46 @@ export function PaletteDesigner({
               onFile={handleImageFile}
               fileInputRef={fileInputRef}
             />
+          )}
+
+          {!cbReport.safe && !cbWarningDismissed && (
+            <div
+              style={{
+                marginTop: 14,
+                padding: '10px 12px',
+                background: '#2a1e10',
+                border: '1px solid #a3711f',
+                borderRadius: 8,
+                color: '#f5d79e',
+                fontSize: 12,
+                lineHeight: 1.5,
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+              }}
+              role="status"
+            >
+              <span style={{ fontSize: 14 }}>⚠</span>
+              <div style={{ flex: 1 }}>
+                <strong>"{cbReport.worstPair.a}" and "{cbReport.worstPair.b}"</strong>{' '}
+                look nearly identical under {cbReport.worstPair.type}. Shift
+                one toward blue or yellow to keep them distinguishable.
+              </div>
+              <button
+                type="button"
+                onClick={() => setCbWarningDismissed(true)}
+                aria-label="Dismiss warning"
+                style={{
+                  all: 'unset',
+                  cursor: 'pointer',
+                  color: '#c9a26a',
+                  fontSize: 14,
+                  padding: '0 4px',
+                }}
+              >
+                ×
+              </button>
+            </div>
           )}
 
           {/* Live preview — always visible regardless of tab */}
