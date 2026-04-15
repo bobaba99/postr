@@ -41,7 +41,7 @@ import {
   insertRow,
   setBorderPreset,
 } from './tableOps';
-import { CITATION_STYLES, SORT_MODE_LABELS, type CitationStyleKey, type SortMode } from './citations';
+import { CITATION_STYLES, type CitationStyleKey } from './citations';
 import { LAYOUT_TEMPLATES, type LayoutKey } from './templates';
 import { parseBibtex, parseRis } from './parsers';
 import { AuthorLine } from './blocks';
@@ -129,8 +129,6 @@ interface SidebarProps {
   onChangeReferences: (refs: Reference[]) => void;
   citationStyle: CitationStyleKey;
   onChangeCitationStyle: (s: CitationStyleKey) => void;
-  sortMode: SortMode;
-  onChangeSortMode: (m: SortMode) => void;
 
   // selection + actions
   selectedBlock: Block | null;
@@ -596,8 +594,6 @@ export function Sidebar(props: SidebarProps) {
             onChangeReferences={props.onChangeReferences}
             citationStyle={props.citationStyle}
             onChangeCitationStyle={props.onChangeCitationStyle}
-            sortMode={props.sortMode}
-            onChangeSortMode={props.onChangeSortMode}
           />
         )}
 
@@ -1278,8 +1274,6 @@ function RefsTab(props: {
   onChangeReferences: (r: Reference[]) => void;
   citationStyle: CitationStyleKey;
   onChangeCitationStyle: (s: CitationStyleKey) => void;
-  sortMode: SortMode;
-  onChangeSortMode: (m: SortMode) => void;
 }) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [manual, setManual] = useState({ authors: '', year: '', title: '', journal: '' });
@@ -1410,20 +1404,6 @@ function RefsTab(props: {
             {(Object.keys(CITATION_STYLES) as CitationStyleKey[]).map((s) => (
               <option key={s} value={s}>
                 {s}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <label style={{ ...miniLabel, width: 48 }}>Sort</label>
-          <select
-            value={props.sortMode}
-            onChange={(e) => props.onChangeSortMode(e.target.value as SortMode)}
-            style={{ ...sel, flex: 1 }}
-          >
-            {Object.entries(SORT_MODE_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>
-                {v}
               </option>
             ))}
           </select>
@@ -2038,6 +2018,8 @@ function EditTab(props: {
     <>
       {sb && sb.type === 'table' ? (
         <>
+          <TableTipsDropdown />
+          <div style={{ height: 12 }} />
           <CaptionEditor
             block={sb}
             label="Table"
@@ -2071,6 +2053,52 @@ function EditTab(props: {
         </div>
       )}
     </>
+  );
+}
+
+// =========================================================================
+// TableTipsDropdown — collapsed-by-default tips for table editing
+// =========================================================================
+//
+// Sits at the very top of the Edit tab when a table block is selected.
+// Uses native <details>/<summary> so it persists open/closed state
+// implicitly per render and adds zero JS state. Closed by default
+// because returning users don't need the reminder every time.
+
+function TableTipsDropdown() {
+  return (
+    <details
+      style={{
+        background: '#1a1a26',
+        border: '1px solid #2a2a3a',
+        borderRadius: 8,
+        padding: '8px 12px',
+        fontSize: 13,
+        color: '#8a8a95',
+        lineHeight: 1.5,
+      }}
+    >
+      <summary
+        style={{
+          cursor: 'pointer',
+          color: '#c8cad0',
+          fontWeight: 700,
+          listStyle: 'revert',
+          userSelect: 'none',
+        }}
+      >
+        💡 Tips for editing tables
+      </summary>
+      <ul style={{ margin: '8px 0 4px', paddingLeft: 18 }}>
+        <li>✏️ Click any cell on the canvas to type directly.</li>
+        <li>🖱️ Click a row/column header strip to select the whole row or column.</li>
+        <li>📋 Paste TSV from Word, Excel, or Google Sheets into any cell — the grid auto-grows.</li>
+        <li>↔️ Drag column borders to resize.</li>
+        <li>🗑️ Select a row/column and press Delete to remove it.</li>
+        <li>⌨️ Tab / Shift+Tab to jump between cells.</li>
+        <li>✨ Type <code>**bold**</code>, <code>*italic*</code>, or <code>M (SD)*</code> in a cell, then click <b>Format table</b> in the Caption section below.</li>
+      </ul>
+    </details>
   );
 }
 
@@ -2193,11 +2221,10 @@ function CaptionEditor(props: {
       {/* ── Note (academic markdown) ─────────────────────────── */}
       <div style={{ ...labelStyle, marginTop: 8 }}>{label} Note</div>
       <p style={{ fontSize: 13, color: '#8a8a95', margin: 0, lineHeight: 1.5 }}>
-        Longer footnote shown below the {label.toLowerCase()}. Supports{' '}
-        <code>**bold**</code>, <code>*italic*</code>, <code>^super^</code>,
-        and auto-superscript of <code>*</code>, <code>†</code>,{' '}
-        <code>‡</code>, <code>§</code> attached to a word. Click{' '}
-        <b>Format</b> to render the markers.
+        Longer footnote shown directly below the {label.toLowerCase()}.
+        Supports <code>**bold**</code>, <code>*italic*</code>,{' '}
+        <code>^super^</code>, and auto-superscript of <code>*</code>,{' '}
+        <code>†</code>, <code>‡</code>, <code>§</code> attached to a word.
       </p>
       <textarea
         value={stripHtmlToPlainText(block.note ?? '')}
@@ -2216,21 +2243,46 @@ function CaptionEditor(props: {
           lineHeight: 1.5,
         }}
       />
+      <p
+        style={{
+          fontSize: 12,
+          color: '#8a8a95',
+          margin: 0,
+          lineHeight: 1.5,
+          background: '#fff7d6',
+          border: '1px solid #f1e3a3',
+          borderRadius: 6,
+          padding: '8px 10px',
+        }}
+      >
+        💡 <b>Tip:</b> after typing markers like{' '}
+        <code>**bold**</code> or <code>*p*</code>
+        {label === 'Table' ? ' in the note or in any cell' : ''}, click{' '}
+        <b>✨ Format {label === 'Table' ? 'table' : 'note'}</b> to convert
+        them into bold / italic / superscript on the poster. Re-click
+        anytime — it's safe to run more than once.
+      </p>
       <button
         type="button"
         onClick={() => {
-          // Format caption + note together. The caption is stored
-          // as plain-ish text (no HTML tags in the `block.caption`
-          // field), but users might type `**bold**` there too —
-          // so we run it through the parser and store the result.
-          // The note field is the primary target of the Format
-          // button. Idempotent via strip-then-reparse.
-          const plainCaption = stripHtmlToPlainText(block.caption ?? '');
+          // Parse markdown markers in the note (always) and — for
+          // tables — every cell, into inline HTML (strong / em /
+          // sup / sub). Idempotent via strip-then-reparse so a
+          // second click won't nest tags. Caption stays plain
+          // text on purpose: the canvas renders it as text.
           const plainNote = stripHtmlToPlainText(block.note ?? '');
-          onUpdateBlock(block.id, {
-            caption: academicMarkdownToHtml(plainCaption),
+          const patch: Partial<Block> = {
             note: academicMarkdownToHtml(plainNote),
-          });
+          };
+          if (block.type === 'table' && block.tableData) {
+            patch.tableData = {
+              ...block.tableData,
+              cells: block.tableData.cells.map((cell) =>
+                academicMarkdownToHtml(stripHtmlToPlainText(cell ?? '')),
+              ),
+            };
+          }
+          onUpdateBlock(block.id, patch);
         }}
         style={{
           all: 'unset',
@@ -2244,7 +2296,7 @@ function CaptionEditor(props: {
           fontWeight: 700,
         }}
       >
-        ✨ Format caption & note
+        ✨ Format {label === 'Table' ? 'table' : 'note'}
       </button>
     </div>
   );
@@ -2328,28 +2380,55 @@ function TableEditor(props: {
     innerV: padArr(rawCustomBorder.innerV, Math.max(0, data.cols - 1)),
   };
   const isCustom = data.borderPreset === 'custom';
+
+  // Derive the border layout the canvas is ACTUALLY rendering right
+  // now so the mockup is always truthful — when on a named preset
+  // (APA 3-Line, All Lines, etc.) we project that preset's flags
+  // into the per-edge customBorder shape; in custom mode we use
+  // the user's stored toggles directly. Clicking any line in the
+  // mockup commits this projection as the new custom state, so the
+  // user can switch from "APA 3-Line" to a tweaked variant in one
+  // click without losing the starting layout.
+  const activePreset =
+    !isCustom ? TABLE_BORDER_PRESETS[data.borderPreset] ?? null : null;
+  const displayBorder: NonNullable<TableData['customBorder']> = activePreset
+    ? {
+        topLine: activePreset.topLine || activePreset.outerBorder,
+        bottomLine: activePreset.bottomLine || activePreset.outerBorder,
+        leftLine: activePreset.outerBorder,
+        rightLine: activePreset.outerBorder,
+        headerLine: activePreset.headerLine,
+        headerBox: activePreset.headerBox,
+        innerH: Array(Math.max(0, data.rows - 2)).fill(activePreset.horizontalLines),
+        innerV: Array(Math.max(0, data.cols - 1)).fill(activePreset.verticalLines),
+      }
+    : customBorder;
+
   const commitCustomBorder = (
     patch: Partial<NonNullable<TableData['customBorder']>>,
   ) => {
+    // Branch off the displayed layout (preset projection or stored
+    // custom) so the very first click in the mockup preserves the
+    // user's starting state instead of snapping to APA defaults.
     commit({
       ...data,
       borderPreset: 'custom',
-      customBorder: { ...customBorder, ...patch },
+      customBorder: { ...displayBorder, ...patch },
     });
   };
   const toggleCustomEdge = (
     key: keyof NonNullable<TableData['customBorder']>,
   ) => {
     if (key === 'innerH' || key === 'innerV') return; // handled per-index
-    commitCustomBorder({ [key]: !customBorder[key] });
+    commitCustomBorder({ [key]: !displayBorder[key] });
   };
   const toggleInnerH = (i: number) => {
-    const next = [...customBorder.innerH];
+    const next = [...displayBorder.innerH];
     next[i] = !next[i];
     commitCustomBorder({ innerH: next });
   };
   const toggleInnerV = (i: number) => {
-    const next = [...customBorder.innerV];
+    const next = [...displayBorder.innerV];
     next[i] = !next[i];
     commitCustomBorder({ innerV: next });
   };
@@ -2428,20 +2507,6 @@ function TableEditor(props: {
         Editing: table · {data.rows} × {data.cols}
       </div>
 
-      {/* ── 1. Tips (on top per user request) ──────────────── */}
-      <div style={{ fontSize: 13, color: '#8a8a95', lineHeight: 1.5 }}>
-        <strong style={{ color: '#c8cad0' }}>💡 Tips</strong>
-        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-          <li>✏️ Click any cell on the canvas to type directly.</li>
-          <li>🖱️ Click a row/column header strip to select the whole row or column.</li>
-          <li>📋 Paste TSV from Word, Excel, or Google Sheets into any cell — the grid auto-grows.</li>
-          <li>↔️ Drag column borders to resize.</li>
-          <li>🗑️ Select a row/column and press Delete to remove it.</li>
-          <li>⌨️ Tab / Shift+Tab to jump between cells.</li>
-          <li>✨ Type <code>**bold**</code>, <code>*italic*</code>, or <code>M (SD)*</code> in a cell, then click <b>Format cells</b> below.</li>
-        </ul>
-      </div>
-
       {/* ── 2. Row / column controls — side-by-side ─────────── */}
       <div style={{ display: 'flex', gap: 16 }}>
         <div style={{ flex: 1 }}>
@@ -2493,35 +2558,21 @@ function TableEditor(props: {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => {
-          // Walk every cell, plain-text-strip any prior HTML, and
-          // re-parse with the academic markdown rules. Idempotent
-          // on repeated clicks because the strip step always runs
-          // first — a second press won't nest <sup><sup>*</sup></sup>.
-          // The caption + note are formatted by the Caption
-          // editor's own button so each control owns one surface.
-          const nextCells = data.cells.map((cell) =>
-            academicMarkdownToHtml(stripHtmlToPlainText(cell ?? '')),
-          );
-          commit({ ...data, cells: nextCells });
-        }}
-        style={{
-          all: 'unset',
-          cursor: 'pointer',
-          padding: '10px 16px',
-          background: '#7c6aed',
-          color: '#fff',
-          borderRadius: 8,
-          fontSize: 13,
-          fontWeight: 700,
-          textAlign: 'center',
-          alignSelf: 'flex-start',
-        }}
-      >
-        ✨ Format cells
-      </button>
+      {/* Visual border editor — always visible. The mockup mirrors
+          whatever borders the canvas is currently rendering (preset
+          OR custom), and clicking any line flips the table into
+          custom mode using the displayed layout as the starting
+          point. Kept above the preset row so users see the live
+          preview before scanning preset names. */}
+      <CustomBorderMockup
+        border={displayBorder}
+        rows={data.rows}
+        cols={data.cols}
+        onToggleOuter={toggleCustomEdge}
+        onToggleInnerH={toggleInnerH}
+        onToggleInnerV={toggleInnerV}
+        onBulkPreset={applyBulkPreset}
+      />
 
       {/* ── 3. Border style (with custom feature) ──────────── */}
       <div>
@@ -2575,22 +2626,6 @@ function TableEditor(props: {
         </div>
       </div>
 
-      {/* Visual custom-border editor. The mockup sizes itself
-          off the real `data.rows` × `data.cols` so users can
-          see every inner gap that they can independently toggle,
-          capped at a sane visual maximum (6×6) for large tables.
-          Bulk preset buttons sit below for one-click resets. */}
-      {isCustom && (
-        <CustomBorderMockup
-          border={customBorder}
-          rows={data.rows}
-          cols={data.cols}
-          onToggleOuter={toggleCustomEdge}
-          onToggleInnerH={toggleInnerH}
-          onToggleInnerV={toggleInnerV}
-          onBulkPreset={applyBulkPreset}
-        />
-      )}
     </div>
   );
 }

@@ -1067,31 +1067,6 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
       )}
       </div>
 
-      {/*
-        Table note — optional footnote rendered below the grid.
-        Stored at the block level (`block.note`) so figures and
-        tables share the same field. Content is HTML pre-formatted
-        by the "Format" button in the Caption / Table editor
-        (academicMarkdownToHtml), so `dangerouslySetInnerHTML`
-        is safe: the parser HTML-escapes user input and only adds
-        strong / em / sup / sub tags. Hidden entirely when the
-        note field is empty.
-      */}
-      {block.note && (
-        <div
-          style={{
-            fontFamily,
-            fontSize: Math.round(styles.body.size * 0.85),
-            lineHeight: 1.35,
-            color: palette.muted || '#6b7280',
-            fontStyle: 'italic',
-            paddingTop: 4,
-            paddingLeft: 2,
-          }}
-          dangerouslySetInnerHTML={{ __html: block.note }}
-        />
-      )}
-
       {/* Figma-style right-click context menu */}
       {ctxMenu && ReactDOM.createPortal(
         <TableContextMenu
@@ -1415,23 +1390,19 @@ function CaptionWrapper({
   // Even an empty caption gets the auto-numbered prefix so users can
   // see "Figure 1." immediately after placing a figure. Setting
   // `captionPosition: 'none'` opts out entirely.
-  const shouldRender = position !== 'none' && captionNumber !== undefined;
-  if (!shouldRender) {
+  const showCaption = position !== 'none' && captionNumber !== undefined;
+  const hasNote = !!block.note;
+  if (!showCaption && !hasNote) {
     return <>{children}</>;
   }
 
-  const flexDirection: React.CSSProperties['flexDirection'] =
-    position === 'top'
-      ? 'column-reverse'
-      : position === 'bottom'
-        ? 'column'
-        : position === 'left'
-          ? 'row-reverse'
-          : 'row';
+  // Caption sits before the body for top/left, after for bottom/right.
+  const captionFirst = position === 'top' || position === 'left';
+  const isSideCaption = position === 'left' || position === 'right';
+  const flexDirection: React.CSSProperties['flexDirection'] = isSideCaption
+    ? 'row'
+    : 'column';
 
-  // Match the body font size + authors-row weight so the caption
-  // reads as a subtle label under/beside the figure. Italic by
-  // convention in academic publishing; user can type plain text.
   const captionStyle: React.CSSProperties = {
     fontFamily,
     fontSize: Math.round(styles.body.size * 0.85),
@@ -1439,12 +1410,56 @@ function CaptionWrapper({
     color: palette.muted || '#6b7280',
     fontStyle: 'italic',
     flex: '0 0 auto',
-    // Side captions get a fixed width so the image doesn't collapse.
-    width: position === 'left' || position === 'right' ? '35%' : undefined,
+    width: isSideCaption ? '35%' : undefined,
     whiteSpace: 'pre-wrap',
     wordWrap: 'break-word',
     overflow: 'hidden',
   };
+
+  const noteStyle: React.CSSProperties = {
+    fontFamily,
+    fontSize: Math.round(styles.body.size * 0.85),
+    lineHeight: 1.35,
+    color: palette.muted || '#6b7280',
+    fontStyle: 'italic',
+    flex: '0 0 auto',
+    paddingTop: 4,
+  };
+
+  // Body + note share a vertical sub-column so the note always sits
+  // directly under the figure/table content, regardless of where the
+  // caption is placed. Note is rendered as HTML (pre-parsed by the
+  // Format button) so inline tags survive JSONB round-trips.
+  const bodyAndNote = (
+    <div
+      style={{
+        flex: 1,
+        minHeight: 0,
+        minWidth: 0,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
+        {children}
+      </div>
+      {hasNote && (
+        <div
+          style={noteStyle}
+          dangerouslySetInnerHTML={{ __html: block.note! }}
+        />
+      )}
+    </div>
+  );
+
+  const captionEl = showCaption ? (
+    <div style={captionStyle}>
+      <b style={{ fontStyle: 'normal', color: palette.primary }}>
+        {label} {captionNumber}.
+      </b>
+      {block.caption ? ` ${block.caption}` : ''}
+    </div>
+  ) : null;
 
   return (
     <div
@@ -1454,33 +1469,20 @@ function CaptionWrapper({
         display: 'flex',
         flexDirection,
         boxSizing: 'border-box',
-        // User-controlled caption gap. Clamped at render time so a
-        // corrupted stored value can't break layout.
         gap: Math.max(0, Math.min(24, block.captionGap ?? 0)),
       }}
     >
-      <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
-        {children}
-      </div>
-      <div style={captionStyle}>
-        <b style={{ fontStyle: 'normal', color: palette.primary }}>
-          {label} {captionNumber}.
-        </b>
-        {block.caption ? ` ${block.caption}` : ''}
-        {/*
-          Optional figure note rendered under the caption line.
-          Stored as HTML pre-parsed by the Format button so inline
-          tags (strong / em / sup / sub) survive round-trips
-          through the poster JSONB. Falls back to nothing when
-          the note field is empty.
-        */}
-        {block.note && (
-          <div
-            style={{ marginTop: 2, fontStyle: 'normal' }}
-            dangerouslySetInnerHTML={{ __html: block.note }}
-          />
-        )}
-      </div>
+      {captionFirst ? (
+        <>
+          {captionEl}
+          {bodyAndNote}
+        </>
+      ) : (
+        <>
+          {bodyAndNote}
+          {captionEl}
+        </>
+      )}
     </div>
   );
 }

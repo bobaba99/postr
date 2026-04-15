@@ -568,7 +568,9 @@ export function PosterEditor() {
 
   const [showGrid, setShowGrid] = useState(true);
   const [showRuler, setShowRuler] = useState(true);
-  const [sortMode, setSortMode] = useState<SortMode>('none');
+  // APA style requires alphabetical reference ordering, so the
+  // sort is fixed — no user-facing toggle.
+  const sortMode: SortMode = 'alpha';
   const [citationStyle, setCitationStyle] = useState<CitationStyleKey>(DEFAULT_CITATION_STYLE);
   // K1 fix: presets persist across posters via localStorage (not
   // component state). Previously useState — lost on every poster open.
@@ -1996,8 +1998,6 @@ export function PosterEditor() {
         onChangeReferences={(refs: Reference[]) => updateDoc({ references: refs })}
         citationStyle={citationStyle}
         onChangeCitationStyle={setCitationStyle}
-        sortMode={sortMode}
-        onChangeSortMode={setSortMode}
         selectedBlock={selectedBlock}
         onUpdateBlock={updateBlock}
         onAddBlock={addBlock}
