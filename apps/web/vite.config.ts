@@ -26,28 +26,26 @@ function resolveBuildId(): string {
 
 const BUILD_ID = resolveBuildId();
 
-// Writes `public/version.json` before Vite copies static assets
-// into the build output. Clients poll this at runtime to detect
-// when a newer bundle has been deployed.
-function versionFilePlugin() {
-  return {
-    name: 'postr-version-file',
-    apply: 'build' as const,
-    buildStart() {
-      const outPath = path.resolve(__dirname, 'public/version.json');
-      fs.writeFileSync(
-        outPath,
-        JSON.stringify({
-          buildId: BUILD_ID,
-          builtAt: new Date().toISOString(),
-        }),
-      );
-    },
-  };
+// Writes `public/version.json` so clients can diff the live deploy's
+// build id against the one baked into their bundle. Runs synchronously
+// at config-load time so it covers both `vite build` AND `vite dev` —
+// otherwise dev clients fetch a stale committed version.json while
+// __BUILD_ID__ resolves to the current git HEAD, so the "new version
+// available" banner stays stuck on forever in local dev.
+function writeVersionFile() {
+  const outPath = path.resolve(__dirname, 'public/version.json');
+  fs.writeFileSync(
+    outPath,
+    JSON.stringify({
+      buildId: BUILD_ID,
+      builtAt: new Date().toISOString(),
+    }),
+  );
 }
+writeVersionFile();
 
 export default defineConfig({
-  plugins: [react(), versionFilePlugin()],
+  plugins: [react()],
   define: {
     // Baked into the bundle so the client has something to compare
     // against whatever /version.json currently advertises.
