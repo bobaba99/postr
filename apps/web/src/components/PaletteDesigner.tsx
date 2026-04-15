@@ -56,6 +56,55 @@ const ROLE_LABELS: { key: keyof Palette; label: string; help: string }[] = [
   { key: 'headerFg', label: 'Header text', help: 'Heading text color' },
 ];
 
+/**
+ * Pool of evocative palette names grouped by dominant hue. The generator
+ * picks a bucket from the palette's accent color so the suggested name
+ * reads like a thoughtfully-chosen theme ("Forest Green" for a green
+ * palette, "Aurora Purple" for a violet one) rather than a generic
+ * "My palette" stamp.
+ */
+const PALETTE_NAMES_BY_HUE: Record<string, string[]> = {
+  red: ['Ember Crimson', 'Velvet Rouge', 'Sunset Coral', 'Ruby Bloom', 'Brick Cinnabar'],
+  orange: ['Amber Dusk', 'Harvest Glow', 'Marigold Bronze', 'Copper Ember', 'Tangerine Haze'],
+  yellow: ['Honey Meadow', 'Saffron Noon', 'Citrine Dawn', 'Mustard Field', 'Sunlit Linen'],
+  green: ['Forest Green', 'Moss Glade', 'Pine Emerald', 'Sage Meadow', 'Fern Verdant'],
+  teal: ['Tidal Teal', 'Lagoon Mist', 'Seaglass Depth', 'Kelp Current', 'Cyan Horizon'],
+  blue: ['Azure Tide', 'Midnight Cobalt', 'Glacier Blue', 'Indigo Drift', 'Harbor Frost'],
+  purple: ['Aurora Purple', 'Velvet Plum', 'Twilight Iris', 'Amethyst Dusk', 'Orchid Bloom'],
+  pink: ['Rosewater Bloom', 'Magenta Nova', 'Blush Petal', 'Coral Fuchsia', 'Berry Dawn'],
+  neutral: ['Linen Stone', 'Slate Mist', 'Driftwood Gray', 'Paper Dune', 'Charcoal Dusk'],
+};
+
+function hexToHueBucket(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m || !m[1]) return 'neutral';
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const delta = max - min;
+  if (delta < 20) return 'neutral';
+  let h = 0;
+  if (max === r) h = ((g - b) / delta) % 6;
+  else if (max === g) h = (b - r) / delta + 2;
+  else h = (r - g) / delta + 4;
+  h = (h * 60 + 360) % 360;
+  if (h < 15 || h >= 345) return 'red';
+  if (h < 45) return 'orange';
+  if (h < 70) return 'yellow';
+  if (h < 165) return 'green';
+  if (h < 200) return 'teal';
+  if (h < 255) return 'blue';
+  if (h < 290) return 'purple';
+  return 'pink';
+}
+
+/** Themed auto-name based on the palette's accent hue. */
+function defaultPaletteName(palette?: Palette): string {
+  const bucket = palette ? hexToHueBucket(palette.accent) : 'green';
+  const pool = PALETTE_NAMES_BY_HUE[bucket] ?? PALETTE_NAMES_BY_HUE.neutral!;
+  return pool[Math.floor(Math.random() * pool.length)]!;
+}
+
 const DEFAULT_PALETTE: Palette = {
   bg: '#FAFDF7',
   primary: '#1B3A2D',
@@ -88,8 +137,9 @@ export function PaletteDesigner({
   useEffect(() => {
     if (!open) return;
     setTab('manual');
-    setName(initialName ?? '');
-    setPalette(initialPalette ?? DEFAULT_PALETTE);
+    const startPalette = initialPalette ?? DEFAULT_PALETTE;
+    setName(initialName ?? defaultPaletteName(startPalette));
+    setPalette(startPalette);
     setStrategy('complementary');
     setTextInput('');
     setTextError(null);
@@ -137,7 +187,9 @@ export function PaletteDesigner({
   }
 
   function randomize() {
-    setPalette(generateRandomPalette(strategy));
+    const next = generateRandomPalette(strategy);
+    setPalette(next);
+    setName(defaultPaletteName(next));
   }
 
   function applyText() {
@@ -149,7 +201,9 @@ export function PaletteDesigner({
       );
       return;
     }
-    setPalette(hexListToPalette(hexes));
+    const next = hexListToPalette(hexes);
+    setPalette(next);
+    setName(defaultPaletteName(next));
     setTab('manual');
   }
 
@@ -159,6 +213,7 @@ export function PaletteDesigner({
     try {
       const extracted = await extractPaletteFromImage(file);
       setPalette(extracted);
+      setName(defaultPaletteName(extracted));
       setTab('manual');
     } catch (err) {
       setImageError(
@@ -355,7 +410,7 @@ export function PaletteDesigner({
         <div
           style={{
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'stretch',
             gap: 10,
             padding: '16px 26px 22px',
             borderTop: '1px solid #1f1f2e',
@@ -371,7 +426,8 @@ export function PaletteDesigner({
             maxLength={60}
             style={{
               flex: 1,
-              padding: '10px 12px',
+              height: 40,
+              padding: '0 12px',
               fontSize: 14,
               color: '#e2e2e8',
               background: '#1a1a26',
@@ -379,13 +435,22 @@ export function PaletteDesigner({
               borderRadius: 6,
               outline: 'none',
               fontFamily: 'inherit',
+              boxSizing: 'border-box',
             }}
           />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <button type="button" onClick={commit} style={primaryBtnStyle}>
-              Save palette
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={commit}
+              style={{ ...primaryBtnStyle, marginTop: 0, height: 40, padding: '0 16px' }}
+            >
+              Save palette and apply
             </button>
-            <button type="button" onClick={onCancel} style={secondaryBtnStyle}>
+            <button
+              type="button"
+              onClick={onCancel}
+              style={{ ...secondaryBtnStyle, height: 40, padding: '0 16px' }}
+            >
               Cancel
             </button>
           </div>
