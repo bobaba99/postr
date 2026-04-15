@@ -52,7 +52,10 @@ import {
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { ReadabilityPanel } from './ReadabilityPanel';
-import { UpdateAvailableBanner } from '@/components/UpdateAvailableToast';
+import {
+  JustRefreshedBanner,
+  UpdateAvailableBanner,
+} from '@/components/UpdateAvailableToast';
 
 export type SidebarTab =
   | 'layout'
@@ -486,6 +489,7 @@ export function Sidebar(props: SidebarProps) {
           Issues panel language so it reads as an in-app editor
           signal, not a browser notification. */}
       <UpdateAvailableBanner />
+      <JustRefreshedBanner />
 
       {/* Body: vertical tab rail on the left + panel content on the right */}
       <div style={{ flex: 1, display: 'flex', marginTop: 16, minHeight: 0 }}>

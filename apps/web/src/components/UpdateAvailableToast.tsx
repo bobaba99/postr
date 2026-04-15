@@ -12,6 +12,11 @@ const POLL_INTERVAL_MS = 60_000;
 // proxies never serve a stale copy.
 const VERSION_URL = '/version.json';
 
+// sessionStorage key set by the "Refresh now" button right before it
+// calls location.reload(). Next mount reads + clears the flag to
+// decide whether to show the "you're on the latest version" toast.
+const JUST_REFRESHED_KEY = 'postr-just-refreshed';
+
 interface VersionPayload {
   buildId: string;
 }
@@ -127,7 +132,15 @@ export function UpdateAvailableBanner() {
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           type="button"
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            try {
+              sessionStorage.setItem(JUST_REFRESHED_KEY, '1');
+            } catch {
+              // sessionStorage can throw in private mode — the post-
+              // refresh toast is just a nicety, so swallow the error.
+            }
+            window.location.reload();
+          }}
           style={{
             all: 'unset',
             cursor: 'pointer',
@@ -153,6 +166,94 @@ export function UpdateAvailableBanner() {
           }}
         >
           Later
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Reads (and clears) the "just refreshed via update banner" flag
+ * that `Refresh now` writes to sessionStorage. Returns a one-shot
+ * signal — a second hook call in the same session returns false.
+ */
+function useJustRefreshed(): { show: boolean; dismiss: () => void } {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(JUST_REFRESHED_KEY) === '1') {
+        sessionStorage.removeItem(JUST_REFRESHED_KEY);
+        setShow(true);
+      }
+    } catch {
+      // sessionStorage unavailable — no toast, no harm done.
+    }
+  }, []);
+  return { show, dismiss: () => setShow(false) };
+}
+
+/**
+ * Post-refresh confirmation banner. Shown once after the user clicks
+ * "Refresh now" on the UpdateAvailableBanner, then dismissed — either
+ * manually via the button or by closing/reloading the tab (the flag
+ * is already cleared on mount).
+ */
+export function JustRefreshedBanner() {
+  const { show, dismiss } = useJustRefreshed();
+  if (!show) return null;
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        margin: '12px 16px 0',
+        padding: '12px 14px',
+        background: '#16231d',
+        border: '1px solid #2ea27a',
+        borderRadius: 10,
+        color: '#e2e2e8',
+        fontSize: 13,
+        lineHeight: 1.5,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontWeight: 700,
+          color: '#7ee3b8',
+          fontSize: 12,
+          textTransform: 'uppercase',
+          letterSpacing: 0.6,
+        }}
+      >
+        ✓ You're on the latest version
+      </div>
+      <div style={{ color: '#b3b5be' }}>
+        Thanks for refreshing — enjoy the fresh fixes. Your work picked
+        up right where you left off.
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          type="button"
+          onClick={dismiss}
+          style={{
+            all: 'unset',
+            cursor: 'pointer',
+            padding: '6px 12px',
+            background: '#2ea27a',
+            color: '#fff',
+            borderRadius: 6,
+            fontWeight: 700,
+            fontSize: 12,
+          }}
+        >
+          Dismiss
         </button>
       </div>
     </div>
