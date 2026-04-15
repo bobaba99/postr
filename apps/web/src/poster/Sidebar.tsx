@@ -2130,6 +2130,31 @@ function CaptionEditor(props: {
 }) {
   const { block, label, onUpdateBlock } = props;
   const position = block.captionPosition ?? 'bottom';
+  // Transient "✓ Formatted" pulse so the click is clearly acknowledged
+  // even when the textarea shows the same plain text after re-strip.
+  const [justFormatted, setJustFormatted] = useState(false);
+  const formatPulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (formatPulseTimerRef.current) clearTimeout(formatPulseTimerRef.current);
+  }, []);
+  const handleFormat = () => {
+    const plainNote = stripHtmlToPlainText(block.note ?? '');
+    const patch: Partial<Block> = {
+      note: academicMarkdownToHtml(plainNote),
+    };
+    if (block.type === 'table' && block.tableData) {
+      patch.tableData = {
+        ...block.tableData,
+        cells: block.tableData.cells.map((cell) =>
+          academicMarkdownToHtml(stripHtmlToPlainText(cell ?? '')),
+        ),
+      };
+    }
+    onUpdateBlock(block.id, patch);
+    setJustFormatted(true);
+    if (formatPulseTimerRef.current) clearTimeout(formatPulseTimerRef.current);
+    formatPulseTimerRef.current = setTimeout(() => setJustFormatted(false), 1400);
+  };
   const positions: Array<{
     key: NonNullable<Block['captionPosition']>;
     label: string;
@@ -2235,6 +2260,29 @@ function CaptionEditor(props: {
         <code>^super^</code>, and auto-superscript of <code>*</code>,{' '}
         <code>†</code>, <code>‡</code>, <code>§</code> attached to a word.
       </p>
+      {/* Button is above the textarea so it's always in view when
+          the Edit tab opens — used to live at the bottom below the
+          tip, which put it below the sidebar fold for tables. */}
+      <button
+        type="button"
+        onClick={handleFormat}
+        style={{
+          all: 'unset',
+          cursor: 'pointer',
+          alignSelf: 'flex-start',
+          padding: '10px 16px',
+          background: justFormatted ? '#2ea27a' : '#7c6aed',
+          color: '#fff',
+          borderRadius: 8,
+          fontSize: 13,
+          fontWeight: 700,
+          transition: 'background 180ms ease',
+        }}
+      >
+        {justFormatted
+          ? `✓ Formatted ${label === 'Table' ? 'table' : 'note'}`
+          : `✨ Format ${label === 'Table' ? 'table' : 'note'}`}
+      </button>
       <textarea
         value={stripHtmlToPlainText(block.note ?? '')}
         onChange={(e) => onUpdateBlock(block.id, { note: e.target.value })}
@@ -2271,42 +2319,6 @@ function CaptionEditor(props: {
         them into bold / italic / superscript on the poster. Re-click
         anytime — it's safe to run more than once.
       </p>
-      <button
-        type="button"
-        onClick={() => {
-          // Parse markdown markers in the note (always) and — for
-          // tables — every cell, into inline HTML (strong / em /
-          // sup / sub). Idempotent via strip-then-reparse so a
-          // second click won't nest tags. Caption stays plain
-          // text on purpose: the canvas renders it as text.
-          const plainNote = stripHtmlToPlainText(block.note ?? '');
-          const patch: Partial<Block> = {
-            note: academicMarkdownToHtml(plainNote),
-          };
-          if (block.type === 'table' && block.tableData) {
-            patch.tableData = {
-              ...block.tableData,
-              cells: block.tableData.cells.map((cell) =>
-                academicMarkdownToHtml(stripHtmlToPlainText(cell ?? '')),
-              ),
-            };
-          }
-          onUpdateBlock(block.id, patch);
-        }}
-        style={{
-          all: 'unset',
-          cursor: 'pointer',
-          alignSelf: 'flex-start',
-          padding: '10px 16px',
-          background: '#7c6aed',
-          color: '#fff',
-          borderRadius: 8,
-          fontSize: 13,
-          fontWeight: 700,
-        }}
-      >
-        ✨ Format {label === 'Table' ? 'table' : 'note'}
-      </button>
     </div>
   );
 }
