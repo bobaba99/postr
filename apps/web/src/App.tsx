@@ -3,7 +3,6 @@ import { AppRoutes } from '@/routes';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { PublishFlow } from '@/components/PublishFlow';
 import { SessionExpiredModal } from '@/components/SessionExpiredModal';
-import { UpdateAvailableToast } from '@/components/UpdateAvailableToast';
 
 export default function App() {
   return (
@@ -12,7 +11,6 @@ export default function App() {
       <FeedbackModal />
       <PublishFlow />
       <SessionExpiredModal />
-      <UpdateAvailableToast />
     </BrowserRouter>
   );
 }

@@ -52,6 +52,7 @@ import {
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { ReadabilityPanel } from './ReadabilityPanel';
+import { UpdateAvailableBanner } from '@/components/UpdateAvailableToast';
 
 export type SidebarTab =
   | 'layout'
@@ -477,6 +478,14 @@ export function Sidebar(props: SidebarProps) {
         </svg>
         Back to My Posters
       </a>
+
+      {/* New-version banner. Renders in-place at the top of the
+          sidebar (above the tab rail) when the deployed
+          /version.json advertises a build id different from the
+          one baked into the running bundle. Styled to match the
+          Issues panel language so it reads as an in-app editor
+          signal, not a browser notification. */}
+      <UpdateAvailableBanner />
 
       {/* Body: vertical tab rail on the left + panel content on the right */}
       <div style={{ flex: 1, display: 'flex', marginTop: 16, minHeight: 0 }}>
