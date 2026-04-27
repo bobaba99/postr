@@ -257,3 +257,52 @@ The data-heavy logo recovery is the bigger UX win, so the trade-off
 is worth keeping while A is investigated. Roll back to round 1 if
 the bastian regression matters more than the matysiak/sala-2017
 recovery.
+
+---
+
+## Appendix: Round 3 — root cause for bastian regression found
+
+After the round-2 commit landed, traced the bastian regression to
+`splitLogoByWhitespace` over-firing on tiny cartoon images. The
+people-icon (4 grey shapes — 2 head circles + 2 shoulder paths in
+a 60×60 SVG) has a natural vertical whitespace band between the
+two head circles that the segmenter mis-read as a logo gap, then
+split the cartoon into 2 sub-logos. That's why bastian showed
+**logo:2** even though the LLM pre-scan correctly returned
+`expectedLogoCount: 1`.
+
+### Fix
+
+Added a long-edge minimum to the segmenter (`SEGMENT_MIN_LONG_EDGE
+= 150` px). Cartoons rasterize to 60–100 px on the long edge so
+they never qualify; real multi-logo banners (3 university crests
+side-by-side) rasterize to ≥200 px so they always qualify. The
+guard lives in `splitLogoByWhitespacePure` and 2 new unit tests
+lock down the threshold behavior.
+
+### Round 3 results (verified)
+
+| Poster        | Round 1 | Round 2 | Round 3 | Notes                                         |
+|---------------|--------:|--------:|--------:|-----------------------------------------------|
+| bastian-2013  | 0       | 2 ✗     | **0 ✓**  | Cartoons dropped; decoration filter holds.    |
+| matysiak-2019 | 0       | 5 (over)| **2**    | Under-emits 1 of 3 source logos due to merge. |
+
+**bastian regression resolved.** The decoration filter again gives
+0 cartoon leaks on the review template.
+
+**matysiak now under-emits**: 2 of 3 source logos visible. The
+remaining issue is the merge step in `mergeAdjacentBBoxes` —
+adjacent logos with small gaps between them get collapsed into
+one bbox. That's a separate tuning problem (next priority for the
+follow-up).
+
+### Status
+
+- Decoration filter: holds (0 cartoons leak across review posters)
+- Brand logos on data-heavy: visible but partially merged (2 of 3)
+- Title/authors/headings/text: 10/10
+- Auto-arrange clip: still open
+
+The big-picture trade-off from round 1 (decorations leak vs logos
+hidden) is gone — both work now, with a smaller new issue (logo
+merge under-emits). Worth shipping the round 3 state.

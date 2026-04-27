@@ -1278,12 +1278,24 @@ const SEGMENT_MIN_GAP_FRACTION = 0.06;
  *
  * Exported for unit testing.
  */
+/** Minimum LONG-EDGE pixel dimension below which the segmenter
+ *  refuses to split. A genuine multi-logo banner (3 university
+ *  crests side by side) renders at ≥200px on the long edge, and a
+ *  vertical stack at ≥150px tall. Cartoon icons (people-silhouette,
+ *  leaf, FAQ bubble) typically rasterize to 60–100px and have
+ *  natural internal whitespace (e.g., the gap between the two head
+ *  circles in the people-icon) that would otherwise get mistaken
+ *  for a logo gap and split a single cartoon into 2. 150px on the
+ *  long edge catches all the cartoon cases without losing real
+ *  banners. Short-edge stays unchecked because horizontal banners
+ *  are wide-and-thin (600×80 is normal). */
+const SEGMENT_MIN_LONG_EDGE = 150;
+
 export function splitLogoByWhitespace(
   source: HTMLCanvasElement,
 ): LogoSubRect[] | null {
   const w = source.width;
   const h = source.height;
-  if (w < 8 || h < 8) return null;
   const ctx = source.getContext('2d');
   if (!ctx) return null;
   const data = ctx.getImageData(0, 0, w, h).data;
@@ -1419,6 +1431,11 @@ export function splitLogoByWhitespacePure(
   h: number,
 ): LogoSubRect[] | null {
   if (w < 8 || h < 8) return null;
+  // Cartoon icons (people, leaf, FAQ bubble) rasterize to 60–100px
+  // and have natural internal whitespace that the segmenter would
+  // mis-read as a logo gap. Refuse to split below this long-edge
+  // pixel cutoff — real multi-logo banners are always larger.
+  if (Math.max(w, h) < SEGMENT_MIN_LONG_EDGE) return null;
   // ── Per-row whitespace detection ─────────────────────────────
   const rowIsWhite = new Uint8Array(h);
   for (let y = 0; y < h; y++) {

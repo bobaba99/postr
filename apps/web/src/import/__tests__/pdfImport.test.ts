@@ -408,6 +408,27 @@ describe('splitLogoByWhitespacePure', () => {
     expect(splitLogoByWhitespacePure(data, 4, 4)).toBeNull();
   });
 
+  it('returns null below the SEGMENT_MIN_LONG_EDGE cutoff (cartoon size)', () => {
+    // Synthetic 100×100 canvas with a clear horizontal whitespace
+    // gap that WOULD split if larger. Long edge < 150 → guard
+    // refuses. This is the people-icon profile from the benchmark.
+    const data = makePixels(100, 100, (_x, y) => {
+      const inGap = y >= 40 && y < 60;
+      return inGap ? [255, 255, 255, 255] : [40, 40, 40, 255];
+    });
+    expect(splitLogoByWhitespacePure(data, 100, 100)).toBeNull();
+  });
+
+  it('does split at the same gap pattern when long edge is ≥ 150', () => {
+    // Same gap fraction as the cartoon test, but on a 200-tall
+    // canvas. Long edge ≥ 150 → guard allows split.
+    const data = makePixels(100, 200, (_x, y) => {
+      const inGap = y >= 80 && y < 120;
+      return inGap ? [255, 255, 255, 255] : [40, 40, 40, 255];
+    });
+    expect(splitLogoByWhitespacePure(data, 100, 200)).not.toBeNull();
+  });
+
   it('returns null for a single solid logo (no internal whitespace gap)', () => {
     // 100×100 mostly-dark canvas — no clear horizontal gap
     const data = makePixels(100, 100, () => [50, 50, 50, 255]);
