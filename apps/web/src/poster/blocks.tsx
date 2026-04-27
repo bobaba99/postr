@@ -252,6 +252,11 @@ interface ImageBlockProps {
 export function ImageBlock({ block, palette, onUpdate, userId, posterId }: ImageBlockProps) {
   const ref = useRef<HTMLInputElement | null>(null);
   const resolvedSrc = useStorageUrl(block.imageSrc);
+  // Tracks the imageSrc we already auto-fit. Prevents the auto-fit
+  // from fighting a user-driven resize: the first time a given src
+  // loads, we resize the block to match the natural aspect ratio;
+  // any subsequent renders of the same src skip the fit.
+  const autoFittedSrcRef = useRef<string | null>(null);
 
   // Listen for the floating Replace button on the BlockFrame. When
   // it dispatches `postr:replace-block` for this block id, open the
@@ -314,6 +319,31 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
           alt={stripHtmlToPlainText(block.caption || '') || 'Figure'}
           draggable={false}
           onDragStart={(e) => e.preventDefault()}
+          onLoad={(e) => {
+            // Auto-fit block aspect to match the image's natural
+            // aspect ratio. The PDF importer + manual file uploads
+            // can both produce blocks whose w/h doesn't match the
+            // image (e.g. importer figure-bbox includes whitespace
+            // padding around a tighter visible figure). Without
+            // this fit, objectFit:contain leaves transparent
+            // padding inside the block and the user complains
+            // "the image doesn't hug".
+            //
+            // Tracking the last-fitted src in a ref prevents
+            // fighting any subsequent user-driven resize — once
+            // a given src has been fitted once, it won't refit.
+            if (autoFittedSrcRef.current === block.imageSrc) return;
+            const t = e.currentTarget;
+            const nw = t.naturalWidth;
+            const nh = t.naturalHeight;
+            if (nw <= 0 || nh <= 0) return;
+            autoFittedSrcRef.current = block.imageSrc ?? null;
+            const aspect = nw / nh;
+            const newH = Math.round(block.w / aspect);
+            if (Math.abs(newH - block.h) > 2) {
+              onUpdate({ h: newH });
+            }
+          }}
           style={{
             width: '100%',
             height: '100%',

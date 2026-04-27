@@ -311,10 +311,7 @@ export function Sidebar(props: SidebarProps) {
       setTab('refs');
       return;
     }
-    // Edit tab removed — selection on a text/heading/title/table/
-    // image/logo block leaves the active tab alone. Editing happens
-    // inline on the canvas; the Style tab covers font + spacing
-    // adjustments.
+    setTab('edit');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.selectedBlock?.id, props.selectedBlock?.type]);
 
@@ -581,14 +578,11 @@ export function Sidebar(props: SidebarProps) {
             (props.readOnly
               ? ([['comments', 'comments']] as Array<[SidebarTab, string]>)
               : ([
-                  // Edit tab removed from the bar 2026-04-27 — the
-                  // EditTab function is kept as dead code so we can
-                  // restore quickly if missing functionality (caption
-                  // editing, table editor) turns out to be needed.
                   ['layout', 'layout'],
                   ['style', 'style'],
                   ['authors', 'authors'],
                   ['insert', 'insert'],
+                  ['edit', 'edit block'],
                   ['refs', 'references'],
                   ['check', 'plot code check'],
                   ['issues', 'issues'],
