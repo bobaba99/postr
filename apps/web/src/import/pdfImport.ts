@@ -186,9 +186,9 @@ export async function extractFromPdf(
   // page text, but they belong to the figure pixels and re-appear
   // as orphan blocks after import otherwise.
   onProgress({ stage: 'uploading-figures', ratio: 0 });
-  let figureBlocks: PartialBlock[];
+  let figureResult: ExtractFiguresResult;
   try {
-    figureBlocks = await extractFigures(
+    figureResult = await extractFigures(
       page,
       pageWidthPt,
       pageHeightPt,
@@ -203,12 +203,14 @@ export async function extractFromPdf(
     }
     throw err;
   }
-  const figureBBoxesPt = figureBlocks
-    .map((b) => bboxFromBlock(b))
-    .filter((bb): bb is FigureBBox => bb !== null);
+  const figureBlocks = figureResult.blocks;
+  // Suppress in-figure text against ALL detected bboxes — including
+  // bboxes whose pixel upload failed (504 etc.). Otherwise the figure
+  // disappears from the page but its internal labels ("ADNI_MEM",
+  // axis ticks) survive as orphan text blocks.
   const filteredClusters = filterClustersInsideFigures(
     clusters,
-    figureBBoxesPt,
+    figureResult.detectedBBoxes,
   );
   const roled = assignRoles(filteredClusters, pageHeightPt);
   // Split overlong heading clusters that swallowed bullet content.
@@ -228,6 +230,9 @@ export async function extractFromPdf(
       'Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.',
       sourceFonts.length > 0
         ? `Source fonts (${sourceFonts.slice(0, 3).join(', ')}${sourceFonts.length > 3 ? '…' : ''}) replaced with the editor default.`
+        : '',
+      figureResult.uploadFailures > 0
+        ? `${figureResult.uploadFailures} figure${figureResult.uploadFailures === 1 ? '' : 's'} couldn't be uploaded (storage timeout). Drop the PDF again to retry the missing figures — your text has already been imported.`
         : '',
     ].filter(Boolean),
   });
@@ -353,6 +358,20 @@ export function computeBBoxStats(boxes: FigureBBox[]): BBoxStats {
  * Then render the page to a hidden canvas and crop each surviving
  * bbox into a PNG that gets uploaded to Storage.
  */
+/** Result of the figure-extraction pass.
+ *  - `blocks`: image / logo blocks that uploaded successfully.
+ *  - `detectedBBoxes`: every bbox the pixel pipeline considered a
+ *    figure, **regardless of upload outcome**. Used downstream to
+ *    suppress in-figure text fragments — we want to drop "ADNI_MEM"
+ *    even when the figure it belongs to failed to upload.
+ *  - `uploadFailures`: count of bboxes whose pixel upload failed
+ *    (504 / network). Surfaced as a warning to the user. */
+interface ExtractFiguresResult {
+  blocks: PartialBlock[];
+  detectedBBoxes: FigureBBox[];
+  uploadFailures: number;
+}
+
 async function extractFigures(
   page: PDFPageProxy,
   pageWidthPt: number,
@@ -361,7 +380,7 @@ async function extractFigures(
   userId: string,
   onProgress: ImportProgressCallback,
   verifyDecorations: boolean,
-): Promise<PartialBlock[]> {
+): Promise<ExtractFiguresResult> {
   const onItemDone = (done: number, total: number): void => {
     onProgress({
       stage: 'uploading-figures',
@@ -376,7 +395,7 @@ async function extractFigures(
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   const ctx = canvas.getContext('2d');
-  if (!ctx) return [];
+  if (!ctx) return { blocks: [], detectedBBoxes: [], uploadFailures: 0 };
 
   await page.render({ canvasContext: ctx, viewport }).promise;
 
@@ -413,7 +432,17 @@ async function extractFigures(
   // and shouldn't trigger an LLM call.
   const smallBlockIndexes: number[] = [];
   const smallBlockBBoxes: FigureBBox[] = [];
+  // Every bbox we try to extract — emitted regardless of whether the
+  // crop / upload succeeds. The text-suppression pass uses this set
+  // (not `blocks`) so figure-internal text fragments still get
+  // dropped even when their parent figure failed to upload.
+  const detectedBBoxes: FigureBBox[] = [];
+  let uploadFailures = 0;
   for (const bbox of merged) {
+    // Push BEFORE any of the per-bbox `continue` paths below — we
+    // want suppression to fire on bboxes that fail crop / are blank
+    // / fail upload, not just on successfully-emitted blocks.
+    detectedBBoxes.push(bbox);
     const cropCanvas = document.createElement('canvas');
     allocatedCanvases.push(cropCanvas);
     cropCanvas.width = Math.round(bbox.w * RENDER_SCALE);
@@ -471,6 +500,7 @@ async function extractFigures(
     const file = new File([blob], `${blockId}.png`, { type: 'image/png' });
     const storageSrc = await uploadPosterImage(userId, posterId, blockId, file);
     if (!storageSrc) {
+      uploadFailures++;
       done++;
       onItemDone(done, total);
       continue;
@@ -976,7 +1006,7 @@ async function extractFigures(
     c.height = 0;
   }
 
-  return blocks;
+  return { blocks, detectedBBoxes, uploadFailures };
 }
 
 /**

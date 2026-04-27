@@ -27,6 +27,10 @@ export function extractStoragePath(src: string): string {
 /**
  * Upload an image File to poster-assets and return the storage
  * imageSrc value ("storage://{path}"). Returns null on failure.
+ *
+ * Retries up to 2 times on transient errors (504, 503, network)
+ * with exponential backoff. The cloud Supabase Storage gateway
+ * sometimes returns 504 under load — most retries succeed.
  */
 export async function uploadPosterImage(
   userId: string,
@@ -40,15 +44,66 @@ export async function uploadPosterImage(
   const ext = file.name.split('.').pop()?.toLowerCase() || 'png';
   const path = `${userId}/${posterId}/${blockId}.${ext}`;
 
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(path, file, {
-      contentType: file.type,
-      upsert: true,
-    });
+  const MAX_ATTEMPTS = 3;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file, {
+        contentType: file.type,
+        upsert: true,
+      });
 
-  if (error) return null;
-  return `${STORAGE_PREFIX}${path}`;
+    if (!error) return `${STORAGE_PREFIX}${path}`;
+
+    // Only retry on transient infra errors. Permanent errors (auth,
+    // bucket-not-found, payload-too-large) bail immediately so we
+    // don't burn 3 attempts on a guaranteed-fail.
+    const transient = isTransientStorageError(error);
+    if (!transient || attempt === MAX_ATTEMPTS) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[poster-images] upload failed (attempt ${attempt}/${MAX_ATTEMPTS}):`,
+        error.message,
+      );
+      return null;
+    }
+    // Backoff: 1s, 4s — Supabase Storage gateway typically needs
+    // 5–30s to recover, so the second wait is the load-bearing one.
+    // ±20% jitter prevents 5 simultaneous figure uploads from
+    // retrying in lockstep and re-overloading the gateway.
+    const baseMs = attempt === 1 ? 1000 : 4000;
+    const jitter = baseMs * (Math.random() * 0.4 - 0.2);
+    await new Promise((r) => setTimeout(r, baseMs + jitter));
+  }
+  return null;
+}
+
+/** Storage gateway errors that warrant a retry. Prefer the typed
+ *  `statusCode` on supabase-js StorageError; fall back to message
+ *  inspection for fetch-level failures (typed differently per
+ *  browser: Chrome "Failed to fetch", Safari "Load failed"). */
+export function isTransientStorageError(err: {
+  message?: string;
+  statusCode?: string | number;
+}): boolean {
+  const status = Number(err.statusCode);
+  if (Number.isFinite(status)) {
+    if (status === 408 || status === 425 || status === 429) return true;
+    if (status >= 500 && status < 600) return true;
+    if (status >= 400) return false; // 4xx is a permanent failure
+  }
+  const msg = (err.message ?? '').toLowerCase();
+  return (
+    msg.includes('504') ||
+    msg.includes('503') ||
+    msg.includes('502') ||
+    msg.includes('gateway') ||
+    msg.includes('timeout') ||
+    msg.includes('network') ||
+    msg.includes('fetch failed') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('load failed')
+  );
 }
 
 /**
