@@ -1,6 +1,7 @@
 import express, { type Express } from 'express';
 import cors from 'cors';
 import { createCronRouter } from './cron.js';
+import { createImportRouter } from './import.js';
 
 export function createApp(): Express {
   const app = express();
@@ -20,6 +21,11 @@ export function createApp(): Express {
   // Scheduled jobs (invoked by GitHub Actions cron). Auth lives
   // inside the router via CRON_SECRET bearer check.
   app.use(createCronRouter());
+
+  // Vision-based poster import. Each route inside enforces its own
+  // auth + rate-limit. ANTHROPIC_API_KEY required at request time;
+  // missing key returns 500 only when the route fires.
+  app.use(createImportRouter());
 
   return app;
 }
