@@ -68,11 +68,14 @@ const MIN_CHARS_TOTAL = 200;
 
 export interface ExtractFromPdfOptions {
   /**
-   * Default true. After the figure pipeline runs, ship each "small"
-   * image block (below the per-poster median size) to Claude Vision
-   * for a single classify-region call. Blocks classified as
-   * decoration are dropped and small ones classified as logos get
-   * promoted from `image` → `logo` type. Adds ~$0.005 per import.
+   * Default false. When true, ship each small / logo-shaped image
+   * block to Claude Vision for a single classify-region call.
+   * Decoration verdicts are dropped, logo verdicts are promoted from
+   * image → logo type. Adds ~$0.005 per import + 5-15s of latency.
+   *
+   * Off by default because the user pays the wait every time it
+   * runs; surface as an opt-in checkbox in the import modal where
+   * the cost trade-off is explicit.
    */
   verifyDecorations?: boolean;
 }
@@ -160,14 +163,8 @@ export async function extractFromPdf(
     pageHeightPt,
     posterId,
     userId,
-    (done, total) => {
-      onProgress({
-        stage: 'uploading-figures',
-        ratio: total === 0 ? 1 : done / total,
-        detail: `${done}/${total}`,
-      });
-    },
-    options.verifyDecorations !== false, // default ON
+    onProgress,
+    options.verifyDecorations === true, // default OFF — opt-in
   );
 
   // ── Synthesize ─────────────────────────────────────────────────
@@ -314,9 +311,16 @@ async function extractFigures(
   pageHeightPt: number,
   posterId: string,
   userId: string,
-  onItemDone: (done: number, total: number) => void,
+  onProgress: ImportProgressCallback,
   verifyDecorations: boolean,
 ): Promise<PartialBlock[]> {
+  const onItemDone = (done: number, total: number): void => {
+    onProgress({
+      stage: 'uploading-figures',
+      ratio: total === 0 ? 1 : done / total,
+      detail: `${done}/${total}`,
+    });
+  };
   // Render the page at 2x scale for crisp figure crops.
   const RENDER_SCALE = 2;
   const viewport = page.getViewport({ scale: RENDER_SCALE });
@@ -454,59 +458,94 @@ async function extractFigures(
 
   // ── LLM decoration verifier ───────────────────────────────────
   // Pure-pixel heuristics can't tell a "magnifier with chart" icon
-  // from a small scatter plot — both have ~120 chroma variance. A
-  // single Claude Vision call per small block fixes that for ~$0.005
-  // total per poster. Runs best-effort: any failure leaves the
-  // pixel-pass result intact.
+  // from a small scatter plot. A single Claude Vision call per
+  // suspect block fixes that — but the calls have to run in parallel
+  // and on a strict total-time budget, otherwise a slow API freezes
+  // the import (the bug the user reported).
   if (verifyDecorations) {
-    const dropIndexes = new Set<number>();
-    const promotions = new Map<number, 'logo'>();
-    const RENDER_SCALE_FOR_CLASSIFY = 2;
+    const targets: { blockIdx: number; bbox: FigureBBox }[] = [];
     for (let i = 0; i < smallBlockIndexes.length; i++) {
       const blockIdx = smallBlockIndexes[i]!;
       if (blockIdx < 0) continue;
-      const bbox = smallBlockBBoxes[i]!;
-      try {
-        const verdict = await classifyRegion(
-          canvas,
-          bbox,
-          pageWidthPt,
-          pageHeightPt,
-          posterId,
-          userId,
-          RENDER_SCALE_FOR_CLASSIFY,
-        );
-        if (!verdict) continue;
+      targets.push({ blockIdx, bbox: smallBlockBBoxes[i]! });
+    }
+
+    if (targets.length > 0) {
+      onProgress({
+        stage: 'llm-call',
+        detail: `Verifying ${targets.length} small region${targets.length === 1 ? '' : 's'}…`,
+      });
+      const PER_CALL_TIMEOUT_MS = 8_000;
+      const TOTAL_BUDGET_MS = Math.min(30_000, targets.length * 8_000);
+      const deadline = Date.now() + TOTAL_BUDGET_MS;
+      const RENDER_SCALE_FOR_CLASSIFY = 2;
+      let done = 0;
+
+      const verdicts = await Promise.all(
+        targets.map(async (t) => {
+          if (Date.now() >= deadline) return null;
+          try {
+            const result = await Promise.race([
+              classifyRegion(
+                canvas,
+                t.bbox,
+                pageWidthPt,
+                pageHeightPt,
+                posterId,
+                userId,
+                RENDER_SCALE_FOR_CLASSIFY,
+              ),
+              new Promise<null>((resolve) =>
+                setTimeout(() => resolve(null), PER_CALL_TIMEOUT_MS),
+              ),
+            ]);
+            done++;
+            onProgress({
+              stage: 'llm-call',
+              ratio: done / targets.length,
+              detail: `Verifying figures ${done}/${targets.length}`,
+            });
+            return result;
+          } catch {
+            done++;
+            return null;
+          }
+        }),
+      );
+
+      const dropIndexes = new Set<number>();
+      const promotions = new Map<number, 'logo'>();
+      verdicts.forEach((verdict, i) => {
+        if (!verdict) return;
+        const blockIdx = targets[i]!.blockIdx;
         if (verdict.kind === 'decoration' && verdict.confidence >= 0.5) {
           dropIndexes.add(blockIdx);
         } else if (verdict.kind === 'logo' && verdict.confidence >= 0.5) {
           promotions.set(blockIdx, 'logo');
         }
-      } catch {
-        // ignore — best-effort filter
-      }
-    }
-    // Apply promotions (image → logo) and drop decorations.
-    if (dropIndexes.size > 0 || promotions.size > 0) {
-      const filtered: PartialBlock[] = [];
-      for (let i = 0; i < blocks.length; i++) {
-        if (dropIndexes.has(i)) continue;
-        const promoted = promotions.get(i);
-        const b = blocks[i]!;
-        filtered.push(promoted ? { ...b, type: promoted } : b);
-      }
-      blocks.length = 0;
-      blocks.push(...filtered);
-    }
+      });
 
-    // For every newly-promoted logo, also save a copy into the user's
-    // logo library so they can reuse it across future posters
-    // without re-uploading. Best-effort: failure is silent because
-    // the import already succeeded.
-    for (const idx of promotions.keys()) {
-      const b = blocks.find((blk) => blk.imageSrc === blocks[idx]?.imageSrc);
-      if (!b || !b.imageSrc) continue;
-      void saveLogoToLibrary(b.imageSrc);
+      if (dropIndexes.size > 0 || promotions.size > 0) {
+        const filtered: PartialBlock[] = [];
+        for (let i = 0; i < blocks.length; i++) {
+          if (dropIndexes.has(i)) continue;
+          const promoted = promotions.get(i);
+          const b = blocks[i]!;
+          filtered.push(promoted ? { ...b, type: promoted } : b);
+        }
+        blocks.length = 0;
+        blocks.push(...filtered);
+      }
+
+      // Save promoted logos to the user's library (fire-and-forget;
+      // never blocks the import).
+      for (const idx of promotions.keys()) {
+        const src = blocks.find(
+          (blk) => blk.type === 'logo' && blk.imageSrc,
+        )?.imageSrc;
+        if (!src) continue;
+        void saveLogoToLibrary(src);
+      }
     }
   }
 
