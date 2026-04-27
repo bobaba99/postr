@@ -913,158 +913,6 @@ async function extractFigures(
         }
       }
 
-      // ── Step 2.5: LLM-driven logo extraction ─────────────────────
-      // The pre-scan returned `logoBBoxes` — pixel-space bboxes for
-      // every logo the LLM saw on the full page. These are the
-      // ground truth for logo localization (the pixel pipeline can't
-      // reliably split vertical stacks or merged-XObject banners).
-      //
-      // For each LLM logo:
-      //   1. Convert pixel coords → page-pt
-      //   2. Drop pixel-pipeline blocks that overlap (≥50% of the
-      //      smaller bbox area) — they're stale duplicates
-      //   3. Crop the logo region from the page canvas, upload, emit
-      //      a NEW logo block at the LLM's bbox
-      //
-      // Runs in the same async block as the verifier so it shares the
-      // 30s budget. If the upload chain fails (504), the warning bag
-      // already covers it.
-      if (
-        preScan &&
-        Array.isArray(preScan.logoBBoxes) &&
-        preScan.logoBBoxes.length > 0 &&
-        preScan.imagePixelWidth > 0 &&
-        preScan.imagePixelHeight > 0
-      ) {
-        const ptPerPxX = pageWidthPt / preScan.imagePixelWidth;
-        const ptPerPxY = pageHeightPt / preScan.imagePixelHeight;
-        const llmLogosPt: FigureBBox[] = preScan.logoBBoxes
-          .map((b) => ({
-            x: b.x * ptPerPxX,
-            y: b.y * ptPerPxY,
-            w: b.w * ptPerPxX,
-            h: b.h * ptPerPxY,
-          }))
-          .filter((b) => b.w > 0 && b.h > 0);
-
-        // Drop pixel-pipeline image/logo blocks that overlap any LLM
-        // logo region — the LLM bbox replaces them.
-        for (let i = 0; i < blocks.length; i++) {
-          const b = blocks[i]!;
-          if (b.type !== 'image' && b.type !== 'logo') continue;
-          const bx = unitsToPt(b.x ?? 0);
-          const by = unitsToPt(b.y ?? 0);
-          const bw = unitsToPt(b.w ?? 0);
-          const bh = unitsToPt(b.h ?? 0);
-          const bArea = bw * bh;
-          if (bArea <= 0) continue;
-          for (const llm of llmLogosPt) {
-            const ix = Math.max(0, Math.min(bx + bw, llm.x + llm.w) - Math.max(bx, llm.x));
-            const iy = Math.max(0, Math.min(by + bh, llm.y + llm.h) - Math.max(by, llm.y));
-            const overlap = ix * iy;
-            const smaller = Math.min(bArea, llm.w * llm.h);
-            if (smaller > 0 && overlap / smaller >= 0.5) {
-              dropIndexes.add(i);
-              break;
-            }
-          }
-        }
-
-        // Crop + upload + emit a logo block per LLM bbox. Each LLM
-        // bbox gets a pixel-gap split attempt FIRST — the LLM
-        // sometimes returns one bbox covering two stacked logos
-        // (McGill on top of Douglas with a thin white gap). When
-        // splitLogoByWhitespace finds a gap, we emit N logo blocks;
-        // when it doesn't, we emit the original as one block.
-        // Append every emitted bbox to detectedBBoxes so in-figure
-        // text suppression catches anything inside them.
-        let totalEmittedLogos = 0;
-        let splitsApplied = 0;
-        for (const llm of llmLogosPt) {
-          detectedBBoxes.push(llm);
-          const parent = document.createElement('canvas');
-          allocatedCanvases.push(parent);
-          parent.width = Math.max(1, Math.round(llm.w * RENDER_SCALE));
-          parent.height = Math.max(1, Math.round(llm.h * RENDER_SCALE));
-          const pctx = parent.getContext('2d');
-          if (!pctx) continue;
-          pctx.drawImage(
-            canvas,
-            Math.round(llm.x * RENDER_SCALE),
-            Math.round(llm.y * RENDER_SCALE),
-            parent.width,
-            parent.height,
-            0,
-            0,
-            parent.width,
-            parent.height,
-          );
-
-          // Each entry: page-pt bbox of the logo region to upload.
-          // Single-element list when no split applies.
-          const sub = splitLogoByWhitespace(parent);
-          let regions: { ptX: number; ptY: number; ptW: number; ptH: number; canvas: HTMLCanvasElement }[];
-          if (sub && sub.length >= 2) {
-            splitsApplied++;
-            regions = sub.map((r) => {
-              const c = document.createElement('canvas');
-              allocatedCanvases.push(c);
-              c.width = r.w;
-              c.height = r.h;
-              const cctx = c.getContext('2d');
-              if (cctx) cctx.drawImage(parent, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
-              return {
-                ptX: llm.x + r.x / RENDER_SCALE,
-                ptY: llm.y + r.y / RENDER_SCALE,
-                ptW: r.w / RENDER_SCALE,
-                ptH: r.h / RENDER_SCALE,
-                canvas: c,
-              };
-            });
-          } else {
-            regions = [{
-              ptX: llm.x,
-              ptY: llm.y,
-              ptW: llm.w,
-              ptH: llm.h,
-              canvas: parent,
-            }];
-          }
-
-          for (const region of regions) {
-            const blob = await canvasToBlob(region.canvas, 'image/png');
-            if (!blob) continue;
-            const id = nanoid(8);
-            const file = new File([blob], `${id}.png`, { type: 'image/png' });
-            const src = await uploadPosterImage(userId, posterId, id, file);
-            if (!src) {
-              uploadFailures++;
-              continue;
-            }
-            blocks.push({
-              type: 'logo',
-              x: ptToUnits(region.ptX),
-              y: ptToUnits(region.ptY),
-              w: ptToUnits(region.ptW),
-              h: ptToUnits(region.ptH),
-              content: '',
-              imageSrc: src,
-              imageFit: 'contain',
-              tableData: null,
-            });
-            void saveLogoToLibrary(src);
-            totalEmittedLogos++;
-          }
-        }
-
-        trace('[import.trace] llm-logo extraction', {
-          llmLogoCount: llmLogosPt.length,
-          totalEmittedLogos,
-          splitsApplied,
-          droppedPixelBlocks: dropIndexes.size,
-        });
-      }
-
       // ── Step 3: apply drops / promotions / split candidates ──
       cooked.forEach((c) => {
         const { kind, blockIdx, bbox, sourceImageSrc, confidence } = c;
@@ -1142,10 +990,43 @@ async function extractFigures(
       detail: `Splitting ${splitCandidatesGlobal.length} multi-logo block${splitCandidatesGlobal.length === 1 ? '' : 's'}…`,
     });
     const RENDER_SCALE_FOR_SPLIT = 2;
+    trace('[import.trace] split-pass start', {
+      candidateCount: splitCandidatesGlobal.length,
+      candidates: splitCandidatesGlobal.map((c) => ({
+        imageSrc: c.imageSrc,
+        bboxW: Math.round(c.bbox.w),
+        bboxH: Math.round(c.bbox.h),
+        aspect: +(c.bbox.w / Math.max(1, c.bbox.h)).toFixed(2),
+      })),
+    });
+
     for (const cand of splitCandidatesGlobal) {
-      let split: Awaited<ReturnType<typeof splitMultiLogo>> = null;
+      // Render the candidate region into a parent canvas so both the
+      // LLM splitter (via crop + upload inside splitMultiLogo) AND
+      // the pixel-gap fallback can work from the same pixels.
+      const parentCanvas = document.createElement('canvas');
+      allocatedCanvases.push(parentCanvas);
+      parentCanvas.width = Math.max(1, Math.round(cand.bbox.w * RENDER_SCALE_FOR_SPLIT));
+      parentCanvas.height = Math.max(1, Math.round(cand.bbox.h * RENDER_SCALE_FOR_SPLIT));
+      const pctx = parentCanvas.getContext('2d');
+      if (pctx) {
+        pctx.drawImage(
+          canvas,
+          Math.round(cand.bbox.x * RENDER_SCALE_FOR_SPLIT),
+          Math.round(cand.bbox.y * RENDER_SCALE_FOR_SPLIT),
+          parentCanvas.width,
+          parentCanvas.height,
+          0,
+          0,
+          parentCanvas.width,
+          parentCanvas.height,
+        );
+      }
+
+      // ── Attempt 1: LLM splitter ───────────────────────────────
+      let llmSplit: Awaited<ReturnType<typeof splitMultiLogo>> = null;
       try {
-        split = await splitMultiLogo(
+        llmSplit = await splitMultiLogo(
           canvas,
           cand.bbox,
           pageWidthPt,
@@ -1154,36 +1035,74 @@ async function extractFigures(
           userId,
           RENDER_SCALE_FOR_SPLIT,
         );
-      } catch {
-        // best-effort
+      } catch (err) {
+        trace('[import.trace] split-pass llm error', {
+          imageSrc: cand.imageSrc,
+          message: err instanceof Error ? err.message : String(err),
+        });
       }
-      if (!split || split.isSingleLogo || split.logos.length < 2) continue;
+      const llmLogoCount = llmSplit?.logos?.length ?? 0;
+
+      // ── Attempt 2 (fallback): pixel-gap segmenter ─────────────
+      // Runs whenever the LLM returns < 2 logos. Catches the
+      // McGill-on-top-of-Douglas case where the LLM sees the merged
+      // image and either flags isSingleLogo or returns one bbox.
+      let pixelSplit: LogoSubRect[] | null = null;
+      const llmSayDontSplit =
+        !llmSplit || llmSplit.isSingleLogo || llmLogoCount < 2;
+      if (llmSayDontSplit) {
+        pixelSplit = splitLogoByWhitespace(parentCanvas);
+      }
+
+      trace('[import.trace] split-pass result', {
+        imageSrc: cand.imageSrc,
+        bboxW: Math.round(cand.bbox.w),
+        bboxH: Math.round(cand.bbox.h),
+        canvasW: parentCanvas.width,
+        canvasH: parentCanvas.height,
+        llmIsSingle: llmSplit?.isSingleLogo ?? null,
+        llmLogoCount,
+        pixelSplitCount: pixelSplit?.length ?? 0,
+        chosen: llmLogoCount >= 2 ? 'llm' : pixelSplit ? 'pixel-gap' : 'no-split',
+      });
+
+      // Pick whichever produced 2+ regions, preferring the LLM.
+      let regions: { ptX: number; ptY: number; ptW: number; ptH: number }[] | null = null;
+      if (llmLogoCount >= 2) {
+        regions = llmSplit!.logos.map((l) => ({
+          ptX: cand.bbox.x + l.bbox.x / RENDER_SCALE_FOR_SPLIT,
+          ptY: cand.bbox.y + l.bbox.y / RENDER_SCALE_FOR_SPLIT,
+          ptW: l.bbox.w / RENDER_SCALE_FOR_SPLIT,
+          ptH: l.bbox.h / RENDER_SCALE_FOR_SPLIT,
+        }));
+      } else if (pixelSplit && pixelSplit.length >= 2) {
+        regions = pixelSplit.map((r) => ({
+          ptX: cand.bbox.x + r.x / RENDER_SCALE_FOR_SPLIT,
+          ptY: cand.bbox.y + r.y / RENDER_SCALE_FOR_SPLIT,
+          ptW: r.w / RENDER_SCALE_FOR_SPLIT,
+          ptH: r.h / RENDER_SCALE_FOR_SPLIT,
+        }));
+      }
+      if (!regions) continue;
 
       // Remove the merged block via its imageSrc (stable across
       // earlier drops/promotions; survives index shifts).
       const idx = blocks.findIndex((b) => b.imageSrc === cand.imageSrc);
       if (idx >= 0) blocks.splice(idx, 1);
 
-      // For each sub-logo bbox returned by the LLM (in pixel coords
-      // of the cropped image), translate back to page-pt coords,
-      // crop from the page canvas, upload, push a new logo block.
-      for (const logo of split.logos) {
-        const subPtX = cand.bbox.x + logo.bbox.x / RENDER_SCALE_FOR_SPLIT;
-        const subPtY = cand.bbox.y + logo.bbox.y / RENDER_SCALE_FOR_SPLIT;
-        const subPtW = logo.bbox.w / RENDER_SCALE_FOR_SPLIT;
-        const subPtH = logo.bbox.h / RENDER_SCALE_FOR_SPLIT;
-        if (subPtW < 1 || subPtH < 1) continue;
-
+      // Crop + upload + emit each sub-region.
+      for (const region of regions) {
+        if (region.ptW < 1 || region.ptH < 1) continue;
         const sub = document.createElement('canvas');
         allocatedCanvases.push(sub);
-        sub.width = Math.round(subPtW * RENDER_SCALE_FOR_SPLIT);
-        sub.height = Math.round(subPtH * RENDER_SCALE_FOR_SPLIT);
+        sub.width = Math.round(region.ptW * RENDER_SCALE_FOR_SPLIT);
+        sub.height = Math.round(region.ptH * RENDER_SCALE_FOR_SPLIT);
         const sctx = sub.getContext('2d');
         if (!sctx) continue;
         sctx.drawImage(
           canvas,
-          Math.round(subPtX * RENDER_SCALE_FOR_SPLIT),
-          Math.round(subPtY * RENDER_SCALE_FOR_SPLIT),
+          Math.round(region.ptX * RENDER_SCALE_FOR_SPLIT),
+          Math.round(region.ptY * RENDER_SCALE_FOR_SPLIT),
           sub.width,
           sub.height,
           0,
@@ -1206,10 +1125,10 @@ async function extractFigures(
         if (!subSrc) continue;
         blocks.push({
           type: 'logo',
-          x: ptToUnits(subPtX),
-          y: ptToUnits(subPtY),
-          w: ptToUnits(subPtW),
-          h: ptToUnits(subPtH),
+          x: ptToUnits(region.ptX),
+          y: ptToUnits(region.ptY),
+          w: ptToUnits(region.ptW),
+          h: ptToUnits(region.ptH),
           content: '',
           imageSrc: subSrc,
           imageFit: 'contain',
