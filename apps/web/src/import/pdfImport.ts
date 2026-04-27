@@ -528,25 +528,29 @@ async function extractFigures(
         const blockIdx = targets[i]!.blockIdx;
         const bbox = targets[i]!.bbox;
 
-        // Strict-evidence guard: a "figure" verdict without observed
-        // axes (or numeric data) is downgraded to "decoration". The
-        // backend prompt forces the model to commit to evidence
-        // before classifying, but we double-check here so a model
-        // that returns inconsistent JSON still doesn't pollute the
-        // poster.
+        // Strict-evidence guard: a "figure" / "table" verdict that
+        // contradicts the model's own evidence gets downgraded.
+        //
+        // The figure rule is INTENTIONALLY broad — covers bars,
+        // heatmaps, pies, schematics, composite subplots, and any
+        // other quantitative-data encoding the model self-reports.
+        // The narrow rule (axes + trendlines) was rejecting
+        // bar charts and heatmaps, which the user pointed out.
         let kind = verdict.kind;
         const ev = verdict.evidence;
         if (kind === 'figure' && ev) {
           const looksReal =
-            ev.hasAxes &&
-            (ev.hasTrendLinesOrDataPoints || ev.hasNumericData);
+            ev.representsQuantitativeData && !ev.isStylizedIcon;
           if (!looksReal) kind = 'decoration';
         }
         if (kind === 'table' && ev) {
-          const looksReal = ev.hasGridRowsAndCols && ev.hasNumericData;
+          const looksReal =
+            ev.hasGridRowsAndCols &&
+            ev.hasNumericData &&
+            !ev.isStylizedIcon;
           if (!looksReal) kind = 'decoration';
         }
-        if (kind === 'logo' && ev?.hasOrnamentalShapesOnly) {
+        if (kind === 'logo' && ev?.isStylizedIcon) {
           kind = 'decoration';
         }
 

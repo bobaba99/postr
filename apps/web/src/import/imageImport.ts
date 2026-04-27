@@ -56,11 +56,14 @@ export interface ClassifyRegionResponse {
   confidence: number;
   reason?: string;
   evidence?: {
-    hasAxes: boolean;
-    hasTrendLinesOrDataPoints: boolean;
+    representsQuantitativeData: boolean;
+    hasAxesWithTicks: boolean;
+    hasPlottedMarks: boolean;
+    hasMultipleSubplots: boolean;
+    hasSchematicWithLabels: boolean;
     hasGridRowsAndCols: boolean;
     hasNumericData: boolean;
-    hasOrnamentalShapesOnly: boolean;
+    isStylizedIcon: boolean;
   };
 }
 

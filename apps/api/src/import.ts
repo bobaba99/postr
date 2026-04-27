@@ -158,46 +158,69 @@ const ClassifyRegionSchema = {
     confidence: { type: 'number' },
     reason: { type: 'string' },
     /**
-     * Forced chain-of-thought: the model must commit to whether
-     * specific data-visual artifacts are present BEFORE settling on
-     * `kind`. The frontend then double-checks the verdict against
-     * the evidence — `kind: 'figure'` without `hasAxes` is downgraded
-     * to `decoration`, etc.
+     * Forced chain-of-thought. The model commits to specific
+     * observations BEFORE settling on `kind`. The frontend then
+     * cross-checks: a `kind: "figure"` verdict that contradicts the
+     * evidence (e.g. `representsQuantitativeData: false`) gets
+     * downgraded to `decoration`.
+     *
+     * The fields cover every chart family used in research posters:
+     * scatter, bar, line, box/violin, heatmap, pie/donut, histogram,
+     * forest plot, error-bar plot, network diagram, schematic
+     * illustration, AND composite figures (multiple subplots).
      */
     evidence: {
       type: 'object',
       required: [
-        'hasAxes',
-        'hasTrendLinesOrDataPoints',
+        'representsQuantitativeData',
+        'hasAxesWithTicks',
+        'hasPlottedMarks',
+        'hasMultipleSubplots',
+        'hasSchematicWithLabels',
         'hasGridRowsAndCols',
         'hasNumericData',
-        'hasOrnamentalShapesOnly',
+        'isStylizedIcon',
       ],
       properties: {
-        hasAxes: {
+        representsQuantitativeData: {
           type: 'boolean',
           description:
-            'True ONLY if the image shows clear x and/or y axes with tick marks or value labels (i.e. it is a plot/chart).',
+            'OVERALL judgment: does the image present real data — any of: a chart with axes, a heatmap, a pie/donut, a histogram, a forest plot, a network with measured edges, a labeled experimental schematic, or a composite figure of any of the above? FALSE for cartoon icons / silhouettes / stock illustrations.',
         },
-        hasTrendLinesOrDataPoints: {
+        hasAxesWithTicks: {
           type: 'boolean',
           description:
-            'True ONLY if the image contains plotted data — scatter points, lines, bars, density curves, error bars, etc.',
+            'X and/or Y axis with tick marks or value labels visible. Bar / line / scatter / box / violin / heatmap / histogram all set this true. Pie charts and pure schematics may set this false.',
+        },
+        hasPlottedMarks: {
+          type: 'boolean',
+          description:
+            'Any visible data-encoding marks — points, lines, bars, boxes, violins, heatmap cells, pie segments, error bars, density curves, forest-plot intervals, network nodes/edges with labeled weights, etc.',
+        },
+        hasMultipleSubplots: {
+          type: 'boolean',
+          description:
+            'The image is a composite/panel figure with 2+ distinct subplots arranged in a grid or row.',
+        },
+        hasSchematicWithLabels: {
+          type: 'boolean',
+          description:
+            'The image is an experimental schematic, conceptual diagram, network, or flowchart with text labels that name conditions, variables, or measurements. NOT a stock cartoon.',
         },
         hasGridRowsAndCols: {
           type: 'boolean',
           description:
-            'True ONLY if the image shows a structured grid of rows and columns of data (a table).',
+            'A structured grid of rows and columns of data (table).',
         },
         hasNumericData: {
           type: 'boolean',
           description:
-            'True if numbers are visible inside the region (table cells, axis ticks, data labels).',
+            'Numbers visible inside the region (table cells, axis ticks, data labels, percentages, p-values).',
         },
-        hasOrnamentalShapesOnly: {
+        isStylizedIcon: {
           type: 'boolean',
           description:
-            'True if the image is purely a stylized icon / cartoon / silhouette / placeholder graphic with NO axes, NO grid, NO data — even if the icon depicts a chart-shape.',
+            'TRUE if the image is purely a stylized icon, cartoon, silhouette, placeholder graphic, ornamental shape, or stock illustration — EVEN if it depicts a chart-shape (e.g. a magnifying glass over a tiny bar-chart icon is still ornamental). Implies `representsQuantitativeData: false`.',
         },
       },
     },
@@ -355,26 +378,28 @@ Return:
 - reason: 1-sentence rationale grounded in the evidence
 - evidence: a forced chain-of-thought of specific yes/no observations
 
-STRICT VERIFICATION RULES — apply these in order:
+VERIFICATION RULES — apply in order:
 
-1. Set kind = "figure" ONLY when BOTH:
-     evidence.hasAxes === true   AND
-     (evidence.hasTrendLinesOrDataPoints === true OR evidence.hasNumericData === true)
-   In other words, you must see real x/y axes with tick marks or labels AND actual plotted data points or numeric values. A cartoon "magnifying glass with bar-chart icon" silhouette has no real axes — it is "decoration", not "figure".
+1. Set kind = "figure" if evidence.representsQuantitativeData === true AND evidence.isStylizedIcon === false. This is INTENTIONALLY broad — it includes:
+   - Scatter / line / bar / box / violin / forest plots (hasAxesWithTicks + hasPlottedMarks)
+   - Histograms and density plots (hasAxesWithTicks + hasPlottedMarks)
+   - Heatmaps (hasAxesWithTicks + hasPlottedMarks=cells)
+   - Pie / donut charts (hasPlottedMarks=segments, hasAxesWithTicks may be false)
+   - Network diagrams with labeled edges
+   - Composite figures with 2+ subplots (hasMultipleSubplots)
+   - Experimental schematics with labeled steps / conditions (hasSchematicWithLabels)
+   The only requirement is that the region presents real measured / labeled information. A figure WITHOUT axes is fine if it has any other data-encoding mark.
 
-2. Set kind = "table" ONLY when:
-     evidence.hasGridRowsAndCols === true AND evidence.hasNumericData === true
-   A grid pattern in a stock illustration is not a real data table.
+2. Set kind = "table" if evidence.hasGridRowsAndCols === true AND evidence.hasNumericData === true AND evidence.isStylizedIcon === false.
 
-3. Set kind = "logo" only for institutional / brand marks (university crests, lab logos, funder marks like ADNI). Decorative icons that depict animals, leaves, magnifying glasses, people silhouettes, speech bubbles, etc. are NOT logos — they are "decoration".
+3. Set kind = "logo" ONLY for institutional / brand marks: university crests, hospital logos, funder marks (e.g. ADNI). Decorative cartoons (animals, leaves, magnifiers, FAQ bubbles, silhouetted people, speech balloons) are NOT logos — set kind = "decoration".
 
-4. Set kind = "decoration" for anything else, ESPECIALLY:
-   - Cartoon icons (✦ leaves, silhouetted people, FAQ bubbles, magnifiers)
-   - Placeholder graphics
-   - Section dividers / banners
-   - Anything where evidence.hasOrnamentalShapesOnly === true
+4. Set kind = "decoration" when evidence.isStylizedIcon === true OR none of the above apply. Especially:
+   - Stock icons that depict a chart-shape but contain no real data (a magnifying glass over a tiny bar icon is decoration)
+   - Section dividers, banners, ornamental shapes
+   - Placeholder / cartoon illustrations
 
-5. When uncertain, prefer "decoration". A false-positive figure pollutes the user's poster; a false-negative is recoverable (the user can re-add manually).`;
+5. When uncertain between figure and decoration, prefer "decoration". A false-positive figure pollutes the user's poster; a false-negative is recoverable.`;
 
 async function callAnthropicFullExtract(
   anthropic: Anthropic,
