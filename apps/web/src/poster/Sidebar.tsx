@@ -52,7 +52,7 @@ import {
 import { auditPaletteCB } from './colorblind';
 import { CommentsPanel } from './CommentsPanel';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
-import { FloatingFormatToolbar } from './FloatingFormatToolbar';
+import { DockedFormatToolbar, FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { ReadabilityPanel } from './ReadabilityPanel';
 import { ImportSection } from './sidebar/ImportSection';
 import { PostrExportButton } from './sidebar/PostrExportButton';
@@ -3164,9 +3164,17 @@ function TextBlockEditor(props: {
 
       {/* Content — shared RichTextEditor. Text typed here supports the
           same bold/italic/underline/strike/highlight/color/slash
-          commands as the canvas inline editor. */}
+          commands as the canvas inline editor.
+          A docked format toolbar sits ABOVE the editor so users see
+          the formatting affordances (bold, italic, lists, alignment,
+          colors) without first making a selection. The floating
+          toolbar still appears for selection-relative actions on the
+          canvas. */}
       <div>
         <label style={fieldLabel}>Content</label>
+        <div style={{ marginBottom: 8 }}>
+          <DockedFormatToolbar />
+        </div>
         <div
           style={{
             background: '#1a1a26',

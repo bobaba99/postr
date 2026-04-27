@@ -44,7 +44,22 @@ const ALLOWED_TAGS = new Set([
   'SUP',
   'BR',
   'SPAN',
+  // List structures emitted by document.execCommand('insertUnorderedList'),
+  // ('insertOrderedList'), ('indent'), ('outdent') from the
+  // FloatingFormatToolbar. Without these, the browser inserts <ul>/<ol>/<li>
+  // but the next commit() runs through this sanitizer and strips them,
+  // making the toolbar buttons appear broken.
+  'OL',
+  'UL',
+  'LI',
 ]);
+
+/** Per-tag attribute allowlist. Most tags allow nothing; OL allows
+ *  `start` (so an "Insert Numbered List" that begins at 5 still
+ *  reads correctly) and `type` (1 / a / A / i / I). */
+const ALLOWED_ATTRS_BY_TAG: Record<string, Set<string>> = {
+  OL: new Set(['start', 'type']),
+};
 
 const ALLOWED_STYLE_PROPS = new Set(['color', 'background-color']);
 
@@ -135,6 +150,21 @@ function sanitizeNode(input: Node, doc: Document): DocumentFragment {
           // A span with no style is also pointless; unwrap.
           walk(el, target);
           continue;
+        }
+      }
+
+      // Per-tag attribute allowlist (e.g. OL.start). Only safe
+      // attributes — never style/onclick/href etc.
+      const allowedAttrs = ALLOWED_ATTRS_BY_TAG[tag];
+      if (allowedAttrs) {
+        for (const attr of allowedAttrs) {
+          const v = el.getAttribute(attr);
+          // Tight value validation: only short alphanumeric-ish
+          // values survive (covers integers + "1"/"a"/"A"/"i"/"I"
+          // for OL).
+          if (v && /^[A-Za-z0-9]{1,4}$/.test(v)) {
+            clone.setAttribute(attr, v);
+          }
         }
       }
 

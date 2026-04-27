@@ -155,23 +155,22 @@ export function CropOverlay({ block, onUpdate, onClose }: CropOverlayProps) {
       <Handle edge="left" crop={crop} onDown={startDrag} />
 
       {/* Done / Cancel toolbar — pinned BELOW the block (not over it)
-          and sized to look like the rotate handle, not a giant
-          full-width modal. The previous version painted huge buttons
-          on top of the figure so users couldn't see what they were
-          cropping. */}
+          and sized to be unobtrusive. Anything bigger competes with
+          the block-frame controls (move / crop-toggle / delete) for
+          attention right above. */}
       <div
         style={{
           position: 'absolute',
           left: '50%',
-          bottom: -34,
+          bottom: -28,
           transform: 'translateX(-50%)',
           display: 'flex',
-          gap: 4,
-          padding: '3px 4px',
+          gap: 2,
+          padding: '2px 3px',
           background: 'rgba(17, 17, 24, 0.95)',
           border: '1px solid #2a2a3a',
-          borderRadius: 6,
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+          borderRadius: 5,
+          boxShadow: '0 3px 10px rgba(0, 0, 0, 0.5)',
           whiteSpace: 'nowrap',
         }}
       >
@@ -197,8 +196,11 @@ function Handle({
 }) {
   const horizontal = edge === 'top' || edge === 'bottom';
   const cursor = horizontal ? 'ns-resize' : 'ew-resize';
-  const size = 14;
-  const length = 28;
+  // Keep the handles small enough that the cropped image is always
+  // visually dominant. The hit-target is a 4× invisible padding
+  // applied via CSS below so dragging stays comfortable.
+  const size = 8;
+  const length = 18;
   const center = `calc(${
     horizontal
       ? crop.left + (100 - crop.left - crop.right) / 2
@@ -226,9 +228,9 @@ function Handle({
       style={{
         position: 'absolute',
         background: '#c8b6ff',
-        border: '2px solid #fff',
-        borderRadius: 4,
-        boxShadow: '0 1px 4px rgba(0, 0, 0, 0.6)',
+        border: '1.5px solid #fff',
+        borderRadius: 3,
+        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.6)',
         cursor,
         touchAction: 'none',
         ...positional,
@@ -243,18 +245,18 @@ function clamp(v: number, lo: number, hi: number): number {
 
 const btnStyle: CSSProperties = {
   cursor: 'pointer',
-  width: 22,
-  height: 22,
+  width: 18,
+  height: 18,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: 0,
-  fontSize: 11,
+  fontSize: 10,
   fontWeight: 600,
   color: '#c8cad0',
   background: '#1a1a26',
   border: '1px solid #2a2a3a',
-  borderRadius: 4,
+  borderRadius: 3,
   lineHeight: 1,
 };
 

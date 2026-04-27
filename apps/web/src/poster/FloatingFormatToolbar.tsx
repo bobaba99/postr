@@ -225,58 +225,37 @@ function colorSwatch(
   );
 }
 
-export function FloatingFormatToolbar({ info, onChange }: FloatingFormatToolbarProps) {
-  // Compute a stable position above the selection. We clamp into
-  // the viewport so toolbars near the top edge flip below.
-  const position = useMemo(() => {
-    if (!info) return null;
-    const TOOLBAR_H = 44;
-    const TOOLBAR_MIN_W = 320;
-    const padding = 8;
-    const { rect } = info;
-    const centerX = rect.left + rect.width / 2;
-    let top = rect.top - TOOLBAR_H - padding;
-    // If too close to top, flip below the selection.
-    if (top < 8) top = rect.bottom + padding;
-    // Clamp horizontally so we never overflow the viewport.
-    const maxLeft = window.innerWidth - TOOLBAR_MIN_W - 8;
-    const minLeft = 8;
-    const left = Math.max(minLeft, Math.min(maxLeft, centerX - TOOLBAR_MIN_W / 2));
-    return { top, left };
-  }, [info]);
+/** Inner button row — all the format affordances, no positioning.
+ *  Reused by:
+ *    - `FloatingFormatToolbar` (portal-positioned above the selection)
+ *    - The Edit-tab sidebar panel (always visible above the
+ *      RichTextEditor so users don't have to make a selection
+ *      first to see lists / alignment / colors)
+ *
+ *  Active-format highlighting requires a `formats` object — when it's
+ *  null (no selection), buttons render unpressed but stay clickable;
+ *  the underlying execCommand still acts on the focused block. */
+export interface FormatToolbarButtonsProps {
+  formats?: SelectionInfo['formats'] | null;
+  onChange?: () => void;
+}
 
-  if (!info || !position) return null;
-
-  const formats = info.formats;
-
-  return createPortal(
-    <div
-      style={{
-        position: 'fixed',
-        top: position.top,
-        left: position.left,
-        zIndex: 9700,
-        pointerEvents: 'none',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          padding: 4,
-          background: '#1a1a2e',
-          border: '1px solid #3a3a4a',
-          borderRadius: 8,
-          boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
-          pointerEvents: 'auto',
-          fontFamily: 'system-ui, sans-serif',
-        }}
-      >
-        {cmdButton('B', 'bold', formats.bold, onChange, { fontWeight: 800 })}
-        {cmdButton('I', 'italic', formats.italic, onChange, { fontStyle: 'italic' })}
-        {cmdButton('U', 'underline', formats.underline, onChange, { textDecoration: 'underline' })}
-        {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}
+export function FormatToolbarButtons({
+  formats: f,
+  onChange,
+}: FormatToolbarButtonsProps) {
+  const formats = f ?? {
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+  };
+  return (
+    <>
+      {cmdButton('B', 'bold', formats.bold, onChange, { fontWeight: 800 })}
+      {cmdButton('I', 'italic', formats.italic, onChange, { fontStyle: 'italic' })}
+      {cmdButton('U', 'underline', formats.underline, onChange, { textDecoration: 'underline' })}
+      {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}
 
         <div style={divider} />
 
@@ -412,6 +391,73 @@ export function FloatingFormatToolbar({ info, onChange }: FloatingFormatToolbarP
         >
           💬
         </button>
+    </>
+  );
+}
+
+/** Visual chrome shared between the floating + docked variants —
+ *  the dark pill background with a thin border and inner padding. */
+const TOOLBAR_PILL: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 2,
+  padding: 4,
+  background: '#1a1a2e',
+  border: '1px solid #3a3a4a',
+  borderRadius: 8,
+  boxShadow: '0 10px 30px rgba(0,0,0,0.7)',
+  fontFamily: 'system-ui, sans-serif',
+  flexWrap: 'wrap',
+};
+
+/** Static / docked variant of the toolbar — render in any container
+ *  (typically the sidebar Edit tab). Always visible regardless of
+ *  selection state; clicking a button acts on the focused
+ *  RichTextEditor's selection (or, when none, the focused block). */
+export function DockedFormatToolbar({
+  onChange,
+}: {
+  onChange?: () => void;
+}) {
+  return (
+    <div style={{ ...TOOLBAR_PILL, boxShadow: 'none' }}>
+      <FormatToolbarButtons onChange={onChange} />
+    </div>
+  );
+}
+
+export function FloatingFormatToolbar({ info, onChange }: FloatingFormatToolbarProps) {
+  // Compute a stable position above the selection. We clamp into
+  // the viewport so toolbars near the top edge flip below.
+  const position = useMemo(() => {
+    if (!info) return null;
+    const TOOLBAR_H = 44;
+    const TOOLBAR_MIN_W = 320;
+    const padding = 8;
+    const { rect } = info;
+    const centerX = rect.left + rect.width / 2;
+    let top = rect.top - TOOLBAR_H - padding;
+    if (top < 8) top = rect.bottom + padding;
+    const maxLeft = window.innerWidth - TOOLBAR_MIN_W - 8;
+    const minLeft = 8;
+    const left = Math.max(minLeft, Math.min(maxLeft, centerX - TOOLBAR_MIN_W / 2));
+    return { top, left };
+  }, [info]);
+
+  if (!info || !position) return null;
+
+  return createPortal(
+    <div
+      style={{
+        position: 'fixed',
+        top: position.top,
+        left: position.left,
+        zIndex: 9700,
+        pointerEvents: 'none',
+      }}
+    >
+      <div style={{ ...TOOLBAR_PILL, pointerEvents: 'auto' }}>
+        <FormatToolbarButtons formats={info.formats} onChange={onChange} />
       </div>
     </div>,
     document.body,

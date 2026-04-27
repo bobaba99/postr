@@ -143,6 +143,42 @@ describe('sanitizeHtml · edges', () => {
   });
 });
 
+describe('list sanitization', () => {
+  it('preserves <ul>, <ol>, <li> structure (toolbar list buttons)', () => {
+    const html = '<ul><li>one</li><li>two</li></ul>';
+    expect(sanitizeHtml(html)).toBe(html);
+  });
+
+  it('preserves the <ol start> attribute when given an integer', () => {
+    expect(sanitizeHtml('<ol start="5"><li>x</li></ol>')).toBe(
+      '<ol start="5"><li>x</li></ol>',
+    );
+  });
+
+  it('preserves <ol type> attribute (numbering style)', () => {
+    expect(sanitizeHtml('<ol type="a"><li>x</li></ol>')).toBe(
+      '<ol type="a"><li>x</li></ol>',
+    );
+  });
+
+  it('strips dangerous attributes from list tags', () => {
+    expect(
+      sanitizeHtml('<ul onclick="alert(1)" style="display:none"><li>x</li></ul>'),
+    ).toBe('<ul><li>x</li></ul>');
+  });
+
+  it('strips an oversized or non-alphanumeric ol-start value', () => {
+    expect(sanitizeHtml('<ol start="javascript:alert(1)"><li>x</li></ol>')).toBe(
+      '<ol><li>x</li></ol>',
+    );
+  });
+
+  it('preserves nested list structures (indent button)', () => {
+    const html = '<ul><li>a<ul><li>nested</li></ul></li></ul>';
+    expect(sanitizeHtml(html)).toBe(html);
+  });
+});
+
 describe('escapeHtml', () => {
   it('escapes the big five', () => {
     expect(escapeHtml(`<>"'&`)).toBe('&lt;&gt;&quot;&#39;&amp;');
