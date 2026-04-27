@@ -66,11 +66,6 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
   // Cached source File so the "Try LLM extraction" button can re-run
   // image OCR on the same input without making the user re-drop.
   const sourceFileRef = useRef<File | null>(null);
-  // Default off now: small / logo-shaped bboxes are ALWAYS verified
-  // unconditionally. This checkbox controls the OPTIONAL extra pass
-  // that also verifies medium-sized figures — useful when a stylized
-  // chart-shaped illustration sneaks past the size filter.
-  const [verifyDecorations, setVerifyDecorations] = useState(false);
 
   // Reset state when (re-)opened
   useEffect(() => {
@@ -143,12 +138,8 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
         }
         setProgress({ stage: 'ready' });
       } else if (lower.endsWith('.pdf') || file.type === 'application/pdf') {
-        const synth = await extractFromPdf(
-          file,
-          posterId,
-          userId,
-          (p) => setProgress(p),
-          { verifyDecorations },
+        const synth = await extractFromPdf(file, posterId, userId, (p) =>
+          setProgress(p),
         );
         doc = synth.doc;
         title = synth.title;
@@ -282,47 +273,12 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
         )}
 
         {phase === 'pick' && (
-          <>
-            <DropZone
-              dragActive={dragActive}
-              setDragActive={setDragActive}
-              onFile={handleFile}
-              onPick={() => fileRef.current?.click()}
-            />
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 8,
-                marginTop: 12,
-                padding: '8px 10px',
-                background: '#1a1a26',
-                border: '1px solid #2a2a3a',
-                borderRadius: 6,
-                fontSize: 12,
-                color: '#9ca3af',
-                cursor: 'pointer',
-                lineHeight: 1.5,
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={verifyDecorations}
-                onChange={(e) => setVerifyDecorations(e.target.checked)}
-                style={{ accentColor: '#7c6aed', marginTop: 2 }}
-              />
-              <span>
-                <strong style={{ color: '#c8b6ff' }}>
-                  ✨ Verify ALL figures with AI (extra)
-                </strong>
-                <br />
-                Small icons and logo banners are always verified. Tick
-                this to ALSO check medium-sized figures — catches the
-                rare case where a chart-shaped illustration sneaks in.
-                Adds ~$0.005 + 5–10s.
-              </span>
-            </label>
-          </>
+          <DropZone
+            dragActive={dragActive}
+            setDragActive={setDragActive}
+            onFile={handleFile}
+            onPick={() => fileRef.current?.click()}
+          />
         )}
 
         {phase === 'extracting' && <ProgressView progress={progress} />}

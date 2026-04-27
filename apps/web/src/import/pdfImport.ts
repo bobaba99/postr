@@ -73,14 +73,14 @@ const MIN_CHARS_TOTAL = 200;
 
 export interface ExtractFromPdfOptions {
   /**
-   * Default false. When true, ship each small / logo-shaped image
-   * block to Claude Vision for a single classify-region call.
-   * Decoration verdicts are dropped, logo verdicts are promoted from
-   * image → logo type. Adds ~$0.005 per import + 5-15s of latency.
+   * Default **true**. Ships each medium-sized image block to Claude
+   * Vision for a classify-region call. Decoration verdicts are
+   * dropped, logo verdicts are promoted from image → logo type.
+   * Small / logo-shaped bboxes are ALWAYS verified regardless of
+   * this flag. Adds ~$0.005 per import + 5-15s of latency.
    *
-   * Off by default because the user pays the wait every time it
-   * runs; surface as an opt-in checkbox in the import modal where
-   * the cost trade-off is explicit.
+   * Pass `false` to skip the medium-bbox pass (used by tests + the
+   * rare caller that wants the fast path).
    */
   verifyDecorations?: boolean;
 }
