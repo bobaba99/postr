@@ -296,6 +296,22 @@ export function FloatingFormatToolbar({ info, onChange }: FloatingFormatToolbarP
         <div style={divider} />
 
         {/*
+          List + indent controls. `insertUnorderedList` /
+          `insertOrderedList` toggle list formatting on the block
+          containing the caret; `indent` / `outdent` nest or unnest
+          the list item. These are deprecated execCommand IDs but
+          still ship in every modern browser and are the lowest-
+          friction path to "give text blocks bulleted lists with
+          indent" for imported / freshly-typed content.
+        */}
+        {cmdButton('•', 'insertUnorderedList', false, onChange, { fontSize: 14 })}
+        {cmdButton('1.', 'insertOrderedList', false, onChange, { fontSize: 11, fontWeight: 600 })}
+        {cmdButton('⇥', 'indent', false, onChange, { fontSize: 14 })}
+        {cmdButton('⇤', 'outdent', false, onChange, { fontSize: 14 })}
+
+        <div style={divider} />
+
+        {/*
           Inline font-size bump — small increments (~6 %/press).
 
           `execCommand('fontSize', …)` takes a 1–7 legacy scale,

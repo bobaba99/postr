@@ -86,32 +86,49 @@ export function autoLayout(
     return { blocks: [...blocks], scaledStyles: null };
   }
 
-  // Step 1: pin headers using the title's measured content height
-  // (the caller's probe may have grown it to accommodate a multi-line
-  // title). Authors sits directly under the title — not at a hardcoded
-  // y — so long titles no longer collide with the authors line.
+  // Step 1: pin headers — but compute their TIGHT heights from the
+  // active styles, not the imported block h. An imported title can
+  // arrive with `h: 200` because the source PDF cluster bbox baked
+  // in line-leading whitespace; trusting that h leaves a 100-unit
+  // gap between title and authors that the user calls out as "for
+  // no reason". Same pattern for the authors line.
   //
-  // HEADER_GAP is intentionally tight (2 units ≈ 0.2") so the
-  // title/authors pair visually reads as one unit, matching the
-  // compact spacing of other stacked components. With the old
-  // hardcoded `snap(57)` + default `title.h = 45`, the implied gap
-  // was also 2 — we preserve that default while letting the gap
-  // scale correctly for longer titles.
+  // We approximate the line count from the title's text length and
+  // canvas width, then size to font × lineHeight × lines. This is
+  // tight on multi-line titles too because the canvas-width-based
+  // estimate scales with wrapping.
   const titleBlk = headers.find((b) => b.type === 'title');
-  const titleH = titleBlk ? titleBlk.h : 45;
+  const authorsBlk = headers.find((b) => b.type === 'authors');
+  const titleH = computeHeaderH(
+    titleBlk?.content ?? '',
+    styles.title.size,
+    styles.title.lineHeight,
+    canvasWidth,
+    titleBlk?.h ?? 0,
+  );
+  const authorsH = computeHeaderH(
+    authorsBlk?.content ?? '',
+    styles.authors.size,
+    styles.authors.lineHeight,
+    canvasWidth,
+    authorsBlk?.h ?? 0,
+  );
   const HEADER_GAP = 2;
   const authorsY = snap(M + titleH + HEADER_GAP);
   const pinnedHeaders = headers.map((b) => {
-    if (b.type === 'title') return { ...b, x: M, y: M, w: canvasWidth - M * 2 };
-    return { ...b, x: M, y: authorsY, w: canvasWidth - M * 2 };
+    if (b.type === 'title')
+      return { ...b, x: M, y: M, w: canvasWidth - M * 2, h: snap(titleH) };
+    return {
+      ...b,
+      x: M,
+      y: authorsY,
+      w: canvasWidth - M * 2,
+      h: snap(authorsH),
+    };
   });
 
-  // Body starts below the full header stack (title + gap + authors)
-  // with a standard body margin `M` below the authors block. This
-  // replaces the old hardcoded `HEADER_BOTTOM = 81` so long titles
-  // push the body down in lockstep with the header grow.
-  const authorsBlk = headers.find((b) => b.type === 'authors');
-  const authorsH = authorsBlk ? authorsBlk.h : 20;
+  // Body starts below the full header stack with a standard body
+  // margin `M` below the authors block.
   const headerBottom = authorsY + authorsH;
 
   // Step 2: derive a starting column-count guess from x-clusters.
@@ -235,6 +252,41 @@ export function autoLayout(
     blocks: [...pinnedHeaders, ...bestScaled!.blocks],
     scaledStyles,
   };
+}
+
+/**
+ * Compute a tight header height in poster units from the text + style.
+ *
+ * Estimates wrapped line count from the text length and the available
+ * width using ~0.45 × font_size as the average glyph width (works
+ * well for typical academic-poster fonts). A 60-character title in
+ * a 460-unit-wide canvas at 22-unit font gives ceil(60×9.9 / 460) =
+ * 2 lines, which renders correctly whether the title fits on one
+ * line or wraps to two.
+ *
+ * `fallback` is the imported block's h — used as a floor only when
+ * the text-based estimate is implausibly small (zero text content,
+ * etc).
+ */
+function computeHeaderH(
+  text: string,
+  fontUnits: number,
+  lineHeight: number,
+  canvasWidth: number,
+  fallback: number,
+): number {
+  if (!text || fontUnits <= 0) {
+    return Math.max(fallback, fontUnits * lineHeight);
+  }
+  const innerWidth = Math.max(1, canvasWidth - M * 2);
+  const avgCharWidth = fontUnits * 0.45;
+  const charsPerLine = Math.max(1, Math.floor(innerWidth / avgCharWidth));
+  const lines = Math.max(1, Math.ceil(text.length / charsPerLine));
+  const computed = fontUnits * lineHeight * lines;
+  // Add a small floor (~0.2 lineH) for descender clearance, but
+  // don't trust an inflated `fallback` over the computed value —
+  // that's the bug we're fixing.
+  return Math.max(fontUnits * lineHeight, computed);
 }
 
 /**

@@ -463,6 +463,32 @@ async function extractFigures(
     onItemDone(done, total);
   }
 
+  // Split candidates aggregated across the verifier + heuristic
+  // passes. Multi-logo split runs UNCONDITIONALLY at the end,
+  // regardless of whether the user opted into the LLM verifier —
+  // McGill+Douglas merging is a high-impact case that should always
+  // get one shot at being split.
+  const splitCandidatesGlobal: {
+    imageSrc: string;
+    bbox: FigureBBox;
+  }[] = [];
+
+  // Heuristic-only candidates: any image block that looks like a
+  // multi-logo banner (small + aspect > 1.5) gets queued for split.
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i]!;
+    if (b.type !== 'image' && b.type !== 'logo') continue;
+    if (!b.imageSrc) continue;
+    const bbox = smallBlockBBoxes[i];
+    if (!bbox) continue;
+    const maxDim = Math.max(bbox.w, bbox.h);
+    const minDim = Math.min(bbox.w, bbox.h);
+    const aspectExtreme = maxDim / Math.max(1, minDim) > 1.5;
+    if (looksLikeLogo(bbox) && aspectExtreme) {
+      splitCandidatesGlobal.push({ imageSrc: b.imageSrc, bbox });
+    }
+  }
+
   // ── LLM decoration verifier ───────────────────────────────────
   // Pure-pixel heuristics can't tell a "magnifier with chart" icon
   // from a small scatter plot. A single Claude Vision call per
@@ -522,11 +548,15 @@ async function extractFigures(
 
       const dropIndexes = new Set<number>();
       const promotions = new Map<number, 'logo'>();
-      const splitCandidates: { blockIdx: number; bbox: FigureBBox }[] = [];
+      const splitCandidates: {
+        imageSrc: string;
+        bbox: FigureBBox;
+      }[] = [];
       verdicts.forEach((verdict, i) => {
         if (!verdict) return;
         const blockIdx = targets[i]!.blockIdx;
         const bbox = targets[i]!.bbox;
+        const sourceImageSrc = blocks[blockIdx]?.imageSrc;
 
         // Strict-evidence guard: a "figure" / "table" verdict that
         // contradicts the model's own evidence gets downgraded.
@@ -558,15 +588,30 @@ async function extractFigures(
           dropIndexes.add(blockIdx);
           return;
         }
-        if (kind !== 'logo' || verdict.confidence < 0.5) return;
-        promotions.set(blockIdx, 'logo');
-        // Wide / tall "logo" bboxes are LLM-splittable now — queue
-        // for a second pass that asks the model to return per-logo
-        // sub-bboxes inside the merged image.
+        // Always queue small/logo-shaped images for a multi-logo
+        // split check, REGARDLESS of whether the LLM said the kind
+        // was logo, image, or figure. The McGill+Douglas banner
+        // case sometimes classifies as `image` because the model
+        // sees "two distinct visual elements"; we still want the
+        // segmentation pass to find the two logos and split them.
+        // The split call is a no-op when there's only one logo.
         const maxDim = Math.max(bbox.w, bbox.h);
         const minDim = Math.min(bbox.w, bbox.h);
-        if (maxDim / Math.max(1, minDim) > 2.0) {
-          splitCandidates.push({ blockIdx, bbox });
+        const aspectExtreme = maxDim / Math.max(1, minDim) > 1.5;
+        if (kind === 'logo' && verdict.confidence >= 0.5) {
+          promotions.set(blockIdx, 'logo');
+          if (aspectExtreme && sourceImageSrc) {
+            splitCandidates.push({ imageSrc: sourceImageSrc, bbox });
+          }
+        } else if (kind === 'figure' && looksLikeLogo(bbox) && aspectExtreme) {
+          // Borderline case: small/wide image that the verifier
+          // didn't call a logo. Still try the split pass — if the
+          // LLM finds 2+ logo sub-regions, they get promoted to
+          // logo blocks. If it finds zero/one, the original block
+          // is left untouched.
+          if (sourceImageSrc) {
+            splitCandidates.push({ imageSrc: sourceImageSrc, bbox });
+          }
         }
       });
 
@@ -582,130 +627,119 @@ async function extractFigures(
         blocks.push(...filtered);
       }
 
-      // ── Multi-logo split pass ─────────────────────────────────
-      // For every wide/tall block the verifier classified as "logo",
-      // ask the model to return per-logo sub-bboxes. If the model
-      // finds 2+ logos, we crop each region out of the page raster,
-      // upload separately, and replace the merged block with N split
-      // blocks. The McGill / Douglas / ADNI banner case.
-      if (splitCandidates.length > 0) {
-        onProgress({
-          stage: 'llm-call',
-          detail: `Splitting ${splitCandidates.length} multi-logo block${splitCandidates.length === 1 ? '' : 's'}…`,
-        });
-        for (const cand of splitCandidates) {
-          // Find current block (its index may have shifted after
-          // the drop pass). Match on imageSrc which is stable.
-          const original = blocks.find(
-            (b) =>
-              b.type === 'logo' &&
-              ptToUnits(cand.bbox.w) === Math.abs(b.w) - 0 &&
-              false, // explicit comparison too brittle; do a simple key below
-          );
-          const src = original?.imageSrc;
-          void src;
-          // Easier: re-derive the block by matching on bbox-derived
-          // unit dims; but the simplest path is to crop+upload from
-          // the page canvas regardless and just remove any block
-          // whose bbox sits inside the candidate region.
-          const split = await splitMultiLogo(
-            canvas,
-            cand.bbox,
-            pageWidthPt,
-            pageHeightPt,
-            posterId,
-            userId,
-            2,
-          );
-          if (!split || split.isSingleLogo || split.logos.length < 2) continue;
-
-          // Remove the merged block. Identify by bbox proximity in
-          // poster-unit space (within 1 unit).
-          const mergedX = ptToUnits(cand.bbox.x);
-          const mergedY = ptToUnits(cand.bbox.y);
-          const mergedW = ptToUnits(cand.bbox.w);
-          const mergedH = ptToUnits(cand.bbox.h);
-          for (let i = blocks.length - 1; i >= 0; i--) {
-            const b = blocks[i]!;
-            if (
-              b.type === 'logo' &&
-              Math.abs(b.x - mergedX) < 1 &&
-              Math.abs(b.y - mergedY) < 1 &&
-              Math.abs(b.w - mergedW) < 1 &&
-              Math.abs(b.h - mergedH) < 1
-            ) {
-              blocks.splice(i, 1);
-              break;
-            }
-          }
-
-          // For each sub-logo bbox returned by the LLM (in pixel
-          // coords of the cropped image), translate back to page-pt
-          // coords, crop from the page canvas, upload, push a new
-          // logo block.
-          const RENDER_SCALE_FOR_SPLIT = 2;
-          for (const logo of split.logos) {
-            // Sub-bbox is in pixel space of the cropped image. The
-            // crop was rendered at RENDER_SCALE_FOR_SPLIT × bbox-pt.
-            const subPtX = cand.bbox.x + logo.bbox.x / RENDER_SCALE_FOR_SPLIT;
-            const subPtY = cand.bbox.y + logo.bbox.y / RENDER_SCALE_FOR_SPLIT;
-            const subPtW = logo.bbox.w / RENDER_SCALE_FOR_SPLIT;
-            const subPtH = logo.bbox.h / RENDER_SCALE_FOR_SPLIT;
-            if (subPtW < 1 || subPtH < 1) continue;
-
-            const sub = document.createElement('canvas');
-            allocatedCanvases.push(sub);
-            sub.width = Math.round(subPtW * RENDER_SCALE_FOR_SPLIT);
-            sub.height = Math.round(subPtH * RENDER_SCALE_FOR_SPLIT);
-            const sctx = sub.getContext('2d');
-            if (!sctx) continue;
-            sctx.drawImage(
-              canvas,
-              Math.round(subPtX * RENDER_SCALE_FOR_SPLIT),
-              Math.round(subPtY * RENDER_SCALE_FOR_SPLIT),
-              sub.width,
-              sub.height,
-              0,
-              0,
-              sub.width,
-              sub.height,
-            );
-            const subBlob = await canvasToBlob(sub, 'image/png');
-            if (!subBlob) continue;
-            const subId = nanoid(8);
-            const subFile = new File([subBlob], `${subId}.png`, {
-              type: 'image/png',
-            });
-            const subSrc = await uploadPosterImage(
-              userId,
-              posterId,
-              subId,
-              subFile,
-            );
-            if (!subSrc) continue;
-            blocks.push({
-              type: 'logo',
-              x: ptToUnits(subPtX),
-              y: ptToUnits(subPtY),
-              w: ptToUnits(subPtW),
-              h: ptToUnits(subPtH),
-              content: '',
-              imageSrc: subSrc,
-              imageFit: 'contain',
-              tableData: null,
-            });
-            void saveLogoToLibrary(subSrc);
-          }
+      // Merge verifier-derived candidates into the global pool.
+      for (const c of splitCandidates) {
+        if (
+          !splitCandidatesGlobal.some((g) => g.imageSrc === c.imageSrc)
+        ) {
+          splitCandidatesGlobal.push(c);
         }
       }
 
-      // Save promoted logos that were NOT split (single-logo blocks)
-      // into the user library. Multi-logo splits already saved above.
+      // Save promoted single-logo blocks into the user's library.
+      // Logos that get split below are saved per-sub-block by the
+      // split pass — guard via `splitCandidatesGlobal` so we don't
+      // double-save.
       for (const idx of promotions.keys()) {
-        const wasSplit = splitCandidates.some((c) => c.blockIdx === idx);
-        if (wasSplit) continue;
         const src = blocks[idx]?.imageSrc;
-        if (src) void saveLogoToLibrary(src);
+        if (!src) continue;
+        const willBeSplit = splitCandidatesGlobal.some(
+          (c) => c.imageSrc === src,
+        );
+        if (willBeSplit) continue;
+        void saveLogoToLibrary(src);
+      }
+    }
+  }
+
+  // ── Multi-logo split pass (unconditional) ──────────────────────
+  // For every logo-shaped block, ask the model to return per-logo
+  // sub-bboxes. If the model finds 2+ logos, crop each region out
+  // of the page raster, upload separately, and replace the merged
+  // block with N split blocks. The McGill / Douglas / ADNI banner
+  // case. Runs even when the verifier is off because logo merging
+  // is a high-impact bug — the user only needs an Anthropic key to
+  // see the fix.
+  if (splitCandidatesGlobal.length > 0) {
+    onProgress({
+      stage: 'llm-call',
+      detail: `Splitting ${splitCandidatesGlobal.length} multi-logo block${splitCandidatesGlobal.length === 1 ? '' : 's'}…`,
+    });
+    const RENDER_SCALE_FOR_SPLIT = 2;
+    for (const cand of splitCandidatesGlobal) {
+      let split: Awaited<ReturnType<typeof splitMultiLogo>> = null;
+      try {
+        split = await splitMultiLogo(
+          canvas,
+          cand.bbox,
+          pageWidthPt,
+          pageHeightPt,
+          posterId,
+          userId,
+          RENDER_SCALE_FOR_SPLIT,
+        );
+      } catch {
+        // best-effort
+      }
+      if (!split || split.isSingleLogo || split.logos.length < 2) continue;
+
+      // Remove the merged block via its imageSrc (stable across
+      // earlier drops/promotions; survives index shifts).
+      const idx = blocks.findIndex((b) => b.imageSrc === cand.imageSrc);
+      if (idx >= 0) blocks.splice(idx, 1);
+
+      // For each sub-logo bbox returned by the LLM (in pixel coords
+      // of the cropped image), translate back to page-pt coords,
+      // crop from the page canvas, upload, push a new logo block.
+      for (const logo of split.logos) {
+        const subPtX = cand.bbox.x + logo.bbox.x / RENDER_SCALE_FOR_SPLIT;
+        const subPtY = cand.bbox.y + logo.bbox.y / RENDER_SCALE_FOR_SPLIT;
+        const subPtW = logo.bbox.w / RENDER_SCALE_FOR_SPLIT;
+        const subPtH = logo.bbox.h / RENDER_SCALE_FOR_SPLIT;
+        if (subPtW < 1 || subPtH < 1) continue;
+
+        const sub = document.createElement('canvas');
+        allocatedCanvases.push(sub);
+        sub.width = Math.round(subPtW * RENDER_SCALE_FOR_SPLIT);
+        sub.height = Math.round(subPtH * RENDER_SCALE_FOR_SPLIT);
+        const sctx = sub.getContext('2d');
+        if (!sctx) continue;
+        sctx.drawImage(
+          canvas,
+          Math.round(subPtX * RENDER_SCALE_FOR_SPLIT),
+          Math.round(subPtY * RENDER_SCALE_FOR_SPLIT),
+          sub.width,
+          sub.height,
+          0,
+          0,
+          sub.width,
+          sub.height,
+        );
+        const subBlob = await canvasToBlob(sub, 'image/png');
+        if (!subBlob) continue;
+        const subId = nanoid(8);
+        const subFile = new File([subBlob], `${subId}.png`, {
+          type: 'image/png',
+        });
+        const subSrc = await uploadPosterImage(
+          userId,
+          posterId,
+          subId,
+          subFile,
+        );
+        if (!subSrc) continue;
+        blocks.push({
+          type: 'logo',
+          x: ptToUnits(subPtX),
+          y: ptToUnits(subPtY),
+          w: ptToUnits(subPtW),
+          h: ptToUnits(subPtH),
+          content: '',
+          imageSrc: subSrc,
+          imageFit: 'contain',
+          tableData: null,
+        });
+        void saveLogoToLibrary(subSrc);
       }
     }
   }

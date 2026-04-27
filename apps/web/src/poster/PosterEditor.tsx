@@ -1046,7 +1046,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     if (!el) return;
 
     const ZOOM_MIN = 0.2;
-    const ZOOM_MAX = 5;
+    const ZOOM_MAX = 10;
 
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return; // not a pinch / Cmd+wheel — let it scroll
@@ -3122,7 +3122,7 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (z: number | null) 
         {Math.round(zoom * 100)}%
       </button>
       <button
-        onClick={() => setZoom(Math.min(3, zoom + 0.15))}
+        onClick={() => setZoom(Math.min(10, zoom + 0.15))}
         style={{ all: 'unset', cursor: 'pointer', color: '#aaa', fontSize: 14, padding: '2px 6px', fontWeight: 700 }}
       >
         +
