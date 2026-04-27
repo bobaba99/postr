@@ -31,7 +31,7 @@ import {
   ptToIn,
   ptToUnits,
 } from '../poster/constants';
-import type { RoledCluster } from './clusterText';
+import { cleanImportedText, type RoledCluster } from './clusterText';
 import { parseAuthorsText } from './parseAuthors';
 
 /** Mininum font size (poster units) to clamp imported style overrides
@@ -233,7 +233,14 @@ function clusterToBlock(
   scaleX: number,
   scaleY: number,
 ): Block | null {
-  const text = c.text.trim();
+  // Body / heading clusters get list-marker stripping + wrapped-line
+  // rejoining via `cleanImportedText`. Title and authors keep their
+  // raw text — list markers are virtually never used in those.
+  const rawText = c.text.trim();
+  const text =
+    c.role === 'text' || c.role === 'heading'
+      ? cleanImportedText(rawText)
+      : rawText;
   if (!text) return null;
 
   const x = snap(ptToUnits(c.bbox.x) * scaleX);

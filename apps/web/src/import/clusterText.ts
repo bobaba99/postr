@@ -408,6 +408,68 @@ export function stripHeadingPrefix(text: string): string {
   );
 }
 
+/** Bullet / list markers stripped per line of body text — same set
+ *  as `BULLET_RE` plus dashes. */
+const LINE_LIST_PREFIX_RE =
+  /^\s*(?:[•●▪◦‣◾▫⦁⁃▶❖✦✓✔\-–—]\s+|(?:\d+|[a-zA-Z]|[ivxlcIVXLC]+)[.)]\s+)/;
+
+/**
+ * Best-effort cleanup for an imported text block:
+ *
+ * 1. Per line: strip any leading list marker (1., a), •, ▪, –,
+ *    etc.) so the line reads as plain text.
+ * 2. Join wrapped lines: when a line ends without a sentence-
+ *    terminating punctuation AND the next line starts lowercase
+ *    (or with an open paren / number / quote that obviously
+ *    continues the same sentence), merge them into one line.
+ *
+ * Used by the synthesizer for both regular text clusters and the
+ * references-section cluster — pdfjs commonly breaks a single
+ * journal citation across 3-4 lines, and the user wants those
+ * joined.
+ *
+ * Exported for unit testing.
+ */
+export function cleanImportedText(raw: string): string {
+  if (!raw) return raw;
+  const lines = raw.split(/\n+/).map((l) => l.trimEnd());
+
+  // Step 1: strip leading list markers from each line.
+  const stripped = lines.map((line) =>
+    line.replace(LINE_LIST_PREFIX_RE, ''),
+  );
+
+  // Step 2: rejoin lines that obviously continue the previous one.
+  const joined: string[] = [];
+  for (const line of stripped) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      // Preserve blank lines as paragraph breaks.
+      joined.push('');
+      continue;
+    }
+    if (joined.length === 0) {
+      joined.push(trimmed);
+      continue;
+    }
+    const prev = joined[joined.length - 1]!;
+    const prevEnd = prev.slice(-1);
+    const curStart = trimmed[0] ?? '';
+    // Sentence terminators: . ! ? : ; or closing quote / paren that
+    // followed one. Anything else means the previous line was
+    // mid-sentence and the current line continues it.
+    const endedSentence = /[.!?:;]["'»\)\]]?$/.test(prev);
+    const continuesLowercase = /^[a-z(]/.test(curStart) || /^[\d"'(]/.test(curStart);
+    if (!endedSentence && continuesLowercase) {
+      joined[joined.length - 1] = `${prev} ${trimmed}`;
+    } else {
+      joined.push(trimmed);
+    }
+  }
+
+  return joined.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /**
  * Sort clusters into multi-column reading order.
  *

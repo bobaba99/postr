@@ -399,7 +399,28 @@ VERIFICATION RULES — apply in order:
    - Section dividers, banners, ornamental shapes
    - Placeholder / cartoon illustrations
 
-5. When uncertain between figure and decoration, prefer "decoration". A false-positive figure pollutes the user's poster; a false-negative is recoverable.`;
+5. When uncertain between figure and decoration, prefer "decoration". A false-positive figure pollutes the user's poster; a false-negative is recoverable.
+
+CONCRETE DECORATION EXAMPLES — these are NOT figures, they are decoration:
+- A "people silhouette" icon (two cartoon heads with shoulders, no axes, no numbers)
+- A "magnifying glass with chart icon" inside a hexagon (line-art icon, not a real chart)
+- A "speech / FAQ bubble with question mark" icon
+- A "leaf" or "tree" icon
+- A "lightbulb" or "gear" icon
+- ANY single-color line-art / silhouette / cartoon shape
+- A geometric shape (circle, hexagon, polygon) used as a section ornament
+- A green / pastel monochrome icon depicting a CONCEPT (search, idea, methodology) rather than data
+
+These all set isStylizedIcon = true and kind = "decoration" regardless of how chart-like the icon's shape appears.
+
+CONCRETE FIGURE EXAMPLES — these ARE figures:
+- A scatter plot with x/y axes and points/regression lines
+- A bar chart with axis labels and bars of varying heights with numeric values
+- A heatmap with colored cells and row/column labels
+- A composite figure showing 4 related subplots
+- A network diagram with named nodes and labeled edges
+- An experimental schematic with labeled time-points and condition arrows
+- A pie chart with percentage labels`;
 
 async function callAnthropicFullExtract(
   anthropic: Anthropic,

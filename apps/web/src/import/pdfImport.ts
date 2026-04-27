@@ -492,10 +492,15 @@ async function extractFigures(
   // ── LLM decoration verifier ───────────────────────────────────
   // Pure-pixel heuristics can't tell a "magnifier with chart" icon
   // from a small scatter plot. A single Claude Vision call per
-  // suspect block fixes that — but the calls have to run in parallel
-  // and on a strict total-time budget, otherwise a slow API freezes
-  // the import (the bug the user reported).
-  if (verifyDecorations) {
+  // suspect block fixes that — calls run in parallel with a 30s
+  // total-time budget so a slow API can't freeze the import.
+  //
+  // Runs UNCONDITIONALLY on small / logo-shaped bboxes — the
+  // `verifyDecorations` flag now only controls whether we ALSO
+  // verify medium bboxes that pass the size filter. Decoration
+  // icons are too damaging to user trust to gate behind a checkbox.
+  const alwaysVerifySmall = true;
+  if (alwaysVerifySmall || verifyDecorations) {
     const targets: { blockIdx: number; bbox: FigureBBox }[] = [];
     for (let i = 0; i < smallBlockIndexes.length; i++) {
       const blockIdx = smallBlockIndexes[i]!;

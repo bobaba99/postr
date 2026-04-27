@@ -66,10 +66,11 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
   // Cached source File so the "Try LLM extraction" button can re-run
   // image OCR on the same input without making the user re-drop.
   const sourceFileRef = useRef<File | null>(null);
-  // On by default now that the verifier runs in parallel with a 30s
-  // total-budget cap (decoration leaks were a bigger UX hit than
-  // the 10-15s wait). Users can untick to skip the LLM call.
-  const [verifyDecorations, setVerifyDecorations] = useState(true);
+  // Default off now: small / logo-shaped bboxes are ALWAYS verified
+  // unconditionally. This checkbox controls the OPTIONAL extra pass
+  // that also verifies medium-sized figures — useful when a stylized
+  // chart-shaped illustration sneaks past the size filter.
+  const [verifyDecorations, setVerifyDecorations] = useState(false);
 
   // Reset state when (re-)opened
   useEffect(() => {
@@ -312,12 +313,13 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
               />
               <span>
                 <strong style={{ color: '#c8b6ff' }}>
-                  ✨ Filter decorations with AI
+                  ✨ Verify ALL figures with AI (extra)
                 </strong>
                 <br />
-                Sends each small image to Claude Vision to identify
-                decorative icons and logos. Adds ~$0.005 + 10–20s to
-                the import.
+                Small icons and logo banners are always verified. Tick
+                this to ALSO check medium-sized figures — catches the
+                rare case where a chart-shaped illustration sneaks in.
+                Adds ~$0.005 + 5–10s.
               </span>
             </label>
           </>
