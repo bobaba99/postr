@@ -33,18 +33,32 @@ export async function captureThumbnail(
     const el = document.getElementById('poster-canvas');
     if (!el) return null;
 
-    // Clone the element off-screen for capture so the live DOM is
-    // never visually disrupted. Previous approach mutated the live
-    // element's transform, causing visible flicker during autosave.
+    // Clone the element so the live DOM is never visually disrupted
+    // (the previous approach mutated the live element's transform,
+    // causing visible flicker during autosave).
+    //
+    // Hiding strategy: wrap the clone in a fixed-position 0×0 div
+    // with overflow:hidden. The clone keeps its natural layout
+    // coordinates (top-left at 0,0 within the wrapper), so when
+    // html-to-image inlines computed styles into its <foreignObject>
+    // SVG the children render inside the SVG viewport. Earlier
+    // versions used `position: absolute; left: -9999px` which got
+    // inlined verbatim and pushed every child outside the SVG
+    // viewport — captured output was a blank white image.
     const clone = el.cloneNode(true) as HTMLElement;
     clone.style.transform = 'none';
-    clone.style.position = 'absolute';
-    clone.style.left = '-9999px';
-    clone.style.top = '-9999px';
-    document.body.appendChild(clone);
+    clone.style.position = 'relative';
+    clone.style.left = '0';
+    clone.style.top = '0';
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText =
+      'position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: hidden; pointer-events: none; opacity: 0;';
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
 
     const canvasWidth = clone.offsetWidth;
-    if (canvasWidth === 0) { document.body.removeChild(clone); return null; }
+    if (canvasWidth === 0) { document.body.removeChild(wrapper); return null; }
     const pixelRatio = THUMB_WIDTH / canvasWidth;
 
     let canvas: HTMLCanvasElement;
@@ -55,7 +69,7 @@ export async function captureThumbnail(
         skipFonts: true,
       });
     } finally {
-      document.body.removeChild(clone);
+      document.body.removeChild(wrapper);
     }
 
     const blob = await new Promise<Blob | null>((resolve) => {
