@@ -42,18 +42,26 @@ function formatLastEdited(iso: string): string {
  */
 function MiniPreview({ row }: { row: PosterListRow }) {
   // Use thumbnail image when available — fast, no JSONB needed.
+  // `imgFailed` covers the case where the storage object is missing or
+  // returns 4xx (e.g. orphaned thumbnail_path pointing at a deleted
+  // file): without this, the broken <img> would render an empty white
+  // card. On error we fall through to the synthetic preview below.
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [imgFailed, setImgFailed] = useState(false);
   useEffect(() => {
+    setImgFailed(false);
+    setThumbUrl(null);
     if (row.thumbnail_path) {
       getThumbnailUrl(row.thumbnail_path).then(setThumbUrl);
     }
   }, [row.thumbnail_path]);
 
-  if (thumbUrl) {
+  if (thumbUrl && !imgFailed) {
     return (
       <img
         src={thumbUrl}
         alt={row.title || 'Poster preview'}
+        onError={() => setImgFailed(true)}
         style={{ width: '100%', height: '100%', objectFit: 'cover' }}
       />
     );
