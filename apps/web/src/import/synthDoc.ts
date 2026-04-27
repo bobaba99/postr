@@ -32,6 +32,7 @@ import {
   ptToUnits,
 } from '../poster/constants';
 import type { RoledCluster } from './clusterText';
+import { parseAuthorsText } from './parseAuthors';
 
 export interface SynthDefaults {
   fontFamily?: string;
@@ -84,8 +85,19 @@ export function synthesizeDoc(
 
   const blocks: Block[] = [];
   let titleText = '';
+  let parsedAuthors: ReturnType<typeof parseAuthorsText> = {
+    authors: [],
+    institutions: [],
+  };
 
   for (const c of clusters) {
+    if (c.role === 'authors') {
+      // Parse the authors-cluster text into structured data so the
+      // sidebar AUTHORS tab populates immediately. The block itself
+      // becomes a positioning anchor — `AuthorLine` renders from the
+      // structured arrays, not from `block.content`.
+      parsedAuthors = parseAuthorsText(c.text);
+    }
     const block = clusterToBlock(c, scaleX, scaleY);
     if (!block) continue;
     if (c.role === 'title' && !titleText) titleText = c.text;
@@ -107,8 +119,8 @@ export function synthesizeDoc(
     palette: defaults.palette ?? DEFAULT_PALETTE,
     styles: defaults.styles ?? DEFAULT_STYLES,
     headingStyle: defaults.headingStyle ?? DEFAULT_HEADING_STYLE,
-    institutions: [],
-    authors: [],
+    institutions: parsedAuthors.institutions,
+    authors: parsedAuthors.authors,
     references: [],
   };
 
