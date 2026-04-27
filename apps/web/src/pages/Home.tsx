@@ -17,7 +17,7 @@ import {
   listPosters,
   type PosterListRow,
 } from '@/data/posters';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { PosterCard } from '@/components/PosterCard';
 import { NewPosterButton } from '@/components/NewPosterButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -31,9 +31,11 @@ type Status =
   | { kind: 'error'; message: string };
 
 export default function Home() {
+  const navigate = useNavigate();
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [actionError, setActionError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PosterListRow | null>(null);
+  const [duplicatedTarget, setDuplicatedTarget] = useState<PosterListRow | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const openFeedback = useFeedbackStore((s) => s.open);
 
@@ -72,6 +74,7 @@ export default function Home() {
       setStatus((s) =>
         s.kind === 'ready' ? { kind: 'ready', rows: [copy, ...s.rows] } : s,
       );
+      setDuplicatedTarget(copy);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to duplicate';
       setActionError(message);
@@ -248,6 +251,20 @@ export default function Home() {
         danger
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmModal
+        open={duplicatedTarget !== null}
+        title="Duplicated"
+        message={`Created "${duplicatedTarget?.title?.trim() || 'Untitled Poster'}". Open the new copy now?`}
+        confirmLabel="Open copy"
+        cancelLabel="Stay here"
+        onConfirm={() => {
+          const target = duplicatedTarget;
+          setDuplicatedTarget(null);
+          if (target) navigate(`/p/${target.id}`);
+        }}
+        onCancel={() => setDuplicatedTarget(null)}
       />
 
       <PublicFooter />
