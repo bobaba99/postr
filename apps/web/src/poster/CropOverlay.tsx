@@ -60,6 +60,15 @@ export function CropOverlay({ block, onUpdate, onClose }: CropOverlayProps) {
     onClose();
   }, [block.id, onClose, onUpdate]);
 
+  // Reset = revert to no crop, but stay in crop mode so the user
+  // can drag again. Different from Cancel (which exits the mode
+  // back to the snapshot taken at open time).
+  const reset = useCallback(() => {
+    const cleared = { top: 0, right: 0, bottom: 0, left: 0 };
+    setCrop(cleared);
+    onUpdate(block.id, { crop: undefined });
+  }, [block.id, onUpdate]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -177,6 +186,13 @@ export function CropOverlay({ block, onUpdate, onClose }: CropOverlayProps) {
         <button onClick={cancel} style={btnStyle} title="Cancel (Esc)">
           ✕
         </button>
+        <button
+          onClick={reset}
+          style={btnStyle}
+          title="Reset crop (revert to no crop, stay in crop mode)"
+        >
+          ↺
+        </button>
         <button onClick={apply} style={{ ...btnStyle, ...primary }} title="Apply crop (Enter)">
           ✓
         </button>
@@ -197,10 +213,11 @@ function Handle({
   const horizontal = edge === 'top' || edge === 'bottom';
   const cursor = horizontal ? 'ns-resize' : 'ew-resize';
   // Keep the handles small enough that the cropped image is always
-  // visually dominant. The hit-target is a 4× invisible padding
-  // applied via CSS below so dragging stays comfortable.
-  const size = 8;
-  const length = 18;
+  // visually dominant. Hit-area is extended via an invisible
+  // padding wrapper (`paddingPx`) so users can still grab the
+  // handles comfortably even though the visible glyph is tiny.
+  const size = 5;
+  const length = 12;
   const center = `calc(${
     horizontal
       ? crop.left + (100 - crop.left - crop.right) / 2
