@@ -35,6 +35,15 @@ export const POINTS_PER_UNIT = 72 / PX; // 7.2
 export const ptToUnits = (points: number): number => points / POINTS_PER_UNIT;
 export const unitsToPt = (units: number): number => units * POINTS_PER_UNIT;
 
+/** Inches → poster units (10 units per inch). */
+export const inToUnits = (inches: number): number => inches * PX;
+/** Poster units → inches. */
+export const unitsToIn = (units: number): number => units / PX;
+/** Points → inches (72 points per inch). */
+export const ptToIn = (points: number): number => points / 72;
+/** Inches → points. */
+export const inToPt = (inches: number): number => inches * 72;
+
 /** Margin (poster units) used by all layout templates. */
 export const M = 10;
 

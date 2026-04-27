@@ -54,6 +54,8 @@ import { CommentsPanel } from './CommentsPanel';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { ReadabilityPanel } from './ReadabilityPanel';
+import { ImportSection } from './sidebar/ImportSection';
+import { PostrExportButton } from './sidebar/PostrExportButton';
 import {
   JustRefreshedBanner,
   UpdateAvailableBanner,
@@ -855,6 +857,8 @@ function LayoutTab(props: {
         </div>
       )}
 
+      <ImportSection />
+
       <div style={labelStyle}>Poster Size</div>
       <select
         value={props.posterSizeKey}
@@ -1057,6 +1061,9 @@ function ExportTab(props: {
           <li>Click Save</li>
         </ol>
       </div>
+
+      <div style={labelStyle}>📦 Lossless backup</div>
+      <PostrExportButton />
 
       <div style={labelStyle}>🏪 Print at Staples</div>
       <button

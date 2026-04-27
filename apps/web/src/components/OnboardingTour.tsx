@@ -24,6 +24,16 @@ interface TourStep {
   position: 'bottom' | 'right' | 'left' | 'top';
 }
 
+// The tour shows ONLY Postr's differentiated features — anything you'd
+// also get from Canva/PowerPoint/Figma (block insertion, font picker,
+// general layout) is intentionally cut. Order walks the typical
+// poster-building flow: import existing work → fill in metadata
+// (authors / refs) → check the figures → fix issues → export.
+//
+// NOTE on tabName: we match against the button's visible label text
+// (the sidebar's display label), NOT the internal SidebarTab key.
+// When a label is renamed in Sidebar.tsx, update the `tabName` here
+// or the tour silently skips clicking the tab.
 const STEPS: TourStep[] = [
   {
     selector: '[data-postr-canvas-frame]',
@@ -31,75 +41,46 @@ const STEPS: TourStep[] = [
     body: 'Click any block to select it, drag to move, and resize from the corner handle.',
     position: 'left',
   },
-  // NOTE on tabName: we match against the button's visible label text
-  // (the sidebar's display label), NOT the internal SidebarTab key.
-  // When a label is renamed in Sidebar.tsx (e.g. "refs" →
-  // "references", "edit" → "edit block", "check" → "plot code check"),
-  // the corresponding `tabName` here has to be updated to the new
-  // display label or the tour silently skips clicking the tab.
-  // Order below mirrors the sidebar's current top-to-bottom order
-  // so the tour walks the rail naturally.
   {
-    selector: '[data-postr-sidebar]',
+    selector: '[data-postr-import-tile]',
     tabName: 'layout',
-    title: 'Layout tab',
-    body: 'Set your poster name, choose a size, pick a template, and auto-arrange blocks.',
-    position: 'right',
-  },
-  {
-    selector: '[data-postr-sidebar]',
-    tabName: 'style',
-    title: 'Style & typography',
-    body: 'Choose a color palette, font, and adjust sizes. Save your look as a preset to reuse across posters.',
+    title: 'Already have a poster? Import it',
+    body: 'Drop a PDF (with selectable text) or a saved .postr bundle to land every text block and figure on the canvas as editable elements. The new "+ New poster ▾" menu on the dashboard does the same for fresh imports.',
     position: 'right',
   },
   {
     selector: '[data-postr-sidebar]',
     tabName: 'authors',
-    title: 'Authors & institutions',
-    body: 'Add your co-authors and affiliations. They render automatically below the poster title.',
-    position: 'right',
-  },
-  {
-    selector: '[data-postr-sidebar]',
-    tabName: 'insert',
-    title: 'Insert blocks',
-    body: 'Add headings, text, images, tables, and references. Each block appears at the center of the canvas with a purple pulse. Logos are limited to one per poster.',
-    position: 'right',
-  },
-  {
-    selector: '[data-postr-sidebar]',
-    tabName: 'edit block',
-    title: 'Edit selected block',
-    body: 'Click a block on the canvas first, then use this tab to fine-tune it — table rows, border presets, per-element font sizing, etc.',
+    title: 'Author list & institutions',
+    body: 'Define institutions once, then assign each author to one or more — the byline auto-formats with superscript footnotes (¹University A · ²University B). No other poster tool gets this right.',
     position: 'right',
   },
   {
     selector: '[data-postr-sidebar]',
     tabName: 'references',
-    title: 'References',
-    body: 'Import a .bib / .ris file, add citations manually, or paste a block of already-formatted references straight from your manuscript. Supports APA, Vancouver, IEEE, and Harvard styles.',
+    title: 'References with citation styles',
+    body: 'Import .bib / .ris / .enw, add citations manually, or paste pre-formatted references straight from your manuscript. APA, Vancouver, IEEE, and Harvard styles render automatically.',
     position: 'right',
   },
   {
     selector: '[data-postr-sidebar]',
     tabName: 'plot code check',
-    title: 'Plot code check',
-    body: 'Paste your R or Python plotting code to check whether figure text will be legible at print size. Drag the gray figure-preview rectangle on the canvas to match your target block, or select an image block to lock to its exact dimensions — the purple pill always shows the current size.',
+    title: 'Plot code readability check',
+    body: 'Paste your R or Python plotting code to verify figure text will be legible at print size. Drag the gray rectangle on the canvas, or select an image block to lock to its exact dimensions.',
     position: 'right',
   },
   {
     selector: '[data-postr-sidebar]',
     tabName: 'issues',
     title: 'Pre-flight issues',
-    body: 'Automated lint that scans for blocks outside the canvas, empty figures, missing authors, placeholder text still on the poster, and more. A red badge on the tab shows how many problems are pending — click any issue to jump straight to the offending block.',
+    body: 'Automated lint scans for blocks off-canvas, empty figures, missing authors, leftover placeholder text, and more. The red badge counts pending problems — click any issue to jump to the offending block.',
     position: 'right',
   },
   {
-    selector: '[data-postr-sidebar]',
+    selector: '[data-postr-export-postr]',
     tabName: 'export',
-    title: 'Preview, print, publish',
-    body: 'The Export tab collects everything you need to finish: preview fullscreen, save as PDF, email your design to any Staples kiosk, or publish to the public gallery.',
+    title: 'Export, print, or save .postr',
+    body: 'Save as PDF, email to any Staples kiosk, publish to the gallery — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser.',
     position: 'right',
   },
   {
