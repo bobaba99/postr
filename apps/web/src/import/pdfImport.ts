@@ -300,7 +300,24 @@ async function extractFigures(
       cropCanvas.height,
     );
 
-    const blob = await canvasToBlob(cropCanvas, 'image/png');
+    // Tighten the crop to the bounding box of non-white content. The
+    // PDF's image XObject often allocates whitespace padding around
+    // the visible plot — without this pass, the editor draws an image
+    // block much larger than the actual figure.
+    const tight = tightenCanvasToContent(cropCanvas);
+    const finalCanvas = tight ? tight.canvas : cropCanvas;
+    const offsetXPt = tight ? tight.offsetX / RENDER_SCALE : 0;
+    const offsetYPt = tight ? tight.offsetY / RENDER_SCALE : 0;
+    const finalWPt = tight ? tight.width / RENDER_SCALE : bbox.w;
+    const finalHPt = tight ? tight.height / RENDER_SCALE : bbox.h;
+    const tightBBox: FigureBBox = {
+      x: bbox.x + offsetXPt,
+      y: bbox.y + offsetYPt,
+      w: finalWPt,
+      h: finalHPt,
+    };
+
+    const blob = await canvasToBlob(finalCanvas, 'image/png');
     if (!blob) {
       done++;
       onItemDone(done, total);
@@ -315,15 +332,15 @@ async function extractFigures(
       continue;
     }
 
-    const isLogo = classifyAsLogo(bbox, pageHeightPt);
+    const isLogo = classifyAsLogo(tightBBox, pageHeightPt);
     blocks.push({
       type: isLogo ? 'logo' : 'image',
       // x/y/w/h in poster units BEFORE scale-to-poster-size. The
       // synthesizer applies the final scale.
-      x: ptToUnits(bbox.x),
-      y: ptToUnits(bbox.y),
-      w: ptToUnits(bbox.w),
-      h: ptToUnits(bbox.h),
+      x: ptToUnits(tightBBox.x),
+      y: ptToUnits(tightBBox.y),
+      w: ptToUnits(tightBBox.w),
+      h: ptToUnits(tightBBox.h),
       content: '',
       imageSrc: storageSrc,
       imageFit: 'contain',
@@ -335,6 +352,88 @@ async function extractFigures(
   }
 
   return blocks;
+}
+
+/**
+ * Scan a cropped figure canvas and return a smaller canvas containing
+ * just the non-white content rectangle (plus a small padding ring).
+ * Returns `null` when the canvas is entirely blank — the caller can
+ * skip the block.
+ *
+ * "Non-white" is any pixel with at least one channel below 240 (so a
+ * faint #f0f0f0 background still counts as content) AND alpha > 0.
+ *
+ * Scans every pixel — at 2× render scale a typical poster figure is
+ * ~600 × 800 = 480k pixels which costs ~5 ms in a typed loop. Fine
+ * for an offline import path.
+ */
+function tightenCanvasToContent(
+  source: HTMLCanvasElement,
+): {
+  canvas: HTMLCanvasElement;
+  offsetX: number;
+  offsetY: number;
+  width: number;
+  height: number;
+} | null {
+  const w = source.width;
+  const h = source.height;
+  if (w === 0 || h === 0) return null;
+  const ctx = source.getContext('2d');
+  if (!ctx) return null;
+  const data = ctx.getImageData(0, 0, w, h).data;
+
+  const WHITE_THRESHOLD = 240; // any channel below this counts as content
+  const PAD_PX = 4; // small ring so anti-aliased edges aren't clipped
+
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const a = data[i + 3]!;
+      if (a === 0) continue;
+      const r = data[i]!;
+      const g = data[i + 1]!;
+      const b = data[i + 2]!;
+      if (
+        r < WHITE_THRESHOLD ||
+        g < WHITE_THRESHOLD ||
+        b < WHITE_THRESHOLD
+      ) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < 0) return null; // entirely blank
+
+  minX = Math.max(0, minX - PAD_PX);
+  minY = Math.max(0, minY - PAD_PX);
+  maxX = Math.min(w - 1, maxX + PAD_PX);
+  maxY = Math.min(h - 1, maxY + PAD_PX);
+
+  const tightW = maxX - minX + 1;
+  const tightH = maxY - minY + 1;
+
+  // Skip the rebuild if the tighten saves less than ~3% in either axis
+  // — not worth a second canvas allocation for a barely-changed bbox.
+  if (tightW > w * 0.97 && tightH > h * 0.97) return null;
+
+  const out = document.createElement('canvas');
+  out.width = tightW;
+  out.height = tightH;
+  const outCtx = out.getContext('2d');
+  if (!outCtx) return null;
+  outCtx.drawImage(source, -minX, -minY);
+
+  return { canvas: out, offsetX: minX, offsetY: minY, width: tightW, height: tightH };
 }
 
 /**
