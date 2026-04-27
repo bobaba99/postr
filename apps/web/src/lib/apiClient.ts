@@ -14,10 +14,29 @@ export class ApiError extends Error {
     message: string,
     public readonly status: number,
     public readonly body?: unknown,
+    /** Seconds to wait before retrying — populated from the
+     *  `Retry-After` header on 429 / 503 responses. Undefined when
+     *  the server didn't send the header. */
+    public readonly retryAfterSec?: number,
   ) {
     super(message);
     this.name = 'ApiError';
   }
+}
+
+/** Convert a `Retry-After` seconds value into a human-readable
+ *  duration: "37 seconds", "2 minutes", "3 hours", "tomorrow".
+ *  Each unit rolls over cleanly — 60 seconds becomes "1 minute"
+ *  (not "60 seconds"), 60 minutes becomes "1 hour". */
+export function formatRetryAfter(sec: number): string {
+  if (!Number.isFinite(sec) || sec < 1) return 'a moment';
+  const s = Math.ceil(sec);
+  if (s < 60) return `${s} second${s === 1 ? '' : 's'}`;
+  const m = Math.ceil(sec / 60);
+  if (m < 60) return `${m} minute${m === 1 ? '' : 's'}`;
+  const h = Math.ceil(sec / 3600);
+  if (h < 24) return `${h} hour${h === 1 ? '' : 's'}`;
+  return 'tomorrow';
 }
 
 interface ApiOptions {
@@ -68,7 +87,15 @@ export async function postJson<T = unknown>(
     const message =
       (payload as { error?: string } | null)?.error ??
       `Request failed (${res.status})`;
-    throw new ApiError(message, res.status, payload);
+    const retryAfterRaw = res.headers.get('Retry-After');
+    // Retry-After can be either an integer-seconds value or an
+    // HTTP-date. We only emit integer seconds server-side, so parse
+    // that path; ignore the date form (rare) to keep this simple.
+    const retryAfterSec =
+      retryAfterRaw && /^\d+$/.test(retryAfterRaw)
+        ? parseInt(retryAfterRaw, 10)
+        : undefined;
+    throw new ApiError(message, res.status, payload, retryAfterSec);
   }
 
   return payload as T;

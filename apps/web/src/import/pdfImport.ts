@@ -28,6 +28,7 @@ import type {
 } from '@postr/shared';
 import { uploadPosterImage, resolveStorageUrl } from '@/data/posterImages';
 import { uploadUserLogo } from '@/data/userLogos';
+import { ApiError, formatRetryAfter } from '@/lib/apiClient';
 import { ptToIn, ptToUnits, unitsToPt } from '../poster/constants';
 import {
   assignRoles,
@@ -61,11 +62,29 @@ export class PdfImportError extends Error {
       | 'multi-page'
       | 'no-text-layer'
       | 'parse-failed'
+      | 'rate-limited'
       | 'unknown',
   ) {
     super(message);
     this.name = 'PdfImportError';
   }
+}
+
+/** Wrap a 429 ApiError into a user-facing PdfImportError. The
+ *  rate-limit middleware uses two windows (per-minute burst + daily
+ *  cap); the message in the body distinguishes them. */
+function rateLimitToImportError(err: ApiError): PdfImportError {
+  const wait = err.retryAfterSec
+    ? ` Try again in ${formatRetryAfter(err.retryAfterSec)}.`
+    : '';
+  const isDaily =
+    typeof err.body === 'object' &&
+    err.body !== null &&
+    (err.body as { error?: string }).error === 'daily_limit_exceeded';
+  const lead = isDaily
+    ? 'Daily AI import limit reached.'
+    : 'Too many AI requests in the last minute.';
+  return new PdfImportError(`${lead}${wait}`, 'rate-limited');
 }
 
 /** Threshold below which a PDF is considered "no usable text layer"
@@ -167,15 +186,23 @@ export async function extractFromPdf(
   // page text, but they belong to the figure pixels and re-appear
   // as orphan blocks after import otherwise.
   onProgress({ stage: 'uploading-figures', ratio: 0 });
-  const figureBlocks = await extractFigures(
-    page,
-    pageWidthPt,
-    pageHeightPt,
-    posterId,
-    userId,
-    onProgress,
-    options.verifyDecorations !== false, // default ON
-  );
+  let figureBlocks: PartialBlock[];
+  try {
+    figureBlocks = await extractFigures(
+      page,
+      pageWidthPt,
+      pageHeightPt,
+      posterId,
+      userId,
+      onProgress,
+      options.verifyDecorations !== false, // default ON
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 429) {
+      throw rateLimitToImportError(err);
+    }
+    throw err;
+  }
   const figureBBoxesPt = figureBlocks
     .map((b) => bboxFromBlock(b))
     .filter((bb): bb is FigureBBox => bb !== null);

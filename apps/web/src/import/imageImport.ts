@@ -24,7 +24,7 @@ import type {
 } from '@postr/shared';
 import { uploadPosterImage } from '@/data/posterImages';
 import { supabase } from '@/lib/supabase';
-import { postJson, ApiError } from '@/lib/apiClient';
+import { postJson, ApiError, formatRetryAfter } from '@/lib/apiClient';
 import { ptToUnits, ptToIn } from '../poster/constants';
 import { synthesizeDocFromResult, type SynthOutput } from './synthDoc';
 
@@ -209,9 +209,17 @@ async function runImageOcr(
   } catch (err) {
     if (allocatedHere) releaseCanvas(pageCanvas);
     if (err instanceof ApiError && err.status === 429) {
-      throw new Error(
-        'Rate-limited — try again in a minute (or tomorrow for daily cap).',
-      );
+      const wait = err.retryAfterSec
+        ? ` Try again in ${formatRetryAfter(err.retryAfterSec)}.`
+        : '';
+      const isDaily =
+        typeof err.body === 'object' &&
+        err.body !== null &&
+        (err.body as { error?: string }).error === 'daily_limit_exceeded';
+      const lead = isDaily
+        ? 'Daily AI import limit reached.'
+        : 'Too many AI requests in the last minute.';
+      throw new Error(`${lead}${wait}`);
     }
     throw err instanceof Error ? err : new Error('Vision call failed.');
   }
@@ -338,7 +346,10 @@ export async function splitMultiLogo(
       { auth: true },
     );
     return response;
-  } catch {
+  } catch (err) {
+    // Surface rate-limit failures so the caller can abort the
+    // import with a useful message instead of silently degrading.
+    if (err instanceof ApiError && err.status === 429) throw err;
     return null;
   } finally {
     void supabase.storage.from('poster-assets').remove([tempPath]);
@@ -403,7 +414,8 @@ export async function classifyRegion(
       { auth: true },
     );
     return response;
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 429) throw err;
     return null;
   } finally {
     void supabase.storage.from('poster-assets').remove([tempPath]);
@@ -478,7 +490,8 @@ export async function countFigures(
       { auth: true },
     );
     return response;
-  } catch {
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 429) throw err;
     return null;
   } finally {
     void supabase.storage.from('poster-assets').remove([tempPath]);
