@@ -2147,10 +2147,14 @@ function EditTab(props: {
             label="Figure"
             onUpdateBlock={props.onUpdateBlock}
           />
+          <ImageFitToggle block={sb} onUpdateBlock={props.onUpdateBlock} />
           <CropHint />
         </>
       ) : sb && sb.type === 'logo' ? (
-        <CropHint />
+        <>
+          <ImageFitToggle block={sb} onUpdateBlock={props.onUpdateBlock} />
+          <CropHint />
+        </>
       ) : sb && isTextLike && styleLevel ? (
         <TextBlockEditor
           block={sb}
@@ -2237,6 +2241,73 @@ function CropHint() {
         directly. Drag any edge to trim, press Enter to apply, Esc to
         cancel. The original is preserved — nothing is baked.
       </div>
+    </div>
+  );
+}
+
+// =========================================================================
+// ImageFitToggle — choose how the image renders inside its block.
+// =========================================================================
+//
+// Two modes:
+//   - "Keep aspect ratio" (default, imageFit=contain): the image is
+//     scaled to fit inside the block, leaving padding when the block
+//     and image aspects don't match. Auto-fit-on-load resizes the
+//     block to match the image's natural aspect on first load.
+//
+//   - "Stretch to fit block" (imageFit=fill): the image fills the
+//     block exactly, distorting if the aspect doesn't match. Auto-
+//     fit-on-load is skipped, so the user's chosen block dimensions
+//     stick. Use this when the imported image has whitespace baked
+//     in (e.g. multi-region figures the auto-tighten can't separate)
+//     and you want to draw the block tight to just the visible
+//     content.
+
+function ImageFitToggle({
+  block,
+  onUpdateBlock,
+}: {
+  block: Block;
+  onUpdateBlock: (id: string, patch: Partial<Block>) => void;
+}) {
+  const isFill = block.imageFit === 'fill';
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={labelStyle}>Image fit</div>
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 10,
+          cursor: 'pointer',
+          padding: '10px 12px',
+          background: '#1a1a26',
+          border: '1px solid #2a2a3a',
+          borderRadius: 8,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={isFill}
+          onChange={(e) =>
+            onUpdateBlock(block.id, {
+              imageFit: e.target.checked ? 'fill' : 'contain',
+            })
+          }
+          style={{ marginTop: 2 }}
+        />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: '#c8cad0', fontWeight: 500 }}>
+            Stretch to fit block
+          </div>
+          <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.45, marginTop: 2 }}>
+            Off (default): keep the image's aspect ratio — block padding may
+            appear if you resize freely. On: image fills the block exactly,
+            distorting if needed. Use when the source image has whitespace
+            baked in that you can't crop away.
+          </div>
+        </div>
+      </label>
     </div>
   );
 }

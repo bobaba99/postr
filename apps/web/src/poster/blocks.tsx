@@ -173,9 +173,13 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
             src={displaySrc}
             alt="Poster logo"
             style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              objectFit: 'contain',
+              // For 'fill' mode the image must fill the parent
+              // exactly (width/height 100%), which conflicts with
+              // maxWidth/maxHeight 100% + objectFit:contain that
+              // makes 'contain' work correctly. Branch on imageFit.
+              ...(block.imageFit === 'fill'
+                ? { width: '100%', height: '100%', objectFit: 'fill' as const }
+                : { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' as const }),
               pointerEvents: 'none',
               clipPath: block.crop
                 ? `inset(${clamp(block.crop.top)}% ${clamp(block.crop.right)}% ${clamp(block.crop.bottom)}% ${clamp(block.crop.left)}%)`
@@ -323,18 +327,17 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
             // Auto-fit block aspect to match the image's natural
             // aspect ratio. The PDF importer + manual file uploads
             // can both produce blocks whose w/h doesn't match the
-            // image (e.g. importer figure-bbox includes whitespace
-            // padding around a tighter visible figure). Without
-            // this fit, objectFit:contain leaves transparent
-            // padding inside the block and the user complains
-            // "the image doesn't hug".
+            // image; without this fit, objectFit:contain leaves
+            // transparent padding inside the block.
             //
-            // The ref is keyed off the DISPLAYED src so we don't
-            // wrongly mark the block as "fitted" when only the
-            // placeholder GIF has loaded (first frame is the 1×1
-            // transparent fallback while the signed Storage URL is
-            // resolving). Skipping the placeholder via the
-            // natural-dim minimum guard handles that case too.
+            // Skipped when imageFit === 'fill' — that mode lets the
+            // user freely resize the block while the image stretches
+            // to fit, so we shouldn't override their dimensions.
+            //
+            // The ref is keyed off the DISPLAYED src (currentSrc) so
+            // the placeholder GIF doesn't wrongly mark the block as
+            // already-fitted before the real image loads.
+            if (block.imageFit === 'fill') return;
             const t = e.currentTarget;
             const nw = t.naturalWidth;
             const nh = t.naturalHeight;
@@ -352,7 +355,12 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            // 'fill' stretches the image to fill the block exactly
+            // (industry-standard "freeform image transform" — Figma,
+            // Canva, PowerPoint all expose this as a toggle). Default
+            // is 'contain' which preserves the image's aspect ratio
+            // and pads the block when aspects mismatch.
+            objectFit: block.imageFit ?? 'contain',
             clipPath,
             userSelect: 'none',
             WebkitUserDrag: 'none',
