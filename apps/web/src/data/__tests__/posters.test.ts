@@ -74,12 +74,13 @@ function makeQuery(table: string) {
 
 // vi.mock is hoisted, so any vars it references have to live inside
 // a vi.hoisted() block or they'll be temporal-dead-zone undefined.
-const { signInAnonymouslyMock, signOutMock } = vi.hoisted(() => ({
+const { signInAnonymouslyMock, signOutMock, storageCopyMock } = vi.hoisted(() => ({
   signInAnonymouslyMock: vi.fn(async () => ({
     data: { session: { user: { id: 'user-1' } }, user: { id: 'user-1' } },
     error: null,
   })),
   signOutMock: vi.fn(async () => ({ error: null })),
+  storageCopyMock: vi.fn(async (): Promise<{ data: unknown; error: { message: string } | null }> => ({ data: null, error: null })),
 }));
 
 vi.mock('@/lib/supabase', () => ({
@@ -92,6 +93,9 @@ vi.mock('@/lib/supabase', () => ({
       })),
       signInAnonymously: signInAnonymouslyMock,
       signOut: signOutMock,
+    },
+    storage: {
+      from: () => ({ copy: storageCopyMock }),
     },
   },
 }));
@@ -167,6 +171,8 @@ beforeEach(() => {
   nextResponses = [];
   fakeUser = { id: 'user-1' };
   getUserError = null;
+  storageCopyMock.mockClear();
+  storageCopyMock.mockResolvedValue({ data: null, error: null });
 });
 
 // ---------------------------------------------------------------------------
@@ -385,6 +391,7 @@ describe('duplicatePoster', () => {
   it('loads the source row and inserts a copy owned by the CURRENT user', async () => {
     // Source belongs to a different user (e.g. a public gallery
     // poster) — duplicate must still succeed and own the new row.
+    // No thumbnail on the source so the storage copy step is skipped.
     const source = makeRow({ id: 'src', title: 'My Poster', user_id: 'someone-else' });
     const copy = makeRow({ id: 'dst', title: 'My Poster (copy)' });
     setResponses(
@@ -406,6 +413,59 @@ describe('duplicatePoster', () => {
     // New row must NOT carry over the share_slug or is_public.
     expect(payload.share_slug).toBeUndefined();
     expect(payload.is_public).toBeUndefined();
+    // No thumbnail on source → no storage copy attempted.
+    expect(storageCopyMock).not.toHaveBeenCalled();
+  });
+
+  it('copies the source thumbnail into the current user\'s folder when present', async () => {
+    const source = makeRow({
+      id: 'src',
+      title: 'Has Thumb',
+      thumbnail_path: 'user-1/src/thumbnail.jpg',
+    });
+    const copy = makeRow({ id: 'dst', title: 'Has Thumb (copy)' });
+    setResponses(
+      { data: source, error: null }, // loadPoster
+      { data: copy, error: null }, // insert new row
+      { data: null, error: null }, // update with new thumbnail_path
+    );
+
+    const result = await duplicatePoster('src');
+
+    expect(result.id).toBe('dst');
+    expect(result.thumbnail_path).toBe('user-1/dst/thumbnail.jpg');
+    expect(storageCopyMock).toHaveBeenCalledWith(
+      'user-1/src/thumbnail.jpg',
+      'user-1/dst/thumbnail.jpg',
+    );
+    // Third trace is the update writing the new thumbnail_path.
+    const updateOp = traces[2]!.ops.find((o) => o.method === 'update')!;
+    expect((updateOp.args[0] as Record<string, unknown>).thumbnail_path).toBe(
+      'user-1/dst/thumbnail.jpg',
+    );
+  });
+
+  it('still returns the duplicate when the storage copy fails', async () => {
+    const source = makeRow({
+      id: 'src',
+      thumbnail_path: 'someone-else/src/thumbnail.jpg', // cross-user, RLS may deny
+    });
+    const copy = makeRow({ id: 'dst' });
+    storageCopyMock.mockResolvedValueOnce({ data: null, error: { message: 'rls' } });
+    setResponses(
+      { data: source, error: null }, // loadPoster
+      { data: copy, error: null }, // insert
+    );
+
+    const result = await duplicatePoster('src');
+
+    expect(result.id).toBe('dst');
+    // Storage copy was attempted but failed → no follow-up update,
+    // and the returned row still carries the source row's path
+    // (not surfaced as broken because PosterCard's onError falls
+    // back to the synthetic preview).
+    expect(storageCopyMock).toHaveBeenCalled();
+    expect(traces).toHaveLength(2);
   });
 
   it('throws when the source poster is missing', async () => {

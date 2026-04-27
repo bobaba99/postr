@@ -322,7 +322,41 @@ export async function duplicatePoster(id: string): Promise<PosterRow> {
   if (error) {
     throw new Error(`Failed to duplicate poster: ${error.message}`);
   }
-  return data as unknown as PosterRow;
+
+  const copy = data as unknown as PosterRow;
+
+  // Best-effort: copy the source's thumbnail into the new user's
+  // storage folder so the dashboard preview shows up immediately.
+  //
+  // Without this, the duplicate carries `thumbnail_path = null` and
+  // the only path that ever populates a thumbnail is the autosave's
+  // post-write capture — which never fires unless the user actually
+  // edits the doc. Opening + closing a fresh duplicate would leave a
+  // permanently blank card.
+  //
+  // Failures here (cross-user RLS denial when forking a public
+  // poster, storage hiccup, etc.) are intentionally swallowed — the
+  // duplicate is still usable and the thumbnail will be regenerated
+  // on the next autosave.
+  if (source.thumbnail_path) {
+    try {
+      const newThumbPath = `${user.id}/${copy.id}/thumbnail.jpg`;
+      const { error: copyError } = await supabase.storage
+        .from('poster-assets')
+        .copy(source.thumbnail_path, newThumbPath);
+      if (!copyError) {
+        await supabase
+          .from('posters')
+          .update({ thumbnail_path: newThumbPath })
+          .eq('id', copy.id);
+        copy.thumbnail_path = newThumbPath;
+      }
+    } catch {
+      // Swallowed — see comment above.
+    }
+  }
+
+  return copy;
 }
 
 /**
