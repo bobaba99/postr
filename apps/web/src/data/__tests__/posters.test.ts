@@ -347,7 +347,7 @@ describe('upsertPoster', () => {
 // listPosters
 // ---------------------------------------------------------------------------
 describe('listPosters', () => {
-  it('returns rows ordered by updated_at desc', async () => {
+  it('filters by current user_id and orders by updated_at desc', async () => {
     const rows = [makeRow({ id: 'a' }), makeRow({ id: 'b' })];
     setResponses({ data: rows, error: null });
 
@@ -355,6 +355,8 @@ describe('listPosters', () => {
 
     expect(result.map((r) => r.id)).toEqual(['a', 'b']);
     const trace = traces[0]!;
+    const eqOp = trace.ops.find((o) => o.method === 'eq');
+    expect(eqOp!.args).toEqual(['user_id', 'user-1']);
     const order = trace.ops.find((o) => o.method === 'order');
     expect(order!.args[0]).toBe('updated_at');
     expect(order!.args[1]).toMatchObject({ ascending: false });
@@ -369,14 +371,21 @@ describe('listPosters', () => {
     setResponses({ data: null, error: { message: 'boom' } });
     await expect(listPosters()).rejects.toThrow(/boom/);
   });
+
+  it('throws when there is no active user', async () => {
+    fakeUser = null;
+    await expect(listPosters()).rejects.toThrow(/no active user/i);
+  });
 });
 
 // ---------------------------------------------------------------------------
 // duplicatePoster
 // ---------------------------------------------------------------------------
 describe('duplicatePoster', () => {
-  it('loads the source row and inserts a copy with "(copy)" appended to the title', async () => {
-    const source = makeRow({ id: 'src', title: 'My Poster' });
+  it('loads the source row and inserts a copy owned by the CURRENT user', async () => {
+    // Source belongs to a different user (e.g. a public gallery
+    // poster) — duplicate must still succeed and own the new row.
+    const source = makeRow({ id: 'src', title: 'My Poster', user_id: 'someone-else' });
     const copy = makeRow({ id: 'dst', title: 'My Poster (copy)' });
     setResponses(
       { data: source, error: null }, // loadPoster
@@ -389,6 +398,7 @@ describe('duplicatePoster', () => {
     expect(traces).toHaveLength(2);
     const insertOp = traces[1]!.ops.find((o) => o.method === 'insert')!;
     const payload = insertOp.args[0] as Record<string, unknown>;
+    expect(payload.user_id).toBe('user-1');
     expect(payload.title).toBe('My Poster (copy)');
     expect(payload.data).toEqual(source.data);
     expect(payload.width_in).toBe(48);
@@ -406,6 +416,13 @@ describe('duplicatePoster', () => {
   it('throws when the source load errors', async () => {
     setResponses({ data: null, error: { message: 'rls' } });
     await expect(duplicatePoster('x')).rejects.toThrow(/rls/);
+  });
+
+  it('throws when there is no active user', async () => {
+    const source = makeRow({ id: 'src' });
+    setResponses({ data: source, error: null });
+    fakeUser = null;
+    await expect(duplicatePoster('src')).rejects.toThrow(/no active user/i);
   });
 });
 

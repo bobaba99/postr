@@ -143,15 +143,32 @@ export async function loadMostRecentPoster(): Promise<PosterRow | null> {
 export type PosterListRow = Omit<PosterRow, 'data'>;
 
 /**
- * Lists every poster the current user can see, newest first.
+ * Lists posters owned by the current user, newest first.
+ *
  * Excludes the heavy `data` JSONB column (which contains base64
  * images) to keep the response small and fast (~10ms vs ~900ms+).
- * RLS scopes the result set server-side.
+ *
+ * The explicit `user_id` filter matters: RLS now also exposes any
+ * `is_public = true` row to every authenticated user (for the share
+ * viewer), so a bare select would surface other users' published
+ * posters in the dashboard. The filter pins the dashboard back to
+ * "my posters only".
  */
 export async function listPosters(): Promise<PosterListRow[]> {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error(
+      `Cannot list posters — no active user: ${authError?.message ?? 'unknown'}`,
+    );
+  }
+
   const { data, error } = await supabase
     .from('posters')
     .select('id,user_id,title,width_in,height_in,thumbnail_path,share_slug,is_public,created_at,updated_at')
+    .eq('user_id', user.id)
     .order('updated_at', { ascending: false });
 
   if (error) {
@@ -261,10 +278,18 @@ export async function upsertPoster(id: string, update: PosterUpdate): Promise<Po
 }
 
 /**
- * Clones an existing poster into a new row owned by the same user.
- * The copy gets "(copy)" appended to the title, inherits the `data`
- * snapshot verbatim, and starts with `share_slug = null` /
- * `is_public = false` so duplicates are never accidentally public.
+ * Clones an existing poster into a new row owned by the **current**
+ * authenticated user. The copy gets "(copy)" appended to the title,
+ * inherits the `data` snapshot verbatim, and starts with
+ * `share_slug = null` / `is_public = false` so duplicates are never
+ * accidentally public.
+ *
+ * Always uses `auth.uid()` for the new row's `user_id` rather than
+ * `source.user_id`. The `posters_insert_own` RLS policy enforces
+ * `auth.uid() = user_id` WITH CHECK, so copying a public poster
+ * owned by another user would otherwise fail with "new row violates
+ * row-level security policy". With this rule the duplicate is always
+ * the current user's, regardless of the source's owner.
  */
 export async function duplicatePoster(id: string): Promise<PosterRow> {
   const source = await loadPoster(id);
@@ -272,10 +297,20 @@ export async function duplicatePoster(id: string): Promise<PosterRow> {
     throw new Error(`Cannot duplicate poster ${id}: not found`);
   }
 
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error(
+      `Cannot duplicate poster — no active user: ${authError?.message ?? 'unknown'}`,
+    );
+  }
+
   const { data, error } = await supabase
     .from('posters')
     .insert({
-      user_id: source.user_id,
+      user_id: user.id,
       title: `${source.title} (copy)`,
       width_in: source.width_in,
       height_in: source.height_in,
