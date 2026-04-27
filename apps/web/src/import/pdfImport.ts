@@ -201,36 +201,62 @@ export interface FigureBBox {
   h: number;
 }
 
-// Tuning constants — bias toward suppression. Users can always insert
-// missing figures manually; can NOT easily delete 25 spurious ones.
+// Heuristics here are tuned per-poster from the actual size
+// distribution of the extracted bboxes — what counts as "small" or
+// "decoration" depends on whether the poster has 30 hero plots or 3
+// pinky-nail icons. Hardcoded inch thresholds break on the long tail.
 
 /** Pixels-per-inch in PDF user space. */
 const PT_PER_INCH = 72;
 
-/** Skip image XObjects below this size in BOTH dimensions. Anything
- *  smaller than ~1" tall AND ~1" wide is almost certainly decoration
- *  (the "leaf" placeholder icons we saw in EW_INS, table dividers,
- *  bullet shapes). The min-of-dims rule keeps narrow tall figures and
- *  wide short figures, both of which can be legitimate. */
-const MIN_FIGURE_INCHES = 1.0;
+/** Below this fraction of the page area, a bbox is treated as
+ *  decoration regardless of its absolute size. 0.05% of a 36×42 page
+ *  is 0.756 in² — a 0.85" × 0.85" icon. */
+const MIN_AREA_PAGE_FRACTION = 0.0005;
 
-/** Reject very thin/tall slivers below this aspect ratio (min/max).
- *  At 1/15 a 0.3" tall × 6" wide horizontal rule passes through, but
- *  a 0.1" × 5" hairline does not. */
+/** Reject slivers below this aspect ratio (min/max). At 1/15 a
+ *  0.3" × 6" caption strip passes; a 0.1" × 5" hairline does not. */
 const MIN_ASPECT = 1 / 15;
 
-/** Merge two image bboxes into one when the gap between them is below
- *  this. Catches the "plot rendered as several adjacent XObjects"
- *  case (axes / data area / title emitted as separate paints). */
-const MERGE_GAP_INCHES = 0.4;
+/** A bbox is "logo-like" when its max-dim is below this fraction of
+ *  the median bbox max-dim on the page. So if the typical figure on a
+ *  poster is 6", anything ≤ 60% × 6" = 3.6" max-dim counts as small.
+ *  Two small bboxes never merge with each other — that's how we keep
+ *  rows of logos / icon strips as separate blocks. */
+const SMALL_BBOX_MEDIAN_FRACTION = 0.6;
+
+/** Merge two image bboxes when the gap between them is below this
+ *  fraction of the smaller of the two boxes' max-dims. So a 6"-wide
+ *  plot will absorb fragments within ~0.3", but a 1" logo only
+ *  absorbs neighbours within ~0.05" — the size of its own anti-alias
+ *  ring, not adjacent siblings. */
+const MERGE_GAP_FRACTION = 0.05;
 
 /** Image bboxes whose top edge lies in the upper N% of the page get
  *  considered for `logo` classification. */
 const LOGO_TOP_FRACTION = 0.18;
 
-/** Largest dim that can still count as a logo (in inches). Tall hero
- *  figures in the masthead area would exceed this and stay `image`. */
-const LOGO_MAX_INCHES = 4.0;
+interface BBoxStats {
+  /** Median max-dim across the supplied boxes (pt). */
+  medianMaxDim: number;
+  /** "Small" cutoff: maxDim ≤ smallCutoffPt → logo-like. */
+  smallCutoffPt: number;
+}
+
+/** Compute per-poster size stats so downstream filters can adapt to
+ *  the actual figure-size distribution on the page. Exported for
+ *  tests. */
+export function computeBBoxStats(boxes: FigureBBox[]): BBoxStats {
+  if (boxes.length === 0) {
+    return { medianMaxDim: 0, smallCutoffPt: 0 };
+  }
+  const dims = boxes.map((b) => Math.max(b.w, b.h)).sort((a, b) => a - b);
+  const medianMaxDim = dims[Math.floor(dims.length / 2)] ?? 0;
+  return {
+    medianMaxDim,
+    smallCutoffPt: medianMaxDim * SMALL_BBOX_MEDIAN_FRACTION,
+  };
+}
 
 /**
  * Walk the page operator list and pull every embedded raster image.
@@ -269,9 +295,15 @@ async function extractFigures(
     pageHeightPt,
   );
 
-  // Stage 1+2+3: dedup → filter → merge.
-  const filtered = filterDecorationBBoxes(rawBBoxes);
-  const merged = mergeAdjacentBBoxes(filtered, MERGE_GAP_INCHES * PT_PER_INCH);
+  // Stage 1+2+3: dedup → filter (page-area relative) → merge (per-poster
+  // size-distribution relative).
+  const filtered = filterDecorationBBoxes(
+    rawBBoxes,
+    pageWidthPt,
+    pageHeightPt,
+  );
+  const stats = computeBBoxStats(filtered);
+  const merged = mergeAdjacentBBoxes(filtered, stats);
 
   const total = merged.length;
   let done = 0;
@@ -332,7 +364,7 @@ async function extractFigures(
       continue;
     }
 
-    const isLogo = classifyAsLogo(tightBBox, pageHeightPt);
+    const isLogo = classifyAsLogo(tightBBox, pageHeightPt, stats);
     blocks.push({
       type: isLogo ? 'logo' : 'image',
       // x/y/w/h in poster units BEFORE scale-to-poster-size. The
@@ -503,17 +535,24 @@ export function collectImageBBoxes(
 }
 
 /**
- * Drop bboxes that are clearly decoration: tiny in both dimensions, or
- * extreme aspect ratios (hairlines, dividers).
+ * Drop bboxes that are clearly decoration: too small a fraction of the
+ * page area, or extreme aspect ratios (hairlines, dividers).
+ *
+ * The page-area fraction is dynamic — `MIN_AREA_PAGE_FRACTION` is a
+ * percentage, not an absolute inch threshold. Same code path works
+ * for a 24" letter poster and a 48" hero poster.
  *
  * Exported for unit testing.
  */
-export function filterDecorationBBoxes(boxes: FigureBBox[]): FigureBBox[] {
-  const minPt = MIN_FIGURE_INCHES * PT_PER_INCH;
+export function filterDecorationBBoxes(
+  boxes: FigureBBox[],
+  pageWidthPt: number,
+  pageHeightPt: number,
+): FigureBBox[] {
+  const pageArea = pageWidthPt * pageHeightPt;
+  const minArea = pageArea * MIN_AREA_PAGE_FRACTION;
   return boxes.filter((b) => {
-    // At least one dimension must be ≥ MIN_FIGURE_INCHES. Real plots
-    // and screenshots always satisfy this; decorative icons don't.
-    if (b.w < minPt && b.h < minPt) return false;
+    if (b.w * b.h < minArea) return false;
     const minDim = Math.min(b.w, b.h);
     const maxDim = Math.max(b.w, b.h);
     if (minDim / maxDim < MIN_ASPECT) return false;
@@ -522,16 +561,43 @@ export function filterDecorationBBoxes(boxes: FigureBBox[]): FigureBBox[] {
 }
 
 /**
- * Union-find merge of bboxes that lie within `gapPt` of each other.
- * The merged bbox is the union of cluster members.
+ * Largest max-dim (inches) for a bbox to be considered "small enough
+ * that it might be a logo." Two small bboxes never merge with each
+ * other — that's the McGill/Douglas/ADNI strip, where 3 logos sit in
+ * a row with sub-0.4" gaps. Pure proximity-merging would collapse
+ * them into a single 7"-wide block.
+ *
+ * Plot fragments (axis label + data area, etc.) usually involve at
+ * least one large bbox, so small-↔-large merges still happen.
+ */
+/**
+ * Union-find merge of bboxes whose gap is below a SIZE-RELATIVE
+ * threshold derived from each pair's smaller bbox.
+ *
+ * Two adaptive rules, both keyed off the per-poster `stats`:
+ *   1. Two "small" bboxes (max-dim ≤ stats.smallCutoffPt, i.e. below
+ *      60% of the median bbox max-dim on this page) never merge with
+ *      each other. Keeps rows of logos / icons separate without
+ *      hardcoding what "small" means in absolute inches.
+ *   2. Pairs only merge when their gap is < smaller-bbox-max-dim
+ *      × MERGE_GAP_FRACTION. A 6" plot pulls in fragments within
+ *      ~0.3"; a 1" logo only absorbs neighbours within ~0.05".
  *
  * Exported for unit testing.
  */
 export function mergeAdjacentBBoxes(
   boxes: FigureBBox[],
-  gapPt: number,
+  stats: BBoxStats,
 ): FigureBBox[] {
   if (boxes.length === 0) return [];
+  const isSmall = (b: FigureBBox): boolean =>
+    stats.smallCutoffPt > 0 &&
+    Math.max(b.w, b.h) <= stats.smallCutoffPt;
+  const pairGapThreshold = (a: FigureBBox, b: FigureBBox): number => {
+    const smaller = Math.min(Math.max(a.w, a.h), Math.max(b.w, b.h));
+    return smaller * MERGE_GAP_FRACTION;
+  };
+
   const parent = boxes.map((_, i) => i);
   const find = (i: number): number => {
     while (parent[i] !== i) {
@@ -548,7 +614,11 @@ export function mergeAdjacentBBoxes(
 
   for (let i = 0; i < boxes.length; i++) {
     for (let j = i + 1; j < boxes.length; j++) {
-      if (bboxGap(boxes[i]!, boxes[j]!) <= gapPt) union(i, j);
+      const a = boxes[i]!;
+      const b = boxes[j]!;
+      if (isSmall(a) && isSmall(b)) continue;
+      if (bboxGap(a, b) > pairGapThreshold(a, b)) continue;
+      union(i, j);
     }
   }
 
@@ -585,11 +655,15 @@ function bboxGap(a: FigureBBox, b: FigureBBox): number {
 export function classifyAsLogo(
   bbox: FigureBBox,
   pageHeightPt: number,
+  stats: BBoxStats,
 ): boolean {
   const topZone = pageHeightPt * LOGO_TOP_FRACTION;
   const inUpper = bbox.y + bbox.h <= topZone;
   const maxDim = Math.max(bbox.w, bbox.h);
-  const isSmall = maxDim <= LOGO_MAX_INCHES * PT_PER_INCH;
+  // "Small" is keyed off the per-poster size distribution — same
+  // adaptive threshold used by the merger.
+  const isSmall =
+    stats.smallCutoffPt > 0 && maxDim <= stats.smallCutoffPt;
   return inUpper && isSmall;
 }
 
