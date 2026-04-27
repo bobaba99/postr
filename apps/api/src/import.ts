@@ -290,7 +290,12 @@ export function createImportRouter(deps: ImportRouterDeps = {}): Router {
   router.post(
     '/api/import/extract',
     requireAuth(getSupabase),
-    createRateLimiter({ maxPerWindow: 5, maxPerDay: 20 }),
+    // The new figure pipeline runs 1 pre-scan + N classify-region +
+    // M split-multi-logo per import (typical: 8–15 calls). The old
+    // 5/min cap was sized for single-shot full-extract imports and
+    // now 429s legitimate users mid-import. 60/min admits one full
+    // import comfortably; 200/day = ~$1/user/day at $0.005/call.
+    createRateLimiter({ maxPerWindow: 60, maxPerDay: 200 }),
     async (req: Request, res: Response) => {
       const parsed = ExtractRequest.safeParse(req.body);
       if (!parsed.success) {
