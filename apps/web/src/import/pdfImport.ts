@@ -504,6 +504,16 @@ async function extractFigures(
     }
 
     if (targets.length > 0) {
+      // eslint-disable-next-line no-console
+      console.debug(
+        `[import.verifier] running on ${targets.length} candidate bbox(es)`,
+        targets.map((t) => ({
+          maxDim: Math.max(t.bbox.w, t.bbox.h),
+          minDim: Math.min(t.bbox.w, t.bbox.h),
+          x: t.bbox.x,
+          y: t.bbox.y,
+        })),
+      );
       onProgress({
         stage: 'llm-call',
         detail: `Verifying ${targets.length} small region${targets.length === 1 ? '' : 's'}…`,
@@ -552,26 +562,61 @@ async function extractFigures(
         imageSrc: string;
         bbox: FigureBBox;
       }[] = [];
+      // eslint-disable-next-line no-console
+      console.debug(
+        `[import.verifier] verdicts (${verdicts.filter(Boolean).length}/${verdicts.length} returned)`,
+        verdicts.map((v, i) => ({
+          target: i,
+          maxDim: Math.max(targets[i]!.bbox.w, targets[i]!.bbox.h),
+          kind: v?.kind,
+          confidence: v?.confidence,
+          representsData: v?.evidence?.representsQuantitativeData,
+          isStylizedIcon: v?.evidence?.isStylizedIcon,
+          axes: v?.evidence?.hasAxesWithTicks,
+          marks: v?.evidence?.hasPlottedMarks,
+        })),
+      );
       verdicts.forEach((verdict, i) => {
         if (!verdict) return;
         const blockIdx = targets[i]!.blockIdx;
         const bbox = targets[i]!.bbox;
         const sourceImageSrc = blocks[blockIdx]?.imageSrc;
 
-        // Strict-evidence guard: a "figure" / "table" verdict that
-        // contradicts the model's own evidence gets downgraded.
-        //
-        // The figure rule is INTENTIONALLY broad — covers bars,
-        // heatmaps, pies, schematics, composite subplots, and any
-        // other quantitative-data encoding the model self-reports.
-        // The narrow rule (axes + trendlines) was rejecting
-        // bar charts and heatmaps, which the user pointed out.
+        // Strict-evidence guard with a SECOND verification layer:
+        // the model's overall `representsQuantitativeData` flag is
+        // not enough by itself — it has to be backed by AT LEAST ONE
+        // specific encoding observation (axes-with-ticks OR
+        // plotted-marks OR multiple-subplots OR
+        // schematic-with-labels). This catches the case where the
+        // model agreed that a stylized icon "represents data"
+        // because the icon depicts a chart shape, but couldn't name
+        // a specific structural feature.
         let kind = verdict.kind;
         const ev = verdict.evidence;
         if (kind === 'figure' && ev) {
+          const hasSpecificEncoding =
+            ev.hasAxesWithTicks ||
+            ev.hasPlottedMarks ||
+            ev.hasMultipleSubplots ||
+            ev.hasSchematicWithLabels ||
+            ev.hasGridRowsAndCols;
           const looksReal =
-            ev.representsQuantitativeData && !ev.isStylizedIcon;
-          if (!looksReal) kind = 'decoration';
+            ev.representsQuantitativeData &&
+            !ev.isStylizedIcon &&
+            hasSpecificEncoding;
+          if (!looksReal) {
+            // eslint-disable-next-line no-console
+            console.debug(
+              '[import.verifier] downgrade figure→decoration',
+              {
+                bbox,
+                evidence: ev,
+                originalKind: verdict.kind,
+                confidence: verdict.confidence,
+              },
+            );
+            kind = 'decoration';
+          }
         }
         if (kind === 'table' && ev) {
           const looksReal =

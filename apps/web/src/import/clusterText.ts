@@ -385,11 +385,27 @@ export function assignRoles(
     else if (roundToHalfPt(c.fontSizePt) >= headingSize && headingSize > 0) {
       role = 'heading';
     } else role = 'text';
-    return { ...c, role };
-  });
 
-  // Suppress unused-binding lint without changing behavior.
-  void sizeCounts;
+    // Strip the imported numeric prefix from heading text. Postr's
+    // heading-style auto-numbering renders its own "1.", "2.", etc.
+    // based on reading order, so leaving the source PDF's "2." in
+    // the text produces "3. 2. AIMS & HYPOTHESIS" on the canvas.
+    let text = c.text;
+    if (role === 'heading') text = stripHeadingPrefix(text);
+
+    return { ...c, role, text };
+  });
+}
+
+/** Strip a leading "1.", "1.1", "1.1.1", or "I." style numeric
+ *  prefix from a heading line. Preserves a heading like
+ *  "3-Step Method" because the dash means it isn't a numeric
+ *  prefix. Exported for unit testing. */
+export function stripHeadingPrefix(text: string): string {
+  return text.replace(
+    /^\s*(?:(?:\d+\.)+\d*|\d+\.|[IVX]+\.)\s+/i,
+    '',
+  );
 }
 
 /**
