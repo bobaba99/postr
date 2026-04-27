@@ -38,7 +38,23 @@ import {
 } from './tableOps';
 import { ResizeHandles, type ResizeHandle } from './resizeHandles';
 import { useStorageUrl } from '@/hooks/useStorageUrl';
-import { uploadPosterImage } from '@/data/posterImages';
+import { isStoragePath, uploadPosterImage } from '@/data/posterImages';
+
+/** 1×1 transparent GIF. Used while a `storage://` path is still
+ *  being signed — preserves layout without firing a network error
+ *  for the literal "storage://..." URL. */
+const PLACEHOLDER_SRC =
+  'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+/** Returns a value safe to assign to `<img src>`. Falls back to a
+ *  transparent placeholder when the only thing we have is an
+ *  unresolved `storage://` path — otherwise the browser logs
+ *  `ERR_UNKNOWN_URL_SCHEME` until the signed URL arrives. */
+function pickImgSrc(resolved: string | null, raw: string | null): string {
+  if (resolved && !isStoragePath(resolved)) return resolved;
+  if (raw && !isStoragePath(raw)) return raw;
+  return PLACEHOLDER_SRC;
+}
 
 // =========================================================================
 // LogoBlock
@@ -127,7 +143,7 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
   const resolvedLogoSrc = useStorageUrl(block.imageSrc);
 
   if (block.imageSrc) {
-    const displaySrc = resolvedLogoSrc ?? block.imageSrc;
+    const displaySrc = pickImgSrc(resolvedLogoSrc, block.imageSrc);
     return (
       <>
         <div
@@ -261,7 +277,7 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
   };
 
   if (block.imageSrc) {
-    const displaySrc = resolvedSrc ?? block.imageSrc;
+    const displaySrc = pickImgSrc(resolvedSrc, block.imageSrc);
     const crop = block.crop;
     const clipPath =
       crop &&

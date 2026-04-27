@@ -28,7 +28,7 @@ import type {
 } from '@postr/shared';
 import { uploadPosterImage, resolveStorageUrl } from '@/data/posterImages';
 import { uploadUserLogo } from '@/data/userLogos';
-import { ptToIn, ptToUnits } from '../poster/constants';
+import { ptToIn, ptToUnits, unitsToPt } from '../poster/constants';
 import {
   assignRoles,
   clusterTextItems,
@@ -159,12 +159,13 @@ export async function extractFromPdf(
   }
 
   const clusters = clusterTextItems(items);
-  const roled = assignRoles(clusters, pageHeightPt);
-  // Split overlong heading clusters that swallowed bullet content.
-  const split = splitHeadingClusters(roled);
-  const ordered = sortReadingOrder(split, pageWidthPt);
 
   // ── Stream 2: figures ──────────────────────────────────────────
+  // Extracted BEFORE text-role assignment so we can suppress text
+  // clusters that fall inside a figure bbox (panel labels, citation
+  // footers, axis tick text). pdfjs returns those as if they were
+  // page text, but they belong to the figure pixels and re-appear
+  // as orphan blocks after import otherwise.
   onProgress({ stage: 'uploading-figures', ratio: 0 });
   const figureBlocks = await extractFigures(
     page,
@@ -175,6 +176,17 @@ export async function extractFromPdf(
     onProgress,
     options.verifyDecorations !== false, // default ON
   );
+  const figureBBoxesPt = figureBlocks
+    .map((b) => bboxFromBlock(b))
+    .filter((bb): bb is FigureBBox => bb !== null);
+  const filteredClusters = filterClustersInsideFigures(
+    clusters,
+    figureBBoxesPt,
+  );
+  const roled = assignRoles(filteredClusters, pageHeightPt);
+  // Split overlong heading clusters that swallowed bullet content.
+  const split = splitHeadingClusters(roled);
+  const ordered = sortReadingOrder(split, pageWidthPt);
 
   // ── Synthesize ─────────────────────────────────────────────────
   onProgress({ stage: 'building-preview' });
@@ -475,18 +487,20 @@ async function extractFigures(
     bbox: FigureBBox;
   }[] = [];
 
-  // Heuristic-only candidates: any image block that looks like a
-  // multi-logo banner (small + aspect > 1.5) gets queued for split.
+  // Heuristic-only candidates: any image block that's logo-shaped
+  // (small + squarish per `looksLikeLogo`) gets queued for the split
+  // pass — covers both horizontal banners (McGill+Douglas+ADNI side
+  // by side) AND vertical stacks (McGill on top, Douglas below)
+  // which have aspect ~1.4 and would slip past a 1.5 gate. The
+  // split LLM call is a no-op when it sees only one logo, so the
+  // false-positive cost is one extra ~$0.005 call per block.
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i]!;
     if (b.type !== 'image' && b.type !== 'logo') continue;
     if (!b.imageSrc) continue;
     const bbox = smallBlockBBoxes[i];
     if (!bbox) continue;
-    const maxDim = Math.max(bbox.w, bbox.h);
-    const minDim = Math.min(bbox.w, bbox.h);
-    const aspectExtreme = maxDim / Math.max(1, minDim) > 1.5;
-    if (looksLikeLogo(bbox) && aspectExtreme) {
+    if (looksLikeLogo(bbox)) {
       splitCandidatesGlobal.push({ imageSrc: b.imageSrc, bbox });
     }
   }
@@ -780,24 +794,19 @@ async function extractFigures(
           dropIndexes.add(blockIdx);
           return;
         }
-        // Always queue small/logo-shaped images for a multi-logo
-        // split check, REGARDLESS of whether the LLM said the kind
-        // was logo, image, or figure. The McGill+Douglas banner
-        // case sometimes classifies as `image` because the model
-        // sees "two distinct visual elements"; we still want the
-        // segmentation pass to find the two logos and split them.
-        // The split call is a no-op when there's only one logo.
-        const maxDim = Math.max(bbox.w, bbox.h);
-        const minDim = Math.min(bbox.w, bbox.h);
-        const aspectExtreme = maxDim / Math.max(1, minDim) > 1.5;
+        // Always queue any logo-shaped block for the split pass —
+        // covers horizontal banners AND vertical stacks (McGill on
+        // top, Douglas below = aspect ~1.4, which an aspect-extreme
+        // gate would reject). The split call returns isSingleLogo
+        // when there's only one, so it's a safe no-op.
         if (kind === 'logo' && confidence >= 0.5) {
           promotions.set(blockIdx, 'logo');
-          if (aspectExtreme && sourceImageSrc) {
+          if (sourceImageSrc) {
             splitCandidates.push({ imageSrc: sourceImageSrc, bbox });
           }
-        } else if (kind === 'figure' && looksLikeLogo(bbox) && aspectExtreme) {
-          // Borderline: small wide image that the verifier didn't
-          // call a logo. Try the split pass anyway.
+        } else if (kind === 'figure' && looksLikeLogo(bbox)) {
+          // Borderline: small image the verifier called `figure` but
+          // its dims are logo-shaped. Try the split pass anyway.
           if (sourceImageSrc) {
             splitCandidates.push({ imageSrc: sourceImageSrc, bbox });
           }
@@ -1221,6 +1230,78 @@ function looksLikeLogo(bbox: FigureBBox): boolean {
   if (aspect < 0.3) return false;
   // ≤ 4" max dim. Above this we're in chart / diagram territory.
   return maxDim <= 4 * PT_PER_INCH;
+}
+
+/** Convert a synthesized image block back to a page-pt bbox. Returns
+ *  null for non-image blocks (text, etc.) which never have spatial
+ *  coords in pt — safe to use with `.filter(Boolean)`.
+ *
+ *  IMPORTANT: must be called on figure blocks BEFORE `synthesizeDoc`'s
+ *  snap-to-grid pass — otherwise the SNAP_GRID rounding shifts coords
+ *  by up to half a unit (~3pt), which would misalign overlap math
+ *  against pdfjs's pt-space text clusters. */
+function bboxFromBlock(block: PartialBlock): FigureBBox | null {
+  if (block.type !== 'image' && block.type !== 'logo') return null;
+  if (
+    typeof block.x !== 'number' ||
+    typeof block.y !== 'number' ||
+    typeof block.w !== 'number' ||
+    typeof block.h !== 'number'
+  )
+    return null;
+  return {
+    x: unitsToPt(block.x),
+    y: unitsToPt(block.y),
+    w: unitsToPt(block.w),
+    h: unitsToPt(block.h),
+  };
+}
+
+/** Suppress text clusters whose bbox is mostly inside a figure
+ *  bbox. pdfjs returns figure-internal text (panel labels like
+ *  "ADNI_MEM", citation footers like "1,2,3", axis ticks) as if it
+ *  were page text — those would otherwise show up as orphan text
+ *  blocks floating around the imported poster. We keep clusters
+ *  with ≥40% area inside a figure as figure-internal noise.
+ *
+ *  IMPORTANT: both `clusters[].bbox` and `figureBBoxes` MUST be in
+ *  page-pt. Mixing units silently fails (the overlap area becomes
+ *  ~50× too small and never crosses the threshold).
+ *
+ *  Figure bboxes get shrink-fit by `FIGURE_INSET_PT` before the
+ *  overlap test so a caption rendered just below a figure (and
+ *  therefore touching the figure's padded bbox edge) survives.
+ *
+ *  Exported for unit testing. */
+const FIGURE_INSET_PT = 3;
+export function filterClustersInsideFigures<
+  T extends { bbox: { x: number; y: number; w: number; h: number } },
+>(clusters: T[], figureBBoxes: FigureBBox[]): T[] {
+  if (figureBBoxes.length === 0) return clusters;
+  const OVERLAP_THRESHOLD = 0.4;
+  // Shrink-fit each figure bbox so captions that sit a few pt
+  // beyond the visible figure pixels (but within the bbox padding
+  // from `tightenCanvasToContent` + RENDER_SCALE rounding) are not
+  // wrongly classified as figure-internal text.
+  const insetFigures = figureBBoxes
+    .map((f) => ({
+      x: f.x + FIGURE_INSET_PT,
+      y: f.y + FIGURE_INSET_PT,
+      w: Math.max(0, f.w - 2 * FIGURE_INSET_PT),
+      h: Math.max(0, f.h - 2 * FIGURE_INSET_PT),
+    }))
+    .filter((f) => f.w > 0 && f.h > 0);
+  return clusters.filter((c) => {
+    const cArea = c.bbox.w * c.bbox.h;
+    if (cArea <= 0) return true;
+    for (const fig of insetFigures) {
+      const ix = Math.max(0, Math.min(c.bbox.x + c.bbox.w, fig.x + fig.w) - Math.max(c.bbox.x, fig.x));
+      const iy = Math.max(0, Math.min(c.bbox.y + c.bbox.h, fig.y + fig.h) - Math.max(c.bbox.y, fig.y));
+      const overlap = ix * iy;
+      if (overlap / cArea >= OVERLAP_THRESHOLD) return false;
+    }
+    return true;
+  });
 }
 
 /** Best-effort: download a freshly-uploaded poster-asset image, then
