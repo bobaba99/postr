@@ -407,10 +407,10 @@ function DropZone({
         Drop file here or click to browse
       </div>
       <div style={{ fontSize: 12, color: '#9ca3af' }}>
-        PDF (with selectable text) · .postr bundle
+        PDF · PNG / JPG · .postr bundle
       </div>
       <div style={{ fontSize: 11, color: '#555', marginTop: 12 }}>
-        Image OCR (PNG/JPG, flattened PDFs) — coming next release
+        Image inputs are processed through Claude Vision (~5–15s).
       </div>
     </div>
   );

@@ -503,7 +503,9 @@ VERIFICATION RULES — apply in order:
 
 2. Set kind = "table" if evidence.hasGridRowsAndCols === true AND evidence.hasNumericData === true AND evidence.isStylizedIcon === false.
 
-3. Set kind = "logo" ONLY for institutional / brand marks: university crests, hospital logos, funder marks (e.g. ADNI). Decorative cartoons (animals, leaves, magnifiers, FAQ bubbles, silhouetted people, speech balloons) are NOT logos — set kind = "decoration".
+3. Set kind = "logo" ONLY for institutional / brand marks. The reliable signal is **readable text inside the image** — university names ("McGill", "Stanford"), hospital names ("Douglas", "Mayo Clinic"), funder acronyms ("ADNI", "NIH", "NSF"), or institutional taglines. Brand crests with no text are also logos when they're clearly an institutional emblem (a shield, a seal, a stylized letterform), but err toward "decoration" when in doubt. Decorative cartoons (animals, leaves, magnifiers, FAQ bubbles, silhouetted people, speech balloons) are NOT logos — set kind = "decoration".
+
+   Special note on TEXT-BEARING LOGOS: even when a brand mark is rendered with only 2–4 distinct colors (e.g. ADNI's "ADNI" wordmark in dark text on light background plus a small accent color), the presence of READABLE LETTERS makes it a logo, not a stock icon. Set isStylizedIcon = false for any image where you can read characters that spell an institution / brand name.
 
 4. Set kind = "decoration" when evidence.isStylizedIcon === true OR none of the above apply. Especially:
    - Stock icons that depict a chart-shape but contain no real data (a magnifying glass over a tiny bar icon is decoration)

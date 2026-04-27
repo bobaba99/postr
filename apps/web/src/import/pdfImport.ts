@@ -474,6 +474,11 @@ async function extractFigures(
   // and shouldn't trigger an LLM call.
   const smallBlockIndexes: number[] = [];
   const smallBlockBBoxes: FigureBBox[] = [];
+  // Pixel signature per emitted block — computed once during the
+  // extraction loop, consumed later by the verifier as a co-signal
+  // to confirm/refute LLM "decoration" verdicts. Indexed by block
+  // index (matches `blocks.length - 1` at push time).
+  const blockSignatures: (PixelSignature | null)[] = [];
   // Every bbox we try to extract — emitted regardless of whether the
   // crop / upload succeeds. The text-suppression pass uses this set
   // (not `blocks`) so figure-internal text fragments still get
@@ -547,21 +552,6 @@ async function extractFigures(
       h: finalHPt,
     };
 
-    // Pre-LLM stock-icon filter. Counts unique color buckets in the
-    // tightened crop — cartoon decorations have ≤6 distinct colors,
-    // text-bearing logos and real charts always have more. Pre-drops
-    // obvious cartoons (people-icon, FAQ bubble, leaf, magnifier,
-    // etc.) before we spend an upload + an LLM call. Only fires for
-    // tiny + squarish bboxes so brand logos can't get caught.
-    if (
-      isStockIcon(finalCanvas, Math.max(tightBBox.w, tightBBox.h))
-    ) {
-      traceRow.outcome = 'pre-drop:stock-icon';
-      done++;
-      onItemDone(done, total);
-      continue;
-    }
-
     const blob = await canvasToBlob(finalCanvas, 'image/png');
     if (!blob) {
       traceRow.outcome = 'no-blob';
@@ -604,6 +594,9 @@ async function extractFigures(
     });
     smallBlockIndexes.push(isSmall ? blocks.length - 1 : -1);
     smallBlockBBoxes.push(tightBBox);
+    // Compute the pixel signature only for small/logo-shaped blocks
+    // (non-small bboxes are obvious figures, no verification cost).
+    blockSignatures.push(isSmall ? computePixelSignature(finalCanvas) : null);
 
     done++;
     onItemDone(done, total);
@@ -806,6 +799,40 @@ async function extractFigures(
         if (kind === 'logo' && ev?.isStylizedIcon) {
           kind = 'decoration';
         }
+
+        // Pixel co-signal: when the LLM verdict is borderline AND
+        // the pixel signature shows iconic structure (low color
+        // count + low edge density), agree with the LLM toward
+        // decoration. Two-of-two-must-agree gate prevents either
+        // signal from being a sole decider — protects ADNI
+        // (low colors, HIGH edge density from text strokes →
+        // iconScore 0 → never demoted) AND catches cartoons that
+        // the LLM mis-labeled as logos (low colors, low edges,
+        // weak LLM confidence → both agree → drop).
+        const sig = blockSignatures[blockIdx];
+        const pixelIcon = sig ? iconScore(sig) : 0;
+        const llmHedge =
+          verdict.confidence < 0.7 ||
+          (kind === 'logo' && ev && !ev.hasNumericData && !ev.hasGridRowsAndCols);
+        if (
+          (kind === 'logo' || kind === 'figure') &&
+          pixelIcon >= 0.6 &&
+          llmHedge
+        ) {
+          // eslint-disable-next-line no-console
+          console.debug(
+            '[import.verifier] downgrade via pixel-signature co-signal',
+            {
+              originalKind: kind,
+              confidence: verdict.confidence,
+              pixelIcon,
+              signature: sig,
+              evidence: ev,
+            },
+          );
+          kind = 'decoration';
+        }
+
         cooked.push({
           blockIdx,
           bbox,
@@ -1244,76 +1271,123 @@ export function splitLogoByWhitespace(
   return splitLogoByWhitespacePure(data, w, h);
 }
 
-/** Heuristic stock-icon detector. Real-world cartoon decorations
- *  (people-silhouette, FAQ bubble, leaf, magnifier, lightbulb)
- *  share a structural property: very low color complexity. They're
- *  drawn with 2–4 flat fills + thin outlines, total ≤ 6 distinct
- *  color buckets at 4-bit quantization. Real charts, text-bearing
- *  brand logos, and figures all have many more colors due to
- *  anti-aliasing of small features.
+/** Pixel signature of a region — used as a CO-SIGNAL alongside the
+ *  LLM verifier. Two cheap signals:
+ *    - dominantColors: distinct color buckets (4-bit-per-channel
+ *      quantization) holding ≥0.5% of pixels each. Cartoon icons
+ *      have 2–6, text-bearing logos and charts have many more.
+ *    - edgeDensity: fraction of pixels where the local 4-neighbour
+ *      max-channel-difference exceeds 50. Text and chart strokes
+ *      produce many edges per area; cartoon flats produce few.
  *
- *  Used as a pre-filter BEFORE the LLM verifier — drops obvious
- *  cartoons without spending an API call. False-positive rate is
- *  near-zero for the small-bbox case (anything text-bearing or
- *  data-bearing has >6 colors). Brand logos that ARE near the
- *  threshold (e.g. simple monochrome marks) survive because the
- *  function only fires when ALL three guards pass: low color count
- *  AND squarish AND tiny.
- *
- *  Returns true when the canvas matches the cartoon-icon profile.
- *  Wraps the canvas to extract pixel data; pure logic lives in
- *  `isStockIconPure` for unit testing. */
-export function isStockIcon(
-  source: HTMLCanvasElement,
-  bboxMaxDimPt: number,
-): boolean {
-  const w = source.width;
-  const h = source.height;
-  if (w < 4 || h < 4) return false;
-  // Only fire for tiny + squarish bboxes — what cartoon icons
-  // actually look like on academic posters.
-  const aspect = Math.min(w, h) / Math.max(w, h);
-  if (aspect < 0.55) return false;
-  if (bboxMaxDimPt > 1.5 * PT_PER_INCH) return false;
-  const ctx = source.getContext('2d');
-  if (!ctx) return false;
-  const data = ctx.getImageData(0, 0, w, h).data;
-  return isStockIconPure(data, w, h);
+ *  Decision lives in the caller — pure pixel data is too ambiguous
+ *  to drop content unilaterally (a 3-color brand mark and a 3-color
+ *  cartoon look identical to a color counter). The CALLER combines
+ *  this with the LLM's verdict and only drops on agreement. */
+export interface PixelSignature {
+  dominantColors: number;
+  edgeDensity: number;
 }
 
-/** Pure inner of `isStockIcon`. Quantizes each pixel to 4-bit per
- *  channel (4096 buckets total), counts buckets that hold ≥ 0.5%
- *  of pixels (suppresses anti-aliasing noise), returns true when
- *  ≤ 6 dominant buckets remain.
- *
- *  Exported for unit testing. */
-const STOCK_ICON_MAX_DOMINANT_BUCKETS = 6;
-const STOCK_ICON_MIN_BUCKET_FRACTION = 0.005;
-export function isStockIconPure(
+const SIGNATURE_MIN_BUCKET_FRACTION = 0.005;
+const SIGNATURE_EDGE_DELTA = 50;
+
+/** Wraps the canvas to extract pixel data, then defers to the pure
+ *  inner function. Returns null for degenerate canvases. */
+export function computePixelSignature(
+  source: HTMLCanvasElement,
+): PixelSignature | null {
+  const w = source.width;
+  const h = source.height;
+  if (w < 4 || h < 4) return null;
+  const ctx = source.getContext('2d');
+  if (!ctx) return null;
+  const data = ctx.getImageData(0, 0, w, h).data;
+  return computePixelSignaturePure(data, w, h);
+}
+
+/** Pure inner of computePixelSignature — exported for unit tests
+ *  without needing a real Canvas2D context. */
+export function computePixelSignaturePure(
   data: Uint8ClampedArray,
   w: number,
   h: number,
-): boolean {
+): PixelSignature {
   const pixelCount = w * h;
-  if (pixelCount === 0) return false;
+  if (pixelCount === 0) return { dominantColors: 0, edgeDensity: 0 };
+
+  // ── Dominant color count ────────────────────────────────────
   const buckets = new Map<number, number>();
   for (let i = 0; i < data.length; i += 4) {
     const a = data[i + 3]!;
     if (a === 0) continue;
-    // 4-bit per channel — top nibble of each byte.
     const r = (data[i]! >> 4) & 0xf;
     const g = (data[i + 1]! >> 4) & 0xf;
     const b = (data[i + 2]! >> 4) & 0xf;
     const key = (r << 8) | (g << 4) | b;
     buckets.set(key, (buckets.get(key) ?? 0) + 1);
   }
-  if (buckets.size === 0) return false;
-  const minPx = Math.max(1, Math.floor(pixelCount * STOCK_ICON_MIN_BUCKET_FRACTION));
-  let dominantCount = 0;
+  const minPx = Math.max(1, Math.floor(pixelCount * SIGNATURE_MIN_BUCKET_FRACTION));
+  let dominantColors = 0;
   for (const v of buckets.values()) {
-    if (v >= minPx) dominantCount++;
+    if (v >= minPx) dominantColors++;
   }
-  return dominantCount <= STOCK_ICON_MAX_DOMINANT_BUCKETS;
+
+  // ── Edge density (4-neighbour max-channel-difference) ───────
+  // Sample every pixel; for performance on large canvases this
+  // could be downsampled, but for sub-2" logo crops the canvas is
+  // typically ≤ 300×300 px so the full pass is fine.
+  let edgePixels = 0;
+  let scannedPixels = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = (y * w + x) * 4;
+      if (data[i + 3]! === 0) continue;
+      scannedPixels++;
+      const r0 = data[i]!;
+      const g0 = data[i + 1]!;
+      const b0 = data[i + 2]!;
+      // Right neighbour only — captures vertical strokes (which
+      // dominate text). Cuts the inner loop cost in half versus a
+      // full 4-neighbour scan with no measurable accuracy loss
+      // for the icon-vs-text distinction.
+      const ir = i + 4;
+      const dr = Math.abs(r0 - data[ir]!);
+      const dg = Math.abs(g0 - data[ir + 1]!);
+      const db = Math.abs(b0 - data[ir + 2]!);
+      if (Math.max(dr, dg, db) > SIGNATURE_EDGE_DELTA) {
+        edgePixels++;
+      }
+    }
+  }
+  const edgeDensity = scannedPixels > 0 ? edgePixels / scannedPixels : 0;
+
+  return { dominantColors, edgeDensity };
+}
+
+/** Heuristic confidence (0..1) that a region is a stock icon and
+ *  NOT a text-bearing brand logo. Only meaningful in combination
+ *  with the LLM verdict — the caller drops a region only when the
+ *  LLM also says "decoration" (or low-confidence "logo").
+ *
+ *  Score climbs with low color count AND low edge density:
+ *    - dominantColors ≤ 4 AND edgeDensity < 4%   → 0.9 (very iconic)
+ *    - dominantColors ≤ 6 AND edgeDensity < 6%   → 0.6 (likely iconic)
+ *    - dominantColors ≤ 6 AND edgeDensity < 8%   → 0.3 (borderline)
+ *    - everything else                            → 0   (text/chart)
+ *
+ *  ADNI logo lands at edgeDensity ~10–15% (text strokes), so
+ *  iconScore = 0 → never gets dropped regardless of color count. */
+export function iconScore(sig: PixelSignature): number {
+  const { dominantColors: dc, edgeDensity: ed } = sig;
+  // No signal — fully-transparent / empty / unscannable region.
+  // Returning a high score here would cause every empty crop to
+  // get demoted as an icon.
+  if (dc === 0) return 0;
+  if (dc <= 4 && ed < 0.04) return 0.9;
+  if (dc <= 6 && ed < 0.06) return 0.6;
+  if (dc <= 6 && ed < 0.08) return 0.3;
+  return 0;
 }
 
 /** Pure inner of splitLogoByWhitespace — takes raw RGBA pixel data

@@ -7,9 +7,10 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyAsLogo,
   computeBBoxStats,
+  computePixelSignaturePure,
   filterDecorationBBoxes,
   filterOrphanLabels,
-  isStockIconPure,
+  iconScore,
   medianBodyFontSize,
   mergeAdjacentBBoxes,
   splitLogoByWhitespacePure,
@@ -504,11 +505,9 @@ describe('splitLogoByWhitespacePure', () => {
   });
 });
 
-describe('isStockIconPure', () => {
-  /** Build a synthetic icon with `n` distinct colors painted in
-   *  evenly-sized horizontal stripes. Useful to reproduce the
-   *  cartoon-icon profile (≤6 dominant colors) vs the chart
-   *  profile (many colors). */
+describe('computePixelSignaturePure + iconScore', () => {
+  /** Build a synthetic canvas with N distinct colors painted in
+   *  evenly-sized horizontal stripes. */
   function makeStripedCanvas(
     w: number,
     h: number,
@@ -522,46 +521,59 @@ describe('isStockIconPure', () => {
     });
   }
 
-  it('flags a 3-color cartoon (people-icon profile)', () => {
-    const data = makeStripedCanvas(60, 60, [
-      [255, 255, 255], // background white
-      [40, 40, 40], // outline dark
-      [200, 200, 200], // accent gray
-    ]);
-    expect(isStockIconPure(data, 60, 60)).toBe(true);
-  });
+  /** Build a "text-bearing" canvas: alternating dark/light columns
+   *  every 2px, simulating vertical strokes of letterforms. Low
+   *  color count (2 dominant) BUT high edge density. */
+  function makeTextLikeCanvas(w: number, h: number): Uint8ClampedArray {
+    return makePixels(w, h, (x, _y) => {
+      const dark = x % 4 < 2;
+      return dark ? [20, 20, 20, 255] : [240, 240, 240, 255];
+    });
+  }
 
-  it('flags a 5-color cartoon (FAQ bubble with question mark)', () => {
-    const data = makeStripedCanvas(60, 60, [
+  it('cartoon profile (3 flat colors, smooth stripes) → high iconScore', () => {
+    const data = makeStripedCanvas(80, 80, [
       [255, 255, 255],
       [40, 40, 40],
-      [120, 120, 120],
-      [220, 220, 220],
-      [60, 60, 60],
+      [200, 200, 200],
     ]);
-    expect(isStockIconPure(data, 60, 60)).toBe(true);
+    const sig = computePixelSignaturePure(data, 80, 80);
+    expect(sig.dominantColors).toBeLessThanOrEqual(4);
+    expect(sig.edgeDensity).toBeLessThan(0.04);
+    expect(iconScore(sig)).toBe(0.9);
   });
 
-  it('does NOT flag a many-color image (chart / text-bearing logo profile)', () => {
-    // 30 stripes — well over the 6-bucket cutoff. Each stripe is a
-    // distinct gray level so they survive the 4-bit quantization.
+  it('text-bearing logo profile (few colors, MANY edges) → iconScore 0', () => {
+    // Mimics ADNI-style wordmark: 2 dominant colors, but vertical
+    // strokes every 2px → edge density ≥ 25%
+    const data = makeTextLikeCanvas(80, 80);
+    const sig = computePixelSignaturePure(data, 80, 80);
+    expect(sig.dominantColors).toBeLessThanOrEqual(4);
+    expect(sig.edgeDensity).toBeGreaterThan(0.1);
+    expect(iconScore(sig)).toBe(0); // saved by edge-density signal
+  });
+
+  it('chart profile (many colors) → iconScore 0', () => {
+    // 30 distinct colors → > 6 buckets → never flagged
     const colors: Array<[number, number, number]> = [];
     for (let i = 0; i < 30; i++) {
       const v = Math.floor((i * 250) / 30);
       colors.push([v, v, v]);
     }
-    const data = makeStripedCanvas(60, 60, colors);
-    expect(isStockIconPure(data, 60, 60)).toBe(false);
+    const data = makeStripedCanvas(80, 80, colors);
+    const sig = computePixelSignaturePure(data, 80, 80);
+    expect(sig.dominantColors).toBeGreaterThan(6);
+    expect(iconScore(sig)).toBe(0);
   });
 
-  it('treats a fully-transparent canvas as not-an-icon (no signal)', () => {
+  it('treats fully-transparent pixels as not-an-icon (no signal)', () => {
     const data = makePixels(60, 60, () => [0, 0, 0, 0]);
-    expect(isStockIconPure(data, 60, 60)).toBe(false);
+    const sig = computePixelSignaturePure(data, 60, 60);
+    expect(sig.dominantColors).toBe(0);
+    expect(iconScore(sig)).toBe(0);
   });
 
-  it('ignores anti-aliasing noise (sparse buckets below the 0.5% floor)', () => {
-    // 3 dominant colors + a single 1-pixel "noise" pixel of a 4th
-    // color → still 3 dominant buckets, so flagged as icon.
+  it('ignores anti-aliasing noise (1px dot of a 4th color does not count)', () => {
     const data = makePixels(100, 100, (x, y) => {
       if (x === 0 && y === 0) return [10, 200, 50, 255]; // 1px noise
       const stripe = y < 33 ? 0 : y < 66 ? 1 : 2;
@@ -573,10 +585,32 @@ describe('isStockIconPure', () => {
       const [r, g, b] = palette[stripe]!;
       return [r, g, b, 255];
     });
-    expect(isStockIconPure(data, 100, 100)).toBe(true);
+    const sig = computePixelSignaturePure(data, 100, 100);
+    expect(sig.dominantColors).toBe(3);
+    expect(iconScore(sig)).toBe(0.9);
   });
 
   it('handles empty input', () => {
-    expect(isStockIconPure(new Uint8ClampedArray(0), 0, 0)).toBe(false);
+    const sig = computePixelSignaturePure(new Uint8ClampedArray(0), 0, 0);
+    expect(sig).toEqual({ dominantColors: 0, edgeDensity: 0 });
+    expect(iconScore(sig)).toBe(0);
+  });
+
+  describe('iconScore tiers', () => {
+    it('tier 0.6 — 5 colors, low edges', () => {
+      expect(
+        iconScore({ dominantColors: 5, edgeDensity: 0.05 }),
+      ).toBe(0.6);
+    });
+    it('tier 0.3 — 6 colors, medium edges', () => {
+      expect(
+        iconScore({ dominantColors: 6, edgeDensity: 0.07 }),
+      ).toBe(0.3);
+    });
+    it('zeroes out when edges climb above 8% (text content)', () => {
+      expect(
+        iconScore({ dominantColors: 3, edgeDensity: 0.1 }),
+      ).toBe(0);
+    });
   });
 });
