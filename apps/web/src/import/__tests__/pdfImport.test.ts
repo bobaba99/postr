@@ -61,9 +61,9 @@ describe('filterDecorationBBoxes (page-area relative)', () => {
     expect(out).toHaveLength(2);
   });
 
-  it('drops icons smaller than 0.05% of page area', () => {
+  it('drops icons smaller than 0.02% of page area', () => {
     // 0.5" × 0.5" = 0.25 in². Page area 1512 in². Fraction = 0.000165
-    // < 0.0005 cutoff — dropped.
+    // < 0.0002 cutoff — dropped.
     const out = filterDecorationBBoxes(
       [bbox(2, 2, 0.5, 0.5)],
       PAGE_W,
@@ -83,10 +83,10 @@ describe('filterDecorationBBoxes (page-area relative)', () => {
   });
 
   it('scales the area gate to small page sizes', () => {
-    // On a 12×18 letter poster (216 in²), 0.0005 × 216 = 0.108 in².
-    // A 0.4" × 0.4" icon is 0.16 in² > 0.108 → kept here, but on a
-    // 36×42 page (1512 in²), the same icon is below 0.0005 × 1512
-    // = 0.756 in² → dropped. The same code handles both.
+    // On a 12×18 letter poster (216 in²), 0.0002 × 216 = 0.043 in².
+    // A 0.4" × 0.4" icon is 0.16 in² > 0.043 → kept here, but on a
+    // 36×42 page (1512 in²), the same icon is below 0.0002 × 1512
+    // = 0.302 in² → dropped. The same code handles both.
     const small = filterDecorationBBoxes([bbox(2, 2, 0.4, 0.4)], 12 * PT, 18 * PT);
     expect(small).toHaveLength(1);
     const big = filterDecorationBBoxes([bbox(2, 2, 0.4, 0.4)], PAGE_W, PAGE_H);
@@ -256,7 +256,7 @@ describe('filterOrphanLabels', () => {
         }),
       ],
       // Figure bbox sits 5pt below the caption — well inside the
-      // proximity gate (2.5 × 9pt = 22.5pt).
+      // proximity gate (4 × 9pt = 36pt, floored at 24pt).
       [{ x: 100, y: 217, w: 200, h: 150 }],
     );
     expect(out).toHaveLength(0);
@@ -264,7 +264,7 @@ describe('filterOrphanLabels', () => {
 
   it('drops a "Figure N." caption sitting one blank line above a figure', () => {
     // Real-world layout: caption baseline 14pt above figure top.
-    // proximity for 9pt text = 22.5pt, so 14pt gap is INSIDE the gate.
+    // proximity for 9pt text = 36pt, so 14pt gap is INSIDE the gate.
     const out = filterOrphanLabels(
       [
         cluster('Figure 2.', {
@@ -278,27 +278,27 @@ describe('filterOrphanLabels', () => {
   });
 
   it('proximity boundary: just-inside drops, just-outside keeps', () => {
-    const baseCaption = (gap: number) =>
+    const baseCaption = (_gap: number) =>
       cluster('Figure 1.', {
         bbox: { x: 100, y: 200, w: 60, h: 12 },
         fontSizePt: 9,
       });
-    // Floor proximity for 9pt fontSize is max(9*2.5, 18) = 22.5pt.
-    // Inside: figure starts 22pt below caption bottom (212).
+    // Proximity for 9pt fontSize is max(9*4, 24) = 36pt.
+    // Inside: figure starts 35pt below caption bottom (212 + 35 = 247).
     expect(
-      filterOrphanLabels([baseCaption(22)], [{ x: 100, y: 234, w: 200, h: 150 }]),
+      filterOrphanLabels([baseCaption(35)], [{ x: 100, y: 247, w: 200, h: 150 }]),
     ).toHaveLength(0);
-    // Outside: figure starts 25pt below caption bottom.
+    // Outside: figure starts 40pt below caption bottom (212 + 40 = 252).
     expect(
-      filterOrphanLabels([baseCaption(25)], [{ x: 100, y: 237, w: 200, h: 150 }]),
+      filterOrphanLabels([baseCaption(40)], [{ x: 100, y: 252, w: 200, h: 150 }]),
     ).toHaveLength(1);
   });
 
   it('keeps "Figure N." captions when no figure bbox is nearby', () => {
     const out = filterOrphanLabels(
       [cluster('Figure 1.', { bbox: { x: 100, y: 200, w: 60, h: 12 } })],
-      // Figure bbox is 150pt away — well outside any reasonable proximity
-      [{ x: 100, y: 400, w: 200, h: 150 }],
+      // Figure bbox is 200pt away — well outside the new 36pt gate
+      [{ x: 100, y: 450, w: 200, h: 150 }],
     );
     expect(out).toHaveLength(1);
   });

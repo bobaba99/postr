@@ -326,10 +326,16 @@ export interface FigureBBox {
 /** Pixels-per-inch in PDF user space. */
 const PT_PER_INCH = 72;
 
-/** Below this fraction of the page area, a bbox is treated as
- *  decoration regardless of its absolute size. 0.05% of a 36×42 page
- *  is 0.756 in² — a 0.85" × 0.85" icon. */
-const MIN_AREA_PAGE_FRACTION = 0.0005;
+/** Below this fraction of the page area, a bbox is dropped without
+ *  classification. The cutoff has to be small enough that
+ *  institutional logos survive — a Chrome-rendered 80×48 CSS-px
+ *  logo lands at ~60×36 pt = 2160 pt² on a 36×24" page (~0.05%), so
+ *  the previous 0.05% cutoff was right on the edge and the logos
+ *  never reached the LLM verifier. 0.02% (~0.36 in² on a 36×24"
+ *  page = a 0.6" × 0.6" thumbnail) lets logos through reliably; the
+ *  LLM verifier + pixel-signature co-signal still drop genuine
+ *  decoration cartoons in the same size range. */
+const MIN_AREA_PAGE_FRACTION = 0.0002;
 
 /** Reject slivers below this aspect ratio (min/max). At 1/15 a
  *  0.3" × 6" caption strip passes; a 0.1" × 5" hairline does not. */
@@ -1943,17 +1949,22 @@ export function filterOrphanLabels<
       return false;
     }
 
-    // Signal 2 — caption near any detected figure bbox. Real-world
-    // captions sit ~2× fontSize below the figure baseline (one
-    // blank line of leading + the caption baseline itself), so the
-    // proximity gate is `2.5 × fontSize` with a 18pt floor.
+    // Signal 2 — caption near any detected figure bbox. Captions
+    // routinely sit 2–4× fontSize from the figure baseline depending
+    // on the source layout (extra spacing for figures with frames,
+    // SVG-rasterized figures with internal padding, etc.), so the
+    // proximity gate uses `4 × fontSize` with a 24pt floor — wide
+    // enough to catch captions across all the templates the
+    // benchmark exercises, narrow enough that adjacent body text
+    // doesn't get caught by accident (body text usually doesn't
+    // match the CAPTION_PATTERN regex anyway).
     if (
       itemCount <= 2 &&
       text.length <= 30 &&
       CAPTION_PATTERN.test(text) &&
       figureBBoxes.length > 0
     ) {
-      const proximity = Math.max(c.fontSizePt * 2.5, 18);
+      const proximity = Math.max(c.fontSizePt * 4, 24);
       for (const fig of figureBBoxes) {
         const cx = c.bbox.x + c.bbox.w / 2;
         const cy = c.bbox.y + c.bbox.h / 2;
