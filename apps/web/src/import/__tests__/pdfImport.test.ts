@@ -11,8 +11,33 @@ import {
   filterOrphanLabels,
   medianBodyFontSize,
   mergeAdjacentBBoxes,
+  splitLogoByWhitespacePure,
   type FigureBBox,
 } from '../pdfImport';
+
+/** Build a synthetic RGBA pixel array `w × h`. `paint` is called
+ *  per pixel and should return [r, g, b, a]. White background by
+ *  default; paint dark blocks where logos live. */
+function makePixels(
+  w: number,
+  h: number,
+  paint: (x: number, y: number) => [number, number, number, number] = () => [
+    255, 255, 255, 255,
+  ],
+): Uint8ClampedArray {
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const [r, g, b, a] = paint(x, y);
+      const i = (y * w + x) * 4;
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      data[i + 3] = a;
+    }
+  }
+  return data;
+}
 
 const PT = 72;
 
@@ -372,5 +397,108 @@ describe('medianBodyFontSize', () => {
         { fontSizePt: 11, items: { length: 5 } },
       ]),
     ).toBe(8);
+  });
+});
+
+describe('splitLogoByWhitespacePure', () => {
+  it('returns null for tiny canvases', () => {
+    const data = makePixels(4, 4);
+    expect(splitLogoByWhitespacePure(data, 4, 4)).toBeNull();
+  });
+
+  it('returns null for a single solid logo (no internal whitespace gap)', () => {
+    // 100×100 mostly-dark canvas — no clear horizontal gap
+    const data = makePixels(100, 100, () => [50, 50, 50, 255]);
+    expect(splitLogoByWhitespacePure(data, 100, 100)).toBeNull();
+  });
+
+  it('splits two stacked logos with a clear horizontal whitespace band', () => {
+    // 100w × 200h
+    // - rows 0..79: dark logo A
+    // - rows 80..119: pure white gap (20% of height — well over the
+    //                                 6% MIN_GAP_FRACTION)
+    // - rows 120..199: dark logo B
+    const data = makePixels(100, 200, (_x, y) => {
+      const inGap = y >= 80 && y < 120;
+      return inGap ? [255, 255, 255, 255] : [40, 40, 40, 255];
+    });
+    const subs = splitLogoByWhitespacePure(data, 100, 200);
+    expect(subs).not.toBeNull();
+    expect(subs!.length).toBe(2);
+    // First sub-rect lives in the upper half; second in the lower
+    expect(subs![0]!.y).toBeLessThan(80);
+    expect(subs![1]!.y).toBeGreaterThanOrEqual(80);
+  });
+
+  it('splits three side-by-side logos with vertical whitespace columns', () => {
+    // 300w × 100h
+    // - cols 0..79: dark logo A
+    // - cols 80..119: pure white gap
+    // - cols 120..199: dark logo B
+    // - cols 200..219: pure white gap
+    // - cols 220..299: dark logo C
+    const data = makePixels(300, 100, (x, _y) => {
+      const inGap1 = x >= 80 && x < 120;
+      const inGap2 = x >= 200 && x < 220;
+      return inGap1 || inGap2 ? [255, 255, 255, 255] : [40, 40, 40, 255];
+    });
+    const subs = splitLogoByWhitespacePure(data, 300, 100);
+    expect(subs).not.toBeNull();
+    expect(subs!.length).toBe(3);
+  });
+
+  it('does NOT split when the whitespace band is too thin', () => {
+    // 100×200 with a 4px gap (2% of height < 6% MIN_GAP_FRACTION)
+    const data = makePixels(100, 200, (_x, y) => {
+      const inGap = y >= 98 && y < 102;
+      return inGap ? [255, 255, 255, 255] : [40, 40, 40, 255];
+    });
+    expect(splitLogoByWhitespacePure(data, 100, 200)).toBeNull();
+  });
+
+  it('ignores edge whitespace runs (padding around a single logo)', () => {
+    // 100×200 with 30px white padding TOP and BOTTOM — not a gap
+    // BETWEEN logos, just edge padding
+    const data = makePixels(100, 200, (_x, y) => {
+      const inEdge = y < 30 || y >= 170;
+      return inEdge ? [255, 255, 255, 255] : [40, 40, 40, 255];
+    });
+    expect(splitLogoByWhitespacePure(data, 100, 200)).toBeNull();
+  });
+
+  it('treats fully-transparent pixels as whitespace', () => {
+    // 100×200 with rows 80..119 fully transparent — same effect as
+    // white pixels (logos exported with alpha channels)
+    const data = makePixels(100, 200, (_x, y) => {
+      const inGap = y >= 80 && y < 120;
+      if (inGap) return [0, 0, 0, 0];
+      return [40, 40, 40, 255];
+    });
+    const subs = splitLogoByWhitespacePure(data, 100, 200);
+    expect(subs).not.toBeNull();
+    expect(subs!.length).toBe(2);
+  });
+
+  it('tightens sub-rects to non-white content', () => {
+    // 100×200, two stacked logos, each surrounded by some
+    // whitespace within their own slice. Tightening should crop the
+    // returned rect to just the dark content.
+    const data = makePixels(100, 200, (_x, y) => {
+      const inGap = y >= 80 && y < 120;
+      if (inGap) return [255, 255, 255, 255];
+      // Logo A occupies rows 10..70; logo B occupies rows 130..190
+      const inA = y >= 10 && y < 70;
+      const inB = y >= 130 && y < 190;
+      return inA || inB ? [40, 40, 40, 255] : [255, 255, 255, 255];
+    });
+    const subs = splitLogoByWhitespacePure(data, 100, 200);
+    expect(subs).not.toBeNull();
+    expect(subs!.length).toBe(2);
+    // Tightened first rect should start near y=10, not y=0
+    expect(subs![0]!.y).toBeGreaterThanOrEqual(8);
+    expect(subs![0]!.y).toBeLessThanOrEqual(12);
+    // Second rect should start near y=130
+    expect(subs![1]!.y).toBeGreaterThanOrEqual(128);
+    expect(subs![1]!.y).toBeLessThanOrEqual(132);
   });
 });

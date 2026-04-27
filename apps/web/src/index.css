@@ -20,8 +20,12 @@
 [data-block-id] ul,
 [data-block-id] ol {
   list-style: revert;
-  margin: revert;
-  padding: revert;
+  /* Browser default padding-left is ~40px which crowds short
+   * poster text columns. 1.2em ≈ ~14px at the typical 11–12pt body
+   * font — enough to make the bullet visually separate from the
+   * text without eating column width. */
+  padding-left: 1.2em;
+  margin: 0.25em 0;
 }
 [data-block-id] li {
   list-style: revert;

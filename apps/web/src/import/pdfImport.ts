@@ -970,52 +970,97 @@ async function extractFigures(
           }
         }
 
-        // Crop + upload + emit a logo block per LLM bbox. Append to
-        // detectedBBoxes so the in-figure text suppression sees them.
+        // Crop + upload + emit a logo block per LLM bbox. Each LLM
+        // bbox gets a pixel-gap split attempt FIRST — the LLM
+        // sometimes returns one bbox covering two stacked logos
+        // (McGill on top of Douglas with a thin white gap). When
+        // splitLogoByWhitespace finds a gap, we emit N logo blocks;
+        // when it doesn't, we emit the original as one block.
+        // Append every emitted bbox to detectedBBoxes so in-figure
+        // text suppression catches anything inside them.
+        let totalEmittedLogos = 0;
+        let splitsApplied = 0;
         for (const llm of llmLogosPt) {
           detectedBBoxes.push(llm);
-          const sub = document.createElement('canvas');
-          allocatedCanvases.push(sub);
-          sub.width = Math.max(1, Math.round(llm.w * RENDER_SCALE));
-          sub.height = Math.max(1, Math.round(llm.h * RENDER_SCALE));
-          const sctx = sub.getContext('2d');
-          if (!sctx) continue;
-          sctx.drawImage(
+          const parent = document.createElement('canvas');
+          allocatedCanvases.push(parent);
+          parent.width = Math.max(1, Math.round(llm.w * RENDER_SCALE));
+          parent.height = Math.max(1, Math.round(llm.h * RENDER_SCALE));
+          const pctx = parent.getContext('2d');
+          if (!pctx) continue;
+          pctx.drawImage(
             canvas,
             Math.round(llm.x * RENDER_SCALE),
             Math.round(llm.y * RENDER_SCALE),
-            sub.width,
-            sub.height,
+            parent.width,
+            parent.height,
             0,
             0,
-            sub.width,
-            sub.height,
+            parent.width,
+            parent.height,
           );
-          const blob = await canvasToBlob(sub, 'image/png');
-          if (!blob) continue;
-          const id = nanoid(8);
-          const file = new File([blob], `${id}.png`, { type: 'image/png' });
-          const src = await uploadPosterImage(userId, posterId, id, file);
-          if (!src) {
-            uploadFailures++;
-            continue;
+
+          // Each entry: page-pt bbox of the logo region to upload.
+          // Single-element list when no split applies.
+          const sub = splitLogoByWhitespace(parent);
+          let regions: { ptX: number; ptY: number; ptW: number; ptH: number; canvas: HTMLCanvasElement }[];
+          if (sub && sub.length >= 2) {
+            splitsApplied++;
+            regions = sub.map((r) => {
+              const c = document.createElement('canvas');
+              allocatedCanvases.push(c);
+              c.width = r.w;
+              c.height = r.h;
+              const cctx = c.getContext('2d');
+              if (cctx) cctx.drawImage(parent, r.x, r.y, r.w, r.h, 0, 0, r.w, r.h);
+              return {
+                ptX: llm.x + r.x / RENDER_SCALE,
+                ptY: llm.y + r.y / RENDER_SCALE,
+                ptW: r.w / RENDER_SCALE,
+                ptH: r.h / RENDER_SCALE,
+                canvas: c,
+              };
+            });
+          } else {
+            regions = [{
+              ptX: llm.x,
+              ptY: llm.y,
+              ptW: llm.w,
+              ptH: llm.h,
+              canvas: parent,
+            }];
           }
-          blocks.push({
-            type: 'logo',
-            x: ptToUnits(llm.x),
-            y: ptToUnits(llm.y),
-            w: ptToUnits(llm.w),
-            h: ptToUnits(llm.h),
-            content: '',
-            imageSrc: src,
-            imageFit: 'contain',
-            tableData: null,
-          });
-          void saveLogoToLibrary(src);
+
+          for (const region of regions) {
+            const blob = await canvasToBlob(region.canvas, 'image/png');
+            if (!blob) continue;
+            const id = nanoid(8);
+            const file = new File([blob], `${id}.png`, { type: 'image/png' });
+            const src = await uploadPosterImage(userId, posterId, id, file);
+            if (!src) {
+              uploadFailures++;
+              continue;
+            }
+            blocks.push({
+              type: 'logo',
+              x: ptToUnits(region.ptX),
+              y: ptToUnits(region.ptY),
+              w: ptToUnits(region.ptW),
+              h: ptToUnits(region.ptH),
+              content: '',
+              imageSrc: src,
+              imageFit: 'contain',
+              tableData: null,
+            });
+            void saveLogoToLibrary(src);
+            totalEmittedLogos++;
+          }
         }
 
         trace('[import.trace] llm-logo extraction', {
           llmLogoCount: llmLogosPt.length,
+          totalEmittedLogos,
+          splitsApplied,
           droppedPixelBlocks: dropIndexes.size,
         });
       }
@@ -1209,6 +1254,220 @@ type TightenResult =
     }
   | null
   | 'blank';
+
+/** Result of pixel-gap logo segmentation. Each entry is a tight
+ *  pixel-space rectangle around one of the sub-logos found inside
+ *  a parent canvas. Coords are relative to the parent canvas
+ *  (origin top-left). */
+export interface LogoSubRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Threshold + minimum-gap-fraction tuned for typical poster logo
+ *  banners. WHITE_THRESHOLD: any channel ≥ this counts as whitespace.
+ *  ROW_WHITE_FRACTION: rows with ≥ this fraction of white pixels are
+ *  considered whitespace rows. MIN_GAP_FRACTION: a run of whitespace
+ *  rows ≥ this fraction of the dimension counts as a real gap (not
+ *  just inter-character padding). */
+const SEGMENT_WHITE_THRESHOLD = 245;
+const SEGMENT_ROW_WHITE_FRACTION = 0.985;
+const SEGMENT_MIN_GAP_FRACTION = 0.06;
+
+/**
+ * Walk a logo canvas looking for a clear horizontal whitespace band
+ * (multiple-logos-stacked-vertically case: McGill on top of Douglas,
+ * with a thin-but-visible gap between them) AND a clear vertical
+ * whitespace band (logos-side-by-side case: McGill ... Douglas ...
+ * ADNI). Returns 2+ tight sub-rectangles when a split is possible,
+ * or null when the image is a single logo.
+ *
+ * Deterministic; no LLM. Pairs with the LLM-driven precheck — the
+ * LLM is the source of truth for "where are the logos" but it
+ * sometimes returns a single bbox for two stacked logos. This
+ * pixel-gap pass catches that case downstream.
+ *
+ * Exported for unit testing.
+ */
+export function splitLogoByWhitespace(
+  source: HTMLCanvasElement,
+): LogoSubRect[] | null {
+  const w = source.width;
+  const h = source.height;
+  if (w < 8 || h < 8) return null;
+  const ctx = source.getContext('2d');
+  if (!ctx) return null;
+  const data = ctx.getImageData(0, 0, w, h).data;
+  return splitLogoByWhitespacePure(data, w, h);
+}
+
+/** Pure inner of splitLogoByWhitespace — takes raw RGBA pixel data
+ *  and dimensions, returns sub-rect candidates. Exported for unit
+ *  testing without needing a real Canvas2D context (jsdom lacks
+ *  one). */
+export function splitLogoByWhitespacePure(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+): LogoSubRect[] | null {
+  if (w < 8 || h < 8) return null;
+  // ── Per-row whitespace detection ─────────────────────────────
+  const rowIsWhite = new Uint8Array(h);
+  for (let y = 0; y < h; y++) {
+    let whiteCount = 0;
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const a = data[i + 3]!;
+      // Treat fully transparent as whitespace.
+      if (a === 0) {
+        whiteCount++;
+        continue;
+      }
+      const r = data[i]!;
+      const g = data[i + 1]!;
+      const b = data[i + 2]!;
+      if (
+        r >= SEGMENT_WHITE_THRESHOLD &&
+        g >= SEGMENT_WHITE_THRESHOLD &&
+        b >= SEGMENT_WHITE_THRESHOLD
+      ) {
+        whiteCount++;
+      }
+    }
+    rowIsWhite[y] = whiteCount / w >= SEGMENT_ROW_WHITE_FRACTION ? 1 : 0;
+  }
+  const horizontalSplits = findSplitsAcrossRuns(rowIsWhite, h);
+
+  // ── Per-column whitespace detection ──────────────────────────
+  const colIsWhite = new Uint8Array(w);
+  for (let x = 0; x < w; x++) {
+    let whiteCount = 0;
+    for (let y = 0; y < h; y++) {
+      const i = (y * w + x) * 4;
+      const a = data[i + 3]!;
+      if (a === 0) {
+        whiteCount++;
+        continue;
+      }
+      const r = data[i]!;
+      const g = data[i + 1]!;
+      const b = data[i + 2]!;
+      if (
+        r >= SEGMENT_WHITE_THRESHOLD &&
+        g >= SEGMENT_WHITE_THRESHOLD &&
+        b >= SEGMENT_WHITE_THRESHOLD
+      ) {
+        whiteCount++;
+      }
+    }
+    colIsWhite[x] = whiteCount / h >= SEGMENT_ROW_WHITE_FRACTION ? 1 : 0;
+  }
+  const verticalSplits = findSplitsAcrossRuns(colIsWhite, w);
+
+  // Prefer the axis with MORE splits. If both axes split, take the
+  // larger one — typical multi-logo banners are arranged on a
+  // single primary axis and producing a 2D grid is usually wrong.
+  const useHorizontal = horizontalSplits.length >= verticalSplits.length;
+  const splits = useHorizontal ? horizontalSplits : verticalSplits;
+  if (splits.length === 0) return null;
+
+  // Convert split positions into rectangles. For horizontal splits,
+  // each rect spans the full width and a vertical slice. For
+  // vertical splits, each rect spans the full height and a
+  // horizontal slice.
+  const out: LogoSubRect[] = [];
+  if (useHorizontal) {
+    let prev = 0;
+    for (const s of splits) {
+      out.push({ x: 0, y: prev, w, h: s - prev });
+      prev = s;
+    }
+    out.push({ x: 0, y: prev, w, h: h - prev });
+  } else {
+    let prev = 0;
+    for (const s of splits) {
+      out.push({ x: prev, y: 0, w: s - prev, h });
+      prev = s;
+    }
+    out.push({ x: prev, y: 0, w: w - prev, h });
+  }
+
+  // Tighten each sub-rect to its non-white content (re-uses the
+  // same single-channel scan as the parent crop but bounded to the
+  // sub-rect). Drop sub-rects that are entirely white — they were
+  // edge padding, not a real logo.
+  const tightSubs: LogoSubRect[] = [];
+  for (const sub of out) {
+    const tight = tightenSubRect(data, w, sub);
+    if (tight) tightSubs.push(tight);
+  }
+  return tightSubs.length >= 2 ? tightSubs : null;
+}
+
+/** Walk a per-row whitespace mask and return split coordinates —
+ *  the midpoint of each whitespace run that is ≥ MIN_GAP_FRACTION
+ *  of the dimension. Edge runs (starting at 0 or ending at length)
+ *  are ignored — those are padding, not a gap between logos. */
+function findSplitsAcrossRuns(mask: Uint8Array, length: number): number[] {
+  const minGap = Math.max(3, Math.round(length * SEGMENT_MIN_GAP_FRACTION));
+  const splits: number[] = [];
+  let runStart: number | null = null;
+  for (let i = 0; i <= length; i++) {
+    const isWhite = i < length && mask[i] === 1;
+    if (isWhite) {
+      if (runStart === null) runStart = i;
+    } else if (runStart !== null) {
+      const runLen = i - runStart;
+      if (runLen >= minGap && runStart > 0 && i < length) {
+        splits.push(Math.floor(runStart + runLen / 2));
+      }
+      runStart = null;
+    }
+  }
+  return splits;
+}
+
+/** Tighten a sub-rect to its non-white content. Returns null when
+ *  the rect is entirely white (edge padding from a split). */
+function tightenSubRect(
+  data: Uint8ClampedArray,
+  parentW: number,
+  rect: LogoSubRect,
+): LogoSubRect | null {
+  let minX = rect.w;
+  let minY = rect.h;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < rect.h; y++) {
+    for (let x = 0; x < rect.w; x++) {
+      const i = ((rect.y + y) * parentW + (rect.x + x)) * 4;
+      const a = data[i + 3]!;
+      if (a === 0) continue;
+      const r = data[i]!;
+      const g = data[i + 1]!;
+      const b = data[i + 2]!;
+      if (
+        r < SEGMENT_WHITE_THRESHOLD ||
+        g < SEGMENT_WHITE_THRESHOLD ||
+        b < SEGMENT_WHITE_THRESHOLD
+      ) {
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  const PAD = 1;
+  const tx = Math.max(0, minX - PAD);
+  const ty = Math.max(0, minY - PAD);
+  const tw = Math.min(rect.w - tx, maxX - minX + 1 + 2 * PAD);
+  const th = Math.min(rect.h - ty, maxY - minY + 1 + 2 * PAD);
+  return { x: rect.x + tx, y: rect.y + ty, w: tw, h: th };
+}
 
 function tightenCanvasToContent(source: HTMLCanvasElement): TightenResult {
   const w = source.width;
