@@ -190,17 +190,59 @@ function isTextItem(item: unknown): item is TextItem {
   );
 }
 
+/** Bounding box in PDF page-pt coords with the y-axis flipped to
+ *  top-down (y=0 = page top), so it's directly usable for canvas crop. */
+export interface FigureBBox {
+  /** Left edge, page-pt (top-down). */
+  x: number;
+  /** Top edge, page-pt (top-down). */
+  y: number;
+  w: number;
+  h: number;
+}
+
+// Tuning constants — bias toward suppression. Users can always insert
+// missing figures manually; can NOT easily delete 25 spurious ones.
+
+/** Pixels-per-inch in PDF user space. */
+const PT_PER_INCH = 72;
+
+/** Skip image XObjects below this size in BOTH dimensions. Anything
+ *  smaller than ~1" tall AND ~1" wide is almost certainly decoration
+ *  (the "leaf" placeholder icons we saw in EW_INS, table dividers,
+ *  bullet shapes). The min-of-dims rule keeps narrow tall figures and
+ *  wide short figures, both of which can be legitimate. */
+const MIN_FIGURE_INCHES = 1.0;
+
+/** Reject very thin/tall slivers below this aspect ratio (min/max).
+ *  At 1/15 a 0.3" tall × 6" wide horizontal rule passes through, but
+ *  a 0.1" × 5" hairline does not. */
+const MIN_ASPECT = 1 / 15;
+
+/** Merge two image bboxes into one when the gap between them is below
+ *  this. Catches the "plot rendered as several adjacent XObjects"
+ *  case (axes / data area / title emitted as separate paints). */
+const MERGE_GAP_INCHES = 0.4;
+
+/** Image bboxes whose top edge lies in the upper N% of the page get
+ *  considered for `logo` classification. */
+const LOGO_TOP_FRACTION = 0.18;
+
+/** Largest dim that can still count as a logo (in inches). Tall hero
+ *  figures in the masthead area would exceed this and stay `image`. */
+const LOGO_MAX_INCHES = 4.0;
+
 /**
  * Walk the page operator list and pull every embedded raster image.
- * Each image becomes an `image` block with its bbox in poster-pt
- * coordinates (ready to be scaled + snapped by `synthesizeDoc`).
  *
- * pdfjs renders images through `OPS.paintImageXObject` ops which take
- * a name argument; the actual pixel data lives in `page.objs` /
- * `page.commonObjs`. We render the page to a hidden canvas and crop
- * each image's transformed bbox back out — this is far more reliable
- * than trying to decode the raw bitmap (PDF supports many color
- * spaces and decoders that pdfjs handles internally during render).
+ * Three filtering stages before upload:
+ *   1. Discard tiny / extreme-aspect images (decorative icons, hairlines)
+ *   2. Merge bboxes whose gaps fall below `MERGE_GAP_INCHES` so plots
+ *      rendered as multiple XObjects collapse into a single block
+ *   3. Classify small upper-region images as `logo` instead of `image`
+ *
+ * Then render the page to a hidden canvas and crop each surviving
+ * bbox into a PNG that gets uploaded to Storage.
  */
 async function extractFigures(
   page: PDFPageProxy,
@@ -221,85 +263,25 @@ async function extractFigures(
 
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  // Walk the operator list to find image bboxes.
-  // OPS.paintImageXObject = 85; OPS.paintImageXObjectRepeat = 88. We
-  // use the numeric values via pdfjs.OPS to stay in sync with the lib.
-  const opList = await page.getOperatorList();
-  const ops = pdfjs.OPS;
-  const figures: { transform: number[]; name: string }[] = [];
+  const rawBBoxes = collectImageBBoxes(
+    await page.getOperatorList(),
+    pageWidthPt,
+    pageHeightPt,
+  );
 
-  // The transformation matrix at the time of the paint op is the
-  // current transform — pdfjs emits OPS.transform / OPS.save / OPS.restore
-  // in the same fnArray. We track the CTM stack as we walk.
-  const ctmStack: number[][] = [[1, 0, 0, 1, 0, 0]];
-  const top = (): number[] => ctmStack[ctmStack.length - 1]!;
+  // Stage 1+2+3: dedup → filter → merge.
+  const filtered = filterDecorationBBoxes(rawBBoxes);
+  const merged = mergeAdjacentBBoxes(filtered, MERGE_GAP_INCHES * PT_PER_INCH);
 
-  for (let i = 0; i < opList.fnArray.length; i++) {
-    const fn = opList.fnArray[i];
-    const args = opList.argsArray[i] ?? [];
-    if (fn === ops.save) {
-      ctmStack.push([...top()]);
-    } else if (fn === ops.restore) {
-      if (ctmStack.length > 1) ctmStack.pop();
-    } else if (fn === ops.transform) {
-      ctmStack[ctmStack.length - 1] = multiplyTransform(
-        top(),
-        args as number[],
-      );
-    } else if (
-      fn === ops.paintImageXObject ||
-      fn === ops.paintInlineImageXObject ||
-      fn === ops.paintImageXObjectRepeat
-    ) {
-      const name = (args[0] as string) ?? `inline-${i}`;
-      figures.push({ transform: [...top()], name });
-    }
-  }
-
-  // De-dupe by name + transform — repeated logos hit the same XObject.
-  const uniq = dedupeFigures(figures);
-  const total = uniq.length;
+  const total = merged.length;
   let done = 0;
   onItemDone(done, total);
 
   const blocks: PartialBlock[] = [];
-  for (const { transform } of uniq) {
-    // The unit square (0,0)-(1,1) in image space is mapped to pt
-    // coords by `transform`. The four corners give us a bbox.
-    const [x0, y0] = applyTransform(transform, 0, 0);
-    const [x1, y1] = applyTransform(transform, 1, 1);
-    const minX = Math.min(x0, x1);
-    const minY = Math.min(y0, y1);
-    const maxX = Math.max(x0, x1);
-    const maxY = Math.max(y0, y1);
-
-    const widthPt = maxX - minX;
-    const heightPt = maxY - minY;
-
-    // PDF coords are bottom-up; canvas coords are top-down. Flip y.
-    const topPt = pageHeightPt - maxY;
-
-    // Skip degenerate / off-page images.
-    if (widthPt <= 1 || heightPt <= 1) {
-      done++;
-      onItemDone(done, total);
-      continue;
-    }
-    if (
-      minX < -1 ||
-      topPt < -1 ||
-      minX + widthPt > pageWidthPt + 1 ||
-      topPt + heightPt > pageHeightPt + 1
-    ) {
-      // Off-page (clipped header decoration etc.) — drop.
-      done++;
-      onItemDone(done, total);
-      continue;
-    }
-
+  for (const bbox of merged) {
     const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = Math.round(widthPt * RENDER_SCALE);
-    cropCanvas.height = Math.round(heightPt * RENDER_SCALE);
+    cropCanvas.width = Math.round(bbox.w * RENDER_SCALE);
+    cropCanvas.height = Math.round(bbox.h * RENDER_SCALE);
     const cropCtx = cropCanvas.getContext('2d');
     if (!cropCtx) {
       done++;
@@ -308,8 +290,8 @@ async function extractFigures(
     }
     cropCtx.drawImage(
       canvas,
-      Math.round(minX * RENDER_SCALE),
-      Math.round(topPt * RENDER_SCALE),
+      Math.round(bbox.x * RENDER_SCALE),
+      Math.round(bbox.y * RENDER_SCALE),
       cropCanvas.width,
       cropCanvas.height,
       0,
@@ -333,14 +315,15 @@ async function extractFigures(
       continue;
     }
 
+    const isLogo = classifyAsLogo(bbox, pageHeightPt);
     blocks.push({
-      type: 'image',
+      type: isLogo ? 'logo' : 'image',
       // x/y/w/h in poster units BEFORE scale-to-poster-size. The
       // synthesizer applies the final scale.
-      x: ptToUnits(minX),
-      y: ptToUnits(topPt),
-      w: ptToUnits(widthPt),
-      h: ptToUnits(heightPt),
+      x: ptToUnits(bbox.x),
+      y: ptToUnits(bbox.y),
+      w: ptToUnits(bbox.w),
+      h: ptToUnits(bbox.h),
       content: '',
       imageSrc: storageSrc,
       imageFit: 'contain',
@@ -352,6 +335,163 @@ async function extractFigures(
   }
 
   return blocks;
+}
+
+/**
+ * Walk pdfjs's operator list, tracking the CTM stack, and emit every
+ * image-paint op's bbox in top-down page-pt coords. Drops degenerate
+ * (≤1pt) and off-page bboxes immediately so callers don't have to.
+ *
+ * Exported for unit testing.
+ */
+export function collectImageBBoxes(
+  opList: { fnArray: number[]; argsArray: unknown[] },
+  pageWidthPt: number,
+  pageHeightPt: number,
+): FigureBBox[] {
+  const ops = pdfjs.OPS;
+  const ctmStack: number[][] = [[1, 0, 0, 1, 0, 0]];
+  const top = (): number[] => ctmStack[ctmStack.length - 1]!;
+
+  const figures: { transform: number[]; name: string }[] = [];
+  for (let i = 0; i < opList.fnArray.length; i++) {
+    const fn = opList.fnArray[i];
+    const args = (opList.argsArray[i] as unknown[] | undefined) ?? [];
+    if (fn === ops.save) {
+      ctmStack.push([...top()]);
+    } else if (fn === ops.restore) {
+      if (ctmStack.length > 1) ctmStack.pop();
+    } else if (fn === ops.transform) {
+      ctmStack[ctmStack.length - 1] = multiplyTransform(
+        top(),
+        args as number[],
+      );
+    } else if (
+      fn === ops.paintImageXObject ||
+      fn === ops.paintInlineImageXObject ||
+      fn === ops.paintImageXObjectRepeat
+    ) {
+      const name = (args[0] as string) ?? `inline-${i}`;
+      figures.push({ transform: [...top()], name });
+    }
+  }
+
+  const uniq = dedupeFigures(figures);
+  const out: FigureBBox[] = [];
+  for (const { transform } of uniq) {
+    const [x0, y0] = applyTransform(transform, 0, 0);
+    const [x1, y1] = applyTransform(transform, 1, 1);
+    const minX = Math.min(x0, x1);
+    const maxX = Math.max(x0, x1);
+    const maxY = Math.max(y0, y1);
+    const widthPt = maxX - minX;
+    const heightPt = maxY - Math.min(y0, y1);
+    const topPt = pageHeightPt - maxY;
+
+    if (widthPt <= 1 || heightPt <= 1) continue;
+    if (
+      minX < -1 ||
+      topPt < -1 ||
+      minX + widthPt > pageWidthPt + 1 ||
+      topPt + heightPt > pageHeightPt + 1
+    ) {
+      // Off-page (clipped header decoration etc.) — drop.
+      continue;
+    }
+    out.push({ x: minX, y: topPt, w: widthPt, h: heightPt });
+  }
+  return out;
+}
+
+/**
+ * Drop bboxes that are clearly decoration: tiny in both dimensions, or
+ * extreme aspect ratios (hairlines, dividers).
+ *
+ * Exported for unit testing.
+ */
+export function filterDecorationBBoxes(boxes: FigureBBox[]): FigureBBox[] {
+  const minPt = MIN_FIGURE_INCHES * PT_PER_INCH;
+  return boxes.filter((b) => {
+    // At least one dimension must be ≥ MIN_FIGURE_INCHES. Real plots
+    // and screenshots always satisfy this; decorative icons don't.
+    if (b.w < minPt && b.h < minPt) return false;
+    const minDim = Math.min(b.w, b.h);
+    const maxDim = Math.max(b.w, b.h);
+    if (minDim / maxDim < MIN_ASPECT) return false;
+    return true;
+  });
+}
+
+/**
+ * Union-find merge of bboxes that lie within `gapPt` of each other.
+ * The merged bbox is the union of cluster members.
+ *
+ * Exported for unit testing.
+ */
+export function mergeAdjacentBBoxes(
+  boxes: FigureBBox[],
+  gapPt: number,
+): FigureBBox[] {
+  if (boxes.length === 0) return [];
+  const parent = boxes.map((_, i) => i);
+  const find = (i: number): number => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]!]!;
+      i = parent[i]!;
+    }
+    return i;
+  };
+  const union = (a: number, b: number): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[ra] = rb;
+  };
+
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      if (bboxGap(boxes[i]!, boxes[j]!) <= gapPt) union(i, j);
+    }
+  }
+
+  const groups = new Map<number, FigureBBox[]>();
+  for (let i = 0; i < boxes.length; i++) {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root)!.push(boxes[i]!);
+  }
+
+  return [...groups.values()].map((g) => {
+    const x = Math.min(...g.map((b) => b.x));
+    const y = Math.min(...g.map((b) => b.y));
+    const x2 = Math.max(...g.map((b) => b.x + b.w));
+    const y2 = Math.max(...g.map((b) => b.y + b.h));
+    return { x, y, w: x2 - x, h: y2 - y };
+  });
+}
+
+/** Edge-to-edge gap between two axis-aligned bboxes. 0 = overlapping. */
+function bboxGap(a: FigureBBox, b: FigureBBox): number {
+  const dx = Math.max(0, Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w)));
+  const dy = Math.max(0, Math.max(a.y - (b.y + b.h), b.y - (a.y + a.h)));
+  return Math.hypot(dx, dy);
+}
+
+/**
+ * Classify a bbox as a logo if it sits in the upper region of the page
+ * AND is small enough that "logo" is plausible. Lets the user override
+ * via the standard block-type controls if we get it wrong.
+ *
+ * Exported for unit testing.
+ */
+export function classifyAsLogo(
+  bbox: FigureBBox,
+  pageHeightPt: number,
+): boolean {
+  const topZone = pageHeightPt * LOGO_TOP_FRACTION;
+  const inUpper = bbox.y + bbox.h <= topZone;
+  const maxDim = Math.max(bbox.w, bbox.h);
+  const isSmall = maxDim <= LOGO_MAX_INCHES * PT_PER_INCH;
+  return inUpper && isSmall;
 }
 
 function multiplyTransform(a: number[], b: number[]): number[] {

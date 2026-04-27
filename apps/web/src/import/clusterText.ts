@@ -109,12 +109,19 @@ export function clusterTextItems(
 }
 
 function areClose(a: RawTextItem, b: RawTextItem, eps: number): boolean {
-  // Items with very different font sizes shouldn't cluster — title vs
-  // authors line on a poster are spatially close but conceptually
-  // different blocks. Reject when the size ratio exceeds 2:1.
+  // Items with different font sizes shouldn't cluster — title /
+  // authors / institutions on a poster sit spatially close but are
+  // conceptually different blocks. We reject pairs where the smaller
+  // font is < 70% of the larger. Empirically this catches:
+  //   title 22 ↔ authors 14   (0.64) — split ✓
+  //   authors 14 ↔ inst 10    (0.71) — kept (need spatial gap to split)
+  //   heading 16 ↔ body 11    (0.69) — split ✓
+  //   body 11 ↔ body 10       (0.91) — kept ✓
+  // Items in the same logical block almost always share a font size,
+  // so 0.7 is rarely too aggressive.
   const maxH = Math.max(a.height, b.height);
   const minH = Math.min(a.height, b.height);
-  if (maxH > 0 && minH / maxH < 0.5) return false;
+  if (maxH > 0 && minH / maxH < 0.7) return false;
 
   // Distance between bounding boxes (0 if overlapping, else gap).
   const ax2 = a.x + a.width;
