@@ -33,6 +33,7 @@ import {
   assignRoles,
   clusterTextItems,
   sortReadingOrder,
+  splitHeadingClusters,
   type RawTextItem,
 } from './clusterText';
 import { synthesizeDoc, type SynthOutput } from './synthDoc';
@@ -153,7 +154,9 @@ export async function extractFromPdf(
 
   const clusters = clusterTextItems(items);
   const roled = assignRoles(clusters, pageHeightPt);
-  const ordered = sortReadingOrder(roled, pageWidthPt);
+  // Split overlong heading clusters that swallowed bullet content.
+  const split = splitHeadingClusters(roled);
+  const ordered = sortReadingOrder(split, pageWidthPt);
 
   // ── Stream 2: figures ──────────────────────────────────────────
   onProgress({ stage: 'uploading-figures', ratio: 0 });
@@ -164,7 +167,7 @@ export async function extractFromPdf(
     posterId,
     userId,
     onProgress,
-    options.verifyDecorations === true, // default OFF — opt-in
+    options.verifyDecorations !== false, // default ON
   );
 
   // ── Synthesize ─────────────────────────────────────────────────
@@ -518,10 +521,26 @@ async function extractFigures(
       verdicts.forEach((verdict, i) => {
         if (!verdict) return;
         const blockIdx = targets[i]!.blockIdx;
+        const bbox = targets[i]!.bbox;
         if (verdict.kind === 'decoration' && verdict.confidence >= 0.5) {
           dropIndexes.add(blockIdx);
         } else if (verdict.kind === 'logo' && verdict.confidence >= 0.5) {
           promotions.set(blockIdx, 'logo');
+          // Wide / tall "logo" bboxes (aspect > 2.5:1) probably
+          // contain MULTIPLE logos baked into a single image XObject
+          // by the source PDF — there is nothing left to split at
+          // the bbox level. Surface a console hint for the dev who
+          // is debugging this; the user-facing fix is the manual
+          // crop or duplicate-block flow.
+          const maxDim = Math.max(bbox.w, bbox.h);
+          const minDim = Math.min(bbox.w, bbox.h);
+          if (maxDim / Math.max(1, minDim) > 2.5) {
+            // eslint-disable-next-line no-console
+            console.warn(
+              '[import] multi-logo image detected — single XObject in source PDF, cannot split without OCR. User can crop or duplicate the block manually.',
+              bbox,
+            );
+          }
         }
       });
 

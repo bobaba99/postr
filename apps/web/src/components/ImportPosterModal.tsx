@@ -66,9 +66,10 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
   // Cached source File so the "Try LLM extraction" button can re-run
   // image OCR on the same input without making the user re-drop.
   const sourceFileRef = useRef<File | null>(null);
-  // Off by default — LLM verification adds 5-15s of wait + ~$0.005
-  // per import. Surface as a checkbox so the cost is explicit.
-  const [verifyDecorations, setVerifyDecorations] = useState(false);
+  // On by default now that the verifier runs in parallel with a 30s
+  // total-budget cap (decoration leaks were a bigger UX hit than
+  // the 10-15s wait). Users can untick to skip the LLM call.
+  const [verifyDecorations, setVerifyDecorations] = useState(true);
 
   // Reset state when (re-)opened
   useEffect(() => {

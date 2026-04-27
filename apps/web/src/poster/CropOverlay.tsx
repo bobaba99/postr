@@ -154,27 +154,32 @@ export function CropOverlay({ block, onUpdate, onClose }: CropOverlayProps) {
       <Handle edge="bottom" crop={crop} onDown={startDrag} />
       <Handle edge="left" crop={crop} onDown={startDrag} />
 
-      {/* Done / Cancel toolbar */}
+      {/* Done / Cancel toolbar — pinned BELOW the block (not over it)
+          and sized to look like the rotate handle, not a giant
+          full-width modal. The previous version painted huge buttons
+          on top of the figure so users couldn't see what they were
+          cropping. */}
       <div
         style={{
           position: 'absolute',
           left: '50%',
-          bottom: -42,
+          bottom: -34,
           transform: 'translateX(-50%)',
           display: 'flex',
-          gap: 8,
-          padding: '6px 10px',
+          gap: 4,
+          padding: '3px 4px',
           background: 'rgba(17, 17, 24, 0.95)',
           border: '1px solid #2a2a3a',
-          borderRadius: 8,
-          boxShadow: '0 6px 20px rgba(0, 0, 0, 0.5)',
+          borderRadius: 6,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)',
+          whiteSpace: 'nowrap',
         }}
       >
-        <button onClick={cancel} style={btnStyle}>
-          Cancel
+        <button onClick={cancel} style={btnStyle} title="Cancel (Esc)">
+          ✕
         </button>
-        <button onClick={apply} style={{ ...btnStyle, ...primary }}>
-          ✓ Apply crop
+        <button onClick={apply} style={{ ...btnStyle, ...primary }} title="Apply crop (Enter)">
+          ✓
         </button>
       </div>
     </div>
@@ -238,18 +243,23 @@ function clamp(v: number, lo: number, hi: number): number {
 
 const btnStyle: CSSProperties = {
   cursor: 'pointer',
-  padding: '5px 10px',
-  fontSize: 12,
-  fontWeight: 500,
+  width: 22,
+  height: 22,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 0,
+  fontSize: 11,
+  fontWeight: 600,
   color: '#c8cad0',
   background: '#1a1a26',
   border: '1px solid #2a2a3a',
-  borderRadius: 5,
+  borderRadius: 4,
+  lineHeight: 1,
 };
 
 const primary: CSSProperties = {
   background: '#7c6aed',
   color: '#fff',
   border: '1px solid #7c6aed',
-  fontWeight: 600,
 };

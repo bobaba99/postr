@@ -209,6 +209,115 @@ export function looksLikeHeading(text: string): boolean {
   return HEADING_PATTERNS.some((re) => re.test(firstLine));
 }
 
+/** Bullet markers commonly used on academic posters. Matches inline
+ *  too: pdfjs frequently joins bullet lines with spaces, so a
+ *  cluster's text reads "Heading • bullet 1 • bullet 2" with no
+ *  newlines. Includes the dash variants (- – —) and arrow heads. */
+const BULLET_RE = /[•●▪◦‣◾▫⦁⁃▶❖✦✓✔]/;
+
+/**
+ * Heuristic split: when a heading cluster also contains bulleted body
+ * text (`6. Statistical Analyses • Assessing hypothesis#1: • …`),
+ * split it into a heading-only cluster and a body cluster sitting
+ * below it. Without this the heading block on the canvas reads as
+ * one giant 80-word run.
+ *
+ * Also caps overrun heading text at ~6 words. Real section titles
+ * ("introduction", "methods and results", "1. background") rarely
+ * exceed that — anything longer is a sentence that picked up the
+ * heading regex by accident.
+ *
+ * Exported for unit testing.
+ */
+export function splitHeadingClusters(
+  clusters: RoledCluster[],
+): RoledCluster[] {
+  const out: RoledCluster[] = [];
+  for (const c of clusters) {
+    if (c.role !== 'heading') {
+      out.push(c);
+      continue;
+    }
+    const split = trySplitHeading(c);
+    if (split) {
+      out.push(...split);
+    } else {
+      out.push(c);
+    }
+  }
+  return out;
+}
+
+function trySplitHeading(c: RoledCluster): RoledCluster[] | null {
+  const text = c.text;
+  // 1. Try to split at the first bullet marker.
+  const bulletMatch = text.match(BULLET_RE);
+  if (bulletMatch && bulletMatch.index !== undefined && bulletMatch.index >= 2) {
+    const before = text.slice(0, bulletMatch.index).trim().replace(/[\s,;:.]+$/, '');
+    const after = text.slice(bulletMatch.index).trim();
+    if (before && after) {
+      const cappedHeading = capHeadingWords(before);
+      const remainder =
+        cappedHeading === before
+          ? after
+          : `${before.slice(cappedHeading.length).trim().replace(/^[\s,;:.]+/, '')} ${after}`.trim();
+      return makeHeadingBodyPair(c, cappedHeading, remainder);
+    }
+  }
+
+  // 2. No bullets but the heading is way too long — split off the
+  // first 6 words as the heading, push the rest to a body cluster.
+  const words = text.split(/\s+/);
+  if (words.length > 8) {
+    const cappedHeading = capHeadingWords(text);
+    const remainder = text.slice(cappedHeading.length).trim().replace(/^[\s,;:.]+/, '');
+    if (cappedHeading && remainder) {
+      return makeHeadingBodyPair(c, cappedHeading, remainder);
+    }
+  }
+  return null;
+}
+
+/** Take the first ≤6 words, preserving any leading numbering
+ *  ("1." / "1.1" / "I."). */
+function capHeadingWords(text: string, maxWords = 6): string {
+  const trimmed = text.trim();
+  const words = trimmed.split(/\s+/);
+  if (words.length <= maxWords) return trimmed;
+  return words.slice(0, maxWords).join(' ');
+}
+
+function makeHeadingBodyPair(
+  c: RoledCluster,
+  headingText: string,
+  bodyText: string,
+): RoledCluster[] {
+  // Split the bbox vertically: heading occupies the top ~30% of the
+  // original cluster height, body fills the rest. Approximate but
+  // good enough for the auto-layout pass to flow them correctly.
+  const headingFrac = Math.max(0.15, Math.min(0.4, 1 / Math.max(1, c.text.length / Math.max(1, headingText.length))));
+  const headingH = c.bbox.h * headingFrac;
+  const heading: RoledCluster = {
+    ...c,
+    text: headingText,
+    bbox: { ...c.bbox, h: headingH },
+    items: [],
+  };
+  const body: RoledCluster = {
+    ...c,
+    text: bodyText,
+    role: 'text',
+    bbox: {
+      x: c.bbox.x,
+      y: c.bbox.y + headingH,
+      w: c.bbox.w,
+      h: c.bbox.h - headingH,
+    },
+    items: [],
+  };
+  return [heading, body];
+}
+
 /**
  * Assign a semantic role to each cluster using a font-size histogram.
  *
