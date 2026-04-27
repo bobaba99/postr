@@ -547,6 +547,21 @@ async function extractFigures(
       h: finalHPt,
     };
 
+    // Pre-LLM stock-icon filter. Counts unique color buckets in the
+    // tightened crop — cartoon decorations have ≤6 distinct colors,
+    // text-bearing logos and real charts always have more. Pre-drops
+    // obvious cartoons (people-icon, FAQ bubble, leaf, magnifier,
+    // etc.) before we spend an upload + an LLM call. Only fires for
+    // tiny + squarish bboxes so brand logos can't get caught.
+    if (
+      isStockIcon(finalCanvas, Math.max(tightBBox.w, tightBBox.h))
+    ) {
+      traceRow.outcome = 'pre-drop:stock-icon';
+      done++;
+      onItemDone(done, total);
+      continue;
+    }
+
     const blob = await canvasToBlob(finalCanvas, 'image/png');
     if (!blob) {
       traceRow.outcome = 'no-blob';
@@ -920,16 +935,23 @@ async function extractFigures(
           dropIndexes.add(blockIdx);
           return;
         }
-        // Always queue any logo-shaped block for the split pass —
-        // covers horizontal banners AND vertical stacks (McGill on
-        // top, Douglas below = aspect ~1.4, which an aspect-extreme
-        // gate would reject). The split call returns isSingleLogo
-        // when there's only one, so it's a safe no-op.
-        if (kind === 'logo' && confidence >= 0.5) {
+        // Tiny "logo" verdicts get a tighter confidence floor (0.7
+        // vs 0.5). Cartoon icons that survived both pixel-icon
+        // pre-filter AND the strict-evidence guard usually came
+        // back from the LLM as borderline-confidence logos
+        // (~0.5–0.7); raising the floor catches that residual case
+        // without hurting genuine brand marks (which the model
+        // typically returns at ≥0.85 confidence).
+        const isTiny = Math.max(bbox.w, bbox.h) <= 1.5 * PT_PER_INCH;
+        const logoFloor = isTiny ? 0.7 : 0.5;
+        if (kind === 'logo' && confidence >= logoFloor) {
           promotions.set(blockIdx, 'logo');
           if (sourceImageSrc) {
             splitCandidates.push({ imageSrc: sourceImageSrc, bbox });
           }
+        } else if (kind === 'logo' && isTiny) {
+          // Sub-floor tiny logo verdict — drop instead of promote.
+          dropIndexes.add(blockIdx);
         } else if (kind === 'figure' && looksLikeLogo(bbox)) {
           // Borderline: small image the verifier called `figure` but
           // its dims are logo-shaped. Try the split pass anyway.
@@ -1220,6 +1242,78 @@ export function splitLogoByWhitespace(
   if (!ctx) return null;
   const data = ctx.getImageData(0, 0, w, h).data;
   return splitLogoByWhitespacePure(data, w, h);
+}
+
+/** Heuristic stock-icon detector. Real-world cartoon decorations
+ *  (people-silhouette, FAQ bubble, leaf, magnifier, lightbulb)
+ *  share a structural property: very low color complexity. They're
+ *  drawn with 2–4 flat fills + thin outlines, total ≤ 6 distinct
+ *  color buckets at 4-bit quantization. Real charts, text-bearing
+ *  brand logos, and figures all have many more colors due to
+ *  anti-aliasing of small features.
+ *
+ *  Used as a pre-filter BEFORE the LLM verifier — drops obvious
+ *  cartoons without spending an API call. False-positive rate is
+ *  near-zero for the small-bbox case (anything text-bearing or
+ *  data-bearing has >6 colors). Brand logos that ARE near the
+ *  threshold (e.g. simple monochrome marks) survive because the
+ *  function only fires when ALL three guards pass: low color count
+ *  AND squarish AND tiny.
+ *
+ *  Returns true when the canvas matches the cartoon-icon profile.
+ *  Wraps the canvas to extract pixel data; pure logic lives in
+ *  `isStockIconPure` for unit testing. */
+export function isStockIcon(
+  source: HTMLCanvasElement,
+  bboxMaxDimPt: number,
+): boolean {
+  const w = source.width;
+  const h = source.height;
+  if (w < 4 || h < 4) return false;
+  // Only fire for tiny + squarish bboxes — what cartoon icons
+  // actually look like on academic posters.
+  const aspect = Math.min(w, h) / Math.max(w, h);
+  if (aspect < 0.55) return false;
+  if (bboxMaxDimPt > 1.5 * PT_PER_INCH) return false;
+  const ctx = source.getContext('2d');
+  if (!ctx) return false;
+  const data = ctx.getImageData(0, 0, w, h).data;
+  return isStockIconPure(data, w, h);
+}
+
+/** Pure inner of `isStockIcon`. Quantizes each pixel to 4-bit per
+ *  channel (4096 buckets total), counts buckets that hold ≥ 0.5%
+ *  of pixels (suppresses anti-aliasing noise), returns true when
+ *  ≤ 6 dominant buckets remain.
+ *
+ *  Exported for unit testing. */
+const STOCK_ICON_MAX_DOMINANT_BUCKETS = 6;
+const STOCK_ICON_MIN_BUCKET_FRACTION = 0.005;
+export function isStockIconPure(
+  data: Uint8ClampedArray,
+  w: number,
+  h: number,
+): boolean {
+  const pixelCount = w * h;
+  if (pixelCount === 0) return false;
+  const buckets = new Map<number, number>();
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3]!;
+    if (a === 0) continue;
+    // 4-bit per channel — top nibble of each byte.
+    const r = (data[i]! >> 4) & 0xf;
+    const g = (data[i + 1]! >> 4) & 0xf;
+    const b = (data[i + 2]! >> 4) & 0xf;
+    const key = (r << 8) | (g << 4) | b;
+    buckets.set(key, (buckets.get(key) ?? 0) + 1);
+  }
+  if (buckets.size === 0) return false;
+  const minPx = Math.max(1, Math.floor(pixelCount * STOCK_ICON_MIN_BUCKET_FRACTION));
+  let dominantCount = 0;
+  for (const v of buckets.values()) {
+    if (v >= minPx) dominantCount++;
+  }
+  return dominantCount <= STOCK_ICON_MAX_DOMINANT_BUCKETS;
 }
 
 /** Pure inner of splitLogoByWhitespace — takes raw RGBA pixel data

@@ -9,6 +9,7 @@ import {
   computeBBoxStats,
   filterDecorationBBoxes,
   filterOrphanLabels,
+  isStockIconPure,
   medianBodyFontSize,
   mergeAdjacentBBoxes,
   splitLogoByWhitespacePure,
@@ -500,5 +501,82 @@ describe('splitLogoByWhitespacePure', () => {
     // Second rect should start near y=130
     expect(subs![1]!.y).toBeGreaterThanOrEqual(128);
     expect(subs![1]!.y).toBeLessThanOrEqual(132);
+  });
+});
+
+describe('isStockIconPure', () => {
+  /** Build a synthetic icon with `n` distinct colors painted in
+   *  evenly-sized horizontal stripes. Useful to reproduce the
+   *  cartoon-icon profile (≤6 dominant colors) vs the chart
+   *  profile (many colors). */
+  function makeStripedCanvas(
+    w: number,
+    h: number,
+    colors: Array<[number, number, number]>,
+  ): Uint8ClampedArray {
+    const stripe = Math.floor(h / colors.length);
+    return makePixels(w, h, (_x, y) => {
+      const idx = Math.min(colors.length - 1, Math.floor(y / stripe));
+      const [r, g, b] = colors[idx]!;
+      return [r, g, b, 255];
+    });
+  }
+
+  it('flags a 3-color cartoon (people-icon profile)', () => {
+    const data = makeStripedCanvas(60, 60, [
+      [255, 255, 255], // background white
+      [40, 40, 40], // outline dark
+      [200, 200, 200], // accent gray
+    ]);
+    expect(isStockIconPure(data, 60, 60)).toBe(true);
+  });
+
+  it('flags a 5-color cartoon (FAQ bubble with question mark)', () => {
+    const data = makeStripedCanvas(60, 60, [
+      [255, 255, 255],
+      [40, 40, 40],
+      [120, 120, 120],
+      [220, 220, 220],
+      [60, 60, 60],
+    ]);
+    expect(isStockIconPure(data, 60, 60)).toBe(true);
+  });
+
+  it('does NOT flag a many-color image (chart / text-bearing logo profile)', () => {
+    // 30 stripes — well over the 6-bucket cutoff. Each stripe is a
+    // distinct gray level so they survive the 4-bit quantization.
+    const colors: Array<[number, number, number]> = [];
+    for (let i = 0; i < 30; i++) {
+      const v = Math.floor((i * 250) / 30);
+      colors.push([v, v, v]);
+    }
+    const data = makeStripedCanvas(60, 60, colors);
+    expect(isStockIconPure(data, 60, 60)).toBe(false);
+  });
+
+  it('treats a fully-transparent canvas as not-an-icon (no signal)', () => {
+    const data = makePixels(60, 60, () => [0, 0, 0, 0]);
+    expect(isStockIconPure(data, 60, 60)).toBe(false);
+  });
+
+  it('ignores anti-aliasing noise (sparse buckets below the 0.5% floor)', () => {
+    // 3 dominant colors + a single 1-pixel "noise" pixel of a 4th
+    // color → still 3 dominant buckets, so flagged as icon.
+    const data = makePixels(100, 100, (x, y) => {
+      if (x === 0 && y === 0) return [10, 200, 50, 255]; // 1px noise
+      const stripe = y < 33 ? 0 : y < 66 ? 1 : 2;
+      const palette: Array<[number, number, number]> = [
+        [255, 255, 255],
+        [40, 40, 40],
+        [200, 200, 200],
+      ];
+      const [r, g, b] = palette[stripe]!;
+      return [r, g, b, 255];
+    });
+    expect(isStockIconPure(data, 100, 100)).toBe(true);
+  });
+
+  it('handles empty input', () => {
+    expect(isStockIconPure(new Uint8ClampedArray(0), 0, 0)).toBe(false);
   });
 });
