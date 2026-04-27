@@ -187,3 +187,73 @@ The decoration-filter work this session is solid — 0 cartoon icons
 leaked across 3 review posters. The pixel-signature co-signal logic
 is doing its job. The remaining issues are layout / size-filter
 problems, not classification problems.
+
+---
+
+## Appendix: Round 2 (commits 531786a + tighter co-signal)
+
+After the visual report flagged "0/12 logos" as the priority,
+applied two fixes:
+
+1. `MIN_AREA_PAGE_FRACTION` 0.0005 → 0.0002 (logos at 60×36 pt
+   were just below the previous cutoff)
+2. Caption-near-figure proximity 2.5 → 4 × fontSize
+3. Pixel-signature co-signal: tiny bboxes use lower iconScore floor
+   (0.3 vs 0.6) since SVG anti-aliasing inflates edge density past
+   the 4% mark for cartoons
+
+### Round 2 results — verified on 5 posters
+
+| Poster              | Round 1 logos | Round 2 logos | Decoration leaked? |
+|---------------------|---------------|---------------|--------------------|
+| matysiak-2019       | 0             | 5             | n/a (data-heavy)   |
+| rodas-2024          | 0             | 4             | n/a (data-heavy)   |
+| sala-2017           | 0             | 5             | n/a (data-heavy)   |
+| sala-2019           | 0             | 5             | n/a (data-heavy)   |
+| bastian-2013        | 0             | 2             | **YES (regression)** |
+
+### Big win
+
+All 4 data-heavy posters now extract the institutional brand logos
+that were previously hidden by the area filter. The
+pixel-signature co-signal protects them via edge density (text
+strokes push iconScore to 0 regardless of color count).
+
+### Remaining regression
+
+bastian-2013 (review template, no real logos) now shows **2 logo
+blocks** that are actually the leaf icon + people-icon cartoons.
+Pre-scan trace reveals: `expectedLogoCount: 1` — the LLM
+mis-classifies one of the cartoons as a logo at the global pre-scan
+step, so the budget allows 1 logo through. The other survives via
+the multi-logo split path or because budget reconciliation
+doesn't catch ties.
+
+This is a **net regression on the review template** — the previous
+behavior was "cartoons silently dropped by area filter", which
+hid the LLM's mis-classification. Now they reach the user.
+
+### Next priority (left for the user)
+
+Three viable paths:
+
+A. **Tighten budget reconciliation** so it actually clamps logo
+   verdicts to `expectedLogoCount` even when both verdicts have
+   the same confidence (current sort-by-confidence-then-area may
+   not break the tie usefully). Highest leverage.
+
+B. **Drop the LLM pre-scan's logo-count signal entirely** for
+   review-style posters and rely purely on per-bbox classification.
+   Simpler but loses the global-context win.
+
+C. **Add a "no readable text" gate to the logo classifier** — a
+   real brand logo has letterforms; the LLM should call any
+   logo-shaped image with no text "decoration". Requires a stricter
+   prompt + maybe a second OCR pass on each candidate.
+
+Recommend A.
+
+The data-heavy logo recovery is the bigger UX win, so the trade-off
+is worth keeping while A is investigated. Roll back to round 1 if
+the bastian regression matters more than the matysiak/sala-2017
+recovery.

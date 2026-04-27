@@ -806,24 +806,37 @@ async function extractFigures(
           kind = 'decoration';
         }
 
-        // Pixel co-signal: when the LLM verdict is borderline AND
-        // the pixel signature shows iconic structure (low color
-        // count + low edge density), agree with the LLM toward
-        // decoration. Two-of-two-must-agree gate prevents either
-        // signal from being a sole decider — protects ADNI
-        // (low colors, HIGH edge density from text strokes →
-        // iconScore 0 → never demoted) AND catches cartoons that
-        // the LLM mis-labeled as logos (low colors, low edges,
-        // weak LLM confidence → both agree → drop).
+        // Pixel co-signal: when the pixel signature shows iconic
+        // structure (low color count + low edge density), demote
+        // toward decoration. Two regimes:
+        //   - tiny bboxes (≤1.5"): trust pixel signal alone. The LLM
+        //     consistently mis-labels small cartoons as confident
+        //     "logos" (e.g. leaf, people-icon, FAQ bubble at ≥0.85
+        //     confidence), so confidence-gating lets them through.
+        //     ADNI-style brand marks get protected here by edge
+        //     density: text strokes push iconScore to 0 regardless
+        //     of color count, so they survive.
+        //   - larger bboxes: keep the two-of-two gate (pixel + LLM
+        //     hedge) so a borderline real chart with limited colors
+        //     doesn't get nuked by pixel signal alone.
         const sig = blockSignatures[blockIdx];
         const pixelIcon = sig ? iconScore(sig) : 0;
+        const isTinyForCoSignal =
+          Math.max(bbox.w, bbox.h) <= 1.5 * PT_PER_INCH;
         const llmHedge =
           verdict.confidence < 0.7 ||
           (kind === 'logo' && ev && !ev.hasNumericData && !ev.hasGridRowsAndCols);
+        // Tiny bboxes use a LOWER iconScore floor (0.3 vs 0.6) — SVG
+        // rasterization picks up anti-aliasing edge pixels that bump
+        // a real cartoon's edge density into the 4–6% range, which
+        // otherwise would put iconScore at 0.3 (borderline) and slip
+        // through the 0.6 gate. Brand marks with text aren't affected
+        // because text strokes push edge density past 8% → iconScore=0.
+        const pixelIconThreshold = isTinyForCoSignal ? 0.3 : 0.6;
         if (
           (kind === 'logo' || kind === 'figure') &&
-          pixelIcon >= 0.6 &&
-          llmHedge
+          pixelIcon >= pixelIconThreshold &&
+          (isTinyForCoSignal || llmHedge)
         ) {
           // eslint-disable-next-line no-console
           console.debug(
