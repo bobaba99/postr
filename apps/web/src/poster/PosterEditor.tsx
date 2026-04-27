@@ -10,7 +10,9 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { flushSync } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import type { CommentAnchor } from '@/data/comments';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { duplicatePoster, type PosterRow } from '@/data/posters';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import type {
   Block,
   HeadingStyle,
@@ -863,6 +865,26 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // Autosave — debounces doc changes and persists via upsertPoster.
   // Status drives the pill rendered in the top-right overlay.
   const autosave = useAutosave(readOnly ? null : posterId, doc, posterDisplayName);
+
+  // Sidebar "Duplicate poster" flow. Tracks the just-created copy so
+  // the ConfirmModal can offer a one-click jump into the new poster.
+  // Always flush pending autosave first so the duplicate captures any
+  // in-memory edits the user just made.
+  const navigate = useNavigate();
+  const [duplicatedFromEditor, setDuplicatedFromEditor] = useState<PosterRow | null>(null);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const handleDuplicateFromSidebar = useCallback(async () => {
+    if (!posterId) return;
+    setDuplicateError(null);
+    try {
+      await autosave.flushNow(posterDisplayName);
+      const copy = await duplicatePoster(posterId);
+      setDuplicatedFromEditor(copy);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to duplicate poster';
+      setDuplicateError(message);
+    }
+  }, [posterId, autosave, posterDisplayName]);
 
   if (!doc || !posterId) {
     return (
@@ -2132,6 +2154,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       >
         <Sidebar
           onToggleSidebar={() => setSidebarOpen(false)}
+        onDuplicatePoster={readOnly ? undefined : handleDuplicateFromSidebar}
         posterTitle={posterDisplayName}
         onChangePosterTitle={(title) => {
           setPosterDisplayName(title);
@@ -2243,6 +2266,61 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           printPoster();
         }}
       />
+
+      {/* "Switch to the new copy?" prompt fired by the sidebar
+          Duplicate pill. Stay-here keeps the user on the original
+          poster; Open-copy navigates to /p/<new-id>. */}
+      <ConfirmModal
+        open={duplicatedFromEditor !== null}
+        title="Duplicated"
+        message={`Created "${duplicatedFromEditor?.title?.trim() || 'Untitled Poster'}". Open the new copy now?`}
+        confirmLabel="Open copy"
+        cancelLabel="Stay here"
+        onConfirm={() => {
+          const target = duplicatedFromEditor;
+          setDuplicatedFromEditor(null);
+          if (target) navigate(`/p/${target.id}`);
+        }}
+        onCancel={() => setDuplicatedFromEditor(null)}
+      />
+
+      {/* Inline duplicate error toast — same pattern other failures
+          surface inside the editor. Auto-clears when the user starts
+          a new duplicate. */}
+      {duplicateError && (
+        <div
+          role="alert"
+          style={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 10000,
+            padding: '10px 16px',
+            background: '#1a1a26',
+            border: '1px solid #f87171',
+            borderRadius: 8,
+            color: '#f87171',
+            fontSize: 13,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          }}
+        >
+          {duplicateError}
+          <button
+            type="button"
+            onClick={() => setDuplicateError(null)}
+            style={{
+              all: 'unset',
+              cursor: 'pointer',
+              marginLeft: 12,
+              color: '#c8cad0',
+              fontWeight: 600,
+            }}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Notion-style reveal tab when the sidebar is hidden. */}
       {!sidebarOpen && (

@@ -162,6 +162,11 @@ interface SidebarProps {
   // sidebar visibility (Notion-style collapse toggle)
   onToggleSidebar?: () => void;
 
+  // Duplicates the current poster. Caller is responsible for the
+  // confirm-and-navigate flow; sidebar just exposes the trigger.
+  // Hidden in readOnly (share viewer) mode.
+  onDuplicatePoster?: () => void;
+
   // active sidebar tab — lifted to PosterEditor so the Check tab
   // can render a draggable "figure size" overlay on the canvas
   // when it's the active tab.
@@ -461,41 +466,80 @@ export function Sidebar(props: SidebarProps) {
       {/* Prominent "back to dashboard" button below the logo — the
           logo itself also links to /dashboard but users don't reliably
           recognize a logo as a back affordance, so this explicit pill
-          makes the exit path unambiguous. */}
-      <a
-        href="/dashboard"
-        title="Back to My Posters"
-        style={{
-          margin: '10px 24px 0',
-          padding: '8px 12px',
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 8,
-          background: '#1a1a26',
-          border: '1px solid #2a2a3a',
-          borderRadius: 6,
-          textDecoration: 'none',
-          color: '#c8cad0',
-          fontSize: 13,
-          fontWeight: 500,
-          width: 'fit-content',
-          transition: 'border-color 120ms, color 120ms',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = '#7c6aed';
-          e.currentTarget.style.color = '#fff';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.borderColor = '#2a2a3a';
-          e.currentTarget.style.color = '#c8cad0';
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M19 12H5" />
-          <path d="M12 19l-7-7 7-7" />
-        </svg>
-        Back to My Posters
-      </a>
+          makes the exit path unambiguous. The Duplicate pill sits next
+          to it so users can fork the current poster without a round
+          trip through the dashboard; it is hidden in read-only (share
+          viewer) mode. */}
+      <div style={{ margin: '10px 24px 0', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <a
+          href="/dashboard"
+          title="Back to My Posters"
+          style={{
+            padding: '8px 12px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            background: '#1a1a26',
+            border: '1px solid #2a2a3a',
+            borderRadius: 6,
+            textDecoration: 'none',
+            color: '#c8cad0',
+            fontSize: 13,
+            fontWeight: 500,
+            transition: 'border-color 120ms, color 120ms',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = '#7c6aed';
+            e.currentTarget.style.color = '#fff';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = '#2a2a3a';
+            e.currentTarget.style.color = '#c8cad0';
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+          Back to My Posters
+        </a>
+        {!props.readOnly && props.onDuplicatePoster && (
+          <button
+            type="button"
+            onClick={() => props.onDuplicatePoster?.()}
+            title="Duplicate this poster"
+            style={{
+              all: 'unset',
+              cursor: 'pointer',
+              padding: '8px 12px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: '#1a1a26',
+              border: '1px solid #2a2a3a',
+              borderRadius: 6,
+              color: '#c8cad0',
+              fontSize: 13,
+              fontWeight: 500,
+              transition: 'border-color 120ms, color 120ms',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = '#7c6aed';
+              e.currentTarget.style.color = '#fff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = '#2a2a3a';
+              e.currentTarget.style.color = '#c8cad0';
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            Duplicate
+          </button>
+        )}
+      </div>
 
       {/* New-version banner. Renders in-place at the top of the
           sidebar (above the tab rail) when the deployed
