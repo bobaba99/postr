@@ -1,0 +1,368 @@
+[
+  {
+    "id": "bastian-2013",
+    "ok": true,
+    "blockTypeCounts": {
+      "title": 1,
+      "authors": 1,
+      "heading": 5,
+      "text": 5
+    },
+    "importTraces": [
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] bbox funnel {raw: 2, afterFilter: 0, afterMerge: 0, medianMaxDimPt: 0, smallCutoffPt: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] extraction outcomes {total: 0, uploaded: 0, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 12, afterInsideFigure: 12, afterOrphanLabel: 12, figureBBoxesUsed: 0, droppedByInsideFigure: Array(0)}"
+      }
+    ],
+    "warnings": [
+      "Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.",
+      "Source fonts (g_d0_f1, g_d0_f2, g_d0_f3…) replaced with the editor default.",
+      "Home",
+      "Gallery",
+      "My posters",
+      "About",
+      "Send feedback",
+      "Sign in",
+      "Profile",
+      "Privacy Policy",
+      "Cookies Policy",
+      "Terms of Service"
+    ],
+    "durationMs": 5366
+  },
+  {
+    "id": "constantinidis-2016",
+    "ok": true,
+    "blockTypeCounts": {
+      "title": 1,
+      "authors": 1,
+      "heading": 5,
+      "text": 5
+    },
+    "importTraces": [
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] bbox funnel {raw: 2, afterFilter: 0, afterMerge: 0, medianMaxDimPt: 0, smallCutoffPt: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] extraction outcomes {total: 0, uploaded: 0, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 12, afterInsideFigure: 12, afterOrphanLabel: 12, figureBBoxesUsed: 0, droppedByInsideFigure: Array(0)}"
+      }
+    ],
+    "warnings": [
+      "Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.",
+      "Source fonts (g_d0_f1, g_d0_f2, g_d0_f3…) replaced with the editor default.",
+      "Home",
+      "Gallery",
+      "My posters",
+      "About",
+      "Send feedback",
+      "Sign in",
+      "Profile",
+      "Privacy Policy",
+      "Cookies Policy",
+      "Terms of Service"
+    ],
+    "durationMs": 6599
+  },
+  {
+    "id": "klingberg-2010",
+    "ok": true,
+    "blockTypeCounts": {
+      "title": 1,
+      "authors": 1,
+      "heading": 6,
+      "text": 6,
+      "image": 1
+    },
+    "importTraces": [
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] bbox funnel {raw: 1, afterFilter: 1, afterMerge: 1, medianMaxDimPt: 1246, smallCutoffPt: 748}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] extraction outcomes {total: 1, uploaded: 1, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 14, afterInsideFigure: 14, afterOrphanLabel: 14, figureBBoxesUsed: 1, droppedByInsideFigure: Array(0)}"
+      }
+    ],
+    "warnings": [
+      "Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.",
+      "Source fonts (g_d0_f1, g_d0_f2, g_d0_f3…) replaced with the editor default.",
+      "Home",
+      "Gallery",
+      "My posters",
+      "About",
+      "Send feedback",
+      "Sign in",
+      "Profile",
+      "Privacy Policy",
+      "Cookies Policy",
+      "Terms of Service"
+    ],
+    "durationMs": 7228
+  },
+  {
+    "id": "matysiak-2019",
+    "ok": true,
+    "blockTypeCounts": {
+      "title": 1,
+      "authors": 1,
+      "heading": 4,
+      "text": 4,
+      "image": 1
+    },
+    "importTraces": [
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 2, afterMerge: 1, medianMaxDimPt: 831, smallCutoffPt: 499}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] extraction outcomes {total: 1, uploaded: 1, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 1, droppedByInsideFigure: Array(1)}"
+      }
+    ],
+    "warnings": [
+      "Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.",
+      "Source fonts (g_d0_f1, g_d0_f2, g_d0_f3…) replaced with the editor default.",
+      "Home",
+      "Gallery",
+      "My posters",
+      "About",
+      "Send feedback",
+      "Sign in",
+      "Profile",
+      "Privacy Policy",
+      "Cookies Policy",
+      "Terms of Service"
+    ],
+    "durationMs": 13667
+  },
+  {
+    "id": "melby-lervaag-2013",
+    "ok": true,
+    "blockTypeCounts": {
+      "title": 1,
+      "authors": 1,
+      "heading": 4,
+      "text": 4,
+      "image": 1
+    },
+    "importTraces": [
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] bbox funnel {raw: 1, afterFilter: 1, afterMerge: 1, medianMaxDimPt: 1251, smallCutoffPt: 751}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] extraction outcomes {total: 1, uploaded: 1, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 10, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 1, droppedByInsideFigure: Array(0)}"
+      }
+    ],
+    "warnings": [
+      "Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.",
+      "Source fonts (g_d0_f1, g_d0_f2, g_d0_f3…) replaced with the editor default.",
+      "Home",
+      "Gallery",
+      "My posters",
+      "About",
+      "Send feedback",
+      "Sign in",
+      "Profile",
+      "Privacy Policy",
+      "Cookies Policy",
+      "Terms of Service"
+    ],
+    "durationMs": 7088
+  },
+  {
+    "id": "morrison-2011",
+    "ok": false,
+    "blockTypeCounts": {},
+    "importTraces": [],
+    "warnings": [],
+    "error": "page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"http://localhost:5174/dashboard\", waiting until \"networkidle\"\n",
+    "durationMs": 30137
+  },
+  {
+    "id": "rodas-2024",
+    "ok": true,
+    "blockTypeCounts": {
+      "title": 1,
+      "authors": 1,
+      "heading": 4,
+      "text": 4,
+      "image": 1
+    },
+    "importTraces": [
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 2, afterMerge: 1, medianMaxDimPt: 831, smallCutoffPt: 499}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] extraction outcomes {total: 1, uploaded: 1, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 1, droppedByInsideFigure: Array(1)}"
+      }
+    ],
+    "warnings": [
+      "Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.",
+      "Source fonts (g_d0_f1, g_d0_f2, g_d0_f3…) replaced with the editor default.",
+      "Home",
+      "Gallery",
+      "My posters",
+      "About",
+      "Send feedback",
+      "Sign in",
+      "Profile",
+      "Privacy Policy",
+      "Cookies Policy",
+      "Terms of Service"
+    ],
+    "durationMs": 5790
+  },
+  {
+    "id": "sala-2017",
+    "ok": true,
+    "blockTypeCounts": {
+      "title": 1,
+      "authors": 1,
+      "heading": 4,
+      "text": 4,
+      "image": 1
+    },
+    "importTraces": [
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 2, afterMerge: 1, medianMaxDimPt: 831, smallCutoffPt: 499}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] extraction outcomes {total: 1, uploaded: 1, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 1, droppedByInsideFigure: Array(1)}"
+      }
+    ],
+    "warnings": [
+      "Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.",
+      "Source fonts (g_d0_f1, g_d0_f2, g_d0_f3…) replaced with the editor default.",
+      "Home",
+      "Gallery",
+      "My posters",
+      "About",
+      "Send feedback",
+      "Sign in",
+      "Profile",
+      "Privacy Policy",
+      "Cookies Policy",
+      "Terms of Service"
+    ],
+    "durationMs": 13967
+  },
+  {
+    "id": "sala-2019",
+    "ok": true,
+    "blockTypeCounts": {
+      "title": 1,
+      "authors": 1,
+      "heading": 4,
+      "text": 4,
+      "image": 1
+    },
+    "importTraces": [
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 2, afterMerge: 1, medianMaxDimPt: 831, smallCutoffPt: 499}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] extraction outcomes {total: 1, uploaded: 1, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 1, droppedByInsideFigure: Array(1)}"
+      }
+    ],
+    "warnings": [
+      "Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.",
+      "Source fonts (g_d0_f1, g_d0_f2, g_d0_f3…) replaced with the editor default.",
+      "Home",
+      "Gallery",
+      "My posters",
+      "About",
+      "Send feedback",
+      "Sign in",
+      "Profile",
+      "Privacy Policy",
+      "Cookies Policy",
+      "Terms of Service"
+    ],
+    "durationMs": 14385
+  },
+  {
+    "id": "shipstead-2012",
+    "ok": true,
+    "blockTypeCounts": {
+      "title": 1,
+      "authors": 1,
+      "heading": 5,
+      "text": 5
+    },
+    "importTraces": [
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] bbox funnel {raw: 2, afterFilter: 0, afterMerge: 0, medianMaxDimPt: 0, smallCutoffPt: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] extraction outcomes {total: 0, uploaded: 0, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 12, afterInsideFigure: 12, afterOrphanLabel: 12, figureBBoxesUsed: 0, droppedByInsideFigure: Array(0)}"
+      }
+    ],
+    "warnings": [
+      "Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.",
+      "Source fonts (g_d0_f1, g_d0_f2, g_d0_f3…) replaced with the editor default.",
+      "Home",
+      "Gallery",
+      "My posters",
+      "About",
+      "Send feedback",
+      "Sign in",
+      "Profile",
+      "Privacy Policy",
+      "Cookies Policy",
+      "Terms of Service"
+    ],
+    "durationMs": 6796
+  }
+]
