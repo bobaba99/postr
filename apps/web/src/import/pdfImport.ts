@@ -55,6 +55,15 @@ if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
   pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl as string;
 }
 
+/** Dev-only trace logger. Gated behind `import.meta.env.DEV` so the
+ *  ~3KB-per-import trace payload never lands in production console
+ *  output. Same call shape as `console.debug` for grep-ability. */
+function trace(tag: string, payload: unknown): void {
+  if (!import.meta.env?.DEV) return;
+  // eslint-disable-next-line no-console
+  console.debug(tag, payload);
+}
+
 export class PdfImportError extends Error {
   constructor(
     message: string,
@@ -208,10 +217,28 @@ export async function extractFromPdf(
   // bboxes whose pixel upload failed (504 etc.). Otherwise the figure
   // disappears from the page but its internal labels ("ADNI_MEM",
   // axis ticks) survive as orphan text blocks.
-  const filteredClusters = filterClustersInsideFigures(
+  const insideFiltered = filterClustersInsideFigures(
     clusters,
     figureResult.detectedBBoxes,
   );
+  const filteredClusters = filterOrphanLabels(
+    insideFiltered,
+    figureResult.detectedBBoxes,
+  );
+  trace('[import.trace] text suppression', {
+    inputClusters: clusters.length,
+    afterInsideFigure: insideFiltered.length,
+    afterOrphanLabel: filteredClusters.length,
+    figureBBoxesUsed: figureResult.detectedBBoxes.length,
+    droppedByInsideFigure: clusters
+      .filter((c) => !insideFiltered.includes(c))
+      .slice(0, 10)
+      .map((c) => ({ text: c.text.slice(0, 40), font: Math.round(c.fontSizePt) })),
+    droppedByOrphanLabel: insideFiltered
+      .filter((c) => !filteredClusters.includes(c))
+      .slice(0, 10)
+      .map((c) => ({ text: c.text.slice(0, 40), font: Math.round(c.fontSizePt) })),
+  });
   const roled = assignRoles(filteredClusters, pageHeightPt);
   // Split overlong heading clusters that swallowed bullet content.
   const split = splitHeadingClusters(roled);
@@ -415,6 +442,20 @@ async function extractFigures(
   const stats = computeBBoxStats(filtered);
   const merged = mergeAdjacentBBoxes(filtered, stats);
 
+  trace('[import.trace] bbox funnel', {
+    raw: rawBBoxes.length,
+    afterFilter: filtered.length,
+    afterMerge: merged.length,
+    medianMaxDimPt: Math.round(stats.medianMaxDim),
+    smallCutoffPt: Math.round(stats.smallCutoffPt),
+    mergedDims: merged.map((b) => ({
+      x: Math.round(b.x),
+      y: Math.round(b.y),
+      w: Math.round(b.w),
+      h: Math.round(b.h),
+    })),
+  });
+
   /** Track every canvas we allocate so we can release them after the
    *  loop. The browser GC will eventually free them, but on a poster
    *  with 25 figures rendered at 2× we hold ~100 MB during extraction
@@ -438,17 +479,31 @@ async function extractFigures(
   // dropped even when their parent figure failed to upload.
   const detectedBBoxes: FigureBBox[] = [];
   let uploadFailures = 0;
-  for (const bbox of merged) {
+  // Per-bbox outcome trace for diagnosis: each entry records what
+  // happened to this bbox so the user can see "5 detected, 3
+  // uploaded, 1 blank, 1 upload-fail" at a glance. Logged once at
+  // the end of the loop.
+  const bboxOutcomes: { idx: number; w: number; h: number; outcome: string }[] = [];
+  for (let bboxIdx = 0; bboxIdx < merged.length; bboxIdx++) {
+    const bbox = merged[bboxIdx]!;
     // Push BEFORE any of the per-bbox `continue` paths below — we
     // want suppression to fire on bboxes that fail crop / are blank
     // / fail upload, not just on successfully-emitted blocks.
     detectedBBoxes.push(bbox);
+    const traceRow = {
+      idx: bboxIdx,
+      w: Math.round(bbox.w),
+      h: Math.round(bbox.h),
+      outcome: '',
+    };
+    bboxOutcomes.push(traceRow);
     const cropCanvas = document.createElement('canvas');
     allocatedCanvases.push(cropCanvas);
     cropCanvas.width = Math.round(bbox.w * RENDER_SCALE);
     cropCanvas.height = Math.round(bbox.h * RENDER_SCALE);
     const cropCtx = cropCanvas.getContext('2d');
     if (!cropCtx) {
+      traceRow.outcome = 'no-crop-context';
       done++;
       onItemDone(done, total);
       continue;
@@ -473,6 +528,7 @@ async function extractFigures(
     if (tight === 'blank') {
       // Entirely-white canvas — skip the upload entirely, don't emit
       // an invisible image block.
+      traceRow.outcome = 'blank';
       done++;
       onItemDone(done, total);
       continue;
@@ -492,6 +548,7 @@ async function extractFigures(
 
     const blob = await canvasToBlob(finalCanvas, 'image/png');
     if (!blob) {
+      traceRow.outcome = 'no-blob';
       done++;
       onItemDone(done, total);
       continue;
@@ -500,6 +557,7 @@ async function extractFigures(
     const file = new File([blob], `${blockId}.png`, { type: 'image/png' });
     const storageSrc = await uploadPosterImage(userId, posterId, blockId, file);
     if (!storageSrc) {
+      traceRow.outcome = 'upload-failed';
       uploadFailures++;
       done++;
       onItemDone(done, total);
@@ -516,6 +574,7 @@ async function extractFigures(
         Math.max(tightBBox.w, tightBBox.h) <= stats.smallCutoffPt) ||
       looksLikeLogo(tightBBox);
     const isLogo = classifyAsLogo(tightBBox, pageHeightPt, stats);
+    traceRow.outcome = isLogo ? 'uploaded:logo' : isSmall ? 'uploaded:small-image' : 'uploaded:image';
     blocks.push({
       type: isLogo ? 'logo' : 'image',
       x: ptToUnits(tightBBox.x),
@@ -533,6 +592,15 @@ async function extractFigures(
     done++;
     onItemDone(done, total);
   }
+
+  trace('[import.trace] extraction outcomes', {
+    total: bboxOutcomes.length,
+    uploaded: bboxOutcomes.filter((o) => o.outcome.startsWith('uploaded')).length,
+    blank: bboxOutcomes.filter((o) => o.outcome === 'blank').length,
+    uploadFailed: bboxOutcomes.filter((o) => o.outcome === 'upload-failed').length,
+    other: bboxOutcomes.filter((o) => !o.outcome.startsWith('uploaded') && o.outcome !== 'blank' && o.outcome !== 'upload-failed').length,
+    rows: bboxOutcomes,
+  });
 
   // Split candidates aggregated across the verifier + heuristic
   // passes. Multi-logo split runs UNCONDITIONALLY at the end,
@@ -1357,6 +1425,83 @@ export function filterClustersInsideFigures<
       const overlap = ix * iy;
       if (overlap / cArea >= OVERLAP_THRESHOLD) return false;
     }
+    return true;
+  });
+}
+
+/** Pattern for label-style text: only uppercase letters, digits,
+ *  and common label punctuation (underscore, comma, period, dash,
+ *  whitespace). Catches "ADNI_MEM", "RC1", "1,2,3" while sparing
+ *  body text ("Methods" — has lowercase) and most author names.
+ *
+ *  Known false-positive class: standalone single-item institution
+ *  acronyms ("MIT", "MGH"). In practice author affiliations are
+ *  multi-item (university name + city) so the items.length ≤ 2
+ *  guard catches almost all real cases. Re-evaluate if users
+ *  report missing affiliation tags. */
+const LABEL_TEXT_PATTERN = /^[A-Z0-9_,.\-\s]+$/;
+
+/** Common figure / table caption prefixes used in academic PDFs. */
+const CAPTION_PATTERN = /^(Figure|Fig\.?|Table|Tab\.?)\s*\d+/i;
+
+/** A cluster is dropped as an "orphan label" when ANY of these
+ *  signals fire. The signals are independent so a misfiring one
+ *  doesn't sink the rest.
+ *
+ *  Bbox-independent (works even when figure detection misses):
+ *    - tiny + uppercase/numeric only ("ADNI_MEM", "RC1", "1,2,3")
+ *
+ *  Bbox-dependent (requires a known figure bbox nearby):
+ *    - tiny "Figure N." / "Table N." caption within 1.5 × line-height
+ *      of any detected figure bbox — typically orphaned because the
+ *      parent figure failed to upload
+ *
+ *  Exported for unit testing.
+ */
+export function filterOrphanLabels<
+  T extends {
+    text: string;
+    items: { length: number };
+    fontSizePt: number;
+    bbox: { x: number; y: number; w: number; h: number };
+  },
+>(clusters: T[], figureBBoxes: FigureBBox[]): T[] {
+  return clusters.filter((c) => {
+    const text = c.text.trim();
+    const itemCount = c.items.length;
+
+    // Signal 1 — bbox-independent label pattern.
+    if (
+      itemCount <= 2 &&
+      text.length > 0 &&
+      text.length <= 15 &&
+      LABEL_TEXT_PATTERN.test(text)
+    ) {
+      return false;
+    }
+
+    // Signal 2 — caption near any detected figure bbox. Real-world
+    // captions sit ~2× fontSize below the figure baseline (one
+    // blank line of leading + the caption baseline itself), so the
+    // proximity gate is `2.5 × fontSize` with a 18pt floor.
+    if (
+      itemCount <= 2 &&
+      text.length <= 30 &&
+      CAPTION_PATTERN.test(text) &&
+      figureBBoxes.length > 0
+    ) {
+      const proximity = Math.max(c.fontSizePt * 2.5, 18);
+      for (const fig of figureBBoxes) {
+        const cx = c.bbox.x + c.bbox.w / 2;
+        const cy = c.bbox.y + c.bbox.h / 2;
+        const fx = fig.x + fig.w / 2;
+        const fy = fig.y + fig.h / 2;
+        const dx = Math.max(0, Math.abs(cx - fx) - (c.bbox.w + fig.w) / 2);
+        const dy = Math.max(0, Math.abs(cy - fy) - (c.bbox.h + fig.h) / 2);
+        if (Math.hypot(dx, dy) <= proximity) return false;
+      }
+    }
+
     return true;
   });
 }

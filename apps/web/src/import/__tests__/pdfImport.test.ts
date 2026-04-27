@@ -8,6 +8,7 @@ import {
   classifyAsLogo,
   computeBBoxStats,
   filterDecorationBBoxes,
+  filterOrphanLabels,
   mergeAdjacentBBoxes,
   type FigureBBox,
 } from '../pdfImport';
@@ -150,5 +151,139 @@ describe('classifyAsLogo', () => {
 
   it('does NOT classify a small image in the body region as a logo', () => {
     expect(classifyAsLogo(bbox(2, 20, 1, 1), pageH, stats)).toBe(false);
+  });
+});
+
+describe('filterOrphanLabels', () => {
+  // Mini cluster shape — only the fields the filter inspects.
+  type C = {
+    text: string;
+    items: { length: number };
+    fontSizePt: number;
+    bbox: { x: number; y: number; w: number; h: number };
+  };
+  const cluster = (
+    text: string,
+    overrides: Partial<C> = {},
+  ): C => ({
+    text,
+    items: { length: 1 },
+    fontSizePt: 9,
+    bbox: { x: 100, y: 100, w: 50, h: 12 },
+    ...overrides,
+  });
+
+  it('drops uppercase/numeric label fragments (signal 1)', () => {
+    const out = filterOrphanLabels(
+      [
+        cluster('ADNI_MEM'),
+        cluster('ADNI_EF'),
+        cluster('1,2,3'),
+        cluster('RC1'),
+      ],
+      [],
+    );
+    expect(out).toHaveLength(0);
+  });
+
+  it('keeps body text containing lowercase letters', () => {
+    const out = filterOrphanLabels(
+      [
+        cluster('Methods'),
+        cluster('Geng'),
+        cluster('introduction', { items: { length: 1 } }),
+      ],
+      [],
+    );
+    expect(out.map((c) => c.text)).toEqual([
+      'Methods',
+      'Geng',
+      'introduction',
+    ]);
+  });
+
+  it('keeps long all-caps content (over 15 chars) — likely a real heading like INTRODUCTION', () => {
+    const out = filterOrphanLabels(
+      [cluster('CONCLUSIONS AND FUTURE WORK')],
+      [],
+    );
+    expect(out).toHaveLength(1);
+  });
+
+  it('keeps multi-item clusters even if they look label-shaped', () => {
+    // 5 items = a real text block, not a stray label
+    const out = filterOrphanLabels(
+      [cluster('ADNI 1 2 3 X', { items: { length: 5 } })],
+      [],
+    );
+    expect(out).toHaveLength(1);
+  });
+
+  it('drops "Figure N." captions near a detected figure bbox (signal 2)', () => {
+    const out = filterOrphanLabels(
+      [
+        cluster('Figure 1.', {
+          bbox: { x: 100, y: 200, w: 60, h: 12 },
+          fontSizePt: 9,
+        }),
+      ],
+      // Figure bbox sits 5pt below the caption — well inside the
+      // proximity gate (2.5 × 9pt = 22.5pt).
+      [{ x: 100, y: 217, w: 200, h: 150 }],
+    );
+    expect(out).toHaveLength(0);
+  });
+
+  it('drops a "Figure N." caption sitting one blank line above a figure', () => {
+    // Real-world layout: caption baseline 14pt above figure top.
+    // proximity for 9pt text = 22.5pt, so 14pt gap is INSIDE the gate.
+    const out = filterOrphanLabels(
+      [
+        cluster('Figure 2.', {
+          bbox: { x: 100, y: 200, w: 60, h: 12 },
+          fontSizePt: 9,
+        }),
+      ],
+      [{ x: 100, y: 226, w: 200, h: 150 }], // 14pt gap below caption
+    );
+    expect(out).toHaveLength(0);
+  });
+
+  it('proximity boundary: just-inside drops, just-outside keeps', () => {
+    const baseCaption = (gap: number) =>
+      cluster('Figure 1.', {
+        bbox: { x: 100, y: 200, w: 60, h: 12 },
+        fontSizePt: 9,
+      });
+    // Floor proximity for 9pt fontSize is max(9*2.5, 18) = 22.5pt.
+    // Inside: figure starts 22pt below caption bottom (212).
+    expect(
+      filterOrphanLabels([baseCaption(22)], [{ x: 100, y: 234, w: 200, h: 150 }]),
+    ).toHaveLength(0);
+    // Outside: figure starts 25pt below caption bottom.
+    expect(
+      filterOrphanLabels([baseCaption(25)], [{ x: 100, y: 237, w: 200, h: 150 }]),
+    ).toHaveLength(1);
+  });
+
+  it('keeps "Figure N." captions when no figure bbox is nearby', () => {
+    const out = filterOrphanLabels(
+      [cluster('Figure 1.', { bbox: { x: 100, y: 200, w: 60, h: 12 } })],
+      // Figure bbox is 150pt away — well outside any reasonable proximity
+      [{ x: 100, y: 400, w: 200, h: 150 }],
+    );
+    expect(out).toHaveLength(1);
+  });
+
+  it('keeps "Figure N." captions when no figures detected at all', () => {
+    const out = filterOrphanLabels(
+      [cluster('Figure 1.')],
+      [],
+    );
+    expect(out).toHaveLength(1);
+  });
+
+  it('handles empty input', () => {
+    expect(filterOrphanLabels([], [])).toEqual([]);
   });
 });
