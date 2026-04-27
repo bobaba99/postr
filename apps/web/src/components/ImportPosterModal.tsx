@@ -15,12 +15,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ImportProgress, PosterDoc } from '@postr/shared';
 import { supabase } from '@/lib/supabase';
-import { createPoster, upsertPoster } from '@/data/posters';
+import { createPoster, deletePoster, upsertPoster } from '@/data/posters';
 import { usePosterStore } from '@/stores/posterStore';
 import {
   PdfImportError,
   extractFromPdf,
 } from '@/import/pdfImport';
+import { extractFromImage } from '@/import/imageImport';
 import { importPostr } from '@/import/postrFile';
 
 export type ImportPosterMode = 'new' | 'replace';
@@ -42,8 +43,8 @@ interface PreviewState {
   thumbnailUrl: string | null;
 }
 
-const ACCEPT = '.pdf,.postr,application/pdf,application/zip';
-const TIER1_WIP = 'Image OCR ships in the next release. Drop a PDF for now.';
+const ACCEPT =
+  '.pdf,.postr,.png,.jpg,.jpeg,application/pdf,application/zip,image/*';
 
 export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props) {
   const navigate = useNavigate();
@@ -57,6 +58,14 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
   // even between re-renders. MUST be declared before any conditional
   // early-return to keep React hook order stable.
   const pendingPosterIdRef = useRef<string | null>(null);
+  // Tracks the most-recently-minted poster row that hasn't been
+  // committed yet. If the user dismisses the modal (Esc, click-out,
+  // close button) while an extraction in progress fails, we sweep
+  // this ref on unmount.
+  const cleanupPosterIdRef = useRef<string | null>(null);
+  // Cached source File so the "Try LLM extraction" button can re-run
+  // image OCR on the same input without making the user re-drop.
+  const sourceFileRef = useRef<File | null>(null);
 
   // Reset state when (re-)opened
   useEffect(() => {
@@ -86,14 +95,13 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
   async function handleFile(file: File) {
     setError(null);
     setPreview(null);
+    sourceFileRef.current = file;
 
     const lower = file.name.toLowerCase();
-    if (lower.endsWith('.png') || lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
-      setError(TIER1_WIP);
-      return;
-    }
-
     setPhase('extracting');
+
+    // Declared OUTSIDE the try so the catch can roll back the mint.
+    let mintedPosterId: string | null = null;
 
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -111,6 +119,7 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
       if (!posterId) {
         const row = await createPoster();
         posterId = row.id;
+        mintedPosterId = row.id;
       }
 
       let doc: PosterDoc;
@@ -135,8 +144,21 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
         doc = synth.doc;
         title = synth.title;
         warnings = synth.warnings;
+      } else if (
+        lower.endsWith('.png') ||
+        lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        file.type.startsWith('image/')
+      ) {
+        // Tier 1 image OCR path — vision LLM extracts text + figures.
+        const synth = await extractFromImage(file, posterId, userId, (p) =>
+          setProgress(p),
+        );
+        doc = synth.doc;
+        title = synth.title;
+        warnings = synth.warnings;
       } else {
-        setError('Unsupported file type. Drop a .pdf or .postr file.');
+        setError('Unsupported file type. Drop a .pdf, image, or .postr file.');
         setPhase('pick');
         return;
       }
@@ -148,6 +170,9 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
 
       // Stash posterId on a ref via closure for the commit step.
       pendingPosterIdRef.current = posterId;
+      // Successful extraction — clear the cleanup latch so the row
+      // survives if the user actually confirms.
+      cleanupPosterIdRef.current = null;
     } catch (err) {
       if (err instanceof PdfImportError) {
         setError(err.message);
@@ -155,7 +180,57 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
         const msg = err instanceof Error ? err.message : 'Import failed.';
         setError(msg);
       }
+      // Clean up the orphan row we minted at the top of this fn.
+      // Best-effort: a failed delete leaves the row but we logged it.
+      if (mintedPosterId) {
+        cleanupPosterIdRef.current = mintedPosterId;
+        deletePoster(mintedPosterId).catch((cleanupErr) => {
+          // eslint-disable-next-line no-console
+          console.warn(
+            'Import failed and cleanup also failed:',
+            cleanupErr instanceof Error ? cleanupErr.message : cleanupErr,
+          );
+        });
+      }
       setPhase('pick');
+    }
+  }
+
+  async function handleTryLlm() {
+    const file = sourceFileRef.current;
+    if (!file) return;
+    setError(null);
+    setPhase('extracting');
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) {
+        setError('Sign-in expired. Please refresh and try again.');
+        setPhase('preview');
+        return;
+      }
+      let posterId = pendingPosterIdRef.current ?? targetPosterId ?? null;
+      if (!posterId) {
+        const row = await createPoster();
+        posterId = row.id;
+      }
+      const synth = await extractFromImage(file, posterId, userId, (p) =>
+        setProgress(p),
+      );
+      const thumbnailUrl =
+        preview?.thumbnailUrl ?? (await renderThumbnail(file).catch(() => null));
+      setPreview({
+        doc: synth.doc,
+        title: synth.title,
+        warnings: synth.warnings,
+        thumbnailUrl,
+      });
+      pendingPosterIdRef.current = posterId;
+      setPhase('preview');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'LLM extraction failed.';
+      setError(msg);
+      setPhase('preview');
     }
   }
 
@@ -209,7 +284,11 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
         {phase === 'extracting' && <ProgressView progress={progress} />}
 
         {phase === 'preview' && preview && (
-          <PreviewPanel preview={preview} />
+          <PreviewPanel
+            preview={preview}
+            onTryLlm={handleTryLlm}
+            llmAvailable={!!sourceFileRef.current}
+          />
         )}
 
         {phase === 'committing' && <Committing />}
@@ -420,7 +499,15 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
   );
 }
 
-function PreviewPanel({ preview }: { preview: PreviewState }) {
+function PreviewPanel({
+  preview,
+  onTryLlm,
+  llmAvailable,
+}: {
+  preview: PreviewState;
+  onTryLlm: () => void;
+  llmAvailable: boolean;
+}) {
   const textBlocks = preview.doc.blocks.filter((b) =>
     ['title', 'authors', 'heading', 'text'].includes(b.type),
   ).length;
@@ -479,20 +566,25 @@ function PreviewPanel({ preview }: { preview: PreviewState }) {
           </ul>
         )}
         <button
-          disabled
-          title="Available in the next release"
+          onClick={onTryLlm}
+          disabled={!llmAvailable}
+          title={
+            llmAvailable
+              ? 'Re-run extraction via Claude Vision for higher accuracy'
+              : 'Only available for PDF / image inputs'
+          }
           style={{
             marginTop: 12,
             padding: '6px 10px',
             fontSize: 12,
-            color: '#555',
+            color: llmAvailable ? '#c8b6ff' : '#555',
             background: '#1a1a26',
-            border: '1px dashed #2a2a3a',
+            border: `1px ${llmAvailable ? 'solid' : 'dashed'} ${llmAvailable ? '#7c6aed' : '#2a2a3a'}`,
             borderRadius: 6,
-            cursor: 'not-allowed',
+            cursor: llmAvailable ? 'pointer' : 'not-allowed',
           }}
         >
-          ✨ Try LLM extraction (next release)
+          ✨ Try LLM extraction
         </button>
       </div>
     </div>

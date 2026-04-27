@@ -10,6 +10,7 @@
  * on import to assert the bundle wasn't tampered with.
  */
 import { unzipSync, zipSync } from 'fflate';
+import { nanoid } from 'nanoid';
 import type {
   Block,
   PostrBundleManifest,
@@ -170,18 +171,30 @@ async function unpackBlock(
   const rawExt = path.split('.').pop() ?? 'png';
   const ext = sanitizeExt(rawExt);
   const blob = new Blob([new Uint8Array(bytes)], { type: mimeFromExt(ext) });
-  // Reuse the existing block id as the storage key. Keeps the
-  // {posterId}/{blockId}.{ext} invariant intact regardless of which
-  // synthesizer downstream runs (avoids a latent id-mismatch when
-  // figures flow through `synthesizeDocFromResult`).
-  const file = new File([blob], `${b.id}.${ext}`, {
+  // Reuse the existing block id as the storage key — but ONLY after
+  // sanitizing it. A malicious bundle could ship `id: "../../admin"`
+  // which would otherwise flow through `uploadPosterImage` straight
+  // into a storage path. `sanitizeBlockId` falls back to a fresh
+  // nanoid when the id doesn't match the safe shape.
+  const safeId = sanitizeBlockId(b.id);
+  const file = new File([blob], `${safeId}.${ext}`, {
     type: mimeFromExt(ext),
   });
-  const storageSrc = await uploadPosterImage(userId, posterId, b.id, file);
+  const storageSrc = await uploadPosterImage(userId, posterId, safeId, file);
   return {
     ...b,
+    id: safeId,
     imageSrc: storageSrc ?? null,
   };
+}
+
+/** Restrict block ids to the same shape nanoid emits so a malicious
+ *  bundle can't sneak path separators into a storage key. */
+function sanitizeBlockId(id: string): string {
+  if (/^[A-Za-z0-9_-]{1,32}$/.test(id)) return id;
+  // Fall back to a generated id rather than rejecting outright — the
+  // bundle's other content is still usable.
+  return nanoid(8);
 }
 
 /** Restrict to lowercase alphanumerics so a malicious filename can't

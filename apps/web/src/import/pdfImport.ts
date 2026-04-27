@@ -35,6 +35,7 @@ import {
   type RawTextItem,
 } from './clusterText';
 import { synthesizeDoc, type SynthOutput } from './synthDoc';
+import { extractFromRasterizedPage } from './imageImport';
 
 // pdfjs needs a worker URL. Vite resolves this with `?url`.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -105,9 +106,32 @@ export async function extractFromPdf(
   const charDensity = pageAreaIn2 > 0 ? totalChars / pageAreaIn2 : 0;
 
   if (totalChars < MIN_CHARS_TOTAL || charDensity < MIN_CHAR_DENSITY_PER_IN2) {
-    throw new PdfImportError(
-      'This PDF has no selectable text. Image OCR ships in the next release.',
-      'no-text-layer',
+    // No usable text layer — rasterize the page and delegate to the
+    // vision-based image OCR path. This covers Canva exports and
+    // any PDF where the text was flattened to outlines.
+    const SCALE = 2;
+    const fallbackViewport = page.getViewport({ scale: SCALE });
+    const fallbackCanvas = document.createElement('canvas');
+    fallbackCanvas.width = fallbackViewport.width;
+    fallbackCanvas.height = fallbackViewport.height;
+    const fctx = fallbackCanvas.getContext('2d');
+    if (!fctx) {
+      throw new PdfImportError(
+        'Could not rasterize page for vision fallback.',
+        'parse-failed',
+      );
+    }
+    await page.render({
+      canvasContext: fctx,
+      viewport: fallbackViewport,
+    }).promise;
+    return extractFromRasterizedPage(
+      fallbackCanvas,
+      pageWidthPt,
+      pageHeightPt,
+      posterId,
+      userId,
+      onProgress,
     );
   }
 
@@ -305,6 +329,12 @@ async function extractFigures(
   const stats = computeBBoxStats(filtered);
   const merged = mergeAdjacentBBoxes(filtered, stats);
 
+  /** Track every canvas we allocate so we can release them after the
+   *  loop. The browser GC will eventually free them, but on a poster
+   *  with 25 figures rendered at 2× we hold ~100 MB during extraction
+   *  before that happens. */
+  const allocatedCanvases: HTMLCanvasElement[] = [canvas];
+
   const total = merged.length;
   let done = 0;
   onItemDone(done, total);
@@ -312,6 +342,7 @@ async function extractFigures(
   const blocks: PartialBlock[] = [];
   for (const bbox of merged) {
     const cropCanvas = document.createElement('canvas');
+    allocatedCanvases.push(cropCanvas);
     cropCanvas.width = Math.round(bbox.w * RENDER_SCALE);
     cropCanvas.height = Math.round(bbox.h * RENDER_SCALE);
     const cropCtx = cropCanvas.getContext('2d');
@@ -337,6 +368,14 @@ async function extractFigures(
     // the visible plot — without this pass, the editor draws an image
     // block much larger than the actual figure.
     const tight = tightenCanvasToContent(cropCanvas);
+    if (tight === 'blank') {
+      // Entirely-white canvas — skip the upload entirely, don't emit
+      // an invisible image block.
+      done++;
+      onItemDone(done, total);
+      continue;
+    }
+    if (tight) allocatedCanvases.push(tight.canvas);
     const finalCanvas = tight ? tight.canvas : cropCanvas;
     const offsetXPt = tight ? tight.offsetX / RENDER_SCALE : 0;
     const offsetYPt = tight ? tight.offsetY / RENDER_SCALE : 0;
@@ -383,14 +422,22 @@ async function extractFigures(
     onItemDone(done, total);
   }
 
+  // Release every allocated canvas immediately. With 25 figures at 2×
+  // we hold ~100 MB before GC otherwise.
+  for (const c of allocatedCanvases) {
+    c.width = 0;
+    c.height = 0;
+  }
+
   return blocks;
 }
 
 /**
  * Scan a cropped figure canvas and return a smaller canvas containing
  * just the non-white content rectangle (plus a small padding ring).
- * Returns `null` when the canvas is entirely blank — the caller can
- * skip the block.
+ * Returns `'blank'` when the canvas is entirely white/transparent so
+ * the caller can skip the upload, or `null` when the savings are
+ * below 3% in either axis (caller keeps the original canvas).
  *
  * "Non-white" is any pixel with at least one channel below 240 (so a
  * faint #f0f0f0 background still counts as content) AND alpha > 0.
@@ -399,18 +446,21 @@ async function extractFigures(
  * ~600 × 800 = 480k pixels which costs ~5 ms in a typed loop. Fine
  * for an offline import path.
  */
-function tightenCanvasToContent(
-  source: HTMLCanvasElement,
-): {
-  canvas: HTMLCanvasElement;
-  offsetX: number;
-  offsetY: number;
-  width: number;
-  height: number;
-} | null {
+type TightenResult =
+  | {
+      canvas: HTMLCanvasElement;
+      offsetX: number;
+      offsetY: number;
+      width: number;
+      height: number;
+    }
+  | null
+  | 'blank';
+
+function tightenCanvasToContent(source: HTMLCanvasElement): TightenResult {
   const w = source.width;
   const h = source.height;
-  if (w === 0 || h === 0) return null;
+  if (w === 0 || h === 0) return 'blank';
   const ctx = source.getContext('2d');
   if (!ctx) return null;
   const data = ctx.getImageData(0, 0, w, h).data;
@@ -444,7 +494,7 @@ function tightenCanvasToContent(
     }
   }
 
-  if (maxX < 0) return null; // entirely blank
+  if (maxX < 0) return 'blank'; // entirely blank — caller skips upload
 
   minX = Math.max(0, minX - PAD_PX);
   minY = Math.max(0, minY - PAD_PX);

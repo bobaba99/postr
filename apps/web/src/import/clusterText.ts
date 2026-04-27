@@ -269,20 +269,24 @@ export function sortReadingOrder(
 
   if (body.length === 0) return [...headers];
 
+  // Column assignment compares against the first item's `bbox.x` in
+  // the active column rather than a rolling `lastX` — the rolling
+  // version chains items into the wrong column when a wide block at
+  // the column boundary nudges `lastX` past `eps`. Anchor stays put.
   const eps = pageWidthPt * 0.05;
   const sortedByX = [...body].sort((a, b) => a.bbox.x - b.bbox.x);
   const columns: RoledCluster[][] = [];
   let current: RoledCluster[] = [sortedByX[0]!];
-  let lastX = sortedByX[0]!.bbox.x;
+  let columnAnchorX = sortedByX[0]!.bbox.x;
   for (let i = 1; i < sortedByX.length; i++) {
     const c = sortedByX[i]!;
-    if (c.bbox.x - lastX <= eps) {
+    if (c.bbox.x - columnAnchorX <= eps) {
       current.push(c);
     } else {
       columns.push(current);
       current = [c];
+      columnAnchorX = c.bbox.x;
     }
-    lastX = c.bbox.x;
   }
   columns.push(current);
 
