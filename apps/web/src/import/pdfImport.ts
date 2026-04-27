@@ -26,7 +26,8 @@ import type {
   ImportProgressCallback,
   PartialBlock,
 } from '@postr/shared';
-import { uploadPosterImage } from '@/data/posterImages';
+import { uploadPosterImage, resolveStorageUrl } from '@/data/posterImages';
+import { uploadUserLogo } from '@/data/userLogos';
 import { ptToIn, ptToUnits } from '../poster/constants';
 import {
   assignRoles,
@@ -35,7 +36,7 @@ import {
   type RawTextItem,
 } from './clusterText';
 import { synthesizeDoc, type SynthOutput } from './synthDoc';
-import { extractFromRasterizedPage } from './imageImport';
+import { classifyRegion, extractFromRasterizedPage } from './imageImport';
 
 // pdfjs needs a worker URL. Vite resolves this with `?url`.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -65,6 +66,17 @@ export class PdfImportError extends Error {
 const MIN_CHAR_DENSITY_PER_IN2 = 1;
 const MIN_CHARS_TOTAL = 200;
 
+export interface ExtractFromPdfOptions {
+  /**
+   * Default true. After the figure pipeline runs, ship each "small"
+   * image block (below the per-poster median size) to Claude Vision
+   * for a single classify-region call. Blocks classified as
+   * decoration are dropped and small ones classified as logos get
+   * promoted from `image` → `logo` type. Adds ~$0.005 per import.
+   */
+  verifyDecorations?: boolean;
+}
+
 /**
  * Main entry point. Extracts a single-page text-layer PDF into a
  * `SynthOutput` ready for the preview modal.
@@ -74,6 +86,7 @@ export async function extractFromPdf(
   posterId: string,
   userId: string,
   onProgress: ImportProgressCallback,
+  options: ExtractFromPdfOptions = {},
 ): Promise<SynthOutput> {
   onProgress({ stage: 'reading', detail: file.name });
 
@@ -154,6 +167,7 @@ export async function extractFromPdf(
         detail: `${done}/${total}`,
       });
     },
+    options.verifyDecorations !== false, // default ON
   );
 
   // ── Synthesize ─────────────────────────────────────────────────
@@ -301,6 +315,7 @@ async function extractFigures(
   posterId: string,
   userId: string,
   onItemDone: (done: number, total: number) => void,
+  verifyDecorations: boolean,
 ): Promise<PartialBlock[]> {
   // Render the page at 2x scale for crisp figure crops.
   const RENDER_SCALE = 2;
@@ -340,6 +355,12 @@ async function extractFigures(
   onItemDone(done, total);
 
   const blocks: PartialBlock[] = [];
+  // Side arrays kept aligned to `blocks` for the LLM verifier pass:
+  // smallBlockIndexes[i] is the block index for the i-th
+  // bbox processed, or -1 when the bbox isn't classified as "small"
+  // and shouldn't trigger an LLM call.
+  const smallBlockIndexes: number[] = [];
+  const smallBlockBBoxes: FigureBBox[] = [];
   for (const bbox of merged) {
     const cropCanvas = document.createElement('canvas');
     allocatedCanvases.push(cropCanvas);
@@ -403,11 +424,18 @@ async function extractFigures(
       continue;
     }
 
+    // Verifier-trigger heuristic: anything "small" by per-poster
+    // stats OR "logo-shaped" by absolute size warrants an LLM check.
+    // The McGill / Douglas / ADNI pattern is small absolute (≤4")
+    // but not below the median-relative cutoff on a figure-heavy
+    // poster.
+    const isSmall =
+      (stats.smallCutoffPt > 0 &&
+        Math.max(tightBBox.w, tightBBox.h) <= stats.smallCutoffPt) ||
+      looksLikeLogo(tightBBox);
     const isLogo = classifyAsLogo(tightBBox, pageHeightPt, stats);
     blocks.push({
       type: isLogo ? 'logo' : 'image',
-      // x/y/w/h in poster units BEFORE scale-to-poster-size. The
-      // synthesizer applies the final scale.
       x: ptToUnits(tightBBox.x),
       y: ptToUnits(tightBBox.y),
       w: ptToUnits(tightBBox.w),
@@ -417,9 +445,69 @@ async function extractFigures(
       imageFit: 'contain',
       tableData: null,
     });
+    smallBlockIndexes.push(isSmall ? blocks.length - 1 : -1);
+    smallBlockBBoxes.push(tightBBox);
 
     done++;
     onItemDone(done, total);
+  }
+
+  // ── LLM decoration verifier ───────────────────────────────────
+  // Pure-pixel heuristics can't tell a "magnifier with chart" icon
+  // from a small scatter plot — both have ~120 chroma variance. A
+  // single Claude Vision call per small block fixes that for ~$0.005
+  // total per poster. Runs best-effort: any failure leaves the
+  // pixel-pass result intact.
+  if (verifyDecorations) {
+    const dropIndexes = new Set<number>();
+    const promotions = new Map<number, 'logo'>();
+    const RENDER_SCALE_FOR_CLASSIFY = 2;
+    for (let i = 0; i < smallBlockIndexes.length; i++) {
+      const blockIdx = smallBlockIndexes[i]!;
+      if (blockIdx < 0) continue;
+      const bbox = smallBlockBBoxes[i]!;
+      try {
+        const verdict = await classifyRegion(
+          canvas,
+          bbox,
+          pageWidthPt,
+          pageHeightPt,
+          posterId,
+          userId,
+          RENDER_SCALE_FOR_CLASSIFY,
+        );
+        if (!verdict) continue;
+        if (verdict.kind === 'decoration' && verdict.confidence >= 0.5) {
+          dropIndexes.add(blockIdx);
+        } else if (verdict.kind === 'logo' && verdict.confidence >= 0.5) {
+          promotions.set(blockIdx, 'logo');
+        }
+      } catch {
+        // ignore — best-effort filter
+      }
+    }
+    // Apply promotions (image → logo) and drop decorations.
+    if (dropIndexes.size > 0 || promotions.size > 0) {
+      const filtered: PartialBlock[] = [];
+      for (let i = 0; i < blocks.length; i++) {
+        if (dropIndexes.has(i)) continue;
+        const promoted = promotions.get(i);
+        const b = blocks[i]!;
+        filtered.push(promoted ? { ...b, type: promoted } : b);
+      }
+      blocks.length = 0;
+      blocks.push(...filtered);
+    }
+
+    // For every newly-promoted logo, also save a copy into the user's
+    // logo library so they can reuse it across future posters
+    // without re-uploading. Best-effort: failure is silent because
+    // the import already succeeded.
+    for (const idx of promotions.keys()) {
+      const b = blocks.find((blk) => blk.imageSrc === blocks[idx]?.imageSrc);
+      if (!b || !b.imageSrc) continue;
+      void saveLogoToLibrary(b.imageSrc);
+    }
   }
 
   // Release every allocated canvas immediately. With 25 figures at 2×
@@ -465,8 +553,8 @@ function tightenCanvasToContent(source: HTMLCanvasElement): TightenResult {
   if (!ctx) return null;
   const data = ctx.getImageData(0, 0, w, h).data;
 
-  const WHITE_THRESHOLD = 240; // any channel below this counts as content
-  const PAD_PX = 4; // small ring so anti-aliased edges aren't clipped
+  const WHITE_THRESHOLD = 245; // any channel below this counts as content
+  const PAD_PX = 1; // tight padding so the block aspect-ratio matches the visible figure
 
   let minX = w;
   let minY = h;
@@ -504,9 +592,11 @@ function tightenCanvasToContent(source: HTMLCanvasElement): TightenResult {
   const tightW = maxX - minX + 1;
   const tightH = maxY - minY + 1;
 
-  // Skip the rebuild if the tighten saves less than ~3% in either axis
-  // — not worth a second canvas allocation for a barely-changed bbox.
-  if (tightW > w * 0.97 && tightH > h * 0.97) return null;
+  // Skip the rebuild only when there is essentially nothing to tighten
+  // — anything ≥1% savings is worth the second canvas allocation
+  // because empty padding inside an image block is visually obvious
+  // (the user's complaint).
+  if (tightW > w * 0.99 && tightH > h * 0.99) return null;
 
   const out = document.createElement('canvas');
   out.width = tightW;
@@ -667,6 +757,11 @@ export function mergeAdjacentBBoxes(
       const a = boxes[i]!;
       const b = boxes[j]!;
       if (isSmall(a) && isSmall(b)) continue;
+      // Don't merge two logo-shaped bboxes even if they're both
+      // "large" by the per-poster median. A McGill + Douglas pair
+      // sits ~3" apart (within the 5%-of-median gap on a poster
+      // where median is 12"), but they're conceptually distinct.
+      if (looksLikeLogo(a) && looksLikeLogo(b)) continue;
       if (bboxGap(a, b) > pairGapThreshold(a, b)) continue;
       union(i, j);
     }
@@ -686,6 +781,42 @@ export function mergeAdjacentBBoxes(
     const y2 = Math.max(...g.map((b) => b.y + b.h));
     return { x, y, w: x2 - x, h: y2 - y };
   });
+}
+
+/** Heuristic: bbox dimensions that suggest an institutional logo
+ *  (McGill, ADNI, Douglas, etc) — squarish + small. Used by the
+ *  merge step to prevent collapsing a horizontal logo strip into one
+ *  multi-logo block, and by the LLM verifier as the "should I check
+ *  this?" gate before spending an API call. */
+function looksLikeLogo(bbox: FigureBBox): boolean {
+  const maxDim = Math.max(bbox.w, bbox.h);
+  const minDim = Math.min(bbox.w, bbox.h);
+  if (maxDim === 0) return false;
+  const aspect = minDim / maxDim;
+  // 0.3..1.0 — squarish. Wider-than-3:1 (banners) and taller-than-3:1
+  // (sidebar strips) aren't logo-shaped.
+  if (aspect < 0.3) return false;
+  // ≤ 4" max dim. Above this we're in chart / diagram territory.
+  return maxDim <= 4 * PT_PER_INCH;
+}
+
+/** Best-effort: download a freshly-uploaded poster-asset image, then
+ *  save it to the user's logo library so it shows up in the
+ *  LogoPicker on future posters. Errors are swallowed — the figure
+ *  block keeps the image either way. */
+async function saveLogoToLibrary(storageSrc: string): Promise<void> {
+  try {
+    const url = await resolveStorageUrl(storageSrc);
+    if (!url) return;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const ext = blob.type.includes('jpeg') ? 'jpg' : 'png';
+    const file = new File([blob], `imported-logo.${ext}`, { type: blob.type });
+    await uploadUserLogo(file, 'Imported logo');
+  } catch {
+    // ignore — best-effort
+  }
 }
 
 /** Edge-to-edge gap between two axis-aligned bboxes. 0 = overlapping. */

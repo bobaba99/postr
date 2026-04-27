@@ -25,6 +25,7 @@ import type {
 import { TABLE_BORDER_PRESETS } from './constants';
 import { CITATION_STYLES, type CitationStyleKey } from './citations';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
+import { CropOverlay } from './CropOverlay';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 import {
   DEFAULT_TABLE_DATA,
@@ -1616,6 +1617,16 @@ export function BlockFrame(props: BlockFrameProps) {
     y: number;
   } | null>(null);
 
+  // Inline crop overlay state. Toggled by the crop button on the
+  // top-row toolbar (image / logo blocks only). When true, a
+  // CropOverlay paints a draggable inset rectangle over the image
+  // and commits to `block.crop` in real time.
+  const [cropMode, setCropMode] = useState(false);
+  // Auto-exit crop mode if the user deselects the block.
+  useEffect(() => {
+    if (!selected) setCropMode(false);
+  }, [selected]);
+
   // B1 fix: every non-title block shifts DOWN by the title's overflow
   // amount so wrapped title lines no longer collide with the authors
   // row / body blocks.
@@ -1972,6 +1983,14 @@ export function BlockFrame(props: BlockFrameProps) {
         )}
         {b.type === 'logo' && <LogoBlock block={b} onUpdate={update} />}
 
+        {selected && cropMode && (b.type === 'image' || b.type === 'logo') && (
+          <CropOverlay
+            block={b}
+            onUpdate={(id, patch) => update(patch)}
+            onClose={() => setCropMode(false)}
+          />
+        )}
+
         {b.type === 'table' && (
           <CaptionWrapper
             block={b}
@@ -2114,6 +2133,39 @@ export function BlockFrame(props: BlockFrameProps) {
                 </span>
               )}
             </div>
+
+            {(b.type === 'image' || b.type === 'logo') && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCropMode((s) => !s);
+                }}
+                style={{
+                  ...circleBtn,
+                  background: cropMode ? '#7c6aed' : 'rgba(0,0,0,0.6)',
+                  cursor: 'pointer',
+                  pointerEvents: 'auto',
+                }}
+                title={cropMode ? 'Exit crop' : 'Crop image'}
+                aria-pressed={cropMode}
+              >
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden
+                  style={{ display: 'block' }}
+                >
+                  <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+                  <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+                </svg>
+              </button>
+            )}
 
             <button
               onClick={(e) => {

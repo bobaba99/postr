@@ -178,6 +178,38 @@ function buildCluster(items: RawTextItem[]): TextCluster {
 }
 
 /**
+ * Common academic-poster section headings. A cluster whose first line
+ * matches one of these (case-insensitive, optional leading numbering
+ * "1." / "1.1" / "I.") gets `role: 'heading'` regardless of its font
+ * size. Catches the case where the heading is rendered at the same
+ * size as body text — pure font-size histograms miss those.
+ */
+const HEADING_PATTERNS: RegExp[] = [
+  /^\s*(?:\d+\.?\d*\.?|[IVX]+\.)?\s*(introduction|background|aims?|hypothes[ie]s|objectives?|motivation|overview)\b/i,
+  /^\s*(?:\d+\.?\d*\.?|[IVX]+\.)?\s*(methods?|methodology|materials\s+and\s+methods|approach|design)\b/i,
+  /^\s*(?:\d+\.?\d*\.?|[IVX]+\.)?\s*(results?|findings?|analyses?|analysis|outcome[s]?|measurements?)\b/i,
+  /^\s*(?:\d+\.?\d*\.?|[IVX]+\.)?\s*(discussion|conclusions?|implications?|future\s+(?:work|directions?))\b/i,
+  /^\s*(?:\d+\.?\d*\.?|[IVX]+\.)?\s*(references?|bibliography|citations?|works\s+cited)\b/i,
+  /^\s*(?:\d+\.?\d*\.?|[IVX]+\.)?\s*(acknowledg[em]+ents?|funding|disclosures?|contact)\b/i,
+  /^\s*(?:\d+\.?\d*\.?|[IVX]+\.)?\s*(demographics?|participants?|subjects?|sample|population)\b/i,
+  /^\s*(?:\d+\.?\d*\.?|[IVX]+\.)?\s*(abstract|summary|highlights?|takeaways?)\b/i,
+  /^\s*(?:\d+\.?\d*\.?|[IVX]+\.)?\s*(statistical\s+(?:analyses?|analysis|methods?))\b/i,
+  /^\s*(?:\d+\.?\d*\.?|[IVX]+\.)?\s*(correlation|regression|principal\s+component)\b/i,
+];
+
+/** Returns true if the cluster's first line looks like a poster
+ *  section heading. Exported for unit testing. */
+export function looksLikeHeading(text: string): boolean {
+  if (!text) return false;
+  const firstLine = text.split(/\n/)[0]?.trim() ?? '';
+  if (!firstLine) return false;
+  // Heading lines are short — anything past ~80 chars is probably a
+  // sentence that happens to start with a heading-like word.
+  if (firstLine.length > 80) return false;
+  return HEADING_PATTERNS.some((re) => re.test(firstLine));
+}
+
+/**
  * Assign a semantic role to each cluster using a font-size histogram.
  *
  * Heuristics (intentionally simple, documented in the preview modal as
@@ -186,8 +218,8 @@ function buildCluster(items: RawTextItem[]): TextCluster {
  *                 upper third of the page
  *   - `authors` : the cluster immediately below the title (size tier 2
  *                 or 3, contiguous on y)
- *   - `heading` : clusters whose median font size is in the second tier
- *                 by histogram mode
+ *   - `heading` : matches the title regex OR has the second-tier
+ *                 font size by histogram mode
  *   - `text`    : everything else
  *
  * `pageHeightPt` is needed to determine the upper-third title window.
@@ -238,6 +270,9 @@ export function assignRoles(
     let role: RoledCluster['role'];
     if (c === titleCluster) role = 'title';
     else if (c === authorsCluster) role = 'authors';
+    // Title-regex match wins over font-size — catches "Methods" / "1.
+    // INTRODUCTION" rendered at body size on poorly-formatted posters.
+    else if (looksLikeHeading(c.text)) role = 'heading';
     else if (roundToHalfPt(c.fontSizePt) >= headingSize && headingSize > 0) {
       role = 'heading';
     } else role = 'text';

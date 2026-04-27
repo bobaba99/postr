@@ -260,13 +260,23 @@ function snapFigureBlock(
   scaleX: number,
   scaleY: number,
 ): Block {
+  // Position snaps to the layout grid like everything else, but the
+  // dimensions snap one axis only and derive the other from the
+  // source aspect ratio. Without this, a 23×11 source bbox becomes
+  // 25×10 (aspect 2.09 → 2.5) and `imageFit: contain` paints visible
+  // bars top + bottom — exactly the empty-padding the user reported.
+  const sourceW = Math.max(1, pb.w * scaleX);
+  const sourceH = Math.max(1, pb.h * scaleY);
+  const aspect = sourceH / sourceW;
+  const snappedW = Math.max(SNAP_GRID, snap(sourceW));
+  const aspectH = Math.max(SNAP_GRID, Math.round(snappedW * aspect));
   return {
     ...pb,
     id: nanoid(8),
     x: clampNonNeg(snap(pb.x * scaleX)),
     y: clampNonNeg(snap(pb.y * scaleY)),
-    w: Math.max(SNAP_GRID, snap(pb.w * scaleX)),
-    h: Math.max(SNAP_GRID, snap(pb.h * scaleY)),
+    w: snappedW,
+    h: aspectH,
   };
 }
 
