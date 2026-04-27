@@ -88,6 +88,21 @@ export interface CountFiguresResponse {
   expectedFigureCount: number;
   expectedTableCount: number;
   expectedLogoCount: number;
+  /** Pixel dimensions of the image the LLM saw — needed to scale
+   *  `logoBBoxes` back to the page-pt coordinate system. */
+  imagePixelWidth: number;
+  imagePixelHeight: number;
+  /** One bbox per logo the LLM identified, in pixel coords of the
+   *  supplied image. The client crops these out of the page raster
+   *  directly — replaces the per-bbox heuristic + multi-logo split
+   *  pipeline for the logo case. */
+  logoBBoxes: Array<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    name?: string;
+  }>;
   reasoning: string;
 }
 

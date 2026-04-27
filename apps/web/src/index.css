@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===================================================================
+ * List restoration inside poster blocks
+ * =================================================================== *
+ *
+ * Tailwind preflight strips list-style + padding from <ul>/<ol>/<li>
+ * globally. The format-toolbar bullet/number buttons insert real
+ * <ul>/<li> via execCommand, but the bullets and indent disappear
+ * because of the preflight reset — making the toolbar buttons appear
+ * broken even though the underlying HTML is correct.
+ *
+ * Restore native rendering inside any block (canvas + share view) so
+ * lists look the way users expect from any other rich editor. Scoped
+ * to [data-block-id] so the rest of the app's Tailwind reset stays
+ * intact (sidebar lists, modal lists, etc.).
+ */
+[data-block-id] ul,
+[data-block-id] ol {
+  list-style: revert;
+  margin: revert;
+  padding: revert;
+}
+[data-block-id] li {
+  list-style: revert;
+  display: list-item;
+}
+
 html,
 body,
 #root {

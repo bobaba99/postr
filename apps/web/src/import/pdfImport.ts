@@ -414,7 +414,6 @@ async function extractFigures(
     onProgress({
       stage: 'uploading-figures',
       ratio: total === 0 ? 1 : done / total,
-      detail: `${done}/${total}`,
     });
   };
   // Render the page at 2x scale for crisp figure crops.
@@ -912,6 +911,113 @@ async function extractFigures(
             },
           );
         }
+      }
+
+      // ── Step 2.5: LLM-driven logo extraction ─────────────────────
+      // The pre-scan returned `logoBBoxes` — pixel-space bboxes for
+      // every logo the LLM saw on the full page. These are the
+      // ground truth for logo localization (the pixel pipeline can't
+      // reliably split vertical stacks or merged-XObject banners).
+      //
+      // For each LLM logo:
+      //   1. Convert pixel coords → page-pt
+      //   2. Drop pixel-pipeline blocks that overlap (≥50% of the
+      //      smaller bbox area) — they're stale duplicates
+      //   3. Crop the logo region from the page canvas, upload, emit
+      //      a NEW logo block at the LLM's bbox
+      //
+      // Runs in the same async block as the verifier so it shares the
+      // 30s budget. If the upload chain fails (504), the warning bag
+      // already covers it.
+      if (
+        preScan &&
+        Array.isArray(preScan.logoBBoxes) &&
+        preScan.logoBBoxes.length > 0 &&
+        preScan.imagePixelWidth > 0 &&
+        preScan.imagePixelHeight > 0
+      ) {
+        const ptPerPxX = pageWidthPt / preScan.imagePixelWidth;
+        const ptPerPxY = pageHeightPt / preScan.imagePixelHeight;
+        const llmLogosPt: FigureBBox[] = preScan.logoBBoxes
+          .map((b) => ({
+            x: b.x * ptPerPxX,
+            y: b.y * ptPerPxY,
+            w: b.w * ptPerPxX,
+            h: b.h * ptPerPxY,
+          }))
+          .filter((b) => b.w > 0 && b.h > 0);
+
+        // Drop pixel-pipeline image/logo blocks that overlap any LLM
+        // logo region — the LLM bbox replaces them.
+        for (let i = 0; i < blocks.length; i++) {
+          const b = blocks[i]!;
+          if (b.type !== 'image' && b.type !== 'logo') continue;
+          const bx = unitsToPt(b.x ?? 0);
+          const by = unitsToPt(b.y ?? 0);
+          const bw = unitsToPt(b.w ?? 0);
+          const bh = unitsToPt(b.h ?? 0);
+          const bArea = bw * bh;
+          if (bArea <= 0) continue;
+          for (const llm of llmLogosPt) {
+            const ix = Math.max(0, Math.min(bx + bw, llm.x + llm.w) - Math.max(bx, llm.x));
+            const iy = Math.max(0, Math.min(by + bh, llm.y + llm.h) - Math.max(by, llm.y));
+            const overlap = ix * iy;
+            const smaller = Math.min(bArea, llm.w * llm.h);
+            if (smaller > 0 && overlap / smaller >= 0.5) {
+              dropIndexes.add(i);
+              break;
+            }
+          }
+        }
+
+        // Crop + upload + emit a logo block per LLM bbox. Append to
+        // detectedBBoxes so the in-figure text suppression sees them.
+        for (const llm of llmLogosPt) {
+          detectedBBoxes.push(llm);
+          const sub = document.createElement('canvas');
+          allocatedCanvases.push(sub);
+          sub.width = Math.max(1, Math.round(llm.w * RENDER_SCALE));
+          sub.height = Math.max(1, Math.round(llm.h * RENDER_SCALE));
+          const sctx = sub.getContext('2d');
+          if (!sctx) continue;
+          sctx.drawImage(
+            canvas,
+            Math.round(llm.x * RENDER_SCALE),
+            Math.round(llm.y * RENDER_SCALE),
+            sub.width,
+            sub.height,
+            0,
+            0,
+            sub.width,
+            sub.height,
+          );
+          const blob = await canvasToBlob(sub, 'image/png');
+          if (!blob) continue;
+          const id = nanoid(8);
+          const file = new File([blob], `${id}.png`, { type: 'image/png' });
+          const src = await uploadPosterImage(userId, posterId, id, file);
+          if (!src) {
+            uploadFailures++;
+            continue;
+          }
+          blocks.push({
+            type: 'logo',
+            x: ptToUnits(llm.x),
+            y: ptToUnits(llm.y),
+            w: ptToUnits(llm.w),
+            h: ptToUnits(llm.h),
+            content: '',
+            imageSrc: src,
+            imageFit: 'contain',
+            tableData: null,
+          });
+          void saveLogoToLibrary(src);
+        }
+
+        trace('[import.trace] llm-logo extraction', {
+          llmLogoCount: llmLogosPt.length,
+          droppedPixelBlocks: dropIndexes.size,
+        });
       }
 
       // ── Step 3: apply drops / promotions / split candidates ──

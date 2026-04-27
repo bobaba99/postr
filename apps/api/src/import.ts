@@ -46,13 +46,23 @@ const ExtractRequest = z.object({
  *  classifiers can over-shoot on a noisy page, so we sort their
  *  verdicts by confidence and keep only the top-K matching this
  *  count. This single global call calibrates the per-bbox classifier
- *  against a holistic view of the poster. */
+ *  against a holistic view of the poster.
+ *
+ *  Also returns logoBBoxes — pixel-space bboxes of every logo the
+ *  model sees, in image pixel coordinates. The client uses these
+ *  directly for logo extraction (replaces the pixel-heuristic +
+ *  multi-logo split pipeline, which was unreliable for vertical
+ *  stacks and merged XObjects).
+ */
 const CountFiguresSchema = {
   type: 'object',
   required: [
     'expectedFigureCount',
     'expectedTableCount',
     'expectedLogoCount',
+    'imagePixelWidth',
+    'imagePixelHeight',
+    'logoBBoxes',
     'reasoning',
   ],
   properties: {
@@ -72,7 +82,34 @@ const CountFiguresSchema = {
       type: 'integer',
       minimum: 0,
       description:
-        'Institutional / brand logos (university crests, hospital marks, funder marks like ADNI). EXCLUDES decorative cartoons or section icons.',
+        'Institutional / brand logos (university crests, hospital marks, funder marks like ADNI). EXCLUDES decorative cartoons or section icons. MUST equal logoBBoxes.length.',
+    },
+    imagePixelWidth: {
+      type: 'number',
+      description: 'Width of the supplied poster image in pixels.',
+    },
+    imagePixelHeight: {
+      type: 'number',
+      description: 'Height of the supplied poster image in pixels.',
+    },
+    logoBBoxes: {
+      type: 'array',
+      description:
+        'Per-logo bbox in PIXEL coordinates of the supplied image (origin top-left). Tighten to the visible logo, NOT the whitespace around it. Two logos sitting side-by-side or stacked in one banner image MUST be returned as TWO separate bboxes — never merge them.',
+      items: {
+        type: 'object',
+        required: ['x', 'y', 'w', 'h'],
+        properties: {
+          x: { type: 'number' },
+          y: { type: 'number' },
+          w: { type: 'number' },
+          h: { type: 'number' },
+          name: {
+            type: 'string',
+            description: 'Optional readable label, e.g. "McGill", "ADNI".',
+          },
+        },
+      },
     },
     reasoning: {
       type: 'string',
@@ -408,15 +445,24 @@ const FULL_EXTRACT_SYSTEM = `You are a layout-extraction assistant for academic 
 
 Be conservative on confidence: prefer 0.5 over hallucinating. Skip purely decorative graphics. Do NOT include logos in figureBBoxes.`;
 
-const COUNT_FIGURES_SYSTEM = `You are a poster auditor. Look at the WHOLE rendered poster image and count, across the entire page:
+const COUNT_FIGURES_SYSTEM = `You are a poster auditor. Look at the WHOLE rendered poster image and produce two outputs:
 
+(A) Counts:
 1. expectedFigureCount — real charts, plots, heatmaps, network diagrams, schematic figures, composite multi-panel figures. Each composite/multi-panel figure with a single shared title counts as ONE. Stylized icons (magnifier, leaf, lightbulb, silhouettes, FAQ bubbles, ornaments) DO NOT count.
 2. expectedTableCount — structured rows × columns of NUMERIC data with column / row headers. A 6-row PCA loadings table is one. A descriptive-stats table with mean / SD per group is one.
-3. expectedLogoCount — institutional / brand marks: university crests, hospital logos, funder logos (e.g. ADNI, NIH, Wellcome Trust). Decorative cartoons / section ornaments DO NOT count, even when they look chart-shaped. Two logos pasted side-by-side in one banner image count as TWO.
+3. expectedLogoCount — institutional / brand marks: university crests, hospital logos, funder logos (e.g. ADNI, NIH, Wellcome Trust). Decorative cartoons / section ornaments DO NOT count, even when they look chart-shaped. Two logos pasted side-by-side or stacked in one banner image count as TWO.
 
-Be precise. The downstream pipeline uses these numbers as a CEILING — if a per-region classifier says there are 7 figures but you see only 3, the 4 lowest-confidence guesses get rejected. Over-counting hurts the user as much as under-counting.
+(B) Per-logo bboxes (logoBBoxes): for EVERY logo you counted, return a tight pixel-space bounding box in image coordinates (origin top-left). expectedLogoCount MUST equal logoBBoxes.length.
+- Tighten each bbox to the visible logo's bounding rectangle — NO whitespace padding.
+- If two logos sit side by side or stacked, emit TWO bboxes — never one merged bbox.
+- A logo's name (e.g. "McGill", "ADNI") is helpful but optional.
+- Report image dimensions (imagePixelWidth, imagePixelHeight) so the client can scale your bboxes back to the original page.
 
-In the reasoning field, name each item briefly with its location: e.g. "Figures (3): Correlation scatter panel bottom-left, PCA biplot middle-right, Network top-center. Tables (2): Demographics top-left, PCA loadings middle. Logos (3): McGill top-right, Douglas top-right, ADNI top-right."`;
+Be precise. The downstream pipeline:
+- uses the counts as a CEILING — over-counting kicks real figures off the page, under-counting lets decorations through.
+- crops your logoBBoxes directly out of the page raster — loose bboxes leak the next logo's whitespace into the crop.
+
+In reasoning, name each item with its location: e.g. "Figures (3): Correlation scatter panel bottom-left, PCA biplot middle-right, Network top-center. Tables (2): Demographics top-left, PCA loadings middle. Logos (3): McGill top-right, Douglas top-right (stacked under McGill), ADNI top-right."`;
 
 const SPLIT_MULTI_LOGO_SYSTEM = `You are a logo segmentation assistant. The image you receive may contain ONE logo or MULTIPLE logos arranged in a row, column, or small grid (typical: a poster header strip with a university crest, a hospital logo, and a funder mark side by side). Your job:
 
