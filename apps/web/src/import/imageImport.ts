@@ -32,7 +32,11 @@ interface ExtractRequestBody {
   imageUrl: string;
   pageWidthPt: number;
   pageHeightPt: number;
-  mode: 'full-extract' | 'classify-region' | 'split-multi-logo';
+  mode:
+    | 'full-extract'
+    | 'classify-region'
+    | 'split-multi-logo'
+    | 'count-figures';
   model?: 'claude' | 'gpt' | 'ollama';
 }
 
@@ -78,6 +82,13 @@ export interface SplitMultiLogoResponse {
   /** True when the LLM thinks the image actually contains exactly
    *  one logo and shouldn't be split. */
   isSingleLogo?: boolean;
+}
+
+export interface CountFiguresResponse {
+  expectedFigureCount: number;
+  expectedTableCount: number;
+  expectedLogoCount: number;
+  reasoning: string;
 }
 
 /** Bucket prefix used for ephemeral upload-then-fetch round trips.
@@ -388,6 +399,81 @@ export async function classifyRegion(
         pageWidthPt,
         pageHeightPt,
         mode: 'classify-region',
+      },
+      { auth: true },
+    );
+    return response;
+  } catch {
+    return null;
+  } finally {
+    void supabase.storage.from('poster-assets').remove([tempPath]);
+  }
+}
+
+/**
+ * Holistic pre-scan: ships the whole rendered page raster to the LLM
+ * and asks it to count expected figures / tables / logos. Used by
+ * `pdfImport.ts` to set a CEILING for the per-bbox classifier — the
+ * pixel-heuristic stream often over-shoots on noisy posters, and a
+ * single full-page call is cheap (~$0.005) compared to running 10
+ * extra per-bbox calls.
+ *
+ * Returns null on failure; the caller should fall back to per-bbox
+ * verdicts without budget enforcement.
+ */
+export async function countFigures(
+  pageCanvas: HTMLCanvasElement,
+  pageWidthPt: number,
+  pageHeightPt: number,
+  posterId: string,
+  userId: string,
+): Promise<CountFiguresResponse | null> {
+  // Downscale to keep the payload under the API's 20 MB ceiling. A
+  // 36×48" poster rendered at 2× is ~5 k × 7 k px — too big as PNG.
+  // 2048 px on the long edge is plenty for counting; we're not OCRing.
+  const MAX_DIM = 2048;
+  const longEdge = Math.max(pageCanvas.width, pageCanvas.height);
+  const scale = longEdge > MAX_DIM ? MAX_DIM / longEdge : 1;
+  let workCanvas: HTMLCanvasElement = pageCanvas;
+  let allocatedHere = false;
+  if (scale < 1) {
+    workCanvas = document.createElement('canvas');
+    workCanvas.width = Math.round(pageCanvas.width * scale);
+    workCanvas.height = Math.round(pageCanvas.height * scale);
+    const ctx = workCanvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(pageCanvas, 0, 0, workCanvas.width, workCanvas.height);
+    allocatedHere = true;
+  }
+
+  const blob = await canvasToBlob(workCanvas, 'image/jpeg');
+  if (allocatedHere) releaseCanvas(workCanvas);
+  if (!blob) return null;
+
+  const tempPath = `${userId}/${TEMP_PREFIX}/${posterId}/count-${nanoid(8)}.jpg`;
+  const { error: uploadErr } = await supabase.storage
+    .from('poster-assets')
+    .upload(tempPath, blob, { contentType: 'image/jpeg', upsert: true });
+  if (uploadErr) return null;
+
+  const { data: signed } = await supabase.storage
+    .from('poster-assets')
+    .createSignedUrl(tempPath, 300);
+  if (!signed?.signedUrl) {
+    void supabase.storage.from('poster-assets').remove([tempPath]);
+    return null;
+  }
+
+  try {
+    const response = await postJson<CountFiguresResponse>(
+      '/api/import/extract',
+      {
+        imageUrl: signed.signedUrl,
+        pageWidthPt,
+        pageHeightPt,
+        mode: 'count-figures',
       },
       { auth: true },
     );

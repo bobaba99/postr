@@ -39,8 +39,10 @@ import {
 import { synthesizeDoc, type SynthOutput } from './synthDoc';
 import {
   classifyRegion,
+  countFigures,
   extractFromRasterizedPage,
   splitMultiLogo,
+  type CountFiguresResponse,
 } from './imageImport';
 
 // pdfjs needs a worker URL. Vite resolves this with `?url`.
@@ -509,6 +511,17 @@ async function extractFigures(
     }
 
     if (targets.length > 0) {
+      // Holistic pre-scan: ask the LLM to count expected figures,
+      // tables, and logos for the WHOLE page in a single call. Used
+      // as a CEILING on the per-bbox verdicts below — when the
+      // per-bbox classifier over-shoots ("everything looks like a
+      // figure"), we keep only the top-K verdicts by confidence.
+      // Runs in parallel with the per-bbox calls so it adds no
+      // latency to the critical path.
+      const preScanPromise: Promise<CountFiguresResponse | null> =
+        countFigures(canvas, pageWidthPt, pageHeightPt, posterId, userId).catch(
+          () => null,
+        );
       // eslint-disable-next-line no-console
       console.debug(
         `[import.verifier] running on ${targets.length} candidate bbox(es)`,
@@ -581,22 +594,27 @@ async function extractFigures(
           marks: v?.evidence?.hasPlottedMarks,
         })),
       );
+
+      // ── Step 1: cook each verdict with the strict-evidence guard ──
+      // The model's overall `representsQuantitativeData` flag is not
+      // enough — it has to be backed by AT LEAST ONE specific
+      // encoding observation (axes-with-ticks / plotted-marks /
+      // subplots / schematic-with-labels / grid-rows-and-cols).
+      // Catches stylized icons the model rationalized as "data".
+      type CookedVerdict = {
+        blockIdx: number;
+        bbox: FigureBBox;
+        sourceImageSrc?: string;
+        kind: 'figure' | 'table' | 'logo' | 'decoration';
+        confidence: number;
+      };
+      const cooked: CookedVerdict[] = [];
       verdicts.forEach((verdict, i) => {
         if (!verdict) return;
         const blockIdx = targets[i]!.blockIdx;
         const bbox = targets[i]!.bbox;
-        const sourceImageSrc = blocks[blockIdx]?.imageSrc;
-
-        // Strict-evidence guard with a SECOND verification layer:
-        // the model's overall `representsQuantitativeData` flag is
-        // not enough by itself — it has to be backed by AT LEAST ONE
-        // specific encoding observation (axes-with-ticks OR
-        // plotted-marks OR multiple-subplots OR
-        // schematic-with-labels). This catches the case where the
-        // model agreed that a stylized icon "represents data"
-        // because the icon depicts a chart shape, but couldn't name
-        // a specific structural feature.
-        let kind = verdict.kind;
+        const sourceImageSrc = blocks[blockIdx]?.imageSrc ?? undefined;
+        let kind: CookedVerdict['kind'] = verdict.kind;
         const ev = verdict.evidence;
         if (kind === 'figure' && ev) {
           const hasSpecificEncoding =
@@ -612,7 +630,7 @@ async function extractFigures(
           if (!looksReal) {
             // eslint-disable-next-line no-console
             console.debug(
-              '[import.verifier] downgrade figure→decoration',
+              '[import.verifier] downgrade figure→decoration (evidence guard)',
               {
                 bbox,
                 evidence: ev,
@@ -633,8 +651,132 @@ async function extractFigures(
         if (kind === 'logo' && ev?.isStylizedIcon) {
           kind = 'decoration';
         }
+        cooked.push({
+          blockIdx,
+          bbox,
+          sourceImageSrc,
+          kind,
+          confidence: verdict.confidence,
+        });
+      });
 
-        if (kind === 'decoration' && verdict.confidence >= 0.5) {
+      // ── Step 2: reconcile against the holistic pre-scan budget ──
+      // The pre-scan returns the EXPECTED count of figures, tables,
+      // and logos visible on the whole page. The per-bbox classifier
+      // can over-shoot when noisy crops resemble plots; we sort by
+      // confidence and demote the lowest-confidence over-shoot to
+      // `decoration`. Trusted non-small image blocks (which never
+      // went through the verifier) consume part of the figure budget
+      // first — they're typically the real plots. Pre-scan failure
+      // (network / API down) leaves the budget unenforced.
+      // 20s ceiling on the pre-scan so a stalled vision call can't
+      // freeze the import indefinitely. The classifyRegion loop above
+      // has its own per-call + total deadline; this one is independent.
+      const PRE_SCAN_TIMEOUT_MS = 20_000;
+      const preScan = await Promise.race([
+        preScanPromise,
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), PRE_SCAN_TIMEOUT_MS),
+        ),
+      ]);
+      // eslint-disable-next-line no-console
+      console.debug('[import.preScan] result', preScan);
+      // Guard against an all-zeros pre-scan — the LLM occasionally
+      // refuses or hallucinates "0 of everything", which would
+      // wrongly demote every real figure on the page.
+      const allZero =
+        preScan !== null &&
+        (preScan.expectedFigureCount ?? 0) === 0 &&
+        (preScan.expectedTableCount ?? 0) === 0 &&
+        (preScan.expectedLogoCount ?? 0) === 0;
+      if (preScan && !allZero) {
+        // The user thinks of "charts/tables" as one combined budget
+        // ("4 charts/tables and 3 logos"). The LLM occasionally
+        // mis-types a heatmap as a table or a stats grid as a figure;
+        // a combined ceiling is robust to that confusion. Logos are
+        // a separate axis (institutional marks vs data).
+        const figureBudget =
+          (preScan.expectedFigureCount ?? 0) +
+          (preScan.expectedTableCount ?? 0);
+        const logoBudget = preScan.expectedLogoCount ?? 0;
+
+        // Trusted non-small blocks: image / logo blocks NOT in the
+        // verifier targets. They bypassed the LLM verifier because
+        // they were large enough to be obvious plots. Counted as
+        // "figures" against the budget — derived from `blocks` and
+        // `targets` directly so the count stays correct even if the
+        // smallBlockIndexes mirror invariant ever drifts.
+        const verifiedBlockIdx = new Set(targets.map((t) => t.blockIdx));
+        let trustedNonSmallCount = 0;
+        for (let i = 0; i < blocks.length; i++) {
+          if (verifiedBlockIdx.has(i)) continue;
+          const t = blocks[i]!.type;
+          if (t === 'image' || t === 'logo') trustedNonSmallCount++;
+        }
+
+        const figureSlotsRemaining = Math.max(
+          0,
+          figureBudget - trustedNonSmallCount,
+        );
+
+        // Stable confidence sort, with bbox area DESC as a tiebreaker.
+        // When three verdicts tie at 0.7 and the budget is 2, the
+        // bigger bbox wins — real plots are almost always larger than
+        // decoration icons, so this is the right structural signal.
+        const byConfThenArea = (a: CookedVerdict, b: CookedVerdict): number =>
+          b.confidence - a.confidence ||
+          b.bbox.w * b.bbox.h - a.bbox.w * a.bbox.h;
+        const figureLike = cooked
+          .filter((c) => c.kind === 'figure' || c.kind === 'table')
+          .sort(byConfThenArea);
+        const logoLike = cooked
+          .filter((c) => c.kind === 'logo')
+          .sort(byConfThenArea);
+
+        // Demote anything beyond the budget to `decoration` AND queue
+        // for drop directly — bypassing the step-3 confidence floor
+        // so a budget-demoted low-confidence verdict can't slip
+        // through as the original `image` block.
+        const demoted: { originalKind: CookedVerdict['kind']; confidence: number; bbox: FigureBBox }[] = [];
+        for (let k = figureSlotsRemaining; k < figureLike.length; k++) {
+          const c = figureLike[k]!;
+          demoted.push({
+            originalKind: c.kind,
+            confidence: c.confidence,
+            bbox: c.bbox,
+          });
+          c.kind = 'decoration';
+          dropIndexes.add(c.blockIdx);
+        }
+        for (let k = logoBudget; k < logoLike.length; k++) {
+          const c = logoLike[k]!;
+          demoted.push({
+            originalKind: c.kind,
+            confidence: c.confidence,
+            bbox: c.bbox,
+          });
+          c.kind = 'decoration';
+          dropIndexes.add(c.blockIdx);
+        }
+        if (demoted.length > 0) {
+          // eslint-disable-next-line no-console
+          console.debug(
+            `[import.budget] demoted ${demoted.length} verdict(s) past budget`,
+            {
+              figureBudget,
+              logoBudget,
+              trustedNonSmallCount,
+              figureSlotsRemaining,
+              demoted,
+            },
+          );
+        }
+      }
+
+      // ── Step 3: apply drops / promotions / split candidates ──
+      cooked.forEach((c) => {
+        const { kind, blockIdx, bbox, sourceImageSrc, confidence } = c;
+        if (kind === 'decoration' && confidence >= 0.5) {
           dropIndexes.add(blockIdx);
           return;
         }
@@ -648,17 +790,14 @@ async function extractFigures(
         const maxDim = Math.max(bbox.w, bbox.h);
         const minDim = Math.min(bbox.w, bbox.h);
         const aspectExtreme = maxDim / Math.max(1, minDim) > 1.5;
-        if (kind === 'logo' && verdict.confidence >= 0.5) {
+        if (kind === 'logo' && confidence >= 0.5) {
           promotions.set(blockIdx, 'logo');
           if (aspectExtreme && sourceImageSrc) {
             splitCandidates.push({ imageSrc: sourceImageSrc, bbox });
           }
         } else if (kind === 'figure' && looksLikeLogo(bbox) && aspectExtreme) {
-          // Borderline case: small/wide image that the verifier
-          // didn't call a logo. Still try the split pass — if the
-          // LLM finds 2+ logo sub-regions, they get promoted to
-          // logo blocks. If it finds zero/one, the original block
-          // is left untouched.
+          // Borderline: small wide image that the verifier didn't
+          // call a logo. Try the split pass anyway.
           if (sourceImageSrc) {
             splitCandidates.push({ imageSrc: sourceImageSrc, bbox });
           }

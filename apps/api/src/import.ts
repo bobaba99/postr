@@ -35,9 +35,52 @@ const ExtractRequest = z.object({
     'classify-region',
     'measure-text',
     'split-multi-logo',
+    'count-figures',
   ]),
   model: z.enum(['claude', 'gpt', 'ollama']).optional().default('claude'),
 });
+
+/** count-figures mode — given a full-page raster of a poster, return
+ *  the EXPECTED count of charts/tables and logos that a downstream
+ *  pipeline should extract. Used as a global budget: per-bbox
+ *  classifiers can over-shoot on a noisy page, so we sort their
+ *  verdicts by confidence and keep only the top-K matching this
+ *  count. This single global call calibrates the per-bbox classifier
+ *  against a holistic view of the poster. */
+const CountFiguresSchema = {
+  type: 'object',
+  required: [
+    'expectedFigureCount',
+    'expectedTableCount',
+    'expectedLogoCount',
+    'reasoning',
+  ],
+  properties: {
+    expectedFigureCount: {
+      type: 'integer',
+      minimum: 0,
+      description:
+        'Real charts / plots / heatmaps / network diagrams visible in the poster. EXCLUDES tables, logos, and decorative icons.',
+    },
+    expectedTableCount: {
+      type: 'integer',
+      minimum: 0,
+      description:
+        'Tables: structured rows × columns of numeric data with headers. EXCLUDES figures and matrix-style heatmaps.',
+    },
+    expectedLogoCount: {
+      type: 'integer',
+      minimum: 0,
+      description:
+        'Institutional / brand logos (university crests, hospital marks, funder marks like ADNI). EXCLUDES decorative cartoons or section icons.',
+    },
+    reasoning: {
+      type: 'string',
+      description:
+        'One sentence per category explaining the count — quote a label or location ("McGill crest top-right", "Demographics table top-left", etc.).',
+    },
+  },
+} as const;
 
 /** split-multi-logo mode — given an image suspected to contain
  *  multiple logos baked into a single XObject, return per-logo
@@ -325,6 +368,13 @@ export function createImportRouter(deps: ImportRouterDeps = {}): Router {
           });
           return res.json(out);
         }
+        if (mode === 'count-figures') {
+          const out = await callAnthropicCountFigures(anthropic, {
+            mediaType,
+            imageData,
+          });
+          return res.json(out);
+        }
         const out = await callAnthropicClassifyRegion(anthropic, {
           mediaType,
           imageData,
@@ -352,6 +402,16 @@ const FULL_EXTRACT_SYSTEM = `You are a layout-extraction assistant for academic 
 - warnings: short notes if you saw rotated text, small unreadable type, multi-column ambiguity, etc.
 
 Be conservative on confidence: prefer 0.5 over hallucinating. Skip purely decorative graphics. Do NOT include logos in figureBBoxes.`;
+
+const COUNT_FIGURES_SYSTEM = `You are a poster auditor. Look at the WHOLE rendered poster image and count, across the entire page:
+
+1. expectedFigureCount — real charts, plots, heatmaps, network diagrams, schematic figures, composite multi-panel figures. Each composite/multi-panel figure with a single shared title counts as ONE. Stylized icons (magnifier, leaf, lightbulb, silhouettes, FAQ bubbles, ornaments) DO NOT count.
+2. expectedTableCount — structured rows × columns of NUMERIC data with column / row headers. A 6-row PCA loadings table is one. A descriptive-stats table with mean / SD per group is one.
+3. expectedLogoCount — institutional / brand marks: university crests, hospital logos, funder logos (e.g. ADNI, NIH, Wellcome Trust). Decorative cartoons / section ornaments DO NOT count, even when they look chart-shaped. Two logos pasted side-by-side in one banner image count as TWO.
+
+Be precise. The downstream pipeline uses these numbers as a CEILING — if a per-region classifier says there are 7 figures but you see only 3, the 4 lowest-confidence guesses get rejected. Over-counting hurts the user as much as under-counting.
+
+In the reasoning field, name each item briefly with its location: e.g. "Figures (3): Correlation scatter panel bottom-left, PCA biplot middle-right, Network top-center. Tables (2): Demographics top-left, PCA loadings middle. Logos (3): McGill top-right, Douglas top-right, ADNI top-right."`;
 
 const SPLIT_MULTI_LOGO_SYSTEM = `You are a logo segmentation assistant. The image you receive may contain ONE logo or MULTIPLE logos arranged in a row, column, or small grid (typical: a poster header strip with a university crest, a hospital logo, and a funder mark side by side). Your job:
 
@@ -459,6 +519,48 @@ async function callAnthropicFullExtract(
           {
             type: 'text',
             text: `Page size: ${ctx.pageWidthPt} × ${ctx.pageHeightPt} pt.`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const toolUse = response.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+  );
+  if (!toolUse) throw new Error('vision_no_tool_use');
+  return toolUse.input as unknown;
+}
+
+async function callAnthropicCountFigures(
+  anthropic: Anthropic,
+  ctx: { mediaType: 'image/png' | 'image/jpeg'; imageData: string },
+): Promise<unknown> {
+  const tool = {
+    name: 'emit_counts',
+    description:
+      'Emit the expected counts of figures, tables, and logos for the supplied poster page.',
+    input_schema:
+      CountFiguresSchema as unknown as Anthropic.Tool.InputSchema,
+  } satisfies Anthropic.Tool;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: 512,
+    system: COUNT_FIGURES_SYSTEM,
+    tools: [tool],
+    tool_choice: { type: 'tool', name: 'emit_counts' },
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: ctx.mediaType,
+              data: ctx.imageData,
+            },
           },
         ],
       },
