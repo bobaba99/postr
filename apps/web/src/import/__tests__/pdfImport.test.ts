@@ -9,6 +9,7 @@ import {
   computeBBoxStats,
   filterDecorationBBoxes,
   filterOrphanLabels,
+  medianBodyFontSize,
   mergeAdjacentBBoxes,
   type FigureBBox,
 } from '../pdfImport';
@@ -285,5 +286,91 @@ describe('filterOrphanLabels', () => {
 
   it('handles empty input', () => {
     expect(filterOrphanLabels([], [])).toEqual([]);
+  });
+
+  it('signal 3: drops a tiny lowercase orphan when font is < 0.85× body median', () => {
+    // Body median is 11pt; the orphan is 8pt → ratio 0.73 → DROP.
+    const bodyMedian = 11;
+    const out = filterOrphanLabels(
+      [
+        cluster('adni_mem', { fontSizePt: 8 }),
+        cluster('var.1', { fontSizePt: 8 }),
+        cluster('n=541', { fontSizePt: 8 }),
+      ],
+      [],
+      bodyMedian,
+    );
+    expect(out).toHaveLength(0);
+  });
+
+  it('signal 3: keeps short body-size text (e.g. citations, stat notes)', () => {
+    const out = filterOrphanLabels(
+      [
+        cluster('p < 0.05', { fontSizePt: 11 }), // body size — keep
+        cluster('(Smith, 2023)', { fontSizePt: 11 }),
+      ],
+      [],
+      11,
+    );
+    expect(out).toHaveLength(2);
+  });
+
+  it('signal 3: keeps multi-item paragraph clusters even if mean fontSize is small', () => {
+    // A real body paragraph that pdfjs split into many items —
+    // items.length > 3 means signal 3 won't fire.
+    const out = filterOrphanLabels(
+      [cluster('one two three', { fontSizePt: 8, items: { length: 12 } })],
+      [],
+      11,
+    );
+    expect(out).toHaveLength(1);
+  });
+
+  it('signal 3 is skipped when bodyFontSize is omitted', () => {
+    const out = filterOrphanLabels(
+      [cluster('adni_mem', { fontSizePt: 8 })],
+      [],
+      // no bodyFontSize → only signals 1+2 run; signal 1 needs uppercase
+    );
+    expect(out).toHaveLength(1);
+  });
+});
+
+describe('medianBodyFontSize', () => {
+  it('returns the item-weighted median', () => {
+    // 1 small label (1 item @ 8pt) + 1 paragraph (50 items @ 11pt)
+    // → weighted: 1×8 + 50×11 → median is 11.
+    const out = medianBodyFontSize([
+      { fontSizePt: 8, items: { length: 1 } },
+      { fontSizePt: 11, items: { length: 50 } },
+    ]);
+    expect(out).toBe(11);
+  });
+
+  it('returns 0 for empty input', () => {
+    expect(medianBodyFontSize([])).toBe(0);
+  });
+
+  it('ignores zero-fontSize clusters', () => {
+    expect(
+      medianBodyFontSize([
+        { fontSizePt: 0, items: { length: 100 } },
+        { fontSizePt: 11, items: { length: 5 } },
+      ]),
+    ).toBe(11);
+  });
+
+  it('caps single-cluster weight at 50 so one mega-paragraph doesn\'t dominate', () => {
+    // Without the cap, a 1000-item 8pt cluster vs a 5-item 11pt
+    // cluster would yield 8 (paragraph dominates). With the cap
+    // at 50, 8pt contributes 50 weight, 11pt contributes 5 → median
+    // is still 8 because 50 ≫ 5. The cap is a soft anti-dominance
+    // guard, not a balancer; this test just locks behavior.
+    expect(
+      medianBodyFontSize([
+        { fontSizePt: 8, items: { length: 1000 } },
+        { fontSizePt: 11, items: { length: 5 } },
+      ]),
+    ).toBe(8);
   });
 });

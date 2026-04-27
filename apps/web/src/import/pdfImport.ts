@@ -221,9 +221,11 @@ export async function extractFromPdf(
     clusters,
     figureResult.detectedBBoxes,
   );
+  const bodyFontPt = medianBodyFontSize(insideFiltered);
   const filteredClusters = filterOrphanLabels(
     insideFiltered,
     figureResult.detectedBBoxes,
+    bodyFontPt,
   );
   trace('[import.trace] text suppression', {
     inputClusters: clusters.length,
@@ -1448,13 +1450,15 @@ const CAPTION_PATTERN = /^(Figure|Fig\.?|Table|Tab\.?)\s*\d+/i;
  *  signals fire. The signals are independent so a misfiring one
  *  doesn't sink the rest.
  *
- *  Bbox-independent (works even when figure detection misses):
- *    - tiny + uppercase/numeric only ("ADNI_MEM", "RC1", "1,2,3")
- *
- *  Bbox-dependent (requires a known figure bbox nearby):
- *    - tiny "Figure N." / "Table N." caption within 1.5 × line-height
- *      of any detected figure bbox — typically orphaned because the
- *      parent figure failed to upload
+ *  Signal 1 (bbox-independent label pattern): tiny + uppercase/numeric
+ *    only ("ADNI_MEM", "RC1", "1,2,3").
+ *  Signal 2 (caption near a figure bbox): tiny "Figure N." / "Table N."
+ *    within 2.5 × line-height of any detected figure bbox.
+ *  Signal 3 (font smaller than body text): the most general signal —
+ *    a tiny isolated cluster whose font is materially smaller than the
+ *    page-median body text is almost always a label rather than
+ *    content. Catches lowercase orphans and label patterns the
+ *    uppercase regex misses ("adni_mem", "var.1", "n=541").
  *
  *  Exported for unit testing.
  */
@@ -1465,7 +1469,14 @@ export function filterOrphanLabels<
     fontSizePt: number;
     bbox: { x: number; y: number; w: number; h: number };
   },
->(clusters: T[], figureBBoxes: FigureBBox[]): T[] {
+>(
+  clusters: T[],
+  figureBBoxes: FigureBBox[],
+  /** When omitted, signal 3 is skipped — useful when the caller has
+   *  already classified clusters into roles and doesn't want to risk
+   *  the relative-size heuristic. */
+  pageBodyFontSizePt?: number,
+): T[] {
   return clusters.filter((c) => {
     const text = c.text.trim();
     const itemCount = c.items.length;
@@ -1502,8 +1513,47 @@ export function filterOrphanLabels<
       }
     }
 
+    // Signal 3 — fontSize materially below page-median body text.
+    // Body text clusters tend to span many items (the whole
+    // paragraph), so the items.length ≤ 3 guard prevents real body
+    // paragraphs from getting nuked when their median fontSize is
+    // anomalously low. The 0.85 ratio is the same threshold the
+    // assignRoles pass uses to split heading-vs-body.
+    if (
+      pageBodyFontSizePt !== undefined &&
+      pageBodyFontSizePt > 0 &&
+      itemCount <= 3 &&
+      text.length < 30 &&
+      c.fontSizePt > 0 &&
+      c.fontSizePt < pageBodyFontSizePt * 0.85
+    ) {
+      return false;
+    }
+
     return true;
   });
+}
+
+/** Median fontSize across all clusters — the best single estimate
+ *  of "this is the body text size on this page." Used by
+ *  filterOrphanLabels signal 3.
+ *
+ *  Exported for unit testing. */
+export function medianBodyFontSize(
+  clusters: { fontSizePt: number; items: { length: number } }[],
+): number {
+  // Weight by item count so a 100-item paragraph contributes more
+  // than a 1-item label. Without this, posters with many small
+  // labels skew the median down.
+  const sizes: number[] = [];
+  for (const c of clusters) {
+    if (c.fontSizePt <= 0) continue;
+    const weight = Math.min(c.items.length, 50); // cap so one mega-paragraph doesn't dominate
+    for (let i = 0; i < weight; i++) sizes.push(c.fontSizePt);
+  }
+  if (sizes.length === 0) return 0;
+  sizes.sort((a, b) => a - b);
+  return sizes[Math.floor(sizes.length / 2)] ?? 0;
 }
 
 /** Best-effort: download a freshly-uploaded poster-asset image, then
