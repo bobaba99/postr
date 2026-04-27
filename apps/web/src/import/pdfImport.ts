@@ -1604,6 +1604,25 @@ function tightenSubRect(
   return { x: rect.x + tx, y: rect.y + ty, w: tw, h: th };
 }
 
+/** Industry-standard image trim: sample corner pixels to determine
+ *  the background color, then mark pixels that differ from the
+ *  background by more than `BG_FUZZ` channel-units as "content".
+ *  Uses row/column density filters to ignore single-pixel noise
+ *  (anti-aliasing fringe, scanner specks).
+ *
+ *  Mirrors the approach Sharp / ImageMagick / Pillow take for their
+ *  trim() / -trim / ImageOps.crop() operations. The previous
+ *  hardcoded `WHITE_THRESHOLD = 245` failed when:
+ *    - PDF rasterization produced a slightly off-white background
+ *      (gray ~248) that fell outside "white" but counted as content
+ *    - Posters used colored backgrounds (light blue, cream)
+ *    - Anti-aliasing edges between content + background introduced
+ *      isolated near-content pixels along a single row/column,
+ *      which expanded the bbox by tens of pixels of empty space. */
+const BG_FUZZ = 24;
+const ROW_MIN_CONTENT_PX = 3;
+const ROW_MIN_CONTENT_FRACTION = 0.005;
+
 function tightenCanvasToContent(source: HTMLCanvasElement): TightenResult {
   const w = source.width;
   const h = source.height;
@@ -1612,37 +1631,102 @@ function tightenCanvasToContent(source: HTMLCanvasElement): TightenResult {
   if (!ctx) return null;
   const data = ctx.getImageData(0, 0, w, h).data;
 
-  const WHITE_THRESHOLD = 245; // any channel below this counts as content
-  const PAD_PX = 1; // tight padding so the block aspect-ratio matches the visible figure
+  // ── Step 1: estimate background color from corners ───────────
+  // Sample the four corners. If at least 3 of 4 agree (within
+  // BG_FUZZ on each channel), that's the background. Otherwise
+  // fall back to the brightest corner (assume the user's poster
+  // has a light background and the figure occupies the dark middle).
+  function readPx(x: number, y: number): [number, number, number, number] {
+    const i = (y * w + x) * 4;
+    return [data[i]!, data[i + 1]!, data[i + 2]!, data[i + 3]!];
+  }
+  const corners = [
+    readPx(0, 0),
+    readPx(w - 1, 0),
+    readPx(0, h - 1),
+    readPx(w - 1, h - 1),
+  ];
+  function close(a: [number, number, number, number], b: [number, number, number, number]): boolean {
+    return (
+      Math.abs(a[0] - b[0]) <= BG_FUZZ &&
+      Math.abs(a[1] - b[1]) <= BG_FUZZ &&
+      Math.abs(a[2] - b[2]) <= BG_FUZZ
+    );
+  }
+  let bgR = 255;
+  let bgG = 255;
+  let bgB = 255;
+  // Average the corners that cluster together. If none cluster,
+  // pick the brightest corner.
+  const visiblePixels = corners.filter((p) => p[3] > 0);
+  if (visiblePixels.length === 0) {
+    return 'blank';
+  }
+  // Find largest cluster of mutually-close corners
+  let bestCluster: [number, number, number, number][] = [];
+  for (const c of visiblePixels) {
+    const cluster = visiblePixels.filter((c2) => close(c, c2));
+    if (cluster.length > bestCluster.length) bestCluster = cluster;
+  }
+  if (bestCluster.length >= 2) {
+    bgR = Math.round(bestCluster.reduce((s, p) => s + p[0], 0) / bestCluster.length);
+    bgG = Math.round(bestCluster.reduce((s, p) => s + p[1], 0) / bestCluster.length);
+    bgB = Math.round(bestCluster.reduce((s, p) => s + p[2], 0) / bestCluster.length);
+  } else {
+    // Fall back to brightest corner
+    const brightest = visiblePixels.reduce((best, p) =>
+      p[0] + p[1] + p[2] > best[0] + best[1] + best[2] ? p : best,
+    );
+    bgR = brightest[0];
+    bgG = brightest[1];
+    bgB = brightest[2];
+  }
 
-  let minX = w;
-  let minY = h;
-  let maxX = -1;
-  let maxY = -1;
-
+  // ── Step 2: per-row + per-column content density ─────────────
+  // A pixel is "content" when ANY channel differs from bg by more
+  // than BG_FUZZ. A row is "content" only when ≥ ROW_MIN_CONTENT_PX
+  // OR ≥ ROW_MIN_CONTENT_FRACTION of the row is content. This
+  // ignores single-pixel noise (anti-aliasing fringe) that would
+  // otherwise extend the bbox by tens of empty pixels.
+  const rowContentCount = new Uint32Array(h);
+  const colContentCount = new Uint32Array(w);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
       const a = data[i + 3]!;
       if (a === 0) continue;
-      const r = data[i]!;
-      const g = data[i + 1]!;
-      const b = data[i + 2]!;
-      if (
-        r < WHITE_THRESHOLD ||
-        g < WHITE_THRESHOLD ||
-        b < WHITE_THRESHOLD
-      ) {
-        if (x < minX) minX = x;
-        if (y < minY) minY = y;
-        if (x > maxX) maxX = x;
-        if (y > maxY) maxY = y;
+      const dr = Math.abs(data[i]! - bgR);
+      const dg = Math.abs(data[i + 1]! - bgG);
+      const db = Math.abs(data[i + 2]! - bgB);
+      if (dr > BG_FUZZ || dg > BG_FUZZ || db > BG_FUZZ) {
+        rowContentCount[y]!++;
+        colContentCount[x]!++;
       }
     }
   }
+  const rowMin = Math.max(ROW_MIN_CONTENT_PX, Math.floor(w * ROW_MIN_CONTENT_FRACTION));
+  const colMin = Math.max(ROW_MIN_CONTENT_PX, Math.floor(h * ROW_MIN_CONTENT_FRACTION));
 
-  if (maxX < 0) return 'blank'; // entirely blank — caller skips upload
+  let minY = -1;
+  let maxY = -1;
+  for (let y = 0; y < h; y++) {
+    if (rowContentCount[y]! >= rowMin) {
+      if (minY < 0) minY = y;
+      maxY = y;
+    }
+  }
+  let minX = -1;
+  let maxX = -1;
+  for (let x = 0; x < w; x++) {
+    if (colContentCount[x]! >= colMin) {
+      if (minX < 0) minX = x;
+      maxX = x;
+    }
+  }
 
+  if (minX < 0 || minY < 0) return 'blank'; // entirely background — caller skips upload
+
+  const PAD_PX = 1;
   minX = Math.max(0, minX - PAD_PX);
   minY = Math.max(0, minY - PAD_PX);
   maxX = Math.min(w - 1, maxX + PAD_PX);

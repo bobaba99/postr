@@ -329,15 +329,20 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
             // padding inside the block and the user complains
             // "the image doesn't hug".
             //
-            // Tracking the last-fitted src in a ref prevents
-            // fighting any subsequent user-driven resize — once
-            // a given src has been fitted once, it won't refit.
-            if (autoFittedSrcRef.current === block.imageSrc) return;
+            // The ref is keyed off the DISPLAYED src so we don't
+            // wrongly mark the block as "fitted" when only the
+            // placeholder GIF has loaded (first frame is the 1×1
+            // transparent fallback while the signed Storage URL is
+            // resolving). Skipping the placeholder via the
+            // natural-dim minimum guard handles that case too.
             const t = e.currentTarget;
             const nw = t.naturalWidth;
             const nh = t.naturalHeight;
-            if (nw <= 0 || nh <= 0) return;
-            autoFittedSrcRef.current = block.imageSrc ?? null;
+            // Placeholder GIF or pre-load is 1×1 — bail until the
+            // real image loads.
+            if (nw < 8 || nh < 8) return;
+            if (autoFittedSrcRef.current === t.currentSrc) return;
+            autoFittedSrcRef.current = t.currentSrc;
             const aspect = nw / nh;
             const newH = Math.round(block.w / aspect);
             if (Math.abs(newH - block.h) > 2) {
