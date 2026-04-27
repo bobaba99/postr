@@ -37,7 +37,11 @@ import {
   type RawTextItem,
 } from './clusterText';
 import { synthesizeDoc, type SynthOutput } from './synthDoc';
-import { classifyRegion, extractFromRasterizedPage } from './imageImport';
+import {
+  classifyRegion,
+  extractFromRasterizedPage,
+  splitMultiLogo,
+} from './imageImport';
 
 // pdfjs needs a worker URL. Vite resolves this with `?url`.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -518,29 +522,47 @@ async function extractFigures(
 
       const dropIndexes = new Set<number>();
       const promotions = new Map<number, 'logo'>();
+      const splitCandidates: { blockIdx: number; bbox: FigureBBox }[] = [];
       verdicts.forEach((verdict, i) => {
         if (!verdict) return;
         const blockIdx = targets[i]!.blockIdx;
         const bbox = targets[i]!.bbox;
-        if (verdict.kind === 'decoration' && verdict.confidence >= 0.5) {
+
+        // Strict-evidence guard: a "figure" verdict without observed
+        // axes (or numeric data) is downgraded to "decoration". The
+        // backend prompt forces the model to commit to evidence
+        // before classifying, but we double-check here so a model
+        // that returns inconsistent JSON still doesn't pollute the
+        // poster.
+        let kind = verdict.kind;
+        const ev = verdict.evidence;
+        if (kind === 'figure' && ev) {
+          const looksReal =
+            ev.hasAxes &&
+            (ev.hasTrendLinesOrDataPoints || ev.hasNumericData);
+          if (!looksReal) kind = 'decoration';
+        }
+        if (kind === 'table' && ev) {
+          const looksReal = ev.hasGridRowsAndCols && ev.hasNumericData;
+          if (!looksReal) kind = 'decoration';
+        }
+        if (kind === 'logo' && ev?.hasOrnamentalShapesOnly) {
+          kind = 'decoration';
+        }
+
+        if (kind === 'decoration' && verdict.confidence >= 0.5) {
           dropIndexes.add(blockIdx);
-        } else if (verdict.kind === 'logo' && verdict.confidence >= 0.5) {
-          promotions.set(blockIdx, 'logo');
-          // Wide / tall "logo" bboxes (aspect > 2.5:1) probably
-          // contain MULTIPLE logos baked into a single image XObject
-          // by the source PDF — there is nothing left to split at
-          // the bbox level. Surface a console hint for the dev who
-          // is debugging this; the user-facing fix is the manual
-          // crop or duplicate-block flow.
-          const maxDim = Math.max(bbox.w, bbox.h);
-          const minDim = Math.min(bbox.w, bbox.h);
-          if (maxDim / Math.max(1, minDim) > 2.5) {
-            // eslint-disable-next-line no-console
-            console.warn(
-              '[import] multi-logo image detected — single XObject in source PDF, cannot split without OCR. User can crop or duplicate the block manually.',
-              bbox,
-            );
-          }
+          return;
+        }
+        if (kind !== 'logo' || verdict.confidence < 0.5) return;
+        promotions.set(blockIdx, 'logo');
+        // Wide / tall "logo" bboxes are LLM-splittable now — queue
+        // for a second pass that asks the model to return per-logo
+        // sub-bboxes inside the merged image.
+        const maxDim = Math.max(bbox.w, bbox.h);
+        const minDim = Math.min(bbox.w, bbox.h);
+        if (maxDim / Math.max(1, minDim) > 2.0) {
+          splitCandidates.push({ blockIdx, bbox });
         }
       });
 
@@ -556,14 +578,130 @@ async function extractFigures(
         blocks.push(...filtered);
       }
 
-      // Save promoted logos to the user's library (fire-and-forget;
-      // never blocks the import).
+      // ── Multi-logo split pass ─────────────────────────────────
+      // For every wide/tall block the verifier classified as "logo",
+      // ask the model to return per-logo sub-bboxes. If the model
+      // finds 2+ logos, we crop each region out of the page raster,
+      // upload separately, and replace the merged block with N split
+      // blocks. The McGill / Douglas / ADNI banner case.
+      if (splitCandidates.length > 0) {
+        onProgress({
+          stage: 'llm-call',
+          detail: `Splitting ${splitCandidates.length} multi-logo block${splitCandidates.length === 1 ? '' : 's'}…`,
+        });
+        for (const cand of splitCandidates) {
+          // Find current block (its index may have shifted after
+          // the drop pass). Match on imageSrc which is stable.
+          const original = blocks.find(
+            (b) =>
+              b.type === 'logo' &&
+              ptToUnits(cand.bbox.w) === Math.abs(b.w) - 0 &&
+              false, // explicit comparison too brittle; do a simple key below
+          );
+          const src = original?.imageSrc;
+          void src;
+          // Easier: re-derive the block by matching on bbox-derived
+          // unit dims; but the simplest path is to crop+upload from
+          // the page canvas regardless and just remove any block
+          // whose bbox sits inside the candidate region.
+          const split = await splitMultiLogo(
+            canvas,
+            cand.bbox,
+            pageWidthPt,
+            pageHeightPt,
+            posterId,
+            userId,
+            2,
+          );
+          if (!split || split.isSingleLogo || split.logos.length < 2) continue;
+
+          // Remove the merged block. Identify by bbox proximity in
+          // poster-unit space (within 1 unit).
+          const mergedX = ptToUnits(cand.bbox.x);
+          const mergedY = ptToUnits(cand.bbox.y);
+          const mergedW = ptToUnits(cand.bbox.w);
+          const mergedH = ptToUnits(cand.bbox.h);
+          for (let i = blocks.length - 1; i >= 0; i--) {
+            const b = blocks[i]!;
+            if (
+              b.type === 'logo' &&
+              Math.abs(b.x - mergedX) < 1 &&
+              Math.abs(b.y - mergedY) < 1 &&
+              Math.abs(b.w - mergedW) < 1 &&
+              Math.abs(b.h - mergedH) < 1
+            ) {
+              blocks.splice(i, 1);
+              break;
+            }
+          }
+
+          // For each sub-logo bbox returned by the LLM (in pixel
+          // coords of the cropped image), translate back to page-pt
+          // coords, crop from the page canvas, upload, push a new
+          // logo block.
+          const RENDER_SCALE_FOR_SPLIT = 2;
+          for (const logo of split.logos) {
+            // Sub-bbox is in pixel space of the cropped image. The
+            // crop was rendered at RENDER_SCALE_FOR_SPLIT × bbox-pt.
+            const subPtX = cand.bbox.x + logo.bbox.x / RENDER_SCALE_FOR_SPLIT;
+            const subPtY = cand.bbox.y + logo.bbox.y / RENDER_SCALE_FOR_SPLIT;
+            const subPtW = logo.bbox.w / RENDER_SCALE_FOR_SPLIT;
+            const subPtH = logo.bbox.h / RENDER_SCALE_FOR_SPLIT;
+            if (subPtW < 1 || subPtH < 1) continue;
+
+            const sub = document.createElement('canvas');
+            allocatedCanvases.push(sub);
+            sub.width = Math.round(subPtW * RENDER_SCALE_FOR_SPLIT);
+            sub.height = Math.round(subPtH * RENDER_SCALE_FOR_SPLIT);
+            const sctx = sub.getContext('2d');
+            if (!sctx) continue;
+            sctx.drawImage(
+              canvas,
+              Math.round(subPtX * RENDER_SCALE_FOR_SPLIT),
+              Math.round(subPtY * RENDER_SCALE_FOR_SPLIT),
+              sub.width,
+              sub.height,
+              0,
+              0,
+              sub.width,
+              sub.height,
+            );
+            const subBlob = await canvasToBlob(sub, 'image/png');
+            if (!subBlob) continue;
+            const subId = nanoid(8);
+            const subFile = new File([subBlob], `${subId}.png`, {
+              type: 'image/png',
+            });
+            const subSrc = await uploadPosterImage(
+              userId,
+              posterId,
+              subId,
+              subFile,
+            );
+            if (!subSrc) continue;
+            blocks.push({
+              type: 'logo',
+              x: ptToUnits(subPtX),
+              y: ptToUnits(subPtY),
+              w: ptToUnits(subPtW),
+              h: ptToUnits(subPtH),
+              content: '',
+              imageSrc: subSrc,
+              imageFit: 'contain',
+              tableData: null,
+            });
+            void saveLogoToLibrary(subSrc);
+          }
+        }
+      }
+
+      // Save promoted logos that were NOT split (single-logo blocks)
+      // into the user library. Multi-logo splits already saved above.
       for (const idx of promotions.keys()) {
-        const src = blocks.find(
-          (blk) => blk.type === 'logo' && blk.imageSrc,
-        )?.imageSrc;
-        if (!src) continue;
-        void saveLogoToLibrary(src);
+        const wasSplit = splitCandidates.some((c) => c.blockIdx === idx);
+        if (wasSplit) continue;
+        const src = blocks[idx]?.imageSrc;
+        if (src) void saveLogoToLibrary(src);
       }
     }
   }

@@ -30,9 +30,45 @@ const ExtractRequest = z.object({
   imageUrl: z.string().url(),
   pageWidthPt: z.number().positive(),
   pageHeightPt: z.number().positive(),
-  mode: z.enum(['full-extract', 'classify-region', 'measure-text']),
+  mode: z.enum([
+    'full-extract',
+    'classify-region',
+    'measure-text',
+    'split-multi-logo',
+  ]),
   model: z.enum(['claude', 'gpt', 'ollama']).optional().default('claude'),
 });
+
+/** split-multi-logo mode — given an image suspected to contain
+ *  multiple logos baked into a single XObject, return per-logo
+ *  pixel-space bboxes. */
+const SplitMultiLogoSchema = {
+  type: 'object',
+  required: ['logos'],
+  properties: {
+    isSingleLogo: { type: 'boolean' },
+    logos: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['bbox'],
+        properties: {
+          bbox: {
+            type: 'object',
+            required: ['x', 'y', 'w', 'h'],
+            properties: {
+              x: { type: 'number' },
+              y: { type: 'number' },
+              w: { type: 'number' },
+              h: { type: 'number' },
+            },
+          },
+          name: { type: 'string' },
+        },
+      },
+    },
+  },
+} as const;
 
 /** measure-text mode — returns every text region in the image with
  *  pixel-space bboxes so the client can compute effective print size. */
@@ -116,11 +152,55 @@ const FullExtractSchema = {
 
 const ClassifyRegionSchema = {
   type: 'object',
-  required: ['kind', 'confidence'],
+  required: ['kind', 'confidence', 'evidence'],
   properties: {
     kind: { enum: ['figure', 'table', 'logo', 'decoration'] },
     confidence: { type: 'number' },
     reason: { type: 'string' },
+    /**
+     * Forced chain-of-thought: the model must commit to whether
+     * specific data-visual artifacts are present BEFORE settling on
+     * `kind`. The frontend then double-checks the verdict against
+     * the evidence — `kind: 'figure'` without `hasAxes` is downgraded
+     * to `decoration`, etc.
+     */
+    evidence: {
+      type: 'object',
+      required: [
+        'hasAxes',
+        'hasTrendLinesOrDataPoints',
+        'hasGridRowsAndCols',
+        'hasNumericData',
+        'hasOrnamentalShapesOnly',
+      ],
+      properties: {
+        hasAxes: {
+          type: 'boolean',
+          description:
+            'True ONLY if the image shows clear x and/or y axes with tick marks or value labels (i.e. it is a plot/chart).',
+        },
+        hasTrendLinesOrDataPoints: {
+          type: 'boolean',
+          description:
+            'True ONLY if the image contains plotted data — scatter points, lines, bars, density curves, error bars, etc.',
+        },
+        hasGridRowsAndCols: {
+          type: 'boolean',
+          description:
+            'True ONLY if the image shows a structured grid of rows and columns of data (a table).',
+        },
+        hasNumericData: {
+          type: 'boolean',
+          description:
+            'True if numbers are visible inside the region (table cells, axis ticks, data labels).',
+        },
+        hasOrnamentalShapesOnly: {
+          type: 'boolean',
+          description:
+            'True if the image is purely a stylized icon / cartoon / silhouette / placeholder graphic with NO axes, NO grid, NO data — even if the icon depicts a chart-shape.',
+        },
+      },
+    },
   },
 } as const;
 
@@ -215,6 +295,13 @@ export function createImportRouter(deps: ImportRouterDeps = {}): Router {
           });
           return res.json(out);
         }
+        if (mode === 'split-multi-logo') {
+          const out = await callAnthropicSplitMultiLogo(anthropic, {
+            mediaType,
+            imageData,
+          });
+          return res.json(out);
+        }
         const out = await callAnthropicClassifyRegion(anthropic, {
           mediaType,
           imageData,
@@ -243,6 +330,15 @@ const FULL_EXTRACT_SYSTEM = `You are a layout-extraction assistant for academic 
 
 Be conservative on confidence: prefer 0.5 over hallucinating. Skip purely decorative graphics. Do NOT include logos in figureBBoxes.`;
 
+const SPLIT_MULTI_LOGO_SYSTEM = `You are a logo segmentation assistant. The image you receive may contain ONE logo or MULTIPLE logos arranged in a row, column, or small grid (typical: a poster header strip with a university crest, a hospital logo, and a funder mark side by side). Your job:
+
+- Return per-logo pixel-space bboxes — origin top-left of the supplied image.
+- Tighten each bbox to the visible logo's bounding rectangle, NOT the whitespace around it.
+- Optionally include each logo's text/name when you can read it (e.g. "McGill", "Douglas", "ADNI").
+- If there's only one logo, set isSingleLogo: true and return that single bbox in logos[].
+
+Be precise — these bboxes get cropped directly out of the source pixels and uploaded as separate logo blocks. A loose bbox includes whitespace from the next logo over.`;
+
 const MEASURE_TEXT_SYSTEM = `You are a measurement assistant for plot/table images. Given an image, return EVERY visible text region with:
 - text: what the region says (verbatim — preserve case and punctuation)
 - bbox: pixel-space bounding box {x, y, w, h} where origin is top-left of the supplied image
@@ -251,17 +347,34 @@ Also return imagePixelWidth and imagePixelHeight so the client can scale.
 
 Be exhaustive — include axis tick labels, tiny legend entries, footnotes. The client uses your bboxes to compute whether each text region is legible at the poster's printed size; missing a small "n=541" caption gives the user a false-pass on readability.`;
 
-const CLASSIFY_REGION_SYSTEM = `You are a single-region classifier for poster image crops. Given an image, return:
+const CLASSIFY_REGION_SYSTEM = `You are a single-region classifier for poster image crops. Your job is to decide whether the region carries actual research data (a figure or a table) or whether it is purely visual chrome (a logo or a decorative icon).
+
+Return:
 - kind: one of "figure", "table", "logo", "decoration"
 - confidence: in [0,1]
-- reason: 1-sentence rationale
+- reason: 1-sentence rationale grounded in the evidence
+- evidence: a forced chain-of-thought of specific yes/no observations
 
-"figure" = a chart, plot, scatter, line graph, or any data visualization.
-"table" = a structured grid of cells with rows/columns of data.
-"logo" = an institutional or brand mark (university logo, lab logo, ADNI etc).
-"decoration" = a stock icon, illustration, placeholder graphic, or any non-data visual element.
+STRICT VERIFICATION RULES — apply these in order:
 
-When in doubt between figure and decoration, prefer "decoration" — false-positive figures pollute the user's poster.`;
+1. Set kind = "figure" ONLY when BOTH:
+     evidence.hasAxes === true   AND
+     (evidence.hasTrendLinesOrDataPoints === true OR evidence.hasNumericData === true)
+   In other words, you must see real x/y axes with tick marks or labels AND actual plotted data points or numeric values. A cartoon "magnifying glass with bar-chart icon" silhouette has no real axes — it is "decoration", not "figure".
+
+2. Set kind = "table" ONLY when:
+     evidence.hasGridRowsAndCols === true AND evidence.hasNumericData === true
+   A grid pattern in a stock illustration is not a real data table.
+
+3. Set kind = "logo" only for institutional / brand marks (university crests, lab logos, funder marks like ADNI). Decorative icons that depict animals, leaves, magnifying glasses, people silhouettes, speech bubbles, etc. are NOT logos — they are "decoration".
+
+4. Set kind = "decoration" for anything else, ESPECIALLY:
+   - Cartoon icons (✦ leaves, silhouetted people, FAQ bubbles, magnifiers)
+   - Placeholder graphics
+   - Section dividers / banners
+   - Anything where evidence.hasOrnamentalShapesOnly === true
+
+5. When uncertain, prefer "decoration". A false-positive figure pollutes the user's poster; a false-negative is recoverable (the user can re-add manually).`;
 
 async function callAnthropicFullExtract(
   anthropic: Anthropic,
@@ -300,6 +413,47 @@ async function callAnthropicFullExtract(
           {
             type: 'text',
             text: `Page size: ${ctx.pageWidthPt} × ${ctx.pageHeightPt} pt.`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const toolUse = response.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+  );
+  if (!toolUse) throw new Error('vision_no_tool_use');
+  return toolUse.input as unknown;
+}
+
+async function callAnthropicSplitMultiLogo(
+  anthropic: Anthropic,
+  ctx: { mediaType: 'image/png' | 'image/jpeg'; imageData: string },
+): Promise<unknown> {
+  const tool = {
+    name: 'emit_logo_segmentation',
+    description: 'Emit per-logo pixel-space bboxes for the supplied image.',
+    input_schema:
+      SplitMultiLogoSchema as unknown as Anthropic.Tool.InputSchema,
+  } satisfies Anthropic.Tool;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: 1024,
+    system: SPLIT_MULTI_LOGO_SYSTEM,
+    tools: [tool],
+    tool_choice: { type: 'tool', name: 'emit_logo_segmentation' },
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: ctx.mediaType,
+              data: ctx.imageData,
+            },
           },
         ],
       },

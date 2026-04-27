@@ -32,7 +32,7 @@ interface ExtractRequestBody {
   imageUrl: string;
   pageWidthPt: number;
   pageHeightPt: number;
-  mode: 'full-extract' | 'classify-region';
+  mode: 'full-extract' | 'classify-region' | 'split-multi-logo';
   model?: 'claude' | 'gpt' | 'ollama';
 }
 
@@ -55,6 +55,26 @@ export interface ClassifyRegionResponse {
   kind: 'figure' | 'table' | 'logo' | 'decoration';
   confidence: number;
   reason?: string;
+  evidence?: {
+    hasAxes: boolean;
+    hasTrendLinesOrDataPoints: boolean;
+    hasGridRowsAndCols: boolean;
+    hasNumericData: boolean;
+    hasOrnamentalShapesOnly: boolean;
+  };
+}
+
+export interface SplitMultiLogoResponse {
+  /** Sub-logo bboxes in image-pixel space (origin top-left). The
+   *  client crops each one out of the source canvas and uploads them
+   *  as separate logo blocks. */
+  logos: Array<{
+    bbox: { x: number; y: number; w: number; h: number };
+    name?: string;
+  }>;
+  /** True when the LLM thinks the image actually contains exactly
+   *  one logo and shouldn't be split. */
+  isSingleLogo?: boolean;
 }
 
 /** Bucket prefix used for ephemeral upload-then-fetch round trips.
@@ -239,6 +259,76 @@ async function runImageOcr(
 
   onProgress({ stage: 'ready' });
   return synth;
+}
+
+/**
+ * Asks the LLM to detect whether a given image contains MULTIPLE
+ * logos (e.g. a McGill + Douglas + ADNI banner baked into a single
+ * PDF image XObject) and to return their pixel-space bboxes. The
+ * caller crops each sub-region from the source canvas and uploads
+ * them as separate logo blocks.
+ *
+ * Returns null on failure or `isSingleLogo: true` so the caller
+ * keeps the original block intact.
+ */
+export async function splitMultiLogo(
+  pageCanvas: HTMLCanvasElement,
+  bbox: { x: number; y: number; w: number; h: number },
+  pageWidthPt: number,
+  pageHeightPt: number,
+  posterId: string,
+  userId: string,
+  scale: number,
+): Promise<SplitMultiLogoResponse | null> {
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width = Math.round(bbox.w * scale);
+  cropCanvas.height = Math.round(bbox.h * scale);
+  const ctx = cropCanvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(
+    pageCanvas,
+    Math.round(bbox.x * scale),
+    Math.round(bbox.y * scale),
+    cropCanvas.width,
+    cropCanvas.height,
+    0,
+    0,
+    cropCanvas.width,
+    cropCanvas.height,
+  );
+
+  const blob = await canvasToBlob(cropCanvas, 'image/png');
+  releaseCanvas(cropCanvas);
+  if (!blob) return null;
+
+  const tempPath = `${userId}/${TEMP_PREFIX}/${posterId}/split-${nanoid(8)}.png`;
+  const { error: uploadErr } = await supabase.storage
+    .from('poster-assets')
+    .upload(tempPath, blob, { contentType: 'image/png', upsert: true });
+  if (uploadErr) return null;
+
+  const { data: signed } = await supabase.storage
+    .from('poster-assets')
+    .createSignedUrl(tempPath, 300);
+  if (!signed?.signedUrl) return null;
+
+  try {
+    const response = await postJson<SplitMultiLogoResponse>(
+      '/api/import/extract',
+      {
+        imageUrl: signed.signedUrl,
+        pageWidthPt,
+        pageHeightPt,
+        mode: 'split-multi-logo',
+      },
+      { auth: true },
+    );
+    return response;
+  } catch {
+    return null;
+  } finally {
+    void supabase.storage.from('poster-assets').remove([tempPath]);
+  }
 }
 
 /**
