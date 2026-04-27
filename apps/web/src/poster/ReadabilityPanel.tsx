@@ -17,6 +17,8 @@ import {
   type ReadabilityResult,
   type FigureParams,
 } from './readability';
+import { resolveStorageUrl } from '@/data/posterImages';
+import { postJson } from '@/lib/apiClient';
 
 interface Props {
   selectedBlock: Block | null;
@@ -29,6 +31,24 @@ interface Props {
    */
   defaultFigureWidthIn?: number;
   defaultFigureHeightIn?: number;
+}
+
+interface ScanRegion {
+  text: string;
+  bbox: { x: number; y: number; w: number; h: number };
+  role: 'title' | 'axis-title' | 'axis-tick' | 'legend' | 'data' | 'other';
+  /** Effective height in printed points, given the block size. */
+  effectivePt: number;
+  /** pass/warn/fail, calibrated to academic poster guidelines. */
+  status: 'pass' | 'warn' | 'fail';
+  /** Minimum acceptable pt for this role. */
+  minPt: number;
+}
+
+interface ScanResult {
+  imagePixelWidth: number;
+  imagePixelHeight: number;
+  regions: ScanRegion[];
 }
 
 // ──────────────────────────────────────────────────────────────────────
@@ -466,6 +486,16 @@ export function ReadabilityPanel({
   const blockWidthIn = isImage ? selectedBlock.w / PX : defaultFigureWidthIn;
   const blockHeightIn = isImage ? selectedBlock.h / PX : defaultFigureHeightIn;
 
+  // Image-OCR readability state — separate from the code-based path
+  // because the inputs and analysis differ. The same `result` shape
+  // backs both views so the rendered table downstream stays one
+  // component.
+  const [scanState, setScanState] = useState<{
+    phase: 'idle' | 'running' | 'done' | 'error';
+    error?: string;
+    result?: ScanResult;
+  }>({ phase: 'idle' });
+
   const detectedLang = useMemo(() => {
     if (lang !== 'auto') return lang;
     return detectLanguage(code);
@@ -503,8 +533,53 @@ export function ReadabilityPanel({
 
   const handleCopied = () => setCopiedBannerOpen(true);
 
+  async function runImageScan() {
+    if (!isImage || !selectedBlock?.imageSrc) return;
+    setScanState({ phase: 'running' });
+    try {
+      const url = await resolveStorageUrl(selectedBlock.imageSrc);
+      if (!url) throw new Error('Could not resolve image URL.');
+      const response = await postJson<{
+        imagePixelWidth: number;
+        imagePixelHeight: number;
+        regions: Array<{
+          text: string;
+          bbox: { x: number; y: number; w: number; h: number };
+          role: ScanRegion['role'];
+        }>;
+      }>(
+        '/api/import/extract',
+        {
+          imageUrl: url,
+          pageWidthPt: 1, // unused by measure-text mode
+          pageHeightPt: 1,
+          mode: 'measure-text',
+        },
+        { auth: true },
+      );
+      const result = computeImageReadability(
+        response,
+        blockWidthIn,
+        blockHeightIn,
+      );
+      setScanState({ phase: 'done', result });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Scan failed.';
+      setScanState({ phase: 'error', error: msg });
+    }
+  }
+
   return (
     <div style={panelStyle}>
+      {isImage && (
+        <ImageScanSection
+          state={scanState}
+          onRun={runImageScan}
+          onClear={() => setScanState({ phase: 'idle' })}
+          blockWidthIn={blockWidthIn}
+          blockHeightIn={blockHeightIn}
+        />
+      )}
       <div style={labelStyle}>Code Readability Check</div>
       <p
         style={{
@@ -771,4 +846,189 @@ export function ReadabilityPanel({
       />
     </div>
   );
+}
+
+// ──────────────────────────────────────────────────────────────────────
+// Image-OCR readability — for figures imported from PDF/JPG where the
+// user doesn't have the original plotting code to paste.
+// ──────────────────────────────────────────────────────────────────────
+
+const MIN_PT_BY_ROLE: Record<ScanRegion['role'], number> = {
+  title: 24,
+  'axis-title': 24,
+  'axis-tick': 18,
+  legend: 18,
+  data: 18,
+  other: 18,
+};
+
+function computeImageReadability(
+  raw: {
+    imagePixelWidth: number;
+    imagePixelHeight: number;
+    regions: Array<{
+      text: string;
+      bbox: { x: number; y: number; w: number; h: number };
+      role: ScanRegion['role'];
+    }>;
+  },
+  blockWidthIn: number,
+  blockHeightIn: number,
+): ScanResult {
+  const W = raw.imagePixelWidth || 1;
+  const H = raw.imagePixelHeight || 1;
+  // Pick the axis whose proportional scale is smaller — that's the
+  // print-axis the figure stretches to fit. Conservative.
+  const widthScale = blockWidthIn / W;
+  const heightScale = blockHeightIn / H;
+  const printScale = Math.min(widthScale, heightScale);
+
+  const regions: ScanRegion[] = raw.regions.map((r) => {
+    const heightIn = r.bbox.h * printScale;
+    const effectivePt = heightIn * 72;
+    const minPt = MIN_PT_BY_ROLE[r.role] ?? 18;
+    let status: ScanRegion['status'];
+    if (effectivePt >= minPt) status = 'pass';
+    else if (effectivePt >= minPt * 0.75) status = 'warn';
+    else status = 'fail';
+    return { ...r, effectivePt, status, minPt };
+  });
+
+  return {
+    imagePixelWidth: W,
+    imagePixelHeight: H,
+    regions,
+  };
+}
+
+function ImageScanSection(props: {
+  state: {
+    phase: 'idle' | 'running' | 'done' | 'error';
+    error?: string;
+    result?: ScanResult;
+  };
+  onRun: () => void;
+  onClear: () => void;
+  blockWidthIn: number;
+  blockHeightIn: number;
+}) {
+  const { state, onRun, onClear } = props;
+
+  const result = state.result;
+  const passCount = result?.regions.filter((r) => r.status === 'pass').length ?? 0;
+  const failCount = result?.regions.filter((r) => r.status === 'fail').length ?? 0;
+  const warnCount = result?.regions.filter((r) => r.status === 'warn').length ?? 0;
+
+  return (
+    <div
+      style={{
+        background: '#1c1a2e',
+        border: '1px solid #4e3fb4',
+        borderRadius: 8,
+        padding: '12px 14px',
+      }}
+    >
+      <div style={{ ...labelStyle, marginBottom: 6 }}>📷 Scan Image Text</div>
+      <p style={{ fontSize: 13, color: '#c8cad0', lineHeight: 1.5, margin: '0 0 10px' }}>
+        Use Claude Vision to measure every text region in this image and
+        compute its effective print size at the block's current
+        dimensions. Useful for plots and tables you imported from a PDF
+        or JPG and don't have the source code for.
+      </p>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <button
+          onClick={onRun}
+          disabled={state.phase === 'running'}
+          style={{
+            ...btnStyle,
+            background: '#7c6aed',
+            color: '#fff',
+            cursor: state.phase === 'running' ? 'wait' : 'pointer',
+          }}
+        >
+          {state.phase === 'running' ? 'Scanning…' : '🔎 Scan image'}
+        </button>
+        {result && (
+          <button onClick={onClear} style={btnStyle}>
+            Clear
+          </button>
+        )}
+        {result && (
+          <span style={{ fontSize: 12, color: '#9ca3af' }}>
+            {passCount} pass · {warnCount} warn · {failCount} fail ·{' '}
+            {result.regions.length} total
+          </span>
+        )}
+      </div>
+      {state.phase === 'error' && state.error && (
+        <div style={{ marginTop: 10, fontSize: 12, color: '#fca5a5' }}>
+          {state.error}
+        </div>
+      )}
+      {result && result.regions.length > 0 && (
+        <div
+          style={{
+            marginTop: 12,
+            maxHeight: 280,
+            overflowY: 'auto',
+            border: '1px solid #2a2a3a',
+            borderRadius: 6,
+          }}
+        >
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead style={{ position: 'sticky', top: 0, background: '#1a1a26' }}>
+              <tr>
+                <th style={thStyle}>Status</th>
+                <th style={thStyle}>Role</th>
+                <th style={{ ...thStyle, textAlign: 'left' }}>Text</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Effective pt</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Min</th>
+              </tr>
+            </thead>
+            <tbody>
+              {result.regions.map((r, i) => (
+                <tr key={i} style={{ borderTop: '1px solid #2a2a3a' }}>
+                  <td style={{ ...tdStyle, color: statusColor(r.status) }}>
+                    {r.status === 'pass' ? '✓' : r.status === 'warn' ? '!' : '✗'}
+                  </td>
+                  <td style={tdStyle}>{r.role}</td>
+                  <td style={{ ...tdStyle, textAlign: 'left', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {r.text}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right' }}>
+                    {r.effectivePt.toFixed(1)}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right', color: '#6b7280' }}>
+                    {r.minPt}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const thStyle: CSSProperties = {
+  padding: '6px 8px',
+  textAlign: 'center',
+  fontSize: 11,
+  color: '#9ca3af',
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: 0.5,
+};
+
+const tdStyle: CSSProperties = {
+  padding: '5px 8px',
+  textAlign: 'center',
+  color: '#c8cad0',
+};
+
+function statusColor(s: ScanRegion['status']): string {
+  if (s === 'pass') return '#a6e3a1';
+  if (s === 'warn') return '#f9e2af';
+  return '#f38ba8';
 }

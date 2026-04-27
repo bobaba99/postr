@@ -148,6 +148,23 @@ export interface Block {
    * `dangerouslySetInnerHTML` without re-parsing on each frame.
    */
   note?: string;
+  /**
+   * Inline crop applied to image blocks via `clip-path: inset()`.
+   * Each value is a percentage 0..50 (a 50% top crop hides the top
+   * half of the image). The original `imageSrc` is preserved — undo
+   * with one click by clearing this field.
+   *
+   * `imageFit` still controls how the cropped image fits inside the
+   * block frame (contain / cover / fill).
+   *
+   * Ignored on non-image / non-logo blocks.
+   */
+  crop?: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
 }
 
 export type FontWeight = 300 | 400 | 500 | 600 | 700 | 800;

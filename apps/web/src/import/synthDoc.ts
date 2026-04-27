@@ -34,6 +34,15 @@ import {
 import type { RoledCluster } from './clusterText';
 import { parseAuthorsText } from './parseAuthors';
 
+/** Mininum font size (poster units) to clamp imported style overrides
+ *  to. ~18pt — anything below the academic-poster floor of 18pt body
+ *  text gets bumped here so an import with weird tiny fonts doesn't
+ *  produce illegible defaults. */
+const MIN_IMPORT_FONT_UNITS = 2.5;
+/** Max font size (poster units). Caps an over-estimated cluster
+ *  median (e.g. when a single chunky decoration leaks in). */
+const MAX_IMPORT_FONT_UNITS = 30;
+
 export interface SynthDefaults {
   fontFamily?: string;
   palette?: Palette;
@@ -110,6 +119,14 @@ export function synthesizeDoc(
     blocks.push(snapFigureBlock(fb, scaleX, scaleY));
   }
 
+  // Override the doc-level type styles with the median font size we
+  // observed in each role-cluster. Without this, every imported text
+  // block renders at the editor's default 36pt body even if the
+  // source PDF used 14pt — text reflows differently and the layout
+  // no longer "replicates the PDF" the user dropped.
+  const baseStyles = defaults.styles ?? DEFAULT_STYLES;
+  const importedStyles = inferStylesFromClusters(clusters, baseStyles);
+
   const doc: PosterDoc = {
     version: 1,
     widthIn: posterWidthIn,
@@ -117,7 +134,7 @@ export function synthesizeDoc(
     blocks,
     fontFamily: defaults.fontFamily ?? DEFAULT_FONT_FAMILY,
     palette: defaults.palette ?? DEFAULT_PALETTE,
-    styles: defaults.styles ?? DEFAULT_STYLES,
+    styles: importedStyles,
     headingStyle: defaults.headingStyle ?? DEFAULT_HEADING_STYLE,
     institutions: parsedAuthors.institutions,
     authors: parsedAuthors.authors,
@@ -251,6 +268,66 @@ function snapFigureBlock(
     w: Math.max(SNAP_GRID, snap(pb.w * scaleX)),
     h: Math.max(SNAP_GRID, snap(pb.h * scaleY)),
   };
+}
+
+/**
+ * Compute per-role font size overrides from a cluster pool. Each role
+ * gets the median observed `fontSizePt` of its members, converted to
+ * poster units (1 unit = 7.2pt) and clamped to a sane range.
+ *
+ * Falls back to the supplied base style on roles with zero clusters.
+ *
+ * Exported for unit testing.
+ */
+export function inferStylesFromClusters(
+  clusters: RoledCluster[],
+  base: Styles,
+): Styles {
+  const byRole: Record<RoledCluster['role'], number[]> = {
+    title: [],
+    heading: [],
+    authors: [],
+    text: [],
+  };
+  for (const c of clusters) {
+    if (c.fontSizePt > 0) byRole[c.role].push(c.fontSizePt);
+  }
+
+  const titlePt = median(byRole.title);
+  const headingPt = median(byRole.heading);
+  const authorsPt = median(byRole.authors);
+  const bodyPt = median(byRole.text);
+
+  return {
+    title: titlePt
+      ? { ...base.title, size: clampSize(ptToUnits(titlePt)) }
+      : base.title,
+    heading: headingPt
+      ? { ...base.heading, size: clampSize(ptToUnits(headingPt)) }
+      : base.heading,
+    authors: authorsPt
+      ? { ...base.authors, size: clampSize(ptToUnits(authorsPt)) }
+      : base.authors,
+    body: bodyPt
+      ? { ...base.body, size: clampSize(ptToUnits(bodyPt)) }
+      : base.body,
+  };
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1]! + sorted[mid]!) / 2
+    : sorted[mid]!;
+}
+
+function clampSize(units: number): number {
+  return Math.max(
+    MIN_IMPORT_FONT_UNITS,
+    Math.min(MAX_IMPORT_FONT_UNITS, Math.round(units * 10) / 10),
+  );
 }
 
 function snap(units: number): number {

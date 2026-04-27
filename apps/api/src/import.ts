@@ -30,9 +30,45 @@ const ExtractRequest = z.object({
   imageUrl: z.string().url(),
   pageWidthPt: z.number().positive(),
   pageHeightPt: z.number().positive(),
-  mode: z.enum(['full-extract', 'classify-region']),
+  mode: z.enum(['full-extract', 'classify-region', 'measure-text']),
   model: z.enum(['claude', 'gpt', 'ollama']).optional().default('claude'),
 });
+
+/** measure-text mode — returns every text region in the image with
+ *  pixel-space bboxes so the client can compute effective print size. */
+const MeasureTextSchema = {
+  type: 'object',
+  required: ['imagePixelWidth', 'imagePixelHeight', 'regions'],
+  properties: {
+    imagePixelWidth: { type: 'number' },
+    imagePixelHeight: { type: 'number' },
+    regions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['text', 'bbox', 'role'],
+        properties: {
+          text: { type: 'string' },
+          /** pixel-space bbox (origin top-left of the cropped image) */
+          bbox: {
+            type: 'object',
+            required: ['x', 'y', 'w', 'h'],
+            properties: {
+              x: { type: 'number' },
+              y: { type: 'number' },
+              w: { type: 'number' },
+              h: { type: 'number' },
+            },
+          },
+          /** plot-anatomy role: title / axis / tick / legend / data / other */
+          role: {
+            enum: ['title', 'axis-title', 'axis-tick', 'legend', 'data', 'other'],
+          },
+        },
+      },
+    },
+  },
+} as const;
 
 const FullExtractSchema = {
   type: 'object',
@@ -172,6 +208,13 @@ export function createImportRouter(deps: ImportRouterDeps = {}): Router {
           );
           return res.json(out);
         }
+        if (mode === 'measure-text') {
+          const out = await callAnthropicMeasureText(anthropic, {
+            mediaType,
+            imageData,
+          });
+          return res.json(out);
+        }
         const out = await callAnthropicClassifyRegion(anthropic, {
           mediaType,
           imageData,
@@ -199,6 +242,14 @@ const FULL_EXTRACT_SYSTEM = `You are a layout-extraction assistant for academic 
 - warnings: short notes if you saw rotated text, small unreadable type, multi-column ambiguity, etc.
 
 Be conservative on confidence: prefer 0.5 over hallucinating. Skip purely decorative graphics. Do NOT include logos in figureBBoxes.`;
+
+const MEASURE_TEXT_SYSTEM = `You are a measurement assistant for plot/table images. Given an image, return EVERY visible text region with:
+- text: what the region says (verbatim — preserve case and punctuation)
+- bbox: pixel-space bounding box {x, y, w, h} where origin is top-left of the supplied image
+- role: one of "title" | "axis-title" | "axis-tick" | "legend" | "data" | "other"
+Also return imagePixelWidth and imagePixelHeight so the client can scale.
+
+Be exhaustive — include axis tick labels, tiny legend entries, footnotes. The client uses your bboxes to compute whether each text region is legible at the poster's printed size; missing a small "n=541" caption gives the user a false-pass on readability.`;
 
 const CLASSIFY_REGION_SYSTEM = `You are a single-region classifier for poster image crops. Given an image, return:
 - kind: one of "figure", "table", "logo", "decoration"
@@ -249,6 +300,48 @@ async function callAnthropicFullExtract(
           {
             type: 'text',
             text: `Page size: ${ctx.pageWidthPt} × ${ctx.pageHeightPt} pt.`,
+          },
+        ],
+      },
+    ],
+  });
+
+  const toolUse = response.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+  );
+  if (!toolUse) throw new Error('vision_no_tool_use');
+  return toolUse.input as unknown;
+}
+
+async function callAnthropicMeasureText(
+  anthropic: Anthropic,
+  ctx: { mediaType: 'image/png' | 'image/jpeg'; imageData: string },
+): Promise<unknown> {
+  const tool = {
+    name: 'emit_measurements',
+    description:
+      'Emit text-region measurements for the supplied figure image.',
+    input_schema:
+      MeasureTextSchema as unknown as Anthropic.Tool.InputSchema,
+  } satisfies Anthropic.Tool;
+
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-5-20250929',
+    max_tokens: 2048,
+    system: MEASURE_TEXT_SYSTEM,
+    tools: [tool],
+    tool_choice: { type: 'tool', name: 'emit_measurements' },
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: ctx.mediaType,
+              data: ctx.imageData,
+            },
           },
         ],
       },

@@ -74,6 +74,13 @@ interface LogoBlockProps {
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB pre-encoding
 
+/** Clamp a percentage to 0..49 — the four crop edges sum on each
+ *  axis, and any pair summing to ≥ 100 would invert the clip. */
+function clamp(pct: number): number {
+  if (!Number.isFinite(pct)) return 0;
+  return Math.max(0, Math.min(49, pct));
+}
+
 function readImageFile(
   file: File | undefined,
   onLoad: (dataUrl: string) => void,
@@ -142,6 +149,9 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
               maxHeight: '100%',
               objectFit: 'contain',
               pointerEvents: 'none',
+              clipPath: block.crop
+                ? `inset(${clamp(block.crop.top)}% ${clamp(block.crop.right)}% ${clamp(block.crop.bottom)}% ${clamp(block.crop.left)}%)`
+                : undefined,
             }}
           />
         </div>
@@ -251,6 +261,12 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
 
   if (block.imageSrc) {
     const displaySrc = resolvedSrc ?? block.imageSrc;
+    const crop = block.crop;
+    const clipPath =
+      crop &&
+      (crop.top > 0 || crop.right > 0 || crop.bottom > 0 || crop.left > 0)
+        ? `inset(${clamp(crop.top)}% ${clamp(crop.right)}% ${clamp(crop.bottom)}% ${clamp(crop.left)}%)`
+        : undefined;
     return (
       <div style={{ width: '100%', height: '100%', position: 'relative' }}>
         <img
@@ -262,6 +278,7 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
             width: '100%',
             height: '100%',
             objectFit: 'contain',
+            clipPath,
             userSelect: 'none',
             WebkitUserDrag: 'none',
             KhtmlUserDrag: 'none',

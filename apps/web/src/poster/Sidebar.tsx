@@ -2141,11 +2141,16 @@ function EditTab(props: {
           <TableEditor block={sb} onUpdateBlock={props.onUpdateBlock} />
         </>
       ) : sb && sb.type === 'image' ? (
-        <CaptionEditor
-          block={sb}
-          label="Figure"
-          onUpdateBlock={props.onUpdateBlock}
-        />
+        <>
+          <CaptionEditor
+            block={sb}
+            label="Figure"
+            onUpdateBlock={props.onUpdateBlock}
+          />
+          <ImageCropEditor block={sb} onUpdateBlock={props.onUpdateBlock} />
+        </>
+      ) : sb && sb.type === 'logo' ? (
+        <ImageCropEditor block={sb} onUpdateBlock={props.onUpdateBlock} />
       ) : sb && isTextLike && styleLevel ? (
         <TextBlockEditor
           block={sb}
@@ -2211,6 +2216,101 @@ function TableTipsDropdown() {
         <li>✨ Type <code>**bold**</code>, <code>*italic*</code>, or <code>M (SD)*</code> in a cell, then click <b>Format table</b> in the Caption section below.</li>
       </ul>
     </details>
+  );
+}
+
+// =========================================================================
+// ImageCropEditor — four-edge crop sliders for image / logo blocks
+// =========================================================================
+//
+// Stores percentages on `block.crop` ({top, right, bottom, left}); the
+// renderer applies a `clip-path: inset()` so cropping is reversible
+// at any time without baking pixels. Each slider is clamped 0–49 to
+// prevent the inverse-crop case where opposite edges sum to ≥100%.
+//
+// Future polish: in-canvas drag handles for direct manipulation.
+// Today's slider UI keeps the implementation 1-screen and works for
+// every keyboard / pointer.
+
+function ImageCropEditor(props: {
+  block: Block;
+  onUpdateBlock: (id: string, patch: Partial<Block>) => void;
+}) {
+  const { block, onUpdateBlock } = props;
+  const crop = block.crop ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  const hasCrop =
+    crop.top > 0 || crop.right > 0 || crop.bottom > 0 || crop.left > 0;
+
+  const setEdge = (edge: keyof typeof crop, value: number) => {
+    const next = { ...crop, [edge]: Math.max(0, Math.min(49, value)) };
+    onUpdateBlock(block.id, { crop: next });
+  };
+
+  const reset = () => {
+    onUpdateBlock(block.id, { crop: undefined });
+  };
+
+  return (
+    <div style={{ marginTop: 18 }}>
+      <div style={labelStyle}>✂︎ Crop</div>
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8, lineHeight: 1.5 }}>
+        Hide outer edges of the image without losing the original. Reset
+        anytime — no pixels baked.
+      </div>
+      {(['top', 'right', 'bottom', 'left'] as const).map((edge) => (
+        <div key={edge} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 12, color: '#9ca3af', width: 56, textTransform: 'capitalize' }}>
+            {edge}
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={49}
+            step={1}
+            value={crop[edge]}
+            onChange={(e) => setEdge(edge, parseInt(e.target.value, 10))}
+            style={{ flex: 1, accentColor: '#7c6aed' }}
+          />
+          <input
+            type="number"
+            min={0}
+            max={49}
+            step={1}
+            value={crop[edge]}
+            onChange={(e) => setEdge(edge, parseInt(e.target.value, 10) || 0)}
+            style={{
+              width: 48,
+              padding: '4px 6px',
+              fontSize: 12,
+              background: '#1a1a26',
+              color: '#ddd',
+              border: '1px solid #2a2a3a',
+              borderRadius: 4,
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          />
+          <span style={{ fontSize: 11, color: '#6b7280', width: 12 }}>%</span>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={reset}
+        disabled={!hasCrop}
+        style={{
+          marginTop: 8,
+          padding: '6px 10px',
+          fontSize: 12,
+          color: hasCrop ? '#c8b6ff' : '#555',
+          background: '#1a1a26',
+          border: `1px solid ${hasCrop ? '#7c6aed' : '#2a2a3a'}`,
+          borderRadius: 6,
+          cursor: hasCrop ? 'pointer' : 'not-allowed',
+        }}
+      >
+        Reset crop
+      </button>
+    </div>
   );
 }
 
