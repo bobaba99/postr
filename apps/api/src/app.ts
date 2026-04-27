@@ -6,7 +6,16 @@ import { createImportRouter } from './import.js';
 export function createApp(): Express {
   const app = express();
 
-  const origins = (process.env.CORS_ORIGINS ?? 'http://localhost:5173')
+  // Vite picks the next free port (5174, 5175, …) when 5173 is
+  // already in use, which happens routinely in dev when an old
+  // server didn't shut down cleanly. Default-allow the common
+  // localhost dev ports so a port collision doesn't silently 502
+  // every figure-import call. Production sets CORS_ORIGINS
+  // explicitly so this default never applies there.
+  const origins = (
+    process.env.CORS_ORIGINS ??
+    'http://localhost:5173,http://localhost:5174,http://localhost:5175'
+  )
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
