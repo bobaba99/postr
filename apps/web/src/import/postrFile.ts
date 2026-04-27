@@ -10,7 +10,6 @@
  * on import to assert the bundle wasn't tampered with.
  */
 import { unzipSync, zipSync } from 'fflate';
-import { nanoid } from 'nanoid';
 import type {
   Block,
   PostrBundleManifest,
@@ -77,11 +76,22 @@ export async function exportPostr(
  * Read a `.postr` File and return a deserialized PosterDoc with assets
  * re-uploaded into the user's poster-assets bucket under `posterId`.
  */
+/** Max accepted .postr file size before unzipping. Guards against
+ *  zip-bomb DoS where a tiny file decompresses to gigabytes. The
+ *  legitimate ceiling for a poster bundle is ~50 MB (a 4-page poster
+ *  with 30 high-res figures). */
+const MAX_POSTR_FILE_BYTES = 100 * 1024 * 1024;
+
 export async function importPostr(
   file: File,
   posterId: string,
   userId: string,
 ): Promise<ImportPostrResult> {
+  if (file.size > MAX_POSTR_FILE_BYTES) {
+    throw new Error(
+      `.postr bundle is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Max supported size is ${MAX_POSTR_FILE_BYTES / 1024 / 1024} MB.`,
+    );
+  }
   const buffer = new Uint8Array(await file.arrayBuffer());
   let entries: Record<string, Uint8Array>;
   try {
@@ -155,21 +165,32 @@ async function unpackBlock(
   const path = b.imageSrc.slice(BUNDLE_PREFIX.length);
   const bytes = assets.get(path);
   if (!bytes) return { ...b, imageSrc: null };
-  const ext = path.split('.').pop() ?? 'png';
+  // ext is derived from a user-controlled filename inside the bundle —
+  // sanitize before it lands in a storage path or MIME header.
+  const rawExt = path.split('.').pop() ?? 'png';
+  const ext = sanitizeExt(rawExt);
   const blob = new Blob([new Uint8Array(bytes)], { type: mimeFromExt(ext) });
-  // Use a fresh blockId for the upload to avoid collisions with the
-  // existing storage object; rewrite the block to the new src + id so
-  // RLS/cleanup can find it via the standard pattern.
-  const newBlockId = nanoid(8);
-  const file = new File([blob], `${newBlockId}.${ext}`, {
+  // Reuse the existing block id as the storage key. Keeps the
+  // {posterId}/{blockId}.{ext} invariant intact regardless of which
+  // synthesizer downstream runs (avoids a latent id-mismatch when
+  // figures flow through `synthesizeDocFromResult`).
+  const file = new File([blob], `${b.id}.${ext}`, {
     type: mimeFromExt(ext),
   });
-  const storageSrc = await uploadPosterImage(userId, posterId, newBlockId, file);
+  const storageSrc = await uploadPosterImage(userId, posterId, b.id, file);
   return {
     ...b,
-    id: newBlockId,
     imageSrc: storageSrc ?? null,
   };
+}
+
+/** Restrict to lowercase alphanumerics so a malicious filename can't
+ *  inject path separators or MIME tricks. Falls back to "png" when the
+ *  source is empty or invalid. */
+function sanitizeExt(raw: string): string {
+  const cleaned = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!cleaned || cleaned.length > 6) return 'png';
+  return cleaned;
 }
 
 async function fetchAsBytes(src: string): Promise<Uint8Array | null> {
