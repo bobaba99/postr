@@ -434,8 +434,30 @@ const STAGE_ORDER: ImportProgress['stage'][] = [
   'ready',
 ];
 
+/** Sub-stages that don't have their own todo-row but conceptually
+ *  belong to one. The LLM verifier fires `llm-call` during the
+ *  upload-figures step; without this mapping `currentIdx = -1` and
+ *  every prior step would briefly revert to gray. */
+const STAGE_PARENT: Partial<Record<ImportProgress['stage'], ImportProgress['stage']>> = {
+  'llm-call': 'uploading-figures',
+};
+
 function ProgressView({ progress }: { progress: ImportProgress }) {
-  const currentIdx = STAGE_ORDER.indexOf(progress.stage);
+  // Map sub-stages to their parent so the rendered todo doesn't
+  // regress when the importer transitions through an unlisted
+  // sub-stage.
+  const effectiveStage = STAGE_PARENT[progress.stage] ?? progress.stage;
+  const liveIdx = STAGE_ORDER.indexOf(effectiveStage);
+
+  // Once a stage has been reached we keep it (and all earlier
+  // stages) visually completed — done items stay green + struck-
+  // through even if a later transition lands on an unknown stage.
+  const maxStageIdxRef = useRef(-1);
+  if (liveIdx > maxStageIdxRef.current) {
+    maxStageIdxRef.current = liveIdx;
+  }
+  const currentIdx = maxStageIdxRef.current;
+
   const ratio =
     progress.ratio !== undefined
       ? Math.max(0, Math.min(1, progress.ratio))
@@ -445,7 +467,7 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
     <div style={{ padding: '20px 8px' }}>
       <ol style={{ listStyle: 'none', padding: 0, margin: '0 0 16px', fontSize: 13 }}>
         {STAGE_ORDER.filter((s) => s !== 'ready').map((s, idx) => {
-          const isCurrent = s === progress.stage;
+          const isCurrent = idx === currentIdx;
           const isDone = currentIdx > idx;
           const color = isCurrent ? '#c8b6ff' : isDone ? '#a6e3a1' : '#555';
           const icon = isDone ? '✓' : isCurrent ? '●' : '○';
@@ -461,7 +483,14 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
               }}
             >
               <span style={{ width: 16, textAlign: 'center' }}>{icon}</span>
-              <span>{STAGE_LABELS[s]}</span>
+              <span
+                style={{
+                  textDecoration: isDone ? 'line-through' : undefined,
+                  textDecorationColor: isDone ? '#a6e3a1' : undefined,
+                }}
+              >
+                {STAGE_LABELS[s]}
+              </span>
               {isCurrent && progress.detail && (
                 <span style={{ color: '#9ca3af', fontSize: 12 }}>
                   · {progress.detail}
