@@ -129,33 +129,44 @@ function readImageFile(
 }
 
 export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
-  // Clicking the empty placeholder or the "change" overlay opens
-  // the LogoPicker modal, which gives the user three paths:
+  // The LogoPicker modal gives the user three paths:
   //   1. Search the preset catalog of ~80 NA universities
   //   2. Pick a previously-uploaded logo from their account library
   //   3. Upload a new file (saved to library + used immediately)
   //
-  // The picker calls `onPick(dataUrl)` with a base64 data URL,
-  // which we stash in the block's `imageSrc` field so the logo
-  // travels with the poster JSONB and doesn't rely on remote
-  // fetches at render / export time.
+  // Two open paths:
+  //   - clicking the EMPTY placeholder (no imageSrc yet) — only path
+  //     to add a logo from a fresh block.
+  //   - the floating "Replace" button on the BlockFrame, which
+  //     dispatches `postr:replace-block` with the block id; the
+  //     filled logo's click handler is a no-op so the block selects
+  //     normally. This stops the previous "click anywhere on the
+  //     logo to replace" behavior that prevented selection.
   const [pickerOpen, setPickerOpen] = useState(false);
   const resolvedLogoSrc = useStorageUrl(block.imageSrc);
+
+  // Listen for the external Replace request so the BlockFrame's
+  // floating Replace button can open this block's picker.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ blockId: string }>;
+      if (ce.detail?.blockId === block.id) setPickerOpen(true);
+    };
+    window.addEventListener('postr:replace-block', handler);
+    return () => window.removeEventListener('postr:replace-block', handler);
+  }, [block.id]);
 
   if (block.imageSrc) {
     const displaySrc = pickImgSrc(resolvedLogoSrc, block.imageSrc);
     return (
       <>
         <div
-          onClick={() => setPickerOpen(true)}
-          title="Click to change logo"
           style={{
             width: '100%',
             height: '100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: 'pointer',
           }}
         >
           <img
@@ -241,6 +252,18 @@ interface ImageBlockProps {
 export function ImageBlock({ block, palette, onUpdate, userId, posterId }: ImageBlockProps) {
   const ref = useRef<HTMLInputElement | null>(null);
   const resolvedSrc = useStorageUrl(block.imageSrc);
+
+  // Listen for the floating Replace button on the BlockFrame. When
+  // it dispatches `postr:replace-block` for this block id, open the
+  // hidden file input. Mirror of the LogoBlock listener.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ blockId: string }>;
+      if (ce.detail?.blockId === block.id) ref.current?.click();
+    };
+    window.addEventListener('postr:replace-block', handler);
+    return () => window.removeEventListener('postr:replace-block', handler);
+  }, [block.id]);
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -2151,36 +2174,80 @@ export function BlockFrame(props: BlockFrameProps) {
             </div>
 
             {(b.type === 'image' || b.type === 'logo') && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCropMode((s) => !s);
-                }}
-                style={{
-                  ...circleBtn,
-                  background: cropMode ? '#7c6aed' : 'rgba(0,0,0,0.6)',
-                  cursor: 'pointer',
-                  pointerEvents: 'auto',
-                }}
-                title={cropMode ? 'Exit crop' : 'Crop image'}
-                aria-pressed={cropMode}
-              >
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden
-                  style={{ display: 'block' }}
+              <>
+                {/* Replace button — opens the LogoPicker (logo blocks)
+                    or the file input (image blocks). The block itself
+                    listens for the postr:replace-block CustomEvent and
+                    responds in its own way; this button just dispatches.
+                    Replaces the previous "click anywhere on the logo to
+                    open the picker" behavior, which prevented users
+                    from selecting filled logo blocks. */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.dispatchEvent(
+                      new CustomEvent('postr:replace-block', {
+                        detail: { blockId: b.id },
+                      }),
+                    );
+                  }}
+                  style={{
+                    ...circleBtn,
+                    background: 'rgba(0,0,0,0.6)',
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                  }}
+                  title={b.type === 'logo' ? 'Replace logo' : 'Replace image'}
                 >
-                  <path d="M6 2v14a2 2 0 0 0 2 2h14" />
-                  <path d="M18 22V8a2 2 0 0 0-2-2H2" />
-                </svg>
-              </button>
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                    style={{ display: 'block' }}
+                  >
+                    <path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3" />
+                    <polyline points="21 4 21 9 16 9" />
+                    <path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.7-3" />
+                    <polyline points="3 20 3 15 8 15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCropMode((s) => !s);
+                  }}
+                  style={{
+                    ...circleBtn,
+                    background: cropMode ? '#7c6aed' : 'rgba(0,0,0,0.6)',
+                    cursor: 'pointer',
+                    pointerEvents: 'auto',
+                  }}
+                  title={cropMode ? 'Exit crop' : 'Crop image'}
+                  aria-pressed={cropMode}
+                >
+                  <svg
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                    style={{ display: 'block' }}
+                  >
+                    <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+                    <path d="M18 22V8a2 2 0 0 0-2-2H2" />
+                  </svg>
+                </button>
+              </>
             )}
 
             <button
