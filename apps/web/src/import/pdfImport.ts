@@ -938,8 +938,20 @@ async function extractFigures(
         // for drop directly — bypassing the step-3 confidence floor
         // so a budget-demoted low-confidence verdict can't slip
         // through as the original `image` block.
+        //
+        // IMPORTANT: budget enforcement is per-kind. When the pre-scan
+        // returned 0 for a kind (figure+table or logo), it means the
+        // LLM didn't see ANY of that kind at the holistic level —
+        // either the page genuinely has none, or the items are too
+        // small for the downscaled-2048px raster the pre-scan saw
+        // (typical for 60×36pt brand logos on a 36×24" page). In
+        // that case, the pre-scan is unreliable and we trust the
+        // per-bbox verifier + evidence guard + pixel co-signal
+        // chain to handle it instead of hard-clamping to zero.
+        const enforceFigureBudget = figureBudget > 0;
+        const enforceLogoBudget = logoBudget > 0;
         const demoted: { originalKind: CookedVerdict['kind']; confidence: number; bbox: FigureBBox }[] = [];
-        for (let k = figureSlotsRemaining; k < figureLike.length; k++) {
+        if (enforceFigureBudget) for (let k = figureSlotsRemaining; k < figureLike.length; k++) {
           const c = figureLike[k]!;
           demoted.push({
             originalKind: c.kind,
@@ -949,7 +961,7 @@ async function extractFigures(
           c.kind = 'decoration';
           dropIndexes.add(c.blockIdx);
         }
-        for (let k = logoBudget; k < logoLike.length; k++) {
+        if (enforceLogoBudget) for (let k = logoBudget; k < logoLike.length; k++) {
           const c = logoLike[k]!;
           demoted.push({
             originalKind: c.kind,

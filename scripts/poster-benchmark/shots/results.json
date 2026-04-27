@@ -11,15 +11,39 @@
     "importTraces": [
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] bbox funnel {raw: 2, afterFilter: 0, afterMerge: 0, medianMaxDimPt: 0, smallCutoffPt: 0}"
+        "payload": "[import.trace] bbox funnel {raw: 2, afterFilter: 2, afterMerge: 2, medianMaxDimPt: 36, smallCutoffPt: 22}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] extraction outcomes {total: 0, uploaded: 0, blank: 0, uploadFailed: 0, other: 0}"
+        "payload": "[import.trace] extraction outcomes {total: 2, uploaded: 2, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] running on 2 candidate bbox(es) [Object, Object]"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] verdicts (2/2 returned) [Object, Object]"
+      },
+      {
+        "tag": "[import.preScan]",
+        "payload": "[import.preScan] result {expectedFigureCount: 0, expectedTableCount: 1, expectedLogoCount: 2, imagePixelWidth: 1357, imagePixelHeight: 881}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] text suppression {inputClusters: 12, afterInsideFigure: 12, afterOrphanLabel: 12, figureBBoxesUsed: 0, droppedByInsideFigure: Array(0)}"
+        "payload": "[import.trace] split-pass start {candidateCount: 2, candidates: Array(2)}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/e3fbf0ca-e558-4dd7-8326-adc9ee4d3ce9/PszRFrnW.png, bboxW: 17, bboxH: 25, canvasW: 33, canvasH: 49}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/e3fbf0ca-e558-4dd7-8326-adc9ee4d3ce9/jTx-QyWG.png, bboxW: 31, bboxH: 27, canvasW: 62, canvasH: 53}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 12, afterInsideFigure: 12, afterOrphanLabel: 12, figureBBoxesUsed: 2, droppedByInsideFigure: Array(0)}"
       }
     ],
     "warnings": [
@@ -36,7 +60,7 @@
       "Cookies Policy",
       "Terms of Service"
     ],
-    "durationMs": 5366
+    "durationMs": 21481
   },
   {
     "id": "constantinidis-2016",
@@ -50,15 +74,39 @@
     "importTraces": [
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] bbox funnel {raw: 2, afterFilter: 0, afterMerge: 0, medianMaxDimPt: 0, smallCutoffPt: 0}"
+        "payload": "[import.trace] bbox funnel {raw: 2, afterFilter: 2, afterMerge: 2, medianMaxDimPt: 36, smallCutoffPt: 22}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] extraction outcomes {total: 0, uploaded: 0, blank: 0, uploadFailed: 0, other: 0}"
+        "payload": "[import.trace] extraction outcomes {total: 2, uploaded: 2, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] running on 2 candidate bbox(es) [Object, Object]"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] verdicts (2/2 returned) [Object, Object]"
+      },
+      {
+        "tag": "[import.preScan]",
+        "payload": "[import.preScan] result {expectedFigureCount: 0, expectedTableCount: 1, expectedLogoCount: 1, imagePixelWidth: 1357, imagePixelHeight: 883}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] text suppression {inputClusters: 12, afterInsideFigure: 12, afterOrphanLabel: 12, figureBBoxesUsed: 0, droppedByInsideFigure: Array(0)}"
+        "payload": "[import.trace] split-pass start {candidateCount: 2, candidates: Array(2)}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/d6b8e7d5-00c4-4ac4-a143-f76ee028de83/bOpU7W3A.png, bboxW: 17, bboxH: 25, canvasW: 33, canvasH: 49}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/d6b8e7d5-00c4-4ac4-a143-f76ee028de83/dPtaYh4j.png, bboxW: 31, bboxH: 27, canvasW: 62, canvasH: 53}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 12, afterInsideFigure: 12, afterOrphanLabel: 12, figureBBoxesUsed: 2, droppedByInsideFigure: Array(0)}"
       }
     ],
     "warnings": [
@@ -75,7 +123,7 @@
       "Cookies Policy",
       "Terms of Service"
     ],
-    "durationMs": 6599
+    "durationMs": 22317
   },
   {
     "id": "klingberg-2010",
@@ -115,30 +163,59 @@
       "Cookies Policy",
       "Terms of Service"
     ],
-    "durationMs": 7228
+    "durationMs": 7225
   },
   {
     "id": "matysiak-2019",
     "ok": true,
     "blockTypeCounts": {
-      "title": 1,
-      "authors": 1,
-      "heading": 4,
-      "text": 4,
-      "image": 1
+      "title": 2,
+      "authors": 2,
+      "logo": 4,
+      "heading": 8,
+      "text": 8,
+      "image": 2
     },
     "importTraces": [
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 2, afterMerge: 1, medianMaxDimPt: 831, smallCutoffPt: 499}"
+        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 5, afterMerge: 4, medianMaxDimPt: 60, smallCutoffPt: 36}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] extraction outcomes {total: 1, uploaded: 1, blank: 0, uploadFailed: 0, other: 0}"
+        "payload": "[import.trace] extraction outcomes {total: 4, uploaded: 4, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] running on 3 candidate bbox(es) [Object, Object, Object]"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] verdicts (3/3 returned) [Object, Object, Object]"
+      },
+      {
+        "tag": "[import.preScan]",
+        "payload": "[import.preScan] result {expectedFigureCount: 2, expectedTableCount: 1, expectedLogoCount: 3, imagePixelWidth: 1400, imagePixelHeight: 868}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 1, droppedByInsideFigure: Array(1)}"
+        "payload": "[import.trace] split-pass start {candidateCount: 3, candidates: Array(3)}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/e4b2b10d-411d-4214-be6b-cd95ace42037/tgoCMTwH.png, bboxW: 60, bboxH: 24, canvasW: 120, canvasH: 47}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/e4b2b10d-411d-4214-be6b-cd95ace42037/sLee7X0o.png, bboxW: 60, bboxH: 32, canvasW: 120, canvasH: 64}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/e4b2b10d-411d-4214-be6b-cd95ace42037/cWa6PKQW.png, bboxW: 60, bboxH: 32, canvasW: 120, canvasH: 63}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 4, droppedByInsideFigure: Array(1)}"
       }
     ],
     "warnings": [
@@ -155,7 +232,7 @@
       "Cookies Policy",
       "Terms of Service"
     ],
-    "durationMs": 13667
+    "durationMs": 29717
   },
   {
     "id": "melby-lervaag-2013",
@@ -195,7 +272,7 @@
       "Cookies Policy",
       "Terms of Service"
     ],
-    "durationMs": 7088
+    "durationMs": 7091
   },
   {
     "id": "morrison-2011",
@@ -204,7 +281,7 @@
     "importTraces": [],
     "warnings": [],
     "error": "page.goto: Timeout 30000ms exceeded.\nCall log:\n  - navigating to \"http://localhost:5174/dashboard\", waiting until \"networkidle\"\n",
-    "durationMs": 30137
+    "durationMs": 30127
   },
   {
     "id": "rodas-2024",
@@ -212,6 +289,7 @@
     "blockTypeCounts": {
       "title": 1,
       "authors": 1,
+      "logo": 2,
       "heading": 4,
       "text": 4,
       "image": 1
@@ -219,15 +297,43 @@
     "importTraces": [
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 2, afterMerge: 1, medianMaxDimPt: 831, smallCutoffPt: 499}"
+        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 5, afterMerge: 4, medianMaxDimPt: 60, smallCutoffPt: 36}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] extraction outcomes {total: 1, uploaded: 1, blank: 0, uploadFailed: 0, other: 0}"
+        "payload": "[import.trace] extraction outcomes {total: 4, uploaded: 4, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] running on 3 candidate bbox(es) [Object, Object, Object]"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] verdicts (3/3 returned) [Object, Object, Object]"
+      },
+      {
+        "tag": "[import.preScan]",
+        "payload": "[import.preScan] result {expectedFigureCount: 2, expectedTableCount: 1, expectedLogoCount: 0, imagePixelWidth: 1360, imagePixelHeight: 896}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 1, droppedByInsideFigure: Array(1)}"
+        "payload": "[import.trace] split-pass start {candidateCount: 3, candidates: Array(3)}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/aea4e8c9-1d18-4e03-a59f-b31b82d7521b/f40LsdWF.png, bboxW: 60, bboxH: 24, canvasW: 120, canvasH: 47}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/aea4e8c9-1d18-4e03-a59f-b31b82d7521b/0bcSF1xB.png, bboxW: 60, bboxH: 32, canvasW: 120, canvasH: 64}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/aea4e8c9-1d18-4e03-a59f-b31b82d7521b/AaQKHR-d.png, bboxW: 60, bboxH: 32, canvasW: 120, canvasH: 63}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 4, droppedByInsideFigure: Array(1)}"
       }
     ],
     "warnings": [
@@ -244,7 +350,7 @@
       "Cookies Policy",
       "Terms of Service"
     ],
-    "durationMs": 5790
+    "durationMs": 28016
   },
   {
     "id": "sala-2017",
@@ -252,6 +358,7 @@
     "blockTypeCounts": {
       "title": 1,
       "authors": 1,
+      "logo": 3,
       "heading": 4,
       "text": 4,
       "image": 1
@@ -259,15 +366,43 @@
     "importTraces": [
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 2, afterMerge: 1, medianMaxDimPt: 831, smallCutoffPt: 499}"
+        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 5, afterMerge: 4, medianMaxDimPt: 60, smallCutoffPt: 36}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] extraction outcomes {total: 1, uploaded: 1, blank: 0, uploadFailed: 0, other: 0}"
+        "payload": "[import.trace] extraction outcomes {total: 4, uploaded: 4, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] running on 3 candidate bbox(es) [Object, Object, Object]"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] verdicts (3/3 returned) [Object, Object, Object]"
+      },
+      {
+        "tag": "[import.preScan]",
+        "payload": "[import.preScan] result {expectedFigureCount: 2, expectedTableCount: 1, expectedLogoCount: 3, imagePixelWidth: 1360, imagePixelHeight: 896}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 1, droppedByInsideFigure: Array(1)}"
+        "payload": "[import.trace] split-pass start {candidateCount: 3, candidates: Array(3)}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/06e1d0b4-8af5-4bbd-ba93-0174790d513a/ird9gOfm.png, bboxW: 60, bboxH: 24, canvasW: 120, canvasH: 47}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/06e1d0b4-8af5-4bbd-ba93-0174790d513a/8gqtG8TZ.png, bboxW: 60, bboxH: 32, canvasW: 120, canvasH: 64}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/06e1d0b4-8af5-4bbd-ba93-0174790d513a/jfxgw9XV.png, bboxW: 60, bboxH: 32, canvasW: 120, canvasH: 63}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 4, droppedByInsideFigure: Array(1)}"
       }
     ],
     "warnings": [
@@ -284,7 +419,7 @@
       "Cookies Policy",
       "Terms of Service"
     ],
-    "durationMs": 13967
+    "durationMs": 27516
   },
   {
     "id": "sala-2019",
@@ -292,6 +427,7 @@
     "blockTypeCounts": {
       "title": 1,
       "authors": 1,
+      "logo": 2,
       "heading": 4,
       "text": 4,
       "image": 1
@@ -299,15 +435,43 @@
     "importTraces": [
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 2, afterMerge: 1, medianMaxDimPt: 831, smallCutoffPt: 499}"
+        "payload": "[import.trace] bbox funnel {raw: 5, afterFilter: 5, afterMerge: 4, medianMaxDimPt: 60, smallCutoffPt: 36}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] extraction outcomes {total: 1, uploaded: 1, blank: 0, uploadFailed: 0, other: 0}"
+        "payload": "[import.trace] extraction outcomes {total: 4, uploaded: 4, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] running on 3 candidate bbox(es) [Object, Object, Object]"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] verdicts (3/3 returned) [Object, Object, Object]"
+      },
+      {
+        "tag": "[import.preScan]",
+        "payload": "[import.preScan] result {expectedFigureCount: 2, expectedTableCount: 1, expectedLogoCount: 3, imagePixelWidth: 1360, imagePixelHeight: 896}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 1, droppedByInsideFigure: Array(1)}"
+        "payload": "[import.trace] split-pass start {candidateCount: 3, candidates: Array(3)}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/4decba1d-5a91-49b4-b99c-d20dfe6d715e/LkCXVDlS.png, bboxW: 60, bboxH: 24, canvasW: 120, canvasH: 47}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/4decba1d-5a91-49b4-b99c-d20dfe6d715e/X3rFA4Fu.png, bboxW: 60, bboxH: 32, canvasW: 120, canvasH: 64}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/4decba1d-5a91-49b4-b99c-d20dfe6d715e/F9ykw8KZ.png, bboxW: 60, bboxH: 32, canvasW: 120, canvasH: 63}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 11, afterInsideFigure: 10, afterOrphanLabel: 10, figureBBoxesUsed: 4, droppedByInsideFigure: Array(1)}"
       }
     ],
     "warnings": [
@@ -324,7 +488,7 @@
       "Cookies Policy",
       "Terms of Service"
     ],
-    "durationMs": 14385
+    "durationMs": 30417
   },
   {
     "id": "shipstead-2012",
@@ -338,15 +502,39 @@
     "importTraces": [
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] bbox funnel {raw: 2, afterFilter: 0, afterMerge: 0, medianMaxDimPt: 0, smallCutoffPt: 0}"
+        "payload": "[import.trace] bbox funnel {raw: 2, afterFilter: 2, afterMerge: 2, medianMaxDimPt: 36, smallCutoffPt: 22}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] extraction outcomes {total: 0, uploaded: 0, blank: 0, uploadFailed: 0, other: 0}"
+        "payload": "[import.trace] extraction outcomes {total: 2, uploaded: 2, blank: 0, uploadFailed: 0, other: 0}"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] running on 2 candidate bbox(es) [Object, Object]"
+      },
+      {
+        "tag": "[import.verifier]",
+        "payload": "[import.verifier] verdicts (2/2 returned) [Object, Object]"
+      },
+      {
+        "tag": "[import.preScan]",
+        "payload": "[import.preScan] result {expectedFigureCount: 0, expectedTableCount: 1, expectedLogoCount: 1, imagePixelWidth: 1360, imagePixelHeight: 896}"
       },
       {
         "tag": "[import.trace]",
-        "payload": "[import.trace] text suppression {inputClusters: 12, afterInsideFigure: 12, afterOrphanLabel: 12, figureBBoxesUsed: 0, droppedByInsideFigure: Array(0)}"
+        "payload": "[import.trace] split-pass start {candidateCount: 2, candidates: Array(2)}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/c2baae20-ce67-4c3c-8ba7-ad2334253332/o8jAWJKW.png, bboxW: 17, bboxH: 25, canvasW: 33, canvasH: 49}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] split-pass result {imageSrc: storage://d2d33b26-d310-408e-8454-a6b2f22f1b1a/c2baae20-ce67-4c3c-8ba7-ad2334253332/7e9Pegxw.png, bboxW: 31, bboxH: 27, canvasW: 62, canvasH: 53}"
+      },
+      {
+        "tag": "[import.trace]",
+        "payload": "[import.trace] text suppression {inputClusters: 12, afterInsideFigure: 12, afterOrphanLabel: 12, figureBBoxesUsed: 2, droppedByInsideFigure: Array(0)}"
       }
     ],
     "warnings": [
@@ -363,6 +551,6 @@
       "Cookies Policy",
       "Terms of Service"
     ],
-    "durationMs": 6796
+    "durationMs": 21373
   }
 ]

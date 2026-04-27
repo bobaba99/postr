@@ -161,9 +161,23 @@ const pdfs = readdirSync(PDF_DIR)
       blockTypeCounts = counts;
 
       // ── Screenshot the canvas frame ───────────────────────────
-      // The canvas can be larger than the viewport — screenshot the
-      // BlockFrame container directly so we capture the whole poster.
-      const canvas = page.locator('[data-postr-canvas-frame]').first();
+      // The canvas can be larger than the viewport. Screenshot the
+      // inner #poster-canvas element (the actual poster grid),
+      // skipping any fixed-position editor chrome that overlaps the
+      // canvas-frame's bounding rect. Hiding overlapping chrome via
+      // CSS first so the screenshot shows ONLY the poster content.
+      await page.addStyleTag({
+        content: `
+          [data-postr-sidebar],
+          [data-postr-guidelines],
+          [data-postr-topbar],
+          [aria-label="Show sidebar"],
+          [aria-label="Show guidelines"],
+          [role="alert"] { display: none !important; }
+        `,
+      });
+      await page.waitForTimeout(150);
+      const canvas = page.locator('#poster-canvas').first();
       await canvas.screenshot({ path: join(SHOT_DIR, `${id}.png`) });
       ok = true;
       // eslint-disable-next-line no-console
