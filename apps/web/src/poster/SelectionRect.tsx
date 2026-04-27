@@ -16,6 +16,7 @@ interface SelectionRectProps {
 export function SelectionRect({ x, y, w, h, accent }: SelectionRectProps) {
   return (
     <div
+      data-postr-selection-ui="true"
       style={{
         position: 'absolute',
         left: x,

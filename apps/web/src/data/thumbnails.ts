@@ -51,6 +51,34 @@ export async function captureThumbnail(
     clone.style.left = '0';
     clone.style.top = '0';
 
+    // Strip editor-only chrome from the clone so the captured
+    // thumbnail looks like the printed poster, not the live edit
+    // surface. Without this, a selected block would appear in the
+    // dashboard preview with its resize handles, move/delete pills,
+    // and accent border baked in.
+    //
+    // Selectors mirror the data attributes set by:
+    //   - resizeHandles.tsx → [data-postr-resize-handle]
+    //   - blocks.tsx top handle row, GroupFrame, SelectionRect,
+    //     FigureSizeOverlay → [data-postr-selection-ui]
+    //   - the grid / ruler overlays → [data-postr-overlay]
+    clone
+      .querySelectorAll(
+        '[data-postr-resize-handle], [data-postr-selection-ui], [data-postr-overlay]',
+      )
+      .forEach((el) => el.remove());
+
+    // Reset the selected-block border back to its unselected state
+    // (1px transparent matches the inline style on non-selected
+    // blocks). The block frame is tagged when selected via
+    // data-postr-selected so we can find it without re-deriving the
+    // selection from React state.
+    clone
+      .querySelectorAll<HTMLElement>('[data-postr-selected="true"]')
+      .forEach((el) => {
+        el.style.border = '1px solid transparent';
+      });
+
     const wrapper = document.createElement('div');
     wrapper.style.cssText =
       'position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: hidden; pointer-events: none; opacity: 0;';

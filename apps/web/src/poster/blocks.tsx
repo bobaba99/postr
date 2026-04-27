@@ -1757,6 +1757,7 @@ export function BlockFrame(props: BlockFrameProps) {
       }}
       data-block-id={b.id}
       data-block-type={b.type}
+      data-postr-selected={selected ? 'true' : undefined}
       style={{
         position: 'absolute',
         left: b.x,
@@ -1993,6 +1994,7 @@ export function BlockFrame(props: BlockFrameProps) {
             full width when there's room.
           */}
           <div
+            data-postr-selection-ui="true"
             style={{
               position: 'absolute',
               top: -24,
@@ -2141,6 +2143,7 @@ export function BlockFrame(props: BlockFrameProps) {
             radius (always on). Hold Shift for harder 15° snaps.
           */}
           <div
+            data-postr-selection-ui="true"
             // Stem connecting the handle to the block. `pointerEvents:
             // none` so clicks pass through to the handle below it.
             style={{
@@ -2157,6 +2160,7 @@ export function BlockFrame(props: BlockFrameProps) {
           />
           <button
             type="button"
+            data-postr-selection-ui="true"
             onPointerDown={(e) => {
               e.stopPropagation();
               onPointerDown(e, b.id, 'rotate');

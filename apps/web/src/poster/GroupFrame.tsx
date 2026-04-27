@@ -98,6 +98,7 @@ export function GroupFrame({
 
   return (
     <div
+      data-postr-selection-ui="true"
       onPointerDown={(e) => handlePointerDown(e, 'move')}
       style={{
         position: 'absolute',

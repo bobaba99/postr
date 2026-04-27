@@ -3225,6 +3225,7 @@ function FigureSizeOverlay({
   return (
     <div
       data-postr-figure-size-overlay
+      data-postr-selection-ui="true"
       className="postr-overlay-enter"
       onPointerDown={(e) => startDrag(e, 'move')}
       onPointerMove={onPointerMove}
