@@ -17,11 +17,14 @@ const KINDS: Array<{ value: FeedbackKind; label: string; hint: string }> = [
 export function FeedbackModal() {
   const isOpen = useFeedbackStore((s) => s.isOpen);
   const initialKind = useFeedbackStore((s) => s.initialKind);
+  const context = useFeedbackStore((s) => s.context);
   const close = useFeedbackStore((s) => s.close);
 
   const [kind, setKind] = useState<FeedbackKind>(initialKind);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [includeAttachment, setIncludeAttachment] = useState(true);
+  const [includeLog, setIncludeLog] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -30,15 +33,17 @@ export function FeedbackModal() {
   useEffect(() => {
     if (isOpen) {
       setKind(initialKind);
-      setTitle('');
-      setBody('');
+      setTitle(context?.title ?? '');
+      setBody(context?.body ?? '');
+      setIncludeAttachment(true);
+      setIncludeLog(true);
       setError(null);
       setDone(false);
       setSubmitting(false);
       // Focus the title field on open (next tick so the input exists).
       requestAnimationFrame(() => titleRef.current?.focus());
     }
-  }, [isOpen, initialKind]);
+  }, [isOpen, initialKind, context]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -58,7 +63,14 @@ export function FeedbackModal() {
     setError(null);
     setSubmitting(true);
     try {
-      await submitFeedback({ kind, title, body });
+      await submitFeedback({
+        kind,
+        title,
+        body,
+        attachment:
+          includeAttachment && context?.attachment ? context.attachment : null,
+        log: includeLog ? context?.log : undefined,
+      });
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error. Please try again.');
@@ -69,6 +81,7 @@ export function FeedbackModal() {
 
   return (
     <div
+      data-postr-modal-backdrop
       onClick={close}
       style={{
         position: 'fixed',
@@ -83,6 +96,7 @@ export function FeedbackModal() {
       }}
     >
       <div
+        data-postr-modal-content
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
@@ -258,6 +272,93 @@ export function FeedbackModal() {
               </div>
             </div>
 
+            {(context?.attachment || context?.log) && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: 12,
+                  background: '#0f0f17',
+                  border: '1px solid #2a2a3a',
+                  borderRadius: 6,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#9ca3af',
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Diagnostic context
+                </div>
+                {context.attachment && (
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontSize: 12,
+                      color: '#c8cad0',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={includeAttachment}
+                      onChange={(e) => setIncludeAttachment(e.target.checked)}
+                      disabled={submitting}
+                    />
+                    Attach{' '}
+                    <code
+                      style={{
+                        padding: '1px 6px',
+                        background: '#1a1a26',
+                        borderRadius: 3,
+                        color: '#e2e2e8',
+                        fontSize: 11,
+                      }}
+                    >
+                      {context.attachment.name}
+                    </code>{' '}
+                    <span style={{ color: '#6b7280' }}>
+                      ({formatBytes(context.attachment.size)})
+                    </span>
+                  </label>
+                )}
+                {context.log && (
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      fontSize: 12,
+                      color: '#c8cad0',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={includeLog}
+                      onChange={(e) => setIncludeLog(e.target.checked)}
+                      disabled={submitting}
+                    />
+                    Include console log{' '}
+                    <span style={{ color: '#6b7280' }}>
+                      ({Math.min(context.log.length, 60_000).toLocaleString()} chars)
+                    </span>
+                  </label>
+                )}
+                <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4 }}>
+                  Helps us reproduce the bug. Nothing is sent until you click Send.
+                </div>
+              </div>
+            )}
+
             {error && (
               <div
                 role="alert"
@@ -319,6 +420,12 @@ export function FeedbackModal() {
       </div>
     </div>
   );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function SuccessView({ onClose }: { onClose: () => void }) {

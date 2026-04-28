@@ -22,6 +22,15 @@ export interface FeedbackInput {
   kind: FeedbackKind;
   title: string;
   body: string;
+  /** Optional file the user uploaded that triggered the report
+   *  (e.g., a PDF that failed import). Uploaded to
+   *  `poster-assets/{user_id}/feedback/{ts}-{name}` and the path
+   *  is appended to the body so triagers can fetch it. */
+  attachment?: File | null;
+  /** Optional captured console-log blob. Appended to the body so
+   *  the report carries diagnostic context. Truncated to 60 KB to
+   *  keep the row size reasonable. */
+  log?: string;
 }
 
 export interface FeedbackRow {
@@ -93,11 +102,36 @@ export async function submitFeedback(input: FeedbackInput): Promise<void> {
   const pageUrl = typeof window !== 'undefined' ? window.location.href.slice(0, 500) : null;
   const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 500) : null;
 
+  // Build the final body: user's text, optionally followed by the
+  // attachment storage path and the truncated console log so triage
+  // has everything in one row without needing schema changes.
+  let attachmentPath: string | null = null;
+  if (input.attachment) {
+    attachmentPath = await uploadFeedbackAttachment(
+      userData.user.id,
+      input.attachment,
+    );
+  }
+  const LOG_MAX = 60_000;
+  const log = input.log?.slice(-LOG_MAX) ?? '';
+  const sections: string[] = [input.body.trim()];
+  if (attachmentPath) {
+    sections.push(`\n--- ATTACHMENT ---\nstorage://${attachmentPath}`);
+  } else if (input.attachment) {
+    sections.push(
+      `\n--- ATTACHMENT (upload failed; metadata only) ---\nname: ${input.attachment.name}\nsize: ${input.attachment.size} bytes\ntype: ${input.attachment.type}`,
+    );
+  }
+  if (log) {
+    sections.push(`\n--- CONSOLE LOG (last ${log.length} chars) ---\n${log}`);
+  }
+  const finalBody = sections.join('\n').slice(0, 1_000_000);
+
   const { error } = await db.from('feedback').insert({
     user_id: userData.user.id,
     kind: input.kind,
     title: input.title.trim(),
-    body: input.body.trim(),
+    body: finalBody,
     page_url: pageUrl,
     user_agent: userAgent,
   });
@@ -107,6 +141,34 @@ export async function submitFeedback(input: FeedbackInput): Promise<void> {
       throw new Error('You have reached the daily limit. Please try again tomorrow.');
     }
     throw new Error(`Could not send feedback: ${error.message}`);
+  }
+}
+
+/** Best-effort: upload the file to `poster-assets/{userId}/feedback/{ts}-{name}`.
+ *  Returns the storage path on success, null on failure (caller still
+ *  submits the feedback row, just with metadata instead of binary).
+ *  We reuse the existing bucket because its RLS already scopes the
+ *  first folder element to `auth.uid()` — adding a `feedback/` prefix
+ *  inside that path keeps storage policies untouched. */
+async function uploadFeedbackAttachment(
+  userId: string,
+  file: File,
+): Promise<string | null> {
+  try {
+    const safeName = file.name
+      .replace(/[^\w.\-]+/g, '_')
+      .slice(0, 80);
+    const path = `${userId}/feedback/${Date.now()}-${safeName}`;
+    const { error } = await supabase.storage
+      .from('poster-assets')
+      .upload(path, file, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: false,
+      });
+    if (error) return null;
+    return path;
+  } catch {
+    return null;
   }
 }
 

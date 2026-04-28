@@ -84,8 +84,20 @@ export async function postJson<T = unknown>(
   }
 
   if (!res.ok) {
+    // Build the ApiError message from whatever the server gave us.
+    // The full body (including `message`) is preserved on
+    // `ApiError.body` so callers can pull richer context for bug
+    // reports — but the surfaced `message` defaults to the
+    // machine-readable code so end-users see something stable
+    // ("vision_call_failed") rather than verbose Anthropic stack
+    // traces. Import flows wrap this with a generic "Something
+    // went wrong" + Send Feedback panel anyway.
+    const errBody = payload as
+      | { error?: string; message?: string }
+      | null;
     const message =
-      (payload as { error?: string } | null)?.error ??
+      errBody?.error ??
+      errBody?.message ??
       `Request failed (${res.status})`;
     const retryAfterRaw = res.headers.get('Retry-After');
     // Retry-After can be either an integer-seconds value or an

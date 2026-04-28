@@ -2,6 +2,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import { installConsoleCapture } from './lib/consoleCapture';
+
+// Capture recent console output so the Send Feedback flow can
+// attach it to bug reports without asking users for screenshots.
+installConsoleCapture();
 
 // Auth is handled per-route via AuthGuard, not globally.
 // Landing and Auth pages are public; Dashboard/Editor/Profile
