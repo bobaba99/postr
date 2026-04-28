@@ -384,7 +384,7 @@ async function runImageOcr(
 
 /**
  * Asks the LLM to detect whether a given image contains MULTIPLE
- * logos (e.g. a McGill + Douglas + ADNI banner baked into a single
+ * logos (e.g. a 3-logo institutional banner baked into a single
  * PDF image XObject) and to return their pixel-space bboxes. The
  * caller crops each sub-region from the source canvas and uploads
  * them as separate logo blocks.

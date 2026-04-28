@@ -218,14 +218,14 @@ describe('filterOrphanLabels', () => {
     const out = filterOrphanLabels(
       [
         cluster('Methods'),
-        cluster('Geng'),
+        cluster('Smith'),
         cluster('introduction', { items: { length: 1 } }),
       ],
       [],
     );
     expect(out.map((c) => c.text)).toEqual([
       'Methods',
-      'Geng',
+      'Smith',
       'introduction',
     ]);
   });
@@ -241,7 +241,7 @@ describe('filterOrphanLabels', () => {
   it('keeps multi-item clusters even if they look label-shaped', () => {
     // 5 items = a real text block, not a stray label
     const out = filterOrphanLabels(
-      [cluster('ADNI 1 2 3 X', { items: { length: 5 } })],
+      [cluster('LABEL 1 2 3 X', { items: { length: 5 } })],
       [],
     );
     expect(out).toHaveLength(1);
@@ -565,7 +565,7 @@ describe('computePixelSignaturePure + iconScore', () => {
   });
 
   it('text-bearing logo profile (few colors, MANY edges) → iconScore 0', () => {
-    // Mimics ADNI-style wordmark: 2 dominant colors, but vertical
+    // Mimics a wordmark logo: 2 dominant colors, but vertical
     // strokes every 2px → edge density ≥ 25%
     const data = makeTextLikeCanvas(80, 80);
     const sig = computePixelSignaturePure(data, 80, 80);

@@ -801,9 +801,9 @@ function LayoutTab(props: {
   const titleLen = localTitle.length;
   const titleTip =
     !localTitle.trim()
-      ? 'Name your poster for the dashboard. Try: presenter, event, date (e.g. "Maya — APA 2026").'
+      ? 'Name your poster for the dashboard. Try: presenter, event, date (e.g. "Smith Lab — APA 2026").'
       : titleLen < 10
-        ? 'Tip: Add the conference name or date for quick identification (e.g. "Kenji — SfN Nov 2026").'
+        ? 'Tip: Add the conference name or date for quick identification (e.g. "Smith Lab — SfN Nov 2026").'
         : titleLen > 80
           ? 'Consider shortening — this name is for the dashboard, not the poster itself.'
           : null;
@@ -821,7 +821,7 @@ function LayoutTab(props: {
           onKeyDown={(e) => {
             if (e.key === 'Enter') saveTitle();
           }}
-          placeholder="e.g. Maya — APA 2026"
+          placeholder="e.g. Smith Lab — APA 2026"
           style={{ ...inputBase, flex: 1, borderColor: !localTitle.trim() ? '#f87171' : titleDirty ? '#f9e2af' : '#2a2a3a' }}
         />
         <button
@@ -1428,7 +1428,7 @@ function parseAuthorBlock(text: string): ParsedAuthorBlock {
 
   // Step 4 — split authors. Treat "and" / "&" as commas, then
   // chunk on commas / semicolons / newlines while preserving
-  // parenthesised nicknames like "Gavin (Zihao) Geng".
+  // parenthesised nicknames like "Mary (Mae) Doe".
   const normalised = authorPart.replace(/\s+(?:and|&)\s+/gi, ', ');
   const tokens =
     normalised.match(/(?:[^,;\n()]|\([^)]*\))+/g) ?? [];
@@ -2380,7 +2380,7 @@ function StyleTab(props: {
         <input
           value={props.presetName}
           onChange={(e) => props.setPresetName(e.target.value)}
-          placeholder="e.g. Kenji Lab Green"
+          placeholder="e.g. Smith Lab Green"
           style={{ ...inputBase, flex: 1, padding: '12px 14px', fontSize: 14 }}
         />
         <button

@@ -4,8 +4,8 @@
  * model.
  *
  * Input format covered:
- *   "Enqi Wang1,2, Gavin (Zihao) Geng1, Corina Lazarenco1
- *    (1) McGill University, (2) Douglas Research Center, (3) UdeM"
+ *   "John Smith1,2, Mary (Mae) Doe1, Alex Roe1
+ *    (1) Acme State University, (2) Sample Research Institute, (3) Demo U"
  *
  * Recognized markers:
  *   - Trailing digit groups (1,2 / 1 / 2) -> affiliation refs

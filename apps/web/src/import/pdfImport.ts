@@ -215,7 +215,7 @@ export async function extractFromPdf(
   const figureBlocks = figureResult.blocks;
   // Suppress in-figure text against ALL detected bboxes — including
   // bboxes whose pixel upload failed (504 etc.). Otherwise the figure
-  // disappears from the page but its internal labels ("ADNI_MEM",
+  // disappears from the page but its internal labels (variable names,
   // axis ticks) survive as orphan text blocks.
   const insideFiltered = filterClustersInsideFigures(
     clusters,
@@ -397,8 +397,8 @@ export function computeBBoxStats(boxes: FigureBBox[]): BBoxStats {
  *  - `blocks`: image / logo blocks that uploaded successfully.
  *  - `detectedBBoxes`: every bbox the pixel pipeline considered a
  *    figure, **regardless of upload outcome**. Used downstream to
- *    suppress in-figure text fragments — we want to drop "ADNI_MEM"
- *    even when the figure it belongs to failed to upload.
+ *    suppress in-figure text fragments — we want to drop a figure's
+ *    internal axis labels even when the figure itself failed to upload.
  *  - `uploadFailures`: count of bboxes whose pixel upload failed
  *    (504 / network). Surfaced as a warning to the user. */
 interface ExtractFiguresResult {
@@ -578,9 +578,8 @@ async function extractFigures(
 
     // Verifier-trigger heuristic: anything "small" by per-poster
     // stats OR "logo-shaped" by absolute size warrants an LLM check.
-    // The McGill / Douglas / ADNI pattern is small absolute (≤4")
-    // but not below the median-relative cutoff on a figure-heavy
-    // poster.
+    // Institutional logo strips are small absolute (≤4") but not
+    // below the median-relative cutoff on a figure-heavy poster.
     const isSmall =
       (stats.smallCutoffPt > 0 &&
         Math.max(tightBBox.w, tightBBox.h) <= stats.smallCutoffPt) ||
@@ -620,7 +619,7 @@ async function extractFigures(
   // Split candidates aggregated across the verifier + heuristic
   // passes. Multi-logo split runs UNCONDITIONALLY at the end,
   // regardless of whether the user opted into the LLM verifier —
-  // McGill+Douglas merging is a high-impact case that should always
+  // merged logo strips are a high-impact case that should always
   // get one shot at being split.
   const splitCandidatesGlobal: {
     imageSrc: string;
@@ -629,9 +628,9 @@ async function extractFigures(
 
   // Heuristic-only candidates: any image block that's logo-shaped
   // (small + squarish per `looksLikeLogo`) gets queued for the split
-  // pass — covers both horizontal banners (McGill+Douglas+ADNI side
-  // by side) AND vertical stacks (McGill on top, Douglas below)
-  // which have aspect ~1.4 and would slip past a 1.5 gate. The
+  // pass — covers both horizontal banners (logos side by side) AND
+  // vertical stacks (one logo on top of another) which have aspect
+  // ~1.4 and would slip past a 1.5 gate. The
   // split LLM call is a no-op when it sees only one logo, so the
   // false-positive cost is one extra ~$0.005 call per block.
   for (let i = 0; i < blocks.length; i++) {
@@ -813,7 +812,7 @@ async function extractFigures(
         //     consistently mis-labels small cartoons as confident
         //     "logos" (e.g. leaf, people-icon, FAQ bubble at ≥0.85
         //     confidence), so confidence-gating lets them through.
-        //     ADNI-style brand marks get protected here by edge
+        //     Wordmark-style brand marks get protected here by edge
         //     density: text strokes push iconScore to 0 regardless
         //     of color count, so they survive.
         //   - larger bboxes: keep the two-of-two gate (pixel + LLM
@@ -1060,7 +1059,7 @@ async function extractFigures(
   // For every logo-shaped block, ask the model to return per-logo
   // sub-bboxes. If the model finds 2+ logos, crop each region out
   // of the page raster, upload separately, and replace the merged
-  // block with N split blocks. The McGill / Douglas / ADNI banner
+  // block with N split blocks. The merged-institutional-banner
   // case. Runs even when the verifier is off because logo merging
   // is a high-impact bug — the user only needs an Anthropic key to
   // see the fix.
@@ -1125,7 +1124,7 @@ async function extractFigures(
 
       // ── Attempt 2 (fallback): pixel-gap segmenter ─────────────
       // Runs whenever the LLM returns < 2 logos. Catches the
-      // McGill-on-top-of-Douglas case where the LLM sees the merged
+      // logo-stacked-on-logo case where the LLM sees the merged
       // image and either flags isSingleLogo or returns one bbox.
       let pixelSplit: LogoSubRect[] | null = null;
       const llmSayDontSplit =
@@ -1277,10 +1276,10 @@ const SEGMENT_MIN_GAP_FRACTION = 0.06;
 
 /**
  * Walk a logo canvas looking for a clear horizontal whitespace band
- * (multiple-logos-stacked-vertically case: McGill on top of Douglas,
- * with a thin-but-visible gap between them) AND a clear vertical
- * whitespace band (logos-side-by-side case: McGill ... Douglas ...
- * ADNI). Returns 2+ tight sub-rectangles when a split is possible,
+ * (multiple-logos-stacked-vertically case: one logo on top of
+ * another, with a thin-but-visible gap between them) AND a clear
+ * vertical whitespace band (logos-side-by-side case: 2+ logos in a
+ * row). Returns 2+ tight sub-rectangles when a split is possible,
  * or null when the image is a single logo.
  *
  * Deterministic; no LLM. Pairs with the LLM-driven precheck — the
@@ -1419,7 +1418,7 @@ export function computePixelSignaturePure(
  *    - dominantColors ≤ 6 AND edgeDensity < 8%   → 0.3 (borderline)
  *    - everything else                            → 0   (text/chart)
  *
- *  ADNI logo lands at edgeDensity ~10–15% (text strokes), so
+ *  Wordmark logos land at edgeDensity ~10–15% (text strokes), so
  *  iconScore = 0 → never gets dropped regardless of color count. */
 export function iconScore(sig: PixelSignature): number {
   const { dominantColors: dc, edgeDensity: ed } = sig;
@@ -1846,9 +1845,9 @@ export function filterDecorationBBoxes(
 /**
  * Largest max-dim (inches) for a bbox to be considered "small enough
  * that it might be a logo." Two small bboxes never merge with each
- * other — that's the McGill/Douglas/ADNI strip, where 3 logos sit in
- * a row with sub-0.4" gaps. Pure proximity-merging would collapse
- * them into a single 7"-wide block.
+ * other — that's the institutional-logo-strip case, where 3+ logos
+ * sit in a row with sub-0.4" gaps. Pure proximity-merging would
+ * collapse them into a single 7"-wide block.
  *
  * Plot fragments (axis label + data area, etc.) usually involve at
  * least one large bbox, so small-↔-large merges still happen.
@@ -1901,8 +1900,8 @@ export function mergeAdjacentBBoxes(
       const b = boxes[j]!;
       if (isSmall(a) && isSmall(b)) continue;
       // Don't merge two logo-shaped bboxes even if they're both
-      // "large" by the per-poster median. A McGill + Douglas pair
-      // sits ~3" apart (within the 5%-of-median gap on a poster
+      // "large" by the per-poster median. Two adjacent institutional
+      // logos sit ~3" apart (within the 5%-of-median gap on a poster
       // where median is 12"), but they're conceptually distinct.
       if (looksLikeLogo(a) && looksLikeLogo(b)) continue;
       if (bboxGap(a, b) > pairGapThreshold(a, b)) continue;
@@ -1927,10 +1926,10 @@ export function mergeAdjacentBBoxes(
 }
 
 /** Heuristic: bbox dimensions that suggest an institutional logo
- *  (McGill, ADNI, Douglas, etc) — squarish + small. Used by the
- *  merge step to prevent collapsing a horizontal logo strip into one
- *  multi-logo block, and by the LLM verifier as the "should I check
- *  this?" gate before spending an API call. */
+ *  (university crest, funder mark, etc.) — squarish + small. Used
+ *  by the merge step to prevent collapsing a horizontal logo strip
+ *  into one multi-logo block, and by the LLM verifier as the
+ *  "should I check this?" gate before spending an API call. */
 function looksLikeLogo(bbox: FigureBBox): boolean {
   const maxDim = Math.max(bbox.w, bbox.h);
   const minDim = Math.min(bbox.w, bbox.h);
@@ -1970,10 +1969,10 @@ function bboxFromBlock(block: PartialBlock): FigureBBox | null {
 
 /** Suppress text clusters whose bbox is mostly inside a figure
  *  bbox. pdfjs returns figure-internal text (panel labels like
- *  "ADNI_MEM", citation footers like "1,2,3", axis ticks) as if it
- *  were page text — those would otherwise show up as orphan text
- *  blocks floating around the imported poster. We keep clusters
- *  with ≥40% area inside a figure as figure-internal noise.
+ *  "GROUP_A_MEAN", citation footers like "1,2,3", axis ticks) as if
+ *  it were page text — those would otherwise show up as orphan
+ *  text blocks floating around the imported poster. We keep
+ *  clusters with ≥40% area inside a figure as figure-internal noise.
  *
  *  IMPORTANT: both `clusters[].bbox` and `figureBBoxes` MUST be in
  *  page-pt. Mixing units silently fails (the overlap area becomes
@@ -2017,14 +2016,15 @@ export function filterClustersInsideFigures<
 
 /** Pattern for label-style text: only uppercase letters, digits,
  *  and common label punctuation (underscore, comma, period, dash,
- *  whitespace). Catches "ADNI_MEM", "RC1", "1,2,3" while sparing
- *  body text ("Methods" — has lowercase) and most author names.
+ *  whitespace). Catches "GROUP_A_MEAN", "RC1", "1,2,3" while
+ *  sparing body text ("Methods" — has lowercase) and most author
+ *  names.
  *
  *  Known false-positive class: standalone single-item institution
- *  acronyms ("MIT", "MGH"). In practice author affiliations are
- *  multi-item (university name + city) so the items.length ≤ 2
- *  guard catches almost all real cases. Re-evaluate if users
- *  report missing affiliation tags. */
+ *  acronyms (3-letter university abbreviations). In practice author
+ *  affiliations are multi-item (university name + city) so the
+ *  items.length ≤ 2 guard catches almost all real cases.
+ *  Re-evaluate if users report missing affiliation tags. */
 const LABEL_TEXT_PATTERN = /^[A-Z0-9_,.\-\s]+$/;
 
 /** Common figure / table caption prefixes used in academic PDFs. */
@@ -2035,7 +2035,7 @@ const CAPTION_PATTERN = /^(Figure|Fig\.?|Table|Tab\.?)\s*\d+/i;
  *  doesn't sink the rest.
  *
  *  Signal 1 (bbox-independent label pattern): tiny + uppercase/numeric
- *    only ("ADNI_MEM", "RC1", "1,2,3").
+ *    only ("GROUP_A_MEAN", "RC1", "1,2,3").
  *  Signal 2 (caption near a figure bbox): tiny "Figure N." / "Table N."
  *    within 2.5 × line-height of any detected figure bbox.
  *  Signal 3 (font smaller than body text): the most general signal —

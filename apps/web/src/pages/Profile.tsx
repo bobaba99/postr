@@ -1003,8 +1003,8 @@ function ProfileFields({ user, onStatusMessage }: { user: User | null; onStatusM
 
   return (
     <div>
-      {fieldRow('Display name', 'displayName', 'e.g. Dr. Maya Chen', 'Used for author auto-fill')}
-      {fieldRow('Institution', 'institution', 'e.g. McGill University')}
+      {fieldRow('Display name', 'displayName', 'e.g. Dr. Jane Smith', 'Used for author auto-fill')}
+      {fieldRow('Institution', 'institution', 'e.g. Acme State University')}
       {fieldRow('Department', 'department', 'e.g. Department of Psychology')}
       {fieldRow('ORCID', 'orcid', 'e.g. 0000-0002-1234-5678', 'Optional — links to your ORCID profile')}
       {fieldRow('Website / Lab page', 'website', 'e.g. https://lab.example.com')}

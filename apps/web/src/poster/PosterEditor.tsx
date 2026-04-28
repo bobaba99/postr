@@ -610,9 +610,9 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // (Style/font/palette/etc live in the doc itself, persisted via store.)
   //
   // Poster display name — separate from the title block content. Used
-  // for dashboard organization (e.g. "Maya — APA 2026" vs the actual
-  // poster title "Single-Dose Psilocybin for Treatment-Resistant
-  // Depression"). Persisted to posters.title via autosave.
+  // for dashboard organization (e.g. "Smith Lab — APA 2026" vs the
+  // actual poster title "Single-Dose Psilocybin for Treatment-
+  // Resistant Depression"). Persisted to posters.title via autosave.
   const posterDisplayName = usePosterStore((s) => s.posterTitle);
   const setPosterDisplayName = usePosterStore((s) => s.setPosterTitle);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

@@ -8,43 +8,43 @@ describe('parseAuthorsText', () => {
     expect(out.institutions).toEqual([]);
   });
 
-  it('parses the EW_INS poster authors block correctly', () => {
+  it('parses a multi-author byline with numbered institutions', () => {
     const raw =
-      'Enqi Wang1,2, Gavin (Zihao) Geng1, Corina Lazarenco1, Maxime Montembeault1,2,3\n(1) McGill University, (2) Douglas Research Center, (3) Université de Montréal';
+      'John Smith1,2, Mary (Mae) Doe1, Alex Roe1, Jordan Lee1,2,3\n(1) Acme State University, (2) Sample Research Institute, (3) Demo University';
     const out = parseAuthorsText(raw);
 
     expect(out.institutions.map((i) => i.name)).toEqual([
-      'McGill University',
-      'Douglas Research Center',
-      'Université de Montréal',
+      'Acme State University',
+      'Sample Research Institute',
+      'Demo University',
     ]);
 
     expect(out.authors.map((a) => a.name)).toEqual([
-      'Enqi Wang',
-      'Gavin (Zihao) Geng',
-      'Corina Lazarenco',
-      'Maxime Montembeault',
+      'John Smith',
+      'Mary (Mae) Doe',
+      'Alex Roe',
+      'Jordan Lee',
     ]);
 
-    // Wang has affiliations 1 and 2
+    // First author has affiliations 1 and 2
     expect(out.authors[0]!.affiliationIds).toHaveLength(2);
     expect(out.authors[0]!.affiliationIds).toEqual([
       out.institutions[0]!.id,
       out.institutions[1]!.id,
     ]);
 
-    // Geng has affiliation 1 only
+    // Second author has affiliation 1 only
     expect(out.authors[1]!.affiliationIds).toEqual([
       out.institutions[0]!.id,
     ]);
 
-    // Montembeault has all three
+    // Last author has all three
     expect(out.authors[3]!.affiliationIds).toHaveLength(3);
   });
 
   it('detects corresponding-author dagger marker', () => {
     const raw =
-      'Alice Smith1†, Bob Jones1\n(1) MIT';
+      'Alice Smith1†, Bob Jones1\n(1) Acme State University';
     const out = parseAuthorsText(raw);
     expect(out.authors[0]!.isCorresponding).toBe(true);
     expect(out.authors[1]!.isCorresponding).toBe(false);
@@ -52,7 +52,7 @@ describe('parseAuthorsText', () => {
   });
 
   it('detects equal-contribution star marker', () => {
-    const raw = 'Alice Smith1*, Bob Jones1*\n(1) MIT';
+    const raw = 'Alice Smith1*, Bob Jones1*\n(1) Acme State University';
     const out = parseAuthorsText(raw);
     expect(out.authors[0]!.equalContrib).toBe(true);
     expect(out.authors[1]!.equalContrib).toBe(true);
@@ -65,18 +65,18 @@ describe('parseAuthorsText', () => {
   });
 
   it('handles single-line "(1) X" suffix without newline', () => {
-    const raw = 'Alice Smith1 (1) MIT';
+    const raw = 'Alice Smith1 (1) Acme State University';
     const out = parseAuthorsText(raw);
     expect(out.institutions).toHaveLength(1);
-    expect(out.institutions[0]!.name).toBe('MIT');
+    expect(out.institutions[0]!.name).toBe('Acme State University');
     expect(out.authors).toHaveLength(1);
     expect(out.authors[0]!.name).toBe('Alice Smith');
   });
 
   it('preserves names containing parenthetical content', () => {
-    const raw = 'Gavin (Zihao) Geng1\n(1) McGill';
+    const raw = 'Mary (Mae) Doe1\n(1) Acme State University';
     const out = parseAuthorsText(raw);
-    expect(out.authors[0]!.name).toBe('Gavin (Zihao) Geng');
+    expect(out.authors[0]!.name).toBe('Mary (Mae) Doe');
   });
 
   it('handles a list with no affiliations', () => {

@@ -120,7 +120,7 @@ const ParseAuthorsToolSchema = {
           name: {
             type: 'string',
             description:
-              'The author\'s full name as written, with parenthesised nicknames preserved (e.g. "Gavin (Zihao) Geng"). Strip footnote markers (*†‡§¶#) and superscript / inline affiliation digits — those go into affiliationIndices.',
+              'The author\'s full name as written, with parenthesised nicknames preserved (e.g. "Mary (Mae) Doe"). Strip footnote markers (*†‡§¶#) and superscript / inline affiliation digits — those go into affiliationIndices.',
           },
           affiliationIndices: {
             type: 'array',
@@ -196,7 +196,7 @@ const CountFiguresSchema = {
       type: 'integer',
       minimum: 0,
       description:
-        'Institutional / brand logos (university crests, hospital marks, funder marks like ADNI). EXCLUDES decorative cartoons or section icons. MUST equal logoBBoxes.length.',
+        'Institutional / brand logos (university crests, hospital marks, funder acronyms). EXCLUDES decorative cartoons or section icons. MUST equal logoBBoxes.length.',
     },
     imagePixelWidth: {
       type: 'number',
@@ -220,7 +220,8 @@ const CountFiguresSchema = {
           h: { type: 'number' },
           name: {
             type: 'string',
-            description: 'Optional readable label, e.g. "McGill", "ADNI".',
+            description:
+              'Optional readable label — the visible institution / funder text inside the logo (a university name, a hospital name, a funder acronym).',
           },
         },
       },
@@ -228,7 +229,7 @@ const CountFiguresSchema = {
     reasoning: {
       type: 'string',
       description:
-        'One sentence per category explaining the count — quote a label or location ("McGill crest top-right", "Demographics table top-left", etc.).',
+        'One sentence per category explaining the count — quote a label or location ("Crest top-right", "Demographics table top-left", etc.).',
     },
   },
 } as const;
@@ -743,25 +744,25 @@ const COUNT_FIGURES_SYSTEM = `You are a poster auditor. Look at the WHOLE render
 (A) Counts:
 1. expectedFigureCount — real charts, plots, heatmaps, network diagrams, schematic figures, composite multi-panel figures. Each composite/multi-panel figure with a single shared title counts as ONE. Stylized icons (magnifier, leaf, lightbulb, silhouettes, FAQ bubbles, ornaments) DO NOT count.
 2. expectedTableCount — structured rows × columns of NUMERIC data with column / row headers. A 6-row PCA loadings table is one. A descriptive-stats table with mean / SD per group is one.
-3. expectedLogoCount — institutional / brand marks: university crests, hospital logos, funder logos (e.g. ADNI, NIH, Wellcome Trust). Decorative cartoons / section ornaments DO NOT count, even when they look chart-shaped. Two logos pasted side-by-side or stacked in one banner image count as TWO.
+3. expectedLogoCount — institutional / brand marks: university crests, hospital logos, funder marks (any acronym or wordmark for an institution / agency / consortium / charity that funded the work). Decorative cartoons / section ornaments DO NOT count, even when they look chart-shaped. Two logos pasted side-by-side or stacked in one banner image count as TWO.
 
 (B) Per-logo bboxes (logoBBoxes): for EVERY logo you counted, return a tight pixel-space bounding box in image coordinates (origin top-left). expectedLogoCount MUST equal logoBBoxes.length.
 - Tighten each bbox to the visible logo's bounding rectangle — NO whitespace padding.
 - If two logos sit side by side or stacked, emit TWO bboxes — never one merged bbox.
-- A logo's name (e.g. "McGill", "ADNI") is helpful but optional.
+- A logo's name (the visible university / hospital / funder text) is helpful but optional.
 - Report image dimensions (imagePixelWidth, imagePixelHeight) so the client can scale your bboxes back to the original page.
 
 Be precise. The downstream pipeline:
 - uses the counts as a CEILING — over-counting kicks real figures off the page, under-counting lets decorations through.
 - crops your logoBBoxes directly out of the page raster — loose bboxes leak the next logo's whitespace into the crop.
 
-In reasoning, name each item with its location: e.g. "Figures (3): Correlation scatter panel bottom-left, PCA biplot middle-right, Network top-center. Tables (2): Demographics top-left, PCA loadings middle. Logos (3): McGill top-right, Douglas top-right (stacked under McGill), ADNI top-right."`;
+In reasoning, name each item with its location: e.g. "Figures (3): Correlation scatter panel bottom-left, PCA biplot middle-right, Network top-center. Tables (2): Demographics top-left, PCA loadings middle. Logos (3): University crest top-right, Hospital wordmark top-right (stacked under the university), Funder acronym top-right."`;
 
 const SPLIT_MULTI_LOGO_SYSTEM = `You are a logo segmentation assistant. The image you receive may contain ONE logo or MULTIPLE logos arranged in a row, column, or small grid (typical: a poster header strip with a university crest, a hospital logo, and a funder mark side by side). Your job:
 
 - Return per-logo pixel-space bboxes — origin top-left of the supplied image.
 - Tighten each bbox to the visible logo's bounding rectangle, NOT the whitespace around it.
-- Optionally include each logo's text/name when you can read it (e.g. "McGill", "Douglas", "ADNI").
+- Optionally include each logo's text/name when you can read it (the visible university / hospital / funder text).
 - If there's only one logo, set isSingleLogo: true and return that single bbox in logos[].
 
 Be precise — these bboxes get cropped directly out of the source pixels and uploaded as separate logo blocks. A loose bbox includes whitespace from the next logo over.`;
@@ -796,9 +797,9 @@ VERIFICATION RULES — apply in order:
 
 2. Set kind = "table" if evidence.hasGridRowsAndCols === true AND evidence.hasNumericData === true AND evidence.isStylizedIcon === false.
 
-3. Set kind = "logo" ONLY for institutional / brand marks. The reliable signal is **readable text inside the image** — university names ("McGill", "Stanford"), hospital names ("Douglas", "Mayo Clinic"), funder acronyms ("ADNI", "NIH", "NSF"), or institutional taglines. Brand crests with no text are also logos when they're clearly an institutional emblem (a shield, a seal, a stylized letterform), but err toward "decoration" when in doubt. Decorative cartoons (animals, leaves, magnifiers, FAQ bubbles, silhouetted people, speech balloons) are NOT logos — set kind = "decoration".
+3. Set kind = "logo" ONLY for institutional / brand marks. The reliable signal is **readable text inside the image** — university names, hospital names, funder acronyms (e.g. NIH-style 3-letter funder marks), or institutional taglines. Brand crests with no text are also logos when they're clearly an institutional emblem (a shield, a seal, a stylized letterform), but err toward "decoration" when in doubt. Decorative cartoons (animals, leaves, magnifiers, FAQ bubbles, silhouetted people, speech balloons) are NOT logos — set kind = "decoration".
 
-   Special note on TEXT-BEARING LOGOS: even when a brand mark is rendered with only 2–4 distinct colors (e.g. ADNI's "ADNI" wordmark in dark text on light background plus a small accent color), the presence of READABLE LETTERS makes it a logo, not a stock icon. Set isStylizedIcon = false for any image where you can read characters that spell an institution / brand name.
+   Special note on TEXT-BEARING LOGOS: even when a brand mark is rendered with only 2–4 distinct colors (e.g. a wordmark in dark text on a light background plus a small accent color), the presence of READABLE LETTERS makes it a logo, not a stock icon. Set isStylizedIcon = false for any image where you can read characters that spell an institution / brand name.
 
 4. Set kind = "decoration" when evidence.isStylizedIcon === true OR none of the above apply. Especially:
    - Stock icons that depict a chart-shape but contain no real data (a magnifying glass over a tiny bar icon is decoration)
@@ -1110,7 +1111,7 @@ async function callAnthropicParseReferences(
 
 const PARSE_AUTHORS_SYSTEM = `You parse manuscript-style author bylines for poster software. Given a free-text byline (potentially copy-pasted from a Word doc, PDF, or website), extract:
 
-- authors: an array of { name, affiliationIndices }. Preserve parenthesised nicknames in the name (e.g. "Gavin (Zihao) Geng"). Drop footnote markers (*†‡§¶#) and any digits — those map to affiliationIndices via the institution list. Use 1-based indices that line up with the institution list. Affiliation indices may appear as ASCII digits (1,2), Unicode superscripts (¹²), or roman numerals (i,ii). Multiple affiliations on a single author are common.
+- authors: an array of { name, affiliationIndices }. Preserve parenthesised nicknames in the name (e.g. "Mary (Mae) Doe"). Drop footnote markers (*†‡§¶#) and any digits — those map to affiliationIndices via the institution list. Use 1-based indices that line up with the institution list. Affiliation indices may appear as ASCII digits (1,2), Unicode superscripts (¹²), or roman numerals (i,ii). Multiple affiliations on a single author are common.
 
 - institutions: an array of { index, name } from the numbered list at the end of the byline. Strip leading markers and trailing punctuation from the name. Indices may use formats: (1), 1., 1), or ¹. If no numbered institution list is present, return an empty array.
 

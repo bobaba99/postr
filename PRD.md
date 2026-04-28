@@ -309,9 +309,9 @@ Text and heading blocks use the `SmartText` component — a `contentEditable` di
 ```typescript
 interface Institution {
   id: string;
-  name: string;        // "McGill University"
+  name: string;        // "Acme State University"
   dept: string;        // "Dept. of Psychology" (optional)
-  location: string;    // "Montreal" (optional)
+  location: string;    // "Anytown, USA" (optional)
 }
 
 interface Author {
