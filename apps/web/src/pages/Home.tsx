@@ -17,6 +17,7 @@ import {
   listPosters,
   type PosterListRow,
 } from '@/data/posters';
+import { seedWelcomePosterIfNeeded } from '@/data/seedWelcomePoster';
 import { Link, useNavigate } from 'react-router-dom';
 import { PosterCard } from '@/components/PosterCard';
 import { NewPosterButton } from '@/components/NewPosterButton';
@@ -56,6 +57,21 @@ export default function Home() {
         const rows = await listPosters();
         if (cancelled) return;
         setStatus({ kind: 'ready', rows });
+        // Brand-new accounts (anonymous guests + permanent
+        // signups) land here with no posters. Seed a playful
+        // cat-themed sample so the dashboard isn't an empty
+        // void — gives researchers a complete poster they can
+        // duplicate, gut, or just smile at. Idempotent via
+        // localStorage flag so deleting everything later doesn't
+        // re-trigger the seed.
+        if (rows.length === 0) {
+          const seeded = await seedWelcomePosterIfNeeded(rows.length);
+          if (seeded && !cancelled) {
+            // Re-fetch so the new poster shows up in the grid.
+            const refreshed = await listPosters();
+            if (!cancelled) setStatus({ kind: 'ready', rows: refreshed });
+          }
+        }
       } catch (err) {
         if (cancelled) return;
         const message = err instanceof Error ? err.message : 'Failed to load posters';
