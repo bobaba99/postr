@@ -45,7 +45,7 @@ const STEPS: TourStep[] = [
     selector: '[data-postr-import-tile]',
     tabName: 'layout',
     title: 'Already have a poster? Import it',
-    body: 'Drop a PDF (with selectable text) or a saved .postr bundle to land every text block and figure on the canvas as editable elements. The new "+ New poster ▾" menu on the dashboard does the same for fresh imports.',
+    body: 'Drop a PDF, image, or .postr bundle. Text-layer PDFs land every paragraph AND embedded figure as editable blocks. Image-based files (flattened PDFs, JPG/PNG scans) bring in the text only — figures and tables need to be re-added with the Insert tab. The "+ New poster ▾" menu on the dashboard does the same for fresh imports.',
     position: 'right',
   },
   {

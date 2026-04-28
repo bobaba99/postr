@@ -221,6 +221,7 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
   // Mounting at document.body sidesteps the transform entirely.
   return ReactDOM.createPortal(
     <div
+      data-postr-modal-backdrop
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -238,6 +239,7 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
       }}
     >
       <div
+        data-postr-modal-content
         onClick={(e) => e.stopPropagation()}
         style={{
           background: '#1a1a26',

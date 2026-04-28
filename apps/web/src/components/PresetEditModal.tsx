@@ -219,6 +219,7 @@ export function PresetEditModal({ open, onClose, onChange }: Props) {
 
   return (
     <div
+      data-postr-modal-backdrop
       onClick={onClose}
       style={{
         position: 'fixed',
@@ -233,6 +234,7 @@ export function PresetEditModal({ open, onClose, onChange }: Props) {
       }}
     >
       <div
+        data-postr-modal-content
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',

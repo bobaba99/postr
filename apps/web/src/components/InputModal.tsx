@@ -49,6 +49,7 @@ export function InputModal({
 
   return (
     <div
+      data-postr-modal-backdrop
       onClick={onCancel}
       style={{
         position: 'fixed',
@@ -62,6 +63,7 @@ export function InputModal({
       }}
     >
       <div
+        data-postr-modal-content
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',

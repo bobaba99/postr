@@ -195,7 +195,7 @@ export default function Home() {
           <p className="text-[14pt] text-[#f87171]">Couldn’t load posters: {status.message}</p>
         )}
 
-        {status.kind === 'ready' && status.rows.length <= 1 && (
+        {status.kind === 'ready' && (
           <div className="mb-8 rounded-xl border border-[#2a2a3a] bg-[#111118] p-8">
             <div className="flex items-center gap-4 mb-4">
               <svg width="48" height="48" viewBox="0 0 64 64" fill="none">

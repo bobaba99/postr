@@ -62,6 +62,7 @@ export function SessionExpiredModal() {
 
   return (
     <div
+      data-postr-modal-backdrop
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="session-expired-title"
@@ -78,6 +79,7 @@ export function SessionExpiredModal() {
       }}
     >
       <div
+        data-postr-modal-content
         style={{
           maxWidth: 460,
           padding: 28,

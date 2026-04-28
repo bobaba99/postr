@@ -448,15 +448,26 @@ export function FloatingFormatToolbar({ info, onChange }: FloatingFormatToolbarP
 
   return createPortal(
     <div
+      // `top` / `left` get a short transition so when the user
+      // expands or shrinks the selection the toolbar glides to the
+      // new position instead of teleporting. The mount animation
+      // (`postr-format-toolbar-enter`) handles the first appearance:
+      // fade + tiny scale + downward drop, the same easing curve
+      // Notion uses on its inline format menu.
       style={{
         position: 'fixed',
         top: position.top,
         left: position.left,
         zIndex: 9700,
         pointerEvents: 'none',
+        transition:
+          'top 140ms cubic-bezier(0.22, 1, 0.36, 1), left 140ms cubic-bezier(0.22, 1, 0.36, 1)',
       }}
     >
-      <div style={{ ...TOOLBAR_PILL, pointerEvents: 'auto' }}>
+      <div
+        className="postr-format-toolbar-enter"
+        style={{ ...TOOLBAR_PILL, pointerEvents: 'auto' }}
+      >
         <FormatToolbarButtons formats={info.formats} onChange={onChange} />
       </div>
     </div>,

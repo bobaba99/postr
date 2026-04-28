@@ -160,6 +160,7 @@ export function PublishConsentModal({
 
   return (
     <div
+      data-postr-modal-backdrop
       onClick={onCancel}
       style={{
         position: 'fixed',
@@ -174,6 +175,7 @@ export function PublishConsentModal({
       }}
     >
       <div
+        data-postr-modal-content
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',

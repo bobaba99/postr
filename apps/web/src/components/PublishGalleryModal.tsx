@@ -178,6 +178,7 @@ export function PublishGalleryModal({
 
   return (
     <div
+      data-postr-modal-backdrop
       onClick={submitting ? undefined : onCancel}
       style={{
         position: 'fixed',
@@ -192,6 +193,7 @@ export function PublishGalleryModal({
       }}
     >
       <div
+        data-postr-modal-content
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',

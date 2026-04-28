@@ -67,8 +67,8 @@ export function ImportConfirmReplaceModal({
   }
 
   return (
-    <div onClick={onCancel} style={overlayStyle}>
-      <div onClick={(e) => e.stopPropagation()} style={modalStyle}>
+    <div data-postr-modal-backdrop onClick={onCancel} style={overlayStyle}>
+      <div data-postr-modal-content onClick={(e) => e.stopPropagation()} style={modalStyle}>
         <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, color: '#fbbf24' }}>
           Replace this poster?
         </h3>
