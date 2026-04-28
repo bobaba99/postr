@@ -12,6 +12,7 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "bench:import": "tsx scripts/import-benchmark/run.ts",
+    "postr:decode": "node scripts/decode-postr.mjs",
     "db:start": "supabase start",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
