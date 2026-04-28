@@ -1513,7 +1513,7 @@ function AuthorManager(props: {
 
   // Bulk paste — handles the manuscript byline shape researchers
   // actually copy:
-  //   "Enqi Wang, Gavin (Zihao) Geng, ... (1) McGill, (2) Douglas, (3) UdeM"
+  //   "John Smith, Mary (Mae) Doe, ... (1) Acme U, (2) Sample Inst"
   // or with linked superscripts:
   //   "John Smith¹,², Jane Doe¹, (1) Foo, (2) Bar"
   // The parser:
@@ -1521,7 +1521,7 @@ function AuthorManager(props: {
   //      before is author names, everything after is the
   //      numbered institution list.
   //   2. Tokenises authors respecting parenthesised nicknames so
-  //      "Gavin (Zihao) Geng" doesn't get cut into three pieces.
+  //      "Mary (Mae) Doe" doesn't get cut into three pieces.
   //   3. Captures each author's trailing comma-separated digits as
   //      affiliation indices, then strips footnote markers
   //      (*†‡§¶#) and the digits themselves.
@@ -1566,7 +1566,7 @@ function AuthorManager(props: {
 
     // Reconcile parsed institutions against the live list. Match
     // by case-insensitive exact name so re-pasting a byline
-    // doesn't create duplicate "McGill University" rows.
+    // doesn't create duplicate "Acme State University" rows.
     const lowerNameToId = new Map<string, string>();
     for (const inst of props.institutions) {
       lowerNameToId.set(inst.name.trim().toLowerCase(), inst.id);
@@ -1760,7 +1760,7 @@ function AuthorManager(props: {
           value={pasteText}
           onChange={(e) => setPasteText(e.target.value)}
           placeholder={
-            'John Smith¹, Jane Doe¹,², (1) McGill University, (2) Douglas Research Center\n\nWe parse:\n· author names — split on , ; / and / &\n· (N) institution names from the byline\n· trailing 1,2 superscripts → linked affiliations'
+            'John Smith¹, Jane Doe¹,², (1) Acme State University, (2) Sample Research Institute\n\nWe parse:\n· author names — split on , ; / and / &\n· (N) institution names from the byline\n· trailing 1,2 superscripts → linked affiliations'
           }
           rows={5}
           style={{

@@ -448,10 +448,10 @@ function PresetsTab(props: {
         }}
       >
         <b>Heads up:</b> preset previews pull 256 × 256 favicons from
-        Google's public service. Some schools (e.g. McGill) return a
-        letter mark instead of their crest, and none are print
-        quality. For your final export, switch to the{' '}
-        <b>Upload</b> tab and use your institution's official logo.
+        Google's public service. Some schools return a letter mark
+        instead of their crest, and none are print quality. For your
+        final export, switch to the <b>Upload</b> tab and use your
+        institution's official logo.
       </div>
       <div style={{ fontSize: 12, color: '#6b7280' }}>
         {props.filtered.length} / {LOGO_PRESETS.length} presets
