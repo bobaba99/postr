@@ -44,6 +44,7 @@ import {
 import { CITATION_STYLES, type CitationStyleKey } from './citations';
 import { LAYOUT_TEMPLATES, type LayoutKey } from './templates';
 import { parseBibtex, parseRis } from './parsers';
+import { postJson } from '@/lib/apiClient';
 import { AuthorLine } from './blocks';
 import {
   autoFormatAPA,
@@ -910,8 +911,48 @@ function LayoutTab(props: {
       </div>
 
       <div style={labelStyle}>Auto Layout</div>
-      <button onClick={props.onAutoLayout} style={{ ...buttonStyle(false), fontSize: 14 }}>
-        ⬡ Auto-Arrange
+      <button
+        onClick={props.onAutoLayout}
+        style={{
+          all: 'unset',
+          boxSizing: 'border-box',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 6,
+          // `all: unset` clears max-width too — clamp the button so
+          // it can't overflow the sidebar's content width and force
+          // a horizontal scrollbar. width:100% is interpreted
+          // against the parent flex item's intrinsic content size,
+          // which without max-width can exceed the sidebar.
+          width: '100%',
+          maxWidth: '100%',
+          padding: '10px 12px',
+          fontSize: 14,
+          fontWeight: 700,
+          color: '#fff',
+          background: 'linear-gradient(135deg, #7c6aed 0%, #9d87ff 100%)',
+          border: '1px solid #7c6aed',
+          borderRadius: 8,
+          boxShadow: '0 6px 18px rgba(124, 106, 237, 0.28)',
+          letterSpacing: 0.2,
+          transition:
+            'transform 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1)',
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.transform = 'translateY(-1px)';
+          (e.currentTarget as HTMLElement).style.boxShadow =
+            '0 10px 26px rgba(124, 106, 237, 0.42)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.transform = 'none';
+          (e.currentTarget as HTMLElement).style.boxShadow =
+            '0 6px 18px rgba(124, 106, 237, 0.28)';
+        }}
+      >
+        <span aria-hidden style={{ fontSize: 15 }}>⬡</span>
+        Auto-Arrange
       </button>
       <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
         Tidy existing blocks into an even grid — measures each text block's
@@ -1121,7 +1162,12 @@ function AuthorsTab(props: {
       <InstitutionManager institutions={props.institutions} onChange={props.onChangeInstitutions} />
 
       <div style={{ ...labelStyle, marginTop: 28 }}>② Authors</div>
-      <AuthorManager authors={props.authors} onChange={props.onChangeAuthors} institutions={props.institutions} />
+      <AuthorManager
+        authors={props.authors}
+        onChange={props.onChangeAuthors}
+        institutions={props.institutions}
+        onChangeInstitutions={props.onChangeInstitutions}
+      />
 
       {props.authors.filter((a) => a.name).length > 0 && (
         <div
@@ -1231,7 +1277,225 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
   );
 }
 
-function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => void; institutions: Institution[] }) {
+interface ParsedAuthorBlock {
+  authors: Array<{ name: string; affiliationIndices: number[] }>;
+  institutions: Array<{ index: number; name: string }>;
+}
+
+// Superscript digits → ASCII digits. Researchers paste from Word /
+// PDFs that often render affiliation markers as Unicode super-
+// scripts (`¹,²`). Normalising up-front lets the rest of the
+// parser stay on plain `\d`.
+const SUPERSCRIPT_TO_DIGIT: Record<string, string> = {
+  '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4',
+  '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9',
+};
+
+/** LLM-backed byline parser. Calls `/api/import/parse-authors`
+ *  which proxies a single short Anthropic tool-use call. Returns
+ *  the same shape as the deterministic `parseAuthorBlock` so the
+ *  bulk-paste handler can swap implementations transparently.
+ *  Throws on network / API failure — the caller is expected to
+ *  catch and fall back to the regex parser. */
+async function parseAuthorBlockViaLLM(
+  text: string,
+): Promise<ParsedAuthorBlock> {
+  const result = await postJson<unknown>(
+    '/api/import/parse-authors',
+    { text },
+    { auth: true },
+  );
+  // Defensive coercion — same as the vision import path. Anthropic
+  // tool_use sometimes omits empty arrays; re-shape so the
+  // downstream UI never reads `.length` of undefined.
+  const r = result as {
+    authors?: Array<{ name?: unknown; affiliationIndices?: unknown }>;
+    institutions?: Array<{ index?: unknown; name?: unknown }>;
+  };
+  const authors: ParsedAuthorBlock['authors'] = Array.isArray(r.authors)
+    ? r.authors
+        .map((a) => ({
+          name: typeof a.name === 'string' ? a.name.trim() : '',
+          affiliationIndices: Array.isArray(a.affiliationIndices)
+            ? (a.affiliationIndices as unknown[])
+                .map((n) => (typeof n === 'number' ? Math.round(n) : NaN))
+                .filter((n) => Number.isFinite(n) && n >= 1 && n <= 99)
+            : [],
+        }))
+        .filter((a) => a.name.length > 0)
+    : [];
+  const institutions: ParsedAuthorBlock['institutions'] = Array.isArray(
+    r.institutions,
+  )
+    ? r.institutions
+        .map((i) => ({
+          index: typeof i.index === 'number' ? Math.round(i.index) : NaN,
+          name: typeof i.name === 'string' ? i.name.trim() : '',
+        }))
+        .filter(
+          (i) =>
+            i.name.length > 0 &&
+            Number.isFinite(i.index) &&
+            i.index >= 1 &&
+            i.index <= 99,
+        )
+    : [];
+  return { authors, institutions };
+}
+
+/** LLM-backed reference-list parser. Calls
+ *  `/api/import/parse-references`. Returns a list of structured
+ *  references (authors / year / title / journal / doi / rawText).
+ *  Throws on API failure — the caller falls back to the plain-text
+ *  splitter. */
+async function parseReferencesViaLLM(
+  text: string,
+): Promise<Array<Omit<Reference, 'id'>>> {
+  const result = await postJson<unknown>(
+    '/api/import/parse-references',
+    { text },
+    { auth: true },
+  );
+  const r = result as {
+    references?: Array<{
+      authors?: unknown;
+      year?: unknown;
+      title?: unknown;
+      journal?: unknown;
+      doi?: unknown;
+      rawText?: unknown;
+    }>;
+  };
+  if (!Array.isArray(r.references)) return [];
+  return r.references
+    .map((ref) => ({
+      authors: Array.isArray(ref.authors)
+        ? (ref.authors as unknown[])
+            .filter((a): a is string => typeof a === 'string')
+            .map((a) => a.trim())
+            .filter(Boolean)
+        : [],
+      year: typeof ref.year === 'string' ? ref.year.trim() : '',
+      title: typeof ref.title === 'string' ? ref.title.trim() : '',
+      journal: typeof ref.journal === 'string' ? ref.journal.trim() : '',
+      doi: typeof ref.doi === 'string' ? ref.doi.trim() : '',
+      rawText: typeof ref.rawText === 'string' ? ref.rawText.trim() : '',
+    }))
+    .filter((ref) => ref.rawText.length > 0 || ref.title.length > 0);
+}
+
+/** Parse a manuscript-style byline into separate author and
+ *  institution lists. See `addPasted` in `AuthorManager` for the
+ *  shapes of input it handles and the linking semantics. */
+function parseAuthorBlock(text: string): ParsedAuthorBlock {
+  let trimmed = text.trim();
+  if (!trimmed) return { authors: [], institutions: [] };
+
+  // Step 1 — normalise Unicode superscripts to ASCII so
+  // "Smith¹,²" works the same as "Smith1,2".
+  trimmed = trimmed.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, (ch) =>
+    SUPERSCRIPT_TO_DIGIT[ch] ?? ch,
+  );
+
+  // Step 2 — disambiguate two uses of `,`:
+  //   • author separator:  "Smith, Doe"
+  //   • affiliation list:  "Smith1,2"
+  // Without this, a comma split also chops the affiliation list
+  // and "Smith1,2, Doe1" becomes ["Smith1", "2", "Doe1"], with
+  // the phantom "2" landing as its own author and Smith losing
+  // its second link. Replace every digit-comma-digit comma with
+  // a sentinel `` so it survives the split, then restore
+  // it inside the per-author trailing-digit capture below. The
+  // replace-loop handles ≥3-element runs ("1,2,3") because each
+  // pass converts one boundary at a time.
+  let prev = '';
+  while (prev !== trimmed) {
+    prev = trimmed;
+    trimmed = trimmed.replace(/(\d)\s*,\s*(\d)/g, '$1$2');
+  }
+
+  // Step 3 — find the first `(N)` token. That's the boundary
+  // between the author list and the institution list. We look for
+  // a small integer in parens (1-99); larger values are unlikely
+  // to be affiliation indices and more likely to be a year (e.g.
+  // "Smith (1989)" inside an author note).
+  const instStartRe = /\(\s*(\d{1,2})\s*\)/;
+  const instMatch = trimmed.match(instStartRe);
+  const instStart = instMatch?.index ?? -1;
+
+  const authorPart = instStart >= 0 ? trimmed.slice(0, instStart) : trimmed;
+  const instPart = instStart >= 0 ? trimmed.slice(instStart) : '';
+
+  // Step 4 — split authors. Treat "and" / "&" as commas, then
+  // chunk on commas / semicolons / newlines while preserving
+  // parenthesised nicknames like "Gavin (Zihao) Geng".
+  const normalised = authorPart.replace(/\s+(?:and|&)\s+/gi, ', ');
+  const tokens =
+    normalised.match(/(?:[^,;\n()]|\([^)]*\))+/g) ?? [];
+
+  const authors: ParsedAuthorBlock['authors'] = [];
+  for (const raw of tokens) {
+    let s = raw.trim();
+    if (!s) continue;
+    s = s.replace(/^by\s+/i, '').replace(/\bet\s+al\.?$/i, '').trim();
+    if (!s) continue;
+
+    // Capture trailing affiliation indices — digits joined by
+    // either whitespace or our `` sentinel from step 2.
+    // Optional leading separators eat "Smith 1, 2" etc.
+    const indices: number[] = [];
+    const numRe = /[\s,]*(\d+(?:[\s,]*\d+)*)\s*$/;
+    const numMatch = s.match(numRe);
+    if (numMatch && typeof numMatch.index === 'number') {
+      const nums = numMatch[1]!
+        .split(/[\s,]+/)
+        .map((n) => parseInt(n, 10))
+        .filter((n) => Number.isFinite(n) && n >= 1 && n <= 99);
+      if (nums.length > 0) {
+        indices.push(...nums);
+        s = s.slice(0, numMatch.index).trim();
+      }
+    }
+
+    // Strip residual footnote markers + trailing punctuation.
+    s = s.replace(/[*†‡§¶#]+$/u, '').replace(/[,;]+$/, '').trim();
+    // Restore any sentinel we skipped restoring inside the name
+    // (rare — should never happen for well-formed bylines).
+    s = s.replace(//g, ',');
+    if (!s) continue;
+    authors.push({ name: s, affiliationIndices: indices });
+  }
+
+  // Parse institutions. Each chunk is `(N) name` until the next
+  // `(N) ` or end of string. Trailing punctuation (commas /
+  // semicolons / "and") on the name is stripped.
+  const institutions: ParsedAuthorBlock['institutions'] = [];
+  if (instPart) {
+    const instRe = /\(\s*(\d{1,2})\s*\)\s*([^()]*?)(?=\(\s*\d{1,2}\s*\)|$)/g;
+    for (const m of instPart.matchAll(instRe)) {
+      const idx = parseInt(m[1]!, 10);
+      const name = m[2]!
+        .trim()
+        .replace(/\s+(?:and|&)\s+$/i, '')
+        .replace(/[,;\s]+$/, '')
+        .trim();
+      if (name) institutions.push({ index: idx, name });
+    }
+  }
+
+  return { authors, institutions };
+}
+
+function AuthorManager(props: {
+  authors: Author[];
+  onChange: (a: Author[]) => void;
+  institutions: Institution[];
+  /** Optional — when supplied, the bulk-paste flow can detect a
+   *  trailing institution list ("(1) X, (2) Y") and create the
+   *  institutions inline, then link each author's superscripts to
+   *  the freshly-minted institution ids. */
+  onChangeInstitutions?: (i: Institution[]) => void;
+}) {
   const update = (id: string, patch: Partial<Author>) =>
     props.onChange(props.authors.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const remove = (id: string) => props.onChange(props.authors.filter((x) => x.id !== id));
@@ -1246,6 +1510,111 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
       ...props.authors,
       { id: `a${nanoid(6)}`, name: '', affiliationIds: [], isCorresponding: false, equalContrib: false },
     ]);
+
+  // Bulk paste — handles the manuscript byline shape researchers
+  // actually copy:
+  //   "Enqi Wang, Gavin (Zihao) Geng, ... (1) McGill, (2) Douglas, (3) UdeM"
+  // or with linked superscripts:
+  //   "John Smith¹,², Jane Doe¹, (1) Foo, (2) Bar"
+  // The parser:
+  //   1. Splits the text at the first `(N)` token — everything
+  //      before is author names, everything after is the
+  //      numbered institution list.
+  //   2. Tokenises authors respecting parenthesised nicknames so
+  //      "Gavin (Zihao) Geng" doesn't get cut into three pieces.
+  //   3. Captures each author's trailing comma-separated digits as
+  //      affiliation indices, then strips footnote markers
+  //      (*†‡§¶#) and the digits themselves.
+  //   4. Parses the institution list into { index, name } pairs
+  //      and creates fresh Institution rows (deduplicated against
+  //      existing ones by exact-name match).
+  //   5. Maps each author's affiliation indices to the matching
+  //      Institution.id.
+  // When the input has no institution list, behaviour falls back
+  // to "create bare authors" — same as the previous version.
+  const [pasteText, setPasteText] = useState('');
+  const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
+
+  const [parsing, setParsing] = useState(false);
+  const addPasted = async () => {
+    if (!pasteText.trim()) {
+      setPasteFeedback('Paste an author list first.');
+      setTimeout(() => setPasteFeedback(null), 2500);
+      return;
+    }
+    setParsing(true);
+    setPasteFeedback('Parsing with AI…');
+    let parsed: ParsedAuthorBlock;
+    try {
+      parsed = await parseAuthorBlockViaLLM(pasteText);
+      // If the LLM returned nothing, fall back to the deterministic
+      // regex parser. Keeps offline mode + rate-limit days usable
+      // without losing the feature.
+      if (parsed.authors.length === 0) {
+        parsed = parseAuthorBlock(pasteText);
+      }
+    } catch {
+      parsed = parseAuthorBlock(pasteText);
+    } finally {
+      setParsing(false);
+    }
+    if (parsed.authors.length === 0) {
+      setPasteFeedback('No authors detected. Try cleaning up the formatting.');
+      setTimeout(() => setPasteFeedback(null), 3500);
+      return;
+    }
+
+    // Reconcile parsed institutions against the live list. Match
+    // by case-insensitive exact name so re-pasting a byline
+    // doesn't create duplicate "McGill University" rows.
+    const lowerNameToId = new Map<string, string>();
+    for (const inst of props.institutions) {
+      lowerNameToId.set(inst.name.trim().toLowerCase(), inst.id);
+    }
+    const newInstitutions: Institution[] = [];
+    const indexToId = new Map<number, string>();
+    for (const inst of parsed.institutions) {
+      const key = inst.name.toLowerCase();
+      let id = lowerNameToId.get(key);
+      if (!id) {
+        id = `i${nanoid(6)}`;
+        newInstitutions.push({ id, name: inst.name });
+        lowerNameToId.set(key, id);
+      }
+      indexToId.set(inst.index, id);
+    }
+
+    const addedAuthors: Author[] = parsed.authors.map((a) => ({
+      id: `a${nanoid(6)}`,
+      name: a.name,
+      affiliationIds: a.affiliationIndices
+        .map((n) => indexToId.get(n))
+        .filter((id): id is string => Boolean(id)),
+      isCorresponding: false,
+      equalContrib: false,
+    }));
+
+    if (newInstitutions.length > 0 && props.onChangeInstitutions) {
+      props.onChangeInstitutions([...props.institutions, ...newInstitutions]);
+    }
+    props.onChange([...props.authors, ...addedAuthors]);
+    setPasteText('');
+
+    const parts: string[] = [
+      `Added ${addedAuthors.length} author${addedAuthors.length === 1 ? '' : 's'}`,
+    ];
+    if (newInstitutions.length > 0) {
+      parts.push(
+        `${newInstitutions.length} institution${newInstitutions.length === 1 ? '' : 's'}`,
+      );
+    }
+    const linked = addedAuthors.filter((a) => a.affiliationIds.length > 0).length;
+    if (linked > 0) {
+      parts.push(`${linked} linked to affiliations`);
+    }
+    setPasteFeedback(`✓ ${parts.join(' · ')}.`);
+    setTimeout(() => setPasteFeedback(null), 3500);
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -1359,6 +1728,102 @@ function AuthorManager(props: { authors: Author[]; onChange: (a: Author[]) => vo
       >
         + Add Author
       </button>
+
+      {/* Bulk paste — collapsed in a subtle card so it doesn't
+          compete with the per-author rows. Most users will Add
+          one at a time; this block is for the "I just copied my
+          author line from the manuscript" flow. */}
+      <div
+        style={{
+          marginTop: 6,
+          padding: 12,
+          background: '#0f0f17',
+          border: '1px solid #2a2a3a',
+          borderRadius: 8,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: '#9ca3af',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          Paste author list
+        </div>
+        <textarea
+          value={pasteText}
+          onChange={(e) => setPasteText(e.target.value)}
+          placeholder={
+            'John Smith¹, Jane Doe¹,², (1) McGill University, (2) Douglas Research Center\n\nWe parse:\n· author names — split on , ; / and / &\n· (N) institution names from the byline\n· trailing 1,2 superscripts → linked affiliations'
+          }
+          rows={5}
+          style={{
+            ...inputBase,
+            width: '100%',
+            resize: 'vertical',
+            fontFamily: 'inherit',
+            lineHeight: 1.4,
+            boxSizing: 'border-box',
+          }}
+        />
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            justifyContent: 'space-between',
+          }}
+        >
+          <span
+            style={{
+              fontSize: 11,
+              color: pasteFeedback?.startsWith('✓') ? '#7ee3b8' : '#9ca3af',
+              minHeight: 14,
+            }}
+          >
+            {pasteFeedback ?? ''}
+          </span>
+          <button
+            onClick={addPasted}
+            disabled={pasteText.trim().length === 0 || parsing}
+            style={{
+              all: 'unset',
+              cursor:
+                pasteText.trim().length === 0 || parsing
+                  ? 'not-allowed'
+                  : 'pointer',
+              padding: '6px 12px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: '#fff',
+              background:
+                pasteText.trim().length === 0 || parsing
+                  ? '#3a3a4a'
+                  : '#7c6aed',
+              border: 'none',
+              borderRadius: 6,
+              opacity: pasteText.trim().length === 0 ? 0.6 : 1,
+            }}
+          >
+            {parsing ? '✨ Parsing…' : '✨ Parse with AI'}
+          </button>
+        </div>
+        <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.45 }}>
+          AI-assisted parsing handles messy bylines — Unicode super-
+          scripts, mixed scripts, footnote markers, range affiliations
+          (<code>1-3</code>), parenthesised nicknames. Detects a
+          trailing <code>(1) X, (2) Y</code> institution list, creates
+          the institutions, and links each author's <code>1,2</code>{' '}
+          markers automatically. Falls back to the offline regex
+          parser if the API is unreachable.
+        </div>
+      </div>
     </div>
   );
 }
@@ -1399,24 +1864,44 @@ function RefsTab(props: {
       .filter((s) => s.length > 0);
   };
 
-  const addPasted = () => {
-    const chunks = splitPastedRefs(pasteText);
-    if (!chunks.length) {
+  const [parsing, setParsing] = useState(false);
+  const addPasted = async () => {
+    if (!pasteText.trim()) {
       setPasteFeedback('Paste some references first.');
       setTimeout(() => setPasteFeedback(null), 2500);
       return;
     }
-    const added: Reference[] = chunks.map((raw) => ({
-      id: nanoid(8),
-      authors: [],
-      rawText: raw,
-    }));
+    setParsing(true);
+    setPasteFeedback('Parsing with AI…');
+    let added: Reference[] = [];
+    try {
+      const llmRefs = await parseReferencesViaLLM(pasteText);
+      if (llmRefs.length > 0) {
+        added = llmRefs.map((r) => ({ id: nanoid(8), ...r }));
+      }
+    } catch {
+      // Fall back to the regex splitter below.
+    }
+    if (added.length === 0) {
+      // Offline / API failure / LLM returned nothing — split on
+      // blank-lines or single-lines and store the raw text. Author
+      // / year / title fields stay empty until the user re-formats.
+      const chunks = splitPastedRefs(pasteText);
+      if (!chunks.length) {
+        setParsing(false);
+        setPasteFeedback('No references detected.');
+        setTimeout(() => setPasteFeedback(null), 3500);
+        return;
+      }
+      added = chunks.map((raw) => ({ id: nanoid(8), authors: [], rawText: raw }));
+    }
     props.onChangeReferences([...props.references, ...added]);
+    setParsing(false);
     setPasteText('');
     setPasteFeedback(
       `✓ Added ${added.length} reference${added.length === 1 ? '' : 's'}.`,
     );
-    setTimeout(() => setPasteFeedback(null), 2500);
+    setTimeout(() => setPasteFeedback(null), 3500);
   };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1571,13 +2056,14 @@ function RefsTab(props: {
         <button
           type="button"
           onClick={addPasted}
-          disabled={!pasteText.trim()}
+          disabled={!pasteText.trim() || parsing}
           style={{
             all: 'unset',
-            cursor: pasteText.trim() ? 'pointer' : 'not-allowed',
+            cursor: pasteText.trim() && !parsing ? 'pointer' : 'not-allowed',
             padding: '10px 16px',
-            background: pasteText.trim() ? '#7c6aed' : '#2a2a3a',
-            color: pasteText.trim() ? '#fff' : '#6b7280',
+            background:
+              pasteText.trim() && !parsing ? '#7c6aed' : '#2a2a3a',
+            color: pasteText.trim() && !parsing ? '#fff' : '#6b7280',
             border: 'none',
             borderRadius: 8,
             fontSize: 13,
@@ -1586,10 +2072,17 @@ function RefsTab(props: {
             opacity: pasteText.trim() ? 1 : 0.6,
           }}
         >
-          Parse & add
+          {parsing ? '✨ Parsing…' : '✨ Parse with AI'}
         </button>
         {pasteFeedback && (
-          <span style={{ fontSize: 13, color: '#a6e3a1' }}>{pasteFeedback}</span>
+          <span
+            style={{
+              fontSize: 13,
+              color: pasteFeedback.startsWith('✓') ? '#a6e3a1' : '#9ca3af',
+            }}
+          >
+            {pasteFeedback}
+          </span>
         )}
       </div>
 
@@ -2928,12 +3421,16 @@ function CustomBorderMockup(props: {
   const PAD = 14; // room for outer-edge hit strips
 
   // Hit-zone helper — a transparent clickable overlay.
+  // Accepts an optional `key` so it can be used inside `.map()`
+  // without React warning about missing keys.
   const hit = (
     style: React.CSSProperties,
     onClick: () => void,
     title: string,
+    key?: string | number,
   ) => (
     <button
+      key={key}
       type="button"
       title={title}
       aria-label={title}
@@ -3129,6 +3626,7 @@ function CustomBorderMockup(props: {
             on
               ? `Remove line between row ${i + 2} and row ${i + 3}`
               : `Add line between row ${i + 2} and row ${i + 3}`,
+            `innerH-${i}`,
           );
         })}
 
@@ -3148,6 +3646,7 @@ function CustomBorderMockup(props: {
             on
               ? `Remove line between col ${i + 1} and col ${i + 2}`
               : `Add line between col ${i + 1} and col ${i + 2}`,
+            `innerV-${i}`,
           );
         })}
       </div>

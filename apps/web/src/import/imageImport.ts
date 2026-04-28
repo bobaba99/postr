@@ -22,11 +22,17 @@ import type {
   PartialBlock,
   Palette,
 } from '@postr/shared';
-import { uploadPosterImage } from '@/data/posterImages';
 import { supabase } from '@/lib/supabase';
 import { postJson, ApiError, formatRetryAfter } from '@/lib/apiClient';
 import { ptToUnits, ptToIn } from '../poster/constants';
 import { synthesizeDocFromResult, type SynthOutput } from './synthDoc';
+import {
+  clampBBoxToPage,
+  countCaptionMentions,
+  inferPtScale,
+  isFiniteBBox,
+  scaleBBox,
+} from './bboxSanitize';
 
 interface ExtractRequestBody {
   imageUrl: string;
@@ -123,7 +129,10 @@ export async function extractFromImage(
 }
 
 /** Public entry for `pdfImport.ts` to delegate flattened PDFs. The
- *  caller passes the rasterized page canvas + page dims in pt. */
+ *  caller passes the rasterized page canvas + page dims in pt.
+ *  `runImageOcr` derives the upload payload directly from
+ *  `pageCanvas` (downscaled), so we just need a placeholder File
+ *  for naming + progress messaging. */
 export async function extractFromRasterizedPage(
   pageCanvas: HTMLCanvasElement,
   pageWidthPt: number,
@@ -132,14 +141,32 @@ export async function extractFromRasterizedPage(
   userId: string,
   onProgress: ImportProgressCallback,
 ): Promise<SynthOutput> {
-  const blob = await canvasToBlob(pageCanvas, 'image/png');
-  if (!blob) throw new Error('Could not rasterize page.');
-  const file = new File([blob], `${nanoid(8)}.png`, { type: 'image/png' });
-  return runImageOcr(file, posterId, userId, onProgress, {
+  const placeholder = new File([], `${nanoid(8)}.jpg`, { type: 'image/jpeg' });
+  return runImageOcr(placeholder, posterId, userId, onProgress, {
     pageCanvas,
     pageWidthPt,
     pageHeightPt,
   });
+}
+
+/** Cap the long edge at 2048 px so the JPEG-encoded payload stays
+ *  comfortably under Anthropic's 5 MB-per-image practical sweet
+ *  spot. Returns the input canvas when no scaling is needed so
+ *  callers don't have to allocate. */
+function downscaleForVision(src: HTMLCanvasElement): HTMLCanvasElement {
+  const MAX_DIM = 2048;
+  const longEdge = Math.max(src.width, src.height);
+  if (longEdge <= MAX_DIM) return src;
+  const scale = MAX_DIM / longEdge;
+  const out = document.createElement('canvas');
+  out.width = Math.round(src.width * scale);
+  out.height = Math.round(src.height * scale);
+  const ctx = out.getContext('2d');
+  if (!ctx) return src;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(src, 0, 0, out.width, out.height);
+  return out;
 }
 
 interface RasterContext {
@@ -186,11 +213,25 @@ async function runImageOcr(
   }
 
   onProgress({ stage: 'llm-call', detail: 'Uploading…' });
-  const tempPath = `${userId}/${TEMP_PREFIX}/${posterId}/${nanoid(8)}.png`;
+  // Always derive the upload from the page canvas (downscaled
+  // JPEG) — the user's original file may be a 30 MB phone-camera
+  // photo or a 5k×7k high-DPI raster, both of which trip
+  // Anthropic's 5 MB practical / 20 MB hard limit and 502 with
+  // `vision_call_failed`. The full-resolution `pageCanvas` is
+  // still used downstream for figure cropping, so fidelity of the
+  // imported figures is preserved.
+  const uploadCanvas = downscaleForVision(pageCanvas);
+  const uploadBlob = await canvasToBlob(uploadCanvas, 'image/jpeg', 0.85);
+  if (uploadCanvas !== pageCanvas) releaseCanvas(uploadCanvas);
+  if (!uploadBlob) {
+    if (allocatedHere) releaseCanvas(pageCanvas);
+    throw new Error('Could not encode upload image.');
+  }
+  const tempPath = `${userId}/${TEMP_PREFIX}/${posterId}/${nanoid(8)}.jpg`;
   const { error: uploadErr } = await supabase.storage
     .from('poster-assets')
-    .upload(tempPath, file, {
-      contentType: file.type || 'image/png',
+    .upload(tempPath, uploadBlob, {
+      contentType: 'image/jpeg',
       upsert: true,
     });
   if (uploadErr) {
@@ -240,41 +281,83 @@ async function runImageOcr(
   }
 
   // Build PartialBlocks from the LLM output. Convert pt-coords to
-  // poster units; figure bboxes get cropped + uploaded separately.
-  onProgress({ stage: 'uploading-figures', ratio: 0 });
-  const figureBlocks: PartialBlock[] = [];
-  for (let i = 0; i < response.figureBBoxes.length; i++) {
-    const bb = response.figureBBoxes[i]!;
-    onProgress({
-      stage: 'uploading-figures',
-      ratio: i / response.figureBBoxes.length,
-      detail: `${i + 1}/${response.figureBBoxes.length}`,
-    });
-    const block = await cropAndUploadRegion(
-      pageCanvas,
-      bb,
-      pageWidthPt,
-      pageHeightPt,
-      posterId,
-      userId,
-    );
-    if (block) figureBlocks.push(block);
-  }
+  // poster units. Figure cropping is intentionally skipped — vision
+  // OCR of figure regions on flattened-content posters proved too
+  // unreliable to ship as a default (LLM-returned bboxes were
+  // missing real figures, hallucinating extras, and occasionally in
+  // the wrong coord space). Until we have a more robust signal,
+  // image-OCR imports text-only and surface a clear "add figures
+  // manually" warning. Defensive `Array.isArray` guards keep the
+  // pipeline alive when Anthropic's tool_use omits empty arrays.
+  const rawResponseBlocks = Array.isArray(response.blocks)
+    ? response.blocks
+    : [];
+  const rawFigureBBoxesCount = Array.isArray(response.figureBBoxes)
+    ? response.figureBBoxes.length
+    : 0;
+
+  // The pt/px coord-space inference still runs on the text bboxes —
+  // even text-only mode benefits from auto-correction when the LLM
+  // returned image-pixel coords by accident.
+  const allBoxesForCoordCheck = rawResponseBlocks
+    .map((b) => b.bbox)
+    .filter(isFiniteBBox);
+  const ptScale = inferPtScale(
+    allBoxesForCoordCheck,
+    pageWidthPt,
+    pageHeightPt,
+  );
+
+  // eslint-disable-next-line no-console
+  console.debug('[import.fullExtract] text-only mode', {
+    rawBlocks: rawResponseBlocks.length,
+    rawFigureBBoxesIgnored: rawFigureBBoxesCount,
+    ptScale,
+  });
 
   onProgress({ stage: 'building-preview' });
-  const blocks: PartialBlock[] = [
-    ...response.blocks.map((b) => ({
-      type: b.type,
-      x: ptToUnits(b.bbox.x),
-      y: ptToUnits(b.bbox.y),
-      w: ptToUnits(b.bbox.w),
-      h: ptToUnits(b.bbox.h),
+  const sanitizedTextBlocks: PartialBlock[] = [];
+  for (const b of rawResponseBlocks) {
+    if (!b || !b.bbox || !isFiniteBBox(b.bbox)) continue;
+    const bb = clampBBoxToPage(
+      scaleBBox(b.bbox, ptScale),
+      pageWidthPt,
+      pageHeightPt,
+    );
+    if (!bb) continue;
+    if (typeof b.text !== 'string') continue;
+    if (b.text.trim().length === 0) continue;
+    // Vision OCR can't reliably reconstruct cell structure for
+    // tables — the LLM tags the region "table" but tableData stays
+    // null, which would render as an empty grid in the editor.
+    // Demote to plain text so the user sees the captured content
+    // (caption + any cell text the LLM concatenated). They can
+    // recreate as a real table via Insert > Table if needed.
+    const blockType: PartialBlock['type'] =
+      b.type === 'table' ? 'text' : b.type;
+    sanitizedTextBlocks.push({
+      type: blockType,
+      x: ptToUnits(bb.x),
+      y: ptToUnits(bb.y),
+      w: ptToUnits(bb.w),
+      h: ptToUnits(bb.h),
       content: b.text,
       imageSrc: null,
       imageFit: 'contain' as const,
       tableData: null,
-    })),
-    ...figureBlocks,
+    });
+  }
+  const blocks: PartialBlock[] = sanitizedTextBlocks;
+
+  // Always lead the warning list with the text-only limitation so
+  // the user knows up-front that figures + tables didn't come
+  // along. When the page contained captions ("Figure N.", "Table
+  // N."), include a count to make the gap concrete and actionable.
+  const captionMatches = countCaptionMentions(rawResponseBlocks);
+  const textOnlyWarnings: string[] = [
+    captionMatches > 0
+      ? `Text-only import — figures and tables were not captured. We detected ${captionMatches} figure/table caption${captionMatches === 1 ? '' : 's'} in the source; you'll need to re-add the visuals manually using the Insert tab.`
+      : 'Text-only import — figures, tables, and other graphics were not captured. Use the Insert tab to add visuals manually.',
   ];
 
   // Best-effort: clean up the temp upload now that the LLM is done.
@@ -289,8 +372,9 @@ async function runImageOcr(
     pageHeightIn: ptToIn(pageHeightPt),
     detectedPalette: response.detectedPalette,
     warnings: [
+      ...textOnlyWarnings,
       ...(response.warnings ?? []),
-      'Imported via vision model — verify accuracy of detected text and figures.',
+      'Imported via vision model — verify the extracted text against the source.',
     ],
   });
 
@@ -574,59 +658,14 @@ async function rasterizeImage(
   }
 }
 
-async function cropAndUploadRegion(
-  pageCanvas: HTMLCanvasElement,
-  bbox: { x: number; y: number; w: number; h: number },
-  pageWidthPt: number,
-  pageHeightPt: number,
-  posterId: string,
-  userId: string,
-): Promise<PartialBlock | null> {
-  // Convert pt-coords to canvas pixel coords. PageCanvas was rendered
-  // at SCALE × pt; we recover the scale from canvas / page-pt.
-  const scaleX = pageCanvas.width / pageWidthPt;
-  const scaleY = pageCanvas.height / pageHeightPt;
-  const px = Math.max(0, Math.round(bbox.x * scaleX));
-  const py = Math.max(0, Math.round(bbox.y * scaleY));
-  const pw = Math.min(pageCanvas.width - px, Math.round(bbox.w * scaleX));
-  const ph = Math.min(pageCanvas.height - py, Math.round(bbox.h * scaleY));
-  if (pw <= 1 || ph <= 1) return null;
-
-  const cropCanvas = document.createElement('canvas');
-  cropCanvas.width = pw;
-  cropCanvas.height = ph;
-  const ctx = cropCanvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.drawImage(pageCanvas, px, py, pw, ph, 0, 0, pw, ph);
-
-  const blob = await canvasToBlob(cropCanvas, 'image/png');
-  releaseCanvas(cropCanvas);
-  if (!blob) return null;
-
-  const blockId = nanoid(8);
-  const f = new File([blob], `${blockId}.png`, { type: 'image/png' });
-  const storageSrc = await uploadPosterImage(userId, posterId, blockId, f);
-  if (!storageSrc) return null;
-
-  return {
-    type: 'image',
-    x: ptToUnits(bbox.x),
-    y: ptToUnits(bbox.y),
-    w: ptToUnits(bbox.w),
-    h: ptToUnits(bbox.h),
-    content: '',
-    imageSrc: storageSrc,
-    imageFit: 'contain',
-    tableData: null,
-  };
-}
 
 function canvasToBlob(
   canvas: HTMLCanvasElement,
   type: string,
+  quality = 0.92,
 ): Promise<Blob | null> {
   return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob), type, 0.92);
+    canvas.toBlob((blob) => resolve(blob), type, quality);
   });
 }
 
@@ -634,3 +673,4 @@ function releaseCanvas(c: HTMLCanvasElement): void {
   c.width = 0;
   c.height = 0;
 }
+
