@@ -119,7 +119,6 @@ export function OnboardingTour() {
   useEffect(() => {
     return () => {
       if (step >= 0) {
-        clearBoost();
         localStorage.setItem(STORAGE_KEY, 'true');
       }
     };
@@ -140,18 +139,6 @@ export function OnboardingTour() {
     return () => { style.remove(); };
   }, []);
 
-  // Track the currently boosted element so we can restore its z-index
-  const boostedRef = useRef<HTMLElement | null>(null);
-  const boostedOriginalZ = useRef<string>('');
-
-  const clearBoost = () => {
-    if (boostedRef.current) {
-      boostedRef.current.style.zIndex = boostedOriginalZ.current;
-      boostedRef.current.style.position = boostedRef.current.style.position === 'relative' ? '' : boostedRef.current.style.position;
-      boostedRef.current = null;
-    }
-  };
-
   const measureStep = useCallback((idx: number) => {
     if (idx < 0 || idx >= STEPS.length) return;
     const s = STEPS[idx]!;
@@ -167,41 +154,30 @@ export function OnboardingTour() {
       }
     }
 
+    // Defer one frame so the tab click + DOM re-layout settle
+    // before measuring. Without this, getBoundingClientRect can
+    // return the previous tab's geometry.
     requestAnimationFrame(() => {
-      // Restore previous element
-      clearBoost();
-
       const el = document.querySelector<HTMLElement>(s.selector);
-      if (el) {
-        setRect(el.getBoundingClientRect());
-        // Boost the target element above the overlay (z-index 10000)
-        boostedOriginalZ.current = el.style.zIndex;
-        el.style.zIndex = '10001';
-        if (getComputedStyle(el).position === 'static') {
-          el.style.position = 'relative';
-        }
-        boostedRef.current = el;
-      } else {
-        setRect(null);
-      }
+      setRect(el ? el.getBoundingClientRect() : null);
     });
   }, []);
 
-  // measureStep boosts the highlighted element to z-index 10001 so
-  // the tour's pulse animation sits above everything else. While a
-  // publish or feedback modal is open we MUST NOT run measureStep at
-  // all — otherwise the boosted element ends up sitting above the
-  // modal and intercepts every click. The suspended flag gates both
-  // the regular step-change effect and the suspend-toggle effect.
+  // Earlier versions also boosted the target element's z-index to
+  // 10001 so it sat above the dim overlay. That's no longer needed
+  // — the 4-rect cutout already excludes the target area, so the
+  // target shows through naturally at its native stacking. Boosting
+  // had a side effect of yanking the target above its siblings,
+  // which broke layouts (e.g. the sidebar floating above the
+  // canvas during the sidebar steps) and made the pulse border
+  // appear to share a stacking layer with the highlighted element.
+  // Removing the boost fixes both visual artifacts.
   useEffect(() => {
     if (step >= 0 && !suspended) measureStep(step);
   }, [step, measureStep, suspended]);
 
   useEffect(() => {
-    if (suspended) {
-      clearBoost();
-      setRect(null);
-    }
+    if (suspended) setRect(null);
     // No else branch — when suspended flips false, the effect above
     // will re-fire because `suspended` is in its deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -215,7 +191,6 @@ export function OnboardingTour() {
   }, [step, measureStep]);
 
   const finish = useCallback(() => {
-    clearBoost();
     localStorage.setItem(STORAGE_KEY, 'true');
     setStep(-1);
   }, []);
