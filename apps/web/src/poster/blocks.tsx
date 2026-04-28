@@ -144,6 +144,10 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
   //     logo to replace" behavior that prevented selection.
   const [pickerOpen, setPickerOpen] = useState(false);
   const resolvedLogoSrc = useStorageUrl(block.imageSrc);
+  // Mirror of ImageBlock.autoFittedSrcRef — once we've fit the
+  // block to a given src's aspect ratio, don't fight subsequent
+  // user resizes by re-fitting on every render.
+  const autoFittedSrcRef = useRef<string | null>(null);
 
   // Listen for the external Replace request so the BlockFrame's
   // floating Replace button can open this block's picker.
@@ -172,6 +176,25 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
           <img
             src={displaySrc}
             alt="Poster logo"
+            onLoad={(e) => {
+              // Auto-fit block aspect to match the logo's natural
+              // aspect ratio so the block hugs the logo edge-to-edge
+              // instead of leaving transparent padding around it.
+              // Skipped when imageFit === 'fill' (user has opted into
+              // freeform resize, so we shouldn't fight their drags).
+              if (block.imageFit === 'fill') return;
+              const t = e.currentTarget;
+              const nw = t.naturalWidth;
+              const nh = t.naturalHeight;
+              if (nw < 8 || nh < 8) return;
+              if (autoFittedSrcRef.current === t.currentSrc) return;
+              autoFittedSrcRef.current = t.currentSrc;
+              const aspect = nw / nh;
+              const newH = Math.round(block.w / aspect);
+              if (Math.abs(newH - block.h) > 2) {
+                onUpdate({ h: newH });
+              }
+            }}
             style={{
               // For 'fill' mode the image must fill the parent
               // exactly (width/height 100%), which conflicts with
@@ -1531,17 +1554,34 @@ function CaptionWrapper({
   // directly under the figure/table content, regardless of where the
   // caption is placed. Note is rendered as HTML (pre-parsed by the
   // Format button) so inline tags survive JSONB round-trips.
+  //
+  // For image/logo blocks, the inner content div is pinned to a
+  // fixed `block.h` (the user's resized image area) so the note
+  // and caption sit as natural-height siblings that ADD to the
+  // wrapper's total height instead of squeezing the image. For
+  // tables, the body auto-sizes (the `<table>` determines its own
+  // height by row count) — matches the long-standing behavior
+  // where `growsWithContent` makes the frame hug the grid.
+  const isImageLike = block.type === 'image' || block.type === 'logo';
   const bodyAndNote = (
     <div
       style={{
-        flex: 1,
+        flex: isSideCaption ? '1 1 0' : '0 0 auto',
         minHeight: 0,
         minWidth: 0,
         display: 'flex',
         flexDirection: 'column',
       }}
     >
-      <div style={{ flex: 1, minHeight: 0, minWidth: 0, position: 'relative' }}>
+      <div
+        style={{
+          flex: '0 0 auto',
+          height: isImageLike ? block.h : 'auto',
+          minHeight: 0,
+          minWidth: 0,
+          position: 'relative',
+        }}
+      >
         {children}
       </div>
       {hasNote && (
@@ -1570,7 +1610,11 @@ function CaptionWrapper({
     <div
       style={{
         width: '100%',
-        height: '100%',
+        // Always `auto` so caption (column mode) or note (any mode)
+        // can ADD height to the block instead of squeezing the
+        // image. The frame's `growsWithContent` path expands the
+        // parent to match.
+        height: 'auto',
         display: 'flex',
         flexDirection,
         boxSizing: 'border-box',
@@ -1718,6 +1762,21 @@ export function BlockFrame(props: BlockFrameProps) {
       : b.y;
 
   const isHeading = b.type === 'heading';
+  // Image/logo blocks need to grow downward whenever they have
+  // chrome that adds vertical space — a top/bottom caption OR a
+  // footnote — so the extra text ADDS to the total block height
+  // instead of squeezing the image. Without this the caption /
+  // note flex siblings would compete with the body for the fixed
+  // `b.h`. Side captions (left/right) without a note share width,
+  // not height — but a note still grows the block even with side
+  // captions because the note always renders below the image.
+  const imageHasGrowingChrome =
+    (b.type === 'image' || b.type === 'logo') &&
+    ((b.captionPosition !== 'none' &&
+      b.captionPosition !== 'left' &&
+      b.captionPosition !== 'right' &&
+      captionNumber !== undefined) ||
+      !!b.note);
   // Blocks that grow with their text content (B1 fix). These use
   // minHeight: b.h as a floor, height: auto so the visible area
   // expands as the user adds more text. Prevents the "title
@@ -1738,6 +1797,7 @@ export function BlockFrame(props: BlockFrameProps) {
     b.type === 'text' ||
     b.type === 'references' ||
     b.type === 'authors' ||
+    imageHasGrowingChrome ||
     // Tables auto-size too — otherwise the user's stored `b.h`
     // was forcing the frame taller than the grid needed, and
     // the caption wrapper's `flex: 1 content` stretched to
@@ -1783,12 +1843,17 @@ export function BlockFrame(props: BlockFrameProps) {
         : 'transparent'
     : 'transparent';
 
+  // Out-of-bounds blocks sit on the dark canvas-outer ruler area,
+  // where the configured text color (often a near-black palette
+  // primary) becomes invisible. Force-paint white while OOB so the
+  // user can still read the content while dragging it back. Reverts
+  // automatically once the block re-enters the canvas bounds.
   const txtStyle: CSSProperties = {
     fontFamily: ff,
     fontSize: level.size,
     fontWeight: level.weight,
     fontStyle: level.italic ? 'italic' : 'normal',
-    color: level.color || p.primary,
+    color: isOutOfBounds ? '#ffffff' : level.color || p.primary,
     lineHeight: level.lineHeight,
     backgroundColor: level.highlight || 'transparent',
   };
@@ -1868,6 +1933,7 @@ export function BlockFrame(props: BlockFrameProps) {
       data-block-id={b.id}
       data-block-type={b.type}
       data-postr-selected={selected ? 'true' : undefined}
+      data-postr-oob={isOutOfBounds ? 'true' : undefined}
       style={{
         position: 'absolute',
         left: b.x,
@@ -1985,7 +2051,9 @@ export function BlockFrame(props: BlockFrameProps) {
               ...txtStyle,
               fontSize: st.title.size,
               fontWeight: st.title.weight,
-              color: st.title.color || p.primary,
+              color: isOutOfBounds
+                ? '#ffffff'
+                : st.title.color || p.primary,
               lineHeight: st.title.lineHeight,
               textAlign: 'center',
             }}
@@ -2002,7 +2070,9 @@ export function BlockFrame(props: BlockFrameProps) {
               ...txtStyle,
               fontSize: st.heading.size,
               fontWeight: st.heading.weight,
-              color: st.heading.color || p.accent,
+              color: isOutOfBounds
+                ? '#ffffff'
+                : st.heading.color || p.accent,
               lineHeight: st.heading.lineHeight,
               textAlign: hs.align,
               ...headingBorderStyle(),
@@ -2022,7 +2092,9 @@ export function BlockFrame(props: BlockFrameProps) {
               style={{
                 fontSize: st.heading.size,
                 fontWeight: st.heading.weight,
-                color: st.heading.color || p.accent,
+                color: isOutOfBounds
+                  ? '#ffffff'
+                  : st.heading.color || p.accent,
                 flex: 1,
               }}
             />
@@ -2061,16 +2133,33 @@ export function BlockFrame(props: BlockFrameProps) {
             label="Figure"
           >
             <ImageBlock block={b} palette={p} onUpdate={update} selected={selected} userId={userId} posterId={posterId} />
+            {selected && cropMode && (
+              <CropOverlay
+                block={b}
+                onUpdate={(id, patch) => update(patch)}
+                onClose={() => setCropMode(false)}
+              />
+            )}
           </CaptionWrapper>
         )}
-        {b.type === 'logo' && <LogoBlock block={b} onUpdate={update} />}
-
-        {selected && cropMode && (b.type === 'image' || b.type === 'logo') && (
-          <CropOverlay
+        {b.type === 'logo' && (
+          <CaptionWrapper
             block={b}
-            onUpdate={(id, patch) => update(patch)}
-            onClose={() => setCropMode(false)}
-          />
+            palette={p}
+            fontFamily={ff}
+            styles={st}
+            captionNumber={captionNumber}
+            label="Figure"
+          >
+            <LogoBlock block={b} onUpdate={update} />
+            {selected && cropMode && (
+              <CropOverlay
+                block={b}
+                onUpdate={(id, patch) => update(patch)}
+                onClose={() => setCropMode(false)}
+              />
+            )}
+          </CaptionWrapper>
         )}
 
         {b.type === 'table' && (
@@ -2091,7 +2180,19 @@ export function BlockFrame(props: BlockFrameProps) {
         <ResizeHandles
           accent={p.accent}
           onPointerDown={(e, handle) => onPointerDown(e, b.id, 'resize', handle)}
-          cornersOnly={b.type === 'image' || b.type === 'logo'}
+          // Images: corners-only in default (contain) mode so edge
+          // drags can't unintentionally reshape a figure block — the
+          // figure should mostly match its source aspect. "Stretch
+          // to fit" (imageFit: 'fill') opts into freeform 8-handle
+          // resize.
+          //
+          // Logos: always 8 handles. Logos are utility marks where
+          // the user often wants to adjust block dimensions freely
+          // (give the logo more horizontal breathing room, etc.) —
+          // in contain mode the logo stays centered with its
+          // original aspect, in fill mode it stretches. Either way
+          // they get all four edges.
+          cornersOnly={b.type === 'image' && b.imageFit !== 'fill'}
         />
       )}
 
@@ -2145,6 +2246,7 @@ export function BlockFrame(props: BlockFrameProps) {
           >
             <button
               type="button"
+              data-no-anim
               onPointerDown={(e) => {
                 e.stopPropagation();
                 onPointerDown(e, b.id, 'move');
@@ -2356,6 +2458,7 @@ export function BlockFrame(props: BlockFrameProps) {
           <button
             type="button"
             data-postr-selection-ui="true"
+            data-no-anim
             onPointerDown={(e) => {
               e.stopPropagation();
               onPointerDown(e, b.id, 'rotate');

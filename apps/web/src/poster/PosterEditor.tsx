@@ -190,8 +190,17 @@ function useBlockDrag(
   setBlocks: (b: Block[]) => void,
   setBlocksSilent: (b: Block[]) => void,
   scale: number,
+  /** Multi-selection set; needed so dragging any one of N selected
+   *  blocks moves the whole group (Figma / Sketch convention). */
+  selectedIds: Set<string>,
   onResizeWarning?: (msg: string) => void,
 ): UseBlockDragResult {
+  // Keep selectedIds in a ref so the pointermove handler reads the
+  // latest set without re-running onPointerDown's useCallback every
+  // selection change. Drag math captures origins at pointerdown and
+  // uses the ref only for the initial "is this a group?" decision.
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
   // Keep a ref to blocks so the pointermove handler always reads the
   // latest positions. Previously the handler closed over a stale
   // blocks snapshot from when onPointerDown was created, causing
@@ -226,6 +235,16 @@ function useBlockDrag(
     oRot: number;
     isHeading: boolean;
     active: boolean;
+    /** Multi-select group-move snapshot. When the dragged block is
+     *  part of a multi-selection, holds the pre-drag (x, y) of every
+     *  selected block keyed by id, plus the floor (`minX`/`minY`)
+     *  so we can clamp the group at the canvas edge instead of
+     *  letting individual blocks underflow into negative coords.
+     *  Empty when only one block is selected — falls through to the
+     *  single-block move path. */
+    groupOrigins: Map<string, { x: number; y: number }>;
+    groupMinX: number;
+    groupMinY: number;
   } | null>(null);
   const didDragRef = useRef(false);
   const prevUserSelectRef = useRef<string>('');
@@ -258,6 +277,30 @@ function useBlockDrag(
         }
       }
 
+      // Snapshot every selected block's origin if this drag is on
+      // an already-selected block AND there's more than one in the
+      // selection. Lets the move handler translate the whole group
+      // together (Figma / Sketch / PowerPoint convention). Skipped
+      // for resize / rotate — those still operate on the single
+      // dragged block to avoid clobbering individual sizes.
+      const currentSelection = selectedIdsRef.current;
+      const isGroupMove =
+        mode === 'move' &&
+        currentSelection.has(id) &&
+        currentSelection.size > 1;
+      const groupOrigins = new Map<string, { x: number; y: number }>();
+      let groupMinX = b.x;
+      let groupMinY = b.y;
+      if (isGroupMove) {
+        for (const blk of blocksRef.current) {
+          if (currentSelection.has(blk.id)) {
+            groupOrigins.set(blk.id, { x: blk.x, y: blk.y });
+            if (blk.x < groupMinX) groupMinX = blk.x;
+            if (blk.y < groupMinY) groupMinY = blk.y;
+          }
+        }
+      }
+
       sessionRef.current = {
         id,
         mode,
@@ -274,6 +317,9 @@ function useBlockDrag(
         oRot: b.rotation ?? 0,
         isHeading: b.type === 'heading',
         active: false,
+        groupOrigins,
+        groupMinX,
+        groupMinY,
       };
 
       const onMove = (ev: PointerEvent) => {
@@ -296,15 +342,40 @@ function useBlockDrag(
           document.body.style.userSelect = 'none';
         }
 
+        // For a group move, clamp dx/dy so the whole selection
+        // shifts together without any block underflowing into
+        // negative space. Without this clamp the leftmost/topmost
+        // block would stop at 0 while the rest kept moving,
+        // shearing the group apart.
+        let groupDx = dx;
+        let groupDy = dy;
+        if (s.mode === 'move' && s.groupOrigins.size > 1) {
+          groupDx = Math.max(dx, -s.groupMinX);
+          groupDy = Math.max(dy, -s.groupMinY);
+        }
+
         // Use blocksRef.current to read the latest block positions,
         // not the stale closure from onPointerDown creation time.
         const nextBlocks = blocksRef.current.map((blk) => {
+          // Group-move path: every selected block gets the same
+          // delta applied to its pre-drag (x, y). Mirrors
+          // Figma/Sketch behavior where dragging any one of N
+          // selected items moves all of them.
+          if (s.mode === 'move' && s.groupOrigins.has(blk.id)) {
+            const origin = s.groupOrigins.get(blk.id)!;
+            return {
+              ...blk,
+              x: snap(Math.max(0, origin.x + groupDx)),
+              y: snap(Math.max(0, origin.y + groupDy)),
+            };
+          }
           if (blk.id !== s.id) return blk;
           if (s.mode === 'move') {
-            // Move is rotation-invariant: screen-space delta maps
-            // directly to canvas-space (x, y). The block's bounding
-            // box in poster coords stays axis-aligned; the rotation
-            // is purely a render-time decoration.
+            // Single-block move. Rotation-invariant: screen-space
+            // delta maps directly to canvas-space (x, y). The
+            // block's bounding box in poster coords stays
+            // axis-aligned; the rotation is purely a render-time
+            // decoration.
             return {
               ...blk,
               x: snap(Math.max(0, s.ox + dx)),
@@ -367,28 +438,43 @@ function useBlockDrag(
           let localShiftX = 0;
           let localShiftY = 0;
 
+          // Lower size floors for image/logo so users can shrink
+          // small marks (university crests, sponsor logos) below
+          // the 40-unit default text floor. Text-like blocks need
+          // the 40-unit width to stay legible, but a logo block
+          // works fine at ~12 units.
+          const isImageLike = blk.type === 'image' || blk.type === 'logo';
+          const minW = isImageLike ? 12 : 40;
+          const minH = isImageLike ? 12 : 20;
+
           // Horizontal: 'w' moves left edge → width shrinks
           //             'e' moves right edge → width grows
           if (h.includes('w')) {
-            nw = Math.max(40, s.ow - localDx);
+            nw = Math.max(minW, s.ow - localDx);
             localShiftX = s.ow - nw;
           } else if (h.includes('e')) {
-            nw = Math.max(40, s.ow + localDx);
+            nw = Math.max(minW, s.ow + localDx);
           }
 
           // Vertical: 'n' moves top edge → height shrinks
           //           's' moves bottom edge → height grows
           if (h.includes('n')) {
-            nh = Math.max(20, s.oh - localDy);
+            nh = Math.max(minH, s.oh - localDy);
             localShiftY = s.oh - nh;
           } else if (h.includes('s')) {
-            nh = Math.max(20, s.oh + localDy);
+            nh = Math.max(minH, s.oh + localDy);
           }
 
-          // Lock aspect ratio for image/logo blocks — width drives
-          // height proportionally. Only corners are shown (cornersOnly
-          // in ResizeHandles), so h always includes both axes.
-          const lockAspect = blk.type === 'image' || blk.type === 'logo';
+          // Lock aspect ratio when:
+          //   - image block in default (contain) mode — figure
+          //     proportions shouldn't change accidentally
+          //   - OR user is holding Shift — universal modifier to
+          //     constrain freeform resizes (Figma/Photoshop
+          //     convention). Lets logos and stretched images
+          //     temporarily preserve their aspect during a drag.
+          const lockAspect =
+            ev.shiftKey ||
+            (blk.type === 'image' && blk.imageFit !== 'fill');
           if (lockAspect && s.oh > 0) {
             const aspect = s.ow / s.oh;
             nh = nw / aspect;
@@ -1147,6 +1233,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
 
   const { onPointerDown, didDragRef, draggingId } = useBlockDrag(
     doc.blocks, setBlocks, storeSetBlocksSilent, zoom,
+    selectedIds,
     (msg) => showToast(msg),
   );
   const draggingBlock = draggingId ? doc.blocks.find((x) => x.id === draggingId) ?? null : null;
@@ -1411,7 +1498,18 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // Mutators (all push back through setPoster for store immutability)
   // -----------------------------------------------------------------------
 
-  const updateDoc = (patch: Partial<PosterDoc>) => setPoster(posterId, { ...doc, ...patch });
+  const updateDoc = (patch: Partial<PosterDoc>) => {
+    // Read the LATEST doc from the store rather than the closed-
+    // over `doc` from the current render. When a single event
+    // handler calls updateDoc twice (e.g. AuthorManager's bulk
+    // paste creates institutions, then sets authors with linked
+    // affiliationIds), the second call previously spread the
+    // stale render-time doc and overwrote the first patch — so
+    // institutions silently disappeared. Reading from getState()
+    // makes sequential patches stack correctly.
+    const latest = usePosterStore.getState().doc ?? doc;
+    setPoster(posterId, { ...latest, ...patch });
+  };
 
   const updateBlock = (id: string, patch: Partial<Block>) =>
     setBlocks(doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)));
@@ -1684,6 +1782,38 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       setStyle('heading', { size: result.scaledStyles.heading.size });
     }
   };
+
+  // Auto-arrange immediately after an import lands. The import
+  // modal sets `postr.autoArrangeOnLoad = posterId` in
+  // sessionStorage just before navigating here. We run on the
+  // first frame after mount + doc-load (useLayoutEffect would be
+  // too eager — the canvas refs aren't ready yet), then clear the
+  // flag so subsequent navigations to the same poster don't
+  // re-arrange the user's manual edits.
+  const ranAutoArrangeOnLoadRef = useRef(false);
+  useEffect(() => {
+    if (ranAutoArrangeOnLoadRef.current) return;
+    if (!posterId || !doc) return;
+    let pending: string | null = null;
+    try {
+      pending = sessionStorage.getItem('postr.autoArrangeOnLoad');
+    } catch {
+      // sessionStorage unavailable — nothing to do.
+    }
+    if (pending !== posterId) return;
+    ranAutoArrangeOnLoadRef.current = true;
+    try {
+      sessionStorage.removeItem('postr.autoArrangeOnLoad');
+    } catch {
+      // best effort
+    }
+    // Defer one tick so the canvas mounts before measurement.
+    // Without this, `measureContent` can race the editor's first
+    // paint and read 0-height for blocks with refs not yet in DOM.
+    const id = window.setTimeout(() => onAutoLayout(), 0);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posterId, doc]);
 
   const savePreset = (name: string) => {
     setSavedPresets((prev) => [

@@ -141,13 +141,14 @@ export const PALETTES: NamedPalette[] = [
  * above. Sizes are in poster units; multiply by POINTS_PER_UNIT (7.2)
  * to see the printed point size.
  *
- *   title    22  ≈ 158pt  (ideal title)
+ *   title    14  ≈ 101pt  (default title — bold, attention-grabbing
+ *                          without dominating the page)
  *   heading   8  ≈  58pt  (just above 56pt ideal section heading)
  *   body      5  ≈  36pt  (ideal body text)
  *   authors   5  ≈  36pt  (treated as prominent supporting text)
  */
 export const DEFAULT_STYLES: Styles = {
-  title: { size: 22, weight: 800, italic: false, lineHeight: 1.15, color: null, highlight: null },
+  title: { size: 14, weight: 800, italic: false, lineHeight: 1.15, color: null, highlight: null },
   // Authors uses the same tight line-height as title so the
   // rendered block wraps snugly around the text. Previous default
   // of 1.5 produced ~50 % extra vertical space beyond the glyphs
