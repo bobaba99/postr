@@ -35,10 +35,11 @@ export interface AutosaveState {
    * propagated through React render (store update + flush in the
    * same event handler).
    */
-  flushNow: (overrideTitle?: string) => Promise<void>;
+  flushNow: (overrideTitle?: string, options?: { forceCapture?: boolean }) => Promise<void>;
 }
 
 const DEBOUNCE_MS = 800;
+const CAPTURE_COOLDOWN_MS = 3000;
 
 /** Strip HTML tags to get plain text for the poster title column. */
 function stripHtml(html: string): string {
@@ -62,6 +63,7 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
   const pendingTitleRef = useRef<string | undefined>(displayTitle);
   const firstRenderRef = useRef(true);
   const lastPosterIdRef = useRef<string | null>(posterId);
+  const lastCaptureRef = useRef<number>(0);
   // Always-current refs so flushNow() can persist even when the debounce
   // effect hasn't scheduled yet (e.g. title change → user clicks Save
   // before React has committed the next render).
@@ -76,7 +78,7 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
   // Actual save — runs at the tail of the debounce window, on unmount,
   // or synchronously when flushNow() is invoked (e.g. the Sidebar "Save"
   // button needs the write to reach Supabase before a potential refresh).
-  const flush = async (overrideTitle?: string) => {
+  const flush = async (overrideTitle?: string, { forceCapture = false }: { forceCapture?: boolean } = {}) => {
     // Cancel any pending debounce — whoever called flush wants this
     // snapshot persisted now, not after another 800ms window.
     if (timerRef.current) {
@@ -110,14 +112,20 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
       setState({ status: 'saved', lastSavedAt: new Date(), error: null });
 
       // Fire-and-forget thumbnail capture — never blocks editing.
-      // Runs after a successful save so the canvas reflects the latest state.
-      supabase.auth.getUser().then(({ data: userData }) => {
-        const uid = userData?.user?.id;
-        if (!uid) return;
-        captureThumbnail(uid, id).then((path) => {
-          if (path) upsertPoster(id, { thumbnailPath: path });
+      // Throttled by CAPTURE_COOLDOWN_MS to avoid repeated html-to-image
+      // calls during rapid edits; forceCapture bypasses the cooldown so
+      // the unmount path always produces a fresh dashboard preview.
+      const now = Date.now();
+      if (forceCapture || now - lastCaptureRef.current >= CAPTURE_COOLDOWN_MS) {
+        lastCaptureRef.current = now;
+        supabase.auth.getUser().then(({ data: userData }) => {
+          const uid = userData?.user?.id;
+          if (!uid) return;
+          captureThumbnail(uid, id).then((path) => {
+            if (path) upsertPoster(id, { thumbnailPath: path });
+          });
         });
-      });
+      }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       setState((s) => ({ ...s, status: 'error', error }));
@@ -169,14 +177,15 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, posterId, displayTitle]);
 
-  // Unmount: flush any pending save so nothing is lost.
+  // Unmount: flush any pending save so nothing is lost, and force a
+  // thumbnail capture so the dashboard always shows a fresh preview.
   useEffect(() => {
     return () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
-        void flush();
       }
+      void flush(undefined, { forceCapture: true });
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -220,5 +229,5 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { ...state, flushNow: flush };
+  return { ...state, flushNow: (overrideTitle?: string, options?: { forceCapture?: boolean }) => flush(overrideTitle, options) };
 }
