@@ -21,6 +21,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { requireAuth, type AuthLocals } from './auth.js';
 import { createRateLimiter } from './rateLimit.js';
+import { checkImageUrl } from './imageUrlGuard.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Request / response schemas
@@ -458,6 +459,22 @@ export function createImportRouter(deps: ImportRouterDeps = {}): Router {
 
       const { imageUrl, pageWidthPt, pageHeightPt, mode, model } = parsed.data;
 
+      // SSRF guard: this endpoint fetches imageUrl server-side, so
+      // accept only our own Supabase Storage host (see imageUrlGuard).
+      const urlCheck = checkImageUrl(imageUrl, process.env.SUPABASE_URL);
+      if (!urlCheck.ok) {
+        if (urlCheck.reason === 'allowlist_not_configured') {
+          return res.status(500).json({
+            error: 'supabase_not_configured',
+            message: 'SUPABASE_URL must be set to validate image sources.',
+          });
+        }
+        return res.status(400).json({
+          error: 'bad_request',
+          message: 'imageUrl must be an https URL on the project storage host.',
+        });
+      }
+
       // Only the Anthropic adapter is wired for now; we 503 on
       // anything else so the frontend can fall back.
       if (model !== 'claude') {
@@ -484,6 +501,9 @@ export function createImportRouter(deps: ImportRouterDeps = {}): Router {
       try {
         const r = await fetchFn(imageUrl, {
           signal: AbortSignal.timeout(15_000),
+          // The host allowlist above is worthless if the allowed host
+          // can 302 to an internal address — refuse redirects outright.
+          redirect: 'error',
         });
         if (!r.ok) {
           return res.status(502).json({
@@ -492,12 +512,16 @@ export function createImportRouter(deps: ImportRouterDeps = {}): Router {
           });
         }
         const buf = Buffer.from(await r.arrayBuffer());
+        // Anthropic enforces its own per-image size limit upstream, so
+        // check raw bytes BEFORE base64 (which inflates 4/3): 5MB raw
+        // stays safely inside the API limit, and the user gets a clean
+        // 413 instead of an opaque upstream failure.
+        if (buf.byteLength > 5 * 1024 * 1024) {
+          return res.status(413).json({ error: 'image_too_large' });
+        }
         const contentType = r.headers.get('content-type') ?? 'image/png';
         mediaType = contentType.includes('jpeg') ? 'image/jpeg' : 'image/png';
         imageData = buf.toString('base64');
-        if (imageData.length > 20 * 1024 * 1024) {
-          return res.status(413).json({ error: 'image_too_large' });
-        }
       } catch (err) {
         const message = err instanceof Error ? err.message : 'unknown';
         return res.status(502).json({ error: 'image_fetch_failed', message });
