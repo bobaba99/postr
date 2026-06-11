@@ -102,6 +102,7 @@ Never commit `.env` files. See `apps/api/.env.example` for the canonical shape.
 | `npm run db:start`       | Start the local Supabase stack                      |
 | `npm run db:stop`        | Stop the local Supabase stack                       |
 | `npm run db:reset`       | Reset the local database                            |
+| `npm run db:test`        | Reset the local database, then run the SQL tests    |
 | `npm run db:types`       | Regenerate `packages/shared/src/database.types.ts`  |
 
 ## Database
@@ -114,6 +115,27 @@ npm run db:types     # regenerate typed client
 ```
 
 Every user-owned table is protected by Row Level Security. See the migrations for the exact policies.
+
+### SQL tests (pgTAP)
+
+The SQL RPCs (`export_my_data()`, `delete_own_account()`, the rate-limit
+triggers) are tested at the database level — PL/pgSQL bodies are only
+syntax-checked at `CREATE` time, so a broken column reference inside a
+function applies cleanly and fails only at runtime. The pgTAP suite in
+`supabase/tests/` catches that class of bug.
+
+```bash
+npm run db:test      # supabase db reset && supabase test db
+```
+
+Requires Docker and a running local stack (`npm run db:start`, or just
+`supabase db start` for Postgres alone). Each test file is a single
+transaction that rolls back at the end, so the suite leaves the local
+database untouched. The same suite runs in CI against a throwaway
+Postgres container — local-stack default credentials only, no secrets.
+CI skips the reset on purpose: a fresh `supabase db start` already applies
+every migration, while the local script resets first because a long-lived
+dev stack may be behind on migrations.
 
 ## Status
 
