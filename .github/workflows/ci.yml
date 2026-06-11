@@ -73,3 +73,33 @@ jobs:
 
       - name: Build API
         run: npm -w @postr/api run build
+
+  db:
+    name: db (migrations + pgTAP)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Boots the Supabase Postgres container from scratch — which applies
+    # every migration in supabase/migrations/ — then runs the pgTAP suite
+    # in supabase/tests/. This is the only job that executes the SQL RPCs
+    # for real: PL/pgSQL bodies are just syntax-checked at CREATE time, so
+    # a broken column reference inside a function applies cleanly and only
+    # fails at runtime (see 20260610000000_fix_gdpr_export_feedback_columns).
+    #
+    # No secrets here by design: the throwaway container uses the Supabase
+    # CLI's well-known local-stack defaults. Real credentials must never
+    # appear in CI. The GOOGLE_CLIENT_ID/SECRET warnings from config.toml
+    # are expected — the auth service isn't started, Postgres alone is.
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned to the version the suite was developed against; `db start`
+      # behavior (auto-applying migrations) is what the job relies on.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.101.0
+
+      - name: Start local Postgres (applies all migrations)
+        run: supabase db start
+
+      - name: Run SQL tests
+        run: supabase test db
