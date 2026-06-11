@@ -15,7 +15,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(15);
+select plan(19);
 
 -- --------------------------------------------------------------------------
 -- Functions exist
@@ -79,14 +79,14 @@ select ok(
 -- --------------------------------------------------------------------------
 -- Wiring + grants
 --
--- NOTE: these assert callability, not an access boundary. EXECUTE is also
--- held by PUBLIC — Postgres grants it on every function by default, and the
--- `revoke ... from anon` in 20260410000000_delete_own_account.sql does not
--- remove the PUBLIC grant. The enforced boundary is the auth.uid() guard
--- inside each function body, covered behaviorally: export_my_data() raises
--- P0001 unauthenticated (export_my_data_test.sql) and delete_own_account()
--- deletes nothing (delete_own_account_test.sql). Tightening the grants with
--- `revoke execute ... from public` is tracked as separate hardening work.
+-- 20260610120000_rpc_grant_hardening.sql revoked the default PUBLIC
+-- EXECUTE grant, so grants are a real access boundary: only `authenticated`
+-- may call the user-facing RPCs. The negative assertions below pin that —
+-- has_function_privilege('anon', ...) sees privileges inherited via PUBLIC,
+-- so they also catch a drop+recreate that silently resurrects the default
+-- grant. The auth.uid() guards inside each body stay covered behaviorally:
+-- export_my_data() raises P0001 unauthenticated (export_my_data_test.sql),
+-- delete_own_account() deletes nothing (delete_own_account_test.sql).
 -- --------------------------------------------------------------------------
 select has_trigger('public', 'feedback', 'feedback_rate_limit_trigger',
   'rate-limit trigger is attached to public.feedback');
@@ -97,6 +97,19 @@ select function_privs_are('public', 'export_my_data', array[]::name[],
 select function_privs_are('public', 'delete_own_account', array[]::name[],
   'authenticated', array['EXECUTE'],
   'authenticated role can execute delete_own_account()');
+select function_privs_are('public', 'is_gallery_admin', array['uuid']::name[],
+  'authenticated', array['EXECUTE'],
+  'authenticated role can execute is_gallery_admin(uuid)');
+
+select ok(
+  not has_function_privilege('anon', 'public.delete_own_account()', 'EXECUTE'),
+  'anon cannot execute delete_own_account()');
+select ok(
+  not has_function_privilege('anon', 'public.export_my_data()', 'EXECUTE'),
+  'anon cannot execute export_my_data()');
+select ok(
+  not has_function_privilege('anon', 'public.is_gallery_admin(uuid)', 'EXECUTE'),
+  'anon cannot execute is_gallery_admin(uuid)');
 
 select * from finish();
 rollback;
