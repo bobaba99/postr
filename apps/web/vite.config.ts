@@ -64,5 +64,12 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     css: false,
+    // Provide stub values so modules that import supabase.ts can load
+    // in the test environment without a real .env file.
+    env: {
+      VITE_SUPABASE_URL: 'https://test.supabase.co',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'test-publishable-key',
+      VITE_API_BASE_URL: 'http://localhost:8787',
+    },
   },
 });
