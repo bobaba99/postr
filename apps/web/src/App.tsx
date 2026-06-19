@@ -1,4 +1,5 @@
 import { BrowserRouter } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { AppRoutes } from '@/routes';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { PublishFlow } from '@/components/PublishFlow';
@@ -11,6 +12,7 @@ export default function App() {
       <FeedbackModal />
       <PublishFlow />
       <SessionExpiredModal />
+      <Analytics />
     </BrowserRouter>
   );
 }
