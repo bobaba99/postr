@@ -114,14 +114,17 @@ select throws_ok(
   'new row violates row-level security policy for table "poster_versions"',
   'RLS rejects a version attached to a poster the user does not own');
 
--- 6 · versions are immutable: no UPDATE policy → 0 rows affected
+-- 6 · versions are immutable: no UPDATE policy → 0 rows affected.
+-- The data-modifying CTE must sit at the TOP LEVEL of the statement
+-- (Postgres rejects it inside is()'s subquery), so is() reads the CTE.
+with updated as (
+  update public.poster_versions
+     set name = 'Renamed'
+   where poster_id = 'b1000000-0000-4000-a000-000000000001'
+  returning 1
+)
 select is(
-  (with updated as (
-     update public.poster_versions
-        set name = 'Renamed'
-      where poster_id = 'b1000000-0000-4000-a000-000000000001'
-      returning 1)
-   select count(*) from updated),
+  (select count(*) from updated),
   0::bigint,
   'updates hit zero rows — versions are immutable snapshots');
 
@@ -144,23 +147,25 @@ select lives_ok(
   'cap is scoped per poster — a second poster still accepts versions');
 
 -- 9 · deleting another user's version hits 0 rows
+with deleted as (
+  delete from public.poster_versions
+   where id = 'c1000000-0000-4000-a000-000000000001'
+  returning 1
+)
 select is(
-  (with deleted as (
-     delete from public.poster_versions
-      where id = 'c1000000-0000-4000-a000-000000000001'
-      returning 1)
-   select count(*) from deleted),
+  (select count(*) from deleted),
   0::bigint,
   'deleting another user''s version affects zero rows');
 
 -- 10 · owner can delete their own version
+with deleted as (
+  delete from public.poster_versions
+   where poster_id = 'b1000000-0000-4000-a000-000000000001'
+     and name = 'Milestone'
+  returning 1
+)
 select is(
-  (with deleted as (
-     delete from public.poster_versions
-      where poster_id = 'b1000000-0000-4000-a000-000000000001'
-        and name = 'Milestone'
-      returning 1)
-   select count(*) from deleted),
+  (select count(*) from deleted),
   1::bigint,
   'owner can delete their own version');
 
