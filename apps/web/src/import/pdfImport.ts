@@ -137,6 +137,10 @@ export async function extractFromPdf(
     throw new PdfImportError(`Could not parse PDF: ${message}`, 'parse-failed');
   }
 
+  // Always release the worker-side document once we're done (or on any
+  // throw) — otherwise every import leaks pdfjs transport + page buffers
+  // until the tab reloads.
+  try {
   if (pdf.numPages > 1) {
     throw new PdfImportError(
       `Multi-page PDFs are not yet supported — this file has ${pdf.numPages} pages.`,
@@ -268,6 +272,9 @@ export async function extractFromPdf(
 
   onProgress({ stage: 'ready' });
   return synth;
+  } finally {
+    void pdf.destroy();
+  }
 }
 
 /** Pull every TextItem from a page, normalizing pdfjs's bottom-up

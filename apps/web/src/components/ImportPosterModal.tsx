@@ -84,6 +84,12 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
   // Holds the most recent import error so the Send Feedback button
   // can include it. Not state because nothing else re-renders on it.
   const pendingErrorRef = useRef<unknown>(null);
+  // Re-entrancy latch: the DropZone unmounts on the NEXT render, not
+  // synchronously, so a double-drop (or drop racing the hidden input's
+  // change event) can call handleFile twice before `phase` flips. Each
+  // call in `new` mode mints its own poster row; without this guard the
+  // earlier row is neither committed nor cleaned up.
+  const importInFlightRef = useRef(false);
 
   // Reset state when (re-)opened
   useEffect(() => {
@@ -141,6 +147,10 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
   }
 
   async function handleFile(file: File) {
+    // Ignore a second call while the first extraction is still running.
+    if (importInFlightRef.current) return;
+    importInFlightRef.current = true;
+
     setError(null);
     setImportFailed(false);
     setPreview(null);
@@ -247,6 +257,8 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
         });
       }
       setPhase('pick');
+    } finally {
+      importInFlightRef.current = false;
     }
   }
 
@@ -887,15 +899,21 @@ async function renderThumbnail(file: File): Promise<string | null> {
     // imports .postr bundles.
     const pdfjs = await import('pdfjs-dist');
     const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
-    const page = await pdf.getPage(1);
-    const viewport = page.getViewport({ scale: 0.4 });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    return canvas.toDataURL('image/png');
+    // Release the worker-side document even if rendering throws — this
+    // runs on every file pick, so a leak here accumulates fast.
+    try {
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 0.4 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      return canvas.toDataURL('image/png');
+    } finally {
+      void pdf.destroy();
+    }
   }
   return null;
 }

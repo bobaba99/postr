@@ -610,25 +610,31 @@ async function rasterizePdfFirstPage(
     const msg = err instanceof Error ? err.message : 'parse error';
     throw new Error(`Could not parse PDF: ${msg}`);
   }
-  if (pdf.numPages > 1) {
-    throw new Error(
-      `Multi-page PDFs are not yet supported — this file has ${pdf.numPages} pages.`,
-    );
+  // Always release the worker-side document — otherwise each import
+  // leaks its transport + page buffers until the tab reloads.
+  try {
+    if (pdf.numPages > 1) {
+      throw new Error(
+        `Multi-page PDFs are not yet supported — this file has ${pdf.numPages} pages.`,
+      );
+    }
+    const page = await pdf.getPage(1);
+    const SCALE = 2;
+    const viewport = page.getViewport({ scale: SCALE });
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('No 2D context available.');
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    return {
+      canvas,
+      pageWidthPt: page.getViewport({ scale: 1 }).width,
+      pageHeightPt: page.getViewport({ scale: 1 }).height,
+    };
+  } finally {
+    void pdf.destroy();
   }
-  const page = await pdf.getPage(1);
-  const SCALE = 2;
-  const viewport = page.getViewport({ scale: SCALE });
-  const canvas = document.createElement('canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('No 2D context available.');
-  await page.render({ canvasContext: ctx, viewport }).promise;
-  return {
-    canvas,
-    pageWidthPt: page.getViewport({ scale: 1 }).width,
-    pageHeightPt: page.getViewport({ scale: 1 }).height,
-  };
 }
 
 async function rasterizeImage(
@@ -639,6 +645,12 @@ async function rasterizeImage(
     const img = new Image();
     img.src = url;
     await img.decode();
+    // A 0×0 image (corrupt/unsupported) would propagate NaN aspect
+    // ratios and Infinity scale factors into every block coordinate
+    // downstream. Reject it with a user-actionable message instead.
+    if (!img.naturalWidth || !img.naturalHeight) {
+      throw new Error('Image has no dimensions — it may be corrupt or unsupported.');
+    }
     const canvas = document.createElement('canvas');
     canvas.width = img.naturalWidth;
     canvas.height = img.naturalHeight;
