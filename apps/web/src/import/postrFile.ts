@@ -23,6 +23,7 @@ import {
   resolveStorageUrl,
   uploadPosterImage,
 } from '@/data/posterImages';
+import { sanitizeHtml } from '@/poster/sanitizeHtml';
 
 const APP_VERSION = '0.0.0';
 
@@ -77,11 +78,21 @@ export async function exportPostr(
  * Read a `.postr` File and return a deserialized PosterDoc with assets
  * re-uploaded into the user's poster-assets bucket under `posterId`.
  */
-/** Max accepted .postr file size before unzipping. Guards against
- *  zip-bomb DoS where a tiny file decompresses to gigabytes. The
- *  legitimate ceiling for a poster bundle is ~50 MB (a 4-page poster
- *  with 30 high-res figures). */
+/** Max accepted .postr file size BEFORE unzipping — first-line defense
+ *  against an oversized upload. This bounds the compressed input; the
+ *  decompressed total is checked separately below (a small compressed
+ *  file can still expand enormously). The legitimate ceiling for a
+ *  poster bundle is ~50 MB (a 4-page poster with 30 high-res figures).
+ *  Images are near-incompressible, so a real bundle's decompressed
+ *  size stays close to its compressed size. */
 const MAX_POSTR_FILE_BYTES = 100 * 1024 * 1024;
+
+/** Max accepted TOTAL decompressed size across all bundle entries.
+ *  A zip bomb is small on disk but expands to gigabytes; refusing to
+ *  process an expansion this large stops it from amplifying into
+ *  base64 + upload work (and flags the tampered bundle) even when the
+ *  compressed file slipped under MAX_POSTR_FILE_BYTES. */
+const MAX_POSTR_DECOMPRESSED_BYTES = 200 * 1024 * 1024;
 
 export async function importPostr(
   file: File,
@@ -99,6 +110,20 @@ export async function importPostr(
     entries = unzipSync(buffer);
   } catch {
     throw new Error('Could not read .postr bundle — file may be corrupted.');
+  }
+
+  // Zip-bomb guard: reject when the decompressed total blows past the
+  // ceiling. A crafted bundle can sit under the compressed cap yet
+  // expand to gigabytes; without this the expansion would be re-encoded
+  // to base64 and uploaded asset-by-asset.
+  let decompressedBytes = 0;
+  for (const bytes of Object.values(entries)) {
+    decompressedBytes += bytes.byteLength;
+  }
+  if (decompressedBytes > MAX_POSTR_DECOMPRESSED_BYTES) {
+    throw new Error(
+      `.postr bundle expands to ${(decompressedBytes / 1024 / 1024).toFixed(1)} MB, over the ${MAX_POSTR_DECOMPRESSED_BYTES / 1024 / 1024} MB limit.`,
+    );
   }
 
   const docBytes = entries['poster.json'];
@@ -127,8 +152,15 @@ export async function importPostr(
     assetEntries.map(([n, b]) => [n.slice('assets/'.length), b]),
   );
 
+  // Shared across blocks so two image blocks with the same id (a
+  // hand-edited or malicious bundle) can't collide on the same storage
+  // key — the second upload would otherwise overwrite the first's
+  // pixels and leave two blocks with identical ids. `.map` runs each
+  // callback synchronously up to its first `await`, so the set is
+  // mutated sequentially before any upload resolves.
+  const usedImageIds = new Set<string>();
   doc.blocks = await Promise.all(
-    doc.blocks.map((b) => unpackBlock(b, assetMap, posterId, userId)),
+    doc.blocks.map((b) => unpackBlock(b, assetMap, posterId, userId, usedImageIds)),
   );
 
   return { doc, title: extractTitle(doc), hashMatch };
@@ -151,17 +183,60 @@ async function packBlock(
   const ext = guessExt(b.imageSrc);
   const path = `${b.id}.${ext}`;
   const bytes = await fetchAsBytes(b.imageSrc);
-  if (!bytes) return b; // skip on fetch failure — block keeps the original src
+  if (!bytes) {
+    // Fetch failed (expired signed URL, offline, transient error). We
+    // can't bundle the bytes, so DON'T keep the original src: a
+    // `storage://<ownerId>/...` path would ride into the bundle with no
+    // asset behind it. On import that path is preserved verbatim (it's
+    // not a `bundle://` ref), leaving the importer with a broken image
+    // pointing at another user's storage — silent data loss plus a
+    // leaked foreign path. Null it so the bundle is self-consistent.
+    return { ...b, imageSrc: null };
+  }
   files[`assets/${path}`] = bytes;
   return { ...b, imageSrc: `${BUNDLE_PREFIX}${path}` };
 }
 
+/**
+ * Scrub the rich-text fields a `.postr` bundle controls but the render
+ * layer injects via `dangerouslySetInnerHTML` WITHOUT re-sanitizing:
+ * `note` (blocks.tsx), `caption` (blocks.tsx), and every `tableData`
+ * cell (blocks.tsx). A bundle is fully attacker-controlled and passes
+ * the integrity check (the hash is computed over the tampered JSON), so
+ * without this an imported bundle carrying `note: "<img src=x
+ * onerror=...>"` is stored XSS running in the importer's authenticated
+ * session. `content` is intentionally left alone — RichTextEditor
+ * re-sanitizes it on every render. Legitimate inline formatting
+ * (bold / italic / sup / sub / highlight) survives sanitizeHtml's
+ * allowlist, so a clean bundle round-trips unchanged.
+ */
+export function sanitizeImportedBlock(b: Block): Block {
+  const next: Block = { ...b };
+  if (typeof next.note === 'string') next.note = sanitizeHtml(next.note);
+  if (typeof next.caption === 'string') next.caption = sanitizeHtml(next.caption);
+  if (next.tableData) {
+    next.tableData = {
+      ...next.tableData,
+      cells: next.tableData.cells.map((cell) =>
+        typeof cell === 'string' ? sanitizeHtml(cell) : cell,
+      ),
+    };
+  }
+  return next;
+}
+
 async function unpackBlock(
-  b: Block,
+  raw: Block,
   assets: Map<string, Uint8Array>,
   posterId: string,
   userId: string,
+  usedImageIds: Set<string>,
 ): Promise<Block> {
+  // Sanitize first so EVERY block is scrubbed — including text/table
+  // blocks that carry no image and would otherwise return early below
+  // with their untrusted note/caption/cells intact.
+  const b = sanitizeImportedBlock(raw);
+
   if (!b.imageSrc?.startsWith(BUNDLE_PREFIX)) return b;
   const path = b.imageSrc.slice(BUNDLE_PREFIX.length);
   const bytes = assets.get(path);
@@ -176,7 +251,11 @@ async function unpackBlock(
   // which would otherwise flow through `uploadPosterImage` straight
   // into a storage path. `sanitizeBlockId` falls back to a fresh
   // nanoid when the id doesn't match the safe shape.
-  const safeId = sanitizeBlockId(b.id);
+  let safeId = sanitizeBlockId(b.id);
+  // Re-mint on collision so two image blocks can't share one storage
+  // key (the second upload would overwrite the first's pixels).
+  while (usedImageIds.has(safeId)) safeId = nanoid(8);
+  usedImageIds.add(safeId);
   const file = new File([blob], `${safeId}.${ext}`, {
     type: mimeFromExt(ext),
   });

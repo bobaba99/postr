@@ -1,6 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalJson, exportPostr, importPostr } from '../postrFile';
-import type { PosterDoc } from '@postr/shared';
+import {
+  canonicalJson,
+  exportPostr,
+  importPostr,
+  sanitizeImportedBlock,
+} from '../postrFile';
+import type { Block, PosterDoc } from '@postr/shared';
+
+/** Minimal Block factory — only the fields a test cares about. */
+function makeBlock(overrides: Partial<Block>): Block {
+  return {
+    id: 'blk1',
+    type: 'text',
+    x: 0,
+    y: 0,
+    w: 10,
+    h: 10,
+    content: '',
+    imageSrc: null,
+    tableData: null,
+    ...overrides,
+  } as Block;
+}
 
 const minimalDoc: PosterDoc = {
   version: 1,
@@ -78,5 +99,53 @@ describe('importPostr safety guards', () => {
     const blob = await exportPostr(minimalDoc);
     expect(blob.size).toBeGreaterThan(0);
     expect(blob.type).toBe('application/zip');
+  });
+});
+
+describe('sanitizeImportedBlock (stored-XSS guard)', () => {
+  it('strips active markup from note, caption, and table cells', () => {
+    const dirty = makeBlock({
+      note: '<img src=x onerror="alert(document.cookie)">hi',
+      caption: '<script>steal()</script>Figure caption',
+      tableData: {
+        rows: 1,
+        cols: 2,
+        cells: ['<a href="javascript:evil()">click</a>', 'plain'],
+        colWidths: null,
+        borderPreset: 'apa',
+      },
+    });
+
+    const clean = sanitizeImportedBlock(dirty);
+
+    // The tag/handler is gone; the visible text is preserved.
+    expect(clean.note).not.toMatch(/onerror|<img/i);
+    expect(clean.note).toContain('hi');
+    expect(clean.caption).not.toMatch(/<script/i);
+    expect(clean.caption).toContain('Figure caption');
+    expect(clean.tableData?.cells[0]).not.toMatch(/javascript:|<a/i);
+    expect(clean.tableData?.cells[0]).toContain('click');
+    expect(clean.tableData?.cells[1]).toBe('plain');
+  });
+
+  it('preserves legitimate inline formatting (idempotent round-trip)', () => {
+    const formatted = makeBlock({
+      note: 'p < 0.05 is <strong>significant</strong><sup>1</sup>',
+      caption: 'Mean <em>±</em> SD',
+    });
+
+    const clean = sanitizeImportedBlock(formatted);
+
+    expect(clean.note).toContain('<strong>significant</strong>');
+    expect(clean.note).toContain('<sup>1</sup>');
+    expect(clean.caption).toContain('<em>±</em>');
+  });
+
+  it('leaves blocks without rich-text fields untouched', () => {
+    const bare = makeBlock({ type: 'image', imageSrc: 'storage://u/p/x.png' });
+    const clean = sanitizeImportedBlock(bare);
+    expect(clean.note).toBeUndefined();
+    expect(clean.caption).toBeUndefined();
+    expect(clean.imageSrc).toBe('storage://u/p/x.png');
   });
 });
