@@ -19,3 +19,13 @@ ux-audit/supabase/.env
 /ux-audit-*.png
 /page-*.png
 /screenshot-*.png
+docs/test_posters/
+social_media_content/
+# Benchmark output artifacts — scripts/ itself is tracked source.
+scripts/poster-benchmark/
+# Transient perf traces + bulky captures. Curated captures belong in
+# docs/ux-audit/<date>/ (same rule as the root screenshot ignores).
+docs/debug/
+docs/screenshots/
+# Sample .postr archives are multi-MB zips — keep them out of git.
+docs/*.postr
