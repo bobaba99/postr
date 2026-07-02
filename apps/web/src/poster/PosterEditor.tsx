@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase';
 import type { CommentAnchor } from '@/data/comments';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { duplicatePoster, type PosterRow } from '@/data/posters';
+import { saveVersion, loadVersion } from '@/data/posterVersions';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import type {
   Block,
@@ -971,6 +972,84 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       setDuplicateError(message);
     }
   }, [posterId, autosave, posterDisplayName]);
+
+  // ── Version control ─────────────────────────────────────────────
+  // Save a snapshot of the current in-memory doc. Reads store state at
+  // call time so the Cmd+S keydown handler (registered once) never sees
+  // a stale doc. An empty name is fine — the Versions list renders the
+  // created_at timestamp for unnamed snapshots. Broadcasts so an open
+  // VersionPanel refetches.
+  const saveVersionNow = useCallback(
+    async (name = '') => {
+      const state = usePosterStore.getState();
+      const currentDoc = state.doc;
+      const currentId = state.posterId;
+      if (!currentId || !currentDoc) return;
+      try {
+        await saveVersion(currentId, name, currentDoc);
+        window.dispatchEvent(new Event('postr:versions-changed'));
+        showToast('Version saved');
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to save version:', err);
+        showToast('Could not save version');
+        throw err;
+      }
+    },
+    [showToast],
+  );
+
+  // Restore a snapshot. Auto-saves the current state as a "Before
+  // restore" version FIRST so the action is never destructive, then
+  // loads the chosen snapshot into the store (autosave persists it).
+  // The current display title is preserved — the snapshot only carries
+  // the PosterDoc, and setPoster would otherwise blank the title.
+  const restoreVersion = useCallback(
+    async (versionId: string) => {
+      const state = usePosterStore.getState();
+      const currentId = state.posterId;
+      const currentDoc = state.doc;
+      const currentTitle = state.posterTitle;
+      if (!currentId) return;
+      // Load the target FIRST: if it's gone (deleted in another tab),
+      // fail before creating a spurious "Before restore" snapshot.
+      const restored = await loadVersion(versionId);
+      if (!restored) throw new Error('version_not_found');
+      if (currentDoc) {
+        const stamp = new Date().toLocaleString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+        });
+        await saveVersion(currentId, `Before restore — ${stamp}`, currentDoc);
+      }
+      setPoster(currentId, restored, currentTitle);
+      window.dispatchEvent(new Event('postr:versions-changed'));
+      showToast('Version restored');
+    },
+    [setPoster, showToast],
+  );
+
+  // Cmd/Ctrl+S → save a version (and swallow the browser save dialog).
+  useEffect(() => {
+    if (readOnly) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        // Ignore OS key auto-repeat — a held Cmd+S would otherwise
+        // insert a snapshot per repeat and blow through the cap.
+        if (e.repeat) return;
+        // Swallow the rejection here: saveVersionNow re-throws for the
+        // awaited VersionPanel path, but the keydown path already gets
+        // the error toast, so an unhandled rejection would just double-
+        // report into the feedback/console-capture buffer.
+        void saveVersionNow().catch(() => {});
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [readOnly, saveVersionNow]);
 
   if (!doc || !posterId) {
     return (
@@ -2360,6 +2439,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         posterId={posterId ?? null}
         pendingCommentAnchor={pendingCommentAnchor}
         onClearPendingCommentAnchor={() => setPendingCommentAnchor(null)}
+        onSaveVersion={saveVersionNow}
+        onRestoreVersion={restoreVersion}
         readOnly={readOnly}
       />
       </div>

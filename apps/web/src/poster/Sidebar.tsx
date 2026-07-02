@@ -57,6 +57,7 @@ import { DockedFormatToolbar, FloatingFormatToolbar } from './FloatingFormatTool
 import { ReadabilityPanel } from './ReadabilityPanel';
 import { ImportSection } from './sidebar/ImportSection';
 import { PostrExportButton } from './sidebar/PostrExportButton';
+import { VersionPanel } from './VersionPanel';
 import {
   JustRefreshedBanner,
   UpdateAvailableBanner,
@@ -72,6 +73,7 @@ export type SidebarTab =
   | 'check'
   | 'issues'
   | 'comments'
+  | 'versions'
   | 'export';
 
 /**
@@ -195,6 +197,13 @@ interface SidebarProps {
   posterId: string | null;
   pendingCommentAnchor: import('@/data/comments').CommentAnchor | null;
   onClearPendingCommentAnchor: () => void;
+
+  // Versions tab. Save snapshots the current in-memory doc; restore
+  // auto-saves the current state first, then loads the chosen snapshot.
+  // Both are owned by PosterEditor (they need store access) and passed
+  // in so the sidebar stays presentational.
+  onSaveVersion: (name: string) => Promise<void>;
+  onRestoreVersion: (versionId: string) => Promise<void>;
 
   /** Read-only mode — share viewer. Hides every tab except Comments. */
   readOnly?: boolean;
@@ -588,6 +597,7 @@ export function Sidebar(props: SidebarProps) {
                   ['check', 'plot code check'],
                   ['issues', 'issues'],
                   ['comments', 'comments'],
+                  ['versions', 'versions'],
                   ['export', 'export'],
                 ] as Array<[SidebarTab, string]>))
           ).map(([t, label]) => {
@@ -747,6 +757,14 @@ export function Sidebar(props: SidebarProps) {
         )}
 
         {tab === 'insert' && <AddBlockPanel onAddBlock={props.onAddBlock} />}
+
+        {tab === 'versions' && (
+          <VersionPanel
+            posterId={props.posterId}
+            onSaveVersion={props.onSaveVersion}
+            onRestoreVersion={props.onRestoreVersion}
+          />
+        )}
 
         {tab === 'export' && (
           <ExportTab
