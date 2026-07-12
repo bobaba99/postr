@@ -385,7 +385,8 @@ body {
   [data-block-id] {
     animation: none !important;
   }
-  .postr-dimension-pill {
+  .postr-dimension-pill,
+  [data-postr-pulse] {
     animation: none !important;
   }
 }

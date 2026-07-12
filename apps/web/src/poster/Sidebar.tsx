@@ -2998,6 +2998,11 @@ function CaptionEditor(props: {
         type="button"
         onClick={handleFormat}
         disabled={!isDirty && !justFormatted}
+        // The dirty-state glow is a decorative attention loop; the
+        // button's color/background already signal the dirty state, so
+        // index.css nulls this animation under prefers-reduced-motion
+        // via [data-postr-pulse].
+        data-postr-pulse
         style={{
           all: 'unset',
           cursor: isDirty || justFormatted ? 'pointer' : 'default',
@@ -3012,9 +3017,9 @@ function CaptionEditor(props: {
           borderRadius: 8,
           fontSize: 13,
           fontWeight: 700,
-          transition: 'background 180ms ease, color 180ms ease',
+          transition: 'background 180ms var(--ease-standard), color 180ms var(--ease-standard)',
           animation: isDirty && !justFormatted
-            ? 'postr-dimension-pulse 1.6s ease-in-out infinite'
+            ? 'postr-dimension-pulse 1.6s var(--ease-standard) infinite'
             : 'none',
         }}
       >
@@ -3487,7 +3492,8 @@ function CustomBorderMockup(props: {
     background: '#1a1a26',
     color: '#c8cad0',
     border: '1px solid #2a2a3a',
-    transition: 'all 150ms ease',
+    transition:
+      'background-color 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out)',
   };
 
   return (
