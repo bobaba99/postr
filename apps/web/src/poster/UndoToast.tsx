@@ -22,7 +22,7 @@ export function UndoToast({ message, onDismiss }: UndoToastProps) {
     setVisible(true);
     const timer = setTimeout(() => {
       setVisible(false);
-      setTimeout(onDismiss, 300); // wait for fade-out
+      setTimeout(onDismiss, 150); // wait for the (faster) fade-out
     }, 1200);
     return () => clearTimeout(timer);
   }, [message, onDismiss]);
@@ -47,9 +47,13 @@ export function UndoToast({ message, onDismiss }: UndoToastProps) {
         pointerEvents: 'none',
         zIndex: 15,
         opacity: visible ? 1 : 0,
+        // Entrance uses ease-out so the toast is instantly responsive;
+        // the exit is faster than the entrance (Emil's asymmetric
+        // rule — the system's response snaps). ease-in on the entrance
+        // delayed the exact moment the user looks, making it sluggish.
         transition: visible
-          ? 'opacity 150ms ease-in'
-          : 'opacity 300ms ease-out',
+          ? 'opacity 200ms var(--ease-out)'
+          : 'opacity 150ms var(--ease-out)',
       }}
     >
       {message}
