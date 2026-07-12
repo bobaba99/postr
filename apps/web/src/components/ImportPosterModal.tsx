@@ -681,11 +681,16 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
         }}
       >
         <div
+          // The indeterminate shimmer is movement; the scoped style
+          // below nulls it under prefers-reduced-motion (the class
+          // gives the media query something to override the inline
+          // animation with).
+          className="postr-progress-fill"
           style={{
             height: '100%',
             width: ratio !== null ? `${ratio * 100}%` : '40%',
             background: '#7c6aed',
-            transition: 'width 200ms',
+            transition: 'width 200ms var(--ease-out)',
             animation: ratio === null ? 'postrPulse 1.4s ease-in-out infinite' : 'none',
           }}
         />
@@ -747,6 +752,18 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
         }
         .postr-caret {
           animation: postrCaretBlink 900ms steps(1, end) infinite;
+        }
+        /* Reduced-motion: stop the moving progress shimmer and the
+         * blinking caret — both are infinite loops. The caret rests
+         * visible so the simulated-typing line stays legible. */
+        @media (prefers-reduced-motion: reduce) {
+          .postr-progress-fill {
+            animation: none !important;
+          }
+          .postr-caret {
+            animation: none;
+            opacity: 1;
+          }
         }
       `}</style>
     </div>
