@@ -3,6 +3,34 @@
 @tailwind utilities;
 
 /* ===================================================================
+ * Motion design tokens
+ * ===================================================================
+ *
+ * A single vocabulary of easing curves + durations so every
+ * transition in the app reaches for a named token instead of a
+ * hand-typed cubic-bezier. Derived from Emil Kowalski's animation
+ * philosophy: strong custom curves (the built-in CSS easings are too
+ * weak), UI motion under 300ms, and exits faster than entrances.
+ *
+ * The canonical house ease-out — cubic-bezier(0.22, 1, 0.36, 1) — is
+ * kept as `--ease-out`; the rest round out the vocabulary so on-screen
+ * movement, drawers, and press feedback each have the right feel.
+ */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1); /* entering / exiting UI — responsive */
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); /* movement / morph on screen */
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1); /* iOS-like sheets & drawers */
+  --ease-back: cubic-bezier(0.34, 1.3, 0.64, 1); /* subtle overshoot "pop" */
+  --ease-standard: cubic-bezier(0.4, 0, 0.6, 1); /* neutral in-out — loops, press */
+
+  /* Duration scale — UI stays under 300ms. */
+  --dur-press: 120ms; /* button / control press feedback */
+  --dur-fast: 160ms; /* hovers, small popovers, format toolbar */
+  --dur-base: 220ms; /* tabs, dropdowns, modal content */
+  --dur-slow: 280ms; /* larger reveals, tab cross-fades */
+}
+
+/* ===================================================================
  * List restoration inside poster blocks
  * =================================================================== *
  *
@@ -180,7 +208,7 @@ body {
 }
 .postr-format-toolbar-enter {
   animation: postr-format-toolbar-enter 160ms
-    cubic-bezier(0.22, 1, 0.36, 1);
+    var(--ease-out);
   transform-origin: 50% 100%;
 }
 
@@ -202,16 +230,16 @@ body {
 }
 
 .postr-tab-enter {
-  animation: postr-tab-enter 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: postr-tab-enter 220ms var(--ease-out);
 }
 
 .postr-dropdown-enter {
-  animation: postr-dropdown-expand 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: postr-dropdown-expand 240ms var(--ease-out);
   overflow: hidden;
 }
 
 .postr-overlay-enter {
-  animation: postr-overlay-enter 260ms cubic-bezier(0.34, 1.3, 0.64, 1);
+  animation: postr-overlay-enter 260ms var(--ease-back);
 }
 
 .postr-dimension-pill {
@@ -223,22 +251,22 @@ body {
   color: #ffffff;
   font-weight: 700;
   letter-spacing: 0.3px;
-  animation: postr-dimension-pulse 2200ms cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  animation: postr-dimension-pulse 2200ms var(--ease-standard) infinite;
   will-change: transform, box-shadow;
 }
 
 [data-postr-modal-backdrop] {
-  animation: postr-modal-backdrop 160ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: postr-modal-backdrop 160ms var(--ease-out);
 }
 
 [data-postr-modal-content] {
-  animation: postr-modal-content 240ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: postr-modal-content 240ms var(--ease-out);
   animation-delay: 40ms;
   animation-fill-mode: backwards;
 }
 
 .postr-rise-in {
-  animation: postr-rise-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: postr-rise-in 200ms var(--ease-out);
 }
 
 /* ===================================================================
@@ -267,12 +295,12 @@ body {
   button:not([data-no-anim]),
   [role='button']:not([data-no-anim]) {
     transition:
-      background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
-      border-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
-      color 140ms cubic-bezier(0.22, 1, 0.36, 1),
-      box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1),
-      opacity 140ms cubic-bezier(0.22, 1, 0.36, 1),
-      transform 120ms cubic-bezier(0.4, 0, 0.6, 1);
+      background-color 140ms var(--ease-out),
+      border-color 140ms var(--ease-out),
+      color 140ms var(--ease-out),
+      box-shadow 160ms var(--ease-out),
+      opacity 140ms var(--ease-out),
+      transform 120ms var(--ease-standard);
   }
   button:not([data-no-anim]):not(:disabled):active,
   [role='button']:not([data-no-anim]):not([aria-disabled='true']):active {
@@ -286,17 +314,17 @@ body {
   textarea:not([data-no-anim]),
   select:not([data-no-anim]) {
     transition:
-      border-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
-      box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
-      background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
-      color 160ms cubic-bezier(0.22, 1, 0.36, 1);
+      border-color 160ms var(--ease-out),
+      box-shadow 180ms var(--ease-out),
+      background-color 160ms var(--ease-out),
+      color 160ms var(--ease-out);
   }
 
   /* Hyperlinks fade their color so hover doesn't snap. */
   a:not([data-no-anim]) {
     transition:
-      color 140ms cubic-bezier(0.22, 1, 0.36, 1),
-      opacity 140ms cubic-bezier(0.22, 1, 0.36, 1);
+      color 140ms var(--ease-out),
+      opacity 140ms var(--ease-out);
   }
 
   /* Block-frame & selection-ui circle handles: gentle hover lift +
