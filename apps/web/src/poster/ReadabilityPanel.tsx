@@ -721,7 +721,7 @@ export function ReadabilityPanel({
             {!isImage && ' (default block size)'}
           </div>
 
-          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', fontVariantNumeric: 'tabular-nums' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #45475a', color: '#9ca3af' }}>
                 <th style={{ textAlign: 'left', padding: '4px 0' }}>Element</th>
@@ -975,7 +975,7 @@ function ImageScanSection(props: {
             borderRadius: 6,
           }}
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
             <thead style={{ position: 'sticky', top: 0, background: '#1a1a26' }}>
               <tr>
                 <th style={thStyle}>Status</th>

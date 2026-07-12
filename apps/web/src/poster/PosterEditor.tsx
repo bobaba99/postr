@@ -3328,7 +3328,10 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (z: number | null) 
       </button>
       <button
         onClick={() => setZoom(null)}
-        style={{ all: 'unset', cursor: 'pointer', color: '#888', fontSize: 9, padding: '2px 8px', fontWeight: 600, fontFamily: 'system-ui' }}
+        // tabular-nums keeps the % from shifting width as the digits
+        // change while dragging zoom (e.g. 90% → 100%), so the readout
+        // and the +/− buttons flanking it stay put.
+        style={{ all: 'unset', cursor: 'pointer', color: '#888', fontSize: 9, padding: '2px 8px', fontWeight: 600, fontFamily: 'system-ui', fontVariantNumeric: 'tabular-nums', minWidth: 34, textAlign: 'center' }}
       >
         {Math.round(zoom * 100)}%
       </button>

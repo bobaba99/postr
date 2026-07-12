@@ -253,7 +253,7 @@ export function PosterCard({ row, onDuplicate, onDelete }: PosterCardProps) {
         </div>
         <div className="flex items-baseline justify-between gap-2 px-3 py-2">
           <span className="truncate text-[14pt] font-medium text-[#e2e2e8]">{title}</span>
-          <span className="shrink-0 text-[12pt] text-[#6b7280]">
+          <span className="shrink-0 text-[12pt] tabular-nums text-[#6b7280]">
             {formatLastEdited(row.updated_at)}
           </span>
         </div>
