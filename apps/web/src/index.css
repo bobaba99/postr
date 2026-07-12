@@ -128,7 +128,7 @@ body {
 @keyframes postr-block-insert {
   0% {
     opacity: 0;
-    transform: scale(0.78);
+    transform: scale(0.94);
     box-shadow:
       0 0 0 0 rgba(124, 106, 237, 0),
       0 0 30px 10px rgba(124, 106, 237, 0.55);
@@ -327,27 +327,33 @@ body {
       opacity 140ms var(--ease-out);
   }
 
-  /* Block-frame & selection-ui circle handles: gentle hover lift +
-   * a soft glow ring so the user feels the affordance light up
-   * before they click. Limited to selection chrome so canvas
-   * blocks don't get unintended scale during normal interaction. */
-  [data-postr-selection-ui] button:not([data-no-anim]):hover:not(:disabled) {
-    transform: scale(1.12);
-    box-shadow:
-      0 1px 3px rgba(0, 0, 0, 0.4),
-      0 0 0 2px rgba(124, 106, 237, 0.18);
-  }
+  /* Selection-UI press feedback stays ungated — `:active` fires on
+   * touch too, and a press should always compress. */
   [data-postr-selection-ui] button:not([data-no-anim]):active:not(:disabled) {
     transform: scale(0.95);
   }
 
-  /* Sidebar list rows / tabs / nav items: hover background fade.
-   * Most rows already use inline backgrounds with hover effects;
-   * adding the transition lets those background changes glide
-   * instead of pop. */
-  [data-postr-sidebar] button:not([data-no-anim]):hover:not(:disabled),
-  [data-postr-guidelines] button:not([data-no-anim]):hover:not(:disabled) {
-    filter: brightness(1.08);
+  /* Hover-driven motion is gated behind a real pointer. Touch devices
+   * synthesize `:hover` on tap, which leaves the scaled/brightened
+   * state stuck after the finger lifts — so scale-lifts and brightness
+   * hovers only apply where a fine pointer that can truly hover exists. */
+  @media (hover: hover) and (pointer: fine) {
+    /* Block-frame & selection-ui circle handles: gentle hover lift +
+     * a soft glow ring so the user feels the affordance light up
+     * before they click. Limited to selection chrome so canvas blocks
+     * don't get unintended scale during normal interaction. */
+    [data-postr-selection-ui] button:not([data-no-anim]):hover:not(:disabled) {
+      transform: scale(1.12);
+      box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.4),
+        0 0 0 2px rgba(124, 106, 237, 0.18);
+    }
+
+    /* Sidebar list rows / tabs / nav items: hover background fade. */
+    [data-postr-sidebar] button:not([data-no-anim]):hover:not(:disabled),
+    [data-postr-guidelines] button:not([data-no-anim]):hover:not(:disabled) {
+      filter: brightness(1.08);
+    }
   }
 }
 
@@ -357,6 +363,30 @@ body {
   button:not([data-no-anim]):not(:disabled):active,
   [role='button']:not([data-no-anim]):active {
     filter: brightness(0.92);
+  }
+
+  /* The keyframe entrance/pulse layer above (tab/dropdown/overlay/
+   * toolbar reveals, modal fades, the infinite dimension-pill glow)
+   * is all movement — slides, scale-bounces, a looping pulse. Under
+   * reduced-motion we drop it and let elements appear in their resting
+   * state, the gentlest, least-vestibular option. Opacity-only reveals
+   * (rise-in) keep a short fade since they aid comprehension without
+   * moving anything. The GSAP and button-transition layers are already
+   * gated separately. */
+  .postr-tab-enter,
+  .postr-dropdown-enter,
+  .postr-overlay-enter,
+  .postr-format-toolbar-enter,
+  [data-postr-modal-content],
+  [data-postr-modal-backdrop],
+  /* Freshly-inserted blocks apply `postr-block-insert` as an inline
+   * animation; !important here beats the inline value so the block
+   * simply appears with no scale-bounce or glow. */
+  [data-block-id] {
+    animation: none !important;
+  }
+  .postr-dimension-pill {
+    animation: none !important;
   }
 }
 

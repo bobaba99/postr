@@ -1974,18 +1974,22 @@ export function BlockFrame(props: BlockFrameProps) {
         // border-color + box-shadow only — transitioning transform
         // would interfere with rotation/drag.
         transition:
-          'border-color 140ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 140ms cubic-bezier(0.22, 1, 0.36, 1)',
+          'border-color 140ms var(--ease-out), box-shadow 140ms var(--ease-out)',
         // One-shot mount animation for freshly-inserted blocks.
-        // `postr-block-insert` scales 0.78 → 1.04 → 1 with a
-        // purple accent glow, playing once then clearing when the
-        // `justInserted` flag flips back to false 700 ms later.
-        // Combined with the existing `b.rotation` transform via
-        // inline style order — the animation's `transform: scale()`
-        // overrides the rotate during the 500 ms animation window,
-        // which is fine because users can't rotate a block the
-        // same frame they insert it.
+        // `postr-block-insert` scales 0.94 → 1.04 → 1 with a purple
+        // accent glow, playing once then clearing when the
+        // `justInserted` flag flips back to false 700 ms later. Starts
+        // at 0.94 (not 0) so the block settles into place rather than
+        // punching out of nothing, and runs at 260 ms to stay within
+        // the sub-300ms UI budget. Combined with the existing
+        // `b.rotation` transform via inline style order — the
+        // animation's `transform: scale()` overrides the rotate during
+        // the animation window, which is fine because users can't
+        // rotate a block the same frame they insert it. Reduced-motion
+        // users get no movement: index.css nulls the animation on
+        // [data-block-id] under `prefers-reduced-motion: reduce`.
         ...(justInserted && !b.rotation
-          ? { animation: 'postr-block-insert 500ms cubic-bezier(0.34, 1.3, 0.64, 1)' }
+          ? { animation: 'postr-block-insert 260ms var(--ease-back)' }
           : {}),
         // Image + logo blocks get `default` cursor because drag is
         // only available from the move handle. Tables also use
