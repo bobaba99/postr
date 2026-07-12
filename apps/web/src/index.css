@@ -221,6 +221,26 @@ body {
   transform-origin: 50% 100%;
 }
 
+/* Origin-aware popover/menu entrance. Scales in from the trigger
+ * rather than from center — the caller sets `transform-origin` inline
+ * to match where the menu is anchored (e.g. `top left` for a menu that
+ * drops from a button's bottom-left). Starts at scale(0.96) + a hair of
+ * upward offset so it grows out of the trigger, never punches from
+ * nothing. Fast (--dur-fast) because menus are opened often. */
+@keyframes postr-popover-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.postr-popover-enter {
+  animation: postr-popover-enter var(--dur-fast) var(--ease-out);
+}
+
 /* Pulsing glow used to draw attention to the figure-size readout in
  * the Check tab description. Tighter than the overlay's scale-in —
  * 2.2s loop, purple glow fading on a 50% duty cycle. */
@@ -386,6 +406,7 @@ body {
   .postr-dropdown-enter,
   .postr-overlay-enter,
   .postr-format-toolbar-enter,
+  .postr-popover-enter,
   [data-postr-modal-content],
   [data-postr-modal-backdrop],
   /* Freshly-inserted blocks apply `postr-block-insert` as an inline

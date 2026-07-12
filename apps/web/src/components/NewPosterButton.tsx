@@ -92,7 +92,12 @@ export function NewPosterButton() {
       {menuOpen && (
         <div
           role="menu"
-          className="absolute left-0 top-full z-20 mt-1 min-w-[260px] overflow-hidden rounded-md border border-[#2a2a3a] bg-[#111118] shadow-2xl"
+          // Origin-aware entrance: the menu scales in from its top-left
+          // corner, anchored to the chevron trigger it drops from, so
+          // the spatial relationship reads clearly (Emil: popovers
+          // scale from their trigger, not center).
+          style={{ transformOrigin: 'top left' }}
+          className="postr-popover-enter absolute left-0 top-full z-20 mt-1 min-w-[260px] overflow-hidden rounded-md border border-[#2a2a3a] bg-[#111118] shadow-2xl"
         >
           <button
             type="button"
