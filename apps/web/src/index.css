@@ -69,7 +69,16 @@ body,
 body {
   margin: 0;
   font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  background-color: #f8fafc;
+  /* Every route paints its own dark chrome (#0a0a12) on <main>; the
+   * old light body colour only ever showed through as a jarring pale
+   * band on overscroll / rubber-band. Match the app so overscroll
+   * reads as one continuous dark surface. */
+  background-color: #0a0a12;
+  /* Crisper type on the dark UI — matches how macOS renders system
+   * font weights and keeps thin purple accents from smearing. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ===================================================================
