@@ -61,7 +61,7 @@ export function NewPosterButton() {
           type="button"
           onClick={handlePrimary}
           disabled={busy}
-          className="rounded-md border border-[#7c6aed] bg-[#7c6aed] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[#7c6aed]/30 transition-all hover:bg-[#9d87ff] hover:shadow-md hover:shadow-[#7c6aed]/40 disabled:cursor-wait disabled:opacity-60"
+          className="rounded-md border border-[#7c6aed] bg-[#7c6aed] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[#7c6aed]/30 transition-[background-color,box-shadow] hover:bg-[#9d87ff] hover:shadow-md hover:shadow-[#7c6aed]/40 disabled:cursor-wait disabled:opacity-60"
         >
           {busy ? 'Creating…' : '+ New poster'}
         </button>
@@ -71,7 +71,7 @@ export function NewPosterButton() {
           disabled={busy}
           data-postr-import-cta
           aria-label="Import an existing poster"
-          className="flex items-center gap-1.5 rounded-md border border-[#7c6aed] bg-[#7c6aed]/10 px-4 py-2 text-sm font-semibold text-[#c8b6ff] transition-all hover:bg-[#7c6aed]/20 hover:text-white disabled:cursor-wait disabled:opacity-60"
+          className="flex items-center gap-1.5 rounded-md border border-[#7c6aed] bg-[#7c6aed]/10 px-4 py-2 text-sm font-semibold text-[#c8b6ff] transition-colors hover:bg-[#7c6aed]/20 hover:text-white disabled:cursor-wait disabled:opacity-60"
         >
           <span aria-hidden>📥</span>
           Import…
@@ -92,7 +92,12 @@ export function NewPosterButton() {
       {menuOpen && (
         <div
           role="menu"
-          className="absolute left-0 top-full z-20 mt-1 min-w-[260px] overflow-hidden rounded-md border border-[#2a2a3a] bg-[#111118] shadow-2xl"
+          // Origin-aware entrance: the menu scales in from its top-left
+          // corner, anchored to the chevron trigger it drops from, so
+          // the spatial relationship reads clearly (Emil: popovers
+          // scale from their trigger, not center).
+          style={{ transformOrigin: 'top left' }}
+          className="postr-popover-enter absolute left-0 top-full z-20 mt-1 min-w-[260px] overflow-hidden rounded-md border border-[#2a2a3a] bg-[#111118] shadow-2xl"
         >
           <button
             type="button"

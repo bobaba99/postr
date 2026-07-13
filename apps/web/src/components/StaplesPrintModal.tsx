@@ -15,6 +15,7 @@
  *   5. At any Staples kiosk → "Mobile Device" → enter the code → print
  */
 import { useEffect, useState } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 
 const STAPLES_EMAIL = 'staplesmobile@printme.com';
 
@@ -46,7 +47,8 @@ export function StaplesPrintModal({
     return () => window.removeEventListener('keydown', handler);
   }, [open, onClose]);
 
-  if (!open) return null;
+  const { mounted, state } = useModalTransition(open);
+  if (!mounted) return null;
 
   // Pre-compose URLs for the three common webmail clients students
   // use (Gmail / Outlook / Yahoo). We deliberately DO NOT include a
@@ -84,7 +86,7 @@ export function StaplesPrintModal({
 
   return (
     <div
-      data-postr-modal-backdrop
+      data-postr-modal-backdrop data-state={state}
       onClick={onClose}
       style={{
         position: 'fixed',
@@ -99,7 +101,7 @@ export function StaplesPrintModal({
       }}
     >
       <div
-        data-postr-modal-content
+        data-postr-modal-content data-state={state}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',

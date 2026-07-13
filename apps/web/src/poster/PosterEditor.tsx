@@ -172,6 +172,17 @@ function paletteNameFor(
  *
  * Returns both the pointerdown handler and didDragRef so call sites
  * can consult "did the user just drag?" in their own click handlers.
+ *
+ * Motion note — no momentum, no springs (deliberate). Block position is
+ * exact, functional data: every move snaps to the grid/guides via
+ * `snap()`, and on release the block must sit precisely where the user
+ * dropped it. Momentum projection would carry it PAST the release point,
+ * and a bouncy spring would overshoot the target cell — both fight the
+ * snap and the user's intent. This is Emil Kowalski's "a functional
+ * graph in a banking app is better with no animation" case: for precise
+ * positioning, 1:1 tracking with an instant, snapped landing is the
+ * correct feel. Springs belong on decorative / dismissal gestures (a
+ * flicked sheet, drag-to-dismiss), of which this editor has none.
  */
 const DRAG_THRESHOLD_PX = 4;
 
@@ -2357,8 +2368,18 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           flexDirection: 'column',
           minHeight: 0,
           overflow: 'hidden',
+          // Deliberate layout animation. This is a space-reclaiming
+          // *push* panel — the canvas sibling reflows to fill the freed
+          // width, which is the right UX for a poster editor (blocks
+          // live at the canvas edges; an overlay panel would cover
+          // them). A transform-composited slide can't reclaim sibling
+          // space without becoming that overlay, so width is the honest
+          // tool here. The cost is bounded and acceptable: one panel,
+          // fixed 484px, 280ms, toggled only occasionally. min-width
+          // animates in lockstep so the flex item can't collapse ahead
+          // of the width tween.
           transition:
-            'width 280ms cubic-bezier(0.22, 1, 0.36, 1), min-width 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+            'width 280ms var(--ease-out), min-width 280ms var(--ease-out)',
         }}
       >
         <Sidebar
@@ -3240,8 +3261,12 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           flexDirection: 'column',
           minHeight: 0,
           overflow: 'hidden',
+          // Same deliberate push-panel width animation as the left
+          // sidebar (see that wrapper for the full rationale): the
+          // canvas reclaims the freed space rather than being covered
+          // by an overlay. Bounded cost — fixed 320px, 280ms, occasional.
           transition:
-            'width 280ms cubic-bezier(0.22, 1, 0.36, 1), min-width 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+            'width 280ms var(--ease-out), min-width 280ms var(--ease-out)',
         }}
       >
         <GuidelinesPanel open={guidelinesOpen} onToggle={() => setGuidelinesOpen((v) => !v)} />
@@ -3328,7 +3353,10 @@ function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (z: number | null) 
       </button>
       <button
         onClick={() => setZoom(null)}
-        style={{ all: 'unset', cursor: 'pointer', color: '#888', fontSize: 9, padding: '2px 8px', fontWeight: 600, fontFamily: 'system-ui' }}
+        // tabular-nums keeps the % from shifting width as the digits
+        // change while dragging zoom (e.g. 90% → 100%), so the readout
+        // and the +/− buttons flanking it stay put.
+        style={{ all: 'unset', cursor: 'pointer', color: '#888', fontSize: 9, padding: '2px 8px', fontWeight: 600, fontFamily: 'system-ui', fontVariantNumeric: 'tabular-nums', minWidth: 34, textAlign: 'center' }}
       >
         {Math.round(zoom * 100)}%
       </button>

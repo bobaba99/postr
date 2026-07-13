@@ -5,6 +5,7 @@
  * can open it.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { submitFeedback, type FeedbackKind } from '@/data/feedback';
 
@@ -57,7 +58,8 @@ export function FeedbackModal() {
     return () => window.removeEventListener('keydown', handler);
   }, [isOpen, close]);
 
-  if (!isOpen) return null;
+  const { mounted, state } = useModalTransition(isOpen);
+  if (!mounted) return null;
 
   async function handleSubmit() {
     setError(null);
@@ -81,7 +83,7 @@ export function FeedbackModal() {
 
   return (
     <div
-      data-postr-modal-backdrop
+      data-postr-modal-backdrop data-state={state}
       onClick={close}
       style={{
         position: 'fixed',
@@ -96,7 +98,7 @@ export function FeedbackModal() {
       }}
     >
       <div
-        data-postr-modal-content
+        data-postr-modal-content data-state={state}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',

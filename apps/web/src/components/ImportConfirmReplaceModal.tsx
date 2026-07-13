@@ -7,6 +7,7 @@
  * before discarding it.
  */
 import { useEffect, useState } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 import type { PosterDoc } from '@postr/shared';
 import { exportPostr } from '@/import/postrFile';
 
@@ -44,7 +45,8 @@ export function ImportConfirmReplaceModal({
     return () => window.removeEventListener('keydown', handler);
   }, [open, onCancel]);
 
-  if (!open) return null;
+  const { mounted, state } = useModalTransition(open);
+  if (!mounted) return null;
 
   async function handleSaveFirst() {
     if (!doc || exporting) return;
@@ -67,8 +69,8 @@ export function ImportConfirmReplaceModal({
   }
 
   return (
-    <div data-postr-modal-backdrop onClick={onCancel} style={overlayStyle}>
-      <div data-postr-modal-content onClick={(e) => e.stopPropagation()} style={modalStyle}>
+    <div data-postr-modal-backdrop data-state={state} onClick={onCancel} style={overlayStyle}>
+      <div data-postr-modal-content data-state={state} onClick={(e) => e.stopPropagation()} style={modalStyle}>
         <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, color: '#fbbf24' }}>
           Replace this poster?
         </h3>

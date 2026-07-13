@@ -38,11 +38,11 @@ export default function Landing() {
         <span className="inline-block rounded-full border border-[#7c6aed]/40 bg-[#7c6aed]/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-[#b8a9ff]">
           Free to use
         </span>
-        <h1 className="mt-5 text-4xl font-bold leading-tight text-white sm:text-5xl">
+        <h1 className="mt-5 text-4xl font-bold leading-[1.05] tracking-[-0.02em] text-white sm:text-5xl">
           Conference posters,<br />
           <span className="text-[#7c6aed]">without the pain.</span>
         </h1>
-        <p className="mt-6 text-lg text-[#9ca3af] leading-relaxed max-w-xl mx-auto">
+        <p className="mx-auto mt-6 max-w-[54ch] text-lg leading-relaxed text-[#a3a7b3]">
           Postr is a free poster editor built for researchers. Pick a template,
           write with guidance, check your figures, share a link for comments,
           and export — all in one place. No design skills needed, no paywall.
@@ -65,26 +65,26 @@ export default function Landing() {
 
       <section className="mx-auto w-full max-w-4xl flex-1 px-8 pb-24">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
+          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
             <div className="text-2xl mb-3">📐</div>
-            <h3 className="text-base font-bold text-[#e2e2e8] mb-2">Smart templates</h3>
-            <p className="text-[14pt] text-[#6b7280] leading-relaxed">
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Smart templates</h3>
+            <p className="text-sm text-[#8b8f99] leading-relaxed">
               5 conference-ready layouts with discipline-specific palettes.
               APA, SfN, ECNP size presets built in.
             </p>
           </div>
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
+          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
             <div className="text-2xl mb-3">📊</div>
-            <h3 className="text-base font-bold text-[#e2e2e8] mb-2">Figure readability</h3>
-            <p className="text-[14pt] text-[#6b7280] leading-relaxed">
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Figure readability</h3>
+            <p className="text-sm text-[#8b8f99] leading-relaxed">
               Paste your R or Python code. See if axis labels will be readable
               at print size. Get a copy-ready fix.
             </p>
           </div>
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
+          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
             <div className="text-2xl mb-3">✍️</div>
-            <h3 className="text-base font-bold text-[#e2e2e8] mb-2">Writing guide</h3>
-            <p className="text-[14pt] text-[#6b7280] leading-relaxed">
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Writing guide</h3>
+            <p className="text-sm text-[#8b8f99] leading-relaxed">
               Section-by-section tips, word count targets, and a checklist
               to follow from intro to conclusion.
             </p>

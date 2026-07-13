@@ -12,6 +12,7 @@
  * surface a "coming next release" toast routed at Tier 1.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 import { useNavigate } from 'react-router-dom';
 import type { ImportProgress, PosterDoc } from '@postr/shared';
 import { supabase } from '@/lib/supabase';
@@ -115,7 +116,8 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
     return () => window.removeEventListener('keydown', handler);
   }, [open, phase, onClose]);
 
-  if (!open) return null;
+  const { mounted, state } = useModalTransition(open);
+  if (!mounted) return null;
 
   function reportImportFailure(err: unknown, file?: File | null) {
     // eslint-disable-next-line no-console
@@ -302,11 +304,11 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
 
   return (
     <div
-      data-postr-modal-backdrop
+      data-postr-modal-backdrop data-state={state}
       onClick={phase === 'committing' ? undefined : onClose}
       style={overlayStyle}
     >
-      <div data-postr-modal-content onClick={(e) => e.stopPropagation()} style={modalStyle}>
+      <div data-postr-modal-content data-state={state} onClick={(e) => e.stopPropagation()} style={modalStyle}>
         <Header onClose={onClose} disabled={phase === 'committing'} mode={mode} />
 
         {importFailed && (
@@ -681,11 +683,16 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
         }}
       >
         <div
+          // The indeterminate shimmer is movement; the scoped style
+          // below nulls it under prefers-reduced-motion (the class
+          // gives the media query something to override the inline
+          // animation with).
+          className="postr-progress-fill"
           style={{
             height: '100%',
             width: ratio !== null ? `${ratio * 100}%` : '40%',
             background: '#7c6aed',
-            transition: 'width 200ms',
+            transition: 'width 200ms var(--ease-out)',
             animation: ratio === null ? 'postrPulse 1.4s ease-in-out infinite' : 'none',
           }}
         />
@@ -747,6 +754,18 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
         }
         .postr-caret {
           animation: postrCaretBlink 900ms steps(1, end) infinite;
+        }
+        /* Reduced-motion: stop the moving progress shimmer and the
+         * blinking caret — both are infinite loops. The caret rests
+         * visible so the simulated-typing line stays legible. */
+        @media (prefers-reduced-motion: reduce) {
+          .postr-progress-fill {
+            animation: none !important;
+          }
+          .postr-caret {
+            animation: none;
+            opacity: 1;
+          }
         }
       `}</style>
     </div>

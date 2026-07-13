@@ -6,7 +6,7 @@
  * Data sourced from official conference websites (links provided inline).
  * The panel is collapsible via a bookmark-style toggle on the right edge.
  */
-import { useState, type CSSProperties } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { InputModal } from '@/components/InputModal';
 
 // ── Guidelines Data ──────────────────────────────────────────────────
@@ -1060,6 +1060,18 @@ function SectionDropdown({ title, open, onToggle, children }: {
   onToggle: () => void;
   children: React.ReactNode;
 }) {
+  // Collapsed content stays mounted (for the grid-rows animation), so
+  // mark it inert while closed. overflow:hidden hides it visually but
+  // does NOT remove it from the tab order — without inert, a keyboard
+  // user tabs into invisible links/buttons inside collapsed sections
+  // (WCAG 2.4.3) and focusing an off-screen control nudges the scroll.
+  // inert drops the subtree from the tab order, the a11y tree, and
+  // pointer hits, all without affecting the visual clip. useLayoutEffect
+  // so there's no focusable frame before it applies.
+  const innerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (innerRef.current) innerRef.current.inert = !open;
+  }, [open]);
   return (
     <div style={{ borderBottom: '1px solid #1a1a26' }}>
       <button
@@ -1073,15 +1085,29 @@ function SectionDropdown({ title, open, onToggle, children }: {
             {title}
           </div>
         </div>
-        <span style={{ fontSize: 22, color: '#6b7280', transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)', transform: open ? 'rotate(90deg)' : 'none', lineHeight: 1 }}>
+        <span style={{ fontSize: 22, color: '#6b7280', transition: 'transform 0.22s var(--ease-out)', transform: open ? 'rotate(90deg)' : 'none', lineHeight: 1 }}>
           ▸
         </span>
       </button>
-      {open && (
-        <div className="postr-dropdown-enter">
+      {/* Collapse via grid-template-rows 0fr → 1fr rather than a
+          max-height keyframe: it animates BOTH open and close, is
+          interruptible mid-flight (a transition, not a keyframe that
+          restarts from zero), and needs no arbitrary max-height guess.
+          The inner overflow:hidden clips the content while the track
+          collapses. index.css nulls the transition under reduced-motion
+          via .postr-collapse. */}
+      <div
+        className="postr-collapse"
+        style={{
+          display: 'grid',
+          gridTemplateRows: open ? '1fr' : '0fr',
+          transition: 'grid-template-rows 240ms var(--ease-out)',
+        }}
+      >
+        <div ref={innerRef} style={{ overflow: 'hidden', minHeight: 0 }}>
           {children}
         </div>
-      )}
+      </div>
     </div>
   );
 }

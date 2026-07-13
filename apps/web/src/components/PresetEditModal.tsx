@@ -17,6 +17,7 @@
  * open a poster and visit the Style tab.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 import type { StylePreset } from '@/poster/Sidebar';
 import type {
   FontWeight,
@@ -128,7 +129,8 @@ export function PresetEditModal({ open, onClose, onChange }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, view, onClose]);
 
-  if (!open) return null;
+  const { mounted, state } = useModalTransition(open);
+  if (!mounted) return null;
 
   function commit(next: StylePreset[]) {
     setPresets(next);
@@ -219,7 +221,7 @@ export function PresetEditModal({ open, onClose, onChange }: Props) {
 
   return (
     <div
-      data-postr-modal-backdrop
+      data-postr-modal-backdrop data-state={state}
       onClick={onClose}
       style={{
         position: 'fixed',
@@ -234,7 +236,7 @@ export function PresetEditModal({ open, onClose, onChange }: Props) {
       }}
     >
       <div
-        data-postr-modal-content
+        data-postr-modal-content data-state={state}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
