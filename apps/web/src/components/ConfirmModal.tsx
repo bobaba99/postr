@@ -6,6 +6,7 @@
  * Used for high-friction destructive actions like account deletion.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 
 interface Props {
   open: boolean;
@@ -52,7 +53,8 @@ export function ConfirmModal({
     return () => window.removeEventListener('keydown', handler);
   }, [open, onCancel, typedConfirmation]);
 
-  if (!open) return null;
+  const { mounted, state } = useModalTransition(open);
+  if (!mounted) return null;
 
   const confirmEnabled = typedConfirmation
     ? typed.toLowerCase().trim() === typedConfirmation.toLowerCase().trim()
@@ -60,7 +62,7 @@ export function ConfirmModal({
 
   return (
     <div
-      data-postr-modal-backdrop
+      data-postr-modal-backdrop data-state={state}
       onClick={onCancel}
       style={{
         position: 'fixed',
@@ -74,7 +76,7 @@ export function ConfirmModal({
       }}
     >
       <div
-        data-postr-modal-content
+        data-postr-modal-content data-state={state}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',

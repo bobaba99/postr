@@ -11,6 +11,7 @@
  * consent, and retraction responsibilities.
  */
 import { useEffect, useState } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 import { Link } from 'react-router-dom';
 
 type Mode = 'publish' | 'share';
@@ -150,7 +151,8 @@ export function PublishConsentModal({
     return () => window.removeEventListener('keydown', handler);
   }, [open, onCancel]);
 
-  if (!open) return null;
+  const { mounted, state } = useModalTransition(open);
+  if (!mounted) return null;
 
   const allAccepted = clauses.every((c) => accepted[c.id]);
 
@@ -160,7 +162,7 @@ export function PublishConsentModal({
 
   return (
     <div
-      data-postr-modal-backdrop
+      data-postr-modal-backdrop data-state={state}
       onClick={onCancel}
       style={{
         position: 'fixed',
@@ -175,7 +177,7 @@ export function PublishConsentModal({
       }}
     >
       <div
-        data-postr-modal-content
+        data-postr-modal-content data-state={state}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',

@@ -12,6 +12,7 @@
  * surface a "coming next release" toast routed at Tier 1.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 import { useNavigate } from 'react-router-dom';
 import type { ImportProgress, PosterDoc } from '@postr/shared';
 import { supabase } from '@/lib/supabase';
@@ -115,7 +116,8 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
     return () => window.removeEventListener('keydown', handler);
   }, [open, phase, onClose]);
 
-  if (!open) return null;
+  const { mounted, state } = useModalTransition(open);
+  if (!mounted) return null;
 
   function reportImportFailure(err: unknown, file?: File | null) {
     // eslint-disable-next-line no-console
@@ -302,11 +304,11 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
 
   return (
     <div
-      data-postr-modal-backdrop
+      data-postr-modal-backdrop data-state={state}
       onClick={phase === 'committing' ? undefined : onClose}
       style={overlayStyle}
     >
-      <div data-postr-modal-content onClick={(e) => e.stopPropagation()} style={modalStyle}>
+      <div data-postr-modal-content data-state={state} onClick={(e) => e.stopPropagation()} style={modalStyle}>
         <Header onClose={onClose} disabled={phase === 'committing'} mode={mode} />
 
         {importFailed && (

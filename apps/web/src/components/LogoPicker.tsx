@@ -29,6 +29,7 @@
  * z-index stacking straightforward.
  */
 import { useEffect, useState, type CSSProperties } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 import ReactDOM from 'react-dom';
 import {
   LOGO_PRESETS,
@@ -206,7 +207,8 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
     }
   };
 
-  if (!open) return null;
+  const { mounted, state } = useModalTransition(open);
+  if (!mounted) return null;
 
   // IMPORTANT: render the modal via a portal to `document.body`.
   // The poster-canvas ancestor (`#poster-canvas`) has
@@ -221,7 +223,7 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
   // Mounting at document.body sidesteps the transform entirely.
   return ReactDOM.createPortal(
     <div
-      data-postr-modal-backdrop
+      data-postr-modal-backdrop data-state={state}
       onClick={onClose}
       role="dialog"
       aria-modal="true"
@@ -239,7 +241,7 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
       }}
     >
       <div
-        data-postr-modal-content
+        data-postr-modal-content data-state={state}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: '#1a1a26',

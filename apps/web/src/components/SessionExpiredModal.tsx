@@ -27,6 +27,7 @@
  * protected page gets the same protection.
  */
 import { useEffect, useState } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 import { supabase } from '@/lib/supabase';
 
 export function SessionExpiredModal() {
@@ -58,11 +59,12 @@ export function SessionExpiredModal() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!expired) return null;
+  const { mounted, state } = useModalTransition(expired);
+  if (!mounted) return null;
 
   return (
     <div
-      data-postr-modal-backdrop
+      data-postr-modal-backdrop data-state={state}
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="session-expired-title"
@@ -79,7 +81,7 @@ export function SessionExpiredModal() {
       }}
     >
       <div
-        data-postr-modal-content
+        data-postr-modal-content data-state={state}
         style={{
           maxWidth: 460,
           padding: 28,

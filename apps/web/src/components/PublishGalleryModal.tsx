@@ -14,6 +14,7 @@
  * can navigate to /gallery/:id.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useModalTransition } from '@/hooks/useModalTransition';
 import { toCanvas } from 'html-to-image';
 import {
   createGalleryEntry,
@@ -114,7 +115,8 @@ export function PublishGalleryModal({
     return () => window.removeEventListener('keydown', handler);
   }, [open, onCancel, submitting]);
 
-  if (!open) return null;
+  const { mounted, state } = useModalTransition(open);
+  if (!mounted) return null;
 
   function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -178,7 +180,7 @@ export function PublishGalleryModal({
 
   return (
     <div
-      data-postr-modal-backdrop
+      data-postr-modal-backdrop data-state={state}
       onClick={submitting ? undefined : onCancel}
       style={{
         position: 'fixed',
@@ -193,7 +195,7 @@ export function PublishGalleryModal({
       }}
     >
       <div
-        data-postr-modal-content
+        data-postr-modal-content data-state={state}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',

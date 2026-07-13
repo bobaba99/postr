@@ -171,6 +171,34 @@ body {
   }
 }
 
+/* Modal exit — the reverse of the entrance, but faster: the entrance
+ * is a considered reveal (~240ms), the dismissal is the system snapping
+ * shut (~120–140ms). Driven by `data-state="closing"` from
+ * useModalTransition, which holds the mount just long enough to play
+ * these before unmounting. `forwards` pins the end state so there's no
+ * flash back to full opacity on the final frame. */
+@keyframes postr-modal-backdrop-out {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(2px);
+  }
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+}
+
+@keyframes postr-modal-content-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
 /* Generic fade-up for inline alerts, toasts, hints. */
 @keyframes postr-rise-in {
   from {
@@ -271,6 +299,18 @@ body {
   animation: postr-modal-content 240ms var(--ease-out);
   animation-delay: 40ms;
   animation-fill-mode: backwards;
+}
+
+/* Exit state (set by useModalTransition). Overrides the entrance
+ * animation above with the faster reverse; the content leaves before
+ * the backdrop so the dialog clears the dim rather than dissolving
+ * into it. */
+[data-postr-modal-content][data-state='closing'] {
+  animation: postr-modal-content-out 120ms var(--ease-out) forwards;
+}
+
+[data-postr-modal-backdrop][data-state='closing'] {
+  animation: postr-modal-backdrop-out 140ms var(--ease-out) forwards;
 }
 
 .postr-rise-in {
