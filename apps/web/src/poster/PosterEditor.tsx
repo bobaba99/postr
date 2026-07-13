@@ -172,6 +172,17 @@ function paletteNameFor(
  *
  * Returns both the pointerdown handler and didDragRef so call sites
  * can consult "did the user just drag?" in their own click handlers.
+ *
+ * Motion note — no momentum, no springs (deliberate). Block position is
+ * exact, functional data: every move snaps to the grid/guides via
+ * `snap()`, and on release the block must sit precisely where the user
+ * dropped it. Momentum projection would carry it PAST the release point,
+ * and a bouncy spring would overshoot the target cell — both fight the
+ * snap and the user's intent. This is Emil Kowalski's "a functional
+ * graph in a banking app is better with no animation" case: for precise
+ * positioning, 1:1 tracking with an instant, snapped landing is the
+ * correct feel. Springs belong on decorative / dismissal gestures (a
+ * flicked sheet, drag-to-dismiss), of which this editor has none.
  */
 const DRAG_THRESHOLD_PX = 4;
 
