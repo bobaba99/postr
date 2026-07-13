@@ -1073,15 +1073,27 @@ function SectionDropdown({ title, open, onToggle, children }: {
             {title}
           </div>
         </div>
-        <span style={{ fontSize: 22, color: '#6b7280', transition: 'transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)', transform: open ? 'rotate(90deg)' : 'none', lineHeight: 1 }}>
+        <span style={{ fontSize: 22, color: '#6b7280', transition: 'transform 0.22s var(--ease-out)', transform: open ? 'rotate(90deg)' : 'none', lineHeight: 1 }}>
           ▸
         </span>
       </button>
-      {open && (
-        <div className="postr-dropdown-enter">
-          {children}
-        </div>
-      )}
+      {/* Collapse via grid-template-rows 0fr → 1fr rather than a
+          max-height keyframe: it animates BOTH open and close, is
+          interruptible mid-flight (a transition, not a keyframe that
+          restarts from zero), and needs no arbitrary max-height guess.
+          The inner overflow:hidden clips the content while the track
+          collapses. index.css nulls the transition under reduced-motion
+          via .postr-collapse. */}
+      <div
+        className="postr-collapse"
+        style={{
+          display: 'grid',
+          gridTemplateRows: open ? '1fr' : '0fr',
+          transition: 'grid-template-rows 240ms var(--ease-out)',
+        }}
+      >
+        <div style={{ overflow: 'hidden', minHeight: 0 }}>{children}</div>
+      </div>
     </div>
   );
 }

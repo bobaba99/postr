@@ -99,22 +99,6 @@ body {
   }
 }
 
-/* Dropdown / collapsible section expand. Used by SectionDropdown in
- * GuidelinesPanel so "Conference Guidelines", "Writing Guide" etc.
- * don't pop open — they unroll from the top with a short fade. */
-@keyframes postr-dropdown-expand {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-    max-height: 0;
-  }
-  to {
-    opacity: 1;
-    transform: none;
-    max-height: 2000px;
-  }
-}
-
 /* Figure-size overlay mount animation — soft scale-in so the gray
  * preview doesn't pop into existence when the Check tab activates. */
 @keyframes postr-overlay-enter {
@@ -262,11 +246,6 @@ body {
   animation: postr-tab-enter 220ms var(--ease-out);
 }
 
-.postr-dropdown-enter {
-  animation: postr-dropdown-expand 240ms var(--ease-out);
-  overflow: hidden;
-}
-
 .postr-overlay-enter {
   animation: postr-overlay-enter 260ms var(--ease-back);
 }
@@ -403,7 +382,6 @@ body {
    * moving anything. The GSAP and button-transition layers are already
    * gated separately. */
   .postr-tab-enter,
-  .postr-dropdown-enter,
   .postr-overlay-enter,
   .postr-format-toolbar-enter,
   .postr-popover-enter,
@@ -418,6 +396,11 @@ body {
   .postr-dimension-pill,
   [data-postr-pulse] {
     animation: none !important;
+  }
+  /* Collapsible sections (GuidelinesPanel) snap open/closed instead of
+   * sliding the grid-template-rows track. */
+  .postr-collapse {
+    transition: none !important;
   }
 }
 
