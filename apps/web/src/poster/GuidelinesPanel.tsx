@@ -6,7 +6,7 @@
  * Data sourced from official conference websites (links provided inline).
  * The panel is collapsible via a bookmark-style toggle on the right edge.
  */
-import { useState, type CSSProperties } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { InputModal } from '@/components/InputModal';
 
 // ── Guidelines Data ──────────────────────────────────────────────────
@@ -1060,6 +1060,18 @@ function SectionDropdown({ title, open, onToggle, children }: {
   onToggle: () => void;
   children: React.ReactNode;
 }) {
+  // Collapsed content stays mounted (for the grid-rows animation), so
+  // mark it inert while closed. overflow:hidden hides it visually but
+  // does NOT remove it from the tab order — without inert, a keyboard
+  // user tabs into invisible links/buttons inside collapsed sections
+  // (WCAG 2.4.3) and focusing an off-screen control nudges the scroll.
+  // inert drops the subtree from the tab order, the a11y tree, and
+  // pointer hits, all without affecting the visual clip. useLayoutEffect
+  // so there's no focusable frame before it applies.
+  const innerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (innerRef.current) innerRef.current.inert = !open;
+  }, [open]);
   return (
     <div style={{ borderBottom: '1px solid #1a1a26' }}>
       <button
@@ -1092,7 +1104,9 @@ function SectionDropdown({ title, open, onToggle, children }: {
           transition: 'grid-template-rows 240ms var(--ease-out)',
         }}
       >
-        <div style={{ overflow: 'hidden', minHeight: 0 }}>{children}</div>
+        <div ref={innerRef} style={{ overflow: 'hidden', minHeight: 0 }}>
+          {children}
+        </div>
       </div>
     </div>
   );
