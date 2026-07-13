@@ -65,7 +65,7 @@ export default function Landing() {
 
       <section className="mx-auto w-full max-w-4xl flex-1 px-8 pb-24">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors [@media(hover:hover)]:hover:border-[#2a2a3a]">
+          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
             <div className="text-2xl mb-3">📐</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Smart templates</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
@@ -73,7 +73,7 @@ export default function Landing() {
               APA, SfN, ECNP size presets built in.
             </p>
           </div>
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors [@media(hover:hover)]:hover:border-[#2a2a3a]">
+          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
             <div className="text-2xl mb-3">📊</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Figure readability</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
@@ -81,7 +81,7 @@ export default function Landing() {
               at print size. Get a copy-ready fix.
             </p>
           </div>
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors [@media(hover:hover)]:hover:border-[#2a2a3a]">
+          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
             <div className="text-2xl mb-3">✍️</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Writing guide</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">

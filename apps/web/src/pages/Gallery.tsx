@@ -140,7 +140,7 @@ function GalleryCard({ row }: { row: GalleryEntryWithUrls }) {
           src={row.image_url}
           alt={row.title}
           loading="lazy"
-          className="h-full w-full object-cover transition-transform duration-300 ease-out [@media(hover:hover)]:group-hover:scale-[1.02]"
+          className="h-full w-full object-cover transition-transform duration-slow ease-smooth [@media(hover:hover)]:group-hover:scale-[1.02]"
         />
       </div>
       <div className="p-4">
