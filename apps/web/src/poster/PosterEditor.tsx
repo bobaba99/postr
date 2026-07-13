@@ -2357,8 +2357,18 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           flexDirection: 'column',
           minHeight: 0,
           overflow: 'hidden',
+          // Deliberate layout animation. This is a space-reclaiming
+          // *push* panel — the canvas sibling reflows to fill the freed
+          // width, which is the right UX for a poster editor (blocks
+          // live at the canvas edges; an overlay panel would cover
+          // them). A transform-composited slide can't reclaim sibling
+          // space without becoming that overlay, so width is the honest
+          // tool here. The cost is bounded and acceptable: one panel,
+          // fixed 484px, 280ms, toggled only occasionally. min-width
+          // animates in lockstep so the flex item can't collapse ahead
+          // of the width tween.
           transition:
-            'width 280ms cubic-bezier(0.22, 1, 0.36, 1), min-width 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+            'width 280ms var(--ease-out), min-width 280ms var(--ease-out)',
         }}
       >
         <Sidebar
@@ -3240,8 +3250,12 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           flexDirection: 'column',
           minHeight: 0,
           overflow: 'hidden',
+          // Same deliberate push-panel width animation as the left
+          // sidebar (see that wrapper for the full rationale): the
+          // canvas reclaims the freed space rather than being covered
+          // by an overlay. Bounded cost — fixed 320px, 280ms, occasional.
           transition:
-            'width 280ms cubic-bezier(0.22, 1, 0.36, 1), min-width 280ms cubic-bezier(0.22, 1, 0.36, 1)',
+            'width 280ms var(--ease-out), min-width 280ms var(--ease-out)',
         }}
       >
         <GuidelinesPanel open={guidelinesOpen} onToggle={() => setGuidelinesOpen((v) => !v)} />
