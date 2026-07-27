@@ -1,0 +1,333 @@
+/**
+ * ChartChooser — the auto-scrolling questionnaire ladder.
+ *
+ * One vertically scrolling column of steps. Answering a step locks
+ * it into a compact summary, reveals the next step, and
+ * smooth-scrolls it into view (guarded by prefers-reduced-motion;
+ * never on page load — only in response to a user answer). Focus
+ * moves with the scroll. Re-opening a step invalidates everything
+ * below it.
+ *
+ * The same component serves both surfaces: the Figure sidebar panel
+ * (stacked previews, insert action) and the standalone /chart-chooser
+ * page (3-up previews, download actions) — only layout and the
+ * action list differ.
+ */
+import { useMemo, useRef, useState } from 'react';
+import type { Palette } from '@postr/shared';
+import { inferTable } from '../inferColumns';
+import type { RawTable } from '../parseData';
+import { groupingCandidates } from '../recommend';
+import {
+  EMPHASIS_OPTIONS,
+  SHAPE_OPTIONS,
+  planLadder,
+  type DataSource,
+  type LadderAnswers,
+  type StepId,
+} from './steps';
+import { ChipRow } from './ChipRow';
+import { DataStep, type PosterTableRef } from './DataStep';
+import { PreviewStep, type PreviewAction } from './PreviewStep';
+import { StepSection } from './StepSection';
+
+export interface ChartChooserProps {
+  layout: 'panel' | 'page';
+  palette: Palette;
+  /** Poster surface font (CSS family string) for previews/captions. */
+  fontFamily: string;
+  posterTables?: PosterTableRef[];
+  /** Result actions rendered under each preview panel. */
+  actions: PreviewAction[];
+  /** Confirmation line after the primary action runs. */
+  confirmation?: string;
+}
+
+const VARS_OPTIONS = [
+  { value: '0' as const, label: 'Just the measure' },
+  { value: '1' as const, label: 'One grouping variable' },
+  { value: '2' as const, label: 'Two grouping variables' },
+];
+
+/** Which answer keys belong to each ladder rung (both branches). */
+const RUNG_KEYS: Record<Exclude<StepId, 'data' | 'preview'>, Array<keyof LadderAnswers>> = {
+  measure: ['shape', 'measure'],
+  grouping: ['vars', 'groupings'],
+  emphasis: ['emphasis'],
+};
+
+const RUNG_ORDER: Array<keyof typeof RUNG_KEYS> = ['measure', 'grouping', 'emphasis'];
+
+export function ChartChooser({
+  layout,
+  palette,
+  fontFamily,
+  posterTables = [],
+  actions,
+  confirmation,
+}: ChartChooserProps) {
+  const [source, setSource] = useState<DataSource | null>(null);
+  const [answers, setAnswers] = useState<LadderAnswers>({});
+  const [dataSummary, setDataSummary] = useState('');
+  const [pendingGroups, setPendingGroups] = useState<string[]>([]);
+  const hasInteracted = useRef(false);
+
+  const plan = useMemo(() => planLadder(source, answers), [source, answers]);
+
+  const answer = (rung: keyof typeof RUNG_KEYS, patch: Partial<LadderAnswers>) => {
+    hasInteracted.current = true;
+    setAnswers((prev) => {
+      const keep: LadderAnswers = {};
+      for (const earlier of RUNG_ORDER.slice(0, RUNG_ORDER.indexOf(rung))) {
+        for (const key of RUNG_KEYS[earlier]) {
+          const value = prev[key];
+          if (value !== undefined) Object.assign(keep, { [key]: value });
+        }
+      }
+      return { ...keep, ...patch };
+    });
+  };
+
+  const reopen = (rung: keyof typeof RUNG_KEYS) => {
+    hasInteracted.current = true;
+    setPendingGroups(answers.groupings ?? []);
+    setAnswers((prev) => {
+      const keep: LadderAnswers = {};
+      for (const earlier of RUNG_ORDER.slice(0, RUNG_ORDER.indexOf(rung))) {
+        for (const key of RUNG_KEYS[earlier]) {
+          const value = prev[key];
+          if (value !== undefined) Object.assign(keep, { [key]: value });
+        }
+      }
+      return keep;
+    });
+  };
+
+  const onTable = (table: RawTable, summary: string) => {
+    hasInteracted.current = true;
+    setSource({ kind: 'table', table: inferTable(table) });
+    setAnswers({});
+    setPendingGroups([]);
+    setDataSummary(summary);
+  };
+
+  const onSynthetic = () => {
+    hasInteracted.current = true;
+    setSource({ kind: 'synthetic' });
+    setAnswers({});
+    setPendingGroups([]);
+    setDataSummary('Worked example — swap in your numbers after inserting');
+  };
+
+  const resetData = () => {
+    hasInteracted.current = true;
+    setSource(null);
+    setAnswers({});
+    setPendingGroups([]);
+    setDataSummary('');
+  };
+
+  const synthetic = source?.kind === 'synthetic';
+  const activeIndex = plan.steps.indexOf(plan.active);
+  const visibleSteps = plan.steps.slice(0, activeIndex + 1);
+
+  const groupingChips =
+    !synthetic && plan.table
+      ? groupingCandidates(plan.table)
+          .filter((c) => c.name !== answers.measure)
+          .map((c) => ({ value: c.name, label: c.name }))
+      : [];
+
+  const summaryFor = (step: StepId): string => {
+    switch (step) {
+      case 'data':
+        return dataSummary;
+      case 'measure':
+        return synthetic
+          ? SHAPE_OPTIONS.find((o) => o.value === answers.shape)?.label ?? ''
+          : answers.measure ?? '';
+      case 'grouping':
+        if (synthetic) return VARS_OPTIONS.find((o) => o.value === String(answers.vars))?.label ?? '';
+        return answers.groupings && answers.groupings.length > 0
+          ? answers.groupings.join(', ')
+          : 'None';
+      case 'emphasis':
+        return EMPHASIS_OPTIONS.find((o) => o.value === answers.emphasis)?.label ?? '';
+      case 'preview':
+        return '';
+    }
+  };
+
+  const titleFor = (step: StepId): string => {
+    switch (step) {
+      case 'data':
+        return 'Your data';
+      case 'measure':
+        return synthetic ? 'What are you showing?' : 'What did you measure?';
+      case 'grouping':
+        return synthetic ? 'How many variables?' : 'What are you breaking it down by?';
+      case 'emphasis':
+        return 'What should the figure emphasise?';
+      case 'preview':
+        return 'Pick your figure';
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {visibleSteps.map((step, i) => {
+        const state = step === plan.active ? 'active' : 'answered';
+        const common = {
+          index: i + 1,
+          title: titleFor(step),
+          state,
+          shouldFocusOnMount: hasInteracted.current,
+        } as const;
+
+        if (step === 'data') {
+          return state === 'answered' ? (
+            <StepSection key={step} {...common} summary={summaryFor(step)} onReopen={resetData} />
+          ) : (
+            <StepSection key={step} {...common}>
+              <DataStep posterTables={posterTables} onTable={onTable} onSynthetic={onSynthetic} />
+            </StepSection>
+          );
+        }
+
+        if (step === 'preview') {
+          return (
+            <StepSection key={step} {...common}>
+              {plan.table && (
+                <PreviewStep
+                  table={plan.table}
+                  choice={plan.choice}
+                  palette={palette}
+                  fontFamily={fontFamily}
+                  layout={layout}
+                  actions={actions}
+                  {...(confirmation !== undefined ? { confirmation } : {})}
+                />
+              )}
+            </StepSection>
+          );
+        }
+
+        if (state === 'answered') {
+          return (
+            <StepSection
+              key={step}
+              {...common}
+              summary={summaryFor(step)}
+              onReopen={() => reopen(step)}
+            />
+          );
+        }
+
+        if (step === 'measure') {
+          return (
+            <StepSection key={step} {...common}>
+              {synthetic ? (
+                <ChipRow
+                  label="What are you showing?"
+                  options={SHAPE_OPTIONS}
+                  selected={answers.shape ?? null}
+                  onPick={(v) => answer('measure', { shape: v })}
+                />
+              ) : (
+                <ChipRow
+                  label="Pick the outcome column"
+                  options={
+                    plan.table
+                      ? plan.table.columns
+                          .filter((c) => c.kind === 'number' && !c.ordered)
+                          .map((c) => ({ value: c.name, label: c.name }))
+                      : []
+                  }
+                  selected={answers.measure ?? null}
+                  onPick={(v) => answer('measure', { measure: v })}
+                />
+              )}
+            </StepSection>
+          );
+        }
+
+        if (step === 'grouping') {
+          return (
+            <StepSection key={step} {...common}>
+              {synthetic ? (
+                <ChipRow
+                  label="How many variables?"
+                  options={VARS_OPTIONS}
+                  selected={answers.vars === undefined ? null : String(answers.vars) as '0' | '1' | '2'}
+                  onPick={(v) => answer('grouping', { vars: Number(v) as 0 | 1 | 2 })}
+                />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <ChipRow
+                    label="Pick up to two grouping columns"
+                    options={groupingChips}
+                    selected={pendingGroups}
+                    multi
+                    onPick={(name) =>
+                      setPendingGroups((prev) =>
+                        prev.includes(name)
+                          ? prev.filter((n) => n !== name)
+                          : [...prev, name].slice(-2),
+                      )
+                    }
+                  />
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => answer('grouping', { groupings: pendingGroups })}
+                      disabled={pendingGroups.length === 0}
+                      style={{
+                        border: 'none',
+                        background: pendingGroups.length > 0 ? '#7c6aed' : '#2a2a3a',
+                        color: pendingGroups.length > 0 ? '#ffffff' : '#6b6b76',
+                        borderRadius: 8,
+                        padding: '7px 14px',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: pendingGroups.length > 0 ? 'pointer' : 'default',
+                      }}
+                    >
+                      Use selected
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => answer('grouping', { groupings: [] })}
+                      style={{
+                        border: '1px solid #2a2a3a',
+                        background: 'transparent',
+                        color: '#c8cad0',
+                        borderRadius: 8,
+                        padding: '7px 14px',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      No grouping
+                    </button>
+                  </div>
+                </div>
+              )}
+            </StepSection>
+          );
+        }
+
+        // emphasis
+        return (
+          <StepSection key={step} {...common}>
+            <ChipRow
+              label="What do you want people to take away?"
+              options={EMPHASIS_OPTIONS}
+              selected={answers.emphasis ?? null}
+              onPick={(v) => answer('emphasis', { emphasis: v })}
+            />
+          </StepSection>
+        );
+      })}
+    </div>
+  );
+}

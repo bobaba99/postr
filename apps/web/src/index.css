@@ -274,6 +274,23 @@ body {
   animation: postr-tab-enter 220ms var(--ease-out);
 }
 
+/* Chart-chooser ladder: the active step's content reveals via
+ * grid-template-rows 0fr -> 1fr (the guideline-section pattern).
+ * The transition lives here, not inline, so reduced-motion users
+ * get an instant reveal — height animation is movement. */
+.postr-step-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+}
+.postr-step-reveal[data-revealed='true'] {
+  grid-template-rows: 1fr;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .postr-step-reveal {
+    transition: grid-template-rows var(--dur-base) var(--ease-out);
+  }
+}
+
 .postr-overlay-enter {
   animation: postr-overlay-enter 260ms var(--ease-back);
 }
@@ -401,6 +418,12 @@ body {
     [data-postr-sidebar] button:not([data-no-anim]):hover:not(:disabled),
     [data-postr-guidelines] button:not([data-no-anim]):hover:not(:disabled) {
       filter: brightness(1.08);
+    }
+
+    /* Chart-chooser chips: border lightens on hover so unselected
+     * options read as interactive before the click. */
+    .postr-chart-chip:not([aria-pressed='true']):hover {
+      border-color: #4a4a5e;
     }
   }
 }
