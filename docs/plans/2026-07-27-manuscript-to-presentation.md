@@ -326,6 +326,72 @@ consequences, both of which cut against the usual instinct:
 2. **Price on what researchers will pay**, not on a cost-plus basis, and prefer fewer, larger
    transactions over many small ones, because the fixed fee dominates at low ticket sizes.
 
+### 5.1.2 Business model — traffic, conversion and fixed costs
+
+§5.1 showed ~98% margin per deck. **That number is close to meaningless on its own**, because it
+ignores the two things that decide whether this works: how many free users pay, and the hosting
+bill that exists whether anyone converts or not. Runnable model:
+`docs/plans/experiments/business-model.mjs`.
+
+**Sourced inputs (2026):** freemium free-to-paid median **8%** across 200 B2B products, but the
+distribution is **bimodal** — a quarter convert under 2.5%, a quarter 10–15%; freemium self-serve
+averages **5.6%**, with 3–5% considered good. Hosting: Vercel Pro $20/seat, Supabase Pro $25 (most
+production apps $35–75 all-in once usage lands), Render $7 starter to $85 pro. Modelled as
+**lean $52/mo · real $90/mo · scaled $220/mo**.
+
+**Planning assumption: 1% conversion, not 8%.** Postr's users are students and postdocs — low
+willingness to pay, and a *seasonal, one-off* need rather than a daily tool. That is the profile of
+the bottom quartile, so the honest planning number sits below the benchmark. Everything below is
+reported at 1% alongside the 5.6% average.
+
+**Break-even (MAU needed to clear hosting):**
+
+| Conversion | Lean $52 | Real $90 | Scaled $220 |
+|---|---|---|---|
+| 1.0% (plan) | 1,100 | **1,900** | 4,700 |
+| 2.5% | 500 | 800 | 1,800 |
+| 5.6% (avg) | 200 | 400 | 800 |
+
+**~1,900 monthly active users at 1% conversion is the number to beat.** That is the whole business
+question, and it is a *traffic* question — which is why the SEO work (§1) is not a side quest but
+the growth engine. For scale: `how many slides for 10 minute presentation` alone is 480/mo.
+
+**Monthly P&L (real hosting, $90/mo):**
+
+| MAU | @1% conversion | @5.6% conversion |
+|---|---|---|
+| 500 | **−$66** | +$52 |
+| 2,000 | +$5 | +$480 |
+| 5,000 | +$147 | +$1,335 |
+| 10,000 | +$385 | +$2,759 |
+| 50,000 | +$2,283 | +$14,156 |
+
+**Three findings that change decisions:**
+
+1. **Hosting dominates early, LLM spend never does.** At 10k MAU the split is 60% model / 40%
+   hosting — and below ~2k MAU hosting is effectively the entire cost base. The instinct to
+   optimise token spend is misdirected at every realistic scale. **Stay on the lean tier until
+   traffic forces otherwise**; that alone halves the break-even MAU.
+2. **Stripe fees exceed LLM costs by ~2×.** At 10k MAU: $262 in Stripe fees against $133 of model
+   spend. The $0.30 fixed fee is why the pack is priced at $4.99 rather than lower — below about
+   $3 the fee eats an indefensible share.
+3. **The free tier is not free.** The poster path calls a model for every free user who generates:
+   ~$29/mo at 10k MAU, ~$146/mo at 50k. Notable that the **chart chooser is fully deterministic and
+   therefore costs nothing marginal** — that is the shape every free surface should aim for, and a
+   concrete argument for the deterministic-first rule beyond predictability.
+
+**Lifetime value:** subscriber **$25.32** (4 months × 3 decks), pack buyer **$4.38**, blended
+**$12.75** per converter. With organic-only acquisition, CAC ≈ 0 and any conversion is profitable.
+Paid acquisition only works below $12.75/converter — i.e. **under $0.71 per free signup** at
+average conversion, which rules out most paid channels and confirms SEO and `.edu` outreach as the
+viable route.
+
+**Assumptions flagged as such** (not measured, and the model is sensitive to them): a 40/60
+subscription-to-pack split, 3 decks per subscriber-month, 4-month subscriber lifetime before
+seasonal churn, and 30% of free users actually generating. Churn is the weakest of these — a
+seasonal tool may see far shorter subscriptions, which would push the mix toward the pack and
+lower blended LTV.
+
 ### 5.1.5 Model pipeline — measured, and it reverses an earlier recommendation
 
 Two blind-graded experiments, 2026-07-27. Scripts and full outputs in the session record.
