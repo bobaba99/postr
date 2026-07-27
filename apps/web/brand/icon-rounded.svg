@@ -1,0 +1,17 @@
+<!--
+  Master icon — rounded-rect form.
+
+  Source of truth for favicon-16/32.png and icon-192/512.png. Matches
+  public/favicon.svg exactly, with two deliberate small-size tweaks:
+  the trailing curve sits at 0.7 opacity rather than 0.55, and strokes
+  are 5.5 rather than 5. At 16px the 0.55 curve rendered as a grey
+  smudge against the purple and the mark read as a single stroke with
+  a dot, which is a different logo. Do not "restore" those values to
+  match the SVG — the SVG is only ever shown at 32px and up.
+-->
+<svg width="512" height="512" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" rx="14" fill="#7c6aed"/>
+  <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" stroke-width="5.5" stroke-linecap="round" opacity="0.95"/>
+  <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" stroke-width="5.5" stroke-linecap="round" opacity="0.7"/>
+  <circle cx="32" cy="32" r="5" fill="white"/>
+</svg>

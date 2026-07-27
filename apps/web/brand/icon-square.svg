@@ -1,0 +1,21 @@
+<!--
+  Master icon — full-bleed square form.
+
+  Used for apple-touch-icon.png and the maskable PWA icon. Both have
+  their corners rounded by the platform, not by us: iOS applies its
+  own squircle, and Android maskable icons are cropped to whatever
+  shape the launcher uses. Shipping our own rx here would produce a
+  visible double-rounded edge on iOS and a clipped corner on Android.
+
+  The mark is scaled to ~62% of the canvas so it survives the maskable
+  safe zone, which guarantees only the centre 80% of the icon (a
+  circle of radius 40% about the centre) is always visible.
+-->
+<svg width="512" height="512" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="64" height="64" fill="#7c6aed"/>
+  <g transform="translate(32 32) scale(0.62) translate(-32 -32)">
+    <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" stroke-width="5.5" stroke-linecap="round" opacity="0.95"/>
+    <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" stroke-width="5.5" stroke-linecap="round" opacity="0.7"/>
+    <circle cx="32" cy="32" r="5" fill="white"/>
+  </g>
+</svg>
