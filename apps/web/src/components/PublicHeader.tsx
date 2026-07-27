@@ -19,12 +19,37 @@
  * The Gallery nav link was removed when the public gallery was
  * deactivated; restore it alongside the /gallery routes if the
  * gallery is switched back on.
+ *
+ * The "Tools" menu exists because /chart-chooser and /paper-to-poster
+ * shipped with nothing linking to them from anywhere in the app — not
+ * the header, not the footer, not the landing page. They were only
+ * reachable by typing the URL, which is how the owner came to not be
+ * able to find them. This menu and the footer/landing entries added
+ * alongside it are that fix.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import type { User } from '@supabase/supabase-js';
+
+/**
+ * The standalone tools, in the order they appear everywhere. Both are
+ * public, need no account, and are canonical URLs (never the alias
+ * spellings) so internal links never bounce through a 308.
+ */
+const TOOL_LINKS = [
+  {
+    to: '/paper-to-poster',
+    label: 'Paper to poster',
+    blurb: 'Turn a manuscript into a poster draft',
+  },
+  {
+    to: '/chart-chooser',
+    label: 'Chart chooser',
+    blurb: 'Find the figure that fits your data',
+  },
+] as const;
 
 export function PublicHeader() {
   const [user, setUser] = useState<User | null>(null);
@@ -77,6 +102,8 @@ export function PublicHeader() {
       </Link>
 
       <div className="flex items-center gap-5">
+        <ToolsMenu />
+
         <Link
           to="/about"
           className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
@@ -118,5 +145,111 @@ export function PublicHeader() {
         )}
       </div>
     </header>
+  );
+}
+
+/**
+ * "Tools" dropdown listing the standalone tools.
+ *
+ * Hidden below `sm` to match the sibling nav links (About, Feedback),
+ * which all use `sm:` prefixes — a lone dropdown at 320px would crowd
+ * the wordmark and the sign-in button off the row. The footer carries
+ * the same two links unprefixed, so small screens keep a real path to
+ * both tools rather than losing them entirely.
+ *
+ * Closes on outside pointerdown, on Escape (restoring focus to the
+ * trigger), and on navigation. Entrance uses the shared
+ * `.postr-popover-enter` class, which is already dropped under
+ * prefers-reduced-motion in index.css.
+ */
+function ToolsMenu() {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (target && !containerRef.current?.contains(target)) setOpen(false);
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      // Focus would otherwise land on <body> and the keyboard user
+      // would lose their place in the nav.
+      triggerRef.current?.focus();
+    }
+
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative hidden sm:block">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((wasOpen) => !wasOpen)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex items-center gap-1.5 border-0 bg-transparent p-0 text-[14pt] font-normal text-[#6b7280] hover:text-[#c8cad0]"
+      >
+        Tools
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          className="transition-transform duration-fast ease-smooth"
+          style={{ transform: open ? 'rotate(180deg)' : undefined }}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {/*
+        Anchored to the trigger's RIGHT edge: "Tools" sits near the end
+        of the nav row, so a left-anchored 18rem panel spills past the
+        viewport (measured ~3px over at 1440px, and worse as the window
+        narrows).
+      */}
+      {open && (
+        <div
+          role="menu"
+          aria-label="Tools"
+          style={{ transformOrigin: 'top right' }}
+          className="postr-popover-enter absolute right-0 top-full z-50 mt-3 w-72 rounded-xl border border-[#2a2a3a] bg-[#111118] p-2 shadow-xl shadow-black/40"
+        >
+          {TOOL_LINKS.map((tool) => (
+            <Link
+              key={tool.to}
+              to={tool.to}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="block rounded-lg px-3 py-2.5 no-underline transition-colors duration-fast ease-smooth hover:bg-[#1a1a26]"
+            >
+              <span className="block text-[14pt] font-medium text-[#c8cad0]">
+                {tool.label}
+              </span>
+              <span className="mt-0.5 block text-[12pt] text-[#6b7280]">
+                {tool.blurb}
+              </span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

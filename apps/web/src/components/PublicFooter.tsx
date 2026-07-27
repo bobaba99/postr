@@ -36,9 +36,14 @@ export function PublicFooter() {
             </p>
           </div>
 
+          {/* The two standalone tools live here as well as in the
+              header's Tools menu. The header menu is `sm:`-gated, so
+              on phones this column is the only route to them. */}
           <FooterColumn title="Product">
             <FooterLink to="/">Home</FooterLink>
             <FooterLink to="/dashboard">My posters</FooterLink>
+            <FooterLink to="/paper-to-poster">Paper to poster</FooterLink>
+            <FooterLink to="/chart-chooser">Chart chooser</FooterLink>
           </FooterColumn>
 
           <FooterColumn title="Learn">

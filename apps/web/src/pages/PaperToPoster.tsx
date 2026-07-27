@@ -257,8 +257,12 @@ export default function PaperToPoster() {
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <PublicHeader />
       <div className="mx-auto w-full max-w-7xl flex-1 px-4 pb-8 pt-6">
+        {/* Must match routes.json "/paper-to-poster".h1 — the prerender
+            script injects that string for non-JS crawlers, and a live
+            heading that disagrees with the crawled one is the drift
+            siteMeta.ts warns about. Change both together. */}
         <h1 className="text-2xl font-bold text-white">
-          From manuscript to poster
+          From paper to poster
         </h1>
         <p className="mt-1 text-sm text-[#6b7280]">
           Paste your manuscript, answer a few short questions, download a

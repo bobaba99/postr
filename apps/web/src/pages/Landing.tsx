@@ -114,7 +114,75 @@ export default function Landing() {
         </div>
       </section>
 
+      {/*
+        Standalone tools. Both shipped with nothing linking to them, so
+        they were reachable only by typing the URL. Each runs without
+        an account and stands on its own — hence "no account needed"
+        rather than a signup CTA.
+
+        Claims here are deliberately narrow: paper-to-poster produces a
+        poster draft (PDF or .postr). It does not make slides.
+      */}
+      <section className="mx-auto w-full max-w-4xl px-8 pb-24">
+        <h2 className="text-center text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8]">
+          Free tools, no account needed
+        </h2>
+        <p className="mx-auto mt-3 max-w-[52ch] text-center text-sm leading-relaxed text-[#8b8f99]">
+          Two parts of the poster workflow you can use on their own,
+          without opening the editor.
+        </p>
+
+        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <ToolCard
+            to="/paper-to-poster"
+            icon="📄"
+            title="Paper to poster"
+            body="Paste your manuscript or upload a .docx, answer a few short questions about what to emphasise, and download a poster draft as a PDF."
+            cta="Start from a paper"
+          />
+          <ToolCard
+            to="/chart-chooser"
+            icon="📊"
+            title="Chart chooser"
+            body="Paste a table or answer three short questions, and get ranked chart suggestions drawn as journal-style panels. Download any panel as SVG or PNG."
+            cta="Find your chart"
+          />
+        </div>
+      </section>
+
       <PublicFooter />
     </main>
+  );
+}
+
+function ToolCard({
+  to,
+  icon,
+  title,
+  body,
+  cta,
+}: {
+  to: string;
+  icon: string;
+  title: string;
+  body: string;
+  cta: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="group flex flex-col rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 no-underline transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#7c6aed]"
+    >
+      <div className="mb-3 text-2xl" aria-hidden="true">
+        {icon}
+      </div>
+      <h3 className="mb-2 text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8]">
+        {title}
+      </h3>
+      <p className="flex-1 text-sm leading-relaxed text-[#8b8f99]">{body}</p>
+      <span className="mt-4 text-sm font-semibold text-[#7c6aed]">
+        {cta} →
+      </span>
+    </Link>
   );
 }

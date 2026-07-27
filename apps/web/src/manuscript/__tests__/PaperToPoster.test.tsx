@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import { fireEvent, render, screen } from '@testing-library/react';
 import PaperToPoster from '../../pages/PaperToPoster';
+import routesJson from '../../seo/routes.json';
 
 const MANUSCRIPT = `Sleep Duration and Recall Accuracy in Undergraduate Students
 
@@ -39,6 +40,19 @@ function renderPage() {
 }
 
 describe('PaperToPoster page', () => {
+  it('renders the h1 the prerender script injects for crawlers', () => {
+    renderPage();
+    // Crawler copy parity: the prerendered document and the hydrated
+    // page must show the same heading, or the crawled page and the
+    // human page disagree.
+    const record = (routesJson.static as Record<string, { h1: string }>)[
+      '/paper-to-poster'
+    ]!;
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      record.h1,
+    );
+  });
+
   it('greets with the paste prompt and a docx upload affordance', () => {
     renderPage();
     expect(screen.getByText(/paste your manuscript below/i)).toBeInTheDocument();
