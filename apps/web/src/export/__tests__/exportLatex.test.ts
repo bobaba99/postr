@@ -26,7 +26,7 @@ describe('exportPosterLatex', () => {
     ]);
 
     const tex = decode(entries['poster.tex']!);
-    expect(tex).toContain('\\includegraphics[width=\\linewidth,height=9in,keepaspectratio]{figures/figure-1.png}');
+    expect(tex).toContain('\\includegraphics[width=12in,height=9in,keepaspectratio]{figures/figure-1.png}');
     expect(entries['figures/figure-1.png']).toEqual(TINY_PNG_BYTES);
 
     const bib = decode(entries['references.bib']!);

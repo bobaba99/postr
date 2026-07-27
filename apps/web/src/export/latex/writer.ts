@@ -212,6 +212,7 @@ function emitAuthors(b: Block, ctx: EmitContext): string {
 function emitHeading(b: Block, ctx: EmitContext): string {
   const st = ctx.doc.styles.heading;
   const hs = ctx.doc.headingStyle;
+  const widthIn = num(unitsToInches(b.w));
   const n = ctx.headingNumbers[b.id];
   const numberPrefix = n && n > 0 ? `${n}.~` : '';
   const align = hs.align === 'center' ? '\\centering ' : '';
@@ -220,17 +221,21 @@ function emitHeading(b: Block, ctx: EmitContext): string {
   if (hs.border === 'left') {
     inner = `\\textcolor{postrAccent}{\\rule[-0.25ex]{2.5pt}{1.1em}}\\hspace{0.4em}${inner}`;
   }
+  // The underline rule stays INSIDE the paragraph (before \par):
+  // after \par we are in vertical mode where \\ is illegal.
+  // Explicit width — \linewidth does not track textpos's \hsize.
+  if (hs.border === 'bottom' || hs.border === 'thick') {
+    const pt = hs.border === 'thick' ? '2.4pt' : '1pt';
+    inner = `${inner}\\\\[2pt]{\\color{postrAccent}\\rule{${widthIn}in}{${pt}}}`;
+  }
   let body =
     `{${fontSize(st.size, st.lineHeight)}${weightCmds(st)}` +
     `${texColor(st.color, 'postrAccent')}{${align}${inner}\\par}}`;
   if (hs.fill || hs.border === 'box') {
-    const boxed = `\\parbox{\\dimexpr\\linewidth-2\\fboxsep\\relax}{${body}}`;
+    const boxed = `\\parbox{\\dimexpr ${widthIn}in-2\\fboxsep\\relax}{${body}}`;
     body = hs.fill
       ? `\\colorbox{postrAccent!12}{${boxed}}`
       : `{\\color{postrAccent}\\fbox{${boxed}}}`;
-  } else if (hs.border === 'bottom' || hs.border === 'thick') {
-    const pt = hs.border === 'thick' ? '2.4pt' : '1pt';
-    body = `${body}\\\\[1pt]\n{\\color{postrAccent}\\rule{\\linewidth}{${pt}}}`;
   }
   return textBlockEnv(b, body);
 }
@@ -264,9 +269,18 @@ function noteLatex(b: Block, ctx: EmitContext): string | null {
   );
 }
 
+/**
+ * Join block sub-parts (caption / graphic / note). Every part ends
+ * with \par (vertical mode), so parts are separated with \vspace —
+ * a \\ here would be a "no line here to end" compile error.
+ */
+const joinParts = (parts: Array<string | null>): string =>
+  parts.filter((p): p is string => p !== null).join('\n\\vspace{4pt}\n');
+
 function emitImage(b: Block, ctx: EmitContext): string {
   const path = ctx.options.assetPaths?.get(b.id);
   const heightIn = num(unitsToInches(b.h));
+  const widthIn = num(unitsToInches(b.w));
   let graphic: string;
   if (path) {
     const fit = b.imageFit ?? 'contain';
@@ -281,12 +295,17 @@ function emitImage(b: Block, ctx: EmitContext): string {
         `"${path}" is an SVG — compile with the svg package (\\usepackage{svg}) or convert it to PNG first.`,
       );
     }
-    graphic = `\\includegraphics[width=\\linewidth,height=${heightIn}in${keep}]{${path}}`;
+    if (b.crop && (b.crop.top || b.crop.right || b.crop.bottom || b.crop.left)) {
+      ctx.warnings.push(
+        'An inline image crop is not applied in the LaTeX export — the full image is included.',
+      );
+    }
+    graphic = `\\includegraphics[width=${widthIn}in,height=${heightIn}in${keep}]{${path}}\\par`;
   } else {
     ctx.warnings.push('An image block had no resolvable file — exported as a placeholder box.');
     graphic =
-      `\\fbox{\\parbox[c][${heightIn}in][c]{\\dimexpr\\linewidth-2\\fboxsep\\relax}` +
-      `{\\centering\\textcolor{postrMuted}{missing image}\\par}}`;
+      `\\fbox{\\parbox[c][${heightIn}in][c]{\\dimexpr ${widthIn}in-2\\fboxsep\\relax}` +
+      `{\\centering\\textcolor{postrMuted}{missing image}\\par}}\\par`;
   }
   const position = b.captionPosition ?? 'top';
   const caption = captionLatex(b, ctx, 'Figure');
@@ -300,7 +319,7 @@ function emitImage(b: Block, ctx: EmitContext): string {
     position === 'bottom' || position === 'right'
       ? [graphic, caption, note]
       : [caption, graphic, note];
-  return textBlockEnv(b, parts.filter((p): p is string => p !== null).join('\\\\[4pt]\n'));
+  return textBlockEnv(b, joinParts(parts));
 }
 
 function emitTable(b: Block, ctx: EmitContext): string {
@@ -333,7 +352,9 @@ function emitTable(b: Block, ctx: EmitContext): string {
     (outer || vertical ? '|' : '') +
     Array.from({ length: data.cols }, (_, c) => {
       const pct = widths ? widths[c]! : 100 / data.cols;
-      return `p{${num((widthIn * pct) / 100 - 0.12)}in}`;
+      // Subtract ~2×tabcolsep, clamped so a narrow column never
+      // produces a negative p{} width.
+      return `p{${num(Math.max(0.2, (widthIn * pct) / 100 - 0.12))}in}`;
     }).join(sep) +
     (outer || vertical ? '|' : '');
 
@@ -356,7 +377,7 @@ function emitTable(b: Block, ctx: EmitContext): string {
   const table =
     `{${fontSize(st.size * 0.9, 1.25)}\\textcolor{postrPrimary}{%\n` +
     `\\setlength{\\tabcolsep}{4pt}\\renewcommand{\\arraystretch}{1.25}%\n` +
-    `\\begin{tabular}{${colSpec}}\n${rows.join('\n')}\n\\end{tabular}}}`;
+    `\\begin{tabular}{${colSpec}}\n${rows.join('\n')}\n\\end{tabular}\\par}}`;
 
   const caption = captionLatex(b, ctx, 'Table');
   const note = noteLatex(b, ctx);
@@ -365,7 +386,7 @@ function emitTable(b: Block, ctx: EmitContext): string {
     position === 'bottom' || position === 'right'
       ? [table, caption, note]
       : [caption, table, note];
-  return textBlockEnv(b, parts.filter((p): p is string => p !== null).join('\\\\[4pt]\n'));
+  return textBlockEnv(b, joinParts(parts));
 }
 
 function emitReferences(b: Block, ctx: EmitContext): string {

@@ -93,6 +93,10 @@ function runOptions(run: RichRun): PptxGenJS.TextPropsOptions {
   return opts;
 }
 
+/** Guard: pptxgenjs needs at least one run per text shape. */
+const orEmptyRun = (runs: PptxGenJS.TextProps[]): PptxGenJS.TextProps[] =>
+  runs.length > 0 ? runs : [{ text: '', options: {} }];
+
 /** Paragraphs → pptxgenjs run array with breakLine + bullets. */
 export function paragraphsToTextProps(
   paragraphs: readonly RichParagraph[],
@@ -134,7 +138,7 @@ function styleOptions(
 // ── block emitters ───────────────────────────────────────────────────
 
 function addTitle(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
-  slide.addText(paragraphsToTextProps(parseRichText(b.content)), {
+  slide.addText(orEmptyRun(paragraphsToTextProps(parseRichText(b.content))), {
     ...rect(b, ctx.scale),
     ...styleOptions(ctx.doc.styles.title, ctx, hex(ctx.doc.palette.primary, '111111')),
     align: 'center',
@@ -197,7 +201,7 @@ function addHeading(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   const hs = ctx.doc.headingStyle;
   const accent = hex(ctx.doc.palette.accent, '0F4C75');
   const n = ctx.headingNumbers[b.id];
-  const runs = paragraphsToTextProps(parseRichText(b.content));
+  const runs = orEmptyRun(paragraphsToTextProps(parseRichText(b.content)));
   const withNumber: PptxGenJS.TextProps[] =
     n && n > 0 ? [{ text: `${n}. `, options: {} }, ...runs] : runs;
 
@@ -237,7 +241,7 @@ function addHeading(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
 }
 
 function addText(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
-  slide.addText(paragraphsToTextProps(parseRichText(b.content)), {
+  slide.addText(orEmptyRun(paragraphsToTextProps(parseRichText(b.content))), {
     ...rect(b, ctx.scale),
     ...styleOptions(ctx.doc.styles.body, ctx, hex(ctx.doc.palette.primary, '111111')),
     align: 'left',
@@ -301,6 +305,11 @@ function addImage(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
     if (asset.ext === 'svg') {
       ctx.warnings.push(
         'An SVG figure was embedded — older PowerPoint versions (pre-2019) may not render it.',
+      );
+    }
+    if (b.crop && (b.crop.top || b.crop.right || b.crop.bottom || b.crop.left)) {
+      ctx.warnings.push(
+        'An inline image crop is not applied in the PowerPoint export — the full image is included.',
       );
     }
     const fit = b.imageFit ?? 'contain';

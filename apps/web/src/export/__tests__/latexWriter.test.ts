@@ -72,7 +72,10 @@ describe('buildLatexDocument — blocks', () => {
 
   it('renders the numbered heading with the default bottom border rule', () => {
     expect(tex).toContain('1.~Methods');
-    expect(tex).toContain('\\rule{\\linewidth}{1pt}');
+    // Rule width is the block's EXPLICIT width (15in for w=150u) —
+    // \linewidth does not track textpos's \hsize — and it stays
+    // inside the paragraph (a \\ after \par cannot compile).
+    expect(tex).toContain('\\\\[2pt]{\\color{postrAccent}\\rule{15in}{1pt}}\\par');
   });
 
   it('renders text paragraphs with italics and lists', () => {
@@ -82,10 +85,17 @@ describe('buildLatexDocument — blocks', () => {
   });
 
   it('includes the figure with its numbered caption after (bottom position)', () => {
-    const graphicIdx = tex.indexOf('\\includegraphics[width=\\linewidth,height=9in,keepaspectratio]{figures/figure-1.png}');
+    const graphicIdx = tex.indexOf('\\includegraphics[width=12in,height=9in,keepaspectratio]{figures/figure-1.png}');
     const captionIdx = tex.indexOf('\\textbf{Figure 1.} Nap duration by whisker length');
     expect(graphicIdx).toBeGreaterThan(-1);
     expect(captionIdx).toBeGreaterThan(graphicIdx);
+  });
+
+  it('separates caption/graphic parts with \\vspace, never \\\\ after \\par', () => {
+    // Every sub-part ends in \par (vertical mode); a \\ separator
+    // there is the "no line here to end" compile error.
+    expect(tex).not.toMatch(/\\par\}*\\\\/);
+    expect(tex).toContain('\\vspace{4pt}');
   });
 
   it('renders the APA table with top, header, and bottom rules only', () => {
