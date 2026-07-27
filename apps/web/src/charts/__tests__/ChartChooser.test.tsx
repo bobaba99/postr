@@ -66,13 +66,17 @@ describe('ChartChooser ladder', () => {
   it('inserting passes the spec and seeded caption to the action', async () => {
     const onPrimary = renderChooser();
     pasteTable(TSV);
-    const insert = (await screen.findAllByText('Insert this figure'))[0]!;
+    const insert = await screen.findByText('Insert this figure');
     fireEvent.click(insert);
     expect(onPrimary).toHaveBeenCalledTimes(1);
-    const [spec, caption] = onPrimary.mock.calls[0]!;
-    expect(spec.form).toBe('bar');
-    expect(spec.version).toBe(1);
-    expect(String(caption)).toMatch(/condition/i);
+    const [selection] = onPrimary.mock.calls[0]!;
+    // One action call carries the whole selection — the fast path is
+    // a selection of exactly one, pre-ticked on mount.
+    expect(selection).toHaveLength(1);
+    expect(selection[0].spec.form).toBe('bar');
+    expect(selection[0].spec.version).toBe(1);
+    expect(selection[0].letter).toBe('A');
+    expect(String(selection[0].caption)).toMatch(/condition/i);
     expect(await screen.findByText(/Inserted — legible at print size/)).toBeInTheDocument();
   });
 
@@ -243,6 +247,112 @@ describe('ChartChooser ladder', () => {
     );
     fireEvent.click(screen.getByText('Table 1'));
     expect(await screen.findByText('Pick your figure')).toBeInTheDocument();
+  });
+
+  it('pre-selects only the recommended panel so one figure is one click', async () => {
+    renderChooser();
+    pasteTable(TSV);
+    await screen.findByText('Pick your figure');
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    expect(boxes.length).toBeGreaterThan(1);
+    expect(boxes[0]!.checked).toBe(true);
+    expect(boxes.slice(1).every((b) => !b.checked)).toBe(true);
+  });
+
+  it('selecting several panels hands the whole selection to one action call', async () => {
+    const onPrimary = renderChooser();
+    pasteTable(TSV);
+    await screen.findByText('Pick your figure');
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    fireEvent.click(boxes[1]!);
+
+    // The button advertises the count so the user knows what will happen.
+    fireEvent.click(await screen.findByText('Insert this figure (2)'));
+
+    expect(onPrimary).toHaveBeenCalledTimes(1);
+    const [selection] = onPrimary.mock.calls[0]!;
+    expect(selection).toHaveLength(2);
+    // Panel order, not click order.
+    expect(selection.map((f: { letter: string }) => f.letter)).toEqual(['A', 'B']);
+    expect(selection[0].spec).not.toBe(selection[1].spec);
+    expect(await screen.findByText(/2 figures — Inserted/)).toBeInTheDocument();
+  });
+
+  it('unticking a panel removes it from the selection', async () => {
+    const onPrimary = renderChooser();
+    pasteTable(TSV);
+    await screen.findByText('Pick your figure');
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    fireEvent.click(boxes[1]!);
+    fireEvent.click(boxes[0]!);
+
+    fireEvent.click(await screen.findByText('Insert this figure'));
+    const [selection] = onPrimary.mock.calls[0]!;
+    expect(selection).toHaveLength(1);
+    expect(selection[0].letter).toBe('B');
+  });
+
+  it('disables the action with an explanation when nothing is selected', async () => {
+    const onPrimary = renderChooser();
+    pasteTable(TSV);
+    await screen.findByText('Pick your figure');
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    fireEvent.click(boxes[0]!);
+
+    const button = screen.getByText('Insert this figure') as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+    // Never a silent no-op — the reason is on screen and wired to the
+    // control via aria-describedby.
+    const hint = screen.getByText('Tick at least one figure above to continue.');
+    expect(button.getAttribute('aria-describedby')).toBe(hint.id);
+
+    fireEvent.click(button);
+    expect(onPrimary).not.toHaveBeenCalled();
+  });
+
+  it('keeps the recommended badge on the top panel through selection changes', async () => {
+    renderChooser();
+    pasteTable(TSV);
+    await screen.findByText('Pick your figure');
+    expect(screen.getByText('Recommended')).toBeInTheDocument();
+    fireEvent.click((screen.getAllByRole('checkbox') as HTMLInputElement[])[0]!);
+    expect(screen.getByText('Recommended')).toBeInTheDocument();
+  });
+
+  it('announces the in-flight action and re-enables afterwards', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    render(
+      <ChartChooser
+        layout="panel"
+        palette={palette}
+        fontFamily="Georgia, serif"
+        actions={[
+          {
+            label: 'Download SVG',
+            primary: true,
+            run: () => gate,
+            busyLabel: (n) => `Zipping ${n} figures…`,
+          },
+        ]}
+        confirmation="Saved"
+      />,
+    );
+    pasteTable(TSV);
+    await screen.findByText('Pick your figure');
+    fireEvent.click((screen.getAllByRole('checkbox') as HTMLInputElement[])[1]!);
+    fireEvent.click(screen.getByText('Download SVG (2)'));
+
+    expect(await screen.findByText('Zipping 2 figures…')).toBeInTheDocument();
+    expect((screen.getByText('Download SVG (2)') as HTMLButtonElement).disabled).toBe(true);
+
+    release();
+    await waitFor(() => {
+      expect(screen.queryByText('Zipping 2 figures…')).not.toBeInTheDocument();
+    });
+    expect((screen.getByText('Download SVG (2)') as HTMLButtonElement).disabled).toBe(false);
   });
 
   it('renders live SVG previews', async () => {

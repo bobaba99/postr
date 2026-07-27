@@ -211,6 +211,58 @@ body {
   }
 }
 
+/* Shared indeterminate-work indicator (BusyIndicator). A track with a
+ * shuttle that sweeps across it — honest about unknown duration in a
+ * way a percentage bar is not. Under reduced-motion the shuttle stops
+ * moving and the track fills as a flat, static bar: still a visible
+ * "work in progress" affordance, never nothing. */
+@keyframes postr-busy-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.postr-busy-track {
+  position: relative;
+  height: 3px;
+  border-radius: 999px;
+  background: #1e1e2b;
+  overflow: hidden;
+}
+
+.postr-busy-shuttle {
+  position: absolute;
+  inset-block: 0;
+  width: 25%;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.85;
+  animation: postr-busy-sweep 1200ms var(--ease-standard) infinite;
+}
+
+/* Small inline dot for buttons — pulses opacity only, no movement. */
+@keyframes postr-busy-dot {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.postr-busy-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: postr-busy-dot 1000ms var(--ease-standard) infinite;
+}
+
 /* Notion-style inline format toolbar entrance. Quick fade with a
  * gentle drop-in and a hair of scale. 160 ms cubic-bezier matches
  * Notion's perceived snappiness — anything slower feels reluctant,
@@ -459,6 +511,22 @@ body {
   .postr-dimension-pill,
   [data-postr-pulse] {
     animation: none !important;
+  }
+  /* Busy indicators: the sweep and the pulse are both movement, so
+   * they stop — but the indicator must NOT vanish, or reduced-motion
+   * users get no feedback at all. The shuttle becomes a static full-
+   * width bar and the dot a static dot; the accompanying word label
+   * ("Reading your spreadsheet…") carries the meaning either way. */
+  .postr-busy-shuttle {
+    animation: none !important;
+    position: static;
+    width: 100%;
+    opacity: 0.5;
+    height: 100%;
+  }
+  .postr-busy-dot {
+    animation: none !important;
+    opacity: 0.8;
   }
   /* Collapsible sections (GuidelinesPanel) snap open/closed instead of
    * sliding the grid-template-rows track. */

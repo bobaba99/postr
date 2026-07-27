@@ -78,8 +78,7 @@ describe('FigureTab', () => {
     const onInsertChart = vi.fn();
     render(<Harness onInsertChart={onInsertChart} />);
     pasteTable(TSV);
-    const insert = (await screen.findAllByText('Insert this figure'))[0]!;
-    fireEvent.click(insert);
+    fireEvent.click(await screen.findByText('Insert selected figures'));
     expect(onInsertChart).toHaveBeenCalledTimes(1);
     const [spec, caption] = onInsertChart.mock.calls[0]! as [
       { form: string; version: number },
@@ -91,5 +90,25 @@ describe('FigureTab', () => {
     expect(
       await screen.findByText(/Inserted — legible at print size/),
     ).toBeInTheDocument();
+  });
+
+  it('inserts one block per selected figure', async () => {
+    const onInsertChart = vi.fn();
+    render(<Harness onInsertChart={onInsertChart} />);
+    pasteTable(TSV);
+    await screen.findByText('Pick your figure');
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    fireEvent.click(boxes[1]!);
+
+    fireEvent.click(await screen.findByText('Insert selected figures (2)'));
+
+    // Two selected figures become two separate chart blocks, in panel
+    // order — not one block, and not a merged spec.
+    expect(onInsertChart).toHaveBeenCalledTimes(2);
+    const forms = onInsertChart.mock.calls.map(
+      (call) => (call[0] as { form: string }).form,
+    );
+    expect(new Set(forms).size).toBe(2);
+    expect(await screen.findByText(/2 figures — Inserted/)).toBeInTheDocument();
   });
 });

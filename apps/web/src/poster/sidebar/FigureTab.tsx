@@ -100,9 +100,17 @@ export function FigureTab({
             posterTables={posterTables}
             actions={[
               {
-                label: 'Insert this figure',
+                label: 'Insert selected figures',
                 primary: true,
-                run: (spec, caption) => onInsertChart(spec, caption),
+                // One block per selected figure, in panel order — the
+                // insert handler already places each new block, so
+                // looping is the whole extension.
+                run: (selection) => {
+                  for (const figure of selection) {
+                    onInsertChart(figure.spec, figure.caption);
+                  }
+                },
+                busyLabel: (n) => (n > 1 ? `Inserting ${n} figures…` : 'Inserting…'),
               },
             ]}
             confirmation="Inserted — legible at print size"

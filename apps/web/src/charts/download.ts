@@ -9,6 +9,7 @@
  * (possibly redundant with the poster export path) and deliberately
  * not built.
  */
+import { zipSync } from 'fflate';
 import type { ChartSpec, Palette } from '@postr/shared';
 import { renderChart } from './renderChart';
 import type { ChartTheme } from './plotOptions';
@@ -63,13 +64,12 @@ export async function downloadChartSvg(
   triggerDownload(new Blob([text], { type: 'image/svg+xml' }), filename);
 }
 
-export async function downloadChartPng(
+export async function chartToPngBlob(
   spec: ChartSpec,
   palette: Palette,
   fontFamily: string,
-  filename: string,
   scale = 2,
-): Promise<void> {
+): Promise<Blob> {
   const text = await chartToSvgString(spec, palette, fontFamily);
   const svgBlob = new Blob([text], { type: 'image/svg+xml' });
   const url = URL.createObjectURL(svgBlob);
@@ -88,11 +88,68 @@ export async function downloadChartPng(
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob>((resolve, reject) => {
+    return await new Promise<Blob>((resolve, reject) => {
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('png encode failed'))), 'image/png');
     });
-    triggerDownload(blob, filename);
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+export async function downloadChartPng(
+  spec: ChartSpec,
+  palette: Palette,
+  fontFamily: string,
+  filename: string,
+  scale = 2,
+): Promise<void> {
+  triggerDownload(await chartToPngBlob(spec, palette, fontFamily, scale), filename);
+}
+
+/** One figure destined for a multi-figure download. */
+export interface ChartDownloadEntry {
+  spec: ChartSpec;
+  /** Entry filename inside the zip, e.g. "figure-A-bar-chart.svg". */
+  filename: string;
+}
+
+/**
+ * Bundle several figures into one `.zip` rather than firing N
+ * downloads. Browsers throttle or block rapid successive downloads
+ * and the user gets an unordered pile of files either way; a single
+ * archive with predictable entry names is the honest shape for a
+ * multi-select result.
+ *
+ * Rendering is sequential on purpose — each render mounts a detached
+ * SVG and the previews are already competing for the same main
+ * thread; a Promise.all over ten specs just makes the tab jank.
+ */
+export async function downloadChartsZip(
+  entries: readonly ChartDownloadEntry[],
+  palette: Palette,
+  fontFamily: string,
+  kind: 'svg' | 'png',
+  zipFilename: string,
+  scale = 2,
+): Promise<void> {
+  if (entries.length === 0) throw new Error('no figures selected');
+
+  const files: Record<string, Uint8Array> = {};
+  for (const entry of entries) {
+    if (kind === 'svg') {
+      const text = await chartToSvgString(entry.spec, palette, fontFamily);
+      files[entry.filename] = new TextEncoder().encode(text);
+    } else {
+      const blob = await chartToPngBlob(entry.spec, palette, fontFamily, scale);
+      // PNG is already deflated; storing it again wastes CPU for ~0%.
+      files[entry.filename] = new Uint8Array(await blob.arrayBuffer());
+    }
+  }
+
+  const zipped = zipSync(files, { level: kind === 'png' ? 0 : 6 });
+  const buf = zipped.buffer.slice(
+    zipped.byteOffset,
+    zipped.byteOffset + zipped.byteLength,
+  ) as ArrayBuffer;
+  triggerDownload(new Blob([buf], { type: 'application/zip' }), zipFilename);
 }

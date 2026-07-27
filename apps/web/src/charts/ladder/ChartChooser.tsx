@@ -18,6 +18,7 @@ import type { Palette } from '@postr/shared';
 import { inferTable } from '../inferColumns';
 import type { RawTable } from '../parseData';
 import { groupingCandidates } from '../recommend';
+import { SAMPLE_DATA_LABEL } from '../sampleData';
 import {
   EMPHASIS_OPTIONS,
   SHAPE_OPTIONS,
@@ -28,8 +29,10 @@ import {
 } from './steps';
 import { ChipRow } from './ChipRow';
 import { DataStep, type PosterTableRef } from './DataStep';
-import { PreviewStep, type PreviewAction } from './PreviewStep';
+import { PreviewStep, type PreviewAction, type SelectedFigure } from './PreviewStep';
 import { StepSection } from './StepSection';
+
+export type { PreviewAction, SelectedFigure };
 
 export interface ChartChooserProps {
   layout: 'panel' | 'page';
@@ -141,7 +144,12 @@ export function ChartChooser({
   const summaryFor = (step: StepId): string => {
     switch (step) {
       case 'data':
-        return dataSummary;
+        // The collapsed step-1 summary is the only trace of the data
+        // source once the ladder scrolls past it, so the sample-data
+        // warning has to appear here too — not just on the previews.
+        return !synthetic && plan.syntheticValues
+          ? `${dataSummary} — ${SAMPLE_DATA_LABEL}`
+          : dataSummary;
       case 'measure':
         return synthetic
           ? SHAPE_OPTIONS.find((o) => o.value === answers.shape)?.label ?? ''
@@ -205,6 +213,7 @@ export function ChartChooser({
                   fontFamily={fontFamily}
                   layout={layout}
                   actions={actions}
+                  sample={plan.syntheticValues}
                   {...(confirmation !== undefined ? { confirmation } : {})}
                 />
               )}

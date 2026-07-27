@@ -4,7 +4,8 @@ import { inferTable } from '../inferColumns';
 import { buildChartSpec } from '../buildSpec';
 import { recommend } from '../recommend';
 import { sampleDatasets } from '../sampleData';
-import { chartToSvgString, downloadChartSvg } from '../download';
+import { unzipSync, strFromU8 } from 'fflate';
+import { chartToSvgString, downloadChartSvg, downloadChartsZip } from '../download';
 
 const palette: Palette = {
   bg: '#ffffff',
@@ -83,5 +84,63 @@ describe('downloadChartSvg', () => {
     expect(clicked[0]!.isConnected).toBe(false);
     vi.runOnlyPendingTimers();
     expect(urlSpy.revoke).toHaveBeenCalledWith('blob:postr-test');
+  });
+
+  it('bundles several figures into one zip instead of firing N downloads', async () => {
+    const spec = fixtureSpec();
+    const clicked: HTMLAnchorElement[] = [];
+    // jsdom's Blob has no arrayBuffer(), so intercept the bytes at the
+    // Blob constructor instead of reading them back off the object.
+    const parts: { bytes: Uint8Array; type: string }[] = [];
+    const RealBlob = globalThis.Blob;
+    class CapturingBlob extends RealBlob {
+      constructor(blobParts?: BlobPart[], options?: BlobPropertyBag) {
+        super(blobParts, options);
+        const first = blobParts?.[0];
+        if (first instanceof ArrayBuffer) {
+          parts.push({ bytes: new Uint8Array(first), type: options?.type ?? '' });
+        }
+      }
+    }
+    globalThis.Blob = CapturingBlob as unknown as typeof Blob;
+    const originalClick = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
+      clicked.push(this);
+    };
+    try {
+      await downloadChartsZip(
+        [
+          { spec, filename: 'figure-A-bar-chart.svg' },
+          { spec, filename: 'figure-B-dot-plot.svg' },
+        ],
+        palette,
+        'Georgia, serif',
+        'svg',
+        'figures-svg.zip',
+      );
+    } finally {
+      HTMLAnchorElement.prototype.click = originalClick;
+      globalThis.Blob = RealBlob;
+    }
+
+    // One download, not two.
+    expect(clicked).toHaveLength(1);
+    expect(clicked[0]!.download).toBe('figures-svg.zip');
+
+    const zip = parts.at(-1)!;
+    expect(zip.type).toBe('application/zip');
+    const entries = unzipSync(zip.bytes);
+    // Predictable, panel-letter-prefixed entry names.
+    expect(Object.keys(entries).sort()).toEqual([
+      'figure-A-bar-chart.svg',
+      'figure-B-dot-plot.svg',
+    ]);
+    expect(strFromU8(entries['figure-A-bar-chart.svg']!)).toContain('<svg');
+  });
+
+  it('refuses an empty selection rather than emitting a zip with no entries', async () => {
+    await expect(
+      downloadChartsZip([], palette, 'Georgia, serif', 'svg', 'figures.zip'),
+    ).rejects.toThrow();
   });
 });

@@ -27,7 +27,8 @@ import { useDocumentMeta } from '@/seo/useDocumentMeta';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { FONTS, PALETTES } from '@/poster/constants';
 import { ChartChooser } from '@/charts/ladder/ChartChooser';
-import { downloadChartPng, downloadChartSvg } from '@/charts/download';
+import type { SelectedFigure } from '@/charts/ladder/PreviewStep';
+import { downloadChartPng, downloadChartSvg, downloadChartsZip } from '@/charts/download';
 
 const CHOOSER_JSON_LD = {
   '@context': 'https://schema.org',
@@ -66,18 +67,31 @@ export default function ChartChooserPage() {
     return rest;
   }, [paletteName]);
 
-  const download = async (
-    kind: 'svg' | 'png',
-    spec: Parameters<typeof downloadChartSvg>[0],
-    formName: string,
-  ) => {
+  const download = async (kind: 'svg' | 'png', selection: readonly SelectedFigure[]) => {
     try {
       setDownloadFailed(false);
-      if (kind === 'svg') {
-        await downloadChartSvg(spec, palette, PREVIEW_FONT, `${fileSlug(formName)}.svg`);
-      } else {
-        await downloadChartPng(spec, palette, PREVIEW_FONT, `${fileSlug(formName)}.png`);
+      const only = selection.length === 1 ? selection[0] : null;
+      if (only) {
+        // One figure stays one file — zipping a single chart would be
+        // a worse result for the common case.
+        const filename = `${fileSlug(only.formName)}.${kind}`;
+        if (kind === 'svg') {
+          await downloadChartSvg(only.spec, palette, PREVIEW_FONT, filename);
+        } else {
+          await downloadChartPng(only.spec, palette, PREVIEW_FONT, filename);
+        }
+        return;
       }
+      await downloadChartsZip(
+        selection.map((figure) => ({
+          spec: figure.spec,
+          filename: `figure-${figure.letter}-${fileSlug(figure.formName)}.${kind}`,
+        })),
+        palette,
+        PREVIEW_FONT,
+        kind,
+        `figures-${kind}.zip`,
+      );
     } catch (error) {
       setDownloadFailed(true);
       // Re-thrown so the panel withholds its success confirmation —
@@ -181,11 +195,15 @@ export default function ChartChooserPage() {
               {
                 label: 'Download SVG',
                 primary: true,
-                run: (spec, _caption, formName) => download('svg', spec, formName),
+                run: (selection) => download('svg', selection),
+                busyLabel: (n) =>
+                  n > 1 ? `Zipping ${n} figures…` : 'Drawing your figure…',
               },
               {
                 label: 'Download PNG',
-                run: (spec, _caption, formName) => download('png', spec, formName),
+                run: (selection) => download('png', selection),
+                busyLabel: (n) =>
+                  n > 1 ? `Zipping ${n} figures…` : 'Rendering the image…',
               },
             ]}
             confirmation="Saved — vector SVG scales to any print size"
