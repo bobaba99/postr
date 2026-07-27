@@ -49,7 +49,7 @@ export default function Gallery() {
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
-      <PublicHeader highlightGallery />
+      <PublicHeader />
 
       <section className="mx-auto max-w-3xl px-8 pt-16 pb-8 text-center">
         <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.3em] text-[#7c6aed]">

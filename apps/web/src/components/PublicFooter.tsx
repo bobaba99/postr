@@ -38,7 +38,6 @@ export function PublicFooter() {
 
           <FooterColumn title="Product">
             <FooterLink to="/">Home</FooterLink>
-            <FooterLink to="/gallery">Gallery</FooterLink>
             <FooterLink to="/dashboard">My posters</FooterLink>
           </FooterColumn>
 

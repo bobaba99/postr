@@ -25,7 +25,7 @@ echo "Verifying prerender at ${BASE}"
 echo
 
 echo "Prerendered routes carry real HTML:"
-for route in "" about gallery privacy cookies terms; do
+for route in "" about privacy cookies terms; do
   url="${BASE}/${route}"
   body="$(curl -sL --max-time 20 "$url")"
   bytes="${#body}"
@@ -48,7 +48,7 @@ done
 
 echo
 echo "Every route has a distinct title:"
-titles="$(for route in "" about gallery privacy cookies terms; do
+titles="$(for route in "" about privacy cookies terms; do
   curl -sL --max-time 20 "${BASE}/${route}" |
     grep -o '<title>[^<]*</title>' | head -1
 done)"

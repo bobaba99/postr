@@ -29,16 +29,6 @@
         "Every poster starts at a real print size, so what you see on screen is what the print shop produces."
       ]
     },
-    "/gallery": {
-      "title": "Academic Poster Gallery: Real Conference Posters | Postr",
-      "description": "Browse real conference posters published by researchers across neuroscience, psychology, medicine, biology and more. Free to view, free to make your own.",
-      "robots": "index,follow",
-      "h1": "Poster gallery",
-      "copy": [
-        "Real conference posters published by the researchers who made them, across neuroscience, psychology, medicine, biology, computer science, physics, chemistry, engineering, social sciences and the humanities.",
-        "Browse for layout ideas, figure sizing, and section structure that worked at a real conference, then build your own for free."
-      ]
-    },
     "/privacy": {
       "title": "Privacy Policy | Postr",
       "description": "How Postr collects, stores, and protects your data, including anonymous sessions, poster documents, and cookies. Plain language, no dark patterns.",

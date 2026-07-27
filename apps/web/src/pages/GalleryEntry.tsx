@@ -70,7 +70,7 @@ export default function GalleryEntryPage() {
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
-      <PublicHeader highlightGallery />
+      <PublicHeader />
 
       <div className="flex-1">
         {status.kind === 'loading' && (

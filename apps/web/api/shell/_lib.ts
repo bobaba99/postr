@@ -5,12 +5,11 @@
  * plain module rather than an endpoint.
  *
  * Everything here is written to degrade to "serve the shell unchanged."
- * These functions sit in front of two public pages; a metadata miss is
+ * These functions sit in front of a public page; a metadata miss is
  * always preferable to an error page, so there is no throwing path.
  */
 import { injectHead } from '../../scripts/lib/headTags.mjs';
 
-const SITE_ORIGIN = 'https://www.postr.sh';
 const SITE = { siteName: 'Postr', locale: 'en_US' };
 
 export interface ShellMeta {
@@ -74,50 +73,6 @@ export function injectOrPassThrough(
     headers['x-robots-tag'] = 'noindex, nofollow';
   }
   return new Response(html, { status: 200, headers });
-}
-
-function clamp(text: string, max: number): string {
-  const collapsed = text.replace(/\s+/g, ' ').trim();
-  if (collapsed.length <= max) return collapsed;
-  const cut = collapsed.slice(0, max - 1);
-  const lastSpace = cut.lastIndexOf(' ');
-  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
-}
-
-/** Mirrors galleryEntryMeta() in src/seo/siteMeta.ts. */
-export function buildEntryMeta(input: {
-  id: string;
-  title: string;
-  fieldLabel: string;
-  conference: string | null;
-  year: number | null;
-  notes: string | null;
-  imagePath: string | null;
-  supabaseUrl: string;
-}): ShellMeta {
-  const venue = [input.conference, input.year ? String(input.year) : null]
-    .filter(Boolean)
-    .join(' ');
-  const parts = [
-    venue ? `${input.title} (${venue})` : input.title,
-    `a ${input.fieldLabel.toLowerCase()} conference poster in the Postr gallery.`,
-  ];
-  if (input.notes) parts.push(input.notes);
-
-  const imageUrl = input.imagePath
-    ? `${input.supabaseUrl}/storage/v1/object/public/gallery/${input.imagePath}`
-    : null;
-
-  return {
-    title: `${clamp(input.title, 45)} — ${input.fieldLabel} Poster | Postr`,
-    description: clamp(parts.join(' '), 155),
-    robots:
-      'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1',
-    canonical: `${SITE_ORIGIN}/gallery/${input.id}`,
-    ogType: 'article',
-    ogImage: imageUrl,
-    ogImageAlt: `Conference poster: ${input.title}`,
-  };
 }
 
 /** Mirrors shareMeta() in src/seo/siteMeta.ts. Never indexable. */

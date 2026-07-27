@@ -27,8 +27,8 @@ describe('canonicalFor', () => {
   });
 
   it('drops query strings and fragments', () => {
-    expect(canonicalFor('/gallery?field=biology&page=2')).toBe(
-      `${SITE_ORIGIN}/gallery`,
+    expect(canonicalFor('/about?utm_source=x&page=2')).toBe(
+      `${SITE_ORIGIN}/about`,
     );
     expect(canonicalFor('/about#team')).toBe(`${SITE_ORIGIN}/about`);
   });
@@ -42,11 +42,12 @@ describe('STATIC_ROUTE_META', () => {
   const entries = Object.entries(STATIC_ROUTE_META);
 
   it('covers every public static route', () => {
+    // "/gallery" is intentionally absent: the public gallery is
+    // deactivated and its routes redirect to the landing page.
     expect(Object.keys(STATIC_ROUTE_META).sort()).toEqual([
       '/',
       '/about',
       '/cookies',
-      '/gallery',
       '/privacy',
       '/terms',
     ]);

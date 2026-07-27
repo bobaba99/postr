@@ -10,11 +10,15 @@
  *
  * This component subscribes to supabase.auth via onAuthStateChange
  * and flips the right side between:
- *   - no session: Gallery, About, "Sign in" button
- *   - with session: Gallery, About, Feedback button, Profile icon
+ *   - no session: About, "Sign in" button
+ *   - with session: About, Feedback button, Profile icon
  *
  * Matches the dashboard header's authenticated chrome so moving from
- * /dashboard to /gallery no longer looks like a regression.
+ * /dashboard to a public page no longer looks like a regression.
+ *
+ * The Gallery nav link was removed when the public gallery was
+ * deactivated; restore it alongside the /gallery routes if the
+ * gallery is switched back on.
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -22,15 +26,7 @@ import { supabase } from '@/lib/supabase';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import type { User } from '@supabase/supabase-js';
 
-interface Props {
-  /**
-   * If true, highlight the "Gallery" link in the nav.
-   * Used on /gallery and /gallery/:id pages.
-   */
-  highlightGallery?: boolean;
-}
-
-export function PublicHeader({ highlightGallery = false }: Props) {
+export function PublicHeader() {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
   const openFeedback = useFeedbackStore((s) => s.open);
@@ -81,16 +77,6 @@ export function PublicHeader({ highlightGallery = false }: Props) {
       </Link>
 
       <div className="flex items-center gap-5">
-        <Link
-          to="/gallery"
-          className={`hidden text-[14pt] font-normal no-underline sm:inline ${
-            highlightGallery
-              ? 'text-[#7c6aed] hover:text-white'
-              : 'text-[#6b7280] hover:text-[#c8cad0]'
-          }`}
-        >
-          Gallery
-        </Link>
         <Link
           to="/about"
           className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"

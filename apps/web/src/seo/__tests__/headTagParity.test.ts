@@ -32,7 +32,7 @@ const site = {
 const staticPaths = Object.keys(routes.static);
 
 describe('canonicalFor parity', () => {
-  it.each(['/', '/about', '/About/', '/gallery?x=1', '/terms#a'])(
+  it.each(['/', '/about', '/About/', '/privacy?x=1', '/terms#a'])(
     '%s resolves identically in both implementations',
     (path) => {
       expect(mjs.canonicalFor(path, site.siteOrigin)).toBe(canonicalFor(path));
@@ -59,7 +59,7 @@ describe('tagSpecsFor parity', () => {
     [
       'with an image',
       {
-        ...(STATIC_ROUTE_META['/gallery'] as PageMeta),
+        ...(STATIC_ROUTE_META['/about'] as PageMeta),
         ogImage: 'https://example.com/poster.png',
         ogImageAlt: 'A poster',
       },

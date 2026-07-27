@@ -2,23 +2,21 @@
 <!--
   Sitemap index.
 
-  Split not for scale (Postr is nowhere near the 50,000-URL limit and
-  will not be for years) but because the two halves have different
-  freshness requirements: static routes change on deploy, gallery
-  entries change whenever a user clicks Publish.
+  Only child today:
 
   - sitemap-static.xml   written by scripts/gen-sitemap.mjs at build time
-  - sitemap-gallery.xml  served by api/sitemap-gallery.ts, cached 1 hour
 
-  Both children genuinely exist. Do not add a third entry before its
-  target does — a child that 404s (or, under the catch-all rewrite,
-  returns HTML with a 200) is a hard Search Console error.
+  A second child, sitemap-gallery.xml (served by an edge function),
+  existed while the public gallery was live. It was removed when the
+  gallery was deactivated — restore it together with the /gallery
+  routes if the gallery is switched back on.
+
+  Every child listed here must genuinely exist. Do not add an entry
+  before its target does — a child that 404s (or, under the catch-all
+  rewrite, returns HTML with a 200) is a hard Search Console error.
 -->
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
     <loc>https://www.postr.sh/sitemap-static.xml</loc>
-  </sitemap>
-  <sitemap>
-    <loc>https://www.postr.sh/sitemap-gallery.xml</loc>
   </sitemap>
 </sitemapindex>
