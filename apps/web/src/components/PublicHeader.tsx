@@ -27,7 +27,7 @@
  * able to find them. This menu and the footer/landing entries added
  * alongside it are that fix.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { useFeedbackStore } from '@/stores/feedbackStore';
@@ -158,14 +158,26 @@ export function PublicHeader() {
  * both tools rather than losing them entirely.
  *
  * Closes on outside pointerdown, on Escape (restoring focus to the
- * trigger), and on navigation. Entrance uses the shared
- * `.postr-popover-enter` class, which is already dropped under
- * prefers-reduced-motion in index.css.
+ * trigger), when focus leaves the container entirely, and on
+ * navigation. Entrance uses the shared `.postr-popover-enter` class,
+ * which is already dropped under prefers-reduced-motion in index.css.
+ *
+ * Deliberately NOT the WAI-ARIA menu pattern. An earlier version
+ * declared role="menu" with role="menuitem" children, which promises a
+ * screen-reader user arrow-key navigation, a roving tabindex, and
+ * Home/End — none of which were implemented, so the items were only
+ * reachable by Tab and the announced affordance was a lie. For a panel
+ * of two ordinary navigation links, the honest markup is a labelled
+ * list of links: Tab moves through them, which is exactly what the
+ * roles now claim. If this ever grows into a real command menu, add
+ * the full keyboard model FIRST, then restore the menu roles.
  */
 function ToolsMenu() {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerId = useId();
+  const panelId = useId();
 
   useEffect(() => {
     if (!open) return;
@@ -191,14 +203,40 @@ function ToolsMenu() {
     };
   }, [open]);
 
+  /**
+   * Keyboard equivalent of the outside-pointerdown dismissal. Without
+   * it, Tabbing past the last link leaves the panel open and floating
+   * over the nav with focus somewhere else entirely.
+   *
+   * relatedTarget === null means focus left the document (window blur,
+   * devtools, another tab). Closing then would collapse the panel out
+   * from under a user who is coming right back, so it is left open.
+   *
+   * This is onBlur, not onFocusOut: React has no onFocusOut prop, and
+   * onBlur is the one that maps to the native *bubbling* focusout —
+   * which is what lets a single handler on the container see focus
+   * leaving any descendant.
+   */
+  function onBlur(event: React.FocusEvent<HTMLDivElement>) {
+    const next = event.relatedTarget as Node | null;
+    if (next === null) return;
+    if (!containerRef.current?.contains(next)) setOpen(false);
+  }
+
   return (
-    <div ref={containerRef} className="relative hidden sm:block">
+    <div
+      ref={containerRef}
+      onBlur={onBlur}
+      className="relative hidden sm:block"
+    >
       <button
         ref={triggerRef}
+        id={triggerId}
         type="button"
         onClick={() => setOpen((wasOpen) => !wasOpen)}
         aria-expanded={open}
-        aria-haspopup="menu"
+        aria-haspopup="true"
+        aria-controls={open ? panelId : undefined}
         className="flex items-center gap-1.5 border-0 bg-transparent p-0 text-[14pt] font-normal text-[#6b7280] hover:text-[#c8cad0]"
       >
         Tools
@@ -226,29 +264,29 @@ function ToolsMenu() {
         narrows).
       */}
       {open && (
-        <div
-          role="menu"
-          aria-label="Tools"
+        <ul
+          id={panelId}
+          aria-labelledby={triggerId}
           style={{ transformOrigin: 'top right' }}
-          className="postr-popover-enter absolute right-0 top-full z-50 mt-3 w-72 rounded-xl border border-[#2a2a3a] bg-[#111118] p-2 shadow-xl shadow-black/40"
+          className="postr-popover-enter absolute right-0 top-full z-50 mt-3 w-72 list-none rounded-xl border border-[#2a2a3a] bg-[#111118] p-2 shadow-xl shadow-black/40"
         >
           {TOOL_LINKS.map((tool) => (
-            <Link
-              key={tool.to}
-              to={tool.to}
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="block rounded-lg px-3 py-2.5 no-underline transition-colors duration-fast ease-smooth hover:bg-[#1a1a26]"
-            >
-              <span className="block text-[14pt] font-medium text-[#c8cad0]">
-                {tool.label}
-              </span>
-              <span className="mt-0.5 block text-[12pt] text-[#6b7280]">
-                {tool.blurb}
-              </span>
-            </Link>
+            <li key={tool.to}>
+              <Link
+                to={tool.to}
+                onClick={() => setOpen(false)}
+                className="block rounded-lg px-3 py-2.5 no-underline transition-colors duration-fast ease-smooth hover:bg-[#1a1a26]"
+              >
+                <span className="block text-[14pt] font-medium text-[#c8cad0]">
+                  {tool.label}
+                </span>
+                <span className="mt-0.5 block text-[12pt] text-[#6b7280]">
+                  {tool.blurb}
+                </span>
+              </Link>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

@@ -58,8 +58,8 @@ describe('PublicHeader Tools menu', () => {
     renderIn(<PublicHeader />);
     fireEvent.click(screen.getByRole('button', { name: /tools/i }));
 
-    const menu = await screen.findByRole('menu', { name: 'Tools' });
-    expect(hrefsOf(menu)).toContain(path);
+    const panel = await screen.findByRole('list', { name: /tools/i });
+    expect(hrefsOf(panel)).toContain(path);
   });
 
   it('reports expanded state to assistive tech', async () => {
@@ -71,15 +71,59 @@ describe('PublicHeader Tools menu', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
   });
 
+  /**
+   * The panel used to declare role="menu" with role="menuitem" children
+   * while implementing none of the WAI-ARIA menu keyboard model — no
+   * roving tabindex, no arrow keys, no Home/End. That announced an
+   * affordance to screen-reader users that did not exist. The roles must
+   * stay honest: plain links in a labelled list, navigated by Tab.
+   */
+  it('does not claim the menu pattern it does not implement', async () => {
+    renderIn(<PublicHeader />);
+    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
+    await screen.findByRole('list', { name: /tools/i });
+
+    expect(screen.queryByRole('menu')).toBeNull();
+    expect(screen.queryAllByRole('menuitem')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: /tools/i })).toHaveAttribute(
+      'aria-haspopup',
+      'true',
+    );
+  });
+
+  it('points the trigger at the panel it controls', async () => {
+    renderIn(<PublicHeader />);
+    const trigger = screen.getByRole('button', { name: /tools/i });
+    fireEvent.click(trigger);
+
+    const panel = await screen.findByRole('list', { name: /tools/i });
+    expect(trigger.getAttribute('aria-controls')).toBe(panel.id);
+    expect(panel.id).toBeTruthy();
+  });
+
+  it('leaves every tool link reachable by Tab', async () => {
+    renderIn(<PublicHeader />);
+    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
+    const panel = await screen.findByRole('list', { name: /tools/i });
+
+    // A roving tabindex would park all but one item at -1. These are
+    // ordinary links, so none of them may be taken out of the tab order.
+    const links = Array.from(panel.querySelectorAll('a[href]'));
+    expect(links).toHaveLength(TOOL_PATHS.length);
+    for (const link of links) {
+      expect(link.getAttribute('tabindex')).toBeNull();
+    }
+  });
+
   it('closes on Escape and returns focus to the trigger', async () => {
     renderIn(<PublicHeader />);
     const trigger = screen.getByRole('button', { name: /tools/i });
     fireEvent.click(trigger);
-    await screen.findByRole('menu', { name: 'Tools' });
+    await screen.findByRole('list', { name: /tools/i });
 
     fireEvent.keyDown(document, { key: 'Escape' });
 
-    expect(screen.queryByRole('menu', { name: 'Tools' })).toBeNull();
+    expect(screen.queryByRole('list', { name: /tools/i })).toBeNull();
     // Without this the keyboard user is dumped on <body>.
     expect(document.activeElement).toBe(trigger);
   });
@@ -92,11 +136,57 @@ describe('PublicHeader Tools menu', () => {
       </>,
     );
     fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    await screen.findByRole('menu', { name: 'Tools' });
+    await screen.findByRole('list', { name: /tools/i });
 
     fireEvent.pointerDown(screen.getByRole('button', { name: 'elsewhere' }));
 
-    expect(screen.queryByRole('menu', { name: 'Tools' })).toBeNull();
+    expect(screen.queryByRole('list', { name: /tools/i })).toBeNull();
+  });
+
+  it('closes when keyboard focus leaves the menu entirely', async () => {
+    renderIn(
+      <>
+        <PublicHeader />
+        <button type="button">elsewhere</button>
+      </>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
+    await screen.findByRole('list', { name: /tools/i });
+
+    // Tabbing past the last link used to strand an open panel over the
+    // nav — the keyboard had no equivalent of clicking outside.
+    const outside = screen.getByRole('button', { name: 'elsewhere' });
+    outside.focus();
+    fireEvent.blur(screen.getByRole('button', { name: /tools/i }), {
+      relatedTarget: outside,
+    });
+
+    expect(screen.queryByRole('list', { name: /tools/i })).toBeNull();
+  });
+
+  it('stays open when focus leaves the window rather than the menu', async () => {
+    renderIn(<PublicHeader />);
+    const trigger = screen.getByRole('button', { name: /tools/i });
+    fireEvent.click(trigger);
+    await screen.findByRole('list', { name: /tools/i });
+
+    // relatedTarget null = window blur, not a move to another control.
+    // Collapsing here would yank the panel from a returning user.
+    fireEvent.blur(trigger, { relatedTarget: null });
+
+    expect(screen.getByRole('list', { name: /tools/i })).toBeTruthy();
+  });
+
+  it('keeps focus moves inside the menu from closing it', async () => {
+    renderIn(<PublicHeader />);
+    const trigger = screen.getByRole('button', { name: /tools/i });
+    fireEvent.click(trigger);
+    const panel = await screen.findByRole('list', { name: /tools/i });
+
+    const firstLink = panel.querySelector('a[href]') as HTMLElement;
+    fireEvent.blur(trigger, { relatedTarget: firstLink });
+
+    expect(screen.getByRole('list', { name: /tools/i })).toBeTruthy();
   });
 });
 
