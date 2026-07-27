@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Flat urlset covering the static public routes, mirroring the
-  `static` block of src/seo/routes.json.
+  Sitemap index.
 
-  Deliberately NOT a sitemap index yet. An index pointing at children
-  that do not exist is worse than no sitemap at all: because of the
-  catch-all rewrite those child URLs return the HTML shell with a 200
-  rather than a 404, so Search Console reports an "unsupported format"
-  error on each one, and a hard sitemap error becomes the first signal
-  Google ever receives from this domain.
+  Split not for scale (Postr is nowhere near the 50,000-URL limit and
+  will not be for years) but because the two halves have different
+  freshness requirements: static routes change on deploy, gallery
+  entries change whenever a user clicks Publish.
 
-  Phase 1 replaces this with a generated sitemap-static.xml plus an
-  edge-served sitemap-gallery.xml, at which point this file becomes the
-  index. Until both children genuinely exist, keep it flat.
+  - sitemap-static.xml   written by scripts/gen-sitemap.mjs at build time
+  - sitemap-gallery.xml  served by api/sitemap-gallery.ts, cached 1 hour
+
+  Both children genuinely exist. Do not add a third entry before its
+  target does — a child that 404s (or, under the catch-all rewrite,
+  returns HTML with a 200) is a hard Search Console error.
 -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://www.postr.sh/</loc></url>
-  <url><loc>https://www.postr.sh/about</loc></url>
-  <url><loc>https://www.postr.sh/gallery</loc></url>
-  <url><loc>https://www.postr.sh/privacy</loc></url>
-  <url><loc>https://www.postr.sh/cookies</loc></url>
-  <url><loc>https://www.postr.sh/terms</loc></url>
-</urlset>
+<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <sitemap>
+    <loc>https://www.postr.sh/sitemap-static.xml</loc>
+  </sitemap>
+  <sitemap>
+    <loc>https://www.postr.sh/sitemap-gallery.xml</loc>
+  </sitemap>
+</sitemapindex>

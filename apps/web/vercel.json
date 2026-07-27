@@ -2,6 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "trailingSlash": false,
   "rewrites": [
+    { "source": "/sitemap-gallery.xml", "destination": "/api/sitemap-gallery" },
+    { "source": "/gallery/:id", "destination": "/api/shell/gallery" },
+    { "source": "/s/:slug", "destination": "/api/shell/share" },
     {
       "source": "/(.*)",
       "destination": "/index.html"
