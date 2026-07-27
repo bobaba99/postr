@@ -74,14 +74,6 @@ import { snap } from './snap';
 // Helpers
 // =========================================================================
 
-/**
- * Google Fonts URL covering ALL curated fonts — used only by the
- * print window (which needs every font available since it renders
- * from a detached document).
- */
-const GOOGLE_FONTS_URL_ALL =
-  'https://fonts.googleapis.com/css2?family=Charter:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@400;500;600;700;800&family=Fira+Sans:wght@300;400;500;600;700;800&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Libre+Franklin:wght@300;400;500;600;700;800&family=Literata:wght@400;500;600;700;800&family=Lora:wght@400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700;800&family=Source+Serif+4:wght@400;500;600;700;800&display=swap';
-
 /** Per-font Google Fonts URL fragments (family + weights). */
 const FONT_URL_FRAGMENTS: Record<string, string> = {
   'Source Sans 3': 'Source+Sans+3:wght@300;400;500;600;700;800',
@@ -2148,7 +2140,20 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
 <head>
 <meta charset="utf-8" />
 <title>${title} — Print</title>
-<link href="${GOOGLE_FONTS_URL_ALL}" rel="stylesheet" />
+<!--
+  Only the poster's own family. This used to request all ten curated
+  families, which cost ~560ms of CSS plus ten woff2 downloads before
+  the print dialog could paint — the editor was fixed to lazy-load a
+  single family but the print window kept the old blanket URL.
+
+  Safe because a poster has exactly one font: PosterDoc.fontFamily is
+  document-level, there is no per-block or per-style override, and
+  sanitizeHtml's ALLOWED_STYLE_PROPS is limited to color and
+  background-color, so inline rich text cannot introduce another
+  family. If a per-block font is ever added, this must go back to
+  collecting the distinct set of families in use.
+-->
+<link href="${googleFontsUrl(doc.fontFamily)}" rel="stylesheet" />
 <style>
   @page {
     size: ${w}in ${h}in;
