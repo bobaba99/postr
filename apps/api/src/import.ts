@@ -22,6 +22,7 @@ import { z } from 'zod';
 import { requireAuth, type AuthLocals } from './auth.js';
 import { createRateLimiter } from './rateLimit.js';
 import { checkImageUrl } from './imageUrlGuard.js';
+import { callAnthropicExtractStyle } from './extractStyle.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Request / response schemas
@@ -37,6 +38,7 @@ const ExtractRequest = z.object({
     'measure-text',
     'split-multi-logo',
     'count-figures',
+    'extract-style',
   ]),
   model: z.enum(['claude', 'gpt', 'ollama']).optional().default('claude'),
 });
@@ -440,6 +442,22 @@ export function createImportRouter(deps: ImportRouterDeps = {}): Router {
   const getAnthropic = deps.getAnthropic ?? defaultGetAnthropic;
   const fetchFn = deps.fetchFn ?? fetch;
 
+  // extract-style shares the route (and its 60/min-200/day limiter)
+  // but carries its own tighter daily cap — 10 style copies/day per
+  // the design-style-extraction plan §3.2 / PRD §16. Copying a design
+  // is a deliberate, occasional action, unlike the multi-call figure
+  // pipeline the route limiter is sized for. The limiter middleware
+  // is fully synchronous, so it is invoked inline from the handler
+  // once the mode is known (see below).
+  // The burst layer is intentionally inert (route-level 60/min
+  // already ran before the handler) — this instance exists solely
+  // for the 10/day cap, so hitting it always reports
+  // daily_limit_exceeded with an accurate Retry-After.
+  const extractStyleLimiter = createRateLimiter({
+    maxPerWindow: Number.MAX_SAFE_INTEGER,
+    maxPerDay: 10,
+  });
+
   router.post(
     '/api/import/extract',
     requireAuth(getSupabase),
@@ -458,6 +476,18 @@ export function createImportRouter(deps: ImportRouterDeps = {}): Router {
       }
 
       const { imageUrl, pageWidthPt, pageHeightPt, mode, model } = parsed.data;
+
+      // Per-mode daily cap for style copies. `createRateLimiter`
+      // middleware is synchronous: after this call either `allowed`
+      // is true or the limiter already sent the 429 (with
+      // Retry-After) and we must return without touching `res`.
+      if (mode === 'extract-style') {
+        let allowed = false;
+        extractStyleLimiter(req, res, () => {
+          allowed = true;
+        });
+        if (!allowed) return;
+      }
 
       // SSRF guard: this endpoint fetches imageUrl server-side, so
       // accept only our own Supabase Storage host (see imageUrlGuard).
@@ -576,6 +606,17 @@ export function createImportRouter(deps: ImportRouterDeps = {}): Router {
         }
         if (mode === 'count-figures') {
           const out = await callAnthropicCountFigures(anthropic, {
+            mediaType,
+            imageData,
+          });
+          return res.json(out);
+        }
+        if (mode === 'extract-style') {
+          // Response is validated against the closed ExtractedStyle
+          // schema inside the adapter — a malformed payload throws
+          // and falls into the shared vision_call_failed handler
+          // below, so nothing unvalidated ever reaches the client.
+          const out = await callAnthropicExtractStyle(anthropic, {
             mediaType,
             imageData,
           });
