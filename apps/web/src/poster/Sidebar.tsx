@@ -57,6 +57,7 @@ import { DockedFormatToolbar, FloatingFormatToolbar } from './FloatingFormatTool
 import { ReadabilityPanel } from './ReadabilityPanel';
 import { ImportSection } from './sidebar/ImportSection';
 import { PostrExportButton } from './sidebar/PostrExportButton';
+import { EditableExportButtons } from './sidebar/EditableExportButtons';
 import { VersionPanel } from './VersionPanel';
 import {
   JustRefreshedBanner,
@@ -772,6 +773,7 @@ export function Sidebar(props: SidebarProps) {
             onPrintAtStaples={props.onPrintAtStaples}
             onPreview={props.onPreview}
             onPublish={props.onPublish}
+            citationStyle={props.citationStyle}
           />
         )}
         </div>
@@ -1070,6 +1072,7 @@ function ExportTab(props: {
   onPrintAtStaples: () => void;
   onPreview: () => void;
   onPublish: () => void;
+  citationStyle: CitationStyleKey;
 }) {
   return (
     <>
@@ -1120,6 +1123,9 @@ function ExportTab(props: {
           <li>Click Save</li>
         </ol>
       </div>
+
+      <div style={labelStyle}>✎ Editable formats</div>
+      <EditableExportButtons citationStyle={props.citationStyle} />
 
       <div style={labelStyle}>📦 Lossless backup</div>
       <PostrExportButton />
