@@ -270,6 +270,89 @@ describe('unsupported shapes', () => {
   });
 });
 
+/**
+ * Decks authored in PowerPoint — not round-tripped through Postr's own
+ * exporter — routinely omit geometry and relationships the exporter
+ * always writes. The round-trip tests above cannot see these cases
+ * because the exporter is their oracle, so they are hand-built here.
+ */
+describe('PowerPoint-authored shapes the exporter never emits', () => {
+  it('keeps body text whose position lives in the slide layout', () => {
+    const bytes = makeMinimalPptx(`
+      <p:sp>
+        <p:spPr/>
+        <p:txBody><a:p><a:r><a:t>IMPORTANT BODY TEXT</a:t></a:r></a:p></p:txBody>
+      </p:sp>`);
+    const parsed = parsePptx(bytes);
+    // The text must survive — dropping it is silent data loss.
+    expect(parsed.doc.blocks).toHaveLength(1);
+    expect(parsed.doc.blocks[0]!.content).toContain('IMPORTANT BODY TEXT');
+    // And the user must be told it was placed, not positioned.
+    const warning = parsed.warnings.find((w) => /IMPORTANT BODY TEXT/.test(w));
+    expect(warning).toBeDefined();
+    expect(warning).toMatch(/top-left/i);
+  });
+
+  it('keeps layout-positioned text even with no spPr element at all', () => {
+    const bytes = makeMinimalPptx(`
+      <p:sp>
+        <p:txBody><a:p><a:r><a:t>Placeholder body</a:t></a:r></a:p></p:txBody>
+      </p:sp>`);
+    const parsed = parsePptx(bytes);
+    expect(parsed.doc.blocks).toHaveLength(1);
+    expect(parsed.doc.blocks[0]!.content).toContain('Placeholder body');
+  });
+
+  it('does not warn about a decorative shape that carries no text', () => {
+    const parsed = parsePptx(makeMinimalPptx('<p:sp><p:spPr/></p:sp>'));
+    expect(parsed.doc.blocks).toHaveLength(0);
+    expect(parsed.warnings.some((w) => /top-left/i.test(w))).toBe(false);
+  });
+
+  it('truncates a long line rather than quoting a whole paragraph', () => {
+    const long = 'Methods and materials for the longitudinal cohort study of feline naps';
+    const parsed = parsePptx(
+      makeMinimalPptx(`
+        <p:sp>
+          <p:spPr/>
+          <p:txBody><a:p><a:r><a:t>${long}</a:t></a:r></a:p></p:txBody>
+        </p:sp>`),
+    );
+    const warning = parsed.warnings.find((w) => /top-left/i.test(w));
+    expect(warning).toBeDefined();
+    expect(warning).toContain('…');
+    expect(warning).not.toContain('feline naps');
+  });
+
+  it('reports a picture whose blip carries no relationship id', () => {
+    const bytes = makeMinimalPptx(`
+      <p:pic>
+        <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm></p:spPr>
+        <p:blipFill><a:blip/></p:blipFill>
+      </p:pic>`);
+    const parsed = parsePptx(bytes);
+    expect(parsed.doc.blocks).toHaveLength(1);
+    expect(parsed.doc.blocks[0]!.type).toBe('image');
+    // Same message as an r:embed that resolves to nothing — one blank
+    // frame, one explanation, regardless of which way it failed.
+    expect(
+      parsed.warnings.some((w) => /could not be read and was left as an empty frame/.test(w)),
+    ).toBe(true);
+  });
+
+  it('reports an r:embed that resolves to no media the same way', () => {
+    const bytes = makeMinimalPptx(`
+      <p:pic>
+        <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm></p:spPr>
+        <p:blipFill><a:blip r:embed="rIdMissing"/></p:blipFill>
+      </p:pic>`);
+    const parsed = parsePptx(bytes);
+    expect(
+      parsed.warnings.some((w) => /could not be read and was left as an empty frame/.test(w)),
+    ).toBe(true);
+  });
+});
+
 describe('degenerate input', () => {
   it('reports an empty slide rather than returning a silently blank doc', () => {
     const parsed = parsePptx(makeMinimalPptx(''));

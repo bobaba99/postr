@@ -45,10 +45,32 @@ export interface ParsedTable {
 }
 
 export type ParsedShape =
-  | { kind: 'text'; rect: ShapeRect; paragraphs: ParsedParagraph[]; sizePt: number | null }
+  | {
+      kind: 'text';
+      rect: ShapeRect;
+      paragraphs: ParsedParagraph[];
+      sizePt: number | null;
+      /** True when the shape carried no `<a:xfrm>` and `rect` is the
+       *  fallback placement rather than the file's own geometry. */
+      placedByFallback?: boolean;
+    }
   | { kind: 'picture'; rect: ShapeRect; embedId: string | null; name: string }
   | { kind: 'table'; rect: ShapeRect; table: ParsedTable }
   | { kind: 'unsupported'; rect: ShapeRect | null; label: string };
+
+/**
+ * Placement for a text shape whose geometry we cannot read.
+ *
+ * PowerPoint placeholders inherit their `<a:xfrm>` from the slide
+ * layout/master and routinely omit `spPr` entirely, so decks authored
+ * in PowerPoint — as opposed to round-tripped through Postr's own
+ * exporter, which always writes an explicit xfrm — would otherwise lose
+ * their body text with nothing said. A nominal box at the origin keeps
+ * the words; the accompanying warning tells the user to reposition it.
+ *
+ * Units are poster units (1 unit = 1/10 inch): a 20×4 inch box.
+ */
+const FALLBACK_TEXT_RECT: ShapeRect = { x: 0, y: 0, w: 200, h: 40 };
 
 /** Read `<a:off>`/`<a:ext>` out of an already-located `xfrm`. */
 function rectFromXfrm(xfrm: Element | null): ShapeRect | null {
@@ -222,18 +244,20 @@ export function parseShapeTree(spTree: Element): ParsedShape[] {
     if (el.namespaceURI === NS_P && local === 'sp') {
       const rect = readRect(firstEl(el, NS_P, 'spPr'));
       const txBody = firstEl(el, NS_P, 'txBody');
-      if (!rect) continue;
       if (!txBody) {
         // A drawn shape with no text (the exporter's heading rules and
         // divider lines). Decorative — dropping it loses no content, so
         // it is not worth a warning.
         continue;
       }
+      // Text is content: never drop it for missing geometry. Fall back
+      // to a nominal box and let toBlocks warn that it needs moving.
       shapes.push({
         kind: 'text',
-        rect,
+        rect: rect ?? FALLBACK_TEXT_RECT,
         paragraphs: readParagraphs(txBody),
         sizePt: readMaxSizePt(txBody),
+        ...(rect ? {} : { placedByFallback: true }),
       });
       continue;
     }

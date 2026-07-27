@@ -67,6 +67,15 @@ const emptyBlock = (
   tableData: null,
 });
 
+/**
+ * Shown whenever a picture cannot be resolved to bytes, for ANY reason:
+ * a `<a:blip>` with no `r:embed` (handled here) and an `r:embed` whose
+ * relationship or media part is missing (handled in `parsePptx`). Both
+ * leave the user with the same blank frame, so both say the same thing.
+ */
+export const UNREADABLE_IMAGE_WARNING =
+  'An image on the slide could not be read and was left as an empty frame.';
+
 export interface MappedBlocks {
   blocks: Block[];
   /** Index into `blocks` → the picture's relationship id, so the
@@ -130,6 +139,12 @@ export function shapesToBlocks(
       if (!plain) continue; // empty text box — nothing to carry over
       const type = classifyText(shape.sizePt, sizes);
       if (type === 'title' && !title) title = plain;
+      if (shape.placedByFallback) {
+        warnings.push(
+          `PowerPoint stored the position of “${preview(plain)}” in the slide layout, ` +
+            'so it was placed at the top-left corner. Drag it where you want it.',
+        );
+      }
       blocks.push({ ...emptyBlock(type, shape.rect, scale), content });
       continue;
     }
@@ -137,7 +152,11 @@ export function shapesToBlocks(
     if (shape.kind === 'picture') {
       const block = emptyBlock('image', shape.rect, scale);
       blocks.push(block);
+      // A blip with no r:embed points at nothing, so `parsePptx` never
+      // sees this picture and cannot warn for it. Warn here instead, so
+      // an empty frame is never left unexplained.
       if (shape.embedId) pictureEmbeds.set(block.id, shape.embedId);
+      else warnings.push(UNREADABLE_IMAGE_WARNING);
       continue;
     }
 
@@ -157,4 +176,11 @@ export function shapesToBlocks(
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** First line of a block's text, short enough to sit inside a warning
+ *  and name the affected content without quoting a whole paragraph. */
+function preview(plain: string): string {
+  const firstLine = plain.split('\n')[0]?.trim() ?? '';
+  return firstLine.length > 40 ? `${firstLine.slice(0, 40).trimEnd()}…` : firstLine;
 }

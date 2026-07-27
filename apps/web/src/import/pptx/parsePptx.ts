@@ -32,7 +32,7 @@ import {
   resolveRelationships,
 } from './ooxml';
 import { parseShapeTree } from './shapes';
-import { shapesToBlocks } from './toBlocks';
+import { UNREADABLE_IMAGE_WARNING, shapesToBlocks } from './toBlocks';
 
 /** Image bytes pulled out of `ppt/media/*`, keyed by block id. */
 export interface PptxMedia {
@@ -184,9 +184,7 @@ export function parsePptx(bytes: Uint8Array): ParsePptxResult {
     const target = rels.get(embedId);
     const bytesForImage = target ? entries[target] : undefined;
     if (!target || !bytesForImage) {
-      warnings.push(
-        'An image on the slide could not be read and was left as an empty frame.',
-      );
+      warnings.push(UNREADABLE_IMAGE_WARNING);
       continue;
     }
     media.push({
