@@ -154,6 +154,8 @@ export type PosterListRow = Omit<PosterRow, 'data'>;
  * posters in the dashboard. The filter pins the dashboard back to
  * "my posters only".
  */
+const inflightLists = new Map<string, Promise<PosterListRow[]>>();
+
 export async function listPosters(): Promise<PosterListRow[]> {
   const {
     data: { user },
@@ -165,16 +167,33 @@ export async function listPosters(): Promise<PosterListRow[]> {
     );
   }
 
-  const { data, error } = await supabase
-    .from('posters')
-    .select('id,user_id,title,width_in,height_in,thumbnail_path,share_slug,is_public,created_at,updated_at')
-    .eq('user_id', user.id)
-    .order('updated_at', { ascending: false });
+  // Keyed by user id, not a single module-level slot. The auth check
+  // above runs before the cache lookup precisely so the key exists:
+  // a bare no-arg cache would hand user B the in-flight result of
+  // user A's request if a session switch landed inside the request
+  // window, which is exactly the kind of bug that only shows up in
+  // production after a guest converts to a permanent account.
+  const existing = inflightLists.get(user.id);
+  if (existing) return existing;
 
-  if (error) {
-    throw new Error(`Failed to list posters: ${error.message}`);
-  }
-  return (data ?? []) as unknown as PosterListRow[];
+  const promise = (async (): Promise<PosterListRow[]> => {
+    const { data, error } = await supabase
+      .from('posters')
+      .select('id,user_id,title,width_in,height_in,thumbnail_path,share_slug,is_public,created_at,updated_at')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to list posters: ${error.message}`);
+    }
+    return (data ?? []) as unknown as PosterListRow[];
+  })();
+
+  inflightLists.set(user.id, promise);
+  // See loadPoster: the .catch(noop) keeps the cleanup chain from
+  // surfacing as an unhandled rejection; the caller handles the error.
+  promise.finally(() => inflightLists.delete(user.id)).catch(() => {});
+  return promise;
 }
 
 // ---------------------------------------------------------------------------

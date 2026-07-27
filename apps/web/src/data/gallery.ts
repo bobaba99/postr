@@ -281,13 +281,30 @@ export async function retractGalleryEntry(entry: GalleryEntry): Promise<void> {
  * admin allowlist. Uses the `is_gallery_admin` SECURITY DEFINER RPC
  * so the client never reads auth.users directly.
  */
+const inflightAdminChecks = new Map<string, Promise<boolean>>();
+
 export async function checkIsGalleryAdmin(): Promise<boolean> {
   const { data: userData } = await supabase.auth.getUser();
   const uid = userData.user?.id;
   if (!uid) return false;
-  const { data, error } = await db.rpc('is_gallery_admin', { uid });
-  if (error) return false;
-  return data === true;
+
+  // Same in-flight dedup as loadPoster/listPosters — React 18
+  // StrictMode double-mounts the dashboard and fired this RPC twice
+  // on every visit. Keyed by uid so a session switch mid-flight
+  // cannot return the previous user's admin verdict, which here
+  // would mean briefly showing moderation UI to a non-admin.
+  const existing = inflightAdminChecks.get(uid);
+  if (existing) return existing;
+
+  const promise = (async (): Promise<boolean> => {
+    const { data, error } = await db.rpc('is_gallery_admin', { uid });
+    if (error) return false;
+    return data === true;
+  })();
+
+  inflightAdminChecks.set(uid, promise);
+  promise.finally(() => inflightAdminChecks.delete(uid)).catch(() => {});
+  return promise;
 }
 
 /**
