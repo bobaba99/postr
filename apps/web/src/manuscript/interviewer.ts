@@ -349,6 +349,18 @@ export function advance(
   }
 }
 
+/**
+ * Page-side reporting into the transcript (ingest failures, condense
+ * status) without moving the script. The step never changes — this is
+ * the ONLY sanctioned way for the page to speak in the chat.
+ */
+export function assistantSay(
+  state: InterviewState,
+  ...texts: string[]
+): InterviewState {
+  return say(state, ...texts);
+}
+
 /** Structured emphasis facts for the condense request. */
 export function emphasisFor(state: InterviewState): CondenseEmphasis {
   const findingsById = new Map(

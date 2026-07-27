@@ -47,6 +47,7 @@ describe('STATIC_ROUTE_META', () => {
       '/about',
       '/cookies',
       '/gallery',
+      '/manuscript-to-poster',
       '/privacy',
       '/terms',
     ]);

@@ -1,0 +1,82 @@
+/**
+ * Standalone page smoke test — the chat shell renders, ingests a
+ * pasted manuscript, reports the deterministic summary, and walks the
+ * first scripted question. The condense call itself is exercised in
+ * the API tests; here we stop before the outline step.
+ */
+import { describe, it, expect } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen } from '@testing-library/react';
+import ManuscriptToPoster from '../../pages/ManuscriptToPoster';
+
+const MANUSCRIPT = `Sleep Duration and Recall Accuracy in Undergraduate Students
+
+John Smith1, Jane Doe2
+(1) Acme State University, (2) Sample Research Institute
+
+Introduction
+
+Memory consolidation depends on sleep, and prior work has focused on total deprivation rather than the partial restriction students actually experience during a normal term. We asked whether moderate sleep restriction produces measurable recall deficits in this population.
+
+Methods
+
+Participants were 120 undergraduates randomized to three sleep groups for one week, and recall was measured with a standard forty-item word-list task.
+
+Results
+
+Recall accuracy fell 21% in the restricted group (p < .001). The intermediate group showed a 9% deficit (p = .02).
+
+Discussion
+
+Even moderate restriction measurably impairs recall, which should inform how universities schedule examinations.`;
+
+function renderPage() {
+  return render(
+    <MemoryRouter initialEntries={['/manuscript-to-poster']}>
+      <ManuscriptToPoster />
+    </MemoryRouter>,
+  );
+}
+
+describe('ManuscriptToPoster page', () => {
+  it('greets with the paste prompt and a docx upload affordance', () => {
+    renderPage();
+    expect(screen.getByText(/paste your manuscript below/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /upload a \.docx/i })).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/paste your manuscript here/i),
+    ).toBeInTheDocument();
+  });
+
+  it('rejects a too-short paste with a bounded scripted reply', () => {
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/paste your manuscript here/i), {
+      target: { value: 'Just a sentence.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /read it/i }));
+    expect(
+      screen.getByText(/shorter than a manuscript/i),
+    ).toBeInTheDocument();
+  });
+
+  it('ingests a manuscript, reports the summary, and asks Q1', () => {
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/paste your manuscript here/i), {
+      target: { value: MANUSCRIPT },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /read it/i }));
+
+    expect(screen.getByText(/got it — /i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/one thing someone should remember/i),
+    ).toBeInTheDocument();
+
+    // Q1 is free text — answer it and land on the finding chips.
+    fireEvent.change(screen.getByPlaceholderText(/type your answer/i), {
+      target: { value: 'Moderate restriction impairs recall.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
+    expect(screen.getByText(/which result matters most/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /keep this order/i })).toBeInTheDocument();
+  });
+});

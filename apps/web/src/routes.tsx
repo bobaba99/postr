@@ -8,6 +8,7 @@
  *   /privacy            → Privacy Policy (public)
  *   /cookies            → Cookies Policy (public)
  *   /terms              → Terms of Service (public)
+ *   /manuscript-to-poster → Manuscript→poster standalone flow (public, code-split)
  *   /auth               → Auth (sign in / sign up / guest)
  *   /dashboard          → My Posters (auth-gated)
  *   /p/:posterId        → Editor (auth-gated, code-split)
@@ -51,6 +52,9 @@ import NotFound from '@/pages/NotFound';
 const Editor = lazy(() => import('@/pages/Editor'));
 const Share = lazy(() => import('@/pages/Share'));
 const AdminGallery = lazy(() => import('@/pages/AdminGallery'));
+// Standalone manuscript→poster flow — pulls in the ingest parsers and
+// block renderers, so it loads on demand like the editor.
+const ManuscriptToPoster = lazy(() => import('@/pages/ManuscriptToPoster'));
 
 function LazyFallback() {
   return (
@@ -72,6 +76,7 @@ export function AppRoutes() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/cookies" element={<Cookies />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/manuscript-to-poster" element={<ManuscriptToPoster />} />
         {/*
           Dev only. This was publicly routable with no guard, which put
           a diagnostics page in the crawlable URL space and shipped it
