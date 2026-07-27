@@ -66,7 +66,7 @@ The sidebar is narrow. The v1 design assumed a modal with room for 2–3 side-by
 
 **Route:** `/chart-chooser` (indexable, prerendered).
 
-Not `/plot-picker` — "plot picker" is our internal name. Nobody searches it. `chart chooser` / `which chart should I use` is the actual query space, and this page is the same species as the figure-readability tool page that SEO Phase 4 already plans to build for .edu outreach. Two free tool pages on one domain compound; one does not. Confirm the exact slug against the keyword pre-flight before building — it is deliberately unresolved here.
+Not `/plot-picker` — "plot picker" is our internal name. Nobody searches it. `chart chooser` / `which chart should I use` is the actual query space, and this page is the same species as the figure-readability tool page that SEO Phase 4 already plans to build for .edu outreach. Two free tool pages on one domain compound; one does not. Slug confirmed against the keyword pre-flight 2026-07-27 — `/chart-chooser` stands (see §6.1).
 
 ### What it is
 
@@ -203,7 +203,7 @@ Concretely:
 
 ## 6. Open questions for Gavin
 
-1. **Slug.** `/chart-chooser` is my proposal; hold until the keyword pre-flight runs (still blocked — OpenSEO's tools need a session restart to become callable).
+1. **Slug. RESOLVED 2026-07-27: `/chart-chooser` confirmed.** Pre-flight measured `chart chooser` 40/mo · KD 0 (navigational) — the only exact-match candidate with both volume and winnability. `chart selector` (70/mo · KD 47) and `chart picker` (10/mo · KD 47) lose on difficulty; question-form queries are tiny and hard (KD 57–75, owned by established dataviz references) and belong in H1/H2 copy, not the slug. Full data in the SEO plan §4.0.
 2. **Standalone-page download formats.** SVG + PNG assumed. PDF too, or is that redundant with the poster export path?
 3. **Step 4's option labels.** I phrased the emphasis choices as plain-language outcomes (*Difference between groups*, *Change over time*, …) rather than chart-theory terms. If your users would rather see *Comparison / Trend / Distribution*, say so — but I think the plain phrasing suits non-tech-savvy psych and med students better, which is the stated target.
 
