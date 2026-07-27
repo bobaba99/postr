@@ -5,6 +5,77 @@
 
 ---
 
+## 0.1 The narrative standard — evidence base
+
+Gavin's shape: **introduce the problem → create the tension → present the study on a silver
+platter.** Literature searched via Consensus 2026-07-27 to check that against evidence rather
+than taste. It holds, with one important caveat recorded at the end.
+
+**Narrative writing is associated with more citations.** Across 732 climate-science abstracts,
+more narrative abstracts were cited more often — though the effect is entangled with journal
+identity, so this is correlational, not causal
+([Hillier et al. 2016](https://consensus.app/papers/details/835990c11a6a5582a9292a5b2133e34d/?utm_source=claude_desktop)).
+A large NLP study of semantic "narrative paths" links discourse shape to success including
+paper citations
+([Toubia et al. 2021, PNAS](https://consensus.app/papers/details/8987451d5ec05406af9363aae0010633/?utm_source=claude_desktop)).
+
+**The ABT structure is the compact form of Gavin's shape.** Randy Olson's **AND / BUT /
+THEREFORE** — established facts, *but* the gap, *therefore* the finding — is explicitly
+recommended for narrative research writing, and contrasted with two named failure modes: **AAA**
+("and, and, and" — facts with no link, which is exactly the section-list failure) and **DHY**
+("despite, however, yet" — unresolved tension, no landing)
+([Boyer et al. 2023, Water Research X](https://consensus.app/papers/details/02b8162709305fcc9fd8a99c6f83f99d/?utm_source=claude_desktop)).
+ABT maps onto the four beats already in §2: STAKES+GAP = AND/BUT, RESOLUTION+SO WHAT = THEREFORE.
+
+**Tension is the mechanism, and it must resolve.** Reflexive analysis of ~40,000 traditional and
+~20,000 non-traditional narratives found a consistent three-process structure — **staging, plot
+progression, and cognitive tension**
+([Boyd et al. 2020, Science Advances](https://consensus.app/papers/details/223e154ac01b5bd2965644e7fc82b90e/?utm_source=claude_desktop)).
+Editorial guidance frames the same idea for research: conflict is what "drives the plot", created
+by naming the gap the literature overlooked, and a paper is interesting when it produces the
+"Aha!" of a resolved paradox — Davis's point that a great theory is great because it is
+*interesting*, not merely true
+([Wang 2025](https://consensus.app/papers/details/9751ac0186b95d70920e1a7fae6b48ef/?utm_source=claude_desktop)).
+
+**Write backwards.** Start from the conclusion, then Results → Methods → Discussion →
+Introduction → Abstract → Title
+([Montagnes et al. 2021](https://consensus.app/papers/details/ea695d657de35120af29174361149dc8/?utm_source=claude_desktop)).
+This is a direct instruction for the pipeline: the deterministic mapper should establish the
+takeaway first (which Q1 already captures) and build the arc back from it, rather than walking
+the manuscript front-to-back.
+
+**For talks specifically**, the same complaint recurs across the conference-presentation
+literature: talks are "crowded with methods and data … lacking in narrative arc", and the fix is
+a journey of discovery ending in a memorable takeaway
+([Langin 2017, The Condor](https://consensus.app/papers/details/009c76cd1e0c5e66b5d8a19cca765614/?utm_source=claude_desktop)).
+A systematic review of 91 expert-opinion articles found the five most frequent recommendations
+were: **keep slides simple, adjust to the audience, rehearse, do not read from slides, make eye
+contact** — with near-total absence of contradicting advice
+([Blome et al. 2017](https://consensus.app/papers/details/083158535adb55cd885a2f278cb7816d/?utm_source=claude_desktop)).
+Three of those five are properties the generator controls (simplicity, audience fit, and notes
+that are spoken rather than read); two are delivery, which belongs in guidance to the user, not
+in the artifact.
+
+**Cognitive-load constraints that bound the design**: dual-channel theory, coherence, signalling
+and segmenting; the visual channel dominates the auditory, so wordy slides *compete with the
+speaker and win*
+([Ameen 2026](https://consensus.app/papers/details/ae8cb8331fa85cb497d9e9f1c07c1899/?utm_source=claude_desktop);
+[Gelernter 2017](https://consensus.app/papers/details/5229651fec1e54ee8867455efcd8b36b/?utm_source=claude_desktop)).
+That is the empirical justification for the bullet-dump ban and for speaker notes carrying what
+the slide does not say. Notably, one of these papers observes that **AI-generated slides are
+"often overly complex, with redundant text, intricate visuals"** — the exact failure this
+product must not ship.
+
+**⚠ The caveat that complicates the story, recorded rather than buried.** Boyd et al. found **no
+evidence that adherence to normative story structure predicted a story's popularity**, and that
+fact-driven texts showed structures *different* from story-based narratives. So "more narrative"
+is not automatically "better received", and a research talk is a fact-driven text. The defensible
+claim is narrower than the marketing temptation: a clear arc aids **comprehension and retention**,
+which is what the cognitive-load literature supports directly. It should not be sold as a
+citation- or career-boosting guarantee. This constrains the product copy as much as the prompt.
+
+---
+
 ## 0. What this is
 
 The deck sibling of `/paper-to-poster`. Same ingest, same scripted interviewer, same
