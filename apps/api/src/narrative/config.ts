@@ -11,14 +11,22 @@ export type CondenseProviderId = 'openai' | 'anthropic';
 export const CONDENSER_PROVIDER: CondenseProviderId = 'openai';
 
 /**
- * Verified 2026-07-27 against developers.openai.com/api/docs/models:
- * `gpt-5.6` is a live alias that routes to GPT-5.6 Sol (the frontier
- * tier), GA since 2026-07-09. The alias is deliberate — it follows the
- * latest Sol snapshot. Pin `gpt-5.6-sol` instead if the bake-off needs
- * reproducible grading across a fixed manuscript set. Cheaper siblings
- * for that bake-off: `gpt-5.6-terra` (mini tier), `gpt-5.6-luna` (nano).
+ * Verified 2026-07-27 against developers.openai.com/api/docs/models.
+ *
+ * Terra (mini tier) is the deliberate default: condensing a manuscript
+ * into ≤200-word role summaries is a summarisation task, not a frontier
+ * reasoning one, and Terra halves the input cost of the flagship.
+ *
+ *   gpt-5.6 / gpt-5.6-sol   $5.00 in / $15.00 out per 1M — frontier
+ *   gpt-5.6-terra           $2.50 in / $15.00 out per 1M — mini  ← here
+ *   gpt-5.6-luna            $1.00 in /  $6.00 out per 1M — nano
+ *
+ * All three carry a ~1.05M context window, so the manuscript fits at
+ * any tier. Luna is the next step down if the Phase-2 bake-off shows
+ * it preserves scientific meaning; grade it before switching, because
+ * a condenser that quietly drops a finding is worse than a dearer one.
  */
-export const CONDENSER_MODEL = 'gpt-5.6';
+export const CONDENSER_MODEL = 'gpt-5.6-terra';
 
 /** Output ceiling: five roles + two pins at ≤200 words each is ~2.4k
  *  tokens; 4096 leaves headroom without letting a runaway reply bill. */
