@@ -114,4 +114,31 @@ describe('matchAudience — specificity ordering', () => {
   it('prefers adolescents over undergraduates for high schoolers', () => {
     expect(matchAudience('high school students').option).toBe('adolescents');
   });
+
+  /**
+   * Specificity has to beat declaration order. `undergraduates` owns the
+   * bare keyword 'students' and is declared before `general`, which owns
+   * 'phd students' — so under a per-preset sort the more specific phrase
+   * could never win, and a poster for postgraduate peers got condensed
+   * as if it were for first years.
+   */
+  it.each([
+    ['PhD students', 'general'],
+    ['phd students', 'general'],
+    ['graduate students', 'general'],
+    ['doctoral students', 'general'],
+    ['medical students', 'undergraduates'],
+    ['university students', 'undergraduates'],
+    ['clinical staff and students', 'clinicians'],
+  ])('lets the longest keyword win: %j resolves to %s', (typed, expected) => {
+    expect(matchAudience(typed).option).toBe(expected);
+  });
+
+  it('breaks exact-length ties by declaration order', () => {
+    // 'student' (undergraduates, 3rd) and 'faculty' (general, 9th) are
+    // both 7 characters, so the earlier preset takes it.
+    expect(matchAudience('a student and faculty mix').option).toBe(
+      'undergraduates',
+    );
+  });
 });

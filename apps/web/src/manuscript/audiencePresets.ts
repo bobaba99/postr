@@ -26,10 +26,12 @@ export interface AudiencePreset {
 }
 
 /**
- * Order matters: the FIRST preset with a match wins, so the more
- * specific audiences are listed before the broad ones they sit inside.
- * "medical students" must reach undergraduates rather than clinicians,
- * and "school children" must reach children before the public.
+ * Specificity, not declaration order, decides a match: the longest
+ * matching keyword across ALL presets wins, so "medical students"
+ * reaches undergraduates and "phd students" reaches general researchers
+ * regardless of where their presets sit in this list. Declaration order
+ * only breaks ties between equally long keywords, which is why the more
+ * specific audiences still come first.
  */
 export const AUDIENCE_PRESETS: readonly AudiencePreset[] = [
   {
@@ -202,6 +204,10 @@ export const AUDIENCE_PRESETS: readonly AudiencePreset[] = [
       'postdocs',
       'postdoc',
       'phd students',
+      'graduate students',
+      'doctoral students',
+      'grad students',
+      'masters students',
       'conference',
       'department',
       'departmental',
@@ -259,15 +265,24 @@ export function matchAudience(text: string): AudienceMatch {
   const padded = normaliseAudienceText(trimmed);
 
   if (padded.trim().length > 0) {
-    for (const preset of AUDIENCE_PRESETS) {
-      // Longest keywords first so "medical students" beats "students"
-      // WITHIN a preset; across presets, declaration order decides.
-      const keywords = [...preset.keywords].sort((a, b) => b.length - a.length);
-      for (const keyword of keywords) {
-        if (hasKeyword(padded, keyword)) {
-          return { option: preset.id, label: preset.label, custom: '' };
-        }
-      }
+    // Collect every hit across every preset, then let the GLOBALLY
+    // longest keyword win. Sorting within a preset was not enough:
+    // "phd students" (general) has to beat "students" (undergraduates)
+    // even though undergraduates is declared first.
+    const hits = AUDIENCE_PRESETS.flatMap((preset, presetIndex) =>
+      preset.keywords
+        .filter((keyword) => hasKeyword(padded, keyword))
+        .map((keyword) => ({ preset, presetIndex, keyword })),
+    );
+
+    // Longest keyword first; declaration order breaks exact-length ties.
+    const best = [...hits].sort(
+      (a, b) =>
+        b.keyword.length - a.keyword.length || a.presetIndex - b.presetIndex,
+    )[0];
+
+    if (best) {
+      return { option: best.preset.id, label: best.preset.label, custom: '' };
     }
   }
 
