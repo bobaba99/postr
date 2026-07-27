@@ -16,12 +16,14 @@ import { saveVersion, loadVersion } from '@/data/posterVersions';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import type {
   Block,
+  ChartSpec,
   HeadingStyle,
   Palette,
   PosterDoc,
   Reference,
   Styles,
 } from '@postr/shared';
+import type { PosterTableRef } from '@/charts/ladder/DataStep';
 import { nanoid } from 'nanoid';
 import { usePosterStore } from '@/stores/posterStore';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
@@ -809,6 +811,14 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     w: 100,
     h: 70,
   });
+  // Figure tab mode ("Make a figure" / "Check a figure"). Null until
+  // the user picks explicitly; the effective default follows the
+  // selection — Check when an image block is selected (its dimensions
+  // feed the checker), Make otherwise. An explicit pick sticks for
+  // the rest of the session ("remembers last used").
+  const [figureModeChoice, setFigureModeChoice] = useState<
+    'make' | 'check' | null
+  >(null);
 
   // Custom palettes persist via localStorage (postr.custom-palettes).
   // They appear in the Style tab beneath the curated catalog and can
@@ -1448,6 +1458,27 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       });
     return out;
   }, [doc.blocks]);
+
+  // Table blocks offered to the chart chooser as zero-upload data
+  // sources ("Or use a table from this poster"). Labels reuse the
+  // auto-computed caption numbers so the chip says the same "Table 2"
+  // the canvas does.
+  const posterTables = useMemo<PosterTableRef[]>(
+    () =>
+      doc.blocks
+        .filter((b) => b.type === 'table' && b.tableData !== null)
+        .map((b) => ({
+          blockId: b.id,
+          label: `Table ${captionNumbers[b.id] ?? '?'}`,
+          tableData: b.tableData!,
+        })),
+    [doc.blocks, captionNumbers],
+  );
+
+  // Effective Figure-tab mode: the user's explicit pick wins; before
+  // any pick, follow the selection (image selected → Check, else Make).
+  const effectiveFigureMode =
+    figureModeChoice ?? (selectedBlock?.type === 'image' ? 'check' : 'make');
   const oobBlockIds = useMemo(
     () => new Set(oobWarnings.map((w) => w.blockId)),
     [oobWarnings],
@@ -1643,40 +1674,24 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     setBlocks(next);
   };
 
-  const addBlock = (type: Block['type']) => {
-    // Logo is limited to ONE per poster. Multiple logos stack at
-    // the top-center and their external handles collide (both
-    // occupy top: -26, so move/delete/rotate controls end up
-    // overlapping with each other and the title's handles).
-    // Selecting the existing logo instead of adding a duplicate
-    // matches user intent: "I want to edit the logo" → jump to it.
-    if (type === 'logo') {
-      const existing = doc.blocks.find((b) => b.type === 'logo');
-      if (existing) {
-        selectOne(existing.id);
-        return;
-      }
-    }
-    const w = type === 'logo' ? 50 : 155;
-    const h = type === 'logo' ? 40 : type === 'heading' ? 22 : type === 'references' ? 120 : 140;
-
-    // Place new blocks centered on the canvas. If the dead-center
-    // slot collides with an existing non-header block, spiral outward
-    // in 20-unit steps (right, down, left, up, repeat with a larger
-    // radius) until a clear slot is found — this keeps fresh blocks
-    // near the middle of the user's working area instead of dumping
-    // them top-left. Headers (title/authors) are still ignored for
-    // collision since they're pinned to the top anyway.
-    //
-    // IMPORTANT: block x/y/w/h live in POSTER UNITS (1 unit = 1/10",
-    // set by the PX constant), not raw inches. `pw` / `ph` here come
-    // from POSTER_SIZES which ARE in inches — we have to multiply by
-    // PX (or use `cW` / `cH` which are already pre-multiplied) or the
-    // center math divides by 10× too many and every new block ends up
-    // clamped to the top-left corner. The 2026-04 regression was
-    // exactly this — `pw/2` computed `24` for a 48" poster, then
-    // subtracting `w/2 = 77.5` gave a negative centerX that clamp
-    // pinned to 10.
+  // Place new blocks centered on the canvas. If the dead-center
+  // slot collides with an existing non-header block, spiral outward
+  // in 20-unit steps (right, down, left, up, repeat with a larger
+  // radius) until a clear slot is found — this keeps fresh blocks
+  // near the middle of the user's working area instead of dumping
+  // them top-left. Headers (title/authors) are still ignored for
+  // collision since they're pinned to the top anyway.
+  //
+  // IMPORTANT: block x/y/w/h live in POSTER UNITS (1 unit = 1/10",
+  // set by the PX constant), not raw inches. `pw` / `ph` here come
+  // from POSTER_SIZES which ARE in inches — we have to multiply by
+  // PX (or use `cW` / `cH` which are already pre-multiplied) or the
+  // center math divides by 10× too many and every new block ends up
+  // clamped to the top-left corner. The 2026-04 regression was
+  // exactly this — `pw/2` computed `24` for a 48" poster, then
+  // subtracting `w/2 = 77.5` gave a negative centerX that clamp
+  // pinned to 10.
+  const findOpenSlot = (w: number, h: number): { x: number; y: number } => {
     const posterW = cW; // poster units
     const posterH = cH; // poster units
 
@@ -1694,10 +1709,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
 
     // Outward spiral offset table: no-op, right, down, left, up,
     // right×2, down×2, left×2, up×2, ... up to 8 rings.
-    let nx = centerX;
-    let ny = centerY;
     const STEP = 20;
-    outer: for (let ring = 0; ring <= 8; ring++) {
+    for (let ring = 0; ring <= 8; ring++) {
       const offsets: Array<[number, number]> =
         ring === 0
           ? [[0, 0]]
@@ -1715,18 +1728,48 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         const tx = clampX(centerX + dx * STEP);
         const ty = clampY(centerY + dy * STEP);
         if (!overlaps(tx, ty)) {
-          nx = tx;
-          ny = ty;
-          break outer;
+          return { x: tx, y: ty };
         }
       }
     }
+    return { x: centerX, y: centerY };
+  };
 
-    const newBlock: Block = {
+  // Shared insert tail: commit the block, select it, and play the
+  // one-shot insert animation. 700 ms is slightly longer than the
+  // `postr-block-insert` keyframe (~500 ms) so the browser completes
+  // the animation before the flag clears, which stops the animation
+  // from re-firing on subsequent re-renders.
+  const commitNewBlock = (newBlock: Block) => {
+    setBlocks([...doc.blocks, newBlock]);
+    selectOne(newBlock.id);
+    setJustInsertedId(newBlock.id);
+    setTimeout(() => setJustInsertedId((id) => (id === newBlock.id ? null : id)), 700);
+  };
+
+  const addBlock = (type: Block['type']) => {
+    // Logo is limited to ONE per poster. Multiple logos stack at
+    // the top-center and their external handles collide (both
+    // occupy top: -26, so move/delete/rotate controls end up
+    // overlapping with each other and the title's handles).
+    // Selecting the existing logo instead of adding a duplicate
+    // matches user intent: "I want to edit the logo" → jump to it.
+    if (type === 'logo') {
+      const existing = doc.blocks.find((b) => b.type === 'logo');
+      if (existing) {
+        selectOne(existing.id);
+        return;
+      }
+    }
+    const w = type === 'logo' ? 50 : 155;
+    const h = type === 'logo' ? 40 : type === 'heading' ? 22 : type === 'references' ? 120 : 140;
+    const { x, y } = findOpenSlot(w, h);
+
+    commitNewBlock({
       id: `b${nanoid(6)}`,
       type,
-      x: nx,
-      y: ny,
+      x,
+      y,
       w,
       h,
       content: type === 'heading' ? 'Section Title' : type === 'text' ? 'Enter your text here.' : '',
@@ -1736,16 +1779,34 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         type === 'table'
           ? { rows: 3, cols: 3, cells: Array(9).fill(''), colWidths: null, borderPreset: 'apa' }
           : null,
-    };
-    setBlocks([...doc.blocks, newBlock]);
-    selectOne(newBlock.id);
-    // Trigger the one-shot insert animation. 700 ms is slightly
-    // longer than the `postr-block-insert` keyframe (~500 ms) so
-    // the browser completes the animation before the flag clears,
-    // which stops the animation from re-firing on subsequent
-    // re-renders.
-    setJustInsertedId(newBlock.id);
-    setTimeout(() => setJustInsertedId((id) => (id === newBlock.id ? null : id)), 700);
+    });
+  };
+
+  // Insert a chart block from the Figure tab's chooser. The spec is
+  // fully built (aggregated, guardrailed) and the caption is the
+  // chooser's seeded journal-style caption — the user refines it in
+  // the Edit tab afterwards. 100×70 units = the 10"×7" default
+  // figure size the readability checker assumes, so a chooser chart
+  // is born at a size its own print-legibility math already passes.
+  const insertChartBlock = (spec: ChartSpec, caption: string) => {
+    const w = 100;
+    const h = 70;
+    const { x, y } = findOpenSlot(w, h);
+    commitNewBlock({
+      id: `b${nanoid(6)}`,
+      type: 'chart',
+      x,
+      y,
+      w,
+      h,
+      content: '',
+      imageSrc: null,
+      imageFit: 'contain',
+      tableData: null,
+      chartSpec: spec,
+      caption,
+      captionPosition: 'bottom',
+    });
   };
 
   const applyTemplate = (key: LayoutKey) => {
@@ -2456,6 +2517,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         onChangeTab={setSidebarTab}
         checkFigureWidthIn={checkFigureRect.w / PX}
         checkFigureHeightIn={checkFigureRect.h / PX}
+        figureMode={effectiveFigureMode}
+        onChangeFigureMode={setFigureModeChoice}
+        posterTables={posterTables}
+        onInsertChart={insertChartBlock}
         issues={posterIssues}
         onJumpToBlock={(id) => {
           selectOne(id);
@@ -3090,15 +3155,17 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
                   accent={doc.palette.accent}
                 />
               )}
-              {sidebarTab === 'check' && selectedBlock?.type !== 'image' && (
-                <FigureSizeOverlay
-                  rect={checkFigureRect}
-                  onChange={setCheckFigureRect}
-                  canvasWidth={cW}
-                  canvasHeight={cH}
-                  zoom={zoom}
-                />
-              )}
+              {sidebarTab === 'check' &&
+                effectiveFigureMode === 'check' &&
+                selectedBlock?.type !== 'image' && (
+                  <FigureSizeOverlay
+                    rect={checkFigureRect}
+                    onChange={setCheckFigureRect}
+                    canvasWidth={cW}
+                    canvasHeight={cH}
+                    zoom={zoom}
+                  />
+                )}
             </div>
           </div>
         </div>

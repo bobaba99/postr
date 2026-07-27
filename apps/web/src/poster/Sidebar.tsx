@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type {
   Author,
   Block,
+  ChartSpec,
   HeadingStyle,
   Institution,
   Palette,
@@ -54,7 +55,8 @@ import { auditPaletteCB } from './colorblind';
 import { CommentsPanel } from './CommentsPanel';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { DockedFormatToolbar, FloatingFormatToolbar } from './FloatingFormatToolbar';
-import { ReadabilityPanel } from './ReadabilityPanel';
+import { FigureTab, type FigureMode } from './sidebar/FigureTab';
+import type { PosterTableRef } from '@/charts/ladder/DataStep';
 import { ImportSection } from './sidebar/ImportSection';
 import { PostrExportButton } from './sidebar/PostrExportButton';
 import { VersionPanel } from './VersionPanel';
@@ -184,6 +186,16 @@ interface SidebarProps {
   checkFigureWidthIn: number;
   checkFigureHeightIn: number;
 
+  // Figure tab two-mode workbench ("Make a figure" / "Check a
+  // figure"). Mode state lives in PosterEditor because the canvas
+  // figure-size overlay must hide itself while Make mode is up.
+  figureMode: FigureMode;
+  onChangeFigureMode: (mode: FigureMode) => void;
+  // Table blocks already on the poster, offered as zero-upload data
+  // sources in the chart chooser's first step.
+  posterTables: PosterTableRef[];
+  onInsertChart: (spec: ChartSpec, caption: string) => void;
+
   // Pre-computed validation issues for the Issues tab. Shared with
   // the in-canvas warning banner so both surfaces stay in sync.
   issues: PosterIssue[];
@@ -312,7 +324,11 @@ export function Sidebar(props: SidebarProps) {
   useEffect(() => {
     if (!props.selectedBlock) return;
     const t = props.selectedBlock.type;
-    if (t === 'image' && tab === 'check') return;
+    // Selecting an image keeps the Figure tab up (its dimensions
+    // feed the checker); a chart keeps it up too so the "Inserted"
+    // confirmation isn't yanked away the moment the picker selects
+    // its own freshly inserted block.
+    if ((t === 'image' || t === 'chart') && tab === 'check') return;
     if (t === 'authors') {
       setTab('authors');
       return;
@@ -594,7 +610,7 @@ export function Sidebar(props: SidebarProps) {
                   ['insert', 'insert'],
                   ['edit', 'edit block'],
                   ['refs', 'references'],
-                  ['check', 'plot code check'],
+                  ['check', 'figure'],
                   ['issues', 'issues'],
                   ['comments', 'comments'],
                   ['versions', 'versions'],
@@ -722,14 +738,20 @@ export function Sidebar(props: SidebarProps) {
         )}
 
         {tab === 'check' && (
-          <ReadabilityPanel
-            selectedBlock={
+          <FigureTab
+            mode={props.figureMode}
+            onChangeMode={props.onChangeFigureMode}
+            selectedImageBlock={
               props.selectedBlock && props.selectedBlock.type === 'image'
                 ? props.selectedBlock
                 : null
             }
             defaultFigureWidthIn={props.checkFigureWidthIn}
             defaultFigureHeightIn={props.checkFigureHeightIn}
+            palette={props.palette}
+            fontFamily={FONTS[props.fontFamily]?.css ?? props.fontFamily}
+            posterTables={props.posterTables}
+            onInsertChart={props.onInsertChart}
           />
         )}
 
@@ -756,7 +778,15 @@ export function Sidebar(props: SidebarProps) {
           />
         )}
 
-        {tab === 'insert' && <AddBlockPanel onAddBlock={props.onAddBlock} />}
+        {tab === 'insert' && (
+          <AddBlockPanel
+            onAddBlock={props.onAddBlock}
+            onOpenChartChooser={() => {
+              props.onChangeFigureMode('make');
+              setTab('check');
+            }}
+          />
+        )}
 
         {tab === 'versions' && (
           <VersionPanel
@@ -2661,6 +2691,14 @@ function EditTab(props: {
           <ImageFitToggle block={sb} onUpdateBlock={props.onUpdateBlock} />
           <CropHint />
         </>
+      ) : sb && sb.type === 'chart' ? (
+        // Charts share the figure caption system — the picker seeds
+        // the caption on insert; this is where users refine it.
+        <CaptionEditor
+          block={sb}
+          label="Figure"
+          onUpdateBlock={props.onUpdateBlock}
+        />
       ) : sb && sb.type === 'logo' ? (
         <>
           <ImageFitToggle block={sb} onUpdateBlock={props.onUpdateBlock} />
@@ -2680,8 +2718,8 @@ function EditTab(props: {
           here, or switch to the{' '}
           <span style={{ color: '#c8b6ff' }}>Insert</span> tab to add a
           new one. Open the{' '}
-          <span style={{ color: '#c8b6ff' }}>Plot Code Check</span> tab
-          to analyze figure readability.
+          <span style={{ color: '#c8b6ff' }}>Figure</span> tab to build
+          a chart from your data or check figure readability.
         </div>
       )}
     </>
@@ -3955,11 +3993,19 @@ function TextBlockEditor(props: {
 // AddBlockPanel — the Insert tab's block-type picker
 // =========================================================================
 
-function AddBlockPanel(props: { onAddBlock: (t: Block['type']) => void }) {
-  const blocks: Array<[Block['type'], string, string]> = [
+function AddBlockPanel(props: {
+  onAddBlock: (t: Block['type']) => void;
+  /** Switches to the Figure tab's Make mode — charts are built
+   *  through the chooser ladder, not dropped in empty. */
+  onOpenChartChooser: () => void;
+}) {
+  // `null` type = the Chart entry, which routes to the Figure tab
+  // instead of inserting an empty block.
+  const blocks: Array<[Block['type'] | null, string, string]> = [
     ['heading', 'Heading', 'Section title with auto-numbering'],
     ['text', 'Text', 'Paragraph with slash-command symbols'],
     ['image', 'Image', 'Figure or photo upload'],
+    [null, 'Chart', 'Build a figure from your data'],
     ['table', 'Table', 'Data table with border presets'],
     ['references', 'References', 'Auto-formatted from Refs tab'],
     ['logo', 'Logo', 'Institution or sponsor mark'],
@@ -3972,9 +4018,9 @@ function AddBlockPanel(props: { onAddBlock: (t: Block['type']) => void }) {
       </div>
       {blocks.map(([type, label, desc]) => (
         <button
-          key={type}
+          key={label}
           type="button"
-          onClick={() => props.onAddBlock(type)}
+          onClick={() => (type === null ? props.onOpenChartChooser() : props.onAddBlock(type))}
           style={{
             all: 'unset',
             cursor: 'pointer',
