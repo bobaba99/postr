@@ -36,6 +36,21 @@ export const unitsToEmu = (units: number): number => Math.round(units * EMU_PER_
 export const inchesToEmu = (inches: number): number => Math.round(inches * EMU_PER_INCH);
 
 // =========================================================================
+// Inverse conversions — used by the .pptx IMPORTER (import/pptx/).
+//
+// Additive only: the exporter's constants above are untouched. These
+// exist so the importer never re-derives 91,440 as a magic number —
+// both directions share EMU_PER_UNIT, which is what makes the
+// round-trip exact.
+// =========================================================================
+
+/** EMU → poster units. Exact for any EMU produced by `unitsToEmu`. */
+export const emuToUnits = (emu: number): number => emu / EMU_PER_UNIT;
+
+/** EMU → inches. */
+export const emuToInches = (emu: number): number => emu / EMU_PER_INCH;
+
+// =========================================================================
 // PowerPoint's 56-inch slide ceiling (plan §2)
 // =========================================================================
 
