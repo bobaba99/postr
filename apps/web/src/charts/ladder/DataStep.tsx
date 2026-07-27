@@ -17,6 +17,7 @@ import {
   type RawTable,
 } from '../parseData';
 import { isExcelFile, readExcelFile, tabulateExcelSheet, type ExcelSheet } from '../parseExcel';
+import { BusyIndicator, busyProps } from '@/components/BusyIndicator';
 
 export interface PosterTableRef {
   blockId: string;
@@ -82,7 +83,14 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [sheets, setSheets] = useState<ExcelSheet[] | null>(null);
-  const [reading, setReading] = useState(false);
+  /**
+   * What we are doing to the user's file, in their words. `null` when
+   * idle. Excel is the slow one — `read-excel-file` is dynamically
+   * imported, so the first upload pays a chunk fetch before a single
+   * row is read, and a silent button is the worst possible response
+   * to "I just gave you my thesis data".
+   */
+  const [reading, setReading] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
 
   const finish = (outcome: ParseOutcome, pending: Pending) => {
@@ -123,7 +131,9 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
     setFailure(null);
     setSheets(null);
     if (isExcelFile(file.name)) {
-      setReading(true);
+      // Set before the await so the indicator paints on the same frame
+      // as the click — no dead time while the reader chunk downloads.
+      setReading('Reading your spreadsheet…');
       try {
         const workbook = await readExcelFile(file);
         if (!workbook.ok) {
@@ -138,15 +148,18 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
           setSheets(workbook.sheets);
         }
       } finally {
-        setReading(false);
+        setReading(null);
       }
       return;
     }
+    setReading('Reading your file…');
     try {
       const text = await file.text();
       handleText(text);
     } catch {
       setFailure({ message: failureMessage({ ok: false, reason: 'unreadable' }) });
+    } finally {
+      setReading(null);
     }
   };
 
@@ -167,6 +180,7 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
       style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+      {...busyProps(reading !== null)}
     >
       <textarea
         aria-label="Paste your table"
@@ -215,10 +229,20 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
             Use this table
           </button>
         )}
-        <button type="button" style={buttonStyle} onClick={() => fileRef.current?.click()}>
-          {reading ? 'Reading…' : 'Upload CSV or Excel'}
+        <button
+          type="button"
+          style={{ ...buttonStyle, opacity: reading ? 0.6 : 1 }}
+          disabled={reading !== null}
+          onClick={() => fileRef.current?.click()}
+        >
+          Upload CSV or Excel
         </button>
-        <button type="button" style={buttonStyle} onClick={onSynthetic}>
+        <button
+          type="button"
+          style={{ ...buttonStyle, opacity: reading ? 0.6 : 1 }}
+          disabled={reading !== null}
+          onClick={onSynthetic}
+        >
           I don’t have data yet
         </button>
         <input
@@ -231,6 +255,13 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
           tabIndex={-1}
         />
       </div>
+
+      {reading && (
+        <BusyIndicator
+          label={reading}
+          hint="Large spreadsheets can take a few seconds."
+        />
+      )}
 
       {posterTables.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

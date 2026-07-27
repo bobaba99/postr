@@ -655,7 +655,7 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
   const showLongHint = elapsedSec >= 30;
 
   return (
-    <div style={{ padding: '20px 8px' }}>
+    <div style={{ padding: '20px 8px' }} aria-busy="true">
       <ol style={{ listStyle: 'none', padding: 0, margin: '0 0 16px', fontSize: 13 }}>
         {STAGE_ORDER.filter((s) => s !== 'ready').map((s, idx) => {
           const isCurrent = idx === currentIdx;
@@ -719,8 +719,6 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
           a blinking caret keeps the eye engaged from t=0 through
           the long LLM calls. */}
       <div
-        aria-live="polite"
-        aria-atomic="true"
         style={{
           marginTop: 14,
           minHeight: 36,
@@ -737,7 +735,11 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
           fontVariantNumeric: 'tabular-nums',
         }}
       >
-        <div style={{ color: '#c8b6ff', fontWeight: 500 }}>
+        {/* The typewriter is decoration: announcing it live would fire
+            a new utterance every ~64 ms, one per character, and drown
+            the user. The visible text is hidden from AT and the settled
+            phrase is announced once, below. */}
+        <div style={{ color: '#c8b6ff', fontWeight: 500 }} aria-hidden="true">
           <span>{typedText}</span>
           <span
             aria-hidden
@@ -760,6 +762,12 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
           </div>
         )}
       </div>
+      {/* What a screen reader actually hears: the current stage,
+          announced once when it changes, not once per typed glyph. */}
+      <span role="status" aria-live="polite" className="sr-only">
+        {STAGE_LABELS[effectiveStage] ?? 'Working'}
+        {showLongHint ? ' — still working, this is taking longer than usual' : ''}
+      </span>
       <style>{`
         @keyframes postrPulse {
           0%, 100% { transform: translateX(-100%); }

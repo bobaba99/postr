@@ -16,6 +16,7 @@
  * the citation style used to render the references block.
  */
 import { useState } from 'react';
+import { BusyIndicator, busyProps } from '@/components/BusyIndicator';
 import { usePosterStore } from '@/stores/posterStore';
 import type { CitationStyleKey } from '@/poster/citations';
 import { PPTX_MAX_DIMENSION_IN } from '@/export/units';
@@ -129,7 +130,7 @@ export function EditableExportButtons({
     });
 
   return (
-    <>
+    <div {...busyProps(state.busy !== null)}>
       <button
         onClick={handlePptx}
         disabled={!doc || state.busy !== null || beyondHalf}
@@ -141,11 +142,16 @@ export function EditableExportButtons({
           '#c46a1f',
         )}
       >
-        {state.done === 'pptx'
-          ? '✓ Saved'
-          : state.busy === 'pptx'
-            ? 'Building slides…'
-            : '▤ PowerPoint (.pptx)'}
+        {state.done === 'pptx' ? (
+          '✓ Saved'
+        ) : state.busy === 'pptx' ? (
+          // The first click pays a ~368 kB pptxgenjs chunk fetch before
+          // any slide is written, so the label alone left the button
+          // looking frozen. The dot proves the app is alive.
+          <BusyIndicator inline tone="#f0a35e" label="Building slides…" />
+        ) : (
+          '▤ PowerPoint (.pptx)'
+        )}
       </button>
       {doc && beyondHalf && (
         <div style={{ ...hintStyle, color: '#fca5a5' }}>
@@ -185,11 +191,13 @@ export function EditableExportButtons({
           '#3178c6',
         )}
       >
-        {state.done === 'latex'
-          ? '✓ Saved'
-          : state.busy === 'latex'
-            ? 'Writing LaTeX…'
-            : '⌨ LaTeX source (.zip)'}
+        {state.done === 'latex' ? (
+          '✓ Saved'
+        ) : state.busy === 'latex' ? (
+          <BusyIndicator inline tone="#8ec5ff" label="Writing LaTeX…" />
+        ) : (
+          '⌨ LaTeX source (.zip)'
+        )}
       </button>
       <div style={hintStyle}>
         A compilable <code>poster.tex</code> with your figures and a{' '}
@@ -214,11 +222,16 @@ export function EditableExportButtons({
         </ul>
       )}
       {state.failed && (
-        <div style={{ fontSize: 12, color: '#fca5a5', marginTop: 6 }}>
+        <div role="alert" style={{ fontSize: 12, color: '#fca5a5', marginTop: 6 }}>
           Something went wrong. Try again, or use Send Feedback so we can look
           into it.
         </div>
       )}
-    </>
+      {state.done && (
+        <span role="status" aria-live="polite" className="sr-only">
+          {state.done === 'pptx' ? 'PowerPoint file saved' : 'LaTeX source saved'}
+        </span>
+      )}
+    </div>
   );
 }

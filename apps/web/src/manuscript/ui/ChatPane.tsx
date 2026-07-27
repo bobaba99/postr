@@ -7,11 +7,19 @@
  * the interviewer state machine.
  */
 import { useEffect, useRef, useState } from 'react';
+import { busyProps } from '@/components/BusyIndicator';
 import { chipsFor, type InterviewState } from '../interviewer';
 
 interface ChatPaneProps {
   state: InterviewState;
-  busy: boolean;
+  /**
+   * What the pane is waiting on, in the user's words — "Reading your
+   * manuscript…" during docx ingest, "Drafting your poster text…"
+   * during the condense call. `null` when idle. It was a bare boolean
+   * that always claimed to be drafting, which is a lie while we are
+   * still unzipping a .docx.
+   */
+  busy: string | null;
   onSubmitText: (text: string) => void;
   onChip: (chipId: string) => void;
   onDocxFile: (file: File) => void;
@@ -62,8 +70,16 @@ export function ChatPane({
           </div>
         ))}
         {busy && (
-          <div className="postr-rise-in max-w-[85%] rounded-lg bg-[#16161f] px-3.5 py-2.5 text-sm italic text-[#6b7280]">
-            Drafting your poster text…
+          // The transcript container is already aria-live, so this
+          // bubble must NOT nest its own live region — that would
+          // announce the same line twice. The dot is decoration; the
+          // text is what the outer region reads.
+          <div
+            className="postr-rise-in flex max-w-[85%] items-center gap-2 rounded-lg bg-[#16161f] px-3.5 py-2.5 text-sm italic text-[#9ca3af]"
+            {...busyProps(true)}
+          >
+            <span className="postr-busy-dot" aria-hidden="true" />
+            <span>{busy}</span>
           </div>
         )}
       </div>
@@ -100,7 +116,7 @@ export function ChatPane({
             <button
               type="button"
               onClick={() => fileRef.current?.click()}
-              disabled={busy}
+              disabled={busy !== null}
               className="rounded-md border border-[#3a3a4e] px-3 py-1.5 text-xs font-semibold text-[#c8cad0] hover:border-[#7c6aed] hover:text-white disabled:opacity-50"
             >
               Upload a .docx
@@ -125,13 +141,13 @@ export function ChatPane({
                 : 'Type your answer…'
             }
             rows={isManuscriptStep ? 6 : 2}
-            disabled={busy}
+            disabled={busy !== null}
             className="min-h-0 w-full resize-y rounded-md border border-[#2a2a3a] bg-[#0a0a12] px-3 py-2 text-sm text-[#c8cad0] outline-none focus:border-[#7c6aed] disabled:opacity-50"
           />
           <button
             type="button"
             onClick={submit}
-            disabled={busy || !draft.trim()}
+            disabled={busy !== null || !draft.trim()}
             className="rounded-md bg-[#7c6aed] px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40"
           >
             {isManuscriptStep ? 'Read it' : 'Send'}

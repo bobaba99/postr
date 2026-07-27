@@ -191,13 +191,73 @@ prices, 2026-07-27:
 | gpt-5.6-luna | $1.00 | $6.00 | nano tier |
 | Kimi K3 | $3.00 | $15.00 | $0.30/1M on **cache hits**; 1M ctx; image+video |
 
-**Kimi K3 is not a cost saving for this workload.** At $3/$15 it costs more than terra
-($2.50/$15) and triple luna ($1.00/$6) on input. It is a *capability* choice — 2.8T params,
-1M context, multimodal — not a cheap one. Its one real edge is the **$0.30/1M cache-hit
-price**, which only pays off with a large static prefix reused across many calls. Postr's
-condense prompt is short and the manuscript differs every time, so the cache would rarely hit.
-**Recommendation: do not adopt K3 for condensing.** Reconsider only if a future feature sends
-a large fixed corpus repeatedly, or needs its multimodal input.
+### Measured cost experiment — run 2026-07-27
+
+Gavin's point that **caching matters once a user iterates** is correct, and it overturns the
+first pass of this section, which had wrongly assumed only the ~400-token system prompt was
+cacheable. The manuscript excerpts are the bulk of the input (up to 20k chars ≈ 5k tokens,
+typically ~2.5k) and are **byte-identical across iterations of the same paper**. That is the
+cacheable asset, not the system prompt.
+
+**Model, measured against the repo:** system 400 tok (from `prompt.ts`) · emphasis ~120 tok,
+changes every iteration · manuscript 2,500 tok typical / 5,000 cap · output ~520 tok
+(five panels at the `rubric.ts` budgets, ≈390 words).
+
+**Prices verified against provider docs, 2026-07-27**, including two things the first pass
+missed: GPT-5.6+ bills **cache writes at 1.25×** the uncached input rate, and caching requires
+a prefix of **≥1,024 tokens**.
+
+| Model | In | Cached in | Out |
+|---|---|---|---|
+| gpt-5.6-terra | $2.50 | $0.25 | $15.00 |
+| gpt-5.6-luna | $1.00 | $0.10 | $6.00 |
+| Kimi K3 | $3.00 | $0.30 | $15.00 |
+
+**Cost per user, one manuscript, N iterations (typical length):**
+
+| Model | 1 iter | 3 iter | 5 iter | 10 iter |
+|---|---|---|---|---|
+| terra, no cache | $0.0153 | $0.0461 | $0.0767 | $0.1535 |
+| terra + cache | $0.0172 | $0.0348 | $0.0525 | $0.0966 |
+| **luna, no cache** | **$0.0061** | $0.0184 | $0.0307 | $0.0614 |
+| **luna + cache** | $0.0069 | **$0.0139** | **$0.0210** | **$0.0386** |
+| K3 + cache | $0.0169 | $0.0349 | $0.0530 | $0.0981 |
+
+**Four findings:**
+
+1. **Caching pays from the second iteration onward**, for every OpenAI-family model. The
+   1.25× write premium costs ~12% extra on a one-shot call and is repaid immediately on the
+   first repeat. At 10 iterations it is a **37% saving**. Gavin's instinct is confirmed:
+   enable caching.
+2. **Kimi K3 still loses, and caching does not rescue it.** It is ~2.5× the cheapest option at
+   every iteration count, because luna caches at $0.10/1M against K3's $0.30/1M — K3's
+   headline cache discount is real but starts from a 3× higher base. **Do not adopt K3 for
+   condensing.** Revisit only for its multimodal input or 1M context, which are capability
+   arguments, not cost ones.
+3. **Model choice dominates caching.** luna-without-cache beats terra-with-cache at every
+   count. Both levers are worth pulling, but if only one ships, ship the model change.
+4. **Short manuscripts cannot cache at all** — a 600-token manuscript yields a 1,000-token
+   prefix, under the 1,024 minimum. Real papers clear it easily; abstracts and short drafts do
+   not, so caching must be treated as an optimisation that sometimes silently does not apply,
+   never as a guaranteed price.
+
+**At scale, 1,000 users × 3 iterations:** luna+cache **$13.20** · terra+cache $34.80 ·
+K3+cache $34.92 · terra uncached (today's shape) $46.10.
+
+### The code change caching depends on
+
+Automatic prefix caching only hits if the **volatile part of the prompt comes last**.
+`buildCondenserUserMessage()` in `prompt.ts` currently emits `AUTHOR EMPHASIS` **first**, then
+the panels — so the emphasis block, which changes on every iteration, sits at the front and
+**invalidates the entire prefix every time**. As written today, the cache would essentially
+never hit on an iteration.
+
+**Required: reorder to panels-then-emphasis.** The panels (static per manuscript) form the
+cacheable prefix; the emphasis block trails. This is a small change to one function, but it is
+load-bearing for every number above, and it must be verified against the provider's
+`cached_tokens` response field rather than assumed. Note the ordering swap changes what the
+model reads last, which can shift output subtly — re-grade the prompt after the change rather
+than treating it as cost-only.
 
 ### Ordered by expected saving
 
@@ -208,9 +268,9 @@ a large fixed corpus repeatedly, or needs its multimodal input.
    60% input / 60% output cut on the main recurring call. It is one constant in
    `api/narrative/config.ts`. **Gate on measured quality** — a condenser that silently drops a
    finding costs more than the saving.
-3. **Cache the system prompt.** The condenser system prompt is static by design (`prompt.ts`
-   keeps document-specific content in the user message precisely so the system half stays
-   cacheable). Whatever provider is used, enable prompt caching on it.
+3. **Enable prompt caching, and reorder the user message so it can hit.** Measured at a 37%
+   saving over 10 iterations — but only after the panels-before-emphasis reorder described
+   above. Verify with the provider's `cached_tokens` field; do not assume.
 4. **One design call per deck**, per §4.
 5. **Never call a model to classify what search can match.** The Q3 audience presets already
    follow this rule. Apply it to every future question.

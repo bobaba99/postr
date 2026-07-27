@@ -16,6 +16,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useModalTransition } from '@/hooks/useModalTransition';
+import { BusyIndicator, busyProps } from './BusyIndicator';
 import { usePosterStore } from '@/stores/posterStore';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { getCapturedLog } from '@/lib/consoleCapture';
@@ -209,25 +210,15 @@ export function CopyDesignModal({ open, onClose }: Props) {
         )}
 
         {phase === 'extracting' && (
-          <div style={{ padding: '32px 8px', textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: '#c8b6ff', fontWeight: 500 }}>
-              {STAGE_LABELS[stage]}…
-            </div>
-            <div style={progressTrackStyle}>
-              <div className="postr-copy-progress" style={progressFillStyle} />
-            </div>
-            <style>{`
-              @keyframes postrCopyPulse {
-                0%, 100% { transform: translateX(-100%); }
-                50%      { transform: translateX(150%); }
-              }
-              .postr-copy-progress {
-                animation: postrCopyPulse 1.4s var(--ease-standard) infinite;
-              }
-              @media (prefers-reduced-motion: reduce) {
-                .postr-copy-progress { animation: none; }
-              }
-            `}</style>
+          <div style={{ padding: '32px 8px' }} {...busyProps(true)}>
+            {/* The stage label changes as extraction progresses, and
+                BusyIndicator's live region announces each change — a
+                screen-reader user hears the same progression a sighted
+                user watches. */}
+            <BusyIndicator
+              label={`${STAGE_LABELS[stage]}…`}
+              hint="Reading a PDF or a large image can take a few seconds."
+            />
           </div>
         )}
 
@@ -535,20 +526,6 @@ const feedbackBtnStyle: CSSProperties = {
   background: '#7c6aed',
   border: 'none',
   borderRadius: 6,
-};
-
-const progressTrackStyle: CSSProperties = {
-  height: 4,
-  marginTop: 16,
-  background: '#1a1a26',
-  borderRadius: 2,
-  overflow: 'hidden',
-};
-
-const progressFillStyle: CSSProperties = {
-  height: '100%',
-  width: '40%',
-  background: '#7c6aed',
 };
 
 const footerStyle: CSSProperties = {

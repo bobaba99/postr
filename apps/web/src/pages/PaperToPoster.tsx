@@ -13,6 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CondensedNarrative } from '@postr/shared';
+import { BusyIndicator, busyProps } from '@/components/BusyIndicator';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
@@ -249,7 +250,14 @@ export default function PaperToPoster() {
     }
   }, [poster, interview.doc]);
 
-  const busy = ingesting || phase === 'condensing';
+  // Name the actual work — ingest and condense are different waits
+  // with different durations, and "Drafting…" during a .docx unzip is
+  // simply wrong.
+  const busy = ingesting
+    ? 'Reading your manuscript…'
+    : phase === 'condensing'
+      ? 'Drafting your poster text…'
+      : null;
   // A passing figure needs no words — only problems get surfaced.
   const flaggedFigures = figureChecks.filter((c) => c.status !== 'pass');
 
@@ -368,10 +376,19 @@ export default function PaperToPoster() {
             )}
 
             {!entries && phase !== 'condense-error' && (
-              <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[#1f1f2e] p-8 text-center text-sm text-[#4b5563]">
-                {phase === 'condensing'
-                  ? 'Drafting your poster text…'
-                  : 'Your poster preview appears here once the questions are done.'}
+              <div
+                className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[#1f1f2e] p-8 text-center text-sm text-[#4b5563]"
+                {...busyProps(phase === 'condensing')}
+              >
+                {phase === 'condensing' ? (
+                  <BusyIndicator
+                    label="Drafting your poster text…"
+                    hint="This usually takes a few seconds."
+                    style={{ alignItems: 'center', minWidth: 220 }}
+                  />
+                ) : (
+                  'Your poster preview appears here once the questions are done.'
+                )}
               </div>
             )}
           </section>
