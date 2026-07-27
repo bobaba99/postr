@@ -153,7 +153,7 @@ export async function extractFromRasterizedPage(
  *  comfortably under Anthropic's 5 MB-per-image practical sweet
  *  spot. Returns the input canvas when no scaling is needed so
  *  callers don't have to allocate. */
-function downscaleForVision(src: HTMLCanvasElement): HTMLCanvasElement {
+export function downscaleForVision(src: HTMLCanvasElement): HTMLCanvasElement {
   const MAX_DIM = 2048;
   const longEdge = Math.max(src.width, src.height);
   if (longEdge <= MAX_DIM) return src;
@@ -599,7 +599,9 @@ export async function countFigures(
 
 // ── helpers ──────────────────────────────────────────────────────────
 
-async function rasterizePdfFirstPage(
+/** Exported for the copy-a-design flow (styleImport.ts), which
+ *  shares the raster + upload plumbing without the block pipeline. */
+export async function rasterizePdfFirstPage(
   file: File,
 ): Promise<{ canvas: HTMLCanvasElement; pageWidthPt: number; pageHeightPt: number }> {
   const buf = await file.arrayBuffer();
@@ -637,7 +639,7 @@ async function rasterizePdfFirstPage(
   }
 }
 
-async function rasterizeImage(
+export async function rasterizeImage(
   file: File,
 ): Promise<{ canvas: HTMLCanvasElement; pageWidthPt: number; pageHeightPt: number }> {
   const url = URL.createObjectURL(file);
@@ -671,7 +673,7 @@ async function rasterizeImage(
 }
 
 
-function canvasToBlob(
+export function canvasToBlob(
   canvas: HTMLCanvasElement,
   type: string,
   quality = 0.92,
@@ -681,7 +683,7 @@ function canvasToBlob(
   });
 }
 
-function releaseCanvas(c: HTMLCanvasElement): void {
+export function releaseCanvas(c: HTMLCanvasElement): void {
   c.width = 0;
   c.height = 0;
 }

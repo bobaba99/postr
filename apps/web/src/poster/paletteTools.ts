@@ -350,14 +350,45 @@ export function generateRandomCBSafePalette(
  */
 export async function extractPaletteFromImage(file: File): Promise<Palette> {
   const img = await loadImage(file);
+  const picked = distinctColorsFromDrawable(img, img.width, img.height, 6);
+  if (picked === null) return fallbackPalette();
+  return hexListToPalette(picked);
+}
+
+/**
+ * Distinct dominant colors from an already-rasterized canvas — the
+ * raw cluster list, before any role assignment. Used by the
+ * copy-a-design flow (styleImport), which snaps the vision model's
+ * role colours onto these exact values. Returns [] when a 2d context
+ * is unavailable.
+ */
+export function extractDistinctColorsFromCanvas(
+  canvas: HTMLCanvasElement,
+  maxColors = 6,
+): string[] {
+  return (
+    distinctColorsFromDrawable(canvas, canvas.width, canvas.height, maxColors) ??
+    []
+  );
+}
+
+/** Shared quantization core: downsample, bucket at 5 bits/channel,
+ *  return the most frequent distinct-enough colors (most frequent
+ *  first). `null` when no 2d context is available. */
+function distinctColorsFromDrawable(
+  src: CanvasImageSource,
+  srcWidth: number,
+  srcHeight: number,
+  maxColors: number,
+): string[] | null {
   const canvas = document.createElement('canvas');
   const MAX = 120;
-  const scale = Math.min(MAX / img.width, MAX / img.height, 1);
-  canvas.width = Math.max(1, Math.floor(img.width * scale));
-  canvas.height = Math.max(1, Math.floor(img.height * scale));
+  const scale = Math.min(MAX / srcWidth, MAX / srcHeight, 1);
+  canvas.width = Math.max(1, Math.floor(srcWidth * scale));
+  canvas.height = Math.max(1, Math.floor(srcHeight * scale));
   const ctx = canvas.getContext('2d');
-  if (!ctx) return fallbackPalette();
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  if (!ctx) return null;
+  ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
   const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
 
   // Bucket by reducing precision to 5 bits per channel.
@@ -396,11 +427,10 @@ export async function extractPaletteFromImage(file: File): Promise<Palette> {
   for (const { hex } of sorted) {
     if (picked.length === 0 || picked.every((p) => hexDistance(p, hex) > 55)) {
       picked.push(hex);
-      if (picked.length >= 6) break;
+      if (picked.length >= maxColors) break;
     }
   }
-
-  return hexListToPalette(picked);
+  return picked;
 }
 
 function hexDistance(a: string, b: string): number {
