@@ -11,11 +11,37 @@ import { InputModal } from '@/components/InputModal';
 
 // ── Guidelines Data ──────────────────────────────────────────────────
 
-interface Guideline {
+/**
+ * A conference's poster specification.
+ *
+ * Every row carries its own provenance because a wrong board dimension
+ * gets someone's poster rejected at the door — that is the worst
+ * failure mode this panel has, and it is not recoverable by the user.
+ * `verifiedOn` + `meetingYear` exist so a stale row is visibly stale
+ * rather than silently wrong.
+ *
+ * `orientation` and `unitSystem` are NOT cosmetic. ECNP (portrait,
+ * metric, A0) and SfN (landscape, imperial, 72x48) cannot share a
+ * preset shape, and normalising one into the other's units is how
+ * transposition errors get introduced.
+ */
+export interface Guideline {
   conference: string;
   field: string;
   size: string;
   sizeNote?: string;
+  /** Board dimensions in inches, as stated by the organiser. */
+  boardWidthIn: number;
+  boardHeightIn: number;
+  orientation: 'landscape' | 'portrait' | 'square' | 'either';
+  /** Units the organiser states authoritatively; the other is a conversion. */
+  unitSystem: 'imperial' | 'metric';
+  /** True when the figure is a maximum the poster must fit within. */
+  isMaximum: boolean;
+  /** Meeting year the cited source covers — not necessarily the current year. */
+  meetingYear: number;
+  /** ISO date this row was last checked against its primary source. */
+  verifiedOn: string;
   fonts: FontSpec[];
   tips: string[];
   url: string;
@@ -28,12 +54,20 @@ interface FontSpec {
   recommended?: string;
 }
 
-const GUIDELINES: Guideline[] = [
+export const GUIDELINES: Guideline[] = [
   {
     conference: 'APA',
     field: 'Psychology',
-    size: '4\' × 6\' board (48" × 72")',
-    sizeNote: 'Board is 4ft high × 6ft wide — poster must fit within.',
+    size: '48" × 72" (4\' high × 6\' wide)',
+    sizeNote:
+      'Maximum poster size — APA sets the poster maximum equal to the board, so you may fill it entirely. Landscape.',
+    boardWidthIn: 72,
+    boardHeightIn: 48,
+    orientation: 'landscape',
+    unitSystem: 'imperial',
+    isMaximum: true,
+    meetingYear: 2026,
+    verifiedOn: '2026-07-27',
     fonts: [
       { element: 'Title', min: '72pt', recommended: '158pt' },
       { element: 'Headings', min: '46pt', recommended: '56pt' },
@@ -53,7 +87,19 @@ const GUIDELINES: Guideline[] = [
     conference: 'SfN',
     field: 'Neuroscience',
     size: '72" × 48" (6\' × 4\') landscape',
-    sizeNote: 'Board is 8\'×4\' — poster must fit within. Check your year\'s guidelines.',
+    // The old sizeNote claimed the board was 8'x4', contradicting this
+    // row's own size field. Verified against sfn.org 2026-07-27: the
+    // board is 6ft x 4ft and has been since at least 2014. It is a
+    // MAXIMUM, not a required size — a smaller poster is fine.
+    sizeNote:
+      'Board is 6ft wide × 4ft high — this is a maximum, not a required size. A smaller poster is fine.',
+    boardWidthIn: 72,
+    boardHeightIn: 48,
+    orientation: 'landscape',
+    unitSystem: 'imperial',
+    isMaximum: true,
+    meetingYear: 2026,
+    verifiedOn: '2026-07-27',
     fonts: [
       { element: 'Title', min: '72pt', recommended: '85pt+' },
       { element: 'Headings', min: '36pt', recommended: '48pt' },
@@ -66,14 +112,31 @@ const GUIDELINES: Guideline[] = [
       'Figures should dominate — minimize text',
       'Number your poster with your assigned board number',
     ],
-    url: 'https://neuronline.sfn.org/professional-development/how-to-make-and-present-a-poster-for-neuroscience-2025',
-    urlLabel: 'SfN Neuronline — How to Make a Poster (2025)',
+    // The dimensions live on this CHILD page. The parent
+    // /presentation-formats page does not state them, and
+    // /presenter-resources/poster-presentations serves a soft-404 at
+    // HTTP 200 until SfN publishes the current meeting year.
+    url: 'https://www.sfn.org/meetings/neuroscience-2026/call-for-abstracts/presentation-formats/poster-sessions',
+    urlLabel: 'SfN Neuroscience 2026 — Poster Sessions',
   },
   {
     conference: 'APS',
     field: 'Psychological Science',
-    size: '4\' × 8\' board (48" × 96")',
-    sizeNote: 'Board is 4ft high × 8ft wide. Common poster sizes: 36"×48" or 24"×36".',
+    // WAS "4' x 8' board (48in x 96in)" — that was not a typo, it was
+    // the wrong poster entirely. Verified against the APS 2026
+    // guidelines 2026-07-27: APS specifies A0, which is less than half
+    // the width the old row claimed. Anyone who built to 48x96 for APS
+    // would have turned up with an unmountable poster.
+    size: 'A0 — 33.1" × 46.8" (84.1 × 118.9 cm)',
+    sizeNote:
+      'A0, landscape or portrait. Note this is metric A0, not a US size — considerably narrower than a 48"×96" board.',
+    boardWidthIn: 33.1,
+    boardHeightIn: 46.8,
+    orientation: 'either',
+    unitSystem: 'metric',
+    isMaximum: true,
+    meetingYear: 2026,
+    verifiedOn: '2026-07-27',
     fonts: [
       { element: 'Headings', min: '30pt' },
       { element: 'Body', min: '20pt' },
@@ -84,14 +147,21 @@ const GUIDELINES: Guideline[] = [
       'No A/V equipment allowed at standard poster sessions',
       'Include QR code linking to your OSF/preprint',
     ],
-    url: 'https://www.psychologicalscience.org/conventions/2025-aps-annual-convention/call-for-submissions/poster-rules-and-guidelines',
-    urlLabel: 'APS 2025 — Poster Rules & Guidelines',
+    url: 'https://www.psychologicalscience.org/conventions/2026-aps-annual-convention/call-for-submissions/poster-rules-guidelines',
+    urlLabel: 'APS 2026 — Poster Rules & Guidelines',
   },
   {
     conference: 'ACNP',
     field: 'Neuropsychopharmacology',
-    size: '45" × 45" max (square)',
-    sizeNote: 'Maximum 45×45 inches. Check yearly PDF guidelines for details.',
+    size: '45" × 45" (square)',
+    sizeNote: 'Maximum 45×45 inches, square. Confirmed for the January 2027 annual meeting.',
+    boardWidthIn: 45,
+    boardHeightIn: 45,
+    orientation: 'square',
+    unitSystem: 'imperial',
+    isMaximum: true,
+    meetingYear: 2027,
+    verifiedOn: '2026-07-27',
     fonts: [
       { element: 'Title', min: '72pt' },
       { element: 'Body', min: '24pt' },
@@ -107,8 +177,21 @@ const GUIDELINES: Guideline[] = [
   {
     conference: 'SOBP',
     field: 'Biological Psychiatry',
-    size: '45" × 45" or 48" × 36"',
-    sizeNote: 'Check acceptance letter — varies by session',
+    // The prior "45x45 or 48x36" had no traceable source. The only
+    // primary SOBP guidance found on 2026-07-27 states 4ft x 4ft — but
+    // it dates from 2018, so meetingYear reflects the SOURCE, not the
+    // current meeting. Do not quietly bump meetingYear to make this row
+    // look fresh; the staleness is the useful information here.
+    size: '48" × 48" (4\' × 4\')',
+    sizeNote:
+      'Maximum 4ft × 4ft. ⚠ Most recent published SOBP guidance found is from 2018 — confirm against your acceptance letter before printing.',
+    boardWidthIn: 48,
+    boardHeightIn: 48,
+    orientation: 'square',
+    unitSystem: 'imperial',
+    isMaximum: true,
+    meetingYear: 2018,
+    verifiedOn: '2026-07-27',
     fonts: [
       { element: 'Title', min: '72pt' },
       { element: 'Body', min: '24pt' },
@@ -123,15 +206,26 @@ const GUIDELINES: Guideline[] = [
   {
     conference: 'ECNP',
     field: 'European Neuropsychopharmacology',
-    size: '95 cm × 140 cm (37.4" × 55.1")',
-    sizeNote: 'Portrait orientation required. ECNP handles printing for all posters.',
+    // WAS "95 cm x 140 cm" — no primary source supports that. ECNP
+    // specifies A0 portrait. Verified 2026-07-27 against an archived
+    // snapshot of the congress2025 guidelines; the live page had moved.
+    size: 'A0 portrait — 84.1 × 118.9 cm (33.1" × 46.8")',
+    sizeNote:
+      'A0, portrait, one page, submitted as PDF. ECNP prints posters for presenters. Source is the 2025 congress guidance — re-check for your congress year.',
+    boardWidthIn: 33.11,
+    boardHeightIn: 46.81,
+    orientation: 'portrait',
+    unitSystem: 'metric',
+    isMaximum: false,
+    meetingYear: 2025,
+    verifiedOn: '2026-07-27',
     fonts: [
       { element: 'Title', min: '72pt' },
       { element: 'Headings', min: '36pt' },
       { element: 'Body', min: '24pt' },
     ],
     tips: [
-      'Portrait orientation — not A0, smaller than typical US posters',
+      'A0 portrait — narrower than a typical US landscape poster, so plan a vertical column flow',
       'Casual observer should grasp the message within seconds',
       'Disclose conflicts of interest at the bottom',
       'Posters hung after 09:00 may not qualify for the ECNP Poster Award',
@@ -142,7 +236,15 @@ const GUIDELINES: Guideline[] = [
   {
     conference: 'SPSP',
     field: 'Social/Personality Psychology',
-    size: '4\' × 6\' board (48" × 72")',
+    size: '48" × 72" (4\' high × 6\' wide)',
+    sizeNote: 'Posters must fit within the board. Landscape.',
+    boardWidthIn: 72,
+    boardHeightIn: 48,
+    orientation: 'landscape',
+    unitSystem: 'imperial',
+    isMaximum: true,
+    meetingYear: 2025,
+    verifiedOn: '2026-07-27',
     fonts: [
       { element: 'Title', min: '72pt' },
       { element: 'Body', min: '24pt' },
@@ -153,8 +255,8 @@ const GUIDELINES: Guideline[] = [
       'Keep methods brief — focus on results + implications',
       'Fabric printing recommended (Spoonflower) — reusable, wrinkle-free',
     ],
-    url: 'https://spsp.org/events/annual-convention',
-    urlLabel: 'SPSP — Annual Convention',
+    url: 'https://spsp.org/sites/default/files/2024-12/2025-SPSP-Poster-Presenter-Guidelines.pdf',
+    urlLabel: 'SPSP 2025 — Poster Presenter Guidelines (PDF)',
   },
 ];
 
