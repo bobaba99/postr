@@ -237,6 +237,27 @@ export interface Block {
     bottom: number;
     left: number;
   };
+  /**
+   * Marks a block the editor placed and the user may not remove.
+   *
+   * Semantics are deliberately narrow: a locked block is fully
+   * MOVABLE, RESIZABLE and RESTYLEABLE — drag it, scale it, recolor
+   * it, send it behind another block. The single thing it refuses is
+   * DELETION. Everything else about it is the user's poster to
+   * arrange, which is what keeps it an acknowledgement rather than a
+   * watermark stapled to a fixed corner.
+   *
+   * Optional, and only ever `true` — a block without the field is
+   * unlocked. That keeps every poster document written before this
+   * field existed valid as-is, so there is no migration: `locked`
+   * is absent on all of them and `!b.locked` reads false.
+   *
+   * Enforcement lives at each delete site (keyboard handler, context
+   * menu, group delete) rather than in the type, because TypeScript
+   * cannot stop `blocks.filter()`. The type is the marker; the call
+   * sites are the lock.
+   */
+  locked?: true;
 }
 
 export type FontWeight = 300 | 400 | 500 | 600 | 700 | 800;
