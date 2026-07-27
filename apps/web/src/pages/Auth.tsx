@@ -15,10 +15,14 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { PasswordStrength, isPasswordValid } from '@/components/PasswordStrength';
 import { PublicFooter } from '@/components/PublicFooter';
+import { APP_ROUTE_META } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 type Mode = 'signin' | 'signup';
 
 export default function Auth() {
+  useDocumentMeta(APP_ROUTE_META['/auth'] ?? null);
+
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<Mode>('signin');

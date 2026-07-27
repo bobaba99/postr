@@ -19,6 +19,8 @@ import { useTwoTabGuard } from '@/hooks/useTwoTabGuard';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
 import { uploadBase64Image } from '@/data/posterImages';
 import { supabase } from '@/lib/supabase';
+import { noindexMeta } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 /**
  * Posters can arrive here empty — either from the handle_new_user
@@ -128,7 +130,17 @@ export default function Editor() {
   const { posterId } = useParams<{ posterId: string }>();
   const navigate = useNavigate();
   const setPoster = usePosterStore((s) => s.setPoster);
+  const posterTitle = usePosterStore((s) => s.posterTitle);
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
+
+  // Noindex, and named after the poster so a user with several editor
+  // tabs open can tell them apart.
+  useDocumentMeta(
+    noindexMeta(
+      posterTitle ? `${posterTitle} | Postr` : 'Poster editor | Postr',
+      'The Postr poster editor.',
+    ),
+  );
 
   useEffect(() => {
     let cancelled = false;

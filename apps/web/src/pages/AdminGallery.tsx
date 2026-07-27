@@ -23,6 +23,8 @@ import {
   type GalleryEntryWithUrls,
 } from '@/data/gallery';
 import { PublicFooter } from '@/components/PublicFooter';
+import { APP_ROUTE_META } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 type Access =
   | { kind: 'checking' }
@@ -37,6 +39,8 @@ type DataStatus =
 type Filter = 'all' | 'active' | 'retracted';
 
 export default function AdminGallery() {
+  useDocumentMeta(APP_ROUTE_META['/admin/gallery'] ?? null);
+
   const navigate = useNavigate();
   const [access, setAccess] = useState<Access>({ kind: 'checking' });
   const [data, setData] = useState<DataStatus>({ kind: 'loading' });

@@ -14,11 +14,15 @@
 import { Link } from 'react-router-dom';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
+import { STATIC_ROUTE_META } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 const LAST_UPDATED = 'April 10, 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Terms() {
+  useDocumentMeta(STATIC_ROUTE_META['/terms'] ?? null);
+
   return (
     <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
       <PublicHeader />

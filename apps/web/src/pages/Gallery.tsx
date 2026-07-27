@@ -9,6 +9,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
+import { STATIC_ROUTE_META } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 import {
   listGallery,
   FIELD_OPTIONS,
@@ -23,6 +25,8 @@ type Status =
   | { kind: 'error'; message: string };
 
 export default function Gallery() {
+  useDocumentMeta(STATIC_ROUTE_META['/gallery'] ?? null);
+
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [field, setField] = useState<GalleryField | 'all'>('all');
 

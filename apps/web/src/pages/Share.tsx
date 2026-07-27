@@ -17,6 +17,8 @@ import { useParams } from 'react-router-dom';
 import { loadPosterBySlug } from '@/data/posters';
 import { usePosterStore } from '@/stores/posterStore';
 import { PosterEditor } from '@/poster/PosterEditor';
+import { shareMeta } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 import type { PosterDoc } from '@postr/shared';
 
 type Status =
@@ -28,7 +30,25 @@ type Status =
 export default function Share() {
   const { slug } = useParams<{ slug: string }>();
   const setPoster = usePosterStore((s) => s.setPoster);
+  const posterTitle = usePosterStore((s) => s.posterTitle);
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
+
+  // Belt-and-braces noindex plus a real tab title. The authoritative
+  // noindex is the `X-Robots-Tag` response header in vercel.json,
+  // because a crawler that does not run scripts never sees anything
+  // this hook writes, and those are exactly the crawlers most likely to
+  // index a URL found in someone's public post. Shared posters are
+  // unpublished research and must never appear in a search result.
+  //
+  // imageUrl is null because there is nothing to point at yet: the page
+  // renders a live PosterEditor canvas, not a stored image. So share
+  // links currently unfurl WITHOUT a preview card — Slackbot and
+  // friends do not run JS and receive the plain app shell. Giving them
+  // a real card needs the Phase 1 edge shell reading
+  // `posters.thumbnail_path`; see docs/plans/2026-07-26-seo-plan.md.
+  useDocumentMeta(
+    status.kind === 'ready' ? shareMeta({ title: posterTitle, imageUrl: null }) : null,
+  );
 
   useEffect(() => {
     if (!slug) {

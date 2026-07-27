@@ -4,7 +4,50 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Postr</title>
+    <meta name="theme-color" content="#0a0a12" />
+
+    <!--
+      Defaults only. scripts/prerender.mjs overwrites title, description,
+      canonical and the OG block per route at build time, and
+      useDocumentMeta adopts and updates them at runtime. Anything left
+      here is what an un-prerendered route (and the app shell) falls back to.
+    -->
+    <title>Free Conference Poster Maker for Researchers | Postr</title>
+    <meta
+      name="description"
+      content="Free conference poster maker for researchers. Print-ready sizes, discipline-appropriate palettes, BibTeX citations. No signup, no paywall, no PowerPoint."
+    />
+    <meta property="og:site_name" content="Postr" />
+    <meta property="og:locale" content="en_US" />
+
+    <!--
+      Site-wide entity graph. Lands in every prerendered route and both
+      edge shells for free. WebSite is what drives Google's Site Name
+      feature; SearchAction is deliberately absent (the sitelinks
+      searchbox rich result was retired in 2024).
+    -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://www.postr.sh/#organization",
+            "name": "Postr",
+            "url": "https://www.postr.sh/",
+            "description": "Postr is a free web app for making academic conference posters."
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://www.postr.sh/#website",
+            "url": "https://www.postr.sh/",
+            "name": "Postr",
+            "publisher": { "@id": "https://www.postr.sh/#organization" },
+            "inLanguage": "en-US"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -1,6 +1,10 @@
 import { Link } from 'react-router-dom';
+import { NOT_FOUND_META } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 export default function NotFound() {
+  useDocumentMeta(NOT_FOUND_META);
+
   return (
     <main className="flex h-screen w-screen flex-col items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
       <h1 className="text-3xl font-semibold">404</h1>

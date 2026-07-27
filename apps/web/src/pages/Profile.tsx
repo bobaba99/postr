@@ -32,6 +32,8 @@ import {
   type GalleryEntryWithUrls,
 } from '@/data/gallery';
 import type { User } from '@supabase/supabase-js';
+import { APP_ROUTE_META } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 type ConfirmAction =
   | 'deletePosters'
@@ -40,6 +42,8 @@ type ConfirmAction =
   | null;
 
 export default function Profile() {
+  useDocumentMeta(APP_ROUTE_META['/profile'] ?? null);
+
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [posterCount, setPosterCount] = useState(0);

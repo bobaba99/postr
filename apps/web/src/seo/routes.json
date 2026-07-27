@@ -1,0 +1,107 @@
+{
+  "siteOrigin": "https://www.postr.sh",
+  "siteName": "Postr",
+  "locale": "en_US",
+  "themeColor": "#0a0a12",
+  "defaultOgImage": null,
+  "static": {
+    "/": {
+      "title": "Free Conference Poster Maker for Researchers | Postr",
+      "description": "Free conference poster maker for researchers. Print-ready sizes, discipline-appropriate palettes, BibTeX citations. No signup, no paywall, no PowerPoint.",
+      "robots": "index,follow",
+      "h1": "Conference posters, without the pain.",
+      "copy": [
+        "Postr is a free poster editor built for researchers. Pick a template, write with guidance, check your figures, share a link for comments, and export. No design skills needed, no paywall.",
+        "Smart templates: conference-ready layouts with discipline-specific palettes, and APA, SfN and ECNP size presets built in.",
+        "Figure readability: paste your R or Python plotting code and see whether the axis labels will still be readable at print size, with a copy-ready fix.",
+        "Writing guide: section-by-section tips, word count targets, and a checklist to follow from intro to conclusion."
+      ]
+    },
+    "/about": {
+      "title": "How Postr Works: Features for Academic Posters",
+      "description": "See how Postr handles authors and affiliations, BibTeX citations, Greek symbols, print sizing, and figure readability: the parts other poster tools get wrong.",
+      "robots": "index,follow",
+      "h1": "About Postr",
+      "copy": [
+        "Postr is a free academic poster editor for students and researchers. It exists because the usual tools were built for something else.",
+        "Enter institutions once, then click to assign them to authors. Superscript numbering stays in sync when you add or remove an affiliation.",
+        "Export a .bib from your reference manager and drop it in. Postr reads BibTeX, RIS and EndNote files and formats the reference list for you.",
+        "Every poster starts at a real print size, so what you see on screen is what the print shop produces."
+      ]
+    },
+    "/gallery": {
+      "title": "Academic Poster Gallery: Real Conference Posters | Postr",
+      "description": "Browse real conference posters published by researchers across neuroscience, psychology, medicine, biology and more. Free to view, free to make your own.",
+      "robots": "index,follow",
+      "h1": "Poster gallery",
+      "copy": [
+        "Real conference posters published by the researchers who made them, across neuroscience, psychology, medicine, biology, computer science, physics, chemistry, engineering, social sciences and the humanities.",
+        "Browse for layout ideas, figure sizing, and section structure that worked at a real conference, then build your own for free."
+      ]
+    },
+    "/privacy": {
+      "title": "Privacy Policy | Postr",
+      "description": "How Postr collects, stores, and protects your data, including anonymous sessions, poster documents, and cookies. Plain language, no dark patterns.",
+      "robots": "index,follow",
+      "h1": "Privacy Policy",
+      "copy": [
+        "How Postr collects, stores and protects your data, including anonymous sessions, the posters you create, and the cookies the app sets."
+      ]
+    },
+    "/cookies": {
+      "title": "Cookie Policy | Postr",
+      "description": "Which cookies Postr sets, why, and how to turn the optional ones off. Essential authentication cookies only unless you opt in.",
+      "robots": "index,follow",
+      "h1": "Cookies Policy",
+      "copy": [
+        "Which cookies Postr sets, why they exist, and how to turn the optional ones off. Postr sets essential authentication cookies only unless you opt in to anything more."
+      ]
+    },
+    "/terms": {
+      "title": "Terms of Service | Postr",
+      "description": "The terms that govern your use of Postr, including who owns the posters you create (you) and what we can and cannot do with them.",
+      "robots": "index,follow",
+      "h1": "Terms of Service",
+      "copy": [
+        "The terms that govern your use of Postr, including who owns the posters you create. You do."
+      ]
+    }
+  },
+  "app": {
+    "/auth": {
+      "title": "Sign in | Postr",
+      "description": "Sign in to Postr, or start a poster as a guest with no account.",
+      "robots": "noindex,nofollow"
+    },
+    "/dashboard": {
+      "title": "My posters | Postr",
+      "description": "Your Postr dashboard.",
+      "robots": "noindex,nofollow"
+    },
+    "/profile": {
+      "title": "Profile and settings | Postr",
+      "description": "Your Postr profile and settings.",
+      "robots": "noindex,nofollow"
+    },
+    "/debug": {
+      "title": "Debug | Postr",
+      "description": "Diagnostics.",
+      "robots": "noindex,nofollow"
+    },
+    "/admin/gallery": {
+      "title": "Gallery moderation | Postr",
+      "description": "Gallery moderation queue.",
+      "robots": "noindex,nofollow"
+    },
+    "/p": {
+      "title": "Poster editor | Postr",
+      "description": "The Postr poster editor.",
+      "robots": "noindex,nofollow"
+    },
+    "/404": {
+      "title": "Page not found | Postr",
+      "description": "That page does not exist.",
+      "robots": "noindex,nofollow"
+    }
+  }
+}

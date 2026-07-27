@@ -5,11 +5,13 @@
  * retracted, shows a friendly "not found" state rather than a 404
  * component, so the URL can be copy-pasted without dead-ending.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
 import { getGalleryEntry, labelForField, type GalleryEntryWithUrls } from '@/data/gallery';
+import { galleryEntryMeta } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 type Status =
   | { kind: 'loading' }
@@ -20,6 +22,27 @@ type Status =
 export default function GalleryEntryPage() {
   const { entryId } = useParams<{ entryId: string }>();
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
+
+  // Null until the entry resolves, so the tab title never flashes a
+  // wrong value and a crawler that renders JS never samples a
+  // half-populated head. Retracted and missing entries stay null too —
+  // they must not advertise themselves as indexable content.
+  const meta = useMemo(
+    () =>
+      status.kind === 'ready'
+        ? galleryEntryMeta({
+            id: status.entry.id,
+            title: status.entry.title,
+            fieldLabel: labelForField(status.entry.field),
+            conference: status.entry.conference,
+            year: status.entry.year,
+            notes: status.entry.notes,
+            imageUrl: status.entry.image_url,
+          })
+        : null,
+    [status],
+  );
+  useDocumentMeta(meta);
 
   useEffect(() => {
     if (!entryId) {

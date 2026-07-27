@@ -15,8 +15,30 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
+import { SITE_ORIGIN, STATIC_ROUTE_META } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
+
+/**
+ * Describes the product itself. `WebApplication` is the accurate type
+ * for a browser-based editor, and the free-tier offer is stated as
+ * structured data because "free" is the single most load-bearing claim
+ * on this page.
+ */
+const LANDING_JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: 'Postr',
+  url: `${SITE_ORIGIN}/`,
+  applicationCategory: 'DesignApplication',
+  operatingSystem: 'Any (web browser)',
+  description:
+    'A free web app for making academic conference posters, built for researchers and students.',
+  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  isAccessibleForFree: true,
+} as const;
 
 export default function Landing() {
+  useDocumentMeta(STATIC_ROUTE_META['/'] ?? null, LANDING_JSON_LD);
   const navigate = useNavigate();
 
   useEffect(() => {

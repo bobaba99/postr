@@ -13,6 +13,8 @@ import { Link } from 'react-router-dom';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
+import { STATIC_ROUTE_META } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 interface Milestone {
   id: string;
@@ -54,6 +56,8 @@ const MILESTONES: Milestone[] = [
 ];
 
 export default function About() {
+  useDocumentMeta(STATIC_ROUTE_META['/about'] ?? null);
+
   const openFeedback = useFeedbackStore((s) => s.open);
 
   return (

@@ -1,0 +1,67 @@
+# https://www.postr.sh/robots.txt
+# Postr — free conference poster maker.
+
+# ── Default: crawl allowed; indexation controlled by header ─────────
+# Nothing is disallowed for general crawlers, on purpose.
+#
+# Every private route (/s/, /dashboard, /p/, /profile, /admin, /auth,
+# /debug) carries `X-Robots-Tag: noindex, nofollow` from vercel.json,
+# and that header is the enforcement. A Disallow here would defeat it:
+# a blocked crawler never fetches the page, so it never learns the page
+# is noindex, and a URL discovered from an external link can still be
+# indexed as a bare listing. Allow the crawl, forbid the index.
+#
+# For /s/ (share links) there is a second reason. Slackbot, Twitterbot
+# and LinkedInBot honour robots.txt, so disallowing /s/ would kill the
+# link previews that are the core sharing loop.
+#
+# These routes are all cheap to crawl — they return the same small app
+# shell — so the crawl-budget cost of allowing them is negligible.
+# Do not "tidy this up" by adding Disallow lines.
+User-agent: *
+Allow: /
+
+# ── AI crawlers: allowed on purpose, EXCEPT on user posters ─────────
+# Postr is free and there is no monetisable content to protect — the
+# site is the pitch. Blocking these guarantees Postr is never the
+# answer when someone asks an assistant what to use instead of
+# PowerPoint. Share links are in-progress research and are off limits.
+User-agent: GPTBot
+User-agent: OAI-SearchBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-SearchBot
+User-agent: Claude-User
+User-agent: PerplexityBot
+User-agent: Perplexity-User
+User-agent: Google-Extended
+User-agent: Applebot-Extended
+User-agent: CCBot
+User-agent: Amazonbot
+User-agent: Meta-ExternalAgent
+Allow: /
+Disallow: /s/
+Disallow: /dashboard
+Disallow: /p/
+Disallow: /profile
+Disallow: /admin
+Disallow: /auth
+Disallow: /debug
+
+# Two notes on why this group looks different from `*` above.
+#
+# 1. It uses Disallow where `*` does not, and that is deliberate: the
+#    goal here is to keep private content out of training corpora and
+#    retrieval, not to keep it out of a search index. Disallow is the
+#    right tool for exclusion; X-Robots-Tag is the right tool for
+#    deindexing. Different objective, different mechanism.
+#
+# 2. A crawler that matches a specific group ignores the `*` group
+#    entirely, so nothing is inherited and every rule has to be
+#    restated here. Do not shorten it.
+
+# ── Blocked: high volume, poor compliance, no citation upside ───────
+User-agent: Bytespider
+Disallow: /
+
+Sitemap: https://www.postr.sh/sitemap.xml

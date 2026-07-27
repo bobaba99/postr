@@ -14,6 +14,7 @@
  *   /profile            → Profile (auth-gated)
  *   /admin/gallery      → Admin gallery moderation (admin-gated, code-split)
  *   /s/:slug            → Share (public read-only)
+ *   /debug              → Diagnostics (development builds only)
  *   *                   → 404
  *
  * ── Code splitting ───────────────────────────────────────────────
@@ -71,7 +72,13 @@ export function AppRoutes() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/cookies" element={<Cookies />} />
         <Route path="/terms" element={<Terms />} />
-        <Route path="/debug" element={<Debug />} />
+        {/*
+          Dev only. This was publicly routable with no guard, which put
+          a diagnostics page in the crawlable URL space and shipped it
+          to every visitor. Gating on import.meta.env.DEV also lets the
+          bundler drop the Debug chunk from production builds entirely.
+        */}
+        {import.meta.env.DEV && <Route path="/debug" element={<Debug />} />}
         <Route path="/auth" element={<Auth />} />
         <Route path="/s/:slug" element={<Share />} />
 

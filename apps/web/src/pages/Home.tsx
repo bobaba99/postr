@@ -25,6 +25,8 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { PublicFooter } from '@/components/PublicFooter';
 import { checkIsGalleryAdmin } from '@/data/gallery';
+import { APP_ROUTE_META } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 type Status =
   | { kind: 'loading' }
@@ -32,6 +34,8 @@ type Status =
   | { kind: 'error'; message: string };
 
 export default function Home() {
+  useDocumentMeta(APP_ROUTE_META['/dashboard'] ?? null);
+
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
   const [actionError, setActionError] = useState<string | null>(null);
