@@ -83,6 +83,23 @@ export default function Landing() {
             Try as guest
           </Link>
         </div>
+
+        {/*
+          Small-screen notice. The editor is a fixed-canvas drag surface
+          with a sidebar — usable on a phone only in the sense that it
+          renders. Saying so here, before someone signs up, is cheaper
+          for them than discovering it in the editor. Mirrors the
+          dashboard notice in Home.tsx; both go when the editor is
+          genuinely responsive.
+        */}
+        <p
+          role="note"
+          className="postr-rise-in mx-auto mt-8 max-w-[46ch] rounded-lg border border-[#2a2a3a] bg-[#111118] px-4 py-3 text-sm leading-relaxed text-[#8b8f99] sm:hidden"
+        >
+          <strong className="font-semibold text-[#c8cad0]">Best on a laptop.</strong>{' '}
+          The editor needs a bigger screen to drag blocks and see your poster at
+          full size. The chart chooser and figure checker work fine on a phone.
+        </p>
       </section>
 
       <section className="mx-auto w-full max-w-4xl flex-1 px-8 pb-24">
