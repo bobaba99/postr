@@ -43,6 +43,49 @@ export function classifyHeading(heading: string): SectionKind {
   return 'other';
 }
 
+/** Function words a real heading may carry around its section term
+ *  ("Materials and Methods", "Results and Discussion", "The Present
+ *  Study"). Anything outside this set is prose vocabulary. */
+const HEADING_FILLER =
+  /^(and|or|of|the|a|an|in|on|for|to|with|study|studies|section|part|chapter|our|present|information|statement|data|note|notes)$/i;
+
+/**
+ * True when a lexicon match describes the WHOLE line rather than
+ * appearing incidentally inside a sentence.
+ *
+ * `classifyHeading` matches its patterns anywhere in the string, which
+ * is right for a known heading but wrong as a heading *detector*: a
+ * hard-wrapped prose line like "The results showed a clear dose-
+ * response" contains "results" and would otherwise be promoted to a
+ * section heading, fabricating sections and misrouting the real
+ * Methods/Results text away from the mapper.
+ *
+ * A genuine heading is (near-)entirely its section term plus filler:
+ * "Materials and Methods" yes, "and the background literature is
+ * extensive" no.
+ */
+function lexiconDominatesLine(trimmed: string): boolean {
+  const kind = classifyHeading(trimmed);
+  if (kind === 'other') return false;
+  const cleaned = stripHeadingMarkers(trimmed).replace(/[:.]$/, '');
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  // Headings are terse. Beyond five words this is a sentence fragment.
+  if (words.length === 0 || words.length > 5) return false;
+  // Strip everything the lexicon itself claims, plus filler. A genuine
+  // heading has nothing left over ("Materials and Methods" → ""); prose
+  // does ("The results showed a clear dose-response" → "showed clear
+  // dose-response"). Matching against the whole pattern set, not per
+  // word, keeps multi-word terms like "Literature Review" intact.
+  const residue = KIND_PATTERNS.reduce(
+    (text, [, pattern]) => text.replace(new RegExp(pattern.source, 'gi'), ' '),
+    cleaned,
+  );
+  return residue
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((word) => HEADING_FILLER.test(word));
+}
+
 /** True when a standalone text line reads like a section heading.
  *  Used by the pasted-text parser, which has no style information. */
 export function looksLikeHeading(line: string): boolean {
@@ -56,8 +99,14 @@ export function looksLikeHeading(line: string): boolean {
   if (/[.!?]$/.test(trimmed) && !/^\d+(\.\d+)*\.$/.test(trimmed)) {
     return false;
   }
+  // An explicit markdown hash is an unambiguous author signal.
   if (/^#+\s+/.test(trimmed)) return true;
-  if (classifyHeading(trimmed) !== 'other') return true;
+  // A lowercase opening word is prose continuing across a hard wrap —
+  // real headings are capitalised. Checked before the lexicon so
+  // "discussion of these findings follows" cannot slip through.
+  const firstLetter = trimmed.match(/[A-Za-z]/)?.[0];
+  if (firstLetter && firstLetter === firstLetter.toLowerCase()) return false;
+  if (lexiconDominatesLine(trimmed)) return true;
   // Numbered heading with an unknown label ("3. Stimuli").
   if (/^\d+(\.\d+)*[.)]\s+\S/.test(trimmed)) return true;
   // SHORT ALL-CAPS LINE (≥4 letters so "DNA" alone doesn't trigger).
