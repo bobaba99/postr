@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import { fireEvent, render, screen } from '@testing-library/react';
-import ManuscriptToPoster from '../../pages/ManuscriptToPoster';
+import PaperToPoster from '../../pages/PaperToPoster';
 
 const MANUSCRIPT = `Sleep Duration and Recall Accuracy in Undergraduate Students
 
@@ -33,12 +33,12 @@ Even moderate restriction measurably impairs recall, which should inform how uni
 function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/manuscript-to-poster']}>
-      <ManuscriptToPoster />
+      <PaperToPoster />
     </MemoryRouter>,
   );
 }
 
-describe('ManuscriptToPoster page', () => {
+describe('PaperToPoster page', () => {
   it('greets with the paste prompt and a docx upload affordance', () => {
     renderPage();
     expect(screen.getByText(/paste your manuscript below/i)).toBeInTheDocument();

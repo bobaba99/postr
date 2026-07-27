@@ -66,6 +66,19 @@ const CLIENT_ROUTES = [
   '/admin/gallery',
 ];
 
+/**
+ * Slug aliases: [alias, canonical]. Each standalone tool has exactly
+ * one indexed URL; every other spelling must 308 to it rather than
+ * render a duplicate. /manuscript-to-poster especially — that URL is
+ * live in production and in the sitemap, so losing its redirect turns
+ * an indexed page into a 404.
+ */
+const ALIAS_REDIRECTS: Array<[string, string]> = [
+  ['/plot-picker', '/chart-chooser'],
+  ['/manuscript-to-poster', '/paper-to-poster'],
+  ['/paper-to-present', '/paper-to-poster'],
+];
+
 /** Paths that must fall through to the platform 404. */
 const UNKNOWN_PATHS = [
   '/wp-admin',
@@ -104,6 +117,18 @@ function concretePathFor(route: string): string {
 
 function rewriteMatching(path: string): Rewrite | undefined {
   return rewrites.find((rewrite) => sourceToRegExp(rewrite.source).test(path));
+}
+
+/**
+ * Path-only redirects that would fire for `path`. Host-conditional
+ * entries (the apex → www rule) are excluded: they match every path by
+ * design and would drown out the signal these assertions look for.
+ */
+function pathRedirectsMatching(path: string): Redirect[] {
+  return redirects.filter(
+    (redirect) =>
+      redirect.has === undefined && sourceToRegExp(redirect.source).test(path),
+  );
 }
 
 describe('vercel.json rewrites', () => {
@@ -154,6 +179,19 @@ describe('vercel.json rewrites', () => {
     const match = rewriteMatching('/s/some-slug');
     expect(match?.destination).toBe('/api/shell/share');
   });
+
+  it('does not rewrite alias slugs (they must redirect, not render)', () => {
+    // A rewrite here would serve the canonical document at the alias
+    // URL with a 200, producing two indexable URLs for one page —
+    // exactly the duplication the redirects exist to prevent.
+    for (const [alias] of ALIAS_REDIRECTS) {
+      const match = rewriteMatching(alias);
+      expect(
+        match,
+        `${alias} is rewritten to ${match?.destination} — it must 308 instead`,
+      ).toBeUndefined();
+    }
+  });
 });
 
 describe('vercel.json redirects', () => {
@@ -168,6 +206,52 @@ describe('vercel.json redirects', () => {
     expect(apex?.permanent).toBe(true);
     expect(apex?.source).toBe('/:path*');
     expect(apex?.destination).toBe('https://www.postr.sh/:path*');
+  });
+
+  it.each(ALIAS_REDIRECTS)(
+    '%s permanently redirects to %s',
+    (alias, canonical) => {
+      const matches = pathRedirectsMatching(alias);
+      const match = matches.find((r) => r.source === alias);
+      expect(match, `${alias} has no redirect — it would 404`).toBeDefined();
+      expect(
+        match?.destination,
+        `${alias} must point at the canonical URL`,
+      ).toBe(canonical);
+      // 301/308 only. A 302 leaves the alias indexable and splits the
+      // link equity this consolidation exists to gather.
+      expect(match?.permanent, `${alias} must be a permanent redirect`).toBe(
+        true,
+      );
+    },
+  );
+
+  it.each(ALIAS_REDIRECTS)(
+    '%s points at a real prerendered page, not another redirect',
+    (_alias, canonical) => {
+      expect(
+        PRERENDERED.has(canonical),
+        `${canonical} is not in routes.json static — the alias would redirect to a 404`,
+      ).toBe(true);
+      expect(
+        pathRedirectsMatching(canonical),
+        `${canonical} is itself redirected — that is a redirect chain`,
+      ).toEqual([]);
+    },
+  );
+
+  it('does not shadow prerendered routes with redirects', () => {
+    // Redirects are evaluated BEFORE the filesystem check, so a
+    // redirect whose source matches a prerendered route would take the
+    // canonical page off the air entirely — a far louder failure than
+    // the equivalent rewrite bug, and worth its own assertion.
+    for (const route of PRERENDERED) {
+      const matches = pathRedirectsMatching(route);
+      expect(
+        matches,
+        `${route} is prerendered but a redirect matches it — the page would never be served`,
+      ).toEqual([]);
+    }
   });
 });
 

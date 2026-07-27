@@ -9,6 +9,17 @@
       "has": [{ "type": "host", "value": "postr.sh" }],
       "destination": "https://www.postr.sh/:path*",
       "permanent": true
+    },
+    { "source": "/plot-picker", "destination": "/chart-chooser", "permanent": true },
+    {
+      "source": "/manuscript-to-poster",
+      "destination": "/paper-to-poster",
+      "permanent": true
+    },
+    {
+      "source": "/paper-to-present",
+      "destination": "/paper-to-poster",
+      "permanent": true
     }
   ],
   "rewrites": [

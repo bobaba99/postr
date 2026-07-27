@@ -30,7 +30,7 @@ echo "Verifying prerender at ${BASE}"
 echo
 
 echo "Prerendered routes carry real HTML:"
-for route in "" about chart-chooser privacy cookies terms; do
+for route in "" about chart-chooser paper-to-poster privacy cookies terms; do
   url="${BASE}/${route}"
   body="$(curl -sL --max-time 20 "$url")"
   bytes="${#body}"
@@ -118,6 +118,34 @@ for route in wp-admin asdf random/deep/path.php debug; do
     fail "/${route} → 404 but the body is not dist/404.html"
   fi
 done
+
+echo
+echo "Slug aliases 308 to their canonical page:"
+# /manuscript-to-poster is the load-bearing one: it is live in
+# production and listed in the deployed sitemap, so if this redirect
+# ever goes missing an indexed URL starts returning 404.
+check_alias() {
+  alias_path="$1"
+  canonical="$2"
+  code="$(curl -s -o /dev/null --max-time 20 -w '%{http_code}' "${BASE}${alias_path}")"
+  case "$code" in
+    308|301) ;;
+    *)
+      fail "${alias_path} → ${code} (expected 308/301 to ${canonical})"
+      return
+      ;;
+  esac
+  location="$(curl -sI --max-time 20 "${BASE}${alias_path}" | tr -d '\r' |
+    awk -F': ' 'tolower($1)=="location"{print $2}' | tail -1)"
+  case "$location" in
+    *"${canonical}") pass "${alias_path} → ${code} ${location}" ;;
+    *) fail "${alias_path} → ${code} but Location is '${location}', expected ${canonical}" ;;
+  esac
+}
+
+check_alias /plot-picker /chart-chooser
+check_alias /manuscript-to-poster /paper-to-poster
+check_alias /paper-to-present /paper-to-poster
 
 echo
 echo "Apex redirect is permanent:"

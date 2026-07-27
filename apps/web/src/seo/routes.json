@@ -68,13 +68,13 @@
         "The terms that govern your use of Postr, including who owns the posters you create. You do."
       ]
     },
-    "/manuscript-to-poster": {
-      "title": "Turn a Manuscript into a Conference Poster | Postr",
-      "description": "Paste your manuscript or upload a Word document, answer a few short questions about emphasis, and download a poster draft as a PDF or an editable Postr file.",
+    "/paper-to-poster": {
+      "title": "Paper to Poster: Turn a Manuscript into One | Postr",
+      "description": "Turn a paper into a conference poster. Paste your manuscript or upload a Word document, answer a few short questions, and download a poster draft as a PDF.",
       "robots": "index,follow",
-      "h1": "From manuscript to poster",
+      "h1": "From paper to poster",
       "copy": [
-        "Paste your manuscript or upload a .docx, answer a few short questions about what to emphasise, and download a poster draft — no editor session required.",
+        "Turn a paper into a conference poster draft. Paste your manuscript or upload a .docx, answer a few short questions about what to emphasise, and download the poster — no editor session required.",
         "The draft follows the structure conference posters actually need: a hook, the research question, only the methods a reader needs to trust the result, one to three key findings, and a take-home message, each with a hard word budget.",
         "You choose the emphasis: the finding to lead with, the audience, what the poster is for, and any section that must not be cut.",
         "Check the outline before you download — every panel shows which manuscript section it came from. Export a print-ready PDF, or a .postr file to keep editing in Postr."

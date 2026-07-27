@@ -49,10 +49,33 @@ describe('STATIC_ROUTE_META', () => {
       '/about',
       '/chart-chooser',
       '/cookies',
-      '/manuscript-to-poster',
+      '/paper-to-poster',
       '/privacy',
       '/terms',
     ]);
+  });
+
+  it('/paper-to-poster promises no slide output — that conversion does not exist', () => {
+    // This flow emits a poster draft (PDF / .postr) only, and
+    // /paper-to-present redirects here purely to reserve the slug —
+    // so visitors arriving from that URL must not be told a deck is
+    // waiting at the end of it.
+    //
+    // Scoped to this one route on purpose. A site-wide ban on the word
+    // "PowerPoint" would fire on the landing page's "no PowerPoint",
+    // which is a disclaimer about what Postr replaces, not a promise.
+    const meta = STATIC_ROUTE_META['/paper-to-poster'];
+    const copy = staticCopyFor('/paper-to-poster');
+    const text = [
+      meta?.title ?? '',
+      meta?.description ?? '',
+      copy?.h1 ?? '',
+      ...(copy?.copy ?? []),
+    ].join(' ');
+
+    expect(text).not.toMatch(
+      /\b(slide|slides|slide deck|powerpoint|pptx|presentation deck|keynote)\b/i,
+    );
   });
 
   it.each(entries)('%s is indexable and carries preview directives', (_p, meta) => {

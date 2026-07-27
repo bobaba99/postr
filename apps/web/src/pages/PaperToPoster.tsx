@@ -1,9 +1,15 @@
 /**
- * /manuscript-to-poster — the standalone route. Upload in, file out:
+ * /paper-to-poster — the standalone route. Upload in, file out:
  * paste a manuscript (or drop a .docx), answer the scripted questions,
  * check the editable outline, download the poster as a PDF or a
  * `.postr` file. No editor step required — opening in the editor is an
  * option, not part of the loop.
+ *
+ * Slug history: shipped as `/manuscript-to-poster`, renamed to
+ * `/paper-to-poster` on 2026-07-27 against measured keyword data
+ * ("paper to poster" 140/mo · KD 0 · transactional). The old URL and
+ * `/paper-to-present` both 308 here — see vercel.json and routes.tsx.
+ * Output is a poster draft only; there is no slide/deck export.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CondensedNarrative } from '@postr/shared';
@@ -43,8 +49,8 @@ const MIN_MANUSCRIPT_WORDS = 50;
 
 type Phase = 'interview' | 'condensing' | 'ready' | 'condense-error';
 
-export default function ManuscriptToPoster() {
-  useDocumentMeta(STATIC_ROUTE_META['/manuscript-to-poster'] ?? null);
+export default function PaperToPoster() {
+  useDocumentMeta(STATIC_ROUTE_META['/paper-to-poster'] ?? null);
 
   const [interview, setInterview] = useState<InterviewState>(createInterview);
   const [phase, setPhase] = useState<Phase>('interview');

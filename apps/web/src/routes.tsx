@@ -4,12 +4,15 @@
  *   /                   → Landing (public)
  *   /about              → About (public, feature tour)
  *   /chart-chooser      → Chart chooser (public, no session, code-split)
+ *   /plot-picker        → redirect to /chart-chooser (alias)
  *   /gallery            → redirect to / (public gallery deactivated)
  *   /gallery/:entryId   → redirect to / (public gallery deactivated)
  *   /privacy            → Privacy Policy (public)
  *   /cookies            → Cookies Policy (public)
  *   /terms              → Terms of Service (public)
- *   /manuscript-to-poster → Manuscript→poster standalone flow (public, code-split)
+ *   /paper-to-poster    → Paper→poster standalone flow (public, code-split)
+ *   /manuscript-to-poster → redirect to /paper-to-poster (old live URL)
+ *   /paper-to-present   → redirect to /paper-to-poster (reserved alias)
  *   /auth               → Auth (sign in / sign up / guest)
  *   /dashboard          → My Posters (auth-gated)
  *   /p/:posterId        → Editor (auth-gated, code-split)
@@ -25,6 +28,25 @@
  * pages/GalleryEntry.tsx), the data layer (data/gallery.ts), the
  * admin moderation page (/admin/gallery) and the database all remain
  * so it can be switched back on by restoring the two routes below.
+ *
+ * ── Slug aliases: one canonical URL, permanent redirects ─────────
+ * Each standalone tool has exactly ONE indexed URL. Alternate spellings
+ * redirect rather than render, so no two URLs serve the same document.
+ *
+ *   /chart-chooser  canonical  ("chart chooser" 40/mo · KD 0)
+ *     ← /plot-picker           (our internal name; no measured volume,
+ *                               but the owner asked for the URL)
+ *   /paper-to-poster canonical ("paper to poster" 140/mo · KD 0)
+ *     ← /manuscript-to-poster  (the previously live URL — it is in the
+ *                               production sitemap and must not 404)
+ *     ← /paper-to-present      (reserved; note this flow outputs a
+ *                               poster draft, never slides)
+ *
+ * The <Navigate replace> entries below only cover in-app navigation.
+ * A cold hit on an alias never reaches this router: vercel.json issues
+ * a real 308 first, which is what crawlers need to consolidate link
+ * equity onto the canonical. Both layers must be kept in sync — the
+ * contract is locked by src/seo/__tests__/vercelRouting.test.ts.
  *
  * ── Code splitting ───────────────────────────────────────────────
  * The poster editor is by far the heaviest chunk in the app: it
@@ -62,9 +84,9 @@ const AdminGallery = lazy(() => import('@/pages/AdminGallery'));
 // lazily Observable Plot beyond that), none of which belongs in the
 // marketing-page bundle.
 const ChartChooserPage = lazy(() => import('@/pages/ChartChooser'));
-// Standalone manuscript→poster flow — pulls in the ingest parsers and
+// Standalone paper→poster flow — pulls in the ingest parsers and
 // block renderers, so it loads on demand like the editor.
-const ManuscriptToPoster = lazy(() => import('@/pages/ManuscriptToPoster'));
+const PaperToPoster = lazy(() => import('@/pages/PaperToPoster'));
 
 function LazyFallback() {
   return (
@@ -90,7 +112,17 @@ export function AppRoutes() {
         {/* Standalone chart chooser — public, indexable, and creates
             no Supabase session (not even anonymous) on load. */}
         <Route path="/chart-chooser" element={<ChartChooserPage />} />
-        <Route path="/manuscript-to-poster" element={<ManuscriptToPoster />} />
+        <Route path="/paper-to-poster" element={<PaperToPoster />} />
+        {/* Alias redirects — see the "Slug aliases" note in the header. */}
+        <Route path="/plot-picker" element={<Navigate to="/chart-chooser" replace />} />
+        <Route
+          path="/manuscript-to-poster"
+          element={<Navigate to="/paper-to-poster" replace />}
+        />
+        <Route
+          path="/paper-to-present"
+          element={<Navigate to="/paper-to-poster" replace />}
+        />
         {/*
           Dev only. This was publicly routable with no guard, which put
           a diagnostics page in the crawlable URL space and shipped it
