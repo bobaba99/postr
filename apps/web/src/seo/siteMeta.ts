@@ -24,11 +24,13 @@ export const THEME_COLOR = routes.themeColor;
 /**
  * Site-wide fallback social card, or null when none exists.
  *
- * Null today, deliberately. Because of the catch-all rewrite, a URL for
- * an image that does not exist returns 200 with the HTML shell rather
- * than a 404 — so pointing og:image at a missing file gives unfurlers
- * an HTML document and they drop the card. No card beats a broken one.
- * Set this once a real 1200x630 asset ships in public/og/.
+ * The value must be a root-relative path to a real file in `public/`
+ * (today the 1200x630 card written by `scripts/rasterize-brand.mjs`).
+ * Because of the catch-all rewrite, a URL for an image that does not
+ * exist returns 200 with the HTML shell rather than a 404 — so pointing
+ * og:image at a missing file gives unfurlers an HTML document and they
+ * drop the card. No card beats a broken one: if the asset ever goes
+ * away, set this back to null rather than leaving a dangling path.
  */
 export const DEFAULT_OG_IMAGE: string | null = routes.defaultOgImage;
 

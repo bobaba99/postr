@@ -47,14 +47,24 @@ describe('useDocumentMeta', () => {
 
   describe('card type follows whether an image actually exists', () => {
     it('omits image tags and downgrades the card when there is none', () => {
-      // No default OG asset ships yet, so pointing og:image anywhere
-      // would point it at the SPA shell (the catch-all returns 200 HTML
-      // for missing files) and unfurlers would drop the card entirely.
-      render(<Probe meta={about} />);
+      // An og:image pointing at a missing file would point at the SPA
+      // shell (the catch-all returns 200 HTML for missing files) and
+      // unfurlers would drop the card entirely — so a route without an
+      // image must emit no image tags at all.
+      render(<Probe meta={{ ...about, ogImage: null, ogImageAlt: null }} />);
 
       expect(count('meta[property="og:image"]')).toBe(0);
       expect(count('meta[name="twitter:image"]')).toBe(0);
       expect(content('meta[name="twitter:card"]')).toBe('summary');
+    });
+
+    it('points indexable routes at the site-wide OG card', () => {
+      render(<Probe meta={about} />);
+
+      expect(content('meta[property="og:image"]')).toBe(
+        'https://www.postr.sh/og-card.png',
+      );
+      expect(content('meta[name="twitter:card"]')).toBe('summary_large_image');
     });
 
     it('uses the large card when a real image is supplied', () => {

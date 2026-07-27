@@ -3,7 +3,7 @@
   "siteName": "Postr",
   "locale": "en_US",
   "themeColor": "#0a0a12",
-  "defaultOgImage": null,
+  "defaultOgImage": "/og-card.png",
   "static": {
     "/": {
       "title": "Free Conference Poster Maker for Researchers | Postr",
