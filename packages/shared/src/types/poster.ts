@@ -14,7 +14,8 @@ export type BlockType =
   | 'image'
   | 'logo'
   | 'table'
-  | 'references';
+  | 'references'
+  | 'chart';
 
 export type ImageFit = 'contain' | 'cover' | 'fill';
 
@@ -90,6 +91,70 @@ export interface TableData {
   customBorder?: CustomTableBorder;
 }
 
+/**
+ * Chart forms the plot picker can produce. The set mirrors the
+ * data-shape → form table in docs/plans/2026-07-23-plot-picker-design.md
+ * §3 — deterministic recommender, no free-form chart config.
+ */
+export type ChartForm =
+  | 'bar'
+  | 'bar-grouped'
+  | 'bar-stacked'
+  | 'bar-diverging'
+  | 'line'
+  | 'area'
+  | 'scatter'
+  | 'histogram'
+  | 'box'
+  | 'heatmap'
+  | 'dumbbell';
+
+export interface ChartColumnDef {
+  name: string;
+  kind: 'number' | 'category' | 'date';
+}
+
+/**
+ * Self-contained chart definition stored on a `chart` block. Lives
+ * inside `posters.data` JSONB like every other block — no migration.
+ *
+ * Size caps (enforced at creation time, not here): ≤ 2,000 rows and
+ * ≤ 200 KB serialized — a deliberate guard against the base64-in-JSONB
+ * performance mistake paid for once already.
+ *
+ * Colors are palette *slots* (e.g. 'accent', 'accent2'), not hex.
+ * The renderer resolves slots against `PosterDoc.palette` at render
+ * time so restyling the poster restyles every chart. Slot order is
+ * fixed per chart: series identity is stable — filtering or
+ * re-forming never recolors survivors.
+ */
+export interface ChartSpec {
+  version: 1;
+  form: ChartForm;
+  data: {
+    columns: ChartColumnDef[];
+    /** Row-major values, aligned with `columns`. */
+    rows: (string | number | null)[][];
+  };
+  encoding: {
+    x?: string;
+    y?: string;
+    series?: string;
+    value?: string;
+  };
+  options: {
+    legend: boolean;
+    sort: 'value' | 'label' | 'none';
+    horizontal: boolean;
+    directLabel: 'auto' | 'none';
+  };
+  /** Palette slot names resolved against `PosterDoc.palette`. */
+  paletteSlots: string[];
+  title?: string;
+  xLabel?: string;
+  yLabel?: string;
+}
+
 export interface Block {
   id: string;
   type: BlockType;
@@ -105,6 +170,13 @@ export interface Block {
   imageSrc: string | null;
   imageFit: ImageFit;
   tableData: TableData | null;
+  /**
+   * Chart definition for `chart` blocks. Optional (rather than
+   * `ChartSpec | null` like `tableData`) so every block created
+   * before charts existed remains valid without a migration.
+   * Undefined / null on non-chart blocks.
+   */
+  chartSpec?: ChartSpec | null;
   /**
    * Rotation in degrees, clockwise, around the block's center.
    * Optional — undefined or 0 means axis-aligned (the default for
