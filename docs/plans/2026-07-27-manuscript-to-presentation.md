@@ -292,27 +292,61 @@ rendering stays in code. This keeps the expensive surface bounded and the output
 
 ### 5.1 Pricing and business model — DECIDED 2026-07-27
 
-**$7.00 / month, unlimited** (soft cap ~50 decks/month) · **$4.99 for 3 decks**, one-off.
+**$19 per 4-month term** (soft cap ~50 decks/term) · **$4.99 for 3 decks**, one-off.
+
+**Term billing, not monthly — decided 2026-07-27 after a churn sensitivity test.** A $7/month
+plan was modelled first and rejected: its viability rested entirely on a 4-month subscriber
+lifetime, which was the weakest assumption in the model. At a 1-month lifetime — the honest
+expectation for a *"one deck for one conference"* user — blended LTV collapses from $12.75 to
+**$5.16**, making a monthly subscription barely distinguishable from a single sale while carrying
+subscription overhead. Term billing removes the dependency instead of betting on it.
+
+| | Net after Stripe | Break-even @1% conv |
+|---|---|---|
+| $7/month | $6.50/mo | 1,600 MAU |
+| **$19 / 4-month term** | ~$18.15 | **~1,400 MAU** |
+| $49/year | $47.28 | 2,600 MAU |
+
+Three reasons this is the defensible tier:
+
+1. **It matches the real usage cycle.** Academic work runs in terms — a conference in March, a
+   committee meeting in May, a defence in autumn. Monthly billing invites cancel-after-one-month;
+   a term is a unit users already think in.
+2. **BioRender validates the exact shape** — their undergraduate plan is **$20 per 4-month cycle**
+   (~$5/mo), for an audience that overlaps almost entirely with Postr's and a tool in the same
+   workflow. $19/term is $4.75/mo, deliberately at or under that, since Postr is narrower in scope.
+3. **One Stripe fee per term instead of four.** $0.60/year in fixed fees versus $1.20. Given fees
+   already run ~2× LLM spend (§5.1.2), that is a real saving rather than a rounding error.
+
+**Calendar caveat:** "4-month term" is the unit, not "semester" — institutions differ (semesters,
+trimesters, quarters, UK terms). Bill a **rolling 4 months from purchase**, never an academic
+calendar, so the product does not have to model every institution's timetable. Say "4 months" in
+the UI; "semester" only ever as an aside.
+
+Annual ($49) is **not offered at launch**: it needs 2,600 MAU to break even and asks a student to
+commit twelve months to a tool they use in bursts. Revisit as a discount once retention data exists.
+
+~~$7.00 / month, unlimited~~ (superseded — retained for the reasoning trail).
 
 Modelled against the measured per-deck cost: **$0.056 typical**, $0.092 worst case (top-tier
 first generation + 6 cached iterations + one theme call).
 
 | | Net after Stripe | Cost at typical use | Margin |
 |---|---|---|---|
-| $7.00/mo, 5 decks | $6.50 | $0.28 | **95.7%** |
-| $7.00/mo, 10 decks | $6.50 | $0.56 | **91.4%** |
-| $7.00/mo, 50 decks | $6.50 | $2.80 | 56.9% |
+| $19/term, 12 decks | $18.15 | $0.67 | **96.3%** |
+| $19/term, 24 decks | $18.15 | $1.34 | **92.6%** |
+| $19/term, 50 decks (cap) | $18.15 | $2.80 | 84.6% |
 | $4.99 pack, 3 decks | $4.55 | $0.17 | **96.3%** |
 
-**The pack must stay cheaper than one month of subscription.** An earlier proposal of $10.99
-for 3 was rejected on this basis: at $3.66/deck against the subscription's $2.33/deck at the
-same volume, a rational one-off buyer would take the $7 subscription and cancel, so the pack
-would only ever sell to people who did not compare. At $4.99 ($1.66/deck) the pack has a real
-reason to exist — no recurring charge, nothing to remember to cancel — which fits the
-"one symposium, one deck" user the SEO plan identifies as the dominant academic pattern.
+**The pack must stay cheaper than a term.** An earlier proposal of $10.99 for 3 was rejected on
+this basis: it cost more per deck than subscribing, so a rational one-off buyer would subscribe
+and cancel, and the pack would only ever sell to people who did not compare. At $4.99 ($1.66/deck,
+versus $19 for a term) the pack has a real reason to exist — no recurring charge, nothing to
+remember to cancel — which fits the "one symposium, one deck" user the SEO plan identifies as the
+dominant academic pattern.
 
-**The soft cap is about abuse, not researchers.** Break-even on the subscription is ~116 decks
-per month (70 in the worst case), which no real user approaches. But accounts are anonymous-
+**The soft cap is about abuse, not researchers.** Break-even on a term is ~324 decks (198 in the
+worst case), which no real user approaches. But accounts are anonymous-
 first and cheap to create, so "unlimited" is a promise made to scripts as well as people. A
 ~50/month soft cap with a contact route above it keeps the word honest for humans while
 bounding the downside.
