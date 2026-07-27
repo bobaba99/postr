@@ -19,6 +19,7 @@
 import type { ChartColumnDef, ChartSpec } from '@postr/shared';
 import type { InferredColumn, InferredTable } from './inferColumns';
 import type { Recommendation } from './recommend';
+import { SAMPLE_CAPTION_PREFIX } from './sampleData';
 
 export const CHART_MAX_SPEC_BYTES = 200_000;
 
@@ -355,7 +356,26 @@ export function buildChartSpec(table: InferredTable, rec: Recommendation): Chart
 
 const lower = (s: string): string => (s.length > 0 ? s.charAt(0).toLowerCase() + s.slice(1) : s);
 
-export function captionFor(table: InferredTable, rec: Recommendation): string {
+export interface CaptionOptions {
+  /**
+   * True when the values were synthesised rather than measured. The
+   * caption is then prefixed with SAMPLE_CAPTION_PREFIX so the
+   * warning travels with the figure into the block's caption field —
+   * nobody should be able to mistake a sample for their results.
+   */
+  sample?: boolean;
+}
+
+export function captionFor(
+  table: InferredTable,
+  rec: Recommendation,
+  options: CaptionOptions = {},
+): string {
+  const body = captionBody(table, rec);
+  return options.sample ? `${SAMPLE_CAPTION_PREFIX} ${body}` : body;
+}
+
+function captionBody(table: InferredTable, rec: Recommendation): string {
   const { form, roles, aggregate } = rec;
   const m = roles.measure?.name ?? 'Value';
   const cat = roles.cat1?.name ?? 'group';

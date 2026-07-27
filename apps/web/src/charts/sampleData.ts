@@ -17,7 +17,24 @@
  * data-shape table exercises the ranking logic end-to-end.
  */
 import type { ChartForm } from '@postr/shared';
+import { classifyColumns, type ClassifiedColumn } from './designShape';
+import type { InferredColumn, InferredTable } from './inferColumns';
 import type { RawTable } from './parseData';
+
+/**
+ * The one string that must appear anywhere synthesised values are
+ * shown. Exported so the UI, the caption builder and the tests all
+ * assert against the same literal — a label that drifts is a label a
+ * user can mistake for their own results.
+ */
+export const SAMPLE_DATA_LABEL = 'Sample data — not your results';
+
+/**
+ * Caption prefix for a figure built from synthesised values. Survives
+ * into the chart block's caption field on insert, so the warning
+ * travels with the figure rather than living only in the picker.
+ */
+export const SAMPLE_CAPTION_PREFIX = 'Sample data, not real results.';
 
 export type SampleKey =
   | 'grouped-means'
@@ -28,7 +45,8 @@ export type SampleKey =
   | 'two-category'
   | 'shares'
   | 'likert'
-  | 'pre-post';
+  | 'pre-post'
+  | 'from-columns';
 
 export interface SampleDataset {
   key: SampleKey;
@@ -37,6 +55,14 @@ export interface SampleDataset {
   table: RawTable;
   /** Form the recommender is expected to rank first for this shape. */
   expectTopForm: ChartForm;
+  /**
+   * True when the VALUES were synthesised from detected columns
+   * rather than chosen as a worked example. Drives the unmissable
+   * sample-data label in the UI and the caption prefix.
+   */
+  synthetic?: boolean;
+  /** Detected column names the sample was generated for. */
+  columnNames?: string[];
 }
 
 /**
@@ -230,6 +256,170 @@ export function makePrePost(): SampleDataset {
     label: 'Before and after',
     table: { header: ['Outcome', 'Baseline (T-score)', 'Follow-up (T-score)'], rows },
     expectTopForm: 'dumbbell',
+  };
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Column-derived samples (B2)
+//
+// When the user has COLUMNS but no usable values — a header-only
+// paste, an extraction that recovered names and nothing else — we
+// still generate a figure, from values synthesised for the columns
+// actually detected. The result is explicitly labelled sample data
+// everywhere it appears.
+//
+// Values are deliberately unremarkable: no dramatic effect, no
+// suspiciously round p-value-shaped numbers, nothing a reader could
+// mistake for a finding. Bogus labels only, per the house rule.
+// ────────────────────────────────────────────────────────────────────
+
+/** Bogus category levels, per feedback_sample_names. Never real. */
+const BOGUS_LEVELS = [
+  'Group A',
+  'Group B',
+  'Group C',
+  'Group D',
+  'Group E',
+  'Group F',
+];
+
+const BOGUS_SITES = [
+  'Acme State University',
+  'Sample Research Institute',
+  'Acme Community Clinic',
+];
+
+const BOGUS_PEOPLE = ['John Smith', 'Jane Doe'];
+
+const SITE_NAME = /\b(site|centre|center|institution|university|clinic|hospital|lab)\b/i;
+const PERSON_NAME = /\b(name|participant|subject|patient|respondent|student|rater)\b/i;
+
+/** Rows to synthesise. Enough to look like data, small enough to scan. */
+const SYNTHESISED_ROWS = 24;
+
+/** How many levels a detected categorical column gets when unknown. */
+const DEFAULT_LEVELS = 4;
+
+function levelsFor(col: ClassifiedColumn): string[] {
+  // An already-populated column keeps its real level names — those
+  // are the user's own labels, not invented ones.
+  const observed = [
+    ...new Set(
+      col.column.values.filter((v): v is string => typeof v === 'string' && v.trim().length > 0),
+    ),
+  ];
+  if (observed.length >= 2) return observed.slice(0, 6);
+
+  if (SITE_NAME.test(col.name)) return BOGUS_SITES;
+  if (PERSON_NAME.test(col.name)) return BOGUS_PEOPLE;
+  const count = Math.min(6, Math.max(2, col.levels >= 2 ? col.levels : DEFAULT_LEVELS));
+  return BOGUS_LEVELS.slice(0, count);
+}
+
+/**
+ * Plausible-but-flat value range for a synthesised measure. Named
+ * units nudge the scale so "Age (years)" is not generated in the
+ * hundreds, but nothing here encodes a result.
+ */
+function rangeFor(name: string): { base: number; spread: number; dp: number } {
+  if (/\b(percent|percentage|%|share|proportion|accuracy)\b/i.test(name)) {
+    return { base: 50, spread: 20, dp: 0 };
+  }
+  if (/\b(ms|millisecond|latency|rt|reaction|response ?time)\b/i.test(name)) {
+    return { base: 450, spread: 90, dp: 0 };
+  }
+  if (/\b(age|years?)\b/i.test(name)) return { base: 40, spread: 14, dp: 0 };
+  if (/\b(score|rating|severity|index)\b/i.test(name)) return { base: 5, spread: 2.5, dp: 1 };
+  if (/\b(count|n|total|participants?|enrolled)\b/i.test(name)) {
+    return { base: 30, spread: 12, dp: 0 };
+  }
+  return { base: 20, spread: 8, dp: 1 };
+}
+
+/**
+ * Stable seed derived from the column names, so the same detected
+ * header always yields the same sample values. Screenshots and
+ * previews do not churn between renders.
+ */
+function seedFromNames(names: string[]): number {
+  let h = 2166136261;
+  for (const ch of names.join(' ')) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/** True when a column has no usable values to chart. */
+function isEmptyColumn(col: InferredColumn): boolean {
+  return col.values.every((v) => v === null);
+}
+
+/**
+ * True when the table has columns but not enough real values behind
+ * them to build a figure — the trigger for the synthesised path.
+ * A table is "partial" when it has no rows at all, or when every
+ * numeric column it detected is empty.
+ */
+export function needsSyntheticValues(table: InferredTable): boolean {
+  if (table.columns.length === 0) return false;
+  if (table.rowCount === 0) return true;
+  // An empty column infers as `category` (there is nothing to parse),
+  // so ask the classifier — which falls back to the column NAME —
+  // rather than the raw inferred kind. Otherwise a table whose only
+  // measure came back blank looks like an all-categorical table and
+  // never reaches the generator.
+  const measures = classifyColumns(table).filter((c) => c.role === 'dependent');
+  if (measures.length === 0) return false;
+  return measures.every((c) => isEmptyColumn(c.column));
+}
+
+/**
+ * Generate sample values for the columns actually detected.
+ *
+ * Every column in `table` is reproduced by name and inferred type;
+ * only the VALUES are invented. The returned dataset is flagged
+ * `synthetic` so every downstream surface — preview, caption, insert
+ * — can label it.
+ */
+export function makeFromColumns(table: InferredTable): SampleDataset {
+  const classified = classifyColumns(table);
+  const rand = mulberry32(seedFromNames(classified.map((c) => c.name)));
+
+  // Level pools for the categorical/temporal columns, resolved once
+  // so every row draws from the same set.
+  const pools = new Map<string, string[]>();
+  for (const col of classified) {
+    if (col.type === 'categorical' || col.type === 'identifier') {
+      pools.set(col.name, levelsFor(col));
+    }
+  }
+
+  const rows: RawTable['rows'] = [];
+  for (let i = 0; i < SYNTHESISED_ROWS; i++) {
+    const row: RawTable['rows'][number] = classified.map((col) => {
+      if (col.type === 'temporal') {
+        // Repeat the ordered axis across groups so a trend exists.
+        return String((i % 8) + 1);
+      }
+      if (col.type === 'continuous') {
+        const { base, spread, dp } = rangeFor(col.name);
+        return String(round(base + (rand() - 0.5) * spread * 2, dp));
+      }
+      const pool = pools.get(col.name) ?? BOGUS_LEVELS;
+      return pool[i % pool.length] ?? BOGUS_LEVELS[0]!;
+    });
+    rows.push(row);
+  }
+
+  return {
+    key: 'from-columns',
+    label: 'Sample values for your columns',
+    table: { header: classified.map((c) => c.name), rows },
+    expectTopForm: 'bar',
+    synthetic: true,
+    /** Named so captions can say which columns the sample covers. */
+    columnNames: classified.map((c) => c.name),
   };
 }
 

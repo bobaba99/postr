@@ -162,6 +162,51 @@ Confirmed by Gavin: **hardcoded recommendation algorithm.** No LLM anywhere in t
 
 ---
 
+## 3a. Variable-pattern recognition (Gavin, 2026-07-27)
+
+Shipped in `apps/web/src/charts/designShape.ts`. This sits *between* column inference and the form recommender, and it exists because `resolveRoles` answers the wrong question when the table is wide.
+
+**The problem it fixes.** `resolveRoles` picks the one measure and up-to-two groupings the spec builder needs and silently ignores every other column. That is right for *building one chart* and wrong for *advising the user*. A table with 5 outcomes and 20 factors is not "a bar chart of the first outcome by the first factor" — it is a table no single figure summarises honestly. Rendering one anyway means quietly dropping 23 columns.
+
+### Two-stage classification
+
+1. **Statistical type** per column — `continuous · categorical · ordinal · temporal · identifier`. Identifiers are caught first, so a "Participant ID" integer column never becomes an outcome. A column with no values at all (header-only paste, partial extraction) is typed from its **name**, since that is the only evidence available.
+2. **Design role** — `dependent · independent · temporal · identifier · constant`. Continuous ⇒ dependent by default: in the tables this tool actually sees, the numbers are what was measured. A constant column carries no information and is excluded from both counts.
+
+The pair `(dvCount, ivCount)` plus the crossed cell count is the **design shape**.
+
+### The treatment ruleset
+
+First matching row wins. Every threshold is a named constant in the module — deliberately, so the numbers can be read and argued with rather than buried in a score.
+
+| # | Condition | Treatment | Why |
+|---|---|---|---|
+| 0 | 0 DV, 0 IV | `nothing-to-plot` | No numbers at all. |
+| 0 | 0 DV, ≥1 IV | `summary-table` | All labels, nothing measured — counts belong in a table. |
+| 1 | ≤1 DV, ≤2 IV, cells ≤ 40 | `single-chart` | The common case; one figure carries it without dropping anything. |
+| 1 | ≤1 DV, ≤2 IV, cells > 40 | `faceted` | Legal shape, unreadable as one figure. |
+| 2 | ≤1 DV, ≤4 IV | `faceted` | **Gavin's "3+ IVs, 1 DV".** Two factors fit inside the figure; the rest become panels, not extra hues nobody can separate. |
+| 3 | ≤6 DV, ≤2 IV | `small-multiples` | Different scales — one panel per outcome, where a shared axis would mislead. |
+| 4 | ≤6 DV, ≤4 IV | `small-multiples` | Per-outcome panels, two strongest factors inside each. |
+| 5 | otherwise | `no-single-chart` | **Gavin's "5 DVs + 20 IVs".** The honest failure. |
+
+**Row 5 is a first-class outcome, not an error.** `recommendFigures()` returns zero ranked forms and a `note` the UI shows verbatim: *"…wider than any single figure can show honestly — a chart covering all of it would either drop most columns or overplot into noise. Pick the one or two outcomes your claim rests on and chart those; put the rest in a summary table."* Saying that is more useful than forcing a suggestion.
+
+`recommendFigures()` is the entry point the ladder calls. The design shape decides the **treatment**; the existing ranking then decides the **form** within it. Both halves are hardcoded lookups — no model is consulted at any point.
+
+The shape label (`"1 outcome × 3 factors"`) renders above the figures either way. That readback is what lets a user catch a misdetected column *before* they trust the chart.
+
+### Generated samples from detected columns
+
+When columns are detected but the values are missing or partial, `makeFromColumns()` synthesises values **for those columns** rather than showing an empty figure. Rules:
+
+- Seeded from the column names, so the same header always yields the same values — previews and screenshots do not churn.
+- Values are deliberately unremarkable, scaled by column name (`Age (years)` lands in the 20s–60s, not the hundreds). Nothing that reads as a finding.
+- Category levels the user already supplied are **kept** — those are their labels, not ours to replace. Invented levels come from the sanctioned bogus set only (`Acme State University`, `John Smith` / `Jane Doe`), per `feedback_sample_names`.
+- **The label is unmissable and it travels.** `SAMPLE_DATA_LABEL` renders as a `role="status"` banner above the figures *and* in the collapsed step-1 summary; `SAMPLE_CAPTION_PREFIX` is baked into the caption string itself, so the warning survives into the chart block's caption field on insert. Nobody should be able to mistake a sample for their results.
+
+---
+
 ## 4. Academic UI direction
 
 This is the part that should not look like every other charting tool. The organising idea:
@@ -213,3 +258,5 @@ Concretely:
 - **Recommender is hardcoded.** Confirmed, no LLM in the create path.
 - **Excel upload is in scope**, Phase 1.
 - **Examples are generated in code**, seeded and deterministic.
+- **Variable-pattern recognition is deterministic** (§3a). Design shape → treatment is a hardcoded table with named thresholds; "no single chart fits" is a real answer the UI shows rather than an error to suppress.
+- **Samples generated from detected columns are labelled everywhere** — banner, collapsed step summary, and inside the caption string that seeds the block.

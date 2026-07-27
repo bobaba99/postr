@@ -19,6 +19,7 @@ import {
   type RoleChoice,
 } from '../recommend';
 import {
+  makeFromColumns,
   makeGroupedMeans,
   makeLikert,
   makeMultiSeries,
@@ -28,6 +29,7 @@ import {
   makeTimeSeries,
   makeTwoCategory,
   makeTwoNumeric,
+  needsSyntheticValues,
   type SampleDataset,
 } from '../sampleData';
 
@@ -71,6 +73,13 @@ export interface StepPlan {
   choice: RoleChoice;
   /** Synthetic dataset backing the previews, when applicable. */
   sample: SampleDataset | null;
+  /**
+   * True when the previewed VALUES were synthesised — either the
+   * "no data yet" branch or a column-only table whose values we
+   * generated. Drives the sample-data label; never true for a table
+   * the user actually supplied values for.
+   */
+  syntheticValues: boolean;
 }
 
 /** Map the synthetic answers to a seeded dataset. */
@@ -148,10 +157,21 @@ function planSynthetic(answers: LadderAnswers): StepPlan {
     table,
     choice: { emphasis: answers.emphasis ?? null },
     sample,
+    // The whole branch is worked examples, so every preview here is
+    // sample data by definition.
+    syntheticValues: true,
   };
 }
 
-function planFromTable(table: InferredTable, answers: LadderAnswers): StepPlan {
+function planFromTable(supplied: InferredTable, answers: LadderAnswers): StepPlan {
+  // Columns detected but no usable values behind them (header-only
+  // paste, partial extraction). Rather than showing an empty figure,
+  // generate values FOR THOSE COLUMNS and label the result as sample
+  // data everywhere it surfaces.
+  const syntheticValues = needsSyntheticValues(supplied);
+  const generated = syntheticValues ? makeFromColumns(supplied) : null;
+  const table = generated ? inferSample(generated) : supplied;
+
   const steps: StepId[] = ['data'];
 
   const measures = measureCandidates(table);
@@ -199,7 +219,8 @@ function planFromTable(table: InferredTable, answers: LadderAnswers): StepPlan {
       ...choiceSoFar,
       emphasis: answers.emphasis ?? null,
     },
-    sample: null,
+    sample: generated,
+    syntheticValues,
   };
 }
 
@@ -215,6 +236,7 @@ export function planLadder(source: DataSource | null, answers: LadderAnswers): S
       table: null,
       choice: {},
       sample: null,
+      syntheticValues: false,
     };
   }
   if (source.kind === 'synthetic') return planSynthetic(answers);

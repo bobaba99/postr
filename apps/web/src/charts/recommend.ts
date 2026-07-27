@@ -12,6 +12,7 @@
  * simply cannot be produced.
  */
 import type { ChartForm } from '@postr/shared';
+import { detectDesignShape, isUnchartable, type DesignShape } from './designShape';
 import type { InferredColumn, InferredTable } from './inferColumns';
 
 export type Emphasis = 'difference' | 'trend' | 'spread' | 'relationship' | 'share';
@@ -383,6 +384,60 @@ export function recommend(table: InferredTable, choice: RoleChoice = {}): Recomm
       aggregate: c.aggregate ?? false,
       horizontal: c.horizontal ?? false,
     }));
+}
+
+/**
+ * What the picker should render for a table: either a ranked figure
+ * set, or an honest explanation that no single chart fits.
+ *
+ * `shape` is always present — the UI shows the design shape ("1
+ * outcome × 3 factors") above the figures either way, because that
+ * readback is what lets a user catch a misdetected column before they
+ * trust the chart.
+ */
+export interface FigureAdvice {
+  shape: DesignShape;
+  /** Ranked forms. Empty when no single chart fits. */
+  recommendations: Recommendation[];
+  /**
+   * Present when the design shape needs more than one figure, or no
+   * figure at all. Shown verbatim — it is the "here is why".
+   */
+  note: string | null;
+  /** Outcome columns to render as separate panels (small multiples). */
+  panels: string[];
+}
+
+/**
+ * The deterministic entry point the ladder should call.
+ *
+ * Design shape decides the TREATMENT (one chart, panels, facets, a
+ * table, or nothing honest); the existing ranking then decides the
+ * FORM within that treatment. Both halves are hardcoded lookups — no
+ * model is consulted at any point.
+ */
+export function recommendFigures(table: InferredTable, choice: RoleChoice = {}): FigureAdvice {
+  const shape = detectDesignShape(table);
+
+  // Honest failure: say why, rank nothing. Forcing a chart here would
+  // mean silently dropping most of the user's columns.
+  if (isUnchartable(shape)) {
+    return { shape, recommendations: [], note: shape.rationale, panels: [] };
+  }
+
+  const recommendations = recommend(table, choice);
+
+  // A treatment beyond a single chart still ranks forms — the form is
+  // what goes INSIDE each panel — but carries the rationale so the
+  // user knows one figure is not the whole story.
+  const needsNote = shape.treatment !== 'single-chart';
+
+  return {
+    shape,
+    recommendations,
+    note: needsNote ? shape.rationale : null,
+    panels: shape.treatment === 'small-multiples' ? shape.dvNames : [],
+  };
 }
 
 /**
