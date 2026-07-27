@@ -355,6 +355,80 @@ describe('ChartChooser ladder', () => {
     expect((screen.getByText('Download SVG (2)') as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it('locks the selection while an action is in flight', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const onPrimary = vi.fn((_selection: unknown[]) => gate);
+    render(
+      <ChartChooser
+        layout="panel"
+        palette={palette}
+        fontFamily="Georgia, serif"
+        actions={[{ label: 'Insert this figure', primary: true, run: onPrimary }]}
+        confirmation="Inserted"
+      />,
+    );
+    pasteTable(TSV);
+    await screen.findByText('Pick your figure');
+
+    // One panel selected, action starts.
+    fireEvent.click(screen.getByText('Insert this figure'));
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+
+    // The selection cannot drift underneath the run: the boxes are
+    // disabled, so a real browser click never reaches the handler.
+    // (`fireEvent.click` bypasses that gate, so drive the change event
+    // the handler is actually bound to.)
+    expect(boxes.every((b) => b.disabled)).toBe(true);
+    fireEvent.change(boxes[1]!, { target: { checked: true } });
+
+    release();
+    // The confirmation reports the snapshot the action actually got —
+    // one figure — not a selection changed mid-flight.
+    expect(await screen.findByText('✓ Inserted')).toBeInTheDocument();
+    expect(onPrimary.mock.calls[0]![0]).toHaveLength(1);
+    await waitFor(() => {
+      expect((screen.getAllByRole('checkbox')[0] as HTMLInputElement).disabled).toBe(false);
+    });
+    // The UI agrees with what ran: one panel ticked, one figure done.
+    const after = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    expect(after.filter((b) => b.checked)).toHaveLength(1);
+  });
+
+  it('counts the busy label from the snapshot, not the live selection', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    render(
+      <ChartChooser
+        layout="panel"
+        palette={palette}
+        fontFamily="Georgia, serif"
+        actions={[
+          {
+            label: 'Download SVG',
+            primary: true,
+            run: () => gate,
+            busyLabel: (n) => `Zipping ${n} figures…`,
+          },
+        ]}
+        confirmation="Saved"
+      />,
+    );
+    pasteTable(TSV);
+    await screen.findByText('Pick your figure');
+    fireEvent.click((screen.getAllByRole('checkbox') as HTMLInputElement[])[1]!);
+    fireEvent.click(screen.getByText('Download SVG (2)'));
+
+    expect(await screen.findByText('Zipping 2 figures…')).toBeInTheDocument();
+    release();
+    // Two figures went to the action, so the confirmation says two.
+    expect(await screen.findByText(/2 figures — Saved/)).toBeInTheDocument();
+  });
+
   it('renders live SVG previews', async () => {
     renderChooser();
     pasteTable(TSV);

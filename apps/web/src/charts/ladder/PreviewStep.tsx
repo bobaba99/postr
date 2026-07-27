@@ -86,6 +86,13 @@ interface PreviewStepProps {
 
 const PANEL_LETTERS = ['A', 'B', 'C'];
 
+/** An action in flight, with the selection it was actually given. */
+interface RunningAction {
+  label: string;
+  /** Size of the selection snapshot handed to `run`. */
+  count: number;
+}
+
 const cardStyle: CSSProperties = {
   background: '#faf9f6',
   border: '1px solid #e3e0d8',
@@ -112,7 +119,11 @@ export function PreviewStep({
   sample = false,
 }: PreviewStepProps) {
   const [confirmed, setConfirmed] = useState<number | null>(null);
-  const [running, setRunning] = useState<string | null>(null);
+  // The in-flight action carries its own frozen snapshot of the
+  // selection. `run` was handed that exact list, so the busy label and
+  // the confirmation must be counted from it — never from the live
+  // selection, which the user can still change while the action runs.
+  const [running, setRunning] = useState<RunningAction | null>(null);
 
   const advice = useMemo(() => recommendFigures(table, choice), [table, choice]);
 
@@ -200,12 +211,17 @@ export function PreviewStep({
 
   const runAction = (action: PreviewAction) => {
     if (nothingSelected || busy) return;
+    // Freeze the selection for the whole run. `snapshot` is what the
+    // action is given, so it is also what the busy label counts and
+    // what the confirmation reports — otherwise a mid-flight tick
+    // could make "✓ 2 figures — done" appear for a 1-figure run.
+    const snapshot = selection;
     setConfirmed(null);
-    setRunning(action.label);
+    setRunning({ label: action.label, count: snapshot.length });
     void (async () => {
       try {
-        await action.run(selection);
-        if (action.primary) setConfirmed(count);
+        await action.run(snapshot);
+        if (action.primary) setConfirmed(snapshot.length);
       } catch {
         setConfirmed(null);
       } finally {
@@ -284,15 +300,23 @@ export function PreviewStep({
                     display: 'flex',
                     alignItems: 'center',
                     gap: 8,
-                    cursor: 'pointer',
+                    cursor: busy ? 'not-allowed' : 'pointer',
                     minWidth: 0,
                   }}
                 >
                   <input
                     type="checkbox"
                     checked={isSelected}
+                    // Locked while an action runs: the selection the
+                    // action was handed must not drift underneath it.
+                    disabled={busy}
                     onChange={() => toggle(panel.rec.form)}
-                    style={{ width: 15, height: 15, accentColor: '#2f6f8f', cursor: 'pointer' }}
+                    style={{
+                      width: 15,
+                      height: 15,
+                      accentColor: '#2f6f8f',
+                      cursor: busy ? 'not-allowed' : 'pointer',
+                    }}
                   />
                   <span
                     style={{
@@ -377,8 +401,10 @@ export function PreviewStep({
             inline
             tone="#2f6f8f"
             label={
-              actions.find((a) => a.label === running)?.busyLabel?.(count) ??
-              (count > 1 ? `Preparing ${count} figures…` : 'Preparing your figure…')
+              actions.find((a) => a.label === running.label)?.busyLabel?.(running.count) ??
+              (running.count > 1
+                ? `Preparing ${running.count} figures…`
+                : 'Preparing your figure…')
             }
             style={{ fontSize: 12 }}
           />
