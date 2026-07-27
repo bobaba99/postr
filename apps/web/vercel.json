@@ -1,12 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "postr.sh" }],
+      "destination": "https://www.postr.sh/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/s/:slug", "destination": "/api/shell/share" },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/gallery", "destination": "/index.html" },
+    { "source": "/gallery/:entryId", "destination": "/index.html" },
+    { "source": "/auth", "destination": "/index.html" },
+    { "source": "/dashboard", "destination": "/index.html" },
+    { "source": "/p/:posterId", "destination": "/index.html" },
+    { "source": "/profile", "destination": "/index.html" },
+    { "source": "/admin/gallery", "destination": "/index.html" }
   ],
   "headers": [
     {

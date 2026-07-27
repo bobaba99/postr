@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 #
-# Post-deploy smoke test for the prerender step.
+# Post-deploy smoke test for the prerender step and the routing config.
 #
-# Why this exists: every route returns HTTP 200 whether prerendering
-# worked or not, because the catch-all rewrite serves the SPA shell for
-# anything the filesystem does not match. So status codes prove nothing.
-# The shell is small and fixed-size; a prerendered document is several
-# KB larger and contains a <meta name="description">. Assert on those.
+# Why this exists: a prerendered route returns HTTP 200 whether the
+# injection worked or not, because a bare shell and an injected document
+# are both valid files. So status codes prove nothing there. The shell
+# is small and fixed-size; a prerendered document is several KB larger
+# and contains a <meta name="description">. Assert on those.
+#
+# It also asserts the routing contract: vercel.json enumerates the real
+# client routes instead of a catch-all, so every enumerated route must
+# still serve the app (200) and every unknown path must return a real
+# 404 backed by dist/404.html — not the old soft-404 shell.
 #
 # Usage:
 #   ./scripts/verify-prerender.sh https://www.postr.sh
@@ -82,6 +87,35 @@ for route in s/smoke-test-slug dashboard profile; do
     pass "/${route} → ${hdr}"
   else
     fail "/${route} has no noindex X-Robots-Tag (got: '${hdr:-none}')"
+  fi
+done
+
+echo
+echo "Real client routes still serve the app (200):"
+for route in auth dashboard profile p/smoke-test-id admin/gallery gallery s/smoke-test-slug; do
+  code="$(curl -s -o /dev/null --max-time 20 -w '%{http_code}' "${BASE}/${route}")"
+  if [ "$code" = "200" ]; then
+    pass "/${route} → ${code}"
+  else
+    fail "/${route} → ${code} (expected 200 — is its rewrite missing from vercel.json?)"
+  fi
+done
+
+echo
+echo "Unknown paths return a real 404 with the branded page:"
+# /debug is here on purpose: production builds drop the Debug route, so
+# serving the shell there would be a soft 404.
+for route in wp-admin asdf random/deep/path.php debug; do
+  code="$(curl -s -o /dev/null --max-time 20 -w '%{http_code}' "${BASE}/${route}")"
+  if [ "$code" != "404" ]; then
+    fail "/${route} → ${code} (expected 404 — the soft-404 space is back)"
+    continue
+  fi
+  body="$(curl -s --max-time 20 "${BASE}/${route}")"
+  if grep -q 'Page not found' <<<"$body"; then
+    pass "/${route} → 404 with the branded page"
+  else
+    fail "/${route} → 404 but the body is not dist/404.html"
   fi
 done
 

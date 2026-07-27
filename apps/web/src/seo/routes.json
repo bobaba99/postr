@@ -91,7 +91,11 @@
     "/404": {
       "title": "Page not found | Postr",
       "description": "That page does not exist.",
-      "robots": "noindex,nofollow"
+      "robots": "noindex,nofollow",
+      "h1": "Page not found",
+      "copy": [
+        "That page does not exist. Check the address for typos, or head back to the Postr home page to start a conference poster."
+      ]
     }
   }
 }
