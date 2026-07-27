@@ -10,7 +10,14 @@ export type CondenseProviderId = 'openai' | 'anthropic';
  *  narrative.ts's provider map; switching is config, not a rewrite. */
 export const CONDENSER_PROVIDER: CondenseProviderId = 'openai';
 
-// TODO: verify exact gpt-5.6 API identifier before production — unconfirmed
+/**
+ * Verified 2026-07-27 against developers.openai.com/api/docs/models:
+ * `gpt-5.6` is a live alias that routes to GPT-5.6 Sol (the frontier
+ * tier), GA since 2026-07-09. The alias is deliberate — it follows the
+ * latest Sol snapshot. Pin `gpt-5.6-sol` instead if the bake-off needs
+ * reproducible grading across a fixed manuscript set. Cheaper siblings
+ * for that bake-off: `gpt-5.6-terra` (mini tier), `gpt-5.6-luna` (nano).
+ */
 export const CONDENSER_MODEL = 'gpt-5.6';
 
 /** Output ceiling: five roles + two pins at ≤200 words each is ~2.4k
