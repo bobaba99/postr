@@ -64,5 +64,17 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     css: false,
+    alias: {
+      // pdfImport.ts does `import pdfWorkerUrl from
+      // 'pdfjs-dist/build/pdf.worker.mjs?url'`. Vite 8 refuses to
+      // transform that `?url` request out of the hoisted workspace
+      // node_modules ("Denied ID"), which fails every suite that
+      // transitively imports it. The worker URL is never exercised
+      // under jsdom — pdfjs is mocked — so point it at a stub.
+      'pdfjs-dist/build/pdf.worker.mjs?url': path.resolve(
+        __dirname,
+        './src/test/pdfWorkerUrlStub.ts',
+      ),
+    },
   },
 });
