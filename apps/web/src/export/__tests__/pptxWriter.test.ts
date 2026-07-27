@@ -98,6 +98,25 @@ describe('exportPosterPptx — unscaled 48×36 poster', () => {
     expect(slide).toContain('References');
     expect(slide).toContain('Whisker-driven navigation');
   });
+
+  it('exports figure and table notes as text under the content', async () => {
+    const base = makeFixtureDoc();
+    const blocks = base.blocks.map((b) =>
+      b.id === 'img1'
+        ? { ...b, note: 'Whisker data from the Acme cat cohort.' }
+        : b.id === 'tbl1'
+          ? { ...b, note: 'Naps self-reported by <i>n</i> = 12 cats.' }
+          : b,
+    );
+    const { entries } = await generate({ blocks });
+    const slide = decode(entries['ppt/slides/slide1.xml']);
+    // Figure note (img1 has a bottom caption — both must survive).
+    expect(slide).toContain('Whisker data from the Acme cat cohort.');
+    expect(slide).toContain('Nap duration by whisker length');
+    // Table note, with its rich-text runs split around the italic n.
+    expect(slide).toContain('Naps self-reported by');
+    expect(slide).toContain(' = 12 cats.');
+  });
 });
 
 describe('exportPosterPptx — the 56-inch ceiling (72×48 SfN poster)', () => {

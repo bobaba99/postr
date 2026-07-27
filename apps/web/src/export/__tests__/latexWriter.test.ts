@@ -122,6 +122,21 @@ describe('buildLatexDocument — blocks', () => {
     expect(out).toContain('missing image');
     expect(warnings.some((w) => w.includes('placeholder'))).toBe(true);
   });
+
+  it('exports figure notes with leading brackets kept literal', () => {
+    const withNote = makeFixtureDoc();
+    const noted = {
+      ...withNote,
+      blocks: withNote.blocks.map((b) =>
+        b.id === 'img1' ? { ...b, note: '[Preliminary] n = 12 cats' } : b,
+      ),
+    };
+    const { tex } = buildLatexDocument(noted, { assetPaths });
+    // Escaped brackets render as "[Preliminary]" but can never be
+    // parsed as an optional argument after a preceding \\ or \item.
+    expect(tex).toContain('{[}Preliminary{]} n = 12 cats');
+    expect(tex).not.toContain('[Preliminary]');
+  });
 });
 
 describe('buildLatexDocument — hostile content stays inert', () => {
@@ -145,6 +160,21 @@ describe('paragraphsToLatex', () => {
   it('joins plain paragraphs with line breaks, none trailing', () => {
     const out = paragraphsToLatex(parseRichText('one<br>two'));
     expect(out).toBe('one\\\\\ntwo');
+  });
+
+  it('never lets a line starting with [ form a \\\\[dimen] argument', () => {
+    // Hand-typed reference lines ("[1] Smith 2026") and "[note]"
+    // prefixes are plausible user content; an unescaped [ after the
+    // \\ join is the "Missing number, treated as zero" compile error.
+    const out = paragraphsToLatex(parseRichText('Item A<br>[note] details'));
+    expect(out).toBe('Item A\\\\\n{[}note{]} details');
+    expect(out).not.toMatch(/\\\\\s*\[/);
+  });
+
+  it('never lets a list item starting with [ become an \\item label', () => {
+    const out = paragraphsToLatex(parseRichText('<ul><li>[draft] idea</li></ul>'));
+    expect(out).toContain('\\item {[}draft{]} idea');
+    expect(out).not.toMatch(/\\item\s*\[/);
   });
 
   it('keeps interior blank lines as ~', () => {

@@ -20,6 +20,12 @@ const LATEX_CHAR_MAP: Record<string, string> = {
   '_': '\\_',
   '^': '\\textasciicircum{}',
   '~': '\\textasciitilde{}',
+  // Brackets are contextually special: after the `\\` line breaks and
+  // `\item` commands we emit, a leading `[` opens an optional argument
+  // ("[1] Smith" after `\\` parses as \\[<dimen>] → "Missing number"
+  // compile error). `{[}` / `{]}` render identically and stay inert.
+  '[': '{[}',
+  ']': '{]}',
 };
 
 /**

@@ -250,43 +250,65 @@ function addText(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   });
 }
 
-/** Caption layout: returns caption box + content box within the
- *  block frame, mirroring the canvas CaptionWrapper geometry. */
+interface SubBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Caption layout: returns caption + content + note boxes within the
+ *  block frame, mirroring the canvas CaptionWrapper geometry. The
+ *  note always sits directly under the content (canvas keeps body +
+ *  note in one vertical sub-column regardless of caption side). */
 function captionSplit(
   b: Block,
   ctx: Ctx,
-): { caption: { x: number; y: number; w: number; h: number } | null; content: { x: number; y: number; w: number; h: number } } {
+): { caption: SubBox | null; content: SubBox; note: SubBox | null } {
   const box = rect(b, ctx.scale);
   const position = b.captionPosition ?? 'top';
   const n = ctx.captionNumbers[b.id];
-  if (position === 'none' || n === undefined) {
-    return { caption: null, content: box };
-  }
-  const capPt = pt(Math.round(ctx.doc.styles.body.size * 0.85), ctx.scale);
-  const capH = (capPt / 72) * 1.6; // one caption line + breathing room, inches
+  const smallPt = pt(Math.round(ctx.doc.styles.body.size * 0.85), ctx.scale);
+  const smallH = (smallPt / 72) * 1.6; // one small-text line + breathing room, inches
   const gap = 0.06 * ctx.scale;
+  const noteUnder = (content: SubBox): SubBox | null =>
+    b.note
+      ? { x: content.x, y: content.y + content.h + gap, w: content.w, h: smallH }
+      : null;
+  if (position === 'none' || n === undefined) {
+    return { caption: null, content: box, note: noteUnder(box) };
+  }
   if (position === 'left' || position === 'right') {
     const capW = box.w * 0.35;
     const contentW = box.w - capW - gap;
     const capX = position === 'left' ? box.x : box.x + contentW + gap;
     const contentX = position === 'left' ? box.x + capW + gap : box.x;
+    const content = { x: contentX, y: box.y, w: contentW, h: box.h };
     return {
       caption: { x: capX, y: box.y, w: capW, h: box.h },
-      content: { x: contentX, y: box.y, w: contentW, h: box.h },
+      content,
+      note: noteUnder(content),
     };
   }
   if (position === 'bottom') {
+    const note = noteUnder(box);
+    // Canvas order for bottom captions is content → note → caption,
+    // so the caption drops below the note when one exists.
+    const capY = note ? note.y + note.h + gap : box.y + box.h + gap;
     return {
-      caption: { x: box.x, y: box.y + box.h + gap, w: box.w, h: capH },
+      caption: { x: box.x, y: capY, w: box.w, h: smallH },
       content: box,
+      note,
     };
   }
   // top (default): caption above, content keeps its declared frame
   // shifted below — same as the canvas where top captions grow the
   // block downward rather than squeezing the image.
+  const content = { x: box.x, y: box.y + smallH + gap, w: box.w, h: box.h };
   return {
-    caption: { x: box.x, y: box.y, w: box.w, h: capH },
-    content: { x: box.x, y: box.y + capH + gap, w: box.w, h: box.h },
+    caption: { x: box.x, y: box.y, w: box.w, h: smallH },
+    content,
+    note: noteUnder(content),
   };
 }
 
@@ -296,9 +318,29 @@ function captionText(b: Block, ctx: Ctx, label: 'Figure' | 'Table'): PptxGenJS.T
   return [{ text: `${label} ${n}. `, options: { bold: true } }, ...runs];
 }
 
+/** Small muted italic text shape — captions and figure/table notes,
+ *  matching the canvas CaptionWrapper styling (0.85 × body size). */
+function addMutedText(
+  slide: PptxGenJS.Slide,
+  runs: PptxGenJS.TextProps[],
+  box: SubBox,
+  ctx: Ctx,
+): void {
+  slide.addText(orEmptyRun(runs), {
+    ...box,
+    fontFace: ctx.doc.fontFamily,
+    fontSize: pt(Math.round(ctx.doc.styles.body.size * 0.85), ctx.scale),
+    color: hex(ctx.doc.palette.muted, '6B7280'),
+    italic: true,
+    align: 'left',
+    valign: 'top',
+  });
+}
+
 function addImage(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   const asset = ctx.assets.get(b.id);
-  const { caption, content } = captionSplit(b, ctx);
+  if (!asset && !b.imageSrc && !b.note) return; // fully empty image block
+  const { caption, content, note } = captionSplit(b, ctx);
   const muted = hex(ctx.doc.palette.muted, '6B7280');
 
   if (asset) {
@@ -334,20 +376,13 @@ function addImage(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
       fontSize: pt(ctx.doc.styles.body.size, ctx.scale),
       line: { color: muted, width: Math.max(0.5, 1 * ctx.scale), dashType: 'dash' },
     });
-  } else {
-    return; // empty image block — nothing to export
   }
 
   if (caption) {
-    slide.addText(captionText(b, ctx, 'Figure'), {
-      ...caption,
-      fontFace: ctx.doc.fontFamily,
-      fontSize: pt(Math.round(ctx.doc.styles.body.size * 0.85), ctx.scale),
-      color: muted,
-      italic: true,
-      align: 'left',
-      valign: 'top',
-    });
+    addMutedText(slide, captionText(b, ctx, 'Figure'), caption, ctx);
+  }
+  if (note) {
+    addMutedText(slide, paragraphsToTextProps(parseRichText(b.note ?? '')), note, ctx);
   }
 }
 
@@ -357,9 +392,8 @@ function addTable(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   if (b.rotation) {
     ctx.warnings.push('PowerPoint tables cannot rotate — a rotated table was exported upright.');
   }
-  const { caption, content } = captionSplit(b, ctx);
+  const { caption, content, note } = captionSplit(b, ctx);
   const primary = hex(ctx.doc.palette.primary, '111111');
-  const muted = hex(ctx.doc.palette.muted, '6B7280');
   const cellPt = pt(ctx.doc.styles.body.size * 0.9, ctx.scale);
 
   const rows: PptxGenJS.TableRow[] = [];
@@ -399,15 +433,10 @@ function addTable(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   });
 
   if (caption) {
-    slide.addText(captionText(b, ctx, 'Table'), {
-      ...caption,
-      fontFace: ctx.doc.fontFamily,
-      fontSize: pt(Math.round(ctx.doc.styles.body.size * 0.85), ctx.scale),
-      color: muted,
-      italic: true,
-      align: 'left',
-      valign: 'top',
-    });
+    addMutedText(slide, captionText(b, ctx, 'Table'), caption, ctx);
+  }
+  if (note) {
+    addMutedText(slide, paragraphsToTextProps(parseRichText(b.note ?? '')), note, ctx);
   }
 }
 

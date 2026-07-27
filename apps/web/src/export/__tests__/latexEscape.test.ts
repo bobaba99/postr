@@ -20,6 +20,14 @@ describe('escapeLatex', () => {
     expect(escapeLatex('~')).toBe('\\textasciitilde{}');
   });
 
+  it('keeps brackets from becoming optional-argument delimiters', () => {
+    // "[1] Smith" after a `\\` break parses as \\[<dimen>] — a
+    // "Missing number" compile error — unless brackets are braced.
+    expect(escapeLatex('[')).toBe('{[}');
+    expect(escapeLatex(']')).toBe('{]}');
+    expect(escapeLatex('[1] Smith 2026')).toBe('{[}1{]} Smith 2026');
+  });
+
   it('escapes a realistic hostile string', () => {
     expect(escapeLatex('\\input{/etc/passwd} & 100% $x_i^2$ #1 ~')).toBe(
       '\\textbackslash{}input\\{/etc/passwd\\} \\& 100\\% \\$x\\_i\\textasciicircum{}2\\$ \\#1 \\textasciitilde{}',
@@ -50,9 +58,9 @@ describe('escapeLatex', () => {
   });
 
   describe('fuzz: no unescaped special ever survives', () => {
-    const SPECIALS = '\\{}$&#%_^~';
+    const SPECIALS = '\\{}$&#%_^~[]';
     const CHARSET =
-      SPECIALS + 'abcXYZ0189 .,;:!?()[]<>"\'-+=/|*@`\n\téü中→';
+      SPECIALS + 'abcXYZ0189 .,;:!?()<>"\'-+=/|*@`\n\téü中→';
 
     /** Deterministic LCG so failures reproduce. */
     const lcg = (seed: number) => () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32;
@@ -76,6 +84,8 @@ describe('escapeLatex', () => {
         .replaceAll('\\textbackslash{}', '')
         .replaceAll('\\textasciicircum{}', '')
         .replaceAll('\\textasciitilde{}', '')
+        .replaceAll('{[}', '')
+        .replaceAll('{]}', '')
         .replaceAll('\\{', '')
         .replaceAll('\\}', '')
         .replaceAll('\\$', '')

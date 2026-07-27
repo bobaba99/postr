@@ -76,6 +76,8 @@ describe('exportPosterLatex', () => {
       citationStyle: 'IEEE',
     });
     const tex = decode(unzipSync(bytes)['poster.tex']!);
-    expect(tex).toContain('[1] J. Smith');
+    // Brackets are escaped ({[}1{]} renders as "[1]") so the numbered
+    // prefix can never parse as an optional argument after \\.
+    expect(tex).toContain('{[}1{]} J. Smith');
   });
 });
