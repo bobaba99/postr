@@ -12,7 +12,7 @@ Opinionated academic poster builder for students and researchers. Anonymous-firs
 - **Greek-symbol shortcuts** — smart text entry for STEM content
 - **Asset uploads** — figures, logos, stored per-user with RLS
 - **Shareable links** — read-only slugs for advisors and co-authors
-- **AI-powered poster scan** — upload a draft and get structured feedback (server-proxied)
+- **Poster import** — extract references and authors from an existing poster image into the structured model (server-proxied)
 
 ## Tech Stack
 
@@ -46,7 +46,7 @@ Architecturally, ~80% of traffic goes directly from browser to Supabase via RLS-
 
 - Node.js 20+ and npm 10+
 - A Supabase project (local via `supabase start`, or a remote project)
-- Anthropic API key (only if you want to run the scan feature)
+- Anthropic API key (only if you want to run the import feature)
 
 ## Getting Started
 
@@ -64,7 +64,7 @@ npm run db:start
 # 4. Run the web app
 npm run dev            # http://localhost:5173
 
-# 5. Run the API (separate terminal, only needed for scan feature)
+# 5. Run the API (separate terminal, only needed for import feature)
 npm run dev:api        # http://localhost:8787
 ```
 
