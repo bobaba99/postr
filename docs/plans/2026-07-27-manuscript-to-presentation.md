@@ -14,7 +14,7 @@ between is derived. Slide count comes from the **1 minute per slide** rule, whic
 already the Q6 question in the poster pipeline.
 
 **Paid feature.** The free tier ends at bare-bones black-and-white text output; the design
-pass is what people pay for. Details in §6.
+pass is what people pay for. Pricing decided 2026-07-27, see §5.1. Details in §6.
 
 ---
 
@@ -181,6 +181,44 @@ rendering stays in code. This keeps the expensive surface bounded and the output
 
 ## 5. Cost optimisation — where the money actually goes
 
+### 5.1 Pricing and business model — DECIDED 2026-07-27
+
+**$7.00 / month, unlimited** (soft cap ~50 decks/month) · **$4.99 for 3 decks**, one-off.
+
+Modelled against the measured per-deck cost: **$0.056 typical**, $0.092 worst case (top-tier
+first generation + 6 cached iterations + one theme call).
+
+| | Net after Stripe | Cost at typical use | Margin |
+|---|---|---|---|
+| $7.00/mo, 5 decks | $6.50 | $0.28 | **95.7%** |
+| $7.00/mo, 10 decks | $6.50 | $0.56 | **91.4%** |
+| $7.00/mo, 50 decks | $6.50 | $2.80 | 56.9% |
+| $4.99 pack, 3 decks | $4.55 | $0.17 | **96.3%** |
+
+**The pack must stay cheaper than one month of subscription.** An earlier proposal of $10.99
+for 3 was rejected on this basis: at $3.66/deck against the subscription's $2.33/deck at the
+same volume, a rational one-off buyer would take the $7 subscription and cancel, so the pack
+would only ever sell to people who did not compare. At $4.99 ($1.66/deck) the pack has a real
+reason to exist — no recurring charge, nothing to remember to cancel — which fits the
+"one symposium, one deck" user the SEO plan identifies as the dominant academic pattern.
+
+**The soft cap is about abuse, not researchers.** Break-even on the subscription is ~116 decks
+per month (70 in the worst case), which no real user approaches. But accounts are anonymous-
+first and cheap to create, so "unlimited" is a promise made to scripts as well as people. A
+~50/month soft cap with a contact route above it keeps the word honest for humans while
+bounding the downside.
+
+**The governing insight: LLM cost is not the constraint.** At every price considered, model
+spend is 1–2% of revenue while **Stripe's $0.30 fixed fee is 6%** of a $4.99 sale. Two
+consequences, both of which cut against the usual instinct:
+1. **Do not degrade narrative quality to save tokens.** Choosing a flagship model over the
+   cheapest for first generation costs roughly 4¢ per deck — invisible at these prices, and
+   narrative quality is the entire differentiator.
+2. **Price on what researchers will pay**, not on a cost-plus basis, and prefer fewer, larger
+   transactions over many small ones, because the fixed fee dominates at low ticket sizes.
+
+### 5.2 Model spend
+
 The owner asked where hardcoding or cheaper models can replace the current shape. Measured
 prices, 2026-07-27:
 
@@ -300,8 +338,9 @@ Owner decision: **book the page now, mark it upcoming, collect a waitlist.**
 
 1. **Design output: theme or image?** §4.1 recommends theme-based to preserve editability.
    This is the load-bearing decision for the whole paid tier.
-2. **Price and gate.** Where exactly does free end — at Phase 1 text output, or after one
-   free themed deck?
+2. ~~**Price and gate.**~~ **RESOLVED 2026-07-27** — $7/mo unlimited (soft cap ~50) plus a
+   $4.99 three-deck pack; see §5.1. Still open within that: whether free ends at Phase-1
+   text output or after one free themed deck.
 3. **`/paper-to-present` re-point.** It currently 308s to `/paper-to-poster`. Confirm it moves
    here on ship.
 4. **Journal club is a different pipeline.** It presents *someone else's* paper, so the
