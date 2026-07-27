@@ -182,6 +182,44 @@ Reuse, do not fork:
 a consumer here; on the poster path it is captured but only weakly consumed, which is stated
 honestly in that pipeline's open questions.
 
+### Selection is hierarchical, not a ranked truncation
+
+**Owner requirement, 2026-07-27:** *"it's also hierarchical when picking things to include in the
+output, start with the core thing, then everything is included revolving this core finding and
+message."*
+
+The pipeline did not do this. `extractFindings()` ranked by effect **prominence**, and
+`mapNarrative()` cut sections against a **static blocklist**. Neither asks the question that
+actually matters — *does this serve the story being told?* Those diverge routinely: a large
+incidental effect can matter less than a modest one carrying the argument.
+
+**The core is established first**, from the author's Q1 takeaway (falling back deterministically
+to title + abstract + top finding, and reporting which source was used). Everything else is then
+scored for **relevance to that core** — term overlap, shared numbers, section-kind priors,
+position — and selected in tiers:
+
+| Tier | What | Budget behaviour |
+|---|---|---|
+| 1 | the core message | never cut, first claim on budget |
+| 2 | direct evidence for the core | protected |
+| 3 | context that makes it interpretable | squeezed before tier 2 |
+| 4 | everything else | cut first |
+
+Word budgets are allocated **by tier**, so scarcity costs tier 4 before tier 2. `POSTER_ROLE_SPECS`
+still sets the shape and ceiling — tiering decides who gets squeezed, not what a poster is — and a
+required role can never be starved to zero.
+
+**Two absolute overrides, both favouring the user over the algorithm:** the author's Q2 finding
+ranking wins even against a higher-scoring alternative, and a Q5 pin is never cut at any score.
+This follows the standing rule that the user decides.
+
+Scoring is **fully deterministic** — no LLM in this path. It is a relevance computation, and the
+standing preference is pattern-matching first. Every score carries which signals fired, so the
+outline can tell the user *why* something was cut in one short phrase rather than showing a number.
+
+This is also the mechanism behind **"write backwards"** (§0.1): establishing the core first and
+building outward from it is the structural form of starting at the conclusion.
+
 ### Slide arc
 
 Deterministic, from the rubric. No LLM decides structure — same rule as the poster.
