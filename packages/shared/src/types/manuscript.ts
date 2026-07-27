@@ -124,10 +124,18 @@ export interface Finding {
   hasNumber: boolean;
 }
 
+/**
+ * Where a candidate sits in the hierarchy around the core message.
+ * 1 = the core itself (never cut), 2 = direct evidence for it,
+ * 3 = context that makes it interpretable, 4 = everything else.
+ */
+export type NarrativeTier = 1 | 2 | 3 | 4;
+
 /** Output of the deterministic narrative mapper for one role. */
 export interface MappedRole {
   role: NarrativeRoleId;
-  /** Hard word budget from the rubric. Never negotiable by the LLM. */
+  /** Hard word budget from the rubric, after Q6 scaling and tiering.
+   *  Never negotiable by the LLM, and never above the rubric ceiling. */
   budgetWords: number;
   /** Raw source material handed to the condenser. */
   sourceText: string;
@@ -139,6 +147,10 @@ export interface MappedRole {
    *  surfaced to the user (a poster without a question is the #1
    *  structural failure). */
   missing: boolean;
+  /** Hierarchy position relative to the core message. */
+  tier: NarrativeTier;
+  /** One short human phrase explaining the tier. Never a number. */
+  reason: string;
 }
 
 /** A section the user pinned against the budget cutter (Q5). Pinned
@@ -150,6 +162,10 @@ export interface MappedPinnedSection {
   heading: string;
   budgetWords: number;
   sourceText: string;
+  /** A pin is a user instruction, so it is always protected (tier 2) —
+   *  a pin outranks any score. */
+  tier: NarrativeTier;
+  reason: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────

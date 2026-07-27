@@ -369,12 +369,21 @@ function askQ6(state: InterviewState): InterviewState {
  */
 function finishQuestions(state: InterviewState): InterviewState {
   if (!state.doc) return state;
-  const remapped = mapNarrative(
-    state.doc,
-    state.answers.pinnedSectionIds,
-    state.answers.requirements.slideCount,
-  );
-  const map = { ...remapped, findings: state.map?.findings ?? remapped.findings };
+  // The full context is finally available: the Q1 takeaway establishes
+  // the core, Q2 overrides the finding ranking, Q5 pins are absolute,
+  // and Q6 sets the scale. This re-map is where the hierarchy is
+  // actually decided — the ingest-time map ran on a derived core.
+  const remapped = mapNarrative(state.doc, {
+    takeaway: state.answers.takeaway,
+    pinnedSectionIds: state.answers.pinnedSectionIds,
+    rankedFindingIds: state.answers.rankedFindingIds,
+    slideCount: state.answers.requirements.slideCount,
+  });
+  // The re-map's findings are used directly. Finding ids are derived
+  // from sentence text (`findingId`), not minted per call, so the ids
+  // behind the user's Q2 ranking survive the re-map and the override in
+  // `rankFindingsByCore` actually binds.
+  const map = remapped;
   return say(
     { ...state, step: 'outline', map },
     'Here is the outline I will build from — each panel shows which section it came from. Edit anything that reads wrong, then build your poster.',

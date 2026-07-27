@@ -17,14 +17,31 @@ export interface OutlineEntryView {
   truncated: boolean;
   budgetWords: number;
   missing: boolean;
+  /** One short human phrase explaining why this panel earned its place
+   *  and its budget — "little overlap with your main message". Never a
+   *  score: a number tells the user nothing they can act on. */
+  reason?: string;
+  /** True for the panel carrying the core message. It gets the only
+   *  emphasis on the card, because everything else revolves around it. */
+  isCore?: boolean;
+}
+
+/** A section the hierarchy left off the poster, with its one-phrase
+ *  reason. Shown so a cut is a visible decision the user can reverse,
+ *  not a silent disappearance. */
+export interface OutlineCutView {
+  key: string;
+  heading: string;
+  reason: string;
 }
 
 interface OutlineCardProps {
   entries: OutlineEntryView[];
   onEdit: (key: string, text: string) => void;
+  cuts?: OutlineCutView[];
 }
 
-export function OutlineCard({ entries, onEdit }: OutlineCardProps) {
+export function OutlineCard({ entries, onEdit, cuts = [] }: OutlineCardProps) {
   return (
     <div className="postr-rise-in rounded-lg border border-[#2a2a3a] bg-[#111118] p-4">
       <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7c6aed]">
@@ -35,6 +52,20 @@ export function OutlineCard({ entries, onEdit }: OutlineCardProps) {
           <OutlineEntry key={entry.key} entry={entry} onEdit={onEdit} />
         ))}
       </div>
+      {cuts.length > 0 && (
+        <div className="mt-4 border-t border-[#2a2a3a] pt-3">
+          <div className="mb-1.5 text-[11px] font-semibold text-[#8b8fa3]">
+            Left off
+          </div>
+          <ul className="flex flex-col gap-1">
+            {cuts.map((cut) => (
+              <li key={cut.key} className="text-[11px] leading-snug text-[#6b7280]">
+                <span className="text-[#8b8fa3]">{cut.heading}</span> — {cut.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -65,12 +96,22 @@ function OutlineEntry({
             shortened to fit
           </span>
         )}
+        {entry.isCore && (
+          <span className="rounded bg-[#7c6aed] px-1.5 py-0.5 text-[10px] font-semibold text-[#0a0a12]">
+            core
+          </span>
+        )}
         {entry.missing && (
           <span className="rounded bg-[#eab30822] px-1.5 py-0.5 text-[10px] font-semibold text-[#eab308]">
             needs your input
           </span>
         )}
       </div>
+      {entry.reason && (
+        <div className="mb-1 text-[11px] leading-snug text-[#8b8fa3]">
+          {entry.reason}
+        </div>
+      )}
       <textarea
         value={entry.text}
         onChange={(e) => onEdit(entry.key, e.target.value)}

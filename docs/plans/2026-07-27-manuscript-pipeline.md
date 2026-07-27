@@ -62,15 +62,65 @@ The five-role spine, in poster reading order:
 | 1 | **Hook** — why anyone should care | Intro ¶1, abstract ¶1 | ≤ 40 w | Drop entirely if the title already carries it |
 | 2 | **Question** — the actual question or hypothesis | Intro final ¶, abstract "we asked/tested" | ≤ 60 w | Never dropped. If absent, flag to the user — a poster without a question is the #1 structural failure |
 | 3 | **Methods** — only what's needed to trust the result | Methods | ≤ 80 w | Prefer a diagram/flow figure over prose. Drop instrument model numbers, software versions, ethics IDs |
-| 4 | **Key result** — figure-led, 1–3 findings max | Results + best figures | ≤ 150 w | Rank findings by effect size / prominence; keep top 3. Every kept finding must have a figure or a number |
-| 5 | **Takeaway** — what changes now | Discussion ¶1, conclusion | ≤ 60 w | Never dropped |
+| 4 | **Key result** — figure-led, 1–3 findings max | Results + best figures | ≤ 150 w | Rank findings by **relevance to the core** (not prominence — see below); keep top 3. Every kept finding must have a figure or a number |
+| 5 | **Takeaway** — what changes now | Discussion ¶1, conclusion | ≤ 60 w | Never dropped. **This is the core message (tier 1).** |
 
-**Deleted wholesale by default:** literature review, limitations (unless the user opts in),
-discussion beyond ¶1, full reference list (trimmed to ≤ 5), acknowledgements (→ small
-footer), appendices, supplementary anything.
+**Cut by default** — literature review, limitations, discussion beyond ¶1, full reference
+list (trimmed to ≤ 5), acknowledgements, appendices, supplementary anything — but this is
+now a scoring **prior**, not a verdict. See §2.6.
 
 Total body budget ≈ **390 words**, against the ~800-word ceiling most conference guidance
 implies. The gap is deliberate: figures and whitespace get the rest.
+
+### 2.6 Selection is hierarchical, not a ranked truncation
+
+**Owner requirement, 2026-07-27:** *"for the narrative, it's also hierarchical when picking
+things to include in the output, start with the core thing, then everything is included
+revolving this core finding and message."*
+
+Implemented in `apps/web/src/manuscript/coreRelevance.ts`, consumed by `mapNarrative()`.
+
+**The core is established first.** The author's Q1 takeaway is primary. Absent that, the
+fallback is deterministic — title + top finding + abstract — and `core.source` reports which
+was used (`'takeaway'` | `'derived'`) so the UI can say so and the outline can warn that a
+derived core is provisional.
+
+**Everything else is scored for relevance to that core**, never for prominence alone:
+weighted term overlap (TF-IDF over the manuscript's own sections), shared numbers/statistics,
+section-kind priors, prior prominence, and position. Signals are renormalised over those that
+can actually fire, so a takeaway containing no digits does not silently compress every score.
+
+| Tier | What | Budget behaviour |
+|---|---|---|
+| 1 | the core message (the takeaway role) | never cut, first claim on budget |
+| 2 | direct evidence for the core | protected |
+| 3 | context that makes it interpretable (methods, hook) | squeezed before tier 2 |
+| 4 | everything else | cut first |
+
+**Budgets are allocated by tier** (`tieredBudget`), not by fixed per-role numbers.
+`POSTER_ROLE_SPECS` remains the shape and the **ceiling** — tiering only ever takes words
+away, and only under **scarcity**: at scale 1 (no stated Q6 slot) every role keeps its full
+rubric budget, because there is nothing to ration. The squeeze interpolates with slot
+tightness rather than arriving as a cliff. A required role can never be starved below
+`REQUIRED_ROLE_MIN_WORDS`.
+
+**Two absolute overrides, both favouring the user over the algorithm:**
+the Q2 finding ranking wins even against a higher-scoring alternative, and a Q5 pin is never
+cut at any score.
+
+**Anti-circularity (load-bearing).** When a takeaway exists, the top-ranked finding is
+deliberately *excluded* from the core. Folding it in would let that finding score against a
+core built partly out of itself — and since the lead finding is chosen by prominence, that
+circularity quietly reinstates prominence as the verdict, which is the whole behaviour this
+replaces. Guarded by tests in `__tests__/hierarchy.test.ts`.
+
+Scoring is **fully deterministic** — no LLM, no clock, no RNG. Every score carries which
+signals fired and what each contributed, so the outline explains a cut in one short phrase
+("little overlap with your main message") rather than showing a number.
+
+This is the mechanism behind **"write backwards"** (Montagnes et al. 2021, see the
+manuscript-to-presentation plan §0.1): establishing the core first and building outward from
+it is the structural form of starting at the conclusion.
 
 ### Talk roles
 
@@ -163,6 +213,12 @@ prior, heading semantics, and position. The ranking is **shown**, the top candid
 **pre-selected** up to `MAX_PINNED_SECTIONS`, and the user adds or removes.
 
 **Never fully automatic** — Gavin was explicit. The derivation suggests; the user decides.
+
+`sectionRelevance.ts` scores sections for the **interview** (what to pre-select at Q5);
+`coreRelevance.ts` (§2.6) scores every candidate for the **mapper** (what tier it lands in
+and how much budget it gets). They share `contentTerms()` and the same TF-IDF idea. A Q5 pin
+is carried into the mapper as an absolute override, so a pinned section is never cut however
+it scores.
 
 ### Q6 — one minute per slide
 
@@ -431,7 +487,7 @@ actually asked for.
 
 **Risks**
 - **Genre collapse.** If the talk output ends up as "the poster, split across slides," the feature has failed. Guard: separate budget tables (§2), and a test asserting one finding per slide.
-- **Wrong finding promoted.** Mitigated by the editable outline, not by better prompting.
+- **Wrong finding promoted.** Now mitigated at three layers: findings are ranked by relevance to the core rather than raw prominence (§2.6), the Q2 answer overrides that ranking outright, and the editable outline remains the final human check. Not by better prompting.
 - **Figure extraction quality** on two-column PDFs with floating figures is the weakest link in the existing importer, and it is load-bearing here.
 - **Overclaiming.** Do not ship copy implying a finished, submittable poster. Say what it is: a structured first draft with the legibility already checked.
 - **Commoditisation** (§1) — revisit scope if the differentiators erode.

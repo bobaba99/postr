@@ -168,7 +168,7 @@ describe('mapNarrative — source cap', () => {
     const pinIds = bigDoc.sections
       .filter((s) => s.kind === 'limitations' || s.kind === 'literature-review')
       .map((s) => s.id);
-    const map = mapNarrative(bigDoc, pinIds);
+    const map = mapNarrative(bigDoc, { pinnedSectionIds: pinIds });
 
     // The uncapped methods source would exceed the API limit.
     const methodsRaw = bigDoc.sections
@@ -266,7 +266,7 @@ describe('mapNarrative — pins (Q5)', () => {
   const ack = doc.sections.find((s) => s.kind === 'acknowledgements')!;
 
   it('rescues a pinned section from the cut with its own budget', () => {
-    const map = mapNarrative(doc, [limitations.id]);
+    const map = mapNarrative(doc, { pinnedSectionIds: [limitations.id] });
     expect(map.pinned).toHaveLength(1);
     expect(map.pinned[0]).toMatchObject({
       id: limitations.id,
@@ -277,7 +277,7 @@ describe('mapNarrative — pins (Q5)', () => {
   });
 
   it('caps pins at the poster physical limit', () => {
-    const map = mapNarrative(doc, [limitations.id, lit.id, ack.id]);
+    const map = mapNarrative(doc, { pinnedSectionIds: [limitations.id, lit.id, ack.id] });
     expect(map.pinned.length).toBe(MAX_PINNED_SECTIONS);
   });
 

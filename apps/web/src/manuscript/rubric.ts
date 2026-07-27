@@ -107,6 +107,75 @@ export function scaledBudget(budgetWords: number, scale: number): number {
   return Math.max(20, Math.round(budgetWords * scale));
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Tier-based budget allocation
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Word budgets are allocated BY TIER, not by fixed per-role numbers.
+ *
+ * POSTER_ROLE_SPECS remains the shape and the CEILING — the rubric still
+ * governs what a poster is. Tiering decides only who gets SQUEEZED when
+ * the Q6 slot is tight: tier 4 loses words before tier 2 does, because
+ * tier 4 is the material that does not serve the core message.
+ *
+ * The multipliers are applied on top of the Q6 scale, so a generous slot
+ * (scale 1) leaves every tier at its rubric budget and only a constrained
+ * slot makes the hierarchy bite. That ordering matters: tiering must
+ * never shrink a poster that had room for the full rubric.
+ */
+export const TIER_BUDGET_MULTIPLIERS: Readonly<Record<1 | 2 | 3 | 4, number>> = {
+  1: 1,
+  2: 1,
+  3: 0.8,
+  4: 0.5,
+};
+
+/**
+ * A required role may never be starved to zero. Question, keyResult and
+ * takeaway are the poster's spine — a poster missing any of them is not
+ * a shorter poster, it is a broken one. This floor sits ABOVE the
+ * general 20-word floor in `scaledBudget` for exactly that reason.
+ */
+export const REQUIRED_ROLE_MIN_WORDS = 25;
+
+/**
+ * A role's word budget under both the Q6 slot scale and its tier.
+ *
+ * Tiering only bites under SCARCITY. At scale 1 — no stated slot
+ * constraint — every role keeps its full rubric budget regardless of
+ * tier, because there is nothing to ration: the rubric already describes
+ * a poster that fits. The hierarchy decides who gets squeezed when the
+ * author's slot forces a choice, not what a poster is by default.
+ *
+ * Under scarcity the tier multiplier is interpolated by how tight the
+ * slot is, so the squeeze arrives gradually rather than as a cliff at
+ * the first minute shaved off. Order: scale (the author's constraint),
+ * then tier (our judgement), then floor.
+ *
+ * The rubric ceiling is never exceeded — tiering only takes words away.
+ */
+export function tieredBudget(
+  budgetWords: number,
+  scale: number,
+  tier: 1 | 2 | 3 | 4,
+  required: boolean,
+): number {
+  // How far into the scarcity range we are: 0 at scale 1 (roomy),
+  // 1 at MIN_BUDGET_SCALE (tightest slot the rubric allows). The range
+  // is a non-zero constant (1 − 0.7), so no divide-by-zero guard.
+  const scarcity = Math.min(
+    1,
+    Math.max(0, (MAX_BUDGET_SCALE - scale) / (MAX_BUDGET_SCALE - MIN_BUDGET_SCALE)),
+  );
+  const full = TIER_BUDGET_MULTIPLIERS[tier];
+  const tierFactor = 1 - (1 - full) * scarcity;
+
+  const scaled = budgetWords * scale * tierFactor;
+  const floor = required ? REQUIRED_ROLE_MIN_WORDS : 20;
+  return Math.min(budgetWords, Math.max(floor, Math.round(scaled)));
+}
+
 /** Reference list is trimmed to this many entries on the poster. */
 export const POSTER_MAX_REFERENCES = 5;
 

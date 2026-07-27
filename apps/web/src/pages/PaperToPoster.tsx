@@ -42,7 +42,11 @@ import {
 import { POSTER_ROLE_SPECS } from '@/manuscript/rubric';
 import { exportPostr } from '@/import/postrFile';
 import { ChatPane } from '@/manuscript/ui/ChatPane';
-import { OutlineCard, type OutlineEntryView } from '@/manuscript/ui/OutlineCard';
+import {
+  OutlineCard,
+  type OutlineCutView,
+  type OutlineEntryView,
+} from '@/manuscript/ui/OutlineCard';
 import { PosterStatic } from '@/manuscript/ui/PosterStatic';
 import { openPosterPrintWindow } from '@/manuscript/ui/printPosterWindow';
 
@@ -326,7 +330,13 @@ export default function PaperToPoster() {
               </button>
             )}
 
-            {entries && <OutlineCard entries={entries} onEdit={handleEditEntry} />}
+            {entries && (
+              <OutlineCard
+                entries={entries}
+                onEdit={handleEditEntry}
+                cuts={cutsFrom(interview)}
+              />
+            )}
 
             {poster && (
               <>
@@ -439,6 +449,8 @@ function entriesFrom(
       truncated: reply?.truncated ?? false,
       budgetWords: role.budgetWords,
       missing: role.missing && !reply?.text,
+      reason: role.reason,
+      isCore: role.tier === 1,
     };
   });
 
@@ -454,10 +466,27 @@ function entriesFrom(
       truncated: reply?.truncated ?? false,
       budgetWords: pin.budgetWords,
       missing: false,
+      reason: pin.reason,
     };
   });
 
   return [...roleEntries, ...pinEntries];
+}
+
+/**
+ * Sections the hierarchy left off, each with the one-phrase reason from
+ * its relevance score. A cut should be a decision the user can see and
+ * argue with, not a silent omission.
+ */
+function cutsFrom(state: InterviewState): OutlineCutView[] {
+  const map = state.map;
+  if (!map) return [];
+  const reasonById = new Map(map.sectionScores.map((s) => [s.id, s.reason]));
+  return map.cutSections.map((section) => ({
+    key: section.id,
+    heading: section.heading || 'Untitled section',
+    reason: reasonById.get(section.id) ?? 'Little overlap with your main message',
+  }));
 }
 
 function narrativeFrom(entries: OutlineEntryView[]): CondensedNarrative {
