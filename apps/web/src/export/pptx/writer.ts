@@ -39,10 +39,17 @@ import {
   type ResolvedAsset,
 } from '../resolveAssets';
 import { tableCellBorders } from './tableBorders';
+import {
+  attributionDocProperty,
+  attributionPptxBox,
+  type AttributionOptions,
+} from '../attribution';
 
 export interface PptxExportOptions extends ExportContentOptions {
   /** Injectable for tests / server pipelines. */
   fetcher?: AssetFetcher;
+  /** Paid-plan seam — see export/attribution.ts. */
+  attribution?: AttributionOptions;
 }
 
 export interface PptxExportResult {
@@ -517,10 +524,20 @@ export async function exportPosterPptx(
   pptx.title = title;
   const authorNames = doc.authors.filter((a) => a.name).map((a) => a.name);
   if (authorNames.length > 0) pptx.author = authorNames.join(', ');
+  // Document properties. The generator string goes in `company`
+  // (app.xml <Company>) — a free slot that does NOT clobber the
+  // half-scale note. core.xml's only writable fields are title /
+  // subject / creator / revision, and the first three already carry
+  // real poster data, so `dc:subject` is used for the generator ONLY
+  // when there is no half-scale note to put there instead.
+  pptx.company = attributionDocProperty();
   if (plan.note) {
     // Core-properties note (dc:subject) — survives being emailed
     // onward without the export screen (plan §2 requirement 2).
+    // Takes precedence over the generator string.
     pptx.subject = plan.note;
+  } else {
+    pptx.subject = attributionDocProperty();
   }
 
   const warnings: string[] = [
@@ -567,6 +584,29 @@ export async function exportPosterPptx(
         addReferences(slide, b, ctx);
         break;
     }
+  }
+
+  // Colophon — a real, small, muted text box near the bottom edge.
+  // Added last so it layers above the poster background. It is an
+  // ordinary shape: the user can click it and press Delete in
+  // PowerPoint, which is deliberate — the mark is non-coercive.
+  const attributionBox = attributionPptxBox(
+    plan.slideWidthIn,
+    plan.slideHeightIn,
+    options.attribution,
+  );
+  if (attributionBox) {
+    slide.addText([{ text: attributionBox.text, options: {} }], {
+      x: attributionBox.x,
+      y: attributionBox.y,
+      w: attributionBox.w,
+      h: attributionBox.h,
+      fontFace: doc.fontFamily,
+      fontSize: attributionBox.fontSize,
+      color: hex(doc.palette.muted, '6B7280'),
+      align: 'left',
+      valign: 'bottom',
+    });
   }
 
   if (plan.note) {

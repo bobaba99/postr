@@ -24,6 +24,7 @@ import {
   uploadPosterImage,
 } from '@/data/posterImages';
 import { sanitizeHtml } from '@/poster/sanitizeHtml';
+import { attributionBundleGenerator } from '@/export/attribution';
 
 const APP_VERSION = '0.0.0';
 
@@ -56,12 +57,19 @@ export async function exportPostr(
 
   const docJson = canonicalJson(exportedDoc);
   const hash = await sha256Hex(docJson);
+  // `generator` is metadata only — a `.postr` is a backup format, so
+  // it gets NO visible mark, just a self-describing field. Safe to add
+  // without a schemaVersion bump: the hash covers poster.json alone
+  // (computed above from `docJson`), never the manifest, so an older
+  // build importing a newer bundle still validates and simply ignores
+  // the extra key.
   const manifest: PostrBundleManifest = {
     schemaVersion: 1,
     app: 'postr',
     appVersion: options.appVersion ?? APP_VERSION,
     exportedAt: new Date().toISOString(),
     hash,
+    generator: attributionBundleGenerator(),
   };
 
   files['poster.json'] = textToBytes(docJson);

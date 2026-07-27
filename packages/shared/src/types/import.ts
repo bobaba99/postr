@@ -95,6 +95,13 @@ export interface PostrBundleManifest {
   exportedAt: string;
   /** sha256 of the canonicalized PosterDoc JSON. */
   hash: string;
+  /**
+   * Human-readable generator string ("Made with postr.sh (…)").
+   * Metadata ONLY — a `.postr` bundle is a backup format that nobody
+   * but the re-importing user ever opens, so it carries no visible
+   * mark. Optional so bundles written before this field still import.
+   */
+  generator?: string;
 }
 
 /** imageSrc prefix used inside a `.postr` bundle so the JSON is

@@ -18,10 +18,13 @@ import {
 } from '../posterContent';
 import { referencesToBib } from './bib';
 import { buildLatexDocument } from './writer';
+import type { AttributionOptions } from '../attribution';
 
 export interface LatexExportOptions extends ExportContentOptions {
   /** Injectable for tests / server pipelines. */
   fetcher?: AssetFetcher;
+  /** Paid-plan seam — see export/attribution.ts. */
+  attribution?: AttributionOptions;
 }
 
 export interface LatexExportResult {
