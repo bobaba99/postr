@@ -9,6 +9,7 @@
  *   /privacy            → Privacy Policy (public)
  *   /cookies            → Cookies Policy (public)
  *   /terms              → Terms of Service (public)
+ *   /manuscript-to-poster → Manuscript→poster standalone flow (public, code-split)
  *   /auth               → Auth (sign in / sign up / guest)
  *   /dashboard          → My Posters (auth-gated)
  *   /p/:posterId        → Editor (auth-gated, code-split)
@@ -61,6 +62,9 @@ const AdminGallery = lazy(() => import('@/pages/AdminGallery'));
 // lazily Observable Plot beyond that), none of which belongs in the
 // marketing-page bundle.
 const ChartChooserPage = lazy(() => import('@/pages/ChartChooser'));
+// Standalone manuscript→poster flow — pulls in the ingest parsers and
+// block renderers, so it loads on demand like the editor.
+const ManuscriptToPoster = lazy(() => import('@/pages/ManuscriptToPoster'));
 
 function LazyFallback() {
   return (
@@ -86,6 +90,7 @@ export function AppRoutes() {
         {/* Standalone chart chooser — public, indexable, and creates
             no Supabase session (not even anonymous) on load. */}
         <Route path="/chart-chooser" element={<ChartChooserPage />} />
+        <Route path="/manuscript-to-poster" element={<ManuscriptToPoster />} />
         {/*
           Dev only. This was publicly routable with no guard, which put
           a diagnostics page in the crawlable URL space and shipped it

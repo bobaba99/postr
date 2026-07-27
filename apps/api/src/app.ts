@@ -2,6 +2,7 @@ import express, { type Express } from 'express';
 import cors from 'cors';
 import { createCronRouter } from './cron.js';
 import { createImportRouter } from './import.js';
+import { createNarrativeRouter } from './narrative.js';
 
 export function createApp(): Express {
   const app = express();
@@ -35,6 +36,11 @@ export function createApp(): Express {
   // auth + rate-limit. ANTHROPIC_API_KEY required at request time;
   // missing key returns 500 only when the route fires.
   app.use(createImportRouter());
+
+  // Manuscript narrative condenser — the one LLM step in the
+  // manuscript→poster pipeline. OPENAI_API_KEY required at request
+  // time; missing key returns 500 only when the route fires.
+  app.use(createNarrativeRouter());
 
   return app;
 }

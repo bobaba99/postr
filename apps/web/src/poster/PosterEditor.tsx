@@ -78,7 +78,8 @@ import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
 // Helpers
 // =========================================================================
 // Font loading (Google Fonts URL + idempotent link injection) lives in
-// fontLoader.ts so the copy-a-design preview can share it.
+// fontLoader.ts, shared by the copy-a-design preview and the
+// standalone manuscript-to-poster preview.
 
 /** Find the closest poster-size key that matches the doc's dimensions. */
 function findSizeKey(widthIn: number, heightIn: number): PosterSizeKey {

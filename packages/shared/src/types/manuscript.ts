@@ -1,0 +1,227 @@
+/**
+ * Manuscript → poster pipeline types.
+ *
+ * `DocumentModel` is the single intermediate representation between
+ * every ingest format (pasted text, .docx, later PDF/.tex) and every
+ * output (poster today, talk in a later phase). Without one IR the
+ * pipeline becomes an N×M matrix of converters — see
+ * docs/plans/2026-07-27-manuscript-pipeline.md §3.
+ *
+ * The split the plan mandates: everything in this file describes
+ * DETERMINISTIC data. The only LLM step in the pipeline is the
+ * condenser (`CondenseRequestBody` → `CondensedNarrative`), and even
+ * its budgets arrive as data computed by the deterministic mapper.
+ */
+import type { Author, Institution, Reference } from './poster';
+
+// ─────────────────────────────────────────────────────────────────────
+// Document model (IR)
+// ─────────────────────────────────────────────────────────────────────
+
+/** Canonical manuscript section kinds detected from the heading
+ *  lexicon. `other` keeps unrecognized sections addressable so the
+ *  pin mechanism (questionnaire Q5) can still protect them. */
+export type SectionKind =
+  | 'abstract'
+  | 'introduction'
+  | 'literature-review'
+  | 'methods'
+  | 'results'
+  | 'discussion'
+  | 'conclusion'
+  | 'limitations'
+  | 'references'
+  | 'acknowledgements'
+  | 'appendix'
+  | 'other';
+
+export interface ManuscriptSection {
+  id: string;
+  /** Heading text as written in the source ("2. Materials and Methods"). */
+  heading: string;
+  /** Canonical kind from the heading lexicon. */
+  kind: SectionKind;
+  /** Heading level, 1 = top-level. */
+  level: number;
+  paragraphs: string[];
+  /** Position in the source document, 0-based. */
+  sourceOrder: number;
+}
+
+export interface ManuscriptFigure {
+  id: string;
+  /** data: URL (DOCX ingest) or storage path — null when the source
+   *  referenced a figure we could not extract. */
+  imageRef: string | null;
+  caption: string;
+  /** Section id the figure appeared in, when known. */
+  sourceSectionId: string | null;
+  /** Deterministic salience in [0, 1] — drives "which figure is the
+   *  money figure". Derived from mention count in Results + position. */
+  prominence: number;
+}
+
+/** Caption-level record of a table in the source manuscript. The MVP
+ *  does not reconstruct table cells — the caption is enough for the
+ *  mapper's ranking and the questionnaire's pin list. */
+export interface ManuscriptTableRef {
+  id: string;
+  caption: string;
+  sourceSectionId: string | null;
+}
+
+/** One IR for every input format and every output format. */
+export interface DocumentModel {
+  version: 1;
+  title: string;
+  /** Reuses the existing first-class poster author model. */
+  authors: Author[];
+  institutions: Institution[];
+  abstract: string | null;
+  sections: ManuscriptSection[];
+  figures: ManuscriptFigure[];
+  tables: ManuscriptTableRef[];
+  references: Reference[];
+  venue: { name: string; year: number } | null;
+  /** Whole-document word count — surfaced in the ingest summary. */
+  wordCount: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Narrative mapping (deterministic — rubric §2)
+// ─────────────────────────────────────────────────────────────────────
+
+/** The five-role poster spine, in reading order. */
+export type NarrativeRoleId =
+  | 'hook'
+  | 'question'
+  | 'methods'
+  | 'keyResult'
+  | 'takeaway';
+
+/** An auto-extracted candidate finding from the Results section. */
+export interface Finding {
+  id: string;
+  text: string;
+  /** Deterministic ranking score — higher is more prominent. */
+  score: number;
+  /** Section id it was extracted from (provenance). */
+  sectionId: string;
+  /** Rubric rule: every kept finding must have a figure or a number. */
+  hasNumber: boolean;
+}
+
+/** Output of the deterministic narrative mapper for one role. */
+export interface MappedRole {
+  role: NarrativeRoleId;
+  /** Hard word budget from the rubric. Never negotiable by the LLM. */
+  budgetWords: number;
+  /** Raw source material handed to the condenser. */
+  sourceText: string;
+  /** Provenance — which manuscript headings this role came from. */
+  sourceHeadings: string[];
+  /** Roles that may never be dropped (question, takeaway). */
+  required: boolean;
+  /** True when the manuscript had no usable source for this role —
+   *  surfaced to the user (a poster without a question is the #1
+   *  structural failure). */
+  missing: boolean;
+}
+
+/** A section the user pinned against the budget cutter (Q5). Pinned
+ *  content is exempt from the wholesale cuts but still gets condensed
+ *  to its own small budget — the poster has physical limits. */
+export interface MappedPinnedSection {
+  /** Section id in the DocumentModel. */
+  id: string;
+  heading: string;
+  budgetWords: number;
+  sourceText: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Emphasis questionnaire (§2.5) — structured answers only
+// ─────────────────────────────────────────────────────────────────────
+
+export type AudienceOption =
+  | 'specialists'
+  | 'adjacent'
+  | 'general'
+  | 'clinicians';
+
+export type PurposeOption =
+  | 'feedback'
+  | 'collaborators'
+  | 'job-market'
+  | 'requirement';
+
+/** The questionnaire's structured answers — the ONLY user input the
+ *  condenser receives beyond the manuscript itself. */
+export interface EmphasisAnswers {
+  /** Q1 — the one thing someone should remember (free text, ≤25 words).
+   *  Load-bearing: the author stating their own thesis. */
+  takeaway: string;
+  /** Q2 — finding ids in the user's preferred order (most important
+   *  first). Empty = keep the auto-extracted ranking. */
+  rankedFindingIds: string[];
+  /** Q3 — audience, controls jargon tolerance. */
+  audience: AudienceOption;
+  /** Q4 — what the poster is for, controls hook framing. */
+  purpose: PurposeOption;
+  /** Q5 — section ids pinned against the budget cutter. */
+  pinnedSectionIds: string[];
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Condenser wire types (shared by apps/web and apps/api)
+// ─────────────────────────────────────────────────────────────────────
+
+export interface CondenseRoleInput {
+  role: NarrativeRoleId;
+  budgetWords: number;
+  sourceText: string;
+}
+
+/** Structured emphasis facts forwarded to the condenser. Kept flat and
+ *  minimal — the prompt module owns how these become instructions. */
+export interface CondenseEmphasis {
+  takeaway: string;
+  audience: AudienceOption;
+  purpose: PurposeOption;
+  /** Verbatim finding texts in the user's preferred order. */
+  rankedFindings: string[];
+}
+
+export interface CondensePinnedInput {
+  id: string;
+  heading: string;
+  budgetWords: number;
+  sourceText: string;
+}
+
+export interface CondenseRequestBody {
+  roles: CondenseRoleInput[];
+  pinned: CondensePinnedInput[];
+  emphasis: CondenseEmphasis;
+}
+
+export interface CondensedRole {
+  role: NarrativeRoleId;
+  /** Condensed prose, guaranteed within budget after enforcement. */
+  text: string;
+  /** True when the server had to hard-truncate an over-budget reply —
+   *  surfaced so the outline can mark the role for a second look. */
+  truncated: boolean;
+}
+
+export interface CondensedPinnedSection {
+  id: string;
+  heading: string;
+  text: string;
+  truncated: boolean;
+}
+
+export interface CondensedNarrative {
+  roles: CondensedRole[];
+  pinned: CondensedPinnedSection[];
+}
