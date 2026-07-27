@@ -18,7 +18,7 @@
  * doesn't blur the editor (which would destroy the current
  * selection range).
  */
-import { useMemo, type CSSProperties } from 'react';
+import { useMemo, type CSSProperties, type JSX } from 'react';
 import { createPortal } from 'react-dom';
 import type { SelectionInfo } from './RichTextEditor';
 

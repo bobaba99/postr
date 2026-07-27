@@ -419,7 +419,7 @@ export function RichTextEditor({
  */
 function insertSymbolViaExec(
   symbolKey: string,
-  editorRef: React.RefObject<HTMLDivElement>,
+  editorRef: React.RefObject<HTMLDivElement | null>,
   commit: () => void,
   setSlash: (s: SlashMenuState) => void,
 ) {

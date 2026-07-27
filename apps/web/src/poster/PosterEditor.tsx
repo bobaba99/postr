@@ -6,7 +6,7 @@
  * after fetching from Supabase). Mutations dispatch back into the
  * store; Phase 4 layers autosave on top by subscribing to changes.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { flushSync } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import type { CommentAnchor } from '@/data/comments';
@@ -556,7 +556,7 @@ function useBlockDrag(
 // Zoom hook
 // =========================================================================
 
-function useZoom(canvasRef: React.RefObject<HTMLDivElement>, sizeKey: PosterSizeKey) {
+function useZoom(canvasRef: React.RefObject<HTMLDivElement | null>, sizeKey: PosterSizeKey) {
   const [manual, setManual] = useState<number | null>(null);
   const [fit, setFit] = useState(1);
 

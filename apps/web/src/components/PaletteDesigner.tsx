@@ -831,7 +831,7 @@ function ImagePanel({
   loading: boolean;
   error: string | null;
   onFile: (file: File) => void;
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
 }) {
   return (
     <div>
