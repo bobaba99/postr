@@ -13,13 +13,13 @@
   ],
   "rewrites": [
     { "source": "/s/:slug", "destination": "/api/shell/share" },
-    { "source": "/gallery", "destination": "/index.html" },
-    { "source": "/gallery/:entryId", "destination": "/index.html" },
-    { "source": "/auth", "destination": "/index.html" },
-    { "source": "/dashboard", "destination": "/index.html" },
-    { "source": "/p/:posterId", "destination": "/index.html" },
-    { "source": "/profile", "destination": "/index.html" },
-    { "source": "/admin/gallery", "destination": "/index.html" }
+    { "source": "/gallery", "destination": "/" },
+    { "source": "/gallery/:entryId", "destination": "/" },
+    { "source": "/auth", "destination": "/" },
+    { "source": "/dashboard", "destination": "/" },
+    { "source": "/p/:posterId", "destination": "/" },
+    { "source": "/profile", "destination": "/" },
+    { "source": "/admin/gallery", "destination": "/" }
   ],
   "headers": [
     {
