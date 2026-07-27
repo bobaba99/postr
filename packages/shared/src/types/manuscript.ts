@@ -61,6 +61,15 @@ export interface ManuscriptFigure {
   prominence: number;
 }
 
+/** Caption-level record of a table in the source manuscript. The MVP
+ *  does not reconstruct table cells — the caption is enough for the
+ *  mapper's ranking and the questionnaire's pin list. */
+export interface ManuscriptTableRef {
+  id: string;
+  caption: string;
+  sourceSectionId: string | null;
+}
+
 /** One IR for every input format and every output format. */
 export interface DocumentModel {
   version: 1;
@@ -71,6 +80,7 @@ export interface DocumentModel {
   abstract: string | null;
   sections: ManuscriptSection[];
   figures: ManuscriptFigure[];
+  tables: ManuscriptTableRef[];
   references: Reference[];
   venue: { name: string; year: number } | null;
   /** Whole-document word count — surfaced in the ingest summary. */
