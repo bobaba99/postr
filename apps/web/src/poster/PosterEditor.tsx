@@ -25,6 +25,7 @@ import type {
 import { nanoid } from 'nanoid';
 import { usePosterStore } from '@/stores/posterStore';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
+import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import { useAutosave } from '@/hooks/useAutosave';
 import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
 import { useGsapContext } from '@/motion';
@@ -1288,6 +1289,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   }, [posterIdFromStore, posterTitleFromStore, openPublishFlow]);
 
   useEffect(() => {
+    if (!GALLERY_PUBLIC_ENABLED) return;
     if (searchParams.get('publish') !== '1') return;
     if (!posterIdFromStore) return;
     // Wait one animation frame so the canvas has mounted, then open.

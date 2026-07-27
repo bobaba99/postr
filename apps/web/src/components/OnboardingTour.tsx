@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
+import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 
 interface TourStep {
@@ -80,7 +81,9 @@ const STEPS: TourStep[] = [
     selector: '[data-postr-export-postr]',
     tabName: 'export',
     title: 'Export, print, or save .postr',
-    body: 'Save as PDF, email to any Staples kiosk, publish to the gallery — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser.',
+    body: GALLERY_PUBLIC_ENABLED
+      ? 'Save as PDF, email to any Staples kiosk, publish to the gallery — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser.'
+      : 'Save as PDF, email to any Staples kiosk — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser.',
     position: 'right',
   },
   {

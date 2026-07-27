@@ -31,6 +31,7 @@ import {
   labelForField,
   type GalleryEntryWithUrls,
 } from '@/data/gallery';
+import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import type { User } from '@supabase/supabase-js';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
@@ -442,21 +443,34 @@ export default function Profile() {
           </div>
         </Section>
 
-        {/* Gallery submissions */}
+        {/* Gallery submissions — while the gallery is offline the section
+            only appears for users who still have published entries, so they
+            keep the ability to retract. */}
+        {(GALLERY_PUBLIC_ENABLED || myGallery.length > 0) && (
         <Section title="Gallery submissions">
-          <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
-            Posters you have published to the{' '}
-            <Link to="/gallery" className="text-[#7c6aed] underline">
-              public gallery
-            </Link>
-            . You can retract any entry at any time — it disappears from the
-            public listing immediately.
-          </p>
-          <div className="mb-4 flex gap-2">
-            <button onClick={openUploadFlow} className={btnSecondary}>
-              Upload external PDF or image
-            </button>
-          </div>
+          {GALLERY_PUBLIC_ENABLED ? (
+            <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
+              Posters you have published to the{' '}
+              <Link to="/gallery" className="text-[#7c6aed] underline">
+                public gallery
+              </Link>
+              . You can retract any entry at any time — it disappears from the
+              public listing immediately.
+            </p>
+          ) : (
+            <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
+              Posters you published while the gallery was open. The gallery is
+              currently offline, but you can still retract any entry at any
+              time — the entry row and stored image are deleted.
+            </p>
+          )}
+          {GALLERY_PUBLIC_ENABLED && (
+            <div className="mb-4 flex gap-2">
+              <button onClick={openUploadFlow} className={btnSecondary}>
+                Upload external PDF or image
+              </button>
+            </div>
+          )}
 
           {myGallery.length === 0 ? (
             <div className="rounded-md border border-dashed border-[#2a2a3a] bg-[#0a0a12] p-6 text-center text-[13px] text-[#6b7280]">
@@ -478,6 +492,7 @@ export default function Profile() {
             </div>
           )}
         </Section>
+        )}
 
         {/* Feedback */}
         <Section title="Feedback">
@@ -653,12 +668,18 @@ function GallerySubmissionRow({
               Retracted by moderator
             </span>
           )}
-          <Link
-            to={`/gallery/${entry.id}`}
-            className="truncate text-[13px] font-medium text-[#c8cad0] no-underline hover:text-white"
-          >
-            {entry.title}
-          </Link>
+          {GALLERY_PUBLIC_ENABLED ? (
+            <Link
+              to={`/gallery/${entry.id}`}
+              className="truncate text-[13px] font-medium text-[#c8cad0] no-underline hover:text-white"
+            >
+              {entry.title}
+            </Link>
+          ) : (
+            <span className="truncate text-[13px] font-medium text-[#c8cad0]">
+              {entry.title}
+            </span>
+          )}
         </div>
         <div className="mt-0.5 text-[11px] text-[#6b7280]">
           Published {date}

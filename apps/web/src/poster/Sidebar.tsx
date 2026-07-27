@@ -9,6 +9,7 @@
  * actions in.
  */
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import type {
   Author,
   Block,
@@ -1055,7 +1056,9 @@ function LayoutTab(props: {
       >
         💡 <strong style={{ color: '#c8b6ff' }}>Done building?</strong> Head to the{' '}
         <strong style={{ color: '#c8b6ff' }}>Export</strong> tab to preview,
-        save PDF, print at Staples, or publish to the gallery.
+        {GALLERY_PUBLIC_ENABLED
+          ? ' save PDF, print at Staples, or publish to the gallery.'
+          : ' save PDF, or print at Staples.'}
       </div>
     </>
   );
@@ -1140,22 +1143,26 @@ function ExportTab(props: {
         code, print at any Staples kiosk without a USB drive.
       </div>
 
-      <div style={labelStyle}>↗ Share to gallery</div>
-      <button
-        onClick={props.onPublish}
-        style={{
-          ...buttonStyle(false),
-          borderColor: '#7c6aed',
-          color: '#7c6aed',
-        }}
-      >
-        ↗ Publish to gallery
-      </button>
-      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-        Publish to the public gallery at{' '}
-        <span style={{ color: '#9ca3af' }}>/gallery</span>. You can retract at
-        any time from your Profile → Gallery submissions.
-      </div>
+      {GALLERY_PUBLIC_ENABLED && (
+        <>
+          <div style={labelStyle}>↗ Share to gallery</div>
+          <button
+            onClick={props.onPublish}
+            style={{
+              ...buttonStyle(false),
+              borderColor: '#7c6aed',
+              color: '#7c6aed',
+            }}
+          >
+            ↗ Publish to gallery
+          </button>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+            Publish to the public gallery at{' '}
+            <span style={{ color: '#9ca3af' }}>/gallery</span>. You can retract
+            at any time from your Profile → Gallery submissions.
+          </div>
+        </>
+      )}
     </>
   );
 }

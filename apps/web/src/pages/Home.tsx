@@ -25,6 +25,7 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { PublicFooter } from '@/components/PublicFooter';
 import { checkIsGalleryAdmin } from '@/data/gallery';
+import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
@@ -143,12 +144,14 @@ export default function Home() {
           <h1 className="text-[20pt] font-medium tracking-tight">Postr</h1>
         </Link>
         <div className="flex items-center gap-5">
-          <Link
-            to="/gallery"
-            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
-          >
-            Gallery
-          </Link>
+          {GALLERY_PUBLIC_ENABLED && (
+            <Link
+              to="/gallery"
+              className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+            >
+              Gallery
+            </Link>
+          )}
           <Link
             to="/about"
             className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
