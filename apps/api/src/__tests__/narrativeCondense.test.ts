@@ -87,7 +87,7 @@ const FULL_REPLY = {
   pinned: [{ id: 'sec12345', text: 'Sample was single-site.' }],
 };
 
-function post(app: ReturnType<typeof buildApp>, body: unknown) {
+function post(app: ReturnType<typeof buildApp>, body: object) {
   return request(app)
     .post('/api/narrative/condense')
     .set('Authorization', 'Bearer test-token')
