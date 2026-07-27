@@ -1430,8 +1430,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     const out: Record<string, number> = {};
     const readingOrder = (a: Block, b: Block) =>
       a.y - b.y || a.x - b.x;
+    // Charts are figures — they share the "Figure N" number sequence
+    // with image blocks so a poster mixing both stays consistent.
     doc.blocks
-      .filter((b) => b.type === 'image')
+      .filter((b) => b.type === 'image' || b.type === 'chart')
       .slice()
       .sort(readingOrder)
       .forEach((b, i) => {
