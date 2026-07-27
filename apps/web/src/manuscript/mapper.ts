@@ -279,6 +279,16 @@ export function extractFindings(doc: DocumentModel): Finding[] {
  * The author's Q2 ranking is an absolute override: an id listed first in
  * `rankedFindingIds` leads, even when it scores lower. The user outranks
  * the algorithm — that is the standing rule, not a special case.
+ *
+ * The converse rule is just as load-bearing: an EMPTY `rankedFindingIds`
+ * must fall through to pure score order and mark nothing
+ * `override: 'user-ranking'`. Callers signal "the user declined to
+ * reorder" by passing nothing, so anything that quietly fills this
+ * parameter with a default order both freezes that order past the
+ * takeaway and makes the outline claim the user picked the lead. Telling
+ * someone they made a decision they did not make removes the very signal
+ * that would let them spot a wrong ordering, so the override is applied
+ * strictly per-id and only for ids the caller actually named.
  */
 export function rankFindingsByCore(
   findings: readonly Finding[],
@@ -292,6 +302,8 @@ export function rankFindingsByCore(
   // Only ids we actually hold — a stale ranking must not resurrect a
   // finding that no longer exists.
   const userOrder = rankedFindingIds.filter((id) => byId.has(id));
+  // `undefined` when the user named nothing, and `c.id === undefined` is
+  // false for every candidate — so no finding is attributed to them.
   const userLead = userOrder[0];
 
   const candidates: RelevanceCandidate[] = findings.map((f, index) => ({
@@ -305,7 +317,7 @@ export function rankFindingsByCore(
   }));
 
   const scores = rankCandidates(candidates, core, idf, (c) => ({
-    userRanked: c.id === userLead,
+    userRanked: userLead !== undefined && c.id === userLead,
   }));
 
   // Score order first, then let the author's explicit ordering pull its

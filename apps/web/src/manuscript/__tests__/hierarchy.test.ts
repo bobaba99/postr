@@ -149,6 +149,30 @@ describe("the author's Q2 ranking overrides the score", () => {
     expect(lead.reason).toMatch(/you chose/i);
   });
 
+  /**
+   * The converse invariant, and the one the shipped flow actually
+   * depends on: no ranking means no attribution. A default must never
+   * masquerade as a choice — the outline renders `override:
+   * 'user-ranking'` as "You chose this to lead", so claiming it for a
+   * user who declined to reorder both fabricates their decision and
+   * promotes an unearned finding to tier 2.
+   */
+  it('claims no user override when the author named no findings', () => {
+    for (const context of [
+      { takeaway: TAKEAWAY },
+      { takeaway: TAKEAWAY, rankedFindingIds: [] },
+    ]) {
+      const map = mapNarrative(doc, context);
+      expect(map.findingScores.length).toBeGreaterThan(0);
+      for (const score of map.findingScores) {
+        expect(score.override).toBeNull();
+        expect(score.reason).not.toMatch(/you chose/i);
+      }
+      // And with nothing to override, relevance decides.
+      expect(map.findings[0]!.text).toMatch(/Recall accuracy fell/);
+    }
+  });
+
   it('ignores a stale id that no longer matches any finding', () => {
     const map = mapNarrative(doc, {
       takeaway: TAKEAWAY,

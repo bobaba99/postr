@@ -188,8 +188,22 @@ export function createInterview(): InterviewState {
   );
 }
 
-/** Called by the page after ingest succeeds. Runs the deterministic
- *  mapper and moves to Q1. */
+/**
+ * Called by the page after ingest succeeds. Runs the deterministic
+ * mapper and moves to Q1.
+ *
+ * `rankedFindingIds` stays EMPTY here, and that emptiness is load-bearing.
+ * It records "the user has not chosen an order", not "the order is
+ * unknown" — `mapNarrative` treats a non-empty list as an ABSOLUTE user
+ * override that pulls its ids to the front regardless of score, and marks
+ * the lead `override: 'user-ranking'` so the outline says "You chose this
+ * to lead". Seeding it with the ingest map's order (computed BEFORE Q1
+ * exists, from a prominence-dominated derived core) would therefore (a)
+ * freeze prominence order past the Q1 takeaway, making the core-relevance
+ * re-ranking dead code for every user who does not manually reorder, and
+ * (b) attribute a choice to a user who never made one. Only
+ * `handleQ2Finding`, on an actual finding chip, may populate it.
+ */
 export function ingestManuscript(
   state: InterviewState,
   doc: DocumentModel,
@@ -203,7 +217,7 @@ export function ingestManuscript(
     step: 'q1-takeaway',
     doc,
     map,
-    answers: { ...DEFAULT_ANSWERS, rankedFindingIds: map.findings.map((f) => f.id) },
+    answers: DEFAULT_ANSWERS,
     rankedSections: [],
     pendingSections: [],
     chartPanelOpen: false,
@@ -370,9 +384,12 @@ function askQ6(state: InterviewState): InterviewState {
 function finishQuestions(state: InterviewState): InterviewState {
   if (!state.doc) return state;
   // The full context is finally available: the Q1 takeaway establishes
-  // the core, Q2 overrides the finding ranking, Q5 pins are absolute,
-  // and Q6 sets the scale. This re-map is where the hierarchy is
-  // actually decided — the ingest-time map ran on a derived core.
+  // the core, Q2 overrides the finding ranking WHEN THE USER GAVE ONE,
+  // Q5 pins are absolute, and Q6 sets the scale. This re-map is where the
+  // hierarchy is actually decided — the ingest-time map ran on a derived,
+  // prominence-dominated core. `rankedFindingIds` is empty unless the user
+  // picked a finding, which is what lets the re-rank actually change the
+  // order rather than rubber-stamping the ingest ranking.
   const remapped = mapNarrative(state.doc, {
     takeaway: state.answers.takeaway,
     pinnedSectionIds: state.answers.pinnedSectionIds,
@@ -432,6 +449,18 @@ function handleQ2Display(state: InterviewState, chipId: string): InterviewState 
   );
 }
 
+/**
+ * Q2b — which finding leads. The ONLY place `rankedFindingIds` is
+ * populated, because it is the only place the user actually expresses a
+ * preference.
+ *
+ * `keep-order` means "I have no preference", NOT "lock in what you
+ * showed me": it leaves `rankedFindingIds` empty so the Q1 takeaway can
+ * re-rank the findings by core relevance in `finishQuestions`. Writing
+ * the displayed order here would silently convert a declined choice into
+ * an absolute override — the algorithm overruling the user while telling
+ * them they chose it.
+ */
 function handleQ2Finding(state: InterviewState, chipId: string): InterviewState {
   const findings = state.map?.findings ?? [];
   const chip = chipsFor(state).find((c) => c.id === chipId);
@@ -676,11 +705,17 @@ export function closeChartPanel(state: InterviewState): InterviewState {
   return { ...state, chartPanelOpen: false };
 }
 
-/** Structured emphasis facts for the condense request. */
+/**
+ * Structured emphasis facts for the condense request.
+ *
+ * `rankedFindings` comes from the MAP, not from `answers.rankedFindingIds`.
+ * The map's finding order is the settled verdict — core relevance with the
+ * Q2 answer already applied as an override — whereas `rankedFindingIds`
+ * holds only the user's explicit preference and is empty whenever they
+ * declined to reorder. Reading the answers directly would send the
+ * condenser nothing at all on the far more common `keep-order` path.
+ */
 export function emphasisFor(state: InterviewState): CondenseEmphasis {
-  const findingsById = new Map(
-    (state.map?.findings ?? []).map((f) => [f.id, f.text]),
-  );
   return {
     takeaway: state.answers.takeaway,
     audience: state.answers.audience,
@@ -688,8 +723,6 @@ export function emphasisFor(state: InterviewState): CondenseEmphasis {
       ? { audienceCustom: state.answers.audienceCustom }
       : {}),
     purpose: state.answers.purpose,
-    rankedFindings: state.answers.rankedFindingIds
-      .map((id) => findingsById.get(id))
-      .filter((t): t is string => Boolean(t)),
+    rankedFindings: (state.map?.findings ?? []).map((f) => f.text),
   };
 }

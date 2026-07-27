@@ -11,6 +11,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { parseManuscriptText } from '../parseManuscriptText';
+import { mapNarrative } from '../mapper';
 import {
   advance,
   chipsFor,
@@ -191,11 +192,20 @@ describe('Q2 — finding promotion still reachable (prompt.ts needs it)', () => 
     expect(state.answers.rankedFindingIds).toHaveLength(3);
   });
 
-  it('keep-order preserves the auto ranking', () => {
+  /**
+   * `keep-order` is the user DECLINING to reorder, so it must record no
+   * preference at all. Recording the displayed order instead would be
+   * read downstream as an absolute override — freezing the ingest-time
+   * prominence ranking past the Q1 takeaway and captioning it "You chose
+   * this to lead". The empty array is the whole fix.
+   */
+  it('keep-order records NO user preference', () => {
     const state = advance(atQ2, { kind: 'chip', chipId: 'keep-order' });
-    expect(state.answers.rankedFindingIds).toEqual(
-      atQ2.map!.findings.map((f) => f.id),
-    );
+    expect(state.answers.rankedFindingIds).toEqual([]);
+  });
+
+  it('ingest does not pre-seed a ranking the user never gave', () => {
+    expect(startInterview().answers.rankedFindingIds).toEqual([]);
   });
 
   it('free text is off-script: bounded reply, question re-armed', () => {
@@ -424,6 +434,119 @@ describe('Q6 — requirements, derived at a minute per slide', () => {
     const tightKey = tight.map!.roles.find((r) => r.role === 'keyResult')!;
     const looseKey = loose.map!.roles.find((r) => r.role === 'keyResult')!;
     expect(tightKey.budgetWords).toBeLessThan(looseKey.budgetWords);
+  });
+});
+
+/**
+ * Regression — the core-relevance re-ranking must actually run for the
+ * user who declines to reorder, which is most of them.
+ *
+ * The fixture makes PROMINENCE and RELEVANCE disagree on purpose: the
+ * incidental reaction-time effect is by far the loudest number in the
+ * manuscript, while the recall finding carries the argument on no number
+ * at all. The ingest map (derived core, prominence-dominated) leads with
+ * the incidental one; the takeaway-aware re-map must not.
+ *
+ * These tests drive the REAL state machine to `step: 'outline'` rather
+ * than calling `mapNarrative` directly, because the bug they pin lived
+ * entirely in the wiring — both the scoring and the override handling
+ * were already correct in isolation.
+ */
+describe('keep-order still re-ranks findings against the takeaway', () => {
+  const DIVERGENT = [
+    'Sleep Restriction and Recall Accuracy in Undergraduate Students',
+    '',
+    'John Smith1, Jane Doe2',
+    '(1) Acme State University, (2) Sample Research Institute',
+    '',
+    'Abstract',
+    '',
+    'Sleep loss impairs memory.',
+    '',
+    'Introduction',
+    '',
+    'We asked whether moderate sleep restriction produces recall deficits.',
+    '',
+    'Methods',
+    '',
+    'Participants were 120 undergraduates randomized to three groups.',
+    '',
+    'Results',
+    '',
+    'Incidental reaction time increased by 43% (p < .0001) as shown in Figure 2. Recall accuracy decreased.',
+    '',
+    'Discussion',
+    '',
+    'Moderate sleep restriction measurably impairs recall.',
+    '',
+    'Acknowledgements',
+    '',
+    'We thank the Sample Research Institute.',
+  ].join('\n');
+
+  const TAKEAWAY = 'Recall accuracy declines under sleep restriction.';
+  const divergentDoc = parseManuscriptText(DIVERGENT);
+
+  /** Drive the real script to the outline, never picking a finding. */
+  function outlineViaKeepOrder(): InterviewState {
+    let state = ingestManuscript(createInterview(), divergentDoc);
+    state = advance(state, { kind: 'text', text: TAKEAWAY });
+    state = advance(state, { kind: 'chip', chipId: 'table' });
+    if (state.step === 'q2-finding') {
+      state = advance(state, { kind: 'chip', chipId: 'keep-order' });
+    }
+    state = advance(state, { kind: 'chip', chipId: 'general' });
+    state = advance(state, { kind: 'chip', chipId: 'committee' });
+    if (state.step === 'q5-sections') {
+      state = advance(state, { kind: 'chip', chipId: 'sections-done' });
+    }
+    return advance(state, { kind: 'chip', chipId: 'req-none' });
+  }
+
+  it('the fixture really does pit prominence against relevance', () => {
+    // Guard: if the ingest map ever stops leading with the loud
+    // incidental finding, the tests below would pass vacuously.
+    const ingestMap = mapNarrative(divergentDoc);
+    expect(ingestMap.findings[0]!.text).toMatch(/Incidental reaction time/);
+  });
+
+  it('the shipped flow matches a takeaway-only map, not the ingest order', () => {
+    const state = outlineViaKeepOrder();
+    expect(state.step).toBe('outline');
+    const expected = mapNarrative(divergentDoc, { takeaway: TAKEAWAY });
+    expect(state.map!.findings.map((f) => f.id)).toEqual(
+      expected.findings.map((f) => f.id),
+    );
+    expect(state.map!.findings[0]!.text).toMatch(/Recall accuracy decreased/);
+  });
+
+  it('claims no user attribution when the user never picked a finding', () => {
+    const state = outlineViaKeepOrder();
+    for (const score of state.map!.findingScores) {
+      expect(score.override).not.toBe('user-ranking');
+      expect(score.reason).not.toMatch(/you chose/i);
+    }
+  });
+
+  it('still honours a finding the user DID pick', () => {
+    let state = ingestManuscript(createInterview(), divergentDoc);
+    state = advance(state, { kind: 'text', text: TAKEAWAY });
+    state = advance(state, { kind: 'chip', chipId: 'table' });
+    const loud = state.map!.findings.find((f) =>
+      /Incidental reaction time/.test(f.text),
+    )!;
+    state = advance(state, { kind: 'chip', chipId: loud.id });
+    state = advance(state, { kind: 'chip', chipId: 'general' });
+    state = advance(state, { kind: 'chip', chipId: 'committee' });
+    if (state.step === 'q5-sections') {
+      state = advance(state, { kind: 'chip', chipId: 'sections-done' });
+    }
+    state = advance(state, { kind: 'chip', chipId: 'req-none' });
+
+    expect(state.step).toBe('outline');
+    expect(state.map!.findings[0]!.id).toBe(loud.id);
+    const lead = state.map!.findingScores.find((s) => s.id === loud.id)!;
+    expect(lead.override).toBe('user-ranking');
   });
 });
 
