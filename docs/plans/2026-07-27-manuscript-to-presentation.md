@@ -288,6 +288,76 @@ consequences, both of which cut against the usual instinct:
 2. **Price on what researchers will pay**, not on a cost-plus basis, and prefer fewer, larger
    transactions over many small ones, because the fixed fee dominates at low ticket sizes.
 
+### 5.1.5 Model pipeline — measured, and it reverses an earlier recommendation
+
+Two blind-graded experiments, 2026-07-27. Scripts and full outputs in the session record.
+
+**Run 1** (baseline prompt, 1 manuscript, 2 graders/deck): narrative scored 23–24/25 across all
+tiers, but **every deck failed fidelity**. Invented prevalence figures ("fifteen million older
+adults"), hypothetical examples with fabricated numbers, causal upgrades, imported constructs.
+Tier spread was ~1 point — inside grader disagreement. On that evidence I recommended a cheap
+generator. **That recommendation was wrong**, and the error was trusting an n=1 result.
+
+**Run 2** (hardened prompt — invention promoted to "Rule Zero" above narrative quality, run 1's
+real violations quoted as forbidden examples, the four invention "moves" banned by name, and a
+mandatory verbatim `sourceQuote` per slide; 4 manuscripts × 3 tiers, 1 grader/deck):
+
+| Model | Fidelity | Total violations | Narrative |
+|---|---|---|---|
+| **Opus-tier** | **4/4 pass** | **0** | 23.2/25 |
+| Sonnet-tier | 2/4 pass | 5 | 23.5/25 |
+| Haiku-tier | 0/4 pass | **55** | 18.8/25 |
+
+**Two findings, in order of importance.**
+
+1. **The hardened prompt is the larger effect** — universal failure became a clean pass on the
+   top tier. Prompt engineering did most of the work here, not model choice.
+2. **But tier is decisive, and the run-1 conclusion inverts.** 0 vs 55 violations is not grader
+   noise. **Use the top tier for first generation.** The ~4¢ premium per deck is invisible
+   against a $7/month price (§5.1) and is the difference between shippable and not.
+
+**Manuscript type predicts invention — the hypothesis held.** Violations by source:
+
+| Manuscript | Opus | Sonnet | Haiku |
+|---|---|---|---|
+| Positive finding | 0 | 0 | 9 |
+| **Null result** | 0 | **3** | **16** |
+| **Methods/tool paper** | 0 | **2** | **16** |
+| Qualitative | 0 | 0 | 14 |
+
+The clean positive finding is the safest source. **Null results and methods papers are the risky
+pair** — the only two that broke the mid tier. The mechanisms differ and both are nameable:
+
+- **A null paper has a claim-shaped hole where the finding should be, and the model fills it.**
+  Observed: a non-significant per-protocol test upgraded to "No Effect in Completers"; a
+  within-arm decline the paper attributes to regression to the mean recast as "real improvement";
+  and — worst — a design asserted to "rule out attention and expectancy" when the paper invokes
+  expectancy as its *own leading explanation*. Reporting someone's null result as a positive
+  finding is the most damaging output this product could produce.
+- **Methods papers invite invented mechanism** — fabricated causal explanations for reported
+  numbers, including one that contradicted the paper's own data.
+
+**What survived on the top tier** (zero hard violations, three borderline reaches, all flagged by
+graders, all in **speaker notes**): a characterisation of standard clinical practice the paper
+never makes; a deployment claim ("commodity compute") absent from the source; and an inaccurate
+quotative frame ("In the author's own words:" followed by a paraphrase). Every one is the notes
+reaching past the source — that is where the next prompt revision belongs.
+
+**Sample-size honesty.** n=4 manuscripts per tier, one generation per cell, **one grader per deck
+in run 2** (run 1 used two), so there is no inter-rater reliability estimate for run 2. The
+top-tier/cheap-tier separation survives any plausible grader noise. **The top-vs-mid separation
+does not** — the mid tier's failure rate is ~50% with a 95% CI of roughly 15–85%. If that choice
+ever needs defending rigorously, run 3 should be mid-tier only, 8–12 manuscripts, 2 graders.
+
+**Pipeline decision:**
+- **First generation: top tier.** Non-negotiable.
+- **Iterations: cheap tier + cache** — an accepted spine constrains the edit, and §5.1's cost
+  model already assumes this.
+- **Never the cheapest tier for first generation.** It failed 4/4 and corrupted verbatim quotes
+  it was handed (3/4 on quote accuracy), so it cannot be trusted even for repair work.
+- **Verification is still required regardless of tier** — see §4.1. A 4/4 pass on four
+  manuscripts is not a guarantee on the fifth.
+
 ### 5.2 Model spend
 
 The owner asked where hardcoding or cheaper models can replace the current shape. Measured
