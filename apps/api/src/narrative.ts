@@ -61,8 +61,35 @@ const CondenseRequest = z
     pinned: z.array(PinnedInput).max(2).default([]),
     emphasis: z.object({
       takeaway: z.string().max(500),
-      audience: z.enum(['specialists', 'adjacent', 'general', 'clinicians']),
-      purpose: z.enum(['feedback', 'collaborators', 'job-market', 'requirement']),
+      // These two enums MUST stay in lockstep with AudienceOption and
+      // PurposeOption in packages/shared, and with the DESCRIPTIONS
+      // maps in narrative/prompt.ts. A value the client can produce but
+      // this schema rejects is a 400 on a legitimate answer.
+      audience: z.enum([
+        'specialists',
+        'general',
+        'clinicians',
+        'public',
+        'adolescents',
+        'children',
+        'undergraduates',
+        'policymakers',
+        'industry',
+        'custom',
+      ]),
+      // Free text only reaches the prompt when the deterministic preset
+      // search found no match. Bounded so a paste cannot inflate the
+      // prompt, and it is quoted as data, never as instructions.
+      audienceCustom: z.string().max(200).optional(),
+      purpose: z.enum([
+        'requirement',
+        'one-time',
+        'committee',
+        'lab-meeting',
+        'feedback',
+        'collaborators',
+        'job-market',
+      ]),
       rankedFindings: z.array(z.string().min(1).max(1000)).max(5),
     }),
   })

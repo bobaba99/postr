@@ -71,6 +71,42 @@ export const POSTER_ROLE_ORDER: NarrativeRoleId[] = [
   'takeaway',
 ];
 
+/**
+ * Q6 content-budget scaling.
+ *
+ * A stated slot length is the author telling us how much they will have
+ * to say. A tight slot (a 3-minute lightning slot, ~3 slides) means the
+ * poster should carry less text, not the same text in smaller type —
+ * which is the same rule as everything else in this file.
+ *
+ * The scale is deliberately gentle and CLAMPED: the budgets in
+ * POSTER_ROLE_SPECS are the rubric, and a questionnaire answer may
+ * nudge them, never rewrite them. A poster must remain a poster at
+ * every slot length.
+ *
+ * `null` (no constraint stated) always means scale 1 — the default is
+ * the rubric untouched.
+ */
+export const REQUIREMENT_REFERENCE_SLIDES = 10;
+export const MIN_BUDGET_SCALE = 0.7;
+export const MAX_BUDGET_SCALE = 1;
+
+export function budgetScaleForSlides(slideCount: number | null): number {
+  if (slideCount === null || !Number.isFinite(slideCount) || slideCount <= 0) {
+    return 1;
+  }
+  const raw = slideCount / REQUIREMENT_REFERENCE_SLIDES;
+  return Math.min(MAX_BUDGET_SCALE, Math.max(MIN_BUDGET_SCALE, raw));
+}
+
+/**
+ * A role's word budget under a stated slot constraint. Rounded to whole
+ * words and floored at 20 so no panel can be scaled into uselessness.
+ */
+export function scaledBudget(budgetWords: number, scale: number): number {
+  return Math.max(20, Math.round(budgetWords * scale));
+}
+
 /** Reference list is trimmed to this many entries on the poster. */
 export const POSTER_MAX_REFERENCES = 5;
 

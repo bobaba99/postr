@@ -159,6 +159,20 @@ describe('POST /api/narrative/condense — auth and validation', () => {
       },
     ],
     ['bad audience', { ...VALID_BODY, emphasis: { ...VALID_BODY.emphasis, audience: 'everyone' } }],
+    ['bad purpose', { ...VALID_BODY, emphasis: { ...VALID_BODY.emphasis, purpose: 'vibes' } }],
+    // The retired values must not linger as accepted input.
+    ['retired audience', { ...VALID_BODY, emphasis: { ...VALID_BODY.emphasis, audience: 'adjacent' } }],
+    [
+      'over-long custom audience',
+      {
+        ...VALID_BODY,
+        emphasis: {
+          ...VALID_BODY.emphasis,
+          audience: 'custom',
+          audienceCustom: 'x'.repeat(201),
+        },
+      },
+    ],
   ])('rejects %s with 400 before any upstream call', async (_label, body) => {
     const fetchFn = vi.fn();
     const app = buildApp(fetchFn as unknown as typeof fetch);
@@ -166,6 +180,67 @@ describe('POST /api/narrative/condense — auth and validation', () => {
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('bad_request');
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  // The wire schema, the shared union, and prompt.ts's description maps
+  // must agree. A value the questionnaire can produce but the schema
+  // rejects is a 400 on a perfectly good answer — so every option the
+  // user can pick is asserted to get through.
+  it.each([
+    'specialists',
+    'general',
+    'clinicians',
+    'public',
+    'adolescents',
+    'children',
+    'undergraduates',
+    'policymakers',
+    'industry',
+  ])('accepts the %s audience', async (audience) => {
+    const fetchFn = vi.fn().mockResolvedValue(openAiToolReply(FULL_REPLY));
+    const app = buildApp(fetchFn as unknown as typeof fetch);
+    const res = await post(app, {
+      ...VALID_BODY,
+      emphasis: { ...VALID_BODY.emphasis, audience },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it.each([
+    'requirement',
+    'one-time',
+    'committee',
+    'lab-meeting',
+    'feedback',
+    'collaborators',
+    'job-market',
+  ])('accepts the %s purpose', async (purpose) => {
+    const fetchFn = vi.fn().mockResolvedValue(openAiToolReply(FULL_REPLY));
+    const app = buildApp(fetchFn as unknown as typeof fetch);
+    const res = await post(app, {
+      ...VALID_BODY,
+      emphasis: { ...VALID_BODY.emphasis, purpose },
+    });
+    expect(res.status).toBe(200);
+  });
+
+  it('accepts a custom audience with its free text', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(openAiToolReply(FULL_REPLY));
+    const app = buildApp(fetchFn as unknown as typeof fetch);
+    const res = await post(app, {
+      ...VALID_BODY,
+      emphasis: {
+        ...VALID_BODY.emphasis,
+        audience: 'custom',
+        audienceCustom: 'museum curators',
+      },
+    });
+    expect(res.status).toBe(200);
+    // And the words reach the upstream prompt verbatim.
+    const body = JSON.parse(
+      (fetchFn.mock.calls[0]![1] as { body: string }).body,
+    );
+    expect(JSON.stringify(body)).toContain('museum curators');
   });
 
   it('fails with 500 when no provider is configured', async () => {

@@ -48,6 +48,44 @@ function walkChildren(parent: Element, items: IngestItem[]): void {
   }
 }
 
+/**
+ * Read a `<table>` into a header + rows grid.
+ *
+ * Word tables rarely carry `<thead>`, so the first row is treated as
+ * the header when mammoth gives us no better signal — the same
+ * convention the chart chooser's paste path already uses. Ragged rows
+ * are padded to the header width rather than dropped: a missing cell is
+ * a blank, not a reason to lose the row.
+ *
+ * Returns null for anything that is not a usable grid (a layout table
+ * with one cell, an empty table), so callers can fall back to the
+ * caption-only record without a special case.
+ */
+export function readTableGrid(el: Element): { header: string[]; rows: string[][] } | null {
+  const rowEls = Array.from(el.querySelectorAll('tr'));
+  const grid = rowEls
+    .map((tr) =>
+      Array.from(tr.querySelectorAll('th, td')).map((cell) =>
+        (cell.textContent ?? '').replace(/\s+/g, ' ').trim(),
+      ),
+    )
+    .filter((cells) => cells.some((c) => c.length > 0));
+
+  // A header plus at least one data row, at least two columns — below
+  // that it is a layout box, not data worth charting.
+  if (grid.length < 2) return null;
+  const header = grid[0]!;
+  if (header.length < 2) return null;
+
+  const rows = grid.slice(1).map((cells) => {
+    const padded = [...cells];
+    while (padded.length < header.length) padded.push('');
+    return padded.slice(0, header.length);
+  });
+
+  return { header, rows };
+}
+
 function visitElement(el: Element, items: IngestItem[]): void {
   const tag = el.tagName.toLowerCase();
 
@@ -85,9 +123,11 @@ function visitElement(el: Element, items: IngestItem[]): void {
   }
 
   if (tag === 'table') {
-    // Cell contents are not reconstructed in the MVP — the ref exists
-    // so the outline can say "1 table detected" and Q5 can pin it.
-    items.push({ kind: 'table', text: '' });
+    // Cells ARE reconstructed: Q2's plot branch offers the manuscript's
+    // own results table to the chart chooser pre-filled, and that is
+    // only possible if ingest keeps the grid. Deterministic parsing —
+    // no model involved in reading a <table>.
+    items.push({ kind: 'table', text: '', tableData: readTableGrid(el) });
     return;
   }
 

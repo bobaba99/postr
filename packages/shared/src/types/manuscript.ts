@@ -61,13 +61,26 @@ export interface ManuscriptFigure {
   prominence: number;
 }
 
-/** Caption-level record of a table in the source manuscript. The MVP
- *  does not reconstruct table cells — the caption is enough for the
- *  mapper's ranking and the questionnaire's pin list. */
+/** A table's reconstructed grid, when the ingest path could recover
+ *  one (.docx `<table>`). Cells are raw strings — typing them is the
+ *  chart chooser's job, not the ingest's. */
+export interface ManuscriptTableData {
+  header: string[];
+  rows: string[][];
+}
+
+/** Caption-level record of a table in the source manuscript.
+ *
+ *  `data` is populated when the source carried a real grid we could
+ *  read (DOCX tables); it stays null for caption-only detections
+ *  (pasted text says "Table 1." but the numbers are an image). Q2's
+ *  plot branch offers `data` to the chart chooser pre-filled — the
+ *  extraction is deterministic parsing, never a model call. */
 export interface ManuscriptTableRef {
   id: string;
   caption: string;
   sourceSectionId: string | null;
+  data: ManuscriptTableData | null;
 }
 
 /** One IR for every input format and every output format. */
@@ -143,17 +156,64 @@ export interface MappedPinnedSection {
 // Emphasis questionnaire (§2.5) — structured answers only
 // ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Q3 audience. The first two are the chips the user sees; the rest are
+ * PRESETS reached by typing into "Other" and matched deterministically
+ * (see apps/web/src/manuscript/audiencePresets.ts). `custom` is the
+ * escape hatch when the search finds nothing — the typed text then
+ * rides along in `EmphasisAnswers.audienceCustom`.
+ *
+ * Every value here MUST have an entry in the condenser prompt's
+ * AUDIENCE_DESCRIPTIONS. A missing key renders "undefined" into the
+ * prompt, silently, which is the worst kind of bug this file can ship.
+ */
 export type AudienceOption =
   | 'specialists'
-  | 'adjacent'
   | 'general'
-  | 'clinicians';
+  | 'clinicians'
+  | 'public'
+  | 'adolescents'
+  | 'children'
+  | 'undergraduates'
+  | 'policymakers'
+  | 'industry'
+  | 'custom';
 
+/**
+ * Q4 purpose. Widened 2026-07-27 from four options to what students
+ * actually do: the common case is a poster presentation for its own
+ * sake, then committee meetings and lab presentations. Wanting FEEDBACK
+ * is now explicitly distinct from a ONE-TIME presentation — they pull
+ * the hook in opposite directions (an ask versus a summary).
+ *
+ * Every value here MUST have an entry in PURPOSE_DESCRIPTIONS.
+ */
 export type PurposeOption =
+  | 'requirement'
+  | 'one-time'
+  | 'committee'
+  | 'lab-meeting'
   | 'feedback'
   | 'collaborators'
-  | 'job-market'
-  | 'requirement';
+  | 'job-market';
+
+/** Q2 — how the key results should be shown on the poster. A plot
+ *  usually condenses results better than a table at three feet, which
+ *  the question says out loud rather than deciding for the user. */
+export type ResultDisplay = 'plot' | 'table';
+
+/**
+ * Q6 — presentation constraints. Either side may be user-stated; the
+ * other is DERIVED at one minute per slide and shown, never hidden.
+ * Captured even when it cannot change today's poster output, because
+ * the poster-to-deck path needs it.
+ */
+export interface PresentationRequirements {
+  /** What the user actually told us — the other field is derived. */
+  statedAs: 'slides' | 'duration' | 'none';
+  slideCount: number | null;
+  durationMinutes: number | null;
+}
 
 /** The questionnaire's structured answers — the ONLY user input the
  *  condenser receives beyond the manuscript itself. */
@@ -161,15 +221,23 @@ export interface EmphasisAnswers {
   /** Q1 — the one thing someone should remember (free text, ≤25 words).
    *  Load-bearing: the author stating their own thesis. */
   takeaway: string;
+  /** Q2 — how key results are shown. */
+  resultDisplay: ResultDisplay;
   /** Q2 — finding ids in the user's preferred order (most important
    *  first). Empty = keep the auto-extracted ranking. */
   rankedFindingIds: string[];
   /** Q3 — audience, controls jargon tolerance. */
   audience: AudienceOption;
+  /** Q3 — free text, set only when `audience` is 'custom' (the preset
+   *  search found no reasonable match). */
+  audienceCustom: string;
   /** Q4 — what the poster is for, controls hook framing. */
   purpose: PurposeOption;
-  /** Q5 — section ids pinned against the budget cutter. */
+  /** Q5 — section ids the user confirmed as critical. Derived
+   *  deterministically, then adjusted by the user — never automatic. */
   pinnedSectionIds: string[];
+  /** Q6 — slide/duration constraints. */
+  requirements: PresentationRequirements;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -187,6 +255,9 @@ export interface CondenseRoleInput {
 export interface CondenseEmphasis {
   takeaway: string;
   audience: AudienceOption;
+  /** Present only when `audience` is 'custom' — the user's own words
+   *  for who reads this, after the preset search found no match. */
+  audienceCustom?: string;
   purpose: PurposeOption;
   /** Verbatim finding texts in the user's preferred order. */
   rankedFindings: string[];

@@ -104,6 +104,79 @@ author knows, and asking beats guessing.
 because the right emphasis genuinely differs: a poster is skimmed by a stranger at 3 feet, a
 talk is narrated to a seated audience.
 
+**Question set as shipped (revised 2026-07-27).** The earlier draft is kept below the
+table for provenance.
+
+| # | Question | Options | Feeds |
+|---|---|---|---|
+| 1 | **What's the one thing someone should remember?** | free text, one sentence, ≤ 25 words | Takeaway role; also the Q5 relevance scoring |
+| 2a | **Table or plot?** | A plot · A table, with a one-line reminder that a plot condenses better on a poster | `resultDisplay`; PLOT opens the chart chooser as an inline side panel |
+| 2b | **Which result leads?** | the auto-extracted findings, ranked — user picks or keeps the order | Key result promotion (`rankedFindings`, still consumed by prompt.ts) |
+| 3 | **Who's reading this poster?** | Specialists in my subfield · General researchers in my field *(sub-text: conference or department talk)* · **Other →** free text | jargon tolerance, how much Methods survives |
+| 4 | **What's the poster for?** | Course requirement · One-time presentation · Committee meeting · Lab presentation · Getting feedback · Finding collaborators · Job market | Hook framing |
+| 5 | **Which sections are critical?** | **derived and ranked**, pre-selected, user adds/removes | pins content against the budget cutter |
+| 6 | **Any limit on the presentation?** | No limit · 5 / 10 / 15 min chips, or type "12 slides" | `requirements`; scales the rubric's word budgets |
+
+### Q2 — result display and the data path
+
+Reframed from "which result matters most" to **how the results should be shown**, because
+that is the decision that actually changes the poster. The finding-ranking question survives
+as Q2b: `narrative/prompt.ts` consumes `rankedFindings`, so deleting it would silently drop
+the author's ordering.
+
+Picking **plot** opens the existing chart chooser (`apps/web/src/charts/ladder/ChartChooser`)
+as a **side panel inline in the flow** — imported, never forked — plus a link to the full
+`/chart-chooser` page. Data reaches it by two paths, both chosen deliberately:
+
+- **(a) extraction.** `.docx` `<table>` grids are reconstructed at ingest
+  (`docxIngest.readTableGrid` → `ManuscriptTableRef.data`) and offered pre-filled, results
+  tables first (`tableExtract.ts`). Deterministic parsing — no model call.
+- **(b) fallback.** Extraction finding nothing, or the user rejecting the offer, drops
+  through to the chooser's own paste / CSV / XLSX ingest. Pasted text always lands here: a
+  paste carries captions but no cells.
+
+### Q3 — audience, and why the free text is not classified by a model
+
+Two chips plus **Other**. Typed text is matched against **prepared presets** by a
+deterministic keyword search (`audiencePresets.ts`): clinicians, general public,
+adolescents, children, undergraduates, policymakers, industry. Matching is word-boundary
+based on a normalised string, so "publication" cannot resolve to "public". Only a genuine
+miss passes the text through as a custom audience.
+
+This is the governing principle in miniature: **search/match presets first, model never on
+the happy path.** Classifying "school nurses" is a keyword table's job, and a wrong guess
+quietly changes how much jargon survives.
+
+Every `AudienceOption` and `PurposeOption` MUST have an entry in `AUDIENCE_DESCRIPTIONS` /
+`PURPOSE_DESCRIPTIONS` in `narrative/prompt.ts`, and MUST appear in the zod enum in
+`narrative.ts`. The maps are `Record<Option, string>` so a missing key is a compile error;
+`narrativePrompt.test.ts` covers the runtime half. A missing key would otherwise render the
+literal string "undefined" into the owner-audited prompt.
+
+### Q5 — derived, not asked from a cut list
+
+The old Q5 handed the user the cut list and asked what to rescue, which makes the user do
+the work of noticing what the cutter was about to destroy. Now `sectionRelevance.ts` scores
+every non-spine section against the paper's core (Q1 takeaway ×3, title ×2, findings ×2,
+abstract ×1) using term overlap with TF-IDF-ish weighting, the section lexicon's own kind
+prior, heading semantics, and position. The ranking is **shown**, the top candidates are
+**pre-selected** up to `MAX_PINNED_SECTIONS`, and the user adds or removes.
+
+**Never fully automatic** — Gavin was explicit. The derivation suggests; the user decides.
+
+### Q6 — one minute per slide
+
+Either side may be stated and the other is derived (`requirements.ts`), with the arithmetic
+shown rather than hidden: "10 minutes is about 10 slides, at a minute each." The constraint
+feeds `budgetScaleForSlides` in `rubric.ts`, which scales every panel's word budget in
+[0.7, 1.0] against a 10-slide reference — a gentle, clamped nudge, because the budgets are
+the rubric and a questionnaire answer may adjust them, never rewrite them. A poster stays a
+poster at every slot length. The answer is persisted regardless, since the poster-to-deck
+path needs it.
+
+<details>
+<summary>Original 2026-07-27 draft of the question set (superseded)</summary>
+
 | # | Question | Options | Feeds |
 |---|---|---|---|
 | 1 | **What's the one thing someone should remember?** | free text, one sentence, ≤ 25 words | Takeaway role; also reorders Key result |
@@ -112,6 +185,8 @@ talk is narrated to a seated audience.
 | 4 | **What's the poster for?** | Getting feedback · Recruiting collaborators · Job market · Requirement | Hook framing, whether contact/QR is prominent |
 | 5 | **Anything you must NOT cut?** | multi-select over detected sections | pins content against the budget cutter |
 | 6 | *(talk only)* **How long is your slot?** | 3 / 5 / 10 / 15 min | slide count, findings per slide |
+
+</details>
 
 **Question 1 is load-bearing and must stay free text.** It is the single highest-signal input
 in the whole pipeline — it is the author stating their own thesis, which is precisely what

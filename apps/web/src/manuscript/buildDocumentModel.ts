@@ -11,6 +11,7 @@ import type {
   DocumentModel,
   ManuscriptFigure,
   ManuscriptSection,
+  ManuscriptTableData,
   ManuscriptTableRef,
   Reference,
   SectionKind,
@@ -27,6 +28,8 @@ export interface IngestItem {
   level?: number;
   /** Figures only — data: URL from the DOCX image converter. */
   imageRef?: string;
+  /** Tables only — the reconstructed grid, when the source had one. */
+  tableData?: ManuscriptTableData | null;
 }
 
 const FIGURE_CAPTION_RE = /^(figure|fig\.?)\s*(\d+)\s*[.:—-]/i;
@@ -177,6 +180,7 @@ export function buildDocumentModel(items: IngestItem[]): DocumentModel {
   let current: ManuscriptSection | null = null;
   let sourceOrder = 0;
   let pendingFigure: ManuscriptFigure | null = null;
+  let pendingTable: ManuscriptTableRef | null = null;
 
   const pushSection = (heading: string, kind: SectionKind, level: number) => {
     const section: ManuscriptSection = {
@@ -198,6 +202,7 @@ export function buildDocumentModel(items: IngestItem[]): DocumentModel {
     if (item.kind === 'heading') {
       if (!text) continue;
       pendingFigure = null;
+      pendingTable = null;
       current = pushSection(text, classifyHeading(text), item.level ?? 1);
       continue;
     }
@@ -218,11 +223,17 @@ export function buildDocumentModel(items: IngestItem[]): DocumentModel {
     }
 
     if (item.kind === 'table') {
-      tables.push({
+      const table: ManuscriptTableRef = {
         id: nanoid(8),
         caption: text,
         sourceSectionId: current?.id ?? null,
-      });
+        data: item.tableData ?? null,
+      };
+      tables.push(table);
+      // A grid with no caption of its own pairs with the next
+      // "Table N." paragraph, exactly as figures do — Word convention
+      // puts the caption above or below, never inside.
+      pendingTable = !text ? table : null;
       continue;
     }
 
@@ -236,7 +247,17 @@ export function buildDocumentModel(items: IngestItem[]): DocumentModel {
       pendingFigure = null;
       continue;
     }
+    // Same for a "Table N." paragraph following a bare grid — the
+    // caption is what the chart chooser labels the pre-filled data
+    // with, so losing it costs the user their own bearings.
+    if (pendingTable && TABLE_CAPTION_RE.test(text)) {
+      const idx = tables.indexOf(pendingTable);
+      tables[idx] = { ...pendingTable, caption: text };
+      pendingTable = null;
+      continue;
+    }
     pendingFigure = null;
+    pendingTable = null;
 
     if (current?.kind === 'abstract') {
       abstractParas = [...abstractParas, unwrapLines(text)];
@@ -261,7 +282,15 @@ export function buildDocumentModel(items: IngestItem[]): DocumentModel {
       continue;
     }
     if (TABLE_CAPTION_RE.test(text)) {
-      tables.push({ id: nanoid(8), caption: text, sourceSectionId: current?.id ?? null });
+      // Caption-only: pasted text declares "Table 1." but the numbers
+      // themselves are an image or were never pasted. `data` stays null
+      // and Q2's plot branch falls back to the chooser's own ingest.
+      tables.push({
+        id: nanoid(8),
+        caption: text,
+        sourceSectionId: current?.id ?? null,
+        data: null,
+      });
       continue;
     }
 

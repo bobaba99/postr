@@ -37,25 +37,58 @@ Rules, in priority order:
 2. NEVER invent facts, numbers, statistics, or claims. Every number in your output must appear in that panel's source text. Keep p-values, percentages, effect sizes, and sample sizes VERBATIM — do not round or restate them.
 3. The author's takeaway sentence is their thesis. The takeaway panel must express that idea (polished for a poster if needed), and the other panels must not contradict or bury it.
 4. Respect the given finding order in the key-results panel: first listed = most important = first and fullest treatment.
-5. Write for the stated audience: specialists tolerate field jargon; adjacent researchers need method shorthand expanded once; a mixed/general audience and clinicians need plain terms and outcomes over mechanisms.
+5. Write for the stated audience. Specialists tolerate field jargon. General researchers in the same field need method shorthand expanded once. Clinicians, policymakers and industry readers want outcomes and implications over mechanisms. The public, undergraduates, adolescents and children need plain terms, no unexplained acronyms, and shorter sentences the younger the reader.
 6. Poster prose style: short declarative sentences, active voice, no filler ("In this study, we..." becomes the finding itself). No citations inside panel text. No headings — the poster supplies them.
 7. Output text only for the panels you were given, one entry per panel. Do not add panels, notes, or commentary.`;
 
-/** Human-readable audience phrasing injected into the user message. */
+/**
+ * Human-readable audience phrasing injected into the user message.
+ *
+ * EXHAUSTIVE BY CONSTRUCTION. `Record<CondenseEmphasis['audience'], …>`
+ * means adding an AudienceOption in packages/shared without adding a
+ * line here is a TYPE ERROR, not a silent "undefined" in the prompt.
+ * Keep it that way — do not loosen this to Partial or index-signature.
+ */
 const AUDIENCE_DESCRIPTIONS: Record<CondenseEmphasis['audience'], string> = {
   specialists: 'specialists in the author\'s own subfield',
-  adjacent: 'researchers in adjacent fields',
-  general: 'a mixed, general conference audience',
+  general: 'general researchers in the author\'s field, such as a conference or department audience',
   clinicians: 'practicing clinicians',
+  public: 'the general public, with no research training',
+  adolescents: 'adolescents — teenage readers',
+  children: 'children — young readers',
+  undergraduates: 'undergraduate students',
+  policymakers: 'policymakers and funders, who need implications over mechanisms',
+  industry: 'an industry audience, who need applications and outcomes',
+  // 'custom' is replaced verbatim by the user's own words below, so
+  // this string only shows if `audienceCustom` was somehow empty.
+  custom: 'a specific audience the author described',
 };
 
-/** What the poster is for — nudges hook framing only. */
+/**
+ * What the poster is for — nudges hook framing only. Also exhaustive by
+ * construction; see the note above.
+ *
+ * The feedback / one-time split is deliberate and load-bearing: a
+ * poster seeking feedback should surface open questions, and a
+ * one-time presentation should close them.
+ */
 const PURPOSE_DESCRIPTIONS: Record<CondenseEmphasis['purpose'], string> = {
-  feedback: 'getting feedback on work in progress',
+  requirement: 'a course or programme requirement',
+  'one-time': 'a single presentation with no follow-up — state conclusions plainly rather than inviting critique',
+  committee: 'a thesis or progress committee meeting — show the work is on track and defensible',
+  'lab-meeting': 'an internal lab presentation among colleagues who know the project',
+  feedback: 'getting feedback on work in progress — make the open questions visible',
   collaborators: 'recruiting collaborators',
   'job-market': 'the academic job market',
-  requirement: 'a course or programme requirement',
 };
+
+/** The audience line, with the custom escape hatch resolved. */
+function audienceLine(emphasis: CondenseEmphasis): string {
+  if (emphasis.audience === 'custom' && emphasis.audienceCustom?.trim()) {
+    return emphasis.audienceCustom.trim();
+  }
+  return AUDIENCE_DESCRIPTIONS[emphasis.audience];
+}
 
 /**
  * Build the user message. All budgets are injected as data — the
@@ -80,7 +113,7 @@ export function buildCondenserUserMessage(
       parts.push(`  ${i + 1}. ${finding}`);
     }
   }
-  parts.push(`- Audience: ${AUDIENCE_DESCRIPTIONS[emphasis.audience]}.`);
+  parts.push(`- Audience: ${audienceLine(emphasis)}.`);
   parts.push(`- The poster is for: ${PURPOSE_DESCRIPTIONS[emphasis.purpose]}.`);
   parts.push('');
   parts.push('PANELS');

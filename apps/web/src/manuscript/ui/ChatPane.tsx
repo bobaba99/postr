@@ -8,7 +8,22 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { busyProps } from '@/components/BusyIndicator';
-import { chipsFor, type InterviewState } from '../interviewer';
+import { chipsFor, type InterviewState, type InterviewStepId } from '../interviewer';
+
+/** The steps where typing is the expected answer get their own prompt —
+ *  a generic "Type your answer…" under a chip row reads as a dead end. */
+function placeholderFor(step: InterviewStepId): string {
+  switch (step) {
+    case 'manuscript':
+      return 'Paste your manuscript here…';
+    case 'q3-audience-other':
+      return 'e.g. school nurses, policymakers…';
+    case 'q6-requirements':
+      return 'e.g. 10 minutes, or 12 slides';
+    default:
+      return 'Type your answer…';
+  }
+}
 
 interface ChatPaneProps {
   state: InterviewState;
@@ -91,9 +106,17 @@ export function ChatPane({
               key={chip.id}
               type="button"
               onClick={() => onChip(chip.id)}
-              className="rounded-full border border-[#3a3a4e] bg-[#16161f] px-3 py-1.5 text-left text-xs text-[#c8cad0] hover:border-[#7c6aed] hover:text-white"
+              className="rounded-2xl border border-[#3a3a4e] bg-[#16161f] px-3 py-1.5 text-left text-xs text-[#c8cad0] hover:border-[#7c6aed] hover:text-white"
             >
-              {chip.label}
+              <span className="block">{chip.label}</span>
+              {/* The qualifier the owner wanted ("covers conference /
+                  department talk") lives here, NOT in the label —
+                  chip labels stay terse. */}
+              {chip.hint && (
+                <span className="mt-0.5 block text-[10px] text-[#6b7280]">
+                  {chip.hint}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -135,11 +158,7 @@ export function ChatPane({
                 submit();
               }
             }}
-            placeholder={
-              isManuscriptStep
-                ? 'Paste your manuscript here…'
-                : 'Type your answer…'
-            }
+            placeholder={placeholderFor(state.step)}
             rows={isManuscriptStep ? 6 : 2}
             disabled={busy !== null}
             className="min-h-0 w-full resize-y rounded-md border border-[#2a2a3a] bg-[#0a0a12] px-3 py-2 text-sm text-[#c8cad0] outline-none focus:border-[#7c6aed] disabled:opacity-50"

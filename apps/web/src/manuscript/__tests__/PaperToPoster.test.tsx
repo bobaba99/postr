@@ -85,12 +85,47 @@ describe('PaperToPoster page', () => {
       screen.getByText(/one thing someone should remember/i),
     ).toBeInTheDocument();
 
-    // Q1 is free text — answer it and land on the finding chips.
+    // Q1 is free text — answer it and land on the table-or-plot step.
     fireEvent.change(screen.getByPlaceholderText(/type your answer/i), {
       target: { value: 'Moderate restriction impairs recall.' },
     });
     fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
-    expect(screen.getByText(/which result matters most/i)).toBeInTheDocument();
+    expect(screen.getByText(/as a table, or as a plot/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/plot usually condenses results better/i),
+    ).toBeInTheDocument();
+
+    // Choosing a table keeps the chart panel closed and reaches the
+    // finding-ranking question, which prompt.ts still consumes.
+    fireEvent.click(screen.getByRole('button', { name: /^a table$/i }));
+    expect(screen.getByText(/which result leads/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /keep this order/i })).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: /^chart builder$/i })).not.toBeInTheDocument();
+  });
+
+  it('opens the chart builder beside the chat when the user picks a plot', () => {
+    renderPage();
+    fireEvent.change(screen.getByPlaceholderText(/paste your manuscript here/i), {
+      target: { value: MANUSCRIPT },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /read it/i }));
+    fireEvent.change(screen.getByPlaceholderText(/type your answer/i), {
+      target: { value: 'Moderate restriction impairs recall.' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^a plot$/i }));
+
+    // Inline panel, plus the escape hatch to the full tool — the user
+    // never has to leave this page.
+    expect(screen.getByRole('complementary', { name: /^chart builder$/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /open the full tool/i })).toHaveAttribute(
+      'href',
+      '/chart-chooser',
+    );
+
+    // And it closes without disturbing the script.
+    fireEvent.click(screen.getByRole('button', { name: /close chart builder/i }));
+    expect(screen.queryByRole('complementary', { name: /^chart builder$/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/which result leads/i)).toBeInTheDocument();
   });
 });

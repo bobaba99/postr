@@ -19,17 +19,19 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 import { ensureFontLoaded } from '@/poster/fontLoader';
-import { DEFAULT_FONT_FAMILY, PX } from '@/poster/constants';
+import { DEFAULT_FONT_FAMILY, DEFAULT_PALETTE, PX } from '@/poster/constants';
 import { parseManuscriptText } from '@/manuscript/parseManuscriptText';
 import { DocxIngestError, ingestDocx } from '@/manuscript/docxIngest';
 import {
   advance,
   assistantSay,
+  closeChartPanel,
   createInterview,
   emphasisFor,
   ingestManuscript,
   type InterviewState,
 } from '@/manuscript/interviewer';
+import { ChartPanel } from '@/manuscript/ui/ChartPanel';
 import { CondenseError, requestCondense } from '@/manuscript/condenseClient';
 import { buildPosterDoc, type BuildPosterResult } from '@/manuscript/buildPoster';
 import {
@@ -294,6 +296,20 @@ export default function PaperToPoster() {
               onDocxFile={(file) => void handleDocxFile(file)}
             />
           </section>
+
+          {/* Q2 plot branch — the chart chooser inline, so the user
+              never leaves this page. Mounted only while the interview
+              asked for it; the full tool is one link away inside. */}
+          {interview.chartPanelOpen && (
+            <div className="flex min-h-0 lg:w-[380px] lg:shrink-0">
+              <ChartPanel
+                doc={interview.doc}
+                palette={DEFAULT_PALETTE}
+                fontFamily={DEFAULT_FONT_FAMILY}
+                onClose={() => setInterview(closeChartPanel)}
+              />
+            </div>
+          )}
 
           {/* Outline + preview + downloads */}
           <section

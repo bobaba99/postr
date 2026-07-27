@@ -21,11 +21,13 @@ import type {
   MappedRole,
 } from '@postr/shared';
 import {
+  budgetScaleForSlides,
   MAX_PINNED_SECTIONS,
   MAX_ROLE_SOURCE_CHARS,
   PINNED_SECTION_BUDGET_WORDS,
   POSTER_MAX_FINDINGS,
   POSTER_ROLE_SPECS,
+  scaledBudget,
 } from './rubric';
 
 export interface NarrativeMap {
@@ -310,9 +312,14 @@ function mapTakeaway(doc: DocumentModel, warnings: string[]): MappedRole {
 export function mapNarrative(
   doc: DocumentModel,
   pinnedSectionIds: string[] = [],
+  /** Q6 slot constraint. `null` = no constraint = rubric budgets
+   *  untouched. A tighter slot scales every panel's budget DOWN — we
+   *  cut, we never shrink the type. */
+  slideCount: number | null = null,
 ): NarrativeMap {
   const warnings: string[] = [];
   const findings = extractFindings(doc);
+  const scale = budgetScaleForSlides(slideCount);
 
   const pinnedIds = new Set(pinnedSectionIds.slice(0, MAX_PINNED_SECTIONS));
   const cutSections = doc.sections.filter(
@@ -323,7 +330,7 @@ export function mapNarrative(
     .map((s) => ({
       id: s.id,
       heading: s.heading || 'Additional Notes',
-      budgetWords: PINNED_SECTION_BUDGET_WORDS,
+      budgetWords: scaledBudget(PINNED_SECTION_BUDGET_WORDS, scale),
       sourceText: capSourceText(sectionText(s)),
     }));
 
@@ -333,7 +340,12 @@ export function mapNarrative(
     mapMethods(doc),
     mapKeyResult(doc, findings, warnings),
     mapTakeaway(doc, warnings),
-  ].filter((r): r is MappedRole => r !== null);
+  ]
+    .filter((r): r is MappedRole => r !== null)
+    .map((role) => ({
+      ...role,
+      budgetWords: scaledBudget(role.budgetWords, scale),
+    }));
 
   return { roles, findings, cutSections, pinned, warnings };
 }
