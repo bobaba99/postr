@@ -40,6 +40,21 @@ export interface AutosaveState {
 
 const DEBOUNCE_MS = 800;
 
+/**
+ * Minimum gap between thumbnail captures. Autosave debounces at 800ms,
+ * so without this a user nudging blocks with the arrow keys queues a
+ * full canvas rasterisation roughly every second. 3s coalesces those
+ * bursts while still keeping the dashboard thumbnail close to current.
+ */
+const THUMBNAIL_COOLDOWN_MS = 3000;
+
+/**
+ * Upper bound on how long a capture may wait for an idle window. A
+ * poster being actively edited may never go idle, and a thumbnail that
+ * never renders is worse than one that costs a frame.
+ */
+const THUMBNAIL_IDLE_TIMEOUT_MS = 2000;
+
 /** Strip HTML tags to get plain text for the poster title column. */
 function stripHtml(html: string): string {
   if (typeof document === 'undefined') return html.replace(/<[^>]+>/g, '');
@@ -72,6 +87,57 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
 
   // Keep the title ref in sync (also read inside the effect below).
   pendingTitleRef.current = displayTitle;
+
+  // ── Thumbnail capture throttling ──────────────────────────────────
+  //
+  // captureThumbnail is expensive on the main thread: it clones
+  // #poster-canvas, inlines every computed style into a foreignObject
+  // SVG, rasterises it, JPEG-encodes it, and uploads. Running that
+  // after *every* autosave made rapid block moves stutter, because a
+  // fast-moving user queues one capture per 800ms debounce window.
+  //
+  // Two guards, deliberately no drag-state plumbing:
+  //   1. A cooldown, so bursts of edits coalesce into one capture.
+  //   2. requestIdleCallback, so a capture that does run yields to
+  //      pending input first. This gets most of the benefit of a
+  //      "skip while dragging" gate without threading pointer state
+  //      from useBlockDrag into this hook.
+  //
+  // captureDirtyRef records that we skipped a capture, so the unmount
+  // path can force one and the dashboard still gets a fresh thumbnail.
+  const lastCaptureRef = useRef(0);
+  const captureDirtyRef = useRef(false);
+
+  const runThumbnailCapture = (id: string) => {
+    lastCaptureRef.current = Date.now();
+    captureDirtyRef.current = false;
+    void supabase.auth.getUser().then(({ data: userData }) => {
+      const uid = userData?.user?.id;
+      if (!uid) return;
+      return captureThumbnail(uid, id).then((path) => {
+        if (path) void upsertPoster(id, { thumbnailPath: path });
+      });
+    });
+  };
+
+  const scheduleThumbnail = (id: string, force = false) => {
+    if (!force && Date.now() - lastCaptureRef.current < THUMBNAIL_COOLDOWN_MS) {
+      captureDirtyRef.current = true;
+      return;
+    }
+    // Forced captures (unmount) run immediately — deferring to idle
+    // would race the component teardown and often never fire.
+    if (force) {
+      runThumbnailCapture(id);
+      return;
+    }
+    const idle = window.requestIdleCallback;
+    if (typeof idle === 'function') {
+      idle(() => runThumbnailCapture(id), { timeout: THUMBNAIL_IDLE_TIMEOUT_MS });
+    } else {
+      window.setTimeout(() => runThumbnailCapture(id), 0);
+    }
+  };
 
   // Actual save — runs at the tail of the debounce window, on unmount,
   // or synchronously when flushNow() is invoked (e.g. the Sidebar "Save"
@@ -109,15 +175,9 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
       await upsertPoster(id, { data, ...(titleText ? { title: titleText } : {}) });
       setState({ status: 'saved', lastSavedAt: new Date(), error: null });
 
-      // Fire-and-forget thumbnail capture — never blocks editing.
-      // Runs after a successful save so the canvas reflects the latest state.
-      supabase.auth.getUser().then(({ data: userData }) => {
-        const uid = userData?.user?.id;
-        if (!uid) return;
-        captureThumbnail(uid, id).then((path) => {
-          if (path) upsertPoster(id, { thumbnailPath: path });
-        });
-      });
+      // Fire-and-forget thumbnail capture — never blocks editing, and
+      // deliberately does NOT run on every save. See scheduleThumbnail.
+      scheduleThumbnail(id);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       setState((s) => ({ ...s, status: 'error', error }));
@@ -169,13 +229,34 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc, posterId, displayTitle]);
 
-  // Unmount: flush any pending save so nothing is lost.
+  // Unmount: flush any pending save so nothing is lost, and try to
+  // leave the dashboard with a current thumbnail.
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
+      const id = pendingIdRef.current ?? posterIdRef.current;
+      // Bind to a local so TypeScript narrows it — reading the ref
+      // again inside the branch widens back to `Timeout | null`.
+      const timer = timerRef.current;
+      const hadPending = timer !== null;
+      if (timer !== null) {
+        clearTimeout(timer);
         timerRef.current = null;
         void flush();
+      }
+
+      // Best-effort, explicitly not a guarantee. Two things can make
+      // this a no-op: #poster-canvas may already be detached by the
+      // time this cleanup runs (captureThumbnail returns null), and
+      // captureThumbnail's module-level `capturing` guard drops the
+      // call outright if an earlier capture is still in flight.
+      //
+      // That is acceptable. The cooldown bounds staleness at
+      // THUMBNAIL_COOLDOWN_MS of editing, so the worst case is a
+      // thumbnail missing the last ~3s of edits — a cosmetic gap on a
+      // 400px preview, refreshed on the next edit session. Do not
+      // rewrite this into something that blocks teardown to "fix" it.
+      if (id && (hadPending || captureDirtyRef.current)) {
+        scheduleThumbnail(id, true);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
