@@ -189,4 +189,73 @@ describe('posterStore', () => {
       expect(usePosterStore.getState().doc?.fontFamily).toBe('Lora');
     });
   });
+
+  describe('applyExtractedStyle', () => {
+    const copiedPalette = {
+      bg: '#FAFDF7',
+      primary: '#1B3A2D',
+      accent: '#2D6A4F',
+      accent2: '#52B788',
+      muted: '#5A6E5F',
+      headerBg: '#2D6A4F',
+      headerFg: '#FFFFFF',
+    };
+
+    it('applies palette + font as a SINGLE undo step', () => {
+      const doc = makeDoc();
+      usePosterStore.getState().setPoster('p1', doc);
+
+      usePosterStore.getState().applyExtractedStyle({
+        palette: copiedPalette,
+        fontFamily: 'Lora',
+      });
+
+      const after = usePosterStore.getState();
+      expect(after.doc?.palette).toEqual(copiedPalette);
+      expect(after.doc?.fontFamily).toBe('Lora');
+      expect(after.canUndo).toBe(true);
+
+      // One undo reverts BOTH fields — the copy-a-design escape hatch.
+      usePosterStore.getState().undo();
+      const reverted = usePosterStore.getState();
+      expect(reverted.doc?.palette).toEqual(doc.palette);
+      expect(reverted.doc?.fontFamily).toBe(doc.fontFamily);
+      expect(reverted.canUndo).toBe(false);
+    });
+
+    it('applies only the fields present in the patch', () => {
+      const doc = makeDoc();
+      usePosterStore.getState().setPoster('p1', doc);
+
+      usePosterStore.getState().applyExtractedStyle({ palette: copiedPalette });
+
+      const after = usePosterStore.getState();
+      expect(after.doc?.palette).toEqual(copiedPalette);
+      expect(after.doc?.fontFamily).toBe(doc.fontFamily);
+    });
+
+    it('is a no-op (no undo entry) for an empty patch', () => {
+      usePosterStore.getState().setPoster('p1', makeDoc());
+
+      usePosterStore.getState().applyExtractedStyle({});
+
+      expect(usePosterStore.getState().canUndo).toBe(false);
+    });
+
+    it('redo restores both fields together', () => {
+      const doc = makeDoc();
+      usePosterStore.getState().setPoster('p1', doc);
+      usePosterStore.getState().applyExtractedStyle({
+        palette: copiedPalette,
+        fontFamily: 'Lora',
+      });
+
+      usePosterStore.getState().undo();
+      usePosterStore.getState().redo();
+
+      const after = usePosterStore.getState();
+      expect(after.doc?.palette).toEqual(copiedPalette);
+      expect(after.doc?.fontFamily).toBe('Lora');
+    });
+  });
 });

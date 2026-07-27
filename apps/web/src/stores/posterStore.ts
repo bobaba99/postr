@@ -33,6 +33,15 @@ export interface PosterStoreState {
   setStyle: (level: StyleLevel, patch: Partial<TypeStyle>) => void;
   setPalette: (palette: Palette) => void;
   setFont: (fontFamily: string) => void;
+  /**
+   * Apply a copied design (palette and/or font) as ONE undo step —
+   * the copy-a-design flow's escape hatch is ⌘Z, so both fields must
+   * revert together (plan §4). Omitted fields are left untouched.
+   */
+  applyExtractedStyle: (patch: {
+    palette?: Palette;
+    fontFamily?: string;
+  }) => void;
   setBlocks: (blocks: Block[]) => void;
   /** Set blocks without pushing to undo — for drag intermediates. */
   setBlocksSilent: (blocks: Block[]) => void;
@@ -124,6 +133,21 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
 
   setFont: (fontFamily) =>
     set((state) => withUndo(state, (doc) => ({ ...doc, fontFamily }))),
+
+  applyExtractedStyle: (patch) =>
+    set((state) => {
+      // Nothing selected → no doc change, no undo entry.
+      if (patch.palette === undefined && patch.fontFamily === undefined) {
+        return {};
+      }
+      return withUndo(state, (doc) => ({
+        ...doc,
+        ...(patch.palette !== undefined ? { palette: patch.palette } : {}),
+        ...(patch.fontFamily !== undefined
+          ? { fontFamily: patch.fontFamily }
+          : {}),
+      }));
+    }),
 
   setBlocks: (blocks) =>
     set((state) => withUndo(state, (doc) => ({ ...doc, blocks }))),

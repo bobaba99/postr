@@ -87,7 +87,8 @@ function xyzToLab(x: number, y: number, z: number): [number, number, number] {
   return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
 }
 
-function hexToLab(hex: string): [number, number, number] {
+/** sRGB hex → CIELAB (D65). Exported for colorDistance's CIEDE2000. */
+export function hexToLab(hex: string): [number, number, number] {
   const [r, g, b] = hexToRgb(hex);
   const [x, y, z] = rgbToXyz(r, g, b);
   return xyzToLab(x, y, z);

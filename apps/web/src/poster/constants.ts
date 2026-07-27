@@ -9,7 +9,13 @@
  * deliberate choice — students should not need to pick from 400
  * fonts or invent a palette.
  */
-import type { Palette, Styles, HeadingStyle, FontWeight } from '@postr/shared';
+import type {
+  CuratedFontFamily,
+  Palette,
+  Styles,
+  HeadingStyle,
+  FontWeight,
+} from '@postr/shared';
 
 /** Internal coordinate scale: 1 unit = 1/10 inch. */
 export const PX = 10;
@@ -96,6 +102,11 @@ export interface FontFamily {
   cat: 'sans' | 'serif';
 }
 
+// `satisfies` pins the keys to the shared CuratedFontFamily union so
+// this record and the API's extract-style enum cannot drift apart — a
+// missing or extra key here is a compile error. The public type stays
+// `Record<string, FontFamily>` because callers index it with
+// user-supplied `doc.fontFamily` strings.
 export const FONTS: Record<string, FontFamily> = {
   'Source Sans 3': { css: "'Source Sans 3',sans-serif", cat: 'sans' },
   'DM Sans': { css: "'DM Sans',sans-serif", cat: 'sans' },
@@ -107,7 +118,7 @@ export const FONTS: Record<string, FontFamily> = {
   Literata: { css: "'Literata',serif", cat: 'serif' },
   'Source Serif 4': { css: "'Source Serif 4',serif", cat: 'serif' },
   Lora: { css: "'Lora',serif", cat: 'serif' },
-};
+} satisfies Record<CuratedFontFamily, FontFamily>;
 
 /** All curated font names — used by the scan endpoint as the enum
  *  constraint when extracting a font from a poster image. */

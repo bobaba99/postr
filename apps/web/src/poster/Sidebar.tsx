@@ -59,6 +59,7 @@ import { ReadabilityPanel } from './ReadabilityPanel';
 import { ImportSection } from './sidebar/ImportSection';
 import { PostrExportButton } from './sidebar/PostrExportButton';
 import { VersionPanel } from './VersionPanel';
+import { CopyDesignModal } from '@/components/CopyDesignModal';
 import {
   JustRefreshedBanner,
   UpdateAvailableBanner,
@@ -2190,6 +2191,11 @@ function StyleTab(props: {
    *  confirmation that their click worked. */
   presetJustSaved: boolean;
 }) {
+  // Copy-a-design modal (Phase 1: colours + fonts). The modal reads
+  // the doc from the store directly and applies via a single undoable
+  // store mutation, so no extra wiring flows through Sidebar props.
+  const [copyDesignOpen, setCopyDesignOpen] = useState(false);
+
   const renderPaletteRow = (p: NamedPalette, isCustom: boolean) => {
     const active = props.paletteName === p.name;
     const cb = auditPaletteCB(p);
@@ -2315,6 +2321,44 @@ function StyleTab(props: {
 
   return (
     <>
+      <div style={labelStyle}>Copy a design</div>
+      <button
+        type="button"
+        onClick={() => setCopyDesignOpen(true)}
+        style={{
+          all: 'unset',
+          cursor: 'pointer',
+          boxSizing: 'border-box',
+          width: '100%',
+          padding: '10px 14px',
+          background: 'linear-gradient(135deg, #7c6aed22 0%, #a855f722 100%)',
+          border: '1px dashed #7c6aed',
+          borderRadius: 8,
+          textAlign: 'center',
+          color: '#c8b6ff',
+          fontSize: 13,
+          fontWeight: 600,
+        }}
+      >
+        🎨 Copy a design
+      </button>
+      <div
+        style={{
+          fontSize: 11,
+          color: '#6b7280',
+          lineHeight: 1.5,
+          marginTop: 4,
+          paddingLeft: 2,
+        }}
+      >
+        Upload a poster you admire and apply its colours and font to
+        yours. Copies the look, not the content.
+      </div>
+      <CopyDesignModal
+        open={copyDesignOpen}
+        onClose={() => setCopyDesignOpen(false)}
+      />
+
       <div style={labelStyle}>Palette</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {PALETTES.map((p) => renderPaletteRow(p, false))}
