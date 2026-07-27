@@ -13,7 +13,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useModalTransition } from '@/hooks/useModalTransition';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import type { ImportProgress, PosterDoc } from '@postr/shared';
 import { supabase } from '@/lib/supabase';
 import { createPoster, deletePoster, upsertPoster } from '@/data/posters';

@@ -6,7 +6,7 @@
  * component, so the URL can be copy-pasted without dead-ending.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
 import { getGalleryEntry, labelForField, type GalleryEntryWithUrls } from '@/data/gallery';

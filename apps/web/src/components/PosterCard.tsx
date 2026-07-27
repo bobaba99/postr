@@ -10,7 +10,7 @@
  * and the optimistic state updates.
  */
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import type { PosterRow, PosterListRow } from '@/data/posters';
 import { getThumbnailUrl } from '@/data/thumbnails';
 import { PALETTES } from '@/poster/constants';

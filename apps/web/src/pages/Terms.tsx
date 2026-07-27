@@ -11,7 +11,7 @@
  * owners, they grant Postr a limited display license, and they
  * indemnify Postr against third-party copyright claims.
  */
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';

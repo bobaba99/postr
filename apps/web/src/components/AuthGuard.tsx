@@ -6,7 +6,7 @@
  * children or redirects to the auth page.
  */
 import { useEffect, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { supabase } from '@/lib/supabase';
 
 export function AuthGuard({ children }: { children: ReactNode }) {

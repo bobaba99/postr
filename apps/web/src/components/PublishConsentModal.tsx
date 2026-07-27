@@ -12,7 +12,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useModalTransition } from '@/hooks/useModalTransition';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 
 type Mode = 'publish' | 'share';
 

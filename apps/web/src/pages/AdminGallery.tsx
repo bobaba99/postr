@@ -13,7 +13,7 @@
  *      the admin operations quietly fail.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import {
   listAllGalleryAdmin,
   adminRetractEntry,

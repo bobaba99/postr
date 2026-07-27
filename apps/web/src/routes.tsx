@@ -38,7 +38,7 @@
  * it overlaps with the Supabase fetch for the poster doc.
  */
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router';
 import { AuthGuard } from '@/components/AuthGuard';
 import { EditorErrorBoundary } from '@/components/EditorErrorBoundary';
 import Landing from '@/pages/Landing';

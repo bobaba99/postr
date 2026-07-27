@@ -8,7 +8,7 @@
  * navigating, so visitors can send feedback from any page without
  * losing their place.
  */
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 
 const CURRENT_YEAR = new Date().getFullYear();

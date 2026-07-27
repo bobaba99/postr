@@ -21,7 +21,7 @@
  * gallery is switched back on.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import type { User } from '@supabase/supabase-js';

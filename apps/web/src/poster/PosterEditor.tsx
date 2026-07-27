@@ -10,7 +10,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { flushSync } from 'react-dom';
 import { supabase } from '@/lib/supabase';
 import type { CommentAnchor } from '@/data/comments';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router';
 import { duplicatePoster, type PosterRow } from '@/data/posters';
 import { saveVersion, loadVersion } from '@/data/posterVersions';
 import { ConfirmModal } from '@/components/ConfirmModal';

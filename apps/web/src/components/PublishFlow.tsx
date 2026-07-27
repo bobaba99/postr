@@ -11,7 +11,7 @@
  *       onCancel → close
  *     onCancel → close
  */
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { PublishConsentModal } from '@/components/PublishConsentModal';
 import { PublishGalleryModal } from '@/components/PublishGalleryModal';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';

@@ -11,7 +11,7 @@
  * data when identities are linked.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { PasswordStrength, isPasswordValid } from '@/components/PasswordStrength';
 import { PublicFooter } from '@/components/PublicFooter';

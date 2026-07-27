@@ -9,7 +9,7 @@
  * card ("Shape what ships next") routes the user straight to the
  * feedback modal.
  */
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';

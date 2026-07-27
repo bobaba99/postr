@@ -13,7 +13,7 @@
  *   - Style presets management (clear saved presets)
  */
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { listPosters, deletePoster } from '@/data/posters';
 import { ConfirmModal } from '@/components/ConfirmModal';

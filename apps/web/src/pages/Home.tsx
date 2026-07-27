@@ -18,7 +18,7 @@ import {
   type PosterListRow,
 } from '@/data/posters';
 import { seedWelcomePosterIfNeeded } from '@/data/seedWelcomePoster';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router';
 import { PosterCard } from '@/components/PosterCard';
 import { NewPosterButton } from '@/components/NewPosterButton';
 import { ConfirmModal } from '@/components/ConfirmModal';

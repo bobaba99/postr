@@ -11,7 +11,7 @@
  * honest is intentional; it will grow (and a consent banner will
  * appear) the first time we add anything that requires opt-in.
  */
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
