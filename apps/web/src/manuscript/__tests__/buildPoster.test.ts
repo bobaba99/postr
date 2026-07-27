@@ -9,7 +9,8 @@ import type { CondensedNarrative } from '@postr/shared';
 import { parseManuscriptText } from '../parseManuscriptText';
 import { buildDocumentModel, type IngestItem } from '../buildDocumentModel';
 import { buildPosterDoc, estimateTextHeight } from '../buildPoster';
-import { DEFAULT_STYLES } from '../../poster/constants';
+import { checkFigure } from '../figureCheck';
+import { DEFAULT_STYLES, PX } from '../../poster/constants';
 
 const MANUSCRIPT = `Sleep Duration and Recall Accuracy in Undergraduate Students
 
@@ -145,6 +146,36 @@ describe('buildPosterDoc — figure-led key findings', () => {
 
   it('emits no image block when the manuscript has no extractable figure', () => {
     expect(poster.blocks.some((b) => b.type === 'image')).toBe(false);
+  });
+
+  /** Plan §4 non-negotiable #1 — every emitted figure is checked at its
+   *  real physical size. The builder's job here is to give the gate a
+   *  block whose w/h are honest poster units, so the DPI it computes
+   *  matches what actually gets printed. */
+  it('emits a figure block whose physical size drives the legibility gate', () => {
+    const items: IngestItem[] = [
+      { kind: 'heading', text: 'A Title With Figures', level: 1 },
+      { kind: 'heading', text: 'Results', level: 2 },
+      { kind: 'paragraph', text: 'Accuracy rose 12% (p = .01), see Figure 1.' },
+      { kind: 'figure', text: '', imageRef: 'data:image/png;base64,AAAA' },
+      { kind: 'paragraph', text: 'Figure 1. Accuracy by group.' },
+    ];
+    const { doc: p } = buildPosterDoc(buildDocumentModel(items), CONDENSED);
+    const image = p.blocks.find((b) => b.type === 'image')!;
+
+    const widthIn = image.w / PX;
+    const heightIn = image.h / PX;
+    expect(widthIn).toBeGreaterThan(0);
+    expect(heightIn).toBeGreaterThan(0);
+
+    // A small screenshot at that physical size must be flagged, not
+    // silently emitted — the user may never open the editor.
+    const flagged = checkFigure(image.id, { width: 400, height: 300 }, widthIn, heightIn);
+    expect(flagged.status).toBe('fail');
+
+    // A properly exported figure at the same size stays quiet.
+    const clean = checkFigure(image.id, { width: 4000, height: 3000 }, widthIn, heightIn);
+    expect(clean.status).toBe('pass');
   });
 });
 

@@ -25,6 +25,11 @@ import {
 } from '@/manuscript/interviewer';
 import { CondenseError, requestCondense } from '@/manuscript/condenseClient';
 import { buildPosterDoc, type BuildPosterResult } from '@/manuscript/buildPoster';
+import {
+  checkFigure,
+  measureImage,
+  type FigureCheck,
+} from '@/manuscript/figureCheck';
 import { POSTER_ROLE_SPECS } from '@/manuscript/rubric';
 import { exportPostr } from '@/import/postrFile';
 import { ChatPane } from '@/manuscript/ui/ChatPane';
@@ -45,6 +50,7 @@ export default function ManuscriptToPoster() {
   const [phase, setPhase] = useState<Phase>('interview');
   const [entries, setEntries] = useState<OutlineEntryView[] | null>(null);
   const [ingesting, setIngesting] = useState(false);
+  const [figureChecks, setFigureChecks] = useState<FigureCheck[]>([]);
   const previewRef = useRef<HTMLDivElement>(null);
   const [previewScale, setPreviewScale] = useState(0.5);
 
@@ -140,6 +146,36 @@ export default function ManuscriptToPoster() {
     return buildPosterDoc(interview.doc, narrativeFrom(entries));
   }, [interview.doc, entries]);
 
+  // ── Figure legibility gate (plan §4 non-negotiable #1) ─────────────
+  // The user may never open the editor, so an illegible figure would
+  // otherwise reach a print shop unflagged. Measured whenever the built
+  // poster changes; stale results are dropped if the poster moves on.
+  useEffect(() => {
+    if (!poster) {
+      setFigureChecks([]);
+      return;
+    }
+    const imageBlocks = poster.doc.blocks.filter(
+      (b) => b.type === 'image' && b.imageSrc,
+    );
+    if (imageBlocks.length === 0) {
+      setFigureChecks([]);
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      imageBlocks.map(async (block) => {
+        const pixels = await measureImage(block.imageSrc!);
+        return checkFigure(block.id, pixels, block.w / PX, block.h / PX);
+      }),
+    ).then((checks) => {
+      if (!cancelled) setFigureChecks(checks);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [poster]);
+
   // Fit the natural-size canvas (1 poster unit = 1 CSS px at zoom 1)
   // to the preview pane width. Runs when the preview pane first
   // appears alongside the poster.
@@ -208,6 +244,8 @@ export default function ManuscriptToPoster() {
   }, [poster, interview.doc]);
 
   const busy = ingesting || phase === 'condensing';
+  // A passing figure needs no words — only problems get surfaced.
+  const flaggedFigures = figureChecks.filter((c) => c.status !== 'pass');
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
@@ -277,6 +315,20 @@ export default function ManuscriptToPoster() {
                     The .postr file opens in the editor for full control.
                   </span>
                 </div>
+
+                {/* Figure legibility — flagged AT DOWNLOAD TIME, next
+                    to the buttons, because this is the single most
+                    valuable thing the pipeline can tell a user. */}
+                {flaggedFigures.length > 0 && (
+                  <ul
+                    aria-label="Figure legibility warnings"
+                    className="postr-rise-in space-y-1 rounded-md border border-[#f9731633] bg-[#f9731611] px-3 py-2 text-xs text-[#fb923c]"
+                  >
+                    {flaggedFigures.map((check) => (
+                      <li key={check.blockId}>{check.message}</li>
+                    ))}
+                  </ul>
+                )}
 
                 {poster.warnings.length > 0 && (
                   <ul className="postr-rise-in space-y-1 rounded-md border border-[#eab30833] bg-[#eab30811] px-3 py-2 text-xs text-[#eab308]">
