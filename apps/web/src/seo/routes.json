@@ -29,6 +29,18 @@
         "Every poster starts at a real print size, so what you see on screen is what the print shop produces."
       ]
     },
+    "/chart-chooser": {
+      "title": "Chart Chooser: Which Chart Fits Your Data? | Postr",
+      "description": "Paste a table or answer three short questions and get ranked, journal-style chart suggestions with captions. Download SVG or PNG. Free, no signup.",
+      "robots": "index,follow",
+      "h1": "Which chart fits your data?",
+      "copy": [
+        "Paste a table, upload a CSV or Excel file, or answer three short questions — the chooser ranks the figures that fit your data, drawn as journal-style panels with captions. Download any panel as SVG or PNG. Free, no account, and your data never leaves the browser.",
+        "Every suggestion explains itself in methods voice: what shape your data has, and why that chart form reads more accurately than the alternatives.",
+        "No data yet? Walk through the three questions and start from a worked example with believable numbers, then swap in your own.",
+        "Need the figure on a conference poster? Postr is a free academic poster editor with the same chart engine built in, plus a print-readability check for figures you already have."
+      ]
+    },
     "/gallery": {
       "title": "Academic Poster Gallery: Real Conference Posters | Postr",
       "description": "Browse real conference posters published by researchers across neuroscience, psychology, medicine, biology and more. Free to view, free to make your own.",

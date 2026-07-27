@@ -45,6 +45,7 @@ describe('STATIC_ROUTE_META', () => {
     expect(Object.keys(STATIC_ROUTE_META).sort()).toEqual([
       '/',
       '/about',
+      '/chart-chooser',
       '/cookies',
       '/gallery',
       '/privacy',

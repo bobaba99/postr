@@ -3,6 +3,7 @@
  *
  *   /                   → Landing (public)
  *   /about              → About (public, feature tour)
+ *   /chart-chooser      → Chart chooser (public, no session, code-split)
  *   /gallery            → Gallery grid (public)
  *   /gallery/:entryId   → Gallery entry detail (public)
  *   /privacy            → Privacy Policy (public)
@@ -51,6 +52,10 @@ import NotFound from '@/pages/NotFound';
 const Editor = lazy(() => import('@/pages/Editor'));
 const Share = lazy(() => import('@/pages/Share'));
 const AdminGallery = lazy(() => import('@/pages/AdminGallery'));
+// The chart chooser pulls the parsing/recommend/render stack (and
+// lazily Observable Plot beyond that), none of which belongs in the
+// marketing-page bundle.
+const ChartChooserPage = lazy(() => import('@/pages/ChartChooser'));
 
 function LazyFallback() {
   return (
@@ -72,6 +77,9 @@ export function AppRoutes() {
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/cookies" element={<Cookies />} />
         <Route path="/terms" element={<Terms />} />
+        {/* Standalone chart chooser — public, indexable, and creates
+            no Supabase session (not even anonymous) on load. */}
+        <Route path="/chart-chooser" element={<ChartChooserPage />} />
         {/*
           Dev only. This was publicly routable with no guard, which put
           a diagnostics page in the crawlable URL space and shipped it
