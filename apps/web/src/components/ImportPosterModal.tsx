@@ -23,6 +23,7 @@ import {
   extractFromPdf,
 } from '@/import/pdfImport';
 import { extractFromImage } from '@/import/imageImport';
+import { extractFromPptx } from '@/import/pptx/pptxImport';
 import { importPostr } from '@/import/postrFile';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { getCapturedLog } from '@/lib/consoleCapture';
@@ -47,7 +48,8 @@ interface PreviewState {
 }
 
 const ACCEPT =
-  '.pdf,.postr,.png,.jpg,.jpeg,application/pdf,application/zip,image/*';
+  '.pdf,.postr,.pptx,.png,.jpg,.jpeg,application/pdf,application/zip,' +
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*';
 
 export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props) {
   const navigate = useNavigate();
@@ -198,6 +200,15 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
           );
         }
         setProgress({ stage: 'ready' });
+      } else if (lower.endsWith('.pptx')) {
+        // Checked by extension before the image/zip branches — a .pptx
+        // is a zip, so a MIME-first test would mis-route it.
+        const result = await extractFromPptx(file, posterId, userId, (p) =>
+          setProgress(p),
+        );
+        doc = result.doc;
+        title = result.title;
+        warnings = result.warnings;
       } else if (lower.endsWith('.pdf') || file.type === 'application/pdf') {
         const synth = await extractFromPdf(file, posterId, userId, (p) =>
           setProgress(p),
@@ -219,7 +230,9 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
         title = synth.title;
         warnings = synth.warnings;
       } else {
-        setError('Unsupported file type. Drop a .pdf, image, or .postr file.');
+        setError(
+          'Unsupported file type. Drop a .pdf, .pptx, image, or .postr file.',
+        );
         setPhase('pick');
         return;
       }
@@ -429,8 +442,8 @@ function Header({
         </h3>
         <p style={{ margin: '4px 0 0', fontSize: 12, color: '#9ca3af' }}>
           {mode === 'new'
-            ? 'Drop a PDF, image, or .postr file. We extract the text and headings into editable blocks at their original positions.'
-            : 'Replace the current poster with content from a PDF, image, or .postr file.'}
+            ? 'Drop a PDF, PowerPoint, image, or .postr file. We extract the content into editable blocks at their original positions.'
+            : 'Replace the current poster with content from a PDF, PowerPoint, image, or .postr file.'}
         </p>
       </div>
       <button
@@ -495,7 +508,7 @@ function DropZone({
         Drop file here or click to browse
       </div>
       <div style={{ fontSize: 12, color: '#9ca3af' }}>
-        PDF · PNG / JPG · .postr bundle
+        PDF · PowerPoint · PNG / JPG · .postr bundle
       </div>
       <div
         style={{
@@ -510,8 +523,12 @@ function DropZone({
           lineHeight: 1.5,
         }}
       >
-        <strong style={{ color: '#fde68a' }}>Text-only import.</strong>{' '}
-        We capture titles, headings, authors, body text, captions, and references at their original positions on the page. Figures, charts, tables, and logos must be re-added manually using the Insert tab. Image-based imports take ~30–90s.
+        <strong style={{ color: '#fde68a' }}>What comes across.</strong>{' '}
+        PowerPoint files bring their text, images, and tables. PDF and
+        image imports are text-only — we capture titles, headings, authors,
+        body text, captions, and references at their original positions, but
+        figures, charts, and logos must be re-added from the Insert tab.
+        Image-based imports take ~30–90s.
       </div>
     </div>
   );
