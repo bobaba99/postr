@@ -148,6 +148,42 @@ describe('buildPosterDoc — figure-led key findings', () => {
     expect(poster.blocks.some((b) => b.type === 'image')).toBe(false);
   });
 
+  /** Plan §4 non-negotiable #1 — a figure that never reaches the poster
+   *  is never checked by the legibility gate either, so the drop has to
+   *  be visible. The layout carries exactly one figure; the rest must be
+   *  reported, not silently discarded. */
+  it('warns about every figure the single-figure layout leaves out', () => {
+    const items: IngestItem[] = [
+      { kind: 'heading', text: 'A Title With Figures', level: 1 },
+      { kind: 'heading', text: 'Results', level: 2 },
+      { kind: 'paragraph', text: 'See Figure 1, Figure 2 and Figure 3.' },
+      { kind: 'figure', text: '', imageRef: 'data:image/png;base64,AAAA' },
+      { kind: 'paragraph', text: 'Figure 1. One.' },
+      { kind: 'figure', text: '', imageRef: 'data:image/png;base64,BBBB' },
+      { kind: 'paragraph', text: 'Figure 2. Two.' },
+      { kind: 'figure', text: '', imageRef: 'data:image/png;base64,CCCC' },
+      { kind: 'paragraph', text: 'Figure 3. Three.' },
+    ];
+    const multiDoc = buildDocumentModel(items);
+    expect(multiDoc.figures).toHaveLength(3);
+
+    const { doc: p, warnings: w } = buildPosterDoc(multiDoc, CONDENSED);
+    expect(p.blocks.filter((b) => b.type === 'image')).toHaveLength(1);
+    expect(w.some((m) => /2 other figures were left out/.test(m))).toBe(true);
+  });
+
+  it('stays quiet when the manuscript has exactly one figure', () => {
+    const items: IngestItem[] = [
+      { kind: 'heading', text: 'A Title With Figures', level: 1 },
+      { kind: 'heading', text: 'Results', level: 2 },
+      { kind: 'paragraph', text: 'Accuracy rose 12% (p = .01), see Figure 1.' },
+      { kind: 'figure', text: '', imageRef: 'data:image/png;base64,AAAA' },
+      { kind: 'paragraph', text: 'Figure 1. Accuracy by group.' },
+    ];
+    const { warnings: w } = buildPosterDoc(buildDocumentModel(items), CONDENSED);
+    expect(w.some((m) => /left out/.test(m))).toBe(false);
+  });
+
   /** Plan §4 non-negotiable #1 — every emitted figure is checked at its
    *  real physical size. The builder's job here is to give the gate a
    *  block whose w/h are honest poster units, so the DPI it computes

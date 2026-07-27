@@ -17,7 +17,13 @@ const KIND_PATTERNS: ReadonlyArray<readonly [SectionKind, RegExp]> = [
   ['acknowledgements', /\b(acknowledg\w*|funding|conflicts?\s+of\s+interest|disclosures?)\b/i],
   ['appendix', /\b(appendix|appendices|supplementar\w*|supporting\s+information)\b/i],
   ['abstract', /\babstract\b/i],
-  ['methods', /\b(methods?|materials?|participants|procedures?|study\s+design|experimental\s+(setup|design)|analysis\s+plan|measures)\b/i],
+  // The analysis family is the most common Methods subheading in
+  // psychology and medicine ("Statistical Analysis", "Data Analyses").
+  // Without it these land in `other`, which the mapper cuts wholesale.
+  [
+    'methods',
+    /\b(methods?|materials?|participants|procedures?|study\s+design|experimental\s+(setup|design)|(statistical|data|analytic)\s+analys[ei]s|analys[ei]s\s+plan|measures)\b/i,
+  ],
   ['results', /\b(results?|findings)\b/i],
   ['discussion', /\bdiscussion\b/i],
   ['conclusion', /\bconclusions?\b/i],
@@ -45,9 +51,12 @@ export function classifyHeading(heading: string): SectionKind {
 
 /** Function words a real heading may carry around its section term
  *  ("Materials and Methods", "Results and Discussion", "The Present
- *  Study"). Anything outside this set is prose vocabulary. */
+ *  Study"), plus the modifier vocabulary academic subheadings stack in
+ *  front of one ("Statistical Methods", "Primary Outcome Measures",
+ *  "Exploratory Analyses"). Anything outside this set is prose
+ *  vocabulary. */
 const HEADING_FILLER =
-  /^(and|or|of|the|a|an|in|on|for|to|with|study|studies|section|part|chapter|our|present|information|statement|data|note|notes)$/i;
+  /^(and|or|of|the|a|an|in|on|for|to|with|study|studies|section|part|chapter|our|present|information|statement|data|note|notes|statistical|statistics|analytic|analytical|primary|secondary|exploratory|quantitative|qualitative|outcome|outcomes)$/i;
 
 /**
  * True when a lexicon match describes the WHOLE line rather than

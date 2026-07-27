@@ -44,6 +44,25 @@ describe('classifyHeading', () => {
   it('falls back to other for unrecognised headings', () => {
     expect(classifyHeading('Stimuli')).toBe('other');
   });
+
+  /** The analysis family is the most common Methods subheading in
+   *  psychology and medicine. Classified `other`, it lands in the
+   *  mapper's CUT_BY_DEFAULT set and the content is deleted from the
+   *  poster wholesale — so these must resolve to methods. */
+  it.each([
+    'Statistical Analysis',
+    'Statistical Analyses',
+    'Data Analysis',
+    'Data Analyses',
+    'Analytic Analyses',
+    'Analysis Plan',
+    'Statistical Methods',
+    'Study Design',
+    'Participants',
+    'Measures',
+  ])('classifies %j as methods', (heading) => {
+    expect(classifyHeading(heading)).toBe('methods');
+  });
 });
 
 describe('looksLikeHeading — real headings are detected', () => {
@@ -68,10 +87,50 @@ describe('looksLikeHeading — real headings are detected', () => {
     '3. Stimuli',
     'METHODS',
     '## Discussion',
+    // Modifier-stacked Methods subheadings. The residue rule that keeps
+    // hard-wrapped prose out must not reject these — a missed heading
+    // dumps the subsection's title into the PREVIOUS section as a stray
+    // prose fragment, which is the same IR corruption in reverse.
+    'Statistical Methods',
+    'Statistical Analysis',
+    'Statistical Analyses',
+    'Data Analysis',
+    'Study Design',
+    'Participants',
+    'Analysis Plan',
+    'Measures',
+    'Experimental Design',
+    'Primary Outcome Measures',
+    'Exploratory Data Analyses',
   ];
 
   it.each(HEADINGS)('detects %j', (heading) => {
     expect(looksLikeHeading(heading)).toBe(true);
+  });
+
+  it('keeps a Methods subheading out of the preceding section body', () => {
+    // The regression this pins: 'Statistical Methods' classified as
+    // methods but failed `looksLikeHeading`, so it was swallowed into
+    // the Methods paragraphs and shipped to the condenser as prose.
+    const pasted = [
+      'Sleep Duration and Recall Accuracy',
+      'Methods',
+      'We recruited 120 undergraduates from two',
+      'Statistical Analysis',
+      'Mixed-effects models were fitted in R',
+      'Results',
+      'The results showed a clear dose-response',
+    ].join('\n');
+
+    const doc = parseManuscriptText(pasted);
+    const methodsText = doc.sections
+      .filter((s) => s.kind === 'methods')
+      .flatMap((s) => s.paragraphs)
+      .join(' ');
+    expect(methodsText).not.toMatch(/Statistical Analysis/);
+    expect(doc.sections.some((s) => s.heading === 'Statistical Analysis')).toBe(
+      true,
+    );
   });
 });
 

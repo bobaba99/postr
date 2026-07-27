@@ -203,6 +203,7 @@ export function buildPosterDoc(
   const moneyFigure = [...doc.figures]
     .filter((f) => f.imageRef !== null)
     .sort((a, b) => b.prominence - a.prominence)[0];
+  let figuresPlaced = 0;
   if (moneyFigure?.imageRef) {
     const remaining = col2.bottom - col2.y;
     if (remaining >= 40) {
@@ -219,11 +220,25 @@ export function buildPosterDoc(
         }),
       );
       col2 = { ...col2, y: col2.bottom };
+      figuresPlaced = 1;
     } else {
       warnings.push(
         'No room for the main figure next to the findings — add it in the editor.',
       );
     }
+  }
+
+  // The layout carries one figure. Every other figure in the manuscript
+  // is dropped — say so, or the user never learns their poster is
+  // missing five of six charts (and the legibility gate, which only
+  // measures emitted blocks, never checks them either).
+  const droppedFigures = doc.figures.length - figuresPlaced;
+  if (droppedFigures > 0 && figuresPlaced > 0) {
+    warnings.push(
+      `Only your highest-impact figure fit on the poster — ${droppedFigures} other ${
+        droppedFigures === 1 ? 'figure was' : 'figures were'
+      } left out. Open it in the editor to add them.`,
+    );
   }
 
   // ── Column 3: takeaway, pinned sections, references ───────────────
