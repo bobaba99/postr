@@ -68,11 +68,22 @@ function failureMessage(outcome: ParseOutcome): string {
   }
 }
 
+/**
+ * A typed table is only worth parsing once it plausibly *is* a table:
+ * a header row plus at least one data row. Parsing sooner would
+ * advance the ladder mid-word and unmount the textarea under the
+ * user's cursor.
+ */
+function looksLikeTable(text: string): boolean {
+  return text.trim().split(/\r?\n/).filter((line) => line.trim().length > 0).length >= 2;
+}
+
 export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [sheets, setSheets] = useState<ExcelSheet[] | null>(null);
   const [reading, setReading] = useState(false);
+  const [draft, setDraft] = useState('');
 
   const finish = (outcome: ParseOutcome, pending: Pending) => {
     if (outcome.ok) {
@@ -98,6 +109,13 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
   const handleText = (text: string) => {
     if (text.trim().length === 0) return;
     setSheets(null);
+    // A lone line is a header with nothing under it — never a table.
+    // Rejecting it here (rather than letting `tabulate` invent
+    // "Column 1" names) also stops a half-typed row from advancing.
+    if (!looksLikeTable(text)) {
+      setFailure({ message: failureMessage({ ok: false, reason: 'empty' }) });
+      return;
+    }
     parsePending({ kind: 'text', text }, false);
   };
 
@@ -154,14 +172,25 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
         aria-label="Paste your table"
         placeholder="Paste cells from Excel, Sheets, or Numbers (⌘V) — include the header row"
         rows={3}
+        value={draft}
         onPaste={(e) => {
           const text = e.clipboardData.getData('text/plain');
           if (text) {
             e.preventDefault();
+            setDraft(text);
             handleText(text);
           }
         }}
-        onChange={(e) => handleText(e.target.value)}
+        // Typing never parses — that would advance the ladder and
+        // unmount this textarea mid-word. Blur is the earliest safe
+        // moment; the button below is the explicit affordance.
+        onChange={(e) => {
+          setDraft(e.target.value);
+          if (failure) setFailure(null);
+        }}
+        onBlur={() => {
+          if (looksLikeTable(draft)) handleText(draft);
+        }}
         style={{
           width: '100%',
           resize: 'vertical',
@@ -177,6 +206,15 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
       />
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        {draft.trim().length > 0 && (
+          <button
+            type="button"
+            style={{ ...buttonStyle, borderColor: '#7c6aed', color: '#d6cfff' }}
+            onClick={() => handleText(draft)}
+          >
+            Use this table
+          </button>
+        )}
         <button type="button" style={buttonStyle} onClick={() => fileRef.current?.click()}>
           {reading ? 'Reading…' : 'Upload CSV or Excel'}
         </button>

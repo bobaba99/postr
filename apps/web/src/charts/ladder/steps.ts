@@ -95,6 +95,17 @@ export function pickSample(shape: SyntheticShape, vars: 0 | 1 | 2 | undefined): 
   }
 }
 
+/**
+ * Shapes where the variable-count answer actually selects a different
+ * dataset. For every other shape `pickSample` ignores `vars`, so asking
+ * would be a dead rung — and the governing rule (§0) is that a question
+ * which cannot change the output is never rendered.
+ */
+export const VARS_SENSITIVE_SHAPES: ReadonlySet<SyntheticShape> = new Set<SyntheticShape>([
+  'groups',
+  'time',
+]);
+
 const inferCache = new WeakMap<SampleDataset['table'], InferredTable>();
 
 function inferSample(sample: SampleDataset): InferredTable {
@@ -106,16 +117,26 @@ function inferSample(sample: SampleDataset): InferredTable {
 }
 
 function planSynthetic(answers: LadderAnswers): StepPlan {
-  // The synthetic branch renders its questions unconditionally —
-  // with no data there is nothing to infer from.
-  const steps: StepId[] = ['data', 'measure', 'grouping', 'emphasis', 'preview'];
+  // With no data there is nothing to infer the shape from, so the
+  // shape question always renders. The variable-count question renders
+  // only for the shapes whose sample it actually changes.
+  const needVars = answers.shape !== undefined && VARS_SENSITIVE_SHAPES.has(answers.shape);
+  const steps: StepId[] = [
+    'data',
+    'measure',
+    ...(needVars ? (['grouping'] as const) : []),
+    'emphasis',
+    'preview',
+  ];
   const sample = answers.shape ? pickSample(answers.shape, answers.vars) : null;
   const table = sample ? inferSample(sample) : null;
+
+  const varsAnswered = !needVars || answers.vars !== undefined;
 
   const active: StepId =
     answers.shape === undefined
       ? 'measure'
-      : answers.vars === undefined
+      : !varsAnswered
         ? 'grouping'
         : answers.emphasis === undefined
           ? 'emphasis'

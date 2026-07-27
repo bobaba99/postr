@@ -64,10 +64,37 @@ describe('planLadder — the self-destructing questionnaire', () => {
     expect(plan.steps).toEqual(['data', 'preview']);
   });
 
-  it('renders steps 2–4 unconditionally on the synthetic branch', () => {
+  it('asks the shape question first on the synthetic branch', () => {
     const plan = planLadder({ kind: 'synthetic' }, {});
-    expect(plan.steps).toEqual(['data', 'measure', 'grouping', 'emphasis', 'preview']);
+    expect(plan.steps).toEqual(['data', 'measure', 'emphasis', 'preview']);
     expect(plan.active).toBe('measure');
+  });
+
+  it('adds the variable-count rung only for shapes whose sample it changes', () => {
+    for (const shape of ['groups', 'time'] as const) {
+      const plan = planLadder({ kind: 'synthetic' }, { shape });
+      expect(plan.steps).toContain('grouping');
+      expect(plan.active).toBe('grouping');
+    }
+  });
+
+  it('never renders the variable-count rung when it cannot change the sample', () => {
+    // pickSample ignores `vars` for these five, so the question would
+    // be a dead rung — the §0 rule says it is never shown.
+    for (const shape of ['relationship', 'whole', 'agreement', 'prepost', 'spread'] as const) {
+      const plan = planLadder({ kind: 'synthetic' }, { shape });
+      expect(plan.steps).not.toContain('grouping');
+      expect(plan.active).toBe('emphasis');
+      // And the sample is identical regardless of the vars answer.
+      const keys = ([0, 1, 2] as const).map((v) => pickSample(shape, v).key);
+      expect(new Set(keys).size).toBe(1);
+    }
+  });
+
+  it('walks a vars-insensitive shape straight from shape to preview', () => {
+    const plan = planLadder({ kind: 'synthetic' }, { shape: 'whole', emphasis: 'share' });
+    expect(plan.active).toBe('preview');
+    expect(plan.sample?.key).toBe('shares');
   });
 
   it('walks the synthetic branch to previews', () => {

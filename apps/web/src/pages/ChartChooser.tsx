@@ -78,8 +78,11 @@ export default function ChartChooserPage() {
       } else {
         await downloadChartPng(spec, palette, PREVIEW_FONT, `${fileSlug(formName)}.png`);
       }
-    } catch {
+    } catch (error) {
       setDownloadFailed(true);
+      // Re-thrown so the panel withholds its success confirmation —
+      // the banner above is the single user-facing message.
+      throw error;
     }
   };
 

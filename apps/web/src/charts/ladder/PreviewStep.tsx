@@ -21,6 +21,11 @@ import { ChartPreview } from './ChartPreview';
 
 export interface PreviewAction {
   label: string;
+  /**
+   * Must reject (or throw) when the action fails — the success
+   * confirmation is gated on it resolving, so a swallowed rejection
+   * would show "✓ done" next to an error banner.
+   */
   run: (spec: ChartSpec, caption: string, formName: string) => void | Promise<void>;
   primary?: boolean;
 }
@@ -142,8 +147,18 @@ export function PreviewStep({
                 key={action.label}
                 type="button"
                 onClick={() => {
-                  if (action.primary) setConfirmedIndex(i);
-                  void action.run(panel.spec, panel.caption, panel.rec.name);
+                  // Clear any prior confirmation first, then confirm
+                  // only once the action has actually resolved — the
+                  // caller surfaces its own error message on failure.
+                  setConfirmedIndex(null);
+                  void (async () => {
+                    try {
+                      await action.run(panel.spec, panel.caption, panel.rec.name);
+                      if (action.primary) setConfirmedIndex(i);
+                    } catch {
+                      setConfirmedIndex(null);
+                    }
+                  })();
                 }}
                 style={{
                   border: action.primary ? 'none' : '1px solid #c9c6c0',

@@ -24,10 +24,29 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { auth: authSpies },
 }));
 
+const downloadSpies = vi.hoisted(() => ({
+  downloadChartSvg: vi.fn(async () => {}),
+  downloadChartPng: vi.fn(async () => {}),
+}));
+
+// Partial mock — the module also exports PREVIEW_THEME_BASE, which
+// ChartPreview needs to render the panels this test clicks through.
+vi.mock('@/charts/download', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/charts/download')>()),
+  ...downloadSpies,
+}));
+
 import ChartChooserPage from '../ChartChooser';
 import routesJson from '../../seo/routes.json';
 
 const TSV = 'Condition\tMean reaction time (ms)\nControl\t512\nPlacebo\t498\nHigh dose\t428';
+
+/** ⌘V into the ladder's textarea — typing deliberately does not parse. */
+function pasteTable(text: string) {
+  fireEvent.paste(screen.getByLabelText('Paste your table'), {
+    clipboardData: { getData: () => text },
+  });
+}
 
 function renderPage() {
   return render(
@@ -40,6 +59,8 @@ function renderPage() {
 describe('ChartChooserPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    downloadSpies.downloadChartSvg.mockResolvedValue(undefined);
+    downloadSpies.downloadChartPng.mockResolvedValue(undefined);
   });
 
   it('renders the h1 the prerender script injects for crawlers', () => {
@@ -60,7 +81,7 @@ describe('ChartChooserPage', () => {
   it('starts the ladder at the data step with download actions downstream', async () => {
     renderPage();
     expect(screen.getByLabelText('Paste your table')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Paste your table'), { target: { value: TSV } });
+    pasteTable(TSV);
     expect(await screen.findByText('Pick your figure')).toBeInTheDocument();
     expect((await screen.findAllByText('Download SVG')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Download PNG').length).toBeGreaterThan(0);
@@ -70,13 +91,36 @@ describe('ChartChooserPage', () => {
 
   it('switches the preview palette from the swatch row', async () => {
     renderPage();
-    fireEvent.change(screen.getByLabelText('Paste your table'), { target: { value: TSV } });
+    pasteTable(TSV);
     await screen.findByText('Pick your figure');
     const natureSwatch = screen.getByRole('button', { name: 'Nature / Biology' });
     fireEvent.click(natureSwatch);
     expect(natureSwatch).toHaveAttribute('aria-pressed', 'true');
     // The previews are still up after the re-theme.
     expect(screen.getByText('Pick your figure')).toBeInTheDocument();
+  });
+
+  it('never shows the saved confirmation next to a download error', async () => {
+    downloadSpies.downloadChartSvg.mockRejectedValue(new Error('render failed'));
+    renderPage();
+    pasteTable(TSV);
+    const download = (await screen.findAllByText('Download SVG'))[0]!;
+    fireEvent.click(download);
+    // The generic error banner is the single message the user gets…
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Something went wrong preparing that download.',
+    );
+    // …never contradicted by a success line under the panel.
+    expect(screen.queryByText(/Saved — vector SVG/)).not.toBeInTheDocument();
+  });
+
+  it('confirms the save only when the download actually succeeds', async () => {
+    renderPage();
+    pasteTable(TSV);
+    const download = (await screen.findAllByText('Download SVG'))[0]!;
+    fireEvent.click(download);
+    expect(await screen.findByText(/Saved — vector SVG/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('gates poster-editor work behind an explicit Start a poster link', () => {

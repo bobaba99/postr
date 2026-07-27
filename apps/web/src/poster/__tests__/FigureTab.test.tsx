@@ -16,6 +16,13 @@ const palette: Palette = {
 
 const TSV = 'Condition\tMean reaction time (ms)\nControl\t512\nPlacebo\t498\nHigh dose\t428';
 
+/** ⌘V into the ladder's textarea — typing deliberately does not parse. */
+function pasteTable(text: string) {
+  fireEvent.paste(screen.getByLabelText('Paste your table'), {
+    clipboardData: { getData: () => text },
+  });
+}
+
 function Harness({
   initialMode = 'make',
   onInsertChart = vi.fn(),
@@ -59,7 +66,7 @@ describe('FigureTab', () => {
 
   it('keeps ladder progress across a mode round-trip', async () => {
     render(<Harness />);
-    fireEvent.change(screen.getByLabelText('Paste your table'), { target: { value: TSV } });
+    pasteTable(TSV);
     expect(await screen.findByText('Pick your figure')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Check a figure' }));
     fireEvent.click(screen.getByRole('button', { name: 'Make a figure' }));
@@ -70,7 +77,7 @@ describe('FigureTab', () => {
   it('inserting passes spec + caption up and confirms legibility', async () => {
     const onInsertChart = vi.fn();
     render(<Harness onInsertChart={onInsertChart} />);
-    fireEvent.change(screen.getByLabelText('Paste your table'), { target: { value: TSV } });
+    pasteTable(TSV);
     const insert = (await screen.findAllByText('Insert this figure'))[0]!;
     fireEvent.click(insert);
     expect(onInsertChart).toHaveBeenCalledTimes(1);
