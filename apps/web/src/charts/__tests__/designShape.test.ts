@@ -80,6 +80,74 @@ describe('classifyColumns — statistical type and design role', () => {
     expect(site?.role).toBe('constant');
   });
 
+  it('reads numerically coded factors as factors, not outcomes', () => {
+    // The SPSS/Stata export idiom: 1 = control, 2 = treatment. Without
+    // a level-count guard these read as three unrelated outcomes.
+    const shape = shapeOf(
+      raw(
+        ['Condition', 'Arm', 'Score'],
+        [
+          ['1', '1', '4.2'],
+          ['2', '2', '5.1'],
+          ['1', '3', '6.0'],
+          ['2', '1', '4.8'],
+          ['1', '2', '5.5'],
+          ['2', '3', '6.3'],
+        ],
+      ),
+    );
+    expect(shape.dvCount).toBe(1);
+    expect(shape.ivCount).toBe(2);
+    expect(shape.dvNames).toEqual(['Score']);
+    expect(shape.ivNames).toEqual(['Condition', 'Arm']);
+    expect(shape.label).toBe('1 outcome × 2 factors');
+  });
+
+  it('keeps an outcome-named integer column an outcome', () => {
+    // A 1–5 Likert "Rating" repeats its levels exactly like a coded
+    // factor does — the NAME is what separates them.
+    const rows: RawTable['rows'] = Array.from({ length: 20 }, (_, i) => [
+      i % 2 === 0 ? 'Control' : 'Drug',
+      String((i % 5) + 1),
+    ]);
+    const table = inferTable(raw(['Condition', 'Rating'], rows));
+    const rating = classifyColumns(table).find((c) => c.name === 'Rating');
+    expect(rating?.type).toBe('continuous');
+    expect(rating?.role).toBe('dependent');
+  });
+
+  it('keeps a non-repeating integer column an outcome', () => {
+    // Six rows, six distinct integers, no outcome-ish name — a
+    // measurement that happens to be whole numbers.
+    const table = inferTable(
+      raw(
+        ['Condition', 'Cells counted'],
+        [
+          ['Control', '11'],
+          ['Drug', '17'],
+          ['Control', '23'],
+          ['Drug', '31'],
+          ['Control', '44'],
+          ['Drug', '52'],
+        ],
+      ),
+    );
+    const measure = classifyColumns(table).find((c) => c.name === 'Cells counted');
+    expect(measure?.role).toBe('dependent');
+  });
+
+  it('keeps a fractional low-cardinality column an outcome', () => {
+    // Two distinct values, but they are not whole numbers, so they
+    // cannot be group codes.
+    const rows: RawTable['rows'] = Array.from({ length: 10 }, (_, i) => [
+      i % 2 === 0 ? 'Control' : 'Drug',
+      i % 2 === 0 ? '4.25' : '5.75',
+    ]);
+    const table = inferTable(raw(['Condition', 'Yield per plate'], rows));
+    const measure = classifyColumns(table).find((c) => c.name === 'Yield per plate');
+    expect(measure?.role).toBe('dependent');
+  });
+
   it('reads a high-cardinality text column as an identifier, not a factor', () => {
     const rows: RawTable['rows'] = Array.from({ length: 40 }, (_, i) => [
       `Free text response ${i}`,

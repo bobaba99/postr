@@ -89,6 +89,23 @@ export interface DesignShape {
 /** Above this many distinct values, a text column is an ID, not a factor. */
 const MAX_FACTOR_LEVELS = 30;
 
+/**
+ * Above this many distinct values, an integer column is a measurement
+ * rather than a numerically coded factor. Far tighter than
+ * MAX_FACTOR_LEVELS because numbers carry no label to vouch for them:
+ * "1, 2" is almost certainly control/treatment, but "1 … 25" is more
+ * plausibly a count than a 25-arm design.
+ */
+const MAX_NUMERIC_FACTOR_LEVELS = 10;
+
+/**
+ * An integer column also has to REPEAT its levels before it reads as a
+ * factor. At most this share of the filled cells may be distinct — a
+ * column where every row is its own value is a measurement, however
+ * few rows there are.
+ */
+const NUMERIC_FACTOR_REPETITION = 0.5;
+
 /** A column whose values are nearly all distinct is an identifier. */
 const IDENTIFIER_UNIQUENESS = 0.9;
 
@@ -145,6 +162,30 @@ function typeFromName(name: string): VariableType {
 }
 
 /**
+ * True when an integer column is a numerically coded grouping factor
+ * rather than a measurement. This is the standard SPSS/Stata export
+ * idiom — 1 = control, 2 = treatment — and without this check every
+ * such factor is counted as an outcome, so a 2×3 factorial design
+ * reads back as "3 outcomes × 0 factors".
+ *
+ * Three conditions, all required:
+ *  - every value is a whole number (5.1 is a measurement, not a code);
+ *  - few enough distinct levels to be a factor;
+ *  - the levels actually repeat, so a short column of distinct
+ *    integers stays a measurement.
+ *
+ * An outcome-sounding NAME overrides all of it: a 1–5 "Rating" or a
+ * 0–10 "Score" is a measured outcome that happens to be integer, and
+ * the name is stronger evidence than the value shape.
+ */
+function isNumericFactor(col: InferredColumn, filled: number): boolean {
+  if (OUTCOME_NAME.test(col.name)) return false;
+  if (col.distinct > MAX_NUMERIC_FACTOR_LEVELS) return false;
+  if (filled === 0 || col.distinct / filled > NUMERIC_FACTOR_REPETITION) return false;
+  return col.values.every((v) => v === null || (typeof v === 'number' && Number.isInteger(v)));
+}
+
+/**
  * Classify one column into a statistical type. Ordering matters:
  * identifiers are caught before anything else so a "Participant ID"
  * integer column never becomes an outcome.
@@ -169,6 +210,9 @@ function classifyType(col: InferredColumn): VariableType {
   if (col.kind === 'number') {
     // Year-like / explicitly time-named integers are the trend axis.
     if (col.ordered) return 'temporal';
+    // Integer group codes (1 = control, 2 = treatment) are factors,
+    // not the thing measured.
+    if (isNumericFactor(col, filled)) return 'categorical';
     return 'continuous';
   }
 
