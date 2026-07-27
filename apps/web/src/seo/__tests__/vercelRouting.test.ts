@@ -39,7 +39,7 @@ interface Redirect {
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const vercelConfig = JSON.parse(
   readFileSync(resolve(WEB_ROOT, 'vercel.json'), 'utf8'),
-) as { rewrites?: Rewrite[]; redirects?: Redirect[] };
+) as { rewrites?: Rewrite[]; redirects?: Redirect[]; cleanUrls?: boolean };
 
 const rewrites = vercelConfig.rewrites ?? [];
 const redirects = vercelConfig.redirects ?? [];
@@ -117,8 +117,21 @@ describe('vercel.json rewrites', () => {
     }
   });
 
+  it('sets cleanUrls so extensionless routes resolve to <route>/index.html', () => {
+    // Without this, Vercel does NOT map /about -> dist/about/index.html:
+    // only "/" auto-resolves to index.html. Prerendered routes have no
+    // rewrite (they rely on filesystem precedence), so absent cleanUrls
+    // every one of /about /privacy /cookies /terms returns a 404 in
+    // production even though the file exists in the build. This shipped
+    // once and 404'd all four content pages — the assertion locks it.
+    expect(
+      vercelConfig.cleanUrls,
+      'cleanUrls must be true or prerendered routes 404 in production',
+    ).toBe(true);
+  });
+
   it.each(CLIENT_ROUTES)('%s is served (prerender or rewrite)', (route) => {
-    if (PRERENDERED.has(route)) return; // filesystem wins before rewrites
+    if (PRERENDERED.has(route)) return; // filesystem wins before rewrites (needs cleanUrls)
     const match = rewriteMatching(concretePathFor(route));
     expect(
       match,
