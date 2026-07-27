@@ -128,6 +128,17 @@ export interface MappedRole {
   missing: boolean;
 }
 
+/** A section the user pinned against the budget cutter (Q5). Pinned
+ *  content is exempt from the wholesale cuts but still gets condensed
+ *  to its own small budget — the poster has physical limits. */
+export interface MappedPinnedSection {
+  /** Section id in the DocumentModel. */
+  id: string;
+  heading: string;
+  budgetWords: number;
+  sourceText: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Emphasis questionnaire (§2.5) — structured answers only
 // ─────────────────────────────────────────────────────────────────────
@@ -181,8 +192,16 @@ export interface CondenseEmphasis {
   rankedFindings: string[];
 }
 
+export interface CondensePinnedInput {
+  id: string;
+  heading: string;
+  budgetWords: number;
+  sourceText: string;
+}
+
 export interface CondenseRequestBody {
   roles: CondenseRoleInput[];
+  pinned: CondensePinnedInput[];
   emphasis: CondenseEmphasis;
 }
 
@@ -195,6 +214,14 @@ export interface CondensedRole {
   truncated: boolean;
 }
 
+export interface CondensedPinnedSection {
+  id: string;
+  heading: string;
+  text: string;
+  truncated: boolean;
+}
+
 export interface CondensedNarrative {
   roles: CondensedRole[];
+  pinned: CondensedPinnedSection[];
 }
