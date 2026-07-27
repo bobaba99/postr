@@ -7,6 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import { parseManuscriptText } from '../parseManuscriptText';
 import {
+  capSourceText,
   extractFindings,
   mapNarrative,
   splitSentences,
@@ -14,6 +15,7 @@ import {
 } from '../mapper';
 import {
   MAX_PINNED_SECTIONS,
+  MAX_ROLE_SOURCE_CHARS,
   PINNED_SECTION_BUDGET_WORDS,
   POSTER_ROLE_SPECS,
 } from '../rubric';
@@ -146,6 +148,57 @@ describe('mapNarrative — roles', () => {
     const takeaway = byRole.get('takeaway')!;
     expect(takeaway.sourceText).toMatch(/^Even moderate restriction/);
     expect(takeaway.sourceText).not.toMatch(/Further work/);
+  });
+});
+
+describe('mapNarrative — source cap', () => {
+  /** The condense route rejects sourceText over MAX_SOURCE_CHARS with a
+   *  400, so the mapper must never emit more than the API accepts.
+   *  Regression guard for a long-manuscript hard failure. */
+  const longManuscript = () => {
+    const filler = 'Participants completed an additional counterbalanced block. ';
+    return `${MANUSCRIPT.replace(
+      'Recall was measured with a 40-item word-list task.',
+      `Recall was measured with a 40-item word-list task. ${filler.repeat(600)}`,
+    )}`;
+  };
+
+  it('caps every role and pin at MAX_ROLE_SOURCE_CHARS', () => {
+    const bigDoc = parseManuscriptText(longManuscript());
+    const pinIds = bigDoc.sections
+      .filter((s) => s.kind === 'limitations' || s.kind === 'literature-review')
+      .map((s) => s.id);
+    const map = mapNarrative(bigDoc, pinIds);
+
+    // The uncapped methods source would exceed the API limit.
+    const methodsRaw = bigDoc.sections
+      .filter((s) => s.kind === 'methods')
+      .flatMap((s) => s.paragraphs)
+      .join(' ');
+    expect(methodsRaw.length).toBeGreaterThan(MAX_ROLE_SOURCE_CHARS);
+
+    for (const role of map.roles) {
+      expect(role.sourceText.length).toBeLessThanOrEqual(MAX_ROLE_SOURCE_CHARS);
+    }
+    for (const pin of map.pinned) {
+      expect(pin.sourceText.length).toBeLessThanOrEqual(MAX_ROLE_SOURCE_CHARS);
+    }
+  });
+
+  it('leaves short sources untouched', () => {
+    const short = 'We tested recall across three sleep-duration groups.';
+    expect(capSourceText(short)).toBe(short);
+  });
+
+  it('cuts on a sentence boundary rather than mid-word', () => {
+    const capped = capSourceText(`${'All participants completed the task. '.repeat(1000)}`);
+    expect(capped.length).toBeLessThanOrEqual(MAX_ROLE_SOURCE_CHARS);
+    expect(capped.endsWith('.')).toBe(true);
+  });
+
+  it('hard-slices unpunctuated input rather than returning nothing', () => {
+    const blob = 'x'.repeat(MAX_ROLE_SOURCE_CHARS + 500);
+    expect(capSourceText(blob).length).toBe(MAX_ROLE_SOURCE_CHARS);
   });
 });
 

@@ -82,3 +82,19 @@ export const POSTER_MAX_FINDINGS = 3;
  *  user wants more, we say so plainly and let them choose what gives. */
 export const MAX_PINNED_SECTIONS = 2;
 export const PINNED_SECTION_BUDGET_WORDS = 60;
+
+/**
+ * Hard cap on the per-role source excerpt the mapper hands to the
+ * condenser, in characters.
+ *
+ * MUST stay ≤ the API's `MAX_SOURCE_CHARS` (apps/api/src/narrative.ts).
+ * The route rejects anything larger with a 400, so an unbounded mapper
+ * would make long manuscripts fail at the network edge rather than
+ * degrade gracefully. Trimming is the mapper's job anyway — cutting is
+ * what this layer is for.
+ *
+ * 20k chars is ~3.5k words, far beyond any panel's 40–150 word budget,
+ * so this only ever bites pathological input (a Methods section that
+ * runs to thirty pages).
+ */
+export const MAX_ROLE_SOURCE_CHARS = 20_000;

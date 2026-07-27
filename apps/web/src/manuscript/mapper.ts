@@ -22,6 +22,7 @@ import type {
 } from '@postr/shared';
 import {
   MAX_PINNED_SECTIONS,
+  MAX_ROLE_SOURCE_CHARS,
   PINNED_SECTION_BUDGET_WORDS,
   POSTER_MAX_FINDINGS,
   POSTER_ROLE_SPECS,
@@ -68,6 +69,35 @@ export function splitSentences(text: string): string[] {
 
 function sectionText(section: ManuscriptSection): string {
   return section.paragraphs.join('\n\n');
+}
+
+/**
+ * Bound a role's source excerpt to MAX_ROLE_SOURCE_CHARS.
+ *
+ * The condense route rejects over-long `sourceText` outright, so an
+ * unbounded excerpt turns a long manuscript into a hard 400 instead of
+ * a poster. Cut at the last sentence boundary inside the budget so the
+ * model never receives a half-sentence; fall back to a hard slice when
+ * a single "sentence" is itself over the cap (unpunctuated dumps).
+ *
+ * Losing the tail is correct behaviour, not a compromise: every role
+ * has a 40–150 word budget, and this only trims sources already ~25x
+ * larger than anything that could survive condensing.
+ */
+export function capSourceText(text: string): string {
+  if (text.length <= MAX_ROLE_SOURCE_CHARS) return text;
+  const head = text.slice(0, MAX_ROLE_SOURCE_CHARS);
+  const lastBreak = Math.max(
+    head.lastIndexOf('. '),
+    head.lastIndexOf('.\n'),
+    head.lastIndexOf('! '),
+    head.lastIndexOf('? '),
+  );
+  // Require the boundary to keep most of the budget, else hard-slice.
+  if (lastBreak > MAX_ROLE_SOURCE_CHARS * 0.5) {
+    return head.slice(0, lastBreak + 1).trim();
+  }
+  return head.trim();
 }
 
 function sectionsOfKind(doc: DocumentModel, kind: ManuscriptSection['kind']) {
@@ -157,7 +187,7 @@ function mapHook(doc: DocumentModel, warnings: string[]): MappedRole | null {
   return {
     role: 'hook',
     budgetWords: POSTER_ROLE_SPECS.hook.budgetWords,
-    sourceText: source,
+    sourceText: capSourceText(source),
     sourceHeadings: intro ? [intro.heading] : ['Abstract'],
     required: POSTER_ROLE_SPECS.hook.required,
     missing: false,
@@ -192,7 +222,7 @@ function mapQuestion(doc: DocumentModel, warnings: string[]): MappedRole {
   return {
     role: 'question',
     budgetWords: POSTER_ROLE_SPECS.question.budgetWords,
-    sourceText,
+    sourceText: capSourceText(sourceText),
     sourceHeadings,
     required: true,
     missing,
@@ -212,7 +242,7 @@ function mapMethods(doc: DocumentModel): MappedRole | null {
   return {
     role: 'methods',
     budgetWords: POSTER_ROLE_SPECS.methods.budgetWords,
-    sourceText: kept.join(' '),
+    sourceText: capSourceText(kept.join(' ')),
     sourceHeadings: methodSections.map((s) => s.heading),
     required: POSTER_ROLE_SPECS.methods.required,
     missing: false,
@@ -234,7 +264,7 @@ function mapKeyResult(
   return {
     role: 'keyResult',
     budgetWords: POSTER_ROLE_SPECS.keyResult.budgetWords,
-    sourceText: findings.map((f) => f.text).join('\n'),
+    sourceText: capSourceText(findings.map((f) => f.text).join('\n')),
     sourceHeadings: resultSections.map((s) => s.heading),
     required: true,
     missing,
@@ -266,7 +296,7 @@ function mapTakeaway(doc: DocumentModel, warnings: string[]): MappedRole {
   return {
     role: 'takeaway',
     budgetWords: POSTER_ROLE_SPECS.takeaway.budgetWords,
-    sourceText: source,
+    sourceText: capSourceText(source),
     sourceHeadings,
     required: true,
     missing,
@@ -294,7 +324,7 @@ export function mapNarrative(
       id: s.id,
       heading: s.heading || 'Additional Notes',
       budgetWords: PINNED_SECTION_BUDGET_WORDS,
-      sourceText: sectionText(s),
+      sourceText: capSourceText(sectionText(s)),
     }));
 
   const roles = [
