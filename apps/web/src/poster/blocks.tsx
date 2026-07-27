@@ -39,6 +39,7 @@ import {
 import { ResizeHandles, type ResizeHandle } from './resizeHandles';
 import { useStorageUrl } from '@/hooks/useStorageUrl';
 import { isStoragePath, uploadPosterImage } from '@/data/posterImages';
+import { ChartBlock } from '@/charts/ChartBlock';
 
 /** 1×1 transparent GIF. Used while a `storage://` path is still
  *  being signed — preserves layout without firing a network error
@@ -2176,6 +2177,19 @@ export function BlockFrame(props: BlockFrameProps) {
             label="Table"
           >
             <TableBlock block={b} palette={p} fontFamily={ff} styles={st} onUpdate={update} selected={selected} />
+          </CaptionWrapper>
+        )}
+
+        {b.type === 'chart' && (
+          <CaptionWrapper
+            block={b}
+            palette={p}
+            fontFamily={ff}
+            styles={st}
+            captionNumber={captionNumber}
+            label="Figure"
+          >
+            <ChartBlock block={b} palette={p} fontFamily={ff} />
           </CaptionWrapper>
         )}
       </div>

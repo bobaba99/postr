@@ -30,7 +30,7 @@ echo "Verifying prerender at ${BASE}"
 echo
 
 echo "Prerendered routes carry real HTML:"
-for route in "" about privacy cookies terms; do
+for route in "" about chart-chooser privacy cookies terms; do
   url="${BASE}/${route}"
   body="$(curl -sL --max-time 20 "$url")"
   bytes="${#body}"
