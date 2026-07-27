@@ -33,7 +33,7 @@ Even moderate restriction measurably impairs recall, which should inform how uni
 
 function renderPage() {
   return render(
-    <MemoryRouter initialEntries={['/manuscript-to-poster']}>
+    <MemoryRouter initialEntries={['/paper-to-poster']}>
       <PaperToPoster />
     </MemoryRouter>,
   );
