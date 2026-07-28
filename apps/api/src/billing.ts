@@ -40,8 +40,9 @@ export type BillingSku = 'term' | 'pack';
 
 /** How many export credits a pack purchase grants. */
 const PACK_EXPORT_CREDITS = 3;
-/** The term's length. Kept here so the webhook and the docs agree. */
-const TERM_MONTHS = 4;
+// The term's 4-month cadence now lives in the Stripe recurring price
+// (interval_count=4 months), not here — Stripe drives the billing period
+// and the webhook derives plan_expires_at from the subscription.
 
 interface BillingDeps {
   getStripe?: () => Stripe | null;
@@ -107,6 +108,7 @@ export function createBillingWebhookRouter(deps: BillingDeps = {}): Router {
         ) {
           await fulfillCheckout(
             supabase,
+            stripe,
             event.data.object as Stripe.Checkout.Session,
           );
         }
@@ -171,21 +173,44 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
       const cancelUrl = billingUrl('cancel');
 
       try {
-        const session = await stripe.checkout.sessions.create({
-          mode: 'payment', // one-time; the term is a term, not a sub
+        // Shared params. The term and the pack differ ONLY in mode:
+        //   - term = a recurring subscription (billed every 4 months by the
+        //     Stripe price; auto-renews) → mode 'subscription'.
+        //   - pack = a one-time purchase of 3 export credits → mode 'payment'.
+        // A single mode is wrong: mode 'payment' with a recurring price is
+        // rejected by Stripe ("passed a recurring price").
+        const params: Stripe.Checkout.SessionCreateParams = {
+          mode: sku === 'term' ? 'subscription' : 'payment',
           line_items: [{ price: priceId, quantity: 1 }],
           // Managed Payments — Stripe becomes the merchant of record and
-          // handles tax filing/remittance worldwide.
+          // handles tax filing/remittance worldwide. Composes with both
+          // payment and subscription mode.
           managed_payments: { enabled: true },
           // Bind the session to our user so the webhook can reconcile it
-          // even before a Stripe customer exists.
+          // even before a Stripe customer exists. NOTE: client_reference_id
+          // exists ONLY on the checkout.session — later subscription
+          // lifecycle events (invoice.paid, customer.subscription.*) do not
+          // carry it, which is why the term also stamps the user id into
+          // subscription_data.metadata below.
           client_reference_id: user.id,
           customer_email: user.email ?? undefined,
           // Carried onto the completed event so the webhook knows the SKU.
           metadata: { user_id: user.id, sku },
           success_url: successUrl,
           cancel_url: cancelUrl,
-        } as Stripe.Checkout.SessionCreateParams);
+        };
+
+        if (sku === 'term') {
+          // Copy the user id onto the Subscription object so later
+          // lifecycle events (which lack client_reference_id) can still be
+          // reconciled to this user. No client-side expiry — Stripe drives
+          // the billing period from the recurring price.
+          params.subscription_data = {
+            metadata: { user_id: user.id, sku: 'term' },
+          };
+        }
+
+        const session = await stripe.checkout.sessions.create(params);
 
         return res.json({ url: session.url });
       } catch (err) {
@@ -256,15 +281,44 @@ export async function consumeExportCredit(
 }
 
 /**
+ * Read a subscription's current-period-end (Unix seconds).
+ *
+ * BREAKING CHANGE (Stripe Basil, live on our pinned 2026-02-25.preview):
+ * the top-level `current_period_end` was REMOVED from the Subscription
+ * object — it now lives on each item: `items.data[0].current_period_end`.
+ * A naive `sub.current_period_end` read returns undefined and would write
+ * a null/NaN expiry, silently revoking a paying user. So we read the
+ * item-level field and FAIL HARD if it's missing (→ throw → 500 → Stripe
+ * retries) rather than write a bad expiry. Exported for tests.
+ */
+export function subscriptionPeriodEnd(sub: Stripe.Subscription): number {
+  const item = sub.items?.data?.[0] as
+    | (Stripe.SubscriptionItem & { current_period_end?: number })
+    | undefined;
+  const periodEnd = item?.current_period_end;
+  if (typeof periodEnd !== 'number' || !Number.isFinite(periodEnd)) {
+    throw new Error(
+      `subscription ${sub.id} has no item-level current_period_end`,
+    );
+  }
+  return periodEnd;
+}
+
+/**
  * Apply a completed checkout to the user's billing state. Idempotent:
  * safe to run twice for the same session (a webhook can fire more than
- * once), because the term is set to an absolute expiry and the pack
- * grant is guarded by a per-session marker.
+ * once) — the pack grant is guarded by a per-session marker, and the term
+ * writes absolute values derived from the retrieved subscription.
+ *
+ * The `stripe` client is needed for the term path: a subscription-mode
+ * session carries only the subscription id, so we retrieve the
+ * subscription to read its status and period end. The pack path ignores it.
  *
  * Exported for tests.
  */
 export async function fulfillCheckout(
   supabase: SupabaseClient,
+  stripe: Stripe,
   session: Stripe.Checkout.Session,
 ): Promise<void> {
   const userId = session.client_reference_id ?? session.metadata?.user_id;
@@ -272,31 +326,49 @@ export async function fulfillCheckout(
   if (!userId || !sku) {
     throw new Error('checkout session missing user_id / sku metadata');
   }
-  if (session.payment_status !== 'paid') {
-    // Only fulfill paid sessions; an incomplete session is a no-op.
-    return;
-  }
 
   const customerId =
     typeof session.customer === 'string' ? session.customer : null;
 
   if (sku === 'term') {
-    const expiresAt = new Date();
-    expiresAt.setMonth(expiresAt.getMonth() + TERM_MONTHS);
-    const { error } = await supabase
-      .from('users')
-      .update({
-        plan: 'term',
-        plan_expires_at: expiresAt.toISOString(),
-        ...(customerId ? { stripe_customer_id: customerId } : {}),
-      })
-      .eq('id', userId);
-    if (error) throw new Error(`term fulfillment update: ${error.message}`);
+    // Subscription mode: the completion signal is session.status ===
+    // 'complete', NOT payment_status (which can be 'no_payment_required').
+    // An incomplete session is a no-op the webhook will re-fire on.
+    const paid =
+      session.status === 'complete' ||
+      session.payment_status === 'paid' ||
+      session.payment_status === 'no_payment_required';
+    if (!paid) return;
+
+    const subscriptionId =
+      typeof session.subscription === 'string'
+        ? session.subscription
+        : session.subscription?.id;
+    if (!subscriptionId) {
+      throw new Error('term checkout session missing subscription id');
+    }
+
+    // Retrieve the subscription for its status + item-level period end.
+    const sub = await stripe.subscriptions.retrieve(subscriptionId);
+    const periodEndSec = subscriptionPeriodEnd(sub); // fails hard if absent
+    const expiresAtIso = new Date(periodEndSec * 1000).toISOString();
+
+    // Forward-only expiry: never move plan_expires_at backward on the term
+    // path (guards against an out-of-order webhook redelivery regressing a
+    // paying user's access). Only advance it.
+    await advanceTermAccess(supabase, userId, {
+      expiresAtIso,
+      subscriptionStatus: sub.status,
+      subscriptionId: sub.id,
+      customerId: customerId ?? (typeof sub.customer === 'string' ? sub.customer : null),
+    });
     return;
   }
 
-  // pack — grant credits. Idempotency: record fulfilled session ids so a
-  // retry can't double-grant. We check-then-insert on a dedicated table.
+  // pack — grant credits. Only fulfill paid sessions.
+  if (session.payment_status !== 'paid') return;
+
+  // Idempotency: record fulfilled session ids so a retry can't double-grant.
   const alreadyFulfilled = await sessionAlreadyFulfilled(supabase, session.id);
   if (alreadyFulfilled) return;
 
@@ -320,6 +392,57 @@ export async function fulfillCheckout(
   }
 
   await markSessionFulfilled(supabase, session.id, userId);
+}
+
+/**
+ * Grant / refresh a user's term access from a subscription's current state,
+ * writing plan_expires_at FORWARD-ONLY.
+ *
+ * Subscription lifecycle events can be redelivered out of order (Stripe
+ * retries failed deliveries with backoff, so a stale event can land after a
+ * fresher one). Every write here derives from an absolute value on the
+ * event, so re-delivery is safe — but a STALE event carries an OLDER
+ * period end, and blindly writing it would move a paying user's expiry
+ * backward. So we only advance plan_expires_at; we never retreat it here.
+ * (Losing access on cancel/past_due is a separate, explicit path added with
+ * the lifecycle handlers — not this function.)
+ *
+ * service_role write; the billing-column guard permits it.
+ */
+async function advanceTermAccess(
+  supabase: SupabaseClient,
+  userId: string,
+  opts: {
+    expiresAtIso: string;
+    subscriptionStatus: string;
+    subscriptionId: string;
+    customerId: string | null;
+  },
+): Promise<void> {
+  // Read the current expiry so we only move it forward.
+  const { data: current } = await supabase
+    .from('users')
+    .select('plan_expires_at' as never)
+    .eq('id', userId)
+    .maybeSingle();
+  const currentIso = (current as { plan_expires_at?: string | null } | null)
+    ?.plan_expires_at;
+  const nextIso =
+    currentIso && new Date(currentIso).getTime() >= new Date(opts.expiresAtIso).getTime()
+      ? currentIso // stored expiry is already the same or later — keep it
+      : opts.expiresAtIso;
+
+  const { error } = await supabase
+    .from('users')
+    .update({
+      plan: 'term',
+      plan_expires_at: nextIso,
+      subscription_status: opts.subscriptionStatus,
+      stripe_subscription_id: opts.subscriptionId,
+      ...(opts.customerId ? { stripe_customer_id: opts.customerId } : {}),
+    })
+    .eq('id', userId);
+  if (error) throw new Error(`term access update: ${error.message}`);
 }
 
 /**
