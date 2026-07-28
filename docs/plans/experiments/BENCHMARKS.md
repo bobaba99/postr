@@ -223,3 +223,55 @@ A pack buyer's 3-yr LTV ≈ 47% of a term buyer's ($10.39 vs $22.28).
 - Direct measured pack-vs-sub substitution rate (none published).
 - Pack-buyer repeat-purchase behavior (the real long-term unknown —
   close it with your own cohort once live).
+
+---
+
+# Payment provider re-comparison (2026-07-28, post-price-change)
+
+Trigger: Lemon Squeezy (Stripe-owned) now steers new signups to **Stripe
+Managed Payments** instead of the classic 5%+$0.50 product. Founder
+suspicious of the upsell. Re-verified.
+
+## Real current pricing (SOLID = vendor's own page)
+- **Stripe Managed Payments** `[SOLID, support.stripe.com]`: **3.5% MoR
+  fee ON TOP of** standard 2.9%+$0.30 processing = **~6.4%+$0.30 domestic,
+  ~8.5–11% intl**. True MoR (files+remits VAT in 80+ countries). Canada
+  seller OK. It's a markup model, materially pricier.
+- **Classic Lemon Squeezy (5%+$0.50) still exists** for new signups
+  `[WEAK — LS page 403'd; third-party corroborated]` — the founder was
+  just funneled to the pricier Managed Payments. Suspicion well-founded.
+- **Polar Starter (free tier): 5%+$0.50, +1.5% intl** `[SOLID, polar.sh]`.
+  Full MoR, one-time payments, clean webhook DX. Grandfathered 4%+40¢ for
+  orgs before 2026-05-27; new = Starter 5%+50¢.
+- **Paddle: 5%+$0.50 BUT "under $10 → contact sales"** `[SOLID]` — kills
+  the $9.99 pack. Disqualified.
+- Dodo (4%+$0.40, 220+ countries), Creem (3.9%+$0.40, ~50 countries) —
+  cheaper headline, newer/less proven `[WEAK]`.
+
+## Net take-home on Postr's tickets `[INFERENCE from SOLID rates]`
+| Provider | $18.99 dom | $18.99 intl | $9.99 dom | $9.99 intl |
+|----------|-----------|-------------|-----------|------------|
+| Managed Payments | $17.47 (8.0%) | ~$16.90 (11%) | $9.05 | ~$8.75 |
+| **Polar Starter** | $17.54 (7.6%) | $17.26 (9.1%) | $8.99 | $8.84 |
+| Lemon Squeezy classic | $17.54 | $17.54 | $8.99 | $8.99 |
+
+## Managed Payments premium over Polar (the "is it a lot?" answer)
+- 500 sales/yr: **~$75–120/yr** · 1,400 sales/yr: **~$210–330/yr**.
+- Tens at low volume, low-hundreds higher. Small — but no reason to pay
+  it, and Polar is cheaper on INTERNATIONAL (matters for worldwide buyers).
+
+## VERDICT: Polar (Starter, free tier)
+Same-or-cheaper than Managed Payments on both tickets, cheaper intl, true
+non-Stripe MoR (tax offload intact), clean Supabase+Express webhook DX,
+and sidesteps the Stripe upsell. Accept Managed Payments only if you
+value Stripe reliability/familiarity over ~$100/yr — a defensible but
+not compelling trade. Do a Polar uptime due-diligence pass first.
+
+## Could NOT verify
+- Managed Payments' exhaustive country list (Stripe says "80+", no list;
+  earlier "not in India/Global South" is third-party only, and limits
+  SELLER location not buyer).
+- Polar's literal "files & remits" wording (positions as full MoR,
+  corroborated, but exact sentence not captured).
+- Provider uptime track records (reputational only — founder should
+  due-diligence before committing production revenue).

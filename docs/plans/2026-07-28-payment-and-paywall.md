@@ -164,29 +164,52 @@ Nothing here is built. This is the sequence when it is.
 - Decrement on a successful paid deck export; never on generation
   (generation is the free trial).
 
-### 4.3 — Payment provider: Stripe Checkout
+### 4.3 — Payment provider: a Merchant of Record (Polar), NOT plain Stripe
 
-- **Stripe**, not a subscription — the $19 is a **term**, i.e. a
-  one-time payment that sets `plan_expires_at = now() + 4 months`. No
-  recurring billing, no cancellation flow, no dunning. (Growth-plan §2:
-  frame as a term, never a subscription — it expires without a
-  cancellation event.)
-- The pack is a second one-time Checkout SKU that adds 3 to
-  `deck_credits`.
-- `apps/api` already has an auth'd service with a cron secret pattern —
-  the **Stripe webhook lives there** (`apps/api/src/`), verified via the
-  Stripe signing secret, writing `plan` with `service_role`. No new
-  service.
+**DECIDED (2026-07-28, on research): Polar.** Postr sells worldwide to
+tax-messy jurisdictions (EU VAT etc.) as a solo Canadian founder — so it
+needs a **Merchant of Record** that becomes the legal seller and
+files+remits tax, not a plain gateway. Plain Stripe is NOT an MoR and
+would leave the founder personally liable for EU VAT / US sales tax
+everywhere. Full comparison: `2026-07-28-pricing-and-market-strategy.md`
+and `experiments/payment-providers.html`.
+
+Why Polar over the alternatives (all real 2026 pricing):
+- **Polar (Starter, free tier): 5% + $0.50, +1.5% intl.** Full MoR,
+  first-class one-time payments, clean webhook DX for Supabase+Express.
+  Nets ~$17.54 on the $18.99 term, ~$8.99 on the $9.99 pack.
+- **NOT Stripe Managed Payments** — it *is* an MoR but a markup model
+  (3.5% MoR **on top of** 2.9%+$0.30 = ~6.4%+$0.30 domestic, ~8.5–11%
+  intl). Lemon Squeezy (Stripe-owned) now steers new signups to it. The
+  premium over Polar is ~$75–120/yr at 500 sales, ~$210–330/yr at 1,400
+  — small, but no reason to pay it, and Polar is *cheaper on
+  international* (9.1% vs ~11%), which matters for worldwide buyers.
+- **NOT Paddle** — its published rule "products under $10 → contact sales"
+  disqualifies the $9.99 pack.
+- Classic Lemon Squeezy (5%+$0.50) still works if Polar's maturity is a
+  concern; Dodo Payments (4%+$0.40, 220+ countries) is the widest-reach
+  fallback. Do a due-diligence pass on Polar's uptime before committing
+  production revenue.
+
+The mechanics are provider-agnostic and unchanged by the choice:
+- **Not a subscription** — the $18.99 is a **term**, a one-time payment
+  that sets `plan_expires_at = now() + 4 months`. No recurring billing,
+  no cancellation, no dunning. (Growth-plan §2: frame as a term — it
+  expires without a cancellation event.)
+- The pack is a second one-time SKU that adds 3 to `deck_credits`.
+- `apps/api` already has an auth'd service with a cron-secret pattern —
+  the **provider webhook lives there** (`apps/api/src/`), signature-
+  verified, writing `plan` with `service_role`. No new service.
 
 ### 4.4 — Webhook → plan
 
-- `checkout.session.completed` → look up the user by
-  `stripe_customer_id` (or client_reference_id set at Checkout
-  creation), set `plan='term'` + `plan_expires_at`, or increment
-  `deck_credits`, per the SKU.
-- Idempotent on Stripe event id (a webhook can fire twice).
-- No cancellation handler needed for the term. A `charge.refunded`
-  handler is optional at launch.
+- On a completed-checkout webhook → look up the user (by the provider's
+  customer id or a `client_reference_id` set at checkout creation), set
+  `plan='term'` + `plan_expires_at`, or increment `deck_credits`, per the
+  SKU.
+- Idempotent on the provider's event id (a webhook can fire twice).
+- No cancellation handler needed for the term. A refund handler is
+  optional at launch.
 
 ### 4.5 — Thread the real plan into the client
 

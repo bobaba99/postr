@@ -174,6 +174,25 @@ wired yet.** The page ships the pricing *story* ahead of Sequence 1
 (payment-and-paywall) so the free/paid line is public and export is never
 a surprise. Checkout gets wired when the paywall is built.
 
+**Talk export is COMING-SOON, not live.** Paper-to-talk generation/export
+is NOT BUILT (`2026-07-28-paper-to-talk.md`). So the pricing page ships
+**two live tiers** (Free, Term — both back only shipped features: editing,
+watermarked PDF, PPTX + LaTeX export) **plus a coming-soon Deck pack** that
+advertises the planned $9.99 price and collects a **waitlist** rather than
+taking a live purchase. The term card deliberately does **not** list "turn
+a paper into a talk" — it only sells what a buyer gets today. This keeps
+the page honest: it never sells an artifact the product can't produce.
+
+> **REDEEM ON LAUNCH — the waitlist free-deck promise (Gavin,
+> 2026-07-28).** The coming-soon pack card promises *"waitlist members get
+> their first deck free."* When paper-to-talk ships and billing is wired,
+> this must be honoured: everyone who joined the waitlist before launch
+> gets one free talk generation+export. Track waitlist signups (the
+> `/auth` route the CTA points at, plus a flag/table) so the cohort is
+> identifiable at redemption time. Do NOT flip the pack to a live purchase
+> without delivering this. Flagged here so it isn't lost between now and
+> the feature landing.
+
 **DECIDED (on research): do NOT build the quiz. Ship a comparison table +
 "recommended" badge + a one-line helper instead.** A 3-tier, one-variable
 decision is well below the complexity threshold where a quiz earns its
