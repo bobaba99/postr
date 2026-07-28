@@ -3,6 +3,7 @@ import cors from 'cors';
 import { createCronRouter } from './cron.js';
 import { createImportRouter } from './import.js';
 import { createNarrativeRouter } from './narrative.js';
+import { createBillingRouter, createBillingWebhookRouter } from './billing.js';
 
 export function createApp(): Express {
   const app = express();
@@ -22,7 +23,18 @@ export function createApp(): Express {
     .filter(Boolean);
 
   app.use(cors({ origin: origins }));
+
+  // The Stripe webhook is mounted BEFORE express.json(): signature
+  // verification needs the RAW request bytes, so this router applies its
+  // own express.raw() to the webhook route. It must see the body before
+  // any JSON parser consumes it.
+  app.use(createBillingWebhookRouter());
+
   app.use(express.json({ limit: '2mb' }));
+
+  // The authed billing routes (create-checkout) read a parsed JSON body,
+  // so they mount AFTER express.json().
+  app.use(createBillingRouter());
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true });

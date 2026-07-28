@@ -141,6 +141,24 @@ export type Database = {
           },
         ]
       }
+      billing_fulfilled_sessions: {
+        Row: {
+          fulfilled_at: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          fulfilled_at?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          fulfilled_at?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       feedback: {
         Row: {
           body: string
@@ -566,6 +584,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      consume_export_credit: { Args: { p_user_id: string }; Returns: number }
       delete_own_account: { Args: never; Returns: undefined }
       export_my_data: { Args: never; Returns: Json }
       is_gallery_admin: { Args: { uid: string }; Returns: boolean }
