@@ -129,6 +129,16 @@ probe.
 
 Nothing here is built. This is the sequence when it is.
 
+> **Already shipped (2026-07-28), out of band:** the product-research
+> email consent. `research_consent_at timestamptz` on `public.users`
+> (migration `20260728000000_research_consent.sql`), a self-managed
+> toggle in Profile → Preferences, and the matching Privacy-policy clause
+> (legal basis: consent, Art. 6(1)(a)). This is Gavin's "email users for
+> product research" requirement. It is user-owned state — the owner's own
+> RLS policy writes it — so it is unlike `plan` below, which is
+> webhook-only. Outreach itself (the email send) is a separate,
+> unbuilt feature: the query selects only rows where the column is set.
+
 ### 4.1 — Data: the plan lives on the user, server-owned
 
 - Add to `public.users`: `plan text`, `plan_expires_at timestamptz`,
