@@ -77,6 +77,7 @@ import Debug from '@/pages/Debug';
 import Auth from '@/pages/Auth';
 import Home from '@/pages/Home';
 import Profile from '@/pages/Profile';
+import BillingResult from '@/pages/BillingResult';
 import NotFound from '@/pages/NotFound';
 
 // Lazy chunks — kept out of the initial bundle.
@@ -136,6 +137,9 @@ export function AppRoutes() {
         */}
         {import.meta.env.DEV && <Route path="/debug" element={<Debug />} />}
         <Route path="/auth" element={<Auth />} />
+        {/* Stripe checkout redirect landings (apps/api billingUrl()). */}
+        <Route path="/billing/success" element={<BillingResult outcome="success" />} />
+        <Route path="/billing/cancel" element={<BillingResult outcome="cancel" />} />
         <Route path="/s/:slug" element={<Share />} />
 
         {/* Protected routes */}
