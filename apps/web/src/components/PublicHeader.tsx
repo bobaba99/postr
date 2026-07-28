@@ -64,6 +64,7 @@ const TOOL_LINKS = [
  */
 export const NAV_LINKS = [
   ...TOOL_LINKS.map(({ to, label }) => ({ to, label })),
+  { to: '/pricing', label: 'Pricing' },
   { to: '/why-posters', label: 'Why posters' },
   { to: '/about', label: 'About' },
 ] as const;

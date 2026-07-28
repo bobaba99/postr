@@ -41,6 +41,7 @@ export function PublicFooter() {
               on phones this column is the only route to them. */}
           <FooterColumn title="Product">
             <FooterLink to="/">Home</FooterLink>
+            <FooterLink to="/pricing">Pricing</FooterLink>
             <FooterLink to="/paper-to-poster">Paper to poster</FooterLink>
             <FooterLink to="/chart-chooser">Plot picker</FooterLink>
           </FooterColumn>

@@ -50,6 +50,7 @@ describe('STATIC_ROUTE_META', () => {
       '/chart-chooser',
       '/cookies',
       '/paper-to-poster',
+      '/pricing',
       '/privacy',
       '/terms',
       '/why-posters',
