@@ -15,6 +15,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { supabase } from '@/lib/supabase';
+import {
+  getResearchConsent,
+  setResearchConsent as setResearchConsentRow,
+} from '@/data/researchConsent';
 import { listPosters, deletePoster } from '@/data/posters';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { resetOnboarding } from '@/components/OnboardingTour';
@@ -60,6 +64,8 @@ export default function Profile() {
   const [myGallery, setMyGallery] = useState<GalleryEntryWithUrls[]>([]);
   const openUploadFlow = usePublishFlowStore((s) => s.openForUpload);
   const publishStep = usePublishFlowStore((s) => s.step);
+  const [researchConsent, setResearchConsent] = useState(false);
+  const [savingConsent, setSavingConsent] = useState(false);
   const [presetModalOpen, setPresetModalOpen] = useState(false);
   const [presetCount, setPresetCount] = useState<number>(() => {
     try {
@@ -74,6 +80,11 @@ export default function Profile() {
     (async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data.user);
+      if (data.user) {
+        // Reflect the stored consent so the toggle starts in the right
+        // state. Non-critical: a read failure just leaves it off.
+        setResearchConsent(await getResearchConsent(data.user.id));
+      }
       try {
         const posters = await listPosters();
         setPosterCount(posters.length);
@@ -149,6 +160,27 @@ export default function Profile() {
     setActionStatus('Style presets cleared.');
     setTimeout(() => setActionStatus(null), 3000);
   }, []);
+
+  // Toggle product-research email consent. Writes research_consent_at
+  // ONLY when the state actually changes, and only when turning ON does
+  // it stamp a fresh timestamp — withdrawing sets it back to null. The
+  // owner's own RLS update policy covers this (consent is user-owned,
+  // unlike `plan`). Optimistic: flip the UI first, revert on failure.
+  const handleResearchConsent = useCallback(
+    async (next: boolean) => {
+      if (!user || savingConsent) return;
+      setSavingConsent(true);
+      setResearchConsent(next); // optimistic
+      const ok = await setResearchConsentRow(user.id, next);
+      if (!ok) {
+        setResearchConsent(!next); // revert
+        setActionError('Could not save that preference. Please try again.');
+        setTimeout(() => setActionError(null), 3000);
+      }
+      setSavingConsent(false);
+    },
+    [user, savingConsent],
+  );
 
   const handleExportData = useCallback(async () => {
     setExportError(null);
@@ -398,6 +430,45 @@ export default function Profile() {
               Replay tour
             </button>
           </div>
+          {/*
+            Only for signed-in accounts with an email. An anonymous guest
+            has no address, so the "email you" promise would be false and
+            the stamped consent would point at an un-emailable row — the
+            outreach query would collect rows it can never contact. Gated
+            like the "Create an Account" block above.
+          */}
+          {!isAnonymous && email && (
+            <div className="flex items-start justify-between gap-3 py-2 border-t border-[#1f1f2e]">
+              <div className="min-w-0 flex-1">
+                <div className="text-sm text-[#c8cad0]">Product-research emails</div>
+                <div className="text-[13px] text-[#6b7280]">
+                  Let us occasionally email you to invite you to a short
+                  interview or survey about Postr. Off by default; turn it off
+                  again anytime. It never affects your access.
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={researchConsent}
+                aria-busy={savingConsent}
+                aria-label="Product-research emails"
+                disabled={savingConsent}
+                onClick={() => handleResearchConsent(!researchConsent)}
+                className={
+                  'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ' +
+                  (researchConsent ? 'bg-[#7c6aed]' : 'bg-[#2a2a3a]')
+                }
+              >
+                <span
+                  className={
+                    'inline-block h-4 w-4 transform rounded-full bg-white transition-transform ' +
+                    (researchConsent ? 'translate-x-6' : 'translate-x-1')
+                  }
+                />
+              </button>
+            </div>
+          )}
           <div className="py-2 border-t border-[#1f1f2e]">
             <div className="text-sm text-[#c8cad0] mb-2">Checklist templates</div>
             <div className="text-[13px] text-[#6b7280] mb-3">

@@ -131,6 +131,11 @@ export default function Privacy() {
               'Feedback content, contact info if you are signed in',
             ],
             [
+              'Inviting you to product research (interviews, surveys) — only if you opt in',
+              'Consent (Art. 6(1)(a)) — withdrawable at any time',
+              'Email address, and any research responses you choose to give',
+            ],
+            [
               'Complying with legal obligations',
               'Legal obligation (Art. 6(1)(c))',
               'Whichever data is required by the specific obligation',
@@ -140,7 +145,10 @@ export default function Privacy() {
         <Body>
           We do not sell personal data, we do not run profiling or automated
           decision-making that produces legal or similarly significant effects, and we
-          do not use your poster content to train any AI model.
+          do not use your poster content to train any AI model. We only email you about
+          product research if you have explicitly opted in, and you can withdraw that
+          consent at any time in your account settings — it never affects your access to
+          Postr.
         </Body>
 
         <SectionHeading n="4" title="Who receives your data" />
