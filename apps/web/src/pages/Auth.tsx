@@ -61,6 +61,11 @@ export default function Auth() {
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState(false);
+  // Whether the current session is an anonymous GUEST. When true, the signup
+  // path must CONVERT the guest in place (updateUser / linkIdentity) so their
+  // posters carry over — NOT signUp, which would create a separate new user
+  // and orphan the guest's work. See project_guest_to_permanent_conversion.
+  const [isAnonGuest, setIsAnonGuest] = useState(false);
   // True while we're minting a Stripe session and redirecting off-site, so
   // the UI shows "Continuing to checkout…" rather than looking idle.
   const [checkingOut, setCheckingOut] = useState(false);
@@ -123,11 +128,17 @@ export default function Auth() {
     supabase.auth.getSession().then(({ data }) => {
       if (!data.session) return;
       const permanent = data.session.user.is_anonymous !== true;
+      // Remember whether we're sitting on an anonymous guest session so the
+      // signup path converts in place instead of creating a new user.
+      setIsAnonGuest(!permanent);
       if (checkoutPlan && permanent) {
         void proceedToCheckout(checkoutPlan);
         return;
       }
-      if (!checkoutPlan) navigate('/dashboard', { replace: true });
+      // A permanent user with no checkout intent goes to the dashboard.
+      // A GUEST does NOT get redirected — they stay on this page so they
+      // can convert their account (with or without a checkout intent).
+      if (!checkoutPlan && permanent) navigate('/dashboard', { replace: true });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
@@ -164,20 +175,53 @@ export default function Auth() {
     setError(null);
 
     if (mode === 'signup') {
-      const { data, error: err } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-      });
+      // Send the confirmation link back to /auth (carrying the checkout
+      // plan if any) so clicking it returns the user into our flow — resume
+      // checkout, or sign in — instead of a bare app root that reads as a
+      // dead-end "headless" landing.
+      const emailRedirectTo = checkoutPlan
+        ? `${window.location.origin}/auth?plan=${checkoutPlan}`
+        : `${window.location.origin}/auth`;
+      // Read the session FRESH here rather than trusting isAnonGuest state:
+      // that state is set by an async effect, and a fast submit (password-
+      // manager autofill) can fire before it resolves. Reading now is
+      // authoritative and can't be defeated by ordering — the same defense
+      // handleGuest uses. Converting the wrong way orphans the guest's
+      // posters, so this must be exact.
+      const { data: cur } = await supabase.auth.getSession();
+      const convertInPlace = cur.session?.user.is_anonymous === true;
+      // Convert a signed-in GUEST in place (updateUser links the email to
+      // their existing anonymous user, so their posters carry over), vs. a
+      // brand-new signUp for a visitor with no session. Using signUp on a
+      // guest would create a SEPARATE user and orphan their work.
+      const { data, error: err } = convertInPlace
+        ? await supabase.auth.updateUser(
+            { email: email.trim(), password },
+            { emailRedirectTo },
+          )
+        : await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: { emailRedirectTo },
+          });
       if (err) {
         setError(err.message);
         setLoading(false);
         return;
       }
       setLoading(false);
-      // No session → email confirmation is required. We can't start
-      // checkout without a session, so keep the intent stashed: after the
-      // user confirms and returns signed-in, this page resumes checkout.
-      if (!data.session) {
+      // `signUp` returns `{ session }`; `updateUser` returns `{ user }` with
+      // no session field. In both cases, if email confirmation is required
+      // the account is NOT yet permanent until the user clicks the link —
+      // updateUser triggers an email_change that keeps them anonymous until
+      // confirmed. Detect "not yet fully signed-in-as-permanent": no fresh
+      // session (signUp) OR still-anonymous user (updateUser pending confirm).
+      const sessionNow = (data as { session?: unknown }).session ?? null;
+      const userNow = (data as { user?: { is_anonymous?: boolean } | null }).user ?? null;
+      const nowPermanent = !!sessionNow || (userNow != null && userNow.is_anonymous === false);
+      if (!nowPermanent) {
+        // Email confirmation pending. Keep the checkout intent stashed so it
+        // resumes after the user confirms and returns signed-in.
         if (checkoutPlan) stashCheckoutIntent(checkoutPlan);
         setConfirmEmail(true);
         return;
@@ -227,10 +271,25 @@ export default function Auth() {
     const redirectTo = checkoutPlan
       ? `${window.location.origin}/auth?plan=${checkoutPlan}`
       : `${window.location.origin}/dashboard`;
-    const { error: err } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo },
-    });
+    // Read the session FRESH (not the async isAnonGuest state) — a fast
+    // click can beat the effect that sets it, and converting the wrong way
+    // orphans the guest's posters.
+    const { data: cur } = await supabase.auth.getSession();
+    const convertInPlace = cur.session?.user.is_anonymous === true;
+    // A signed-in GUEST links Google to their existing anonymous user
+    // (linkIdentity → converts in place, posters carry over). Everyone else
+    // does a normal OAuth sign-in. Using signInWithOAuth on a guest would
+    // start a fresh session and orphan their work. linkIdentity is instant
+    // on return — no email-confirmation gap — so it's the smooth path.
+    const { error: err } = convertInPlace
+      ? await supabase.auth.linkIdentity({
+          provider: 'google',
+          options: { redirectTo },
+        })
+      : await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo },
+        });
     if (err) {
       setError(err.message);
     }
@@ -297,10 +356,20 @@ export default function Auth() {
           </p>
 
           {confirmEmail && (
-            <div className="mb-4 rounded-md border border-[#34d399]/40 bg-[#34d399]/10 px-3 py-2 text-[13px] text-[#34d399]">
-              {checkoutPlan
-                ? 'Check your email to confirm your account, then come back to continue to checkout.'
-                : 'Check your email to confirm your account.'}
+            <div className="mb-4 rounded-md border border-[#34d399]/40 bg-[#34d399]/10 px-4 py-3 text-[13px] text-[#a7f3d0]">
+              <div className="font-semibold text-[#34d399]">Check your inbox</div>
+              <p className="mt-1 leading-relaxed">
+                We sent a confirmation link to{' '}
+                <span className="font-medium text-[#d1fae5]">{email.trim()}</span>.
+                Click it to finish setting up your account
+                {isAnonGuest ? ' — your posters stay with you' : ''}.
+                {checkoutPlan
+                  ? ' Then come back here and we’ll continue to checkout.'
+                  : ' Then come back to sign in.'}
+              </p>
+              <p className="mt-2 text-[12px] text-[#6ee7b7]/70">
+                Don’t see it? Check spam, or wait a minute and look again.
+              </p>
             </div>
           )}
 
