@@ -41,6 +41,13 @@ import {
 } from '../resolveAssets';
 import { tableCellBorders } from './tableBorders';
 import { attributionDocProperty, attributionPptxBox } from '../attribution';
+import {
+  POSTER_LAYOUT,
+  buildMasters,
+  resolveMasterPalette,
+  safeFontFamily,
+} from './masters';
+import { patchThemeColors } from './themePatch';
 
 export interface PptxExportOptions extends ExportContentOptions {
   /** Injectable for tests / server pipelines. */
@@ -61,6 +68,12 @@ export interface PptxExportResult {
 
 interface Ctx {
   doc: PosterDoc;
+  /** `doc.fontFamily` restricted to the curated families. pptxgenjs
+   *  writes font names into `typeface="…"` WITHOUT escaping, so an
+   *  `&` or `<` in the name emits malformed XML that PowerPoint
+   *  refuses to open. Names can arrive from an imported deck, so
+   *  every emitter uses this rather than `doc.fontFamily` directly. */
+  font: string;
   scale: number;
   captionNumbers: Record<string, number>;
   headingNumbers: Record<string, number>;
@@ -131,7 +144,7 @@ function styleOptions(
   fallbackColor: string,
 ): PptxGenJS.TextPropsOptions {
   return {
-    fontFace: ctx.doc.fontFamily,
+    fontFace: ctx.font,
     fontSize: pt(style.size, ctx.scale),
     bold: style.weight >= 600,
     italic: style.italic,
@@ -192,7 +205,7 @@ function addAuthors(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
 
   slide.addText(runs, {
     ...rect(b, ctx.scale),
-    fontFace: ctx.doc.fontFamily,
+    fontFace: ctx.font,
     fontSize: pt(st.size, ctx.scale),
     color: primary,
     align: 'center',
@@ -333,7 +346,7 @@ function addMutedText(
 ): void {
   slide.addText(orEmptyRun(runs), {
     ...box,
-    fontFace: ctx.doc.fontFamily,
+    fontFace: ctx.font,
     fontSize: pt(Math.round(ctx.doc.styles.body.size * 0.85), ctx.scale),
     color: hex(ctx.doc.palette.muted, '6B7280'),
     italic: true,
@@ -434,7 +447,7 @@ function addTable(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
     y: content.y,
     w: content.w,
     colW,
-    fontFace: ctx.doc.fontFamily,
+    fontFace: ctx.font,
     fontSize: cellPt,
     color: primary,
     autoPage: false,
@@ -471,7 +484,7 @@ function addReferences(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   });
   slide.addText(runs, {
     ...rect(b, ctx.scale),
-    fontFace: ctx.doc.fontFamily,
+    fontFace: ctx.font,
     fontSize: pt(st.size, ctx.scale),
     color: hex(ctx.doc.palette.primary, '111111'),
     align: 'left',
@@ -521,6 +534,23 @@ export async function exportPosterPptx(
   });
   pptx.layout = 'POSTR_POSTER';
 
+  // Theme fonts — `+mj-lt` / `+mn-lt` in ppt/theme/theme1.xml. This is
+  // what a NEW shape or slide inherits in PowerPoint, so the poster's
+  // family is the default rather than Calibri. Theme COLOURS are not
+  // expressible here; `patchThemeColors` handles them after write.
+  //
+  // Routed through `safeFontFamily` because pptxgenjs interpolates the
+  // name into `typeface="…"` unescaped, and theme1.xml is the first
+  // part PowerPoint parses — a stray `&` there breaks the whole file.
+  const themeFont = safeFontFamily(doc.fontFamily);
+  pptx.theme = { headFontFace: themeFont, bodyFontFace: themeFont };
+
+  // Named layouts, offered in PowerPoint's New Slide / Layout gallery.
+  // The first is the empty `POSTER_LAYOUT` used by the poster slide.
+  for (const master of buildMasters(doc, plan.slideWidthIn, plan.slideHeightIn, plan.scale)) {
+    pptx.defineSlideMaster(master);
+  }
+
   const title = extractPosterTitle(doc) || 'Poster';
   pptx.title = title;
   const authorNames = doc.authors.filter((a) => a.name).map((a) => a.name);
@@ -549,6 +579,7 @@ export async function exportPosterPptx(
 
   const ctx: Ctx = {
     doc,
+    font: themeFont,
     scale: plan.scale,
     captionNumbers: computeCaptionNumbers(doc.blocks),
     headingNumbers: computeHeadingNumbers(doc.blocks),
@@ -557,7 +588,11 @@ export async function exportPosterPptx(
     warnings,
   };
 
-  const slide = pptx.addSlide();
+  // The poster slide attaches to the deliberately EMPTY
+  // `POSTER_LAYOUT`. A layout supplies defaults only, and an empty one
+  // has no object to inherit from — so every block below keeps the
+  // exact geometry, size and colour it had before masters existed.
+  const slide = pptx.addSlide({ masterName: POSTER_LAYOUT });
   // Background: the poster's own fill colour, and nothing else.
   //
   // An earlier build flattened the acknowledgement mark into a
@@ -611,7 +646,7 @@ export async function exportPosterPptx(
       y: attributionBox.y,
       w: attributionBox.w,
       h: attributionBox.h,
-      fontFace: doc.fontFamily,
+      fontFace: themeFont,
       fontSize: attributionBox.fontSize,
       color: hex(doc.palette.muted, '6B7280'),
       align: 'left',
@@ -635,8 +670,12 @@ export async function exportPosterPptx(
   }
 
   const buffer = (await pptx.write({ outputType: 'arraybuffer' })) as ArrayBuffer;
+  // Last step: the poster's palette as the deck's theme colours, which
+  // pptxgenjs itself cannot write. Falls back to the library's bytes
+  // untouched if anything about the theme part is unexpected.
+  const bytes = patchThemeColors(new Uint8Array(buffer), resolveMasterPalette(doc.palette));
   return {
-    bytes: new Uint8Array(buffer),
+    bytes,
     scaled: plan.scaled,
     note: plan.note,
     warnings: [...new Set(warnings)],
