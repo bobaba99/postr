@@ -1060,30 +1060,33 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
     );
   }
 
-  if (plan.credits > 0) {
-    return (
-      <div className="space-y-3">
-        <p className="text-[14pt] text-[#c8cad0]">
-          You have {plan.credits} export{plan.credits === 1 ? '' : 's'} left in
-          your pack. Credits never expire — use them whenever.
-        </p>
-        <Link
-          to="/pricing"
-          className="inline-block rounded-md border border-[#2a2a3a] bg-[#111118] px-4 py-2 text-[14pt] font-medium text-[#c8cad0] no-underline hover:border-[#7c6aed] hover:text-[#fff]"
-        >
-          See plans
-        </Link>
-      </div>
-    );
-  }
-
-  // Free / no plan.
+  // No active term — the free state. Always show the export-credit balance
+  // (0 if they never bought a pack, or the remaining count if they did —
+  // credits never expire) and a "Get a subscription" CTA.
+  const hasCredits = plan.credits > 0;
   return (
     <div className="space-y-3">
       <p className="text-[14pt] text-[#c8cad0]">
         You’re on the free plan — unlimited editing and print-ready PDF export,
         with a small “made with postr.sh” mark.
       </p>
+
+      {/* Export-credit balance — shown even at 0 so the user always knows
+          where they stand. Pack credits never expire. */}
+      <div className="rounded-md border border-[#2a2a3a] bg-[#111118] px-4 py-3">
+        <div className="flex items-baseline justify-between">
+          <span className="text-[14pt] text-[#c8cad0]">Export credits</span>
+          <span className="text-[18pt] font-bold text-[#e2e2e8]">
+            {plan.credits}
+          </span>
+        </div>
+        <p className="mt-1 text-[13pt] text-[#6b7280]">
+          {hasCredits
+            ? `${plan.credits} PowerPoint or LaTeX export${plan.credits === 1 ? '' : 's'} left — credits never expire.`
+            : 'From a $9.99 export pack. Credits never expire once purchased.'}
+        </p>
+      </div>
+
       <p className="text-[14pt] text-[#6b7280]">
         Unlock clean PowerPoint &amp; LaTeX export with the term, or a one-time
         export pack whose credits never expire.
@@ -1092,7 +1095,7 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
         to="/pricing"
         className="inline-block rounded-md border border-[#7c6aed] bg-transparent px-4 py-2 text-[14pt] font-semibold text-[#7c6aed] no-underline hover:bg-[#7c6aed] hover:text-white"
       >
-        View plans
+        Get a subscription
       </Link>
     </div>
   );
