@@ -29,6 +29,7 @@ import { usePosterStore } from '@/stores/posterStore';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
 import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import { useAutosave } from '@/hooks/useAutosave';
+import { useIsSmallScreen } from '@/hooks/useIsSmallScreen';
 import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
 import { useGsapContext } from '@/motion';
 import { editorEntrance } from '@/motion/timelines/editorEntrance';
@@ -532,7 +533,18 @@ function useBlockDrag(
 // Zoom hook
 // =========================================================================
 
-function useZoom(canvasRef: React.RefObject<HTMLDivElement | null>, sizeKey: PosterSizeKey) {
+function useZoom(
+  canvasRef: React.RefObject<HTMLDivElement | null>,
+  sizeKey: PosterSizeKey,
+  /**
+   * Gutter reserved around the poster when auto-fitting. The desktop
+   * workspace keeps a generous 60px so blocks dragged just past the
+   * canvas edge stay grabbable; a phone has no drag affordances to
+   * protect and needs the pixels, so the mobile share path passes a
+   * much smaller gutter.
+   */
+  fitPadding = 60,
+) {
   const [manual, setManual] = useState<number | null>(null);
   const [fit, setFit] = useState(1);
 
@@ -542,12 +554,12 @@ function useZoom(canvasRef: React.RefObject<HTMLDivElement | null>, sizeKey: Pos
       const r = canvasRef.current.getBoundingClientRect();
       const sz = POSTER_SIZES[sizeKey]!;
       // Fit-to-viewport picks the tighter of width vs height ratio
-      // minus 60 px of canvas padding. The 5× upper bound is a
+      // minus the canvas gutter. The 5× upper bound is a
       // safety net for pathological cases (canvas not yet measured,
       // offscreen, etc.) — it's not a "sensible max zoom", auto-fit
       // on a large monitor should happily go to 3–4×.
-      const wRatio = (r.width - 60) / (sz.w * PX);
-      const hRatio = (r.height - 60) / (sz.h * PX);
+      const wRatio = (r.width - fitPadding) / (sz.w * PX);
+      const hRatio = (r.height - fitPadding) / (sz.h * PX);
       const ratio = Math.min(wRatio, hRatio, 5);
       // Guard against NaN / negative when the container hasn't laid
       // out yet (width < 60).
@@ -565,7 +577,7 @@ function useZoom(canvasRef: React.RefObject<HTMLDivElement | null>, sizeKey: Pos
       window.removeEventListener('resize', compute);
       ro.disconnect();
     };
-  }, [sizeKey, canvasRef]);
+  }, [sizeKey, canvasRef, fitPadding]);
 
   return { zoom: manual ?? fit, setZoom: setManual };
 }
@@ -659,7 +671,31 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       // Quota / private mode — silently drop; presets only live in-session.
     }
   }, [savedPresets]);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Phone-sized read-only viewing (a shared /s/:slug link opened on a
+  // phone) is the one context where the desktop chrome actively gets
+  // in the way: a fixed 484px rail plus 96px of workspace padding
+  // leaves ~180px of a 375px viewport for the poster itself, and the
+  // poster IS the content. Everything gated on `mobileShare` collapses
+  // that chrome so the poster fits the viewport on open. The editing
+  // paths never see it — `readOnly` is only true on the share route.
+  const isSmallScreen = useIsSmallScreen();
+  const mobileShare = readOnly && isSmallScreen;
+
+  // Ruler and workspace grid are authoring aids — they measure and
+  // align blocks nobody can move on a share link. On a phone they also
+  // cost real estate and add visual noise over the one thing the
+  // visitor came for. The underlying toggles keep their state; only
+  // the rendering is suppressed, so widening the window restores them.
+  const showRulerEffective = showRuler && !mobileShare;
+  const showGridEffective = showGrid && !mobileShare;
+
+  const [sidebarOpen, setSidebarOpen] = useState(!mobileShare);
+  // The breakpoint can flip after mount (rotation, a desktop window
+  // dragged narrow), so the rail follows it rather than staying at
+  // whatever the first render picked.
+  useEffect(() => {
+    if (mobileShare) setSidebarOpen(false);
+  }, [mobileShare]);
   const [guidelinesOpen, setGuidelinesOpen] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
   // Lifted from Sidebar so the Check tab can render a draggable
@@ -1157,7 +1193,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     );
   }
 
-  const { zoom, setZoom } = useZoom(canvasRef, sizeKey);
+  // 16px of gutter on a phone versus 60 on desktop: at 375px wide the
+  // desktop gutter alone eats a sixth of the viewport, and the whole
+  // point of the mobile share view is that the poster arrives fitted.
+  const { zoom, setZoom } = useZoom(canvasRef, sizeKey, mobileShare ? 16 : 60);
 
   // ── Touchpad pinch-to-zoom + pan ───────────────────────────────────
   //
@@ -2248,10 +2287,27 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           instead of growing unbounded and clipping the bottom. */}
       <div
         style={{
-          flex: '0 0 auto',
-          width: sidebarOpen ? 484 : 0,
-          minWidth: sidebarOpen ? 484 : 0,
-          display: 'flex',
+          // On the mobile share view the rail becomes an overlay
+          // sheet: a 484px push-panel cannot share a 375px viewport
+          // with the poster, so instead of reflowing the canvas to
+          // nothing it covers it, and dismisses back to the poster.
+          ...(mobileShare
+            ? {
+                position: 'fixed' as const,
+                inset: 0,
+                zIndex: 40,
+                width: '100%',
+                minWidth: 0,
+                // Fully unmounted from the layout when closed so it
+                // cannot swallow taps meant for the poster.
+                display: sidebarOpen ? 'flex' : 'none',
+              }
+            : {
+                flex: '0 0 auto',
+                width: sidebarOpen ? 484 : 0,
+                minWidth: sidebarOpen ? 484 : 0,
+                display: 'flex',
+              }),
           flexDirection: 'column',
           minHeight: 0,
           overflow: 'hidden',
@@ -2265,8 +2321,12 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           // fixed 484px, 280ms, toggled only occasionally. min-width
           // animates in lockstep so the flex item can't collapse ahead
           // of the width tween.
-          transition:
-            'width 280ms var(--ease-out), min-width 280ms var(--ease-out)',
+          // The mobile sheet is full-width and toggles `display`, so a
+          // width tween has nothing to animate and would only fight
+          // the fixed positioning.
+          transition: mobileShare
+            ? undefined
+            : 'width 280ms var(--ease-out), min-width 280ms var(--ease-out)',
         }}
       >
         <Sidebar
@@ -2448,8 +2508,78 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         </div>
       )}
 
+      {/* Mobile share bar — the only chrome on a phone-sized share
+          view. It replaces the desktop reveal tab with two things a
+          reviewer on a phone actually needs: a way into the comments
+          sheet, and the conversion path back to Postr. Anchored to
+          the bottom because that is the reachable edge on a phone,
+          and inset by the safe-area so it clears the iOS home bar. */}
+      {mobileShare && !sidebarOpen && (
+        <div
+          data-postr-mobile-share-bar
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 30,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '10px 12px',
+            paddingBottom: 'calc(10px + env(safe-area-inset-bottom, 0px))',
+            background: 'rgba(10,10,18,0.92)',
+            backdropFilter: 'blur(8px)',
+            borderTop: '1px solid #1f1f2e',
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            style={{
+              all: 'unset',
+              boxSizing: 'border-box',
+              minHeight: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 16px',
+              borderRadius: 10,
+              border: '1px solid #2a2a3a',
+              background: '#14141f',
+              color: '#c8cad0',
+              fontSize: 15,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Comments
+          </button>
+          <a
+            href="/"
+            style={{
+              boxSizing: 'border-box',
+              minHeight: 44,
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 16px',
+              borderRadius: 10,
+              background: '#7c6aed',
+              color: '#fff',
+              fontSize: 15,
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
+          >
+            Make your own
+          </a>
+        </div>
+      )}
+
       {/* Notion-style reveal tab when the sidebar is hidden. */}
-      {!sidebarOpen && (
+      {!sidebarOpen && !mobileShare && (
         <button
           aria-label="Show sidebar"
           title="Show sidebar (⌘/)"
@@ -2592,7 +2722,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           // Workspace grid — CSS repeating background that tiles
           // infinitely across the workspace, scaling with zoom.
           // Minor grid every SNAP_GRID units, major every 10×SNAP_GRID.
-          ...(showGrid ? {
+          ...(showGridEffective ? {
             backgroundImage: [
               `linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px)`,
               `linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)`,
@@ -2634,7 +2764,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
             minWidth: '100%',
             minHeight: '100%',
             boxSizing: 'border-box',
-            padding: 96,
+            // Matches the auto-fit gutter above, so the fitted poster
+            // sits flush in the viewport instead of being pushed
+            // into a scroll by padding the fit calculation ignored.
+            padding: mobileShare ? 8 : 96,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -2684,7 +2817,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
                   against the white background. The workspace grid (CSS
                   background on the scroll container) is visible in the
                   dark area; this SVG grid covers the white poster. */}
-              {showGrid && (
+              {showGridEffective && (
                 <svg
                   data-postr-overlay="grid"
                   width={cW}
@@ -2997,7 +3130,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         {/* Workspace rulers — fixed at viewport edges, Figma-style.
             Positioned absolutely over the scroll container so they
             stay visible during scroll/zoom. */}
-        {showRuler && (() => {
+        {showRulerEffective && (() => {
           // Continuous rulers — compute which inch marks are visible
           // based on scroll position, then render only those ticks.
           const inchPx = PX * zoom; // pixels per inch at current zoom
@@ -3134,7 +3267,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           </div>
         )}
 
-        <ZoomBar zoom={zoom} setZoom={setZoom} />
+        <ZoomBar zoom={zoom} setZoom={setZoom} touch={mobileShare} />
         <AutosaveStatusPill
           status={autosave.status}
           lastSavedAt={autosave.lastSavedAt}
@@ -3151,9 +3284,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       <div
         style={{
           flex: '0 0 auto',
-          width: guidelinesOpen ? 320 : 0,
-          minWidth: guidelinesOpen ? 320 : 0,
-          display: 'flex',
+          // Hidden outright on the mobile share view: a 320px fixed
+          // rail on a 375px viewport leaves 55px for the poster, which
+          // is what made the canvas auto-fit to 8%. Design guidance is
+          // authoring chrome and has no audience on a share link.
+          width: mobileShare ? 0 : guidelinesOpen ? 320 : 0,
+          minWidth: mobileShare ? 0 : guidelinesOpen ? 320 : 0,
+          display: mobileShare ? 'none' : 'flex',
           flexDirection: 'column',
           minHeight: 0,
           overflow: 'hidden',
@@ -3214,7 +3351,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         </button>
       )}
 
-      <OnboardingTour />
+      {/* The tour teaches editing ("click any block to edit", "drag to
+          move") — none of which a share-link visitor can do. Running it
+          over someone else's poster is noise at any width, so this is
+          gated on readOnly rather than on the phone breakpoint. */}
+      {!readOnly && <OnboardingTour />}
     </div>
   );
 }
@@ -3223,49 +3364,83 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
 // ZoomBar
 // =========================================================================
 
-function ZoomBar({ zoom, setZoom }: { zoom: number; setZoom: (z: number | null) => void }) {
+function ZoomBar({
+  zoom,
+  setZoom,
+  touch = false,
+}: {
+  zoom: number;
+  setZoom: (z: number | null) => void;
+  /**
+   * Touch sizing for the mobile share view. The desktop bar is a
+   * deliberately unobtrusive 8–14px cluster driven by a precise
+   * cursor; a finger needs the 44px target floor, and on a phone the
+   * zoom controls are the *primary* way to read poster detail, so
+   * they earn the space.
+   */
+  touch?: boolean;
+}) {
+  // Square 44px touch targets vs the desktop's tight padding.
+  const stepStyle = touch
+    ? { fontSize: 20, padding: 0, minWidth: 44, minHeight: 44 }
+    : { fontSize: 14, padding: '2px 6px' };
+  const readoutStyle = touch
+    ? { fontSize: 14, padding: '0 10px', minWidth: 56, minHeight: 44 }
+    : { fontSize: 9, padding: '2px 8px', minWidth: 34 };
+  const fitStyle = touch
+    ? { fontSize: 13, padding: '0 12px', minWidth: 44, minHeight: 44 }
+    : { fontSize: 8, padding: '2px 6px' };
+  // Centred flex so the enlarged targets stay visually aligned once
+  // `all: unset` has stripped the button's own centring.
+  const center = { display: 'flex', alignItems: 'center', justifyContent: 'center' } as const;
+
   return (
     <div
       style={{
         position: 'absolute',
-        bottom: 12,
+        // Clears the mobile share bar pinned to the bottom edge.
+        bottom: touch ? 76 : 12,
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'flex',
         alignItems: 'center',
         gap: 2,
         background: '#1a1a26ee',
-        borderRadius: 6,
-        padding: '4px 8px',
+        borderRadius: touch ? 12 : 6,
+        padding: touch ? '2px 6px' : '4px 8px',
         border: '1px solid #2a2a3a',
         zIndex: 10,
       }}
     >
       <button
+        aria-label="Zoom out"
         onClick={() => setZoom(Math.max(0.3, zoom - 0.15))}
-        style={{ all: 'unset', cursor: 'pointer', color: '#aaa', fontSize: 14, padding: '2px 6px', fontWeight: 700 }}
+        style={{ all: 'unset', ...center, cursor: 'pointer', color: '#aaa', fontWeight: 700, ...stepStyle }}
       >
         −
       </button>
       <button
+        aria-label="Reset zoom to fit"
         onClick={() => setZoom(null)}
         // tabular-nums keeps the % from shifting width as the digits
         // change while dragging zoom (e.g. 90% → 100%), so the readout
         // and the +/− buttons flanking it stay put.
-        style={{ all: 'unset', cursor: 'pointer', color: '#888', fontSize: 9, padding: '2px 8px', fontWeight: 600, fontFamily: 'system-ui', fontVariantNumeric: 'tabular-nums', minWidth: 34, textAlign: 'center' }}
+        style={{ all: 'unset', ...center, cursor: 'pointer', color: '#888', fontWeight: 600, fontFamily: 'system-ui', fontVariantNumeric: 'tabular-nums', textAlign: 'center', ...readoutStyle }}
       >
         {Math.round(zoom * 100)}%
       </button>
       <button
+        aria-label="Zoom in"
         onClick={() => setZoom(Math.min(10, zoom + 0.15))}
-        style={{ all: 'unset', cursor: 'pointer', color: '#aaa', fontSize: 14, padding: '2px 6px', fontWeight: 700 }}
+        style={{ all: 'unset', ...center, cursor: 'pointer', color: '#aaa', fontWeight: 700, ...stepStyle }}
       >
         +
       </button>
-      <div style={{ width: 1, height: 14, background: '#333', margin: '0 4px' }} />
+      <div style={{ width: 1, height: touch ? 24 : 14, background: '#333', margin: '0 4px' }} />
       <button
+        aria-label="Fit poster to screen"
         onClick={() => setZoom(null)}
-        style={{ all: 'unset', cursor: 'pointer', color: '#666', fontSize: 8, padding: '2px 6px', fontWeight: 600 }}
+        style={{ all: 'unset', ...center, cursor: 'pointer', color: '#666', fontWeight: 600, ...fitStyle }}
       >
         FIT
       </button>
