@@ -106,14 +106,14 @@ export function ChatPane({
               key={chip.id}
               type="button"
               onClick={() => onChip(chip.id)}
-              className="rounded-2xl border border-[#3a3a4e] bg-[#16161f] px-3 py-1.5 text-left text-xs text-[#c8cad0] hover:border-[#7c6aed] hover:text-white"
+              className="flex min-h-11 flex-col justify-center rounded-2xl border border-[#3a3a4e] bg-[#16161f] px-3.5 py-2 text-left text-sm text-[#c8cad0] hover:border-[#7c6aed] hover:text-white"
             >
               <span className="block">{chip.label}</span>
               {/* The qualifier the owner wanted ("covers conference /
                   department talk") lives here, NOT in the label —
                   chip labels stay terse. */}
               {chip.hint && (
-                <span className="mt-0.5 block text-[10px] text-[#6b7280]">
+                <span className="mt-0.5 block text-xs text-[#6b7280]">
                   {chip.hint}
                 </span>
               )}
@@ -140,7 +140,7 @@ export function ChatPane({
               type="button"
               onClick={() => fileRef.current?.click()}
               disabled={busy !== null}
-              className="rounded-md border border-[#3a3a4e] px-3 py-1.5 text-xs font-semibold text-[#c8cad0] hover:border-[#7c6aed] hover:text-white disabled:opacity-50"
+              className="inline-flex min-h-11 items-center rounded-md border border-[#3a3a4e] px-4 text-sm font-semibold text-[#c8cad0] hover:border-[#7c6aed] hover:text-white disabled:opacity-50"
             >
               Upload a .docx
             </button>
@@ -170,7 +170,7 @@ export function ChatPane({
             type="button"
             onClick={submit}
             disabled={busy !== null || !draft.trim()}
-            className="rounded-md bg-[#7c6aed] px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40"
+            className="inline-flex min-h-11 shrink-0 items-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40"
           >
             {isManuscriptStep ? 'Read it' : 'Send'}
           </button>

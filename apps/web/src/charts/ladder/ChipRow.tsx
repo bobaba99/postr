@@ -53,8 +53,15 @@ export function ChipRow<T extends string>({
               background: isOn ? 'rgba(124, 106, 237, 0.16)' : '#14141f',
               color: isOn ? '#d6cfff' : '#c8cad0',
               borderRadius: 8,
-              padding: '7px 12px',
-              fontSize: 13,
+              padding: '8px 14px',
+              // Chips ARE the questionnaire — every answer above the
+              // preview is a chip tap, and a mis-tap silently advances
+              // the ladder to the wrong branch. 44px minimum, with
+              // flex centring so multi-line labels stay balanced.
+              minHeight: 44,
+              display: 'inline-flex',
+              alignItems: 'center',
+              fontSize: 14,
               lineHeight: 1.3,
               cursor: 'pointer',
               textAlign: 'left',

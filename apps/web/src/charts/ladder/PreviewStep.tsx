@@ -302,6 +302,10 @@ export function PreviewStep({
                     gap: 8,
                     cursor: busy ? 'not-allowed' : 'pointer',
                     minWidth: 0,
+                    // The whole "☑ A Bar chart" row is the target, not
+                    // just the box — that is what makes selection
+                    // comfortable on a phone.
+                    minHeight: 44,
                   }}
                 >
                   <input
@@ -312,8 +316,13 @@ export function PreviewStep({
                     disabled={busy}
                     onChange={() => toggle(panel.rec.form)}
                     style={{
-                      width: 15,
-                      height: 15,
+                      // Selecting panels is how the download set is
+                      // built, so this is a primary control. 15px is
+                      // half the touch floor; 22px plus the padded
+                      // label around it clears 44px of tappable row.
+                      width: 22,
+                      height: 22,
+                      flexShrink: 0,
                       accentColor: '#2f6f8f',
                       cursor: busy ? 'not-allowed' : 'pointer',
                     }}
@@ -335,12 +344,15 @@ export function PreviewStep({
                 {i === 0 && (
                   <span
                     style={{
-                      fontSize: 11,
+                      // 12px floor — this badge is the ladder's actual
+                      // recommendation, not decoration.
+                      fontSize: 12,
                       fontWeight: 700,
                       letterSpacing: '0.06em',
                       textTransform: 'uppercase',
                       color: '#2f6f4f',
                       marginLeft: 'auto',
+                      flexShrink: 0,
                     }}
                   >
                     Recommended
@@ -385,8 +397,14 @@ export function PreviewStep({
               background: action.primary ? '#2f6f8f' : 'transparent',
               color: action.primary ? '#ffffff' : '#44423d',
               borderRadius: 7,
-              padding: '7px 12px',
-              fontSize: 13,
+              padding: '0 16px',
+              // Download is the terminal action of the whole ladder —
+              // the one button the page exists to deliver the user to.
+              // It measured 34px tall; 44px is the floor.
+              minHeight: 44,
+              display: 'inline-flex',
+              alignItems: 'center',
+              fontSize: 14,
               fontWeight: action.primary ? 600 : 400,
               cursor: nothingSelected || busy ? 'not-allowed' : 'pointer',
               opacity: nothingSelected || busy ? 0.55 : 1,

@@ -128,4 +128,62 @@ describe('ChartChooserPage', () => {
     const cta = screen.getByRole('link', { name: 'Start a poster' });
     expect(cta).toHaveAttribute('href', '/auth');
   });
+
+  /**
+   * This is a no-auth tool page with no fixed-canvas constraint, so a
+   * phone is a first-class viewport, not a fallback. A measured audit
+   * found every control here under the 44px target floor; these pin
+   * the floor for the two controls that terminate the flow — selecting
+   * panels and downloading them.
+   */
+  describe('phone ergonomics', () => {
+    /** WCAG 2.5.5 / Apple HIG minimum target size, in CSS px. */
+    const TARGET_FLOOR = 44;
+
+    it('makes the whole panel row tappable, not just the checkbox', async () => {
+      renderPage();
+      pasteTable(TSV);
+      await screen.findByText('Pick your figure');
+
+      // A 22px checkbox is under the floor on its own; the <label>
+      // wrapping it forwards the tap, so the label is the real target.
+      const checkbox = screen.getAllByRole('checkbox')[0]!;
+      const label = checkbox.closest('label');
+      expect(label).not.toBeNull();
+      expect(parseFloat(getComputedStyle(label!).minHeight)).toBeGreaterThanOrEqual(
+        TARGET_FLOOR,
+      );
+    });
+
+    it('gives the download actions a 44px target', async () => {
+      renderPage();
+      pasteTable(TSV);
+      await screen.findByText('Pick your figure');
+
+      for (const label of ['Download SVG', 'Download PNG']) {
+        const button = screen.getAllByText(label)[0]!.closest('button');
+        expect(button).not.toBeNull();
+        expect(parseFloat(getComputedStyle(button!).minHeight)).toBeGreaterThanOrEqual(
+          TARGET_FLOOR,
+        );
+      }
+    });
+
+    it('keeps the palette swatches above the floor despite sitting eight abreast', () => {
+      renderPage();
+      // Undersized targets in a dense row are mis-taps, not near
+      // misses — and a mis-tap here silently re-themes every panel.
+      const swatch = screen.getByRole('button', { name: 'Nature / Biology' });
+      expect(swatch.className).toContain('min-h-11');
+    });
+
+    it('does not pad the page to a desktop gutter on a phone', () => {
+      const { container } = renderPage();
+      // px-8 costs 64px of a 375px viewport — a sixth of the line
+      // length, and the figure panels are the widest thing here.
+      const section = container.querySelector('section');
+      expect(section?.className).toContain('px-5');
+      expect(section?.className).toContain('sm:px-8');
+    });
+  });
 });

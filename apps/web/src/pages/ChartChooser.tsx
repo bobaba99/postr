@@ -104,11 +104,14 @@ export default function ChartChooserPage() {
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <PublicHeader />
 
-      <section className="mx-auto w-full max-w-5xl flex-1 px-8 pb-24 pt-14">
-        <h1 className="text-4xl font-bold leading-[1.1] tracking-[-0.02em] text-white">
+      {/* px-5 on a phone rather than px-8: 64px of a 375px viewport is
+          a sixth of the line length, and the figure panels below are
+          the widest thing on the page. */}
+      <section className="mx-auto w-full max-w-5xl flex-1 px-5 pb-24 pt-10 sm:px-8 sm:pt-14">
+        <h1 className="text-3xl font-bold leading-[1.1] tracking-[-0.02em] text-white sm:text-4xl">
           Which chart fits your data?
         </h1>
-        <p className="mt-5 max-w-[62ch] text-lg leading-relaxed text-[#a3a7b3]">
+        <p className="mt-4 max-w-[62ch] text-base leading-relaxed text-[#a3a7b3] sm:mt-5 sm:text-lg">
           Paste a table, upload a CSV or Excel file, or answer three short
           questions — the chooser ranks the figures that fit your data, drawn
           as journal-style panels with captions. Download any panel as SVG or
@@ -132,10 +135,11 @@ export default function ChartChooserPage() {
                   title={p.name}
                   aria-pressed={active}
                   onClick={() => setPaletteName(p.name)}
-                  // py-3 lifts these from 26px to a 44px hit area.
                   // Eight swatches sit side by side, so an undersized
                   // target here is a mis-tap, not just a near miss.
-                  className="flex items-center gap-1 rounded-full px-1 py-3"
+                  // min-h-11 (44px) is the floor rather than py-3,
+                  // which measured 42px once the border was counted.
+                  className="flex min-h-11 items-center gap-1 rounded-full px-2 py-3"
                   style={{
                     border: `2px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
                     background: '#14141f',
@@ -227,7 +231,7 @@ export default function ChartChooserPage() {
           </p>
           <Link
             to="/auth"
-            className="mt-4 inline-block rounded-lg bg-[#7c6aed] px-6 py-2.5 text-[15px] font-semibold text-white no-underline transition-colors hover:bg-[#6c5ce7]"
+            className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-[#7c6aed] px-6 text-[15px] font-semibold text-white no-underline transition-colors hover:bg-[#6c5ce7]"
           >
             Start a poster
           </Link>

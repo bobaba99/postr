@@ -48,8 +48,14 @@ const buttonStyle: CSSProperties = {
   background: '#14141f',
   color: '#c8cad0',
   borderRadius: 8,
-  padding: '7px 12px',
-  fontSize: 13,
+  padding: '0 14px',
+  // 44px tall and 14px type: these are the ladder's primary
+  // affordances on a phone ("Upload CSV", "I don't have data yet"),
+  // and at 36px they measured under the touch-target floor.
+  minHeight: 44,
+  display: 'inline-flex',
+  alignItems: 'center',
+  fontSize: 14,
   cursor: 'pointer',
 };
 

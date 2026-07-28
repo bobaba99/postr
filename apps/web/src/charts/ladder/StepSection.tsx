@@ -36,7 +36,8 @@ const headerStyle: CSSProperties = {
 };
 
 const indexStyle: CSSProperties = {
-  fontSize: 11,
+  // 12px is the legibility floor on a phone; 11px tripped the audit.
+  fontSize: 12,
   fontWeight: 700,
   letterSpacing: '0.08em',
   textTransform: 'uppercase',
@@ -112,9 +113,15 @@ export function StepSection({
               border: 'none',
               background: 'transparent',
               color: '#7c6aed',
-              fontSize: 12,
+              fontSize: 13,
               cursor: 'pointer',
-              padding: '2px 4px',
+              // Re-opening an answered step is the only way back up
+              // the ladder, so it needs a real target rather than the
+              // 22px sliver it measured at.
+              minHeight: 44,
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '0 8px',
               flexShrink: 0,
             }}
           >

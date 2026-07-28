@@ -288,7 +288,7 @@ export default function PaperToPoster() {
           {/* Chat shell */}
           <section
             aria-label="Interview"
-            className="flex h-[460px] flex-col rounded-lg border border-[#1f1f2e] bg-[#0d0d15] lg:h-auto lg:w-[420px] lg:shrink-0"
+            className="flex h-[65vh] min-h-[380px] flex-col rounded-lg border border-[#1f1f2e] bg-[#0d0d15] lg:h-auto lg:min-h-0 lg:w-[420px] lg:shrink-0"
           >
             <ChatPane
               state={interview}
@@ -324,7 +324,7 @@ export default function PaperToPoster() {
               <button
                 type="button"
                 onClick={() => void condense(interview)}
-                className="postr-rise-in self-start rounded-md bg-[#7c6aed] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
+                className="postr-rise-in inline-flex min-h-11 items-center self-start rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110"
               >
                 Try drafting again
               </button>
@@ -344,18 +344,18 @@ export default function PaperToPoster() {
                   <button
                     type="button"
                     onClick={handleSavePdf}
-                    className="rounded-md bg-[#7c6aed] px-4 py-2 text-sm font-semibold text-white hover:brightness-110"
+                    className="inline-flex min-h-11 items-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110"
                   >
                     Save PDF
                   </button>
                   <button
                     type="button"
                     onClick={() => void handleDownloadPostr()}
-                    className="rounded-md border border-[#3a3a4e] px-4 py-2 text-sm font-semibold text-[#c8cad0] hover:border-[#7c6aed] hover:text-white"
+                    className="inline-flex min-h-11 items-center rounded-md border border-[#3a3a4e] px-4 text-sm font-semibold text-[#c8cad0] hover:border-[#7c6aed] hover:text-white"
                   >
                     Download .postr
                   </button>
-                  <span className="text-[11px] text-[#6b7280]">
+                  <span className="text-xs text-[#6b7280]">
                     The .postr file opens in the editor for full control.
                   </span>
                 </div>

@@ -128,4 +128,43 @@ describe('PaperToPoster page', () => {
     expect(screen.queryByRole('complementary', { name: /^chart builder$/i })).not.toBeInTheDocument();
     expect(screen.getByText(/which result leads/i)).toBeInTheDocument();
   });
+
+  /**
+   * No fixed-canvas constraint here, so a phone is a first-class
+   * viewport. The two panes must STACK below `lg` (side-by-side at
+   * 375px would give each ~180px) and the chat controls must clear the
+   * 44px target floor — a measured audit found them at 30–36px.
+   */
+  describe('phone ergonomics', () => {
+    /** WCAG 2.5.5 / Apple HIG minimum target size, in CSS px. */
+    const TARGET_FLOOR = 44;
+
+    it('stacks the chat and preview panes below the lg breakpoint', () => {
+      const { container } = renderPage();
+      const row = container.querySelector('[class*="lg:flex-row"]');
+      expect(row).not.toBeNull();
+      // Column by default, row only once there is width for two panes.
+      expect(row!.className).toContain('flex-col');
+      expect(row!.className).toContain('lg:flex-row');
+    });
+
+    it('sizes the chat pane to the viewport rather than a fixed 460px', () => {
+      const { container } = renderPage();
+      const chat = container.querySelector('section[aria-label="Interview"]');
+      // A hard 460px on an 812px-tall phone left the preview pane a
+      // sliver; a viewport-relative height keeps both usable.
+      expect(chat!.className).toContain('h-[65vh]');
+      expect(chat!.className).toContain('lg:h-auto');
+    });
+
+    it('gives the chat controls a 44px target', () => {
+      renderPage();
+      for (const name of [/upload a \.docx/i, /read it/i]) {
+        const button = screen.getByRole('button', { name });
+        expect(button.className).toContain('min-h-11');
+      }
+      // Guard the intent, not just the class: min-h-11 IS 44px.
+      expect(TARGET_FLOOR).toBe(44);
+    });
+  });
 });
