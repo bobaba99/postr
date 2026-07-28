@@ -1,9 +1,15 @@
 /**
- * About page — a feature tour told as a vertical "roadtrip".
+ * About page — a feature tour told as a vertical timeline.
  *
- * A dotted SVG path runs top to bottom; feature waypoints sit along
- * the road, alternating left and right. The design is deliberately
- * abstract — no photos, no illustrations beyond geometric primitives.
+ * A dotted line runs top to bottom; feature waypoints sit along it,
+ * alternating left and right. The design is deliberately abstract —
+ * no photos and no illustrations.
+ *
+ * The decorative line drawings that used to bookend the timeline (a
+ * sun/horizon mark, a mountain ridgeline, and a route squiggle behind
+ * the closing card) were removed at the owner's request. The dotted
+ * road stays: it is structural, not scenery — it is what makes the
+ * alternating cards read as one sequence.
  *
  * Also serves as a second home for the feedback feature: the final
  * card ("Shape what ships next") routes the user straight to the
@@ -131,25 +137,6 @@ export default function About() {
         </p>
       </section>
 
-      {/* Sun + horizon marker above the road */}
-      <div className="relative mx-auto flex max-w-3xl items-center justify-center">
-        <svg
-          data-postr-scenery
-          width="72"
-          height="72"
-          viewBox="0 0 72 72"
-          fill="none"
-          aria-hidden="true"
-        >
-          <circle cx="36" cy="36" r="14" fill="#7c6aed" opacity="0.9" />
-          <circle cx="36" cy="36" r="22" stroke="#7c6aed" strokeWidth="1" opacity="0.35" />
-          <circle cx="36" cy="36" r="30" stroke="#7c6aed" strokeWidth="1" opacity="0.2" />
-          <line x1="2" y1="36" x2="14" y2="36" stroke="#7c6aed" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-          <line x1="58" y1="36" x2="70" y2="36" stroke="#7c6aed" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-          <line x1="36" y1="2" x2="36" y2="14" stroke="#7c6aed" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-        </svg>
-      </div>
-
       {/* Timeline */}
       <section className="relative mx-auto max-w-4xl px-8 pb-20 pt-8">
         {/* Dotted vertical road — SVG so the dash pattern stays crisp on any zoom. */}
@@ -169,57 +156,11 @@ export default function About() {
           ))}
         </div>
 
-        {/* Mountain silhouette — decorative only. Peaks mirror around
-            center x=140, valleys mirror too, so the ridgeline is exactly
-            symmetric under horizontal flip. */}
-        <div className="pointer-events-none mt-8 flex justify-center opacity-40">
-          <svg
-            data-postr-scenery
-            width="280"
-            height="70"
-            viewBox="0 0 280 70"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M0 65 L40 30 L70 48 L100 20 L140 6 L180 20 L210 48 L240 30 L280 65 Z"
-              fill="#7c6aed"
-              opacity="0.08"
-            />
-            <path
-              d="M0 65 L40 30 L70 48 L100 20 L140 6 L180 20 L210 48 L240 30 L280 65"
-              fill="none"
-              stroke="#7c6aed"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
       </section>
 
       {/* Final stop — feedback CTA */}
       <section className="mx-auto w-full max-w-3xl flex-1 px-8 pb-24">
         <div className="relative overflow-hidden rounded-2xl border border-[#2a2a3a] bg-[#111118] p-10">
-          {/* Decorative route squiggle in the background */}
-          <svg
-            className="pointer-events-none absolute -right-8 -top-8 opacity-30"
-            width="220"
-            height="220"
-            viewBox="0 0 220 220"
-            fill="none"
-            aria-hidden="true"
-          >
-            <path
-              d="M20 110 C 60 40, 160 40, 200 110 S 60 180, 20 110"
-              stroke="#7c6aed"
-              strokeWidth="2"
-              strokeDasharray="4 8"
-              strokeLinecap="round"
-            />
-            <circle cx="20" cy="110" r="5" fill="#7c6aed" />
-            <circle cx="200" cy="110" r="5" fill="#7c6aed" opacity="0.5" />
-          </svg>
-
           <div className="relative">
             <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-[#7c6aed]">
               Shape what ships next

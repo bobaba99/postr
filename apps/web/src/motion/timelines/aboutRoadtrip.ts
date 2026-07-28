@@ -98,35 +98,6 @@ function revealRows(scope: Element): void {
 }
 
 /**
- * The sun/horizon mark above the road, and the mountain silhouette
- * below it — a plain fade, no movement.
- *
- * These are decorative SVG bookends. Giving them their own directional
- * motion would be a third competing effect on a page that already has
- * two; a fade is enough to stop them being simply present from the
- * first frame.
- */
-function revealScenery(scope: Element): void {
-  const scenery = Array.from(scope.querySelectorAll('[data-postr-scenery]'));
-  if (scenery.length === 0) return;
-
-  gsap.set(scenery, { opacity: 0 });
-
-  scenery.forEach((el) => {
-    gsap.to(el, {
-      // Not opacity: 1 — the mountain and sun are drawn at reduced
-      // opacity by design (0.4 / decorative). Their own CSS owns the
-      // resting value, so we clear the inline override instead of
-      // asserting a number here and flattening the art.
-      clearProps: 'opacity',
-      duration: CSS_DURATION.slow,
-      ease: HOUSE_OUT,
-      scrollTrigger: { trigger: el, start: 'top 90%', once: true },
-    });
-  });
-}
-
-/**
  * Wires the page up behind matchMedia; caller reverts on unmount.
  *
  * Unlike the landing page, the mobile branch KEEPS the reveals. On
@@ -160,7 +131,6 @@ export function aboutRoadtrip(scope: Element): gsap.MatchMedia {
       } else {
         revealRowsMobile(scope);
       }
-      revealScenery(scope);
     },
   );
 
