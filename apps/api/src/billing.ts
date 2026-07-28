@@ -25,6 +25,7 @@ import express, { type Router, type Request, type Response } from 'express';
 import Stripe from 'stripe';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireAuth, type AuthLocals } from './auth.js';
+import { createRateLimiter } from './rateLimit.js';
 
 /**
  * Managed Payments requires this preview API version (or later). Set
@@ -123,10 +124,19 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
   const getSupabaseAdmin = deps.getSupabaseAdmin ?? defaultGetSupabaseAdmin;
   const router = express.Router();
 
+  // Per-user rate limits on the authed billing routes, matching the
+  // import/narrative stack. No money moves here (that's Stripe's hosted
+  // page) and credits are server-owned, so this only bounds session-spam
+  // and RPC hammering — modest limits are enough. The webhook is
+  // deliberately NOT limited: it's signature-gated, not per-user.
+  const checkoutLimiter = createRateLimiter({ maxPerWindow: 10, maxPerDay: 40 });
+  const consumeLimiter = createRateLimiter({ maxPerWindow: 30, maxPerDay: 200 });
+
   // ── Create a checkout session for the signed-in user.
   router.post(
     '/billing/create-checkout',
     requireAuth(getSupabaseAdmin, { requirePermanent: true }),
+    checkoutLimiter,
     async (req: Request, res: Response) => {
       const stripe = getStripe();
       const supabase = getSupabaseAdmin();
@@ -182,6 +192,7 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
   router.post(
     '/billing/consume-credit',
     requireAuth(getSupabaseAdmin, { requirePermanent: true }),
+    consumeLimiter,
     async (_req: Request, res: Response) => {
       const supabase = getSupabaseAdmin();
       if (!supabase) {
@@ -276,24 +287,24 @@ export async function fulfillCheckout(
   const alreadyFulfilled = await sessionAlreadyFulfilled(supabase, session.id);
   if (alreadyFulfilled) return;
 
-  // Read current credits, add the pack, write back. The billing-column
-  // guard permits this because we're service_role.
-  const { data: row, error: readErr } = await supabase
-    .from('users')
-    .select('export_credits')
-    .eq('id', userId)
-    .single();
-  if (readErr) throw new Error(`pack read: ${readErr.message}`);
+  // Grant credits atomically (SET export_credits = export_credits + N in
+  // one statement, via the RPC) so two distinct concurrent pack
+  // fulfillments can't lose a grant on a stale read. service_role can run
+  // it; the billing-column guard permits the write.
+  const { error: grantErr } = await supabase.rpc(
+    'grant_export_credits' as never,
+    { p_user_id: userId, p_amount: PACK_EXPORT_CREDITS } as never,
+  );
+  if (grantErr) throw new Error(`pack credit grant: ${grantErr.message}`);
 
-  const next = (row?.export_credits ?? 0) + PACK_EXPORT_CREDITS;
-  const { error: writeErr } = await supabase
-    .from('users')
-    .update({
-      export_credits: next,
-      ...(customerId ? { stripe_customer_id: customerId } : {}),
-    })
-    .eq('id', userId);
-  if (writeErr) throw new Error(`pack credit grant: ${writeErr.message}`);
+  // Record the Stripe customer id separately (not part of the atomic
+  // credit math). Guarded write, service_role.
+  if (customerId) {
+    await supabase
+      .from('users')
+      .update({ stripe_customer_id: customerId })
+      .eq('id', userId);
+  }
 
   await markSessionFulfilled(supabase, session.id, userId);
 }

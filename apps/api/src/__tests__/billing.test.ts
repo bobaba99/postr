@@ -24,6 +24,7 @@ function fakeSupabase(opts: {
 } = {}) {
   const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
   const inserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
+  const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = [];
 
   const client = {
     from(table: string) {
@@ -54,9 +55,14 @@ function fakeSupabase(opts: {
         },
       };
     },
+    rpc(fn: string, args: Record<string, unknown>) {
+      rpcs.push({ fn, args });
+      // grant returns the new balance; irrelevant to fulfillCheckout.
+      return Promise.resolve({ data: (opts.currentCredits ?? 0) + 3, error: null });
+    },
   } as unknown as SupabaseClient;
 
-  return { client, updates, inserts };
+  return { client, updates, inserts, rpcs };
 }
 
 function session(overrides: Partial<Stripe.Checkout.Session>): Stripe.Checkout.Session {
@@ -90,14 +96,15 @@ describe('fulfillCheckout — term', () => {
 });
 
 describe('fulfillCheckout — pack', () => {
-  it('adds 3 export credits to the current balance', async () => {
+  it('grants 3 export credits atomically via the RPC', async () => {
     const fake = fakeSupabase({ currentCredits: 2 });
     await fulfillCheckout(
       fake.client,
       session({ metadata: { user_id: 'user-1', sku: 'pack' } }),
     );
-    const usersUpdate = fake.updates.find((u) => u.table === 'users');
-    expect(usersUpdate?.payload.export_credits).toBe(5); // 2 + 3
+    const grant = fake.rpcs.find((r) => r.fn === 'grant_export_credits');
+    expect(grant).toBeTruthy();
+    expect(grant?.args).toEqual({ p_user_id: 'user-1', p_amount: 3 });
     // records the session as fulfilled (idempotency)
     expect(fake.inserts.some((i) => i.table === 'billing_fulfilled_sessions')).toBe(true);
   });
@@ -108,7 +115,7 @@ describe('fulfillCheckout — pack', () => {
       fake.client,
       session({ metadata: { user_id: 'user-1', sku: 'pack' } }),
     );
-    expect(fake.updates).toHaveLength(0);
+    expect(fake.rpcs).toHaveLength(0);
     expect(fake.inserts).toHaveLength(0);
   });
 });
