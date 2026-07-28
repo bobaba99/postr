@@ -40,10 +40,10 @@ interface Tier {
   /** Rendered as the primary (recommended) column. */
   featured?: boolean;
   /**
-   * Talk generation/export isn't built yet (docs/plans/2026-07-28-
-   * paper-to-talk.md, NOT BUILT). A coming-soon tier advertises the
-   * planned price and collects a waitlist instead of a live purchase, so
-   * the page never sells an artifact the product can't produce.
+   * Marks a tier as not-yet-purchasable (dashed border, "Coming soon"
+   * badge, no live checkout). Currently unused — all three tiers sell
+   * live products (the pack sells poster PPTX/LaTeX exports, which ship
+   * today). Kept for when a genuinely-staged tier is needed again.
    */
   comingSoon?: boolean;
   cta: string;
@@ -94,19 +94,18 @@ const TIERS: Tier[] = [
   },
   {
     id: 'pack',
-    name: 'Deck pack',
+    name: 'Export pack',
     price: '$9.99',
-    cadence: 'one-time · 3 talks',
-    tagline: 'Turn a paper into a conference talk. Landing soon.',
-    comingSoon: true,
-    cta: 'Join the waitlist',
+    cadence: 'one-time · 3 exports',
+    tagline: 'Just need a couple of clean exports? Pay only for those.',
+    cta: 'Get the pack',
     ctaTo: '/auth',
-    forWho: 'A one-off talk, without committing to a term.',
+    forWho: 'A one-off export, without committing to a term.',
     features: [
-      'Turn a paper into a slide deck',
-      'Export 3 talks — PowerPoint & PDF',
+      'Export 3 posters to PowerPoint or LaTeX',
+      'No watermark on those exports',
       'No subscription, no term',
-      'Waitlist members get their first deck free',
+      'Talk export counts too, when it lands',
     ],
   },
 ];
@@ -140,8 +139,8 @@ export function PricingSection() {
       */}
       <p className="mx-auto mt-8 max-w-[60ch] text-center text-sm leading-relaxed text-[#8b8f99]">
         <span className="font-semibold text-[#c8cad0]">Which should I pick?</span>{' '}
-        Just printing a poster? Free covers it. Presenting all term or making several? The term
-        pays for itself after two exports. Talks are coming soon.
+        Just printing a poster? Free covers it. Need one or two clean exports? Grab the pack.
+        Exporting through the term, or making several? The term pays for itself after two.
       </p>
     </section>
   );
