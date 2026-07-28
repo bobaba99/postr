@@ -24,10 +24,14 @@
  * the product actually does: editing + watermarked PDF are free today;
  * PPTX/LaTeX export is the paid line (talk export joins it when built).
  *
- * The tier CTAs route to /auth — the real checkout is triggered from the
- * paywall on the export buttons (EditableExportButtons), where the plan
- * state lives. The card at the bottom collects paper-to-talk waitlist
- * interest for the deferred feature.
+ * The paid tier CTAs route to /auth?plan=<sku> — the account-first
+ * checkout flow: a signed-out user creates a REAL account (never guest,
+ * for a paid plan) and is then handed straight to Stripe for the plan
+ * they chose (Auth.tsx resolves the intent). A signed-in user skips the
+ * form and goes straight to checkout. The free tier keeps ?guest=1. The
+ * in-editor export paywall (EditableExportButtons) also starts checkout,
+ * for users who hit the wall mid-export. The card at the bottom collects
+ * paper-to-talk waitlist interest for the deferred feature.
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -82,7 +86,7 @@ const TIERS: Tier[] = [
     tagline: 'The full workflow, all term. About $4.75 a month.',
     featured: true,
     cta: 'Get the term',
-    ctaTo: '/auth',
+    ctaTo: '/auth?plan=term',
     forWho: 'Presenting through the term, or making several posters.',
     // Only shipped features. "Turn a paper into a talk" is deliberately
     // NOT listed here — it isn't built, and the term must advertise only
@@ -102,7 +106,7 @@ const TIERS: Tier[] = [
     cadence: 'one-time · 3 exports',
     tagline: 'Just need a couple of clean exports? Pay only for those.',
     cta: 'Get the pack',
-    ctaTo: '/auth',
+    ctaTo: '/auth?plan=pack',
     forWho: 'A one-off export, without committing to a term.',
     features: [
       'Export 3 posters to PowerPoint or LaTeX',
