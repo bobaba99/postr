@@ -60,9 +60,28 @@ export function StepSection({
 
   // Reveal on mount (0fr → 1fr), then scroll + focus — but never on
   // page load: only after the user's own answer created this step.
+  //
+  // The rAF is a PAINT-TIMING nicety, not a correctness requirement:
+  // deferring one frame lets the browser paint the collapsed state
+  // first so the reveal is a transition rather than a pop. It must
+  // therefore never be the only thing that sets `revealed`.
+  //
+  // requestAnimationFrame DOES NOT FIRE IN A BACKGROUND TAB. When this
+  // was the sole path, a step mounted in a hidden tab never revealed:
+  // the callback stayed queued, `revealed` stayed false, and the row
+  // sat at 0fr permanently with its content in the DOM but clipped to
+  // zero height. Verified in Chromium — /chart-chooser step 1 rendered
+  // as an empty gap, paste box and all three entry buttons invisible.
+  //
+  // The timeout is the guarantee: whichever fires first wins, and a
+  // hidden tab still reveals (instantly, which is correct — there is
+  // no one watching to see a transition). Same principle as
+  // motion/canAnimate.ts: an enhancement that cannot prove it will run
+  // does not get to decide whether content is visible.
   useEffect(() => {
     if (state !== 'active') return;
     const frame = requestAnimationFrame(() => setRevealed(true));
+    const fallback = window.setTimeout(() => setRevealed(true), 80);
     if (shouldFocusOnMount && sectionRef.current) {
       const el = sectionRef.current;
       const reduced =
@@ -74,7 +93,10 @@ export function StepSection({
       );
       focusable?.focus({ preventScroll: true });
     }
-    return () => cancelAnimationFrame(frame);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(fallback);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 

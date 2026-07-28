@@ -25,6 +25,7 @@ const audit = async (page) => page.evaluate(() => {
     smallTargets: [],
     zoomingInputs: [],
     tinyText: [],
+    collapsedReveals: [],
   };
 
   const describe = (el) => {
@@ -65,6 +66,36 @@ const audit = async (page) => page.evaluate(() => {
     if (fs > 0 && fs < 12) out.tinyText.push({ el: describe(el), fontSize: fs });
   }
 
+  // Reveal wrappers that claim to be open but render at zero height.
+  //
+  // Deliberately does NOT use visible() — that helper skips zero-height
+  // elements, which is exactly the state this check exists to catch.
+  //
+  // Two independent bugs produced this on /chart-chooser: a
+  // requestAnimationFrame that never fired in a background tab, so
+  // `revealed` stayed false; and a grid-template-rows 0fr -> 1fr
+  // transition that never interpolated, so the row computed to 0px
+  // even when revealed was true. Both left content in the DOM and in
+  // the accessibility tree while clipping it to nothing — the paste
+  // box and every entry button, invisible on a live page.
+  //
+  // jsdom does not compute grid layout, so no vitest suite can catch
+  // this class of failure. It has to be asserted in a real browser.
+  for (const el of document.querySelectorAll('[data-revealed="true"]')) {
+    const r = el.getBoundingClientRect();
+    const inner = el.firstElementChild;
+    const wanted = inner ? inner.scrollHeight : 0;
+    // Content worth showing (>8px) that is rendering at under 4px.
+    if (wanted > 8 && r.height < 4) {
+      out.collapsedReveals.push({
+        el: describe(el),
+        renderedHeight: Math.round(r.height),
+        contentHeight: wanted,
+        gridTemplateRows: getComputedStyle(el).gridTemplateRows,
+      });
+    }
+  }
+
   return out;
 });
 
@@ -79,7 +110,11 @@ for (const vp of WIDTHS) {
     await page.waitForTimeout(400);
     const r = await audit(page);
     const problems =
-      (r.overflowBy > 0 ? 1 : 0) + r.smallTargets.length + r.zoomingInputs.length + r.tinyText.length;
+      (r.overflowBy > 0 ? 1 : 0) +
+      r.smallTargets.length +
+      r.zoomingInputs.length +
+      r.tinyText.length +
+      r.collapsedReveals.length;
     findings.push({ width: vp.w, label: vp.label, route, ...r, problems });
   }
   await ctx.close();
@@ -91,7 +126,23 @@ await browser.close();
 const line = (s) => console.log(s);
 line('M1 MOBILE AUDIT — measured, not eyeballed\n');
 
-line('OVERFLOW (page body must never scroll sideways)');
+line('COLLAPSED REVEALS (content present but clipped to zero height)');
+const collapsed = findings.filter((f) => f.collapsedReveals.length);
+if (!collapsed.length) line('  none — every open section renders its content');
+else {
+  const seen = new Set();
+  collapsed.forEach((f) => f.collapsedReveals.forEach((c) => {
+    const k = f.route + c.el;
+    if (seen.has(k)) return;
+    seen.add(k);
+    line(
+      `  ${f.route} @${f.width}px: ${c.el} rendered ${c.renderedHeight}px ` +
+      `but content is ${c.contentHeight}px (grid-template-rows: ${c.gridTemplateRows})`,
+    );
+  }));
+}
+
+line('\nOVERFLOW (page body must never scroll sideways)');
 const overflow = findings.filter((f) => f.overflowBy > 0);
 if (!overflow.length) line('  none at any width — clean');
 else overflow.forEach((f) => line(`  ${f.route} @${f.width}px overflows by ${f.overflowBy}px`));
