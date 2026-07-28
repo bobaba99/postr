@@ -6,6 +6,7 @@
  * field on every change, maintaining two stacks capped at 50 entries.
  */
 import { create } from 'zustand';
+import { filterDeletable, preserveLocked } from '@/export/blockLock';
 import type {
   Block,
   Palette,
@@ -109,13 +110,23 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
       })),
     ),
 
+  // Locked blocks refuse deletion here too, not only at the UI call
+  // sites. `removeBlock` is a public store action — anything holding
+  // the store can call it — so the guard has to sit at the mutation,
+  // not only in front of it.
+  //
+  // A fully-refused removal makes NO doc change and pushes NO undo
+  // entry: a delete that did nothing should not cost the user a ⌘Z.
   removeBlock: (id) =>
-    set((state) =>
-      withUndo(state, (doc) => ({
+    set((state) => {
+      if (!state.doc) return {};
+      const outcome = filterDeletable(state.doc.blocks, [id]);
+      if (outcome.removedIds.length === 0) return {};
+      return withUndo(state, (doc) => ({
         ...doc,
-        blocks: doc.blocks.filter((b) => b.id !== id),
-      })),
-    ),
+        blocks: outcome.blocks,
+      }));
+    }),
 
   setStyle: (level, patch) =>
     set((state) =>
@@ -149,16 +160,39 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
       }));
     }),
 
+  // Whole-list replacement. Every UI delete path ultimately lands
+  // here, as do auto-layout, template swaps and clear-all — so this
+  // is the chokepoint where a locked block that went missing gets put
+  // back, whatever removed it. Locked blocks PRESENT in `blocks` pass
+  // through untouched, which is what keeps them movable and
+  // resizable while still undeletable.
   setBlocks: (blocks) =>
-    set((state) => withUndo(state, (doc) => ({ ...doc, blocks }))),
+    set((state) =>
+      withUndo(state, (doc) => ({
+        ...doc,
+        blocks: preserveLocked(doc.blocks, blocks),
+      })),
+    ),
 
   /** Set blocks WITHOUT pushing to undo — used for drag intermediates. */
   setBlocksSilent: (blocks: Block[]) =>
     set((state) => {
       if (!state.doc) return {};
-      return { doc: { ...state.doc, blocks } };
+      return {
+        doc: { ...state.doc, blocks: preserveLocked(state.doc.blocks, blocks) },
+      };
     }),
 
+  // Undo/redo restore whole documents from the history stacks, which
+  // is a second way to lose a locked block: a snapshot taken BEFORE
+  // the acknowledgement was added contains no such block, and
+  // restoring it would delete the block without any delete path
+  // running. Both directions therefore re-apply `preserveLocked`
+  // against the doc being replaced.
+  //
+  // Consequence, and it is the intended one: undo cannot take the
+  // poster back to a state without the credit, and redo cannot
+  // advance it into one either.
   undo: () =>
     set((state) => {
       if (undoStack.length === 0 || !state.doc) return {};
@@ -166,7 +200,7 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
       const prev = undoStack[undoStack.length - 1]!;
       undoStack = undoStack.slice(0, -1);
       return {
-        doc: prev,
+        doc: { ...prev, blocks: preserveLocked(state.doc.blocks, prev.blocks) },
         canUndo: undoStack.length > 0,
         canRedo: true,
       };
@@ -179,7 +213,7 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
       const next = redoStack[redoStack.length - 1]!;
       redoStack = redoStack.slice(0, -1);
       return {
-        doc: next,
+        doc: { ...next, blocks: preserveLocked(state.doc.blocks, next.blocks) },
         canUndo: true,
         canRedo: redoStack.length > 0,
       };

@@ -70,6 +70,7 @@ import {
   type SortMode,
 } from './citations';
 import { autoLayout } from './autoLayout';
+import { filterDeletable, preserveLocked } from '@/export/blockLock';
 import { LAYOUT_TEMPLATES, makeBlocks, type LayoutKey } from './templates';
 import { snap } from './snap';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
@@ -1603,8 +1604,18 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   const updateBlock = (id: string, patch: Partial<Block>) =>
     setBlocks(doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)));
 
+  // Single-block delete — the block frame's ✕ button, the context
+  // menu's Delete entry, and the sidebar control all route here.
+  //
+  // A locked block refuses, VISIBLY: the toast states the bargain in
+  // one line so the click reads as "declined" rather than "broken".
+  // Selection is kept on a refusal — clearing it would look like the
+  // block went away.
   const deleteBlock = (id: string) => {
-    setBlocks(doc.blocks.filter((b) => b.id !== id));
+    const outcome = filterDeletable(doc.blocks, [id]);
+    if (outcome.refusalMessage) showToast(outcome.refusalMessage);
+    if (outcome.removedIds.length === 0) return;
+    setBlocks(outcome.blocks);
     clearSelection();
   };
 
@@ -1788,12 +1799,16 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     clearSelection();
   };
 
+  // Changing the poster size rebuilds the block list from a template,
+  // which would otherwise drop a locked block on the floor. This
+  // writes via `updateDoc` (not `setBlocks`), so it bypasses the
+  // store's guard and has to call `preserveLocked` itself.
   const changeSize = (key: PosterSizeKey) => {
     const sz = POSTER_SIZES[key]!;
     updateDoc({
       widthIn: sz.w,
       heightIn: sz.h,
-      blocks: makeBlocks('3col', sz.w, sz.h),
+      blocks: preserveLocked(doc.blocks, makeBlocks('3col', sz.w, sz.h)),
     });
     clearSelection();
     setZoom(null);
@@ -2022,10 +2037,17 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       if (isInput) return;
 
       // Delete / Backspace → remove all selected blocks in one batch.
+      //
+      // A mixed selection deletes what it can and keeps what it must:
+      // the unlocked blocks go, the locked one stays, and the toast
+      // explains the survivor. Refusing the WHOLE batch because one
+      // block is locked would be the more surprising behaviour.
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        const idsToDelete = new Set(selectedIds);
-        setBlocks(doc.blocks.filter((b) => !idsToDelete.has(b.id)));
+        const outcome = filterDeletable(doc.blocks, selectedIds);
+        if (outcome.refusalMessage) showToast(outcome.refusalMessage);
+        if (outcome.removedIds.length === 0) return;
+        setBlocks(outcome.blocks);
         clearSelection();
         return;
       }
