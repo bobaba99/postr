@@ -329,7 +329,24 @@ body {
 /* Chart-chooser ladder: the active step's content reveals via
  * grid-template-rows 0fr -> 1fr (the guideline-section pattern).
  * The transition lives here, not inline, so reduced-motion users
- * get an instant reveal — height animation is movement. */
+ * get an instant reveal — height animation is movement.
+ *
+ * THE `1fr` IS DECLARED WITHOUT A UNIT-FR TRANSITION ON PURPOSE.
+ * Transitioning `grid-template-rows` from `0fr` does not interpolate
+ * reliably: measured in Chromium 2026-07-28 on /chart-chooser, the
+ * revealed row computed to `0px` with the transition applied and
+ * `212px` with it disabled — so step 1 rendered at ZERO HEIGHT with
+ * its content present in the DOM but clipped away. The row never
+ * reached its resting size, so the bug was permanent rather than a
+ * slow animation.
+ *
+ * `0fr` is a valid resting value but a poor animation origin, because
+ * a zero-fraction track has no basis for the engine to interpolate
+ * against. Animating opacity + a translate instead keeps the motion
+ * (the point of the reveal) while letting the ROW SIZE resolve
+ * instantly and correctly, which is the part that must never fail.
+ * The collapsed state still uses 0fr, so a hidden step contributes no
+ * height — the layout behaviour is unchanged. */
 .postr-step-reveal {
   display: grid;
   grid-template-rows: 0fr;
@@ -337,9 +354,30 @@ body {
 .postr-step-reveal[data-revealed='true'] {
   grid-template-rows: 1fr;
 }
+
+/* The inner wrapper carries the motion. `> *` targets StepSection's
+ * overflow-hidden child (see StepSection.tsx), which already has
+ * `min-height: 0` — required for a grid item to be allowed to shrink
+ * below its content size.
+ *
+ * NOTE THE DIRECTION: the collapsed state is the one that sets
+ * `opacity: 0`, and the revealed state is a plain `opacity: 1` with no
+ * dependency on a transition having run. A revealed step is therefore
+ * visible even if the transition never fires — the same principle as
+ * motion/canAnimate.ts, which exists because an entrance that hides
+ * content and then fails to reveal it is worse than no entrance at
+ * all. Never invert this so that visibility is the animation's job. */
 @media (prefers-reduced-motion: no-preference) {
-  .postr-step-reveal {
-    transition: grid-template-rows var(--dur-base) var(--ease-out);
+  .postr-step-reveal > * {
+    opacity: 0;
+    transform: translateY(-4px);
+    transition:
+      opacity var(--dur-base) var(--ease-out),
+      transform var(--dur-base) var(--ease-out);
+  }
+  .postr-step-reveal[data-revealed='true'] > * {
+    opacity: 1;
+    transform: none;
   }
 }
 
