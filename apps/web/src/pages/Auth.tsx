@@ -6,17 +6,30 @@
  *   2. Sign up with email + password
  *   3. Continue as guest (anonymous Supabase session)
  *
- * After auth, redirects to /dashboard. Guest accounts can be
- * linked later from the Profile page — Supabase auto-merges
- * data when identities are linked.
+ * After auth it redirects to /dashboard — UNLESS a paid checkout intent
+ * is present (?plan=term|pack, from a pricing CTA). In that case this is
+ * the account-first checkout flow: the user gets a REAL account (guest is
+ * suppressed — a paid entitlement must not hang off a throwaway anonymous
+ * session) and is then handed straight to Stripe for the chosen plan. The
+ * intent survives the Google OAuth round-trip via sessionStorage (see
+ * data/checkoutIntent.ts). Guest accounts can be linked later from the
+ * Profile page — Supabase auto-merges data when identities are linked.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { PasswordStrength, isPasswordValid } from '@/components/PasswordStrength';
 import { PublicFooter } from '@/components/PublicFooter';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
+import {
+  resolveCheckoutPlan,
+  parseCheckoutPlan,
+  stashCheckoutIntent,
+  clearCheckoutIntent,
+  startCheckoutForPlan,
+  type CheckoutPlan,
+} from '@/data/checkoutIntent';
 
 type Mode = 'signin' | 'signup';
 
@@ -25,27 +38,98 @@ export default function Auth() {
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [mode, setMode] = useState<Mode>('signin');
+
+  // A paid checkout intent (from a pricing CTA) turns this page into the
+  // account-first checkout step: URL ?plan= wins, else a stash left before
+  // an OAuth round-trip. When set, guest is suppressed and signup leads.
+  // Memoised so it's a stable value across renders (resolveCheckoutPlan
+  // touches sessionStorage) and safe to read from effects.
+  const planParam = searchParams.get('plan');
+  const checkoutPlan = useMemo(
+    () => resolveCheckoutPlan(planParam),
+    [planParam],
+  );
+  // Whether the intent came from the URL this visit — used to decide if a
+  // failed/abandoned checkout should clear the stash (a stash with no URL
+  // param backing it, e.g. the email-confirm return, must be preserved).
+  const intentFromUrl = parseCheckoutPlan(planParam) !== null;
+
+  const [mode, setMode] = useState<Mode>(checkoutPlan ? 'signup' : 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetSent, setResetSent] = useState(false);
   const [confirmEmail, setConfirmEmail] = useState(false);
+  // True while we're minting a Stripe session and redirecting off-site, so
+  // the UI shows "Continuing to checkout…" rather than looking idle.
+  const [checkingOut, setCheckingOut] = useState(false);
+  // Guards checkout kickoff to exactly once. The already-authenticated
+  // effect can run more than once (StrictMode double-invoke, or a re-render
+  // before the redirect commits); without this, a signed-in user could mint
+  // two Stripe sessions and race two redirects.
+  const checkoutStartedRef = useRef(false);
 
-  // If ?guest=1, auto-trigger guest login
+  /**
+   * Hand a signed-in user off to Stripe for the chosen plan. Fires at most
+   * once (ref-guarded). On failure, surface an error and stay put — the
+   * account already exists, so they can retry without re-registering; the
+   * guard is released so a retry is possible. Returns true if a checkout
+   * was started (caller should NOT also navigate to /dashboard).
+   */
+  const proceedToCheckout = useCallback(
+    async (plan: CheckoutPlan): Promise<boolean> => {
+      if (checkoutStartedRef.current) return true;
+      checkoutStartedRef.current = true;
+      setCheckingOut(true);
+      setError(null);
+      try {
+        await startCheckoutForPlan(plan); // full-page redirect to Stripe
+        return true;
+      } catch (err) {
+        // Log for observability; the user sees only a generic message.
+        // eslint-disable-next-line no-console
+        console.error('[checkout] failed to start Stripe session:', err);
+        checkoutStartedRef.current = false; // allow a retry
+        // If the intent isn't backed by a URL ?plan= this visit, an
+        // abandoned/failed attempt would otherwise resurrect on the next
+        // plain /auth visit in this tab — clear it. When ?plan= IS present
+        // (pricing CTA / OAuth return), retry still works from the URL, and
+        // the email-confirm-return path (stash only, no URL) is preserved.
+        if (!intentFromUrl) clearCheckoutIntent();
+        setCheckingOut(false);
+        setError('We couldn’t start checkout. Please try again.');
+        return false;
+      }
+    },
+    [intentFromUrl],
+  );
+
+  // If ?guest=1, auto-trigger guest login — but NEVER when a paid checkout
+  // intent is present (a paid plan must not land in a guest session).
   useEffect(() => {
-    if (searchParams.get('guest') === '1') {
+    if (searchParams.get('guest') === '1' && !checkoutPlan) {
       handleGuest();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Check if already authenticated
+  // Already authenticated? A signed-in visitor with a paid intent goes
+  // straight to checkout (skip the form); otherwise to the dashboard. An
+  // anonymous (guest) session does NOT satisfy a paid intent — the
+  // create-checkout route requires a permanent account — so fall through
+  // to the form so they can register/sign in for real.
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate('/dashboard', { replace: true });
+      if (!data.session) return;
+      const permanent = data.session.user.is_anonymous !== true;
+      if (checkoutPlan && permanent) {
+        void proceedToCheckout(checkoutPlan);
+        return;
+      }
+      if (!checkoutPlan) navigate('/dashboard', { replace: true });
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
   const handleGuest = useCallback(async () => {
@@ -90,11 +174,15 @@ export default function Auth() {
         return;
       }
       setLoading(false);
-      // If no session, email confirmation is required
+      // No session → email confirmation is required. We can't start
+      // checkout without a session, so keep the intent stashed: after the
+      // user confirms and returns signed-in, this page resumes checkout.
       if (!data.session) {
+        if (checkoutPlan) stashCheckoutIntent(checkoutPlan);
         setConfirmEmail(true);
         return;
       }
+      if (checkoutPlan && (await proceedToCheckout(checkoutPlan))) return;
       navigate('/dashboard', { replace: true });
     } else {
       const { error: err } = await supabase.auth.signInWithPassword({
@@ -106,9 +194,11 @@ export default function Auth() {
         setLoading(false);
         return;
       }
+      setLoading(false);
+      if (checkoutPlan && (await proceedToCheckout(checkoutPlan))) return;
       navigate('/dashboard', { replace: true });
     }
-  }, [email, password, mode, navigate]);
+  }, [email, password, mode, navigate, checkoutPlan, proceedToCheckout]);
 
   const handleForgotPassword = useCallback(async () => {
     if (!email.trim()) {
@@ -128,14 +218,23 @@ export default function Auth() {
 
   const handleGoogle = useCallback(async () => {
     setError(null);
+    // With a paid intent, return to /auth?plan=… so this page resumes
+    // checkout on the OAuth bounce-back. Also mirror the plan to
+    // sessionStorage — the round-trip through Google does not preserve our
+    // query string reliably, and the stash is the fallback. Without an
+    // intent, land on the dashboard as before.
+    if (checkoutPlan) stashCheckoutIntent(checkoutPlan);
+    const redirectTo = checkoutPlan
+      ? `${window.location.origin}/auth?plan=${checkoutPlan}`
+      : `${window.location.origin}/dashboard`;
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/dashboard` },
+      options: { redirectTo },
     });
     if (err) {
       setError(err.message);
     }
-  }, []);
+  }, [checkoutPlan]);
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
@@ -152,7 +251,21 @@ export default function Auth() {
           <span className="text-2xl font-bold text-white">Postr</span>
         </Link>
 
-        {/* Guest — most prominent, top of card */}
+        {/* Paid-intent banner replaces the guest pitch: a paid plan needs a
+            real account, so we lead with "create an account to continue to
+            checkout", not "no account needed". */}
+        {checkoutPlan ? (
+          <div className="rounded-xl border border-[#7c6aed]/40 bg-[#14121e] p-5 mb-4 text-center">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-[#9b8cf0]">
+              {checkoutPlan === 'term' ? 'Term · CA$18.99 / 4 months' : 'Export pack · CA$9.99'}
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-[#c8cad0]">
+              {checkingOut
+                ? 'Continuing to secure checkout…'
+                : 'Create your account below to continue to secure checkout.'}
+            </p>
+          </div>
+        ) : (
         <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 mb-4">
           <button
             onClick={handleGuest}
@@ -166,11 +279,16 @@ export default function Auth() {
             Link an account anytime to sync across devices.
           </p>
         </div>
+        )}
 
         {/* Sign in / Sign up card */}
         <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
           <h2 className="text-base font-bold text-[#e2e2e8] mb-1">
-            {mode === 'signin' ? 'Or sign in' : 'Or create an account'}
+            {mode === 'signin'
+              ? 'Sign in'
+              : checkoutPlan
+                ? 'Create your account'
+                : 'Or create an account'}
           </h2>
           <p className="text-[14pt] text-[#6b7280] mb-5">
             {mode === 'signin'
@@ -180,7 +298,9 @@ export default function Auth() {
 
           {confirmEmail && (
             <div className="mb-4 rounded-md border border-[#34d399]/40 bg-[#34d399]/10 px-3 py-2 text-[13px] text-[#34d399]">
-              Check your email to confirm your account.
+              {checkoutPlan
+                ? 'Check your email to confirm your account, then come back to continue to checkout.'
+                : 'Check your email to confirm your account.'}
             </div>
           )}
 
@@ -193,7 +313,7 @@ export default function Auth() {
           {/* Google */}
           <button
             onClick={handleGoogle}
-            disabled={loading}
+            disabled={loading || checkingOut}
             className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm font-semibold text-[#c8cad0] hover:border-[#7c6aed] transition-colors disabled:opacity-50 flex items-center justify-center gap-3"
           >
             <svg width="18" height="18" viewBox="0 0 24 24">
@@ -252,10 +372,18 @@ export default function Auth() {
             </div>
             <button
               type="submit"
-              disabled={loading || !email.trim() || !password || (mode === 'signup' && !isPasswordValid(password))}
+              disabled={loading || checkingOut || !email.trim() || !password || (mode === 'signup' && !isPasswordValid(password))}
               className="w-full rounded-lg border border-[#7c6aed] bg-transparent px-4 py-3 text-sm font-semibold text-[#7c6aed] hover:bg-[#7c6aed] hover:text-white transition-colors disabled:opacity-50"
             >
-              {loading ? 'Loading…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+              {checkingOut
+                ? 'Continuing to checkout…'
+                : loading
+                  ? 'Loading…'
+                  : mode === 'signin'
+                    ? 'Sign in'
+                    : checkoutPlan
+                      ? 'Create account & continue'
+                      : 'Create account'}
             </button>
           </form>
 

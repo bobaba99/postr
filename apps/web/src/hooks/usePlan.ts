@@ -31,6 +31,22 @@ export interface PlanState {
    * export-button unlock and watermark removal.
    */
   canExport: boolean;
+  /**
+   * True when there is no session at all, OR the session is anonymous
+   * (a guest). A guest CANNOT check out — the create-checkout route
+   * requires a permanent account — so the paywall must route them to
+   * account creation first, not straight to Stripe.
+   */
+  isGuest: boolean;
+  /**
+   * Mirror of the Stripe subscription status for the recurring term
+   * (active | trialing | past_due | canceled | ... | null). Access is
+   * gated on hasActiveTerm (which already reflects plan + expiry, forced
+   * to free by the webhook when the sub goes terminal); this is exposed
+   * for copy that distinguishes states (e.g. "renews soon", "payment
+   * issue"). Null when the user never subscribed.
+   */
+  subscriptionStatus: string | null;
 }
 
 const INITIAL: PlanState = {
@@ -38,20 +54,35 @@ const INITIAL: PlanState = {
   hasActiveTerm: false,
   credits: 0,
   canExport: false,
+  isGuest: true,
+  subscriptionStatus: null,
 };
 
 interface BillingRow {
   plan?: string | null;
   plan_expires_at?: string | null;
   export_credits?: number | null;
+  subscription_status?: string | null;
 }
 
-function derive(row: BillingRow | null): Omit<PlanState, 'loading'> {
+/** The billing-derived slice of PlanState (everything except loading/isGuest,
+ *  which come from the auth check, not the billing row). */
+type BillingDerived = Pick<
+  PlanState,
+  'hasActiveTerm' | 'credits' | 'canExport' | 'subscriptionStatus'
+>;
+
+function derive(row: BillingRow | null): BillingDerived {
   const expires = row?.plan_expires_at ? new Date(row.plan_expires_at) : null;
   const hasActiveTerm =
     row?.plan === 'term' && expires !== null && expires.getTime() > Date.now();
   const credits = row?.export_credits ?? 0;
-  return { hasActiveTerm, credits, canExport: hasActiveTerm || credits > 0 };
+  return {
+    hasActiveTerm,
+    credits,
+    canExport: hasActiveTerm || credits > 0,
+    subscriptionStatus: row?.subscription_status ?? null,
+  };
 }
 
 export function usePlan(): PlanState {
@@ -63,18 +94,24 @@ export function usePlan(): PlanState {
     async function load() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) {
-        if (!cancelled) setState({ ...INITIAL, loading: false });
+        // No session at all — treated as a guest for paywall routing.
+        if (!cancelled) setState({ ...INITIAL, loading: false, isGuest: true });
         return;
       }
+      const isGuest = auth.user.is_anonymous === true;
       // `plan` / `plan_expires_at` / `export_credits` are newer than the
       // generated Database type in some builds; cast the projection.
       const { data } = await supabase
         .from('users')
-        .select('plan, plan_expires_at, export_credits' as never)
+        .select('plan, plan_expires_at, export_credits, subscription_status' as never)
         .eq('id', auth.user.id)
         .maybeSingle();
       if (cancelled) return;
-      setState({ loading: false, ...derive(data as BillingRow | null) });
+      setState({
+        loading: false,
+        ...derive(data as BillingRow | null),
+        isGuest,
+      });
     }
 
     void load();

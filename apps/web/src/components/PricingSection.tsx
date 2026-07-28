@@ -6,13 +6,14 @@
  * upgrade modal later without duplication. The page owns the hero H1;
  * this section leads with an H2 so the heading order stays valid.
  *
- * Free · Deck pack · Term. Decided 2026-07-28
+ * Free · Export pack · Term. Decided 2026-07-28
  * (docs/plans/2026-07-28-pricing-and-market-strategy.md):
- *   - Term $18.99 / 4 months = $4.75/mo, under the ~$5 student ceiling.
- *   - Deck pack $9.99 / 3 exports — priced to clear the payment-fee trap
- *     ($4.99 kept only 82% after fees; $9.99 keeps 88%) while staying a
- *     cheap entry that recruits price-sensitive users rather than
- *     cannibalising the term.
+ *   - Term CA$18.99 every 4 months — a RECURRING subscription (auto-
+ *     renews, cancel anytime), ~CA$4.75/mo, under the ~$5 student ceiling.
+ *   - Export pack CA$9.99 / 3 exports — a ONE-TIME purchase whose credits
+ *     never expire; priced to clear the payment-fee trap ($4.99 kept only
+ *     82% after fees; $9.99 keeps 88%) while staying a cheap entry that
+ *     recruits price-sensitive users rather than cannibalising the term.
  *   - The TERM is marked "Recommended". Research (Chernev choice-overload
  *     meta-analysis, NN/g wizards) ruled OUT a plan-selector quiz for a
  *     3-tier / one-variable choice — a comparison table + a "recommended"
@@ -24,10 +25,14 @@
  * the product actually does: editing + watermarked PDF are free today;
  * PPTX/LaTeX export is the paid line (talk export joins it when built).
  *
- * The tier CTAs route to /auth — the real checkout is triggered from the
- * paywall on the export buttons (EditableExportButtons), where the plan
- * state lives. The card at the bottom collects paper-to-talk waitlist
- * interest for the deferred feature.
+ * The paid tier CTAs route to /auth?plan=<sku> — the account-first
+ * checkout flow: a signed-out user creates a REAL account (never guest,
+ * for a paid plan) and is then handed straight to Stripe for the plan
+ * they chose (Auth.tsx resolves the intent). A signed-in user skips the
+ * form and goes straight to checkout. The free tier keeps ?guest=1. The
+ * in-editor export paywall (EditableExportButtons) also starts checkout,
+ * for users who hit the wall mid-export. The card at the bottom collects
+ * paper-to-talk waitlist interest for the deferred feature.
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -77,12 +82,12 @@ const TIERS: Tier[] = [
   {
     id: 'term',
     name: 'Term',
-    price: '$18.99',
-    cadence: 'for 4 months',
-    tagline: 'The full workflow, all term. About $4.75 a month.',
+    price: 'CA$18.99',
+    cadence: 'every 4 months',
+    tagline: 'The full workflow, all term. About CA$4.75 a month, cancel anytime.',
     featured: true,
     cta: 'Get the term',
-    ctaTo: '/auth',
+    ctaTo: '/auth?plan=term',
     forWho: 'Presenting through the term, or making several posters.',
     // Only shipped features. "Turn a paper into a talk" is deliberately
     // NOT listed here — it isn't built, and the term must advertise only
@@ -92,21 +97,22 @@ const TIERS: Tier[] = [
       'Everything in Free — no watermark',
       'Export to PowerPoint & LaTeX',
       'Keep editing your poster anywhere',
-      'One payment, no renewal — it just ends',
+      'Renews every 4 months — cancel anytime',
     ],
   },
   {
     id: 'pack',
     name: 'Export pack',
-    price: '$9.99',
+    price: 'CA$9.99',
     cadence: 'one-time · 3 exports',
-    tagline: 'Just need a couple of clean exports? Pay only for those.',
+    tagline: 'Just need a couple of clean exports? Pay only for those — credits never expire.',
     cta: 'Get the pack',
-    ctaTo: '/auth',
+    ctaTo: '/auth?plan=pack',
     forWho: 'A one-off export, without committing to a term.',
     features: [
       'Export 3 posters to PowerPoint or LaTeX',
       'No watermark on those exports',
+      'Credits never expire — use them whenever',
       'No subscription, no term',
       'Talk export counts too, when it lands',
     ],
