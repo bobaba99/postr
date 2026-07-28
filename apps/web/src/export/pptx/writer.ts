@@ -19,7 +19,6 @@ import type PptxGenJS from 'pptxgenjs';
 import type { Block, PosterDoc, TypeStyle } from '@postr/shared';
 import { planPptxScale, unitsToInches, unitsToPoints } from '../units';
 import { ACK_BLOCK_ID } from '../ackBlock';
-import { ackMarkSvgInner } from '../ackMark';
 import {
   cssColorToHex6,
   parseRichText,
@@ -41,12 +40,7 @@ import {
   type ResolvedAsset,
 } from '../resolveAssets';
 import { tableCellBorders } from './tableBorders';
-import {
-  attributionDocProperty,
-  attributionPptxBox,
-  shouldAttribute,
-  type AttributionOptions,
-} from '../attribution';
+import { attributionDocProperty, attributionPptxBox } from '../attribution';
 
 export interface PptxExportOptions extends ExportContentOptions {
   /** Injectable for tests / server pipelines. */
@@ -355,7 +349,10 @@ function addImage(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   const muted = hex(ctx.doc.palette.muted, '6B7280');
 
   if (asset) {
-    if (asset.ext === 'svg') {
+    // The acknowledgement mark is an SVG we generate ourselves, so the
+    // pre-2019 caveat is not something the user chose or can act on —
+    // warning about it would be noise about a block they did not add.
+    if (asset.ext === 'svg' && b.id !== ACK_BLOCK_ID) {
       ctx.warnings.push(
         'An SVG figure was embedded — older PowerPoint versions (pre-2019) may not render it.',
       );
@@ -500,56 +497,6 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-/**
- * Compose the slide background: the poster's fill colour with the
- * acknowledgement mark drawn into it at the block's own coordinates.
- *
- * The mark is positioned in poster units scaled to the slide's inch
- * geometry, so a half-scale export (a poster over 56in) puts the mark
- * in the same relative spot as a full-scale one. It is drawn at the
- * block's live x/y/w/h — so if the user MOVED the mark on the canvas,
- * the export follows them. Movable, not removable.
- *
- * SVG rather than a raster: it stays a few hundred bytes at any
- * poster size, and PowerPoint 2019+ renders SVG backgrounds natively.
- */
-function flattenedBackgroundDataUri(
-  doc: PosterDoc,
-  ack: Block,
-  plan: { slideWidthIn: number; slideHeightIn: number },
-  bgColorHex: string,
-): string {
-  // Poster units → slide inches, via the same `unitsToInches` every
-  // other block's geometry goes through, then × the export scale so a
-  // half-scale poster puts the mark in the same relative spot.
-  const scale = plan.slideWidthIn / (unitsToInches(doc.widthIn * 10) || 1);
-
-  // Render the SVG at 100 units per inch so stroke widths stay sane
-  // integers; the viewBox makes the absolute numbers irrelevant.
-  const S = 100;
-  const vbW = Math.round(plan.slideWidthIn * S);
-  const vbH = Math.round(plan.slideHeightIn * S);
-  const x = Math.round(unitsToInches(ack.x) * scale * S);
-  const y = Math.round(unitsToInches(ack.y) * scale * S);
-  const w = Math.round(unitsToInches(ack.w) * scale * S);
-  const h = Math.round(unitsToInches(ack.h) * scale * S);
-
-  const svg = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${vbW}" height="${vbH}" viewBox="0 0 ${vbW} ${vbH}">`,
-    `<rect width="${vbW}" height="${vbH}" fill="#${bgColorHex}"/>`,
-    `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="0 0 64 64">`,
-    ackMarkSvgInner(),
-    '</svg>',
-    '</svg>',
-  ].join('');
-
-  const encoded =
-    typeof btoa === 'function'
-      ? btoa(svg)
-      : Buffer.from(svg, 'utf-8').toString('base64');
-  return `image/svg+xml;base64,${encoded}`;
-}
-
 // ── entry point ──────────────────────────────────────────────────────
 
 /**
@@ -611,29 +558,18 @@ export async function exportPosterPptx(
   };
 
   const slide = pptx.addSlide();
-  // Background: the poster's fill, plus the acknowledgement mark
-  // baked in when the doc carries one. Baking it into the background
-  // image rather than adding a shape is what makes the mark survive
-  // "select everything and delete" in PowerPoint — a background is
-  // not a canvas object. When there is no ack block (or the paid seam
-  // suppresses it) this is the plain colour fill it always was.
-  const ackBlock = doc.blocks.find((b) => b.id === ACK_BLOCK_ID);
-  const bgColor = hex(doc.palette.bg, 'FFFFFF');
-  slide.background =
-    ackBlock && shouldAttribute(options.attribution)
-      ? {
-          data: flattenedBackgroundDataUri(doc, ackBlock, plan, bgColor),
-        }
-      : { color: bgColor };
+  // Background: the poster's own fill colour, and nothing else.
+  //
+  // An earlier build flattened the acknowledgement mark into a
+  // generated background IMAGE so it could not be selected or deleted.
+  // That worked, and it cost every user the background-colour picker:
+  // PowerPoint cannot recolour a picture fill, so a user who never
+  // wanted to touch the credit could no longer restyle their poster.
+  // The mark is an ordinary picture shape again (see the block loop),
+  // and this is a plain solid fill.
+  slide.background = { color: hex(doc.palette.bg, 'FFFFFF') };
 
   for (const b of doc.blocks) {
-    // The acknowledgement mark is NOT emitted as a shape here — it is
-    // flattened into the slide background below. A shape in
-    // PowerPoint is one click and one Delete away; the background is
-    // not selectable on the canvas at all. That is the owner's
-    // explicit choice of a hard lock over an editable export, and the
-    // cost is stated plainly in the export UI copy.
-    if (b.id === ACK_BLOCK_ID) continue;
     switch (b.type) {
       case 'title':
         addTitle(slide, b, ctx);

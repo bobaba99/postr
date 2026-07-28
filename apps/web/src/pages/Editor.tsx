@@ -172,7 +172,17 @@ export default function Editor() {
         // self-heal on load without needing a db reset.
         const raw = row.data as PosterDoc;
         const hydrated = hydrateIfEmpty(normalizeStaleStyles(raw));
-        setPoster(row.id, hydrated, row.title);
+        // Seeding is opt-in and belongs to the EDITING entry point only.
+        // Inside the editor the acknowledgement is fixed: seeded on load
+        // and refused by every delete path. Exports are the opposite —
+        // the mark ships as an ordinary removable object, because that
+        // file is the author's, not ours.
+        //
+        // Deliberately NOT set on the other three setPoster callers:
+        // Share.tsx renders a poster exactly as stored, version restore
+        // already keeps the mark via the lock guard, and importPostr
+        // calls ensureAckBlock itself.
+        setPoster(row.id, hydrated, row.title, { seedAcknowledgement: true });
         // Normalize the URL so refreshes land on the real id, not "/p/new"
         if (posterId !== row.id) {
           navigate(`/p/${row.id}`, { replace: true });
