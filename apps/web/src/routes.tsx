@@ -68,6 +68,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { EditorErrorBoundary } from '@/components/EditorErrorBoundary';
 import Landing from '@/pages/Landing';
 import About from '@/pages/About';
+import WhyPosters from '@/pages/WhyPosters';
 import Privacy from '@/pages/Privacy';
 import Cookies from '@/pages/Cookies';
 import Terms from '@/pages/Terms';
@@ -104,6 +105,7 @@ export function AppRoutes() {
         {/* Public routes */}
         <Route path="/" element={<Landing />} />
         <Route path="/about" element={<About />} />
+        <Route path="/why-posters" element={<WhyPosters />} />
         {/* Public gallery is deactivated — see the header comment. */}
         <Route path="/gallery" element={<Navigate to="/" replace />} />
         <Route path="/gallery/:entryId" element={<Navigate to="/" replace />} />

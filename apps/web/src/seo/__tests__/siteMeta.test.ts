@@ -52,6 +52,7 @@ describe('STATIC_ROUTE_META', () => {
       '/paper-to-poster',
       '/privacy',
       '/terms',
+      '/why-posters',
     ]);
   });
 

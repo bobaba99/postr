@@ -29,6 +29,19 @@
         "Every poster starts at a real print size, so what you see on screen is what the print shop produces."
       ]
     },
+    "/why-posters": {
+      "title": "Why Poster Sessions Matter: Skills That Outlast Them",
+      "description": "Presenting a poster teaches explaining your work at three lengths, arguing visually, and handling questions live. Plus how to get more from one.",
+      "robots": "index,follow",
+      "h1": "Why poster sessions matter",
+      "copy": [
+        "Poster sessions have a reputation as the consolation prize of conference formats. That reading misses what the format is unusually good at.",
+        "A poster visit lasts anywhere from twenty seconds to twenty minutes, so you build a one-line version, a two-minute version, and the full walkthrough.",
+        "A poster has no room for the paragraph that rescues a confusing figure, so the layout has to carry the logic. That is editorial work, not decoration.",
+        "Committee meetings, peer review, and interviews all run on answering questions in real time. A poster session is a low-stakes place to learn it.",
+        "You cannot fit the project on the board, so you decide the one claim the poster defends. Framing early, on a deadline, is unusually good practice."
+      ]
+    },
     "/chart-chooser": {
       "title": "Chart Chooser: Which Chart Fits Your Data? | Postr",
       "description": "Paste a table or answer three short questions and get ranked, journal-style chart suggestions with captions. Download SVG or PNG. Free, no signup.",
