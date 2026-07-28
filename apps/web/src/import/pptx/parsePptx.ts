@@ -11,6 +11,7 @@
  */
 import type { PosterDoc } from '@postr/shared';
 import { emuToInches } from '@/export/units';
+import { APPENDED_SLIDE_COUNT, TEMPLATE_SLIDE_PREFIX } from '@/export/pptx/templateMarker';
 import {
   DEFAULT_FONT_FAMILY,
   DEFAULT_HEADING_STYLE,
@@ -106,6 +107,82 @@ function listSlidePaths(entries: ZipEntries, presentation: Document): string[] {
 const slideNumber = (path: string): number =>
   Number.parseInt(path.replace(/\D+/g, ''), 10) || 0;
 
+/**
+ * How many slides after the first are Postr's own appended templates.
+ *
+ * Every Postr export is a multi-slide deck: the poster, an explainer,
+ * and one empty slide per named layout (see
+ * `export/pptx/templateSlides.ts`). Re-importing a file Postr itself
+ * produced must NOT tell the user that six slides of their content
+ * were skipped — they never authored those slides.
+ *
+ * The exporter names each appended slide `<p:cSld name="Postr
+ * template - …">`, so identity travels with the slide rather than
+ * with its POSITION. That matters: the moment a user pastes their own
+ * slide at the end of a Postr deck, a trailing-run rule would stop
+ * recognising all six templates and over-report the skip count. Here
+ * the pasted slide is the only one counted, which is the honest
+ * answer.
+ *
+ * A genuine deck from PowerPoint carries `Slide 1`…`Slide 7` (or no
+ * name at all), so it warns exactly as it did before. A user who
+ * renames one of our templates has adopted it as their own, and it
+ * counts again — also correct.
+ */
+function countTemplateSlides(entries: ZipEntries, slidePaths: string[]): number {
+  return slidePaths.filter((path) => isTemplateSlide(entries, path)).length;
+}
+
+/**
+ * Which slide is the poster.
+ *
+ * Normally the first, but a user can reorder slides in the sorter or
+ * delete the poster outright — and then slide 1 is one of OUR empty
+ * templates. Importing that would hand the user a blank canvas titled
+ * "3-Column Classic" and quietly drop the poster sitting two slides
+ * down. So the poster is the first slide that is not one of ours.
+ *
+ * Returns -1 when EVERY slide is one of ours — the user deleted the
+ * poster and kept only the blank templates. There is no poster to
+ * import then, and falling back to the first slide would hand them
+ * Postr's own explainer copy as if it were their content.
+ */
+function findPosterSlide(entries: ZipEntries, slidePaths: string[]): number {
+  return slidePaths.findIndex((path) => !isTemplateSlide(entries, path));
+}
+
+/**
+ * `<p:cSld name="…">` is the FIRST element inside `<p:sld>`, so the
+ * marker always lands within the opening kilobyte.
+ */
+const CSLD_NAME_RE = /<p:cSld[^>]*\bname="([^"]*)"/;
+const CSLD_SCAN_BYTES = 2048;
+
+/**
+ * Is this slide one Postr appended?
+ *
+ * Deliberately reads the RAW BYTES instead of parsing the part. Two
+ * reasons, both load-bearing:
+ *
+ * 1. `parsePart` THROWS on malformed XML. This probe runs over slides
+ *    2..n — the very slides the importer is about to discard anyway —
+ *    so parsing them would let one bad byte in a trailing slide sink
+ *    an otherwise perfectly importable poster. A slide we cannot read
+ *    is definitionally not one we wrote, and saying so costs nothing.
+ * 2. It runs once per slide on the import path. Building a full DOM
+ *    for an entire slide part to read one attribute is work that
+ *    scales with deck size for a result that is thrown away.
+ *
+ * A false negative is harmless: the slide simply counts as skipped
+ * content and the user gets the warning they used to get.
+ */
+function isTemplateSlide(entries: ZipEntries, path: string): boolean {
+  const bytes = entries[path];
+  if (!bytes) return false;
+  const head = bytesToText(bytes.subarray(0, CSLD_SCAN_BYTES));
+  return CSLD_NAME_RE.exec(head)?.[1]?.startsWith(TEMPLATE_SLIDE_PREFIX) ?? false;
+}
+
 /** Detect the exporter's half-scale marker in the core properties. */
 function readHalfScale(entries: ZipEntries): { scale: number; note: string | null } {
   const core = entries['docProps/core.xml'];
@@ -157,18 +234,37 @@ export function parsePptx(bytes: Uint8Array): ParsePptxResult {
 
   const warnings: string[] = [];
   if (note) warnings.push(note);
-  if (slidePaths.length > 1) {
+  // Postr's own appended template slides are not the user's content,
+  // so they are not "skipped" — subtract them before deciding.
+  //
+  // Capped at the number we actually append: the marker lives in an
+  // attribute anyone can write, and nothing here is a trust decision,
+  // but an unbounded subtraction would let a deck full of forged (or
+  // merely unlucky) names claim that NOTHING was skipped. The cap
+  // bounds the worst case to under-reporting by six.
+  const templates = Math.min(
+    countTemplateSlides(entries, slidePaths),
+    APPENDED_SLIDE_COUNT,
+  );
+  const posterIdx = findPosterSlide(entries, slidePaths);
+  if (posterIdx === -1) {
+    // Only Postr's own blank templates are left — the poster slide was
+    // deleted. Refuse rather than importing the explainer as content.
+    throw new PptxImportError('Presentation contains no slides.');
+  }
+  const userSlides = slidePaths.length - templates;
+  if (userSlides > 1) {
     // A poster is ONE canvas. Say plainly what was dropped rather than
-    // letting slides 2..n vanish without a word.
-    const skipped = slidePaths.length - 1;
+    // letting the other slides vanish without a word.
+    const skipped = userSlides - 1;
     warnings.push(
-      `This file has ${slidePaths.length} slides. Only the first was imported — ` +
+      `This file has ${userSlides} slides. Only one was imported — ` +
         `${skipped} ${skipped === 1 ? 'slide was' : 'slides were'} skipped, ` +
         'because a poster is a single canvas.',
     );
   }
 
-  const slidePath = slidePaths[0]!;
+  const slidePath = slidePaths[posterIdx]!;
   const slide = parsePart(entries, slidePath);
   if (!slide) throw new PptxImportError('First slide could not be read.');
   const spTree = firstEl(slide, NS_P, 'spTree');

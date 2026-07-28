@@ -203,7 +203,14 @@ describe('tables', () => {
 });
 
 describe('multi-slide decks', () => {
-  /** Clone slide1 into a second slide so the deck reports 2 slides. */
+  /**
+   * Clone slide1 into an EXTRA slide, so the deck carries two slides
+   * of real user content on top of Postr's own template slides.
+   *
+   * The clone lands past the templates rather than on top of one —
+   * slide2..7 are Postr's, and overwriting one would be testing a
+   * corrupt deck rather than a user's second poster slide.
+   */
   const makeTwoSlideDeck = async (): Promise<Uint8Array> => {
     const { unzipSync } = await import('fflate');
     const entries = unzipSync(await exportBytes(makeFixtureDoc()));
@@ -211,27 +218,27 @@ describe('multi-slide decks', () => {
     const encode = (s: string) => new TextEncoder().encode(s);
 
     const next: Record<string, Uint8Array> = { ...entries };
-    next['ppt/slides/slide2.xml'] = entries['ppt/slides/slide1.xml']!;
-    next['ppt/slides/_rels/slide2.xml.rels'] =
+    next['ppt/slides/slide8.xml'] = entries['ppt/slides/slide1.xml']!;
+    next['ppt/slides/_rels/slide8.xml.rels'] =
       entries['ppt/slides/_rels/slide1.xml.rels']!;
 
     // Register slide2 in the presentation + its rels so slide ordering
     // is discovered the same way PowerPoint would report it.
     const relsXml = decode('ppt/_rels/presentation.xml.rels').replace(
       '</Relationships>',
-      '<Relationship Id="ridSlide2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide2.xml"/></Relationships>',
+      '<Relationship Id="ridSlide8" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide8.xml"/></Relationships>',
     );
     next['ppt/_rels/presentation.xml.rels'] = encode(relsXml);
 
     const presXml = decode('ppt/presentation.xml').replace(
       '</p:sldIdLst>',
-      '<p:sldId id="257" r:id="ridSlide2"/></p:sldIdLst>',
+      '<p:sldId id="264" r:id="ridSlide8"/></p:sldIdLst>',
     );
     next['ppt/presentation.xml'] = encode(presXml);
 
     const ctXml = decode('[Content_Types].xml').replace(
       '</Types>',
-      '<Override PartName="/ppt/slides/slide2.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>',
+      '<Override PartName="/ppt/slides/slide8.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>',
     );
     next['[Content_Types].xml'] = encode(ctXml);
 
@@ -242,6 +249,8 @@ describe('multi-slide decks', () => {
     const parsed = parsePptx(await makeTwoSlideDeck());
     const warning = parsed.warnings.find((w) => /slides/i.test(w));
     expect(warning).toBeDefined();
+    // The deck is 8 parts, but 6 of them are Postr's own appended
+    // templates — the user authored 2 slides, and lost 1.
     expect(warning).toContain('2 slides');
     expect(warning).toContain('1 slide was skipped');
     // Still a single canvas worth of blocks, not both slides merged.
@@ -249,6 +258,213 @@ describe('multi-slide decks', () => {
     expect(titles).toHaveLength(1);
   });
 });
+
+/**
+ * Every Postr export is now a 7-slide deck (poster + explainer + five
+ * empty layout templates). Re-importing one must not accuse the user
+ * of losing six slides they never wrote — while a genuine multi-slide
+ * deck from PowerPoint must still warn.
+ */
+describe('Postr’s own template slides are not counted as skipped content', () => {
+  const skipWarning = (parsed: { warnings: string[] }): string | undefined =>
+    parsed.warnings.find((w) => /were skipped|was skipped/.test(w));
+
+  it('produces NO skipped-slides warning for a Postr export', async () => {
+    const parsed = await roundTrip(makeFixtureDoc());
+    expect(skipWarning(parsed)).toBeUndefined();
+  });
+
+  it('still imports the poster itself from such a deck', async () => {
+    const parsed = await roundTrip(makeFixtureDoc());
+    expect(parsed.doc.blocks.filter((b) => b.type === 'title')).toHaveLength(1);
+    expect(parsed.title).toContain('Whisker Maps &');
+  });
+
+  it('does NOT import the explainer or template slides as content', async () => {
+    const parsed = await roundTrip(makeFixtureDoc());
+    const text = parsed.doc.blocks.map((b) => b.content).join(' ');
+    expect(text).not.toContain('Duplicate Slide');
+    expect(text).not.toContain('empty templates');
+    expect(text).not.toContain('3-Column Classic');
+  });
+
+  it('stays silent for a HALVED Postr export, and still restores its size', async () => {
+    // The half-scale note is a different warning and must survive; the
+    // skipped-slides one must still not appear.
+    const parsed = await roundTrip(makeFixtureDoc({ widthIn: 96, heightIn: 48 }));
+    expect(skipWarning(parsed)).toBeUndefined();
+    expect(parsed.warnings.some((w) => /half size/i.test(w))).toBe(true);
+    expect(parsed.doc.widthIn).toBe(96);
+    expect(parsed.doc.heightIn).toBe(48);
+  });
+
+  it('DOES warn for a genuine 7-slide deck not produced by Postr', async () => {
+    // Same slide count as a Postr export, but the slides are named the
+    // way PowerPoint names them — so all six are real user content.
+    const parsed = parsePptx(await makeForeignDeck(7));
+    const warning = skipWarning(parsed);
+    expect(warning).toBeDefined();
+    expect(warning).toContain('7 slides');
+    expect(warning).toContain('6 slides were skipped');
+  });
+
+  it('warns for a foreign deck whose slides carry no name at all', async () => {
+    const parsed = parsePptx(await makeForeignDeck(3, { unnamed: true }));
+    expect(skipWarning(parsed)).toContain('2 slides were skipped');
+  });
+
+  it('survives a MALFORMED slide among the ones it discards', async () => {
+    // The template probe must never parse the slides it is about to
+    // throw away: one bad byte in slide 5 previously sank an
+    // otherwise perfectly importable poster.
+    const { unzipSync } = await import('fflate');
+    const entries = unzipSync(await exportBytes(makeFixtureDoc()));
+    const broken: Record<string, Uint8Array> = { ...entries };
+    broken['ppt/slides/slide5.xml'] = new TextEncoder().encode('<p:sld><oops>');
+    const parsed = parsePptx(zipSync(broken));
+    // The poster still imports, with its blocks intact.
+    expect(parsed.doc.blocks.filter((b) => b.type === 'title')).toHaveLength(1);
+    expect(parsed.title).toContain('Whisker Maps &');
+    // The unreadable slide is not ours, so it counts as skipped.
+    expect(skipWarning(parsed)).toContain('1 slide was skipped');
+  });
+
+  it('imports the POSTER when a template slide has been dragged in front', async () => {
+    // Reordering in the slide sorter is a click away. Importing the
+    // empty template as "the poster" would silently drop the real one.
+    const parsed = parsePptx(await reorderPosterTo(2));
+    expect(parsed.title).toContain('Whisker Maps &');
+    expect(parsed.title).not.toContain('3-Column Classic');
+    expect(parsed.doc.blocks.filter((b) => b.type === 'title')).toHaveLength(1);
+    expect(skipWarning(parsed)).toBeUndefined();
+  });
+
+  it('refuses a deck whose poster was deleted, leaving only templates', async () => {
+    // There is no poster to import. Silently handing back Postr's own
+    // explainer copy as the user's content would be worse than an
+    // error, so this rejects rather than inventing a poster.
+    const bytes = await reorderPosterTo(2, { dropPoster: true });
+    expect(() => parsePptx(bytes)).toThrow(PptxImportError);
+  });
+
+  it('caps the subtraction so forged names cannot silence the warning', async () => {
+    // The marker is an attribute anyone can write. Renaming a whole
+    // deck must not let it claim that nothing was skipped.
+    const parsed = parsePptx(await makeForeignDeck(10, { forgeMarker: true }));
+    const warning = skipWarning(parsed);
+    expect(warning).toBeDefined();
+    // 10 slides, at most 6 credited as ours → 4 user slides, 3 lost.
+    expect(warning).toContain('4 slides');
+    expect(warning).toContain('3 slides were skipped');
+  });
+
+  it('is not fooled by a slide merely MENTIONING the marker in its text', async () => {
+    // The marker lives in the slide's <p:cSld name> attribute. Body
+    // text that happens to quote it must not buy a free pass.
+    const parsed = parsePptx(
+      await makeForeignDeck(2, { bodyText: 'Postr template - Billboard' }),
+    );
+    expect(skipWarning(parsed)).toContain('1 slide was skipped');
+  });
+});
+
+/**
+ * A deck with `count` slides that Postr did NOT produce: slides are
+ * named the way PowerPoint names them (or not at all), so none of them
+ * carry the template marker.
+ */
+/**
+ * A real Postr export whose slide ORDER has been changed, as a user
+ * would by dragging in the slide sorter: the poster moves to position
+ * `position` (1-based), or is deleted outright with `dropPoster`.
+ *
+ * Only `<p:sldIdLst>` is rewritten — that list, not the part
+ * filenames, is what PowerPoint treats as the deck order.
+ */
+async function reorderPosterTo(
+  position: number,
+  opts: { dropPoster?: boolean } = {},
+): Promise<Uint8Array> {
+  const { unzipSync } = await import('fflate');
+  const entries = unzipSync(await exportBytes(makeFixtureDoc()));
+  const decode = (n: string): string => new TextDecoder().decode(entries[n]!);
+
+  const pres = decode('ppt/presentation.xml');
+  const list = /<p:sldIdLst>([\s\S]*?)<\/p:sldIdLst>/.exec(pres)![1]!;
+  const ids = list.match(/<p:sldId\b[^/]*\/>/g)!;
+  const [poster, ...rest] = ids;
+  const reordered = opts.dropPoster
+    ? rest
+    : [...rest.slice(0, position - 1), poster!, ...rest.slice(position - 1)];
+
+  return zipSync({
+    ...entries,
+    'ppt/presentation.xml': new TextEncoder().encode(
+      pres.replace(list, reordered.join('')),
+    ),
+  });
+}
+
+async function makeForeignDeck(
+  count: number,
+  opts: { unnamed?: boolean; bodyText?: string; forgeMarker?: boolean } = {},
+): Promise<Uint8Array> {
+  const { unzipSync } = await import('fflate');
+  const entries = unzipSync(
+    (await exportPosterPptx(makeFixtureDoc(), {
+      fetcher: async () => TINY_PNG_BYTES,
+      templateSlides: false,
+    })).bytes,
+  );
+  const decode = (n: string): string => new TextDecoder().decode(entries[n]!);
+  const encode = (s: string): Uint8Array => new TextEncoder().encode(s);
+
+  const body = opts.bodyText
+    ? `<p:sp><p:nvSpPr><p:cNvPr id="2" name="T"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>` +
+      `<p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/></a:xfrm></p:spPr>` +
+      `<p:txBody><a:bodyPr/><a:p><a:r><a:t>${opts.bodyText}</a:t></a:r></a:p></p:txBody></p:sp>`
+    : '';
+
+  const next: Record<string, Uint8Array> = { ...entries };
+  let rels = decode('ppt/_rels/presentation.xml.rels');
+  let pres = decode('ppt/presentation.xml');
+  let types = decode('[Content_Types].xml');
+
+  for (let i = 2; i <= count; i++) {
+    const name = opts.unnamed
+      ? '<p:cSld>'
+      : opts.forgeMarker
+        ? `<p:cSld name="Postr template - forged ${i}">`
+        : `<p:cSld name="Slide ${i}">`;
+    next[`ppt/slides/slide${i}.xml`] = encode(
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
+        ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"' +
+        ' xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
+        `${name}<p:spTree>` +
+        '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
+        '<p:grpSpPr/>' +
+        `${body}</p:spTree></p:cSld></p:sld>`,
+    );
+    rels = rels.replace(
+      '</Relationships>',
+      `<Relationship Id="ridForeign${i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i}.xml"/></Relationships>`,
+    );
+    pres = pres.replace(
+      '</p:sldIdLst>',
+      `<p:sldId id="${300 + i}" r:id="ridForeign${i}"/></p:sldIdLst>`,
+    );
+    types = types.replace(
+      '</Types>',
+      `<Override PartName="/ppt/slides/slide${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>`,
+    );
+  }
+
+  next['ppt/_rels/presentation.xml.rels'] = encode(rels);
+  next['ppt/presentation.xml'] = encode(pres);
+  next['[Content_Types].xml'] = encode(types);
+  return zipSync(next);
+}
 
 describe('unsupported shapes', () => {
   it('reports a chart graphicFrame instead of dropping it silently', () => {
