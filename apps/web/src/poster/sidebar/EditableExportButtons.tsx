@@ -96,9 +96,15 @@ export function EditableExportButtons({
       const notes = await job();
       setState({ busy: null, done: kind, notes, failed: false });
       setTimeout(() => setState((s) => ({ ...s, done: null })), 2500);
-    } catch {
-      // House rule: user-facing errors stay generic; details go
-      // through the Send Feedback path (console capture).
+    } catch (err) {
+      // House rule: the user-facing message stays generic. But the
+      // error itself must not vanish — an earlier revision swallowed it
+      // entirely, which is why a real pptxgenjs failure (it cannot embed
+      // SVG, so the seeded acknowledgement mark threw) surfaced only as
+      // "Something went wrong" with nothing in the console to diagnose.
+      // Log it so the Send Feedback capture and any future debugging
+      // have the actual cause.
+      console.error(`[export:${kind}]`, err);
       setState({ busy: null, done: null, notes: [], failed: true });
     }
   }

@@ -18,7 +18,6 @@
 import type PptxGenJS from 'pptxgenjs';
 import type { Block, PosterDoc, TypeStyle } from '@postr/shared';
 import { planPptxScale, unitsToInches, unitsToPoints } from '../units';
-import { ACK_BLOCK_ID } from '../ackBlock';
 import {
   cssColorToHex6,
   parseRichText,
@@ -49,6 +48,7 @@ import {
 } from './masters';
 import { patchThemeColors } from './themePatch';
 import { addTemplateSlides, resolveTemplateStyle } from './templateSlides';
+import { browserRasterizeSvg, type SvgRasterizer } from './rasterizeSvg';
 
 export interface PptxExportOptions extends ExportContentOptions {
   /** Injectable for tests / server pipelines. */
@@ -60,6 +60,16 @@ export interface PptxExportOptions extends ExportContentOptions {
    * deck. Not a user-facing option.
    */
   templateSlides?: boolean;
+  /**
+   * SVG → PNG rasterizer. pptxgenjs cannot embed an SVG data URI —
+   * its `<img>`-based loader fires `onerror` and `pptx.write()`
+   * rejects — so every SVG asset (most commonly the seeded
+   * acknowledgement mark) is converted to PNG before it reaches
+   * `addImage`. Defaults to the browser canvas implementation;
+   * injectable so tests and headless pipelines can supply their own
+   * or omit it (a doc with no SVG asset never calls it).
+   */
+  rasterizeSvg?: SvgRasterizer;
   // `attribution` (the paid-plan seam) is inherited from
   // ExportContentOptions, which also threads it into the references
   // formatter so the credit entry honours the same seam.
@@ -370,14 +380,12 @@ function addImage(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   const muted = hex(ctx.doc.palette.muted, '6B7280');
 
   if (asset) {
-    // The acknowledgement mark is an SVG we generate ourselves, so the
-    // pre-2019 caveat is not something the user chose or can act on —
-    // warning about it would be noise about a block they did not add.
-    if (asset.ext === 'svg' && b.id !== ACK_BLOCK_ID) {
-      ctx.warnings.push(
-        'An SVG figure was embedded — older PowerPoint versions (pre-2019) may not render it.',
-      );
-    }
+    // No SVG warning here any more: SVG assets are rasterized to PNG in
+    // `exportPosterPptx` before this runs (pptxgenjs cannot embed SVG at
+    // all — it does not merely degrade on old PowerPoint, it throws and
+    // fails the whole export), so by this point every asset is a raster
+    // that renders everywhere. If rasterization failed the asset was
+    // dropped and the `else` branch below emits a placeholder.
     if (b.crop && (b.crop.top || b.crop.right || b.crop.bottom || b.crop.left)) {
       ctx.warnings.push(
         'An inline image crop is not applied in the PowerPoint export — the full image is included.',
@@ -531,6 +539,32 @@ export async function exportPosterPptx(
 ): Promise<PptxExportResult> {
   const plan = planPptxScale(doc.widthIn, doc.heightIn);
   const { assets } = await resolvePosterAssets(doc, options.fetcher);
+
+  // pptxgenjs cannot embed SVG (see rasterizeSvg.ts). Convert every
+  // resolved SVG asset to PNG in place BEFORE any slide is drawn, so
+  // `addImage` only ever sees a raster the library can load. The passed
+  // size is a FALLBACK: an SVG with intrinsic width/height (the ack mark
+  // is 64×64) rasters at its own resolution, so this only bounds a
+  // dimensionless SVG. block.w/.h are poster units (PX = 10 u/in); ×2
+  // gives a reasonable raster for such a case. On conversion failure the
+  // asset is dropped (not left as SVG, which would make pptxgenjs
+  // throw), so `addImage` emits a missing-image placeholder — because
+  // `b.imageSrc` is untouched, its `else` branch fires — instead of
+  // aborting the whole export.
+  const rasterizeSvg = options.rasterizeSvg ?? browserRasterizeSvg;
+  const svgBlocks = doc.blocks.filter((b) => assets.get(b.id)?.ext === 'svg');
+  await Promise.all(
+    svgBlocks.map(async (block) => {
+      const asset = assets.get(block.id);
+      if (!asset) return;
+      const png = await rasterizeSvg(asset.bytes, block.w * 2, block.h * 2);
+      if (png && png.length > 0) {
+        assets.set(block.id, { bytes: png, ext: 'png', mime: 'image/png' });
+      } else {
+        assets.delete(block.id);
+      }
+    }),
+  );
 
   // Lazy-load pptxgenjs so it stays out of the main bundle.
   const { default: PptxGen } = await import('pptxgenjs');
