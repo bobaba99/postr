@@ -132,7 +132,10 @@ export default function ChartChooserPage() {
                   title={p.name}
                   aria-pressed={active}
                   onClick={() => setPaletteName(p.name)}
-                  className="flex items-center gap-1 rounded-full p-1"
+                  // py-3 lifts these from 26px to a 44px hit area.
+                  // Eight swatches sit side by side, so an undersized
+                  // target here is a mis-tap, not just a near miss.
+                  className="flex items-center gap-1 rounded-full px-1 py-3"
                   style={{
                     border: `2px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
                     background: '#14141f',

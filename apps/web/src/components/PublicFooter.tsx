@@ -121,7 +121,7 @@ function FooterButton({
       <button
         type="button"
         onClick={onClick}
-        className="cursor-pointer border-0 bg-transparent p-0 text-left text-[14pt] text-[#9ca3af] hover:text-white"
+        className="-my-2.5 cursor-pointer border-0 bg-transparent px-0 py-2.5 text-left text-[14pt] text-[#9ca3af] hover:text-white"
       >
         {children}
       </button>
