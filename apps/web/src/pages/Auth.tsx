@@ -30,6 +30,13 @@ import {
   startCheckoutForPlan,
   type CheckoutPlan,
 } from '@/data/checkoutIntent';
+import {
+  writeConsent,
+  stashSignupConsent,
+  readStashedSignupConsent,
+  clearStashedSignupConsent,
+  type ConsentChoice,
+} from '@/data/consent';
 
 type Mode = 'signin' | 'signup';
 
@@ -66,6 +73,11 @@ export default function Auth() {
   // posters carry over — NOT signUp, which would create a separate new user
   // and orphan the guest's work. See project_guest_to_permanent_conversion.
   const [isAnonGuest, setIsAnonGuest] = useState(false);
+  // Signup consent — both OFF by default (affirmative opt-in only, valid
+  // under GDPR + CASL; we never pre-tick). Captured on any new-account
+  // path; a returning sign-in never touches consent.
+  const [researchOptIn, setResearchOptIn] = useState(false);
+  const [marketingOptIn, setMarketingOptIn] = useState(false);
   // True while we're minting a Stripe session and redirecting off-site, so
   // the UI shows "Continuing to checkout…" rather than looking idle.
   const [checkingOut, setCheckingOut] = useState(false);
@@ -74,6 +86,26 @@ export default function Auth() {
   // before the redirect commits); without this, a signed-in user could mint
   // two Stripe sessions and race two redirects.
   const checkoutStartedRef = useRef(false);
+
+  /**
+   * Record a NEW account's signup consent from the given choice. Best-
+   * effort: consent capture must never block or fail the signup — a write
+   * error is logged, not surfaced. writeConsent only sets the opted-in
+   * columns (both default OFF), so this can't fabricate consent. Reads the
+   * live session for the user id so it works on whichever path just created
+   * the account.
+   */
+  const recordSignupConsent = useCallback(async (choice: ConsentChoice) => {
+    // No opt-in at all → nothing to write, skip the round-trip.
+    if (!choice.research && !choice.marketing) return;
+    try {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) await writeConsent(data.user.id, choice);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[consent] failed to record signup consent:', err);
+    }
+  }, []);
 
   /**
    * Hand a signed-in user off to Stripe for the chosen plan. Fires at most
@@ -125,12 +157,27 @@ export default function Auth() {
   // create-checkout route requires a permanent account — so fall through
   // to the form so they can register/sign in for real.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(async ({ data }) => {
       if (!data.session) return;
       const permanent = data.session.user.is_anonymous !== true;
       // Remember whether we're sitting on an anonymous guest session so the
       // signup path converts in place instead of creating a new user.
       setIsAnonGuest(!permanent);
+
+      // Returning signed-in-and-permanent with a stashed signup consent —
+      // this is the OAuth round-trip return or the email-confirm return.
+      // Write it now (best-effort) and clear the stash so it can't leak to a
+      // later session on a shared machine. writeConsent only sets opted-in
+      // columns and is a no-op if nothing changed, so re-running is safe and
+      // it never overwrites a returning user's prior choice with a default.
+      if (permanent) {
+        const stashed = readStashedSignupConsent();
+        if (stashed.research || stashed.marketing) {
+          void writeConsent(data.session.user.id, stashed);
+        }
+        clearStashedSignupConsent();
+      }
+
       if (checkoutPlan && permanent) {
         void proceedToCheckout(checkoutPlan);
         return;
@@ -219,13 +266,19 @@ export default function Auth() {
       const sessionNow = (data as { session?: unknown }).session ?? null;
       const userNow = (data as { user?: { is_anonymous?: boolean } | null }).user ?? null;
       const nowPermanent = !!sessionNow || (userNow != null && userNow.is_anonymous === false);
+      const consent: ConsentChoice = { research: researchOptIn, marketing: marketingOptIn };
       if (!nowPermanent) {
-        // Email confirmation pending. Keep the checkout intent stashed so it
-        // resumes after the user confirms and returns signed-in.
+        // Email confirmation pending. Stash the checkout intent AND the
+        // consent choice so both resume after the user confirms and returns
+        // signed-in (the session-check effect writes the stashed consent).
         if (checkoutPlan) stashCheckoutIntent(checkoutPlan);
+        stashSignupConsent(consent);
         setConfirmEmail(true);
         return;
       }
+      // Permanent now — record consent for the new account (best-effort,
+      // never blocks the flow).
+      await recordSignupConsent(consent);
       if (checkoutPlan && (await proceedToCheckout(checkoutPlan))) return;
       navigate('/dashboard', { replace: true });
     } else {
@@ -242,7 +295,7 @@ export default function Auth() {
       if (checkoutPlan && (await proceedToCheckout(checkoutPlan))) return;
       navigate('/dashboard', { replace: true });
     }
-  }, [email, password, mode, navigate, checkoutPlan, proceedToCheckout]);
+  }, [email, password, mode, navigate, checkoutPlan, proceedToCheckout, researchOptIn, marketingOptIn, recordSignupConsent]);
 
   const handleForgotPassword = useCallback(async () => {
     if (!email.trim()) {
@@ -268,6 +321,13 @@ export default function Auth() {
     // query string reliably, and the stash is the fallback. Without an
     // intent, land on the dashboard as before.
     if (checkoutPlan) stashCheckoutIntent(checkoutPlan);
+    // Stash the signup consent so it survives the OAuth round-trip and is
+    // written on return. Only in signup mode (a returning user signing in
+    // must not have consent recorded) and only when they opted into
+    // something — an empty stash correctly reads back as no consent.
+    if (mode === 'signup' && (researchOptIn || marketingOptIn)) {
+      stashSignupConsent({ research: researchOptIn, marketing: marketingOptIn });
+    }
     const redirectTo = checkoutPlan
       ? `${window.location.origin}/auth?plan=${checkoutPlan}`
       : `${window.location.origin}/dashboard`;
@@ -293,7 +353,7 @@ export default function Auth() {
     if (err) {
       setError(err.message);
     }
-  }, [checkoutPlan]);
+  }, [checkoutPlan, mode, researchOptIn, marketingOptIn]);
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
@@ -439,6 +499,49 @@ export default function Auth() {
                 </div>
               )}
             </div>
+
+            {/* Optional consent — shown only for a new account (signup mode).
+                Both UNCHECKED by default: an affirmative tick is the only
+                valid consent under GDPR (no pre-ticking) and CASL (express
+                opt-in). Governs whichever signup method the user picks. */}
+            {mode === 'signup' && (
+              <fieldset className="rounded-lg border border-[#2a2a3a] bg-[#0f0f18] px-3 py-2.5">
+                <legend className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[#8b8f99]">
+                  Stay in touch (optional)
+                </legend>
+                <label htmlFor="consent-research" className="flex items-start gap-2.5 py-1 cursor-pointer">
+                  <input
+                    id="consent-research"
+                    type="checkbox"
+                    checked={researchOptIn}
+                    onChange={(e) => setResearchOptIn(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#7c6aed]"
+                  />
+                  <span className="text-[13px] leading-snug text-[#c8cad0]">
+                    Occasionally invite me to a short interview or survey about Postr.
+                    <span className="block text-[12px] text-[#6b7280]">
+                      Turn off anytime in settings. Never affects your access.
+                    </span>
+                  </span>
+                </label>
+                <label htmlFor="consent-marketing" className="flex items-start gap-2.5 py-1 cursor-pointer">
+                  <input
+                    id="consent-marketing"
+                    type="checkbox"
+                    checked={marketingOptIn}
+                    onChange={(e) => setMarketingOptIn(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#7c6aed]"
+                  />
+                  <span className="text-[13px] leading-snug text-[#c8cad0]">
+                    Email me product updates and new features.
+                    <span className="block text-[12px] text-[#6b7280]">
+                      Occasional only. Unsubscribe anytime.
+                    </span>
+                  </span>
+                </label>
+              </fieldset>
+            )}
+
             <button
               type="submit"
               disabled={loading || checkingOut || !email.trim() || !password || (mode === 'signup' && !isPasswordValid(password))}

@@ -15,10 +15,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { supabase } from '@/lib/supabase';
-import {
-  getResearchConsent,
-  setResearchConsent as setResearchConsentRow,
-} from '@/data/researchConsent';
+import { getConsent, writeConsent } from '@/data/consent';
 import { listPosters, deletePoster } from '@/data/posters';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { resetOnboarding } from '@/components/OnboardingTour';
@@ -68,6 +65,7 @@ export default function Profile() {
   const openUploadFlow = usePublishFlowStore((s) => s.openForUpload);
   const publishStep = usePublishFlowStore((s) => s.step);
   const [researchConsent, setResearchConsent] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [savingConsent, setSavingConsent] = useState(false);
   const [presetModalOpen, setPresetModalOpen] = useState(false);
   const [presetCount, setPresetCount] = useState<number>(() => {
@@ -84,9 +82,11 @@ export default function Profile() {
       const { data } = await supabase.auth.getUser();
       setUser(data.user);
       if (data.user) {
-        // Reflect the stored consent so the toggle starts in the right
-        // state. Non-critical: a read failure just leaves it off.
-        setResearchConsent(await getResearchConsent(data.user.id));
+        // Reflect the stored consents so the toggles start in the right
+        // state. Non-critical: a read failure just leaves them off.
+        const consent = await getConsent(data.user.id);
+        setResearchConsent(consent.research);
+        setMarketingConsent(consent.marketing);
       }
       try {
         const posters = await listPosters();
@@ -174,7 +174,7 @@ export default function Profile() {
       if (!user || savingConsent) return;
       setSavingConsent(true);
       setResearchConsent(next); // optimistic
-      const ok = await setResearchConsentRow(user.id, next);
+      const ok = await writeConsent(user.id, { research: next, marketing: marketingConsent });
       if (!ok) {
         setResearchConsent(!next); // revert
         setActionError('Could not save that preference. Please try again.');
@@ -182,7 +182,23 @@ export default function Profile() {
       }
       setSavingConsent(false);
     },
-    [user, savingConsent],
+    [user, savingConsent, marketingConsent],
+  );
+
+  const handleMarketingConsent = useCallback(
+    async (next: boolean) => {
+      if (!user || savingConsent) return;
+      setSavingConsent(true);
+      setMarketingConsent(next); // optimistic
+      const ok = await writeConsent(user.id, { research: researchConsent, marketing: next });
+      if (!ok) {
+        setMarketingConsent(!next); // revert
+        setActionError('Could not save that preference. Please try again.');
+        setTimeout(() => setActionError(null), 3000);
+      }
+      setSavingConsent(false);
+    },
+    [user, savingConsent, researchConsent],
   );
 
   const handleExportData = useCallback(async () => {
@@ -441,36 +457,68 @@ export default function Profile() {
             like the "Create an Account" block above.
           */}
           {!isAnonymous && email && (
-            <div className="flex items-start justify-between gap-3 py-2 border-t border-[#1f1f2e]">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm text-[#c8cad0]">Product-research emails</div>
-                <div className="text-[13px] text-[#6b7280]">
-                  Let us occasionally email you to invite you to a short
-                  interview or survey about Postr. Off by default; turn it off
-                  again anytime. It never affects your access.
+            <>
+              <div className="flex items-start justify-between gap-3 py-2 border-t border-[#1f1f2e]">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-[#c8cad0]">Product-research emails</div>
+                  <div className="text-[13px] text-[#6b7280]">
+                    Let us occasionally email you to invite you to a short
+                    interview or survey about Postr. Turn it on or off anytime.
+                    It never affects your access.
+                  </div>
                 </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={researchConsent}
-                aria-busy={savingConsent}
-                aria-label="Product-research emails"
-                disabled={savingConsent}
-                onClick={() => handleResearchConsent(!researchConsent)}
-                className={
-                  'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ' +
-                  (researchConsent ? 'bg-[#7c6aed]' : 'bg-[#2a2a3a]')
-                }
-              >
-                <span
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={researchConsent}
+                  aria-busy={savingConsent}
+                  aria-label="Product-research emails"
+                  disabled={savingConsent}
+                  onClick={() => handleResearchConsent(!researchConsent)}
                   className={
-                    'inline-block h-4 w-4 transform rounded-full bg-white transition-transform ' +
-                    (researchConsent ? 'translate-x-6' : 'translate-x-1')
+                    'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ' +
+                    (researchConsent ? 'bg-[#7c6aed]' : 'bg-[#2a2a3a]')
                   }
-                />
-              </button>
-            </div>
+                >
+                  <span
+                    className={
+                      'inline-block h-4 w-4 transform rounded-full bg-white transition-transform ' +
+                      (researchConsent ? 'translate-x-6' : 'translate-x-1')
+                    }
+                  />
+                </button>
+              </div>
+              <div className="flex items-start justify-between gap-3 py-2 border-t border-[#1f1f2e]">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-[#c8cad0]">Product-update emails</div>
+                  <div className="text-[13px] text-[#6b7280]">
+                    Occasional emails about new Postr features and updates.
+                    Turn it on or off anytime; unsubscribe links are in every
+                    email too.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={marketingConsent}
+                  aria-busy={savingConsent}
+                  aria-label="Product-update emails"
+                  disabled={savingConsent}
+                  onClick={() => handleMarketingConsent(!marketingConsent)}
+                  className={
+                    'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ' +
+                    (marketingConsent ? 'bg-[#7c6aed]' : 'bg-[#2a2a3a]')
+                  }
+                >
+                  <span
+                    className={
+                      'inline-block h-4 w-4 transform rounded-full bg-white transition-transform ' +
+                      (marketingConsent ? 'translate-x-6' : 'translate-x-1')
+                    }
+                  />
+                </button>
+              </div>
+            </>
           )}
           <div className="py-2 border-t border-[#1f1f2e]">
             <div className="text-sm text-[#c8cad0] mb-2">Checklist templates</div>
