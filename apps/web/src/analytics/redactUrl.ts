@@ -44,38 +44,55 @@ const IDENTIFIER_ROUTES: ReadonlyArray<{ prefix: string; shape: string }> = [
 /** Whole subtrees recorded only as their root. */
 const REDACTED_SUBTREES: readonly string[] = ['/admin'];
 
+/** Origin used when the incoming URL is relative or unparseable. */
+const FALLBACK_ORIGIN = 'https://www.postr.sh';
+
 /**
  * Rewrite a URL before it is sent to analytics.
  *
- * Returns the redacted URL, never null — dropping the event entirely
- * would lose the page-view count too, and the count is the part worth
- * having. Callers pass this to `<Analytics beforeSend>`.
+ * RETURNS AN ABSOLUTE URL, and must keep doing so. Vercel validates
+ * the beacon payload against `^https?://` and rejects anything else
+ * with HTTP 400 — the event is dropped server-side and the dashboard
+ * shows zero. An earlier version returned bare pathnames, which meant
+ * analytics silently collected nothing at all while looking correct
+ * in the client: the script loaded, `window.va` existed, the beacon
+ * fired, and every POST came back 400.
+ *
+ * The origin is preserved rather than invented, so apex vs www stays
+ * visible in the data. Only the PATH is redacted, which is where the
+ * identifiers are.
+ *
+ * Never returns null — dropping the event entirely would lose the
+ * page-view count too, and the count is the part worth having.
+ * Callers pass this to `<Analytics beforeSend>`.
  */
 export function redactUrl(url: string): string {
-  let pathname: string;
+  let parsed: URL;
   try {
     // Vercel passes an absolute URL; the base is a fallback for the
     // relative case so this never throws on malformed input.
-    pathname = new URL(url, 'https://www.postr.sh').pathname;
+    parsed = new URL(url, FALLBACK_ORIGIN);
   } catch {
     // Unparseable input reveals nothing useful and might contain
     // anything — record it as unknown rather than passing it through.
-    return '/[unparseable]';
+    return `${FALLBACK_ORIGIN}/[unparseable]`;
   }
 
+  const origin = /^https?:$/.test(parsed.protocol) ? parsed.origin : FALLBACK_ORIGIN;
+
   for (const { prefix, shape } of IDENTIFIER_ROUTES) {
-    if (pathname === prefix || pathname.startsWith(`${prefix}/`)) {
-      return shape;
+    if (parsed.pathname === prefix || parsed.pathname.startsWith(`${prefix}/`)) {
+      return `${origin}${shape}`;
     }
   }
 
   for (const root of REDACTED_SUBTREES) {
-    if (pathname === root || pathname.startsWith(`${root}/`)) {
-      return `${root}/[redacted]`;
+    if (parsed.pathname === root || parsed.pathname.startsWith(`${root}/`)) {
+      return `${origin}${root}/[redacted]`;
     }
   }
 
   // Everything else is a public route with no identifier: keep the
   // path, drop the query string.
-  return pathname;
+  return `${origin}${parsed.pathname}`;
 }
