@@ -51,6 +51,27 @@ const TOOL_LINKS = [
   },
 ] as const;
 
+/**
+ * The full public nav set, in display order — the tools plus the two
+ * Learn pages.
+ *
+ * Exported and consumed by the dashboard header (pages/Home) and the
+ * admin header (pages/AdminGallery) rather than being retyped there.
+ * Those two had drifted to listing only About, so a signed-in user lost
+ * the standalone tools the moment they left a marketing page. Three
+ * hand-maintained copies of the same list is what caused that drift, so
+ * the list lives here once.
+ */
+export const NAV_LINKS = [
+  ...TOOL_LINKS.map(({ to, label }) => ({ to, label })),
+  { to: '/why-posters', label: 'Why posters' },
+  { to: '/about', label: 'About' },
+] as const;
+
+/** Shared styling for a top-level nav link, `sm:`-gated. */
+export const NAV_LINK_CLASS =
+  'hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline';
+
 export function PublicHeader() {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
@@ -115,29 +136,11 @@ export function PublicHeader() {
           sign-in button, and the footer was the only route to any of
           this. Nav that vanishes is not responsive, it is missing.
         */}
-        {TOOL_LINKS.map((tool) => (
-          <Link
-            key={tool.to}
-            to={tool.to}
-            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
-          >
-            {tool.label}
+        {NAV_LINKS.map((link) => (
+          <Link key={link.to} to={link.to} className={NAV_LINK_CLASS}>
+            {link.label}
           </Link>
         ))}
-
-        <Link
-          to="/why-posters"
-          className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
-        >
-          Why posters
-        </Link>
-
-        <Link
-          to="/about"
-          className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
-        >
-          About
-        </Link>
 
         <MobileNav signedIn={signedIn} onFeedback={() => openFeedback('feature')} />
 
@@ -318,25 +321,21 @@ function MobileNav({
             </li>
           ))}
 
-          <li>
-            <Link
-              to="/why-posters"
-              onClick={() => setOpen(false)}
-              className="block rounded-lg px-3 py-3 text-[14pt] font-medium text-[#c8cad0] no-underline hover:bg-[#1a1a26]"
-            >
-              Why posters
-            </Link>
-          </li>
-
-          <li>
-            <Link
-              to="/about"
-              onClick={() => setOpen(false)}
-              className="block rounded-lg px-3 py-3 text-[14pt] font-medium text-[#c8cad0] no-underline hover:bg-[#1a1a26]"
-            >
-              About
-            </Link>
-          </li>
+          {/* The Learn pages — the entries NAV_LINKS carries beyond the
+              tools, which have their own blurbed rows above. */}
+          {NAV_LINKS.filter(
+            (link) => !TOOL_LINKS.some((tool) => tool.to === link.to),
+          ).map((link) => (
+            <li key={link.to}>
+              <Link
+                to={link.to}
+                onClick={() => setOpen(false)}
+                className="block rounded-lg px-3 py-3 text-[14pt] font-medium text-[#c8cad0] no-underline hover:bg-[#1a1a26]"
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
 
           {/* Feedback is a button on desktop too — it opens the modal
               rather than navigating. Signed-out visitors don't get it

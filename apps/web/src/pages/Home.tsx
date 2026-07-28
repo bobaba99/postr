@@ -19,6 +19,7 @@ import {
 } from '@/data/posters';
 import { seedWelcomePosterIfNeeded } from '@/data/seedWelcomePoster';
 import { Link, useNavigate } from 'react-router';
+import { NAV_LINKS, NAV_LINK_CLASS } from '@/components/PublicHeader';
 import { PosterCard } from '@/components/PosterCard';
 import { NewPosterButton } from '@/components/NewPosterButton';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -153,36 +154,18 @@ export default function Home() {
             </Link>
           )}
           {/*
-            Kept in step with PublicHeader's nav set. The dashboard
-            header had drifted: it listed only About, so a signed-in
-            user lost the two standalone tools the moment they left a
-            marketing page — the same invisibility that prompted
-            adding them to the public header in the first place.
+            Driven by PublicHeader's NAV_LINKS so this header cannot
+            drift from it again. It had: this listed only About, so a
+            signed-in user lost the two standalone tools the moment
+            they left a marketing page — the same invisibility that
+            prompted adding them to the public header in the first
+            place.
           */}
-          <Link
-            to="/paper-to-poster"
-            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
-          >
-            Paper to poster
-          </Link>
-          <Link
-            to="/chart-chooser"
-            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
-          >
-            Plot picker
-          </Link>
-          <Link
-            to="/why-posters"
-            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
-          >
-            Why posters
-          </Link>
-          <Link
-            to="/about"
-            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
-          >
-            About
-          </Link>
+          {NAV_LINKS.map((link) => (
+            <Link key={link.to} to={link.to} className={NAV_LINK_CLASS}>
+              {link.label}
+            </Link>
+          ))}
           {isAdmin && (
             <Link
               to="/admin/gallery"

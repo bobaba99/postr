@@ -123,13 +123,23 @@ export default function WhyPosters() {
               <p className="text-[13pt] leading-relaxed text-[#9ca3af]">
                 {skill.atTheSession}
               </p>
-              <p className="mt-4 border-l-2 border-[#2a2a3a] pl-4 text-[12pt] leading-relaxed text-[#6b7280]">
-                <span className="font-semibold uppercase tracking-[0.15em] text-[#7c6aed]">
+              {/*
+                A real heading + paragraph rather than a span, a <br />,
+                and body text: the label names the paragraph under it, so
+                the relationship should be in the markup and not only in
+                the styling. Body colour is #9ca3af (7.4:1 on this card)
+                — #6b7280 measured 3.89:1 at this size, under the 4.5:1
+                AA floor, and 16px is too small for the large-text
+                exemption. The left border carries the de-emphasis.
+              */}
+              <div className="mt-4 border-l-2 border-[#2a2a3a] pl-4">
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#7c6aed]">
                   Where it shows up again
-                </span>
-                <br />
-                {skill.laterOn}
-              </p>
+                </h3>
+                <p className="mt-1 text-[12pt] leading-relaxed text-[#9ca3af]">
+                  {skill.laterOn}
+                </p>
+              </div>
             </li>
           ))}
         </ul>
@@ -188,9 +198,9 @@ export default function WhyPosters() {
           </h2>
           <p className="mb-6 text-[13pt] leading-relaxed text-[#9ca3af]">
             The skills above come from presenting, not from formatting. Postr
-            exists so the formatting takes an afternoon instead of a week — real
-            print sizes, authors and affiliations that stay in sync, and figures
-            checked for legibility before you get to the print shop.
+            exists so the formatting is not the hard part — real print sizes,
+            authors and affiliations that stay in sync, and figures checked for
+            legibility before you get to the print shop.
           </p>
           <div className="flex flex-wrap gap-3">
             <Link

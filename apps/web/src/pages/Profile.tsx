@@ -481,9 +481,13 @@ export default function Profile() {
                   button in the editor, or the upload button above.
                 </>
               ) : (
-                // The publish entry points this used to name are all gone
-                // while the gallery is offline; pointing at buttons that
-                // no longer render reads as a broken UI.
+                // Defensive, not currently reachable: the section above
+                // only renders when the flag is on OR the user has
+                // entries, so an empty list implies the flag is on. Kept
+                // because the copy above names publish buttons that no
+                // longer render while the gallery is offline, and this
+                // branch is what keeps that honest if the outer
+                // condition ever changes.
                 <>You haven’t published anything to the gallery.</>
               )}
             </div>

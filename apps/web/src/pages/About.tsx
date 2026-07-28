@@ -155,13 +155,16 @@ export default function About() {
             <TimelineRow key={m.id} milestone={m} side={i % 2 === 0 ? 'left' : 'right'} index={i} />
           ))}
         </div>
-
       </section>
 
       {/* Final stop — feedback CTA */}
       <section className="mx-auto w-full max-w-3xl flex-1 px-8 pb-24">
-        <div className="relative overflow-hidden rounded-2xl border border-[#2a2a3a] bg-[#111118] p-10">
-          <div className="relative">
+        {/* `relative overflow-hidden` and the inner `relative` wrapper
+            went with the route squiggle: overflow-hidden existed only to
+            clip it and would now only clip focus rings, and the wrapper
+            only existed to stack content above it. */}
+        <div className="rounded-2xl border border-[#2a2a3a] bg-[#111118] p-10">
+          <div>
             <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.3em] text-[#7c6aed]">
               Shape what ships next
             </div>

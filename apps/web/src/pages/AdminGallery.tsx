@@ -23,6 +23,7 @@ import {
   type GalleryEntryWithUrls,
 } from '@/data/gallery';
 import { PublicFooter } from '@/components/PublicFooter';
+import { NAV_LINKS, NAV_LINK_CLASS } from '@/components/PublicHeader';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
@@ -141,25 +142,17 @@ export default function AdminGallery() {
           </span>
         </Link>
         {/*
-          Nav kept in step with PublicHeader / the dashboard header. This
-          page is a moderation tool, so it stays deliberately sparse —
-          but "back to dashboard" was the only way out, which meant
-          leaving the admin view to reach anything else. The tool links
-          match the set every other header carries.
+          Driven by PublicHeader's NAV_LINKS, same as the dashboard
+          header, so all three carry an identical set. "Back to
+          dashboard" used to be the only way out of this page, which
+          meant leaving the admin view to reach anything else.
         */}
         <div className="flex items-center gap-5">
-          <Link
-            to="/paper-to-poster"
-            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
-          >
-            Paper to poster
-          </Link>
-          <Link
-            to="/chart-chooser"
-            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
-          >
-            Plot picker
-          </Link>
+          {NAV_LINKS.map((link) => (
+            <Link key={link.to} to={link.to} className={NAV_LINK_CLASS}>
+              {link.label}
+            </Link>
+          ))}
           <Link
             to="/dashboard"
             className="text-[14pt] text-[#6b7280] no-underline hover:text-[#c8cad0]"
