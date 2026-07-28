@@ -26,6 +26,7 @@ mm.add(
 );
 
 export { gsap };
+export * from './canAnimate';
 export * from './eases';
 export * from './presets';
 export { useGsapContext } from './useGsapContext';

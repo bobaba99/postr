@@ -9,7 +9,9 @@
  * card ("Shape what ships next") routes the user straight to the
  * feedback modal.
  */
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router';
+import { aboutRoadtrip } from '@/motion/timelines/aboutRoadtrip';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
@@ -77,9 +79,28 @@ export default function About() {
   useDocumentMeta(STATIC_ROUTE_META['/about'] ?? null);
 
   const openFeedback = useFeedbackStore((s) => s.open);
+  const scopeRef = useRef<HTMLElement>(null);
+
+  /*
+    Scroll reveals for the roadtrip. `mm.revert()` kills every
+    ScrollTrigger and clears the inline styles on unmount — without it
+    the triggers would keep measuring detached nodes after navigating
+    away, and a milestone card could be left invisible on return.
+  */
+  useEffect(() => {
+    const scope = scopeRef.current;
+    if (!scope) return;
+    const mm = aboutRoadtrip(scope);
+    return () => {
+      mm.revert();
+    };
+  }, []);
 
   return (
-    <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
+    <main
+      ref={scopeRef}
+      className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]"
+    >
       <PublicHeader />
 
       {/* Hero */}
@@ -112,7 +133,14 @@ export default function About() {
 
       {/* Sun + horizon marker above the road */}
       <div className="relative mx-auto flex max-w-3xl items-center justify-center">
-        <svg width="72" height="72" viewBox="0 0 72 72" fill="none" aria-hidden="true">
+        <svg
+          data-postr-scenery
+          width="72"
+          height="72"
+          viewBox="0 0 72 72"
+          fill="none"
+          aria-hidden="true"
+        >
           <circle cx="36" cy="36" r="14" fill="#7c6aed" opacity="0.9" />
           <circle cx="36" cy="36" r="22" stroke="#7c6aed" strokeWidth="1" opacity="0.35" />
           <circle cx="36" cy="36" r="30" stroke="#7c6aed" strokeWidth="1" opacity="0.2" />
@@ -145,7 +173,14 @@ export default function About() {
             center x=140, valleys mirror too, so the ridgeline is exactly
             symmetric under horizontal flip. */}
         <div className="pointer-events-none mt-8 flex justify-center opacity-40">
-          <svg width="280" height="70" viewBox="0 0 280 70" fill="none" aria-hidden="true">
+          <svg
+            data-postr-scenery
+            width="280"
+            height="70"
+            viewBox="0 0 280 70"
+            fill="none"
+            aria-hidden="true"
+          >
             <path
               d="M0 65 L40 30 L70 48 L100 20 L140 6 L180 20 L210 48 L240 30 L280 65 Z"
               fill="#7c6aed"
@@ -237,15 +272,26 @@ function TimelineRow({
 }) {
   const isLeft = side === 'left';
   return (
-    <div className="relative grid grid-cols-1 items-center gap-6 sm:grid-cols-[1fr_auto_1fr]">
+    /*
+      `data-postr-milestone` carries the SIDE, not just a flag: the
+      scroll reveal slides each card in from its own side of the road,
+      and reading the direction off the DOM keeps the motion and the
+      layout deciding alternation from the same source. Deriving it
+      again in the timeline would mean two places to keep in step.
+    */
+    <div
+      data-postr-milestone={side}
+      className="relative grid grid-cols-1 items-center gap-6 sm:grid-cols-[1fr_auto_1fr]"
+    >
       {/* Left card (only when side === left) */}
       <div className={`${isLeft ? 'sm:block' : 'hidden sm:block'}`}>
-        {isLeft ? <Card milestone={milestone} align="right" /> : null}
+        {isLeft ? <Card milestone={milestone} align="right" animated /> : null}
       </div>
 
       {/* Waypoint marker — sits on top of the dotted road */}
       <div className="relative flex items-center justify-center">
         <svg
+          data-postr-milestone-marker
           width="56"
           height="56"
           viewBox="0 0 56 56"
@@ -271,10 +317,19 @@ function TimelineRow({
 
       {/* Right card (only when side === right) */}
       <div className={`${!isLeft ? 'sm:block' : 'hidden sm:block'}`}>
-        {!isLeft ? <Card milestone={milestone} align="left" /> : null}
+        {!isLeft ? <Card milestone={milestone} align="left" animated /> : null}
       </div>
 
-      {/* Mobile fallback — always show the card below the marker */}
+      {/*
+        Mobile fallback — always show the card below the marker.
+
+        This renders a SECOND copy of the same card; the two are shown
+        and hidden by breakpoint, never both at once. Only the desktop
+        copy is marked `animated`, so the desktop timeline's selector
+        cannot match two nodes for one milestone and slide the hidden
+        one as well. The mobile branch targets the row and animates
+        whichever card is actually visible.
+      */}
       <div className="sm:hidden">
         <Card milestone={milestone} align="left" />
       </div>
@@ -282,9 +337,18 @@ function TimelineRow({
   );
 }
 
-function Card({ milestone, align }: { milestone: Milestone; align: 'left' | 'right' }) {
+function Card({
+  milestone,
+  align,
+  animated = false,
+}: {
+  milestone: Milestone;
+  align: 'left' | 'right';
+  animated?: boolean;
+}) {
   return (
     <div
+      data-postr-milestone-card={animated ? '' : undefined}
       className={`relative rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 ${
         align === 'right' ? 'sm:text-right' : 'sm:text-left'
       }`}

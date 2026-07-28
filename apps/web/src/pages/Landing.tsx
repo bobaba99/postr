@@ -10,9 +10,10 @@
  * guest" again and accidentally create a duplicate anonymous
  * account that orphans their existing posters.
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { supabase } from '@/lib/supabase';
+import { landingEntrance } from '@/motion/timelines/landingEntrance';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
 import { RotatingWord } from '@/components/RotatingWord';
@@ -77,6 +78,7 @@ const HERO_FRICTIONS = [
 export default function Landing() {
   useDocumentMeta(STATIC_ROUTE_META['/'] ?? null, LANDING_JSON_LD);
   const navigate = useNavigate();
+  const scopeRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,24 +91,64 @@ export default function Landing() {
     };
   }, [navigate]);
 
+  /*
+    Entrance + scroll reveals. `mm.revert()` on unmount undoes every
+    tween, ScrollTrigger, and inline style the timelines created — so
+    navigating away and back cannot leave a card stuck at opacity 0,
+    and Strict Mode's double-mount is a no-op rather than a leak.
+
+    useEffect rather than useLayoutEffect: the initial states are set
+    inside the timeline, and running after paint is what lets the
+    hero's first frame land as fully-painted markup. A layout effect
+    would hide the headline before the browser ever showed it, which
+    is the LCP regression this page cannot afford.
+  */
+  useEffect(() => {
+    const scope = scopeRef.current;
+    if (!scope) return;
+    const mm = landingEntrance(scope);
+    return () => {
+      mm.revert();
+    };
+  }, []);
+
   return (
-    <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
+    <main
+      ref={scopeRef}
+      className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]"
+    >
       <PublicHeader />
 
       <section className="mx-auto max-w-3xl px-8 py-24 text-center">
-        <span className="inline-block rounded-full border border-[#7c6aed]/40 bg-[#7c6aed]/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-[#b8a9ff]">
+        <span
+          data-postr-hero-item
+          className="inline-block rounded-full border border-[#7c6aed]/40 bg-[#7c6aed]/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-[#b8a9ff]"
+        >
           Built for researchers
         </span>
-        <h1 className="mt-5 text-4xl font-bold leading-[1.05] tracking-[-0.02em] text-white sm:text-5xl">
+        <h1
+          data-postr-hero-item
+          className="mt-5 text-4xl font-bold leading-[1.05] tracking-[-0.02em] text-white sm:text-5xl"
+        >
           Academic posters,<br />
           <span className="text-[#7c6aed]">without the hassle.</span>
         </h1>
-        <p className="mx-auto mt-6 max-w-[54ch] text-lg leading-relaxed text-[#a3a7b3]">
+        {/*
+          The rotating slot lives inside this paragraph and runs its own
+          CSS cube animation. We animate the PARAGRAPH, never the slot —
+          stacking a GSAP opacity tween on an element that is already
+          mid-rotation is the "third simultaneous effect" the house
+          style warns about, and it made the first turn look dropped.
+        */}
+        <p
+          data-postr-hero-item
+          className="mx-auto mt-6 max-w-[54ch] text-lg leading-relaxed text-[#a3a7b3]"
+        >
           A poster editor that handles{' '}
           <RotatingWord phrases={HERO_FRICTIONS} className="font-medium text-[#c8b6ff]" />{' '}
           so you can work on the science.
         </p>
-        <div className="mt-10 flex items-center justify-center gap-4">
+        <div data-postr-hero-item className="mt-10 flex items-center justify-center gap-4">
           <Link
             to="/auth"
             className="rounded-lg bg-[#7c6aed] px-8 py-3 text-base font-semibold text-white no-underline hover:bg-[#6c5ce7] transition-colors"
@@ -141,7 +183,10 @@ export default function Landing() {
 
       <section className="mx-auto w-full max-w-4xl flex-1 px-8 pb-24">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
+          <div
+            data-postr-reveal
+            className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
+          >
             <div className="text-2xl mb-3">📐</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Smart templates</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
@@ -149,7 +194,10 @@ export default function Landing() {
               APA, SfN, ECNP size presets built in.
             </p>
           </div>
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
+          <div
+            data-postr-reveal
+            className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
+          >
             <div className="text-2xl mb-3">📊</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Figure readability</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
@@ -157,7 +205,10 @@ export default function Landing() {
               at print size. Get a copy-ready fix.
             </p>
           </div>
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
+          <div
+            data-postr-reveal
+            className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
+          >
             <div className="text-2xl mb-3">✍️</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Writing guide</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
@@ -165,7 +216,10 @@ export default function Landing() {
               to follow from intro to conclusion.
             </p>
           </div>
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
+          <div
+            data-postr-reveal
+            className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
+          >
             <div className="text-2xl mb-3">🎞️</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">PowerPoint, both ways</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
@@ -173,7 +227,10 @@ export default function Landing() {
               export one back out with every block still editable.
             </p>
           </div>
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
+          <div
+            data-postr-reveal
+            className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
+          >
             <div className="text-2xl mb-3">📐</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">LaTeX source</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
@@ -181,7 +238,10 @@ export default function Landing() {
               references.bib — keep working in Overleaf if you prefer.
             </p>
           </div>
-          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
+          <div
+            data-postr-reveal
+            className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
+          >
             <div className="text-2xl mb-3">🎨</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Copy a design</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
@@ -249,6 +309,7 @@ function ToolCard({
   return (
     <Link
       to={to}
+      data-postr-reveal
       className="group flex flex-col rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 no-underline transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#7c6aed]"
     >
       <div className="mb-3 text-2xl" aria-hidden="true">
