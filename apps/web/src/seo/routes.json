@@ -52,11 +52,11 @@
     },
     "/cookies": {
       "title": "Cookie Policy | Postr",
-      "description": "Which cookies Postr sets, why, and how to turn the optional ones off. Essential authentication cookies only unless you opt in.",
+      "description": "What Postr stores on your device and what it does not. Essential authentication only — page counting is cookieless, with no persistent identifier.",
       "robots": "index,follow",
       "h1": "Cookies Policy",
       "copy": [
-        "Which cookies Postr sets, why they exist, and how to turn the optional ones off. Postr sets essential authentication cookies only unless you opt in to anything more."
+        "What Postr stores on your device, why, and what it deliberately does not. Postr sets essential authentication storage only. Page views are counted without cookies and without any identifier that persists between visits, so there is nothing optional to opt out of and no consent banner to dismiss."
       ]
     },
     "/terms": {
