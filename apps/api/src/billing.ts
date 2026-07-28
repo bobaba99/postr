@@ -92,14 +92,27 @@ export function createBillingWebhookRouter(deps: BillingDeps = {}): Router {
       }
 
       try {
-        if (event.type === 'checkout.session.completed') {
+        // Fulfill on a completed checkout AND on a delayed-settlement
+        // success. For synchronous (card) payments `checkout.session.
+        // completed` already arrives with payment_status = 'paid'. For an
+        // async method (e.g. a bank debit that Managed Payments may offer),
+        // `completed` can arrive UNPAID and the money confirms later via
+        // `async_payment_succeeded` — without handling that event those
+        // orders would never fulfill. fulfillCheckout guards on
+        // payment_status === 'paid' and is idempotent, so handling both is
+        // safe: the unpaid `completed` is a no-op, the later success grants.
+        if (
+          event.type === 'checkout.session.completed' ||
+          event.type === 'checkout.session.async_payment_succeeded'
+        ) {
           await fulfillCheckout(
             supabase,
             event.data.object as Stripe.Checkout.Session,
           );
         }
-        // Unhandled event types are acknowledged (2xx) so Stripe stops
-        // retrying them — we only act on completed checkouts.
+        // Every other event type (including async_payment_failed) is
+        // acknowledged (2xx) so Stripe stops retrying — we act only on the
+        // two fulfillment-worthy checkout events above.
         return res.json({ received: true });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'fulfillment_failed';
