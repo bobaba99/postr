@@ -41,13 +41,13 @@ export function PublicFooter() {
               on phones this column is the only route to them. */}
           <FooterColumn title="Product">
             <FooterLink to="/">Home</FooterLink>
-            <FooterLink to="/dashboard">My posters</FooterLink>
             <FooterLink to="/paper-to-poster">Paper to poster</FooterLink>
             <FooterLink to="/chart-chooser">Plot picker</FooterLink>
           </FooterColumn>
 
           <FooterColumn title="Learn">
             <FooterLink to="/about">About</FooterLink>
+            <FooterLink to="/why-posters">Why poster sessions</FooterLink>
             <FooterButton onClick={() => openFeedback('other')}>
               Send feedback
             </FooterButton>

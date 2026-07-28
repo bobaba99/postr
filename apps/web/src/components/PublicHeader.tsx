@@ -126,6 +126,13 @@ export function PublicHeader() {
         ))}
 
         <Link
+          to="/why-posters"
+          className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+        >
+          Why posters
+        </Link>
+
+        <Link
           to="/about"
           className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
         >
@@ -310,6 +317,16 @@ function MobileNav({
               </Link>
             </li>
           ))}
+
+          <li>
+            <Link
+              to="/why-posters"
+              onClick={() => setOpen(false)}
+              className="block rounded-lg px-3 py-3 text-[14pt] font-medium text-[#c8cad0] no-underline hover:bg-[#1a1a26]"
+            >
+              Why posters
+            </Link>
+          </li>
 
           <li>
             <Link

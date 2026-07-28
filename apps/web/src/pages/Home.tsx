@@ -152,6 +152,31 @@ export default function Home() {
               Gallery
             </Link>
           )}
+          {/*
+            Kept in step with PublicHeader's nav set. The dashboard
+            header had drifted: it listed only About, so a signed-in
+            user lost the two standalone tools the moment they left a
+            marketing page — the same invisibility that prompted
+            adding them to the public header in the first place.
+          */}
+          <Link
+            to="/paper-to-poster"
+            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+          >
+            Paper to poster
+          </Link>
+          <Link
+            to="/chart-chooser"
+            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+          >
+            Plot picker
+          </Link>
+          <Link
+            to="/why-posters"
+            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+          >
+            Why posters
+          </Link>
           <Link
             to="/about"
             className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"

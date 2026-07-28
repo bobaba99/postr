@@ -140,12 +140,33 @@ export default function AdminGallery() {
             Admin
           </span>
         </Link>
-        <Link
-          to="/dashboard"
-          className="text-sm text-[#6b7280] no-underline hover:text-[#c8cad0]"
-        >
-          ← Back to dashboard
-        </Link>
+        {/*
+          Nav kept in step with PublicHeader / the dashboard header. This
+          page is a moderation tool, so it stays deliberately sparse —
+          but "back to dashboard" was the only way out, which meant
+          leaving the admin view to reach anything else. The tool links
+          match the set every other header carries.
+        */}
+        <div className="flex items-center gap-5">
+          <Link
+            to="/paper-to-poster"
+            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+          >
+            Paper to poster
+          </Link>
+          <Link
+            to="/chart-chooser"
+            className="hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline"
+          >
+            Plot picker
+          </Link>
+          <Link
+            to="/dashboard"
+            className="text-[14pt] text-[#6b7280] no-underline hover:text-[#c8cad0]"
+          >
+            ← Back to dashboard
+          </Link>
+        </div>
       </header>
 
       <section className="mx-auto w-full max-w-6xl flex-1 px-8 py-10">
