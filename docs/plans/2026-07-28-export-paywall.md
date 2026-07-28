@@ -264,10 +264,11 @@ inverts the intent:
   per semester" reintroduces a free-tier quantity cap from a different
   direction. See the unresolved §2 conflict.
 
-**Amendment:** keep the numbers and the message, move the meter onto the
-**pipeline run**.
+**Amendment:** keep the message, move the meter onto the **pipeline
+run**. Allowance set to 10 after modelling (see below) — the original
+proposal was 5, which the cost model showed was saving nothing.
 
-> **5 free manuscript-pipeline runs per semester. $1 per run after.**
+> **10 free manuscript-pipeline runs per semester. $1 per run after.**
 
 - Meters the operation that actually costs money, so the ceiling tracks
   spend instead of accidentally taxing free activity.
@@ -337,32 +338,43 @@ what that figure implied.
    two years, average $15.29. These are rounding errors against the goal
    of buying trust with a founding cohort.
 
-#### Implication: consider raising the free allowance
+#### Allowance raised 5 → 10 (DECIDED 2026-07-28)
 
-`[JUDGEMENT]` Given that the *entire* free allowance for all 100 users
-costs $46 over two years, 5 runs/semester is conservative to the point
-of being pointlessly stingy. The marginal cost of going to 10 or 15
-runs/semester is a few dollars, and it removes almost all risk of a
-founding user hitting a wall and feeling metered — the precise outcome
-the whole grandfather scheme exists to avoid.
+`[EVIDENCE — modelled]` The *entire* free allowance for all 100 users
+across the full two years costs **$46 at 5/semester** and **$92 at
+10/semester** — $1.92 vs $3.84 per month. Doubling the generosity costs
+$46 over two years.
 
-Counter-argument for keeping 5 `[JUDGEMENT]`: a visible ceiling
-establishes that runs are a metered resource *before* the paid tier
-matters, so the later transition is not a surprise. A limit nobody ever
-reaches teaches nothing.
+At that price 5 was conservative to the point of being pointlessly
+stingy: it saved nothing measurable while carrying a real risk that a
+founding user hits a wall and feels metered — the precise outcome the
+grandfather scheme exists to prevent.
 
-**Recommendation:** keep the meter, raise the number to **10/semester**.
-It preserves the "this is metered" signal while making it very unlikely
-any genuine user hits it. Decide before launch.
+`[JUDGEMENT]` The meter is *kept* rather than removed because a visible
+ceiling establishes that runs are a metered resource **before** the paid
+tier matters, so the later transition is not a surprise. 10/semester
+preserves that signal while making it very unlikely a genuine user
+reaches it — at better than two runs a month, exceeding it indicates
+heavy iteration, which is exactly the case where $1 is a fair ask.
+
+**Settled: 10 free pipeline runs per semester, $1 per run after.**
 
 #### Caveats on the above
 
-- `[UNVERIFIED]` The 0.1 cache discount is assumed, not measured.
-  **Prompt caching does not currently work at all**:
-  `buildCondenserUserMessage()` emits the volatile emphasis block
-  *first*, which defeats prefix caching. Until that is reordered, every
-  run is cold — use the $0.0153 figure, not $0.0088. Fixing it is a
-  known open item and would cut repeat-run cost ~43%.
+- `[UNVERIFIED]` The 0.1 cache discount *rate* is assumed, not measured
+  against a live bill.
+- ✅ **Cache ordering FIXED 2026-07-28.** `buildCondenserUserMessage()`
+  previously emitted the volatile emphasis block *first*, putting
+  changing bytes at position zero and defeating prefix caching entirely
+  — the manuscript was re-billed in full on every iteration. It now
+  emits `PANELS` first and `AUTHOR EMPHASIS` last. Measured **91.2% of
+  the message byte-identical** across two runs where every emphasis
+  field differs (~646 prefix tokens plus the ~470-token system prompt).
+  The system prompt was updated to announce the sections in their new
+  order, and `narrativePrompt.test.ts` now pins the ordering — including
+  a test that the cacheable prefix is unchanged when emphasis varies.
+  Instruction text is otherwise untouched, per this module's
+  owner-audited status.
 - `[UNVERIFIED]` Token counts are estimates from the prompt's shape, not
   live API usage data. Re-verify once there is traffic.
 - `[EVIDENCE]` `config.ts` flags `gpt-5.6-luna` ($1.00/$6.00) as the
@@ -511,7 +523,9 @@ they're blocked from.
 | 2026-07-28 | Paywall goes live at ~100 users, not before | Gavin |
 | 2026-07-28 | Founding cohort gets a 2-year term, sized to a master's program | Gavin |
 | 2026-07-28 | Posters created in-term keep editable export permanently, by `created_at` | Gavin |
-| 2026-07-28 | LLM meter: 5 free pipeline RUNS per semester, $1/run after — not per poster | Gavin proposed per-poster; amended on recommendation |
+| 2026-07-28 | LLM meter: free pipeline RUNS per semester, $1/run after — not per poster | Gavin proposed per-poster; amended on recommendation |
+| 2026-07-28 | Allowance set to **10 runs/semester** (up from 5) — full allowance for all 100 users costs $92 over 2 years | Gavin |
+| 2026-07-28 | Prompt cache ordering fixed in `narrative/prompt.ts`; 91.2% cacheable prefix | Gavin |
 
 ---
 
@@ -529,13 +543,14 @@ they're blocked from.
    two-year exposure for the whole cohort is $903 ($37.62/month). The
    earlier `max_tokens: 16_384` figure was the wrong call site (poster
    import, not the pipeline).
-2b. **Raise the free allowance from 5 to 10 runs/semester?** The entire
-   allowance for 100 users over two years costs $46. 5 is conservative
-   to the point of being stingy for no saving. Recommended; needs a
-   decision before launch.
-2c. **Fix prompt-cache ordering.** `buildCondenserUserMessage()` emits
-   the volatile emphasis block first, defeating prefix caching entirely.
-   Reordering it cuts repeat-run cost ~43%. Independently worth doing.
+2b. ~~Raise the free allowance from 5 to 10 runs/semester?~~
+   **DONE 2026-07-28** — set to 10. Costs $92 for all 100 users over the
+   full two years, vs $46 at 5.
+2c. ~~Fix prompt-cache ordering.~~ **DONE 2026-07-28** — `PANELS` now
+   precedes `AUTHOR EMPHASIS`; 91.2% of the message is a stable
+   cacheable prefix. Order is pinned by tests. **Still to verify:** that
+   the provider actually reports cache hits in production, and the real
+   discount rate. The 0.1 assumption is unconfirmed.
 3. **Does the paid tier stand on editable exports alone?** (§3)
    Unresolved until the manuscript-to-presentation pipeline ships. The
    run meter partly answers this — it gives the tier a second axis of

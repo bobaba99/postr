@@ -89,7 +89,15 @@ console.log(`      or ${Math.floor(1 / typical)} typical runs.`);
 // ---------------------------------------------------------------
 // A "semester" here = 4 months, so a 2-year term = 6 semesters.
 const SEMESTERS = 6;
-const FREE_RUNS = 5;
+/**
+ * Raised 5 → 10 on 2026-07-28. The first run of this model showed the
+ * ENTIRE free allowance for all 100 users over the full two years cost
+ * $46 at 5/semester — so the limit was saving nothing while still
+ * risking a founding user hitting a wall. 10 keeps the "runs are
+ * metered" signal (which matters for the later paid transition) while
+ * making it very unlikely a genuine user ever reaches it.
+ */
+const FREE_RUNS = 10;
 const OVERAGE = 1.0;
 
 /**
@@ -180,10 +188,12 @@ console.log(`   = ${Math.round(runsForPain / 100)} runs/user/month across all 10
 // ---------------------------------------------------------------
 // 4. Is the free allowance generous?
 // ---------------------------------------------------------------
-console.log('\n4. IS 5 RUNS/SEMESTER GENEROUS?');
+console.log(`\n4. IS ${FREE_RUNS} RUNS/SEMESTER GENEROUS?`);
 const freeCostPerUser = FREE_RUNS * SEMESTERS * typical;
 console.log(`   Cost of the full free allowance, per user, over 2 years:`);
-console.log(`     5 runs x 6 semesters x ${usd(typical)} = ${usd2(freeCostPerUser)}`);
+console.log(
+  `     ${FREE_RUNS} runs x ${SEMESTERS} semesters x ${usd(typical)} = ${usd2(freeCostPerUser)}`,
+);
 console.log(`   Across all 100 users, if every one exhausted it:`);
 console.log(`     ${usd2(freeCostPerUser * 100)} over 2 years = ${usd2((freeCostPerUser * 100) / 24)}/month`);
 console.log(`\n   -> Giving all 100 users their FULL allowance for the entire`);
@@ -204,11 +214,16 @@ console.log('\n' + '='.repeat(70));
 console.log('NOTES / ASSUMPTIONS (do not quote these as measured)');
 console.log('='.repeat(70));
 console.log(`
- - Cache discount ${CACHE_RATE} is ASSUMED, per condense-cost-model.mjs.
-   Prompt caching also requires reordering buildCondenserUserMessage()
-   to put the volatile emphasis block LAST; it currently emits emphasis
-   first, which defeats the cache entirely. Until that lands, treat
-   every run as COLD — i.e. use the 'typical' not 'cached' figure.
+ - Cache discount ${CACHE_RATE} is ASSUMED (per condense-cost-model.mjs);
+   the discount RATE is unverified against a live bill.
+
+   The ORDERING prerequisite is now DONE (2026-07-28):
+   buildCondenserUserMessage() emits PANELS first and AUTHOR EMPHASIS
+   last, so the manuscript is a stable cacheable prefix across a user's
+   iterations. Measured 91.2% of the message byte-identical when every
+   emphasis field changes (~646 prefix tokens + ~470 system). Before the
+   reorder the volatile block sat at byte zero and the cache could never
+   hit. narrativePrompt.test.ts now pins the order.
 
  - Token counts are estimates from the shipped prompt shape, not
    measured from live API responses. Verify against real usage data
