@@ -6,10 +6,22 @@
  * PIPEDA, and Quebec's Law 25 all cover "cookies and similar
  * technologies", so this policy uses that broader framing.
  *
- * Today Postr only uses strictly-necessary technologies — no analytics,
- * no advertising, no social trackers. Keeping the policy short and
- * honest is intentional; it will grow (and a consent banner will
- * appear) the first time we add anything that requires opt-in.
+ * Postr uses only strictly-necessary DEVICE STORAGE — no advertising,
+ * no social trackers, and nothing optional written to the browser.
+ *
+ * Page views ARE counted, via Vercel Web Analytics (added 2026-07-27).
+ * That is compatible with the above and with the consent promise in
+ * §4 because it stores nothing on the device: no cookie, no
+ * localStorage, no persistent identifier — a visitor is a hash of the
+ * request, discarded after 24h. The ePrivacy Art. 5(3) consent duty
+ * attaches to storing or reading data on the device, so a genuinely
+ * storage-free counter does not trigger it.
+ *
+ * If that ever changes — a real identifier, a cookie, anything
+ * optional written to the browser — the banner promised in §4 is owed,
+ * and this comment is the reminder. `analytics/redactUrl.ts` is the
+ * other half: it strips share-link slugs and poster ids before any
+ * URL is sent.
  */
 import { Link } from 'react-router';
 import { PublicFooter } from '@/components/PublicFooter';
@@ -17,7 +29,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = 'April 10, 2026';
+const LAST_UPDATED = 'July 27, 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Cookies() {
@@ -67,13 +79,17 @@ export default function Cookies() {
 
         <SectionHeading n="3" title="What Postr uses today" />
         <CalloutBox>
-          <strong className="text-[#e2e2e8]">Postr currently uses only strictly-necessary storage.</strong>
+          <strong className="text-[#e2e2e8]">Postr uses only strictly-necessary storage.</strong>
           <br />
           We do not run Google Analytics, Facebook Pixel, advertising trackers,
-          social-media share buttons with tracking, or any other optional
-          technology. No consent banner is shown because none of the entries below
-          require consent under GDPR, the ePrivacy Directive, PIPEDA, or Quebec
-          Law 25.
+          social-media share buttons with tracking, or any other technology that
+          stores something on your device. We do count page views, using Vercel
+          Web Analytics — it sets no cookie, writes nothing to your browser, and
+          cannot recognise you on a second visit or on any other site. No consent
+          banner is shown because none of the entries below require consent under
+          GDPR, the ePrivacy Directive, PIPEDA, or Quebec Law 25 — that duty
+          attaches to storing or reading data on your device, and page counting
+          does neither.
         </CalloutBox>
 
         <Table
@@ -112,21 +128,42 @@ export default function Cookies() {
           Law 25. None of them track you across other sites.
         </Body>
 
-        <SectionHeading n="4" title="What Postr does not use" />
+        <SectionHeading n="4" title="Page counting, and what Postr still does not use" />
+        <Body>
+          Postr counts page views with{' '}
+          <strong className="text-[#e2e2e8]">Vercel Web Analytics</strong>, so we
+          can see which pages people find useful. It is worth being precise about
+          what that does and does not involve. It sets{' '}
+          <strong>no cookie</strong> and writes nothing to your browser. There is
+          no identifier that persists: a visit is counted using a value derived
+          from the request itself and discarded within 24 hours, so a second
+          visit tomorrow is a stranger. Every figure is an aggregate — a count of
+          views on a page, never a record of what you did.
+        </Body>
+        <Body>
+          We also strip the address before it is counted. Poster URLs, share
+          links and admin pages are recorded only as their shape —{' '}
+          <code className="text-[#c8b6ff]">/s/[redacted]</code> rather than the
+          slug you were sent. A share link is a link to unpublished work, and the
+          slug is what opens it, so it never leaves the app. Query strings are
+          discarded entirely.
+        </Body>
         <List
           items={[
             'Advertising cookies — there are no ads on Postr.',
-            'Third-party analytics — no Google Analytics, no Matomo, no PostHog, no Plausible.',
+            'Google Analytics, Matomo, PostHog, Plausible — none of these.',
             'Cross-site tracking or fingerprinting — we do not profile you between visits or across other websites.',
             'Social-media widgets — no Facebook, Twitter, or LinkedIn buttons that phone home.',
             'Persistent identifiers beyond what your authentication session requires.',
+            'Recording of your poster contents, share-link slugs, or query strings in analytics.',
           ]}
         />
         <Body>
-          If we ever add optional analytics or any other non-essential technology,
-          we will update this policy, display a consent banner with equally-visible
-          “Accept” and “Reject” choices, and refrain from setting any non-essential
-          storage until you click “Accept”.
+          If we ever add something that <em>does</em> store or read data on your
+          device for optional purposes, we will update this policy, display a
+          consent banner with equally-visible “Accept” and “Reject” choices, and
+          refrain from setting any non-essential storage until you click
+          “Accept”.
         </Body>
 
         <SectionHeading n="5" title="How to control cookies" />
