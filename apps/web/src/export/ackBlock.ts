@@ -14,7 +14,8 @@
  * nothing — the block genuinely IS a logo.
  */
 import type { Block, PosterDoc } from '@postr/shared';
-import { placeAckMark } from '@/poster/ackPlacement';
+import { placeAckMark, type Rect } from '@/poster/ackPlacement';
+import { M } from '@/poster/constants';
 import { ackMarkDataUri } from './ackMark';
 import { shouldAttribute, type AttributionOptions } from './attribution';
 
@@ -84,4 +85,73 @@ export function ensureAckBlock(
   const block = makeAckBlock(doc, pxPerInch);
   if (!block) return doc;
   return { ...doc, blocks: [...doc.blocks, block] };
+}
+
+/** Axis-aligned overlap, matching `ackPlacement`'s test. */
+function overlaps(a: Rect, b: Rect): boolean {
+  return !(
+    a.x + a.w <= b.x ||
+    b.x + b.w <= a.x ||
+    a.y + a.h <= b.y ||
+    b.y + b.h <= a.y
+  );
+}
+
+/**
+ * Return a doc whose acknowledgement mark is valid for ITS OWN canvas.
+ *
+ * ── Why this exists ──────────────────────────────────────────────
+ * `Block.locked` preserves the mark's identity across whole-list
+ * replacements, and `preserveLocked` restores it verbatim — coordinates
+ * included. That is correct while the canvas is fixed, and wrong the
+ * moment it is not. A rect is only meaningful in the coordinate space
+ * it was computed in: a mark placed at y = 460 on a 36×48 sheet is 112
+ * units past the bottom edge of a 24×36 one, and a mark preserved
+ * through a template swap can land squarely on top of new content.
+ *
+ * So every write that changes `widthIn`/`heightIn`, or that replaces
+ * the block list wholesale, runs the result through here. The mark is
+ * re-placed against the NEW geometry — same block, same id, same
+ * locked flag, new rect — rather than restored from a coordinate space
+ * that no longer exists.
+ *
+ * Idempotent and conservative: a mark that is still legal where it sits
+ * is returned untouched, so a user who deliberately dragged the mark
+ * keeps their position through any change that does not invalidate it.
+ * When the new canvas has nowhere legal at all, the mark is dropped and
+ * the references-line credit carries the acknowledgement alone — the
+ * same degradation `makeAckBlock` already chooses over a bad placement.
+ *
+ * Pure: returns a new doc, never mutates, and never moves any block
+ * other than the acknowledgement mark.
+ */
+export function replaceAckBlock(doc: PosterDoc, pxPerInch = 10): PosterDoc {
+  const existing = doc.blocks.find((b) => b.id === ACK_BLOCK_ID);
+  if (!existing) return doc;
+
+  const canvasW = doc.widthIn * pxPerInch;
+  const canvasH = doc.heightIn * pxPerInch;
+  const others = doc.blocks.filter((b) => b.id !== ACK_BLOCK_ID);
+
+  const stillLegal =
+    existing.x >= M &&
+    existing.y >= M &&
+    existing.x + existing.w <= canvasW - M &&
+    existing.y + existing.h <= canvasH - M &&
+    !others.some((b) => overlaps(existing, b));
+  if (stillLegal) return doc;
+
+  const placement = placeAckMark(others, canvasW, canvasH);
+  if (!placement) return { ...doc, blocks: others };
+
+  return {
+    ...doc,
+    blocks: others.concat({
+      ...existing,
+      x: placement.x,
+      y: placement.y,
+      w: placement.w,
+      h: placement.h,
+    }),
+  };
 }

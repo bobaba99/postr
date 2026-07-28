@@ -71,6 +71,7 @@ import {
 } from './citations';
 import { autoLayout } from './autoLayout';
 import { filterDeletable, preserveLocked } from '@/export/blockLock';
+import { replaceAckBlock } from '@/export/ackBlock';
 import { LAYOUT_TEMPLATES, makeBlocks, type LayoutKey } from './templates';
 import { snap } from './snap';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
@@ -1803,13 +1804,21 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // which would otherwise drop a locked block on the floor. This
   // writes via `updateDoc` (not `setBlocks`), so it bypasses the
   // store's guard and has to call `preserveLocked` itself.
+  //
+  // `preserveLocked` restores the mark VERBATIM — its old rect included
+  // — and that rect belongs to the OLD canvas. `replaceAckBlock` then
+  // re-places it against the new geometry, so a draft started at one
+  // preset and switched before printing cannot end up with the mark off
+  // the sheet or sitting on top of the user's content.
   const changeSize = (key: PosterSizeKey) => {
     const sz = POSTER_SIZES[key]!;
-    updateDoc({
+    const resized = {
+      ...doc,
       widthIn: sz.w,
       heightIn: sz.h,
       blocks: preserveLocked(doc.blocks, makeBlocks('3col', sz.w, sz.h)),
-    });
+    };
+    updateDoc(replaceAckBlock(resized));
     clearSelection();
     setZoom(null);
   };
@@ -2277,7 +2286,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         posterHeightIn={doc.heightIn}
         onChangePosterSize={changeSize}
         onChangeCustomSize={(w, h) => {
-          updateDoc({ widthIn: w, heightIn: h });
+          // A custom size keeps the existing blocks, so the mark is not
+          // dropped — but shrinking the sheet can still strand it past
+          // the new edge. Same re-placement pass as the preset path.
+          updateDoc(replaceAckBlock({ ...doc, widthIn: w, heightIn: h }));
           setZoom(null);
         }}
         showGrid={showGrid}

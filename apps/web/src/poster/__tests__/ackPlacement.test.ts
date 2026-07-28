@@ -63,14 +63,14 @@ describe('placeAckMark — invariants at every size, both orientations', () => {
 
   for (const [sizeName, size] of Object.entries(SIZES)) {
     for (const [scenarioName, blocks] of scenarios) {
-      it(`${sizeName} / ${scenarioName}: never overlaps and never leaves the canvas`, () => {
+      it(`${sizeName} / ${scenarioName}: never overlaps and never leaves the print margin`, () => {
         const placed = placeAckMark(blocks, size.w, size.h);
         if (!placed) return; // a null placement is a valid, safe outcome
-        // On-canvas, exactly.
-        expect(placed.x).toBeGreaterThanOrEqual(0);
-        expect(placed.y).toBeGreaterThanOrEqual(0);
-        expect(placed.x + placed.w).toBeLessThanOrEqual(size.w);
-        expect(placed.y + placed.h).toBeLessThanOrEqual(size.h);
+        // Inside the margin, which is strictly inside the canvas.
+        expect(placed.x).toBeGreaterThanOrEqual(M);
+        expect(placed.y).toBeGreaterThanOrEqual(M);
+        expect(placed.x + placed.w).toBeLessThanOrEqual(size.w - M);
+        expect(placed.y + placed.h).toBeLessThanOrEqual(size.h - M);
         // Clear of every existing block.
         for (const b of blocks) {
           expect(overlaps(placed, b), `overlapped ${b.id}`).toBe(false);
@@ -200,6 +200,75 @@ describe('clustering — the requirement', () => {
     const placed = placeAckMark([l], 480, 360)!;
     expect(placed.strategy).toBe('cluster');
     expect(placed.y).toBeLessThan(100); // up with the logo, not at the foot
+  });
+});
+
+describe('the print margin is a shared bound, not a per-strategy afterthought', () => {
+  const sizes = Object.values(SIZES);
+
+  it('never places a CLUSTERED mark in the trim area, whatever the logo row does', () => {
+    // A logo flush to each edge in turn. Cluster is the PRIMARY
+    // strategy, so these are the cases that previously escaped the
+    // margin entirely — `isFree` only checked raw canvas bounds.
+    const edgeLogos: Array<[string, Block]> = [
+      ['top edge', logo('l1', 200, 0, 6, 6)],
+      ['bottom edge', logo('l1', 200, 354, 6, 6)],
+      ['right edge', logo('l1', 460, 160, 20, 20)],
+      ['left edge', logo('l1', 0, 160, 20, 20)],
+    ];
+    for (const [name, l] of edgeLogos) {
+      const placed = placeAckMark([l], 480, 360);
+      if (!placed) continue; // refusing is safe; escaping the margin is not
+      expect(placed.x, `${name}: x`).toBeGreaterThanOrEqual(M);
+      expect(placed.y, `${name}: y`).toBeGreaterThanOrEqual(M);
+      expect(placed.x + placed.w, `${name}: right`).toBeLessThanOrEqual(480 - M);
+      expect(placed.y + placed.h, `${name}: bottom`).toBeLessThanOrEqual(360 - M);
+      expect(overlaps(placed, l), `${name}: overlapped the logo`).toBe(false);
+    }
+  });
+
+  it('pulls a top-edge logo row INTO the margin band rather than giving up on clustering', () => {
+    // The review's exact case: a 6 × 6 logo at y = 0 previously
+    // yielded the mark at y = 0, flush to the trim.
+    const l = logo('l1', 200, 0, 6, 6);
+    const placed = placeAckMark([l], 480, 360)!;
+    expect(placed.strategy).toBe('cluster');
+    expect(placed.y).toBeGreaterThanOrEqual(M);
+  });
+
+  it('keeps a right-edge logo row inside the right margin', () => {
+    // The review's other case: a logo at x = 460, w = 20 on a
+    // 480-wide canvas previously yielded x = 435 … 455, past 470.
+    const l = logo('l1', 460, 160, 20, 20);
+    const placed = placeAckMark([l], 480, 360);
+    if (placed) expect(placed.x + placed.w).toBeLessThanOrEqual(480 - M);
+  });
+
+  it('holds the margin for BOTH strategies at every size and orientation', () => {
+    const scenarios: Block[][] = [
+      [],
+      [logo('l1', 200, 0, 6, 6)],
+      [logo('l1', 200, 20, 20, 20), logo('l2', 230, 20, 20, 20)],
+      [block({ id: 'ref', type: 'references', x: 0, y: 300, w: 60, h: 60 })],
+    ];
+    for (const size of sizes) {
+      for (const blocks of scenarios) {
+        const placed = placeAckMark(blocks, size.w, size.h);
+        if (!placed) continue;
+        expect(placed.x).toBeGreaterThanOrEqual(M);
+        expect(placed.y).toBeGreaterThanOrEqual(M);
+        expect(placed.x + placed.w).toBeLessThanOrEqual(size.w - M);
+        expect(placed.y + placed.h).toBeLessThanOrEqual(size.h - M);
+      }
+    }
+  });
+
+  it('seats the empty-region fallback inside the foot margin, not on the trim line', () => {
+    // 360 tall: maxY = 338. `snap` would round that to 340, whose
+    // bottom edge (352) overruns the 350 margin line — so the band
+    // gives up the grid, not the margin.
+    const placed = placeAckMark([], 480, 360)!;
+    expect(placed.y + placed.h).toBeLessThanOrEqual(360 - M);
   });
 });
 

@@ -19,7 +19,10 @@
  *
  * ── Invariants, asserted with exact numbers in the tests ─────────
  *   - the returned rect NEVER overlaps any existing block
- *   - the returned rect NEVER leaves the canvas
+ *   - the returned rect NEVER leaves the canvas, and never leaves the
+ *     `M` print margin — both strategies share one placeability test,
+ *     so neither can put the mark in the trim area a large-format
+ *     printer cuts off
  *   - NO other block's x/y/w/h changes — this module is pure and
  *     returns only the new rect; it has no access to the block list
  *     to mutate even if it wanted to
@@ -75,19 +78,45 @@ function overlaps(a: Rect, b: Rect): boolean {
   );
 }
 
-function withinCanvas(r: Rect, canvasW: number, canvasH: number): boolean {
-  return r.x >= 0 && r.y >= 0 && r.x + r.w <= canvasW && r.y + r.h <= canvasH;
+/**
+ * Inside the print margin, not merely inside the sheet.
+ *
+ * Large-format printers routinely trim 0.25–0.5in, so a rect flush to
+ * the canvas edge prints clipped or is lost entirely. `M` is the same
+ * margin every layout template reserves, so a mark inside it sits in
+ * the band a reader already reads as furniture.
+ *
+ * This is the SINGLE placeability bound — both strategies test against
+ * it, so they cannot disagree about what "placeable" means.
+ */
+function withinMargins(r: Rect, canvasW: number, canvasH: number): boolean {
+  return (
+    r.x >= M && r.y >= M && r.x + r.w <= canvasW - M && r.y + r.h <= canvasH - M
+  );
 }
 
-/** A rect is placeable when it is on-canvas and hits nothing. */
+/** A rect is placeable when it is inside the margins and hits nothing. */
 function isFree(
   r: Rect,
   blocks: readonly Block[],
   canvasW: number,
   canvasH: number,
 ): boolean {
-  if (!withinCanvas(r, canvasW, canvasH)) return false;
+  if (!withinMargins(r, canvasW, canvasH)) return false;
   return !blocks.some((b) => overlaps(r, b));
+}
+
+/**
+ * Snap `value` to the grid, then pull it back inside `[lo, hi]`.
+ *
+ * `snap` can round a legal coordinate up past the margin (a bottom-band
+ * y of 338 snaps to 340, which on a 360-tall canvas overruns the 1-inch
+ * foot margin by 2 units). Clamping after snapping keeps the grid
+ * alignment where it is legal and gives up the grid, not the margin,
+ * where it is not.
+ */
+function snapWithin(value: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, snap(value)));
 }
 
 /**
@@ -136,7 +165,11 @@ function placeByCluster(
   const rowTop = Math.min(...row.map((b) => b.y));
   const rowBottom = Math.max(...row.map((b) => b.y + b.h));
   const centreY = (rowTop + rowBottom) / 2;
-  const y = snap(centreY - size / 2);
+  // A logo row hugging the top or bottom trim would otherwise drag the
+  // mark out of the margin band with it. Clamp into the band so the row
+  // still yields an in-margin mark instead of falling through to the
+  // fallback (which would break the cluster the row exists to form).
+  const y = snapWithin(centreY - size / 2, M, canvasH - M - size);
 
   const rightMost = Math.max(...row.map((b) => b.x + b.w));
   const leftMost = Math.min(...row.map((b) => b.x));
@@ -180,7 +213,7 @@ function placeByEmptyRegion(
 
   const maxX = canvasW - M - size;
   const maxY = canvasH - M - size;
-  const bandY = snap(maxY);
+  const bandY = snapWithin(maxY, M, maxY);
 
   // 1. The references column in the bottom margin band.
   const preferred: Rect = { x: M, y: bandY, w: size, h: size };
@@ -191,9 +224,12 @@ function placeByEmptyRegion(
   const step = GAP;
 
   // 2. The rest of the bottom band, left to right.
+  // `isFree` now owns the margin bound, so the scans no longer need
+  // their own inline `> canvasW - M` guards — they clamp instead, which
+  // keeps the last column and the last row reachable rather than
+  // skipping them.
   for (let x = M; x <= maxX; x += step) {
-    const r: Rect = { x: snap(x), y: bandY, w: size, h: size };
-    if (r.x + r.w > canvasW - M) continue;
+    const r: Rect = { x: snapWithin(x, M, maxX), y: bandY, w: size, h: size };
     if (isFree(r, blocks, canvasW, canvasH)) {
       return { ...r, strategy: 'empty-region' };
     }
@@ -202,8 +238,12 @@ function placeByEmptyRegion(
   // 3. Anywhere else, bottom-up.
   for (let y = maxY; y >= M; y -= step) {
     for (let x = M; x <= maxX; x += step) {
-      const r: Rect = { x: snap(x), y: snap(y), w: size, h: size };
-      if (r.x + r.w > canvasW - M || r.y + r.h > canvasH - M) continue;
+      const r: Rect = {
+        x: snapWithin(x, M, maxX),
+        y: snapWithin(y, M, maxY),
+        w: size,
+        h: size,
+      };
       if (isFree(r, blocks, canvasW, canvasH)) {
         return { ...r, strategy: 'empty-region' };
       }
