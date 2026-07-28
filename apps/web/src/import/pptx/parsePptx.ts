@@ -16,6 +16,7 @@ import {
   DEFAULT_HEADING_STYLE,
   DEFAULT_PALETTE,
   DEFAULT_STYLES,
+  FONT_NAMES,
 } from '@/poster/constants';
 import {
   NS_A,
@@ -222,11 +223,29 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
 
 /** Most-used `<a:latin typeface>` on the slide, when it is one of the
  *  curated families; otherwise null so the default applies. */
+/**
+ * The most-used font on the slide, IF we recognise it.
+ *
+ * An imported .pptx is a file from outside this system, so `typeface`
+ * is untrusted input: it is whatever string the authoring tool wrote,
+ * and it flows into a PosterDoc that later gets re-serialised into
+ * exported XML. Returning it verbatim would let a hostile or merely
+ * malformed name (an `&`, a quote, a `<`) travel through the document
+ * and corrupt an export downstream.
+ *
+ * So this is an allowlist, not a sanitiser: a face is accepted only if
+ * it is one of the curated families in `FONT_NAMES`. Anything else —
+ * a font Postr does not ship, or a crafted name — falls back to the
+ * default, which is also the honest outcome, since the editor could
+ * not render an unknown family anyway.
+ */
 function readFontFamily(slide: Document): string | null {
   const counts = new Map<string, number>();
   for (const latin of allEls(slide, NS_A, 'latin')) {
     const face = latin.getAttribute('typeface');
-    if (face) counts.set(face, (counts.get(face) ?? 0) + 1);
+    if (face && FONT_NAMES.includes(face)) {
+      counts.set(face, (counts.get(face) ?? 0) + 1);
+    }
   }
   let best: string | null = null;
   let bestCount = 0;

@@ -12,6 +12,7 @@ import { zipSync } from 'fflate';
 import { exportPosterPptx } from '@/export/pptx/writer';
 import { makeFixtureDoc, baseBlock, TINY_PNG_BYTES } from '@/export/__tests__/fixtures';
 import { EMU_PER_UNIT, emuToUnits, unitsToEmu } from '@/export/units';
+import { DEFAULT_FONT_FAMILY, FONT_NAMES } from '@/poster/constants';
 import { PptxImportError } from '../pptx/ooxml';
 import { parsePptx } from '../pptx/parsePptx';
 import type { PosterDoc } from '@postr/shared';
@@ -276,6 +277,42 @@ describe('unsupported shapes', () => {
  * always writes. The round-trip tests above cannot see these cases
  * because the exporter is their oracle, so they are hand-built here.
  */
+describe('font names from an imported file are untrusted', () => {
+  // A .pptx is a file from outside this system. `typeface` is whatever
+  // the authoring tool wrote, and it lands in a PosterDoc that is later
+  // re-serialised into exported XML — so a name carrying markup could
+  // corrupt an export downstream. readFontFamily allowlists against
+  // FONT_NAMES rather than sanitising, since an unknown family could
+  // not be rendered anyway.
+  const fontShape = (typeface: string) => `
+      <p:sp>
+        <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="7315200" cy="3657600"/></a:xfrm></p:spPr>
+        <p:txBody><a:p><a:r>
+          <a:rPr><a:latin typeface="${typeface}"/></a:rPr>
+          <a:t>Body text</a:t>
+        </a:r></a:p></p:txBody>
+      </p:sp>`;
+
+  it('keeps a font it recognises', () => {
+    const known = FONT_NAMES[0]!;
+    const parsed = parsePptx(makeMinimalPptx(fontShape(known)));
+    expect(parsed.doc.fontFamily).toBe(known);
+  });
+
+  it('falls back to the default for a font it does not ship', () => {
+    const parsed = parsePptx(makeMinimalPptx(fontShape('Comic Sans MS')));
+    expect(parsed.doc.fontFamily).toBe(DEFAULT_FONT_FAMILY);
+  });
+
+  it('never lets a crafted typeface reach the document', () => {
+    // Markup in the name is the case that would corrupt a later export.
+    const hostile = 'Evil&quot;/&gt;&lt;script&gt;x&lt;/script&gt;';
+    const parsed = parsePptx(makeMinimalPptx(fontShape(hostile)));
+    expect(parsed.doc.fontFamily).toBe(DEFAULT_FONT_FAMILY);
+    expect(parsed.doc.fontFamily).not.toContain('script');
+  });
+});
+
 describe('PowerPoint-authored shapes the exporter never emits', () => {
   it('keeps body text whose position lives in the slide layout', () => {
     const bytes = makeMinimalPptx(`
