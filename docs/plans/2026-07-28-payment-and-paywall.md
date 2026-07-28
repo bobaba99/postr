@@ -17,12 +17,14 @@ the paywall waits until ~100 users. It does not. See §1.
 
 Everyone pays from launch. The point is to learn **whether this
 audience pays at all** — a question no amount of modelling answers, and
-which a deferred paywall answers never. Editing and a watermarked PDF
-stay free forever; a **$19 / 4-month term** (or a **$4.99 / 3-decks
-pack**) unlocks the clean editable exports (PPTX + LaTeX) and, once
-Sequence 2 ships, paper-to-talk export. The free/paid line goes on the
-home page as a comparison table so no one meets the wall at export time.
-The founding-cohort benefit is **not dropped — it is deferred**: the
+which a deferred paywall answers never. The editor and all tools, plus a
+watermarked PDF, stay free forever; a **$18.99 / 4-month term** (or a
+**$9.99 / 3-export pack**) unlocks the clean editable exports — **PPTX +
+LaTeX (posters, live today)** and, once Sequence 2 ships, talk export.
+The free/paid line lives on the standalone `/pricing` page as a
+comparison table so no one meets the wall at export time. Provider:
+**Stripe Managed Payments** (a Merchant of Record — §4.3). The
+founding-cohort benefit is **not dropped — it is deferred**: the
 grandfather logic is designed now and granted retroactively at a
 threshold Gavin sets later (§6).
 
@@ -57,23 +59,28 @@ is gated, so there is always a clean signal.
 The canonical free/paid split. This table is also the home-page table
 (§5), so it is written to be shown, not just referenced.
 
-|                                   | **Free** | **Term — $19 / 4 mo** | **Deck pack — $4.99 / 3** |
-|-----------------------------------|:--------:|:---------------------:|:-------------------------:|
-| Editing, all tools, unlimited     |    ✓     |          ✓            |             —             |
-| Poster **PDF** export             | ✓ *(watermark)* |   ✓ *(clean)*  |             —             |
-| Poster **PPTX / LaTeX** export    |    —     |          ✓            |             —             |
-| Paper → poster                    |    ✓     |          ✓            |             —             |
-| Paper → talk: **generate + preview** | ✓ *(free trial)* |    ✓       |             ✓             |
-| Paper → talk: **export** (any format) | —    |          ✓            |          ✓ (×3)           |
+|                                   | **Free** | **Term — $18.99 / 4 mo** | **Export pack — $9.99 / 3** |
+|-----------------------------------|:--------:|:------------------------:|:---------------------------:|
+| Editing, all tools, unlimited     |    ✓     |            ✓             |    ✓ *(free anyway)*        |
+| Poster **PDF** export             | ✓ *(watermark)* |   ✓ *(clean)*     |             —               |
+| Poster **PPTX / LaTeX** export    |    —     |     ✓ *(unlimited)*      |          ✓ (×3)             |
+| Paper → poster                    |    ✓     |            ✓             |             —               |
+| Paper → talk: **generate + preview** *(when built)* | ✓ |        ✓         |             —               |
+| Paper → talk: **export** *(when built)* | —    |     ✓ *(unlimited)*      |          ✓ (counts ×1)      |
 
-**Read the asymmetry deliberately** — it is decided, not an oversight:
+**MODEL CORRECTED 2026-07-28 (Gavin).** Earlier revisions had the pack
+selling *talk exports only* (coming-soon) and treated presentations as
+"no free export". The decided model is simpler: **the paywall gates ALL
+editable exports** — PPTX + LaTeX for posters (live today) and, later,
+talk export. The editor and all tools are free. So:
 
-- A **poster has a free usable output**: the watermarked PDF is
-  conference-ready and hangs on a board. What you pay for is taking it
-  *elsewhere to keep editing* (PPTX/LaTeX).
-- A **presentation has no free export**. Generation and preview are the
-  free trial; every export format is paid, including PDF. The deck is
-  the paid artifact. (Full trial mechanics in Sequence 2.)
+- **The pack sells a live product now** (3 poster exports), not a
+  coming-soon one. When talk export ships it just spends the same credit.
+- A **poster still has a free usable output** — the watermarked PDF. What
+  you pay for is the clean editable formats (PPTX/LaTeX).
+- No talk-specific "free trial" mechanic — talks are gated at export like
+  everything else. (Simpler than the Sequence-2 trial framing; that trial
+  idea is superseded by this.)
 
 **Always free, never metered, stated plainly:** editing, every tool
 (plot picker, readability checker, paper-to-poster), and the watermarked
@@ -153,43 +160,66 @@ Nothing here is built. This is the sequence when it is.
 - `created_at` already exists — no migration needed for grandfathering
   (§6).
 
-### 4.2 — Deck-pack credits (for the $4.99 pack)
+### 4.2 — Export-pack credits (for the $9.99 pack)
 
-- The term is a boolean-ish state (`plan='term'` until
-  `plan_expires_at`). The **pack is a consumable count** and needs its
-  own ledger: `deck_credits int not null default 0` on `users`, or a
-  `credit_ledger` table if per-purchase audit matters. Decision: start
-  with a single column; move to a ledger only if refunds/disputes need
-  per-transaction history.
-- Decrement on a successful paid deck export; never on generation
-  (generation is the free trial).
+**MODEL CLARIFIED 2026-07-28 (Gavin):** the paywall gates **all editable
+exports** — PPTX + LaTeX (posters, which SHIP TODAY) and talk export (when
+paper-to-talk lands). The editor and all tools stay free; the watermarked
+PDF stays free. So the **pack sells export credits and has a live product
+now** (poster exports), not a coming-soon one.
 
-### 4.3 — Payment provider: a Merchant of Record (Polar), NOT plain Stripe
+- The term is a boolean-ish state (`plan='term'` until `plan_expires_at`)
+  = unlimited exports while active. The **pack is a consumable count**:
+  `export_credits int not null default 0` on `users` (named for exports,
+  not "decks", since it covers poster exports too), or a `credit_ledger`
+  table if per-purchase audit matters. Decision: start with a single
+  column; move to a ledger only if refunds/disputes need per-transaction
+  history.
+- **+3** when the pack-purchase webhook fires.
+- **−1** on each successful paid export (PPTX / LaTeX now; talk export
+  later). NOT on generation or editing — those are free.
+- The export button unlocks if: active term OR `export_credits > 0`.
+  Decrement only after the bytes are produced, so a failed export never
+  burns a credit.
 
-**DECIDED (2026-07-28, on research): Polar.** Postr sells worldwide to
-tax-messy jurisdictions (EU VAT etc.) as a solo Canadian founder — so it
-needs a **Merchant of Record** that becomes the legal seller and
-files+remits tax, not a plain gateway. Plain Stripe is NOT an MoR and
-would leave the founder personally liable for EU VAT / US sales tax
-everywhere. Full comparison: `2026-07-28-pricing-and-market-strategy.md`
-and `experiments/payment-providers.html`.
+### 4.3 — Payment provider: Stripe Managed Payments (a Merchant of Record)
 
-Why Polar over the alternatives (all real 2026 pricing):
-- **Polar (Starter, free tier): 5% + $0.50, +1.5% intl.** Full MoR,
-  first-class one-time payments, clean webhook DX for Supabase+Express.
-  Nets ~$17.54 on the $18.99 term, ~$8.99 on the $9.99 pack.
-- **NOT Stripe Managed Payments** — it *is* an MoR but a markup model
-  (3.5% MoR **on top of** 2.9%+$0.30 = ~6.4%+$0.30 domestic, ~8.5–11%
-  intl). Lemon Squeezy (Stripe-owned) now steers new signups to it. The
-  premium over Polar is ~$75–120/yr at 500 sales, ~$210–330/yr at 1,400
-  — small, but no reason to pay it, and Polar is *cheaper on
-  international* (9.1% vs ~11%), which matters for worldwide buyers.
-- **NOT Paddle** — its published rule "products under $10 → contact sales"
+**DECIDED (2026-07-28, on research + owner priority): Stripe Managed
+Payments.** Postr sells worldwide to tax-messy jurisdictions (EU VAT etc.)
+as a solo Canadian founder — so it needs a **Merchant of Record** that
+becomes the legal seller and files+remits tax, not a plain gateway. Plain
+Stripe is NOT an MoR. Full comparison:
+`2026-07-28-pricing-and-market-strategy.md`,
+`experiments/payment-providers.html`, and the Polar deep-dive in
+`experiments/BENCHMARKS.md`.
+
+**Why Managed Payments, and why NOT the cheaper options:** the owner
+explicitly prioritised **maturity, compliance robustness, and MCP / AI-
+agent access over the fee**. On those criteria Stripe wins decisively:
+
+- **Stripe Managed Payments** — Stripe's first-party MoR, actively
+  invested, PCI-L1 + SOC 2 + published DPA + 80+ country tax
+  filing/remittance, and the strongest MCP/agentic story in the field.
+  Cost: **3.5% MoR on top of 2.9%+$0.30 = ~6.4%+$0.30 domestic, ~8.5–11%
+  intl.** Nets ~$17.47 on the $18.99 term, ~$9.05 on the $9.99 pack.
+- **NOT classic Lemon Squeezy** — also Stripe-owned and cheaper (5%+$0.50),
+  and still gettable if you decline the Managed Payments upsell — but
+  Stripe steers new signups *off* it, so it's a wind-down product. Building
+  on it trades ~1.4%/sale for a maturity risk the owner chose to avoid.
+- **NOT Polar** — cheapest and best on international with a first-class
+  MCP, BUT Seed-stage (2022, $10M seed only), **Canada GST/HST
+  registration unconfirmed on its own docs**, no published SOC 2/DPA, and
+  documented payout-hold + slow-support complaints. Rejected on the
+  maturity/compliance priority, not the fee. (Revisit as a cheaper
+  graduation-*down* option only if fees ever dominate; both ride Stripe
+  underneath so migration isn't a rebuild.)
+- **NOT Paddle** — its "products under $10 → contact sales" rule
   disqualifies the $9.99 pack.
-- Classic Lemon Squeezy (5%+$0.50) still works if Polar's maturity is a
-  concern; Dodo Payments (4%+$0.40, 220+ countries) is the widest-reach
-  fallback. Do a due-diligence pass on Polar's uptime before committing
-  production revenue.
+
+**Acknowledged trade-off:** the Managed Payments premium over the cheapest
+viable MoR is ~$75–330/yr at launch volumes, and it's a *markup* model so
+the gap widens with international volume. Accepted as the price of a mature,
+well-supported, compliance-solid MoR — the owner's stated priority.
 
 The mechanics are provider-agnostic and unchanged by the choice:
 - **Not a subscription** — the $18.99 is a **term**, a one-time payment
