@@ -28,9 +28,9 @@ import type {
  */
 export const CONDENSER_SYSTEM_PROMPT = `You condense manuscript excerpts into poster panel text for an academic research poster.
 
-You will receive:
-- A list of PANELS. Each panel has a role name, a HARD word budget, and source text taken verbatim from the author's manuscript.
-- The author's stated EMPHASIS: their own one-sentence takeaway, their preferred finding order, the audience, and what the poster is for.
+You will receive, in this order:
+1. A list of PANELS. Each panel has a role name, a HARD word budget, and source text taken verbatim from the author's manuscript.
+2. The author's stated EMPHASIS: their own one-sentence takeaway, their preferred finding order, the audience, and what the poster is for. The emphasis arrives AFTER the panels and applies to all of them — read it before writing anything.
 
 Rules, in priority order:
 1. NEVER exceed a panel's word budget. Shorter is fine; over is a failure. Do not compensate by inventing abbreviations that lose meaning.
@@ -93,6 +93,31 @@ function audienceLine(emphasis: CondenseEmphasis): string {
 /**
  * Build the user message. All budgets are injected as data — the
  * numbers come from the rubric via the request, never hard-coded here.
+ *
+ * ORDER IS LOAD-BEARING, FOR CACHING — do not reorder these sections.
+ *
+ * Prompt caching keys on the longest matching PREFIX of a request. The
+ * whole point of the manuscript pipeline is that a user re-runs it on
+ * the SAME manuscript while adjusting their emphasis, so the ideal
+ * split is:
+ *
+ *   stable, large  → PANELS   (~2500 tok of manuscript, identical
+ *                              across every iteration)  ......... FIRST
+ *   volatile, small→ EMPHASIS (~120 tok, changes every iteration) . LAST
+ *
+ * This module previously emitted EMPHASIS first. Because the volatile
+ * block sat at the head of the message, every iteration produced a
+ * different prefix from byte one and the cache never hit — the
+ * manuscript was re-billed at full input rate on every single run.
+ * Modelled at ~43% of repeat-run cost thrown away
+ * (docs/plans/experiments/founding-cohort-cost-model.mjs).
+ *
+ * Putting PANELS first makes the manuscript a stable cacheable prefix
+ * across a user's iterations. The instructions themselves are unchanged
+ * — this is purely a reordering of the same content, so the model sees
+ * identical information. The system prompt already tells it both
+ * sections are coming, and the EMPHASIS block is explicitly framed
+ * below as applying to the panels above.
  */
 export function buildCondenserUserMessage(
   roles: CondenseRoleInput[],
@@ -101,21 +126,7 @@ export function buildCondenserUserMessage(
 ): string {
   const parts: string[] = [];
 
-  parts.push('AUTHOR EMPHASIS');
-  parts.push(
-    emphasis.takeaway
-      ? `- The one thing a reader should remember: "${emphasis.takeaway}"`
-      : '- The author did not state a takeaway; derive it faithfully from the source.',
-  );
-  if (emphasis.rankedFindings.length > 0) {
-    parts.push('- Findings in the author\'s preferred order:');
-    for (const [i, finding] of emphasis.rankedFindings.entries()) {
-      parts.push(`  ${i + 1}. ${finding}`);
-    }
-  }
-  parts.push(`- Audience: ${audienceLine(emphasis)}.`);
-  parts.push(`- The poster is for: ${PURPOSE_DESCRIPTIONS[emphasis.purpose]}.`);
-  parts.push('');
+  // ── Cacheable prefix: the manuscript. Identical across iterations.
   parts.push('PANELS');
 
   for (const role of roles) {
@@ -130,6 +141,25 @@ export function buildCondenserUserMessage(
     );
     parts.push(pin.sourceText);
   }
+
+  // ── Volatile suffix: the author's emphasis. Changes every iteration,
+  //    so everything above it stays a stable cache prefix.
+  parts.push('');
+  parts.push('AUTHOR EMPHASIS');
+  parts.push('Apply the following to the panels above.');
+  parts.push(
+    emphasis.takeaway
+      ? `- The one thing a reader should remember: "${emphasis.takeaway}"`
+      : '- The author did not state a takeaway; derive it faithfully from the source.',
+  );
+  if (emphasis.rankedFindings.length > 0) {
+    parts.push('- Findings in the author\'s preferred order:');
+    for (const [i, finding] of emphasis.rankedFindings.entries()) {
+      parts.push(`  ${i + 1}. ${finding}`);
+    }
+  }
+  parts.push(`- Audience: ${audienceLine(emphasis)}.`);
+  parts.push(`- The poster is for: ${PURPOSE_DESCRIPTIONS[emphasis.purpose]}.`);
 
   return parts.join('\n');
 }

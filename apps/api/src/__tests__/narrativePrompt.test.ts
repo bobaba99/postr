@@ -120,3 +120,66 @@ describe('the custom audience is quoted as data, not instructions', () => {
     expect(message.match(/^PANELS$/gm)).toHaveLength(1);
   });
 });
+
+/**
+ * Section order is a CACHING contract, not a style preference.
+ *
+ * Prompt caching keys on the longest matching prefix. Users re-run the
+ * pipeline on the same manuscript while adjusting emphasis, so the
+ * manuscript must sit at the FRONT (stable across iterations) and the
+ * emphasis at the BACK (changes every time). Emitting emphasis first —
+ * which this module used to do — puts volatile bytes at position zero
+ * and the cache never hits, re-billing the whole manuscript on every
+ * run at roughly 43% more than necessary.
+ *
+ * These tests fail if anyone reorders the message back.
+ */
+describe('message order keeps the manuscript cacheable', () => {
+  it('puts PANELS before AUTHOR EMPHASIS', () => {
+    const message = build({});
+    const panels = message.indexOf('PANELS');
+    const emphasis = message.indexOf('AUTHOR EMPHASIS');
+
+    expect(panels).toBeGreaterThanOrEqual(0);
+    expect(emphasis).toBeGreaterThanOrEqual(0);
+    expect(panels).toBeLessThan(emphasis);
+  });
+
+  it('starts the message with the stable section', () => {
+    // Not merely "before" — the manuscript must be the very first
+    // bytes, or the cacheable prefix is shortened by whatever precedes
+    // it.
+    expect(build({}).startsWith('PANELS')).toBe(true);
+  });
+
+  it('keeps the volatile emphasis fields out of the cacheable prefix', () => {
+    // Everything up to AUTHOR EMPHASIS is the prefix that must be
+    // byte-identical across two runs on one manuscript. Vary every
+    // emphasis field and assert that prefix does not move.
+    const a = build({
+      takeaway: 'First framing.',
+      audience: 'specialists',
+      purpose: 'committee',
+      rankedFindings: ['alpha', 'beta'],
+    });
+    const b = build({
+      takeaway: 'A completely different framing.',
+      audience: 'children',
+      purpose: 'job-market',
+      rankedFindings: ['gamma'],
+    });
+
+    const prefixOf = (m: string) => m.slice(0, m.indexOf('AUTHOR EMPHASIS'));
+    expect(prefixOf(a)).toBe(prefixOf(b));
+    // Guard against the assertion passing on an empty prefix.
+    expect(prefixOf(a).length).toBeGreaterThan(0);
+    expect(prefixOf(a)).toContain('X matters.');
+  });
+
+  it('tells the model the emphasis applies to the panels above it', () => {
+    // Reordering without this line would leave the emphasis reading as
+    // an afterthought rather than as instructions for the panels.
+    const message = build({});
+    expect(message).toMatch(/Apply the following to the panels above\./);
+  });
+});
