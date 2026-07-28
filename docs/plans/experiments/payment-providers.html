@@ -1,0 +1,361 @@
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Postr — Payment Provider Comparison</title>
+<style>
+  :root {
+    --bg: #f7f6fb;
+    --panel: #ffffff;
+    --panel-2: #f2f0f9;
+    --ink: #1b1930;
+    --ink-soft: #56526e;
+    --ink-faint: #8b87a4;
+    --line: #e4e1ee;
+    --accent: #6f5ce6;
+    --accent-soft: #efeafc;
+    --win: #1f9d6b;
+    --win-soft: #e3f5ec;
+    --warn: #c98a1e;
+    --warn-soft: #f9f0dd;
+    --bad: #d0464f;
+    --bad-soft: #fbe6e8;
+    --shadow: 0 1px 2px rgba(27,25,48,.04), 0 10px 30px rgba(27,25,48,.07);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#111019; --panel:#191725; --panel-2:#201d30; --ink:#eeedf6;
+      --ink-soft:#aba7c4; --ink-faint:#726d90; --line:#2a2740;
+      --accent:#9585f1; --accent-soft:#241f3a;
+      --win:#4cc48c; --win-soft:#16281f; --warn:#e0a94a; --warn-soft:#2a2113;
+      --bad:#e8646c; --bad-soft:#2b1719;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 34px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="light"]{--bg:#f7f6fb;--panel:#fff;--panel-2:#f2f0f9;--ink:#1b1930;--ink-soft:#56526e;--ink-faint:#8b87a4;--line:#e4e1ee;--accent:#6f5ce6;--accent-soft:#efeafc;--win:#1f9d6b;--win-soft:#e3f5ec;--warn:#c98a1e;--warn-soft:#f9f0dd;--bad:#d0464f;--bad-soft:#fbe6e8;--shadow:0 1px 2px rgba(27,25,48,.04),0 10px 30px rgba(27,25,48,.07);}
+  :root[data-theme="dark"]{--bg:#111019;--panel:#191725;--panel-2:#201d30;--ink:#eeedf6;--ink-soft:#aba7c4;--ink-faint:#726d90;--line:#2a2740;--accent:#9585f1;--accent-soft:#241f3a;--win:#4cc48c;--win-soft:#16281f;--warn:#e0a94a;--warn-soft:#2a2113;--bad:#e8646c;--bad-soft:#2b1719;--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4);}
+
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1140px; margin:0 auto; padding:32px 22px 80px; }
+
+  .eyebrow { font-family:var(--mono); font-size:12px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--accent); font-weight:600; margin-bottom:10px; }
+  h1 { font-size:clamp(28px,4.2vw,42px); line-height:1.06; margin:0 0 12px;
+    letter-spacing:-0.025em; font-weight:700; text-wrap:balance; }
+  .lede { color:var(--ink-soft); font-size:16px; max-width:64ch; margin:0; }
+  .lede b { color:var(--ink); font-weight:600; }
+  .theme-btn { position:absolute; top:26px; right:22px; background:var(--panel);
+    border:1px solid var(--line); color:var(--ink-soft); border-radius:9px;
+    width:38px; height:38px; cursor:pointer; font-size:15px; box-shadow:var(--shadow); }
+  .theme-btn:hover { color:var(--accent); border-color:var(--accent); }
+
+  /* ── Verdict ─────────────────────────────── */
+  .verdict { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:14px; margin:26px 0 18px; }
+  .vcard { background:var(--panel); border:1px solid var(--line); border-radius:16px;
+    padding:20px 22px; box-shadow:var(--shadow); position:relative; overflow:hidden; }
+  .vcard .rail { position:absolute; left:0; top:0; bottom:0; width:4px; }
+  .vcard.pick .rail { background:var(--win); }
+  .vcard.alt .rail { background:var(--accent); }
+  .vcard.avoid .rail { background:var(--bad); }
+  .vcard .tagline { font-family:var(--mono); font-size:11px; letter-spacing:.1em;
+    text-transform:uppercase; margin-bottom:8px; font-weight:600; }
+  .vcard.pick .tagline { color:var(--win); }
+  .vcard.alt .tagline { color:var(--accent); }
+  .vcard.avoid .tagline { color:var(--bad); }
+  .vcard .name { font-size:22px; font-weight:700; letter-spacing:-0.02em; margin-bottom:6px; }
+  .vcard .why { font-size:13.5px; color:var(--ink-soft); line-height:1.5; }
+  .vcard.avoid .why { font-size:12.5px; }
+  .vcard .why b { color:var(--ink); font-weight:600; }
+
+  /* ── The axis callout ───────────────────── */
+  .axis { background:var(--accent-soft); border:1px solid var(--line); border-left:4px solid var(--accent);
+    border-radius:12px; padding:18px 22px; margin:20px 0 30px; }
+  .axis h2 { font-size:15px; margin:0 0 8px; color:var(--ink); font-weight:700; }
+  .axis p { margin:0; font-size:14px; color:var(--ink-soft); line-height:1.55; }
+  .axis p b { color:var(--ink); font-weight:600; }
+  .axis .mor { color:var(--win); font-weight:700; }
+  .axis .gw { color:var(--bad); font-weight:700; }
+
+  /* ── Section head ───────────────────────── */
+  h2.sec { font-size:13px; text-transform:uppercase; letter-spacing:.1em; font-family:var(--mono);
+    color:var(--ink-faint); font-weight:600; margin:34px 0 14px; }
+
+  /* ── Table ──────────────────────────────── */
+  .tbl-scroll { overflow-x:auto; border:1px solid var(--line); border-radius:14px;
+    background:var(--panel); box-shadow:var(--shadow); }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; min-width:820px; }
+  thead th { position:sticky; top:0; background:var(--panel-2); text-align:left;
+    padding:13px 14px; font-family:var(--mono); font-size:11px; text-transform:uppercase;
+    letter-spacing:.05em; color:var(--ink-faint); font-weight:600; border-bottom:1px solid var(--line);
+    white-space:nowrap; }
+  tbody td { padding:13px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tbody tr:last-child td { border-bottom:none; }
+  tbody tr.pick { background:color-mix(in srgb, var(--win-soft) 55%, transparent); }
+  tbody tr.pick td:first-child { box-shadow:inset 3px 0 0 var(--win); }
+  tbody tr.alt td:first-child { box-shadow:inset 3px 0 0 var(--accent); }
+  .prov { font-weight:700; font-size:14.5px; white-space:nowrap; }
+  .prov .note { display:block; font-weight:400; font-size:11.5px; color:var(--ink-faint);
+    margin-top:2px; white-space:normal; font-family:var(--sans); letter-spacing:0; text-transform:none; }
+  .num { font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .eff { font-family:var(--mono); font-variant-numeric:tabular-nums; font-weight:600; }
+  .eff .pct { color:var(--ink-faint); font-weight:400; font-size:12px; }
+
+  .chip { display:inline-block; font-family:var(--mono); font-size:11px; font-weight:700;
+    padding:2px 8px; border-radius:20px; letter-spacing:.03em; white-space:nowrap; }
+  .chip.mor { background:var(--win-soft); color:var(--win); }
+  .chip.no { background:var(--bad-soft); color:var(--bad); }
+  .chip.yes { background:var(--win-soft); color:var(--win); }
+  .chip.warn { background:var(--warn-soft); color:var(--warn); }
+
+  /* ── Fee-on-ticket visual ───────────────── */
+  .bars { margin-top:6px; }
+  .barrow { display:grid; grid-template-columns:130px 1fr; gap:12px; align-items:center;
+    padding:8px 0; border-bottom:1px solid var(--line); }
+  .barrow:last-child { border-bottom:none; }
+  .barrow .lbl { font-size:13px; font-weight:600; }
+  .barrow .lbl .sub { display:block; font-size:11px; color:var(--ink-faint); font-weight:400; }
+  .track { position:relative; height:26px; background:var(--panel-2); border-radius:6px; overflow:hidden; }
+  .fill { position:absolute; left:0; top:0; bottom:0; border-radius:6px; display:flex;
+    align-items:center; justify-content:flex-end; padding-right:8px; font-family:var(--mono);
+    font-size:11px; font-weight:700; color:#fff; }
+
+  /* ── Notes cards ────────────────────────── */
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px;
+    padding:18px 20px; box-shadow:var(--shadow); }
+  .card h3 { margin:0 0 8px; font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .card p, .card li { font-size:13px; color:var(--ink-soft); line-height:1.55; }
+  .card ul { margin:0; padding-left:18px; }
+  .card li { margin-bottom:6px; }
+  .dot { width:9px; height:9px; border-radius:3px; display:inline-block; }
+
+  .foot { margin-top:30px; font-size:12px; color:var(--ink-faint); line-height:1.55; max-width:80ch; }
+  .foot b { color:var(--ink-soft); }
+
+  @media (max-width:840px){
+    .verdict{grid-template-columns:1fr;} .cards{grid-template-columns:1fr;}
+    .theme-btn{position:static;margin-bottom:14px;}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+
+<button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐</button>
+<div class="wrap">
+  <div class="eyebrow">Postr · payments · July 2026</div>
+  <h1>Who should collect the $19.</h1>
+  <p class="lede">Six providers, judged for <b>Postr's actual case</b>: a $19 one-time term and a
+    $4.99 pack, sold to researchers <b>worldwide</b>, by a <b>solo Canadian founder</b> on a
+    Supabase stack. At this size the real question isn't the fee — it's <b>who is the legal
+    seller</b>, and therefore who owns the worldwide tax mess.</p>
+
+  <div class="verdict">
+    <div class="vcard pick">
+      <div class="rail"></div>
+      <div class="tagline">✓ Recommended</div>
+      <div class="name">Lemon Squeezy</div>
+      <div class="why">Full <b>Merchant of Record</b> — your worldwide VAT/sales-tax liability
+        disappears. Native one-time payments, <b>no seller-approval gauntlet</b>, and it's
+        <b>Stripe-owned</b> (2024), so low platform risk. The most mature webhook→Supabase path
+        for flipping your <code>plan</code> column. 5% + $0.50.</div>
+    </div>
+    <div class="vcard alt">
+      <div class="rail"></div>
+      <div class="tagline">Runner-up</div>
+      <div class="name">Polar</div>
+      <div class="why">Same MoR benefit, most <b>developer-native</b> API. Cheaper on paid tiers
+        as you scale. Trade-off: <b>youngest</b>, pricing recently in flux.</div>
+    </div>
+    <div class="vcard avoid">
+      <div class="rail"></div>
+      <div class="tagline">✕ Not for launch</div>
+      <div class="name">Plain Stripe</div>
+      <div class="why">Cheapest fees, but <b>not</b> an MoR — leaves <b>you</b> liable for EU VAT
+        &amp; US sales tax everywhere. That's the whole problem you're avoiding. Also skip:
+        Shopify (wrong tool), Gumroad (~15–23% at your prices), Paddle (approval friction,
+        sub-$10 custom pricing).</div>
+    </div>
+  </div>
+
+  <div class="axis">
+    <h2>The one axis that decides it: Merchant of Record vs. gateway</h2>
+    <p>When a Munich grad student buys your $19 term, EU rules charge <b>German VAT (19%) from the
+      first euro</b> — there's no small-seller threshold for a non-EU seller. With a
+      <span class="gw">plain gateway (Stripe)</span> <b>you</b> register for EU VAT OSS, file
+      quarterly, track US state nexus, and carry the liability. With a
+      <span class="mor">Merchant of Record</span> the provider <b>is</b> the legal seller — it
+      charges, files, and remits that VAT; your tax life becomes "declare the payouts as Canadian
+      income." The ~2–3 pt fee premium is trivial against avoiding even one EU VAT registration
+      (~€2–5k). <b>For this business, choose an MoR.</b></p>
+  </div>
+
+  <h2 class="sec">The matrix</h2>
+  <div class="tbl-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Provider</th>
+          <th>Base fee</th>
+          <th>Intl card</th>
+          <th>Merchant of Record</th>
+          <th>Handles your tax?</th>
+          <th>On $19</th>
+          <th>On $4.99</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="pick">
+          <td class="prov">Lemon Squeezy<span class="note">Stripe-owned · one-time OK</span></td>
+          <td class="num">5% + $0.50</td>
+          <td class="num">+1.5%</td>
+          <td><span class="chip mor">MoR ✓</span></td>
+          <td><span class="chip yes">Files &amp; remits</span></td>
+          <td class="eff">$1.45 <span class="pct">7.6%</span></td>
+          <td class="eff">$0.75 <span class="pct">15%</span></td>
+        </tr>
+        <tr class="alt">
+          <td class="prov">Polar<span class="note">dev-first · cheaper on Pro</span></td>
+          <td class="num">5% + $0.50 <span style="color:var(--ink-faint)">(free tier)</span></td>
+          <td class="num">+1.5%</td>
+          <td><span class="chip mor">MoR ✓</span></td>
+          <td><span class="chip yes">Files &amp; remits</span></td>
+          <td class="eff">$1.45 <span class="pct">7.6%</span></td>
+          <td class="eff">$0.75 <span class="pct">15%</span></td>
+        </tr>
+        <tr>
+          <td class="prov">Paddle<span class="note">approval gauntlet · &lt;$10 custom pricing</span></td>
+          <td class="num">5% + $0.50</td>
+          <td class="num">blended</td>
+          <td><span class="chip mor">MoR ✓</span></td>
+          <td><span class="chip yes">Files &amp; remits</span></td>
+          <td class="eff">$1.45 <span class="pct">7.6%</span></td>
+          <td class="eff"><span style="color:var(--warn)">contact sales</span></td>
+        </tr>
+        <tr>
+          <td class="prov">Stripe<span class="note">best DX · cheapest fee</span></td>
+          <td class="num">2.9% + $0.30</td>
+          <td class="num">+0.8% · +2% FX</td>
+          <td><span class="chip no">Not MoR</span></td>
+          <td><span class="chip no">You do — solo</span></td>
+          <td class="eff">$0.85 <span class="pct">4.5%</span></td>
+          <td class="eff">$0.44 <span class="pct">8.9%</span></td>
+        </tr>
+        <tr>
+          <td class="prov">Stripe + Tax<span class="note">calculates only, no remit</span></td>
+          <td class="num">2.9% + $0.30 + 0.5%</td>
+          <td class="num">+0.8% · +2% FX</td>
+          <td><span class="chip no">Not MoR</span></td>
+          <td><span class="chip warn">Calc only — you file</span></td>
+          <td class="eff">$0.95 <span class="pct">5.0%</span></td>
+          <td class="eff">$0.46 <span class="pct">9.2%</span></td>
+        </tr>
+        <tr>
+          <td class="prov">Gumroad<span class="note">storefront-oriented</span></td>
+          <td class="num">10% + $0.50 + card</td>
+          <td class="num">blended ~13%</td>
+          <td><span class="chip mor">MoR ✓</span></td>
+          <td><span class="chip yes">Files &amp; remits</span></td>
+          <td class="eff">$2.75 <span class="pct">14.5%</span></td>
+          <td class="eff">$1.14 <span class="pct">23%</span></td>
+        </tr>
+        <tr>
+          <td class="prov">Shopify / Shop Pay<span class="note">commerce storefront, not SaaS</span></td>
+          <td class="num">$39/mo + 2.9% + 30¢</td>
+          <td class="num">varies</td>
+          <td><span class="chip no">Not MoR</span></td>
+          <td><span class="chip no">You do</span></td>
+          <td class="eff" colspan="2" style="color:var(--bad)">Wrong tool — fixed monthly fee dominates at low volume</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:12px;color:var(--ink-faint);margin-top:10px;">
+    Base rates are sourced current figures; the $19 / $4.99 effective costs are calculated from
+    them (domestic card — add the intl surcharge for EU buyers). MoR statuses confirmed against
+    each provider's docs.</p>
+
+  <h2 class="sec">Why the $4.99 pack is the fee trap</h2>
+  <div class="card" style="box-shadow:var(--shadow);">
+    <p style="margin:0 0 12px;">The fixed <b>per-transaction</b> fee ($0.30–$0.50) is a huge slice of a
+      small sale. On $4.99 an MoR lands near <b>15% effective</b>; on the $19 term the same
+      provider is only ~7.6%, because the fixed fee is a smaller fraction. Take-home per sale:</p>
+    <div class="bars" id="bars"></div>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--ink-faint);">
+      <b>Pricing implication:</b> the $4.99 consumable is structurally fee-inefficient on
+      <em>any</em> provider. Steer buyers toward the $19 term, or offer a bigger deck bundle, to
+      lift your effective margin.</p>
+  </div>
+
+  <h2 class="sec">The rest of the decision</h2>
+  <div class="cards">
+    <div class="card">
+      <h3><span class="dot" style="background:var(--accent)"></span>Integration (Supabase + webhook)</h3>
+      <p>All MoRs use the same shape: hosted checkout → provider POSTs a webhook → your Express
+        endpoint verifies the HMAC signature → Supabase <b>service-role</b> update of the
+        <code>plan</code> column. Keep that key server-side only.</p>
+      <ul>
+        <li><b>Stripe / Lemon Squeezy</b> — most examples, best-documented Supabase guides.</li>
+        <li><b>Polar</b> — cleanest API, fewer battle-tested Supabase examples yet.</li>
+        <li><b>Gumroad</b> — simplest but storefront-redirect, least "in-app".</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3><span class="dot" style="background:var(--win)"></span>Chargebacks &amp; disputes</h3>
+      <p>MoRs <b>absorb the fraud/dispute burden</b> as the merchant — real de-risking for a solo
+        founder. Polar charges $15/dispute; Lemon Squeezy folds most into the blended fee.</p>
+      <p>Plain Stripe: <b>you</b> handle disputes and pay ~CA$15 per chargeback (refunded only if
+        you win). Academic buyers are low-fraud, so this is a modest factor — but "not your
+        problem" still has value.</p>
+    </div>
+  </div>
+
+  <p class="foot">
+    <b>Confidence.</b> Base pricing is solidly sourced from each provider's own pages (Stripe CA,
+    Lemon Squeezy, Paddle, Polar, Gumroad, Shopify). The $19 / $4.99 effective-cost math and the
+    integration ranking are calculated/inferred. The "EU VAT from the first euro, no threshold for
+    non-EU sellers" rule is correct as a general principle — <b>confirm the exact OSS mechanics
+    with a Canadian cross-border tax accountant before relying on it.</b> Paddle's approval-friction
+    claims come from third-party 2026 reviews, not Paddle's page. Stripe now also offers "Managed
+    Payments" (its own MoR) at ~6.4%+ all-in, but it's geographically limited (excludes India and
+    much of the Global South) — worse for a worldwide academic audience, so it's left off the
+    shortlist.</p>
+</div>
+
+<script>
+  // Take-home bars — the fee trap, visualized on the two real prices.
+  // net = price − (pct·price + fixed). Domestic card shown.
+  const PRICE = { term:19.00, pack:4.99 };
+  const PROV = [
+    { name:'Lemon Squeezy / Polar', tag:'MoR', pct:0.05, fixed:0.50, c:'var(--accent)' },
+    { name:'Stripe', tag:'gateway', pct:0.029, fixed:0.30, c:'var(--ink-faint)' },
+    { name:'Gumroad', tag:'MoR', pct:0.129, fixed:0.50, c:'var(--bad)' },
+  ];
+  function net(p, price){ return price - (p.pct*price + p.fixed); }
+  const bars = document.getElementById('bars');
+  [['term','$19 term'],['pack','$4.99 pack']].forEach(([k,label])=>{
+    // Group heading row.
+    const head = document.createElement('div');
+    head.style.cssText='font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;padding:12px 0 4px;';
+    head.textContent = label + ' — take-home per sale';
+    bars.appendChild(head);
+    PROV.forEach((p)=>{
+      const price = PRICE[k];
+      const n = net(p, price);
+      const pctKept = n/price;
+      const row = document.createElement('div'); row.className='barrow';
+      row.innerHTML =
+        '<div class="lbl">'+p.name+'<span class="sub">'+p.tag+'</span></div>'+
+        '<div class="track"><div class="fill" style="width:'+(pctKept*100).toFixed(0)+
+          '%;background:'+p.c+'">$'+n.toFixed(2)+'</div></div>';
+      bars.appendChild(row);
+    });
+  });
+
+  const tb=document.getElementById('themeBtn');
+  tb.addEventListener('click',()=>{
+    const cur=document.documentElement.getAttribute('data-theme');
+    const next=cur==='dark'?'light':cur==='light'?'dark':
+      (matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark');
+    document.documentElement.setAttribute('data-theme',next);
+  });
+</script>

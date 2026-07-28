@@ -1,0 +1,261 @@
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Postr — Market &amp; Pricing Strategy</title>
+<style>
+  :root{--bg:#f7f6fb;--panel:#fff;--panel-2:#f2f0f9;--ink:#1b1930;--ink-soft:#56526e;--ink-faint:#8b87a4;--line:#e4e1ee;--accent:#6f5ce6;--accent-soft:#efeafc;--win:#1f9d6b;--win-soft:#e3f5ec;--warn:#c98a1e;--warn-soft:#f9f0dd;--bad:#d0464f;--bad-soft:#fbe6e8;--shadow:0 1px 2px rgba(27,25,48,.04),0 10px 30px rgba(27,25,48,.07);--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;--sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;}
+  @media (prefers-color-scheme:dark){:root{--bg:#111019;--panel:#191725;--panel-2:#201d30;--ink:#eeedf6;--ink-soft:#aba7c4;--ink-faint:#726d90;--line:#2a2740;--accent:#9585f1;--accent-soft:#241f3a;--win:#4cc48c;--win-soft:#16281f;--warn:#e0a94a;--warn-soft:#2a2113;--bad:#e8646c;--bad-soft:#2b1719;--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4);}}
+  :root[data-theme="light"]{--bg:#f7f6fb;--panel:#fff;--panel-2:#f2f0f9;--ink:#1b1930;--ink-soft:#56526e;--ink-faint:#8b87a4;--line:#e4e1ee;--accent:#6f5ce6;--accent-soft:#efeafc;--win:#1f9d6b;--win-soft:#e3f5ec;--warn:#c98a1e;--warn-soft:#f9f0dd;--bad:#d0464f;--bad-soft:#fbe6e8;--shadow:0 1px 2px rgba(27,25,48,.04),0 10px 30px rgba(27,25,48,.07);}
+  :root[data-theme="dark"]{--bg:#111019;--panel:#191725;--panel-2:#201d30;--ink:#eeedf6;--ink-soft:#aba7c4;--ink-faint:#726d90;--line:#2a2740;--accent:#9585f1;--accent-soft:#241f3a;--win:#4cc48c;--win-soft:#16281f;--warn:#e0a94a;--warn-soft:#2a2113;--bad:#e8646c;--bad-soft:#2b1719;--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4);}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1120px;margin:0 auto;padding:32px 22px 80px;}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:10px;}
+  h1{font-size:clamp(28px,4.2vw,42px);line-height:1.06;margin:0 0 12px;letter-spacing:-0.025em;font-weight:700;text-wrap:balance;}
+  .lede{color:var(--ink-soft);font-size:16px;max-width:66ch;margin:0;}
+  .lede b{color:var(--ink);font-weight:600;}
+  .theme-btn{position:absolute;top:26px;right:22px;background:var(--panel);border:1px solid var(--line);color:var(--ink-soft);border-radius:9px;width:38px;height:38px;cursor:pointer;font-size:15px;box-shadow:var(--shadow);}
+  .theme-btn:hover{color:var(--accent);border-color:var(--accent);}
+  h2.sec{font-size:13px;text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);color:var(--ink-faint);font-weight:600;margin:34px 0 14px;}
+
+  /* Funnel */
+  .funnel{display:flex;flex-direction:column;gap:8px;}
+  .frow{display:grid;grid-template-columns:88px 1fr;gap:14px;align-items:center;}
+  .frow .k{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink-faint);text-align:right;}
+  .fbar{position:relative;height:44px;border-radius:8px;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow);overflow:hidden;display:flex;align-items:center;}
+  .fbar .fill{position:absolute;left:0;top:0;bottom:0;background:var(--accent-soft);border-right:2px solid var(--accent);}
+  .fbar .txt{position:relative;padding:0 14px;font-size:13.5px;z-index:1;}
+  .fbar .txt b{font-weight:700;font-variant-numeric:tabular-nums;}
+  .fbar .txt .desc{color:var(--ink-soft);}
+  .frow.target .fbar{border-color:var(--win);border-width:1.5px;}
+  .frow.target .fbar .fill{background:var(--win-soft);border-right-color:var(--win);}
+
+  /* Verdict on target */
+  .tverdict{background:var(--warn-soft);border:1px solid var(--line);border-left:4px solid var(--warn);border-radius:12px;padding:18px 22px;margin:22px 0 8px;}
+  .tverdict h2{font-size:15px;margin:0 0 8px;font-weight:700;}
+  .tverdict p{margin:0 0 6px;font-size:14px;color:var(--ink-soft);line-height:1.55;}
+  .tverdict b{color:var(--ink);font-weight:600;}
+  .tverdict .amb{color:var(--warn);font-weight:700;}
+
+  /* Decision panel */
+  .main{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start;}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:var(--shadow);}
+  .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-faint);margin:0 0 4px;font-family:var(--mono);font-weight:600;}
+  .panel .note{font-size:12px;color:var(--ink-faint);margin:0 0 16px;}
+  .ctrl{margin-bottom:18px;}
+  .ctrl label{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--ink-soft);margin-bottom:7px;font-weight:500;}
+  .ctrl .val{font-family:var(--mono);font-size:13px;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums;}
+  input[type=range]{width:100%;height:4px;-webkit-appearance:none;appearance:none;background:var(--line);border-radius:3px;outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.25);border:2px solid var(--panel);}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid var(--panel);}
+  .ctrl .hint{font-size:11px;color:var(--ink-faint);margin-top:5px;line-height:1.4;}
+  .ctrl .hint .src{color:var(--win);font-weight:600;}.ctrl .hint .key{color:var(--accent);font-weight:600;}
+
+  .decision{border-radius:14px;padding:20px 22px;text-align:center;margin-bottom:14px;transition:background .2s;}
+  .decision.sub{background:var(--accent-soft);border:1.5px solid var(--accent);}
+  .decision.pack{background:var(--win-soft);border:1.5px solid var(--win);}
+  .decision .lab{font-family:var(--mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;font-weight:600;margin-bottom:8px;}
+  .decision.sub .lab{color:var(--accent);}.decision.pack .lab{color:var(--win);}
+  .decision .verdict{font-size:20px;font-weight:700;letter-spacing:-0.02em;margin-bottom:6px;}
+  .decision .detail{font-size:13px;color:var(--ink-soft);line-height:1.5;}
+  .decision .detail b{color:var(--ink);}
+
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .ccard{background:var(--panel-2);border:1px solid var(--line);border-radius:11px;padding:14px 16px;}
+  .ccard .t{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;font-family:var(--mono);color:var(--ink-faint);margin-bottom:8px;}
+  .ccard .v{font-size:24px;font-weight:700;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;}
+  .ccard .v.pos{color:var(--win);}.ccard .v.neg{color:var(--bad);}
+  .ccard .s{font-size:12px;color:var(--ink-faint);margin-top:4px;}
+  .ccard.winner{background:var(--win-soft);border-color:var(--win);}
+
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);}
+  .card h3{margin:0 0 8px;font-size:14px;font-weight:700;}
+  .card p,.card li{font-size:13px;color:var(--ink-soft);line-height:1.55;}
+  .card ul{margin:0;padding-left:18px;}.card li{margin-bottom:6px;}
+  .card b{color:var(--ink);}
+  .tagi{font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:4px;}
+  .tagi.solid{background:var(--win-soft);color:var(--win);}.tagi.infer{background:var(--bad-soft);color:var(--bad);}
+
+  .foot{margin-top:28px;font-size:12px;color:var(--ink-faint);line-height:1.55;max-width:82ch;}
+  .foot b{color:var(--ink-soft);}
+  @media (max-width:860px){.main{grid-template-columns:1fr;}.compare{grid-template-columns:1fr;}.cards{grid-template-columns:1fr;}.theme-btn{position:static;margin-bottom:14px;}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+
+<button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐</button>
+<div class="wrap">
+  <div class="eyebrow">Postr · market &amp; pricing strategy</div>
+  <h1>The market is big enough. Reaching it is the whole problem.</h1>
+  <p class="lede">Sizing the social-science &amp; biology poster niche, testing the <b>$20–30k/yr</b>
+    target against it, and settling <b>sub-only vs. adding a cheap pack</b> with real substitution
+    data. The short version: the market is millions; a solo founder's <b>organic reach</b>, not
+    market size, is what decides whether the target is hit.</p>
+
+  <h2 class="sec">The funnel — where 53,000 users/year sits</h2>
+  <div class="funnel" id="funnel"></div>
+  <p style="font-size:12px;color:var(--ink-faint);margin-top:10px;">
+    Target fields: psychology, sociology, public health, neuroscience, biology, medicine, nursing,
+    education, ecology — the fields stuck with PowerPoint and no LaTeX escape. Excludes CS/eng/physics.
+    <span class="tagi solid">SOLID</span> counts from NSF NCSES, Eurostat, HESA; funnel narrowing is
+    <span class="tagi infer">INFERENCE</span>.</p>
+
+  <div class="tverdict">
+    <h2>Is $20–30k/yr realistic? &nbsp;Realistic but <span class="amb">ambitious</span> — and it's a distribution problem, not a market one.</h2>
+    <p>$25k needs <b>~1,400 sales/yr → ~53,000 users/yr</b> at 2.6% conversion. That's ~1.5% of the
+      market but <b>7–13% of the serviceable market</b> — the <b>top of what a solo, unfunded,
+      word-of-mouth tool realistically reaches</b> in 3–4 years (comparable: Mind the Graph hit ~500k,
+      BioRender 4M — but both took years and BioRender took venture money).</p>
+    <p>If conversion runs 4–5% (plausible — PowerPoint pain in these fields is acute), the same $25k
+      needs only <b>~30k users</b> and the target turns conservative. If word-of-mouth stalls at
+      low-thousands (the common solo outcome), <b>$3–8k is likelier</b>. The lever is reach, not TAM.</p>
+  </div>
+
+  <h2 class="sec">The decision: sub-only, or add the pack?</h2>
+  <div class="main">
+    <div class="panel">
+      <h2>The two variables that decide it</h2>
+      <p class="note">Everything else nets out. These don't.</p>
+      <div id="sliders"></div>
+      <div style="font-size:12px;color:var(--ink-faint);line-height:1.5;margin-top:4px;">
+        <b>Substitution</b> = of pack buyers, the share who'd otherwise have bought the $18.99 term.
+        <b>Incremental</b> = net-new buyers the cheaper pack unlocks (would've paid $0) per 100
+        would-be subscribers.</div>
+    </div>
+    <div class="panel">
+      <div class="decision" id="decision"></div>
+      <div class="compare" id="compare"></div>
+      <p style="font-size:12px;color:var(--ink-faint);margin-top:14px;line-height:1.5;" id="breakeven"></p>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <h3>Why the pack probably recruits, not cannibalizes</h3>
+      <ul>
+        <li><span class="tagi solid">SOLID</span> Hybrid buyers are <b>7% of buyers but 25% of
+          revenue</b> (RevenueCat, 115k apps) — one-time buyers are a distinct high-value segment,
+          not lost subscribers.</li>
+        <li><span class="tagi solid">SOLID</span> Education has the <b>worst annual renewal (24%)</b>
+          but best weekly — your segment rejects long commitments and pays in bursts.</li>
+        <li><span class="tagi solid">SOLID</span> <b>88% of students stay free</b>, and cap ~$5/mo —
+          a subscription leaves the price-sensitive majority uncaptured; a $9.99 one-time reaches them.</li>
+        <li>Base case: <b>~35% substitution, ~65% incremental</b>. The pack mostly serves people
+          you'd otherwise earn nothing from.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>If you add the pack, design it to recruit</h3>
+      <ul>
+        <li><b>Keep a real value gap:</b> $9.99 / 3 decks vs $18.99 / 4-months-unlimited. Anyone making
+          &gt;~4 posters is better off with the term → heavy users self-select up (anchor effect,
+          Ariely).</li>
+        <li><b>Don't show it side-by-side</b> as a co-equal tier. Surface it as the lighter option,
+          or at the moment someone declines the term (RevenueCat).</li>
+        <li><b>Price it at $9.99, not $4.99</b> — $4.99 keeps 82% after fees, $9.99 keeps 88%, and the
+          curve flattens above that. $9.99 is the efficient point.</li>
+        <li><b>Don't undercut your own recurring revenue</b> — if the pack is too generous, it just
+          shifts would-be term money earlier.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="foot">
+    <b>Confidence.</b> Market counts are sourced (NSF NCSES, Eurostat, HESA); the funnel narrowing to
+    target fields and the SAM/SOM bands are inference — the softest number is "switch-willing share."
+    The <b>substitution rate (20/35/55%) is triangulated, not measured</b> — no study directly tests
+    pack-vs-sub substitution for a tool like this; validate it with your own first cohort. Pack-buyer
+    <em>repeat-purchase</em> behaviour is unknown and assumed lower than term repurchase. LTV over ~3
+    years (6 poster seasons), net of Lemon Squeezy fees + LLM cost. The single biggest real-world
+    unknown is <b>organic distribution reach</b> — every comparable that scaled had years and/or
+    funding.</p>
+</div>
+
+<script>
+// ── Economics (mirrors sub-vs-pack.mjs) ──
+const netFee=p=>p-(0.05*p+0.5);
+const COST_DECK=0.056;
+const NET_TERM=netFee(18.99), NET_PACK=netFee(9.99);
+const SEASONS=6, R_TERM=0.22, R_PACK=0.15;
+function ltv(net,decks,r){let v=0;for(let s=0;s<SEASONS;s++)v+=Math.pow(r,s)*(net-COST_DECK*decks);return v;}
+const LTV_TERM=ltv(NET_TERM,3,R_TERM), LTV_PACK=ltv(NET_PACK,3,R_PACK);
+
+let S={sub:0.35,incr:40};
+
+// ── Funnel ──
+const FUNNEL=[
+  {k:'TAM',w:1.0,v:'2.5–3.5M',d:'target-field researchers (grad + postdoc + faculty), global EN+EU'},
+  {k:'SAM',w:0.22,v:'400–800k',d:'active, switch-willing poster-makers per year'},
+  {k:'SOM',w:0.045,v:'20–60k',d:'realistic solo-founder reach, years 3–4'},
+  {k:'TARGET',w:0.038,v:'~53k',d:'users/yr needed for $25k @ 2.6% conversion',target:true},
+];
+const fEl=document.getElementById('funnel');
+FUNNEL.forEach(f=>{
+  const row=document.createElement('div');row.className='frow'+(f.target?' target':'');
+  row.innerHTML='<div class="k">'+f.k+'</div>'+
+    '<div class="fbar"><div class="fill" style="width:'+(f.w*100)+'%"></div>'+
+    '<div class="txt"><b>'+f.v+'</b> · <span class="desc">'+f.d+'</span></div></div>';
+  fEl.appendChild(row);
+});
+
+// ── Sliders ──
+const SLIDERS=[
+  {key:'sub',label:'Substitution rate',min:0,max:70,step:5,mul:100,suf:'%',
+    hint:'Pack buyers who\'d otherwise buy the term. <span class="src">Base 35% (triangulated)</span>; higher = more cannibalization.'},
+  {key:'incr',label:'Incremental buyers',min:0,max:120,step:5,mul:1,suf:' /100',
+    hint:'Net-new buyers the pack unlocks per 100 would-be subscribers. <span class="key">The number your positioning controls.</span>'},
+];
+const sEl=document.getElementById('sliders');
+SLIDERS.forEach(s=>{
+  const w=document.createElement('div');w.className='ctrl';
+  w.innerHTML='<label>'+s.label+'<span class="val" id="v_'+s.key+'"></span></label>'+
+    '<input type="range" id="s_'+s.key+'" min="'+s.min+'" max="'+s.max+'" step="'+s.step+'">'+
+    '<div class="hint">'+s.hint+'</div>';
+  sEl.appendChild(w);
+  w.querySelector('input').addEventListener('input',e=>{S[s.key]=(+e.target.value)/s.mul;render();});
+});
+function sync(){SLIDERS.forEach(s=>{document.getElementById('s_'+s.key).value=S[s.key]*s.mul;
+  document.getElementById('v_'+s.key).textContent=Math.round(S[s.key]*s.mul)+s.suf;});}
+
+const usd=n=>(n<0?'−$':'$')+Math.round(Math.abs(n)).toLocaleString();
+
+// ── Render decision ──
+function render(){
+  // per 100 would-be subscribers
+  const subOnly=100*LTV_TERM;
+  const defectors=100*S.sub, loyal=100-defectors;
+  const withPack=loyal*LTV_TERM+(defectors+S.incr)*LTV_PACK;
+  const delta=withPack-subOnly;
+  const packWins=delta>=0;
+  // break-even incremental at this substitution
+  const incrBE=(100*LTV_TERM-loyal*LTV_TERM)/LTV_PACK-defectors;
+
+  const dec=document.getElementById('decision');
+  dec.className='decision '+(packWins?'pack':'sub');
+  dec.innerHTML='<div class="lab">'+(packWins?'✓ Add the $9.99 pack':'✗ Stay sub-only')+'</div>'+
+    '<div class="verdict">'+(packWins
+      ? 'The pack adds '+usd(delta)+' per 100 subscribers'
+      : 'The pack costs '+usd(-delta)+' per 100 subscribers')+'</div>'+
+    '<div class="detail">At <b>'+Math.round(S.sub*100)+'% substitution</b>, the pack needs '+
+      '<b>>'+Math.round(incrBE)+' net-new buyers</b> per 100 would-be subscribers to pay for itself. '+
+      'You\'ve set <b>'+S.incr+'</b>.</div>';
+
+  const cmp=document.getElementById('compare');
+  cmp.innerHTML=
+    '<div class="ccard'+(!packWins?' winner':'')+'"><div class="t">Sub-only</div>'+
+      '<div class="v">'+usd(subOnly)+'</div><div class="s">3-yr value / 100 subscribers</div></div>'+
+    '<div class="ccard'+(packWins?' winner':'')+'"><div class="t">Sub + $9.99 pack</div>'+
+      '<div class="v '+(packWins?'pos':'neg')+'">'+usd(withPack)+'</div>'+
+      '<div class="s">'+Math.round(defectors)+' defect · '+S.incr+' net-new</div></div>';
+
+  document.getElementById('breakeven').innerHTML=
+    'A pack buyer\'s 3-year value ≈ <b>'+Math.round(LTV_PACK/LTV_TERM*100)+'%</b> of a term buyer\'s '+
+    '('+usd(LTV_PACK)+' vs '+usd(LTV_TERM)+') — because the term repurchases at '+Math.round(R_TERM*100)+
+    '%/season and the pack is mostly one-and-done. So the pack only wins by <b>volume</b>: enough '+
+    'price-sensitive people who\'d never have subscribed at all.';
+}
+
+const tb=document.getElementById('themeBtn');
+tb.addEventListener('click',()=>{const c=document.documentElement.getAttribute('data-theme');
+  const nx=c==='dark'?'light':c==='light'?'dark':(matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark');
+  document.documentElement.setAttribute('data-theme',nx);render();});
+sync();render();
+</script>

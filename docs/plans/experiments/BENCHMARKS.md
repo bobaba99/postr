@@ -80,3 +80,146 @@ correct one for this audience.
 4. Student conversion for Grammarly/Notion/Canva — proprietary; they
    mostly give student tiers away, so not comparable.
 5. WOM-only niche year-1 growth — general SaaS only; likely lower/lumpier.
+
+---
+
+# Free-trial abuse benchmarks — sourced 2026-07-28
+
+For the single-deck-trial pricing decision. Same quality legend.
+
+## Abuse rate — the SOLID anchor, and why Postr is far below it
+- **7.4% of AI-startup signups implicated in multi-account abuse** —
+  Stripe, "Analyzing first-party fraud trends", Mar 10 2026. **SOLID.**
+  https://stripe.com/blog/analyzing-first-party-fraud-trends-account-free-trial-and-refund-abuse
+- Stripe qualifier **[SOLID]**: AI startups with free trials see ~10× more
+  attempted abuse than enterprise AI, because free compute is the payoff.
+- **Abuse is ROI-driven** — operators quit when payoff < cost. Security
+  Boulevard, May 2026. **SOLID (commentary).**
+- **GitLab natural experiment [SOLID]**: got flooded ONLY because free
+  CI/CD minutes had crypto-mining resale value. A 2-cent one-shot deck
+  with no resale does not attract industrial abuse.
+  https://about.gitlab.com/blog/prevent-crypto-mining-abuse
+- **1 in 5 consumers reuse different emails for promos; 29% Gen Z, 27%
+  Millennials** — Stripe/451 Research. **SOLID (population).** Postr's
+  users skew into the highest-propensity age band → expect CASUAL manual
+  multi-accounting, not bot farms.
+- **Model bands** (INFERENCE, grounded): **low 3% · base 8% · high 15%**
+  of free decks are abusive. Even the high case × $0.056 = under a cent
+  of waste per real free deck. Abuse is a rounding error, not a threat.
+
+## Why abuse is financially immaterial here
+Each abused free deck costs ~$0.015–0.056 in LLM. No published abuse-cost
+model goes this low — all assume persistent SaaS accounts ($0.50–2/mo) or
+high-value promos. Postr is below the floor of the literature. Correct
+posture: **"log it, don't fight it."**
+
+## Proportionate mitigation stack (all near-zero conversion cost)
+1. Email normalize + dedup (strip Gmail dots/`+tags`, lowercase).
+2. Block disposable-email domains (maintained list, ~12% of form fills
+   use them [WEAK vendor number]).
+3. Email verification before the free deck unlocks.
+4. Server-side one-shot gating (never trust the client).
+5. Salted hash of email retained AFTER deletion → detect delete-recreate.
+   GDPR: fraud-prevention legitimate interest; document it.
+**Do NOT** require phone/SMS or card — they cost 5–37% of conversions
+(HubSpot/Unbounce [SOLID-ish]) to prevent 2 cents. GitLab proved one card
+validates many accounts anyway.
+
+## Trial→paid uplift — the DECIDING variable, and it's UNSOURCED
+No published curve for "does seeing one free deck make you buy" at
+Postr's shape. The freemium aha-moment effect is real but unquantified
+here. This is INFERENCE and the key sensitivity knob — the model must
+show the answer's dependence on it, not hide it. Bands: 1.3× / 1.6× / 2×.
+
+## Could NOT find
+- Students-specific trial-abuse rate (only price-sensitivity signals).
+- Any incentive-value → abuse-rate elasticity curve (direction SOLID,
+  magnitude unpublished).
+- Any abuse figure for a trial as cheap as $0.02–0.05 (below the
+  literature's floor — the low-abuse conclusion is INFERENCE).
+
+---
+
+# Market sizing — social-science + biology poster niche (2026-07-28)
+
+Target: psych, sociology, public health, neuro, biology, medicine,
+nursing, education, ecology. EXCLUDES CS/eng/math/physics (LaTeX users).
+
+## TAM → SAM → SOM
+- **US target-field grad+postdoc+faculty ≈ 750k–900k** [INFERENCE from
+  NSF NCSES nsf25316: 818k SEH grad, 65,850 postdocs; ~50% in target
+  fields per doctorate field-mix nsf25300]. SOLID underlying counts.
+- **Global English+EU TAM ≈ 2.5–3.5M** [INFERENCE; Eurostat 670k EU
+  doctoral, HESA 700k UK PG applied at ~40–50% target share]. MEDIUM.
+- **~2–4M posters/year** in target fields [INFERENCE; Frontiers 2023:
+  ~4.5M conference presentations/yr, "several million posters", 1–3
+  posters/postgrad/yr SOLID-survey].
+- **SAM ≈ 400k–800k** active, switch-willing makers/yr [LOW-MED — the
+  "switch-willing" fraction is the softest number].
+- **SOM (solo, unfunded, yr 3–4) ≈ 20k–60k active users/yr** = 0.5–3%
+  of SAM [LOW — solo outcomes vary hugely].
+
+## Competitor proof the niche is real (SOLID)
+- **Mind the Graph** — life-sci poster/figure maker, **~500k users**.
+  Closest direct analog.
+- **BioRender** — 4M registered, 500k MAU, $900M val — but VENTURE-BACKED,
+  7+ yrs. Academic plan $35/mo ($420/yr) → academics DO pay for visual
+  tools. Postr's $19 one-time is far below, well-placed for students.
+- **Overleaf** — 10M users, ARPU ~$1/user/yr (thin). The ARPU north star.
+
+## What they use now (SOLID)
+- **PowerPoint dominant** ("vast majority of posters" — Purrington).
+  Canva secondary (libraries teach it). BioRender/Mind the Graph for
+  figures. Target fields have NO LaTeX escape → highest-intent for a GUI.
+
+## The $20-30k target verdict
+- $25k ÷ $18 net = ~1,389 sales/yr → ~53k users/yr @2.6% conv.
+- 53k = ~1.5-2% of TAM · ~7-13% of SAM · TOP of realistic SOM band.
+- **Realistic but AMBITIOUS, not conservative.** At 4-5% conv (plausible
+  given acute PowerPoint pain), only ~28-35k users → conservative. If
+  word-of-mouth stalls at low-thousands (common solo outcome), $3-8k is
+  likelier. **The constraint is DISTRIBUTION reach, not market size.**
+
+---
+
+# Pack-vs-sub cannibalization (2026-07-28)
+
+## The load-bearing SOLID facts
+- **Hybrid buyers = 7% of buyers but 25% of revenue** (RevenueCat, 115k
+  apps). One-time buyers are a DISTINCT high-value segment, not lost subs.
+- **Education: worst annual renewal (24%), best weekly** (RevenueCat) —
+  the segment rejects long commitments, pays in bursts.
+- **Education one-time-purchase share 6%→17%** 2023-25 (Adapty) — users
+  prefer buying specific content over subscribing.
+- **88% of students stay on free tier** (arXiv 2508.00717); students cap
+  ~$5/mo (Łupa-Wójcik). Recurring leaves the price-sensitive majority
+  uncaptured; a $10 one-time reaches them.
+- **Decoy/anchor effect** (Ariely, n=100): a cheap option can make the
+  premium look better and LIFT it ~30% — IF positioned as smaller/limited.
+
+## Substitution rate to model (INFERENCE, triangulated — no direct study)
+- **low 20% / base 35% / high 55%** of pack buyers would-otherwise-have
+  bought the term. So base ~65% are INCREMENTAL (net-new).
+- Dierks & Seuken 2020 (arXiv): offering BOTH types "typically leads to
+  significantly higher revenue than either alone" — the options SORT
+  customers. [SOLID game-theoretic].
+
+## Break-even (from sub-vs-pack.mjs)
+Pack helps IFF it unlocks enough net-new buyers to pay for poached subs:
+- @20% substitution: need >23 net-new pack buyers per 100 would-be subs
+- @35% substitution: need >40 net-new
+- @55% substitution: need >63 net-new
+A pack buyer's 3-yr LTV ≈ 47% of a term buyer's ($10.39 vs $22.28).
+
+## DESIGN GUARDRAILS (make the pack recruit, not cannibalize)
+- Real value gap: $10/3-decks vs $19/4mo-unlimited. Anyone making >~4
+  posters is better off with the term → heavy users self-select up.
+- DON'T show pack side-by-side as co-equal. Surface as the lighter
+  option / on term rejection (RevenueCat "moment of rejection").
+- Watch RevenueCat failure mode: don't price so low it just shifts
+  would-be recurring revenue earlier.
+
+## Could NOT find
+- Direct measured pack-vs-sub substitution rate (none published).
+- Pack-buyer repeat-purchase behavior (the real long-term unknown —
+  close it with your own cohort once live).

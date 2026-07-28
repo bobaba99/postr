@@ -28,9 +28,9 @@ const COST_POSTER       = 0.0139;   // condense only, luna+cache, 3 iters
 // FREE tier keeps unlimited editing, all tools, and a watermarked PDF
 // export ("made with postr.sh") plus paper→poster. What you pay for is
 // the clean editable export and the presentation.
-const PRICE_TERM  = 19.00;   // $19 / 4-month term
+const PRICE_TERM  = 18.99;   // $18.99 / 4-month term = $4.75/mo (student ceiling)
 const TERM_MONTHS = 4;
-const PRICE_PACK  = 4.99;
+const PRICE_PACK  = 9.99;    // $9.99 / 3-deck pack (raised from $4.99: clears fee trap, still recruits)
 const PACK_DECKS  = 3;
 const stripe = (r) => r * 0.029 + 0.30;
 

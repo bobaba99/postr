@@ -19,8 +19,8 @@
  */
 
 // ── PRICING (decided 2026-07-28) ───────────────────────────────────
-const PRICE_TERM = 19.0;   // $19 / 4-month term
-const PRICE_PACK = 4.99;   // $4.99 / 3-deck pack
+const PRICE_TERM = 18.99;  // $18.99 / 4-month term = $4.75/mo (student ceiling)
+const PRICE_PACK = 9.99;   // $9.99 / 3-deck pack (raised from $4.99 to clear the fee trap)
 const stripeFee = (r) => r * 0.029 + 0.3;
 const NET_TERM = PRICE_TERM - stripeFee(PRICE_TERM); // ~$18.15
 const NET_PACK = PRICE_PACK - stripeFee(PRICE_PACK); // ~$4.55
