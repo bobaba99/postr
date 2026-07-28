@@ -44,27 +44,72 @@ function hrefsOf(container: HTMLElement): string[] {
   );
 }
 
-describe('PublicHeader Tools menu', () => {
+/**
+ * The tools were previously folded into a "Tools" dropdown. They are
+ * now listed flat in the header, because a menu hides the very thing
+ * that was undiscoverable in the first place — the owner's own
+ * complaint, twice. These tests assert the flat listing so nobody
+ * re-folds them.
+ */
+describe('PublicHeader tool links', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('keeps the tool links out of the DOM until the menu is opened', () => {
+  it.each(TOOL_PATHS)('links to %s directly, with no menu to open', (path) => {
     const { container } = renderIn(<PublicHeader />);
-    expect(hrefsOf(container)).not.toContain('/chart-chooser');
+    expect(hrefsOf(container)).toContain(path);
   });
 
-  it.each(TOOL_PATHS)('links to %s once the menu is opened', async (path) => {
+  it('does not hide the tools behind a disclosure', () => {
     renderIn(<PublicHeader />);
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
+    // No "Tools" trigger, and nothing claiming a popup, at desktop
+    // width. If one comes back, the links must still be flat too.
+    expect(screen.queryByRole('button', { name: /^tools$/i })).toBeNull();
+  });
 
-    const panel = await screen.findByRole('list', { name: /tools/i });
+  it('reaches every tool in one click', () => {
+    const { container } = renderIn(<PublicHeader />);
+    const links = Array.from(container.querySelectorAll('a[href]'));
+    for (const path of TOOL_PATHS) {
+      const link = links.find((a) => a.getAttribute('href') === path);
+      expect(link, `${path} should be a plain anchor`).toBeTruthy();
+      // A roving tabindex or -1 would take it out of the tab order.
+      expect(link?.getAttribute('tabindex')).toBeNull();
+    }
+  });
+});
+
+/**
+ * The phone header used to render NOTHING but the wordmark and a
+ * sign-in button: every nav item carried an `sm:` prefix, so the
+ * footer was the only route to any of it. That is the bug these cover.
+ */
+describe('PublicHeader mobile menu', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function openMobileMenu() {
+    fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+  }
+
+  it('offers a menu control on small screens', () => {
+    renderIn(<PublicHeader />);
+    expect(screen.getByRole('button', { name: /menu/i })).toBeTruthy();
+  });
+
+  it.each(TOOL_PATHS)('reaches %s from the mobile menu', async (path) => {
+    renderIn(<PublicHeader />);
+    openMobileMenu();
+
+    const panel = await screen.findByRole('list');
     expect(hrefsOf(panel)).toContain(path);
   });
 
-  it('reports expanded state to assistive tech', async () => {
+  it('reports expanded state to assistive tech', () => {
     renderIn(<PublicHeader />);
-    const trigger = screen.getByRole('button', { name: /tools/i });
+    const trigger = screen.getByRole('button', { name: /menu/i });
 
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(trigger);
@@ -72,58 +117,39 @@ describe('PublicHeader Tools menu', () => {
   });
 
   /**
-   * The panel used to declare role="menu" with role="menuitem" children
-   * while implementing none of the WAI-ARIA menu keyboard model — no
-   * roving tabindex, no arrow keys, no Home/End. That announced an
-   * affordance to screen-reader users that did not exist. The roles must
-   * stay honest: plain links in a labelled list, navigated by Tab.
+   * role="menu" promises a roving tabindex, arrow keys, and Home/End.
+   * None of that is implemented, so the honest markup for a list of
+   * navigation links is a labelled list navigated by Tab. The old
+   * dropdown got this wrong once already.
    */
   it('does not claim the menu pattern it does not implement', async () => {
     renderIn(<PublicHeader />);
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    await screen.findByRole('list', { name: /tools/i });
+    openMobileMenu();
+    await screen.findByRole('list');
 
     expect(screen.queryByRole('menu')).toBeNull();
     expect(screen.queryAllByRole('menuitem')).toHaveLength(0);
-    expect(screen.getByRole('button', { name: /tools/i })).toHaveAttribute(
-      'aria-haspopup',
-      'true',
-    );
   });
 
   it('points the trigger at the panel it controls', async () => {
     renderIn(<PublicHeader />);
-    const trigger = screen.getByRole('button', { name: /tools/i });
+    const trigger = screen.getByRole('button', { name: /menu/i });
     fireEvent.click(trigger);
 
-    const panel = await screen.findByRole('list', { name: /tools/i });
+    const panel = await screen.findByRole('list');
     expect(trigger.getAttribute('aria-controls')).toBe(panel.id);
     expect(panel.id).toBeTruthy();
   });
 
-  it('leaves every tool link reachable by Tab', async () => {
-    renderIn(<PublicHeader />);
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    const panel = await screen.findByRole('list', { name: /tools/i });
-
-    // A roving tabindex would park all but one item at -1. These are
-    // ordinary links, so none of them may be taken out of the tab order.
-    const links = Array.from(panel.querySelectorAll('a[href]'));
-    expect(links).toHaveLength(TOOL_PATHS.length);
-    for (const link of links) {
-      expect(link.getAttribute('tabindex')).toBeNull();
-    }
-  });
-
   it('closes on Escape and returns focus to the trigger', async () => {
     renderIn(<PublicHeader />);
-    const trigger = screen.getByRole('button', { name: /tools/i });
+    const trigger = screen.getByRole('button', { name: /menu/i });
     fireEvent.click(trigger);
-    await screen.findByRole('list', { name: /tools/i });
+    await screen.findByRole('list');
 
     fireEvent.keyDown(document, { key: 'Escape' });
 
-    expect(screen.queryByRole('list', { name: /tools/i })).toBeNull();
+    expect(screen.queryByRole('list')).toBeNull();
     // Without this the keyboard user is dumped on <body>.
     expect(document.activeElement).toBe(trigger);
   });
@@ -135,58 +161,22 @@ describe('PublicHeader Tools menu', () => {
         <button type="button">elsewhere</button>
       </>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    await screen.findByRole('list', { name: /tools/i });
+    fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+    await screen.findByRole('list');
 
     fireEvent.pointerDown(screen.getByRole('button', { name: 'elsewhere' }));
 
-    expect(screen.queryByRole('list', { name: /tools/i })).toBeNull();
+    expect(screen.queryByRole('list')).toBeNull();
   });
 
-  it('closes when keyboard focus leaves the menu entirely', async () => {
-    renderIn(
-      <>
-        <PublicHeader />
-        <button type="button">elsewhere</button>
-      </>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
-    await screen.findByRole('list', { name: /tools/i });
-
-    // Tabbing past the last link used to strand an open panel over the
-    // nav — the keyboard had no equivalent of clicking outside.
-    const outside = screen.getByRole('button', { name: 'elsewhere' });
-    outside.focus();
-    fireEvent.blur(screen.getByRole('button', { name: /tools/i }), {
-      relatedTarget: outside,
-    });
-
-    expect(screen.queryByRole('list', { name: /tools/i })).toBeNull();
-  });
-
-  it('stays open when focus leaves the window rather than the menu', async () => {
+  it('closes after following a link, so it never covers the new page', async () => {
     renderIn(<PublicHeader />);
-    const trigger = screen.getByRole('button', { name: /tools/i });
-    fireEvent.click(trigger);
-    await screen.findByRole('list', { name: /tools/i });
+    fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+    const panel = await screen.findByRole('list');
 
-    // relatedTarget null = window blur, not a move to another control.
-    // Collapsing here would yank the panel from a returning user.
-    fireEvent.blur(trigger, { relatedTarget: null });
+    fireEvent.click(panel.querySelector('a[href]') as HTMLElement);
 
-    expect(screen.getByRole('list', { name: /tools/i })).toBeTruthy();
-  });
-
-  it('keeps focus moves inside the menu from closing it', async () => {
-    renderIn(<PublicHeader />);
-    const trigger = screen.getByRole('button', { name: /tools/i });
-    fireEvent.click(trigger);
-    const panel = await screen.findByRole('list', { name: /tools/i });
-
-    const firstLink = panel.querySelector('a[href]') as HTMLElement;
-    fireEvent.blur(trigger, { relatedTarget: firstLink });
-
-    expect(screen.getByRole('list', { name: /tools/i })).toBeTruthy();
+    expect(screen.queryByRole('list')).toBeNull();
   });
 });
 
@@ -196,9 +186,10 @@ describe('PublicFooter', () => {
     expect(hrefsOf(container)).toContain(path);
   });
 
-  it('keeps both tools in the footer, which is the only path on phones', () => {
-    // The header menu is sm:-gated, so if these ever move behind a
-    // breakpoint too, small screens lose the tools entirely.
+  it('keeps both tools in the footer as a second route', () => {
+    // The header's flat links are sm:-gated (the mobile menu covers
+    // phones), so the footer is the redundant path if that menu ever
+    // regresses.
     const { container } = renderIn(<PublicFooter />);
     const productHeading = screen.getByRole('heading', { name: /product/i });
     const column = productHeading.parentElement;
@@ -263,7 +254,8 @@ describe('internal links point at canonical URLs', () => {
         <PublicFooter />
       </>,
     );
-    fireEvent.click(screen.getByRole('button', { name: /tools/i }));
+    // Open the mobile menu too, so its copies of the links are covered.
+    fireEvent.click(screen.getByRole('button', { name: /menu/i }));
 
     // Linking an alias internally would send every visitor through a
     // needless 308 and dilute the canonical's internal link signal.
