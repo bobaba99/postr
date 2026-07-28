@@ -128,19 +128,53 @@ export const FONT_NAMES = Object.keys(FONTS);
 // Palettes (8 print-safe academic palettes)
 // =========================================================================
 
+/**
+ * Accent colours are taken from Simplified Science Publishing's
+ * accessibility-tested palettes for scientific figures:
+ * https://www.simplifiedsciencepublishing.com/resources/best-color-palettes-for-scientific-figures-and-data-visualizations
+ *
+ * Those palettes are published as flat colour lists for charts; a
+ * poster palette is a 7-slot semantic structure, so the mapping is
+ * deliberate rather than mechanical:
+ *
+ *   accent   → the palette's strongest colour (section headers, rules)
+ *   accent2  → its published partner colour, kept as-is so the pair
+ *              stays the tested combination rather than a tint I chose
+ *   primary  → body text: a near-black darkened from the accent's hue,
+ *              because pure #000 on paper reads harsher than a hue-
+ *              matched dark, and text is not part of the chart palette
+ *   bg       → near-white, faintly tinted toward the accent
+ *   muted    → captions and secondary rules
+ *
+ * The accent/accent2 PAIRS are the part that carries the source's
+ * colour-vision-deficiency testing, so keep pairs together when
+ * editing. Changing one half of a pair to a hue you like breaks the
+ * property the source was chosen for.
+ *
+ * Chart SERIES colours are separate — see charts/seriesPalettes.ts.
+ */
 export interface NamedPalette extends Palette {
   name: string;
 }
 
 export const PALETTES: NamedPalette[] = [
-  { name: 'Classic Academic', bg: '#FFFFFF', primary: '#1a1a2e', accent: '#0f4c75', accent2: '#3282b8', muted: '#6c757d', headerBg: '#0f4c75', headerFg: '#fff' },
-  { name: 'Nature / Biology', bg: '#FAFDF7', primary: '#1b3a2d', accent: '#2d6a4f', accent2: '#52b788', muted: '#5a6e5f', headerBg: '#2d6a4f', headerFg: '#fff' },
-  { name: 'Medical / Clinical', bg: '#F8FAFF', primary: '#0d1b2a', accent: '#1b4965', accent2: '#62b6cb', muted: '#5c6b7a', headerBg: '#1b4965', headerFg: '#fff' },
-  { name: 'Engineering', bg: '#FAFAFA', primary: '#212529', accent: '#c1121f', accent2: '#e36414', muted: '#6c757d', headerBg: '#c1121f', headerFg: '#fff' },
-  { name: 'Psychology / Neuro', bg: '#FAF8FF', primary: '#1a1030', accent: '#5b3a8c', accent2: '#9b72cf', muted: '#6e6480', headerBg: '#5b3a8c', headerFg: '#fff' },
-  { name: 'Humanities / Arts', bg: '#FDF8F3', primary: '#2b2118', accent: '#7b2d26', accent2: '#c07a52', muted: '#7a6b5d', headerBg: '#7b2d26', headerFg: '#fff' },
-  { name: 'Earth Sciences', bg: '#F8F6F0', primary: '#2c2416', accent: '#8B6914', accent2: '#b8860b', muted: '#7a7060', headerBg: '#5c4a10', headerFg: '#fff' },
-  { name: 'Clean Minimal', bg: '#FFFFFF', primary: '#111111', accent: '#333333', accent2: '#666666', muted: '#999999', headerBg: '#111111', headerFg: '#fff' },
+  // Blue + orange: the source's headline two-colour divergent pair,
+  // and the most reliable combination under both red-green CVD types.
+  { name: 'Classic Academic', bg: '#FFFFFF', primary: '#12233a', accent: '#1a80bb', accent2: '#ea801c', muted: '#6c757d', headerBg: '#1a80bb', headerFg: '#fff' },
+  // Sequential teal, dark + medium stops.
+  { name: 'Nature / Biology', bg: '#FAFDFC', primary: '#12262b', accent: '#1f6f6f', accent2: '#54a1a1', muted: '#5f7373', headerBg: '#1f6f6f', headerFg: '#fff' },
+  // Divergent heat-map blues — the clinical convention.
+  { name: 'Medical / Clinical', bg: '#F8FAFF', primary: '#0d1b2a', accent: '#2066a8', accent2: '#8ec1da', muted: '#5c6b7a', headerBg: '#2066a8', headerFg: '#fff' },
+  // Teal + red: high separation for engineering figures.
+  { name: 'Engineering', bg: '#FAFAFA', primary: '#1e2223', accent: '#298c8c', accent2: '#a00000', muted: '#6c757d', headerBg: '#298c8c', headerFg: '#fff' },
+  // Dull purple + gold, from the source's three-colour set.
+  { name: 'Psychology / Neuro', bg: '#FAF8FC', primary: '#241d28', accent: '#5e4c5f', accent2: '#ffbb6f', muted: '#6e6480', headerBg: '#5e4c5f', headerFg: '#fff' },
+  // Sequential reds, dark + medium stops.
+  { name: 'Humanities / Arts', bg: '#FDF8F8', primary: '#2b1818', accent: '#a00000', accent2: '#c46666', muted: '#7a6b6b', headerBg: '#a00000', headerFg: '#fff' },
+  // Medium brown + medium teal, from the four-colour sequential pairs.
+  { name: 'Earth Sciences', bg: '#FBF9F4', primary: '#2c2416', accent: '#c99b38', accent2: '#00b0be', muted: '#7a7060', headerBg: '#8a6a20', headerFg: '#fff' },
+  // The source's published grayscale ramp, for mono printing.
+  { name: 'Clean Minimal', bg: '#FFFFFF', primary: '#262626', accent: '#595959', accent2: '#7f7f7f', muted: '#a1a1a1', headerBg: '#262626', headerFg: '#fff' },
 ];
 
 // =========================================================================

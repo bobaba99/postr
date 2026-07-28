@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { buildLatexDocument, paragraphsToLatex } from '../latex/writer';
 import { parseRichText } from '../richText';
 import { baseBlock, makeFixtureDoc } from './fixtures';
+import { DEFAULT_PALETTE } from '@/poster/constants';
 
 const doc = makeFixtureDoc();
 const assetPaths = new Map([['img1', 'figures/figure-1.png']]);
@@ -34,9 +35,16 @@ describe('buildLatexDocument — preamble', () => {
   });
 
   it('defines the poster palette as named colors', () => {
-    expect(tex).toContain('\\definecolor{postrBg}{HTML}{FFFFFF}');
-    expect(tex).toContain('\\definecolor{postrPrimary}{HTML}{1A1A2E}');
-    expect(tex).toContain('\\definecolor{postrAccent}{HTML}{0F4C75}');
+    // Derived from DEFAULT_PALETTE rather than pinned to hexes: this
+    // asserts the MECHANISM (every slot becomes a \definecolor, hash
+    // stripped and uppercased for xcolor's HTML model), which is what
+    // the writer is responsible for. Hard-coded hexes made this test
+    // fail whenever the palette catalog was retuned — a false alarm
+    // about the exporter when only the colours had changed.
+    const hex = (c: string) => c.replace('#', '').toUpperCase();
+    expect(tex).toContain(`\\definecolor{postrBg}{HTML}{${hex(DEFAULT_PALETTE.bg)}}`);
+    expect(tex).toContain(`\\definecolor{postrPrimary}{HTML}{${hex(DEFAULT_PALETTE.primary)}}`);
+    expect(tex).toContain(`\\definecolor{postrAccent}{HTML}{${hex(DEFAULT_PALETTE.accent)}}`);
   });
 
   it('emits a full-size document for >56in posters (no PPTX ceiling)', () => {
