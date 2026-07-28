@@ -25,6 +25,7 @@ import {
 } from '@/data/posterImages';
 import { sanitizeHtml } from '@/poster/sanitizeHtml';
 import { attributionBundleGenerator } from '@/export/attribution';
+import { ensureAckBlock } from '@/export/ackBlock';
 
 const APP_VERSION = '0.0.0';
 
@@ -167,11 +168,23 @@ export async function importPostr(
   // callback synchronously up to its first `await`, so the set is
   // mutated sequentially before any upload resolves.
   const usedImageIds = new Set<string>();
-  doc.blocks = await Promise.all(
+  const unpacked = await Promise.all(
     doc.blocks.map((b) => unpackBlock(b, assetMap, posterId, userId, usedImageIds)),
   );
 
-  return { doc, title: extractTitle(doc), hashMatch };
+  // Re-inject the acknowledgement mark when a returned bundle lacks
+  // it. `.postr` is the one export a user can edit outside Postr —
+  // unzip it, delete the block from poster.json, re-zip — so the
+  // in-editor lock is not sufficient on this path.
+  //
+  // Idempotent by construction: `ensureAckBlock` is a no-op when a
+  // block with the sentinel id is already present, so repeated
+  // export → import round-trips never accumulate a second mark, and
+  // a valid bundle comes back byte-for-byte identical in its blocks.
+  const doc2: PosterDoc = { ...doc, blocks: unpacked };
+  const restored = ensureAckBlock(doc2);
+
+  return { doc: restored, title: extractTitle(restored), hashMatch };
 }
 
 // ── packing helpers ──────────────────────────────────────────────────

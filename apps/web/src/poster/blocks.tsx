@@ -24,6 +24,7 @@ import type {
 } from '@postr/shared';
 import { TABLE_BORDER_PRESETS } from './constants';
 import { CITATION_STYLES, type CitationStyleKey } from './citations';
+import { withAcknowledgementReference } from '@/export/attribution';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { CropOverlay } from './CropOverlay';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
@@ -1462,14 +1463,21 @@ export function RefsBlock({ references, palette, fontFamily, styles, citationSty
     );
   }
   const fmt = CITATION_STYLES[citationStyle] ?? CITATION_STYLES['APA 7'];
+  // The Postr credit renders as the LAST entry, in the poster's own
+  // citation style — the same list the exporters build via
+  // `formatReferencesForExport`, so what the user sees on canvas is
+  // what prints. Appending here (rather than into `doc.references`)
+  // keeps the credit out of the user's editable reference list in the
+  // Refs tab, where it would look like a row they could delete.
+  const entries = withAcknowledgementReference(references);
   return (
     <div style={{ fontFamily, fontSize: styles.body.size * 0.88, color: palette.primary, lineHeight: 1.15 }}>
       <div style={{ fontWeight: 700, fontSize: styles.body.size, marginBottom: 3, color: palette.accent }}>
         References
       </div>
-      {references.map((r, i) => (
+      {entries.map((r, i) => (
         <div key={r.id ?? i} style={{ marginBottom: 2, opacity: 0.85 }}>
-          {fmt(r, i)}
+          {fmt(r as Reference, i)}
         </div>
       ))}
     </div>

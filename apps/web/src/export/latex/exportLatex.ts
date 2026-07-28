@@ -107,14 +107,18 @@ export async function exportPosterLatex(
     files[path] = asset.bytes;
   }
 
+  // The bib now always carries at least the Postr `@misc` entry when
+  // attribution is active, so `hasBib` is derived from the rendered
+  // bib rather than from the user's reference count.
+  const bib = referencesToBib(doc.references, options.attribution);
+
   const { tex, warnings } = buildLatexDocument(doc, {
     ...options,
     assetPaths,
-    hasBib: doc.references.length > 0,
+    hasBib: bib.length > 0,
   });
 
   files['poster.tex'] = textToBytes(tex);
-  const bib = referencesToBib(doc.references);
   if (bib) files['references.bib'] = textToBytes(bib);
   files['README.txt'] = textToBytes(
     buildReadme(doc, bib.length > 0, assetPaths.size > 0),

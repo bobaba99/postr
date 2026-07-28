@@ -44,8 +44,9 @@ export interface LatexWriterOptions extends ExportContentOptions {
   assetPaths?: ReadonlyMap<string, string>;
   /** Whether a references.bib ships alongside (mentioned in header). */
   hasBib?: boolean;
-  /** Paid-plan seam — see export/attribution.ts. */
-  attribution?: AttributionOptions;
+  // `attribution` (the paid-plan seam) is inherited from
+  // ExportContentOptions, which also threads it into the references
+  // formatter so the credit entry honours the same seam.
 }
 
 export interface LatexDocument {

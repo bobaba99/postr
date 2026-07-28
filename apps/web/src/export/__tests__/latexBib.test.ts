@@ -4,8 +4,34 @@ import type { Reference } from '@postr/shared';
 import { referencesToBib } from '../latex/bib';
 
 describe('referencesToBib', () => {
-  it('returns empty string for no references', () => {
-    expect(referencesToBib([])).toBe('');
+  // The credit ships as a real @misc entry, so a reference-less
+  // poster now yields a one-entry bib rather than nothing. A comment
+  // is not citable; an entry is, which is the whole point of the .bib.
+  it('still emits the Postr credit entry when the poster has no references', () => {
+    const bib = referencesToBib([]);
+    expect(bib).toContain('@misc{postr,');
+    expect(bib).toContain('Poster made with postr.sh');
+  });
+
+  it('returns empty string for no references once the paid seam suppresses the credit', () => {
+    expect(referencesToBib([], { paidPlan: true })).toBe('');
+  });
+
+  it('appends the credit LAST, after every user reference', () => {
+    const bib = referencesToBib([
+      { id: 'r1', authors: ['Smith, John'], year: '2026', title: 'A paper' },
+    ]);
+    expect(bib.indexOf('@article{')).toBeLessThan(bib.indexOf('@misc{postr,'));
+  });
+
+  it('namespaces the credit key so it cannot collide with a user entry', () => {
+    // A user reference authored by someone named "Postr" would
+    // generate key `postr<year>`, never bare `postr`.
+    const bib = referencesToBib([
+      { id: 'r1', authors: ['Postr, P'], year: '2026', title: 'Collision bait' },
+    ]);
+    expect(bib.match(/@misc\{postr,/g)).toHaveLength(1);
+    expect(bib).toContain('@article{postr2026,');
   });
 
   it('renders field-based references as @article entries', () => {

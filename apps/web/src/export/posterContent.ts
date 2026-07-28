@@ -13,6 +13,10 @@
  */
 import type { Author, Block, Institution, PosterDoc, Reference } from '@postr/shared';
 import {
+  withAcknowledgementReference,
+  type AttributionOptions,
+} from './attribution';
+import {
   CITATION_STYLES,
   DEFAULT_CITATION_STYLE,
   sortReferences,
@@ -129,6 +133,8 @@ export function deriveAuthorsContent(
 export interface ExportContentOptions {
   citationStyle?: CitationStyleKey;
   sortMode?: SortMode;
+  /** Paid-plan seam — see export/attribution.ts. */
+  attribution?: AttributionOptions;
 }
 
 /**
@@ -137,6 +143,16 @@ export interface ExportContentOptions {
  * citations.ts (split with `splitItalicMarkers`).
  *
  * Defaults mirror the editor: APA 7, alphabetical sort.
+ *
+ * The Postr credit is appended as the LAST entry (owner decision) —
+ * see `withAcknowledgementReference`. It is added AFTER sorting on
+ * purpose: sorting first would alphabetize "Postr" into the middle of
+ * the user's list, where a tool citation does not belong. Numbering
+ * still runs over the combined list, so Vancouver/IEEE give it the
+ * correct final index.
+ *
+ * Appending is idempotent, so a doc whose `references` already carry
+ * the entry (a re-imported `.postr`) does not gain a second one.
  */
 export function formatReferencesForExport(
   references: readonly Reference[],
@@ -145,7 +161,9 @@ export function formatReferencesForExport(
   const style = options.citationStyle ?? DEFAULT_CITATION_STYLE;
   const sortMode = options.sortMode ?? 'alpha';
   const fmt = CITATION_STYLES[style] ?? CITATION_STYLES[DEFAULT_CITATION_STYLE];
-  return sortReferences([...references], sortMode).map((r, i) => fmt(r, i));
+  const sorted = sortReferences([...references], sortMode);
+  const withAck = withAcknowledgementReference(sorted, options.attribution);
+  return withAck.map((r, i) => fmt(r, i));
 }
 
 // =========================================================================

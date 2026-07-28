@@ -48,10 +48,27 @@ describe('exportPosterLatex', () => {
     expect(entries['figures/figure-1.png']).toBeDefined();
   });
 
-  it('omits references.bib when the poster has no references', async () => {
+  // A reference-less poster still ships a .bib, because the credit is
+  // now a citable @misc entry rather than a comment. The bundle is
+  // only bib-less once the paid seam suppresses the credit.
+  it('still ships references.bib carrying the credit when the poster has no references', async () => {
     const doc = makeFixtureDoc({ references: [] });
     const { bytes } = await exportPosterLatex(doc, {
       fetcher: async () => TINY_PNG_BYTES,
+    });
+    const entries = unzipSync(bytes);
+    expect(entries['references.bib']).toBeDefined();
+    expect(new TextDecoder().decode(entries['references.bib'])).toContain(
+      '@misc{postr,',
+    );
+    expect(entries['poster.tex']).toBeDefined();
+  });
+
+  it('omits references.bib entirely when there are no references and no credit', async () => {
+    const doc = makeFixtureDoc({ references: [] });
+    const { bytes } = await exportPosterLatex(doc, {
+      fetcher: async () => TINY_PNG_BYTES,
+      attribution: { paidPlan: true },
     });
     const entries = unzipSync(bytes);
     expect(entries['references.bib']).toBeUndefined();
