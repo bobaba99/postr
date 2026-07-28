@@ -10,6 +10,16 @@
 
 ### #1 — Put "Made with postr.sh" on every free-tier export, and ship it before the August notification wave
 
+> **Terminology note (Gavin, 2026-07-28).** The mark is framed as an
+> **acknowledgement**, not a "watermark" — "users got a free service,
+> the mark is the least they can do." "Watermark" survives below only as
+> the label for the anti-pattern *"make watermark removal the primary
+> paid benefit"*, which is still a dead end. The distinction that
+> matters: the paid tier's value is the **clean editable export**
+> (PPTX/LaTeX), and removing the mark is a *side effect* of that, never
+> the thing being sold. Built as `export/ackMark.ts` — an SVG mark
+> rasterized to PNG for PowerPoint (see `docs/bugs/2026-07-28-pptx-…`).
+
 **Why it's first:** highest impact per hour of work in the entire research set. A conference poster hangs at eye level for 3-6 hours in a room full of exactly the target audience. Nothing else Postr can do reaches 50-200 psychology/medicine researchers for zero marginal cost.
 
 - `[EVIDENCE]` BioRender contractually requires free-tier exports to carry "Created with BioRender.com"; that mark now appears in 500,000+ journal citations against 4M+ researchers — roughly 1 citation per 8 users. The absolute numbers are company-reported and self-serving, but the *mechanism* is verifiable in the licensing terms.
@@ -141,9 +151,16 @@
 - `[EVIDENCE — honesty flag]` The "credits beat subscriptions under bursty demand" claim has **essentially no evidence base**. A dedicated search for academic or experimental work returned only vendor content marketing from billing companies (Flexprice, Lago, Tangle, Freemius, Apiable) with a direct commercial interest in usage-based billing. The assertion is plausible and internally consistent across sources but has no cited study, sample, or experiment behind it anywhere. Keep the credits because the instinct is good and the cost of keeping them is zero, not because the literature supports it.
 - `[JUDGEMENT]` Time the deck add-on's promotion to March-April. `[EVIDENCE]` Thesis-defence deadlines cluster there (WMU Apr 17, U. Miami defend-by Mar 27, CU Boulder Apr 12), and the already-measured "how many slides for 10 minute presentation" keyword (480/mo, KD 0) is defence-shaped, not poster-shaped.
 
-### What to meter: the export, never the clock
+### What to meter: the format, never the clock (and never the count)
 
-**Free = unlimited editing + one full-resolution/print-ready export per term. Paid = additional exports + decks.**
+> **UPDATED 2026-07-28.** This section originally proposed a **quantity**
+> meter — "one print-ready export per term". That was superseded the
+> same week by a **format** meter, for the reasons the paywall doc lays
+> out (a per-term count punishes the re-export-after-every-advisor-comment
+> behaviour Postr wants, and taxes the user who fixes a typo). The line
+> below is the current decision. See `2026-07-28-payment-and-paywall.md`.
+
+**Free = unlimited editing + unlimited watermarked PDF export. Paid = clean PPTX / LaTeX export + presentation export.**
 
 - `[EVIDENCE]` The Frontiers RCT (n=680,588) identified **demand saturation** — users fulfilling their need during the free window — as an offsetting negative force, and found creative/exploratory features showed cannibalization risk from longer exposure.
 - `[JUDGEMENT]` A poster is the extreme demand-saturation case: one artifact, one date. A user who finishes their poster inside any time-limited free window has permanently zero reason to pay. **This is the single strongest argument in the entire research set for metering the artifact rather than the clock**, and it rules out the 14-day trial that 62% of products use.
@@ -168,7 +185,14 @@
 - `[EVIDENCE — critical caveat]` The standard "find your aha moment" method is **correlational by construction**, and no peer-reviewed validation of it was found. Even Lenny Rachitsky's own widely-circulated framework is explicit that steps 1-2 produce only correlation and that structured experimentation is required for causality. The failure mode here is mechanical: users who export are users who *had a poster to make*, so exporting predicts retention partly because motivated users both export and return.
 - `[EVIDENCE]` Do not copy thresholds by analogy. Slack's 2,000 messages measures *team* value under network effects and has no analogue in a single-author poster tool.
 - **The actual test `[JUDGEMENT]`:** does an intervention that *raises* export rate also raise return-in-next-season rate? If pushing more people to export doesn't move seasonal return, the metric is a bystander, not a lever.
-- **Implementation note `[EVIDENCE]`:** this runs against the standing no-analytics/no-cookies decision. It needs first-party server-side counting, not PostHog or GA4.
+- **Implementation note `[EVIDENCE]` — UPDATED 2026-07-28.** The
+  "standing no-analytics/no-cookies decision" this line referenced was
+  partially reversed: **Vercel Web Analytics is now installed** (commit
+  `5099102`, fixed in `b171452`). It is cookieless and privacy-first, so
+  it does not reintroduce a cookie-consent gate — the no-*cookies* stance
+  holds, the no-*analytics* stance does not. Activation-rate measurement
+  can now lean on Vercel's page/event data rather than needing bespoke
+  first-party server-side counting; PostHog/GA4 are still not used.
 - **Danger `[EVIDENCE]`:** optimizing a correlational metric can actively mislead. Chasing "exports" could push toward nagging prompts that raise the number while degrading the experience for deliberately non-tech-savvy users.
 
 ---
