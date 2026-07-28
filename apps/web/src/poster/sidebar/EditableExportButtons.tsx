@@ -16,12 +16,14 @@
  * the citation style used to render the references block.
  */
 import { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { BusyIndicator, busyProps } from '@/components/BusyIndicator';
 import { usePosterStore } from '@/stores/posterStore';
 import type { CitationStyleKey } from '@/poster/citations';
 import { PPTX_MAX_DIMENSION_IN } from '@/export/units';
 import { usePlan } from '@/hooks/usePlan';
 import { createCheckout, consumeExportCredit as consumeCreditApi } from '@/data/billing';
+import { stashCheckoutIntent, type CheckoutPlan } from '@/data/checkoutIntent';
 
 type ExportKind = 'latex' | 'pptx';
 
@@ -82,6 +84,7 @@ export function EditableExportButtons({
   const doc = usePosterStore((s) => s.doc);
   const posterTitle = usePosterStore((s) => s.posterTitle);
   const plan = usePlan();
+  const navigate = useNavigate();
   const [state, setState] = useState<ExportState>(IDLE);
 
   // The paywall (docs/plans/2026-07-28-payment-and-paywall.md): editable
@@ -142,7 +145,17 @@ export function EditableExportButtons({
     }
   }
 
-  async function startCheckout(sku: 'term' | 'pack') {
+  async function startCheckout(sku: CheckoutPlan) {
+    // A guest cannot check out — create-checkout requires a permanent
+    // account (it returns permanent_account_required). Route them through
+    // the account-first flow instead of firing a doomed API call: /auth
+    // creates a real account (or links Google) and then resumes checkout
+    // for this plan. The stash is the OAuth-round-trip fallback.
+    if (plan.isGuest) {
+      stashCheckoutIntent(sku);
+      navigate(`/auth?plan=${sku}`);
+      return;
+    }
     try {
       const url = await createCheckout(sku);
       window.location.href = url;
@@ -210,8 +223,9 @@ export function EditableExportButtons({
             Keep editing in PowerPoint or Overleaf
           </div>
           <div style={{ fontSize: 12.5, color: '#9ca3af', lineHeight: 1.5, marginBottom: 12 }}>
-            Your PDF export is free. Unlock clean PowerPoint &amp; LaTeX with a
-            $18.99 term, or grab a $9.99 3-export pack.
+            Your PDF export is free. Unlock clean PowerPoint &amp; LaTeX with the
+            CA$18.99 term (renews every 4 months, cancel anytime), or a CA$9.99
+            3-export pack whose credits never expire.
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
@@ -247,6 +261,16 @@ export function EditableExportButtons({
               Get the pack
             </button>
           </div>
+          {/* Guests can't check out (payment needs a real account). Set the
+              expectation up front so the redirect to sign-up reads as the
+              next step, not a surprise. */}
+          {plan.isGuest && (
+            <div style={{ fontSize: 11.5, color: '#8b8f99', lineHeight: 1.5, marginTop: 10 }}>
+              You&apos;re working as a guest — you&apos;ll create a free account
+              (or sign in with Google) first, so your purchase and posters stay
+              yours across devices.
+            </div>
+          )}
         </div>
       )}
       {/* Credit-holder reassurance: show the remaining count so a pack
@@ -254,7 +278,7 @@ export function EditableExportButtons({
       {!plan.loading && canExport && usesCredit && (
         <div style={{ ...hintStyle, color: '#a3a7b3', marginTop: 0, marginBottom: 10 }}>
           {plan.credits} export{plan.credits === 1 ? '' : 's'} left in your pack —
-          each PowerPoint or LaTeX export uses one.
+          each PowerPoint or LaTeX export uses one. Credits never expire.
         </div>
       )}
       <button

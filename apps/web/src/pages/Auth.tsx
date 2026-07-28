@@ -257,7 +257,7 @@ export default function Auth() {
         {checkoutPlan ? (
           <div className="rounded-xl border border-[#7c6aed]/40 bg-[#14121e] p-5 mb-4 text-center">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-[#9b8cf0]">
-              {checkoutPlan === 'term' ? 'Term · $18.99' : 'Export pack · $9.99'}
+              {checkoutPlan === 'term' ? 'Term · CA$18.99 / 4 months' : 'Export pack · CA$9.99'}
             </div>
             <p className="mt-2 text-sm leading-relaxed text-[#c8cad0]">
               {checkingOut
