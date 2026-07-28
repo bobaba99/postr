@@ -24,7 +24,7 @@ import type {
 } from '@postr/shared';
 import { TABLE_BORDER_PRESETS } from './constants';
 import { CITATION_STYLES, type CitationStyleKey } from './citations';
-import { withAcknowledgementReference } from '@/export/attribution';
+import { ACK_REFERENCE_ID, withAcknowledgementReference } from '@/export/attribution';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { CropOverlay } from './CropOverlay';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
@@ -1482,7 +1482,17 @@ export function RefsBlock({ references, palette, fontFamily, styles, citationSty
         References
       </div>
       {entries.map((r, i) => (
-        <div key={r.id ?? i} style={{ marginBottom: 2, opacity: 0.85 }}>
+        <div
+          key={r.id ?? i}
+          style={{
+            marginBottom: 2,
+            opacity: 0.85,
+            // The credit is bold at the owner's request. Only that row:
+            // bolding the whole list would flatten the distinction
+            // between the user's citations and ours.
+            ...(r.id === ACK_REFERENCE_ID ? { fontWeight: 600 } : null),
+          }}
+        >
           {fmt(r as Reference, i)}
         </div>
       ))}

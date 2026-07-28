@@ -128,6 +128,10 @@ export function acknowledgementPrintCss(opts: AttributionOptions = {}): string {
     z-index: 1;
     font-family: system-ui, -apple-system, sans-serif;
     font-size: 7px;
+    /* Bold at the owner's request. The size and muted colour still do
+       the subordinating, so the line reads as a credit with a little
+       more presence rather than as something competing for attention. */
+    font-weight: 600;
     line-height: 1;
     letter-spacing: 0.02em;
     color: rgba(107, 114, 128, 0.72);
@@ -202,7 +206,7 @@ export function acknowledgementLatexBlock(
   const y = Number((heightIn * 10 - 3).toFixed(3));
   return [
     `\\begin{textblock}{40}(3,${y})`,
-    `{\\fontsize{9pt}{11pt}\\selectfont\\textcolor{postrMuted}{${ACKNOWLEDGEMENT_TEXT}}\\par}`,
+    `{\\fontsize{9pt}{11pt}\\selectfont\\bfseries\\textcolor{postrMuted}{${ACKNOWLEDGEMENT_TEXT}}\\par}`,
     '\\end{textblock}',
   ].join('\n');
 }
