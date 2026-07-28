@@ -36,3 +36,31 @@ export async function consumeExportCredit(): Promise<number | null> {
   );
   return credits;
 }
+
+/** Where a user manages their subscription when the portal isn't available. */
+export const LINK_MANAGE_URL = 'https://link.com';
+
+/**
+ * Open the subscription-management surface for the signed-in user.
+ *
+ * Prefers a Stripe Billing customer-portal session (deep-links straight to
+ * THEIR subscription — cancel, update card, receipts). Under Managed
+ * Payments the portal may be unavailable (Link is the merchant of record),
+ * so on any failure this falls back to the generic link.com — never a dead
+ * end. Returns the URL it navigated to (or null if it couldn't).
+ */
+export async function openBillingPortal(): Promise<string> {
+  try {
+    const { url } = await postJson<{ url: string | null }>(
+      '/billing/portal',
+      {},
+      { auth: true },
+    );
+    if (url) return url;
+  } catch {
+    // Portal unavailable/unconfigured under MoR, or no customer — fall
+    // through to the Link homepage where the user can still find their
+    // Postr subscription.
+  }
+  return LINK_MANAGE_URL;
+}

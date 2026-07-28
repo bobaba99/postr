@@ -39,7 +39,8 @@ import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import type { User } from '@supabase/supabase-js';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
-import { usePlan } from '@/hooks/usePlan';
+import { usePlan, type PlanState } from '@/hooks/usePlan';
+import { openBillingPortal } from '@/data/billing';
 
 type ConfirmAction =
   | 'deletePosters'
@@ -612,49 +613,13 @@ export default function Profile() {
           )}
         </Section>
 
-        {/* Subscription / billing — shown once the plan has loaded and the
-            user has something billed. Managed Payments makes Link the
-            merchant of record, so subscription management (cancel, update
-            card, receipts) lives at link.com, not a Postr-hosted portal. */}
-        {!plan.loading && (plan.hasActiveTerm || plan.credits > 0) && (
-          <Section title="Subscription">
-            <div className="space-y-3">
-              {plan.hasActiveTerm && (
-                <>
-                  <p className="text-[14pt] text-[#c8cad0]">
-                    Your term is active — PowerPoint and LaTeX export are
-                    unlocked, no watermark.
-                    {plan.subscriptionStatus === 'past_due' && (
-                      <span className="text-[#fbbf24]">
-                        {' '}There’s a payment issue on your latest renewal —
-                        update your card at Link to keep your term.
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-[14pt] text-[#6b7280]">
-                    The term renews every 4 months. Manage it — update your
-                    card, see receipts, or cancel — at Link, which handles
-                    billing for Postr.
-                  </p>
-                  <a
-                    href="https://link.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-block rounded-md border border-[#2a2a3a] bg-[#111118] px-4 py-2 text-[14pt] font-medium text-[#c8cad0] no-underline hover:border-[#7c6aed] hover:text-[#fff]"
-                  >
-                    Manage subscription at Link ↗
-                  </a>
-                </>
-              )}
-              {!plan.hasActiveTerm && plan.credits > 0 && (
-                <p className="text-[14pt] text-[#c8cad0]">
-                  You have {plan.credits} export{plan.credits === 1 ? '' : 's'}{' '}
-                  left in your pack. Credits never expire — use them whenever.
-                </p>
-              )}
-            </div>
-          </Section>
-        )}
+        {/* Subscription / billing — ALWAYS shown (free users see the plan
+            state + a path to upgrade). Managed Payments makes Link the
+            merchant of record, so management (cancel, update card, receipts)
+            happens via the Stripe billing portal, falling back to link.com. */}
+        <Section title="Subscription">
+          <SubscriptionPanel plan={plan} />
+        </Section>
 
         {/* Data export — GDPR Art. 15 / 20 */}
         <Section title="Your data">
@@ -1044,6 +1009,91 @@ function DangerAction({
       <button onClick={onClick} disabled={disabled} className={btnDanger}>
         {buttonText}
       </button>
+    </div>
+  );
+}
+
+// ── SubscriptionPanel — plan state + manage/upgrade, always shown ──
+
+function SubscriptionPanel({ plan }: { plan: PlanState }) {
+  const [opening, setOpening] = useState(false);
+
+  const handleManage = async () => {
+    setOpening(true);
+    // Prefer the Stripe portal (deep-links to their own subscription),
+    // falling back to link.com — openBillingPortal never rejects.
+    const url = await openBillingPortal();
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setOpening(false);
+  };
+
+  if (plan.loading) {
+    return <p className="text-[14pt] text-[#6b7280]">Loading your plan…</p>;
+  }
+
+  if (plan.hasActiveTerm) {
+    return (
+      <div className="space-y-3">
+        <p className="text-[14pt] text-[#c8cad0]">
+          Your term is active — PowerPoint and LaTeX export are unlocked, no
+          watermark.
+          {plan.subscriptionStatus === 'past_due' && (
+            <span className="text-[#fbbf24]">
+              {' '}There’s a payment issue on your latest renewal — update your
+              card to keep your term.
+            </span>
+          )}
+        </p>
+        <p className="text-[14pt] text-[#6b7280]">
+          The term renews every 4 months. Manage it — update your card, see
+          receipts, or cancel — through Stripe, which handles billing for Postr.
+        </p>
+        <button
+          type="button"
+          onClick={handleManage}
+          disabled={opening}
+          className="rounded-md border border-[#2a2a3a] bg-[#111118] px-4 py-2 text-[14pt] font-medium text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] disabled:opacity-50"
+        >
+          {opening ? 'Opening…' : 'Manage subscription ↗'}
+        </button>
+      </div>
+    );
+  }
+
+  if (plan.credits > 0) {
+    return (
+      <div className="space-y-3">
+        <p className="text-[14pt] text-[#c8cad0]">
+          You have {plan.credits} export{plan.credits === 1 ? '' : 's'} left in
+          your pack. Credits never expire — use them whenever.
+        </p>
+        <Link
+          to="/pricing"
+          className="inline-block rounded-md border border-[#2a2a3a] bg-[#111118] px-4 py-2 text-[14pt] font-medium text-[#c8cad0] no-underline hover:border-[#7c6aed] hover:text-[#fff]"
+        >
+          See plans
+        </Link>
+      </div>
+    );
+  }
+
+  // Free / no plan.
+  return (
+    <div className="space-y-3">
+      <p className="text-[14pt] text-[#c8cad0]">
+        You’re on the free plan — unlimited editing and print-ready PDF export,
+        with a small “made with postr.sh” mark.
+      </p>
+      <p className="text-[14pt] text-[#6b7280]">
+        Unlock clean PowerPoint &amp; LaTeX export with the term, or a one-time
+        export pack whose credits never expire.
+      </p>
+      <Link
+        to="/pricing"
+        className="inline-block rounded-md border border-[#7c6aed] bg-transparent px-4 py-2 text-[14pt] font-semibold text-[#7c6aed] no-underline hover:bg-[#7c6aed] hover:text-white"
+      >
+        View plans
+      </Link>
     </div>
   );
 }

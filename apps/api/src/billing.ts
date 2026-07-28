@@ -271,6 +271,65 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
     },
   );
 
+  // ── Deep-link the signed-in user to manage THEIR subscription.
+  //    Creates a Stripe Billing customer-portal session bound to their
+  //    stripe_customer_id and returns its URL, so they land straight on
+  //    their own subscription (cancel, update card, receipts) rather than
+  //    the generic link.com homepage.
+  //
+  //    Managed Payments makes Link the merchant of record, and Stripe's
+  //    docs say a merchant "can offer additional subscription management
+  //    using the Customer Portal" — but whether billingPortal composes
+  //    with MoR (and whether a portal configuration exists) is not
+  //    guaranteed. So this fails SOFT: on any Stripe error it returns
+  //    503 portal_unavailable and the client falls back to link.com,
+  //    never a dead end.
+  router.post(
+    '/billing/portal',
+    requireAuth(getSupabaseAdmin, { requirePermanent: true }),
+    checkoutLimiter,
+    async (_req: Request, res: Response) => {
+      const stripe = getStripe();
+      const supabase = getSupabaseAdmin();
+      if (!stripe || !supabase) {
+        return res.status(500).json({ error: 'billing_not_configured' });
+      }
+      const user = (res.locals as AuthLocals).user;
+
+      // Look up the user's Stripe customer id (service_role read).
+      const { data, error } = await supabase
+        .from('users')
+        .select('stripe_customer_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error('[billing] portal customer lookup failed:', error.message);
+        return res.status(500).json({ error: 'portal_lookup_failed' });
+      }
+      const customerId = (data as { stripe_customer_id?: string | null } | null)
+        ?.stripe_customer_id;
+      if (!customerId) {
+        // Never purchased — nothing to manage.
+        return res.status(409).json({ error: 'no_customer' });
+      }
+
+      try {
+        const portal = await stripe.billingPortal.sessions.create({
+          customer: customerId,
+          return_url: `${process.env.APP_ORIGIN ?? 'http://localhost:5173'}/profile`,
+        });
+        return res.json({ url: portal.url });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'portal_failed';
+        // eslint-disable-next-line no-console
+        console.error('[billing] portal session create failed:', message);
+        // Soft failure → client falls back to link.com.
+        return res.status(503).json({ error: 'portal_unavailable' });
+      }
+    },
+  );
+
   return router;
 }
 
