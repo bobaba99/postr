@@ -1,47 +1,52 @@
 /**
- * RotatingWord — one slot in a sentence that cycles through phrases.
+ * RotatingWord — a line that types out a series of phrases in turn.
  *
- * Used in the landing hero to let a single line carry several claims
- * without becoming a list. The sentence stays readable as prose; the
- * slot does the work.
+ * Used in the landing hero to let one sentence carry several claims
+ * without becoming a bullet list.
  *
- * Three things this deliberately gets right, because rotating text is
- * usually done badly:
+ * IT SITS ON ITS OWN LINE, ON PURPOSE. Earlier versions ran the slot
+ * inline inside the sentence, which made the phrase's rendered WIDTH a
+ * layout problem: the sentence reflowed on every change, and reserving
+ * the widest phrase left a visible gap after the short ones. That was
+ * fought with a character budget, then a pixel budget, then a hidden
+ * grid sizer — and phrases still clipped. Breaking the line removes the
+ * constraint rather than managing it: nothing follows the phrase on its
+ * line, so a long one simply has room. Add phrases freely; there is no
+ * width budget to respect any more.
  *
- * 1. THE SENTENCE NEVER REFLOWS. The slot reserves the widest phrase,
- *    so the words after it never jump as phrases change. This only
- *    works because the phrases are written to a tight length budget —
- *    see HERO_FRICTIONS in Landing.tsx. An earlier attempt reserved
- *    the widest phrase over a set that ran 16–34 characters, which
- *    left a visible gap after every short phrase; the fix is equal
- *    phrases, not a slot that resizes under the reader.
+ * Three things this deliberately gets right:
  *
- * 2. REDUCED MOTION IS RESPECTED, and respected properly — not by
- *    animating anyway, and not by freezing on the first phrase
- *    forever. The text still changes so the reader sees every claim;
- *    it simply cross-fades instead of rotating. Anyone who has asked
- *    their OS to stop things moving gets that, without losing content.
+ * 1. NO LAYOUT SHIFT. The line reserves its own height from the
+ *    typography, so the buttons below never move as phrases change —
+ *    and because the caret sits at the end of the text rather than in
+ *    reserved space, nothing jumps horizontally either.
  *
- * 3. IT IS READABLE BY A CRAWLER AND A SCREEN READER. All phrases are
- *    in the DOM. The visible one is announced via aria-live="polite"
- *    only when the user has NOT asked for reduced motion — otherwise
- *    a politely-announced change every few seconds is its own kind
- *    of hostile.
+ * 2. REDUCED MOTION IS RESPECTED, and properly — not by animating
+ *    anyway, and not by freezing on the first phrase forever. Each
+ *    phrase appears whole and holds; the reader still sees every claim
+ *    without a character-by-character effect that is, by definition,
+ *    the thing they asked their OS to stop.
  *
- * The transition is a CUBE ROTATION: the outgoing phrase rotates away
- * about the x-axis while the incoming one rotates in behind it, so the
- * two read as adjacent faces of a solid rather than one word blinking
- * out and another blinking in. Both faces are in the DOM during the
- * turn — that is what makes it a rotation and not a cross-fade.
+ * 3. IT IS READABLE BY A CRAWLER AND A SCREEN READER. The full current
+ *    phrase is always in the DOM as text — the typing effect reveals a
+ *    substring, so no assistive technology sees a half-word. The live
+ *    region announces only settled phrases, never mid-type, and only
+ *    when motion is welcome.
  */
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * Dwell time per phrase, including the turn. 2600ms read as frantic;
- * at ~26 characters a phrase this leaves roughly three seconds to
- * actually finish reading one before it moves.
+ * Typing cadence. 45ms/char is the range that reads as brisk
+ * typing rather than a stutter; at ~25 characters a phrase takes
+ * roughly a second to appear.
  */
-const ROTATE_MS = 4200;
+const TYPE_MS = 45;
+/** Erase runs faster than typing — nobody needs to watch a rewind. */
+const ERASE_MS = 22;
+/** How long a completed phrase holds before it erases. */
+const HOLD_MS = 1500;
+/** Beat between erasing one phrase and typing the next. */
+const GAP_MS = 220;
 
 interface RotatingWordProps {
   /** Phrases to cycle through, in order. At least one. */
@@ -70,75 +75,80 @@ function usePrefersReducedMotion(): boolean {
 
 export function RotatingWord({ phrases, className = '' }: RotatingWordProps) {
   const [index, setIndex] = useState(0);
-  // The phrase rotating OUT. null on first paint, so the hero does not
-  // animate a face in from nothing before the reader has looked at it.
-  const [previous, setPrevious] = useState<number | null>(null);
+  const [typed, setTyped] = useState(() => phrases[0] ?? '');
+  const [erasing, setErasing] = useState(false);
   const reducedMotion = usePrefersReducedMotion();
   const timer = useRef<number | null>(null);
 
+  const current = phrases[index % phrases.length] ?? '';
+
+  /*
+    One timeout per step rather than an interval: each phase has its own
+    duration (type, hold, erase, gap), and a single interval cannot
+    express that without tracking elapsed time by hand.
+
+    Under reduced motion the whole state machine collapses to "swap the
+    phrase on a slow timer" — no substring animation at all.
+  */
   useEffect(() => {
     if (phrases.length <= 1) return;
-    timer.current = window.setInterval(() => {
-      setIndex((i) => {
-        setPrevious(i);
-        return (i + 1) % phrases.length;
-      });
-    }, ROTATE_MS);
-    return () => {
-      if (timer.current !== null) window.clearInterval(timer.current);
-    };
-  }, [phrases.length]);
 
-  const current = phrases[index % phrases.length] ?? '';
-  const outgoing = previous === null ? null : phrases[previous % phrases.length] ?? null;
+    if (reducedMotion) {
+      setTyped(current);
+      timer.current = window.setTimeout(
+        () => setIndex((i) => (i + 1) % phrases.length),
+        HOLD_MS + 1200,
+      );
+      return () => {
+        if (timer.current !== null) window.clearTimeout(timer.current);
+      };
+    }
+
+    let delay: number;
+    let next: () => void;
+
+    if (!erasing && typed.length < current.length) {
+      delay = TYPE_MS;
+      next = () => setTyped(current.slice(0, typed.length + 1));
+    } else if (!erasing && typed.length === current.length) {
+      delay = HOLD_MS;
+      next = () => setErasing(true);
+    } else if (erasing && typed.length > 0) {
+      delay = ERASE_MS;
+      next = () => setTyped(current.slice(0, typed.length - 1));
+    } else {
+      delay = GAP_MS;
+      next = () => {
+        setErasing(false);
+        setIndex((i) => (i + 1) % phrases.length);
+      };
+    }
+
+    timer.current = window.setTimeout(next, delay);
+    return () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+    };
+  }, [typed, erasing, current, index, phrases.length, reducedMotion]);
+
+  // Announce only settled phrases. Announcing every keystroke would
+  // make a screen reader read the phrase letter by letter.
+  const settled = typed === current;
 
   return (
-    <span className="postr-rotating-word">
-      {/*
-        Width reservation: ALL phrases, stacked in a grid cell so the
-        slot is as wide as the genuinely widest one and as tall as one
-        line. Present in layout, hidden from everyone.
-
-        An earlier version reserved whichever phrase had the most
-        CHARACTERS, which is not the same thing — measured at the
-        hero's face, "the unreadable tiny figures" (27 chars, 219.4px)
-        is wider than "the authors and affiliations" (28 chars,
-        218.5px), so the slot came up 3px short and that one phrase
-        overflowed. Letting the browser measure removes the guess, and
-        also means new phrases can't silently break the layout.
-      */}
-      <span className="postr-rotating-word__sizer" aria-hidden="true">
-        {phrases.map((phrase, i) => (
-          <span key={i} className="postr-rotating-word__sizer-item">
-            {phrase}
-          </span>
-        ))}
-      </span>
-
-      {/*
-        Both faces are mounted during a turn. `key` on each face
-        restarts its animation on every rotation; the outgoing face is
-        aria-hidden so a screen reader never hears the old and new
-        phrase as one run-on string.
-      */}
-      {outgoing !== null && !reducedMotion && (
-        <span
-          key={`out-${previous}-${index}`}
-          aria-hidden="true"
-          className={`postr-rotating-word__face postr-rotating-word__face--out ${className}`}
-        >
-          {outgoing}
-        </span>
-      )}
-
+    <span className="postr-typed-line">
       <span
-        // Announced only when motion is welcome — see the note above.
+        className={`postr-typed-line__text ${className}`}
         aria-live={reducedMotion ? 'off' : 'polite'}
-        className={`postr-rotating-word__face postr-rotating-word__face--in ${className}`}
-        key={`in-${index}`}
       >
-        {current}
+        {typed}
       </span>
+      <span className="postr-typed-line__caret" aria-hidden="true" />
+      {/*
+        The full phrase for assistive tech and crawlers, so neither
+        depends on the animation's progress. `settled` keeps the live
+        region above from double-announcing mid-type.
+      */}
+      <span className="sr-only">{settled ? '' : current}</span>
     </span>
   );
 }

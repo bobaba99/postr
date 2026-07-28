@@ -435,150 +435,75 @@ body {
  * moving. Freezing on one phrase would hide content from the people
  * most likely to be reading carefully.
  */
-/* Rotating hero slot, animated as a CUBE.
+/* Typed hero line.
  *
- * The slot reserves the WIDEST phrase so the sentence around it never
- * reflows. That only reads well because the phrases are written to a
- * 22–28 character band (see HERO_FRICTIONS in Landing.tsx) — reserving
- * the widest over a 16–34 char set is what left a visible gap after
- * every short phrase in an earlier pass. Equal phrases, not an elastic
- * slot: the fix belongs in the copy.
+ * The phrase sits on its OWN LINE, which is what makes this simple.
+ * Earlier inline versions had to reconcile the phrase's rendered width
+ * against the rest of the sentence — a character budget, then a pixel
+ * budget, then a hidden grid sizer — and phrases still clipped.
+ * Nothing follows the phrase on its line now, so width is not a
+ * constraint and none of that machinery is needed. Add phrases freely;
+ * there is no width budget to respect any more.
  *
- * `perspective` on the container is what makes the turn read as a
- * solid rotating rather than as text squashing vertically. It is set
- * in `em` so the effect scales with the type rather than being tuned
- * to one font size. */
-.postr-rotating-word {
-  position: relative;
+ * `min-height: 1lh` reserves exactly one line from the element's own
+ * typography, so the brief empty moment between phrases cannot collapse
+ * the line and bounce the buttons below it. */
+.postr-typed-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.08em;
+  min-height: 1lh;
+}
+
+/* Wrapping is allowed rather than clipped: a long phrase on a narrow
+ * phone should take a second line, never disappear. The container
+ * reserves one line and grows if a phrase needs two. */
+.postr-typed-line__text {
+  text-align: center;
+}
+
+/* The caret trails the text rather than sitting in reserved space, so
+ * the line's width follows the typed substring and nothing shifts
+ * around it. Sized in `em` so it tracks the type scale. */
+.postr-typed-line__caret {
   display: inline-block;
-  vertical-align: bottom;
-  text-align: left;
-  perspective: 22em;
-  /* Faces rotate about an axis BEHIND the slot, so mid-turn each one
-   * swings outside the slot's box — above it going out, below it
-   * coming in. Unclipped, a turn shows both phrases stacked on top of
-   * the line below, which reads as broken text rather than as a cube.
-   * `clip` rather than `hidden` because `hidden` on an inline-block
-   * establishes a scroll container, and a stray 1px of overflow then
-   * makes the hero scrollable sideways on a phone.
-   *
-   * The clip box is padded vertically so the faces are trimmed at the
-   * slot edges rather than through the glyphs: descenders and the
-   * rotation both need a little room, and `overflow-clip-margin`
-   * grants it without letting the faces escape into the next line. */
-  overflow: clip;
-}
-
-/* Reserves width AND height by sitting in normal flow. The faces are
- * absolutely positioned over it, so the slot's size is this element's
- * size — stable regardless of which phrase is showing. Invisible but
- * not `display:none`, so it still lays out.
- *
- * Every phrase is inside, stacked into a SINGLE grid cell: the grid
- * sizes to its widest item, and because all items share cell 1/1 they
- * overlap instead of stacking down the page. So the slot is exactly as
- * wide as the widest rendered phrase and exactly one line tall, with
- * the browser doing the measuring. Picking a "widest" string in JS by
- * character count got this wrong by 3px — see RotatingWord.tsx. */
-.postr-rotating-word__sizer {
-  display: inline-grid;
-  visibility: hidden;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.postr-rotating-word__sizer-item {
-  grid-area: 1 / 1;
-}
-
-/* Both faces overlay the sizer, filling the slot exactly. `inset: 0`
- * rather than `left/top: 0` because an absolutely positioned INLINE
- * box collapses to zero height — measured at 0.6px, which made the
- * rotation invisible. Stretching to the slot's own box gives each face
- * a real height to rotate about. */
-.postr-rotating-word__face {
-  position: absolute;
-  inset: 0;
-  white-space: nowrap;
-  /* Rotate about the face's OWN centre, in its own plane. Pushing the
-   * axis behind the slot (`center center -0.5em`) swings each face out
-   * through the top and bottom edges mid-turn, so both phrases were
-   * visible at once, stacked over the following line — the exact
-   * "sudden appear and disappear" mess a cube is supposed to avoid.
-   * With the axis in-plane, the turn stays inside the slot and the
-   * clip above only has to catch sub-pixel spill. */
-  transform-origin: center center;
-  backface-visibility: hidden;
+  width: 0.09em;
+  height: 1.05em;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.85;
+  transform: translateY(0.08em);
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .postr-rotating-word__face--in {
-    animation: postr-cube-in var(--dur-slow) var(--ease-out) both;
-  }
-
-  .postr-rotating-word__face--out {
-    animation: postr-cube-out var(--dur-slow) var(--ease-out) both;
+  .postr-typed-line__caret {
+    animation: postr-caret-blink 1.1s steps(1, end) infinite;
   }
 }
 
-/* Reduced motion: no rotation, no vertical travel — the phrase still
- * changes so no content is lost, it simply fades. The outgoing face is
- * not rendered at all in this mode (see RotatingWord.tsx), so there is
- * nothing to cross-fade against. */
+/* Reduced motion: the caret holds steady instead of blinking, and
+ * RotatingWord swaps whole phrases rather than typing them. The line
+ * still changes, so no claim is lost — it simply does not animate. */
 @media (prefers-reduced-motion: reduce) {
-  .postr-rotating-word__face--in {
-    animation: postr-word-fade var(--dur-base) var(--ease-standard) both;
+  .postr-typed-line__caret {
+    opacity: 0.5;
   }
 }
 
-/* The two faces are adjacent sides of a cube turning about its
- * horizontal axis: the outgoing face rotates up and away, the incoming
- * one arrives from below into the same plane. Opacity shades the
- * faces the way a real solid would fall out of the light, which is
- * what stops the turn reading as two flat words swapping. */
-/* Opacity is driven to zero by the HALFWAY point of each face's turn,
- * not at its end. A face at 45° is still perfectly legible, so linear
- * opacity leaves both phrases readable simultaneously through the
- * middle of the transition. Front-loading the fade means the outgoing
- * phrase is gone by the time it is far enough round to overlap the
- * incoming one, and the pair reads as one surface turning. */
-@keyframes postr-cube-in {
-  from {
-    opacity: 0;
-    transform: rotateX(-90deg);
+@keyframes postr-caret-blink {
+  0%,
+  45% {
+    opacity: 0.85;
   }
-  50% {
-    opacity: 0.15;
-  }
-  to {
-    opacity: 1;
-    transform: rotateX(0deg);
-  }
-}
-
-@keyframes postr-cube-out {
-  from {
-    opacity: 1;
-    transform: rotateX(0deg);
-  }
-  50% {
-    opacity: 0.15;
-  }
-  to {
-    opacity: 0;
-    transform: rotateX(90deg);
-  }
-}
-
-@keyframes postr-word-fade {
-  from {
+  50%,
+  95% {
     opacity: 0;
   }
-  to {
-    opacity: 1;
+  100% {
+    opacity: 0.85;
   }
 }
-
 
 
 /* ===================================================================

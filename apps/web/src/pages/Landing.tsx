@@ -50,21 +50,14 @@ const LANDING_JSON_LD = {
  * Kept to noun phrases so the sentence reads as prose at every step:
  * "A poster editor that handles X so you can work on the science."
  *
- * WRITTEN TO A WIDTH BUDGET, and the budget is in PIXELS, not
- * characters. RotatingWord reserves the widest phrase so the sentence
- * never reflows; that reads as stable rather than gappy only when the
- * phrases render at similar widths.
+ * NO LENGTH BUDGET ANY MORE. These once had to render at near-equal
+ * pixel widths, because the phrase sat inline and the words after it
+ * moved when it changed. The line is now vertical — nothing follows
+ * the phrase — so a long one just takes the room it needs, and on a
+ * narrow screen it wraps rather than clipping.
  *
- * Character count is a bad proxy here and measurably so: at the hero's
- * 18px/500 face, "the authors and affiliations" (28 chars) renders at
- * 218px while "the figures nobody can read" (27 chars) renders at
- * 230px — fewer characters, wider box. An earlier set ran 176–235px.
- * These six were chosen by measuring each candidate on a canvas at the
- * exact computed font, and land in 202–219px — a 17px spread on a
- * ~215px slot, which no reader will catch.
- *
- * If you add a phrase, MEASURE IT rather than counting letters. Watch
- * for wide glyphs (m, w, capitals) and narrow ones (i, l, t, f).
+ * Keep them short enough to read in one glance, but do not count
+ * characters. That constraint is gone.
  */
 const HERO_FRICTIONS = [
   'the fiddly block nudging',
@@ -128,26 +121,35 @@ export default function Landing() {
         </span>
         <h1
           data-postr-hero-item
-          className="mt-5 text-4xl font-bold leading-[1.05] tracking-[-0.02em] text-white sm:text-5xl"
+          className="mt-5 text-5xl font-bold leading-[1.05] tracking-[-0.02em] text-white sm:text-6xl"
         >
           Academic posters,<br />
           <span className="text-[#7c6aed]">without the hassle.</span>
         </h1>
         {/*
-          The rotating slot lives inside this paragraph and runs its own
-          CSS cube animation. We animate the PARAGRAPH, never the slot —
-          stacking a GSAP opacity tween on an element that is already
-          mid-rotation is the "third simultaneous effect" the house
-          style warns about, and it made the first turn look dropped.
+          The typed phrase sits on its OWN LINE rather than inline in
+          the sentence. Inline, its rendered width had to be reconciled
+          with the words after it — which produced a reflowing sentence,
+          then a character budget, then a pixel budget, and phrases that
+          still clipped. On its own line nothing follows it, so length
+          simply stops being a constraint.
+
+          GSAP animates the PARAGRAPH, never the typed line itself:
+          stacking an opacity tween on an element already running its
+          own animation is the "third simultaneous effect" the house
+          style warns about.
         */}
-        <p
+        <div
           data-postr-hero-item
-          className="mx-auto mt-6 max-w-[54ch] text-lg leading-relaxed text-[#a3a7b3]"
+          className="mx-auto mt-7 max-w-[46ch] text-xl leading-relaxed text-[#a3a7b3] sm:text-2xl"
         >
-          A poster editor that handles{' '}
-          <RotatingWord phrases={HERO_FRICTIONS} className="font-medium text-[#c8b6ff]" />{' '}
-          so you can work on the science.
-        </p>
+          <p>A poster editor that handles</p>
+          <RotatingWord
+            phrases={HERO_FRICTIONS}
+            className="font-medium text-[#c8b6ff]"
+          />
+          <p>so you can work on the science.</p>
+        </div>
         <div data-postr-hero-item className="mt-10 flex items-center justify-center gap-4">
           <Link
             to="/auth"
