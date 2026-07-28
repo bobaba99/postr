@@ -12,5 +12,10 @@
  *   - src/seo/routes.json + sitemap: /gallery entry was removed
  *   - api/shell/gallery.ts + api/sitemap-gallery.ts were deleted
  *     (recover from git history, commit 0f404da^)
+ *   - components/PosterCard.tsx: the per-card "Publish" hover action was
+ *     DELETED rather than flag-gated. It was never gated in the first
+ *     place, so it survived the deactivation as a dead end — it routed
+ *     to /p/:id?publish=1, which PosterEditor ignores while this flag is
+ *     false. Re-add it from git history if the gallery comes back.
  */
 export const GALLERY_PUBLIC_ENABLED = false;

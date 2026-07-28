@@ -474,9 +474,18 @@ export default function Profile() {
 
           {myGallery.length === 0 ? (
             <div className="rounded-md border border-dashed border-[#2a2a3a] bg-[#0a0a12] p-6 text-center text-[13px] text-[#6b7280]">
-              You haven’t published anything yet. Use the <strong>Publish</strong>{' '}
-              button on a poster card, the Publish button in the editor, or the
-              upload button above.
+              {GALLERY_PUBLIC_ENABLED ? (
+                <>
+                  You haven’t published anything yet. Use the{' '}
+                  <strong>Publish</strong> button on a poster card, the Publish
+                  button in the editor, or the upload button above.
+                </>
+              ) : (
+                // The publish entry points this used to name are all gone
+                // while the gallery is offline; pointing at buttons that
+                // no longer render reads as a broken UI.
+                <>You haven’t published anything to the gallery.</>
+              )}
             </div>
           ) : (
             <div className="space-y-2">

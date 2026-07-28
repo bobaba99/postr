@@ -10,7 +10,7 @@
  * and the optimistic state updates.
  */
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import type { PosterRow, PosterListRow } from '@/data/posters';
 import { getThumbnailUrl } from '@/data/thumbnails';
 import { PALETTES } from '@/poster/constants';
@@ -259,9 +259,17 @@ export function PosterCard({ row, onDuplicate, onDelete }: PosterCardProps) {
         </div>
       </Link>
 
-      {/* Hover actions — positioned absolutely so they never push layout. */}
+      {/*
+        Hover actions — positioned absolutely so they never push layout.
+
+        The Publish action was removed when the public gallery was
+        deactivated. It was the last ungated publish entry point: the
+        button navigated to `/p/:id?publish=1`, but PosterEditor bails
+        on that param while GALLERY_PUBLIC_ENABLED is false, so the
+        click opened the editor and silently did nothing. Restore it
+        alongside the flag (see config/features.ts).
+      */}
       <div className="pointer-events-none absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
-        <PublishButton row={row} title={title} />
         <button
           type="button"
           aria-label={`Duplicate ${title}`}
@@ -289,24 +297,3 @@ export function PosterCard({ row, onDuplicate, onDelete }: PosterCardProps) {
   );
 }
 
-function PublishButton({ row, title }: { row: PosterListRow; title: string }) {
-  const navigate = useNavigate();
-  return (
-    <button
-      type="button"
-      aria-label={`Publish ${title}`}
-      // Navigate to the editor with ?publish=1. The editor mounts the
-      // poster, then auto-opens the publish flow so html-to-image can
-      // capture #poster-canvas from the real DOM. Publishing from the
-      // dashboard without first rendering the poster would force the
-      // user to upload a screenshot themselves.
-      onClick={(e) => {
-        e.preventDefault();
-        navigate(`/p/${row.id}?publish=1`);
-      }}
-      className="rounded-md border border-[#2a2a3a] bg-[#1a1a26]/90 px-2 py-1 text-[13px] font-semibold text-[#7c6aed] backdrop-blur hover:border-[#7c6aed]"
-    >
-      Publish
-    </button>
-  );
-}
