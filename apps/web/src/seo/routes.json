@@ -44,14 +44,14 @@
     },
     "/pricing": {
       "title": "Postr Pricing: Free Poster Maker, Paid Export",
-      "description": "Editing and PDF export are always free. Pay $18.99 for a 4-month term (PowerPoint & LaTeX export) or $9.99 for a 3-talk pack. Priced for students.",
+      "description": "Editing and PDF export are always free. Pay $18.99 for a 4-month term to export to PowerPoint & LaTeX. Priced for students, no subscription.",
       "robots": "index,follow",
       "h1": "Free to build. Pay only to take it further.",
       "copy": [
         "A finished, print-ready poster costs nothing on Postr. Editing and PDF export are always free, with a small \"made with postr.sh\" mark.",
-        "The $18.99 term covers four months — about $4.75 a month — and unlocks PowerPoint and LaTeX export plus turning a paper into a talk.",
-        "The $9.99 deck pack exports three generated talks with no subscription, for anyone who just needs a one-off presentation.",
-        "You only pay to export to PowerPoint or LaTeX, or to download a generated talk. The free poster workflow has no limits."
+        "The $18.99 term covers four months — about $4.75 a month — and unlocks PowerPoint and LaTeX export, with no watermark and no renewal.",
+        "You only pay to export to PowerPoint or LaTeX. The free poster workflow has no limits.",
+        "Turning a paper into a conference talk is coming soon — a $9.99 pack, with a free first deck for the waitlist."
       ]
     },
     "/chart-chooser": {

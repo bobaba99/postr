@@ -39,6 +39,13 @@ interface Tier {
   tagline: string;
   /** Rendered as the primary (recommended) column. */
   featured?: boolean;
+  /**
+   * Talk generation/export isn't built yet (docs/plans/2026-07-28-
+   * paper-to-talk.md, NOT BUILT). A coming-soon tier advertises the
+   * planned price and collects a waitlist instead of a live purchase, so
+   * the page never sells an artifact the product can't produce.
+   */
+  comingSoon?: boolean;
   cta: string;
   ctaTo: string;
   /** Plain-language "who is this for". */
@@ -74,10 +81,13 @@ const TIERS: Tier[] = [
     cta: 'Get the term',
     ctaTo: '/auth',
     forWho: 'Presenting through the term, or making several posters.',
+    // Only shipped features. "Turn a paper into a talk" is deliberately
+    // NOT listed here — it isn't built, and the term must advertise only
+    // what a buyer gets today (PPTX + LaTeX export both ship). The talk
+    // feature lives in the coming-soon pack below.
     features: [
       'Everything in Free — no watermark',
       'Export to PowerPoint & LaTeX',
-      'Turn a paper into a talk — unlimited',
       'Keep editing your poster anywhere',
       'One payment, no renewal — it just ends',
     ],
@@ -87,15 +97,16 @@ const TIERS: Tier[] = [
     name: 'Deck pack',
     price: '$9.99',
     cadence: 'one-time · 3 talks',
-    tagline: 'Just need a talk or two? Pay only for what you export.',
-    cta: 'Get the pack',
+    tagline: 'Turn a paper into a conference talk. Landing soon.',
+    comingSoon: true,
+    cta: 'Join the waitlist',
     ctaTo: '/auth',
     forWho: 'A one-off talk, without committing to a term.',
     features: [
-      'Export 3 generated talks',
-      'PowerPoint & PDF',
+      'Turn a paper into a slide deck',
+      'Export 3 talks — PowerPoint & PDF',
       'No subscription, no term',
-      'Top up whenever you need more',
+      'Waitlist members get their first deck free',
     ],
   },
 ];
@@ -103,7 +114,7 @@ const TIERS: Tier[] = [
 export function PricingSection() {
   return (
     <section className="mx-auto w-full max-w-5xl px-8 pb-24" aria-labelledby="pricing-heading">
-      <div data-postr-reveal className="text-center">
+      <div className="text-center">
         <h2
           id="pricing-heading"
           className="text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8] sm:text-3xl"
@@ -112,8 +123,7 @@ export function PricingSection() {
         </h2>
         <p className="mx-auto mt-3 max-w-[54ch] text-sm leading-relaxed text-[#8b8f99]">
           Editing and PDF export are <span className="text-[#c8cad0]">always free</span> — with a
-          small “made with postr.sh” mark. You only pay to export to PowerPoint or LaTeX, or to
-          download a generated talk.
+          small “made with postr.sh” mark. You only pay to export to PowerPoint or LaTeX.
         </p>
       </div>
 
@@ -128,31 +138,38 @@ export function PricingSection() {
         replacement for a plan-selector quiz. Answers the single variable
         (one-off vs. repeated use) in a sentence, with no extra step.
       */}
-      <p
-        data-postr-reveal
-        className="mx-auto mt-8 max-w-[60ch] text-center text-sm leading-relaxed text-[#8b8f99]"
-      >
+      <p className="mx-auto mt-8 max-w-[60ch] text-center text-sm leading-relaxed text-[#8b8f99]">
         <span className="font-semibold text-[#c8cad0]">Which should I pick?</span>{' '}
-        Just printing a poster? Free covers it. Need one talk? Grab the pack. Presenting all term
-        or making several? The term pays for itself after two.
+        Just printing a poster? Free covers it. Presenting all term or making several? The term
+        pays for itself after two exports. Talks are coming soon.
       </p>
     </section>
   );
 }
 
 function PricingCard({ tier }: { tier: Tier }) {
+  // Card background sets which "check" the features use; the coming-soon
+  // tier is dimmed and its checks become a "planned" clock so it never
+  // reads as already-available.
+  const base = tier.featured
+    ? 'relative rounded-2xl border-2 border-[#7c6aed] bg-[#14121e] p-6 shadow-[0_0_0_1px_rgba(124,106,237,0.15),0_18px_50px_-12px_rgba(124,106,237,0.35)] md:-mt-3 md:mb-3'
+    : tier.comingSoon
+      ? 'relative rounded-2xl border border-dashed border-[#33334a] bg-[#0e0e16] p-6'
+      : 'relative rounded-2xl border border-[#1f1f2e] bg-[#111118] p-6';
+
   return (
-    <div
-      data-postr-reveal
-      className={
-        tier.featured
-          ? 'relative rounded-2xl border-2 border-[#7c6aed] bg-[#14121e] p-6 shadow-[0_0_0_1px_rgba(124,106,237,0.15),0_18px_50px_-12px_rgba(124,106,237,0.35)] md:-mt-3 md:mb-3'
-          : 'relative rounded-2xl border border-[#1f1f2e] bg-[#111118] p-6'
-      }
-    >
+    <div className={base}>
       {tier.featured && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#7c6aed] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white">
+        // #5641b8 (not #7c6aed): white on the brand violet is only 4.08:1
+        // — below AA. The darker step is 7.38:1. Border/accents keep the
+        // brighter brand; only the white-text surfaces darken.
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#5641b8] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white">
           Recommended
+        </span>
+      )}
+      {tier.comingSoon && (
+        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-[#33334a] bg-[#1a1a26] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#a3a7b3]">
+          Coming soon
         </span>
       )}
 
@@ -167,21 +184,22 @@ function PricingCard({ tier }: { tier: Tier }) {
         to={tier.ctaTo}
         className={
           tier.featured
-            ? 'mt-5 block rounded-lg bg-[#7c6aed] px-5 py-2.5 text-center text-sm font-semibold text-white no-underline transition-colors hover:bg-[#6c5ce7]'
+            ? 'mt-5 block rounded-lg bg-[#5641b8] px-5 py-2.5 text-center text-sm font-semibold text-white no-underline transition-colors hover:bg-[#4c39a6]'
             : 'mt-5 block rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-5 py-2.5 text-center text-sm font-semibold text-[#c8cad0] no-underline transition-colors hover:border-[#7c6aed]'
         }
       >
         {tier.cta}
       </Link>
 
-      <p className="mt-5 text-xs font-medium uppercase tracking-wider text-[#6b7280]">
+      {/* #8b8f99 (5.8:1), not #6b7280 (3.9:1 — below AA for this 12px text). */}
+      <p className="mt-5 text-xs font-medium uppercase tracking-wider text-[#8b8f99]">
         {tier.forWho}
       </p>
       <ul className="mt-3 flex flex-col gap-2.5">
         {tier.features.map((f) => (
           <li key={f} className="flex items-start gap-2.5 text-sm leading-snug text-[#a3a7b3]">
             <svg
-              className="mt-0.5 shrink-0 text-[#7c6aed]"
+              className={tier.comingSoon ? 'mt-0.5 shrink-0 text-[#6b6b85]' : 'mt-0.5 shrink-0 text-[#7c6aed]'}
               width="15"
               height="15"
               viewBox="0 0 24 24"
@@ -192,7 +210,14 @@ function PricingCard({ tier }: { tier: Tier }) {
               strokeLinejoin="round"
               aria-hidden="true"
             >
-              <polyline points="20 6 9 17 4 12" />
+              {tier.comingSoon ? (
+                <>
+                  <circle cx="12" cy="12" r="9" />
+                  <polyline points="12 7 12 12 15 14" />
+                </>
+              ) : (
+                <polyline points="20 6 9 17 4 12" />
+              )}
             </svg>
             <span>{f}</span>
           </li>
