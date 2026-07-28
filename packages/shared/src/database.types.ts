@@ -513,6 +513,24 @@ export type Database = {
           },
         ]
       }
+      talk_waitlist: {
+        Row: {
+          email: string | null
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          email?: string | null
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          email?: string | null
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_logos: {
         Row: {
           created_at: string

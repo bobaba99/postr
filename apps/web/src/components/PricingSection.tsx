@@ -22,14 +22,17 @@
  * Copy names the workflow, never a capability, and makes no AI claim
  * (feedback_marketing_no_ai_framing). Every line is checked against what
  * the product actually does: editing + watermarked PDF are free today;
- * PPTX/LaTeX export and talk export are the paid line.
+ * PPTX/LaTeX export is the paid line (talk export joins it when built).
  *
- * NOTE: no checkout is wired yet — the CTAs route to signup. Billing is
- * Sequence 1 (docs/plans/2026-07-28-payment-and-paywall.md); this section
- * ships the pricing story ahead of it so the free/paid line is on the
- * home page and export is never a surprise.
+ * The tier CTAs route to /auth — the real checkout is triggered from the
+ * paywall on the export buttons (EditableExportButtons), where the plan
+ * state lives. The card at the bottom collects paper-to-talk waitlist
+ * interest for the deferred feature.
  */
-import { Link } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
+import { supabase } from '@/lib/supabase';
+import { isOnTalkWaitlist, joinTalkWaitlist } from '@/data/talkWaitlist';
 
 interface Tier {
   id: string;
@@ -142,6 +145,8 @@ export function PricingSection() {
         Just printing a poster? Free covers it. Need one or two clean exports? Grab the pack.
         Exporting through the term, or making several? The term pays for itself after two.
       </p>
+
+      <TalkWaitlistCallout />
     </section>
   );
 }
@@ -222,6 +227,78 @@ function PricingCard({ tier }: { tier: Tier }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/**
+ * Paper-to-talk waitlist callout.
+ *
+ * The talk feature is deferred (docs/plans/2026-07-28-paper-to-talk.md).
+ * This captures interest so there's a list to notify on launch. A
+ * signed-in user joins in place; a signed-out one is sent to sign in and
+ * lands back here to join. State: checking → (signed-out | can-join |
+ * joined). The talk feature is never advertised as buyable — only as
+ * "coming, want to know?".
+ */
+function TalkWaitlistCallout() {
+  const navigate = useNavigate();
+  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  const [joined, setJoined] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      const isIn = !!data.session && data.session.user.is_anonymous !== true;
+      if (cancelled) return;
+      setSignedIn(isIn);
+      if (isIn) setJoined(await isOnTalkWaitlist());
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleJoin() {
+    if (signedIn === false) {
+      // Send them to sign in, returning here to finish joining.
+      navigate('/auth?next=/pricing');
+      return;
+    }
+    setBusy(true);
+    const ok = await joinTalkWaitlist();
+    setBusy(false);
+    if (ok) setJoined(true);
+  }
+
+  return (
+    <div className="mx-auto mt-10 max-w-2xl rounded-2xl border border-[#2a2a3a] bg-[#0f0f18] p-6 text-center">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7c6aed]">
+        Coming soon
+      </div>
+      <h3 className="mt-2 text-lg font-semibold text-[#e2e2e8]">
+        Turn a paper into a conference talk
+      </h3>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#9ca3af]">
+        We&apos;re building paper-to-talk generation next. Want to know the moment
+        it lands?
+      </p>
+      {joined ? (
+        <p className="mt-4 text-sm font-medium text-[#4cc48c]">
+          ✓ You&apos;re on the list — we&apos;ll email you when talks are ready.
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={handleJoin}
+          disabled={busy || signedIn === null}
+          className="mt-4 rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-5 py-2.5 text-sm font-semibold text-[#c8cad0] transition-colors hover:border-[#7c6aed] disabled:opacity-60"
+        >
+          {busy ? 'Joining…' : signedIn === false ? 'Sign in to join the waitlist' : 'Join the waitlist'}
+        </button>
+      )}
     </div>
   );
 }
