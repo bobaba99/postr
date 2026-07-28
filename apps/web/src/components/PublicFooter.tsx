@@ -93,7 +93,16 @@ function FooterColumn({
 function FooterLink({ to, children }: { to: string; children: React.ReactNode }) {
   return (
     <li>
-      <Link to={to} className="text-[14pt] text-[#9ca3af] no-underline hover:text-white">
+      {/*
+        `py-2.5` gives the link a 44px-tall hit area on a phone without
+        changing how the footer looks: the text stays put, the padding
+        is invisible, and the list already has enough gap to absorb it.
+        Measured at 22px before — half the WCAG 2.5.5 / iOS target floor.
+      */}
+      <Link
+        to={to}
+        className="-my-2.5 inline-block py-2.5 text-[14pt] text-[#9ca3af] no-underline hover:text-white"
+      >
         {children}
       </Link>
     </li>

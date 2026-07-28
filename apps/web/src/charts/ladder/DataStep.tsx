@@ -212,7 +212,10 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
           borderRadius: 8,
           background: '#101018',
           color: '#c8cad0',
-          fontSize: 13,
+          // 16px is the floor: iOS Safari zooms the whole page when a
+          // focused input is smaller, which throws the reader out of
+          // the ladder mid-paste. This is the page's primary input.
+          fontSize: 16,
           padding: '10px 12px',
           fontFamily: 'inherit',
           boxSizing: 'border-box',

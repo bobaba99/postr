@@ -161,7 +161,10 @@ export function ChatPane({
             placeholder={placeholderFor(state.step)}
             rows={isManuscriptStep ? 6 : 2}
             disabled={busy !== null}
-            className="min-h-0 w-full resize-y rounded-md border border-[#2a2a3a] bg-[#0a0a12] px-3 py-2 text-sm text-[#c8cad0] outline-none focus:border-[#7c6aed] disabled:opacity-50"
+            /* text-base (16px), not text-sm: iOS Safari zooms the page
+               when a focused input is under 16px, and this is where the
+               whole manuscript gets pasted. */
+            className="min-h-0 w-full resize-y rounded-md border border-[#2a2a3a] bg-[#0a0a12] px-3 py-2 text-base text-[#c8cad0] outline-none focus:border-[#7c6aed] disabled:opacity-50"
           />
           <button
             type="button"
