@@ -101,9 +101,19 @@ export function filterDeletable(
 export function preserveLocked(
   previous: readonly Block[],
   next: readonly Block[],
+  ...alsoConsider: ReadonlyArray<readonly Block[]>
 ): Block[] {
   const nextIds = new Set(next.map((b) => b.id));
-  const missing = previous.filter((b) => isLocked(b) && !nextIds.has(b.id));
-  if (missing.length === 0) return [...next];
-  return [...next, ...missing];
+  const restored = new Map<string, Block>();
+  // `previous` first, then any additional sources, so the most
+  // current version of a block wins if several carry the same id.
+  for (const source of [previous, ...alsoConsider]) {
+    for (const b of source) {
+      if (isLocked(b) && !nextIds.has(b.id) && !restored.has(b.id)) {
+        restored.set(b.id, b);
+      }
+    }
+  }
+  if (restored.size === 0) return [...next];
+  return [...next, ...restored.values()];
 }
