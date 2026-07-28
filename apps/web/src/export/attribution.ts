@@ -276,9 +276,21 @@ export function acknowledgementReference(): AckReference {
 /**
  * Append the credit to a reference list, idempotently.
  *
- * Returns the input unchanged when suppressed by the paid seam or
- * when the entry is already present — so a doc that round-trips
- * through export and import repeatedly never accumulates duplicates.
+ * Returns the input unchanged when:
+ *   - suppressed by the paid seam;
+ *   - the entry is already present, so a doc that round-trips through
+ *     export and import repeatedly never accumulates duplicates;
+ *   - the poster has NO references of its own (owner decision,
+ *     2026-07-27). A credit is a credit only when it sits among real
+ *     citations. Alone under a "References" heading it is the only
+ *     thing in the section, which reads as self-serving rather than as
+ *     the software citation it is meant to be. Nothing is lost: the
+ *     geometry-placed logo block still carries the acknowledgement on
+ *     those posters.
+ *
+ * The empty check counts entries that are not the sentinel, so a list
+ * containing ONLY a previously-injected credit (a re-imported bundle
+ * whose user references were all deleted) is still treated as empty.
  *
  * Returns a NEW array; the input is never mutated.
  */
@@ -287,8 +299,20 @@ export function withAcknowledgementReference<T extends { id: string }>(
   opts: AttributionOptions = {},
 ): T[] {
   if (!shouldAttribute(opts)) return [...references];
+  if (!hasOwnReferences(references)) return [...references];
   if (references.some((r) => r.id === ACK_REFERENCE_ID)) return [...references];
   return [...references, acknowledgementReference() as unknown as T];
+}
+
+/**
+ * True when the list holds at least one reference the user actually
+ * added — i.e. anything that is not the injected credit sentinel.
+ *
+ * Shared by every output path so "has references of its own" means the
+ * same thing on canvas, in print, in LaTeX and in the .bib.
+ */
+export function hasOwnReferences(references: readonly { id: string }[]): boolean {
+  return references.some((r) => r.id !== ACK_REFERENCE_ID);
 }
 
 /**

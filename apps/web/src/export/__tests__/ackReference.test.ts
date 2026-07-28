@@ -57,12 +57,19 @@ describe('withAcknowledgementReference', () => {
     expect(withAcknowledgementReference(userRefs, { paidPlan: true })).toHaveLength(2);
   });
 
-  it('works on an empty list', () => {
+  it('adds nothing to an empty list — no references, no credit', () => {
     // Annotated because an empty literal gives `never[]`, from which
     // TS cannot infer the element type the generic needs.
     const out = withAcknowledgementReference<{ id: string }>([]);
+    expect(out).toHaveLength(0);
+  });
+
+  it('treats a list holding ONLY a previously-injected credit as empty', () => {
+    // A re-imported bundle whose user references were all deleted must
+    // not keep the credit alive on its own.
+    const out = withAcknowledgementReference([{ id: ACK_REFERENCE_ID }]);
     expect(out).toHaveLength(1);
-    expect(out[0]!.id).toBe(ACK_REFERENCE_ID);
+    expect(out.filter((r) => r.id === ACK_REFERENCE_ID)).toHaveLength(1);
   });
 });
 
@@ -110,10 +117,11 @@ describe('rendered in every citation style', () => {
     expect(out.join('\n')).not.toContain(ACKNOWLEDGEMENT_TEXT);
   });
 
-  it('a poster with NO references still gets the credit line', () => {
+  it('a poster with NO references gets NO credit line', () => {
+    // A "References" heading whose only entry is the tool reads as
+    // self-serving. The logo block carries the acknowledgement there.
     const out = formatReferencesForExport([]);
-    expect(out).toHaveLength(1);
-    expect(out[0]).toContain(ACKNOWLEDGEMENT_TEXT);
+    expect(out).toHaveLength(0);
   });
 });
 

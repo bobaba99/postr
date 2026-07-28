@@ -10,7 +10,9 @@
  */
 import type { Reference } from '@postr/shared';
 import {
+  ACK_REFERENCE_ID,
   acknowledgementBibEntry,
+  hasOwnReferences,
   shouldAttribute,
   type AttributionOptions,
 } from '../attribution';
@@ -68,16 +70,24 @@ function formatEntry(ref: Reference, index: number, used: Set<string>): string {
  * LaTeX, a citable entry is the only form of the credit that survives
  * into their recompiled document.
  *
- * A poster with NO references still emits the bib when the credit is
- * active: a one-entry .bib is valid and keeps `\bibliography` working
- * for a user who adds citations later in LaTeX.
+ * A poster with NO references of its own emits NO bib at all (owner
+ * decision, 2026-07-27). Shipping a one-entry references.bib that
+ * cites only the tool is the .bib form of a references section built
+ * to hold the credit alone — the credit rides with real citations or
+ * not at all. The logo block still carries the acknowledgement.
  */
 export function referencesToBib(
   references: readonly Reference[],
   options: AttributionOptions = {},
 ): string {
+  if (!hasOwnReferences(references)) return '';
   const used = new Set<string>();
-  const entries = references.map((r, i) => formatEntry(r, i, used));
+  // Drop any already-injected credit so a re-imported bundle does not
+  // emit it twice — once as a user @misc here, once as the namespaced
+  // @misc{postr} below.
+  const entries = references
+    .filter((r) => r.id !== ACK_REFERENCE_ID)
+    .map((r, i) => formatEntry(r, i, used));
   const ack = shouldAttribute(options) ? acknowledgementBibEntry() : null;
   if (ack) entries.push(ack);
   if (entries.length === 0) return '';

@@ -1469,6 +1469,12 @@ export function RefsBlock({ references, palette, fontFamily, styles, citationSty
   // what prints. Appending here (rather than into `doc.references`)
   // keeps the credit out of the user's editable reference list in the
   // Refs tab, where it would look like a row they could delete.
+  //
+  // A poster with no references of its own gets no credit line: the
+  // early return above means we never reach here, and
+  // `withAcknowledgementReference` declines it independently. A
+  // "References" heading whose only entry is the tool reads as
+  // self-serving — the logo block carries the acknowledgement instead.
   const entries = withAcknowledgementReference(references);
   return (
     <div style={{ fontFamily, fontSize: styles.body.size * 0.88, color: palette.primary, lineHeight: 1.15 }}>

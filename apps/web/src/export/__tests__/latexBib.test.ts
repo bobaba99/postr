@@ -4,17 +4,24 @@ import type { Reference } from '@postr/shared';
 import { referencesToBib } from '../latex/bib';
 
 describe('referencesToBib', () => {
-  // The credit ships as a real @misc entry, so a reference-less
-  // poster now yields a one-entry bib rather than nothing. A comment
-  // is not citable; an entry is, which is the whole point of the .bib.
-  it('still emits the Postr credit entry when the poster has no references', () => {
-    const bib = referencesToBib([]);
-    expect(bib).toContain('@misc{postr,');
-    expect(bib).toContain('Poster made with postr.sh');
+  it('returns empty string for no references', () => {
+    // Restored: v2 weakened this to only hold under `paidPlan: true`,
+    // because the credit alone produced a one-entry .bib. A poster
+    // with no references of its own now ships no .bib at all.
+    expect(referencesToBib([])).toBe('');
+    expect(referencesToBib([], { paidPlan: true })).toBe('');
   });
 
-  it('returns empty string for no references once the paid seam suppresses the credit', () => {
-    expect(referencesToBib([], { paidPlan: true })).toBe('');
+  it('emits no bib for a list holding only a previously-injected credit', () => {
+    expect(referencesToBib([{ id: '__postr_ack__', authors: ['Postr'] }])).toBe('');
+  });
+
+  it('emits the credit exactly once when the list already carries it', () => {
+    const bib = referencesToBib([
+      { id: 'r1', authors: ['Smith, John'], year: '2026', title: 'A paper' },
+      { id: '__postr_ack__', authors: ['Postr'], rawText: 'Poster made with postr.sh https://postr.sh' },
+    ]);
+    expect(bib.match(/Poster made with postr\.sh/g)).toHaveLength(1);
   });
 
   it('appends the credit LAST, after every user reference', () => {

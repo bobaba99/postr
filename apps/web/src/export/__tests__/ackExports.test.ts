@@ -16,6 +16,23 @@ import { makeFixtureDoc, baseBlock, TINY_PNG_BYTES } from './fixtures';
 
 const decode = (b: Uint8Array | undefined) => new TextDecoder().decode(b ?? new Uint8Array());
 
+/**
+ * The single `textblock` environment holding the references list.
+ *
+ * Isolating it matters: the credit legitimately appears elsewhere in
+ * poster.tex (the header comment and the margin-band acknowledgement),
+ * so a whole-document search cannot tell "credited in the margin" from
+ * "credited as a reference entry" — which is exactly the distinction
+ * under test.
+ */
+function referencesTextblock(tex: string): string {
+  const heading = tex.indexOf('{References}');
+  if (heading === -1) return '';
+  const start = tex.lastIndexOf('\\begin{textblock}', heading);
+  const end = tex.indexOf('\\end{textblock}', heading);
+  return tex.slice(start, end === -1 ? undefined : end);
+}
+
 describe('LaTeX export', () => {
   it('renders the credit as the last reference entry in poster.tex', async () => {
     const { bytes } = await exportPosterLatex(makeFixtureDoc(), {
@@ -34,6 +51,30 @@ describe('LaTeX export', () => {
     // The pre-existing comment is not sufficient on its own — a
     // comment cannot be cited by \bibliography.
     expect(bib.indexOf('@misc{postr,')).toBeGreaterThan(-1);
+  });
+
+  it('emits no credit in the references list and no references.bib when the poster has no references', async () => {
+    const { bytes } = await exportPosterLatex(makeFixtureDoc({ references: [] }), {
+      fetcher: async () => TINY_PNG_BYTES,
+    });
+    const entries = unzipSync(bytes);
+    expect(entries['references.bib']).toBeUndefined();
+    // The header comment and the margin-band block still carry the
+    // acknowledgement — both are separate, deliberate, and are the
+    // reason suppressing the references credit loses nothing. So
+    // assert on the references TEXTBLOCK only.
+    expect(referencesTextblock(decode(entries['poster.tex']))).not.toContain(
+      ACKNOWLEDGEMENT_TEXT,
+    );
+  });
+
+  it('still renders the credit inside the references list when the poster HAS references', async () => {
+    const { bytes } = await exportPosterLatex(makeFixtureDoc(), {
+      fetcher: async () => TINY_PNG_BYTES,
+    });
+    expect(referencesTextblock(decode(unzipSync(bytes)['poster.tex']))).toContain(
+      ACKNOWLEDGEMENT_TEXT,
+    );
   });
 });
 
