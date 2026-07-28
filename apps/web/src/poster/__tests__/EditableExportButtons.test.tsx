@@ -24,6 +24,19 @@ vi.mock('@/export/posterContent', () => ({
   safeFileBaseName: () => 'poster',
 }));
 
+// A paid user (active term) so the export path runs; the paywall gate is
+// covered by its own tests. Loading resolves immediately.
+vi.mock('@/hooks/usePlan', () => ({
+  usePlan: () => ({ loading: false, hasActiveTerm: true, credits: 0, canExport: true }),
+}));
+
+// The billing client is never reached by a term holder (no credit spend),
+// but stub it so an accidental call can't hit the network.
+vi.mock('@/data/billing', () => ({
+  createCheckout: vi.fn(),
+  consumeExportCredit: vi.fn(),
+}));
+
 function seedPoster() {
   usePosterStore.setState({
     doc: {

@@ -20,6 +20,8 @@ import { BusyIndicator, busyProps } from '@/components/BusyIndicator';
 import { usePosterStore } from '@/stores/posterStore';
 import type { CitationStyleKey } from '@/poster/citations';
 import { PPTX_MAX_DIMENSION_IN } from '@/export/units';
+import { usePlan } from '@/hooks/usePlan';
+import { createCheckout, consumeExportCredit as consumeCreditApi } from '@/data/billing';
 
 type ExportKind = 'latex' | 'pptx';
 
@@ -79,7 +81,15 @@ export function EditableExportButtons({
 }) {
   const doc = usePosterStore((s) => s.doc);
   const posterTitle = usePosterStore((s) => s.posterTitle);
+  const plan = usePlan();
   const [state, setState] = useState<ExportState>(IDLE);
+
+  // The paywall (docs/plans/2026-07-28-payment-and-paywall.md): editable
+  // exports are paid. Unlock on an active term (unlimited) or an export
+  // credit from the $9.99 pack. A credit-based export spends one credit
+  // (server-side, after the bytes are produced); a term export does not.
+  const canExport = plan.canExport;
+  const usesCredit = !plan.hasActiveTerm && plan.credits > 0;
 
   // The 56-inch ceiling, surfaced BEFORE export (plan §2 req. 1).
   const overCeiling =
@@ -91,9 +101,19 @@ export function EditableExportButtons({
 
   async function run(kind: ExportKind, job: () => Promise<string[]>) {
     if (!doc || state.busy) return;
+    // Paywall gate: a user without an active term or a credit can't run
+    // an editable export — the button is disabled and the upgrade prompt
+    // is shown instead, so this is a belt-and-suspenders guard.
+    if (!canExport) return;
     setState({ ...IDLE, busy: kind });
     try {
       const notes = await job();
+      // Credit-based export: spend one credit AFTER the bytes are
+      // produced, so a failed export never burns a credit. Server-side,
+      // because export_credits is server-owned. A term export skips this.
+      if (usesCredit) {
+        await consumeExportCredit();
+      }
       setState({ busy: null, done: kind, notes, failed: false });
       setTimeout(() => setState((s) => ({ ...s, done: null })), 2500);
     } catch (err) {
@@ -109,13 +129,39 @@ export function EditableExportButtons({
     }
   }
 
+  // Spend one credit after a successful credit-based export. Best-effort:
+  // the file is already downloaded, so a failure here must NOT make the
+  // export look failed — log and move on. (Worst case the user keeps a
+  // credit they used; acceptable, and far better than a "failed" export
+  // that actually succeeded.)
+  async function consumeExportCredit() {
+    try {
+      await consumeCreditApi();
+    } catch (err) {
+      console.error('[billing] consume-credit failed (export already done):', err);
+    }
+  }
+
+  async function startCheckout(sku: 'term' | 'pack') {
+    try {
+      const url = await createCheckout(sku);
+      window.location.href = url;
+    } catch (err) {
+      console.error('[billing] checkout failed:', err);
+      setState((s) => ({ ...s, failed: true }));
+    }
+  }
+
   const handlePptx = () =>
     run('pptx', async () => {
       const [{ exportPosterPptx }, { safeFileBaseName }] = await Promise.all([
         import('@/export/pptx/writer'),
         import('@/export/posterContent'),
       ]);
-      const { bytes, note, warnings } = await exportPosterPptx(doc!, { citationStyle });
+      const { bytes, note, warnings } = await exportPosterPptx(doc!, {
+        citationStyle,
+        attribution: { paidPlan: canExport },
+      });
       downloadBytes(
         bytes,
         `${safeFileBaseName(posterTitle)}.pptx`,
@@ -130,19 +176,93 @@ export function EditableExportButtons({
         import('@/export/latex/exportLatex'),
         import('@/export/posterContent'),
       ]);
-      const { bytes, warnings } = await exportPosterLatex(doc!, { citationStyle });
+      const { bytes, warnings } = await exportPosterLatex(doc!, {
+        citationStyle,
+        attribution: { paidPlan: canExport },
+      });
       downloadBytes(bytes, `${safeFileBaseName(posterTitle)}-latex.zip`, 'application/zip');
       return warnings;
     });
 
+  const pptxDisabled = !doc || state.busy !== null || beyondHalf || !canExport;
+  const latexDisabled = !doc || state.busy !== null || !canExport;
+
   return (
     <div {...busyProps(state.busy !== null)}>
+      {/*
+        Paywall (docs/plans/2026-07-28-payment-and-paywall.md): editable
+        exports are the paid line. Shown only once the plan has loaded and
+        the user can't export — never flashes during the initial read.
+        Copy names what they GET ("keep editing in PowerPoint or
+        Overleaf"), not what they're blocked from (marketing rule).
+      */}
+      {!plan.loading && !canExport && (
+        <div
+          style={{
+            padding: '14px 16px',
+            marginBottom: 12,
+            borderRadius: 8,
+            border: '1px solid #3a3050',
+            background: '#17141f',
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8', marginBottom: 4 }}>
+            Keep editing in PowerPoint or Overleaf
+          </div>
+          <div style={{ fontSize: 12.5, color: '#9ca3af', lineHeight: 1.5, marginBottom: 12 }}>
+            Your PDF export is free. Unlock clean PowerPoint &amp; LaTeX with a
+            $18.99 term, or grab a $9.99 3-export pack.
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => startCheckout('term')}
+              style={{
+                flex: 1,
+                padding: '9px 12px',
+                borderRadius: 7,
+                border: 'none',
+                background: '#5641b8',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Get the term
+            </button>
+            <button
+              onClick={() => startCheckout('pack')}
+              style={{
+                flex: 1,
+                padding: '9px 12px',
+                borderRadius: 7,
+                border: '1px solid #3a3050',
+                background: '#1a1a26',
+                color: '#c8cad0',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Get the pack
+            </button>
+          </div>
+        </div>
+      )}
+      {/* Credit-holder reassurance: show the remaining count so a pack
+          buyer knows an export will spend one of a finite number. */}
+      {!plan.loading && canExport && usesCredit && (
+        <div style={{ ...hintStyle, color: '#a3a7b3', marginTop: 0, marginBottom: 10 }}>
+          {plan.credits} export{plan.credits === 1 ? '' : 's'} left in your pack —
+          each PowerPoint or LaTeX export uses one.
+        </div>
+      )}
       <button
         onClick={handlePptx}
-        disabled={!doc || state.busy !== null || beyondHalf}
+        disabled={pptxDisabled}
         data-postr-export-pptx
         style={exportButtonStyle(
-          !doc || state.busy !== null || beyondHalf,
+          pptxDisabled,
           state.done === 'pptx',
           '#f0a35e',
           '#c46a1f',
@@ -188,10 +308,10 @@ export function EditableExportButtons({
 
       <button
         onClick={handleLatex}
-        disabled={!doc || state.busy !== null}
+        disabled={latexDisabled}
         data-postr-export-latex
         style={exportButtonStyle(
-          !doc || state.busy !== null,
+          latexDisabled,
           state.done === 'latex',
           '#8ec5ff',
           '#3178c6',
