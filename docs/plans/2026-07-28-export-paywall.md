@@ -195,10 +195,110 @@ before the date the paid tier goes live retains PPTX and LaTeX export
 permanently at no cost. Implement as a `created_at` comparison against a
 single hard-coded launch timestamp.
 
-### 3b.i — Scope the grandfather to the CAPABILITY, not to the whole tier
+### 3b.i — The founding cohort: 100 users, 2-year term, timestamp-scoped
+
+**DECIDED (2026-07-28), superseding the analysis in 3b.ii below.**
+
+The paywall goes live at **~100 users** — the point at which scaling
+looks viable and there is a real prospect of further customers. Users
+present at that point receive a **2-year free term**.
+
+**Why 2 years is the right number** `[JUDGEMENT]`: it is sized to a
+master's program, not picked round. A student who adopts Postr in year
+one is covered for the whole degree. The term then expires exactly when
+the user's circumstances change — they either leave academia (never a
+customer) or continue to a PhD with grant money behind them. The grant
+therefore spends free access precisely across the period when the user
+provably cannot pay, and ends when that stops being true.
+
+**This also resolves the pricing-signal objection** raised in 3b.ii. That
+objection assumed the grant ran from *today*. It does not: it starts at
+user ~100, so users 101+ arrive under the paywall and are the test
+cohort. No signal is lost, because there is nothing to measure before
+there is a paid tier at all.
+
+#### Timestamp scoping — what survives expiry
+
+**Posters created inside the grant window keep editable export
+permanently, even after the term ends.** Posters created after expiry
+are gated normally.
+
+`[JUDGEMENT]` This is the strongest available trust position: nothing a
+user has already made ever becomes *less* capable than it was on the day
+they made it. The take-back that damages trust is retroactive; this rule
+is strictly forward-looking. A user who returns in year three finds
+every poster they built still exports exactly as before, and only new
+work sits behind the tier.
+
+**Mechanism — no schema change needed.** Both tables already carry the
+required timestamps:
+- `public.users.created_at` (`20260408000000_users.sql:18`) — determines
+  founding-cohort membership and the term start.
+- `public.posters.created_at` (`20260408000100_posters.sql:62`) —
+  determines per-poster export entitlement.
+
+The check is: *founding user AND poster.created_at ≤ user's term end* →
+editable export allowed, forever.
+
+#### Metering the LLM features: meter RUNS, not posters
+
+**Proposed (Gavin):** 5 free posters per semester, $1 per poster beyond
+that. **Amended on recommendation — see below.**
+
+`[JUDGEMENT]` The framing is right and should be kept: "5 free per
+semester, $1 after" reads as generous, and at better than one per month
+almost nobody hits the ceiling. But the **noun is wrong**, in a way that
+inverts the intent:
+
+- A poster is **not a unit of cost.** A user can create five posters
+  that never call the API — cost to Postr, `$0` — or run the manuscript
+  pipeline thirty times against a single poster while iterating, at real
+  and uncapped cost. `import.ts:920` allocates `max_tokens: 16_384` on a
+  Sonnet call; that is the expensive operation, and it is per *run*, not
+  per *poster*.
+- So a poster meter charges the user who costs nothing and waves through
+  the user who costs the most. It is the one metric guaranteed not to
+  track spend.
+- `[EVIDENCE]` It also collides with a decision already made: the growth
+  plan rules out metering print-ready exports per term, and "5 posters
+  per semester" reintroduces a free-tier quantity cap from a different
+  direction. See the unresolved §2 conflict.
+
+**Amendment:** keep the numbers and the message, move the meter onto the
+**pipeline run**.
+
+> **5 free manuscript-pipeline runs per semester. $1 per run after.**
+
+- Meters the operation that actually costs money, so the ceiling tracks
+  spend instead of accidentally taxing free activity.
+- Poster creation and editing stay **unlimited**, which is a stronger
+  marketing line than "5 posters" and preserves the growth plan's
+  "editing stays free forever because that is where time-to-value
+  lives."
+- Same generosity optics: 5/semester at better than one a month, and
+  `[JUDGEMENT]` a user who exceeds five *pipeline runs* is
+  demonstrating heavy engagement — exactly the person for whom $1 is a
+  reasonable ask.
+- Caps the only unbounded liability in the founding grant. Everything
+  else offered (PPTX, LaTeX, editing) runs in the browser at zero
+  marginal cost and can be given away permanently without risk.
+
+`[JUDGEMENT]` $1/run needs a sanity check against real token spend
+before launch — at 16k max output tokens plus manuscript input, verify
+the margin holds. Not blocking, but do not publish the price until the
+per-run cost is measured against the model actually in use.
+
+---
+
+### 3b.ii — Earlier analysis: why an *open-ended* 2-year giveaway was wrong
+
+**Superseded by 3b.i**, which resolves the objections below by starting
+the grant at user ~100 and metering pipeline runs. Retained because the
+reasoning about *account sharing* still stands and may come up again.
 
 **Considered and rejected (2026-07-28):** "first 100 users get 2 years
-of free subscription."
+of free subscription" — as originally posed, i.e. starting immediately
+and covering the whole tier without a cap on LLM usage.
 
 `[JUDGEMENT]` The account-sharing worry that prompted this question is
 **not the real risk**, and at this stage is arguably a benefit:
@@ -232,17 +332,21 @@ of free subscription."
    accounts is an unbounded inference bill with no ceiling and no way to
    walk it back.
 
-**Decision:** grandfather the **capability**, not the tier.
+**Conclusion at the time:** grandfather the capability, not the tier —
+PPTX + LaTeX permanently, LLM features priced for everyone.
 
-- **Granted permanently:** PPTX + LaTeX export. Zero marginal cost —
-  both writers run in the browser — so this is free to honour forever,
-  and *"permanent"* is a stronger loyalty story than *"2 years."*
-- **Not granted:** metered LLM-backed features (manuscript pipeline,
-  deck generation). These stay priced for everyone.
-- `[JUDGEMENT]` If the founding cohort should feel materially special
-  beyond that, grant a **fixed** allocation with a hard ceiling — e.g.
-  10 deck credits each — rather than unlimited-for-a-duration. Bounded
-  cost, same gesture.
+**How 3b.i resolves this.** The final design keeps the *principle*
+(bound the LLM cost, give away the zero-marginal-cost capability) while
+recovering the generosity of a real term:
+
+- Editable exports are granted **per poster, permanently, by timestamp**
+  — strictly better than the "permanent capability" framing, because it
+  guarantees no existing work is ever devalued.
+- The 2-year term is retained but is **not** unlimited: pipeline runs
+  are metered at 5/semester + $1 overage, so the unbounded liability
+  identified above never materialises.
+- The pricing-signal concern is void once the grant starts at user ~100
+  rather than today.
 
 ---
 
@@ -318,8 +422,11 @@ they're blocked from.
 | 2026-07-28 | Editable exports (PPTX + LaTeX) paid; PDF free with acknowledgement | Gavin |
 | 2026-07-28 | Both editable formats, not PPTX alone — LaTeX is a one-click bypass | Gavin, on recommendation |
 | 2026-07-28 | Document only; no code this session | Gavin |
-| 2026-07-28 | Pre-paywall accounts grandfathered permanently (answers the trust objection) | Gavin |
-| 2026-07-28 | "First 100 users, 2 years free" REJECTED — grandfather the capability, not the tier | on recommendation; **needs Gavin's confirmation** |
+| 2026-07-28 | Pre-paywall accounts grandfathered (answers the trust objection) | Gavin |
+| 2026-07-28 | Paywall goes live at ~100 users, not before | Gavin |
+| 2026-07-28 | Founding cohort gets a 2-year term, sized to a master's program | Gavin |
+| 2026-07-28 | Posters created in-term keep editable export permanently, by `created_at` | Gavin |
+| 2026-07-28 | LLM meter: 5 free pipeline RUNS per semester, $1/run after — not per poster | Gavin proposed per-poster; amended on recommendation |
 
 ---
 
@@ -327,11 +434,20 @@ they're blocked from.
 
 1. **§2 conflict is unresolved.** `2026-07-27-growth-plan.md` §2 states a
    quantity meter ("one print-ready export per term"); this document
-   states a format meter with unlimited free PDF. Amend the growth plan
-   or overrule this one. They cannot both ship.
-2. **The 2-year/100-user grant was rejected on my recommendation, not
-   yet confirmed by Gavin.** If the founding-cohort gesture matters more
-   than the pricing signal, that is a legitimate different call — but
-   cap the LLM-backed features either way.
-3. **Does the paid tier stand on editable exports alone?** (§3) Unresolved
-   until the manuscript-to-presentation pipeline ships.
+   states a format meter with unlimited free PDF and a run meter on the
+   pipeline. Amend the growth plan or overrule this one. They cannot
+   both ship. **This is the one blocking item before any build.**
+2. **$1/run margin is unverified.** `import.ts:920` allocates
+   `max_tokens: 16_384` on `claude-sonnet-4-5`. Measure real per-run
+   cost (input + output, accounting for prompt caching) before
+   publishing the price. `experiments/condense-cost-model.mjs` already
+   models this and should be re-run against the shipped prompt.
+3. **Does the paid tier stand on editable exports alone?** (§3)
+   Unresolved until the manuscript-to-presentation pipeline ships. The
+   run meter partly answers this — it gives the tier a second axis of
+   value — but the pipeline still needs to exist.
+4. **"Semester" needs a definition in code.** `[EVIDENCE]` Gavin's own
+   note on the $19 term: "some schools use different systems." Decide
+   whether a semester is a fixed 4-month window from first use, or two
+   fixed calendar resets a year. The former is simpler and avoids a
+   January/September cliff where everyone's quota refills at once.
