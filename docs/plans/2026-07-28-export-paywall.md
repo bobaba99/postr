@@ -283,10 +283,95 @@ inverts the intent:
   else offered (PPTX, LaTeX, editing) runs in the browser at zero
   marginal cost and can be given away permanently without risk.
 
-`[JUDGEMENT]` $1/run needs a sanity check against real token spend
-before launch — at 16k max output tokens plus manuscript input, verify
-the margin holds. Not blocking, but do not publish the price until the
-per-run cost is measured against the model actually in use.
+#### Cost model — run 2026-07-28, `experiments/founding-cohort-cost-model.mjs`
+
+**Correction to an earlier claim in this document.** A previous revision
+cited `import.ts:920`'s `max_tokens: 16_384` as the pipeline's cost.
+That is the **poster-image import** path, not the manuscript pipeline.
+`app.ts:40` states the pipeline has exactly **one** LLM step, and
+`narrative/config.ts` sets it to `gpt-5.6-terra` with
+`CONDENSER_MAX_TOKENS = 4096`. The real exposure is roughly a quarter of
+what that figure implied.
+
+**Measured cost of one pipeline run** (terra @ $2.50 in / $15.00 out):
+
+| Case | Cost |
+|------|------|
+| Cached repeat, same manuscript | **$0.0088** |
+| Typical first run | **$0.0153** |
+| Worst case (5k input, 4096 output) | **$0.0752** |
+
+**Two-year totals for the 100-user cohort:**
+
+| Scenario | Active | Runs | LLM cost | Overage rev. | Net |
+|----------|--------|------|----------|--------------|-----|
+| Best — light use, 2 runs/sem | 30 | 360 | $4.35 | $0 | −$4.35 |
+| Average — 4 runs/sem, within allowance | 50 | 1,200 | $15.29 | $0 | −$15.29 |
+| Worst — all 100 × 20 runs/sem, max tokens, no cache | 100 | 12,000 | $902.88 | $9,000 | +$8,097 |
+
+**Conclusions:**
+
+1. `[EVIDENCE — modelled]` **The worst case cannot hurt.** $903 over two
+   years is **$37.62/month**, and it requires every one of the 100 users
+   to run the pipeline 20×/semester on maximum-size manuscripts with
+   zero cache hits, continuously, for two years. Reaching a genuinely
+   painful $500/month would take ~66 worst-case runs per user per month.
+   `[JUDGEMENT]` For a tool used around conference deadlines, that is not
+   a realistic load; it is a bound, not a forecast.
+
+2. `[EVIDENCE — modelled]` **The free allowance is nearly free to give.**
+   Five runs × six semesters × 100 users, if every user exhausted every
+   semester, is **$46 over two years — $1.92/month.** The generous-
+   looking number costs essentially nothing.
+
+3. `[JUDGEMENT]` **$1/run is not a cost-recovery price.** Break-even is
+   $0.0752; $1 is **13× worst-case cost**, a 92.5–98.5% margin. It
+   should therefore be understood as a **friction instrument** — it
+   exists to stop unbounded or automated use, not to fund the service.
+   That is a legitimate purpose, but it should be *named* as such
+   internally so nobody later mistakes it for a revenue line.
+
+4. `[JUDGEMENT]` **The realistic scenarios lose money, and that is
+   fine** — and was the stated intent: *"I never expected the first 100
+   users to make money in the first place."* Best case loses $4.35 over
+   two years, average $15.29. These are rounding errors against the goal
+   of buying trust with a founding cohort.
+
+#### Implication: consider raising the free allowance
+
+`[JUDGEMENT]` Given that the *entire* free allowance for all 100 users
+costs $46 over two years, 5 runs/semester is conservative to the point
+of being pointlessly stingy. The marginal cost of going to 10 or 15
+runs/semester is a few dollars, and it removes almost all risk of a
+founding user hitting a wall and feeling metered — the precise outcome
+the whole grandfather scheme exists to avoid.
+
+Counter-argument for keeping 5 `[JUDGEMENT]`: a visible ceiling
+establishes that runs are a metered resource *before* the paid tier
+matters, so the later transition is not a surprise. A limit nobody ever
+reaches teaches nothing.
+
+**Recommendation:** keep the meter, raise the number to **10/semester**.
+It preserves the "this is metered" signal while making it very unlikely
+any genuine user hits it. Decide before launch.
+
+#### Caveats on the above
+
+- `[UNVERIFIED]` The 0.1 cache discount is assumed, not measured.
+  **Prompt caching does not currently work at all**:
+  `buildCondenserUserMessage()` emits the volatile emphasis block
+  *first*, which defeats prefix caching. Until that is reordered, every
+  run is cold — use the $0.0153 figure, not $0.0088. Fixing it is a
+  known open item and would cut repeat-run cost ~43%.
+- `[UNVERIFIED]` Token counts are estimates from the prompt's shape, not
+  live API usage data. Re-verify once there is traffic.
+- `[EVIDENCE]` `config.ts` flags `gpt-5.6-luna` ($1.00/$6.00) as the
+  next tier down pending a quality bake-off — that would cut all figures
+  above by ~60%.
+- **Infrastructure is not modelled here and is the larger line item.**
+  `[EVIDENCE]` The growth plan puts break-even at ~50 MAU on free
+  hosting tiers; 100 users may push Render or Supabase into a paid band.
+  At every scenario above, hosting costs more than inference.
 
 ---
 
@@ -437,11 +522,20 @@ they're blocked from.
    states a format meter with unlimited free PDF and a run meter on the
    pipeline. Amend the growth plan or overrule this one. They cannot
    both ship. **This is the one blocking item before any build.**
-2. **$1/run margin is unverified.** `import.ts:920` allocates
-   `max_tokens: 16_384` on `claude-sonnet-4-5`. Measure real per-run
-   cost (input + output, accounting for prompt caching) before
-   publishing the price. `experiments/condense-cost-model.mjs` already
-   models this and should be re-run against the shipped prompt.
+2. ~~$1/run margin is unverified.~~ **RESOLVED 2026-07-28** — modelled
+   in `experiments/founding-cohort-cost-model.mjs`. A run costs
+   $0.0153 typical / $0.0752 worst case, so $1 carries a 92.5–98.5%
+   margin and is a friction price, not a cost-recovery one. Worst-case
+   two-year exposure for the whole cohort is $903 ($37.62/month). The
+   earlier `max_tokens: 16_384` figure was the wrong call site (poster
+   import, not the pipeline).
+2b. **Raise the free allowance from 5 to 10 runs/semester?** The entire
+   allowance for 100 users over two years costs $46. 5 is conservative
+   to the point of being stingy for no saving. Recommended; needs a
+   decision before launch.
+2c. **Fix prompt-cache ordering.** `buildCondenserUserMessage()` emits
+   the volatile emphasis block first, defeating prefix caching entirely.
+   Reordering it cuts repeat-run cost ~43%. Independently worth doing.
 3. **Does the paid tier stand on editable exports alone?** (§3)
    Unresolved until the manuscript-to-presentation pipeline ships. The
    run meter partly answers this — it gives the tier a second axis of
