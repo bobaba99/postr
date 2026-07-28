@@ -17,8 +17,19 @@ const COST_DECK_TYPICAL = 0.0560;   // top-tier gen + 3 cached iters + theme
 const COST_DECK_WORST   = 0.0917;   // + 6 iters
 const COST_POSTER       = 0.0139;   // condense only, luna+cache, 3 iters
 
-// ── SOURCED: pricing (2026) ────────────────────────────────────────
-const PRICE_SUB   = 7.00;
+// ── DECIDED: pricing (2026-07-28) ──────────────────────────────────
+// Two paid things, not a monthly subscription:
+//   1. The $19 / 4-month TERM. Unlocks the paywalled outputs — clean
+//      editable exports (PPTX + LaTeX, no watermark) AND paper→
+//      presentation deck generation. Framed as a term, never a sub:
+//      it expires without a cancellation event (growth-plan §2).
+//   2. The $4.99 / 3-decks PACK. Per-artifact credit for deck
+//      generation, for users who want decks without the full term.
+// FREE tier keeps unlimited editing, all tools, and a watermarked PDF
+// export ("made with postr.sh") plus paper→poster. What you pay for is
+// the clean editable export and the presentation.
+const PRICE_TERM  = 19.00;   // $19 / 4-month term
+const TERM_MONTHS = 4;
 const PRICE_PACK  = 4.99;
 const PACK_DECKS  = 3;
 const stripe = (r) => r * 0.029 + 0.30;
@@ -45,37 +56,44 @@ const CONVERSION = {
   good:        0.080,  // 8.0% — survey median
 };
 
-// ASSUMPTION: mix of subscription vs pack among converters, and usage.
-const SUB_SHARE = 0.4;          // ASSUMPTION: 40% subscribe, 60% buy the pack
-const DECKS_PER_SUB_MONTH = 3;  // ASSUMPTION: typical academic cadence
-const SUB_MONTHS = 4;           // ASSUMPTION: churn after ~4 months (seasonal need)
+// ASSUMPTION: mix of term-buyers vs pack-buyers among converters, and usage.
+// A converter buys EITHER the $19 term (unlocks clean exports + decks) OR a
+// $4.99 deck pack. The term is amortised to a monthly figure over its 4-month
+// life so the monthly P&L is apples-to-apples.
+const TERM_SHARE = 0.4;          // ASSUMPTION: 40% buy the term, 60% the pack
+const DECKS_PER_TERM_MONTH = 3;  // ASSUMPTION: term-buyer deck cadence
+// Free-tier variable cost: paper→poster still runs the condense pipeline for
+// the users who use it. Watermarked PDF export itself is zero marginal cost
+// (browser-side), so the free LLM line is the poster pipeline only.
+const FREE_GENERATE_SHARE = 0.30; // ASSUMPTION: 30% of free users run the pipeline
 
 const usd = (n) => (n < 0 ? '-$' : '$') + Math.abs(n).toFixed(2);
 
 function monthlyModel(mau, convRate, hosting) {
   const converters = mau * convRate;
-  const subs = converters * SUB_SHARE;
-  const packs = converters * (1 - SUB_SHARE);
+  const termBuyers = converters * TERM_SHARE;
+  const packs = converters * (1 - TERM_SHARE);
 
-  const subRev = subs * (PRICE_SUB - stripe(PRICE_SUB));
+  // The $19 term is a one-time charge amortised across its 4 months.
+  const termRevMonthly = termBuyers * (PRICE_TERM - stripe(PRICE_TERM)) / TERM_MONTHS;
   const packRev = packs * (PRICE_PACK - stripe(PRICE_PACK));
-  const revenue = subRev + packRev;
+  const revenue = termRevMonthly + packRev;
 
-  // Variable cost: paying users generate decks; free users cost the poster
-  // condense path (the free tier still calls a model).
+  // Variable cost: term-buyers generate decks each month; pack-buyers spend
+  // their 3 decks; free users cost the poster condense path only.
   const varCost =
-    subs * DECKS_PER_SUB_MONTH * COST_DECK_TYPICAL +
+    termBuyers * DECKS_PER_TERM_MONTH * COST_DECK_TYPICAL +
     packs * PACK_DECKS * COST_DECK_TYPICAL +
-    (mau - converters) * COST_POSTER * 0.30;  // ASSUMPTION: 30% of free users actually generate
+    (mau - converters) * COST_POSTER * FREE_GENERATE_SHARE;
 
   const fixed = hostingTotal(hosting);
   return { mau, converters, revenue, varCost, fixed, profit: revenue - varCost - fixed };
 }
 
 console.log('POSTR BUSINESS MODEL — unit economics + fixed costs\n');
-console.log('Inputs: deck $%s typical / $%s worst · poster $%s · sub $%s · pack $%s for %d',
+console.log('Inputs: deck $%s typical / $%s worst · poster $%s · term $%s/%dmo · pack $%s for %d',
   COST_DECK_TYPICAL.toFixed(4), COST_DECK_WORST.toFixed(4), COST_POSTER.toFixed(4),
-  PRICE_SUB.toFixed(2), PRICE_PACK.toFixed(2), PACK_DECKS);
+  PRICE_TERM.toFixed(2), TERM_MONTHS, PRICE_PACK.toFixed(2), PACK_DECKS);
 console.log('Hosting: lean $%d/mo · real $%d/mo · scaled $%d/mo',
   hostingTotal(HOSTING.lean), hostingTotal(HOSTING.real), hostingTotal(HOSTING.scaled));
 console.log('Conversion benchmarks: median 8%, freemium self-serve avg 5.6%, bottom quartile <2.5%\n');
@@ -124,7 +142,11 @@ console.log('═'.repeat(78));
   const total = m.varCost + m.fixed;
   console.log(`LLM (variable)  ${usd(m.varCost).padStart(9)}  ${(100 * m.varCost / total).toFixed(1)}% of cost`);
   console.log(`Hosting (fixed) ${usd(m.fixed).padStart(9)}  ${(100 * m.fixed / total).toFixed(1)}% of cost`);
-  const stripeTotal = m.converters * SUB_SHARE * stripe(PRICE_SUB) + m.converters * (1 - SUB_SHARE) * stripe(PRICE_PACK);
+  // Term Stripe fee is charged once at purchase; shown per-month here to
+  // match the amortised revenue line above (fee/TERM_MONTHS).
+  const stripeTotal =
+    m.converters * TERM_SHARE * stripe(PRICE_TERM) / TERM_MONTHS +
+    m.converters * (1 - TERM_SHARE) * stripe(PRICE_PACK);
   console.log(`Stripe fees     ${usd(stripeTotal).padStart(9)}  (already netted out of revenue above)`);
 }
 
@@ -132,11 +154,13 @@ console.log('\n' + '═'.repeat(78));
 console.log('D. LIFETIME VALUE vs the cost to serve one converter');
 console.log('═'.repeat(78));
 {
-  const ltvSub = SUB_MONTHS * (PRICE_SUB - stripe(PRICE_SUB) - DECKS_PER_SUB_MONTH * COST_DECK_TYPICAL);
+  // Term buyer: one $19 charge, decks consumed across the 4-month term.
+  const ltvTerm =
+    PRICE_TERM - stripe(PRICE_TERM) - TERM_MONTHS * DECKS_PER_TERM_MONTH * COST_DECK_TYPICAL;
   const ltvPack = PRICE_PACK - stripe(PRICE_PACK) - PACK_DECKS * COST_DECK_TYPICAL;
-  console.log(`subscriber LTV (${SUB_MONTHS} mo @ ${DECKS_PER_SUB_MONTH} decks): ${usd(ltvSub)}`);
+  console.log(`term buyer LTV ($19, ${TERM_MONTHS}mo @ ${DECKS_PER_TERM_MONTH} decks/mo): ${usd(ltvTerm)}`);
   console.log(`pack buyer LTV (one purchase):        ${usd(ltvPack)}`);
-  const blended = SUB_SHARE * ltvSub + (1 - SUB_SHARE) * ltvPack;
+  const blended = TERM_SHARE * ltvTerm + (1 - TERM_SHARE) * ltvPack;
   console.log(`blended LTV per converter:            ${usd(blended)}`);
   console.log(`\nCAC ceiling: with organic-only acquisition CAC ~= $0, so any conversion is`);
   console.log(`profitable per-unit. Paid acquisition only works below ${usd(blended)} per converter,`);

@@ -1,0 +1,543 @@
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Postr — Financial Projection</title>
+<style>
+  :root {
+    /* Neutrals biased warm-violet, not pure grey — chosen, not defaulted */
+    --bg: #f7f6fb;
+    --panel: #ffffff;
+    --panel-2: #f0eef7;
+    --ink: #1c1a2e;
+    --ink-soft: #57536e;
+    --ink-faint: #8a86a3;
+    --line: #e3e0ee;
+    --accent: #6f5ce6;      /* Postr violet, slightly deepened */
+    --accent-soft: #efeafc;
+    --good: #1f9d6b;
+    --good-soft: #e2f5ec;
+    --bad: #d0464f;
+    --bad-soft: #fbe6e7;
+    --shadow: 0 1px 2px rgba(28,26,46,.04), 0 8px 24px rgba(28,26,46,.06);
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Menlo, monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12111c;
+      --panel: #1a1826;
+      --panel-2: #201d30;
+      --ink: #ecebf5;
+      --ink-soft: #a9a5c2;
+      --ink-faint: #726d8e;
+      --line: #2a2740;
+      --accent: #9484f0;
+      --accent-soft: #241f3a;
+      --good: #4cc48c;
+      --good-soft: #16281f;
+      --bad: #e8646c;
+      --bad-soft: #2b1719;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#f7f6fb;--panel:#fff;--panel-2:#f0eef7;--ink:#1c1a2e;--ink-soft:#57536e;
+    --ink-faint:#8a86a3;--line:#e3e0ee;--accent:#6f5ce6;--accent-soft:#efeafc;
+    --good:#1f9d6b;--good-soft:#e2f5ec;--bad:#d0464f;--bad-soft:#fbe6e7;
+    --shadow:0 1px 2px rgba(28,26,46,.04),0 8px 24px rgba(28,26,46,.06);
+  }
+  :root[data-theme="dark"] {
+    --bg:#12111c;--panel:#1a1826;--panel-2:#201d30;--ink:#ecebf5;--ink-soft:#a9a5c2;
+    --ink-faint:#726d8e;--line:#2a2740;--accent:#9484f0;--accent-soft:#241f3a;
+    --good:#4cc48c;--good-soft:#16281f;--bad:#e8646c;--bad-soft:#2b1719;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--sans); line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  /* ── Header ─────────────────────────────────────────── */
+  header { margin-bottom: 28px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--accent); font-weight: 600;
+    margin-bottom: 10px;
+  }
+  h1 {
+    font-size: clamp(30px, 4.4vw, 46px); line-height: 1.04; margin: 0 0 12px;
+    letter-spacing: -0.025em; font-weight: 700; text-wrap: balance;
+  }
+  .lede { color: var(--ink-soft); font-size: 16px; max-width: 62ch; margin: 0; }
+  .lede b { color: var(--ink); font-weight: 600; }
+  .theme-btn {
+    position: absolute; top: 28px; right: 24px; background: var(--panel);
+    border: 1px solid var(--line); color: var(--ink-soft); border-radius: 9px;
+    width: 38px; height: 38px; cursor: pointer; font-size: 15px; box-shadow: var(--shadow);
+  }
+  .theme-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ── Summary tiles ──────────────────────────────────── */
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 26px 0; }
+  .tile {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 20px; box-shadow: var(--shadow); position: relative; overflow: hidden;
+  }
+  .tile .horizon { font-family: var(--mono); font-size: 12px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-faint); margin-bottom: 8px; }
+  .tile .balance { font-size: clamp(26px, 3.4vw, 34px); font-weight: 700;
+    letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1; }
+  .tile .sub { margin-top: 10px; font-size: 13px; color: var(--ink-soft);
+    display: flex; gap: 14px; font-variant-numeric: tabular-nums; }
+  .tile .sub .k { color: var(--ink-faint); }
+  .tile.pos .balance { color: var(--good); }
+  .tile.neg .balance { color: var(--bad); }
+  .tile .rail { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--accent); }
+  .tile.pos .rail { background: var(--good); }
+  .tile.neg .rail { background: var(--bad); }
+
+  /* ── Main grid: controls + chart ────────────────────── */
+  .main { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    padding: 20px; box-shadow: var(--shadow);
+  }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .1em;
+    color: var(--ink-faint); margin: 0 0 4px; font-family: var(--mono); font-weight: 600; }
+  .panel .panel-note { font-size: 12px; color: var(--ink-faint); margin: 0 0 16px; }
+
+  .ctrl { margin-bottom: 18px; }
+  .ctrl label { display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px; color: var(--ink-soft); margin-bottom: 7px; font-weight: 500; }
+  .ctrl .val { font-family: var(--mono); font-size: 13px; color: var(--accent);
+    font-weight: 600; font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; height: 4px; -webkit-appearance: none; appearance: none;
+    background: var(--line); border-radius: 3px; outline: none; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; border-radius: 50%; background: var(--accent);
+    cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.25); border: 2px solid var(--panel); }
+  input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: 2px solid var(--panel); }
+  .ctrl .hint { font-size: 11px; color: var(--ink-faint); margin-top: 5px; line-height: 1.4; }
+  .ctrl .hint .src { color: var(--good); font-weight: 600; }
+  .ctrl .hint .assume { color: var(--accent); font-weight: 600; }
+
+  .preset-row { display: flex; gap: 7px; margin-bottom: 18px; }
+  .preset {
+    flex: 1; padding: 8px 4px; font-size: 12px; font-weight: 600; cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px;
+    color: var(--ink-soft); font-family: var(--sans);
+  }
+  .preset:hover { border-color: var(--accent); color: var(--accent); }
+  .preset.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .founding {
+    display: flex; align-items: center; gap: 10px; padding: 12px; margin-top: 6px;
+    background: var(--accent-soft); border-radius: 10px; font-size: 12px; color: var(--ink-soft);
+  }
+  .founding input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+  /* ── Chart panel ────────────────────────────────────── */
+  .chart-head { display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 4px; flex-wrap: wrap; gap: 8px; }
+  .chart-head h2 { margin: 0; }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: var(--ink-soft); }
+  .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  canvas { width: 100%; display: block; }
+  .chart-scroll { overflow-x: auto; }
+  .season-note { font-size: 11px; color: var(--ink-faint); margin-top: 10px; display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 22px; height: 10px; border-radius: 2px; display: inline-block;
+    background: linear-gradient(90deg, var(--accent-soft), var(--accent)); }
+
+  /* ── Sensitivity grid ───────────────────────────────── */
+  .grid-panel { margin-top: 18px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 10px 12px; text-align: right; font-size: 13px; }
+  th { color: var(--ink-faint); font-weight: 600; font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--line); }
+  td:first-child, th:first-child { text-align: left; }
+  .cell { font-weight: 600; border-radius: 6px; }
+
+  /* ── Assumptions / sources footer ───────────────────── */
+  .notes { margin-top: 34px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .note-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 18px 20px; box-shadow: var(--shadow); }
+  .note-card h3 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase;
+    letter-spacing: .09em; font-family: var(--mono); color: var(--ink-faint); }
+  .note-card ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink-soft); }
+  .note-card li { margin-bottom: 8px; }
+  .tag { font-family: var(--mono); font-size: 10px; font-weight: 700; padding: 1px 5px;
+    border-radius: 4px; letter-spacing: .04em; }
+  .tag.solid { background: var(--good-soft); color: var(--good); }
+  .tag.assume { background: var(--accent-soft); color: var(--accent); }
+  .tag.infer { background: var(--bad-soft); color: var(--bad); }
+
+  .disclaimer { margin-top: 26px; font-size: 12px; color: var(--ink-faint);
+    line-height: 1.55; max-width: 78ch; }
+  .disclaimer b { color: var(--ink-soft); }
+
+  @media (max-width: 820px) {
+    .main { grid-template-columns: 1fr; }
+    .tiles { grid-template-columns: 1fr; }
+    .notes { grid-template-columns: 1fr; }
+    .theme-btn { position: static; margin-bottom: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐</button>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Postr · financial projection</div>
+    <h1>What a $19 term earns from a seasonal academic tool.</h1>
+    <p class="lede">A month-by-month balance from launch through three years, driven by
+      <b>real published benchmarks</b> — EdTech conversion, education repurchase, academic
+      seasonality — with every optimistic knob something you dial <b>in</b>, not out. The
+      defaults are the conservative reading, because the honest data says this market
+      monetizes thinly.</p>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="main">
+    <div class="panel" id="controls">
+      <h2>Scenario</h2>
+      <p class="panel-note">Presets set the honest range. Then tune any input.</p>
+      <div class="preset-row" id="presets">
+        <button class="preset" data-preset="pessimistic">Bear</button>
+        <button class="preset on" data-preset="base">Base</button>
+        <button class="preset" data-preset="optimistic">Bull</button>
+      </div>
+      <div id="sliders"></div>
+      <label class="founding">
+        <input type="checkbox" id="founding" />
+        <span>Grandfather first 100 users (they pay $0 — founding benefit)</span>
+      </label>
+    </div>
+
+    <div class="panel">
+      <div class="chart-head">
+        <h2>Cumulative balance &amp; monthly profit</h2>
+        <div class="legend">
+          <span><span class="dot" style="background:var(--accent)"></span>Balance</span>
+          <span><span class="dot" style="background:var(--good)"></span>Profit mo.</span>
+          <span><span class="dot" style="background:var(--bad)"></span>Loss mo.</span>
+        </div>
+      </div>
+      <div class="chart-scroll"><canvas id="chart" height="360"></canvas></div>
+      <div class="season-note">
+        <span class="swatch"></span>
+        Column shading = seasonality. Poster deadlines cluster Feb–Apr &amp; Oct; summer is a trough.
+      </div>
+
+      <div class="grid-panel">
+        <h2 style="font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.09em;color:var(--ink-faint);margin:18px 0 10px;">3-year ending balance — conversion × repurchase</h2>
+        <table id="sens"></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="note-card">
+      <h3>Grounded in</h3>
+      <ul>
+        <li><span class="tag solid">SOLID</span> <b>2.6% conversion</b> — EdTech is the lowest of 15 industries (First Page Sage, 2026).</li>
+        <li><span class="tag solid">SOLID</span> <b>24% annual repurchase</b> — education has the lowest annual renewal of any app category (RevenueCat).</li>
+        <li><span class="tag solid">SOLID</span> <b>Seasonality is real</b> — academic activity is biphasic, R²=0.55–0.74 (Gillis &amp; Garrison, JMIR 2022).</li>
+        <li><span class="tag solid">SOLID</span> <b>ARPU ≈ $1/user/yr</b> — Overleaf's 19–20M users vs ~$9–25M revenue. The north star.</li>
+      </ul>
+    </div>
+    <div class="note-card">
+      <h3>Set by us, not sourced</h3>
+      <ul>
+        <li><span class="tag assume">ASSUME</span> <b>Seasonal magnitude</b> — peak ≈2.4×, summer ≈0.35×. The pattern is published; the size is not.</li>
+        <li><span class="tag assume">ASSUME</span> <b>Term/pack mix &amp; decks per user</b> — no comparable data exists.</li>
+        <li><span class="tag infer">INFER</span> <b>12% pack attach</b> — no benchmark for academic consumable packs. Do not trust above 20%.</li>
+        <li><span class="tag assume">ASSUME</span> <b>120 seed signups, 5% organic</b> — a first campus, growing by word of mouth.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="disclaimer">
+    <b>Read this as a shape, not a forecast.</b> Postr is not subscription SaaS — it's a
+    one-time term unlock closer to occasion-driven e-commerce, so every benchmark here is a
+    directional analog from an adjacent market, not a measurement of this product. The value
+    is in the <b>relationships</b> — how balance responds to conversion, repurchase, and the
+    summer trough — not in any single dollar figure. The first real conversion event will
+    beat all of it. Numbers net of Stripe fees (2.9% + $0.30); hosting steps up with scale.
+  </p>
+</div>
+
+<script>
+// ── Projection engine — mirrors docs/plans/experiments/projection.mjs ──
+const NET_TERM = 19 - (19 * 0.029 + 0.30);
+const NET_PACK = 4.99 - (4.99 * 0.029 + 0.30);
+const COST_DECK = 0.056;
+const COST_POSTER_FREE = 0.0139 * 0.3;
+const SEASON = [1.4,1.9,2.4,2.2,1.1,0.5, 0.35,0.6,1.3,1.8,1.5,0.7];
+const SEASON_AVG = SEASON.reduce((a,b)=>a+b,0)/12;
+const MABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function hostingFor(mau){ return mau<2000?52:mau<20000?90:220; }
+
+function simulate(months, o){
+  const p = Object.assign({
+    startMonth:0, seedSignups:120, organicGrowth:0.05, conversion:0.026,
+    termShare:0.55, repurchase:0.22, packAttach:0.12, decksPerTermMonth:1.5,
+    foundingThreshold:0,
+  }, o);
+  const rows=[]; let totalUsers=0, cumBalance=0, returningPool=0;
+  for(let m=0;m<months;m++){
+    const cal=(p.startMonth+m)%12, season=SEASON[cal];
+    const trend=p.seedSignups*Math.pow(1+p.organicGrowth,m);
+    const newSignups = m===0 ? p.seedSignups : Math.round(trend*season/SEASON_AVG);
+    const usersBefore = totalUsers;
+    totalUsers+=newSignups;
+    // Founding grant: users below the threshold pay $0. Gate per-USER so
+    // the month that CROSSES the threshold is split — only the signups
+    // above it pay. (An all-or-nothing per-month check never fires when
+    // month 1 already exceeds 100.)
+    const paidThisMonth = p.foundingThreshold>0
+      ? Math.max(0, totalUsers - Math.max(usersBefore, p.foundingThreshold))
+      : newSignups;
+    const payingSignups = paidThisMonth;
+    const seasonalConv = Math.min(p.conversion*season, 0.12);
+    const newConverters = payingSignups*seasonalConv;
+    const repurchasers = season>1.2 ? returningPool*p.repurchase : 0;
+    returningPool = returningPool + newConverters;
+    const converters = newConverters + repurchasers;
+    const termBuyers = converters*p.termShare;
+    const packBuyers = converters*(1-p.termShare);
+    const packAttachBuyers = termBuyers*p.packAttach;
+    const revenue = termBuyers*NET_TERM + (packBuyers+packAttachBuyers)*NET_PACK;
+    const activeTermHolders = returningPool*p.termShare;
+    const deckCost = activeTermHolders*p.decksPerTermMonth*COST_DECK + packBuyers*3*COST_DECK;
+    const freeCost = (totalUsers-converters)*COST_POSTER_FREE*(season/SEASON_AVG);
+    const hosting = hostingFor(totalUsers);
+    const cost = deckCost+freeCost+hosting;
+    const profit = revenue-cost; cumBalance+=profit;
+    rows.push({month:m+1, cal:MABBR[cal], season, newSignups, totalUsers,
+      converters:Math.round(converters), revenue, cost, profit, cumBalance});
+  }
+  return rows;
+}
+
+// ── Scenario presets ──
+const PRESETS = {
+  pessimistic:{ conversion:0.015, repurchase:0.10, organicGrowth:0.03, seedSignups:80, packAttach:0.06, decksPerTermMonth:1 },
+  base:       { conversion:0.026, repurchase:0.22, organicGrowth:0.05, seedSignups:120, packAttach:0.12, decksPerTermMonth:1.5 },
+  optimistic: { conversion:0.04,  repurchase:0.35, organicGrowth:0.08, seedSignups:200, packAttach:0.18, decksPerTermMonth:2.5 },
+};
+
+// ── Slider config ──
+const SLIDERS = [
+  { key:'conversion', label:'Free → paid conversion', min:0.5, max:8, step:0.1, mul:100, suffix:'%',
+    hint:'EdTech median is <span class="src">2.6% (SOLID)</span> — the lowest of 15 industries.' },
+  { key:'repurchase', label:'Repurchase next season', min:0, max:50, step:1, mul:100, suffix:'%',
+    hint:'Education annual renewal <span class="src">24% (SOLID)</span> — buy for the deadline, then lapse.' },
+  { key:'organicGrowth', label:'Organic growth / mo', min:0, max:15, step:0.5, mul:100, suffix:'%',
+    hint:'Underlying trend before seasonality. <span class="assume">3–7% (ASSUME)</span> for word-of-mouth.' },
+  { key:'seedSignups', label:'Month-1 signups', min:20, max:500, step:10, mul:1, suffix:'',
+    hint:'<span class="assume">ASSUME</span> — a first campus adopting the tool.' },
+  { key:'termShare', label:'Buy term (vs pack)', min:0, max:100, step:5, mul:100, suffix:'%',
+    hint:'Of payers, share choosing the $19 term over the $4.99 pack. <span class="assume">ASSUME</span>.' },
+  { key:'packAttach', label:'Term buyers who add a pack', min:0, max:30, step:1, mul:100, suffix:'%',
+    hint:'<span class="assume">INFER</span> — no benchmark. Don\'t trust above 20%.' },
+];
+
+let state = Object.assign({}, PRESETS.base);
+let activePreset = 'base';
+
+// ── Render controls ──
+const slidersEl = document.getElementById('sliders');
+SLIDERS.forEach(s=>{
+  const wrap=document.createElement('div'); wrap.className='ctrl';
+  wrap.innerHTML =
+    '<label>'+s.label+'<span class="val" id="v_'+s.key+'"></span></label>'+
+    '<input type="range" id="s_'+s.key+'" min="'+s.min+'" max="'+s.max+'" step="'+s.step+'">'+
+    '<div class="hint">'+s.hint+'</div>';
+  slidersEl.appendChild(wrap);
+  wrap.querySelector('input').addEventListener('input', e=>{
+    state[s.key] = (+e.target.value)/s.mul;
+    setPreset(null); render();
+  });
+});
+const foundingEl = document.getElementById('founding');
+foundingEl.addEventListener('change', ()=>{ render(); });
+
+function syncSliders(){
+  SLIDERS.forEach(s=>{
+    const raw = state[s.key]*s.mul;
+    document.getElementById('s_'+s.key).value = raw;
+    const disp = s.mul===100 ? raw.toFixed(s.step<1?1:0) : Math.round(raw);
+    document.getElementById('v_'+s.key).textContent = disp + s.suffix;
+  });
+}
+
+document.querySelectorAll('.preset').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    state = Object.assign({}, PRESETS[b.dataset.preset]);
+    setPreset(b.dataset.preset); syncSliders(); render();
+  });
+});
+function setPreset(name){
+  activePreset=name;
+  document.querySelectorAll('.preset').forEach(b=>b.classList.toggle('on', b.dataset.preset===name));
+}
+
+// ── Formatting ──
+const fmt=(n)=>{ const s=Math.round(Math.abs(n)).toLocaleString(); return (n<0?'−$':'$')+s; };
+const fmt1=(n)=>{ const a=Math.abs(n); const s=a>=1000?(a/1000).toFixed(1)+'k':Math.round(a); return (n<0?'−$':'$')+s; };
+
+// ── Main render ──
+function render(){
+  const opts = Object.assign({}, state, { foundingThreshold: foundingEl.checked?100:0 });
+  const r36 = simulate(36, opts);
+  const horizons = [[6,'6 months'],[12,'1 year'],[36,'3 years']];
+  const tiles = document.getElementById('tiles'); tiles.innerHTML='';
+  horizons.forEach(([n,label])=>{
+    const rows = r36.slice(0,n); const last=rows[rows.length-1];
+    const rev = rows.reduce((a,x)=>a+x.revenue,0);
+    const cls = last.cumBalance>=0?'pos':'neg';
+    const el=document.createElement('div'); el.className='tile '+cls;
+    el.innerHTML='<div class="rail"></div><div class="horizon">'+label+'</div>'+
+      '<div class="balance">'+fmt(last.cumBalance)+'</div>'+
+      '<div class="sub"><span><span class="k">users</span> '+last.totalUsers.toLocaleString()+'</span>'+
+      '<span><span class="k">revenue</span> '+fmt(rev)+'</span></div>';
+    tiles.appendChild(el);
+  });
+  drawChart(simulate(36, opts));
+  drawSens(opts);
+}
+
+// ── Chart: cumulative balance line + monthly profit bars, season-shaded ──
+function drawChart(rows){
+  const cv=document.getElementById('chart');
+  const dpr=Math.min(2, window.devicePixelRatio||1);
+  const cssW=cv.parentElement.clientWidth, cssH=360;
+  cv.width=cssW*dpr; cv.height=cssH*dpr; cv.style.height=cssH+'px';
+  const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,cssW,cssH);
+  const cs=getComputedStyle(document.documentElement);
+  const c={ ink:cs.getPropertyValue('--ink'), soft:cs.getPropertyValue('--ink-faint'),
+    line:cs.getPropertyValue('--line'), accent:cs.getPropertyValue('--accent'),
+    good:cs.getPropertyValue('--good'), bad:cs.getPropertyValue('--bad'),
+    aSoft:cs.getPropertyValue('--accent-soft'), panel:cs.getPropertyValue('--panel') };
+  const padL=56, padR=16, padT=18, padB=28;
+  const W=cssW-padL-padR, H=cssH-padT-padB;
+  const n=rows.length;
+  const bals=rows.map(r=>r.cumBalance), profs=rows.map(r=>r.profit);
+  let lo=Math.min(0,...bals,...profs), hi=Math.max(0,...bals,...profs);
+  const pad=(hi-lo)*0.08||1; lo-=pad; hi+=pad;
+  const x=i=>padL + (n<=1?0:i/(n-1))*W;
+  const y=v=>padT + (1-(v-lo)/(hi-lo))*H;
+  const colW = W/n*0.6;
+
+  // Season shading columns — a gentle violet wash, intensity tracks the
+  // season index. Kept subtle (max ~0.14 alpha) so it reads as ambient
+  // rhythm behind the data, never as opaque bars competing with the line.
+  // Only peak months (season>1) get any tint; troughs stay clear, so the
+  // eye reads "these are the busy months" rather than a striped backdrop.
+  rows.forEach((r,i)=>{
+    if(r.season<=1) return;
+    const intensity = Math.min(1,(r.season-1)/1.4);
+    ctx.fillStyle = c.accent;
+    ctx.globalAlpha = 0.04 + intensity*0.10;
+    ctx.fillRect(x(i)-W/n/2, padT, W/n, H);
+  });
+  ctx.globalAlpha=1;
+
+  // Zero line
+  ctx.strokeStyle=c.line; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(padL,y(0)); ctx.lineTo(padL+W,y(0)); ctx.stroke();
+
+  // Y gridlines + labels
+  ctx.fillStyle=c.soft; ctx.font='11px ui-monospace, monospace'; ctx.textAlign='right';
+  const ticks=4;
+  for(let t=0;t<=ticks;t++){
+    const v=lo+(hi-lo)*t/ticks; const yy=y(v);
+    ctx.strokeStyle=c.line; ctx.globalAlpha=0.5;
+    ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(padL+W,yy); ctx.stroke();
+    ctx.globalAlpha=1; ctx.fillStyle=c.soft;
+    ctx.fillText(fmt1(v), padL-8, yy+3);
+  }
+
+  // Monthly profit/loss bars
+  rows.forEach((r,i)=>{
+    const cx=x(i); const y0=y(0), y1=y(r.profit);
+    ctx.fillStyle = r.profit>=0 ? c.good : c.bad;
+    ctx.globalAlpha=0.55;
+    ctx.fillRect(cx-colW/2, Math.min(y0,y1), colW, Math.abs(y1-y0));
+  });
+  ctx.globalAlpha=1;
+
+  // Cumulative balance line
+  ctx.strokeStyle=c.accent; ctx.lineWidth=2.5; ctx.lineJoin='round';
+  ctx.beginPath();
+  rows.forEach((r,i)=>{ const px=x(i),py=y(r.cumBalance); i?ctx.lineTo(px,py):ctx.moveTo(px,py); });
+  ctx.stroke();
+  // area under line
+  ctx.lineTo(x(n-1),y(0)); ctx.lineTo(x(0),y(0)); ctx.closePath();
+  ctx.fillStyle=c.accent; ctx.globalAlpha=0.08; ctx.fill(); ctx.globalAlpha=1;
+  // endpoint dot
+  const lp=rows[n-1];
+  ctx.fillStyle=c.accent; ctx.beginPath(); ctx.arc(x(n-1),y(lp.cumBalance),4,0,7); ctx.fill();
+
+  // X labels (every 3 months + year marks)
+  ctx.fillStyle=c.soft; ctx.font='10px ui-monospace, monospace'; ctx.textAlign='center';
+  rows.forEach((r,i)=>{
+    if(i%3===0 || i===n-1){
+      ctx.fillText(r.cal, x(i), padT+H+16);
+    }
+  });
+  // year separators
+  ctx.strokeStyle=c.line; ctx.globalAlpha=0.7;
+  [12,24].forEach(mi=>{ if(mi<n){ const px=x(mi-0.5); ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(px,padT); ctx.lineTo(px,padT+H); ctx.stroke(); ctx.setLineDash([]); }});
+  ctx.globalAlpha=1;
+}
+
+// ── Sensitivity table: 3yr balance across conversion × repurchase ──
+function drawSens(baseOpts){
+  const convs=[0.015,0.026,0.04], reps=[0.10,0.22,0.35];
+  const vals=[]; let lo=Infinity,hi=-Infinity;
+  convs.forEach(cv=>{ const row=[]; reps.forEach(rp=>{
+    const r=simulate(36, Object.assign({}, baseOpts, {conversion:cv, repurchase:rp}));
+    const v=r[r.length-1].cumBalance; row.push(v); lo=Math.min(lo,v); hi=Math.max(hi,v);
+  }); vals.push(row); });
+  const cs=getComputedStyle(document.documentElement);
+  const t=document.getElementById('sens');
+  let html='<thead><tr><th>conv ↓ · repurch →</th>'+reps.map(r=>'<th>'+Math.round(r*100)+'%</th>').join('')+'</tr></thead><tbody>';
+  convs.forEach((cv,i)=>{
+    html+='<tr><td>'+(cv*100).toFixed(1)+'%'+(cv===0.026?' · base':'')+'</td>';
+    vals[i].forEach(v=>{
+      const norm=(v-lo)/((hi-lo)||1);
+      const isBase = cv===state.conversion && false;
+      html+='<td><span class="cell" style="padding:4px 8px;background:'+heat(norm)+';color:'+(norm>0.55?'#fff':'var(--ink)')+'">'+fmt(v)+'</span></td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody>'; t.innerHTML=html;
+}
+function heat(t){
+  // interpolate accent-soft → accent
+  const a=[111,92,230]; // accent rgb
+  return 'rgba('+a[0]+','+a[1]+','+a[2]+','+(0.10+t*0.85).toFixed(2)+')';
+}
+
+// ── Theme toggle ──
+const tb=document.getElementById('themeBtn');
+tb.addEventListener('click', ()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  const next = cur==='dark'?'light': cur==='light'?'dark':
+    (matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark');
+  document.documentElement.setAttribute('data-theme', next);
+  render();
+});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', render);
+window.addEventListener('resize', ()=>render());
+
+// ── Init ──
+setPreset('base'); syncSliders(); render();
+</script>

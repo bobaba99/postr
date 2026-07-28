@@ -1,8 +1,16 @@
 /**
  * Founding-cohort cost model — 100 users, 2-year term.
  *
- * Question: is "5 free pipeline runs per semester, $1/run after" a
- * defensible offer for the first 100 users?
+ * Question: is "10 free outputs per MONTH, $1/output after" a
+ * defensible offer for the first 100 users? An "output" is a paywalled
+ * artifact — a clean editable export (PPTX/LaTeX) OR a paper→
+ * presentation deck — pooled across both and metered at export/generate
+ * time. Watermarked PDF and editing stay free and unmetered.
+ *
+ * (Supersedes the earlier "5 (then 10) runs per semester" framing:
+ * the allowance now resets monthly and counts exports as well as decks,
+ * per Gavin 2026-07-28. Only the deck share of outputs costs LLM money;
+ * a clean export is zero marginal cost.)
  *
  * The brief explicitly is NOT "does this turn a profit". Gavin:
  *   "it's not just a cost to cover, it's the cost of trust and
@@ -12,7 +20,7 @@
  * So the question this answers is narrower and more useful:
  *   1. What is the WORST case exposure? (can it hurt him?)
  *   2. Is the free allowance generous enough to never feel mean?
- *   3. Does $1/run insult anyone, or is it a rounding error either way?
+ *   3. Does $1/output insult anyone, or is it a rounding error either way?
  *
  * ---------------------------------------------------------------
  * MEASURED PARAMETERS (read from the repo 2026-07-28, not assumed)
@@ -87,85 +95,105 @@ console.log(`      or ${Math.floor(1 / typical)} typical runs.`);
 // ---------------------------------------------------------------
 // 2. Three scenarios over the 2-year term
 // ---------------------------------------------------------------
-// A "semester" here = 4 months, so a 2-year term = 6 semesters.
-const SEMESTERS = 6;
+// The 2-year founding term, counted in MONTHS — the allowance resets
+// monthly (revised 2026-07-28), so a 2-year term = 24 months.
+const MONTHS = 24;
 /**
- * Raised 5 → 10 on 2026-07-28. The first run of this model showed the
- * ENTIRE free allowance for all 100 users over the full two years cost
- * $46 at 5/semester — so the limit was saving nothing while still
- * risking a founding user hitting a wall. 10 keeps the "runs are
- * metered" signal (which matters for the later paid transition) while
- * making it very unlikely a genuine user ever reaches it.
+ * Founding-cohort offer, FINAL (2026-07-28, superseding the earlier
+ * "10 runs per semester"):
+ *
+ *   First 100 users: 10 outputs per MONTH, free, for 2 years.
+ *   $1 per output over 10. An "output" is a paywalled artifact —
+ *   a CLEAN editable export (PPTX/LaTeX, no watermark) OR a paper→
+ *   presentation deck. It is a COMBINED pool across both, metered at
+ *   export/generate time. (Watermarked PDF and editing stay free and
+ *   unmetered.)
+ *
+ * The meter's PURPOSE is appreciation-with-a-ceiling, not revenue: it
+ * hands the founding cohort the paid product for two years while
+ * bounding the one unbounded cost (deck generation). A clean export is
+ * zero marginal LLM cost, so only the deck share of outputs costs money.
  */
-const FREE_RUNS = 10;
+const FREE_OUTPUTS_PER_MONTH = 10;
 const OVERAGE = 1.0;
+// ASSUMPTION: of the 10 monthly outputs an active user produces, this
+// share are deck generations (the LLM-costed kind); the rest are clean
+// exports at zero marginal cost. Deck generation is the newer, heavier
+// action, so most founding-cohort output is exports.
+const DECK_SHARE_OF_OUTPUTS = 0.3;
 
 /**
  * @param label
- * @param activeFrac  share of the 100 who ever run the pipeline
- * @param runsPerSem  runs per semester for an active user
- * @param manuscript  input size
- * @param output      output size
- * @param cacheHit    share of runs that hit a warm cache
+ * @param activeFrac    share of the 100 who ever produce a paid output
+ * @param outsPerMonth  paid outputs (exports + decks) per active user/month
+ * @param manuscript    input size for the deck-generation runs
+ * @param output        output size for the deck-generation runs
+ * @param cacheHit      share of deck runs that hit a warm cache
  */
-function scenario(label, { activeFrac, runsPerSem, manuscript, output, cacheHit }) {
+function scenario(label, { activeFrac, outsPerMonth, manuscript, output, cacheHit, deckShare = DECK_SHARE_OF_OUTPUTS }) {
   const users = 100 * activeFrac;
-  const totalRuns = users * runsPerSem * SEMESTERS;
+  const totalOutputs = users * outsPerMonth * MONTHS;
 
-  const cachedRuns = totalRuns * cacheHit;
-  const coldRuns = totalRuns - cachedRuns;
+  // Only the deck-generation share of outputs calls the LLM; a clean
+  // editable export is zero marginal cost.
+  const deckRuns = totalOutputs * deckShare;
+  const cachedRuns = deckRuns * cacheHit;
+  const coldRuns = deckRuns - cachedRuns;
   const cost =
     cachedRuns * runCost({ manuscript, output, cached: true }) +
     coldRuns * runCost({ manuscript, output });
 
-  // Revenue: only runs beyond the free 5/semester are billed.
-  const billablePerUserPerSem = Math.max(0, runsPerSem - FREE_RUNS);
-  const revenue = users * billablePerUserPerSem * SEMESTERS * OVERAGE;
+  // Revenue: only outputs beyond the free 10/month are billed at $1.
+  const billablePerUserPerMonth = Math.max(0, outsPerMonth - FREE_OUTPUTS_PER_MONTH);
+  const revenue = users * billablePerUserPerMonth * MONTHS * OVERAGE;
 
-  return { label, users, totalRuns, cost, revenue, net: revenue - cost };
+  return { label, users, totalOutputs, deckRuns, cost, revenue, net: revenue - cost };
 }
 
 const scenarios = [
-  scenario('BEST — light, cache-friendly use', {
-    // Most founding users try it once or twice. Realistic for a tool
-    // with no traffic: the pipeline is one feature among many.
+  scenario('BEST — light use, well within the allowance', {
+    // Most founding users make a poster or two and export it. Realistic
+    // for a tool with no traffic: it is one feature among many.
     activeFrac: 0.3,
-    runsPerSem: 2,
+    outsPerMonth: 2,
     manuscript: TOK.manuscriptTypical,
     output: TOK.outputTypical,
     cacheHit: 0.5,
   }),
-  scenario('AVERAGE — engaged but within the allowance', {
-    // Half the cohort uses it, ~4 runs/semester: one poster, a few
-    // iterations. Lands just under the free ceiling by design.
+  scenario('AVERAGE — engaged, still under the ceiling', {
+    // Half the cohort active at ~5 outputs/month: a couple of posters
+    // and a deck, exported a few times. Lands under the free 10 by
+    // design.
     activeFrac: 0.5,
-    runsPerSem: 4,
+    outsPerMonth: 5,
     manuscript: TOK.manuscriptTypical,
     output: TOK.outputTypical,
     cacheHit: 0.4,
   }),
-  scenario('WORST — everyone hammers it, no caching, max tokens', {
-    // Every one of the 100 runs 20x/semester on max-size manuscripts
-    // with zero cache benefit. Deliberately absurd: this is a bound,
-    // not a forecast.
+  scenario('WORST — everyone hammers it, all decks, no cache, max tokens', {
+    // Every one of the 100 produces 20 outputs/month, ALL of them
+    // max-size deck generations with zero cache benefit. Deliberately
+    // absurd: a bound, not a forecast — so deckShare is forced to 1.0.
     activeFrac: 1.0,
-    runsPerSem: 20,
+    outsPerMonth: 20,
     manuscript: TOK.manuscriptMax,
     output: TOK.outputMax,
     cacheHit: 0,
+    deckShare: 1.0,
   }),
 ];
 
-console.log('\n2. TWO-YEAR TOTALS (6 semesters, 100-user cohort)');
+console.log('\n2. TWO-YEAR TOTALS (24 months, 100-user cohort)');
 console.log('   ' + '-'.repeat(66));
 for (const s of scenarios) {
   console.log(`\n   ${s.label}`);
-  console.log(`     active users     : ${s.users}`);
-  console.log(`     total runs       : ${s.totalRuns.toLocaleString()}`);
-  console.log(`     LLM cost (2yr)   : ${usd2(s.cost)}`);
-  console.log(`     overage revenue  : ${usd2(s.revenue)}`);
-  console.log(`     net              : ${usd2(s.net)}  (${s.net >= 0 ? 'profit' : 'LOSS'})`);
-  console.log(`     cost per month   : ${usd2(s.cost / 24)}`);
+  console.log(`     active users      : ${s.users}`);
+  console.log(`     total outputs     : ${s.totalOutputs.toLocaleString()}`);
+  console.log(`     of which decks    : ${Math.round(s.deckRuns).toLocaleString()} (the LLM-costed share)`);
+  console.log(`     LLM cost (2yr)    : ${usd2(s.cost)}`);
+  console.log(`     overage revenue   : ${usd2(s.revenue)}`);
+  console.log(`     net               : ${usd2(s.net)}  (${s.net >= 0 ? 'profit' : 'LOSS'})`);
+  console.log(`     cost per month    : ${usd2(s.cost / MONTHS)}`);
 }
 
 // ---------------------------------------------------------------
@@ -174,38 +202,43 @@ for (const s of scenarios) {
 console.log('\n3. WORST-CASE EXPOSURE — can this hurt?');
 const w = scenarios[2];
 console.log(`   Absolute worst modelled : ${usd2(w.cost)} over 2 years`);
-console.log(`                           = ${usd2(w.cost / 24)}/month`);
-console.log(`   That assumes ALL 100 users run 20x/semester on maximum-size`);
-console.log(`   manuscripts with zero cache hits, for two years straight.`);
+console.log(`                           = ${usd2(w.cost / MONTHS)}/month`);
+console.log(`   That assumes ALL 100 users produce 20 outputs/month, every one`);
+console.log(`   a max-size deck with zero cache hits, for two years straight.`);
 
 // What would it take to reach a genuinely painful number?
 const PAIN = 500; // $/month that would actually sting a solo operator
 const runsForPain = PAIN / worst;
 console.log(`\n   To reach ${usd2(PAIN)}/month of LLM spend would need`);
-console.log(`   ${Math.round(runsForPain).toLocaleString()} worst-case runs/month`);
-console.log(`   = ${Math.round(runsForPain / 100)} runs/user/month across all 100.`);
+console.log(`   ${Math.round(runsForPain).toLocaleString()} worst-case deck runs/month`);
+console.log(`   = ${Math.round(runsForPain / 100)} deck runs/user/month across all 100.`);
 
 // ---------------------------------------------------------------
 // 4. Is the free allowance generous?
 // ---------------------------------------------------------------
-console.log(`\n4. IS ${FREE_RUNS} RUNS/SEMESTER GENEROUS?`);
-const freeCostPerUser = FREE_RUNS * SEMESTERS * typical;
-console.log(`   Cost of the full free allowance, per user, over 2 years:`);
+console.log(`\n4. IS ${FREE_OUTPUTS_PER_MONTH} OUTPUTS/MONTH GENEROUS?`);
+// Only the deck share of a fully-exhausted allowance actually costs money.
+const freeDecksPerUserPerMonth = FREE_OUTPUTS_PER_MONTH * DECK_SHARE_OF_OUTPUTS;
+const freeCostPerUser = freeDecksPerUserPerMonth * MONTHS * typical;
+console.log(`   If a user maxes 10 outputs/month for 2 years, only the deck`);
+console.log(`   share (${(DECK_SHARE_OF_OUTPUTS * 100).toFixed(0)}%) calls the LLM; clean exports are free to serve:`);
 console.log(
-  `     ${FREE_RUNS} runs x ${SEMESTERS} semesters x ${usd(typical)} = ${usd2(freeCostPerUser)}`,
+  `     ${freeDecksPerUserPerMonth.toFixed(1)} decks x ${MONTHS} months x ${usd(typical)} = ${usd2(freeCostPerUser)}/user`,
 );
 console.log(`   Across all 100 users, if every one exhausted it:`);
-console.log(`     ${usd2(freeCostPerUser * 100)} over 2 years = ${usd2((freeCostPerUser * 100) / 24)}/month`);
+console.log(`     ${usd2(freeCostPerUser * 100)} over 2 years = ${usd2((freeCostPerUser * 100) / MONTHS)}/month`);
 console.log(`\n   -> Giving all 100 users their FULL allowance for the entire`);
 console.log(`      2-year term costs less than a single month of most SaaS.`);
 
 // ---------------------------------------------------------------
-// 5. Does $1/run make sense as a price?
+// 5. Does $1/output make sense as a price?
 // ---------------------------------------------------------------
-console.log('\n5. THE $1 OVERAGE PRICE');
-console.log(`   Margin at typical cost : ${usd2(OVERAGE - typical)} per run (${((1 - typical / OVERAGE) * 100).toFixed(1)}%)`);
-console.log(`   Margin at worst case   : ${usd2(OVERAGE - worst)} per run (${((1 - worst / OVERAGE) * 100).toFixed(1)}%)`);
-console.log(`   Break-even price would be ${usd(worst)} — $1 is ${(OVERAGE / worst).toFixed(0)}x that.`);
+console.log('\n5. THE $1 OVERAGE PRICE (per output over 10/month)');
+console.log(`   A clean export over the cap costs $0 to serve — $1 is pure margin.`);
+console.log(`   A deck over the cap, at LLM cost:`);
+console.log(`     margin at typical cost : ${usd2(OVERAGE - typical)} (${((1 - typical / OVERAGE) * 100).toFixed(1)}%)`);
+console.log(`     margin at worst case   : ${usd2(OVERAGE - worst)} (${((1 - worst / OVERAGE) * 100).toFixed(1)}%)`);
+console.log(`     break-even would be ${usd(worst)} — $1 is ${(OVERAGE / worst).toFixed(0)}x that.`);
 console.log(`\n   The price is not a cost-recovery instrument. At these`);
 console.log(`   margins it is a FRICTION instrument: it exists to stop`);
 console.log(`   unbounded automated use, not to fund the service.`);
