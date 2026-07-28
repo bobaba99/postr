@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -39,6 +34,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_emails: {
+        Row: {
+          added_at: string
+          email: string
+          note: string | null
+        }
+        Insert: {
+          added_at?: string
+          email: string
+          note?: string | null
+        }
+        Update: {
+          added_at?: string
+          email?: string
+          note?: string | null
+        }
+        Relationships: []
+      }
       assets: {
         Row: {
           created_at: string
@@ -175,6 +188,8 @@ export type Database = {
           pdf_path: string | null
           poster_id: string | null
           retracted_at: string | null
+          retracted_by: string | null
+          retraction_reason: string | null
           source: Database["public"]["Enums"]["gallery_source"]
           title: string
           user_id: string
@@ -190,6 +205,8 @@ export type Database = {
           pdf_path?: string | null
           poster_id?: string | null
           retracted_at?: string | null
+          retracted_by?: string | null
+          retraction_reason?: string | null
           source: Database["public"]["Enums"]["gallery_source"]
           title: string
           user_id: string
@@ -205,6 +222,8 @@ export type Database = {
           pdf_path?: string | null
           poster_id?: string | null
           retracted_at?: string | null
+          retracted_by?: string | null
+          retraction_reason?: string | null
           source?: Database["public"]["Enums"]["gallery_source"]
           title?: string
           user_id?: string
@@ -251,6 +270,98 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poster_comments: {
+        Row: {
+          anchor: Json
+          anchor_type: string
+          author_name: string
+          body: string
+          created_at: string
+          id: string
+          parent_id: string | null
+          poster_id: string
+          resolved_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          anchor?: Json
+          anchor_type: string
+          author_name: string
+          body: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          poster_id: string
+          resolved_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          anchor?: Json
+          anchor_type?: string
+          author_name?: string
+          body?: string
+          created_at?: string
+          id?: string
+          parent_id?: string | null
+          poster_id?: string
+          resolved_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poster_comments_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "poster_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "poster_comments_poster_id_fkey"
+            columns: ["poster_id"]
+            isOneToOne: false
+            referencedRelation: "posters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poster_versions: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          name: string
+          poster_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          name?: string
+          poster_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          name?: string
+          poster_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poster_versions_poster_id_fkey"
+            columns: ["poster_id"]
+            isOneToOne: false
+            referencedRelation: "posters"
             referencedColumns: ["id"]
           },
         ]
@@ -384,30 +495,69 @@ export type Database = {
           },
         ]
       }
+      user_logos: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          storage_path: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          storage_path: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          storage_path?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           cookie_consent_at: string | null
           created_at: string
           display_name: string | null
           email: string | null
+          export_credits: number
           id: string
           is_anonymous: boolean
+          plan: string
+          plan_expires_at: string | null
+          research_consent_at: string | null
+          stripe_customer_id: string | null
         }
         Insert: {
           cookie_consent_at?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
+          export_credits?: number
           id: string
           is_anonymous?: boolean
+          plan?: string
+          plan_expires_at?: string | null
+          research_consent_at?: string | null
+          stripe_customer_id?: string | null
         }
         Update: {
           cookie_consent_at?: string | null
           created_at?: string
           display_name?: string | null
           email?: string | null
+          export_credits?: number
           id?: string
           is_anonymous?: boolean
+          plan?: string
+          plan_expires_at?: string | null
+          research_consent_at?: string | null
+          stripe_customer_id?: string | null
         }
         Relationships: []
       }
@@ -417,6 +567,8 @@ export type Database = {
     }
     Functions: {
       delete_own_account: { Args: never; Returns: undefined }
+      export_my_data: { Args: never; Returns: Json }
+      is_gallery_admin: { Args: { uid: string }; Returns: boolean }
     }
     Enums: {
       gallery_field:
@@ -579,3 +731,4 @@ export const Constants = {
     },
   },
 } as const
+
