@@ -48,10 +48,18 @@ import {
   safeFontFamily,
 } from './masters';
 import { patchThemeColors } from './themePatch';
+import { addTemplateSlides, resolveTemplateStyle } from './templateSlides';
 
 export interface PptxExportOptions extends ExportContentOptions {
   /** Injectable for tests / server pipelines. */
   fetcher?: AssetFetcher;
+  /**
+   * Append the explainer + empty template slides after the poster.
+   * Defaults to true; the ONLY reason to turn it off is the
+   * no-regression test that diffs slide1.xml against a poster-only
+   * deck. Not a user-facing option.
+   */
+  templateSlides?: boolean;
   // `attribution` (the paid-plan seam) is inherited from
   // ExportContentOptions, which also threads it into the references
   // formatter so the credit entry honours the same seam.
@@ -667,6 +675,19 @@ export async function exportPosterPptx(
       align: 'left',
       valign: 'top',
     });
+  }
+
+  // Everything above belongs to slide 1. The template slides are
+  // appended only once the poster is complete, and never reach back
+  // into it — slide1.xml is byte-identical with or without them,
+  // which `pptxTemplateSlides.test.ts` asserts by diff.
+  if (options.templateSlides !== false) {
+    addTemplateSlides(
+      pptx,
+      resolveTemplateStyle(doc, resolveMasterPalette(doc.palette), themeFont, plan.scale),
+      plan.slideWidthIn,
+      plan.slideHeightIn,
+    );
   }
 
   const buffer = (await pptx.write({ outputType: 'arraybuffer' })) as ArrayBuffer;
