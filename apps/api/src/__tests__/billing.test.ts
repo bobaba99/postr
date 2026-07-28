@@ -12,7 +12,12 @@
 import { describe, it, expect } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
-import { fulfillCheckout, subscriptionPeriodEnd } from '../billing.js';
+import {
+  fulfillCheckout,
+  subscriptionPeriodEnd,
+  handleInvoicePaid,
+  handleSubscriptionChange,
+} from '../billing.js';
 
 /**
  * A fake Supabase that records `.update(...)` payloads and serves canned
@@ -24,6 +29,8 @@ function fakeSupabase(opts: {
   currentCredits?: number;
   currentExpiry?: string | null;
   alreadyFulfilled?: boolean;
+  /** The user id the reconciliation lookup should resolve to (by sub/customer). */
+  lookupUserId?: string | null;
 } = {}) {
   const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
   const inserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
@@ -40,7 +47,8 @@ function fakeSupabase(opts: {
           inserts.push({ table, payload });
           return Promise.resolve({ error: null });
         },
-        select() {
+        select(cols?: string) {
+          const selectingId = cols === 'id';
           return {
             eq: () => ({
               single: () =>
@@ -50,8 +58,12 @@ function fakeSupabase(opts: {
                 }),
               maybeSingle: () =>
                 Promise.resolve({
-                  data:
-                    table === 'billing_fulfilled_sessions'
+                  data: selectingId
+                    ? // reconciliation lookup by sub/customer id
+                      opts.lookupUserId
+                      ? { id: opts.lookupUserId }
+                      : null
+                    : table === 'billing_fulfilled_sessions'
                       ? opts.alreadyFulfilled
                         ? { session_id: 's' }
                         : null
@@ -70,6 +82,19 @@ function fakeSupabase(opts: {
   } as unknown as SupabaseClient;
 
   return { client, updates, inserts, rpcs };
+}
+
+/** Build a fake Stripe.Subscription with an item-level period end. */
+function fakeSub(overrides: Partial<Stripe.Subscription> & { periodEndSec?: number } = {}): Stripe.Subscription {
+  const periodEndSec = overrides.periodEndSec ?? unixDaysFromNow(120);
+  return {
+    id: overrides.id ?? 'sub_1',
+    status: overrides.status ?? 'active',
+    customer: overrides.customer ?? 'cus_1',
+    metadata: overrides.metadata ?? { user_id: 'user-1' },
+    items: { data: [{ current_period_end: periodEndSec }] },
+    ...overrides,
+  } as unknown as Stripe.Subscription;
 }
 
 /** Unix seconds for a date N days from now. */
@@ -230,5 +255,79 @@ describe('fulfillCheckout — guards', () => {
         session({ client_reference_id: null, metadata: {} }),
       ),
     ).rejects.toThrow(/user_id \/ sku/);
+  });
+});
+
+describe('handleInvoicePaid — renewal', () => {
+  it('extends plan_expires_at to the new period end and keeps plan=term', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    const newEnd = unixDaysFromNow(120);
+    const stripe = {
+      subscriptions: { retrieve: () => Promise.resolve(fakeSub({ id: 'sub_1', status: 'active', periodEndSec: newEnd })) },
+    } as unknown as Stripe;
+    const invoice = { subscription: 'sub_1', customer: 'cus_1' } as unknown as Stripe.Invoice;
+    await handleInvoicePaid(fake.client, stripe, invoice);
+
+    const { payload } = fake.updates[0]!;
+    expect(payload.plan).toBe('term');
+    expect(payload.subscription_status).toBe('active');
+    expect(payload.plan_expires_at).toBe(new Date(newEnd * 1000).toISOString());
+  });
+
+  it('ignores an invoice with no subscription (a one-time pack invoice)', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    const stripe = { subscriptions: { retrieve: () => Promise.reject(new Error('should not be called')) } } as unknown as Stripe;
+    await handleInvoicePaid(fake.client, stripe, { customer: 'cus_1' } as unknown as Stripe.Invoice);
+    expect(fake.updates).toHaveLength(0);
+  });
+});
+
+describe('handleSubscriptionChange — status transitions', () => {
+  it('cancel-at-period-end (status active) KEEPS term access', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({ status: 'active', cancel_at_period_end: true } as Partial<Stripe.Subscription>),
+    );
+    const { payload } = fake.updates[0]!;
+    expect(payload.plan).toBe('term'); // still entitled until the period lapses
+  });
+
+  it('past_due KEEPS access (dunning window — do not revoke early)', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    await handleSubscriptionChange(fake.client, fakeSub({ status: 'past_due' }));
+    const { payload } = fake.updates[0]!;
+    expect(payload.plan).toBe('term');
+    expect(payload.subscription_status).toBe('past_due');
+  });
+
+  it('deleted / canceled REVOKES access, keeping plan and expiry consistent', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    await handleSubscriptionChange(fake.client, fakeSub({ status: 'canceled' }));
+    const { payload } = fake.updates[0]!;
+    expect(payload.plan).toBe('free');
+    expect(payload.subscription_status).toBe('canceled');
+    // expiry set to now (past) so no code path grants access
+    expect(new Date(payload.plan_expires_at as string).getTime()).toBeLessThanOrEqual(Date.now() + 1000);
+  });
+
+  it('unpaid (terminal) also revokes', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    await handleSubscriptionChange(fake.client, fakeSub({ status: 'unpaid' }));
+    expect(fake.updates[0]!.payload.plan).toBe('free');
+  });
+
+  it('reconciles the user by subscription id (lookup resolves)', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-42' });
+    await handleSubscriptionChange(fake.client, fakeSub({ id: 'sub_9', status: 'canceled', metadata: {} }));
+    // it updated a row (found the user); no throw
+    expect(fake.updates).toHaveLength(1);
+  });
+
+  it('throws when the user cannot be reconciled (→ 500 → Stripe retry)', async () => {
+    const fake = fakeSupabase({ lookupUserId: null });
+    await expect(
+      handleSubscriptionChange(fake.client, fakeSub({ id: 'sub_x', status: 'canceled', customer: null as unknown as string, metadata: {} })),
+    ).rejects.toThrow(/no user for subscription/);
   });
 });

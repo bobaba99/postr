@@ -111,10 +111,29 @@ export function createBillingWebhookRouter(deps: BillingDeps = {}): Router {
             stripe,
             event.data.object as Stripe.Checkout.Session,
           );
+        } else if (event.type === 'invoice.paid') {
+          // A term renewal (fires on the first invoice AND every 4-month
+          // renewal). Extend the user's access to the new period end.
+          await handleInvoicePaid(
+            supabase,
+            stripe,
+            event.data.object as Stripe.Invoice,
+          );
+        } else if (
+          event.type === 'customer.subscription.updated' ||
+          event.type === 'customer.subscription.deleted'
+        ) {
+          // Status change: cancel-at-period-end, past_due, reactivation,
+          // and final deletion all flow through here. The event object IS
+          // the subscription (no retrieve needed).
+          await handleSubscriptionChange(
+            supabase,
+            event.data.object as Stripe.Subscription,
+          );
         }
         // Every other event type (including async_payment_failed) is
         // acknowledged (2xx) so Stripe stops retrying — we act only on the
-        // two fulfillment-worthy checkout events above.
+        // events handled above.
         return res.json({ received: true });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'fulfillment_failed';
@@ -443,6 +462,145 @@ async function advanceTermAccess(
     })
     .eq('id', userId);
   if (error) throw new Error(`term access update: ${error.message}`);
+}
+
+/**
+ * Subscription statuses under which the user KEEPS term access. Note
+ * `past_due` is intentionally included: when a renewal card fails, Stripe
+ * runs dunning retries for days — revoking access the instant the status
+ * flips to past_due would slam the paywall shut on a paying user mid-work,
+ * then flip back when a retry succeeds. Access is lost only on a TERMINAL
+ * status (canceled / unpaid / incomplete_expired) or when the period
+ * actually lapses (plan_expires_at in the past, enforced by usePlan).
+ */
+const TERM_ACTIVE_STATUSES = new Set([
+  'active',
+  'trialing',
+  'past_due',
+]);
+
+/**
+ * A term renewal — `invoice.paid` fires on the first invoice AND every
+ * 4-month renewal. Extend the user's access to the subscription's new
+ * period end. Absolute-value + forward-only write, so redelivery is safe.
+ */
+export async function handleInvoicePaid(
+  supabase: SupabaseClient,
+  stripe: Stripe,
+  invoice: Stripe.Invoice,
+): Promise<void> {
+  // `invoice.subscription` is a string id when the invoice belongs to a
+  // subscription. The SDK's Invoice type varies by API version, so read it
+  // defensively via unknown rather than a direct field access.
+  const rawSub = (invoice as unknown as { subscription?: unknown }).subscription;
+  const subscriptionId = typeof rawSub === 'string' ? rawSub : undefined;
+  // A one-time pack produces no subscription invoice we act on — guard.
+  if (!subscriptionId) return;
+
+  const sub = await stripe.subscriptions.retrieve(subscriptionId);
+  const customerId =
+    typeof invoice.customer === 'string' ? invoice.customer : null;
+
+  const userId = await findUserIdForSubscriptionEvent(supabase, {
+    subscriptionId,
+    customerId,
+    metadataUserId: sub.metadata?.user_id ?? null,
+  });
+
+  const periodEndSec = subscriptionPeriodEnd(sub);
+  await advanceTermAccess(supabase, userId, {
+    expiresAtIso: new Date(periodEndSec * 1000).toISOString(),
+    subscriptionStatus: sub.status,
+    subscriptionId: sub.id,
+    customerId,
+  });
+}
+
+/**
+ * A subscription status change — `customer.subscription.updated` (cancel-
+ * at-period-end, past_due, reactivation) and `.deleted` (final cancel).
+ * The event object IS the subscription; no retrieve needed.
+ *
+ * Access rule (single source of truth, mirrored in usePlan):
+ *   - status in {active, trialing, past_due} → keep plan='term'; expiry
+ *     stays the period end (advanced forward-only). cancel-at-period-end
+ *     is status 'active' with a flag, so the user keeps access UNTIL the
+ *     period lapses — correct.
+ *   - any terminal status (canceled / unpaid / incomplete_expired) → set
+ *     plan='free' AND plan_expires_at=now() so the two signals never
+ *     contradict (no code path can grant a canceled user access).
+ */
+export async function handleSubscriptionChange(
+  supabase: SupabaseClient,
+  sub: Stripe.Subscription,
+): Promise<void> {
+  const customerId =
+    typeof sub.customer === 'string' ? sub.customer : null;
+  const userId = await findUserIdForSubscriptionEvent(supabase, {
+    subscriptionId: sub.id,
+    customerId,
+    metadataUserId: sub.metadata?.user_id ?? null,
+  });
+
+  if (TERM_ACTIVE_STATUSES.has(sub.status)) {
+    // Still entitled — advance access to the (item-level) period end.
+    const periodEndSec = subscriptionPeriodEnd(sub);
+    await advanceTermAccess(supabase, userId, {
+      expiresAtIso: new Date(periodEndSec * 1000).toISOString(),
+      subscriptionStatus: sub.status,
+      subscriptionId: sub.id,
+      customerId,
+    });
+    return;
+  }
+
+  // Terminal — revoke access, keeping plan and expiry consistent.
+  const { error } = await supabase
+    .from('users')
+    .update({
+      plan: 'free',
+      plan_expires_at: new Date().toISOString(),
+      subscription_status: sub.status,
+    })
+    .eq('id', userId);
+  if (error) throw new Error(`subscription revoke update: ${error.message}`);
+}
+
+/**
+ * Resolve a subscription-lifecycle event back to the Postr user id.
+ *
+ * `client_reference_id` exists ONLY on the checkout.session — later events
+ * (invoice.paid, customer.subscription.*) don't carry it. So we look up by
+ * the stamped subscription id, then the customer id, then the user id we
+ * copied into subscription_data.metadata at checkout. Throwing on a total
+ * miss → 500 → Stripe retries, which covers the race where a subscription
+ * event beats the checkout event that first stored these ids.
+ */
+async function findUserIdForSubscriptionEvent(
+  supabase: SupabaseClient,
+  ids: { subscriptionId: string; customerId: string | null; metadataUserId: string | null },
+): Promise<string> {
+  const bySub = await supabase
+    .from('users')
+    .select('id')
+    .eq('stripe_subscription_id', ids.subscriptionId)
+    .maybeSingle();
+  if (bySub.data?.id) return bySub.data.id as string;
+
+  if (ids.customerId) {
+    const byCust = await supabase
+      .from('users')
+      .select('id')
+      .eq('stripe_customer_id', ids.customerId)
+      .maybeSingle();
+    if (byCust.data?.id) return byCust.data.id as string;
+  }
+
+  if (ids.metadataUserId) return ids.metadataUserId;
+
+  throw new Error(
+    `no user for subscription ${ids.subscriptionId} / customer ${ids.customerId ?? 'none'}`,
+  );
 }
 
 /**
