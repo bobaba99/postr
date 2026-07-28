@@ -33,14 +33,12 @@ import { downloadChartPng, downloadChartSvg, downloadChartsZip } from '@/charts/
 const CHOOSER_JSON_LD = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: 'Postr Chart Chooser',
+  name: 'Postr Plot Picker',
   url: `${SITE_ORIGIN}/chart-chooser`,
   applicationCategory: 'DesignApplication',
   operatingSystem: 'Any (web browser)',
   description:
     'Paste a table or answer three short questions and get ranked, journal-style chart suggestions with captions. Download SVG or PNG.',
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-  isAccessibleForFree: true,
 } as const;
 
 /** Serif poster type for the figure panels — previews read as print. */
@@ -113,9 +111,9 @@ export default function ChartChooserPage() {
         </h1>
         <p className="mt-4 max-w-[62ch] text-base leading-relaxed text-[#a3a7b3] sm:mt-5 sm:text-lg">
           Paste a table, upload a CSV or Excel file, or answer three short
-          questions — the chooser ranks the figures that fit your data, drawn
+          questions — the picker ranks the figures that fit your data, drawn
           as journal-style panels with captions. Download any panel as SVG or
-          PNG. Free, no account, and your data never leaves the browser.
+          PNG. No account, and your data never leaves the browser.
         </p>
 
         {/* Palette switcher — the standalone page has no poster to

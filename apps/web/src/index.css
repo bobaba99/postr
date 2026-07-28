@@ -387,6 +387,86 @@ body {
 }
 
 /* ===================================================================
+ * RotatingWord — a slot in a sentence that cycles through phrases
+ * ===================================================================
+ *
+ * The sizer reserves the widest phrase so the sentence never reflows
+ * mid-read; the visible text is absolutely positioned over it.
+ *
+ * Under reduced motion the phrase still CHANGES — it simply stops
+ * moving. Freezing on one phrase would hide content from the people
+ * most likely to be reading carefully.
+ */
+/* The slot sizes to the CURRENT phrase, not the longest one.
+ *
+ * An earlier version reserved the widest phrase so the sentence could
+ * never reflow — but that leaves a visible gap after every shorter
+ * phrase, which reads as broken copy rather than as stability. A
+ * sentence that re-wraps is the lesser problem: the eye follows it,
+ * and the transition is short enough not to jar. The sizer is kept
+ * only to reserve HEIGHT, so a wrap never shifts the block below. */
+.postr-rotating-word {
+  position: relative;
+  display: inline-block;
+  vertical-align: bottom;
+  text-align: left;
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+/* Absolutely positioned: a zero-HEIGHT sizer still contributes its
+ * WIDTH, which was the whole bug — the slot stayed as wide as the
+ * longest phrase and left a gap mid-sentence. Out of flow, it
+ * contributes neither, and exists only so the phrases stay in the DOM
+ * for crawlers. */
+.postr-rotating-word__sizer {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.postr-rotating-word__text {
+  display: inline;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .postr-rotating-word__text {
+    animation: postr-word-in var(--dur-slow) var(--ease-out);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .postr-rotating-word__text {
+    animation: postr-word-fade var(--dur-base) var(--ease-standard);
+  }
+}
+
+@keyframes postr-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.32em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes postr-word-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+
+
+/* ===================================================================
  * Premium interaction transitions
  * ===================================================================
  *

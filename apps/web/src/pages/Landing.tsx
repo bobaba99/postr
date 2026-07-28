@@ -15,14 +15,20 @@ import { Link, useNavigate } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
+import { RotatingWord } from '@/components/RotatingWord';
 import { SITE_ORIGIN, STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 /**
  * Describes the product itself. `WebApplication` is the accurate type
- * for a browser-based editor, and the free-tier offer is stated as
- * structured data because "free" is the single most load-bearing claim
- * on this page.
+ * for a browser-based editor.
+ *
+ * No price or `isAccessibleForFree` claim: the page no longer pitches
+ * on price (owner decision, 2026-07-27), and structured data that
+ * says "free" would outlive that decision the moment a paid tier
+ * ships. Schema.org treats `offers` as optional — omitting it says
+ * nothing, which is accurate, rather than asserting something that
+ * will age badly.
  */
 const LANDING_JSON_LD = {
   '@context': 'https://schema.org',
@@ -32,10 +38,25 @@ const LANDING_JSON_LD = {
   applicationCategory: 'DesignApplication',
   operatingSystem: 'Any (web browser)',
   description:
-    'A free web app for making academic conference posters, built for researchers and students.',
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-  isAccessibleForFree: true,
+    'A web app for making academic conference posters, built for researchers and students.',
 } as const;
+
+/**
+ * The hero's rotating slot. These are FRICTIONS REMOVED, not features
+ * — the pitch is that the fiddly parts are handled, so each phrase
+ * names something the reader has personally lost an evening to.
+ *
+ * Kept to noun phrases so the sentence reads as prose at every step:
+ * "A poster editor that handles X so you can work on the science."
+ */
+const HERO_FRICTIONS = [
+  'the fiddly micro-edits',
+  'text that reflows when you resize',
+  'conference size specs',
+  'figures too small to read in print',
+  'authors and affiliations',
+  'BibTeX citations',
+] as const;
 
 export default function Landing() {
   useDocumentMeta(STATIC_ROUTE_META['/'] ?? null, LANDING_JSON_LD);
@@ -58,23 +79,23 @@ export default function Landing() {
 
       <section className="mx-auto max-w-3xl px-8 py-24 text-center">
         <span className="inline-block rounded-full border border-[#7c6aed]/40 bg-[#7c6aed]/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-[#b8a9ff]">
-          Free to use
+          Built for researchers
         </span>
         <h1 className="mt-5 text-4xl font-bold leading-[1.05] tracking-[-0.02em] text-white sm:text-5xl">
-          Conference posters,<br />
-          <span className="text-[#7c6aed]">without the pain.</span>
+          Academic posters,<br />
+          <span className="text-[#7c6aed]">without the hassle.</span>
         </h1>
         <p className="mx-auto mt-6 max-w-[54ch] text-lg leading-relaxed text-[#a3a7b3]">
-          Postr is a free poster editor built for researchers. Pick a template,
-          write with guidance, check your figures, share a link for comments,
-          and export — all in one place. No design skills needed, no paywall.
+          A poster editor that handles{' '}
+          <RotatingWord phrases={HERO_FRICTIONS} className="font-medium text-[#c8b6ff]" />{' '}
+          so you can work on the science.
         </p>
         <div className="mt-10 flex items-center justify-center gap-4">
           <Link
             to="/auth"
             className="rounded-lg bg-[#7c6aed] px-8 py-3 text-base font-semibold text-white no-underline hover:bg-[#6c5ce7] transition-colors"
           >
-            Get started free
+            Get started
           </Link>
           <Link
             to="/auth?guest=1"
@@ -98,7 +119,7 @@ export default function Landing() {
         >
           <strong className="font-semibold text-[#c8cad0]">Best on a laptop.</strong>{' '}
           The editor needs a bigger screen to drag blocks and see your poster at
-          full size. The chart chooser and figure checker work fine on a phone.
+          full size. The plot picker and figure checker work fine on a phone.
         </p>
       </section>
 
@@ -128,6 +149,30 @@ export default function Landing() {
               to follow from intro to conclusion.
             </p>
           </div>
+          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
+            <div className="text-2xl mb-3">🎞️</div>
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">PowerPoint, both ways</h3>
+            <p className="text-sm text-[#8b8f99] leading-relaxed">
+              Open an existing .pptx poster and keep editing it here, or
+              export one back out with every block still editable.
+            </p>
+          </div>
+          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
+            <div className="text-2xl mb-3">📐</div>
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">LaTeX source</h3>
+            <p className="text-sm text-[#8b8f99] leading-relaxed">
+              Download a compilable poster.tex with your figures and a
+              references.bib — keep working in Overleaf if you prefer.
+            </p>
+          </div>
+          <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]">
+            <div className="text-2xl mb-3">🎨</div>
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Copy a design</h3>
+            <p className="text-sm text-[#8b8f99] leading-relaxed">
+              Upload a poster you admire and apply its colours and type to
+              yours. Copies the look, never the content.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -142,11 +187,11 @@ export default function Landing() {
       */}
       <section className="mx-auto w-full max-w-4xl px-8 pb-24">
         <h2 className="text-center text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8]">
-          Free tools, no account needed
+          Tools you can use on their own
         </h2>
         <p className="mx-auto mt-3 max-w-[52ch] text-center text-sm leading-relaxed text-[#8b8f99]">
-          Two parts of the poster workflow you can use on their own,
-          without opening the editor.
+          Two parts of the poster workflow that work without an account,
+          and without opening the editor.
         </p>
 
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -160,9 +205,9 @@ export default function Landing() {
           <ToolCard
             to="/chart-chooser"
             icon="📊"
-            title="Chart chooser"
+            title="Plot picker"
             body="Paste a table or answer three short questions, and get ranked chart suggestions drawn as journal-style panels. Download any panel as SVG or PNG."
-            cta="Find your chart"
+            cta="Find your figure"
           />
         </div>
       </section>

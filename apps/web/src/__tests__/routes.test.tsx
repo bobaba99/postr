@@ -33,7 +33,7 @@ describe('deactivated public gallery routes', () => {
     expect(await screen.findByTestId('location-probe')).toHaveTextContent(
       /^\/$/,
     );
-    expect(screen.getByText(/conference posters/i)).toBeInTheDocument();
+    expect(screen.getByText(/academic posters/i)).toBeInTheDocument();
   });
 
   it('redirects /gallery/:entryId to the landing page', async () => {
@@ -42,6 +42,6 @@ describe('deactivated public gallery routes', () => {
     expect(await screen.findByTestId('location-probe')).toHaveTextContent(
       /^\/$/,
     );
-    expect(screen.getByText(/conference posters/i)).toBeInTheDocument();
+    expect(screen.getByText(/academic posters/i)).toBeInTheDocument();
   });
 });

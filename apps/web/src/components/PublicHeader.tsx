@@ -46,7 +46,7 @@ const TOOL_LINKS = [
   },
   {
     to: '/chart-chooser',
-    label: 'Chart chooser',
+    label: 'Plot picker',
     blurb: 'Find the figure that fits your data',
   },
 ] as const;

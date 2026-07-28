@@ -3,7 +3,8 @@
  *
  *   /                   → Landing (public)
  *   /about              → About (public, feature tour)
- *   /chart-chooser      → Chart chooser (public, no session, code-split)
+ *   /chart-chooser      → Plot picker (public, no session, code-split)
+ *                         URL keeps the measured slug; label is the product name.
  *   /plot-picker        → redirect to /chart-chooser (alias)
  *   /gallery            → redirect to / (public gallery deactivated)
  *   /gallery/:entryId   → redirect to / (public gallery deactivated)

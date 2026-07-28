@@ -6,12 +6,12 @@
   "defaultOgImage": "/og-card.png",
   "static": {
     "/": {
-      "title": "Free Conference Poster Maker for Researchers | Postr",
-      "description": "Free conference poster maker for researchers. Print-ready sizes, discipline-appropriate palettes, BibTeX citations. No signup, no paywall, no PowerPoint.",
+      "title": "Academic Poster Maker for Researchers | Postr",
+      "description": "A poster editor built for researchers. Print-ready conference sizes, figure readability checks, authors and affiliations, BibTeX citations.",
       "robots": "index,follow",
-      "h1": "Conference posters, without the pain.",
+      "h1": "Academic posters, without the hassle.",
       "copy": [
-        "Postr is a free poster editor built for researchers. Pick a template, write with guidance, check your figures, share a link for comments, and export. No design skills needed, no paywall.",
+        "A poster editor that handles the fiddly parts — micro-edits, text that reflows when you resize, conference size specs, figures too small to read in print, authors and affiliations, BibTeX citations — so you can work on the science.",
         "Smart templates: conference-ready layouts with discipline-specific palettes, and APA, SfN and ECNP size presets built in.",
         "Figure readability: paste your R or Python plotting code and see whether the axis labels will still be readable at print size, with a copy-ready fix.",
         "Writing guide: section-by-section tips, word count targets, and a checklist to follow from intro to conclusion."

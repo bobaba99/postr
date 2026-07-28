@@ -43,7 +43,7 @@ export function PublicFooter() {
             <FooterLink to="/">Home</FooterLink>
             <FooterLink to="/dashboard">My posters</FooterLink>
             <FooterLink to="/paper-to-poster">Paper to poster</FooterLink>
-            <FooterLink to="/chart-chooser">Chart chooser</FooterLink>
+            <FooterLink to="/chart-chooser">Plot picker</FooterLink>
           </FooterColumn>
 
           <FooterColumn title="Learn">

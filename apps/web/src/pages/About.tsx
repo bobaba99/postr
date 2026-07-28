@@ -48,10 +48,28 @@ const MILESTONES: Milestone[] = [
       'Paste your R or Python plotting code and Postr checks whether axis labels will actually be legible at print size. Out-of-bounds warnings catch layout slips. No more discovering typography problems at the FedEx counter.',
   },
   {
+    id: 'start-from-work',
+    title: 'Start from the work you already have',
+    body:
+      'Paste a manuscript or drop a .docx and answer a few short questions about what to emphasise — you get a structured poster draft rather than a blank canvas. Already have a poster in PowerPoint? Open the .pptx here and keep editing it, blocks and all.',
+  },
+  {
+    id: 'figures',
+    title: 'The right figure, drawn for print',
+    body:
+      'Paste a table or answer three questions and the plot picker ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once, insert them, or download SVG and PNG.',
+  },
+  {
+    id: 'design',
+    title: 'Borrow a look you like',
+    body:
+      'Upload a poster you admire and Postr lifts its colours and type onto yours — the look, never the content. Print-safe clamping keeps the result legible on paper rather than only on screen.',
+  },
+  {
     id: 'ship',
     title: 'Share, iterate, print',
     body:
-      "Read-only share links for advisors and co-authors. Undo and redo through the entire session. Asset uploads with per-user storage. Browser print-to-PDF turns a finished draft into a conference-ready sheet — everything you need between \"first draft\" and \"it's on the wall\".",
+      "Read-only share links for advisors and co-authors, readable on a phone. Undo and redo through the entire session. Export to PDF, to PowerPoint with every block still editable, or to LaTeX with a compilable poster.tex and references.bib for Overleaf.",
   },
 ];
 
