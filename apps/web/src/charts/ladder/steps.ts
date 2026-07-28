@@ -9,6 +9,7 @@
  * never shown. Typical question counts: 0 (data pasted), 1 (data
  * pasted, ambiguous intent), 3–4 (no data at all).
  */
+import { inferFromVariables, type DeclaredVariable } from '../declaredVariables';
 import type { InferredTable } from '../inferColumns';
 import { inferTable } from '../inferColumns';
 import {
@@ -47,7 +48,13 @@ export type SyntheticShape =
 
 export type DataSource =
   | { kind: 'table'; table: InferredTable }
-  | { kind: 'synthetic' };
+  | { kind: 'synthetic' }
+  /**
+   * Variables declared by name and type instead of pasted (the mobile
+   * path). Resolved to a synthesised table at plan time, so every rung
+   * below behaves exactly as it does for a real paste.
+   */
+  | { kind: 'variables'; variables: readonly DeclaredVariable[] };
 
 export interface LadderAnswers {
   /** Synthetic branch: chosen data shape (step 2). */
@@ -240,6 +247,15 @@ export function planLadder(source: DataSource | null, answers: LadderAnswers): S
     };
   }
   if (source.kind === 'synthetic') return planSynthetic(answers);
+  if (source.kind === 'variables') {
+    // The declared design goes through the SAME table planner as a
+    // paste — that shared path is what guarantees a declared design
+    // and an equivalent pasted one rank identically.
+    const plan = planFromTable(inferFromVariables(source.variables), answers);
+    // The shape is the user's own, but every number in it was invented,
+    // so the preview has to say so.
+    return { ...plan, syntheticValues: true };
+  }
   return planFromTable(source.table, answers);
 }
 

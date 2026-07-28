@@ -15,6 +15,7 @@
  */
 import { useMemo, useRef, useState } from 'react';
 import type { Palette } from '@postr/shared';
+import type { DeclaredVariable } from '../declaredVariables';
 import { inferTable } from '../inferColumns';
 import type { RawTable } from '../parseData';
 import { groupingCandidates } from '../recommend';
@@ -29,6 +30,7 @@ import {
 } from './steps';
 import { ChipRow } from './ChipRow';
 import { DataStep, type PosterTableRef } from './DataStep';
+import { VariablesStep } from './VariablesStep';
 import { PreviewStep, type PreviewAction, type SelectedFigure } from './PreviewStep';
 import { StepSection } from './StepSection';
 
@@ -73,6 +75,12 @@ export function ChartChooser({
   const [answers, setAnswers] = useState<LadderAnswers>({});
   const [dataSummary, setDataSummary] = useState('');
   const [pendingGroups, setPendingGroups] = useState<string[]>([]);
+  /**
+   * True while step 1 shows the declare-your-variables form instead of
+   * the paste/upload affordances. Local to step 1 — once variables are
+   * declared the source carries them and this returns to false.
+   */
+  const [listingVariables, setListingVariables] = useState(false);
   const hasInteracted = useRef(false);
 
   const plan = useMemo(() => planLadder(source, answers), [source, answers]);
@@ -111,6 +119,7 @@ export function ChartChooser({
     setSource({ kind: 'table', table: inferTable(table) });
     setAnswers({});
     setPendingGroups([]);
+    setListingVariables(false);
     setDataSummary(summary);
   };
 
@@ -119,7 +128,17 @@ export function ChartChooser({
     setSource({ kind: 'synthetic' });
     setAnswers({});
     setPendingGroups([]);
+    setListingVariables(false);
     setDataSummary('Worked example — swap in your numbers after inserting');
+  };
+
+  const onDeclare = (variables: readonly DeclaredVariable[], summary: string) => {
+    hasInteracted.current = true;
+    setSource({ kind: 'variables', variables });
+    setAnswers({});
+    setPendingGroups([]);
+    setListingVariables(false);
+    setDataSummary(summary);
   };
 
   const resetData = () => {
@@ -127,6 +146,7 @@ export function ChartChooser({
     setSource(null);
     setAnswers({});
     setPendingGroups([]);
+    setListingVariables(false);
     setDataSummary('');
   };
 
@@ -197,7 +217,22 @@ export function ChartChooser({
             <StepSection key={step} {...common} summary={summaryFor(step)} onReopen={resetData} />
           ) : (
             <StepSection key={step} {...common}>
-              <DataStep posterTables={posterTables} onTable={onTable} onSynthetic={onSynthetic} />
+              {listingVariables ? (
+                <VariablesStep
+                  onDeclare={onDeclare}
+                  onCancel={() => setListingVariables(false)}
+                />
+              ) : (
+                <DataStep
+                  posterTables={posterTables}
+                  onTable={onTable}
+                  onSynthetic={onSynthetic}
+                  onListVariables={() => {
+                    hasInteracted.current = true;
+                    setListingVariables(true);
+                  }}
+                />
+              )}
             </StepSection>
           );
         }

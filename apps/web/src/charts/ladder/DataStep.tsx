@@ -29,6 +29,8 @@ interface DataStepProps {
   posterTables: PosterTableRef[];
   onTable: (table: RawTable, summary: string) => void;
   onSynthetic: () => void;
+  /** Switch to declaring variables by name (the mobile path). */
+  onListVariables: () => void;
 }
 
 type Pending =
@@ -85,7 +87,12 @@ function looksLikeTable(text: string): boolean {
   return text.trim().split(/\r?\n/).filter((line) => line.trim().length > 0).length >= 2;
 }
 
-export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) {
+export function DataStep({
+  posterTables,
+  onTable,
+  onSynthetic,
+  onListVariables,
+}: DataStepProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [sheets, setSheets] = useState<ExcelSheet[] | null>(null);
@@ -245,6 +252,18 @@ export function DataStep({ posterTables, onTable, onSynthetic }: DataStepProps) 
           onClick={() => fileRef.current?.click()}
         >
           Upload CSV or Excel
+        </button>
+        {/* The phone-friendly entry: naming variables beats pasting a
+            table on a 375px screen, which is the whole reason it
+            exists. Listed before the worked-example branch because it
+            uses the user's OWN design rather than a canned one. */}
+        <button
+          type="button"
+          style={{ ...buttonStyle, opacity: reading ? 0.6 : 1 }}
+          disabled={reading !== null}
+          onClick={onListVariables}
+        >
+          List my variables
         </button>
         <button
           type="button"

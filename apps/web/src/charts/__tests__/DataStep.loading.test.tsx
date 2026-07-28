@@ -32,7 +32,7 @@ function dropFile(file: File) {
 describe('DataStep loading feedback', () => {
   it('shows an immediate, worded indicator while a file is being read', async () => {
     const { file, release } = gatedCsvFile();
-    render(<DataStep posterTables={[]} onTable={vi.fn()} onSynthetic={vi.fn()} />);
+    render(<DataStep posterTables={[]} onTable={vi.fn()} onSynthetic={vi.fn()} onListVariables={vi.fn()} />);
 
     dropFile(file);
 
@@ -50,7 +50,7 @@ describe('DataStep loading feedback', () => {
   it('marks the step busy so assistive tech knows it is mid-update', async () => {
     const { file, release } = gatedCsvFile();
     const { container } = render(
-      <DataStep posterTables={[]} onTable={vi.fn()} onSynthetic={vi.fn()} />,
+      <DataStep posterTables={[]} onTable={vi.fn()} onSynthetic={vi.fn()} onListVariables={vi.fn()} />,
     );
 
     dropFile(file);
@@ -66,7 +66,7 @@ describe('DataStep loading feedback', () => {
 
   it('disables the upload controls while a read is in flight', async () => {
     const { file, release } = gatedCsvFile();
-    render(<DataStep posterTables={[]} onTable={vi.fn()} onSynthetic={vi.fn()} />);
+    render(<DataStep posterTables={[]} onTable={vi.fn()} onSynthetic={vi.fn()} onListVariables={vi.fn()} />);
 
     dropFile(file);
     await waitFor(() => {
@@ -91,7 +91,7 @@ describe('DataStep loading feedback', () => {
     Object.defineProperty(file, 'text', {
       value: () => Promise.reject(new Error('unreadable')),
     });
-    render(<DataStep posterTables={[]} onTable={vi.fn()} onSynthetic={vi.fn()} />);
+    render(<DataStep posterTables={[]} onTable={vi.fn()} onSynthetic={vi.fn()} onListVariables={vi.fn()} />);
 
     dropFile(file);
 
