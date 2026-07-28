@@ -1,8 +1,26 @@
 # Export Paywall — where the free/paid line goes
 
+> **⚠️ PARTIALLY SUPERSEDED (2026-07-28, later same day).** Two things
+> in this doc were overtaken by a subsequent decision:
+>
+> 1. **The paywall no longer waits for ~100 users.** Everyone pays from
+>    launch — the goal is a willingness-to-pay signal, not deferred
+>    revenue. The founding benefit is now delivered **retroactively at a
+>    threshold**, not withheld before one. See
+>    `2026-07-28-payment-and-paywall.md` (Sequence 1).
+> 2. **The LLM meter is now 10 combined outputs / MONTH** (clean exports
+>    + talk exports pooled), not "10 runs per semester (decks only)".
+>    Re-modelled in `experiments/founding-cohort-cost-model.mjs`.
+>
+> **Still valid and carried forward:** the format line itself — free
+> watermarked PDF, paid PPTX + LaTeX — the grandfather-by-`created_at`
+> mechanism, the "UI-gate now, server-gate later" enforcement call, and
+> the marketing/copy constraints. Read this doc for that reasoning; read
+> the two Sequence docs (`2026-07-28-payment-and-paywall.md`,
+> `2026-07-28-paper-to-talk.md`) for the current build plan.
+
 **Date:** 2026-07-28
-**Status:** DECIDED, NOT BUILT. No code exists for this. Documented so the
-decision survives the gap between now and implementation.
+**Status:** DECIDED, PARTIALLY SUPERSEDED (see banner). No code exists.
 **Decided by:** Gavin, 2026-07-28.
 **Tagging convention:** inherited from `2026-07-27-growth-plan.md` —
 `[EVIDENCE]` traceable to a cited source, `[JUDGEMENT]` inference,
