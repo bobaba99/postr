@@ -39,6 +39,7 @@ import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import type { User } from '@supabase/supabase-js';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
+import { usePlan } from '@/hooks/usePlan';
 
 type ConfirmAction =
   | 'deletePosters'
@@ -48,6 +49,7 @@ type ConfirmAction =
 
 export default function Profile() {
   useDocumentMeta(APP_ROUTE_META['/profile'] ?? null);
+  const plan = usePlan();
 
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
@@ -609,6 +611,50 @@ export default function Profile() {
             </>
           )}
         </Section>
+
+        {/* Subscription / billing — shown once the plan has loaded and the
+            user has something billed. Managed Payments makes Link the
+            merchant of record, so subscription management (cancel, update
+            card, receipts) lives at link.com, not a Postr-hosted portal. */}
+        {!plan.loading && (plan.hasActiveTerm || plan.credits > 0) && (
+          <Section title="Subscription">
+            <div className="space-y-3">
+              {plan.hasActiveTerm && (
+                <>
+                  <p className="text-[14pt] text-[#c8cad0]">
+                    Your term is active — PowerPoint and LaTeX export are
+                    unlocked, no watermark.
+                    {plan.subscriptionStatus === 'past_due' && (
+                      <span className="text-[#fbbf24]">
+                        {' '}There’s a payment issue on your latest renewal —
+                        update your card at Link to keep your term.
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[14pt] text-[#6b7280]">
+                    The term renews every 4 months. Manage it — update your
+                    card, see receipts, or cancel — at Link, which handles
+                    billing for Postr.
+                  </p>
+                  <a
+                    href="https://link.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block rounded-md border border-[#2a2a3a] bg-[#111118] px-4 py-2 text-[14pt] font-medium text-[#c8cad0] no-underline hover:border-[#7c6aed] hover:text-[#fff]"
+                  >
+                    Manage subscription at Link ↗
+                  </a>
+                </>
+              )}
+              {!plan.hasActiveTerm && plan.credits > 0 && (
+                <p className="text-[14pt] text-[#c8cad0]">
+                  You have {plan.credits} export{plan.credits === 1 ? '' : 's'}{' '}
+                  left in your pack. Credits never expire — use them whenever.
+                </p>
+              )}
+            </div>
+          </Section>
+        )}
 
         {/* Data export — GDPR Art. 15 / 20 */}
         <Section title="Your data">
