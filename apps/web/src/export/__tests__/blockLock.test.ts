@@ -223,6 +223,64 @@ describe('undo / redo cannot remove the locked block', () => {
   });
 });
 
+describe('setPoster seeding — opt-in, never automatic', () => {
+  beforeEach(() => {
+    usePosterStore.setState({ posterId: null, doc: null, canUndo: false, canRedo: false });
+  });
+
+  it('does NOT add the mark by default — read-only viewers render as stored', () => {
+    const doc = makeFixtureDoc({ blocks: [plain('a')] });
+    usePosterStore.getState().setPoster('p1', doc);
+    expect(ids()).toEqual(['a']);
+  });
+
+  it('adds the mark when the editing entry point opts in', () => {
+    const doc = makeFixtureDoc({ blocks: [plain('a')] });
+    usePosterStore.getState().setPoster('p1', doc, undefined, {
+      seedAcknowledgement: true,
+    });
+    expect(ids()).toContain('__postr_ack_mark__');
+  });
+
+  it('seeds a poster created before the feature existed', () => {
+    // No `locked` block anywhere — the pre-feature database shape.
+    const legacy = makeFixtureDoc({ blocks: [plain('a'), plain('b')] });
+    usePosterStore.getState().setPoster('p1', legacy, undefined, {
+      seedAcknowledgement: true,
+    });
+    const ack = usePosterStore.getState().doc!.blocks.find(
+      (b) => b.id === '__postr_ack_mark__',
+    )!;
+    expect(ack.locked).toBe(true);
+  });
+
+  it('a seeded mark is immediately protected by the lock', () => {
+    const doc = makeFixtureDoc({ blocks: [plain('a')] });
+    usePosterStore.getState().setPoster('p1', doc, undefined, {
+      seedAcknowledgement: true,
+    });
+    usePosterStore.getState().setBlocks([]);
+    expect(ids()).toContain('__postr_ack_mark__');
+  });
+
+  it('does not duplicate when the doc already carries the mark', () => {
+    const doc = makeFixtureDoc({ blocks: [locked({ id: '__postr_ack_mark__' })] });
+    usePosterStore.getState().setPoster('p1', doc, undefined, {
+      seedAcknowledgement: true,
+    });
+    expect(ids().filter((i) => i === '__postr_ack_mark__')).toHaveLength(1);
+  });
+
+  it('switching posters rebases the baseline, so the old mark does not leak across', () => {
+    usePosterStore
+      .getState()
+      .setPoster('p1', makeFixtureDoc({ blocks: [locked()] }));
+    usePosterStore.getState().setPoster('p2', makeFixtureDoc({ blocks: [plain('x')] }));
+    usePosterStore.getState().setBlocks([plain('x'), plain('y')]);
+    expect(ids()).not.toContain('ack');
+  });
+});
+
 describe('refusal copy', () => {
   it('states the exchange without scolding or advertising a tier', () => {
     expect(LOCKED_BLOCK_REFUSAL).toBe('Postr is free — this credit stays on the poster.');

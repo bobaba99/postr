@@ -177,12 +177,17 @@ export async function importPostr(
   // unzip it, delete the block from poster.json, re-zip — so the
   // in-editor lock is not sufficient on this path.
   //
+  // The store's `setPoster` also seeds the mark, so this is belt and
+  // braces; it is kept here because `importPostr` is a public
+  // function whose returned doc is inspected (the preview modal reads
+  // it before any store write), and that preview should show what the
+  // user is actually about to get.
+  //
   // Idempotent by construction: `ensureAckBlock` is a no-op when a
   // block with the sentinel id is already present, so repeated
   // export → import round-trips never accumulate a second mark, and
   // a valid bundle comes back byte-for-byte identical in its blocks.
-  const doc2: PosterDoc = { ...doc, blocks: unpacked };
-  const restored = ensureAckBlock(doc2);
+  const restored = ensureAckBlock({ ...doc, blocks: unpacked });
 
   return { doc: restored, title: extractTitle(restored), hashMatch };
 }

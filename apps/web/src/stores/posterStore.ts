@@ -7,6 +7,7 @@
  */
 import { create } from 'zustand';
 import { filterDeletable, preserveLocked } from '@/export/blockLock';
+import { ensureAckBlock } from '@/export/ackBlock';
 import type {
   Block,
   Palette,
@@ -17,6 +18,15 @@ import type {
 
 const MAX_HISTORY = 50;
 
+export interface SetPosterOptions {
+  /**
+   * Add the acknowledgement mark when the doc lacks one. Set by the
+   * EDITING entry point only — read-only viewers (the public Share
+   * page, version previews) must render the poster as stored.
+   */
+  seedAcknowledgement?: boolean;
+}
+
 export interface PosterStoreState {
   posterId: string | null;
   posterTitle: string;
@@ -26,7 +36,12 @@ export interface PosterStoreState {
   canUndo: boolean;
   canRedo: boolean;
 
-  setPoster: (posterId: string, doc: PosterDoc, title?: string) => void;
+  setPoster: (
+    posterId: string,
+    doc: PosterDoc,
+    title?: string,
+    options?: SetPosterOptions,
+  ) => void;
   setPosterTitle: (title: string) => void;
   addBlock: (block: Block) => void;
   updateBlock: (id: string, patch: Partial<Block>) => void;
@@ -113,12 +128,36 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
   canUndo: false,
   canRedo: false,
 
-  setPoster: (posterId, doc, title) => {
+  setPoster: (posterId, doc, title, options = {}) => {
     // Reset undo history when loading a new poster
     undoStack = [];
     redoStack = [];
-    lockedBaseline = doc.blocks.filter((b) => b.locked === true);
-    set({ posterId, doc, posterTitle: title ?? '', canUndo: false, canRedo: false });
+    // Seeding is OPT-IN (`seedAcknowledgement`) rather than automatic.
+    //
+    // A store setter that silently adds content would break its own
+    // contract — "replaces the current doc" has to mean that — and
+    // `setPoster` serves read-only paths too (the public Share page,
+    // a version-history preview) where injecting a block into someone
+    // else's poster is wrong. The EDITING entry point opts in; the
+    // viewing ones do not.
+    //
+    // `ensureAckBlock` is a no-op when the mark is already present, so
+    // opting in neither duplicates on re-entry nor overwrites a mark
+    // the user has moved. It returns the doc unchanged when there is
+    // no room, in which case the references-line credit carries the
+    // acknowledgement alone.
+    //
+    // This runs BEFORE the baseline snapshot, so a freshly seeded mark
+    // is part of the baseline the lock enforces against.
+    const seeded = options.seedAcknowledgement ? ensureAckBlock(doc) : doc;
+    lockedBaseline = seeded.blocks.filter((b) => b.locked === true);
+    set({
+      posterId,
+      doc: seeded,
+      posterTitle: title ?? '',
+      canUndo: false,
+      canRedo: false,
+    });
   },
 
   setPosterTitle: (posterTitle) => set({ posterTitle }),
@@ -231,12 +270,11 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
       return {
         doc: {
           ...prev,
-          // Draw from the whole history, not only the current doc: if
-          // the block is ALREADY missing from `state.doc` (a doc
-          // written by a build without this guard, or restored from a
-          // hand-edited bundle), preserving against current state
-          // alone would propagate the absence forever. Scanning the
-          // stacks makes the invariant self-healing.
+          // `guardLocked` consults the load-time baseline as well as
+          // the current doc: if the block is ALREADY missing from
+          // `state.doc` (a doc written by a build without this guard,
+          // or restored from a hand-edited bundle), preserving against
+          // current state alone would propagate that absence forever.
           blocks: guardLocked(state.doc.blocks, prev.blocks),
         },
         canUndo: undoStack.length > 0,
