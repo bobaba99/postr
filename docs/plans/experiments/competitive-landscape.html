@@ -1,0 +1,281 @@
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Postr — Competitive Landscape</title>
+<style>
+  :root{--bg:#f6f6fa;--panel:#fff;--panel-2:#eeecf6;--ink:#191828;--ink-soft:#54506a;--ink-faint:#8a86a2;--line:#e2dfec;--accent:#6f5ce6;--accent-soft:#eeeafc;--threat:#d0464f;--threat-soft:#fbe6e8;--ok:#1f9d6b;--ok-soft:#e3f5ec;--warn:#c98a1e;--warn-soft:#f9f0dd;--note:#2b7de0;--note-soft:#e4f0fc;--shadow:0 1px 2px rgba(25,24,40,.04),0 10px 30px rgba(25,24,40,.07);--mono:ui-monospace,"SF Mono","JetBrains Mono",Menlo,monospace;--sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;}
+  @media (prefers-color-scheme:dark){:root{--bg:#100f18;--panel:#181624;--panel-2:#201d30;--ink:#edecf6;--ink-soft:#aaa6c2;--ink-faint:#726e8e;--line:#2a2740;--accent:#9585f1;--accent-soft:#241f3a;--threat:#e8646c;--threat-soft:#2b1719;--ok:#4cc48c;--ok-soft:#16281f;--warn:#e0a94a;--warn-soft:#2a2113;--note:#5aa9f0;--note-soft:#13202e;--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4);}}
+  :root[data-theme="light"]{--bg:#f6f6fa;--panel:#fff;--panel-2:#eeecf6;--ink:#191828;--ink-soft:#54506a;--ink-faint:#8a86a2;--line:#e2dfec;--accent:#6f5ce6;--accent-soft:#eeeafc;--threat:#d0464f;--threat-soft:#fbe6e8;--ok:#1f9d6b;--ok-soft:#e3f5ec;--warn:#c98a1e;--warn-soft:#f9f0dd;--note:#2b7de0;--note-soft:#e4f0fc;--shadow:0 1px 2px rgba(25,24,40,.04),0 10px 30px rgba(25,24,40,.07);}
+  :root[data-theme="dark"]{--bg:#100f18;--panel:#181624;--panel-2:#201d30;--ink:#edecf6;--ink-soft:#aaa6c2;--ink-faint:#726e8e;--line:#2a2740;--accent:#9585f1;--accent-soft:#241f3a;--threat:#e8646c;--threat-soft:#2b1719;--ok:#4cc48c;--ok-soft:#16281f;--warn:#e0a94a;--warn-soft:#2a2113;--note:#5aa9f0;--note-soft:#13202e;--shadow:0 1px 2px rgba(0,0,0,.3),0 12px 34px rgba(0,0,0,.4);}
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1080px;margin:0 auto;padding:30px 20px 80px;}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:9px;}
+  h1{font-size:clamp(27px,4vw,40px);line-height:1.07;margin:0 0 10px;letter-spacing:-0.025em;font-weight:700;text-wrap:balance;}
+  .lede{color:var(--ink-soft);font-size:15.5px;max-width:70ch;margin:0;}
+  .lede b{color:var(--ink);font-weight:600;}
+  .theme-btn{position:absolute;top:24px;right:20px;background:var(--panel);border:1px solid var(--line);color:var(--ink-soft);border-radius:9px;width:36px;height:36px;cursor:pointer;font-size:15px;box-shadow:var(--shadow);}
+  h2.sec{font-size:12.5px;text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);color:var(--ink-faint);font-weight:600;margin:34px 0 14px;}
+
+  .note-band{background:var(--note-soft);border:1px solid var(--line);border-left:4px solid var(--note);border-radius:11px;padding:14px 18px;margin:20px 0;font-size:13.5px;color:var(--ink-soft);line-height:1.55;}
+  .note-band b{color:var(--ink);} .note-band .tag{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--note);text-transform:uppercase;letter-spacing:.06em;}
+
+  /* takeaways / threats */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow);}
+  .box h3{margin:0 0 12px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
+  .box.threats h3{color:var(--threat);} .box.wins h3{color:var(--ok);}
+  .box ol,.box ul{margin:0;padding-left:20px;} .box li{font-size:13px;color:var(--ink-soft);margin-bottom:9px;line-height:1.5;}
+  .box li b{color:var(--ink);}
+
+  /* tier legend */
+  .tiers{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;}
+  .tierchip{font-family:var(--mono);font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid var(--line);cursor:pointer;background:var(--panel);color:var(--ink-soft);}
+  .tierchip.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+  /* competitor cards */
+  .cards{display:flex;flex-direction:column;gap:12px;}
+  .comp{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden;}
+  .comp-head{display:grid;grid-template-columns:1fr auto;gap:12px;padding:16px 20px;cursor:pointer;align-items:center;}
+  .comp-head:hover{background:var(--panel-2);}
+  .comp-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .comp-title .nm{font-size:17px;font-weight:700;letter-spacing:-0.01em;}
+  .comp-title .tier{font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.03em;}
+  .t-incumbent{background:var(--threat-soft);color:var(--threat);}
+  .t-design{background:var(--accent-soft);color:var(--accent);}
+  .t-science{background:var(--ok-soft);color:var(--ok);}
+  .t-ai{background:var(--warn-soft);color:var(--warn);}
+  .t-print{background:var(--panel-2);color:var(--ink-faint);}
+  .comp-sub{font-size:12.5px;color:var(--ink-faint);margin-top:3px;}
+  .comp-metrics{display:flex;gap:14px;font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);text-align:right;flex-wrap:wrap;justify-content:flex-end;}
+  .comp-metrics .m .v{font-weight:700;color:var(--ink);display:block;} .comp-metrics .m .k{color:var(--ink-faint);font-size:10px;}
+  .chev{color:var(--ink-faint);transition:transform .2s;font-size:13px;}
+  .comp.open .chev{transform:rotate(90deg);}
+  .comp-body{display:none;padding:0 20px 20px;border-top:1px solid var(--line);}
+  .comp.open .comp-body{display:block;}
+
+  .threat-badge{font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--threat-soft);color:var(--threat);}
+
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin:16px 0;}
+  .fact{font-size:13px;} .fact .k{color:var(--ink-faint);font-size:11px;text-transform:uppercase;letter-spacing:.04em;font-family:var(--mono);} .fact .v{color:var(--ink);}
+  .block{margin-top:14px;} .block h4{margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;font-family:var(--mono);color:var(--ink-faint);}
+  .block p,.block li{font-size:13px;color:var(--ink-soft);line-height:1.55;} .block ul{margin:4px 0 0;padding-left:18px;} .block li{margin-bottom:5px;}
+  .block b{color:var(--ink);}
+
+  .mynote{background:var(--note-soft);border-left:3px solid var(--note);border-radius:0 8px 8px 0;padding:12px 15px;margin-top:14px;}
+  .mynote .lbl{font-family:var(--mono);font-size:10px;font-weight:700;color:var(--note);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:5px;}
+  .mynote p{margin:0;font-size:13px;color:var(--ink-soft);line-height:1.55;} .mynote b{color:var(--ink);}
+
+  .foot{margin-top:34px;font-size:12px;color:var(--ink-faint);line-height:1.55;max-width:80ch;}
+  .foot b{color:var(--ink-soft);}
+  @media (max-width:760px){.grid2{grid-template-columns:1fr;}.facts{grid-template-columns:1fr;}.comp-head{grid-template-columns:1fr;}.comp-metrics{justify-content:flex-start;margin-top:8px;}.theme-btn{position:static;margin-bottom:12px;}}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+
+<button class="theme-btn" id="themeBtn" aria-label="Toggle theme">◐</button>
+<div class="wrap">
+  <div class="eyebrow">Postr · competitive landscape · Jul 2026</div>
+  <h1>Nobody owns the poster workflow end to end.</h1>
+  <p class="lede">Nine competitors across five tiers, mapped against Postr's plan. Every profile carries
+    the source report's facts <b>plus a note from me</b> — what it actually means for Postr. The
+    thesis the whole report converges on: the incumbents monetize something else and treat posters as
+    an edge case, the AI tools generate drafts with no print path, and <b>the poster-first + paper→poster
+    + print-ready lane is empty.</b></p>
+
+  <div class="note-band">
+    <span class="tag">How to read this</span> &nbsp;Click any competitor to expand its full profile.
+    The blue <b>"What this means for Postr"</b> blocks are my analysis layered on the source report —
+    they're the decision-relevant part. Filter by tier with the chips below.
+  </div>
+
+  <h2 class="sec">The strategic picture</h2>
+  <div class="grid2">
+    <div class="box wins">
+      <h3>◆ Validated & open for Postr</h3>
+      <ol id="takeaways"></ol>
+    </div>
+    <div class="box threats">
+      <h3>▲ The biggest threats</h3>
+      <ul id="threats"></ul>
+    </div>
+  </div>
+
+  <h2 class="sec">Competitors — click to expand</h2>
+  <div class="tiers" id="tierFilter"></div>
+  <div class="cards" id="cards"></div>
+
+  <div class="note-band" style="margin-top:26px;">
+    <span class="tag">My bottom line</span> &nbsp;The report confirms Postr's wedge is real but the
+    window is <b>visibly closing</b> — BioRender shipped a Poster Builder (Jun–Jul 2026), SciSpace owns
+    the Paper2Poster fork, and every major player added an MCP server in the last 12 months. Postr's
+    defensible moat isn't generation (commoditized at ~$0.005/poster) — it's the <b>edit + print last
+    mile</b>, <b>trust</b> (extract from the manuscript, never fabricate citations — the exact failure
+    that sinks Gamma and SciSpace with academics), and the <b>$18.99 no-auto-renewal term</b> against a
+    field where billing rage is the #1 complaint in six of nine profiles.
+  </div>
+
+  <p class="foot">
+    <b>Source:</b> <code>docs/competitive-report.md</code> (2026-07-28), compiled from nine web-research
+    profiles. Every factual claim there carries an inline source + date; ratings, prices, and traffic are
+    July-2026 point-in-time snapshots that will drift. The blue analysis blocks and the summary judgements
+    are mine, layered on that report — not new facts. Where the report flagged a claim <code>[UNVERIFIED]</code>
+    I've kept it qualified.
+  </p>
+</div>
+
+<script>
+const TAKEAWAYS = [
+  "<b>Pricing + watermark model is validated, not speculative.</b> BioRender's $20/4-month undergrad cycle is the direct precedent for $18.99/term; its \"Created in BioRender\" citation rides 500K+ publications.",
+  "<b>Billing hostility is the industry's open wound.</b> Auto-renewal/subscription rage is the #1 complaint in six of nine profiles (BioRender, Canva, Microsoft, Figma, Gamma, Overleaf). A no-auto-renewal term is a positioning weapon.",
+  "<b>Nobody owns the poster workflow end to end.</b> Incumbents lack poster semantics; design tools lack print fidelity + paper ingestion; AI tools lack an editor + print path; printers have no tool.",
+  "<b>Education pricing has a hole at exactly Postr's price point.</b> Canva excludes higher-ed from free; Gamma has no student discount; the cheapest paid alternatives are $98–144/yr. $18.99/term undercuts all.",
+  "<b>Librarian/LibGuide outreach is earned everywhere, owned nowhere</b> — a first-mover channel across all nine competitors.",
+  "<b>The paper→poster frontier is real but research-grade.</b> Paper2Poster works at ~$0.005/poster but the last mile (editing, polish, printing) is open — exactly where Postr sits.",
+];
+const THREATS = [
+  "<b>BioRender</b> — same watermark loop, same student-price precedent, now shipping Poster Builder, ~$900M valuation, profitable, OpenAI + Anthropic distribution. If it makes posters first-class + print-ready, the life-sciences wedge compresses.",
+  "<b>Microsoft + Copilot</b> — \"create deck from Word/PDF\" (Apr 2025) is a proto paper→talk pipeline; Agent Mode (Jul 2026) keeps advancing. Moat is format lock-in, not love — export flawless PPTX rather than fight it.",
+  "<b>SciSpace + Paper2Poster</b> — owns the productionized open-source fork; any player can generate a draft for half a cent. Postr's moat can't be generation alone.",
+  "<b>Canva's SEO gravity</b> — \"research poster template\" lands on Canva; 100M+ monthly organic visits make generic terms uneconomic. Win long-tail academic intent instead.",
+  "<b>Print-shop bundling</b> — PosterPresentations/Genigraphics own the funnel's end + university SEO; if one licenses a web editor at checkout, it closes the loop from the print side.",
+];
+
+const COMPS = [
+  {
+    id:'biorender', name:'BioRender', tier:'science', tierLabel:'Science tool', threat:true,
+    sub:"Postr's closest analog & pricing precedent — figure/poster tool for life sciences",
+    metrics:[['~$900M','valuation'],['4M+','users'],['$20/4mo','undergrad']],
+    facts:[['Founded','2017, Toronto (Science Suite Inc.)'],['Funding','~$17M raised; profitable since Q1; $900M val (Dec 2025)'],['Scale','4M+ registered, 500K MAU, 25M+ figures'],['Reviews','G2 4.8/5 (66)']],
+    pricing:"Free: 3 figures, watermarked, no publication. Academic Individual $35/mo (annual). Undergrad $20/4-month cycle (VERIFIED — the $18.99 precedent). Lab $99/mo·5 seats.",
+    strength:"Watermark growth loop (\"Created in BioRender\" on 500K+ papers), the de-facto life-science figure standard, near-monthly changelog, OpenAI (ChatGPT app + MCP) + Anthropic (Claude for Life Sciences) deals.",
+    weakness:"Biomedical-only library; posters are one file-type among many; NO paper→poster pipeline (generates figures, not poster layouts from a manuscript); free tier forbids publication + caps at 3 figures; weak vector/high-res export for large-format print; billing/auto-renewal complaints; no print service.",
+    note:"The single most important competitor — it validates Postr's entire model (price, term, watermark loop) AND is the biggest threat. Its Poster Builder (Jun–Jul 2026) is the watch item: today it generates figures, not manuscript→poster layouts, and it's life-sciences-only. Postr's wedge is field-agnostic, poster-first, paper-ingesting, print-aware. Move if BioRender adds print-ready poster export or paper ingestion."
+  },
+  {
+    id:'canva', name:'Canva', tier:'design', tierLabel:'Design tool', threat:true,
+    sub:"The generalist academics actually reach for — huge free tier + SEO gravity",
+    metrics:[['265M','MAU'],['$4B+','revenue'],['$42B','valuation']],
+    facts:[['Founded','2013, Sydney'],['Scale','265M MAU, 31M paid seats, FCF+ 9yrs'],['Academic','100M+ edu users — but K-12 ONLY for free tier'],['Reviews','Trustpilot billing-heavy (57% 1-star snapshot)']],
+    pricing:"Deep free tier; Pro $144/yr. Canva for Education free K-12 only; higher-ed pays or needs institutional Canva for Campus. Print via Canva Print + FedEx/Office Depot.",
+    strength:"265M MAU, dominant SEO on \"research poster template\", zero-friction editor, AI design generation, MCP for Claude/ChatGPT/Cursor/Gemini (Jun 2025), institutional beachheads.",
+    weakness:"Templates are marketing-oriented not scientific; no DPI control (prints blurry at poster scale); CMYK export is Pro-only; NO paper→poster pipeline; free Education excludes universities; editor-bloat + billing complaints.",
+    note:"Can't out-SEO Canva on generic terms — its 100M+ organic visits make that uneconomic. Postr must win on workflow DEPTH (paper ingestion, figure handling, conference print specs) and long-tail academic intent, not price or template count. The higher-ed free-tier exclusion is a real gap: grad students face $144/yr Pro; $18.99/term undercuts cleanly."
+  },
+  {
+    id:'powerpoint', name:'Microsoft PowerPoint', tier:'incumbent', tierLabel:'Incumbent', threat:true,
+    sub:"The TRUE poster incumbent — mandated, distributed, format lock-in",
+    metrics:[['~450M','M365 users'],['1987','since'],['near-','monopoly']],
+    facts:[['Founded','PowerPoint 1.0 1987 (Forethought → MS)'],['Scale','~450M commercial M365 users; 89M consumer subs'],['Roadmap','Copilot \"create deck from Word/PDF\" (Apr 2025); Agent Mode (Jul 2026)'],['Reviews','Trustpilot 1.2–1.3/5 (subscription rage)']],
+    pricing:"Bundled in M365. Student desktop path narrowed (A1 Plus killed Aug 2024, web-only A1). Monetizes the bundle, not posters.",
+    strength:"Format lock-in: universities require/distribute it, printers standardize on PPTX, conferences mandate it, #betterposter spread as .pptx. Copilot moving up the paper→deck path.",
+    weakness:"No poster semantics (blank slide; hand-set A0/DPI/bleed); web version mangles poster PDFs; no research structure or paper→poster AI; no printing workflow; subscription-rage + \"forced AI bloat\" reviews.",
+    note:"The moat is the PPTX exchange FORMAT, not the product — so Postr must EXPORT flawless PPTX/PDF rather than fight it. Export fidelity is existential, not a feature. Copilot's create-from-file is the threat to watch on the paper→talk side, but it produces bullet-decks, understands no IMRaD/poster semantics. The whole #betterposter movement exists because PowerPoint gives zero poster guidance — that vacuum is Postr's."
+  },
+  {
+    id:'figma', name:'Figma', tier:'design', tierLabel:'Design tool', threat:false,
+    sub:"Pro-grade free editor some researchers use — with a real free Education plan",
+    metrics:[['$1.06B','FY25 rev'],['public','NYSE:FIG'],['free','edu plan']],
+    facts:[['Founded','2012, San Francisco'],['Adobe deal','$20B acquisition TERMINATED Dec 2023 ($1B breakup fee); IPO Jul 2025'],['Scale','FY25 $1.056B (+41%); NDR 136%'],['Reviews','Trustpilot 2.6/5 post-seat-change']],
+    pricing:"Deep free tier; 2025 seat-pricing change drove \"dark UX\" complaints. Free Education plan for verified students — the one genuinely-free competitor offer.",
+    strength:"Best-in-class collaborative editor; Community poster templates; Figma Slides + Figma Make show AI-layout demand; free Education plan is a real counterweight.",
+    weakness:"Learning curve for non-designers (Postr's exact user); NO paper→poster/talk AI (its AI targets app/web UI); documented raster/print/export weaknesses; seat/billing complexity pushed budget users away.",
+    note:"Lower threat — it's a pro-designer tool, and its learning curve is precisely the barrier for the less-tech-savvy academic Postr targets. The one thing to watch is its FREE Education plan for verified students, the only genuinely-free competitor offer. Figma users self-select as designers; Postr's user wants zero learning curve."
+  },
+  {
+    id:'overleaf', name:'Overleaf', tier:'incumbent', tierLabel:'Incumbent (LaTeX)', threat:false,
+    sub:"The LaTeX poster default — layout-as-code, compile quotas kill A0",
+    metrics:[['25M+','users'],['2012','founded'],['$98/yr','student']],
+    facts:[['Founded','2012, London (writeLaTeX); Digital Science/Holtzbrinck'],['Scale','25M+ users'],['Posters','beamerposter/tikzposter; official Posters guide + template gallery'],['Reviews','Trustpilot 2.2/5 (auto-renew, compile timeouts)']],
+    pricing:"Free tier with compile-time quotas; Student $98/yr. Now monetizing AI error-interpretation. Owns the LaTeX default for quantitative fields.",
+    strength:"25M-user academic base; publisher-integrated submission; official poster packages + university-branded templates; the LaTeX default route.",
+    weakness:"Layout is CODE (visual editor edits text/tables, not spatial design); free compile timeouts disproportionately kill image-heavy A0 posters; cryptic errors now paywalled; billing hostility; no print sizing / no paper→poster.",
+    note:"Treat LaTeX users as an EXPORT target (PDF/PPTX), NOT a conversion battle — the report is explicit. The wedge: hours of LaTeX for a one-off conference poster, or a paywalled compile quota, is exactly the friction a free visual poster tool removes. Postr's LaTeX export is the bridge; don't try to win the CS/physics crowd who are happy in beamerposter."
+  },
+  {
+    id:'mtg', name:'Mind the Graph', tier:'science', tierLabel:'Science tool', threat:false,
+    sub:"The cheaper BioRender clone (CACTUS/Editage) — the closest watermark-loop analog",
+    metrics:[['2016','founded'],['$9–12/mo','paid'],['2021','AI poster']],
+    facts:[['Founded','2016, Brazil; acquired by CACTUS/Editage 2022'],['Scale','Marketing claims 3M–5M (inconsistent, treat as unverified)'],['Product','AI Poster Maker since 2021; 75K+ illustrations'],['Reviews','Thin & stale (Product Hunt: 0 recent)']],
+    pricing:"Free: 4 illustrations, watermarked. Paid $9–12/mo (annual). Student $99/yr. Creations HELD HOSTAGE on downgrade.",
+    strength:"Closest existing watermark-on-free growth loop to Postr's; AI paper→poster since 2021; poster templates; CACTUS SEO + bundle distribution.",
+    weakness:"Free plan too restrictive (4 illustrations); no PowerPoint export; creations blocked on downgrade (subscription hostility); poster-making buried in a general infographic tool; thin/stale reviews; near-zero organic buzz; $99–144/yr sits above Postr's term.",
+    note:"The cautionary tale as much as a competitor: it has the watermark loop but a hostile free tier (4 illustrations, creations-blocked-on-downgrade) that generates the exact \"alternative\" content Postr should avoid triggering. Its AI Poster Maker existing since 2021 proves the category isn't novel — the differentiator is the last mile, not the generation. Undercut on single-conference-poster intent ($18.99 vs $99/yr)."
+  },
+  {
+    id:'gamma', name:'Gamma (+Beautiful.ai, Plus AI)', tier:'ai', tierLabel:'AI generator', threat:false,
+    sub:"Proof of prompt→artifact demand + badge virality — but zero academic surface",
+    metrics:[['$100M','ARR'],['$2.1B','valuation'],['70M','users']],
+    facts:[['Founded','2020, San Francisco (ex-Optimizely founders)'],['Scale','70M users, $100M ARR, profitable, ~50 staff'],['Growth','\"Made with Gamma\" badge drove 0→50M largely organic'],['Reviews','TrustScore 1.5/5 (auto-renewal/refund anger)']],
+    pricing:"Free with 400 LIFETIME credits + badge; paid tiers. NO education discount (top Canny request). Beautiful.ai / Plus AI have no free tier.",
+    strength:"Proves the prompt→artifact demand curve and badge-on-free viral loop ($100M ARR, 50 people). Claude/ChatGPT connectors.",
+    weakness:"Zero academic surface; DOCUMENTED hallucinated citations (r/AskAcademia); no poster formats or print-ready export (export fidelity is its #1 complaint); no education pricing; generic \"every deck looks the same\" aesthetics; no print service.",
+    note:"Validates Postr's paper→talk adjacency and the badge-on-free loop — but its hallucinated-citations problem is the gift. An academic needing a 36×48 poster with real references has no reason to stay in Gamma. Postr's paper→talk must EXTRACT from the manuscript (real figures, captions, references), never generate — the complaint record shows academics notice and punish fabrication. Its missing student discount is a hole at Postr's exact price."
+  },
+  {
+    id:'scispace', name:'SciSpace (+Paper2Poster)', tier:'ai', tierLabel:'AI generator', threat:true,
+    sub:"The closest paper→poster challenger — owns the productionized open-source fork",
+    metrics:[['9.6M','claimed users'],['$0.005','/poster'],['credit','gated']],
+    facts:[['Founded','2015–16 as Typeset (PubGenius Inc.); rebrand 2022'],['Scale','9.6M claimed researchers; ~4.3M monthly visits'],['Product','Agent generates posters/talks; owns Paper2Poster fork (NeurIPS 2025, 3,882★)'],['Reviews','credit-expiry the #1 complaint']],
+    pricing:"Freemium; Premium $144/yr. Poster/talk generation locked behind monthly-EXPIRING credits. A 150-agent menu; posters one line item.",
+    strength:"Closest feature-for-feature paper→poster challenger; owns the productionized Paper2Poster fork (research authors committing to it); 9.6M claimed users; elite SEO; $0.005/poster cost curve.",
+    weakness:"Output is a LaTeX/PPTX DRAFT artifact — no dedicated poster editor, template gallery, or print path; credits expire monthly (top complaint); trust complaints (fabricated citations, retraction blindness); user content PUBLICLY INDEXED — toxic for unpublished research.",
+    note:"The most direct paper→poster threat — but its weaknesses are precisely Postr's openings. (1) It generates a draft with no editor/print last mile — where Postr lives. (2) Its content is publicly indexed, toxic for unpublished research — Postr's anonymous-first stance counters this cleanly and is a real trust differentiator. (3) Credit-expiry + fabricated-citation complaints. Postr's moat is edit+print+trust, not generation. Watch the Paper2Poster follow-ups (Paper2Video, auto conference logos) SciSpace can ship at scale."
+  },
+  {
+    id:'printers', name:'Print services (PosterPresentations / Genigraphics / PosterNerd)', tier:'print', tierLabel:'Print last-mile', threat:true,
+    sub:"Bootstrapped print bureaus owning print checkout + university SEO",
+    metrics:[['1997','since (PP)'],['libguide','SEO moat'],['no tool','static PPTX']],
+    facts:[['PosterPresentations','Berkeley CA (Canterbury Media); 100K+ customers; since 1997'],['Genigraphics','Kansas; owns conference VENUE logistics (society contracts, onsite hanging, ePoster kiosks)'],['PosterNerd','MakeSigns brand; per-conference promo deals'],['Product','Static PPTX template downloads only — no editor, AI, or SaaS']],
+    pricing:"Per-print pricing. Free static PPTX templates as SEO lead magnets. No SaaS, no editor.",
+    strength:"Own the moment \"poster is done, now print\"; dominate university LibGuide citations + \"scientific poster template\" SERPs; Genigraphics uniquely owns the conference venue (society contracts, onsite hanging).",
+    weakness:"No web editor, no AI pipeline, no SaaS. Design \"tooling\" is static template downloads. Small bootstrapped teams.",
+    note:"The funnel's END, and a SEO threat more than a product one — their per-university/per-conference pages dominate the template SERPs. The bundling risk: if one licenses a web editor at print checkout, it closes the loop from the print side. Postr's conference-calendar + poster-spec content attacks the intent UPSTREAM of print checkout. Genigraphics' venue logistics ground is locked — contest the DIGITAL side (conference sizes/specs/deadlines as content + tool), not the physical hanging."
+  },
+];
+
+const TIER_META={incumbent:'Incumbent',design:'Design',science:'Science',ai:'AI generator',print:'Print'};
+
+// render summary
+document.getElementById('takeaways').innerHTML = TAKEAWAYS.map(t=>'<li>'+t+'</li>').join('');
+document.getElementById('threats').innerHTML = THREATS.map(t=>'<li>'+t+'</li>').join('');
+
+// tier filter chips
+let activeTier='all';
+const tf=document.getElementById('tierFilter');
+const chips=[['all','All']].concat(Object.entries(TIER_META));
+tf.innerHTML=chips.map(([k,l])=>'<button class="tierchip'+(k==='all'?' on':'')+'" data-t="'+k+'">'+l+'</button>').join('');
+tf.addEventListener('click',e=>{const b=e.target.closest('.tierchip');if(!b)return;activeTier=b.dataset.t;
+  tf.querySelectorAll('.tierchip').forEach(c=>c.classList.toggle('on',c.dataset.t===activeTier));renderCards();});
+
+function renderCards(){
+  const host=document.getElementById('cards');
+  host.innerHTML=COMPS.filter(c=>activeTier==='all'||c.tier===activeTier).map(c=>{
+    const metrics=c.metrics.map(m=>'<div class="m"><span class="v">'+m[0]+'</span><span class="k">'+m[1]+'</span></div>').join('');
+    const facts=c.facts.map(f=>'<div class="fact"><div class="k">'+f[0]+'</div><div class="v">'+f[1]+'</div></div>').join('');
+    return '<div class="comp" data-id="'+c.id+'">'+
+      '<div class="comp-head" role="button" tabindex="0" aria-expanded="false">'+
+        '<div><div class="comp-title"><span class="nm">'+c.name+'</span>'+
+          '<span class="tier t-'+c.tier+'">'+c.tierLabel+'</span>'+
+          (c.threat?'<span class="threat-badge">▲ threat</span>':'')+'</div>'+
+          '<div class="comp-sub">'+c.sub+'</div></div>'+
+        '<div class="comp-metrics">'+metrics+'<span class="chev">▶</span></div>'+
+      '</div>'+
+      '<div class="comp-body">'+
+        '<div class="facts">'+facts+'</div>'+
+        '<div class="block"><h4>Pricing & model</h4><p>'+c.pricing+'</p></div>'+
+        '<div class="block"><h4>Strengths</h4><p>'+c.strength+'</p></div>'+
+        '<div class="block"><h4>Weaknesses vs a poster specialist</h4><p>'+c.weakness+'</p></div>'+
+        '<div class="mynote"><span class="lbl">What this means for Postr</span><p>'+c.note+'</p></div>'+
+      '</div></div>';
+  }).join('');
+  host.querySelectorAll('.comp-head').forEach(h=>{
+    const toggle=()=>{const c=h.closest('.comp');const o=c.classList.toggle('open');h.setAttribute('aria-expanded',o);};
+    h.addEventListener('click',toggle);
+    h.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle();}});
+  });
+}
+renderCards();
+
+const tb=document.getElementById('themeBtn');
+tb.addEventListener('click',()=>{const cur=document.documentElement.getAttribute('data-theme');
+  const nx=cur==='dark'?'light':cur==='light'?'dark':(matchMedia('(prefers-color-scheme: dark)').matches?'light':'dark');
+  document.documentElement.setAttribute('data-theme',nx);});
+</script>
