@@ -59,14 +59,18 @@ Recorded for context, not used to pick the winner: **cost** (LLM $/paper) and
 
 ## Inputs (the two things only Gavin can supply)
 
-### The fixture set (N = 12: 6 social science + 6 biology) — Consensus-generated
+### The fixture set (N = 12: 6 social science + 6 biology) — Elicit-generated
 
 Decided 2026-07-29. Rather than collect individual PDFs, **generate each fixture
-from a research question via Consensus**: a core research question →
-Consensus's papers-grounded synthesis → that synthesis IS the fixture text (a
-findings-bearing body of prose with a known main result). Because *we chose* the
-core question, the expected star finding is largely determined — which is what
-makes the gold set draftable and the experiment reproducible.
+from a research question via Elicit's `create_systematic_review`**: a core
+research question → Elicit searches, screens, and runs **full-text extraction**
+(main finding + a verbatim supporting quote + effect direction per paper) → the
+review's synthesis + extraction table IS the fixture text (a findings-bearing
+body with a known main result *and* per-paper verbatim quotes). Elicit's
+full-text extraction is why it beats Consensus here — findings live in the
+Results, and Elicit reads them, returning the verbatim spans the fidelity axis
+needs. Because *we chose* the core question, the expected star finding is largely
+determined — which makes the gold set draftable and the experiment reproducible.
 
 - **9 clean fixtures** — one core research question each, 6 across social science
   + 3 across biology (and vice-versa to reach 6/6 with the degraded ones). The
