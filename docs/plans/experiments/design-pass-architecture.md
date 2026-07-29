@@ -95,3 +95,40 @@ back into spec §4 Phase 2.
 value; Arm I adds a little on the title slide; Arm P likely fails the editability
 gate (image-of-slides) or is inconsistent. But that is exactly what the
 experiment exists to verify, not assume.
+
+---
+
+## Results (run 2026-07-29) + Gavin's reframing — arms COMPOSE, not compete
+
+First run outcomes (all costs per deck; note costs differ by work done):
+- **Arm T** — theme via `gpt-5.6-terra`, **~$0.007/deck**. Themes vary
+  meaningfully by field (SS1 slate-blue / BIO2 teal-navy / BIO4 sage). Editable
+  by construction. Clean. **PASSES.**
+- **Arm I** — Arm T + one `gpt-image-1` title background, **~$0.19/image**.
+  Output is clean and abstract but arguably marginal over a solid fill. Editable
+  (image is title-only). **PASSES** (design approved by Gavin).
+- **Arm P** — one-step GPT → styled deck. Constrained to STRUCTURED output (not
+  image-of-slides) it stayed **editable**, **~$0.016/deck**, and produced real,
+  coordinated devices (3-stage progress bar = the talk arc, quote block, stat
+  emphasis + method callout). Rendered for review. **Editability PASSES; design
+  cleanliness pending Gavin's look at the render.**
+
+**Gavin's reframing (2026-07-29) — long-term architecture, NOT a build-now
+decision:** these are not rival arms. They **compose**:
+- **Arm I** supplies the visual *structure* (abstract shape backgrounds, solid
+  color regions).
+- **Arm T** supplies the *parameter layer* — its field palette can **recolor
+  Arm I's solid fills**, so an I background is not a frozen PNG but a
+  recolorable layout. Same structure, different vibe per paper (or per user
+  edit).
+- This turns the design pass from one-shot generation into a **controllable
+  system**, and is the natural hook for the Phase-3 "make it warmer / calmer"
+  edit requests (the design-terms crosswalk feeds this).
+- **Arm P** is the still-open one — Gavin needs to judge its rendered design
+  before its role is settled.
+
+So the revised direction: **Arm T as the parameter layer + Arm I structure it
+recolors**, with Arm P evaluated as a possible richer generator once its render
+is judged. Build Arm T first (cheapest, safest, and the parameter layer
+everything else hangs off), then layer I's recolorable structure. This is
+feature planning captured for later — not a commitment to build now.
