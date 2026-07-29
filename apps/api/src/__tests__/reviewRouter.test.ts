@@ -309,6 +309,25 @@ describe('POST /api/review/critique — entitlement (D4)', () => {
 });
 
 describe('POST /api/review/critique — initial critique', () => {
+  it('maps an upstream page-fetch failure to 502 and charges nothing', async () => {
+    const anthropic = fakeAnthropic();
+    const { client, rpcs, inserts } = fakeSupabase({ userRow: PACK_USER });
+    const fetchFn = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const res = await post(app, validBody());
+
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe('fetch_failed');
+    expect(anthropic.create).not.toHaveBeenCalled();
+    expect(rpcs).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+  });
+
   it('runs the pack path and consumes the credit AFTER success', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
