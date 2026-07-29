@@ -141,9 +141,10 @@ describe('isCanvasBlank', () => {
     expect(isCanvasBlank({ data: makePixels(16, 16) })).toBe(true);
   });
 
-  it('treats any near-uniform color as blank (all-black, flat gray)', () => {
+  it('treats any near-uniform color as blank (all-black, flat gray, solid red)', () => {
     expect(isCanvasBlank({ data: makePixels(16, 16, () => [0, 0, 0]) })).toBe(true);
     expect(isCanvasBlank({ data: makePixels(16, 16, () => [250, 250, 250]) })).toBe(true);
+    expect(isCanvasBlank({ data: makePixels(16, 16, () => [255, 0, 0]) })).toBe(true);
   });
 
   it('tolerates JPEG-level noise within the ±8 channel range', () => {
