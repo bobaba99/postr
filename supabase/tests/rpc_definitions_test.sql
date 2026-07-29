@@ -15,7 +15,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(31);
+select plan(38);
 
 -- --------------------------------------------------------------------------
 -- Functions exist
@@ -30,6 +30,11 @@ select has_function('public', 'consume_review_credit', array['uuid']::name[],
   'consume_review_credit(uuid) exists');
 select has_function('public', 'grant_review_credits', array['uuid', 'integer']::name[],
   'grant_review_credits(uuid, integer) exists');
+select has_function(
+  'public',
+  'fulfill_credit_pack',
+  array['text', 'uuid', 'integer', 'text']::name[],
+  'fulfill_credit_pack(text, uuid, integer, text) exists');
 
 -- --------------------------------------------------------------------------
 -- Return types
@@ -44,6 +49,12 @@ select function_returns('public', 'consume_review_credit', array['uuid']::name[]
   'consume_review_credit(uuid) returns integer');
 select function_returns('public', 'grant_review_credits', array['uuid', 'integer']::name[], 'integer',
   'grant_review_credits(uuid, integer) returns integer');
+select function_returns(
+  'public',
+  'fulfill_credit_pack',
+  array['text', 'uuid', 'integer', 'text']::name[],
+  'integer',
+  'fulfill_credit_pack(text, uuid, integer, text) returns integer');
 
 -- --------------------------------------------------------------------------
 -- security definer — all three read/write across RLS boundaries on purpose
@@ -58,6 +69,11 @@ select is_definer('public', 'consume_review_credit', array['uuid']::name[],
   'consume_review_credit(uuid) is security definer');
 select is_definer('public', 'grant_review_credits', array['uuid', 'integer']::name[],
   'grant_review_credits(uuid, integer) is security definer');
+select is_definer(
+  'public',
+  'fulfill_credit_pack',
+  array['text', 'uuid', 'integer', 'text']::name[],
+  'fulfill_credit_pack(text, uuid, integer, text) is security definer');
 
 -- --------------------------------------------------------------------------
 -- Pinned search_path — a security definer function without one is open to
@@ -103,6 +119,14 @@ select ok(
       and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
   ),
   'grant_review_credits() pins search_path');
+select ok(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'fulfill_credit_pack'
+      and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+  ),
+  'fulfill_credit_pack() pins search_path');
 
 -- --------------------------------------------------------------------------
 -- Wiring + grants
@@ -152,6 +176,24 @@ select ok(
 select ok(
   not has_function_privilege('authenticated', 'public.grant_review_credits(uuid, integer)', 'EXECUTE'),
   'authenticated cannot execute grant_review_credits(uuid, integer)');
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.fulfill_credit_pack(text, uuid, integer, text)',
+    'EXECUTE'),
+  'anon cannot execute fulfill_credit_pack(text, uuid, integer, text)');
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.fulfill_credit_pack(text, uuid, integer, text)',
+    'EXECUTE'),
+  'authenticated cannot execute fulfill_credit_pack(text, uuid, integer, text)');
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.fulfill_credit_pack(text, uuid, integer, text)',
+    'EXECUTE'),
+  'service_role can execute fulfill_credit_pack(text, uuid, integer, text)');
 
 select * from finish();
 rollback;

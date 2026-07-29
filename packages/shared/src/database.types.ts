@@ -716,6 +716,15 @@ export type Database = {
       consume_review_credit: { Args: { p_user_id: string }; Returns: number }
       delete_own_account: { Args: never; Returns: undefined }
       export_my_data: { Args: never; Returns: Json }
+      fulfill_credit_pack: {
+        Args: {
+          p_amount: number
+          p_session_id: string
+          p_sku: string
+          p_user_id: string
+        }
+        Returns: number
+      }
       grant_export_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: number
@@ -895,4 +904,3 @@ export const Constants = {
     },
   },
 } as const
-
