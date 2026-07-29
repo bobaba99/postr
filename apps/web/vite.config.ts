@@ -42,7 +42,9 @@ function writeVersionFile() {
     }),
   );
 }
-writeVersionFile();
+if (!process.env.VITEST) {
+  writeVersionFile();
+}
 
 export default defineConfig({
   plugins: [react()],
@@ -64,6 +66,20 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     css: false,
+    coverage: {
+      provider: 'v8',
+      include: [
+        'src/review/**/*.{ts,tsx}',
+        'src/pages/PresentationChecker.tsx',
+        'src/poster/sidebar/ReviewTab.tsx',
+        'src/poster/PosterSnapshotCanvas.tsx',
+      ],
+      thresholds: {
+        statements: 80,
+        functions: 80,
+        lines: 80,
+      },
+    },
     alias: {
       // pdfImport.ts does `import pdfWorkerUrl from
       // 'pdfjs-dist/build/pdf.worker.mjs?url'`. Vite 8 refuses to

@@ -10,6 +10,7 @@
     "dev:api": "npm run dev --workspace=apps/api",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:coverage:review": "npm run test:coverage:review --workspace=apps/api && npm run test:coverage:review --workspace=apps/web",
     "lint": "npm run lint --workspaces --if-present",
     "bench:import": "tsx scripts/import-benchmark/run.ts",
     "postr:decode": "node scripts/decode-postr.mjs",
@@ -20,6 +21,7 @@
     "db:types": "supabase gen types typescript --local > packages/shared/src/database.types.ts"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "4.1.4",
     "playwright": "^1.59.1",
     "tsx": "^4.21.0"
   }
