@@ -15,10 +15,9 @@ import express from 'express';
 import request from 'supertest';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { RequestHandler } from 'express';
 import { createReviewRouter } from '../review.js';
 import { CURRENT_RUBRIC_VERSION } from '../review/rubric/index.js';
-import { REVIEW_MODEL } from '../review/config.js';
+import { REVIEW_ADDON_WEEKLY_QUOTA, REVIEW_MODEL } from '../review/config.js';
 
 const SUPABASE_URL = 'https://testref.supabase.co';
 const PAGE_URL = `${SUPABASE_URL}/storage/v1/object/sign/poster-assets/u/p/review-capture.jpg?token=abc`;
@@ -45,6 +44,12 @@ interface FakeSupabaseOpts {
   consumeResult?: number | null;
   insertedId?: string;
   removeError?: boolean;
+  addonSlotResult?: {
+    data: unknown;
+    error: { message: string } | null;
+  };
+  addonSlotThrows?: boolean;
+  claimResult?: unknown;
 }
 
 function fakeSupabase(opts: FakeSupabaseOpts = {}) {
@@ -87,13 +92,23 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
       rpcs.push({ fn, args });
       if (fn === 'claim_initial_review') {
         return Promise.resolve({
-          data: {
-            outcome: 'claimed',
-            claimToken: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-            expiresAt: '2099-01-01T00:10:00.000Z',
-          },
+          data:
+            opts.claimResult ??
+            {
+              outcome: 'claimed',
+              claimToken: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+              expiresAt: '2099-01-01T00:10:00.000Z',
+            },
           error: null,
         });
+      }
+      if (fn === 'consume_review_addon_slot') {
+        if (opts.addonSlotThrows) {
+          return Promise.reject(new Error('quota rpc crashed'));
+        }
+        return Promise.resolve(
+          opts.addonSlotResult ?? { data: { allowed: true }, error: null },
+        );
       }
       if (fn === 'release_initial_review') {
         return Promise.resolve({ data: true, error: null });
@@ -188,7 +203,6 @@ function buildApp(deps: {
   supabase: SupabaseClient;
   anthropic?: Anthropic;
   fetchFn: typeof fetch;
-  weeklyLimiter?: RequestHandler;
 }) {
   const app = express();
   app.use(express.json());
@@ -197,7 +211,6 @@ function buildApp(deps: {
       getSupabaseAdmin: () => deps.supabase,
       getAnthropic: () => deps.anthropic ?? fakeAnthropic().client,
       fetchFn: deps.fetchFn,
-      weeklyLimiter: deps.weeklyLimiter,
     }),
   );
   return app;
@@ -331,53 +344,144 @@ describe('POST /api/review/critique — entitlement (D4)', () => {
     expect(inserts).toHaveLength(0);
   });
 
-  it('maps a weekly-window rejection to 402 weekly_quota_exceeded with retryAfterSec', async () => {
+  it('maps a persistent quota denial to 402 with matching Retry-After header and body', async () => {
     const anthropic = fakeAnthropic();
-    const { client } = fakeSupabase({ userRow: ADDON_USER });
+    const { client, rpcs } = fakeSupabase({
+      userRow: { ...ADDON_USER, review_credits: 2 },
+      addonSlotResult: {
+        data: { allowed: false, retryAfterSec: 3600 },
+        error: null,
+      },
+    });
     const fetchFn = vi.fn();
-    // Mirrors createRateLimiter's own rejection wire shape; the router
-    // invokes it with a capturing response, never the real one.
-    const weeklyLimiter: RequestHandler = (_req, res, _next) => {
-      res.setHeader('Retry-After', '3600');
-      res.status(429).json({ error: 'rate_limited' });
-    };
     const app = buildApp({
       supabase: client,
       anthropic: anthropic.client,
       fetchFn: fetchFn as unknown as typeof fetch,
-      weeklyLimiter,
     });
     const res = await post(app, validBody());
     expect(res.status).toBe(402);
+    expect(res.headers['retry-after']).toBe('3600');
     expect(res.body).toMatchObject({
       error: 'review_payment_required',
       reason: 'weekly_quota_exceeded',
       retryAfterSec: 3600,
     });
+    expect(rpcs.map((rpc) => rpc.fn)).toEqual([
+      'claim_initial_review',
+      'consume_review_addon_slot',
+      'release_initial_review',
+    ]);
+    expect(fetchFn).not.toHaveBeenCalled();
     expect(anthropic.create).not.toHaveBeenCalled();
   });
 
   it('ignores the add-on when the term is not active (D4 term-active rule)', async () => {
     const anthropic = fakeAnthropic();
-    const { client } = fakeSupabase({
-      userRow: { ...ADDON_USER, plan_expires_at: '2000-01-01T00:00:00.000Z' },
+    const { client, rpcs } = fakeSupabase({
+      userRow: {
+        ...ADDON_USER,
+        review_credits: 1,
+        plan_expires_at: '2000-01-01T00:00:00.000Z',
+      },
     });
-    const fetchFn = vi.fn();
-    let weeklyCalls = 0;
-    const weeklyLimiter: RequestHandler = (_req, _res, next) => {
-      weeklyCalls++;
-      next();
-    };
+    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
     const app = buildApp({
       supabase: client,
       anthropic: anthropic.client,
       fetchFn: fetchFn as unknown as typeof fetch,
-      weeklyLimiter,
     });
     const res = await post(app, validBody());
-    expect(res.status).toBe(402);
-    expect(res.body).toMatchObject({ error: 'review_payment_required', reason: 'no_credit' });
-    expect(weeklyCalls).toBe(0);
+    expect(res.status).toBe(200);
+    expect(rpcs.map((rpc) => rpc.fn)).toEqual([
+      'claim_initial_review',
+      'finalize_initial_review',
+    ]);
+    expect(rpcs[1]!.args.p_credit_source).toBe('pack');
+  });
+
+  it.each([
+    {
+      name: 'RPC error',
+      opts: {
+        addonSlotResult: {
+          data: null,
+          error: { message: 'database unavailable' },
+        },
+      },
+    },
+    {
+      name: 'thrown RPC error',
+      opts: { addonSlotThrows: true },
+    },
+    {
+      name: 'malformed allowed response',
+      opts: {
+        addonSlotResult: {
+          data: { allowed: 'yes' },
+          error: null,
+        },
+      },
+    },
+    {
+      name: 'malformed denied response',
+      opts: {
+        addonSlotResult: {
+          data: { allowed: false, retryAfterSec: 0.5 },
+          error: null,
+        },
+      },
+    },
+  ])('fails closed before fetch/model on $name', async ({ opts }) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const anthropic = fakeAnthropic();
+    const { client, rpcs } = fakeSupabase({
+      userRow: ADDON_USER,
+      ...opts,
+    });
+    const fetchFn = vi.fn();
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const res = await post(app, validBody());
+
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'review_internal' });
+    expect(rpcs.map((rpc) => rpc.fn)).toEqual([
+      'claim_initial_review',
+      'consume_review_addon_slot',
+      'release_initial_review',
+    ]);
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(anthropic.create).not.toHaveBeenCalled();
+  });
+
+  it('replays a completed request key before entitlement and quota work', async () => {
+    const anthropic = fakeAnthropic();
+    const { client, rpcs } = fakeSupabase({
+      userRow: ADDON_USER,
+      claimResult: {
+        outcome: 'replay',
+        reviewId: '11111111-1111-4111-8111-111111111111',
+        stage: 'initial',
+        critique: VALID_CRITIQUE,
+      },
+    });
+    const fetchFn = vi.fn();
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const res = await post(app, validBody());
+
+    expect(res.status).toBe(200);
+    expect(rpcs.map((rpc) => rpc.fn)).toEqual(['claim_initial_review']);
+    expect(fetchFn).not.toHaveBeenCalled();
     expect(anthropic.create).not.toHaveBeenCalled();
   });
 });
@@ -506,33 +610,54 @@ describe('POST /api/review/critique — initial critique', () => {
     expect(anthropic.create).toHaveBeenCalledOnce();
   });
 
-  it('runs the add-on path through the weekly limiter and never touches credits', async () => {
+  it('consumes a persistent add-on slot after claiming and before provider work', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
     const { client, rpcs, inserts } = fakeSupabase({ userRow: ADDON_USER });
     const fetchFn = vi.fn().mockResolvedValue(imageResponse());
-    let weeklyCalls = 0;
-    const weeklyLimiter: RequestHandler = (_req, _res, next) => {
-      weeklyCalls++;
-      next();
-    };
     const app = buildApp({
       supabase: client,
       anthropic: anthropic.client,
       fetchFn: fetchFn as unknown as typeof fetch,
-      weeklyLimiter,
     });
 
     const res = await post(app, validBody());
 
     expect(res.status).toBe(200);
-    expect(weeklyCalls).toBe(1);
     expect(rpcs.map((rpc) => rpc.fn)).toEqual([
       'claim_initial_review',
+      'consume_review_addon_slot',
       'finalize_initial_review',
     ]);
+    expect(rpcs[1]!.args).toEqual({
+      p_user_id: 'user-1',
+      p_quota: REVIEW_ADDON_WEEKLY_QUOTA,
+    });
     expect(inserts).toHaveLength(1);
     expect(inserts[0]!.payload.credit_source).toBe('subscription_addon');
+  });
+
+  it('keeps an add-on slot consumed when provider work fails (D17)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const anthropic = fakeAnthropic();
+    anthropic.create.mockRejectedValue(new Error('provider unavailable'));
+    const { client, rpcs, inserts } = fakeSupabase({ userRow: ADDON_USER });
+    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const res = await post(app, validBody());
+
+    expect(res.status).toBe(502);
+    expect(rpcs.map((rpc) => rpc.fn)).toEqual([
+      'claim_initial_review',
+      'consume_review_addon_slot',
+      'release_initial_review',
+    ]);
+    expect(inserts).toHaveLength(0);
   });
 
   it('maps an invalid model payload to 502 bad_model_output and charges nothing', async () => {

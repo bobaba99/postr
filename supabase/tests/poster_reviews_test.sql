@@ -31,7 +31,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(31);
+select plan(56);
 
 -- --------------------------------------------------------------------------
 -- Fixtures (as superuser): two users (handle_new_user auto-creates their
@@ -49,6 +49,19 @@ from (values
   ('d1000000-0000-4000-a000-000000000001'::uuid, 'jane.doe@example.com'),
   ('d1000000-0000-4000-a000-000000000002'::uuid, 'john.smith@example.com')
 ) as u (id, email);
+
+-- The historical schema predates Supabase's generated API grants. Give this
+-- transaction's service_role fixture only the legacy privileges exercised by
+-- the pre-existing poster-review tests; rollback removes these fixture grants.
+-- The new quota ledger's production least-privilege grants are asserted
+-- independently below and are not supplemented here.
+grant select, update, delete on public.users to service_role;
+grant select, insert, update on public.poster_reviews to service_role;
+grant select, update on public.poster_review_requests to service_role;
+grant execute on function public.consume_review_credit(uuid) to service_role;
+grant execute on function public.grant_review_credits(uuid, integer) to service_role;
+grant select, update on public.users to authenticated;
+grant select, insert, update on public.poster_reviews to authenticated;
 
 insert into public.poster_reviews (id, user_id, source_kind) values
   ('e1000000-0000-4000-a000-000000000001', 'd1000000-0000-4000-a000-000000000001', 'postr'),
@@ -441,6 +454,248 @@ select is(
       and request_key = 'a1000000-0000-4000-a000-000000000002'),
   0::bigint,
   'an insert/FK failure leaves no partial review row');
+
+-- --------------------------------------------------------------------------
+-- Persistent review add-on quota ledger + sliding-window RPC
+-- --------------------------------------------------------------------------
+
+-- 32 · usage is persisted in a dedicated service-only table
+select has_table(
+  'public',
+  'review_addon_usage',
+  'review_addon_usage persists weekly add-on consumption');
+
+-- 33 · every event carries a database-owned consumption timestamp
+select has_column(
+  'public',
+  'review_addon_usage',
+  'consumed_at',
+  'review_addon_usage records consumed_at');
+
+-- 34 · usage follows the public.users lifecycle
+select ok(
+  exists (
+    select 1
+      from pg_constraint c
+      join pg_class t on t.oid = c.conrelid
+      join pg_namespace n on n.oid = t.relnamespace
+     where n.nspname = 'public'
+       and t.relname = 'review_addon_usage'
+       and c.contype = 'f'
+       and c.confdeltype = 'c'
+  ),
+  'review_addon_usage user FK cascades on delete');
+
+-- 35 · the prune/count/oldest query has the required compound index
+select ok(
+  exists (
+    select 1
+      from pg_indexes
+     where schemaname = 'public'
+       and tablename = 'review_addon_usage'
+       and indexdef ~ '\(user_id, consumed_at\)'
+  ),
+  'review_addon_usage indexes (user_id, consumed_at)');
+
+-- 36 · defense in depth: direct table access is still behind RLS
+select is(
+  (select relrowsecurity
+     from pg_class c
+     join pg_namespace n on n.oid = c.relnamespace
+    where n.nspname = 'public'
+      and c.relname = 'review_addon_usage'),
+  true,
+  'review_addon_usage has RLS enabled');
+
+-- 37 · neither browser-facing role has any direct table privilege
+select ok(
+  not has_table_privilege('anon', 'public.review_addon_usage', 'SELECT')
+  and not has_table_privilege('anon', 'public.review_addon_usage', 'INSERT')
+  and not has_table_privilege('authenticated', 'public.review_addon_usage', 'SELECT')
+  and not has_table_privilege('authenticated', 'public.review_addon_usage', 'INSERT')
+  and not has_table_privilege('authenticated', 'public.review_addon_usage', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.review_addon_usage', 'DELETE'),
+  'browser roles have no review_addon_usage table access');
+
+-- 38 · the API service role can maintain the ledger
+select ok(
+  has_table_privilege('service_role', 'public.review_addon_usage', 'SELECT')
+  and has_table_privilege('service_role', 'public.review_addon_usage', 'INSERT')
+  and has_table_privilege('service_role', 'public.review_addon_usage', 'DELETE')
+  and not has_table_privilege('service_role', 'public.review_addon_usage', 'UPDATE')
+  and not has_table_privilege('service_role', 'public.review_addon_usage', 'TRUNCATE'),
+  'service_role has only the table privileges needed to maintain usage');
+
+-- 39 · the identity sequence is not browser-accessible
+select ok(
+  not has_sequence_privilege(
+    'anon',
+    'public.review_addon_usage_id_seq',
+    'USAGE')
+  and not has_sequence_privilege(
+    'authenticated',
+    'public.review_addon_usage_id_seq',
+    'USAGE'),
+  'browser roles cannot use the review_addon_usage sequence');
+
+-- 40 · service_role owns the corresponding sequence path
+select ok(
+  has_sequence_privilege(
+    'service_role',
+    'public.review_addon_usage_id_seq',
+    'USAGE'),
+  'service_role can use the review_addon_usage sequence');
+
+delete from public.review_addon_usage;
+create temporary table review_addon_results (
+  name text primary key,
+  payload jsonb not null
+);
+
+insert into review_addon_results values
+  ('first', public.consume_review_addon_slot(
+    'd1000000-0000-4000-a000-000000000001', 2)),
+  ('second', public.consume_review_addon_slot(
+    'd1000000-0000-4000-a000-000000000001', 2)),
+  ('third', public.consume_review_addon_slot(
+    'd1000000-0000-4000-a000-000000000001', 2));
+
+-- 41 · the first slot through the configured quota is admitted
+select is(
+  (select payload->>'allowed' from review_addon_results where name = 'first'),
+  'true',
+  'the first add-on slot is allowed');
+
+-- 42 · the final slot through the configured quota is admitted
+select is(
+  (select payload->>'allowed' from review_addon_results where name = 'second'),
+  'true',
+  'the quota-th add-on slot is allowed');
+
+-- 43 · the next slot is denied
+select is(
+  (select payload->>'allowed' from review_addon_results where name = 'third'),
+  'false',
+  'the slot after quota is denied');
+
+-- 44 · denial never inserts another usage event
+select is(
+  (select count(*)
+     from public.review_addon_usage
+    where user_id = 'd1000000-0000-4000-a000-000000000001'),
+  2::bigint,
+  'a denied slot is not consumed');
+
+-- 45 · retry-after is an integer ceiling within the seven-day window
+select ok(
+  (select jsonb_typeof(payload->'retryAfterSec') = 'number'
+          and (payload->>'retryAfterSec')::integer between 1 and 604800
+     from review_addon_results
+    where name = 'third'),
+  'denial returns a positive integer retryAfterSec');
+
+-- 46 · admitted events use database time, not caller input
+select ok(
+  (select bool_and(consumed_at is not null and consumed_at <= pg_catalog.clock_timestamp())
+     from public.review_addon_usage),
+  'admitted usage events receive consumed_at from the database');
+
+-- An event exactly on the boundary is expired and must be pruned before
+-- quota is counted.
+delete from public.review_addon_usage;
+insert into public.review_addon_usage (user_id, consumed_at)
+values (
+  'd1000000-0000-4000-a000-000000000001',
+  pg_catalog.now() - interval '7 days'
+);
+insert into review_addon_results values
+  ('after_expiry', public.consume_review_addon_slot(
+    'd1000000-0000-4000-a000-000000000001', 1));
+
+-- 47 · the boundary-expired event no longer blocks a slot
+select is(
+  (select payload->>'allowed'
+     from review_addon_results
+    where name = 'after_expiry'),
+  'true',
+  'an event at now minus seven days is expired');
+
+-- 48 · expiration is physical pruning, not only a filtered count
+select is(
+  (select count(*)
+     from public.review_addon_usage
+    where user_id = 'd1000000-0000-4000-a000-000000000001'
+      and consumed_at <= pg_catalog.now() - interval '7 days'),
+  0::bigint,
+  'expired usage events are pruned');
+
+-- Each user owns an independent serialized window.
+delete from public.review_addon_usage;
+insert into review_addon_results values
+  ('u1_isolated', public.consume_review_addon_slot(
+    'd1000000-0000-4000-a000-000000000001', 1)),
+  ('u2_isolated', public.consume_review_addon_slot(
+    'd1000000-0000-4000-a000-000000000002', 1));
+
+-- 49 · u1 receives its own slot
+select is(
+  (select payload->>'allowed'
+     from review_addon_results
+    where name = 'u1_isolated'),
+  'true',
+  'the first user receives an isolated slot');
+
+-- 50 · u2 is not denied by u1's usage
+select is(
+  (select payload->>'allowed'
+     from review_addon_results
+    where name = 'u2_isolated'),
+  'true',
+  'the second user has an independent quota');
+
+-- 51 · each user has exactly its own event
+select is(
+  (select count(distinct user_id) from public.review_addon_usage),
+  2::bigint,
+  'usage rows remain isolated by user');
+
+-- 52–54 · quota validation is fail-closed across both bounds and NULL
+select throws_ok(
+  $q$ select public.consume_review_addon_slot(
+        'd1000000-0000-4000-a000-000000000001', 0) $q$,
+  '22023',
+  'review add-on quota must be between 1 and 100',
+  'zero quota is rejected');
+select throws_ok(
+  $q$ select public.consume_review_addon_slot(
+        'd1000000-0000-4000-a000-000000000001', 101) $q$,
+  '22023',
+  'review add-on quota must be between 1 and 100',
+  'quota above 100 is rejected');
+select throws_ok(
+  $q$ select public.consume_review_addon_slot(
+        'd1000000-0000-4000-a000-000000000001', null) $q$,
+  '22023',
+  'review add-on quota must be between 1 and 100',
+  'NULL quota is rejected');
+
+-- 55 · a slot cannot be consumed for a missing public.users row
+select throws_ok(
+  $q$ select public.consume_review_addon_slot(
+        'ffffffff-ffff-4fff-8fff-ffffffffffff', 1) $q$,
+  'P0002',
+  'review add-on user not found',
+  'missing user is rejected');
+
+-- 56 · deleting the public.users owner cascades its usage events
+delete from public.users
+ where id = 'd1000000-0000-4000-a000-000000000002';
+select is(
+  (select count(*)
+     from public.review_addon_usage
+    where user_id = 'd1000000-0000-4000-a000-000000000002'),
+  0::bigint,
+  'deleting public.users cascades review add-on usage');
 
 reset role;
 

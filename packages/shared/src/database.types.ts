@@ -629,6 +629,32 @@ export type Database = {
           },
         ]
       }
+      review_addon_usage: {
+        Row: {
+          consumed_at: string
+          id: number
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string
+          id?: never
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string
+          id?: never
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_addon_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       talk_waitlist: {
         Row: {
           email: string | null
@@ -744,6 +770,10 @@ export type Database = {
         Returns: Json
       }
       consume_export_credit: { Args: { p_user_id: string }; Returns: number }
+      consume_review_addon_slot: {
+        Args: { p_quota: number; p_user_id: string }
+        Returns: Json
+      }
       consume_review_credit: { Args: { p_user_id: string }; Returns: number }
       delete_own_account: { Args: never; Returns: undefined }
       export_my_data: { Args: never; Returns: Json }

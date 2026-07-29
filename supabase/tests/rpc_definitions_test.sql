@@ -15,7 +15,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(56);
+select plan(64);
 
 -- --------------------------------------------------------------------------
 -- Functions exist
@@ -30,6 +30,11 @@ select has_function('public', 'consume_review_credit', array['uuid']::name[],
   'consume_review_credit(uuid) exists');
 select has_function('public', 'grant_review_credits', array['uuid', 'integer']::name[],
   'grant_review_credits(uuid, integer) exists');
+select has_function(
+  'public',
+  'consume_review_addon_slot',
+  array['uuid', 'integer']::name[],
+  'consume_review_addon_slot(uuid, integer) exists');
 select has_function('public', 'claim_initial_review', array['uuid', 'uuid']::name[],
   'claim_initial_review(uuid, uuid) exists');
 select has_function('public', 'release_initial_review', array['uuid', 'uuid', 'uuid']::name[],
@@ -58,6 +63,12 @@ select function_returns('public', 'consume_review_credit', array['uuid']::name[]
   'consume_review_credit(uuid) returns integer');
 select function_returns('public', 'grant_review_credits', array['uuid', 'integer']::name[], 'integer',
   'grant_review_credits(uuid, integer) returns integer');
+select function_returns(
+  'public',
+  'consume_review_addon_slot',
+  array['uuid', 'integer']::name[],
+  'jsonb',
+  'consume_review_addon_slot(uuid, integer) returns jsonb');
 select function_returns('public', 'claim_initial_review', array['uuid', 'uuid']::name[], 'jsonb',
   'claim_initial_review(uuid, uuid) returns jsonb');
 select function_returns('public', 'release_initial_review', array['uuid', 'uuid', 'uuid']::name[], 'boolean',
@@ -88,6 +99,11 @@ select is_definer('public', 'consume_review_credit', array['uuid']::name[],
   'consume_review_credit(uuid) is security definer');
 select is_definer('public', 'grant_review_credits', array['uuid', 'integer']::name[],
   'grant_review_credits(uuid, integer) is security definer');
+select is_definer(
+  'public',
+  'consume_review_addon_slot',
+  array['uuid', 'integer']::name[],
+  'consume_review_addon_slot(uuid, integer) is security definer');
 select is_definer('public', 'claim_initial_review', array['uuid', 'uuid']::name[],
   'claim_initial_review(uuid, uuid) is security definer');
 select is_definer('public', 'release_initial_review', array['uuid', 'uuid', 'uuid']::name[],
@@ -147,6 +163,25 @@ select ok(
       and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
   ),
   'grant_review_credits() pins search_path');
+select ok(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'consume_review_addon_slot'
+      and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+  ),
+  'consume_review_addon_slot() pins search_path');
+select ok(
+  exists (
+    select 1
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.proname = 'consume_review_addon_slot'
+       and pg_get_functiondef(p.oid) ~* 'for update'
+       and pg_get_functiondef(p.oid) ~* 'ceil'
+  ),
+  'consume_review_addon_slot() locks the user row and ceilings retry-after');
 select ok(
   exists (
     select 1 from pg_proc p
@@ -228,6 +263,24 @@ select ok(
 select ok(
   not has_function_privilege('authenticated', 'public.grant_review_credits(uuid, integer)', 'EXECUTE'),
   'authenticated cannot execute grant_review_credits(uuid, integer)');
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.consume_review_addon_slot(uuid, integer)',
+    'EXECUTE'),
+  'anon cannot execute consume_review_addon_slot(uuid, integer)');
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.consume_review_addon_slot(uuid, integer)',
+    'EXECUTE'),
+  'authenticated cannot execute consume_review_addon_slot(uuid, integer)');
+select ok(
+  has_function_privilege(
+    'service_role',
+    'public.consume_review_addon_slot(uuid, integer)',
+    'EXECUTE'),
+  'service_role can execute consume_review_addon_slot(uuid, integer)');
 select ok(
   not has_function_privilege('anon', 'public.claim_initial_review(uuid, uuid)', 'EXECUTE'),
   'anon cannot execute claim_initial_review(uuid, uuid)');

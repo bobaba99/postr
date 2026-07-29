@@ -137,8 +137,6 @@ export interface ReviewRouterDeps {
   getSupabaseAdmin?: () => SupabaseClient | null;
   getAnthropic?: () => Anthropic | null;
   fetchFn?: typeof fetch;
-  /** Add-on weekly window; default built per D5. */
-  weeklyLimiter?: RequestHandler;
   now?: () => number;
   /** PPTX render seam (Task 18). Default: LibreOffice headless via review/pptx.ts. */
   getPptxRenderer?: () => PptxRenderer;
@@ -180,19 +178,6 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
   const getPptxRenderer = deps.getPptxRenderer ?? defaultGetPptxRenderer;
   const fetchFn = deps.fetchFn ?? fetch;
   const now = deps.now ?? Date.now;
-  // D5: the add-on weekly quota is a plain createRateLimiter instance
-  // (7-day window, daily layer inert), created ONCE here so its buckets
-  // persist across requests. It is invoked manually inside the handler
-  // (the import.ts:484 pattern) because a rejection must not consume a
-  // slot and must surface as 402, not the limiter's own 429.
-  const weeklyLimiter =
-    deps.weeklyLimiter ??
-    createRateLimiter({
-      windowMs: 7 * 24 * 60 * 60 * 1000,
-      maxPerWindow: REVIEW_ADDON_WEEKLY_QUOTA,
-      dailyMs: Number.MAX_SAFE_INTEGER,
-      maxPerDay: Number.MAX_SAFE_INTEGER,
-    });
 
   router.post(
     '/api/review/critique',
@@ -238,13 +223,11 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
                 message: 'ANTHROPIC_API_KEY is missing on the server.',
               })
           : runInitial({
-              req,
               res,
               supabase,
               anthropic,
               fetchFn,
               now,
-              weeklyLimiter,
               user,
               body,
             }));
@@ -464,13 +447,11 @@ function isOwnedReviewTempPath(path: string, userId: string): boolean {
 // ─────────────────────────────────────────────────────────────────────
 
 interface InitialCtx {
-  req: Request;
   res: Response;
   supabase: SupabaseClient;
   anthropic: Anthropic | null;
   fetchFn: typeof fetch;
   now: () => number;
-  weeklyLimiter: RequestHandler;
   user: User;
   body: CritiqueBody;
 }
@@ -484,6 +465,29 @@ type InitialReviewRpcResult =
       stage: 'initial' | 'closed';
       critique: CritiqueResult;
     };
+
+type ReviewAddonSlotRpcResult =
+  | { allowed: true }
+  | { allowed: false; retryAfterSec: number };
+
+function parseReviewAddonSlotRpcResult(
+  raw: unknown,
+): ReviewAddonSlotRpcResult | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  if (value.allowed === true) return { allowed: true };
+  if (
+    value.allowed === false &&
+    Number.isSafeInteger(value.retryAfterSec) &&
+    (value.retryAfterSec as number) >= 1
+  ) {
+    return {
+      allowed: false,
+      retryAfterSec: value.retryAfterSec as number,
+    };
+  }
+  return null;
+}
 
 function parseInitialReviewRpcResult(raw: unknown): InitialReviewRpcResult | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -555,7 +559,7 @@ async function releaseInitialReviewClaim(
 }
 
 async function runInitial(ctx: InitialCtx): Promise<Response> {
-  const { req, res, supabase, anthropic, fetchFn, now, weeklyLimiter, user, body } = ctx;
+  const { res, supabase, anthropic, fetchFn, now, user, body } = ctx;
   // Legacy first-party callers that predate requestKey remain functional,
   // while the web client always supplies and reuses its own key on retry.
   const requestKey = body.requestKey ?? randomUUID();
@@ -612,15 +616,41 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
 
     let creditSource: 'pack' | 'subscription_addon';
     if (row.review_addon === true && isTermActive(row, now())) {
-      // Add-on path: weekly window, invoked manually (D5). The limiter
-      // records the slot at this pre-check, so a FAILED model call still
-      // consumes the slot (D17 — accepted: slots are a soft cap).
-      const slot = weeklySlotAllowed(weeklyLimiter, req, res);
+      // The claim above makes same-key replays free. A fresh active add-on
+      // request then consumes one persistent slot before page/provider work;
+      // later provider failure intentionally does not refund it (D17).
+      let slotRaw: unknown;
+      let slotError: { message?: string } | null = null;
+      try {
+        const response = await supabase.rpc(
+          'consume_review_addon_slot' as never,
+          {
+            p_user_id: user.id,
+            p_quota: REVIEW_ADDON_WEEKLY_QUOTA,
+          } as never,
+        );
+        slotRaw = response.data;
+        slotError = response.error;
+      } catch (err) {
+        slotError = {
+          message: err instanceof Error ? err.message : 'quota rpc crashed',
+        };
+      }
+      const slot = parseReviewAddonSlotRpcResult(slotRaw);
+      if (slotError || !slot) {
+        // eslint-disable-next-line no-console
+        console.error('[review.critique] consume_review_addon_slot rpc failed', {
+          userId: user.id,
+          message: slotError?.message ?? 'invalid rpc response',
+        });
+        return res.status(500).json({ error: 'review_internal' });
+      }
       if (!slot.allowed) {
+        res.setHeader('Retry-After', String(slot.retryAfterSec));
         return res.status(402).json({
           error: 'review_payment_required',
           reason: 'weekly_quota_exceeded',
-          ...(slot.retryAfterSec !== undefined ? { retryAfterSec: slot.retryAfterSec } : {}),
+          retryAfterSec: slot.retryAfterSec,
         });
       }
       creditSource = 'subscription_addon';
@@ -1005,39 +1035,6 @@ function isTermActive(row: EntitlementRow, nowMs: number): boolean {
   const expiresMs = new Date(row.plan_expires_at).getTime();
   if (!Number.isFinite(expiresMs) || expiresMs <= nowMs) return false;
   return !['canceled', 'unpaid', 'incomplete_expired'].includes(row.subscription_status ?? '');
-}
-
-/**
- * Invoke the weekly add-on limiter manually (the import.ts:484
- * pattern), but capture its 429 instead of letting it own the response:
- * a quota rejection here is a BILLING state, so the client sees 402
- * review_payment_required with the limiter's Retry-After surfaced as
- * retryAfterSec — not a generic 429. The capture object must carry
- * `locals` because createRateLimiter reads res.locals.user.
- */
-function weeklySlotAllowed(
-  limiter: RequestHandler,
-  req: Request,
-  res: Response,
-): { allowed: true } | { allowed: false; retryAfterSec?: number } {
-  let allowed = false;
-  let retryAfterSec: number | undefined;
-  const capture = {
-    locals: res.locals,
-    setHeader(name: string, value: string) {
-      if (name.toLowerCase() === 'retry-after') {
-        const parsed = Number(value);
-        if (Number.isFinite(parsed)) retryAfterSec = parsed;
-      }
-    },
-    status(_code: number) {
-      return { json: (_body: unknown) => undefined };
-    },
-  } as unknown as Response;
-  limiter(req, capture, () => {
-    allowed = true;
-  });
-  return allowed ? { allowed: true } : { allowed: false, retryAfterSec };
 }
 
 // ─────────────────────────────────────────────────────────────────────

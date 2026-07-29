@@ -7,8 +7,8 @@
 --                      export_credits; credits never expire.
 --   review_addon / review_addon_subscription_id
 --                      the term-subscription add-on granting a weekly review
---                      quota (enforced API-side via createRateLimiter; no
---                      per-review decrement).
+--                      quota. Usage is persisted in review_addon_usage and
+--                      consumed through one serialized service-role RPC.
 --
 -- RLS on poster_reviews is OWNER SELECT-ONLY (D3 — a hardening of the §5.1
 -- draft's owner select/insert/update): every write goes through the API's
@@ -222,7 +222,113 @@ revoke execute on function public.grant_review_credits(uuid, integer)
   from public, anon, authenticated;
 
 -- =========================================================================
--- 5. Retry-idempotent initial-review finalization
+-- 5. Persistent weekly review add-on quota — service_role only
+-- =========================================================================
+-- One row is one consumed initial-review slot. The API never reads or writes
+-- this ledger directly: consume_review_addon_slot serializes each user's
+-- sliding window by locking their public.users row, prunes expired events,
+-- and inserts at database time. RLS plus explicit privilege revocation keeps
+-- both the table and its identity sequence inaccessible to browser roles.
+create table if not exists public.review_addon_usage (
+  id          bigint generated always as identity primary key,
+  user_id     uuid not null references public.users(id) on delete cascade,
+  consumed_at timestamptz not null default pg_catalog.now()
+);
+
+comment on table public.review_addon_usage is
+  'Service-only sliding-window ledger for consumed Presentation Checker '
+  'review add-on slots. Browser roles have no direct access.';
+
+create index if not exists review_addon_usage_user_consumed_at_idx
+  on public.review_addon_usage (user_id, consumed_at);
+
+alter table public.review_addon_usage enable row level security;
+
+revoke all on table public.review_addon_usage
+  from public, anon, authenticated, service_role;
+revoke all on sequence public.review_addon_usage_id_seq
+  from public, anon, authenticated, service_role;
+grant select, insert, delete on table public.review_addon_usage to service_role;
+grant usage on sequence public.review_addon_usage_id_seq to service_role;
+
+create or replace function public.consume_review_addon_slot(
+  p_user_id uuid,
+  p_quota integer
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_now timestamptz;
+  v_count integer;
+  v_oldest timestamptz;
+  v_retry_after_sec integer;
+begin
+  if p_quota is null or p_quota < 1 or p_quota > 100 then
+    raise exception 'review add-on quota must be between 1 and 100'
+      using errcode = '22023';
+  end if;
+
+  -- This row is the per-user mutex. Concurrent calls for the same user
+  -- serialize before either counts or inserts, while different users remain
+  -- independent.
+  perform id
+    from public.users
+   where id = p_user_id
+   for update;
+
+  if not found then
+    raise exception 'review add-on user not found'
+      using errcode = 'P0002';
+  end if;
+
+  -- Acquire real database time only after a possible lock wait. Transaction
+  -- start time would make a queued caller's window stale.
+  v_now := pg_catalog.clock_timestamp();
+
+  delete from public.review_addon_usage
+   where user_id = p_user_id
+     and consumed_at <= v_now - interval '7 days';
+
+  select count(*)::integer, min(consumed_at)
+    into v_count, v_oldest
+    from public.review_addon_usage
+   where user_id = p_user_id;
+
+  if v_count >= p_quota then
+    v_retry_after_sec := greatest(
+      1,
+      pg_catalog.ceil(
+        extract(epoch from (v_oldest + interval '7 days' - v_now))
+      )::integer
+    );
+    return pg_catalog.jsonb_build_object(
+      'allowed', false,
+      'retryAfterSec', v_retry_after_sec
+    );
+  end if;
+
+  insert into public.review_addon_usage (user_id, consumed_at)
+  values (p_user_id, v_now);
+
+  return pg_catalog.jsonb_build_object('allowed', true);
+end;
+$$;
+
+comment on function public.consume_review_addon_slot(uuid, integer) is
+  'Atomically consumes one persistent seven-day review add-on slot and '
+  'returns {allowed:true}, or {allowed:false,retryAfterSec:N}. '
+  'service_role only.';
+
+revoke execute on function public.consume_review_addon_slot(uuid, integer)
+  from public, anon, authenticated;
+grant execute on function public.consume_review_addon_slot(uuid, integer)
+  to service_role;
+
+-- =========================================================================
+-- 6. Retry-idempotent initial-review finalization
 -- =========================================================================
 -- A short-lived claim prevents concurrent requests carrying the same
 -- browser-generated key from both reaching the model. The durable result

@@ -14,12 +14,11 @@
  * injected fetchFn, exactly like the import router tests.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import express, { type RequestHandler } from 'express';
+import express from 'express';
 import request from 'supertest';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createReviewRouter } from '../review.js';
-import { createRateLimiter } from '../rateLimit.js';
 import { REVIEW_ADDON_WEEKLY_QUOTA } from '../review/config.js';
 
 const SUPABASE_URL = 'https://testref.supabase.co';
@@ -77,7 +76,10 @@ function applyFilters<T extends Record<string, unknown>>(rows: T[], filters: EqF
  * select(...).eq(...).single()/maybeSingle(), update(...).eq(...), rpc(...).
  * Awaiting an insert/update directly resolves `{ error: null }`.
  */
-function fakeReviewSupabase(userOverrides: Partial<FakeUserRow> = {}) {
+function fakeReviewSupabase(
+  userOverrides: Partial<FakeUserRow> = {},
+  now: () => number = Date.now,
+) {
   const users: FakeUserRow = {
     id: USER_ID,
     plan: 'free',
@@ -91,6 +93,7 @@ function fakeReviewSupabase(userOverrides: Partial<FakeUserRow> = {}) {
   const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = [];
   const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
   const claims = new Map<string, string>();
+  const addonUsage: number[] = [];
   let reviewSeq = 0;
   let claimSeq = 0;
 
@@ -256,6 +259,30 @@ function fakeReviewSupabase(userOverrides: Partial<FakeUserRow> = {}) {
           error: null,
         });
       }
+      if (fn === 'consume_review_addon_slot') {
+        const quota = Number(args.p_quota);
+        const nowMs = now();
+        const cutoff = nowMs - WEEK_MS;
+        while (addonUsage.length > 0 && addonUsage[0]! <= cutoff) {
+          addonUsage.shift();
+        }
+        if (addonUsage.length >= quota) {
+          return Promise.resolve({
+            data: {
+              allowed: false,
+              retryAfterSec: Math.ceil(
+                (addonUsage[0]! + WEEK_MS - nowMs) / 1000,
+              ),
+            },
+            error: null,
+          });
+        }
+        addonUsage.push(nowMs);
+        return Promise.resolve({
+          data: { allowed: true },
+          error: null,
+        });
+      }
       if (fn !== 'finalize_initial_review') {
         return Promise.resolve({
           data: null,
@@ -309,7 +336,7 @@ function fakeReviewSupabase(userOverrides: Partial<FakeUserRow> = {}) {
     },
   } as unknown as SupabaseClient;
 
-  return { client, users, reviews, rpcs, updates };
+  return { client, users, reviews, rpcs, updates, addonUsage };
 }
 
 // ---- Anthropic SDK-layer fake + contract-valid fixtures -------------------
@@ -396,7 +423,6 @@ function pngFetch() {
 function buildApp(deps: {
   supabase: SupabaseClient;
   anthropic: Anthropic;
-  weeklyLimiter?: RequestHandler;
   now?: () => number;
 }) {
   const app = express();
@@ -406,7 +432,6 @@ function buildApp(deps: {
       getSupabaseAdmin: () => deps.supabase,
       getAnthropic: () => deps.anthropic,
       fetchFn: pngFetch() as unknown as typeof fetch,
-      ...(deps.weeklyLimiter ? { weeklyLimiter: deps.weeklyLimiter } : {}),
       ...(deps.now ? { now: deps.now } : {}),
     }),
   );
@@ -566,15 +591,6 @@ describe('POST /api/review/critique — no charge on model failure (D6)', () => 
 describe('POST /api/review/critique — add-on weekly window (D5/D17)', () => {
   it('initials consume weekly slots, the follow-up does not, exhaustion 402s, reset re-opens', async () => {
     let nowMs = 1_800_000_000_000; // fixed fake clock, injected everywhere
-    // The REAL limiter from rateLimit.ts (D5 writes no new rate-limit
-    // code), driven by the injected clock.
-    const weeklyLimiter = createRateLimiter({
-      windowMs: WEEK_MS,
-      maxPerWindow: REVIEW_ADDON_WEEKLY_QUOTA,
-      dailyMs: Number.MAX_SAFE_INTEGER,
-      maxPerDay: Number.MAX_SAFE_INTEGER,
-      now: () => nowMs,
-    });
     const sb = fakeReviewSupabase({
       plan: 'term',
       // Term-active per D4 (plan + future expiry + non-terminal status).
@@ -582,10 +598,10 @@ describe('POST /api/review/critique — add-on weekly window (D5/D17)', () => {
       subscription_status: 'active',
       review_addon: true,
       review_credits: 0,
-    });
+    }, () => nowMs);
     const { create, client: anthropic } = fakeAnthropic();
     create.mockResolvedValue(toolReply(INITIAL_CRITIQUE));
-    const app = buildApp({ supabase: sb.client, anthropic, weeklyLimiter, now: () => nowMs });
+    const app = buildApp({ supabase: sb.client, anthropic, now: () => nowMs });
 
     // Slot 1 — an initial critique.
     const first = await postCritique(app, { sourceKind: 'image', pages: ONE_PAGE });
@@ -602,6 +618,9 @@ describe('POST /api/review/critique — add-on weekly window (D5/D17)', () => {
     });
     expect(followup.status).toBe(200);
     expect(followup.body.stage).toBe('closed');
+    expect(
+      sb.rpcs.filter((rpc) => rpc.fn === 'consume_review_addon_slot'),
+    ).toHaveLength(1);
 
     // Slots 2..N — one per initial, all inside the same window.
     for (let i = 2; i <= REVIEW_ADDON_WEEKLY_QUOTA; i++) {
@@ -614,9 +633,8 @@ describe('POST /api/review/critique — add-on weekly window (D5/D17)', () => {
     expect(over.status).toBe(402);
     expect(over.body.error).toBe('review_payment_required');
     expect(over.body.reason).toBe('weekly_quota_exceeded');
-    expect(
-      over.body.retryAfterSec === undefined || typeof over.body.retryAfterSec === 'number',
-    ).toBe(true);
+    expect(typeof over.body.retryAfterSec).toBe('number');
+    expect(over.headers['retry-after']).toBe(String(over.body.retryAfterSec));
 
     // The add-on path never decrements pack credits (D4).
     expect(
