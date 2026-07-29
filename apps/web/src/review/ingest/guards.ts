@@ -62,15 +62,17 @@ export function isCanvasBlank(imageData: { data: Uint8ClampedArray }): boolean {
   const totalPixels = Math.floor(data.length / 4);
   if (totalPixels === 0) return true;
   const stride = Math.max(1, Math.floor(totalPixels / BLANK_SAMPLE_COUNT));
-  let min = 255;
-  let max = 0;
+  const minimumChannels: [number, number, number] = [255, 255, 255];
+  const maximumChannels: [number, number, number] = [0, 0, 0];
   for (let p = 0; p < totalPixels; p += stride) {
     const i = p * 4;
     for (let c = 0; c < 3; c++) {
       const v = data[i + c]!;
-      if (v < min) min = v;
-      if (v > max) max = v;
+      if (v < minimumChannels[c]!) minimumChannels[c] = v;
+      if (v > maximumChannels[c]!) maximumChannels[c] = v;
     }
   }
-  return max - min <= BLANK_CHANNEL_RANGE;
+  return minimumChannels.every(
+    (minimum, channel) => maximumChannels[channel]! - minimum <= BLANK_CHANNEL_RANGE,
+  );
 }
