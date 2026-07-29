@@ -11,10 +11,10 @@ export async function downloadLocalPreviewUrl(
   opts: {
     fetchFn?: typeof fetch;
     createObjectUrl?: (blob: Blob) => string;
+    validateBlob?: (blob: Blob) => void | Promise<void>;
   } = {},
 ): Promise<string | undefined> {
   const createObjectUrl = opts.createObjectUrl ?? URL.createObjectURL?.bind(URL);
-  if (!createObjectUrl) return undefined;
   const response = await (opts.fetchFn ?? fetch)(signedUrl, {
     credentials: 'omit',
     redirect: 'error',
@@ -24,7 +24,9 @@ export async function downloadLocalPreviewUrl(
   if (!contentType.startsWith('image/')) {
     throw new Error(`preview fetch returned ${contentType || 'unknown content'}`);
   }
-  return createObjectUrl(await response.blob());
+  const blob = await response.blob();
+  await opts.validateBlob?.(blob);
+  return createObjectUrl?.(blob);
 }
 
 export function revokePagePreviews(pages: PageImage[]): void {

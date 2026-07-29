@@ -4,13 +4,22 @@
  * kept (importOriginal) so the instanceof error mapping is exercised
  * for real.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockPostJson, mockUpload, mockCreateSignedUrl, mockRemove } = vi.hoisted(() => ({
+const {
+  mockPostJson,
+  mockUpload,
+  mockCreateSignedUrl,
+  mockRemove,
+  mockRasterizeImage,
+  mockReleaseCanvas,
+} = vi.hoisted(() => ({
   mockPostJson: vi.fn(),
   mockUpload: vi.fn(),
   mockCreateSignedUrl: vi.fn(),
   mockRemove: vi.fn(),
+  mockRasterizeImage: vi.fn(),
+  mockReleaseCanvas: vi.fn(),
 }));
 
 vi.mock('@/lib/apiClient', async (importOriginal) => ({
@@ -28,6 +37,11 @@ vi.mock('@/lib/supabase', () => ({
       }),
     },
   },
+}));
+
+vi.mock('@/import/imageImport', () => ({
+  rasterizeImage: mockRasterizeImage,
+  releaseCanvas: mockReleaseCanvas,
 }));
 
 import { ApiError } from '@/lib/apiClient';
@@ -49,14 +63,39 @@ function pptxFile(name = 'deck.pptx'): File {
   return new File(['pptx-bytes'], name, { type: PPTX_MIME });
 }
 
+function fakeCanvas(data: Uint8ClampedArray): HTMLCanvasElement {
+  return {
+    width: 2,
+    height: 2,
+    getContext: () => ({
+      getImageData: () => ({ data }),
+    }),
+  } as unknown as HTMLCanvasElement;
+}
+
+const NON_BLANK = new Uint8ClampedArray([
+  255, 255, 255, 255, 255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255,
+]);
+const ALL_WHITE = new Uint8ClampedArray(2 * 2 * 4).fill(255);
+
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  mockRasterizeImage.mockImplementation(async () => ({
+    canvas: fakeCanvas(NON_BLANK),
+    pageWidthPt: 1,
+    pageHeightPt: 1,
+  }));
   mockUpload.mockResolvedValue({ error: null });
   mockCreateSignedUrl.mockResolvedValue({
     data: { signedUrl: 'https://signed/raw-pptx' },
     error: null,
   });
   mockRemove.mockResolvedValue({ data: null, error: null });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('fromPptx', () => {
@@ -154,6 +193,103 @@ describe('fromPptx', () => {
     expect(artifact.pages[0]!.previewUrl).toBe(
       'blob:https://postr.test/pptx-page-1',
     );
+  });
+
+  it('rejects a blank slide and removes every rendered page preview and path', async () => {
+    const secondPage = {
+      ...VALID_RENDERED_PAGE,
+      pageNumber: 2,
+      storagePath: 'u1/review-temp/rendered/page-2.jpg',
+      url: 'https://signed/p2',
+    };
+    mockPostJson.mockResolvedValue({
+      pages: [VALID_RENDERED_PAGE, secondPage],
+    });
+    const firstCanvas = fakeCanvas(NON_BLANK);
+    const secondCanvas = fakeCanvas(ALL_WHITE);
+    mockRasterizeImage
+      .mockResolvedValueOnce({
+        canvas: firstCanvas,
+        pageWidthPt: 1,
+        pageHeightPt: 1,
+      })
+      .mockResolvedValueOnce({
+        canvas: secondCanvas,
+        pageWidthPt: 1,
+        pageHeightPt: 1,
+      });
+    const fetchFn = vi.fn().mockImplementation(async () =>
+      new Response(new Blob(['jpeg'], { type: 'image/jpeg' }), {
+        status: 200,
+        headers: { 'content-type': 'image/jpeg' },
+      }),
+    );
+    const createObjectUrl = vi
+      .fn()
+      .mockReturnValueOnce('blob:https://postr.test/pptx-page-1')
+      .mockReturnValueOnce('blob:https://postr.test/pptx-page-2');
+
+    let caught: unknown;
+    try {
+      await fromPptx(pptxFile(), CTX, {
+        fetchFn: fetchFn as unknown as typeof fetch,
+        createObjectUrl,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toMatchObject({
+      name: 'IngestError',
+      kind: 'blank-render',
+    });
+    expect((caught as Error).message).toMatch(/slide 2.*blank/i);
+    expect(mockReleaseCanvas).toHaveBeenCalledWith(firstCanvas);
+    expect(mockReleaseCanvas).toHaveBeenCalledWith(secondCanvas);
+    expect(createObjectUrl).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(
+      'blob:https://postr.test/pptx-page-1',
+    );
+    expect(mockRemove).toHaveBeenCalledWith([
+      VALID_RENDERED_PAGE.storagePath,
+      secondPage.storagePath,
+    ]);
+    expect(mockRemove).toHaveBeenCalledWith([RAW_PATH]);
+  });
+
+  it('maps a malformed rendered slide to server-render-failed and removes its path', async () => {
+    mockPostJson.mockResolvedValue({ pages: [VALID_RENDERED_PAGE] });
+    mockRasterizeImage.mockRejectedValue(new Error('decode failed'));
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(new Blob(['not-an-image'], { type: 'image/jpeg' }), {
+        status: 200,
+        headers: { 'content-type': 'image/jpeg' },
+      }),
+    );
+    const createObjectUrl = vi.fn();
+
+    let caught: unknown;
+    try {
+      await fromPptx(pptxFile(), CTX, {
+        fetchFn: fetchFn as unknown as typeof fetch,
+        createObjectUrl,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toMatchObject({
+      name: 'IngestError',
+      kind: 'server-render-failed',
+    });
+    expect((caught as Error).message).toBe(
+      "We couldn't read that file. Try exporting it as a PDF and upload that instead.",
+    );
+    expect(createObjectUrl).not.toHaveBeenCalled();
+    expect(mockRemove).toHaveBeenCalledWith([
+      VALID_RENDERED_PAGE.storagePath,
+    ]);
+    expect(mockRemove).toHaveBeenCalledWith([RAW_PATH]);
   });
 
   it("maps the route's too_many_pages body to too-many-pages", async () => {

@@ -22,6 +22,7 @@ import {
   downloadLocalPreviewUrl,
   revokePagePreviews,
 } from './localPreview';
+import { assertReviewPageBlobNotBlank } from './pageBlobPreflight';
 import { removeReviewPages } from './uploadReviewPage';
 
 const BUCKET = 'poster-assets';
@@ -154,7 +155,14 @@ export async function fromPptx(
     const pageImages: PageImage[] = [];
     try {
       for (const page of pages) {
-        const previewUrl = await downloadLocalPreviewUrl(page.url, previewOpts);
+        const previewUrl = await downloadLocalPreviewUrl(page.url, {
+          ...previewOpts,
+          validateBlob: (blob) =>
+            assertReviewPageBlobNotBlank(
+              blob,
+              `Slide ${page.pageNumber} of that deck looks blank — the checker needs something to read. Check the file and try again.`,
+            ),
+        });
         pageImages.push({
           pageNumber: page.pageNumber,
           storagePath: page.storagePath,
@@ -164,9 +172,12 @@ export async function fromPptx(
           heightPx: page.heightPx,
         });
       }
-    } catch {
+    } catch (error) {
       revokePagePreviews(pageImages);
       await removeReviewPages(pages.map((page) => page.storagePath));
+      if (error instanceof IngestError && error.kind === 'blank-render') {
+        throw error;
+      }
       throw new IngestError(
         SERVER_RENDER_FAILED_MESSAGE,
         'server-render-failed',

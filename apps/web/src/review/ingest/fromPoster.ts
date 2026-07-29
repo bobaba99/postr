@@ -6,8 +6,13 @@
  */
 import type { PosterDoc } from '@postr/shared';
 import { captureReviewImage } from '@/data/thumbnails';
-import { createLocalPreviewUrl } from './localPreview';
+import {
+  createLocalPreviewUrl,
+  revokePagePreviews,
+} from './localPreview';
+import { assertReviewPageBlobNotBlank } from './pageBlobPreflight';
 import { IngestError, type NormalizedArtifact, type PageImage } from './types';
+import { removeReviewPages } from './uploadReviewPage';
 
 /** captureReviewImage lands the long edge at 2048px (D11). */
 const REVIEW_LONG_EDGE_PX = 2048;
@@ -45,6 +50,20 @@ export async function fromPoster(
     ...(previewUrl ? { previewUrl } : {}),
     ...reviewPixelDims(doc),
   };
+  try {
+    await assertReviewPageBlobNotBlank(
+      capture.blob,
+      'That poster capture looks blank — the checker needs something to read. Reopen it in the editor and try again.',
+    );
+  } catch (error) {
+    revokePagePreviews([page]);
+    await removeReviewPages([capture.path]);
+    if (error instanceof IngestError) throw error;
+    throw new IngestError(
+      "We couldn't capture the poster — reopen it in the editor and try again.",
+      'unreadable-file',
+    );
+  }
   return {
     pages: [page],
     posterDoc: doc,
