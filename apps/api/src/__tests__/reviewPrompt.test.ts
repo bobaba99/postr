@@ -199,6 +199,66 @@ describe('buildFollowupUserMessage', () => {
 });
 
 describe('CRITIQUE_TOOL_INPUT_SCHEMA', () => {
+  it('encodes each strict anchor variant under nested anyOf', () => {
+    type AnchorKind = 'block' | 'region' | 'slide';
+    type AnchorVariant = {
+      required: readonly string[];
+      additionalProperties: boolean;
+      properties: {
+        kind: { enum: readonly AnchorKind[] };
+      };
+    };
+
+    const anchor = CRITIQUE_TOOL_INPUT_SCHEMA.properties.findings.items
+      .properties.anchor as unknown as {
+      anyOf?: readonly AnchorVariant[];
+    };
+    expect(anchor.anyOf).toHaveLength(3);
+
+    const variants = anchor.anyOf ?? [];
+    const findVariant = (kind: AnchorKind): AnchorVariant => {
+      const variant = variants.find(({ properties }) =>
+        properties.kind.enum.includes(kind),
+      );
+      expect(variant).toBeDefined();
+      return variant!;
+    };
+
+    expect(findVariant('block')).toEqual({
+      type: 'object',
+      required: ['kind', 'blockId'],
+      additionalProperties: false,
+      properties: {
+        kind: { type: 'string', enum: ['block'] },
+        blockId: { type: 'string', minLength: 1 },
+      },
+    });
+    expect(findVariant('region')).toEqual({
+      type: 'object',
+      required: ['kind', 'page', 'bbox'],
+      additionalProperties: false,
+      properties: {
+        kind: { type: 'string', enum: ['region'] },
+        page: { type: 'integer', minimum: 1 },
+        bbox: {
+          type: 'array',
+          items: { type: 'number' },
+          minItems: 4,
+          maxItems: 4,
+        },
+      },
+    });
+    expect(findVariant('slide')).toEqual({
+      type: 'object',
+      required: ['kind', 'page'],
+      additionalProperties: false,
+      properties: {
+        kind: { type: 'string', enum: ['slide'] },
+        page: { type: 'integer', minimum: 1 },
+      },
+    });
+  });
+
   it('derives the category enum from the rubric taxonomy', () => {
     const categories =
       CRITIQUE_TOOL_INPUT_SCHEMA.properties.findings.items.properties

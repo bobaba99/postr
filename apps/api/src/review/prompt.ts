@@ -147,12 +147,8 @@ export function buildFollowupUserMessage(input: {
 }
 
 /**
- * Forced tool-use input schema — mirrors the Zod contract in schema.ts
- * (validateCritique is the enforcement; this is the model-facing shape).
- * The category enum is built from CURRENT_RUBRIC.issueCategories so the
- * taxonomy stays single-source (§2.0). The anchor stays a loose object
- * here — tool input schemas cannot express a discriminated union —
- * and schema.ts validates the strict union afterwards.
+ * Anthropic rejects top-level input-schema unions, so the strict anchor
+ * union lives under its property, where nested `anyOf` is supported.
  */
 export const CRITIQUE_TOOL_INPUT_SCHEMA = {
   type: 'object',
@@ -197,19 +193,41 @@ export const CRITIQUE_TOOL_INPUT_SCHEMA = {
             enum: [...CURRENT_RUBRIC.issueCategories],
           },
           anchor: {
-            type: 'object',
-            required: ['kind'],
-            properties: {
-              kind: { type: 'string', enum: ['block', 'region', 'slide'] },
-              blockId: { type: 'string' },
-              page: { type: 'integer', minimum: 1 },
-              bbox: {
-                type: 'array',
-                items: { type: 'number' },
-                minItems: 4,
-                maxItems: 4,
+            anyOf: [
+              {
+                type: 'object',
+                required: ['kind', 'blockId'],
+                additionalProperties: false,
+                properties: {
+                  kind: { type: 'string', enum: ['block'] },
+                  blockId: { type: 'string', minLength: 1 },
+                },
               },
-            },
+              {
+                type: 'object',
+                required: ['kind', 'page', 'bbox'],
+                additionalProperties: false,
+                properties: {
+                  kind: { type: 'string', enum: ['region'] },
+                  page: { type: 'integer', minimum: 1 },
+                  bbox: {
+                    type: 'array',
+                    items: { type: 'number' },
+                    minItems: 4,
+                    maxItems: 4,
+                  },
+                },
+              },
+              {
+                type: 'object',
+                required: ['kind', 'page'],
+                additionalProperties: false,
+                properties: {
+                  kind: { type: 'string', enum: ['slide'] },
+                  page: { type: 'integer', minimum: 1 },
+                },
+              },
+            ],
           },
           action: {
             type: 'string',
