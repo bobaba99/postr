@@ -37,7 +37,7 @@ import type { User } from '@supabase/supabase-js';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 import { usePlan, type PlanState } from '@/hooks/usePlan';
-import { openBillingPortal } from '@/data/billing';
+import { openBillingPortal, requestRefund } from '@/data/billing';
 
 type ConfirmAction =
   | 'deletePosters'
@@ -1065,6 +1065,8 @@ function DangerAction({
 
 function SubscriptionPanel({ plan }: { plan: PlanState }) {
   const [opening, setOpening] = useState(false);
+  const [refunding, setRefunding] = useState(false);
+  const [refundMsg, setRefundMsg] = useState<string | null>(null);
 
   const handleManage = async () => {
     setOpening(true);
@@ -1073,6 +1075,30 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
     const url = await openBillingPortal();
     window.open(url, '_blank', 'noopener,noreferrer');
     setOpening(false);
+  };
+
+  // Request a refund. The server decides eligibility; we surface the
+  // outcome. A generic message on failure per the house error rule, but the
+  // specific 409 reasons are mapped to something actionable.
+  const handleRefund = async (kind: 'term' | 'pack') => {
+    setRefunding(true);
+    setRefundMsg(null);
+    try {
+      const { amountCents } = await requestRefund(kind);
+      setRefundMsg(`Refunded CA$${(amountCents / 100).toFixed(2)}. It may take a few days to appear.`);
+    } catch (err) {
+      // Map known eligibility reasons; fall back to generic.
+      const reason = (err as { body?: { error?: string } })?.body?.error;
+      const map: Record<string, string> = {
+        window_expired: 'The 14-day refund window has passed. You can cancel anytime to stop renewals.',
+        already_used: 'This term isn’t refundable once you’ve taken a paid export.',
+        no_unused_credits: 'You have no unused credits to refund.',
+        no_pack_purchase: 'No refundable pack purchase found.',
+      };
+      setRefundMsg(reason && map[reason] ? map[reason] : 'We couldn’t process that refund. Please try again or contact support.');
+    } finally {
+      setRefunding(false);
+    }
   };
 
   if (plan.loading) {
@@ -1096,14 +1122,29 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
           The term renews every 4 months. Manage it — update your card, see
           receipts, or cancel — through Stripe, which handles billing for Postr.
         </p>
-        <button
-          type="button"
-          onClick={handleManage}
-          disabled={opening}
-          className="rounded-md border border-[#2a2a3a] bg-[#111118] px-4 py-2 text-[14pt] font-medium text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] disabled:opacity-50"
-        >
-          {opening ? 'Opening…' : 'Manage subscription ↗'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleManage}
+            disabled={opening}
+            className="rounded-md border border-[#2a2a3a] bg-[#111118] px-4 py-2 text-[14pt] font-medium text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] disabled:opacity-50"
+          >
+            {opening ? 'Opening…' : 'Manage subscription ↗'}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRefund('term')}
+            disabled={refunding}
+            className="rounded-md border border-[#2a2a3a] bg-transparent px-4 py-2 text-[14pt] font-medium text-[#9ca3af] hover:border-[#7c6aed] hover:text-[#fff] disabled:opacity-50"
+          >
+            {refunding ? 'Processing…' : 'Request refund'}
+          </button>
+        </div>
+        <p className="text-[13pt] text-[#6b7280]">
+          Refundable in full within 14 days of your charge if you haven’t
+          taken a paid export.
+        </p>
+        {refundMsg && <p className="text-[13pt] text-[#a3a7b3]">{refundMsg}</p>}
       </div>
     );
   }
@@ -1133,6 +1174,22 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
             ? `${plan.credits} PowerPoint or LaTeX export${plan.credits === 1 ? '' : 's'} left — credits never expire.`
             : 'From a $9.99 export pack. Credits never expire once purchased.'}
         </p>
+        {hasCredits && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => handleRefund('pack')}
+              disabled={refunding}
+              className="rounded-md border border-[#2a2a3a] bg-transparent px-3 py-1.5 text-[13pt] font-medium text-[#9ca3af] hover:border-[#7c6aed] hover:text-[#fff] disabled:opacity-50"
+            >
+              {refunding ? 'Processing…' : `Refund ${plan.credits} unused credit${plan.credits === 1 ? '' : 's'}`}
+            </button>
+            <p className="mt-1 text-[12pt] text-[#6b7280]">
+              CA$3.33 per unused credit. Refunding removes them from your account.
+            </p>
+            {refundMsg && <p className="mt-1 text-[13pt] text-[#a3a7b3]">{refundMsg}</p>}
+          </div>
+        )}
       </div>
 
       <p className="text-[14pt] text-[#6b7280]">

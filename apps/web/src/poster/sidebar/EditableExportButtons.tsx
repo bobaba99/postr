@@ -90,6 +90,13 @@ export function EditableExportButtons({
   const plan = usePlan();
   const navigate = useNavigate();
   const [state, setState] = useState<ExportState>(IDLE);
+  // EU right-of-withdrawal waiver: to enforce "no refund once you've
+  // exported" against EU buyers, they must expressly consent to immediate
+  // performance and acknowledge losing the 14-day withdrawal right. Gate
+  // the buy buttons on this (shown only in the paywall). Non-EU users are
+  // unaffected legally, but a single clear checkbox for everyone is simplest
+  // and honest.
+  const [withdrawalAck, setWithdrawalAck] = useState(false);
 
   // The paywall (docs/plans/2026-07-28-payment-and-paywall.md): editable
   // exports are paid. Unlock on an active term (unlimited) or an export
@@ -247,8 +254,31 @@ export function EditableExportButtons({
             CA$18.99 term (renews every 4 months, cancel anytime), or a CA$9.99
             3-export pack whose credits never expire.
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          {/* EU right-of-withdrawal waiver (required to enforce the refund
+              policy). Gates the buy buttons. */}
+          <label
+            htmlFor="withdrawal-ack"
+            style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 12, cursor: 'pointer' }}
+          >
+            <input
+              id="withdrawal-ack"
+              type="checkbox"
+              checked={withdrawalAck}
+              onChange={(e) => setWithdrawalAck(e.target.checked)}
+              style={{ marginTop: 2, accentColor: '#7c6aed', width: 15, height: 15, flexShrink: 0 }}
+            />
+            <span style={{ fontSize: 11.5, color: '#8b8f99', lineHeight: 1.45 }}>
+              I want access right away and understand I lose my 14-day refund
+              right once I take a paid export.{' '}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#9b8cf0' }}>
+                Refund terms
+              </a>
+              .
+            </span>
+          </label>
+          <div style={{ display: 'flex', gap: 8, opacity: withdrawalAck ? 1 : 0.5 }}>
             <button
+              disabled={!withdrawalAck}
               onClick={() => startCheckout('term')}
               style={{
                 flex: 1,
@@ -259,12 +289,13 @@ export function EditableExportButtons({
                 color: '#fff',
                 fontSize: 13,
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: withdrawalAck ? 'pointer' : 'not-allowed',
               }}
             >
               Get the term
             </button>
             <button
+              disabled={!withdrawalAck}
               onClick={() => startCheckout('pack')}
               style={{
                 flex: 1,
@@ -275,7 +306,7 @@ export function EditableExportButtons({
                 color: '#c8cad0',
                 fontSize: 13,
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: withdrawalAck ? 'pointer' : 'not-allowed',
               }}
             >
               Get the pack
