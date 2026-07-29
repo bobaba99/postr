@@ -123,15 +123,16 @@ describe('requestCritique', () => {
     postJsonMock.mockRejectedValue(
       new ApiError('rate_limited', 429, { error: 'rate_limited' }, 90),
     );
+    const basePage = BODY.pages[0]!;
     const body = {
       ...BODY,
       pages: [
         {
-          ...BODY.pages[0],
+          ...basePage,
           storagePath: 'user-1/review-temp/session-1/page-1.jpg',
         },
         {
-          ...BODY.pages[0],
+          ...basePage,
           pageNumber: 2,
           storagePath: 'user-1/poster-1/review-capture.jpg',
         },
