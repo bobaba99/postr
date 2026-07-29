@@ -119,6 +119,8 @@ const CritiqueRequest = z.object({
   reviewId: z.string().uuid().optional(),
   /** Browser-generated idempotency key for one logical initial review. */
   requestKey: z.string().uuid().optional(),
+  /** Browser-generated idempotency key for one logical follow-up review. */
+  followupRequestId: z.string().uuid().optional(),
   filename: z.string().max(255).optional(),
 });
 
@@ -213,12 +215,7 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
         const anthropic = getAnthropic();
 
         return await (body.reviewId
-          ? anthropic
-            ? runFollowup({ res, supabase, anthropic, fetchFn, now, user, body })
-            : res.status(500).json({
-                error: 'provider_not_configured',
-                message: 'ANTHROPIC_API_KEY is missing on the server.',
-              })
+          ? runFollowup({ res, supabase, anthropic, fetchFn, user, body })
           : runInitial({
               res,
               supabase,
@@ -811,22 +808,187 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
 // Follow-up critique (§5.2)
 // ─────────────────────────────────────────────────────────────────────
 
-interface ReviewRow {
-  id: string;
-  user_id: string;
-  status: 'pending' | 'complete' | 'failed';
-  stage: 'initial' | 'followup' | 'closed';
-  initial_findings: CritiqueResult | null;
-}
-
 interface FollowupCtx {
   res: Response;
   supabase: SupabaseClient;
-  anthropic: Anthropic;
+  anthropic: Anthropic | null;
   fetchFn: typeof fetch;
-  now: () => number;
   user: User;
   body: CritiqueBody;
+}
+
+type FollowupClaimRpcResult =
+  | {
+      outcome: 'claimed';
+      leaseToken: string;
+      expiresAt: string;
+      initialCritique: CritiqueResult;
+    }
+  | {
+      outcome:
+        | 'in_progress'
+        | 'closed'
+        | 'not_found'
+        | 'not_owner'
+        | 'not_complete';
+    }
+  | {
+      outcome: 'replay';
+      reviewId: string;
+      stage: 'closed';
+      critique: CritiqueResult;
+    };
+
+type FollowupCompleteRpcResult =
+  | {
+      outcome: 'complete' | 'replay';
+      reviewId: string;
+      stage: 'closed';
+      critique: CritiqueResult;
+    }
+  | {
+      outcome:
+        | 'claim_missing'
+        | 'closed'
+        | 'not_found'
+        | 'not_owner'
+        | 'not_complete';
+    };
+
+function parseClosedFollowupResult(
+  value: Record<string, unknown>,
+): {
+  reviewId: string;
+  stage: 'closed';
+  critique: CritiqueResult;
+} | null {
+  if (typeof value.reviewId !== 'string' || value.stage !== 'closed') {
+    return null;
+  }
+  const critique = validateCritique(value.critique);
+  if (!critique) return null;
+  return {
+    reviewId: value.reviewId,
+    stage: 'closed',
+    critique,
+  };
+}
+
+function parseFollowupClaimRpcResult(
+  raw: unknown,
+): FollowupClaimRpcResult | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  if (value.outcome === 'claimed') {
+    if (
+      typeof value.leaseToken !== 'string' ||
+      typeof value.expiresAt !== 'string'
+    ) {
+      return null;
+    }
+    const initialCritique = validateCritique(value.initialCritique);
+    if (!initialCritique) return null;
+    return {
+      outcome: 'claimed',
+      leaseToken: value.leaseToken,
+      expiresAt: value.expiresAt,
+      initialCritique,
+    };
+  }
+  if (
+    value.outcome === 'in_progress' ||
+    value.outcome === 'closed' ||
+    value.outcome === 'not_found' ||
+    value.outcome === 'not_owner' ||
+    value.outcome === 'not_complete'
+  ) {
+    return { outcome: value.outcome };
+  }
+  if (value.outcome !== 'replay') return null;
+  const closed = parseClosedFollowupResult(value);
+  return closed ? { outcome: 'replay', ...closed } : null;
+}
+
+function parseFollowupCompleteRpcResult(
+  raw: unknown,
+): FollowupCompleteRpcResult | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const value = raw as Record<string, unknown>;
+  if (value.outcome === 'complete' || value.outcome === 'replay') {
+    const closed = parseClosedFollowupResult(value);
+    return closed ? { outcome: value.outcome, ...closed } : null;
+  }
+  if (
+    value.outcome === 'claim_missing' ||
+    value.outcome === 'closed' ||
+    value.outcome === 'not_found' ||
+    value.outcome === 'not_owner' ||
+    value.outcome === 'not_complete'
+  ) {
+    return { outcome: value.outcome };
+  }
+  return null;
+}
+
+async function releaseFollowupClaim(
+  supabase: SupabaseClient,
+  userId: string,
+  reviewId: string,
+  requestId: string,
+  leaseToken: string,
+): Promise<void> {
+  try {
+    const { error } = await supabase.rpc(
+      'release_review_followup' as never,
+      {
+        p_user_id: userId,
+        p_review_id: reviewId,
+        p_request_id: requestId,
+        p_lease_token: leaseToken,
+      } as never,
+    );
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('[review.critique] release_review_followup rpc failed', {
+        userId,
+        reviewId,
+        requestId,
+        message: error.message,
+      });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[review.critique] release_review_followup rpc crashed', {
+      userId,
+      reviewId,
+      requestId,
+      message: err instanceof Error ? err.message : 'unknown',
+    });
+  }
+}
+
+function replyFollowupState(
+  res: Response,
+  outcome:
+    | 'closed'
+    | 'not_found'
+    | 'not_owner'
+    | 'not_complete'
+    | 'claim_missing',
+): Response {
+  if (outcome === 'not_found') {
+    return res.status(404).json({ error: 'review_not_found' });
+  }
+  if (outcome === 'not_owner') {
+    return res.status(403).json({ error: 'not_review_owner' });
+  }
+  if (outcome === 'not_complete') {
+    return res.status(409).json({ error: 'review_not_complete' });
+  }
+  if (outcome === 'closed') {
+    return res.status(409).json({ error: 'review_closed' });
+  }
+  return res.status(500).json({ error: 'review_internal' });
 }
 
 /**
@@ -836,72 +998,66 @@ interface FollowupCtx {
  * no entitlement check, no consume, no weekly slot (D6).
  */
 async function runFollowup(ctx: FollowupCtx): Promise<Response> {
-  const { res, supabase, anthropic, fetchFn, now, user, body } = ctx;
+  const { res, supabase, anthropic, fetchFn, user, body } = ctx;
   const reviewId = body.reviewId!;
+  // Legacy first-party callers remain functional, while current web clients
+  // always generate and reuse their own request id across transport retries.
+  const requestId = body.followupRequestId ?? randomUUID();
 
-  // The API reads/writes poster_reviews through the service_role
-  // client, which BYPASSES the table's owner-SELECT RLS (D3).
-  // Ownership is therefore enforced HERE, manually — without this
-  // check any authenticated user could drive another user's review
-  // by id.
-  const { data: reviewRaw, error: loadErr } = await supabase
-    .from('poster_reviews')
-    .select('id, user_id, status, stage, initial_findings')
-    .eq('id', reviewId)
-    .maybeSingle();
-  if (loadErr) {
-    // eslint-disable-next-line no-console
-    console.error('[review.critique] review load failed', {
-      reviewId,
-      message: loadErr.message,
-    });
-    return res.status(500).json({ error: 'review_internal' });
-  }
-  const review = reviewRaw as unknown as ReviewRow | null;
-  if (!review) {
-    return res.status(404).json({ error: 'review_not_found' });
-  }
-  if (review.user_id !== user.id) {
-    return res.status(403).json({ error: 'not_review_owner' });
-  }
-  // `closed` is terminal (§5.2): a further critique needs a new credit.
-  if (review.stage !== 'initial') {
-    return res.status(409).json({ error: 'review_closed' });
-  }
-  if (review.status !== 'complete' || !review.initial_findings) {
-    return res.status(409).json({ error: 'review_not_complete' });
-  }
-
-  // Claim the one included follow-up BEFORE fetching pages or calling the
-  // model. The stage predicate makes this a compare-and-set: even when two
-  // requests both loaded `initial` above, only one can transition it to
-  // `followup`; the loser never reaches billable work.
-  const { data: claimedRaw, error: claimErr } = await supabase
-    .from('poster_reviews')
-    .update({
-      stage: 'followup',
-      updated_at: new Date(now()).toISOString(),
-    })
-    .eq('id', reviewId)
-    .eq('user_id', user.id)
-    .eq('status', 'complete')
-    .eq('stage', 'initial')
-    .select('id')
-    .maybeSingle();
-  if (claimErr) {
-    // eslint-disable-next-line no-console
-    console.error('[review.critique] follow-up claim failed', {
-      reviewId,
-      message: claimErr.message,
-    });
-    return res.status(500).json({ error: 'review_internal' });
-  }
-  if (!claimedRaw) {
-    return res.status(409).json({ error: 'review_closed' });
-  }
-
-  let closed = false;
+  let claimRaw: unknown;
+  let claimError: { message?: string } | null = null;
   try {
+    const response = await supabase.rpc(
+      'claim_review_followup' as never,
+      {
+        p_user_id: user.id,
+        p_review_id: reviewId,
+        p_request_id: requestId,
+      } as never,
+    );
+    claimRaw = response.data;
+    claimError = response.error;
+  } catch (err) {
+    claimError = {
+      message: err instanceof Error ? err.message : 'claim rpc crashed',
+    };
+  }
+  const claim = parseFollowupClaimRpcResult(claimRaw);
+  if (claimError || !claim) {
+    // eslint-disable-next-line no-console
+    console.error('[review.critique] claim_review_followup rpc failed', {
+      userId: user.id,
+      reviewId,
+      requestId,
+      message: claimError?.message ?? 'invalid rpc response',
+    });
+    return res.status(500).json({ error: 'review_internal' });
+  }
+  if (claim.outcome === 'replay') {
+    return res.status(200).json({
+      reviewId: claim.reviewId,
+      stage: claim.stage,
+      critique: claim.critique,
+    });
+  }
+  if (claim.outcome === 'in_progress') {
+    (res.locals as ReviewAuthLocals).deferReviewTempCleanup = true;
+    return res.status(409).json({ error: 'review_in_progress' });
+  }
+  if (claim.outcome !== 'claimed') {
+    return replyFollowupState(res, claim.outcome);
+  }
+
+  const { leaseToken, initialCritique } = claim;
+  let claimSettled = false;
+  try {
+    if (!anthropic) {
+      return res.status(500).json({
+        error: 'provider_not_configured',
+        message: 'ANTHROPIC_API_KEY is missing on the server.',
+      });
+    }
+
     // Fetch the REVISED pages (SSRF-guarded inside fetchReviewPages).
     let fetched: FetchedPage[];
     try {
@@ -921,7 +1077,7 @@ async function runFollowup(ctx: FollowupCtx): Promise<Response> {
       callResult = await callAnthropicCritique(anthropic, {
         systemPrompt: composeReviewSystemPrompt(),
         userMessage: buildFollowupUserMessage({
-          initialFindings: review.initial_findings,
+          initialFindings: initialCritique,
           pageCount: body.pages.length,
           sourceKind: body.sourceKind,
           signals,
@@ -958,69 +1114,57 @@ async function runFollowup(ctx: FollowupCtx): Promise<Response> {
       findings: enforced.findings.length,
     });
 
-    // Store findings only while this request still owns the `followup`
-    // claim. Returning the row proves the conditional close happened.
-    const { data: closedRaw, error: updateErr } = await supabase
-      .from('poster_reviews')
-      .update({
-        followup_findings: enforced,
-        stage: 'closed',
-        updated_at: new Date(now()).toISOString(),
-      })
-      .eq('id', reviewId)
-      .eq('user_id', user.id)
-      .eq('status', 'complete')
-      .eq('stage', 'followup')
-      .select('id')
-      .maybeSingle();
-    if (updateErr || !closedRaw) {
+    let completeRaw: unknown;
+    let completeError: { message?: string } | null = null;
+    try {
+      const response = await supabase.rpc(
+        'complete_review_followup' as never,
+        {
+          p_user_id: user.id,
+          p_review_id: reviewId,
+          p_request_id: requestId,
+          p_lease_token: leaseToken,
+          p_followup_findings: enforced,
+        } as never,
+      );
+      completeRaw = response.data;
+      completeError = response.error;
+    } catch (err) {
+      completeError = {
+        message: err instanceof Error ? err.message : 'completion rpc crashed',
+      };
+    }
+    const completed = parseFollowupCompleteRpcResult(completeRaw);
+    if (completeError || !completed) {
       // eslint-disable-next-line no-console
-      console.error('[review.critique] follow-up update failed', {
+      console.error('[review.critique] complete_review_followup rpc failed', {
+        userId: user.id,
         reviewId,
-        message: updateErr?.message ?? 'claim no longer owned',
+        requestId,
+        message: completeError?.message ?? 'invalid rpc response',
       });
       return res.status(500).json({ error: 'review_internal' });
     }
-
-    closed = true;
-    return res.status(200).json({ reviewId, stage: 'closed', critique: enforced });
-  } finally {
-    if (!closed) {
-      await rollbackFollowupClaim(supabase, reviewId, user.id, now);
+    if (completed.outcome !== 'complete' && completed.outcome !== 'replay') {
+      return replyFollowupState(res, completed.outcome);
     }
-  }
-}
 
-async function rollbackFollowupClaim(
-  supabase: SupabaseClient,
-  reviewId: string,
-  userId: string,
-  now: () => number,
-): Promise<void> {
-  try {
-    const { error } = await supabase
-      .from('poster_reviews')
-      .update({
-        stage: 'initial',
-        updated_at: new Date(now()).toISOString(),
-      })
-      .eq('id', reviewId)
-      .eq('user_id', userId)
-      .eq('status', 'complete')
-      .eq('stage', 'followup');
-    if (error) {
-      // eslint-disable-next-line no-console
-      console.error('[review.critique] follow-up claim rollback failed', {
-        reviewId,
-        message: error.message,
-      });
-    }
-  } catch (err) {
-    // eslint-disable-next-line no-console
-    console.error('[review.critique] follow-up claim rollback crashed', {
-      reviewId,
-      message: err instanceof Error ? err.message : 'unknown',
+    claimSettled = true;
+    return res.status(200).json({
+      reviewId: completed.reviewId,
+      stage: completed.stage,
+      critique: completed.critique,
     });
+  } finally {
+    if (!claimSettled) {
+      await releaseFollowupClaim(
+        supabase,
+        user.id,
+        reviewId,
+        requestId,
+        leaseToken,
+      );
+    }
   }
 }
 

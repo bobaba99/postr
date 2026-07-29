@@ -1,15 +1,12 @@
 /**
- * POST /api/review/critique — FOLLOW-UP flow (spec §5.2): one follow-up
- * per review, a DIFF against the stored initial findings, then the
- * review closes for good. Included in the initial credit — no second
- * entitlement check, no second consume, no second weekly slot (D6).
- * `closed` is terminal and enforced by the route, not hidden in UI.
+ * Durable follow-up idempotency contract.
  *
- * Ownership is checked manually in the route because the service_role
- * client bypasses the table's owner-SELECT RLS (D3) — the
- * not_review_owner test is what keeps another user's review safe.
+ * A browser-generated followupRequestId identifies one logical follow-up.
+ * The database leases provider work, fences completion/release with the
+ * exact request + token pair, and replays the stored terminal response
+ * after an ambiguous transport failure.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -17,10 +14,31 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createReviewRouter } from '../review.js';
 
 const SUPABASE_URL = 'https://testref.supabase.co';
-const PAGE_URL = `${SUPABASE_URL}/storage/v1/object/sign/poster-assets/u/p/review-capture.jpg?token=abc`;
+const PAGE_URL =
+  `${SUPABASE_URL}/storage/v1/object/sign/poster-assets/user-1/review-temp/revised.jpg?token=abc`;
 const REVIEW_ID = '11111111-1111-4111-8111-111111111111';
+const FOLLOWUP_REQUEST_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const OTHER_REQUEST_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const LEASE_TOKEN = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
-const VALID_CRITIQUE = {
+const INITIAL_CRITIQUE = {
+  dimensionScores: { narrative: 2, design: 2, content: 3 },
+  attentionSummary: 'The key result is hard to find.',
+  findings: [
+    {
+      dimension: 'narrative',
+      severity: 'high',
+      category: 'buried-key-result',
+      anchor: { kind: 'region', page: 1, bbox: [0.55, 0.7, 0.4, 0.25] },
+      action: 'keep-as-primary',
+      problem: 'The key result is buried in the bottom-right corner.',
+      fix: 'Make the key-result figure the entry point.',
+      example: 'Move Figure 3 to the top-left column.',
+    },
+  ],
+};
+
+const FOLLOWUP_CRITIQUE = {
   dimensionScores: { narrative: 4, design: 3, content: 4 },
   attentionSummary: 'The key-result figure now earns the first fixation.',
   findings: [
@@ -32,51 +50,90 @@ const VALID_CRITIQUE = {
       action: 'condense',
       problem: 'Six bolded phrases still compete in the methods column.',
       fix: 'Keep bold only on the sampling-rate number.',
-      example: 'Unbold "novel", "first", and "significantly" in the second paragraph.',
+      example: 'Return the secondary labels to regular weight.',
     },
   ],
 };
 
-/** The stored review the follow-up runs against (stage 'initial'). */
-const REVIEW_ROW = {
-  id: REVIEW_ID,
-  user_id: 'user-1',
-  status: 'complete',
-  stage: 'initial',
-  initial_findings: {
-    dimensionScores: { narrative: 2, design: 2, content: 3 },
-    attentionSummary: 'First pass: the key result is hard to find.',
-    findings: [
-      {
-        dimension: 'narrative',
-        severity: 'high',
-        category: 'buried-key-result',
-        anchor: { kind: 'region', page: 1, bbox: [0.55, 0.7, 0.4, 0.25] },
-        action: 'keep-as-primary',
-        problem: 'The key result is buried in the bottom-right corner.',
-        fix: 'Make the key-result figure the entry point of the poster.',
-        example: 'Move Figure 3 ("72% reduction in error") to the top-left column.',
-      },
-    ],
-  },
-};
+type RpcResult = { data: unknown; error: { message: string } | null };
 
-interface FakeSupabaseOpts {
-  reviewRow?: Record<string, unknown> | null;
-  beforeReviewLoad?: () => Promise<void>;
+interface FakeSupabaseOptions {
+  claim?: (args: Record<string, unknown>) => RpcResult | Promise<RpcResult>;
+  complete?: (args: Record<string, unknown>) => RpcResult | Promise<RpcResult>;
+  release?: (args: Record<string, unknown>) => RpcResult | Promise<RpcResult>;
 }
 
-function fakeSupabase(opts: FakeSupabaseOpts = {}) {
-  const inserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
-  const updates: Array<{
-    table: string;
-    payload: Record<string, unknown>;
-    eqVal: unknown;
-    filters: Array<{ col: string; val: unknown }>;
-  }> = [];
+function fakeSupabase(options: FakeSupabaseOptions = {}) {
   const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = [];
+  const tableQueries: string[] = [];
   const remove = vi.fn().mockResolvedValue({ data: [], error: null });
-  const reviewState = opts.reviewRow == null ? null : { ...opts.reviewRow };
+  let state: 'initial' | 'followup' | 'closed' = 'initial';
+  let activeRequestId: string | null = null;
+
+  const defaultClaim = (args: Record<string, unknown>): RpcResult => {
+    const requestId = String(args.p_request_id);
+    if (state === 'initial') {
+      state = 'followup';
+      activeRequestId = requestId;
+      return {
+        data: {
+          outcome: 'claimed',
+          leaseToken: LEASE_TOKEN,
+          expiresAt: '2026-07-29T12:10:00.000Z',
+          initialCritique: INITIAL_CRITIQUE,
+        },
+        error: null,
+      };
+    }
+    if (state === 'followup') {
+      return { data: { outcome: 'in_progress' }, error: null };
+    }
+    if (activeRequestId === requestId) {
+      return {
+        data: {
+          outcome: 'replay',
+          reviewId: REVIEW_ID,
+          stage: 'closed',
+          critique: FOLLOWUP_CRITIQUE,
+        },
+        error: null,
+      };
+    }
+    return { data: { outcome: 'closed' }, error: null };
+  };
+
+  const defaultComplete = (args: Record<string, unknown>): RpcResult => {
+    if (
+      state !== 'followup' ||
+      args.p_request_id !== activeRequestId ||
+      args.p_lease_token !== LEASE_TOKEN
+    ) {
+      return { data: { outcome: 'claim_missing' }, error: null };
+    }
+    state = 'closed';
+    return {
+      data: {
+        outcome: 'complete',
+        reviewId: REVIEW_ID,
+        stage: 'closed',
+        critique: args.p_followup_findings,
+      },
+      error: null,
+    };
+  };
+
+  const defaultRelease = (args: Record<string, unknown>): RpcResult => {
+    const released =
+      state === 'followup' &&
+      args.p_request_id === activeRequestId &&
+      args.p_lease_token === LEASE_TOKEN;
+    if (released) {
+      state = 'initial';
+      activeRequestId = null;
+    }
+    return { data: released, error: null };
+  };
+
   const client = {
     auth: {
       getUser: async () => ({
@@ -85,81 +142,54 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
       }),
     },
     from(table: string) {
+      tableQueries.push(table);
       return {
-        select: (_cols?: string) => ({
-          eq: (_col: string, _val: unknown) => ({
-            maybeSingle: async () => {
-              if (table === 'poster_reviews') {
-                await opts.beforeReviewLoad?.();
-              }
-              return {
-                data: table === 'poster_reviews' && reviewState ? { ...reviewState } : null,
-                error: null,
-              };
-            },
+        select: (_columns?: string) => ({
+          eq: (_column: string, _value: unknown) => ({
+            maybeSingle: async () => ({ data: null, error: null }),
           }),
         }),
-        insert: (payload: Record<string, unknown>) => {
-          inserts.push({ table, payload });
-          return {
-            select: (_cols?: string) => ({
-              single: () => Promise.resolve({ data: { id: 'review-new-1' }, error: null }),
-            }),
-          };
-        },
-        update: (payload: Record<string, unknown>) => {
-          const filters: Array<{ col: string; val: unknown }> = [];
-          let result: { data: { id: unknown } | null; error: null } | undefined;
-          const execute = () => {
-            if (result) return result;
-            const matches =
-              table === 'poster_reviews' &&
-              reviewState !== null &&
-              filters.every(({ col, val }) => String(reviewState[col]) === String(val));
-            updates.push({
-              table,
-              payload,
-              eqVal: filters[0]?.val,
-              filters: [...filters],
-            });
-            if (!matches) {
-              result = { data: null, error: null };
-              return result;
-            }
-            Object.assign(reviewState, payload);
-            result = { data: { id: reviewState.id }, error: null };
-            return result;
-          };
-          const chain = {
-            eq(col: string, val: unknown) {
-              filters.push({ col, val });
-              return chain;
-            },
-            select: (_cols?: string) => ({
-              maybeSingle: async () => execute(),
-            }),
-            then(onFulfilled?: (value: { error: null }) => unknown, onRejected?: (reason: unknown) => unknown) {
-              return Promise.resolve({ error: execute().error }).then(onFulfilled, onRejected);
-            },
-          };
-          return chain;
-        },
       };
     },
-    rpc(fn: string, args: Record<string, unknown>) {
+    async rpc(fn: string, args: Record<string, unknown>) {
       rpcs.push({ fn, args });
-      return Promise.resolve({ data: 1, error: null });
+      if (fn === 'claim_review_followup') {
+        return (options.claim ?? defaultClaim)(args);
+      }
+      if (fn === 'complete_review_followup') {
+        return (options.complete ?? defaultComplete)(args);
+      }
+      if (fn === 'release_review_followup') {
+        return (options.release ?? defaultRelease)(args);
+      }
+      return { data: null, error: { message: `unexpected rpc ${fn}` } };
     },
     storage: {
       from: (_bucket: string) => ({ remove }),
     },
   } as unknown as SupabaseClient;
-  return { client, inserts, updates, rpcs, remove, reviewState };
+
+  return {
+    client,
+    rpcs,
+    tableQueries,
+    remove,
+    get state() {
+      return state;
+    },
+  };
 }
 
-function fakeAnthropic(critique: unknown = VALID_CRITIQUE) {
+function fakeAnthropic() {
   const create = vi.fn().mockResolvedValue({
-    content: [{ type: 'tool_use', id: 'toolu_test', name: 'emit_critique', input: critique }],
+    content: [
+      {
+        type: 'tool_use',
+        id: 'toolu_test',
+        name: 'emit_critique',
+        input: FOLLOWUP_CRITIQUE,
+      },
+    ],
     stop_reason: 'tool_use',
     usage: { input_tokens: 140, output_tokens: 90 },
   });
@@ -173,14 +203,28 @@ function imageResponse(): Response {
   });
 }
 
-function buildApp(deps: { supabase: SupabaseClient; anthropic?: Anthropic; fetchFn: typeof fetch }) {
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+function buildApp(deps: {
+  supabase: SupabaseClient;
+  anthropic?: Anthropic | null;
+  fetchFn?: typeof fetch;
+}) {
   const app = express();
   app.use(express.json());
   app.use(
     createReviewRouter({
       getSupabaseAdmin: () => deps.supabase,
-      getAnthropic: () => deps.anthropic ?? fakeAnthropic().client,
-      fetchFn: deps.fetchFn,
+      getAnthropic: () => deps.anthropic === undefined
+        ? fakeAnthropic().client
+        : deps.anthropic,
+      fetchFn: deps.fetchFn ?? (vi.fn().mockResolvedValue(imageResponse()) as unknown as typeof fetch),
     }),
   );
   return app;
@@ -189,22 +233,26 @@ function buildApp(deps: { supabase: SupabaseClient; anthropic?: Anthropic; fetch
 function validBody(overrides: Record<string, unknown> = {}) {
   return {
     sourceKind: 'pdf',
-    pages: [{ pageNumber: 1, url: PAGE_URL, widthPx: 2048, heightPx: 1152 }],
+    pages: [
+      {
+        pageNumber: 1,
+        url: PAGE_URL,
+        widthPx: 2048,
+        heightPx: 1152,
+        storagePath: 'user-1/review-temp/revised/page-1.jpg',
+      },
+    ],
     reviewId: REVIEW_ID,
+    followupRequestId: FOLLOWUP_REQUEST_ID,
     ...overrides,
   };
 }
 
-function post(app: ReturnType<typeof buildApp>, body: object) {
-  return request(app).post('/api/review/critique').set('Authorization', 'Bearer test-token').send(body);
-}
-
-function deferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void;
-  const promise = new Promise<T>((resolvePromise) => {
-    resolve = resolvePromise;
-  });
-  return { promise, resolve };
+function post(app: ReturnType<typeof buildApp>, body = validBody()) {
+  return request(app)
+    .post('/api/review/critique')
+    .set('Authorization', 'Bearer test-token')
+    .send(body);
 }
 
 beforeEach(() => {
@@ -216,16 +264,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('POST /api/review/critique — follow-up (§5.2)', () => {
-  it('atomically admits one of two concurrent follow-ups before either model call', async () => {
+describe('POST /api/review/critique — durable follow-up lease', () => {
+  it('admits only one concurrent request ID before provider work and defers loser cleanup', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
+    const supabase = fakeSupabase();
     const anthropic = fakeAnthropic();
-    const firstModelStarted = deferred<void>();
+    const modelStarted = deferred<void>();
     const releaseModel = deferred<void>();
-    const bothLoadsReady = deferred<void>();
-    let reviewLoads = 0;
     anthropic.create.mockImplementation(async () => {
-      firstModelStarted.resolve();
+      modelStarted.resolve();
       await releaseModel.promise;
       return {
         content: [
@@ -233,256 +280,239 @@ describe('POST /api/review/critique — follow-up (§5.2)', () => {
             type: 'tool_use',
             id: 'toolu_test',
             name: 'emit_critique',
-            input: VALID_CRITIQUE,
+            input: FOLLOWUP_CRITIQUE,
           },
         ],
         stop_reason: 'tool_use',
         usage: { input_tokens: 140, output_tokens: 90 },
       };
     });
-    const { client, reviewState } = fakeSupabase({
-      reviewRow: REVIEW_ROW,
-      beforeReviewLoad: async () => {
-        reviewLoads += 1;
-        if (reviewLoads === 2) bothLoadsReady.resolve();
-        await bothLoadsReady.promise;
-      },
-    });
     const fetchFn = vi.fn().mockResolvedValue(imageResponse());
     const app = buildApp({
-      supabase: client,
+      supabase: supabase.client,
       anthropic: anthropic.client,
       fetchFn: fetchFn as unknown as typeof fetch,
     });
 
-    const responses: Array<Awaited<ReturnType<typeof post>>> = [];
-    const firstPromise = Promise.resolve(post(app, validBody())).then((response) => {
-      responses.push(response);
-      return response;
-    });
-    const secondPromise = Promise.resolve(post(app, validBody())).then((response) => {
-      responses.push(response);
-      return response;
-    });
+    const firstPromise = Promise.resolve(post(app));
+    await modelStarted.promise;
+    const loser = await post(app);
 
-    await firstModelStarted.promise;
-    await vi.waitFor(() => {
-      expect(responses.length > 0 || anthropic.create.mock.calls.length >= 2).toBe(true);
-    });
+    expect(loser.status).toBe(409);
+    expect(loser.body.error).toBe('review_in_progress');
+    expect(supabase.remove).not.toHaveBeenCalled();
+
     releaseModel.resolve();
+    const winner = await firstPromise;
 
-    const [first, second] = await Promise.all([firstPromise, secondPromise]);
-
-    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    expect(winner.status).toBe(200);
     expect(anthropic.create).toHaveBeenCalledTimes(1);
-    expect(reviewState).toMatchObject({
-      stage: 'closed',
-      followup_findings: VALID_CRITIQUE,
-    });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect(supabase.remove).toHaveBeenCalledTimes(1);
   });
 
-  it('conditionally rolls an admitted follow-up back to initial when the model fails', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    const anthropic = fakeAnthropic();
-    anthropic.create.mockRejectedValue(new Error('upstream unavailable'));
-    const { client, updates, reviewState } = fakeSupabase({
-      reviewRow: REVIEW_ROW,
-    });
-    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
-    const app = buildApp({
-      supabase: client,
-      anthropic: anthropic.client,
-      fetchFn: fetchFn as unknown as typeof fetch,
-    });
-
-    const res = await post(app, validBody());
-
-    expect(res.status).toBe(502);
-    expect(reviewState).toMatchObject({ stage: 'initial' });
-    expect(updates.map(({ payload }) => payload.stage)).toEqual(['followup', 'initial']);
-    expect(updates[0]!.filters).toEqual(
-      expect.arrayContaining([
-        { col: 'id', val: REVIEW_ID },
-        { col: 'user_id', val: 'user-1' },
-        { col: 'status', val: 'complete' },
-        { col: 'stage', val: 'initial' },
-      ]),
-    );
-    expect(updates[1]!.filters).toEqual(
-      expect.arrayContaining([
-        { col: 'id', val: REVIEW_ID },
-        { col: 'stage', val: 'followup' },
-      ]),
-    );
-  });
-
-  it('runs the follow-up against the initial findings and closes the review without charging', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const anthropic = fakeAnthropic();
-    const { client, inserts, updates, rpcs } = fakeSupabase({ reviewRow: REVIEW_ROW });
-    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
-    const app = buildApp({
-      supabase: client,
-      anthropic: anthropic.client,
-      fetchFn: fetchFn as unknown as typeof fetch,
-    });
-
-    const res = await post(app, validBody());
-
-    expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ reviewId: REVIEW_ID, stage: 'closed' });
-    expect(res.body.critique.findings).toHaveLength(1);
-
-    // The follow-up is a diff, not a fresh review: the model received
-    // the initial findings' problem text in its user message.
-    const createArg = anthropic.create.mock.calls[0]![0];
-    expect(JSON.stringify(createArg)).toContain('buried in the bottom-right corner');
-
-    // The first conditional write claims the one included follow-up before
-    // model work; the second stores findings and terminally closes it.
-    expect(updates).toHaveLength(2);
-    expect(updates[0]!.table).toBe('poster_reviews');
-    expect(updates[0]!.eqVal).toBe(REVIEW_ID);
-    expect(updates[0]!.payload.stage).toBe('followup');
-    expect(updates[0]!.filters).toContainEqual({
-      col: 'stage',
-      val: 'initial',
-    });
-    expect(updates[1]!.table).toBe('poster_reviews');
-    expect(updates[1]!.eqVal).toBe(REVIEW_ID);
-    expect(updates[1]!.payload.stage).toBe('closed');
-    expect(updates[1]!.payload.followup_findings).toBeDefined();
-    expect(updates[1]!.filters).toContainEqual({
-      col: 'stage',
-      val: 'followup',
-    });
-    expect(typeof updates[1]!.payload.updated_at).toBe('string');
-
-    // No new review row, and NO credit consume — the follow-up is
-    // included in the initial credit (D6).
-    expect(inserts).toHaveLength(0);
-    expect(rpcs).toHaveLength(0);
-  });
-
-  it('removes revised review-temp pages before replying', async () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
-    const anthropic = fakeAnthropic();
-    const { client, remove } = fakeSupabase({ reviewRow: REVIEW_ROW });
-    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
-    const app = buildApp({
-      supabase: client,
-      anthropic: anthropic.client,
-      fetchFn: fetchFn as unknown as typeof fetch,
-    });
-
-    const res = await post(
-      app,
-      validBody({
-        pages: [
-          {
-            pageNumber: 1,
-            url: PAGE_URL,
-            widthPx: 2048,
-            heightPx: 1152,
-            storagePath: 'user-1/review-temp/revised/page-1.jpg',
-          },
-        ],
+  it('replays a stored response for the same request without pages, provider, or cleanup dependency', async () => {
+    const supabase = fakeSupabase({
+      claim: () => ({
+        data: {
+          outcome: 'replay',
+          reviewId: REVIEW_ID,
+          stage: 'closed',
+          critique: FOLLOWUP_CRITIQUE,
+        },
+        error: null,
       }),
-    );
-
-    expect(res.status).toBe(200);
-    expect(remove).toHaveBeenCalledWith([
-      'user-1/review-temp/revised/page-1.jpg',
-    ]);
-  });
-
-  it('rejects a third critique on a closed review with 409 review_closed', async () => {
-    const anthropic = fakeAnthropic();
-    const { client, updates, remove } = fakeSupabase({
-      reviewRow: { ...REVIEW_ROW, stage: 'closed' },
     });
+    const anthropic = fakeAnthropic();
     const fetchFn = vi.fn();
     const app = buildApp({
-      supabase: client,
+      supabase: supabase.client,
       anthropic: anthropic.client,
       fetchFn: fetchFn as unknown as typeof fetch,
     });
 
-    const res = await post(
-      app,
-      validBody({
-        pages: [
-          {
-            pageNumber: 1,
-            url: PAGE_URL,
-            widthPx: 2048,
-            heightPx: 1152,
-            storagePath: 'user-1/review-temp/closed/page-1.jpg',
-          },
-        ],
-      }),
-    );
+    const response = await post(app);
 
-    expect(res.status).toBe(409);
-    expect(res.body.error).toBe('review_closed');
-    expect(remove).toHaveBeenCalledWith([
-      'user-1/review-temp/closed/page-1.jpg',
-    ]);
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      reviewId: REVIEW_ID,
+      stage: 'closed',
+      critique: FOLLOWUP_CRITIQUE,
+    });
     expect(fetchFn).not.toHaveBeenCalled();
     expect(anthropic.create).not.toHaveBeenCalled();
-    expect(updates).toHaveLength(0);
+    expect(supabase.rpcs.map(({ fn }) => fn)).toEqual(['claim_review_followup']);
   });
 
-  it("rejects a follow-up on another user's review with 403 not_review_owner", async () => {
-    const anthropic = fakeAnthropic();
-    const { client } = fakeSupabase({ reviewRow: { ...REVIEW_ROW, user_id: 'user-2' } });
-    const fetchFn = vi.fn();
-    const app = buildApp({
-      supabase: client,
-      anthropic: anthropic.client,
-      fetchFn: fetchFn as unknown as typeof fetch,
+  it('rejects a different request after terminal close', async () => {
+    const supabase = fakeSupabase({
+      claim: () => ({ data: { outcome: 'closed' }, error: null }),
     });
+    const anthropic = fakeAnthropic();
+    const response = await post(buildApp({
+      supabase: supabase.client,
+      anthropic: anthropic.client,
+    }), validBody({ followupRequestId: OTHER_REQUEST_ID }));
 
-    const res = await post(app, validBody());
-
-    expect(res.status).toBe(403);
-    expect(res.body.error).toBe('not_review_owner');
+    expect(response.status).toBe(409);
+    expect(response.body.error).toBe('review_closed');
     expect(anthropic.create).not.toHaveBeenCalled();
   });
 
-  it('rejects a missing review with 404 review_not_found', async () => {
+  it('releases a failed provider call with the exact request and lease token', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const supabase = fakeSupabase();
     const anthropic = fakeAnthropic();
-    const { client } = fakeSupabase({ reviewRow: null });
-    const fetchFn = vi.fn();
+    anthropic.create.mockRejectedValue(new Error('upstream unavailable'));
     const app = buildApp({
-      supabase: client,
+      supabase: supabase.client,
       anthropic: anthropic.client,
-      fetchFn: fetchFn as unknown as typeof fetch,
     });
 
-    const res = await post(app, validBody());
+    const response = await post(app);
 
-    expect(res.status).toBe(404);
-    expect(res.body.error).toBe('review_not_found');
+    expect(response.status).toBe(502);
+    expect(supabase.rpcs.at(-1)).toEqual({
+      fn: 'release_review_followup',
+      args: {
+        p_user_id: 'user-1',
+        p_review_id: REVIEW_ID,
+        p_request_id: FOLLOWUP_REQUEST_ID,
+        p_lease_token: LEASE_TOKEN,
+      },
+    });
+    expect(supabase.state).toBe('initial');
+  });
+
+  it('completes with the exact request and lease token without entitlement or credit RPCs', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const supabase = fakeSupabase();
+    const anthropic = fakeAnthropic();
+    const response = await post(buildApp({
+      supabase: supabase.client,
+      anthropic: anthropic.client,
+    }));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      reviewId: REVIEW_ID,
+      stage: 'closed',
+      critique: FOLLOWUP_CRITIQUE,
+    });
+    expect(JSON.stringify(anthropic.create.mock.calls[0]![0])).toContain(
+      'buried in the bottom-right corner',
+    );
+    expect(supabase.rpcs).toEqual([
+      {
+        fn: 'claim_review_followup',
+        args: {
+          p_user_id: 'user-1',
+          p_review_id: REVIEW_ID,
+          p_request_id: FOLLOWUP_REQUEST_ID,
+        },
+      },
+      {
+        fn: 'complete_review_followup',
+        args: {
+          p_user_id: 'user-1',
+          p_review_id: REVIEW_ID,
+          p_request_id: FOLLOWUP_REQUEST_ID,
+          p_lease_token: LEASE_TOKEN,
+          p_followup_findings: FOLLOWUP_CRITIQUE,
+        },
+      },
+    ]);
+  });
+
+  it('releases a page-fetch failure with the exact request and lease token', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const supabase = fakeSupabase();
+    const fetchFn = vi.fn().mockRejectedValue(new Error('network failed'));
+    const response = await post(buildApp({
+      supabase: supabase.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    }));
+
+    expect(response.status).toBe(400);
+    expect(supabase.rpcs.at(-1)).toMatchObject({
+      fn: 'release_review_followup',
+      args: {
+        p_request_id: FOLLOWUP_REQUEST_ID,
+        p_lease_token: LEASE_TOKEN,
+      },
+    });
+  });
+
+  it.each([
+    ['not_found', 404, 'review_not_found'],
+    ['not_owner', 403, 'not_review_owner'],
+    ['not_complete', 409, 'review_not_complete'],
+  ])('maps claim outcome %s to %i %s', async (outcome, status, error) => {
+    const supabase = fakeSupabase({
+      claim: () => ({ data: { outcome }, error: null }),
+    });
+    const anthropic = fakeAnthropic();
+    const response = await post(buildApp({
+      supabase: supabase.client,
+      anthropic: anthropic.client,
+    }));
+
+    expect(response.status).toBe(status);
+    expect(response.body.error).toBe(error);
     expect(anthropic.create).not.toHaveBeenCalled();
   });
 
-  it('rejects a review whose initial critique never completed with 409 review_not_complete', async () => {
+  it.each([
+    ['claim RPC error', { data: null, error: { message: 'db unavailable' } }],
+    ['malformed claim response', { data: { outcome: 'claimed' }, error: null }],
+  ])('fails closed on %s', async (_label, claimResult) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const supabase = fakeSupabase({ claim: () => claimResult });
     const anthropic = fakeAnthropic();
-    const { client } = fakeSupabase({
-      reviewRow: { ...REVIEW_ROW, status: 'pending', initial_findings: null },
-    });
-    const fetchFn = vi.fn();
-    const app = buildApp({
-      supabase: client,
+    const response = await post(buildApp({
+      supabase: supabase.client,
       anthropic: anthropic.client,
-      fetchFn: fetchFn as unknown as typeof fetch,
-    });
+    }));
 
-    const res = await post(app, validBody());
-
-    expect(res.status).toBe(409);
-    expect(res.body.error).toBe('review_not_complete');
+    expect(response.status).toBe(500);
+    expect(response.body.error).toBe('review_internal');
     expect(anthropic.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['completion RPC error', { data: null, error: { message: 'db unavailable' } }],
+    ['malformed completion response', { data: { outcome: 'complete' }, error: null }],
+  ])('fails closed on %s and attempts exact release', async (_label, completeResult) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const supabase = fakeSupabase({ complete: () => completeResult });
+    const response = await post(buildApp({ supabase: supabase.client }));
+
+    expect(response.status).toBe(500);
+    expect(response.body.error).toBe('review_internal');
+    expect(supabase.rpcs.at(-1)).toMatchObject({
+      fn: 'release_review_followup',
+      args: {
+        p_request_id: FOLLOWUP_REQUEST_ID,
+        p_lease_token: LEASE_TOKEN,
+      },
+    });
+  });
+
+  it('generates one UUID request ID for legacy clients and reuses it through completion', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const supabase = fakeSupabase();
+    const response = await post(
+      buildApp({ supabase: supabase.client }),
+      validBody({ followupRequestId: undefined }),
+    );
+
+    expect(response.status).toBe(200);
+    const [claim, complete] = supabase.rpcs;
+    expect(claim!.args.p_request_id).toEqual(expect.any(String));
+    expect(claim!.args.p_request_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
+    expect(complete!.args.p_request_id).toBe(claim!.args.p_request_id);
   });
 });

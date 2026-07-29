@@ -259,6 +259,142 @@ function fakeReviewSupabase(
           error: null,
         });
       }
+      if (fn === 'claim_review_followup') {
+        const review = reviews.get(String(args.p_review_id));
+        if (!review) {
+          return Promise.resolve({
+            data: { outcome: 'not_found' },
+            error: null,
+          });
+        }
+        if (review.user_id !== args.p_user_id) {
+          return Promise.resolve({
+            data: { outcome: 'not_owner' },
+            error: null,
+          });
+        }
+        if (review.status !== 'complete' || !review.initial_findings) {
+          return Promise.resolve({
+            data: { outcome: 'not_complete' },
+            error: null,
+          });
+        }
+        const followupRequestId = String(args.p_request_id);
+        if (review.stage === 'closed') {
+          return Promise.resolve({
+            data:
+              review.followup_request_id === followupRequestId
+                ? {
+                    outcome: 'replay',
+                    reviewId: review.id,
+                    stage: 'closed',
+                    critique: review.followup_findings,
+                  }
+                : { outcome: 'closed' },
+            error: null,
+          });
+        }
+        if (review.stage === 'followup') {
+          return Promise.resolve({
+            data: { outcome: 'in_progress' },
+            error: null,
+          });
+        }
+        const leaseToken = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+        Object.assign(review, {
+          stage: 'followup',
+          followup_request_id: followupRequestId,
+          followup_lease_token: leaseToken,
+          followup_lease_expires_at: '2099-01-01T00:10:00.000Z',
+        });
+        return Promise.resolve({
+          data: {
+            outcome: 'claimed',
+            leaseToken,
+            expiresAt: review.followup_lease_expires_at,
+            initialCritique: review.initial_findings,
+          },
+          error: null,
+        });
+      }
+      if (fn === 'complete_review_followup') {
+        const review = reviews.get(String(args.p_review_id));
+        if (!review) {
+          return Promise.resolve({
+            data: { outcome: 'not_found' },
+            error: null,
+          });
+        }
+        if (review.user_id !== args.p_user_id) {
+          return Promise.resolve({
+            data: { outcome: 'not_owner' },
+            error: null,
+          });
+        }
+        if (review.status !== 'complete' || !review.initial_findings) {
+          return Promise.resolve({
+            data: { outcome: 'not_complete' },
+            error: null,
+          });
+        }
+        const followupRequestId = String(args.p_request_id);
+        if (review.stage === 'closed') {
+          return Promise.resolve({
+            data:
+              review.followup_request_id === followupRequestId
+                ? {
+                    outcome: 'replay',
+                    reviewId: review.id,
+                    stage: 'closed',
+                    critique: review.followup_findings,
+                  }
+                : { outcome: 'closed' },
+            error: null,
+          });
+        }
+        if (
+          review.stage !== 'followup' ||
+          review.followup_request_id !== followupRequestId ||
+          review.followup_lease_token !== args.p_lease_token
+        ) {
+          return Promise.resolve({
+            data: { outcome: 'claim_missing' },
+            error: null,
+          });
+        }
+        Object.assign(review, {
+          stage: 'closed',
+          followup_findings: args.p_followup_findings,
+          followup_lease_token: null,
+          followup_lease_expires_at: null,
+        });
+        return Promise.resolve({
+          data: {
+            outcome: 'complete',
+            reviewId: review.id,
+            stage: 'closed',
+            critique: review.followup_findings,
+          },
+          error: null,
+        });
+      }
+      if (fn === 'release_review_followup') {
+        const review = reviews.get(String(args.p_review_id));
+        const released =
+          review?.stage === 'followup' &&
+          review.user_id === args.p_user_id &&
+          review.followup_request_id === args.p_request_id &&
+          review.followup_lease_token === args.p_lease_token;
+        if (released) {
+          Object.assign(review, {
+            stage: 'initial',
+            followup_request_id: null,
+            followup_lease_token: null,
+            followup_lease_expires_at: null,
+          });
+        }
+        return Promise.resolve({ data: released, error: null });
+      }
       if (fn === 'consume_review_addon_slot') {
         const quota = Number(args.p_quota);
         const nowMs = now();
