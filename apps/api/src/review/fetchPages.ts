@@ -23,10 +23,11 @@ export interface FetchedPage {
 function parsePageMediaType(
   contentType: string,
 ): FetchedPage['mediaType'] | null {
-  if (contentType.includes('jpeg')) {
+  const mediaType = contentType.split(';', 1)[0]?.trim().toLowerCase();
+  if (mediaType === 'image/jpeg') {
     return 'image/jpeg';
   }
-  if (contentType.includes('png')) {
+  if (mediaType === 'image/png') {
     return 'image/png';
   }
   return null;
@@ -52,6 +53,78 @@ export class PageFetchError extends Error {
     super(detail ?? code);
     this.name = 'PageFetchError';
   }
+}
+
+function createTooLargeError(
+  pageNumber: number,
+  byteLength: number,
+  maxBytes: number,
+): PageFetchError {
+  return new PageFetchError(
+    'too_large',
+    `page ${pageNumber}: ${byteLength} bytes exceeds ${maxBytes}`,
+    pageNumber,
+  );
+}
+
+function parseContentLength(response: Response): number | null {
+  const headerValue = response.headers.get('content-length');
+  if (!headerValue) {
+    return null;
+  }
+
+  const byteLength = Number(headerValue);
+  return Number.isSafeInteger(byteLength) && byteLength >= 0
+    ? byteLength
+    : null;
+}
+
+async function readPageBody(
+  response: Response,
+  pageNumber: number,
+  maxBytes: number,
+): Promise<Buffer> {
+  const contentLength = parseContentLength(response);
+  if (contentLength !== null && contentLength > maxBytes) {
+    throw createTooLargeError(pageNumber, contentLength, maxBytes);
+  }
+  if (!response.body) {
+    return Buffer.alloc(0);
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      byteLength += value.byteLength;
+      if (byteLength > maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        throw createTooLargeError(pageNumber, byteLength, maxBytes);
+      }
+      chunks.push(value);
+    }
+  } catch (error) {
+    if (error instanceof PageFetchError) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : 'unknown';
+    throw new PageFetchError(
+      'fetch_failed',
+      `page ${pageNumber}: ${message}`,
+      pageNumber,
+    );
+  } finally {
+    reader.releaseLock();
+  }
+
+  return Buffer.concat(chunks, byteLength);
 }
 
 /**
@@ -112,16 +185,7 @@ export async function fetchReviewPages(
       );
     }
 
-    const buf = Buffer.from(await response.arrayBuffer());
-    // Raw bytes BEFORE base64 (which inflates 4/3): a clean typed error
-    // beats an opaque upstream rejection (import.ts:544-551).
-    if (buf.byteLength > maxBytes) {
-      throw new PageFetchError(
-        'too_large',
-        `page ${page.pageNumber}: ${buf.byteLength} bytes exceeds ${maxBytes}`,
-        page.pageNumber,
-      );
-    }
+    const buf = await readPageBody(response, page.pageNumber, maxBytes);
 
     const contentType = response.headers.get('content-type') ?? '';
     const mediaType = parsePageMediaType(contentType);
