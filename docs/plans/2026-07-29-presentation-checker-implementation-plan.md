@@ -10,6 +10,47 @@
 
 **Spec:** `docs/plans/2026-07-29-presentation-checker-review.md` — currently on branch `docs/presentation-checker-spec-clean` (pushed); lands on main when that branch merges. Section references (§N) below point into it.
 
+## As-built status (2026-07-29)
+
+This plan remains the task-level design record, but the checked boxes below
+were intentionally left as authored rather than rewritten after execution.
+The implementation now lives on
+`feat/presentation-checker-codex` in the
+`/Users/zihaogeng/development/postr-presentation-checker-codex` worktree.
+The living design spec is included in the same branch.
+
+Implemented and covered by automated tests:
+
+- versioned rubric, deterministic grounding/enforcement, Anthropic tool-output
+  validation, review API, initial/follow-up state machine, and owner-scoped
+  history;
+- Postr-native, PDF, image, and PPTX ingest code paths, with strict page,
+  byte, archive, and image validation;
+- durable idempotency leases, exact-token fencing, pack-credit reservation,
+  weekly add-on quota accounting, and failure-safe credit release;
+- review pack/add-on checkout and webhook lifecycle handling;
+- standalone noindex route and editor integration, with production rollout
+  flags defaulting off until the manual launch gates below pass.
+
+The following are deliberately **not complete** and must not be inferred from
+the presence of the implementation:
+
+- the corpus manifest is still unfrozen (`frozenAt: null`, zero items), Gavin's
+  rating sheets are not filled, and the Phase-0 thresholds are still
+  placeholders;
+- no live Anthropic corpus run, agreement decision, token-cost pricing
+  decision, or signed GO record exists;
+- live Stripe prices and production secrets are not configured;
+- the PPTX renderer has not passed the isolated Render deployment smoke, so
+  PPTX remains disabled and is presented as coming next;
+- the `review-temp` Storage lifecycle policy, production dogfood, public
+  linking/indexing, deployment, and indexability verification remain owner
+  launch tasks.
+
+Until every manual gate is recorded, `/presentation-checker` stays unlinked
+and `noindex`, the editor entry point stays feature-flagged off, and this
+branch is suitable only for a draft pull request and internal review.
+
 ## Global Constraints
 
 Every task implicitly includes these (values verbatim from the spec):
