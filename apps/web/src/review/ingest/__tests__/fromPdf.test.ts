@@ -199,4 +199,23 @@ describe('fromPdf', () => {
     expect(artifact.pages[0]!.widthPx).toBeLessThanOrEqual(2048);
     expect(artifact.pages[0]!.heightPx).toBeLessThanOrEqual(2048);
   });
+
+  it('maps render failures to unreadable-file and releases the page canvas', async () => {
+    const page = fakePdfPage();
+    page.render.mockImplementation(() => ({
+      promise: Promise.reject(new Error('render failed')),
+    }));
+    const doc = fakePdfDoc(1, [page]);
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(doc) });
+    const sourceCanvas = fakeCanvas(NON_BLANK);
+    canvases = [sourceCanvas];
+    const file = new File(['pdf-bytes'], 'broken.pdf', { type: 'application/pdf' });
+
+    await expect(fromPdf(file, CTX)).rejects.toMatchObject({
+      name: 'IngestError',
+      kind: 'unreadable-file',
+    });
+    expect(mockReleaseCanvas).toHaveBeenCalledWith(sourceCanvas);
+    expect(doc.destroy).toHaveBeenCalledTimes(1);
+  });
 });

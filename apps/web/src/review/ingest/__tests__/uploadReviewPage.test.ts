@@ -67,6 +67,15 @@ describe('uploadReviewPage', () => {
     expect(mockCreateSignedUrl).not.toHaveBeenCalled();
   });
 
+  it('maps a rejected upload request to upload-failed', async () => {
+    mockUpload.mockRejectedValue(new Error('network unavailable'));
+
+    await expect(
+      uploadReviewPage('u1', 'sess-1', 1, new Blob(['x']), { widthPx: 1024, heightPx: 1024 }),
+    ).rejects.toMatchObject({ name: 'IngestError', kind: 'upload-failed' });
+    expect(mockCreateSignedUrl).not.toHaveBeenCalled();
+  });
+
   it('throws upload-failed when signing fails', async () => {
     mockCreateSignedUrl.mockResolvedValue({ data: null, error: { message: 'nope' } });
     await expect(

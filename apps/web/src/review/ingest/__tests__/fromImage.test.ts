@@ -158,4 +158,42 @@ describe('fromImage', () => {
     });
     expect(mockUploadReviewPage).not.toHaveBeenCalled();
   });
+
+  it('enforces the 2048px ceiling when the shared downscale falls back', async () => {
+    mockRasterizeImage.mockResolvedValue({
+      canvas: fakeCanvas(NON_BLANK, 4000, 3000),
+      pageWidthPt: 960,
+      pageHeightPt: 720,
+    });
+    const file = new File(['png-bytes'], 'oversized.png', { type: 'image/png' });
+
+    await fromImage(file, CTX);
+
+    expect(mockUploadReviewPage).toHaveBeenCalledWith(
+      'u1',
+      'sess-1',
+      1,
+      expect.any(Blob),
+      { widthPx: 2048, heightPx: 1536 },
+    );
+  });
+
+  it('maps scaling failures to unreadable-file and releases the source canvas', async () => {
+    const sourceCanvas = fakeCanvas(NON_BLANK);
+    mockRasterizeImage.mockResolvedValue({
+      canvas: sourceCanvas,
+      pageWidthPt: 288,
+      pageHeightPt: 144,
+    });
+    mockDownscale.mockImplementation(() => {
+      throw new Error('canvas allocation failed');
+    });
+    const file = new File(['png-bytes'], 'poster.png', { type: 'image/png' });
+
+    await expect(fromImage(file, CTX)).rejects.toMatchObject({
+      name: 'IngestError',
+      kind: 'unreadable-file',
+    });
+    expect(mockReleaseCanvas).toHaveBeenCalledWith(sourceCanvas);
+  });
 });
