@@ -33,6 +33,11 @@ interface ExportDrawerProps {
   /** Reserved for the export handlers (slide count in the toggle label);
    *  the deck itself is not rendered here — the viewer owns that. */
   deck: SlideDeck;
+  /** Task 10 — both exports now render the styled deck (spec §3), so
+   *  neither button can do anything useful until the automatic
+   *  style+theme pass has produced one. Defaults to true so existing
+   *  callers/tests that don't pass it keep the buttons enabled. */
+  exportReady?: boolean;
   onExportPdf: () => void;
   onExportPptx: () => void;
 }
@@ -45,6 +50,7 @@ export function ExportDrawer({
   open,
   onToggle,
   deck,
+  exportReady = true,
   onExportPdf,
   onExportPptx,
 }: ExportDrawerProps) {
@@ -86,6 +92,12 @@ export function ExportDrawer({
             You never pay for beauty — you pay only for the editable file.
           </p>
 
+          {!exportReady && (
+            <p className="mb-4 text-xs text-[#8b8fa3]" role="status">
+              Styling your deck — export unlocks once it's done.
+            </p>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2">
             <ExportCard
               badge="Free"
@@ -106,7 +118,8 @@ export function ExportDrawer({
                 <button
                   type="button"
                   onClick={onExportPdf}
-                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[#3a3a4e] px-4 text-sm font-semibold text-[#c8cad0] hover:border-[#7c6aed] hover:text-white"
+                  disabled={!exportReady}
+                  className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-md border border-[#3a3a4e] px-4 text-sm font-semibold text-[#c8cad0] hover:border-[#7c6aed] hover:text-white disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[#3a3a4e] disabled:hover:text-[#c8cad0]"
                 >
                   Download PDF
                 </button>
@@ -127,20 +140,25 @@ export function ExportDrawer({
                 { included: true, label: 'No watermark' },
               ]}
               action={
+                // Pricing + account note sit ABOVE the button so the button
+                // is the last element in the card — flush to the bottom,
+                // bottom-aligned with the PDF card's "Download PDF". Keeps the
+                // two export CTAs on the same baseline (cleaner, per review).
                 <div className="mt-4">
+                  <p className="text-center text-xs font-medium text-[#c8cad0]">
+                    {PRICE_LINE}
+                  </p>
+                  <p className="mt-1 mb-3 text-center text-[11px] text-[#6b7280]">
+                    Account asked only here — no card to preview.
+                  </p>
                   <button
                     type="button"
                     onClick={onExportPptx}
-                    className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110"
+                    disabled={!exportReady}
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:brightness-100"
                   >
                     Export PowerPoint (.pptx)
                   </button>
-                  <p className="mt-2 text-center text-xs font-medium text-[#c8cad0]">
-                    {PRICE_LINE}
-                  </p>
-                  <p className="mt-1 text-center text-[11px] text-[#6b7280]">
-                    Account asked only here — no card to preview.
-                  </p>
                 </div>
               }
             />

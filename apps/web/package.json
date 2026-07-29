@@ -24,6 +24,7 @@
     "mammoth": "^1.12.0",
     "nanoid": "^5.0.7",
     "papaparse": "^5.5.4",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.7.76",
     "pptxgenjs": "^4.0.1",
     "react": "^19.2.8",

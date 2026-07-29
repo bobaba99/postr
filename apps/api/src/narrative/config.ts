@@ -59,3 +59,51 @@ export const EXTRACTION_MODEL = 'gpt-5.6-terra';
  *  under 2k tokens; the cap bounds a runaway reply without truncating a
  *  legitimate one. */
 export const EXTRACTION_MAX_TOKENS = 2048;
+
+// ─────────────────────────────────────────────────────────────────────
+//  Deck styling (Arm P) — the Phase-2 §3.1 experiment's LLM-styling arm:
+//  it turns a plain SlideDeck into a structured, editable layout (device
+//  + positioned elements per slide), never an image. ADDITIVE and
+//  server-side; does not touch the deterministic poster path.
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Styling model. Same tier as the condenser/extraction and for the same
+ * reason: choosing a device from a fixed 5-value vocabulary and placing
+ * a handful of elements per slide is a structured layout task, not a
+ * frontier-reasoning one. Grade before switching tiers — a cheaper model
+ * that quietly picks illegal devices is worse than a dearer one (though
+ * coerceDevices gates that failure mode regardless).
+ */
+export const STYLE_MODEL = 'gpt-5.6-terra';
+
+/** Output ceiling for styling. Each slide emits a device string plus a
+ *  handful of positioned elements (kind/text/x/y/fontSize/color) — a
+ *  multi-slide deck's worth of that is comfortably under 3k tokens; the
+ *  cap bounds a runaway reply without truncating a legitimate one. */
+export const STYLE_MAX_TOKENS = 3000;
+
+// ─────────────────────────────────────────────────────────────────────
+//  Theme generation (Arm T) — the Phase-2 §3.1 experiment's normalize/
+//  parameter layer: a field-appropriate THEME (palette + type scale) plus
+//  4 palette variations. A "vibe" re-run only re-invokes this arm.
+//  ADDITIVE and server-side; does not touch the deterministic poster
+//  path or the applyTheme recolor step (fbc58c0), which consumes this
+//  arm's output.
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Theme model. Same tier as the condenser/extraction/styling arms and
+ * for the same reason: picking a restrained, field-appropriate palette
+ * and type scale plus 4 variations is a structured-generation task, not
+ * a frontier-reasoning one. Grade before switching tiers — a cheaper
+ * model that quietly picks a garish or illegible palette is worse than
+ * a dearer one.
+ */
+export const THEME_MODEL = 'gpt-5.6-terra';
+
+/** Output ceiling for theme generation. A theme (palette + typeScale +
+ *  accentTreatment + rationale) plus 4 short palette-variation arrays is
+ *  comfortably under 1.5k tokens; the cap bounds a runaway reply without
+ *  truncating a legitimate one. */
+export const THEME_MAX_TOKENS = 1500;
