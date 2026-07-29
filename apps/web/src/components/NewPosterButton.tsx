@@ -10,7 +10,7 @@
  * place for future variants (templates, etc.).
  */
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { createPoster } from '@/data/posters';
 import { ImportPosterModal } from './ImportPosterModal';
 
@@ -87,6 +87,31 @@ export function NewPosterButton() {
         >
           ▾
         </button>
+      </div>
+
+      {/*
+        Import a whole manuscript (paste text or upload a .docx) → a
+        structured poster draft, via the standalone paper-to-poster
+        flow. Distinct from the "Import…" button above, which brings in
+        an already-designed poster (PDF / image / .postr). Carries the
+        privacy line up front so the reassurance is visible before the
+        user commits any effort — the manuscript never leaves the
+        browser except to transit the model in-flight. Copy verified
+        against docs/plans/2026-07-29-paper-to-slides.md §1/§7.
+      */}
+      <div className="flex flex-col items-start gap-0.5">
+        <Link
+          to="/paper-to-poster"
+          data-postr-import-manuscript-cta
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-[#c8b6ff] no-underline transition-colors hover:text-white"
+        >
+          <span aria-hidden>📄</span>
+          Import manuscript
+        </Link>
+        <p className="max-w-xs text-[11px] leading-snug text-[#6b7280]">
+          Your manuscript is never stored on our servers, and is never used
+          to train AI.
+        </p>
       </div>
 
       {menuOpen && (

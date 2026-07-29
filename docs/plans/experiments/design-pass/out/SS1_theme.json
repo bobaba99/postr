@@ -1,0 +1,18 @@
+{
+  "palette": [
+    "#F7F8FA",
+    "#1F2933",
+    "#3E5C76",
+    "#5F8F8B",
+    "#C98A5B",
+    "#D9E2EC"
+  ],
+  "typeScale": {
+    "heading": 30,
+    "body": 18,
+    "label": 13
+  },
+  "layoutRules": "Use a warm-white background with charcoal text. Keep a consistent 12-column grid with generous outer margins (7\u20138% of slide width). Use one main claim per slide; limit body text to 3\u20135 concise lines or one compact figure/table. Titles are left-aligned, with content aligned to a stable vertical baseline. Use two-column layouts only for direct comparisons (e.g., correlation vs. causal inference). Reserve full-width layouts for conceptual diagrams, causal DAGs, and primary results. Place source notes and sample/analysis details in a small, quiet footer; maintain ample whitespace around charts and annotations. Use direct labels in figures rather than legends where possible.",
+  "accentTreatment": "Use muted slate blue as the primary structural accent for headings, rules, and focal estimates. Use teal for supportive or protective factors and restrained terracotta only for cautionary findings, uncertainty, or potential harms. Keep accent color coverage below roughly 15% of each slide. For causal diagrams, use slate arrows for hypothesized pathways, light gray for covariates, and terracotta only for contested or non-causal associations. Avoid gradients, saturated fills, heavy shadows, and decorative imagery.",
+  "rationale": "This restrained social-science palette supports an adolescent well-being topic without signaling a predetermined conclusion. Slate blue communicates analytical credibility; muted teal provides a calm secondary contrast; terracotta flags interpretive caution without alarmism. The light neutral base and high-contrast charcoal type keep statistical figures, longitudinal designs, and causal-inference diagrams readable in conference rooms and accessible in print."
+}

@@ -1,0 +1,223 @@
+{
+  "slides": [
+    {
+      "device": "plain with understated section marker",
+      "elements": [
+        {
+          "kind": "background",
+          "color": "#F7F5F1",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "kind": "top-rule",
+          "color": "#1F5E63",
+          "x": 0.7,
+          "y": 0.55
+        },
+        {
+          "kind": "section-label",
+          "text": "ADOLESCENT SOCIAL MEDIA & WELL-BEING",
+          "fontSize": 14,
+          "color": "#1F5E63",
+          "x": 0.72,
+          "y": 0.75
+        },
+        {
+          "kind": "title",
+          "text": "Does social media use lower adolescent well-being?",
+          "fontSize": 42,
+          "color": "#17252A",
+          "x": 0.72,
+          "y": 2.0
+        },
+        {
+          "kind": "accent-line",
+          "color": "#D9875D",
+          "x": 0.74,
+          "y": 4.5
+        },
+        {
+          "kind": "footer",
+          "text": "Research talk",
+          "fontSize": 11,
+          "color": "#68767A",
+          "x": 0.72,
+          "y": 7.1
+        },
+        {
+          "kind": "slide-number",
+          "text": "01",
+          "fontSize": 12,
+          "color": "#68767A",
+          "x": 12.15,
+          "y": 7.1
+        }
+      ]
+    },
+    {
+      "device": "evidence statement with progress-bar",
+      "elements": [
+        {
+          "kind": "background",
+          "color": "#F7F5F1",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "kind": "section-label",
+          "text": "LONGITUDINAL EVIDENCE",
+          "fontSize": 14,
+          "color": "#1F5E63",
+          "x": 0.72,
+          "y": 0.72
+        },
+        {
+          "kind": "title",
+          "text": "More time does not reliably predict lower well-being.",
+          "fontSize": 37,
+          "color": "#17252A",
+          "x": 0.72,
+          "y": 1.42
+        },
+        {
+          "kind": "quote-block",
+          "text": "Longitudinal evidence finds little support that more time lowers well-being.",
+          "fontSize": 26,
+          "color": "#29464A",
+          "x": 1.08,
+          "y": 3.0
+        },
+        {
+          "kind": "quote-rule",
+          "color": "#D9875D",
+          "x": 0.72,
+          "y": 2.95
+        },
+        {
+          "kind": "progress-track",
+          "color": "#DDE5E3",
+          "x": 0.72,
+          "y": 6.55
+        },
+        {
+          "kind": "progress-fill",
+          "color": "#1F5E63",
+          "x": 0.72,
+          "y": 6.55
+        },
+        {
+          "kind": "progress-label",
+          "text": "QUESTION",
+          "fontSize": 11,
+          "color": "#68767A",
+          "x": 0.72,
+          "y": 6.86
+        },
+        {
+          "kind": "progress-label",
+          "text": "EVIDENCE",
+          "fontSize": 11,
+          "color": "#1F5E63",
+          "x": 5.96,
+          "y": 6.86
+        },
+        {
+          "kind": "progress-label",
+          "text": "INTERPRETATION",
+          "fontSize": 11,
+          "color": "#68767A",
+          "x": 10.55,
+          "y": 6.86
+        },
+        {
+          "kind": "slide-number",
+          "text": "02",
+          "fontSize": 12,
+          "color": "#68767A",
+          "x": 12.15,
+          "y": 7.1
+        }
+      ]
+    },
+    {
+      "device": "stat-emphasis with methodological callout",
+      "elements": [
+        {
+          "kind": "background",
+          "color": "#F7F5F1",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "kind": "section-label",
+          "text": "INTERPRETATION",
+          "fontSize": 14,
+          "color": "#1F5E63",
+          "x": 0.72,
+          "y": 0.72
+        },
+        {
+          "kind": "title",
+          "text": "Small effects. Often null.",
+          "fontSize": 42,
+          "color": "#17252A",
+          "x": 0.72,
+          "y": 1.38
+        },
+        {
+          "kind": "body",
+          "text": "Effects are small and often null once time-order is respected.",
+          "fontSize": 26,
+          "color": "#29464A",
+          "x": 0.72,
+          "y": 2.7
+        },
+        {
+          "kind": "callout-box",
+          "color": "#E4EEEB",
+          "x": 0.72,
+          "y": 4.35
+        },
+        {
+          "kind": "callout-label",
+          "text": "METHOD MATTERS",
+          "fontSize": 13,
+          "color": "#1F5E63",
+          "x": 1.02,
+          "y": 4.7
+        },
+        {
+          "kind": "callout-text",
+          "text": "Testing whether use precedes changes in well-being is not optional\u2014it changes the conclusion.",
+          "fontSize": 20,
+          "color": "#17252A",
+          "x": 1.02,
+          "y": 5.12
+        },
+        {
+          "kind": "accent-dot",
+          "color": "#D9875D",
+          "x": 0.72,
+          "y": 6.75
+        },
+        {
+          "kind": "footer",
+          "text": "Prioritize temporal ordering over cross-sectional association.",
+          "fontSize": 13,
+          "color": "#68767A",
+          "x": 0.98,
+          "y": 6.68
+        },
+        {
+          "kind": "slide-number",
+          "text": "03",
+          "fontSize": 12,
+          "color": "#68767A",
+          "x": 12.15,
+          "y": 7.1
+        }
+      ]
+    }
+  ]
+}

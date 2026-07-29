@@ -18,7 +18,12 @@
     },
     {
       "source": "/paper-to-present",
-      "destination": "/paper-to-poster",
+      "destination": "/paper-to-slides",
+      "permanent": true
+    },
+    {
+      "source": "/paper-to-presentation",
+      "destination": "/paper-to-slides",
       "permanent": true
     }
   ],

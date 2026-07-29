@@ -1,0 +1,18 @@
+{
+  "palette": [
+    "#102A43",
+    "#1F7A8C",
+    "#2BB3A3",
+    "#F7FAFC",
+    "#D9E2EC",
+    "#D05A4E"
+  ],
+  "typeScale": {
+    "heading": 34,
+    "body": 18,
+    "label": 12
+  },
+  "layoutRules": "Use a 16:9 white or very pale-blue canvas with wide margins and a consistent 12-column grid. Set titles in deep navy, body text in charcoal/navy, and reserve teal for positive specificity/fidelity findings; use restrained coral only to flag off-target risk or undesirable edits. Prefer one central visual or chart per slide, with short evidence-led headlines, left-aligned text, and ample whitespace. Use thin pale-blue dividers and simple outlined molecular schematics; avoid decorative gradients, dense genomic imagery, or more than two data encodings per chart.",
+  "accentTreatment": "A thin teal rule beneath section titles and small teal locus/guide-RNA markers provide continuity. Depict on-target edits in teal and off-target edits in coral across all figures; use navy for Cas9/protein context. Keep accents flat, low-saturation, and functional rather than ornamental.",
+  "rationale": "This clinical-molecular palette supports a rigorous genome-engineering presentation: navy conveys scientific credibility, teal communicates improved precision and high-fidelity performance, while a restrained coral warning color makes genome-wide off-target reduction immediately legible. The layout is optimized for comparative variant data, GUIDE-seq/CIRCLE-seq-style summaries, and mechanistic CRISPR schematics."
+}

@@ -102,6 +102,15 @@ export function createOpenAiProvider(
           signal: AbortSignal.timeout(CONDENSER_TIMEOUT_MS),
           body: JSON.stringify({
             model: options.model,
+            // gpt-5.6-terra rejects function tools on /chat/completions unless
+            // reasoning_effort is 'none' (else HTTP 400 invalid_request_error:
+            // "Function tools with reasoning_effort are not supported ... use
+            // /v1/responses or set reasoning_effort to 'none'"). Reproduced live
+            // against OpenAI 2026-07-29. Condensing is a summarisation task, not
+            // a reasoning one, so 'none' is correct. The mocked-fetch test never
+            // caught this because it asserts the request shape, not the API's
+            // acceptance of it — see narrativeCondense.test.ts.
+            reasoning_effort: 'none',
             max_completion_tokens: CONDENSER_MAX_TOKENS,
             messages: [
               { role: 'system', content: CONDENSER_SYSTEM_PROMPT },

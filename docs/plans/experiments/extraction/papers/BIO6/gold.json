@@ -1,0 +1,31 @@
+{
+  "id": "BIO6",
+  "question": "Does ocean warming reduce coral reef calcification?",
+  "starFinding": {
+    "text": "Yes — end-century projected ocean warming caused a fivefold decrease in coral calcification in Siderastrea siderea, a more immediate threat than acidification.",
+    "sourceQuote": "Castillo et al. reported that warming projected by the IPCC for the end of the twenty-first century caused a fivefold decrease in calcification rate in *S. siderea*, while projected acidification had no statistically significant impact, suggesting that ocean warming poses a more immediate threat than acidification for this species[K. Castillo et al., 2014]."
+  },
+  "top3": [
+    {
+      "text": "End-century projected warming caused a fivefold decrease in calcification in the reef-building coral Siderastrea siderea, outweighing acidification.",
+      "sourceQuote": "Castillo et al. reported that warming projected by the IPCC for the end of the twenty-first century caused a fivefold decrease in calcification rate in *S. siderea*, while projected acidification had no statistically significant impact, suggesting that ocean warming poses a more immediate threat than acidification for this species[K. Castillo et al., 2014]."
+    },
+    {
+      "text": "Warming beyond ~4-5°C above ambient, or above 30-32°C, consistently reduces calcification across coral reef organisms, while moderate warming may modestly enhance it.",
+      "sourceQuote": "However, warming beyond approximately 4-5°C above ambient, or warming that brings temperatures above 30-32°C, consistently reduces calcification across coral reef organisms."
+    },
+    {
+      "text": "Elevated temperature greatly reduced calcification in calcareous algae and foraminifera, with rates significantly reduced at 34°C across all pH levels.",
+      "sourceQuote": "Sinutok et al. documented that elevated temperature treatments greatly reduced calcification in *Marginopora vertebralis* and *Halimeda* species, with calcification rates significantly reduced at 34°C across all pH levels[S. Sinutok et al., 2011]."
+    }
+  ],
+  "doNotPromote": [
+    "McNeil et al.'s modeling projection that coral reef calcification will INCREASE with future warming and exceed pre-industrial rates by about 35% by 2100 — this is off-direction (opposite of the question's answer) and applies only within a moderate 1-3°C optimal range, so it must not be ranked #1.",
+    "Schoepf et al.'s result that only 1 of 4 coral species (A. millepora) decreased calcification while the other three maintained rates even under elevated temperature — a species-specific / contradicts-the-hypothesis finding that must not be promoted as the direct answer.",
+    "Cornwall et al.'s finding that the negative temperature effect on coralline algae is only significant at +5.2°C above ambient — a threshold/qualifier result, not the direct top-line answer."
+  ],
+  "draftedBy": "workflow",
+  "approved": true,
+  "approvedBy": "Gavin",
+  "wellWritten": true
+}

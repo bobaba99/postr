@@ -110,17 +110,19 @@ const slideNumber = (path: string): number =>
 /**
  * How many slides after the first are Postr's own appended templates.
  *
- * Every Postr export is a multi-slide deck: the poster, an explainer,
- * and one empty slide per named layout (see
- * `export/pptx/templateSlides.ts`). Re-importing a file Postr itself
- * produced must NOT tell the user that six slides of their content
- * were skipped — they never authored those slides.
+ * The POSTER export is a single slide now, but two kinds of deck still
+ * carry these template slides: the talk deck (which reuses
+ * `export/pptx/templateSlides.ts`), and every poster file exported
+ * before the poster path stopped appending them — a poster, an
+ * explainer, and one empty slide per named layout. Re-importing such a
+ * file must NOT tell the user that the `APPENDED_SLIDE_COUNT` template
+ * slides of their content were skipped — they never authored those slides.
  *
  * The exporter names each appended slide `<p:cSld name="Postr
  * template - …">`, so identity travels with the slide rather than
  * with its POSITION. That matters: the moment a user pastes their own
  * slide at the end of a Postr deck, a trailing-run rule would stop
- * recognising all six templates and over-report the skip count. Here
+ * recognising the appended templates and over-report the skip count. Here
  * the pasted slide is the only one counted, which is the honest
  * answer.
  *
@@ -241,7 +243,8 @@ export function parsePptx(bytes: Uint8Array): ParsePptxResult {
   // attribute anyone can write, and nothing here is a trust decision,
   // but an unbounded subtraction would let a deck full of forged (or
   // merely unlucky) names claim that NOTHING was skipped. The cap
-  // bounds the worst case to under-reporting by six.
+  // bounds the worst case to under-reporting by APPENDED_SLIDE_COUNT
+  // (currently 8 — see templateMarker.ts for what it covers).
   const templates = Math.min(
     countTemplateSlides(entries, slidePaths),
     APPENDED_SLIDE_COUNT,

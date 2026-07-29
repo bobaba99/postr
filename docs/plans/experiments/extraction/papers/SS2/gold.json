@@ -1,0 +1,30 @@
+{
+  "id": "SS2",
+  "question": "Does remote work increase or decrease employee productivity?",
+  "starFinding": {
+    "text": "Remote work neither uniformly increases nor decreases productivity; its effect depends systematically on job type, organizational infrastructure, temporal factors, work-arrangement model, and individual differences.",
+    "sourceQuote": "Remote work productivity effects are not uniformly positive or negative but depend systematically on job characteristics, organizational infrastructure, temporal factors, work arrangement models, and individual differences."
+  },
+  "top3": [
+    {
+      "text": "Remote work can enhance productivity through increased flexibility, autonomy, and reduced commuting time, but its impact depends on both individual and organizational factors rather than work location alone.",
+      "sourceQuote": "The findings indicate that remote work can enhance productivity through increased flexibility, autonomy, and reduced commuting time."
+    },
+    {
+      "text": "In a digital-era study, 65% of respondents experienced an increase in productivity while working remotely, implying the remaining 35% saw no gain or a decrease.",
+      "sourceQuote": "65% of respondents experienced an increase in productivity while working remotely"
+    },
+    {
+      "text": "Productivity increased or held steady for many knowledge workers in creative, IT, and consultancy roles, while roles requiring close teamwork or physical presence suffered and long-term remote work risked performance fatigue.",
+      "sourceQuote": "Productivity has either increased or stayed the same for a large number of knowledge workers."
+    }
+  ],
+  "doNotPromote": [
+    "The single early-pandemic literature review (Dr. G. Udayasuriyan, abstract-only) reporting an overall decline in productivity attributed to working from home — a lone, context-limited null/negative result that must not be ranked #1 as the answer.",
+    "The isolated bivariate claim that remote work is positively correlated with performance so 'as remote work increases, employee performance also increases' — an over-simplified single-study correlation that must not be promoted as the headline answer over the context-dependent synthesis."
+  ],
+  "draftedBy": "workflow",
+  "approved": true,
+  "approvedBy": "Gavin",
+  "wellWritten": true
+}

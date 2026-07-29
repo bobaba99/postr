@@ -47,17 +47,16 @@ import {
   safeFontFamily,
 } from './masters';
 import { patchThemeColors } from './themePatch';
-import { addTemplateSlides, resolveTemplateStyle } from './templateSlides';
 import { browserRasterizeSvg, type SvgRasterizer } from './rasterizeSvg';
 
 export interface PptxExportOptions extends ExportContentOptions {
   /** Injectable for tests / server pipelines. */
   fetcher?: AssetFetcher;
   /**
-   * Append the explainer + empty template slides after the poster.
-   * Defaults to true; the ONLY reason to turn it off is the
-   * no-regression test that diffs slide1.xml against a poster-only
-   * deck. Not a user-facing option.
+   * Accepted-but-ignored. Once toggled whether the explainer + empty
+   * template slides were appended after the poster; the poster export no
+   * longer appends anything (a poster is a single slide), so this is now
+   * inert. Kept only so callers that still pass it are not broken.
    */
   templateSlides?: boolean;
   /**
@@ -711,18 +710,18 @@ export async function exportPosterPptx(
     });
   }
 
-  // Everything above belongs to slide 1. The template slides are
-  // appended only once the poster is complete, and never reach back
-  // into it — slide1.xml is byte-identical with or without them,
-  // which `pptxTemplateSlides.test.ts` asserts by diff.
-  if (options.templateSlides !== false) {
-    addTemplateSlides(
-      pptx,
-      resolveTemplateStyle(doc, resolveMasterPalette(doc.palette), themeFont, plan.scale),
-      plan.slideWidthIn,
-      plan.slideHeightIn,
-    );
-  }
+  // Everything above belongs to slide 1, and the poster export stops
+  // there: a poster is a single canvas, so its `.pptx` is a single
+  // slide. The empty talk-layout template slides that once followed the
+  // poster (an explainer + one slide per named layout) belong to the
+  // talk deck, not the poster — `templateSlides.ts` stays for that path
+  // to reuse, but the poster no longer appends them.
+  //
+  // `options.templateSlides` is accepted-but-ignored: it was the seam
+  // that turned the appended slides off for the no-regression test, and
+  // nothing appends now, so it can only ever be a no-op. Kept so callers
+  // that still pass it are not broken; `pptxTemplateSlides.test.ts`
+  // pins that it stays inert.
 
   const buffer = (await pptx.write({ outputType: 'arraybuffer' })) as ArrayBuffer;
   // Last step: the poster's palette as the deck's theme colours, which

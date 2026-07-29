@@ -16,7 +16,9 @@
  *                           code-split, noindex; registered but not
  *                           linked from nav — D12)
  *   /manuscript-to-poster → redirect to /paper-to-poster (old live URL)
- *   /paper-to-present   → redirect to /paper-to-poster (reserved alias)
+ *   /paper-to-slides    → Paper→slides standalone flow (public, code-split)
+ *   /paper-to-present   → redirect to /paper-to-slides (canonical is slides)
+ *   /paper-to-presentation → redirect to /paper-to-slides (alias)
  *   /auth               → Auth (sign in / sign up / guest)
  *   /dashboard          → My Posters (auth-gated)
  *   /p/:posterId        → Editor (auth-gated, code-split)
@@ -43,8 +45,10 @@
  *   /paper-to-poster canonical ("paper to poster" 140/mo · KD 0)
  *     ← /manuscript-to-poster  (the previously live URL — it is in the
  *                               production sitemap and must not 404)
- *     ← /paper-to-present      (reserved; note this flow outputs a
- *                               poster draft, never slides)
+ *   /paper-to-slides canonical (the talk flow — editable deck out)
+ *     ← /paper-to-present      (a talk-intent spelling; slides is the
+ *                               output, so it consolidates here)
+ *     ← /paper-to-presentation (the same intent, longer spelling)
  *
  * The <Navigate replace> entries below only cover in-app navigation.
  * A cold hit on an alias never reaches this router: vercel.json issues
@@ -100,6 +104,9 @@ const PaperToPoster = lazy(() => import('@/pages/PaperToPoster'));
 // Presentation Checker — the review upload surface. Kept out of the
 // initial bundle for the same reason as the other standalone tools.
 const PresentationChecker = lazy(() => import('@/pages/PresentationChecker'));
+// Standalone paper→slides flow — pulls the deck builder and the lazy
+// pptx writer, so it loads on demand like its poster sibling.
+const PaperToSlides = lazy(() => import('@/pages/PaperToSlides'));
 
 function LazyFallback() {
   return (
@@ -131,6 +138,7 @@ export function AppRoutes() {
             no Supabase session (not even anonymous) on load. */}
         <Route path="/chart-chooser" element={<ChartChooserPage />} />
         <Route path="/paper-to-poster" element={<PaperToPoster />} />
+        <Route path="/paper-to-slides" element={<PaperToSlides />} />
         {/* Presentation Checker — public but noindex (D12): registered
             now, deliberately NOT linked from nav; the indexed static
             record + nav links are the Milestone-6 launch checklist. */}
@@ -143,7 +151,11 @@ export function AppRoutes() {
         />
         <Route
           path="/paper-to-present"
-          element={<Navigate to="/paper-to-poster" replace />}
+          element={<Navigate to="/paper-to-slides" replace />}
+        />
+        <Route
+          path="/paper-to-presentation"
+          element={<Navigate to="/paper-to-slides" replace />}
         />
         {/*
           Dev only. This was publicly routable with no guard, which put

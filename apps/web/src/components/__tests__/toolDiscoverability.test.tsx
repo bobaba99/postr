@@ -78,6 +78,19 @@ describe('PublicHeader tool links', () => {
       expect(link?.getAttribute('tabindex')).toBeNull();
     }
   });
+
+  /**
+   * The two sibling manuscript flows must BOTH be listed. Paper-to-Poster
+   * is live; Paper-to-Slides is a not-yet-open flow whose nav link is
+   * placed now so the entry exists the moment the route lands (spec §7).
+   * Asserted by href — the flat listing serves both from the same source.
+   */
+  it('lists both Paper-to-Poster and Paper-to-Slides', () => {
+    const { container } = renderIn(<PublicHeader />);
+    const hrefs = hrefsOf(container);
+    expect(hrefs).toContain('/paper-to-poster');
+    expect(hrefs).toContain('/paper-to-slides');
+  });
 });
 
 /**
@@ -199,6 +212,17 @@ describe('PublicFooter', () => {
       expect.arrayContaining(TOOL_PATHS),
     );
     expect(hrefsOf(container)).toEqual(expect.arrayContaining(TOOL_PATHS));
+  });
+
+  it('lists Paper-to-Slides under Product alongside Paper-to-Poster', () => {
+    const { container } = renderIn(<PublicFooter />);
+    const productHeading = screen.getByRole('heading', { name: /product/i });
+    const column = productHeading.parentElement;
+
+    expect(column).not.toBeNull();
+    expect(hrefsOf(column as HTMLElement)).toEqual(
+      expect.arrayContaining(['/paper-to-poster', '/paper-to-slides']),
+    );
   });
 });
 
