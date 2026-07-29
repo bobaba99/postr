@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Block, PosterDoc } from '@postr/shared';
 import { BlockFrame } from './blocks';
 import {
@@ -15,6 +15,16 @@ import { FONTS, PX } from './constants';
  */
 export function PosterSnapshotCanvas({ doc }: { doc: PosterDoc }) {
   const didDragRef = useRef(false);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
+  const [titleOverflowPx, setTitleOverflowPx] = useState(0);
+  const titleBlockId = useMemo(
+    () => doc.blocks.find((block) => block.type === 'title')?.id ?? null,
+    [doc.blocks],
+  );
+  const titleBlockH = useMemo(
+    () => doc.blocks.find((block) => block.type === 'title')?.h ?? 0,
+    [doc.blocks],
+  );
   const headingNumbers = useMemo(() => {
     const numbers: Record<string, number> = {};
     let next = 0;
@@ -36,6 +46,24 @@ export function PosterSnapshotCanvas({ doc }: { doc: PosterDoc }) {
   );
   const fontFamily = FONTS[doc.fontFamily]?.css ?? doc.fontFamily;
 
+  useLayoutEffect(() => {
+    if (!titleBlockId || !canvasRef.current || titleBlockH <= 0) {
+      setTitleOverflowPx(0);
+      return;
+    }
+    const title = canvasRef.current.querySelector<HTMLElement>(
+      `[data-block-id="${titleBlockId}"]`,
+    );
+    if (!title) return;
+    const measure = () => {
+      setTitleOverflowPx(Math.max(0, title.offsetHeight - titleBlockH));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(title);
+    return () => observer.disconnect();
+  }, [titleBlockH, titleBlockId]);
+
   return (
     <div
       aria-hidden="true"
@@ -49,6 +77,7 @@ export function PosterSnapshotCanvas({ doc }: { doc: PosterDoc }) {
       }}
     >
       <div
+        ref={canvasRef}
         id="poster-canvas"
         style={{
           width: doc.widthIn * PX,
@@ -77,6 +106,7 @@ export function PosterSnapshotCanvas({ doc }: { doc: PosterDoc }) {
             didDragRef={didDragRef}
             onUpdate={() => undefined}
             onDelete={() => undefined}
+            titleOverflowPx={titleOverflowPx}
             captionNumber={captionNumbers[block.id]}
           />
         ))}

@@ -125,6 +125,16 @@ async function waitForPosterSnapshotAssets(): Promise<void> {
     // Font loading is best effort; the CSS fallback remains capturable.
   }
 
+  // Font completion can resize a wrapped title. Give ResizeObserver one
+  // layout pass to measure it and React one more pass to commit the shifted
+  // downstream blocks before html-to-image clones the canvas.
+  await new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+  await new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+
   const canvas = document.getElementById('poster-canvas');
   if (!canvas) {
     throw new IngestError(
@@ -262,6 +272,7 @@ export default function PresentationChecker() {
   }
 
   async function handleFile(file: File) {
+    if (plan.loading) return;
     const isPptx =
       file.type ===
         'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
@@ -642,8 +653,9 @@ export default function PresentationChecker() {
                   </p>
                   <button
                     type="button"
+                    disabled={plan.loading}
                     onClick={() => fileInputRef.current?.click()}
-                    className="mt-3 inline-flex min-h-11 items-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b5aaff]"
+                    className="mt-3 inline-flex min-h-11 items-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110 disabled:cursor-wait disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b5aaff]"
                   >
                     Choose a file
                   </button>

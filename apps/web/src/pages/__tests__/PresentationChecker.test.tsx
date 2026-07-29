@@ -8,8 +8,14 @@
  * ReviewPaymentRequiredError class keeps `instanceof` working because
  * the page and the test share the same mocked binding.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import PresentationChecker from '../../pages/PresentationChecker';
 
@@ -282,6 +288,10 @@ beforeEach(() => {
   };
 });
 
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
 describe('PresentationChecker page', () => {
   it('happy path: upload → scores, finding cards, and the personalized example', async () => {
     requestCritiqueMock.mockResolvedValue(CRITIQUE);
@@ -425,6 +435,53 @@ describe('PresentationChecker page', () => {
       }),
     ).toBeTruthy();
     expect(ingestFileMock).not.toHaveBeenCalled();
+  });
+
+  it('defers PPTX selection until guest status has resolved', () => {
+    planState.value = {
+      ...planState.value,
+      loading: true,
+      isGuest: true,
+    };
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText('File to review'), {
+      target: {
+        files: [
+          new File(['pptx'], 'talk.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          }),
+        ],
+      },
+    });
+
+    expect(
+      screen.queryByRole('heading', {
+        name: /Get feedback on your poster or talk/i,
+      }),
+    ).toBeNull();
+    expect(ingestFileMock).not.toHaveBeenCalled();
+  });
+
+  it('disables file selection while guest status is loading', () => {
+    planState.value = {
+      ...planState.value,
+      loading: true,
+      isGuest: true,
+    };
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Choose a file' }),
+    ).toBeDisabled();
   });
 
   it('the follow-up button reveals the up-front disclosure before anything runs', async () => {
@@ -606,6 +663,45 @@ describe('PresentationChecker page', () => {
 
     expect(await screen.findByTestId('score-narrative')).toBeTruthy();
     expect(document.getElementById('poster-canvas')).toBeNull();
+  });
+
+  it('settles layout after fonts load before capturing a selected poster', async () => {
+    const frameCallbacks: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frameCallbacks.push(callback);
+      return frameCallbacks.length;
+    });
+    listPostersMock.mockResolvedValue([POSTER_ROW]);
+    loadPosterMock.mockResolvedValue(POSTER_ROW);
+    requestCritiqueMock.mockResolvedValue(CRITIQUE);
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(
+      await screen.findByLabelText(/review one of your Postr posters/i),
+      { target: { value: POSTER_ROW.id } },
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review this poster' }),
+    );
+
+    await waitFor(() => expect(frameCallbacks).toHaveLength(1));
+    expect(ingestPosterMock).not.toHaveBeenCalled();
+    await act(async () => {
+      frameCallbacks.shift()?.(0);
+      await Promise.resolve();
+    });
+    expect(frameCallbacks).toHaveLength(1);
+    expect(ingestPosterMock).not.toHaveBeenCalled();
+    await act(async () => {
+      frameCallbacks.shift()?.(16);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(ingestPosterMock).toHaveBeenCalledTimes(1));
   });
 
   it('coalesces rapid activation of the one Postr follow-up', async () => {
