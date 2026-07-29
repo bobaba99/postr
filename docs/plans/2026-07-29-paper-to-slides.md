@@ -137,27 +137,27 @@ viewer (§5); the design pass (§4.2).
 These are the traps a future editor must know about. Record them in the code
 (reuse-ledger comment) as well as here.
 
-1. **Extraction approach is DECIDED BY EXPERIMENT — do not build it until the
-   experiment picks a winner.** The talk needs *ranked findings with a verbatim
-   quote each* for the star-finding cards. Two candidate approaches:
-   - **(A) Upgrade the deterministic engine** (`coreRelevance.ts`) with stronger
-     signals — semantic relatedness, semantic/word-content frequency,
-     informational density — so it extracts and ranks findings well without an
-     LLM. Keeps the poster path deterministic, zero added cost/latency.
-     `coreRelevance` stays the structure decider regardless.
-   - **(B) Add an LLM extraction layer** (server-side, `apps/api`) that reads the
-     results text and returns ranked findings, each with a mandatory verbatim
-     `sourceQuote` (fidelity gate). Survives badly-written papers better, but adds
-     cost/latency/hallucination surface.
-   **The experiment (§4 Phase 0) runs BEFORE any implementation** and scores both
-   arms on three axes: (1) **ranking agreement** with a human gold set (star
-   finding + top-3 on N real papers), (2) **fidelity** — every claimed finding is
-   supported by a verbatim span actually in the paper, none invented or
-   misattributed, and (3) **robustness on badly-written papers** (≥2 deliberately
-   poorly-structured manuscripts). Whichever wins is what gets built; if the
-   deterministic upgrade wins, `/paper-to-poster` gains nothing risky at all.
-   IMPORTANT: this reverses the earlier "refactor to LLM" assumption — that was
-   never validated, and the experiment exists precisely to validate it.
+1. **Extraction approach — DECIDED BY EXPERIMENT: use the LLM arm (B).**
+   RESOLVED 2026-07-29. The talk needs *ranked findings with a verbatim quote
+   each* for the star-finding cards. Two arms were built and scored (harness in
+   `docs/plans/experiments/extraction/`, design in
+   `experiments/extraction-deterministic-vs-llm.md`):
+   - **(A) Deterministic** — an upgraded scoring spike (content-frequency +
+     informational density + section prior). Zero cost/latency, no hallucination
+     surface. **Result: 0.08 star-hit, 0.19 top-3 overlap on well-written papers.**
+     It extracts *real* findings (0 fidelity failures) but is weak at ranking
+     *which* finding is the star.
+   - **(B) LLM** (`gpt-5.6-terra`, forced tool use, mandatory verbatim
+     `sourceQuote` fidelity gate). **Result: 0.62 star-hit, 0.49 top-3 overlap on
+     well-written papers, 0 fidelity failures, ~$0.015/paper, ~4s latency.**
+   **Verdict: Arm B wins decisively (~8× on star-hit) — the feature uses the LLM
+   extraction layer.** This is NOT a tie, so the deterministic-preference
+   tiebreak does not apply. Caveats on record: the badly-written subset was only
+   3 papers (too small for a firm robustness claim), and the experiment ran on
+   Elicit *synthesis prose*, not raw multi-page manuscripts — re-validate against
+   real manuscripts when the extraction layer is built. `coreRelevance.ts` stays
+   the poster's structure decider; the LLM extraction is ADDITIVE (talk path),
+   server-side (`apps/api`), and does not touch the deterministic poster path.
 2. **Poster PPTX loses its 5 empty layout slides.** Those layout slides
    (`export/pptx/templateSlides.ts`: three-col, two-col, billboard, sidebar,
    blank + explainer) are **presentation scaffolding** — they exist so a user can

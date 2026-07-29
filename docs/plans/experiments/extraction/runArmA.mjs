@@ -18,18 +18,34 @@
  *
  * Common output shape (identical to Arm B, so both are scored the same):
  *   { text, sourceQuote, sourceSection, rank }[]
- * For Arm A, a finding's `sourceQuote` IS the verbatim sentence that
- * scored it, so `text === sourceQuote` and the fidelity gate (does the
- * quote appear verbatim in the paper?) passes for free.
+ * For Arm A, a finding's `sourceQuote` IS a VERBATIM SLICE of the paper that
+ * scored it, so `text === sourceQuote` and the fidelity gate (does the quote
+ * appear verbatim in the paper?) passes for free.
+ *
+ * INPUT SHAPE these fixtures actually have: Elicit systematic-review SYNTHESIS
+ * prose — markdown with `**bold**` citation labels, `[text](url)` links, inline
+ * `[Author, Year]` brackets, a `**Source:** https://…` metadata line, and a
+ * per-paper list whose findings are `- **Supporting quote:** "…"` / `> "…"`
+ * items. So BEFORE scoring we (a) DROP formatting artifacts (Source/URL/table/
+ * bare-citation-label lines), (b) extract the finding CLAUSE from list items,
+ * and (c) score every candidate on a MARKDOWN-DE-NOISED copy (`scoringText`)
+ * while emitting the untouched verbatim slice. See the de-noising block below.
+ * The emitted quote's characters are never altered, only sliced — the fidelity
+ * invariant (verbatim substring of text.md after norm) holds for all outputs.
  *
  * Three signals, combined into one score (per the experiment doc §Arm A):
  *   1. semantic/word-content frequency — how often a candidate's content
  *      terms recur across the Results/Discussion corpus (TF-style,
- *      stopword-filtered);
+ *      stopword-filtered), measured on the de-noised text;
  *   2. informational density — numbers + effect-size patterns
- *      (d=, p<, %, CI, r=, β=) + capitalized entities, per token;
+ *      (d=, p<, %, CI, r=, β=) + capitalized entities, per token, on the
+ *      de-noised text (a RUN of Capitalized words = one entity, not many, so a
+ *      citation/title can't inflate this);
  *   3. position/section prior — a Results sentence outranks
- *      Discussion/Conclusion, which outrank Methods/Introduction, etc.
+ *      Discussion/Conclusion, which outrank Methods/Introduction, etc.; an
+ *      author-CURATED per-paper finding gets a dedicated high prior.
+ * Every candidate must ALSO pass an assertion gate (carries a finding verb or a
+ * statistic) — titles, labels, and section captions carry neither and are cut.
  *
  * TODO (production Arm A, out of scope for a no-dependency spike):
  *   The experiment doc names *embedding-based semantic relatedness*
@@ -69,6 +85,239 @@ function contentTerms(text) {
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter((w) => w.length >= 4 && !STOP_WORDS.has(w));
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Markdown de-noising — the fixtures are Elicit systematic-review SYNTHESIS
+// prose: markdown with `**bold**` citation labels, `[text](url)` links,
+// `- ` list markers, `#` headings, a `**Source:** https://…` metadata line,
+// and inline `[Author, Year]` citation brackets. None of that is *content*.
+//
+// CRITICAL INVARIANT: the emitted `sourceQuote` MUST stay a verbatim slice of
+// text.md after the scorer's normalization (collapse-whitespace + trim +
+// lowercase). We therefore NEVER strip characters from the emitted quote. We
+// strip markdown ONLY to build the internal SCORING signal (`scoringText`
+// below): frequency, density, and capitalized-entity counts are measured on
+// the de-noised text so formatting tokens can't inflate an artifact, while the
+// quote we emit is left byte-for-byte as it appears in the paper.
+// ─────────────────────────────────────────────────────────────────────
+
+/**
+ * De-noise a candidate line into the plain content we SCORE on. Removes
+ * markdown emphasis (`**`, `*`, `__`, `_`), converts `[text](url)` links to
+ * their visible `text`, drops inline `[Author, Year]` citation brackets and
+ * bare URLs, and collapses whitespace. This return value is used ONLY for
+ * scoring — never emitted as a quote.
+ */
+function scoringText(line) {
+  return line
+    // [visible](http://url) → visible
+    .replace(/\[([^\]]*)\]\((?:[^)]*)\)/g, '$1')
+    // inline citation brackets [Author, 2019] / [1] → removed (they are not
+    // content, and their many Capitalized author tokens otherwise inflate the
+    // capitalized-entity signal).
+    .replace(/\[[^\]]*\]/g, ' ')
+    // bold / italic / underscore emphasis markers.
+    .replace(/\*\*|__|\*|(?<=\w)_(?=\w)|_/g, '')
+    // bare URLs anywhere in the line.
+    .replace(/https?:\/\/\S+/gi, ' ')
+    // markdown table pipes.
+    .replace(/\|/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// A finding ASSERTS something — it carries a finding verb or a statistic.
+// Titles, citation labels, section captions ("Each entry lists …"), and table
+// headers are noun phrases with no assertion, so this is the principled gate
+// that keeps them out of the ranking. (Every gold finding across the 15
+// fixtures satisfies this at the sentence level; the one BIO1 star clause that
+// lacks a verb is a substring of a full prose sentence that has one, and we
+// emit the full sentence.)
+// STRICT: inflected VERB forms only — never noun-stem `\w+` wildcards. A paper
+// TITLE full of nouns like "Causality", "Correlation", "Association" must NOT
+// register as asserting a finding, so we match "causes/caused", not "caus\w+".
+const FINDING_VERB =
+  /\b(is|are|was|were|found|finds|shows?|showed|shown|demonstrates?|demonstrated|reduces?|reduced|increases?|increased|leads?|led|suggests?|suggested|associated|impairs?|impaired|improves?|improved|exhibits?|exhibited|retains?|retained|estimated|indicates?|indicated|results?|resulted|reveals?|revealed|highlights?|highlighted|confers?|conferred|causes?|caused|drives?|driven|predisposes?|predisposed|enhances?|enhanced|decreases?|decreased|elevated|correlates?|correlated|contributes?|contributed|linked|affects?|affected|induces?|induced|provides?|provided|supports?|supported|disrupts?|disrupted|establish\w*|extends?|extended)\b/i;
+const STAT_ASSERTION =
+  /[drtzfβbβη]\s*=\s*-?\.?\d|\bp\s*[<>=]\s*\.?\d|\bci\b|\d+(?:\.\d+)?\s*%|\b(?:od|hr|rr|or)\s*=\s*\d|\$\s?\d/i;
+
+/** Does this candidate state a finding (has a finding verb or a statistic)? */
+function assertsFinding(scored) {
+  return FINDING_VERB.test(scored) || STAT_ASSERTION.test(scored);
+}
+
+/** Fraction of a string's non-space characters that belong to a URL. */
+function urlCharFraction(line) {
+  const nonSpace = line.replace(/\s+/g, '');
+  if (nonSpace.length === 0) return 0;
+  let urlChars = 0;
+  for (const m of line.match(/https?:\/\/\S+/gi) ?? []) {
+    urlChars += m.replace(/\s+/g, '').length;
+  }
+  return urlChars / nonSpace.length;
+}
+
+/**
+ * Formatting artifacts that are NOT findings and must never be ranked:
+ *   - a `**Source:**` / `Source:` metadata line (Elicit's provenance line);
+ *   - a line that is >30% URL characters (mostly a link);
+ *   - a markdown table row / separator (`| … |`, `|----|`);
+ *   - a bare citation LABEL with no finding clause — a line whose stripped
+ *     content is just "Author Year — Title" / "Author, Year" with no prose
+ *     after the label (detected in extractCandidate by the absence of an
+ *     extractable finding clause), handled at the call site.
+ */
+function isMetadataOrArtifactLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed) return true;
+  // "**Source:** …" or "Source: …" provenance line.
+  if (/^[-*\s>]*(?:\*\*|__)?\s*source\s*:?\s*(?:\*\*|__)?\s*:/i.test(trimmed)) return true;
+  if (/^[-*\s>]*(?:\*\*|__)?source(?:\*\*|__)?:/i.test(trimmed)) return true;
+  // Line that is mostly a URL.
+  if (urlCharFraction(trimmed) > 0.3) return true;
+  // Markdown table row or separator.
+  if (/^\|/.test(trimmed) || /^[-|:\s]+$/.test(trimmed)) return true;
+  // "Papers extracted:" style metadata header.
+  if (/^\*{0,2}papers?\s+extracted\s*:?/i.test(trimmed)) return true;
+  return false;
+}
+
+/**
+ * Does a stripped line OPEN with an author-year citation label — a run of
+ * `Surname (et al.)?, YEAR` (accented letters allowed)? These head the per-paper
+ * entries in the Elicit synthesis:
+ *   "Morán-Ramos et al., 2017 — Gut Microbiota …"
+ *   "Zhang et al., 2024 — The complex link …"
+ *   "B. Gilroy, 2012 — Center for International …"
+ *   "J. Gromadzki, 2021 — Labor supply effects …"   (### sub-heading form)
+ * The finding for such an entry is NEVER on this head line — it lives on the
+ * sibling "- Supporting quote:" / "- Main finding:" sub-lines. So a line headed
+ * by an author-year label is dropped, and its em-dashed TITLE never leaks in.
+ * Uses Unicode letters so "Morán"/"Báñez"/"Gérard" are recognized.
+ */
+const AUTHOR_YEAR_HEAD =
+  /^\p{Lu}[\p{L}.'’-]*(?:\s+(?:&|and|et\s+al\.?|\p{Lu}[\p{L}.'’-]*))*,?\s*\(?(?:19|20)\d{2}\)?/u;
+
+function startsWithAuthorYearLabel(stripped) {
+  return AUTHOR_YEAR_HEAD.test(stripped.trim());
+}
+
+/**
+ * Turn ONE candidate line into { quote, scored } — or null to drop it.
+ *
+ *   • `quote`  is what we emit as `sourceQuote`. It is ALWAYS a verbatim slice
+ *              of the original line (hence of text.md), so the fidelity gate
+ *              and gold substring-matching pass. We only ever *slice* the line,
+ *              never rewrite its characters.
+ *   • `scored` is the de-noised text we compute signals on.
+ *
+ * List items in the "Per-paper findings" section are written as
+ *   `- **Author Year** — Title: <finding>` or
+ *   `- **Supporting quote (verbatim):** "<finding>"`.
+ * The real finding is the clause AFTER the citation label / quote-label — the
+ * label itself is not a finding. When such a clause exists AND is a verbatim
+ * substring of the line, we emit THAT clause; otherwise we fall back to the
+ * whole line minus its leading list marker.
+ */
+function extractCandidate(line) {
+  const trimmed = line.trim();
+  if (isMetadataOrArtifactLine(trimmed)) return null;
+
+  // (0) A blockquote finding line: `> "…"` (SS3-style). The inner quoted text is
+  //     the review's curated supporting quote and is verbatim in text.md.
+  if (/^\s*>/.test(line)) {
+    const q = /"([^"]+)"/.exec(line);
+    if (q && q[1].trim()) {
+      const quote = q[1].trim();
+      return { quote, scored: scoringText(quote), kind: 'curated' };
+    }
+    // A blockquote without an explicit quoted span → emit its verbatim body.
+    const body = line.replace(/^\s*>+\s?/, '').trim();
+    if (body) return { quote: body, scored: scoringText(body), kind: 'curated' };
+    return null;
+  }
+
+  // Strip a leading list marker ("- ", "* ", "1. ") / heading hashes, keeping a
+  // verbatim tail (we only ever SLICE, so the emitted quote stays a substring).
+  const listMarker = /^(\s*(?:[-*]|\d+\.|#{1,6})\s+)/.exec(line);
+  const afterMarker = listMarker ? line.slice(listMarker[0].length) : line;
+  const strippedWhole = scoringText(afterMarker);
+
+  // (1) A "Supporting quote"-style item: the finding is the FIRST double-quoted
+  //     span. Its inner text is verbatim in text.md, so emit the inner text.
+  //     This is an author-CURATED per-paper finding → kind 'curated'.
+  if (/supporting quote/i.test(afterMarker) || /^\s*(?:\*\*|__)?\s*quote\b/i.test(afterMarker)) {
+    const q = /"([^"]+)"/.exec(afterMarker);
+    if (q && q[1].trim()) {
+      const quote = q[1].trim();
+      return { quote, scored: scoringText(quote), kind: 'curated' };
+    }
+    // A "Supporting quote: Not mentioned" item with no quoted span → not a
+    // finding; drop it rather than emit the label.
+    return null;
+  }
+
+  // (2) A per-paper ENTRY head line — "Author, Year — Title" (numbered,
+  //     bulleted, or ### sub-heading). The finding is NOT on this line (it's on
+  //     the sibling "- Supporting quote:" / "- Main finding:" lines), so drop
+  //     it. This is what kept citation labels and their em-dashed TITLES out.
+  if (startsWithAuthorYearLabel(strippedWhole)) return null;
+
+  // (3) A "- **Title** (Year) — <finding>" item (SS2-style): the head is a
+  //     TITLE + parenthetical year and the finding follows the em-dash. This is
+  //     the review's per-paper finding → kind 'curated'.
+  const clause = findFindingClause(afterMarker);
+  if (clause) {
+    return { quote: clause, scored: scoringText(clause), kind: 'curated' };
+  }
+
+  // (4) "- **Main finding:** <finding>" item: emit the text after the bold
+  //     label, verbatim. Also author-curated. (Effect-direction lines carry no
+  //     finding verb and are dropped by the assertion gate upstream.)
+  const labeled = /^\s*(?:\*\*|__)?\s*[A-Za-z][A-Za-z \-()]*:\s*(?:\*\*|__)?\s*(\S.*)$/.exec(afterMarker);
+  if (labeled && /main finding|finding|effect/i.test(afterMarker)) {
+    // Slice the verbatim tail from the ORIGINAL line so it stays a substring.
+    const idx = afterMarker.indexOf(labeled[1]);
+    if (idx >= 0) {
+      const quote = afterMarker.slice(idx).trim();
+      return { quote, scored: scoringText(quote), kind: 'curated' };
+    }
+  }
+
+  // (5) Fallback: the whole line minus the leading marker, emitted verbatim.
+  //     Prose sentences land here (no marker, no label) → kind 'prose'.
+  const quote = afterMarker.trim();
+  if (!quote) return null;
+  return { quote, scored: scoringText(quote), kind: 'prose' };
+}
+
+/**
+ * "- **Title** (Year) — <finding>" (SS2-style): the finding follows the EM-DASH,
+ * with a TITLE + parenthetical year as the head. Return the verbatim finding
+ * clause after the em-dash, or null if this shape doesn't apply. We split ONLY
+ * on the em-dash (never a colon — titles carry "Subtitle:" colons that would
+ * mis-split), and require (a) a year in the head and (b) a finding verb in the
+ * tail so we don't slice an ordinary prose sentence that happens to contain a
+ * dash.
+ */
+function findFindingClause(body) {
+  for (const m of body.matchAll(/[—–]/g)) {
+    const idx = m.index;
+    const head = scoringText(body.slice(0, idx));
+    const tail = body.slice(idx + 1).trim();
+    if (!tail) continue;
+    if (!/\b(19|20)\d{2}\b/.test(head)) continue; // head must carry a year
+    if (!FINDING_VERB.test(scoringText(tail))) continue; // tail must assert
+    // Emit the verbatim tail slice (drop only leading emphasis/space chars that
+    // are actually present, so the result stays a real substring of the line).
+    const rawTail = body.slice(idx + 1);
+    const lead = /^[\s*_]+/.exec(rawTail);
+    const start = idx + 1 + (lead ? lead[0].length : 0);
+    const verbatim = body.slice(start).trim();
+    if (verbatim) return verbatim;
+  }
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -215,12 +464,28 @@ function statCount(sentence) {
  * Capitalized entities: interior Capitalized words (not the first token
  * of the sentence, so a normal sentence-initial capital does not count).
  * A crude named-entity proxy — instrument names, scales, brain regions.
+ *
+ * FIX: a RUN of consecutive Capitalized words is almost always a citation or a
+ * paper TITLE ("Gut Microbiota in Obesity and Metabolic Abnormalities",
+ * "Morán-Ramos et al.") — NOT a set of independent entities. Rewarding each
+ * word in the run inflated citation/header lines to the top. So we count each
+ * consecutive-capital run as ONE entity (discounted), not one per word. A
+ * genuine lone entity ("hippocampus modulated by GABA") still counts.
  */
 function capitalizedEntityCount(sentence) {
   const tokens = sentence.split(/\s+/);
   let n = 0;
+  let inRun = false;
   for (let i = 1; i < tokens.length; i++) {
-    if (/^[A-Z][a-zA-Z]{2,}/.test(tokens[i])) n += 1;
+    const isCap = /^[A-Z][a-zA-Z]{2,}/.test(tokens[i]);
+    if (isCap && !inRun) {
+      // start of a (possibly single-word) run — count it once.
+      n += 1;
+      inRun = true;
+    } else if (!isCap) {
+      inRun = false;
+    }
+    // isCap && inRun → continuation of a run → NOT counted again.
   }
   return n;
 }
@@ -229,13 +494,17 @@ function capitalizedEntityCount(sentence) {
  * Density = (numbers + 2×stat-patterns + 0.5×capitalized-entities) per
  * token, squashed to [0,1). Stat patterns are worth double a bare number
  * because "d = 1.12" is a finding signature, "60" alone is not.
+ *
+ * Measured on the de-noised `scored` text (markdown/citations removed) so that
+ * `**bold**` markers, `[Author, Year]` brackets, and their Capitalized tokens
+ * do not count as density — they are formatting, not information.
  */
-function densityScore(sentence) {
-  const tokenCount = Math.max(sentence.split(/\s+/).length, 1);
+function densityScore(scored) {
+  const tokenCount = Math.max(scored.split(/\s+/).length, 1);
   const raw =
-    (numberCount(sentence) +
-      2 * statCount(sentence) +
-      0.5 * capitalizedEntityCount(sentence)) /
+    (numberCount(scored) +
+      2 * statCount(scored) +
+      0.5 * capitalizedEntityCount(scored)) /
     tokenCount;
   return raw / (raw + 0.15); // squash; 0.15 ≈ "moderately dense"
 }
@@ -254,7 +523,10 @@ function buildCorpusFrequency(sections) {
   const freq = new Map();
   for (const section of sections) {
     if (!FREQUENCY_CORPUS_KINDS.has(section.kind)) continue;
-    for (const term of contentTerms(section.body.join(' '))) {
+    // De-noise the corpus too, so inline-citation author names (Janssen,
+    // Kersten, …) don't dominate the frequency table and pull citation-heavy
+    // lines to the top.
+    for (const term of contentTerms(scoringText(section.body.join(' ')))) {
       freq.set(term, (freq.get(term) ?? 0) + 1);
     }
   }
@@ -266,9 +538,9 @@ function buildCorpusFrequency(sections) {
  * terms, normalized by the corpus max so it lands in [0,1). Sentences
  * with no content terms score 0.
  */
-function frequencyScore(sentence, corpusFreq, corpusMax) {
+function frequencyScore(scored, corpusFreq, corpusMax) {
   if (corpusMax <= 0) return 0;
-  const terms = new Set(contentTerms(sentence));
+  const terms = new Set(contentTerms(scored));
   if (terms.size === 0) return 0;
   let sum = 0;
   for (const term of terms) sum += corpusFreq.get(term) ?? 0;
@@ -280,10 +552,19 @@ function frequencyScore(sentence, corpusFreq, corpusMax) {
 // Combination + ranking.
 // ─────────────────────────────────────────────────────────────────────
 
-/** Relative signal weights. Density leads — a spike ranking findings
- *  cares most about which sentences actually carry a stated result;
- *  frequency and the section prior break ties. Not required to sum to 1. */
-const WEIGHTS = { frequency: 0.35, density: 0.45, prior: 0.2 };
+/** Relative signal weights. For Elicit systematic-REVIEW synthesis, the key
+ *  finding is the review-level consensus, which is usually QUALITATIVE — so
+ *  frequency (how central a candidate's terms are to the whole review) leads,
+ *  density (numbers / effect sizes) is a supporting signal that must not bury a
+ *  qualitative consensus under a single study's big number, and the section /
+ *  candidate-kind prior breaks ties. Not required to sum to 1. */
+const WEIGHTS = { frequency: 0.5, density: 0.2, prior: 0.3 };
+
+/** Prior for an author-CURATED per-paper finding (a "Supporting quote" /
+ *  "Main finding" list item, or a "Title (Year) — finding" entry). The review
+ *  already selected these as each paper's finding, so they outrank incidental
+ *  narrative sentences. Used in place of the section prior for curated items. */
+const CURATED_PRIOR = 1.0;
 
 /**
  * Near-duplicate detection: Jaccard over content-term sets. Two Results
@@ -319,36 +600,92 @@ export function extractFindingsFromText(markdown, opts = {}) {
   const corpusMax = Math.max(0, ...corpusFreq.values());
 
   // Collect candidate sentences with their section context.
+  //
+  // Two candidate shapes coexist in these fixtures and must be handled
+  // differently BEFORE scoring:
+  //   • prose paragraphs (Results/Discussion/Synthesis narrative) — blank-line
+  //     separated; sentence-split as before.
+  //   • per-paper LIST items ("- **Author Year** — Title: <finding>",
+  //     "- **Supporting quote:** \"<finding>\"") — one candidate per line; the
+  //     finding CLAUSE is extracted, and formatting artifacts are dropped.
+  // `extractCandidate` unifies both: it returns { quote, scored } (a verbatim
+  // slice + its de-noised scoring text) or null to drop the line. We score on
+  // `scored` but emit `quote`.
   const candidates = [];
+  const seenQuotes = new Set();
+
+  /** Turn one verbatim candidate unit into a scored candidate (or skip it). */
+  const consider = (unit, section) => {
+    if (!unit) return;
+    const { quote, scored, kind } = unit;
+    // Guard length on the SCORED (content) text, not the raw quote, so a short
+    // finding padded by a long citation label still passes/fails on content.
+    if (scored.split(/\s+/).filter(Boolean).length < minTokens) return;
+    // Eligibility gate: a finding ASSERTS something. Titles, citation labels,
+    // section captions, and table headers carry no finding verb / statistic, so
+    // they are dropped here even if they survived the artifact filters.
+    if (!assertsFinding(scored)) return;
+    if (seenQuotes.has(quote)) return; // exact-dup line (repeated list items)
+    seenQuotes.add(quote);
+    const terms = new Set(contentTerms(scored));
+    if (terms.size === 0) return;
+    const frequency = frequencyScore(scored, corpusFreq, corpusMax);
+    const density = densityScore(scored);
+    // An author-curated per-paper finding gets the curated prior; a narrative
+    // sentence gets its section prior. This lets the review's own extracted
+    // findings outrank incidental prose without discarding the prose (which is
+    // the only source of findings for papers that have no per-paper list).
+    const prior = kind === 'curated' ? CURATED_PRIOR : (KIND_PRIOR[section.kind] ?? 0.35);
+    const score =
+      frequency * WEIGHTS.frequency + density * WEIGHTS.density + prior * WEIGHTS.prior;
+    candidates.push({
+      text: quote,
+      sourceSection: section.heading,
+      terms,
+      score: Math.round(score * 1e6) / 1e6,
+    });
+  };
+
   for (const section of sections) {
     // References/acknowledgements never yield findings.
     if (section.kind === 'references' || section.kind === 'acknowledgements') {
       continue;
     }
-    const paragraphs = section.body
-      .join('\n')
-      .split(/\n{2,}/)
-      .map((p) => p.trim())
-      .filter(Boolean);
-    for (const paragraph of paragraphs) {
+    // Walk the section body, grouping consecutive prose lines into paragraphs
+    // but treating each list-item / label line as its own candidate unit.
+    let proseBuffer = [];
+    const flushProse = () => {
+      if (proseBuffer.length === 0) return;
+      const paragraph = proseBuffer.join(' ').replace(/\s+/g, ' ').trim();
+      proseBuffer = [];
+      if (!paragraph) return;
       for (const sentence of splitSentences(paragraph)) {
-        if (sentence.split(/\s+/).length < minTokens) continue;
-        const terms = new Set(contentTerms(sentence));
-        const frequency = frequencyScore(sentence, corpusFreq, corpusMax);
-        const density = densityScore(sentence);
-        const prior = KIND_PRIOR[section.kind] ?? 0.35;
-        const score =
-          frequency * WEIGHTS.frequency +
-          density * WEIGHTS.density +
-          prior * WEIGHTS.prior;
-        candidates.push({
-          text: sentence,
-          sourceSection: section.heading,
-          terms,
-          score: Math.round(score * 1e6) / 1e6,
-        });
+        consider(extractCandidate(sentence), section);
+      }
+    };
+    for (const rawLine of section.body) {
+      const line = rawLine;
+      if (line.trim() === '') {
+        flushProse();
+        continue;
+      }
+      const isListy = /^\s*(?:[-*]|\d+\.)\s+/.test(line) || /^\s*#{1,6}\s+/.test(line);
+      const isTableRow = /^\s*\|/.test(line);
+      const isBlockquote = /^\s*>/.test(line);
+      // A line that is ENTIRELY italic ("*C. Hoxby (2000) — Quarterly Journal*")
+      // is a citation/metadata line — keep it out of the prose buffer so it does
+      // not merge into an adjacent finding sentence; it is then dropped by the
+      // label/assertion filters.
+      const isItalicMetaLine = /^\s*\*[^*].*\*\s*$/.test(line) && !/^\s*\*\s/.test(line);
+      if (isListy || isTableRow || isBlockquote || isItalicMetaLine) {
+        // Line-level candidate (may be dropped as an artifact/label inside).
+        flushProse();
+        consider(extractCandidate(line), section);
+      } else {
+        proseBuffer.push(line);
       }
     }
+    flushProse();
   }
 
   // Rank by score descending; stable, so equal scores keep document order.
