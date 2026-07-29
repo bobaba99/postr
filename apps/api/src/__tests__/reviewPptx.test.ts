@@ -12,12 +12,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   createLibreOfficeRenderer,
+  inspectPptxArchive,
   type ExecFileFn,
 } from '../review/pptx.js';
 
 /** Minimal JPEG carrying real SOF0 dimensions (what the parser reads). */
-function fakeJpeg(widthPx: number, heightPx: number): Buffer {
-  return Buffer.from([
+function fakeJpeg(
+  widthPx: number,
+  heightPx: number,
+  byteLength?: number,
+): Buffer {
+  const header = Buffer.from([
     0xff, 0xd8, // SOI
     0xff, 0xc0, // SOF0
     0x00, 0x11, // segment length
@@ -25,6 +30,8 @@ function fakeJpeg(widthPx: number, heightPx: number): Buffer {
     (heightPx >> 8) & 0xff, heightPx & 0xff,
     (widthPx >> 8) & 0xff, widthPx & 0xff,
   ]);
+  if (byteLength === undefined || byteLength <= header.length) return header;
+  return Buffer.concat([header, Buffer.alloc(byteLength - header.length)]);
 }
 
 interface ExecCall {
@@ -34,7 +41,11 @@ interface ExecCall {
 
 function fakeExec(
   opts: {
-    pages?: Array<{ widthPx: number; heightPx: number }>;
+    pages?: Array<{
+      widthPx: number;
+      heightPx: number;
+      byteLength?: number;
+    }>;
     failOn?: 'soffice' | 'pdftoppm';
   } = {},
 ) {
@@ -60,13 +71,81 @@ function fakeExec(
       for (let i = 0; i < pages.length; i++) {
         await writeFile(
           `${outPrefix}-${i + 1}.jpg`,
-          fakeJpeg(pages[i]!.widthPx, pages[i]!.heightPx),
+          fakeJpeg(
+            pages[i]!.widthPx,
+            pages[i]!.heightPx,
+            pages[i]!.byteLength,
+          ),
         );
       }
     }
     return { stdout: '', stderr: '' };
   };
   return { execFileFn, calls, getSawInputBytes: () => sawInputBytes };
+}
+
+interface ZipEntry {
+  name: string;
+  flags?: number;
+  compressionMethod?: number;
+  compressedBytes?: number;
+  uncompressedBytes?: number;
+}
+
+function zipWithEntries(entries: ZipEntry[]): Buffer {
+  const localParts: Buffer[] = [];
+  const centralParts: Buffer[] = [];
+  let localOffset = 0;
+  for (const entry of entries) {
+    const nameBytes = Buffer.from(entry.name);
+    const flags = entry.flags ?? 0;
+    const method = entry.compressionMethod ?? 0;
+    const compressedBytes = entry.compressedBytes ?? 0;
+    const uncompressedBytes = entry.uncompressedBytes ?? 0;
+    const local = Buffer.alloc(30 + nameBytes.length);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(flags, 6);
+    local.writeUInt16LE(method, 8);
+    local.writeUInt32LE(compressedBytes, 18);
+    local.writeUInt32LE(uncompressedBytes, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    nameBytes.copy(local, 30);
+    localParts.push(local);
+
+    const central = Buffer.alloc(46 + nameBytes.length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(flags, 8);
+    central.writeUInt16LE(method, 10);
+    central.writeUInt32LE(compressedBytes, 20);
+    central.writeUInt32LE(uncompressedBytes, 24);
+    central.writeUInt16LE(nameBytes.length, 28);
+    central.writeUInt32LE(localOffset, 42);
+    nameBytes.copy(central, 46);
+    centralParts.push(central);
+    localOffset += local.length;
+  }
+  const locals = Buffer.concat(localParts);
+  const central = Buffer.concat(centralParts);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(entries.length, 8);
+  eocd.writeUInt16LE(entries.length, 10);
+  eocd.writeUInt32LE(central.length, 12);
+  eocd.writeUInt32LE(locals.length, 16);
+  return Buffer.concat([locals, central, eocd]);
+}
+
+function requiredPptxEntries(
+  overrides: Partial<ZipEntry> = {},
+): ZipEntry[] {
+  return [
+    { name: '[Content_Types].xml', ...overrides },
+    { name: 'ppt/presentation.xml', ...overrides },
+    { name: 'ppt/slides/slide1.xml', ...overrides },
+  ];
 }
 
 let workDir: string;
@@ -152,6 +231,73 @@ describe('createLibreOfficeRenderer', () => {
     await expect(renderer.render(Buffer.from('x'))).resolves.toEqual([]);
   });
 
+  it('rejects a rendered JPEG whose file size exceeds the per-page cap', async () => {
+    const fake = fakeExec({
+      pages: [{ widthPx: 100, heightPx: 100, byteLength: 33 }],
+    });
+    const renderer = createLibreOfficeRenderer({
+      workDir,
+      execFileFn: fake.execFileFn,
+      maxRenderedPageBytes: 32,
+      maxRenderedTotalBytes: 64,
+    });
+
+    await expect(renderer.render(Buffer.from('x'))).rejects.toThrow(
+      /page-1\.jpg.*32 bytes/,
+    );
+  });
+
+  it('rejects rendered JPEGs whose aggregate file size exceeds the cap', async () => {
+    const fake = fakeExec({
+      pages: [
+        { widthPx: 100, heightPx: 100, byteLength: 20 },
+        { widthPx: 100, heightPx: 100, byteLength: 20 },
+      ],
+    });
+    const renderer = createLibreOfficeRenderer({
+      workDir,
+      execFileFn: fake.execFileFn,
+      maxRenderedPageBytes: 32,
+      maxRenderedTotalBytes: 39,
+    });
+
+    await expect(renderer.render(Buffer.from('x'))).rejects.toThrow(
+      /aggregate.*39 bytes/,
+    );
+  });
+
+  it('rejects a rendered JPEG whose width or height exceeds the dimension cap', async () => {
+    const fake = fakeExec({
+      pages: [{ widthPx: 1201, heightPx: 100 }],
+    });
+    const renderer = createLibreOfficeRenderer({
+      workDir,
+      execFileFn: fake.execFileFn,
+      maxRenderedDimensionPx: 1200,
+      maxRenderedPixels: 1_000_000,
+    });
+
+    await expect(renderer.render(Buffer.from('x'))).rejects.toThrow(
+      /1201x100.*1200px/,
+    );
+  });
+
+  it('rejects a rendered JPEG whose decoded pixel area exceeds the cap', async () => {
+    const fake = fakeExec({
+      pages: [{ widthPx: 101, heightPx: 100 }],
+    });
+    const renderer = createLibreOfficeRenderer({
+      workDir,
+      execFileFn: fake.execFileFn,
+      maxRenderedDimensionPx: 1000,
+      maxRenderedPixels: 10_000,
+    });
+
+    await expect(renderer.render(Buffer.from('x'))).rejects.toThrow(
+      /10100 pixels.*10000/,
+    );
+  });
+
   it('kills a default subprocess that exceeds the configured hard timeout', async () => {
     const sleeper = join(workDir, 'sleep.sh');
     await writeFile(sleeper, '#!/bin/sh\nexec sleep 1\n');
@@ -167,5 +313,58 @@ describe('createLibreOfficeRenderer', () => {
       killed: true,
       signal: 'SIGKILL',
     });
+  });
+});
+
+describe('inspectPptxArchive', () => {
+  it('rejects encrypted ZIP entries', () => {
+    const pptx = zipWithEntries(requiredPptxEntries({ flags: 0x0001 }));
+
+    expect(() => inspectPptxArchive(pptx, 24)).toThrow(/encrypted/i);
+  });
+
+  it('rejects ZIP entries using unsupported compression methods', () => {
+    const pptx = zipWithEntries(
+      requiredPptxEntries({ compressionMethod: 12 }),
+    );
+
+    expect(() => inspectPptxArchive(pptx, 24)).toThrow(
+      /compression method 12/i,
+    );
+  });
+
+  it('rejects archives whose declared uncompressed total exceeds the cap', () => {
+    const pptx = zipWithEntries(
+      requiredPptxEntries({
+        compressionMethod: 8,
+        compressedBytes: 20,
+        uncompressedBytes: 60,
+      }),
+    );
+
+    expect(() =>
+      inspectPptxArchive(pptx, 24, {
+        maxUncompressedBytes: 179,
+        maxCompressionRatio: 100,
+      }),
+    ).toThrow(/uncompressed.*179 bytes/i);
+  });
+
+  it('rejects entries whose declared compression ratio exceeds the cap', () => {
+    const entries = requiredPptxEntries();
+    entries[2] = {
+      ...entries[2]!,
+      compressionMethod: 8,
+      compressedBytes: 1,
+      uncompressedBytes: 101,
+    };
+    const pptx = zipWithEntries(entries);
+
+    expect(() =>
+      inspectPptxArchive(pptx, 24, {
+        maxUncompressedBytes: 1000,
+        maxCompressionRatio: 100,
+      }),
+    ).toThrow(/compression ratio.*100/i);
   });
 });

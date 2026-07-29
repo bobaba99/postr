@@ -15,9 +15,24 @@
  */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, writeFile, readFile, readdir, rm } from 'node:fs/promises';
+import {
+  mkdtemp,
+  writeFile,
+  readFile,
+  readdir,
+  rm,
+  stat,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import {
+  REVIEW_PPTX_MAX_COMPRESSION_RATIO,
+  REVIEW_PPTX_MAX_UNCOMPRESSED_BYTES,
+  REVIEW_PPTX_RENDERED_MAX_DIMENSION_PX,
+  REVIEW_PPTX_RENDERED_MAX_PIXELS,
+  REVIEW_PPTX_RENDERED_PAGE_MAX_BYTES,
+  REVIEW_PPTX_RENDERED_TOTAL_MAX_BYTES,
+} from './config.js';
 
 const ZIP_EOCD_SIGNATURE = 0x06054b50;
 const ZIP_CENTRAL_FILE_SIGNATURE = 0x02014b50;
@@ -66,6 +81,13 @@ export class PptxArchiveError extends Error {
   ) {
     super(detail);
     this.name = 'PptxArchiveError';
+  }
+}
+
+export class PptxRenderOutputError extends Error {
+  constructor(detail: string) {
+    super(detail);
+    this.name = 'PptxRenderOutputError';
   }
 }
 
@@ -130,7 +152,15 @@ export async function readPptxResponse(
 export function inspectPptxArchive(
   pptx: Buffer,
   maxSlides: number,
+  options: {
+    maxUncompressedBytes?: number;
+    maxCompressionRatio?: number;
+  } = {},
 ): { slideCount: number } {
+  const maxUncompressedBytes =
+    options.maxUncompressedBytes ?? REVIEW_PPTX_MAX_UNCOMPRESSED_BYTES;
+  const maxCompressionRatio =
+    options.maxCompressionRatio ?? REVIEW_PPTX_MAX_COMPRESSION_RATIO;
   const eocdOffset = findEndOfCentralDirectory(pptx);
   if (eocdOffset < 0) {
     throw new PptxArchiveError('invalid_pptx', 'ZIP end-of-central-directory not found');
@@ -173,6 +203,8 @@ export function inspectPptxArchive(
 
   const names = new Set<string>();
   let cursor = centralOffset;
+  let totalCompressedBytes = 0;
+  let totalUncompressedBytes = 0;
   for (let index = 0; index < totalEntries; index++) {
     if (
       cursor + 46 > centralEnd ||
@@ -187,11 +219,66 @@ export function inspectPptxArchive(
     if (nameLength === 0 || entryEnd > centralEnd) {
       throw new PptxArchiveError('invalid_pptx', 'Malformed PPTX central directory lengths');
     }
-    names.add(pptx.toString('utf8', cursor + 46, cursor + 46 + nameLength));
+    const name = pptx.toString('utf8', cursor + 46, cursor + 46 + nameLength);
+    const flags = pptx.readUInt16LE(cursor + 8);
+    const compressionMethod = pptx.readUInt16LE(cursor + 10);
+    const compressedBytes = pptx.readUInt32LE(cursor + 20);
+    const uncompressedBytes = pptx.readUInt32LE(cursor + 24);
+    if ((flags & 0x0001) !== 0) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `Encrypted PPTX entry is not supported: ${name}`,
+      );
+    }
+    if (compressionMethod !== 0 && compressionMethod !== 8) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `Unsupported PPTX compression method ${compressionMethod}: ${name}`,
+      );
+    }
+    if (
+      compressedBytes === 0xffffffff ||
+      uncompressedBytes === 0xffffffff
+    ) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `ZIP64 PPTX entry is not supported: ${name}`,
+      );
+    }
+    totalCompressedBytes += compressedBytes;
+    totalUncompressedBytes += uncompressedBytes;
+    if (totalUncompressedBytes > maxUncompressedBytes) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `PPTX uncompressed size exceeds ${maxUncompressedBytes} bytes`,
+      );
+    }
+    if (
+      uncompressedBytes > 0 &&
+      (compressedBytes === 0 ||
+        uncompressedBytes > compressedBytes * maxCompressionRatio)
+    ) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `PPTX entry compression ratio exceeds ${maxCompressionRatio}: ${name}`,
+      );
+    }
+    names.add(name);
     cursor = entryEnd;
   }
   if (cursor !== centralEnd) {
     throw new PptxArchiveError('invalid_pptx', 'PPTX central directory entry count is invalid');
+  }
+  if (
+    totalUncompressedBytes > 0 &&
+    (totalCompressedBytes === 0 ||
+      totalUncompressedBytes >
+        totalCompressedBytes * maxCompressionRatio)
+  ) {
+    throw new PptxArchiveError(
+      'invalid_pptx',
+      `PPTX aggregate compression ratio exceeds ${maxCompressionRatio}`,
+    );
   }
   if (!names.has('[Content_Types].xml') || !names.has('ppt/presentation.xml')) {
     throw new PptxArchiveError('invalid_pptx', 'Required PPTX OOXML entries are missing');
@@ -252,6 +339,14 @@ export interface LibreOfficeRendererOptions {
   execFileFn?: ExecFileFn;
   /** Hard timeout for each default subprocess (default 60 seconds). */
   processTimeoutMs?: number;
+  /** Maximum encoded bytes for one rendered JPEG. */
+  maxRenderedPageBytes?: number;
+  /** Maximum encoded bytes across all rendered JPEGs. */
+  maxRenderedTotalBytes?: number;
+  /** Maximum accepted JPEG width or height. */
+  maxRenderedDimensionPx?: number;
+  /** Maximum accepted decoded pixel area for one JPEG. */
+  maxRenderedPixels?: number;
 }
 
 export function createLibreOfficeRenderer(
@@ -263,6 +358,14 @@ export function createLibreOfficeRenderer(
   const execFileFn =
     opts.execFileFn ??
     createExecFileFn(opts.processTimeoutMs ?? DEFAULT_PROCESS_TIMEOUT_MS);
+  const maxRenderedPageBytes =
+    opts.maxRenderedPageBytes ?? REVIEW_PPTX_RENDERED_PAGE_MAX_BYTES;
+  const maxRenderedTotalBytes =
+    opts.maxRenderedTotalBytes ?? REVIEW_PPTX_RENDERED_TOTAL_MAX_BYTES;
+  const maxRenderedDimensionPx =
+    opts.maxRenderedDimensionPx ?? REVIEW_PPTX_RENDERED_MAX_DIMENSION_PX;
+  const maxRenderedPixels =
+    opts.maxRenderedPixels ?? REVIEW_PPTX_RENDERED_MAX_PIXELS;
 
   return {
     async render(pptx: Buffer): Promise<RenderedPage[]> {
@@ -298,10 +401,45 @@ export function createLibreOfficeRenderer(
         const names = (await readdir(dir))
           .filter((n) => /^page-\d+\.jpg$/.test(n))
           .sort((a, b) => pageNumberOf(a) - pageNumberOf(b));
+        let totalRenderedBytes = 0;
+        for (const name of names) {
+          const { size } = await stat(join(dir, name));
+          if (size > maxRenderedPageBytes) {
+            throw new PptxRenderOutputError(
+              `${name} exceeds ${maxRenderedPageBytes} bytes`,
+            );
+          }
+          totalRenderedBytes += size;
+          if (totalRenderedBytes > maxRenderedTotalBytes) {
+            throw new PptxRenderOutputError(
+              `Rendered JPEG aggregate exceeds ${maxRenderedTotalBytes} bytes`,
+            );
+          }
+        }
+
         const pages: RenderedPage[] = [];
         for (const [index, name] of names.entries()) {
           const jpeg = await readFile(join(dir, name));
+          if (jpeg.byteLength > maxRenderedPageBytes) {
+            throw new PptxRenderOutputError(
+              `${name} exceeds ${maxRenderedPageBytes} bytes`,
+            );
+          }
           const { widthPx, heightPx } = jpegDimensions(jpeg);
+          if (
+            widthPx > maxRenderedDimensionPx ||
+            heightPx > maxRenderedDimensionPx
+          ) {
+            throw new PptxRenderOutputError(
+              `${name} is ${widthPx}x${heightPx}; maximum dimension is ${maxRenderedDimensionPx}px`,
+            );
+          }
+          const pixels = widthPx * heightPx;
+          if (pixels > maxRenderedPixels) {
+            throw new PptxRenderOutputError(
+              `${name} has ${pixels} pixels; maximum is ${maxRenderedPixels}`,
+            );
+          }
           pages.push({ pageNumber: index + 1, jpeg, widthPx, heightPx });
         }
         return pages;
