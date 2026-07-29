@@ -9,7 +9,7 @@
  */
 import { postJson } from '@/lib/apiClient';
 
-export type BillingSku = 'term' | 'pack';
+export type BillingSku = 'term' | 'pack' | 'review_pack' | 'review_addon';
 
 /** Create a checkout session and return its hosted Stripe URL. */
 export async function createCheckout(sku: BillingSku): Promise<string> {

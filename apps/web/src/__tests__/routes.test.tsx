@@ -9,8 +9,14 @@
  */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AppRoutes } from '../routes';
+
+// The presentation-checker page pulls in the review API client and the
+// ingest layer; routing behaviour doesn't need them.
+vi.mock('@/pages/PresentationChecker', () => ({
+  default: () => <h1>Presentation Checker</h1>,
+}));
 
 function LocationProbe() {
   const location = useLocation();
@@ -43,5 +49,22 @@ describe('deactivated public gallery routes', () => {
       /^\/$/,
     );
     expect(screen.getByText(/academic posters/i)).toBeInTheDocument();
+  });
+});
+
+describe('presentation checker route', () => {
+  it('serves /presentation-checker publicly — registered, not redirected', async () => {
+    renderAt('/presentation-checker');
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /presentation checker/i,
+        level: 1,
+      }),
+    ).toBeInTheDocument();
+    // …and the URL stays put (no alias redirect).
+    expect(await screen.findByTestId('location-probe')).toHaveTextContent(
+      /^\/presentation-checker$/,
+    );
   });
 });
