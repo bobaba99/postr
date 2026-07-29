@@ -61,6 +61,7 @@ import type { PosterTableRef } from '@/charts/ladder/DataStep';
 import { ImportSection } from './sidebar/ImportSection';
 import { PostrExportButton } from './sidebar/PostrExportButton';
 import { EditableExportButtons } from './sidebar/EditableExportButtons';
+import { ReviewTab } from './sidebar/ReviewTab';
 import { VersionPanel } from './VersionPanel';
 import { CopyDesignModal } from '@/components/CopyDesignModal';
 import {
@@ -77,6 +78,7 @@ export type SidebarTab =
   | 'insert'
   | 'check'
   | 'issues'
+  | 'review'
   | 'comments'
   | 'versions'
   | 'export';
@@ -332,6 +334,11 @@ export function Sidebar(props: SidebarProps) {
     // confirmation isn't yanked away the moment the picker selects
     // its own freshly inserted block.
     if ((t === 'image' || t === 'chart') && tab === 'check') return;
+    // The Review tab is never yanked away on selection: the user is
+    // reading findings and clicking them to jump to blocks — each jump
+    // selects a block, and without this exemption the first click would
+    // bounce the sidebar straight back to Edit.
+    if (tab === 'review') return;
     if (t === 'authors') {
       setTab('authors');
       return;
@@ -615,6 +622,7 @@ export function Sidebar(props: SidebarProps) {
                   ['refs', 'references'],
                   ['check', 'figure'],
                   ['issues', 'issues'],
+                  ['review', 'review'],
                   ['comments', 'comments'],
                   ['versions', 'versions'],
                   ['export', 'export'],
@@ -763,6 +771,10 @@ export function Sidebar(props: SidebarProps) {
             issues={props.issues}
             onJumpToBlock={props.onJumpToBlock}
           />
+        )}
+
+        {tab === 'review' && (
+          <ReviewTab onJumpToBlock={props.onJumpToBlock} />
         )}
 
         {tab === 'comments' && (
