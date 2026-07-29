@@ -71,6 +71,25 @@ function fakeSupabase(initialCredits = 2) {
       }),
     },
     from(table: string) {
+      if (table === 'posters') {
+        const filters = new Map<string, unknown>();
+        const chain = {
+          eq(column: string, value: unknown) {
+            filters.set(column, value);
+            return chain;
+          },
+          maybeSingle: async () => ({
+            data:
+              filters.get('id') === FOREIGN_POSTER_ID
+                ? null
+                : { id: filters.get('id') },
+            error: null,
+          }),
+        };
+        return {
+          select: (_cols?: string) => chain,
+        };
+      }
       return {
         select: (_cols?: string) => ({
           eq: (_col: string, _value: unknown) => ({
@@ -486,5 +505,10 @@ describe('POST /api/review/critique — initial request idempotency', () => {
     expect(supabase.reviewCredits).toBe(1);
     expect(supabase.reviews.size).toBe(0);
     expect(supabase.claims.has(REQUEST_KEY)).toBe(false);
+    expect(anthropic.create).not.toHaveBeenCalled();
+    expect(supabase.rpcs.map(({ fn }) => fn)).toEqual([
+      'claim_initial_review',
+      'release_initial_review',
+    ]);
   });
 });

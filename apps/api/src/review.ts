@@ -609,6 +609,41 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
 
   let claimSettled = false;
   try {
+    // Reject a caller-controlled foreign/missing poster before quota,
+    // page-fetch, or provider work. The finalization RPC repeats this check
+    // under a database lock so ownership remains authoritative across races.
+    if (body.posterId) {
+      let ownedPoster: unknown;
+      let posterError: { message?: string } | null = null;
+      try {
+        const response = await supabase
+          .from('posters')
+          .select('id')
+          .eq('id', body.posterId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        ownedPoster = response.data;
+        posterError = response.error;
+      } catch (err) {
+        posterError = {
+          message:
+            err instanceof Error ? err.message : 'poster lookup crashed',
+        };
+      }
+      if (posterError) {
+        // eslint-disable-next-line no-console
+        console.error('[review.critique] poster ownership lookup failed', {
+          userId: user.id,
+          posterId: body.posterId,
+          message: posterError.message,
+        });
+        return res.status(500).json({ error: 'review_internal' });
+      }
+      if (!ownedPoster) {
+        return res.status(403).json({ error: 'not_poster_owner' });
+      }
+    }
+
     if (!anthropic) {
       return res.status(500).json({
         error: 'provider_not_configured',
