@@ -71,6 +71,20 @@ describe('fetchReviewPages', () => {
     );
   });
 
+  it('rejects a batch whose aggregate raw bytes exceed the request budget', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(imageResponse(700))
+      .mockResolvedValueOnce(imageResponse(700));
+
+    await expect(
+      fetchReviewPages(
+        [page(1), page(2)],
+        deps(fetchFn, { maxBytes: 1024, maxTotalBytes: 1024 }),
+      ),
+    ).rejects.toMatchObject({ code: 'too_large', pageNumber: 2 });
+  });
+
   it('rejects a foreign host with url_not_allowed BEFORE any fetch', async () => {
     const fetchFn = vi.fn();
     await expect(
@@ -99,6 +113,67 @@ describe('fetchReviewPages', () => {
     await expect(
       fetchReviewPages([page(1)], deps(fetchFn, { maxBytes: 1024 })),
     ).rejects.toMatchObject({ code: 'too_large', pageNumber: 1 });
+  });
+
+  it('rejects a declared oversize page before reading its body', async () => {
+    const cancel = vi.fn();
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        pull() {
+          throw new Error('the declared-oversize body must not be read');
+        },
+        cancel,
+      }),
+      {
+        status: 200,
+        headers: {
+          'content-type': 'image/png',
+          'content-length': '1025',
+        },
+      },
+    );
+    const fetchFn = vi.fn().mockResolvedValue(response);
+
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn, { maxBytes: 1024 })),
+    ).rejects.toMatchObject({ code: 'too_large', pageNumber: 1 });
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels a chunked page as soon as its running byte count exceeds the cap', async () => {
+    const cancel = vi.fn();
+    const releaseLock = vi.fn();
+    const read = vi
+      .fn()
+      .mockResolvedValueOnce({
+        done: false,
+        value: new Uint8Array(700),
+      })
+      .mockResolvedValueOnce({
+        done: false,
+        value: new Uint8Array(400),
+      });
+    const response = {
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'image/png' }),
+      body: {
+        getReader: () => ({
+          read,
+          cancel,
+          releaseLock,
+        }),
+      },
+      arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(1100)),
+    } as unknown as Response;
+    const fetchFn = vi.fn().mockResolvedValue(response);
+
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn, { maxBytes: 1024 })),
+    ).rejects.toMatchObject({ code: 'too_large', pageNumber: 1 });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(releaseLock).toHaveBeenCalledTimes(1);
   });
 
   it('accepts a page at exactly the byte cap', async () => {

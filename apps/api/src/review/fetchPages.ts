@@ -13,7 +13,10 @@
  */
 import type { ReviewPageRef } from '@postr/shared';
 import { checkImageUrl } from '../imageUrlGuard.js';
-import { REVIEW_IMAGE_MAX_BYTES } from './config.js';
+import {
+  REVIEW_IMAGE_MAX_BYTES,
+  REVIEW_TOTAL_IMAGE_MAX_BYTES,
+} from './config.js';
 
 export interface FetchedPage {
   mediaType: 'image/jpeg' | 'image/png';
@@ -51,6 +54,7 @@ export class PageFetchError extends Error {
  * missing the guard fails closed as url_not_allowed (the detail string
  * records 'allowlist_not_configured' for logs). `opts.maxBytes` defaults
  * to REVIEW_IMAGE_MAX_BYTES and exists so tests don't allocate 5MB.
+ * `opts.maxTotalBytes` bounds the raw bytes retained across every page.
  */
 export async function fetchReviewPages(
   pages: ReviewPageRef[],
@@ -58,13 +62,17 @@ export async function fetchReviewPages(
     supabaseUrl?: string;
     fetchFn?: typeof fetch;
     maxBytes?: number;
+    maxTotalBytes?: number;
   } = {},
 ): Promise<FetchedPage[]> {
   const supabaseUrl = opts.supabaseUrl ?? process.env.SUPABASE_URL;
   const fetchFn = opts.fetchFn ?? fetch;
   const maxBytes = opts.maxBytes ?? REVIEW_IMAGE_MAX_BYTES;
+  const maxTotalBytes =
+    opts.maxTotalBytes ?? REVIEW_TOTAL_IMAGE_MAX_BYTES;
 
   const out: FetchedPage[] = [];
+  let totalBytes = 0;
   for (const page of pages) {
     const check = checkImageUrl(page.url, supabaseUrl);
     if (!check.ok) {
@@ -100,17 +108,6 @@ export async function fetchReviewPages(
       );
     }
 
-    const buf = Buffer.from(await response.arrayBuffer());
-    // Raw bytes BEFORE base64 (which inflates 4/3): a clean typed error
-    // beats an opaque upstream rejection (import.ts:544-551).
-    if (buf.byteLength > maxBytes) {
-      throw new PageFetchError(
-        'too_large',
-        `page ${page.pageNumber}: ${buf.byteLength} bytes exceeds ${maxBytes}`,
-        page.pageNumber,
-      );
-    }
-
     const contentType = response.headers.get('content-type') ?? '';
     const mediaType = contentType.includes('jpeg')
       ? ('image/jpeg' as const)
@@ -125,7 +122,104 @@ export async function fetchReviewPages(
       );
     }
 
+    const remainingTotal = maxTotalBytes - totalBytes;
+    const allowedBytes = Math.min(maxBytes, remainingTotal);
+    if (allowedBytes < 0) {
+      throw new PageFetchError(
+        'too_large',
+        `page ${page.pageNumber}: request exceeds ${maxTotalBytes} total bytes`,
+        page.pageNumber,
+      );
+    }
+
+    const buf = await readBoundedPageBody(
+      response,
+      allowedBytes,
+      page.pageNumber,
+      maxBytes,
+      maxTotalBytes,
+      remainingTotal,
+    );
+    totalBytes += buf.byteLength;
     out.push({ mediaType, imageData: buf.toString('base64') });
   }
   return out;
+}
+
+async function readBoundedPageBody(
+  response: Response,
+  allowedBytes: number,
+  pageNumber: number,
+  maxBytes: number,
+  maxTotalBytes: number,
+  remainingTotal: number,
+): Promise<Buffer> {
+  const declared = response.headers.get('content-length')?.trim();
+  if (declared && /^\d+$/.test(declared)) {
+    const declaredBytes = BigInt(declared);
+    if (declaredBytes > BigInt(allowedBytes)) {
+      await cancelBody(response.body);
+      const reason =
+        declaredBytes > BigInt(maxBytes)
+          ? `${declared} bytes exceeds ${maxBytes}`
+          : `${declared} bytes exceeds the ${remainingTotal}-byte remainder of the ${maxTotalBytes}-byte request budget`;
+      throw new PageFetchError(
+        'too_large',
+        `page ${pageNumber}: ${reason}`,
+        pageNumber,
+      );
+    }
+  }
+
+  if (!response.body) return Buffer.alloc(0);
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value || value.byteLength === 0) continue;
+      const nextTotal = total + value.byteLength;
+      if (nextTotal > allowedBytes) {
+        try {
+          await reader.cancel();
+        } catch {
+          // Best effort: the typed size error remains authoritative.
+        }
+        const reason =
+          nextTotal > maxBytes
+            ? `${nextTotal} bytes exceeds ${maxBytes}`
+            : `${nextTotal} bytes exceeds the ${remainingTotal}-byte remainder of the ${maxTotalBytes}-byte request budget`;
+        throw new PageFetchError(
+          'too_large',
+          `page ${pageNumber}: ${reason}`,
+          pageNumber,
+        );
+      }
+      chunks.push(value);
+      total = nextTotal;
+    }
+  } catch (error) {
+    if (error instanceof PageFetchError) throw error;
+    const message = error instanceof Error ? error.message : 'unknown';
+    throw new PageFetchError(
+      'fetch_failed',
+      `page ${pageNumber}: ${message}`,
+      pageNumber,
+    );
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total);
+}
+
+async function cancelBody(
+  body: ReadableStream<Uint8Array> | null,
+): Promise<void> {
+  try {
+    await body?.cancel();
+  } catch {
+    // Best effort: the typed size error remains authoritative.
+  }
 }

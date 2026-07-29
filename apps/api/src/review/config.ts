@@ -30,8 +30,36 @@ export const REVIEW_MAX_PAGES = 24;
  */
 export const REVIEW_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
+/**
+ * Aggregate raw-image budget for one critique request. This is checked while
+ * streaming, before base64 expansion, so a valid 24-page request cannot make
+ * the API retain 24 independently max-sized objects.
+ */
+export const REVIEW_TOTAL_IMAGE_MAX_BYTES = 40 * 1024 * 1024;
+
 /** PPTX upload cap for the /api/review/render-pptx route (D10). */
 export const REVIEW_PPTX_MAX_BYTES = 50 * 1024 * 1024;
+
+/** Maximum declared expansion of all ZIP entries before conversion. */
+export const REVIEW_PPTX_MAX_UNCOMPRESSED_BYTES = 250 * 1024 * 1024;
+
+/** Maximum declared expansion ratio for any ZIP entry or the archive total. */
+export const REVIEW_PPTX_MAX_COMPRESSION_RATIO = 100;
+
+/** Reject excess LibreOffice work instead of queueing unbounded conversions. */
+export const REVIEW_PPTX_MAX_CONCURRENT_RENDERS = 1;
+
+/** Maximum encoded bytes retained for one JPEG emitted by pdftoppm. */
+export const REVIEW_PPTX_RENDERED_PAGE_MAX_BYTES = 8 * 1024 * 1024;
+
+/** Maximum encoded bytes retained across all rendered page JPEGs. */
+export const REVIEW_PPTX_RENDERED_TOTAL_MAX_BYTES = 48 * 1024 * 1024;
+
+/** Maximum width or height accepted from a rendered page JPEG. */
+export const REVIEW_PPTX_RENDERED_MAX_DIMENSION_PX = 8192;
+
+/** Maximum decoded pixel area accepted from a rendered page JPEG. */
+export const REVIEW_PPTX_RENDERED_MAX_PIXELS = 40_000_000;
 
 /**
  * Hard findings clamp applied by enforce.ts (Task 14). The prompt asks
