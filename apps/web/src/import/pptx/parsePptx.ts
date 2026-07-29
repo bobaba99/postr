@@ -110,11 +110,13 @@ const slideNumber = (path: string): number =>
 /**
  * How many slides after the first are Postr's own appended templates.
  *
- * Every Postr export is a multi-slide deck: the poster, an explainer,
- * and one empty slide per named layout (see
- * `export/pptx/templateSlides.ts`). Re-importing a file Postr itself
- * produced must NOT tell the user that six slides of their content
- * were skipped — they never authored those slides.
+ * The POSTER export is a single slide now, but two kinds of deck still
+ * carry these template slides: the talk deck (which reuses
+ * `export/pptx/templateSlides.ts`), and every poster file exported
+ * before the poster path stopped appending them — a poster, an
+ * explainer, and one empty slide per named layout. Re-importing such a
+ * file must NOT tell the user that six slides of their content were
+ * skipped — they never authored those slides.
  *
  * The exporter names each appended slide `<p:cSld name="Postr
  * template - …">`, so identity travels with the slide rather than

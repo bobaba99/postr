@@ -59,13 +59,32 @@ Recorded for context, not used to pick the winner: **cost** (LLM $/paper) and
 
 ## Inputs (the two things only Gavin can supply)
 
-### The paper set (N = 8–12)
+### The fixture set (N = 12: 6 social science + 6 biology) — Consensus-generated
 
-Full **text** is required — not just abstracts (findings live in Results). Consensus
-MCP search returns titles/abstracts/URLs, so it is used to *find* candidates, not
-to supply the text. Assemble the set as:
-- **6–8 well-written** papers across psychology + medicine (the target domains),
-  as PDFs or pasted text Gavin provides.
+Decided 2026-07-29. Rather than collect individual PDFs, **generate each fixture
+from a research question via Consensus**: a core research question →
+Consensus's papers-grounded synthesis → that synthesis IS the fixture text (a
+findings-bearing body of prose with a known main result). Because *we chose* the
+core question, the expected star finding is largely determined — which is what
+makes the gold set draftable and the experiment reproducible.
+
+- **9 clean fixtures** — one core research question each, 6 across social science
+  + 3 across biology (and vice-versa to reach 6/6 with the degraded ones). The
+  synthesis prose is the fixture `text.md`.
+- **3 degraded fixtures (bad-intro simulation)** — take a clean fixture's core
+  question and **prepend adjacent, off-target "umbrella" background** generated
+  from 2–3 *adjacent* research questions (the noise), THEN keep the **real study
+  objective + hypothesis at the end** (the original core question). This mimics
+  Gavin's umbrella-background failure (AD language-deficits: behavioural +
+  biological + caregiving noise → then the real language gap). The test: does each
+  arm push past the intro noise to the real objective at the end? The clean and
+  degraded versions of the same core question are paired for degradation measurement.
+
+**Gold set:** drafted by the orchestrator from each core research question +
+Consensus synthesis (star finding + top-3), then **reviewed and approved by Gavin
+before scoring**. Blind ordering still applies when grading arm outputs.
+
+Consensus pacing: batch ≤3 searches, wait on any 429, per the server's own rule.
 - **≥2 badly-written — SIMULATED** from a well-written paper by degrading its
   introduction into an **over-comprehensive umbrella background**. The canonical
   failure pattern (Gavin, 2026-07-29): the intro stops being about the specific

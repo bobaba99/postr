@@ -11,6 +11,10 @@ import { describe, expect, it } from 'vitest';
 import { zipSync } from 'fflate';
 import { exportPosterPptx } from '@/export/pptx/writer';
 import { makeFixtureDoc, baseBlock, TINY_PNG_BYTES } from '@/export/__tests__/fixtures';
+import {
+  APPENDED_SLIDE_COUNT,
+  TEMPLATE_SLIDE_PREFIX,
+} from '@/export/pptx/templateMarker';
 import { EMU_PER_UNIT, emuToUnits, unitsToEmu } from '@/export/units';
 import { DEFAULT_FONT_FAMILY, FONT_NAMES } from '@/poster/constants';
 import { PptxImportError } from '../pptx/ooxml';
@@ -260,10 +264,14 @@ describe('multi-slide decks', () => {
 });
 
 /**
- * Every Postr export is now a 7-slide deck (poster + explainer + five
- * empty layout templates). Re-importing one must not accuse the user
- * of losing six slides they never wrote — while a genuine multi-slide
- * deck from PowerPoint must still warn.
+ * The POSTER export is a single slide now, but earlier Postr exports —
+ * still in users' hands — were 7-slide decks (poster + explainer + five
+ * empty layout templates), and the talk deck reuses those template
+ * slides. Re-importing such a deck must not accuse the user of losing
+ * six slides they never wrote, while a genuine multi-slide deck from
+ * PowerPoint must still warn. These use `withTemplateSlides` to
+ * reconstruct that historical/talk deck shape directly, since the
+ * poster exporter no longer appends the slides.
  */
 describe('Postr’s own template slides are not counted as skipped content', () => {
   const skipWarning = (parsed: { warnings: string[] }): string | undefined =>
@@ -317,15 +325,14 @@ describe('Postr’s own template slides are not counted as skipped content', () 
     // The template probe must never parse the slides it is about to
     // throw away: one bad byte in slide 5 previously sank an
     // otherwise perfectly importable poster.
-    const { unzipSync } = await import('fflate');
-    const entries = unzipSync(await exportBytes(makeFixtureDoc()));
-    const broken: Record<string, Uint8Array> = { ...entries };
+    const broken = await withTemplateSlides();
     broken['ppt/slides/slide5.xml'] = new TextEncoder().encode('<p:sld><oops>');
     const parsed = parsePptx(zipSync(broken));
     // The poster still imports, with its blocks intact.
     expect(parsed.doc.blocks.filter((b) => b.type === 'title')).toHaveLength(1);
     expect(parsed.title).toContain('Whisker Maps &');
-    // The unreadable slide is not ours, so it counts as skipped.
+    // The unreadable slide can no longer be recognised as ours, so it
+    // counts as skipped; the other five templates still do not.
     expect(skipWarning(parsed)).toContain('1 slide was skipped');
   });
 
@@ -385,8 +392,9 @@ async function reorderPosterTo(
   position: number,
   opts: { dropPoster?: boolean } = {},
 ): Promise<Uint8Array> {
-  const { unzipSync } = await import('fflate');
-  const entries = unzipSync(await exportBytes(makeFixtureDoc()));
+  // Built on the template-slide deck so there are slides to reorder the
+  // poster among — the poster export alone is a single slide now.
+  const entries = await withTemplateSlides();
   const decode = (n: string): string => new TextDecoder().decode(entries[n]!);
 
   const pres = decode('ppt/presentation.xml');
@@ -403,6 +411,57 @@ async function reorderPosterTo(
       pres.replace(list, reordered.join('')),
     ),
   });
+}
+
+/**
+ * A poster-only export with `APPENDED_SLIDE_COUNT` genuinely
+ * template-marked slides appended — the shape of a historical Postr
+ * export (and of a talk deck), reconstructed here because the poster
+ * exporter no longer appends them. Each appended slide carries
+ * `<p:cSld name="Postr template - …">`, so the importer recognises them
+ * exactly as it did when the exporter wrote them.
+ */
+async function withTemplateSlides(): Promise<Record<string, Uint8Array>> {
+  const { unzipSync } = await import('fflate');
+  const entries = unzipSync(await exportBytes(makeFixtureDoc()));
+  const decode = (n: string): string => new TextDecoder().decode(entries[n]!);
+  const encode = (s: string): Uint8Array => new TextEncoder().encode(s);
+
+  const next: Record<string, Uint8Array> = { ...entries };
+  let rels = decode('ppt/_rels/presentation.xml.rels');
+  let pres = decode('ppt/presentation.xml');
+  let types = decode('[Content_Types].xml');
+
+  // slide1 is the poster; append slides 2..(1 + APPENDED_SLIDE_COUNT).
+  for (let i = 2; i <= 1 + APPENDED_SLIDE_COUNT; i++) {
+    const label = i === 2 ? 'About these slides' : `Layout ${i}`;
+    next[`ppt/slides/slide${i}.xml`] = encode(
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+        '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"' +
+        ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"' +
+        ' xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">' +
+        `<p:cSld name="${TEMPLATE_SLIDE_PREFIX}${label}"><p:spTree>` +
+        '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>' +
+        '<p:grpSpPr/></p:spTree></p:cSld></p:sld>',
+    );
+    rels = rels.replace(
+      '</Relationships>',
+      `<Relationship Id="ridTmpl${i}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide${i}.xml"/></Relationships>`,
+    );
+    pres = pres.replace(
+      '</p:sldIdLst>',
+      `<p:sldId id="${300 + i}" r:id="ridTmpl${i}"/></p:sldIdLst>`,
+    );
+    types = types.replace(
+      '</Types>',
+      `<Override PartName="/ppt/slides/slide${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/></Types>`,
+    );
+  }
+
+  next['ppt/_rels/presentation.xml.rels'] = encode(rels);
+  next['ppt/presentation.xml'] = encode(pres);
+  next['[Content_Types].xml'] = encode(types);
+  return next;
 }
 
 async function makeForeignDeck(
