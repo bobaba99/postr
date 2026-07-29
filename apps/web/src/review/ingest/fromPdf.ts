@@ -81,9 +81,9 @@ export async function fromPdf(
 ): Promise<NormalizedArtifact> {
   assertFileAllowed(file, PDF_MIME_TYPES);
 
-  const fileBuffer = await readFileBuffer(file);
   let pdfDocument: PDFDocumentProxy;
   try {
+    const fileBuffer = await readFileBuffer(file);
     pdfDocument = await pdfjs.getDocument({ data: fileBuffer }).promise;
   } catch {
     throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
@@ -102,16 +102,18 @@ export async function fromPdf(
       const sourceCanvas = document.createElement('canvas');
       sourceCanvas.width = Math.ceil(viewport.width);
       sourceCanvas.height = Math.ceil(viewport.height);
-      const sourceContext = sourceCanvas.getContext('2d');
-      if (!sourceContext) {
-        throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
-      }
-
-      await page.render({ canvasContext: sourceContext, viewport }).promise;
-      const cappedCanvas = downscaleForVision(sourceCanvas);
-      let reviewCanvas = cappedCanvas;
+      let cappedCanvas = sourceCanvas;
+      let reviewCanvas = sourceCanvas;
 
       try {
+        const sourceContext = sourceCanvas.getContext('2d');
+        if (!sourceContext) {
+          throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+        }
+        await page.render({ canvasContext: sourceContext, viewport }).promise;
+        cappedCanvas = downscaleForVision(sourceCanvas);
+        reviewCanvas = cappedCanvas;
+
         const reviewContext = cappedCanvas.getContext('2d');
         if (!reviewContext) {
           throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
@@ -169,7 +171,16 @@ export async function fromPdf(
         ingestedAt: new Date().toISOString(),
       },
     };
+  } catch (error) {
+    if (error instanceof IngestError) {
+      throw error;
+    }
+    throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
   } finally {
-    void pdfDocument.destroy();
+    try {
+      await pdfDocument.destroy();
+    } catch {
+      throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+    }
   }
 }

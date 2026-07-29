@@ -19,15 +19,21 @@ const BLANK_IMAGE_COPY =
 
 function ensureAuditDimensions(sourceCanvas: HTMLCanvasElement): HTMLCanvasElement {
   const shortEdge = Math.min(sourceCanvas.width, sourceCanvas.height);
-  if (shortEdge >= MIN_AUDIT_DIMENSION_PX) {
+  const longEdge = Math.max(sourceCanvas.width, sourceCanvas.height);
+  if (
+    shortEdge >= MIN_AUDIT_DIMENSION_PX &&
+    longEdge <= MAX_AUDIT_DIMENSION_PX
+  ) {
     return sourceCanvas;
   }
 
-  const longEdge = Math.max(sourceCanvas.width, sourceCanvas.height);
-  const scale = Math.min(
-    MAX_AUDIT_DIMENSION_PX / longEdge,
-    MIN_AUDIT_DIMENSION_PX / shortEdge,
-  );
+  const scale =
+    longEdge > MAX_AUDIT_DIMENSION_PX
+      ? MAX_AUDIT_DIMENSION_PX / longEdge
+      : Math.min(
+          MAX_AUDIT_DIMENSION_PX / longEdge,
+          MIN_AUDIT_DIMENSION_PX / shortEdge,
+        );
   const drawWidth = Math.round(sourceCanvas.width * scale);
   const drawHeight = Math.round(sourceCanvas.height * scale);
   const outputCanvas = document.createElement('canvas');
@@ -65,9 +71,11 @@ export async function fromImage(
     throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
   }
 
-  const cappedCanvas = downscaleForVision(sourceCanvas);
-  let reviewCanvas = cappedCanvas;
+  let cappedCanvas = sourceCanvas;
+  let reviewCanvas = sourceCanvas;
   try {
+    cappedCanvas = downscaleForVision(sourceCanvas);
+    reviewCanvas = cappedCanvas;
     const reviewContext = cappedCanvas.getContext('2d');
     if (!reviewContext) {
       throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
@@ -109,6 +117,11 @@ export async function fromImage(
         ingestedAt: new Date().toISOString(),
       },
     };
+  } catch (error) {
+    if (error instanceof IngestError) {
+      throw error;
+    }
+    throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
   } finally {
     releaseCanvas(sourceCanvas);
     if (cappedCanvas !== sourceCanvas) {
