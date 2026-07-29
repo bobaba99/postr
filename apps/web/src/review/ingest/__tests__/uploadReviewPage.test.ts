@@ -100,9 +100,13 @@ describe('uploadReviewPage', () => {
       caughtError = error;
     }
 
+    expect(mockUpload).toHaveBeenCalled();
     expect(mockRemove).toHaveBeenCalledWith([
       'u1/review-temp/sess-1/page-1.jpg',
     ]);
+    expect(mockUpload.mock.invocationCallOrder[0]!).toBeLessThan(
+      mockRemove.mock.invocationCallOrder[0]!,
+    );
     expect(caughtError).toBe(signingError);
   });
 });
