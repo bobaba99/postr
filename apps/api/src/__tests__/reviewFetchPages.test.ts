@@ -117,6 +117,52 @@ describe('fetchReviewPages', () => {
     ).rejects.toMatchObject({ code: 'unsupported_media', pageNumber: 1 });
   });
 
+  it('rejects deceptive media types that only contain an image subtype', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(imageResponse(100, 'application/notjpeg'));
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn)),
+    ).rejects.toMatchObject({ code: 'unsupported_media', pageNumber: 1 });
+  });
+
+  it('rejects an oversized content-length before reading the body', async () => {
+    const response = new Response(new Uint8Array(1025), {
+      status: 200,
+      headers: {
+        'content-length': '1025',
+        'content-type': 'image/png',
+      },
+    });
+    const arrayBufferSpy = vi.spyOn(response, 'arrayBuffer');
+    const fetchFn = vi.fn().mockResolvedValue(response);
+
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn, { maxBytes: 1024 })),
+    ).rejects.toMatchObject({ code: 'too_large', pageNumber: 1 });
+    expect(arrayBufferSpy).not.toHaveBeenCalled();
+  });
+
+  it('maps a response body read failure to fetch_failed', async () => {
+    const failedBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.error(new Error('stream failed'));
+      },
+    });
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(failedBody, {
+        status: 200,
+        headers: { 'content-type': 'image/png' },
+      }),
+    );
+
+    const err = await fetchReviewPages([page(1)], deps(fetchFn)).catch(
+      (error) => error,
+    );
+    expect(err).toBeInstanceOf(PageFetchError);
+    expect(err).toMatchObject({ code: 'fetch_failed', pageNumber: 1 });
+  });
+
   it('rejects a failed upstream response with fetch_failed + status', async () => {
     const fetchFn = vi
       .fn()
