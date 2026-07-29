@@ -104,6 +104,18 @@
         "You choose the emphasis: the finding to lead with, the audience, what the poster is for, and any section that must not be cut.",
         "Check the outline before you download — every panel shows which manuscript section it came from. Export a print-ready PDF, or a .postr file to keep editing in Postr."
       ]
+    },
+    "/paper-to-slides": {
+      "title": "Paper to Slides: Turn a Manuscript into a Deck | Postr",
+      "description": "Turn a paper into an editable slide deck. Paste a manuscript or upload a Word file, answer a few short questions, and download a free PDF or a PowerPoint.",
+      "robots": "index,follow",
+      "h1": "From paper to slides",
+      "copy": [
+        "Turn a paper into a slide deck. Paste your manuscript or upload a .docx, answer a few short questions about your talk, and build an ordered deck — no editor session required.",
+        "The deck follows the arc a research talk needs: the most important result first, the gap and tension it resolves, then methods and figures as fill-ins. One finding per slide, each under a hard word budget so the slide never competes with the speaker.",
+        "Every slide carries speaker notes taken from your paper, each showing which section it came from, so nothing on a slide is invented.",
+        "Your manuscript is never stored on our servers and is never used to train models. Download a free PDF, or an editable PowerPoint you can open in PowerPoint, Keynote, Google Slides, or LibreOffice."
+      ]
     }
   },
   "app": {

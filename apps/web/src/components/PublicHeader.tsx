@@ -45,6 +45,11 @@ const TOOL_LINKS = [
     blurb: 'Turn a manuscript into a poster draft',
   },
   {
+    to: '/paper-to-slides',
+    label: 'Paper to slides',
+    blurb: 'Turn a manuscript into a talk (coming soon)',
+  },
+  {
     to: '/chart-chooser',
     label: 'Plot picker',
     blurb: 'Find the figure that fits your data',

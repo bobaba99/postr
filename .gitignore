@@ -29,3 +29,4 @@ docs/debug/
 docs/screenshots/
 # Sample .postr archives are multi-MB zips — keep them out of git.
 docs/*.postr
+.scratch/
