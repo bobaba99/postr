@@ -61,3 +61,24 @@ If B beats A, the relations doc adds real value. If they tie, it is redundant.
   judge's reference, NOT shown to the resolving arms).
 - `crosswalk_ref.md`, `relations_ref.md` — example-stripped references.
 - `RESULTS.md` — written by the run.
+
+---
+
+## DECISION (LOCKED, Gavin 2026-07-29)
+
+**Keep the slim relation lookup. Scope = little tweaks only, not a full editor.**
+
+- **Keep** the component vocabulary + "dominant text" rule + bound-pair list
+  (the slim relations doc), folded into the Phase-3 viewer's few-shot alongside
+  the crosswalk.
+- **Bigger payoff than the ablation showed:** the relation model lets the viewer
+  resolve which component a request/click targets **without a vision LLM reading
+  red circles** users draw — text-based component resolution keeps accuracy while
+  avoiding image parsing. It ALSO powers **component selection** in the viewer:
+  the user clicks a component to attach a comment, resolved through the same
+  relation model.
+- **Scope boundary (hard):** this is for **small tweaks** — nudge spacing, swap a
+  palette, re-emphasize, move a block. It is NOT a general slide editor. If it
+  grew into full free-form positioning/editing, "I might as well build a slide
+  editor" — which is explicitly NOT the product. **Lean now; a fuller editor is a
+  future feature if ever.**
