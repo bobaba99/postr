@@ -132,3 +132,28 @@ recolors**, with Arm P evaluated as a possible richer generator once its render
 is judged. Build Arm T first (cheapest, safest, and the parameter layer
 everything else hangs off), then layer I's recolorable structure. This is
 feature planning captured for later — not a commitment to build now.
+
+---
+
+## DECISION (LOCKED, Gavin 2026-07-29)
+
+**Phase 2 current scope = Arm T + Arm P. Arm I deferred to a future design
+feature.**
+
+- **Arm T** — the field-aware theme / **parameter layer** (palette + type scale +
+  layout rules), applied deterministically. ~$0.007/deck.
+- **Arm P** — the **one-step structured styled deck** (GPT emits per-slide styled
+  layout as data, not an image). Rendered and judged **good** by Gavin, and
+  **cheaper in practice right now** than the two-step. Stays fully editable. The
+  primary design generator for Phase 2.
+- **Arm I** (generated decorative imagery + the T-recolors-I composability) —
+  **SAVED for a future design feature**, out of current Phase-2 scope. The
+  reframing above is preserved as the roadmap for that later feature.
+
+Rationale: T + P together give a clean, editable, field-appropriate, cheap
+design pass with no image-generation dependency or cost. I's imagery is a
+nice-to-have that can layer on later (its structure is recolorable by T when it
+lands). Record this in spec §4 Phase 2 when Phase 2 is planned/built.
+
+Editability gate: PASSED by both T and P (content stays real text). Cost is not
+a decider here beyond "cheap enough to run free," which T+P clear easily.
