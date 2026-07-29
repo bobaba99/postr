@@ -18,6 +18,11 @@ const SIGNED_URL_TTL = 3600; // 1 hour
 /** In-flight guard — only one thumbnail capture at a time. */
 let capturing = false;
 
+/** html-to-image pixelRatio that lands the capture width on targetWidthPx. */
+export function pixelRatioFor(canvasWidthPx: number, targetWidthPx: number): number {
+  return targetWidthPx / canvasWidthPx;
+}
+
 /**
  * Capture the poster canvas and upload a thumbnail.
  * Returns the storage path on success, null on failure (non-blocking).
