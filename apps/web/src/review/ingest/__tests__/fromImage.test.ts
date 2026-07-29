@@ -3,7 +3,7 @@
  * Canvas + storage seams are module mocks (jsdom has no 2D canvas);
  * the guards themselves are covered in guards.test.ts.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const {
   mockRasterizeImage,
@@ -43,6 +43,8 @@ function fakeCanvas(data: Uint8ClampedArray, widthPx = 100, heightPx = 50): HTML
     height: heightPx,
     getContext: () => ({
       getImageData: () => ({ data }),
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
     }),
   } as unknown as HTMLCanvasElement;
 }
@@ -62,8 +64,19 @@ function uploadedPage(pageNumber: number): PageImage {
   };
 }
 
+let createElementSpy: ReturnType<typeof vi.spyOn>;
+
 beforeEach(() => {
   vi.clearAllMocks();
+  const realCreateElement = document.createElement.bind(document);
+  createElementSpy = vi
+    .spyOn(document, 'createElement')
+    .mockImplementation(((tagName: string, options?: ElementCreationOptions) => {
+      if (tagName === 'canvas') {
+        return fakeCanvas(NON_BLANK, 0, 0);
+      }
+      return realCreateElement(tagName, options);
+    }) as typeof document.createElement);
   mockDownscale.mockImplementation((c: HTMLCanvasElement) => c);
   mockCanvasToBlob.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
   mockUploadReviewPage.mockImplementation(
@@ -71,8 +84,12 @@ beforeEach(() => {
   );
 });
 
+afterEach(() => {
+  createElementSpy.mockRestore();
+});
+
 describe('fromImage', () => {
-  it('normalizes a PNG to a single-page artifact', async () => {
+  it('normalizes and upscales a PNG to the audit resolution floor', async () => {
     mockRasterizeImage.mockResolvedValue({
       canvas: fakeCanvas(NON_BLANK),
       pageWidthPt: 288,
@@ -95,7 +112,7 @@ describe('fromImage', () => {
       'sess-1',
       1,
       expect.any(Blob),
-      { widthPx: 100, heightPx: 50 },
+      { widthPx: 2048, heightPx: 1024 },
     );
   });
 
