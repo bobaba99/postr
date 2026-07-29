@@ -110,6 +110,9 @@ describe('assertFileAllowed', () => {
       caught = err;
     }
     expect((caught as IngestError).kind).toBe('file-too-large');
+    expect((caught as IngestError).message).toBe(
+      'That file is over 50 MB — the checker can read files up to 50 MB. Export a smaller copy and try again.',
+    );
   });
 
   it('checks size before MIME (oversized beats unsupported)', () => {
