@@ -167,3 +167,31 @@ contract.
 - Polish-is-free stated plainly at export (spec §6).
 - Generic user-facing errors ("Something went wrong").
 - Conference-appropriate restraint — the design must not read as an "AI deck."
+
+---
+
+## Future enhancement — a domain-organized icon library (Gavin 2026-07-29)
+
+Phase 2 ships an 11-icon curated set with `pickIcons(topicKeywords)` selecting
+from it (no per-presentation generation — the library is pre-built, generation
+just picks). That architecture is already what Gavin asked for. The enhancement,
+tracked for later (NOT a Phase-2 blocker):
+
+- **Organize the library by research DOMAIN**, not just flat tags. Scan the
+  paper's theme into a domain (social science vs bio/med vs shared), then pick
+  from that domain's icons + the always-relevant shared presentation icons.
+- **Expand the set** beyond the starter 11:
+  - **Bio/med:** dna, flask, molecule, brain (have) + microscope, cell,
+    pill/capsule, heart, virus, petri dish, syringe, etc.
+  - **Social science:** person/cohort (have) + group/network, survey/clipboard,
+    speech bubble, scale/balance, map/region, household, etc.
+  - **Shared presentation:** chart, bar chart, clock, magnifier, book (have) +
+    computer/screen, arrow/flow, checkmark, target, calendar, etc.
+- Still **hand-authored original CC0 SVGs** (the licensing basis Task 7 set), just
+  more of them, tagged + grouped by domain.
+- `pickIcons` stays the selection mechanism; add a domain hint so a bio paper
+  doesn't surface social-science-only icons and vice versa.
+
+This is pure library growth + a domain grouping — no change to the generation
+pipeline (still pick, never generate per deck). Do it when the 11-icon starter
+proves too thin in real use.
