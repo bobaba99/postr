@@ -13,7 +13,11 @@
  */
 import type Anthropic from '@anthropic-ai/sdk';
 import type { CritiqueResult } from '@postr/shared';
-import { REVIEW_MODEL, REVIEW_MAX_TOKENS } from './config.js';
+import {
+  REVIEW_MODEL,
+  REVIEW_MAX_TOKENS,
+  REVIEW_PROVIDER_TIMEOUT_MS,
+} from './config.js';
 import { CRITIQUE_TOOL_INPUT_SCHEMA } from './prompt.js';
 import { validateCritique } from './schema.js';
 import type { FetchedPage } from './fetchPages.js';
@@ -80,14 +84,17 @@ export async function callAnthropicCritique(
 
   let response: Anthropic.Message;
   try {
-    response = await anthropic.messages.create({
-      model: REVIEW_MODEL,
-      max_tokens: REVIEW_MAX_TOKENS,
-      system: ctx.systemPrompt,
-      tools: [tool],
-      tool_choice: { type: 'tool', name: 'emit_critique' },
-      messages: [{ role: 'user', content }],
-    });
+    response = await anthropic.messages.create(
+      {
+        model: REVIEW_MODEL,
+        max_tokens: REVIEW_MAX_TOKENS,
+        system: ctx.systemPrompt,
+        tools: [tool],
+        tool_choice: { type: 'tool', name: 'emit_critique' },
+        messages: [{ role: 'user', content }],
+      },
+      { timeout: REVIEW_PROVIDER_TIMEOUT_MS, maxRetries: 0 },
+    );
   } catch (err) {
     const name = err instanceof Error ? err.name : '';
     if (name === 'TimeoutError' || name === 'APIConnectionTimeoutError') {

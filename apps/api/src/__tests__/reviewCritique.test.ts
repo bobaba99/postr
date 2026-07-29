@@ -11,7 +11,11 @@ import {
   CritiqueUpstreamError,
   type CritiqueCallCtx,
 } from '../review/critique.js';
-import { REVIEW_MODEL, REVIEW_MAX_TOKENS } from '../review/config.js';
+import {
+  REVIEW_MODEL,
+  REVIEW_MAX_TOKENS,
+  REVIEW_PROVIDER_TIMEOUT_MS,
+} from '../review/config.js';
 
 const VALID_CRITIQUE: CritiqueResult = {
   dimensionScores: { narrative: 4, design: 2, content: 3 },
@@ -77,6 +81,7 @@ describe('callAnthropicCritique — success', () => {
         system: 'SYS',
         tool_choice: { type: 'tool', name: 'emit_critique' },
       }),
+      { timeout: REVIEW_PROVIDER_TIMEOUT_MS, maxRetries: 0 },
     );
   });
 

@@ -31,7 +31,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(14);
+select plan(31);
 
 -- --------------------------------------------------------------------------
 -- Fixtures (as superuser): two users (handle_new_user auto-creates their
@@ -190,6 +190,257 @@ select throws_ok(
   '23514',
   null,
   'the review_credits nonneg CHECK rejects a negative balance');
+
+-- 15 · initial requests carry a durable browser-generated idempotency key
+select has_column(
+  'public',
+  'poster_reviews',
+  'request_key',
+  'poster_reviews has the initial-review request key');
+
+-- 16 · one logical initial request can create at most one review per user
+select ok(
+  exists (
+    select 1
+      from pg_index i
+      join pg_class t on t.oid = i.indrelid
+      join pg_namespace n on n.oid = t.relnamespace
+     where n.nspname = 'public'
+       and t.relname = 'poster_reviews'
+       and i.indisunique
+       and pg_get_indexdef(i.indexrelid)
+           like '%(user_id, request_key)%'
+  ),
+  'poster_reviews uniquely indexes (user_id, request_key)');
+
+-- Set an exact one-credit fixture for transactional finalization.
+update public.users
+   set review_credits = 1
+ where id = 'd1000000-0000-4000-a000-000000000001';
+
+create temporary table review_claim_fixtures (
+  name text primary key,
+  payload jsonb not null
+);
+
+insert into review_claim_fixtures (name, payload)
+values (
+  'first',
+  public.claim_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000001'
+  )
+);
+
+-- 17 · first claimant owns the request key
+select is(
+  (select payload->>'outcome'
+     from review_claim_fixtures
+    where name = 'first'),
+  'claimed',
+  'the first initial-review request claims its key');
+
+-- 18 · a concurrent claimant is deduplicated before provider work
+select is(
+  public.claim_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000001'
+  )->>'outcome',
+  'in_progress',
+  'a second claimant sees the request in progress');
+
+-- 19 · pack finalization atomically spends + inserts
+select is(
+  public.finalize_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000001',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'first'),
+    null,
+    'pdf',
+    '{"pageCount":1,"rubric_version":"rubric.v1"}'::jsonb,
+    '{"dimensionScores":{"narrative":4,"design":3,"content":4},"attentionSummary":"Results first.","findings":[]}'::jsonb,
+    'pack'
+  )->>'outcome',
+  'complete',
+  'pack finalization returns complete');
+
+-- 20 · the same transaction spent exactly one credit
+select is(
+  (select review_credits
+     from public.users
+    where id = 'd1000000-0000-4000-a000-000000000001'),
+  0,
+  'pack finalization spends exactly one credit');
+
+-- 21 · and inserted exactly one completed review carrying the key
+select is(
+  (select count(*)
+     from public.poster_reviews
+    where user_id = 'd1000000-0000-4000-a000-000000000001'
+      and request_key = 'a1000000-0000-4000-a000-000000000001'
+      and status = 'complete'
+      and credit_source = 'pack'),
+  1::bigint,
+  'pack finalization inserts one keyed completed review');
+
+-- 22 · replay returns the stored review without another spend/insert
+select is(
+  public.finalize_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000001',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'first'),
+    null,
+    'pdf',
+    '{}'::jsonb,
+    '{"dimensionScores":{"narrative":1,"design":1,"content":1},"attentionSummary":"must not replace stored","findings":[]}'::jsonb,
+    'pack'
+  )->>'outcome',
+  'replay',
+  're-finalizing a completed key replays the stored review');
+
+-- A keyed initial operation must keep replaying its original response even
+-- after its included follow-up advances the review to closed.
+update public.poster_reviews
+   set stage = 'closed',
+       followup_findings =
+         '{"dimensionScores":{"narrative":5,"design":5,"content":5},"attentionSummary":"Follow-up result must not replace initial.","findings":[]}'::jsonb
+ where user_id = 'd1000000-0000-4000-a000-000000000001'
+   and request_key = 'a1000000-0000-4000-a000-000000000001';
+
+-- 23 · replay remains the initial operation's stage
+select is(
+  public.claim_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000001'
+  )->>'stage',
+  'initial',
+  'a closed review still replays with the initial stage');
+
+-- 24 · replay remains the initially stored critique, never follow-up findings
+select is(
+  public.claim_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000001'
+  )#>>'{critique,attentionSummary}',
+  'Results first.',
+  'a closed review still replays its initial critique');
+
+-- Set up a second request whose lease will expire and whose eventual insert
+-- will violate the poster FK.
+update public.users
+   set review_credits = 1
+ where id = 'd1000000-0000-4000-a000-000000000001';
+
+insert into review_claim_fixtures (name, payload)
+values (
+  'stale',
+  public.claim_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000002'
+  )
+);
+
+update public.poster_review_requests
+   set expires_at = now() - interval '1 second'
+ where user_id = 'd1000000-0000-4000-a000-000000000001'
+   and request_key = 'a1000000-0000-4000-a000-000000000002';
+
+insert into review_claim_fixtures (name, payload)
+values (
+  'replacement',
+  public.claim_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000002'
+  )
+);
+
+-- 25 · a takeover receives a distinct fencing token
+select isnt(
+  (select payload->>'claimToken'
+     from review_claim_fixtures
+    where name = 'stale'),
+  (select payload->>'claimToken'
+     from review_claim_fixtures
+    where name = 'replacement'),
+  'an expired-lease takeover receives a new claim token');
+
+-- 26 · an old worker cannot release the newer claimant's lease
+select is(
+  public.release_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000002',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'stale')
+  ),
+  false,
+  'a stale claim token cannot release its replacement');
+
+-- 27 · an old worker cannot finalize the newer claimant's lease
+select is(
+  public.finalize_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000002',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'stale'),
+    null,
+    'pdf',
+    '{}'::jsonb,
+    '{"dimensionScores":{"narrative":4,"design":3,"content":4},"attentionSummary":"Results first.","findings":[]}'::jsonb,
+    'pack'
+  )->>'outcome',
+  'claim_missing',
+  'a stale claim token cannot finalize its replacement');
+
+-- 28 · the fenced stale finalizer cannot spend a credit
+select is(
+  (select review_credits
+     from public.users
+    where id = 'd1000000-0000-4000-a000-000000000001'),
+  1,
+  'a stale finalizer leaves the credit untouched');
+
+-- 29 · the insert error escapes the RPC
+select throws_ok(
+  $q$
+    select public.finalize_initial_review(
+      'd1000000-0000-4000-a000-000000000001',
+      'a1000000-0000-4000-a000-000000000002',
+      (select (payload->>'claimToken')::uuid
+         from review_claim_fixtures
+        where name = 'replacement'),
+      'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      'postr',
+      '{}'::jsonb,
+      '{"dimensionScores":{"narrative":4,"design":3,"content":4},"attentionSummary":"Results first.","findings":[]}'::jsonb,
+      'pack'
+    )
+  $q$,
+  '23503',
+  null,
+  'a poster FK failure aborts finalization');
+
+-- 30 · transaction rollback means the failed insert cannot lose a credit
+select is(
+  (select review_credits
+     from public.users
+    where id = 'd1000000-0000-4000-a000-000000000001'),
+  1,
+  'an insert/FK failure rolls the credit spend back');
+
+-- 31 · and no partially finalized review exists
+select is(
+  (select count(*)
+     from public.poster_reviews
+    where user_id = 'd1000000-0000-4000-a000-000000000001'
+      and request_key = 'a1000000-0000-4000-a000-000000000002'),
+  0::bigint,
+  'an insert/FK failure leaves no partial review row');
 
 reset role;
 

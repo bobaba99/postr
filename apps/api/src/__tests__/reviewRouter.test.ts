@@ -3,12 +3,12 @@
  * the 24-page hard cap (§1: typed error, never silent truncation),
  * server-side entitlement resolution (D4: term-active add-on → weekly
  * window → pack credits → 402), SSRF-guarded page fetch, upstream
- * error mapping, credit consume AFTER success (D6), and the
- * success-only poster_reviews write (D16).
+ * error mapping, and transactional credit spend + success-only
+ * poster_reviews insert AFTER success (D6/D16).
  *
  * Anthropic is mocked at the SDK layer (the importExtract.test.ts
  * pattern); Supabase is a stateful fake serving the users row and
- * recording rpc/insert calls (the billing.test.ts pattern).
+ * recording RPC finalization calls (the billing.test.ts pattern).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
@@ -85,9 +85,56 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
     },
     rpc(fn: string, args: Record<string, unknown>) {
       rpcs.push({ fn, args });
+      if (fn === 'claim_initial_review') {
+        return Promise.resolve({
+          data: {
+            outcome: 'claimed',
+            claimToken: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            expiresAt: '2099-01-01T00:10:00.000Z',
+          },
+          error: null,
+        });
+      }
+      if (fn === 'release_initial_review') {
+        return Promise.resolve({ data: true, error: null });
+      }
+      if (fn === 'finalize_initial_review') {
+        if (
+          args.p_credit_source === 'pack' &&
+          opts.consumeResult === null
+        ) {
+          return Promise.resolve({
+            data: { outcome: 'no_credit' },
+            error: null,
+          });
+        }
+        inserts.push({
+          table: 'poster_reviews',
+          payload: {
+            user_id: args.p_user_id,
+            request_key: args.p_request_key,
+            poster_id: args.p_poster_id,
+            source_kind: args.p_source_kind,
+            source_meta: args.p_source_meta,
+            status: 'complete',
+            stage: 'initial',
+            initial_findings: args.p_initial_findings,
+            credit_source: args.p_credit_source,
+          },
+        });
+        return Promise.resolve({
+          data: {
+            outcome: 'complete',
+            reviewId: opts.insertedId ?? 'review-new-1',
+            stage: 'initial',
+            critique: args.p_initial_findings,
+          },
+          error: null,
+        });
+      }
       return Promise.resolve({
-        data: opts.consumeResult === undefined ? 1 : opts.consumeResult,
-        error: null,
+        data: null,
+        error: { message: `unexpected rpc ${fn}` },
       });
     },
     storage: {
@@ -277,7 +324,10 @@ describe('POST /api/review/critique — entitlement (D4)', () => {
     ]);
     expect(fetchFn).not.toHaveBeenCalled();
     expect(anthropic.create).not.toHaveBeenCalled();
-    expect(rpcs).toHaveLength(0);
+    expect(rpcs.map((rpc) => rpc.fn)).toEqual([
+      'claim_initial_review',
+      'release_initial_review',
+    ]);
     expect(inserts).toHaveLength(0);
   });
 
@@ -333,7 +383,7 @@ describe('POST /api/review/critique — entitlement (D4)', () => {
 });
 
 describe('POST /api/review/critique — initial critique', () => {
-  it('runs the pack path and consumes the credit AFTER success', async () => {
+  it('runs the pack path and transactionally finalizes AFTER success', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
     const { client, rpcs, inserts } = fakeSupabase({ userRow: PACK_USER });
@@ -351,7 +401,15 @@ describe('POST /api/review/critique — initial critique', () => {
     expect(res.body.stage).toBe('initial');
     expect(res.body.critique.findings).toHaveLength(1);
 
-    expect(rpcs).toEqual([{ fn: 'consume_review_credit', args: { p_user_id: 'user-1' } }]);
+    expect(rpcs.map((rpc) => rpc.fn)).toEqual([
+      'claim_initial_review',
+      'finalize_initial_review',
+    ]);
+    expect(rpcs[1]!.args).toMatchObject({
+      p_user_id: 'user-1',
+      p_claim_token: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      p_credit_source: 'pack',
+    });
     expect(inserts).toHaveLength(1);
     expect(inserts[0]!.table).toBe('poster_reviews');
     expect(inserts[0]!.payload).toMatchObject({
@@ -469,7 +527,10 @@ describe('POST /api/review/critique — initial critique', () => {
 
     expect(res.status).toBe(200);
     expect(weeklyCalls).toBe(1);
-    expect(rpcs).toHaveLength(0);
+    expect(rpcs.map((rpc) => rpc.fn)).toEqual([
+      'claim_initial_review',
+      'finalize_initial_review',
+    ]);
     expect(inserts).toHaveLength(1);
     expect(inserts[0]!.payload.credit_source).toBe('subscription_addon');
   });
@@ -489,7 +550,10 @@ describe('POST /api/review/critique — initial critique', () => {
 
     expect(res.status).toBe(502);
     expect(res.body.error).toBe('bad_model_output');
-    expect(rpcs).toHaveLength(0);
+    expect(rpcs.map((rpc) => rpc.fn)).toEqual([
+      'claim_initial_review',
+      'release_initial_review',
+    ]);
     expect(inserts).toHaveLength(0);
   });
 });

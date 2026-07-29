@@ -3,8 +3,10 @@
  * (spec §5; the naming trap is why nothing here says "feedback").
  *
  * `requestCritique` wraps POST /api/review/critique in the shared
- * postJson helper and translates the two statuses the UI handles
- * specially:
+ * postJson helper. Initial calls carry one browser-generated request key;
+ * an ambiguous transport failure retries once with the same key so the
+ * API can replay instead of charging twice. It also translates the two
+ * statuses the UI handles specially:
  *   402 → ReviewPaymentRequiredError (the paywall; `reason` tells the
  *         panel which pitch to show — 'no_credit' buys a pack,
  *         'weekly_quota_exceeded' waits or buys a pack)
@@ -35,6 +37,8 @@ export interface CritiqueRequestBody {
   posterDoc?: PosterDoc;
   posterId?: string;
   reviewId?: string;
+  /** Stable idempotency key for one logical initial review. */
+  requestKey?: string;
   /** Upload filename — the API stamps it into source_meta (shown in the past-reviews list). */
   filename?: string;
 }
@@ -61,11 +65,27 @@ export class ReviewPaymentRequiredError extends Error {
 export async function requestCritique(
   body: CritiqueRequestBody,
 ): Promise<CritiqueResponse> {
-  try {
-    return await postJson<CritiqueResponse>('/api/review/critique', body, {
+  const requestBody: CritiqueRequestBody = body.reviewId
+    ? body
+    : { ...body, requestKey: body.requestKey ?? crypto.randomUUID() };
+  const post = () =>
+    postJson<CritiqueResponse>('/api/review/critique', requestBody, {
       auth: true,
     });
+
+  try {
+    return await post();
   } catch (err) {
+    // A transport failure is ambiguous: the server may have completed the
+    // review after the connection disappeared. Retry once with the exact same
+    // key so the API replays instead of charging/calling the provider again.
+    if (!(err instanceof ApiError)) {
+      try {
+        return await post();
+      } catch (retryErr) {
+        err = retryErr;
+      }
+    }
     if (err instanceof ApiError && err.status === 402) {
       const paymentBody = err.body as { reason?: string } | null;
       throw new ReviewPaymentRequiredError(

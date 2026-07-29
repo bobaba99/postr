@@ -8,7 +8,7 @@
  * module-mocked (the data/__tests__/posters.test.ts convention) — no
  * network.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/apiClient';
 
 const { postJsonMock, fromMock, removeMock } = vi.hoisted(() => ({
@@ -46,12 +46,20 @@ const BODY = {
     },
   ],
 };
+const REQUEST_KEY = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 beforeEach(() => {
   postJsonMock.mockReset();
   fromMock.mockReset();
   removeMock.mockReset();
   removeMock.mockResolvedValue({ data: [], error: null });
+  vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(
+    REQUEST_KEY as `${string}-${string}-${string}-${string}-${string}`,
+  );
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 describe('requestCritique', () => {
@@ -69,10 +77,61 @@ describe('requestCritique', () => {
 
     const result = await requestCritique(BODY);
 
-    expect(postJsonMock).toHaveBeenCalledWith('/api/review/critique', BODY, {
-      auth: true,
-    });
+    expect(postJsonMock).toHaveBeenCalledWith(
+      '/api/review/critique',
+      { ...BODY, requestKey: REQUEST_KEY },
+      { auth: true },
+    );
     expect(result).toBe(response);
+  });
+
+  it('retries a transport failure once with the same generated request key', async () => {
+    const response = {
+      reviewId: 'rev-1',
+      stage: 'initial' as const,
+      critique: {
+        dimensionScores: { narrative: 4, design: 3, content: 5 },
+        attentionSummary: 'The eye lands on the results figure first.',
+        findings: [],
+      },
+    };
+    postJsonMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(response);
+
+    await expect(requestCritique(BODY)).resolves.toBe(response);
+
+    expect(postJsonMock).toHaveBeenCalledTimes(2);
+    expect(postJsonMock.mock.calls[0]![1]).toEqual({
+      ...BODY,
+      requestKey: REQUEST_KEY,
+    });
+    expect(postJsonMock.mock.calls[1]![1]).toEqual(
+      postJsonMock.mock.calls[0]![1],
+    );
+    expect(globalThis.crypto.randomUUID).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not add a request key to a follow-up', async () => {
+    postJsonMock.mockResolvedValue({
+      reviewId: 'rev-1',
+      stage: 'closed',
+      critique: {
+        dimensionScores: { narrative: 4, design: 4, content: 5 },
+        attentionSummary: 'The revision lands the result first.',
+        findings: [],
+      },
+    });
+    const followup = { ...BODY, reviewId: 'rev-1' };
+
+    await requestCritique(followup);
+
+    expect(postJsonMock).toHaveBeenCalledWith(
+      '/api/review/critique',
+      followup,
+      { auth: true },
+    );
+    expect(globalThis.crypto.randomUUID).not.toHaveBeenCalled();
   });
 
   it('maps a 402 ApiError to ReviewPaymentRequiredError with the server reason', async () => {

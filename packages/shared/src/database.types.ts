@@ -385,6 +385,30 @@ export type Database = {
           },
         ]
       }
+      poster_review_requests: {
+        Row: {
+          claim_token: string
+          claimed_at: string
+          expires_at: string
+          request_key: string
+          user_id: string
+        }
+        Insert: {
+          claim_token?: string
+          claimed_at?: string
+          expires_at?: string
+          request_key: string
+          user_id: string
+        }
+        Update: {
+          claim_token?: string
+          claimed_at?: string
+          expires_at?: string
+          request_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       poster_reviews: {
         Row: {
           created_at: string
@@ -393,6 +417,7 @@ export type Database = {
           id: string
           initial_findings: Json | null
           poster_id: string | null
+          request_key: string | null
           source_kind: string
           source_meta: Json
           stage: string
@@ -407,6 +432,7 @@ export type Database = {
           id?: string
           initial_findings?: Json | null
           poster_id?: string | null
+          request_key?: string | null
           source_kind: string
           source_meta?: Json
           stage?: string
@@ -421,6 +447,7 @@ export type Database = {
           id?: string
           initial_findings?: Json | null
           poster_id?: string | null
+          request_key?: string | null
           source_kind?: string
           source_meta?: Json
           stage?: string
@@ -712,10 +739,27 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_initial_review: {
+        Args: { p_request_key: string; p_user_id: string }
+        Returns: Json
+      }
       consume_export_credit: { Args: { p_user_id: string }; Returns: number }
       consume_review_credit: { Args: { p_user_id: string }; Returns: number }
       delete_own_account: { Args: never; Returns: undefined }
       export_my_data: { Args: never; Returns: Json }
+      finalize_initial_review: {
+        Args: {
+          p_claim_token: string
+          p_credit_source: string
+          p_initial_findings: Json
+          p_poster_id: string
+          p_request_key: string
+          p_source_kind: string
+          p_source_meta: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
       fulfill_credit_pack: {
         Args: {
           p_amount: number
@@ -737,6 +781,14 @@ export type Database = {
       mark_first_paid_export: {
         Args: { p_user_id: string }
         Returns: undefined
+      }
+      release_initial_review: {
+        Args: {
+          p_claim_token: string
+          p_request_key: string
+          p_user_id: string
+        }
+        Returns: boolean
       }
       revoke_export_credits: {
         Args: { p_amount: number; p_user_id: string }

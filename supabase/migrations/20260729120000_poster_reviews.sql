@@ -32,6 +32,7 @@
 create table if not exists public.poster_reviews (
   id                uuid primary key default gen_random_uuid(),
   user_id           uuid not null references auth.users(id) on delete cascade,
+  request_key       uuid,
   poster_id         uuid references public.posters(id) on delete set null, -- null for uploads
   source_kind       text not null check (source_kind in ('postr','pdf','pptx','image')),
   source_meta       jsonb not null default '{}'::jsonb,   -- filename, page count, ingest info
@@ -45,6 +46,15 @@ create table if not exists public.poster_reviews (
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
+
+-- Existing development databases may already have the pre-idempotency table
+-- from an earlier version of this migration.
+alter table public.poster_reviews
+  add column if not exists request_key uuid;
+
+create unique index if not exists poster_reviews_user_request_key_uidx
+  on public.poster_reviews (user_id, request_key)
+  where request_key is not null;
 
 comment on table public.poster_reviews is
   'Presentation Checker reviews: one row per review with the initial → '
@@ -210,3 +220,279 @@ comment on function public.grant_review_credits(uuid, integer) is
 
 revoke execute on function public.grant_review_credits(uuid, integer)
   from public, anon, authenticated;
+
+-- =========================================================================
+-- 5. Retry-idempotent initial-review finalization
+-- =========================================================================
+-- A short-lived claim prevents concurrent requests carrying the same
+-- browser-generated key from both reaching the model. The durable result
+-- lives on poster_reviews.request_key; claims are only coordination state.
+create table if not exists public.poster_review_requests (
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  request_key  uuid not null,
+  claim_token  uuid not null default gen_random_uuid(),
+  claimed_at   timestamptz not null default now(),
+  expires_at   timestamptz not null default (now() + interval '10 minutes'),
+  primary key (user_id, request_key)
+);
+
+comment on table public.poster_review_requests is
+  'Service-role-only claims for in-flight initial presentation reviews. '
+  'Completed idempotency records live on poster_reviews.request_key.';
+
+alter table public.poster_review_requests enable row level security;
+revoke all on table public.poster_review_requests from public, anon, authenticated;
+
+-- Claim before page fetch/model work. The transaction-scoped advisory lock
+-- serializes same-key contenders even before either transaction has committed
+-- its claim row. A ten-minute lease recovers keys abandoned by a crashed API
+-- process; normal review calls complete well inside that window.
+create or replace function public.claim_initial_review(
+  p_user_id uuid,
+  p_request_key uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_review public.poster_reviews%rowtype;
+  v_claimed boolean;
+  v_claim_token uuid := gen_random_uuid();
+  v_expires_at timestamptz := pg_catalog.now() + interval '10 minutes';
+begin
+  if p_user_id is null or p_request_key is null then
+    raise exception 'user id and request key are required'
+      using errcode = '22004';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_user_id::text || ':' || p_request_key::text, 0)
+  );
+
+  select *
+    into v_review
+    from public.poster_reviews
+   where user_id = p_user_id
+     and request_key = p_request_key
+     and status = 'complete'
+   limit 1;
+
+  if found then
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'replay',
+      'reviewId', v_review.id,
+      'stage', 'initial',
+      'critique', v_review.initial_findings
+    );
+  end if;
+
+  delete from public.poster_review_requests
+   where user_id = p_user_id
+     and request_key = p_request_key
+     and expires_at <= pg_catalog.now();
+
+  insert into public.poster_review_requests (
+    user_id,
+    request_key,
+    claim_token,
+    expires_at
+  )
+  values (p_user_id, p_request_key, v_claim_token, v_expires_at)
+  on conflict do nothing
+  returning true into v_claimed;
+
+  if coalesce(v_claimed, false) then
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'claimed',
+      'claimToken', v_claim_token,
+      'expiresAt', v_expires_at
+    );
+  end if;
+  return pg_catalog.jsonb_build_object('outcome', 'in_progress');
+end;
+$$;
+
+comment on function public.claim_initial_review(uuid, uuid) is
+  'Claims a client request key before provider work, or returns its completed '
+  'stored review. service_role only.';
+
+revoke execute on function public.claim_initial_review(uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.claim_initial_review(uuid, uuid)
+  to service_role;
+
+create or replace function public.release_initial_review(
+  p_user_id uuid,
+  p_request_key uuid,
+  p_claim_token uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_released boolean;
+begin
+  if p_user_id is null or p_request_key is null or p_claim_token is null then
+    return false;
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_user_id::text || ':' || p_request_key::text, 0)
+  );
+
+  delete from public.poster_review_requests
+   where user_id = p_user_id
+     and request_key = p_request_key
+     and claim_token = p_claim_token
+  returning true into v_released;
+
+  return coalesce(v_released, false);
+end;
+$$;
+
+comment on function public.release_initial_review(uuid, uuid, uuid) is
+  'Releases an unfinished initial-review claim after fetch/provider/API '
+  'failure. service_role only.';
+
+revoke execute on function public.release_initial_review(uuid, uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.release_initial_review(uuid, uuid, uuid)
+  to service_role;
+
+-- This is the paid-review transaction boundary. For pack reviews the
+-- conditional decrement and completed review insert execute in one database
+-- transaction. Any insert/constraint failure aborts the statement and rolls
+-- the credit decrement back. Subscription add-on reviews use the same durable
+-- idempotency path without decrementing pack credits.
+create or replace function public.finalize_initial_review(
+  p_user_id uuid,
+  p_request_key uuid,
+  p_claim_token uuid,
+  p_poster_id uuid,
+  p_source_kind text,
+  p_source_meta jsonb,
+  p_initial_findings jsonb,
+  p_credit_source text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_review public.poster_reviews%rowtype;
+  v_review_id uuid;
+  v_remaining integer;
+begin
+  if p_user_id is null or p_request_key is null or p_claim_token is null then
+    raise exception 'user id, request key, and claim token are required'
+      using errcode = '22004';
+  end if;
+  if p_credit_source not in ('pack', 'subscription_addon') then
+    raise exception 'invalid credit source'
+      using errcode = '22023';
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_user_id::text || ':' || p_request_key::text, 0)
+  );
+
+  select *
+    into v_review
+    from public.poster_reviews
+   where user_id = p_user_id
+     and request_key = p_request_key
+     and status = 'complete'
+   limit 1;
+
+  if found then
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'replay',
+      'reviewId', v_review.id,
+      'stage', 'initial',
+      'critique', v_review.initial_findings
+    );
+  end if;
+
+  if not exists (
+    select 1
+      from public.poster_review_requests
+     where user_id = p_user_id
+       and request_key = p_request_key
+       and claim_token = p_claim_token
+       and expires_at > pg_catalog.now()
+  ) then
+    return pg_catalog.jsonb_build_object('outcome', 'claim_missing');
+  end if;
+
+  if p_credit_source = 'pack' then
+    update public.users
+       set review_credits = review_credits - 1
+     where id = p_user_id
+       and review_credits > 0
+    returning review_credits into v_remaining;
+
+    if v_remaining is null then
+      delete from public.poster_review_requests
+       where user_id = p_user_id
+         and request_key = p_request_key
+         and claim_token = p_claim_token;
+      return pg_catalog.jsonb_build_object('outcome', 'no_credit');
+    end if;
+  end if;
+
+  insert into public.poster_reviews (
+    user_id,
+    request_key,
+    poster_id,
+    source_kind,
+    source_meta,
+    status,
+    stage,
+    initial_findings,
+    credit_source
+  )
+  values (
+    p_user_id,
+    p_request_key,
+    p_poster_id,
+    p_source_kind,
+    coalesce(p_source_meta, '{}'::jsonb),
+    'complete',
+    'initial',
+    p_initial_findings,
+    p_credit_source
+  )
+  returning id into v_review_id;
+
+  delete from public.poster_review_requests
+   where user_id = p_user_id
+     and request_key = p_request_key
+     and claim_token = p_claim_token;
+
+  return pg_catalog.jsonb_build_object(
+    'outcome', 'complete',
+    'reviewId', v_review_id,
+    'stage', 'initial',
+    'critique', p_initial_findings,
+    'remainingCredits', v_remaining
+  );
+end;
+$$;
+
+comment on function public.finalize_initial_review(
+  uuid, uuid, uuid, uuid, text, jsonb, jsonb, text
+) is
+  'Atomically spends a pack credit (when applicable) and inserts the keyed '
+  'completed review. Replays a prior completed key. service_role only.';
+
+revoke execute on function public.finalize_initial_review(
+  uuid, uuid, uuid, uuid, text, jsonb, jsonb, text
+) from public, anon, authenticated;
+grant execute on function public.finalize_initial_review(
+  uuid, uuid, uuid, uuid, text, jsonb, jsonb, text
+) to service_role;

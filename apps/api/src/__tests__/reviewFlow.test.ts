@@ -9,8 +9,7 @@
  *     follow-up does not, quota exhaustion 402s, and sliding the
  *     injected clock past 7 days re-opens the window (D5/D17).
  * Supabase is ONE stateful in-memory fake (poster_reviews store + users
- * billing row + consume_review_credit semantics mirroring the
- * export-credit RPC it was copied from); Anthropic is mocked at the SDK
+ * billing row + atomic finalize_initial_review semantics); Anthropic is mocked at the SDK
  * layer (the importExtract.test.ts pattern); page bytes come from an
  * injected fetchFn, exactly like the import router tests.
  */
@@ -91,7 +90,9 @@ function fakeReviewSupabase(userOverrides: Partial<FakeUserRow> = {}) {
   const reviews = new Map<string, FakeReviewRow>();
   const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = [];
   const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
+  const claims = new Map<string, string>();
   let reviewSeq = 0;
+  let claimSeq = 0;
 
   const client = {
     auth: {
@@ -181,19 +182,28 @@ function fakeReviewSupabase(userOverrides: Partial<FakeUserRow> = {}) {
           update(payload: Record<string, unknown>) {
             updates.push({ table, payload });
             const filters: EqFilter[] = [];
-            const apply = () => {
-              for (const row of applyFilters([...reviews.values()], filters)) {
-                Object.assign(row, payload);
+            let result: { data: { id: string } | null; error: null } | undefined;
+            const execute = () => {
+              if (result) return result;
+              const hit = applyFilters([...reviews.values()], filters)[0];
+              if (!hit) {
+                result = { data: null, error: null };
+                return result;
               }
+              Object.assign(hit, payload);
+              result = { data: { id: hit.id }, error: null };
+              return result;
             };
             const chain = {
               eq(col: string, val: unknown) {
                 filters.push({ col, val });
-                apply();
                 return chain;
               },
+              select: (_cols?: string) => ({
+                maybeSingle: async () => execute(),
+              }),
               then(onFulfilled?: (v: { error: null }) => unknown) {
-                return Promise.resolve({ error: null }).then(onFulfilled);
+                return Promise.resolve({ error: execute().error }).then(onFulfilled);
               },
             };
             return chain;
@@ -204,16 +214,98 @@ function fakeReviewSupabase(userOverrides: Partial<FakeUserRow> = {}) {
     },
     rpc(fn: string, args: Record<string, unknown>) {
       rpcs.push({ fn, args });
-      if (fn !== 'consume_review_credit') {
-        return Promise.resolve({ data: null, error: { message: `unknown rpc ${fn}` } });
+      const requestKey = String(args.p_request_key ?? '');
+      if (fn === 'claim_initial_review') {
+        const existing = [...reviews.values()].find(
+          (review) => review.request_key === requestKey,
+        );
+        if (existing) {
+          return Promise.resolve({
+            data: {
+              outcome: 'replay',
+              reviewId: existing.id,
+              stage: 'initial',
+              critique: existing.initial_findings,
+            },
+            error: null,
+          });
+        }
+        if (claims.has(requestKey)) {
+          return Promise.resolve({
+            data: { outcome: 'in_progress' },
+            error: null,
+          });
+        }
+        claimSeq += 1;
+        const claimToken =
+          `bbbbbbbb-bbbb-4bbb-8bbb-${String(claimSeq).padStart(12, '0')}`;
+        claims.set(requestKey, claimToken);
+        return Promise.resolve({
+          data: {
+            outcome: 'claimed',
+            claimToken,
+            expiresAt: '2099-01-01T00:10:00.000Z',
+          },
+          error: null,
+        });
       }
-      // Verbatim mirror of consume_export_credit: conditional decrement,
-      // returns the new balance, NULL when the balance was already 0.
-      if (users.review_credits > 0) {
+      if (fn === 'release_initial_review') {
+        const matches = claims.get(requestKey) === args.p_claim_token;
+        return Promise.resolve({
+          data: matches ? claims.delete(requestKey) : false,
+          error: null,
+        });
+      }
+      if (fn !== 'finalize_initial_review') {
+        return Promise.resolve({
+          data: null,
+          error: { message: `unknown rpc ${fn}` },
+        });
+      }
+      if (claims.get(requestKey) !== args.p_claim_token) {
+        return Promise.resolve({
+          data: { outcome: 'claim_missing' },
+          error: null,
+        });
+      }
+      if (args.p_credit_source === 'pack') {
+        if (users.review_credits <= 0) {
+          claims.delete(requestKey);
+          return Promise.resolve({
+            data: { outcome: 'no_credit' },
+            error: null,
+          });
+        }
         users.review_credits -= 1;
-        return Promise.resolve({ data: users.review_credits, error: null });
       }
-      return Promise.resolve({ data: null, error: null });
+      reviewSeq += 1;
+      const timestamp = new Date().toISOString();
+      const row = {
+        id: `11111111-1111-4111-8111-${String(reviewSeq).padStart(12, '0')}`,
+        user_id: USER_ID,
+        request_key: requestKey,
+        poster_id: (args.p_poster_id as string | null) ?? null,
+        source_kind: String(args.p_source_kind),
+        source_meta: args.p_source_meta as Record<string, unknown>,
+        status: 'complete',
+        stage: 'initial',
+        initial_findings: args.p_initial_findings,
+        followup_findings: null,
+        credit_source: String(args.p_credit_source),
+        created_at: timestamp,
+        updated_at: timestamp,
+      } as FakeReviewRow;
+      reviews.set(row.id, row);
+      claims.delete(requestKey);
+      return Promise.resolve({
+        data: {
+          outcome: 'complete',
+          reviewId: row.id,
+          stage: 'initial',
+          critique: row.initial_findings,
+        },
+        error: null,
+      });
     },
   } as unknown as SupabaseClient;
 
@@ -368,7 +460,13 @@ describe('POST /api/review/critique — §5.2 state machine', () => {
       credit_source: 'pack',
     });
     expect(row.initial_findings).toBeTruthy();
-    expect(sb.rpcs.filter((r) => r.fn === 'consume_review_credit')).toHaveLength(1);
+    expect(
+      sb.rpcs.filter(
+        (r) =>
+          r.fn === 'finalize_initial_review' &&
+          r.args.p_credit_source === 'pack',
+      ),
+    ).toHaveLength(1);
     expect(sb.users.review_credits).toBe(1);
 
     // 2. Follow-up — included in the initial credit: NO second decrement (§5.3).
@@ -377,7 +475,13 @@ describe('POST /api/review/critique — §5.2 state machine', () => {
     expect(followup.body.reviewId).toBe(reviewId);
     expect(followup.body.stage).toBe('closed');
     expect(followup.body.critique.dimensionScores).toEqual(FOLLOWUP_CRITIQUE.dimensionScores);
-    expect(sb.rpcs.filter((r) => r.fn === 'consume_review_credit')).toHaveLength(1); // still one
+    expect(
+      sb.rpcs.filter(
+        (r) =>
+          r.fn === 'finalize_initial_review' &&
+          r.args.p_credit_source === 'pack',
+      ),
+    ).toHaveLength(1); // still one
     expect(sb.users.review_credits).toBe(1);
     expect(sb.reviews.get(reviewId)).toMatchObject({ status: 'complete', stage: 'closed' });
     expect(sb.reviews.get(reviewId)!.followup_findings).toBeTruthy();
@@ -405,7 +509,9 @@ describe('POST /api/review/critique — no charge on model failure (D6)', () => 
     // The 502 contract is a union; which member maps to an SDK throw is
     // the router's choice (Tasks 15/16) — either satisfies D6.
     expect(['review_upstream', 'bad_model_output']).toContain(failed.body.error);
-    expect(sb.rpcs).toHaveLength(0); // consume_review_credit never called
+    expect(
+      sb.rpcs.filter((r) => r.fn === 'finalize_initial_review'),
+    ).toHaveLength(0);
     expect(sb.users.review_credits).toBe(1);
     expect(sb.reviews.size).toBe(0); // no poster_reviews row on failure (D16)
 
@@ -435,13 +541,25 @@ describe('POST /api/review/critique — no charge on model failure (D6)', () => 
       stage: 'initial', // still open — the included follow-up is not forfeit
       followup_findings: null,
     });
-    expect(sb.rpcs.filter((r) => r.fn === 'consume_review_credit')).toHaveLength(1);
+    expect(
+      sb.rpcs.filter(
+        (r) =>
+          r.fn === 'finalize_initial_review' &&
+          r.args.p_credit_source === 'pack',
+      ),
+    ).toHaveLength(1);
 
     create.mockResolvedValueOnce(toolReply(FOLLOWUP_CRITIQUE));
     const retried = await postCritique(app, { sourceKind: 'image', pages: ONE_PAGE, reviewId });
     expect(retried.status).toBe(200);
     expect(retried.body.stage).toBe('closed');
-    expect(sb.rpcs.filter((r) => r.fn === 'consume_review_credit')).toHaveLength(1);
+    expect(
+      sb.rpcs.filter(
+        (r) =>
+          r.fn === 'finalize_initial_review' &&
+          r.args.p_credit_source === 'pack',
+      ),
+    ).toHaveLength(1);
   });
 });
 
@@ -501,7 +619,13 @@ describe('POST /api/review/critique — add-on weekly window (D5/D17)', () => {
     ).toBe(true);
 
     // The add-on path never decrements pack credits (D4).
-    expect(sb.rpcs.filter((r) => r.fn === 'consume_review_credit')).toHaveLength(0);
+    expect(
+      sb.rpcs.filter(
+        (r) =>
+          r.fn === 'finalize_initial_review' &&
+          r.args.p_credit_source === 'pack',
+      ),
+    ).toHaveLength(0);
     expect(sb.users.review_credits).toBe(0);
 
     // Slide the injected clock past the 7-day window — quota re-opens.

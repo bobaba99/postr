@@ -15,6 +15,7 @@ import type { ReviewPageRef } from '@postr/shared';
 import { checkImageUrl } from '../imageUrlGuard.js';
 import {
   REVIEW_IMAGE_MAX_BYTES,
+  REVIEW_PAGE_FETCH_TIMEOUT_MS,
   REVIEW_TOTAL_IMAGE_MAX_BYTES,
 } from './config.js';
 
@@ -86,7 +87,7 @@ export async function fetchReviewPages(
     let response: Response;
     try {
       response = await fetchFn(page.url, {
-        signal: AbortSignal.timeout(15_000),
+        signal: AbortSignal.timeout(REVIEW_PAGE_FETCH_TIMEOUT_MS),
         // The host allowlist is worthless if the allowed host can 302
         // elsewhere — refuse redirects outright (import.ts:534-537).
         redirect: 'error',

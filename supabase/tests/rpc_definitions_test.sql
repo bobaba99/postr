@@ -15,7 +15,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(38);
+select plan(56);
 
 -- --------------------------------------------------------------------------
 -- Functions exist
@@ -30,6 +30,15 @@ select has_function('public', 'consume_review_credit', array['uuid']::name[],
   'consume_review_credit(uuid) exists');
 select has_function('public', 'grant_review_credits', array['uuid', 'integer']::name[],
   'grant_review_credits(uuid, integer) exists');
+select has_function('public', 'claim_initial_review', array['uuid', 'uuid']::name[],
+  'claim_initial_review(uuid, uuid) exists');
+select has_function('public', 'release_initial_review', array['uuid', 'uuid', 'uuid']::name[],
+  'release_initial_review(uuid, uuid, uuid) exists');
+select has_function(
+  'public',
+  'finalize_initial_review',
+  array['uuid', 'uuid', 'uuid', 'uuid', 'text', 'jsonb', 'jsonb', 'text']::name[],
+  'finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text) exists');
 select has_function(
   'public',
   'fulfill_credit_pack',
@@ -49,6 +58,16 @@ select function_returns('public', 'consume_review_credit', array['uuid']::name[]
   'consume_review_credit(uuid) returns integer');
 select function_returns('public', 'grant_review_credits', array['uuid', 'integer']::name[], 'integer',
   'grant_review_credits(uuid, integer) returns integer');
+select function_returns('public', 'claim_initial_review', array['uuid', 'uuid']::name[], 'jsonb',
+  'claim_initial_review(uuid, uuid) returns jsonb');
+select function_returns('public', 'release_initial_review', array['uuid', 'uuid', 'uuid']::name[], 'boolean',
+  'release_initial_review(uuid, uuid, uuid) returns boolean');
+select function_returns(
+  'public',
+  'finalize_initial_review',
+  array['uuid', 'uuid', 'uuid', 'uuid', 'text', 'jsonb', 'jsonb', 'text']::name[],
+  'jsonb',
+  'finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text) returns jsonb');
 select function_returns(
   'public',
   'fulfill_credit_pack',
@@ -69,6 +88,15 @@ select is_definer('public', 'consume_review_credit', array['uuid']::name[],
   'consume_review_credit(uuid) is security definer');
 select is_definer('public', 'grant_review_credits', array['uuid', 'integer']::name[],
   'grant_review_credits(uuid, integer) is security definer');
+select is_definer('public', 'claim_initial_review', array['uuid', 'uuid']::name[],
+  'claim_initial_review(uuid, uuid) is security definer');
+select is_definer('public', 'release_initial_review', array['uuid', 'uuid', 'uuid']::name[],
+  'release_initial_review(uuid, uuid, uuid) is security definer');
+select is_definer(
+  'public',
+  'finalize_initial_review',
+  array['uuid', 'uuid', 'uuid', 'uuid', 'text', 'jsonb', 'jsonb', 'text']::name[],
+  'finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text) is security definer');
 select is_definer(
   'public',
   'fulfill_credit_pack',
@@ -119,6 +147,30 @@ select ok(
       and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
   ),
   'grant_review_credits() pins search_path');
+select ok(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'claim_initial_review'
+      and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+  ),
+  'claim_initial_review() pins search_path');
+select ok(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'release_initial_review'
+      and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+  ),
+  'release_initial_review() pins search_path');
+select ok(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'finalize_initial_review'
+      and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+  ),
+  'finalize_initial_review() pins search_path');
 select ok(
   exists (
     select 1 from pg_proc p
@@ -176,6 +228,30 @@ select ok(
 select ok(
   not has_function_privilege('authenticated', 'public.grant_review_credits(uuid, integer)', 'EXECUTE'),
   'authenticated cannot execute grant_review_credits(uuid, integer)');
+select ok(
+  not has_function_privilege('anon', 'public.claim_initial_review(uuid, uuid)', 'EXECUTE'),
+  'anon cannot execute claim_initial_review(uuid, uuid)');
+select ok(
+  not has_function_privilege('authenticated', 'public.claim_initial_review(uuid, uuid)', 'EXECUTE'),
+  'authenticated cannot execute claim_initial_review(uuid, uuid)');
+select ok(
+  not has_function_privilege('anon', 'public.release_initial_review(uuid, uuid, uuid)', 'EXECUTE'),
+  'anon cannot execute release_initial_review(uuid, uuid, uuid)');
+select ok(
+  not has_function_privilege('authenticated', 'public.release_initial_review(uuid, uuid, uuid)', 'EXECUTE'),
+  'authenticated cannot execute release_initial_review(uuid, uuid, uuid)');
+select ok(
+  not has_function_privilege(
+    'anon',
+    'public.finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text)',
+    'EXECUTE'),
+  'anon cannot execute finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text)');
+select ok(
+  not has_function_privilege(
+    'authenticated',
+    'public.finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text)',
+    'EXECUTE'),
+  'authenticated cannot execute finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text)');
 select ok(
   not has_function_privilege(
     'anon',

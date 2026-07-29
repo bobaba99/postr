@@ -9,8 +9,9 @@
  * silent truncation) → server-side entitlement resolution (D4:
  * term-active add-on → weekly window → pack credits → 402) →
  * SSRF-guarded page fetch → two-stage rubric critique → deterministic
- * enforce → credit consume AFTER success (D6) → single poster_reviews
- * write (success-only, D16).
+ * enforce → transactional credit spend + poster_reviews insert AFTER
+ * success (D6/D16). A browser request key claims provider work and
+ * replays the stored initial result on an ambiguous retry.
  *
  * POST /api/review/critique — FOLLOW-UP flow (body.reviewId set):
  * a diff critique against the stored initial findings, then the review
@@ -49,6 +50,7 @@ import {
   REVIEW_IMAGE_MAX_BYTES,
   REVIEW_MAX_PAGES,
   REVIEW_MODEL,
+  REVIEW_PPTX_MAX_CONCURRENT_RENDERS,
   REVIEW_PPTX_MAX_BYTES,
   REVIEW_SIGNED_URL_TTL_SEC,
 } from './review/config.js';
@@ -75,6 +77,7 @@ import {
   type CritiqueCallResult,
 } from './review/critique.js';
 import { enforceFindings } from './review/enforce.js';
+import { validateCritique } from './review/schema.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Request schema
@@ -115,6 +118,8 @@ const CritiqueRequest = z.object({
   posterDoc: PosterDocEnvelope.optional(),
   posterId: z.string().uuid().optional(),
   reviewId: z.string().uuid().optional(),
+  /** Browser-generated idempotency key for one logical initial review. */
+  requestKey: z.string().uuid().optional(),
   filename: z.string().max(255).optional(),
 });
 
@@ -143,6 +148,30 @@ export interface ReviewRouterDeps {
 function defaultGetPptxRenderer(): PptxRenderer {
   return createLibreOfficeRenderer();
 }
+
+let activePptxRenders = 0;
+
+const limitPptxRenderConcurrency: RequestHandler = (_req, res, next) => {
+  if (activePptxRenders >= REVIEW_PPTX_MAX_CONCURRENT_RENDERS) {
+    res.setHeader('Retry-After', '5');
+    res.status(503).json({
+      error: 'pptx_render_busy',
+      message: 'Presentation conversion is busy. Try again shortly.',
+    });
+    return;
+  }
+
+  activePptxRenders++;
+  let released = false;
+  const release = () => {
+    if (released) return;
+    released = true;
+    activePptxRenders--;
+  };
+  res.once('finish', release);
+  res.once('close', release);
+  next();
+};
 
 export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
   const router = express.Router();
@@ -200,15 +229,14 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
         }
 
         const anthropic = getAnthropic();
-        if (!anthropic) {
-          return res.status(500).json({
-            error: 'provider_not_configured',
-            message: 'ANTHROPIC_API_KEY is missing on the server.',
-          });
-        }
 
         return await (body.reviewId
-          ? runFollowup({ res, supabase, anthropic, fetchFn, now, user, body })
+          ? anthropic
+            ? runFollowup({ res, supabase, anthropic, fetchFn, now, user, body })
+            : res.status(500).json({
+                error: 'provider_not_configured',
+                message: 'ANTHROPIC_API_KEY is missing on the server.',
+              })
           : runInitial({
               req,
               res,
@@ -231,9 +259,10 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
   //    .pptx is re-fetched through the same SSRF guard as import images.
   router.post(
     '/api/review/render-pptx',
-    requireAuth(getSupabase),
+    requireAuth(getSupabase, { requirePermanent: true }),
     // Conversion is CPU-heavy (LibreOffice) — a tight burst + daily cap.
     createRateLimiter({ maxPerWindow: 2, maxPerDay: 10 }),
+    limitPptxRenderConcurrency,
     async (req: Request, res: Response) => {
       const parsed = RenderPptxRequest.safeParse(req.body);
       if (!parsed.success) {
@@ -438,7 +467,7 @@ interface InitialCtx {
   req: Request;
   res: Response;
   supabase: SupabaseClient;
-  anthropic: Anthropic;
+  anthropic: Anthropic | null;
   fetchFn: typeof fetch;
   now: () => number;
   weeklyLimiter: RequestHandler;
@@ -446,154 +475,285 @@ interface InitialCtx {
   body: CritiqueBody;
 }
 
+type InitialReviewRpcResult =
+  | { outcome: 'claimed'; claimToken: string; expiresAt: string }
+  | { outcome: 'in_progress' | 'no_credit' | 'claim_missing' }
+  | {
+      outcome: 'complete' | 'replay';
+      reviewId: string;
+      stage: 'initial' | 'closed';
+      critique: CritiqueResult;
+    };
+
+function parseInitialReviewRpcResult(raw: unknown): InitialReviewRpcResult | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const value = raw as Record<string, unknown>;
+  if (value.outcome === 'claimed') {
+    if (
+      typeof value.claimToken !== 'string' ||
+      typeof value.expiresAt !== 'string'
+    ) {
+      return null;
+    }
+    return {
+      outcome: 'claimed',
+      claimToken: value.claimToken,
+      expiresAt: value.expiresAt,
+    };
+  }
+  if (
+    value.outcome === 'in_progress' ||
+    value.outcome === 'no_credit' ||
+    value.outcome === 'claim_missing'
+  ) {
+    return { outcome: value.outcome };
+  }
+  if (value.outcome !== 'complete' && value.outcome !== 'replay') return null;
+  if (typeof value.reviewId !== 'string') return null;
+  if (value.stage !== 'initial' && value.stage !== 'closed') return null;
+  const critique = validateCritique(value.critique);
+  if (!critique) return null;
+  return {
+    outcome: value.outcome,
+    reviewId: value.reviewId,
+    stage: value.stage,
+    critique,
+  };
+}
+
+async function releaseInitialReviewClaim(
+  supabase: SupabaseClient,
+  userId: string,
+  requestKey: string,
+  claimToken: string,
+): Promise<void> {
+  try {
+    const { error } = await supabase.rpc(
+      'release_initial_review' as never,
+      {
+        p_user_id: userId,
+        p_request_key: requestKey,
+        p_claim_token: claimToken,
+      } as never,
+    );
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('[review.critique] release_initial_review rpc failed', {
+        userId,
+        requestKey,
+        message: error.message,
+      });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[review.critique] release_initial_review rpc crashed', {
+      userId,
+      requestKey,
+      message: err instanceof Error ? err.message : 'unknown',
+    });
+  }
+}
+
 async function runInitial(ctx: InitialCtx): Promise<Response> {
   const { req, res, supabase, anthropic, fetchFn, now, weeklyLimiter, user, body } = ctx;
+  // Legacy first-party callers that predate requestKey remain functional,
+  // while the web client always supplies and reuses its own key on retry.
+  const requestKey = body.requestKey ?? randomUUID();
 
-  // ── Entitlement (D4): resolved server-side, never client-chosen.
-  const entitlement = await resolveEntitlement(supabase, user.id);
-  if (!entitlement.ok) {
+  const { data: claimRaw, error: claimErr } = await supabase.rpc(
+    'claim_initial_review' as never,
+    { p_user_id: user.id, p_request_key: requestKey } as never,
+  );
+  const claim = parseInitialReviewRpcResult(claimRaw);
+  if (claimErr || !claim) {
     // eslint-disable-next-line no-console
-    console.error('[review.critique] entitlement lookup failed', {
+    console.error('[review.critique] claim_initial_review rpc failed', {
       userId: user.id,
-      message: entitlement.message,
+      requestKey,
+      message: claimErr?.message ?? 'invalid rpc response',
     });
     return res.status(500).json({ error: 'review_internal' });
   }
-  const { row } = entitlement;
+  if (claim.outcome === 'replay') {
+    return res.status(200).json({
+      reviewId: claim.reviewId,
+      stage: claim.stage,
+      critique: claim.critique,
+    });
+  }
+  if (claim.outcome === 'in_progress') {
+    return res.status(409).json({ error: 'review_in_progress' });
+  }
+  if (claim.outcome !== 'claimed') {
+    return res.status(500).json({ error: 'review_internal' });
+  }
+  const { claimToken } = claim;
 
-  let creditSource: 'pack' | 'subscription_addon';
-  if (row.review_addon === true && isTermActive(row, now())) {
-    // Add-on path: weekly window, invoked manually (D5). The limiter
-    // records the slot at this pre-check, so a FAILED model call still
-    // consumes the slot (D17 — accepted: slots are a soft cap).
-    const slot = weeklySlotAllowed(weeklyLimiter, req, res);
-    if (!slot.allowed) {
-      return res.status(402).json({
-        error: 'review_payment_required',
-        reason: 'weekly_quota_exceeded',
-        ...(slot.retryAfterSec !== undefined ? { retryAfterSec: slot.retryAfterSec } : {}),
+  let claimSettled = false;
+  try {
+    if (!anthropic) {
+      return res.status(500).json({
+        error: 'provider_not_configured',
+        message: 'ANTHROPIC_API_KEY is missing on the server.',
       });
     }
-    creditSource = 'subscription_addon';
-  } else if ((row.review_credits ?? 0) > 0) {
-    creditSource = 'pack';
-  } else {
-    return res.status(402).json({ error: 'review_payment_required', reason: 'no_credit' });
-  }
 
-  // ── Fetch the page bytes (SSRF-guarded inside fetchReviewPages).
-  let fetched: FetchedPage[];
-  try {
-    fetched = await fetchReviewPages(body.pages, {
-      supabaseUrl: process.env.SUPABASE_URL,
-      fetchFn,
-      maxBytes: REVIEW_IMAGE_MAX_BYTES,
-    });
-  } catch (err) {
-    return replyPageFetchError(res, err);
-  }
-
-  const signals = body.posterDoc ? computeReviewSignals(body.posterDoc.blocks) : undefined;
-
-  let callResult: CritiqueCallResult;
-  try {
-    callResult = await callAnthropicCritique(anthropic, {
-      systemPrompt: composeReviewSystemPrompt(),
-      userMessage: buildInitialUserMessage({
-        pageCount: body.pages.length,
-        sourceKind: body.sourceKind,
-        signals,
-        posterDocPresent: body.posterDoc !== undefined,
-      }),
-      pages: fetched,
-    });
-  } catch (err) {
-    return replyCritiqueError(res, err, { userId: user.id, stage: 'initial' });
-  }
-  const { critique, usage } = callResult;
-
-  // Deterministic grounding (§4.5): the prompt asks, this guarantees.
-  const enforced: CritiqueResult = {
-    ...critique,
-    findings: enforceFindings(critique.findings, {
-      blockIds: body.posterDoc ? new Set(body.posterDoc.blocks.map((b) => b.id)) : undefined,
-      pageCount: body.pages.length,
-    }),
-  };
-
-  // §6.2.4 cost instrumentation — real numbers set the pack price.
-  // eslint-disable-next-line no-console
-  console.log('[review.critique] critique done', {
-    userId: user.id,
-    stage: 'initial',
-    creditSource,
-    model: REVIEW_MODEL,
-    inputTokens: usage.inputTokens,
-    outputTokens: usage.outputTokens,
-    findings: enforced.findings.length,
-  });
-
-  // Pack path: consume AFTER success (D6). The RPC is a single atomic
-  // conditional UPDATE; a NULL return means a concurrent review won the
-  // race for the last credit — the model call already happened, so log
-  // loudly and refuse the row.
-  if (creditSource === 'pack') {
-    const { data: remaining, error: consumeErr } = await supabase.rpc(
-      'consume_review_credit' as never,
-      { p_user_id: user.id } as never,
-    );
-    if (consumeErr) {
+    // ── Entitlement (D4): resolved server-side, never client-chosen.
+    const entitlement = await resolveEntitlement(supabase, user.id);
+    if (!entitlement.ok) {
       // eslint-disable-next-line no-console
-      console.error('[review.critique] consume_review_credit rpc failed', {
+      console.error('[review.critique] entitlement lookup failed', {
         userId: user.id,
-        message: consumeErr.message,
+        message: entitlement.message,
       });
       return res.status(500).json({ error: 'review_internal' });
     }
-    if (remaining === null || remaining === undefined) {
-      // eslint-disable-next-line no-console
-      console.error('[review.critique] credit race lost after successful critique', {
-        userId: user.id,
+    const { row } = entitlement;
+
+    let creditSource: 'pack' | 'subscription_addon';
+    if (row.review_addon === true && isTermActive(row, now())) {
+      // Add-on path: weekly window, invoked manually (D5). The limiter
+      // records the slot at this pre-check, so a FAILED model call still
+      // consumes the slot (D17 — accepted: slots are a soft cap).
+      const slot = weeklySlotAllowed(weeklyLimiter, req, res);
+      if (!slot.allowed) {
+        return res.status(402).json({
+          error: 'review_payment_required',
+          reason: 'weekly_quota_exceeded',
+          ...(slot.retryAfterSec !== undefined ? { retryAfterSec: slot.retryAfterSec } : {}),
+        });
+      }
+      creditSource = 'subscription_addon';
+    } else if ((row.review_credits ?? 0) > 0) {
+      creditSource = 'pack';
+    } else {
+      return res.status(402).json({
+        error: 'review_payment_required',
+        reason: 'no_credit',
       });
-      return res.status(402).json({ error: 'review_payment_required', reason: 'no_credit' });
+    }
+
+    // ── Fetch the page bytes (SSRF-guarded inside fetchReviewPages).
+    let fetched: FetchedPage[];
+    try {
+      fetched = await fetchReviewPages(body.pages, {
+        supabaseUrl: process.env.SUPABASE_URL,
+        fetchFn,
+        maxBytes: REVIEW_IMAGE_MAX_BYTES,
+      });
+    } catch (err) {
+      return replyPageFetchError(res, err);
+    }
+
+    const signals = body.posterDoc
+      ? computeReviewSignals(body.posterDoc.blocks)
+      : undefined;
+
+    let callResult: CritiqueCallResult;
+    try {
+      callResult = await callAnthropicCritique(anthropic, {
+        systemPrompt: composeReviewSystemPrompt(),
+        userMessage: buildInitialUserMessage({
+          pageCount: body.pages.length,
+          sourceKind: body.sourceKind,
+          signals,
+          posterDocPresent: body.posterDoc !== undefined,
+        }),
+        pages: fetched,
+      });
+    } catch (err) {
+      return replyCritiqueError(res, err, {
+        userId: user.id,
+        stage: 'initial',
+      });
+    }
+    const { critique, usage } = callResult;
+
+    // Deterministic grounding (§4.5): the prompt asks, this guarantees.
+    const enforced: CritiqueResult = {
+      ...critique,
+      findings: enforceFindings(critique.findings, {
+        blockIds: body.posterDoc
+          ? new Set(body.posterDoc.blocks.map((b) => b.id))
+          : undefined,
+        pageCount: body.pages.length,
+      }),
+    };
+
+    // §6.2.4 cost instrumentation — real numbers set the pack price.
+    // eslint-disable-next-line no-console
+    console.log('[review.critique] critique done', {
+      userId: user.id,
+      stage: 'initial',
+      creditSource,
+      model: REVIEW_MODEL,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      findings: enforced.findings.length,
+    });
+
+    // The decrement and insert happen in one database transaction. If the
+    // insert (including its poster FK) fails, Postgres rolls the spend back.
+    const { data: finalRaw, error: finalErr } = await supabase.rpc(
+      'finalize_initial_review' as never,
+      {
+        p_user_id: user.id,
+        p_request_key: requestKey,
+        p_claim_token: claimToken,
+        p_poster_id: body.posterId ?? null,
+        p_source_kind: body.sourceKind,
+        p_source_meta: {
+          pageCount: body.pages.length,
+          rubric_version: CURRENT_RUBRIC_VERSION,
+          model: REVIEW_MODEL,
+          input_tokens: usage.inputTokens,
+          output_tokens: usage.outputTokens,
+          ...(body.filename ? { filename: body.filename } : {}),
+        },
+        p_initial_findings: enforced,
+        p_credit_source: creditSource,
+      } as never,
+    );
+    const finalized = parseInitialReviewRpcResult(finalRaw);
+    if (finalErr || !finalized) {
+      // eslint-disable-next-line no-console
+      console.error('[review.critique] finalize_initial_review rpc failed', {
+        userId: user.id,
+        requestKey,
+        message: finalErr?.message ?? 'invalid rpc response',
+      });
+      return res.status(500).json({ error: 'review_internal' });
+    }
+    if (finalized.outcome === 'no_credit') {
+      claimSettled = true;
+      return res.status(402).json({
+        error: 'review_payment_required',
+        reason: 'no_credit',
+      });
+    }
+    if (
+      finalized.outcome !== 'complete' &&
+      finalized.outcome !== 'replay'
+    ) {
+      return res.status(500).json({ error: 'review_internal' });
+    }
+
+    claimSettled = true;
+    return res.status(200).json({
+      reviewId: finalized.reviewId,
+      stage: finalized.stage,
+      critique: finalized.critique,
+    });
+  } finally {
+    if (!claimSettled) {
+      await releaseInitialReviewClaim(
+        supabase,
+        user.id,
+        requestKey,
+        claimToken,
+      );
     }
   }
-
-  const { data: inserted, error: insertErr } = await supabase
-    .from('poster_reviews')
-    .insert({
-      user_id: user.id,
-      poster_id: body.posterId ?? null,
-      source_kind: body.sourceKind,
-      source_meta: {
-        pageCount: body.pages.length,
-        rubric_version: CURRENT_RUBRIC_VERSION,
-        model: REVIEW_MODEL,
-        input_tokens: usage.inputTokens,
-        output_tokens: usage.outputTokens,
-        ...(body.filename ? { filename: body.filename } : {}),
-      },
-      status: 'complete',
-      stage: 'initial',
-      initial_findings: enforced,
-      credit_source: creditSource,
-    })
-    .select('id')
-    .single();
-  if (insertErr || !inserted) {
-    // eslint-disable-next-line no-console
-    console.error('[review.critique] poster_reviews insert failed', {
-      userId: user.id,
-      message: insertErr?.message ?? 'no row returned',
-    });
-    return res.status(500).json({ error: 'review_internal' });
-  }
-
-  return res.status(200).json({
-    reviewId: inserted.id as string,
-    stage: 'initial',
-    critique: enforced,
-  });
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -661,77 +821,156 @@ async function runFollowup(ctx: FollowupCtx): Promise<Response> {
     return res.status(409).json({ error: 'review_not_complete' });
   }
 
-  // Fetch the REVISED pages (SSRF-guarded inside fetchReviewPages).
-  let fetched: FetchedPage[];
-  try {
-    fetched = await fetchReviewPages(body.pages, {
-      supabaseUrl: process.env.SUPABASE_URL,
-      fetchFn,
-      maxBytes: REVIEW_IMAGE_MAX_BYTES,
-    });
-  } catch (err) {
-    return replyPageFetchError(res, err);
-  }
-
-  const signals = body.posterDoc ? computeReviewSignals(body.posterDoc.blocks) : undefined;
-
-  let callResult: CritiqueCallResult;
-  try {
-    callResult = await callAnthropicCritique(anthropic, {
-      systemPrompt: composeReviewSystemPrompt(),
-      userMessage: buildFollowupUserMessage({
-        initialFindings: review.initial_findings,
-        pageCount: body.pages.length,
-        sourceKind: body.sourceKind,
-        signals,
-      }),
-      pages: fetched,
-    });
-  } catch (err) {
-    return replyCritiqueError(res, err, { userId: user.id, reviewId, stage: 'followup' });
-  }
-  const { critique, usage } = callResult;
-
-  const enforced: CritiqueResult = {
-    ...critique,
-    findings: enforceFindings(critique.findings, {
-      blockIds: body.posterDoc ? new Set(body.posterDoc.blocks.map((b) => b.id)) : undefined,
-      pageCount: body.pages.length,
-    }),
-  };
-
-  // §6.2.4 cost instrumentation — follow-ups are part of the true
-  // cost per review credit.
-  // eslint-disable-next-line no-console
-  console.log('[review.critique] critique done', {
-    userId: user.id,
-    reviewId,
-    stage: 'followup',
-    model: REVIEW_MODEL,
-    inputTokens: usage.inputTokens,
-    outputTokens: usage.outputTokens,
-    findings: enforced.findings.length,
-  });
-
-  // One write: follow-up findings + terminal close, a single UPDATE.
-  const { error: updateErr } = await supabase
+  // Claim the one included follow-up BEFORE fetching pages or calling the
+  // model. The stage predicate makes this a compare-and-set: even when two
+  // requests both loaded `initial` above, only one can transition it to
+  // `followup`; the loser never reaches billable work.
+  const { data: claimedRaw, error: claimErr } = await supabase
     .from('poster_reviews')
     .update({
-      followup_findings: enforced,
-      stage: 'closed',
+      stage: 'followup',
       updated_at: new Date(now()).toISOString(),
     })
-    .eq('id', reviewId);
-  if (updateErr) {
+    .eq('id', reviewId)
+    .eq('user_id', user.id)
+    .eq('status', 'complete')
+    .eq('stage', 'initial')
+    .select('id')
+    .maybeSingle();
+  if (claimErr) {
     // eslint-disable-next-line no-console
-    console.error('[review.critique] follow-up update failed', {
+    console.error('[review.critique] follow-up claim failed', {
       reviewId,
-      message: updateErr.message,
+      message: claimErr.message,
     });
     return res.status(500).json({ error: 'review_internal' });
   }
+  if (!claimedRaw) {
+    return res.status(409).json({ error: 'review_closed' });
+  }
 
-  return res.status(200).json({ reviewId, stage: 'closed', critique: enforced });
+  let closed = false;
+  try {
+    // Fetch the REVISED pages (SSRF-guarded inside fetchReviewPages).
+    let fetched: FetchedPage[];
+    try {
+      fetched = await fetchReviewPages(body.pages, {
+        supabaseUrl: process.env.SUPABASE_URL,
+        fetchFn,
+        maxBytes: REVIEW_IMAGE_MAX_BYTES,
+      });
+    } catch (err) {
+      return replyPageFetchError(res, err);
+    }
+
+    const signals = body.posterDoc ? computeReviewSignals(body.posterDoc.blocks) : undefined;
+
+    let callResult: CritiqueCallResult;
+    try {
+      callResult = await callAnthropicCritique(anthropic, {
+        systemPrompt: composeReviewSystemPrompt(),
+        userMessage: buildFollowupUserMessage({
+          initialFindings: review.initial_findings,
+          pageCount: body.pages.length,
+          sourceKind: body.sourceKind,
+          signals,
+        }),
+        pages: fetched,
+      });
+    } catch (err) {
+      return replyCritiqueError(res, err, {
+        userId: user.id,
+        reviewId,
+        stage: 'followup',
+      });
+    }
+    const { critique, usage } = callResult;
+
+    const enforced: CritiqueResult = {
+      ...critique,
+      findings: enforceFindings(critique.findings, {
+        blockIds: body.posterDoc ? new Set(body.posterDoc.blocks.map((b) => b.id)) : undefined,
+        pageCount: body.pages.length,
+      }),
+    };
+
+    // §6.2.4 cost instrumentation — follow-ups are part of the true
+    // cost per review credit.
+    // eslint-disable-next-line no-console
+    console.log('[review.critique] critique done', {
+      userId: user.id,
+      reviewId,
+      stage: 'followup',
+      model: REVIEW_MODEL,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      findings: enforced.findings.length,
+    });
+
+    // Store findings only while this request still owns the `followup`
+    // claim. Returning the row proves the conditional close happened.
+    const { data: closedRaw, error: updateErr } = await supabase
+      .from('poster_reviews')
+      .update({
+        followup_findings: enforced,
+        stage: 'closed',
+        updated_at: new Date(now()).toISOString(),
+      })
+      .eq('id', reviewId)
+      .eq('user_id', user.id)
+      .eq('status', 'complete')
+      .eq('stage', 'followup')
+      .select('id')
+      .maybeSingle();
+    if (updateErr || !closedRaw) {
+      // eslint-disable-next-line no-console
+      console.error('[review.critique] follow-up update failed', {
+        reviewId,
+        message: updateErr?.message ?? 'claim no longer owned',
+      });
+      return res.status(500).json({ error: 'review_internal' });
+    }
+
+    closed = true;
+    return res.status(200).json({ reviewId, stage: 'closed', critique: enforced });
+  } finally {
+    if (!closed) {
+      await rollbackFollowupClaim(supabase, reviewId, user.id, now);
+    }
+  }
+}
+
+async function rollbackFollowupClaim(
+  supabase: SupabaseClient,
+  reviewId: string,
+  userId: string,
+  now: () => number,
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('poster_reviews')
+      .update({
+        stage: 'initial',
+        updated_at: new Date(now()).toISOString(),
+      })
+      .eq('id', reviewId)
+      .eq('user_id', userId)
+      .eq('status', 'complete')
+      .eq('stage', 'followup');
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error('[review.critique] follow-up claim rollback failed', {
+        reviewId,
+        message: error.message,
+      });
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[review.critique] follow-up claim rollback crashed', {
+      reviewId,
+      message: err instanceof Error ? err.message : 'unknown',
+    });
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────

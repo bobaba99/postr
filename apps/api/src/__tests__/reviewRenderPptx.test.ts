@@ -65,7 +65,11 @@ function pptxBytes(slideCount = 1): Buffer {
 const PPTX_BYTES = pptxBytes();
 
 function fakeSupabase(
-  storageOpts: { failUploadAt?: number; failSignAt?: number } = {},
+  storageOpts: {
+    failUploadAt?: number;
+    failSignAt?: number;
+    userIsAnonymous?: boolean;
+  } = {},
 ) {
   const uploads: Array<{
     bucket: string;
@@ -80,7 +84,12 @@ function fakeSupabase(
   const client = {
     auth: {
       getUser: async () => ({
-        data: { user: { id: 'user-1', is_anonymous: false } },
+        data: {
+          user: {
+            id: 'user-1',
+            is_anonymous: storageOpts.userIsAnonymous ?? false,
+          },
+        },
         error: null,
       }),
     },
@@ -145,7 +154,11 @@ function fakeRenderer(pages: Array<{ widthPx: number; heightPx: number }>) {
 function buildApp(deps: {
   renderer: PptxRenderer;
   fetchFn?: typeof fetch;
-  storageOpts?: { failUploadAt?: number; failSignAt?: number };
+  storageOpts?: {
+    failUploadAt?: number;
+    failSignAt?: number;
+    userIsAnonymous?: boolean;
+  };
 }) {
   const fake = fakeSupabase(deps.storageOpts);
   const fetchFn =
@@ -187,6 +200,69 @@ afterEach(() => {
 });
 
 describe('POST /api/review/render-pptx', () => {
+  it('requires a permanent account before fetching or converting a deck', async () => {
+    const fetchFn = vi.fn();
+    const { renderer, calls } = fakeRenderer([
+      { widthPx: 2048, heightPx: 1152 },
+    ]);
+    const { app } = buildApp({
+      renderer,
+      fetchFn: fetchFn as unknown as typeof fetch,
+      storageOpts: { userIsAnonymous: true },
+    });
+
+    const res = await postRender(app, VALID_FILE_URL);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('permanent_account_required');
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+
+  it('rejects concurrent conversion across router instances with 503', async () => {
+    let renderCalls = 0;
+    let releaseFirst!: () => void;
+    let markFirstStarted!: () => void;
+    const firstStarted = new Promise<void>((resolve) => {
+      markFirstStarted = resolve;
+    });
+    const firstRelease = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const renderer: PptxRenderer = {
+      async render(): Promise<RenderedPage[]> {
+        renderCalls++;
+        if (renderCalls === 1) {
+          markFirstStarted();
+          await firstRelease;
+        }
+        return [
+          {
+            pageNumber: 1,
+            jpeg: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+            widthPx: 2048,
+            heightPx: 1152,
+          },
+        ];
+      },
+    };
+    const { app: firstApp } = buildApp({ renderer });
+    const { app: secondApp } = buildApp({ renderer });
+
+    const firstResponse = postRender(firstApp, VALID_FILE_URL);
+    const firstPromise = Promise.resolve(firstResponse);
+    await firstStarted;
+    const second = await postRender(secondApp, VALID_FILE_URL);
+    releaseFirst();
+    const first = await firstPromise;
+
+    expect(second.status).toBe(503);
+    expect(second.body.error).toBe('pptx_render_busy');
+    expect(second.headers['retry-after']).toBeDefined();
+    expect(first.status).toBe(200);
+    expect(renderCalls).toBe(1);
+  });
+
   it('renders the deck, uploads page JPEGs to review-temp, returns signed URLs', async () => {
     const { renderer, calls } = fakeRenderer([
       { widthPx: 2048, heightPx: 1152 },

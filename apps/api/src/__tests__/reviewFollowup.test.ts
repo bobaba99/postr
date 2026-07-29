@@ -63,13 +63,20 @@ const REVIEW_ROW = {
 
 interface FakeSupabaseOpts {
   reviewRow?: Record<string, unknown> | null;
+  beforeReviewLoad?: () => Promise<void>;
 }
 
 function fakeSupabase(opts: FakeSupabaseOpts = {}) {
   const inserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
-  const updates: Array<{ table: string; payload: Record<string, unknown>; eqVal: unknown }> = [];
+  const updates: Array<{
+    table: string;
+    payload: Record<string, unknown>;
+    eqVal: unknown;
+    filters: Array<{ col: string; val: unknown }>;
+  }> = [];
   const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = [];
   const remove = vi.fn().mockResolvedValue({ data: [], error: null });
+  const reviewState = opts.reviewRow == null ? null : { ...opts.reviewRow };
   const client = {
     auth: {
       getUser: async () => ({
@@ -81,11 +88,15 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
       return {
         select: (_cols?: string) => ({
           eq: (_col: string, _val: unknown) => ({
-            maybeSingle: () =>
-              Promise.resolve({
-                data: table === 'poster_reviews' ? (opts.reviewRow ?? null) : null,
+            maybeSingle: async () => {
+              if (table === 'poster_reviews') {
+                await opts.beforeReviewLoad?.();
+              }
+              return {
+                data: table === 'poster_reviews' && reviewState ? { ...reviewState } : null,
                 error: null,
-              }),
+              };
+            },
           }),
         }),
         insert: (payload: Record<string, unknown>) => {
@@ -96,12 +107,43 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
             }),
           };
         },
-        update: (payload: Record<string, unknown>) => ({
-          eq: (_col: string, val: unknown) => {
-            updates.push({ table, payload, eqVal: val });
-            return Promise.resolve({ error: null });
-          },
-        }),
+        update: (payload: Record<string, unknown>) => {
+          const filters: Array<{ col: string; val: unknown }> = [];
+          let result: { data: { id: unknown } | null; error: null } | undefined;
+          const execute = () => {
+            if (result) return result;
+            const matches =
+              table === 'poster_reviews' &&
+              reviewState !== null &&
+              filters.every(({ col, val }) => String(reviewState[col]) === String(val));
+            updates.push({
+              table,
+              payload,
+              eqVal: filters[0]?.val,
+              filters: [...filters],
+            });
+            if (!matches) {
+              result = { data: null, error: null };
+              return result;
+            }
+            Object.assign(reviewState, payload);
+            result = { data: { id: reviewState.id }, error: null };
+            return result;
+          };
+          const chain = {
+            eq(col: string, val: unknown) {
+              filters.push({ col, val });
+              return chain;
+            },
+            select: (_cols?: string) => ({
+              maybeSingle: async () => execute(),
+            }),
+            then(onFulfilled?: (value: { error: null }) => unknown, onRejected?: (reason: unknown) => unknown) {
+              return Promise.resolve({ error: execute().error }).then(onFulfilled, onRejected);
+            },
+          };
+          return chain;
+        },
       };
     },
     rpc(fn: string, args: Record<string, unknown>) {
@@ -112,7 +154,7 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
       from: (_bucket: string) => ({ remove }),
     },
   } as unknown as SupabaseClient;
-  return { client, inserts, updates, rpcs, remove };
+  return { client, inserts, updates, rpcs, remove, reviewState };
 }
 
 function fakeAnthropic(critique: unknown = VALID_CRITIQUE) {
@@ -154,10 +196,15 @@ function validBody(overrides: Record<string, unknown> = {}) {
 }
 
 function post(app: ReturnType<typeof buildApp>, body: object) {
-  return request(app)
-    .post('/api/review/critique')
-    .set('Authorization', 'Bearer test-token')
-    .send(body);
+  return request(app).post('/api/review/critique').set('Authorization', 'Bearer test-token').send(body);
+}
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 }
 
 beforeEach(() => {
@@ -170,6 +217,105 @@ afterEach(() => {
 });
 
 describe('POST /api/review/critique — follow-up (§5.2)', () => {
+  it('atomically admits one of two concurrent follow-ups before either model call', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const anthropic = fakeAnthropic();
+    const firstModelStarted = deferred<void>();
+    const releaseModel = deferred<void>();
+    const bothLoadsReady = deferred<void>();
+    let reviewLoads = 0;
+    anthropic.create.mockImplementation(async () => {
+      firstModelStarted.resolve();
+      await releaseModel.promise;
+      return {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'toolu_test',
+            name: 'emit_critique',
+            input: VALID_CRITIQUE,
+          },
+        ],
+        stop_reason: 'tool_use',
+        usage: { input_tokens: 140, output_tokens: 90 },
+      };
+    });
+    const { client, reviewState } = fakeSupabase({
+      reviewRow: REVIEW_ROW,
+      beforeReviewLoad: async () => {
+        reviewLoads += 1;
+        if (reviewLoads === 2) bothLoadsReady.resolve();
+        await bothLoadsReady.promise;
+      },
+    });
+    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const responses: Array<Awaited<ReturnType<typeof post>>> = [];
+    const firstPromise = Promise.resolve(post(app, validBody())).then((response) => {
+      responses.push(response);
+      return response;
+    });
+    const secondPromise = Promise.resolve(post(app, validBody())).then((response) => {
+      responses.push(response);
+      return response;
+    });
+
+    await firstModelStarted.promise;
+    await vi.waitFor(() => {
+      expect(responses.length > 0 || anthropic.create.mock.calls.length >= 2).toBe(true);
+    });
+    releaseModel.resolve();
+
+    const [first, second] = await Promise.all([firstPromise, secondPromise]);
+
+    expect([first.status, second.status].sort()).toEqual([200, 409]);
+    expect(anthropic.create).toHaveBeenCalledTimes(1);
+    expect(reviewState).toMatchObject({
+      stage: 'closed',
+      followup_findings: VALID_CRITIQUE,
+    });
+  });
+
+  it('conditionally rolls an admitted follow-up back to initial when the model fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const anthropic = fakeAnthropic();
+    anthropic.create.mockRejectedValue(new Error('upstream unavailable'));
+    const { client, updates, reviewState } = fakeSupabase({
+      reviewRow: REVIEW_ROW,
+    });
+    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const res = await post(app, validBody());
+
+    expect(res.status).toBe(502);
+    expect(reviewState).toMatchObject({ stage: 'initial' });
+    expect(updates.map(({ payload }) => payload.stage)).toEqual(['followup', 'initial']);
+    expect(updates[0]!.filters).toEqual(
+      expect.arrayContaining([
+        { col: 'id', val: REVIEW_ID },
+        { col: 'user_id', val: 'user-1' },
+        { col: 'status', val: 'complete' },
+        { col: 'stage', val: 'initial' },
+      ]),
+    );
+    expect(updates[1]!.filters).toEqual(
+      expect.arrayContaining([
+        { col: 'id', val: REVIEW_ID },
+        { col: 'stage', val: 'followup' },
+      ]),
+    );
+  });
+
   it('runs the follow-up against the initial findings and closes the review without charging', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
@@ -192,13 +338,25 @@ describe('POST /api/review/critique — follow-up (§5.2)', () => {
     const createArg = anthropic.create.mock.calls[0]![0];
     expect(JSON.stringify(createArg)).toContain('buried in the bottom-right corner');
 
-    // One write: follow-up findings + terminal close.
-    expect(updates).toHaveLength(1);
+    // The first conditional write claims the one included follow-up before
+    // model work; the second stores findings and terminally closes it.
+    expect(updates).toHaveLength(2);
     expect(updates[0]!.table).toBe('poster_reviews');
     expect(updates[0]!.eqVal).toBe(REVIEW_ID);
-    expect(updates[0]!.payload.stage).toBe('closed');
-    expect(updates[0]!.payload.followup_findings).toBeDefined();
-    expect(typeof updates[0]!.payload.updated_at).toBe('string');
+    expect(updates[0]!.payload.stage).toBe('followup');
+    expect(updates[0]!.filters).toContainEqual({
+      col: 'stage',
+      val: 'initial',
+    });
+    expect(updates[1]!.table).toBe('poster_reviews');
+    expect(updates[1]!.eqVal).toBe(REVIEW_ID);
+    expect(updates[1]!.payload.stage).toBe('closed');
+    expect(updates[1]!.payload.followup_findings).toBeDefined();
+    expect(updates[1]!.filters).toContainEqual({
+      col: 'stage',
+      val: 'followup',
+    });
+    expect(typeof updates[1]!.payload.updated_at).toBe('string');
 
     // No new review row, and NO credit consume — the follow-up is
     // included in the initial credit (D6).
