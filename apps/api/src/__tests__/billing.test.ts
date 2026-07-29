@@ -383,3 +383,124 @@ describe('packRefundAmountCents — flat per-credit rate', () => {
     expect(packRefundAmountCents(3)).toBeLessThanOrEqual(999);
   });
 });
+
+describe('fulfillCheckout — review_pack (one-time)', () => {
+  it('grants 3 review credits atomically via the grant_review_credits RPC', async () => {
+    const fake = fakeSupabase();
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({}),
+      session({ mode: 'payment', subscription: undefined, metadata: { user_id: 'user-1', sku: 'review_pack' } }),
+    );
+    const grant = fake.rpcs.find((r) => r.fn === 'grant_review_credits');
+    expect(grant).toBeTruthy();
+    expect(grant?.args).toEqual({ p_user_id: 'user-1', p_amount: 3 });
+    // never touches the export-credit pool
+    expect(fake.rpcs.some((r) => r.fn === 'grant_export_credits')).toBe(false);
+    const marker = fake.inserts.find((i) => i.table === 'billing_fulfilled_sessions');
+    expect(marker?.payload.credits_granted).toBe(3);
+  });
+
+  it('is idempotent — an already-fulfilled session grants nothing', async () => {
+    const fake = fakeSupabase({ alreadyFulfilled: true });
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({}),
+      session({ mode: 'payment', subscription: undefined, metadata: { user_id: 'user-1', sku: 'review_pack' } }),
+    );
+    expect(fake.rpcs).toHaveLength(0);
+    expect(fake.inserts).toHaveLength(0);
+  });
+
+  it('does nothing for an unpaid review_pack session', async () => {
+    const fake = fakeSupabase();
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({}),
+      session({ mode: 'payment', subscription: undefined, payment_status: 'unpaid', metadata: { user_id: 'user-1', sku: 'review_pack' } }),
+    );
+    expect(fake.updates).toHaveLength(0);
+    expect(fake.rpcs).toHaveLength(0);
+  });
+});
+
+describe('fulfillCheckout — review_addon (subscription)', () => {
+  it('sets review_addon + review_addon_subscription_id — never the plan columns', async () => {
+    const fake = fakeSupabase();
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({ id: 'sub_addon_1', status: 'active', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
+      session({ metadata: { user_id: 'user-1', sku: 'review_addon' }, subscription: 'sub_addon_1' }),
+    );
+    expect(fake.updates).toHaveLength(1);
+    const { table, payload } = fake.updates[0]!;
+    expect(table).toBe('users');
+    expect(payload.review_addon).toBe(true);
+    expect(payload.review_addon_subscription_id).toBe('sub_addon_1');
+    expect(payload.stripe_customer_id).toBe('cus_1');
+    // the term's columns are the term's — an add-on never writes them
+    expect(payload).not.toHaveProperty('plan');
+    expect(payload).not.toHaveProperty('plan_expires_at');
+    expect(payload).not.toHaveProperty('subscription_status');
+    expect(payload).not.toHaveProperty('stripe_subscription_id');
+    // absolute-value write, naturally idempotent: no credit RPC, no ledger row
+    expect(fake.rpcs).toHaveLength(0);
+    expect(fake.inserts).toHaveLength(0);
+  });
+
+  it('does nothing for an incomplete review_addon session', async () => {
+    const fake = fakeSupabase();
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({}),
+      session({ status: 'open', payment_status: 'unpaid', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
+    );
+    expect(fake.updates).toHaveLength(0);
+    expect(fake.rpcs).toHaveLength(0);
+  });
+});
+
+describe('handleSubscriptionChange — review_addon', () => {
+  it('a live add-on status sets the flag + subscription id (no plan columns)', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({ id: 'sub_addon_1', status: 'active', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
+    );
+    expect(fake.updates).toHaveLength(1);
+    const { payload } = fake.updates[0]!;
+    expect(payload.review_addon).toBe(true);
+    expect(payload.review_addon_subscription_id).toBe('sub_addon_1');
+    expect(payload).not.toHaveProperty('plan');
+    expect(payload).not.toHaveProperty('plan_expires_at');
+    expect(payload).not.toHaveProperty('subscription_status');
+  });
+
+  it('a deleted (canceled) add-on clears the flag but KEEPS the subscription id for reconciliation', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({ id: 'sub_addon_1', status: 'canceled', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
+    );
+    expect(fake.updates).toHaveLength(1);
+    // exactly { review_addon: false } — sub id kept, plan columns untouched
+    expect(fake.updates[0]!.payload).toEqual({ review_addon: false });
+  });
+});
+
+describe('handleInvoicePaid — review_addon invoice', () => {
+  it('is NOT treated as a term renewal — no writes at all', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    const stripe = {
+      subscriptions: {
+        retrieve: () =>
+          Promise.resolve(
+            fakeSub({ id: 'sub_addon_1', status: 'active', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
+          ),
+      },
+    } as unknown as Stripe;
+    const invoice = { subscription: 'sub_addon_1', customer: 'cus_1' } as unknown as Stripe.Invoice;
+    await handleInvoicePaid(fake.client, stripe, invoice);
+    expect(fake.updates).toHaveLength(0);
+  });
+});
