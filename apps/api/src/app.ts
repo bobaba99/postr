@@ -3,6 +3,7 @@ import cors from 'cors';
 import { createCronRouter } from './cron.js';
 import { createImportRouter } from './import.js';
 import { createNarrativeRouter } from './narrative.js';
+import { createReviewRouter } from './review.js';
 import { createBillingRouter, createBillingWebhookRouter } from './billing.js';
 
 export function createApp(): Express {
@@ -53,6 +54,11 @@ export function createApp(): Express {
   // manuscript→poster pipeline. OPENAI_API_KEY required at request
   // time; missing key returns 500 only when the route fires.
   app.use(createNarrativeRouter());
+
+  // Presentation Checker — poster/talk critique. ANTHROPIC_API_KEY +
+  // Supabase service key required at request time; missing config
+  // returns 500 only when the route fires.
+  app.use(createReviewRouter());
 
   return app;
 }
