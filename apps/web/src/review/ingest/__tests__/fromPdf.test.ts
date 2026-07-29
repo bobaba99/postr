@@ -49,12 +49,12 @@ interface FakePage {
   render: ReturnType<typeof vi.fn>;
 }
 
-/** A fake pdfjs page: 612×792pt (letter) at scale 1; render resolves immediately. */
-function fakePdfPage(): FakePage {
+/** A fake pdfjs page, letter-sized by default; render resolves immediately. */
+function fakePdfPage(widthPt = 612, heightPt = 792): FakePage {
   return {
     getViewport: ({ scale }: { scale: number }) => ({
-      width: 612 * scale,
-      height: 792 * scale,
+      width: widthPt * scale,
+      height: heightPt * scale,
     }),
     render: vi.fn(() => ({ promise: Promise.resolve() })),
   };
@@ -184,5 +184,19 @@ describe('fromPdf', () => {
     expect(pages[1]!.render).toHaveBeenCalledTimes(1);
     expect(mockUploadReviewPage).toHaveBeenCalledTimes(2);
     expect(doc.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders small PDF pages at the audit resolution floor', async () => {
+    const doc = fakePdfDoc(1, [fakePdfPage(400, 300)]);
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(doc) });
+    canvases = [fakeCanvas(NON_BLANK)];
+    const file = new File(['pdf-bytes'], 'small.pdf', { type: 'application/pdf' });
+
+    const artifact = await fromPdf(file, CTX);
+
+    expect(artifact.pages[0]!.widthPx).toBeGreaterThanOrEqual(1024);
+    expect(artifact.pages[0]!.heightPx).toBeGreaterThanOrEqual(1024);
+    expect(artifact.pages[0]!.widthPx).toBeLessThanOrEqual(2048);
+    expect(artifact.pages[0]!.heightPx).toBeLessThanOrEqual(2048);
   });
 });
