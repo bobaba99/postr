@@ -23,10 +23,75 @@ const BUCKET = 'poster-assets';
 const PPTX_MIME =
   'application/vnd.openxmlformats-officedocument.presentationml.presentation';
 const SIGNED_URL_TTL_SEC = 600;
+const UPLOAD_FAILED_MESSAGE =
+  "The upload didn't complete — check your connection and try again.";
+const SERVER_RENDER_FAILED_MESSAGE =
+  "We couldn't read that file. Try exporting it as a PDF and upload that instead.";
 
-/** Task 18 adds storagePath to the shared route contract. Keeping it
- * optional here lets this client interoperate with older API deploys. */
-type RenderedReviewPageRef = ReviewPageRef & { storagePath?: string };
+/** Rendered pages are temporary objects that the critique flow must
+ * be able to remove, so the route response must include their paths. */
+type RenderedReviewPageRef = ReviewPageRef & { storagePath: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0;
+}
+
+function isUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isOwnedReviewTempPath(path: string, userId: string): boolean {
+  const segments = path.split('/');
+  return (
+    segments.length >= 4 &&
+    segments[0] === userId &&
+    segments[1] === 'review-temp' &&
+    segments.every(
+      (segment) => segment.length > 0 && segment !== '.' && segment !== '..',
+    )
+  );
+}
+
+function isRenderedReviewPage(
+  value: unknown,
+  userId: string,
+): value is RenderedReviewPageRef {
+  return (
+    isRecord(value) &&
+    isPositiveInteger(value.pageNumber) &&
+    isUrl(value.url) &&
+    isPositiveInteger(value.widthPx) &&
+    isPositiveInteger(value.heightPx) &&
+    typeof value.storagePath === 'string' &&
+    isOwnedReviewTempPath(value.storagePath, userId)
+  );
+}
+
+function parseRenderedPages(
+  response: unknown,
+  userId: string,
+): RenderedReviewPageRef[] {
+  if (
+    !isRecord(response) ||
+    !Array.isArray(response.pages) ||
+    response.pages.length < 1 ||
+    response.pages.length > INGEST_MAX_PAGES ||
+    !response.pages.every((page) => isRenderedReviewPage(page, userId))
+  ) {
+    throw new IngestError(SERVER_RENDER_FAILED_MESSAGE, 'server-render-failed');
+  }
+  return response.pages as RenderedReviewPageRef[];
+}
 
 async function removeRawUpload(rawPath: string): Promise<void> {
   try {
@@ -43,14 +108,17 @@ export async function fromPptx(
   assertFileAllowed(file, [PPTX_MIME]);
 
   const rawPath = `${ctx.userId}/review-temp/${ctx.sessionId}/source.pptx`;
-  const { error } = await supabase.storage
-    .from(BUCKET)
-    .upload(rawPath, file, { contentType: PPTX_MIME, upsert: true });
+  let error: unknown;
+  try {
+    ({ error } = await supabase.storage
+      .from(BUCKET)
+      .upload(rawPath, file, { contentType: PPTX_MIME, upsert: true }));
+  } catch {
+    await removeRawUpload(rawPath);
+    throw new IngestError(UPLOAD_FAILED_MESSAGE, 'upload-failed');
+  }
   if (error) {
-    throw new IngestError(
-      "The upload didn't complete — check your connection and try again.",
-      'upload-failed',
-    );
+    throw new IngestError(UPLOAD_FAILED_MESSAGE, 'upload-failed');
   }
 
   let signedUrl: string;
@@ -64,21 +132,19 @@ export async function fromPptx(
     signedUrl = data.signedUrl;
   } catch {
     await removeRawUpload(rawPath);
-    throw new IngestError(
-      "The upload didn't complete — check your connection and try again.",
-      'upload-failed',
-    );
+    throw new IngestError(UPLOAD_FAILED_MESSAGE, 'upload-failed');
   }
 
   try {
-    const { pages } = await postJson<{ pages: RenderedReviewPageRef[] }>(
+    const response = await postJson<unknown>(
       '/api/review/render-pptx',
       { fileUrl: signedUrl },
       { auth: true },
     );
+    const pages = parseRenderedPages(response, ctx.userId);
     const pageImages: PageImage[] = pages.map((page) => ({
       pageNumber: page.pageNumber,
-      storagePath: page.storagePath ?? '',
+      storagePath: page.storagePath,
       signedUrl: page.url,
       widthPx: page.widthPx,
       heightPx: page.heightPx,
@@ -102,7 +168,7 @@ export async function fromPptx(
         );
       }
       throw new IngestError(
-        "We couldn't read that file. Try exporting it as a PDF and upload that instead.",
+        SERVER_RENDER_FAILED_MESSAGE,
         'server-render-failed',
       );
     }

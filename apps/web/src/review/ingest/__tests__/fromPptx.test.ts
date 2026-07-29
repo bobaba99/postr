@@ -37,6 +37,13 @@ const CTX = { userId: 'u1', sessionId: 'sess-1' };
 const RAW_PATH = 'u1/review-temp/sess-1/source.pptx';
 const PPTX_MIME =
   'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+const VALID_RENDERED_PAGE = {
+  pageNumber: 1,
+  storagePath: 'u1/review-temp/rendered/page-1.jpg',
+  url: 'https://signed/p1',
+  widthPx: 1280,
+  heightPx: 720,
+};
 
 function pptxFile(name = 'deck.pptx'): File {
   return new File(['pptx-bytes'], name, { type: PPTX_MIME });
@@ -56,14 +63,14 @@ describe('fromPptx', () => {
   it('round-trips the raw file and normalizes rendered pages with server paths when available', async () => {
     mockPostJson.mockResolvedValue({
       pages: [
+        VALID_RENDERED_PAGE,
         {
-          pageNumber: 1,
-          storagePath: 'u1/review-temp/rendered/page-1.jpg',
-          url: 'https://signed/p1',
+          pageNumber: 2,
+          storagePath: 'u1/review-temp/rendered/page-2.jpg',
+          url: 'https://signed/p2',
           widthPx: 1280,
           heightPx: 720,
         },
-        { pageNumber: 2, url: 'https://signed/p2', widthPx: 1280, heightPx: 720 },
       ],
     });
 
@@ -90,7 +97,7 @@ describe('fromPptx', () => {
       },
       {
         pageNumber: 2,
-        storagePath: '',
+        storagePath: 'u1/review-temp/rendered/page-2.jpg',
         signedUrl: 'https://signed/p2',
         widthPx: 1280,
         heightPx: 720,
@@ -164,6 +171,18 @@ describe('fromPptx', () => {
     expect(mockRemove).not.toHaveBeenCalled();
   });
 
+  it('removes the raw path and maps a rejected upload to upload-failed', async () => {
+    mockUpload.mockRejectedValue(new TypeError('network down'));
+
+    await expect(fromPptx(pptxFile(), CTX)).rejects.toMatchObject({
+      name: 'IngestError',
+      kind: 'upload-failed',
+    });
+    expect(mockCreateSignedUrl).not.toHaveBeenCalled();
+    expect(mockPostJson).not.toHaveBeenCalled();
+    expect(mockRemove).toHaveBeenCalledWith([RAW_PATH]);
+  });
+
   it('removes the raw upload when signing returns an error', async () => {
     mockCreateSignedUrl.mockResolvedValue({
       data: null,
@@ -187,6 +206,105 @@ describe('fromPptx', () => {
       kind: 'upload-failed',
     });
     expect(mockPostJson).not.toHaveBeenCalled();
+    expect(mockRemove).toHaveBeenCalledWith([RAW_PATH]);
+  });
+
+  it.each([
+    ['a missing pages field', {}],
+    ['an empty pages array', { pages: [] }],
+    [
+      'more than 24 pages',
+      {
+        pages: Array.from({ length: 25 }, (_, index) => ({
+          ...VALID_RENDERED_PAGE,
+          pageNumber: index + 1,
+          storagePath: `u1/review-temp/rendered/page-${index + 1}.jpg`,
+        })),
+      },
+    ],
+    ['an invalid page URL', { pages: [{ ...VALID_RENDERED_PAGE, url: 'not-a-url' }] }],
+    ['a zero page number', { pages: [{ ...VALID_RENDERED_PAGE, pageNumber: 0 }] }],
+    ['a fractional page number', { pages: [{ ...VALID_RENDERED_PAGE, pageNumber: 1.5 }] }],
+    ['a zero width', { pages: [{ ...VALID_RENDERED_PAGE, widthPx: 0 }] }],
+    ['a fractional width', { pages: [{ ...VALID_RENDERED_PAGE, widthPx: 1279.5 }] }],
+    ['a zero height', { pages: [{ ...VALID_RENDERED_PAGE, heightPx: 0 }] }],
+    ['a fractional height', { pages: [{ ...VALID_RENDERED_PAGE, heightPx: 719.5 }] }],
+    [
+      'a missing storage path',
+      {
+        pages: [
+          {
+            pageNumber: 1,
+            url: 'https://signed/p1',
+            widthPx: 1280,
+            heightPx: 720,
+          },
+        ],
+      },
+    ],
+    ['an empty storage path', { pages: [{ ...VALID_RENDERED_PAGE, storagePath: '' }] }],
+    [
+      "another user's storage path",
+      {
+        pages: [
+          {
+            ...VALID_RENDERED_PAGE,
+            storagePath: 'other-user/review-temp/rendered/page-1.jpg',
+          },
+        ],
+      },
+    ],
+    [
+      'a path outside review-temp',
+      {
+        pages: [
+          {
+            ...VALID_RENDERED_PAGE,
+            storagePath: 'u1/posters/rendered/page-1.jpg',
+          },
+        ],
+      },
+    ],
+    [
+      'an empty path segment',
+      {
+        pages: [
+          {
+            ...VALID_RENDERED_PAGE,
+            storagePath: 'u1/review-temp//page-1.jpg',
+          },
+        ],
+      },
+    ],
+    [
+      'a dot path segment',
+      {
+        pages: [
+          {
+            ...VALID_RENDERED_PAGE,
+            storagePath: 'u1/review-temp/./page-1.jpg',
+          },
+        ],
+      },
+    ],
+    [
+      'a dot-dot path segment',
+      {
+        pages: [
+          {
+            ...VALID_RENDERED_PAGE,
+            storagePath: 'u1/review-temp/../page-1.jpg',
+          },
+        ],
+      },
+    ],
+  ])('maps a successful response with %s to server-render-failed', async (_label, response) => {
+    mockPostJson.mockResolvedValue(response);
+
+    await expect(fromPptx(pptxFile(), CTX)).rejects.toMatchObject({
+      name: 'IngestError',
+      kind: 'server-render-failed',
+    });
     expect(mockRemove).toHaveBeenCalledWith([RAW_PATH]);
   });
 });
