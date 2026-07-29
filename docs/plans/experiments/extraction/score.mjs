@@ -71,7 +71,11 @@ async function exists(path) {
 function starHit(armFindings, gold) {
   const top = armFindings.find((f) => f.rank === 1);
   if (!top) return false;
-  return sameFinding(top.sourceQuote, gold.star.sourceQuote);
+  // Gold files use `starFinding` (the fixture schema); tolerate the older
+  // `star` alias too so a hand-written gold still scores.
+  const goldStar = gold.starFinding ?? gold.star;
+  if (!goldStar) return false;
+  return sameFinding(top.sourceQuote, goldStar.sourceQuote);
 }
 
 /** top-3 overlap: how many of the human's top-3 quotes are matched by any of the
@@ -121,7 +125,11 @@ function promotedForbidden(armFindings, gold) {
   const armTop3 = armFindings.filter((f) => f.rank >= 1 && f.rank <= 3);
   let count = 0;
   for (const bad of forbidden) {
-    if (armTop3.some((f) => sameFinding(f.sourceQuote, bad.sourceQuote))) {
+    // doNotPromote entries are plain strings (the fixture schema); tolerate an
+    // object with a sourceQuote too. Match if the forbidden text/quote overlaps
+    // any of the arm's top-3 quotes.
+    const badQuote = typeof bad === 'string' ? bad : (bad?.sourceQuote ?? '');
+    if (armTop3.some((f) => sameFinding(f.sourceQuote, badQuote))) {
       count += 1;
     }
   }
