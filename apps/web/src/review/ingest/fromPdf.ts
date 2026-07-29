@@ -214,12 +214,9 @@ export async function fromPdf(
     ingestError ??= new IngestError(UNREADABLE_COPY, 'unreadable-file');
   }
 
-  if (!artifact) {
-    ingestError ??= new IngestError(UNREADABLE_COPY, 'unreadable-file');
-  }
-  if (ingestError) {
+  if (ingestError || !artifact) {
     await removeUploadedPages(uploadedStoragePaths);
-    throw ingestError;
+    throw ingestError ?? new IngestError(UNREADABLE_COPY, 'unreadable-file');
   }
   return artifact;
 }
