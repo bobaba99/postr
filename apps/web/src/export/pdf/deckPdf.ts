@@ -162,14 +162,32 @@ function drawShapeElement(page: PDFPage, el: StyledElement): void {
  * skipped — never thrown, matching the pptx writer's graceful
  * degradation contract (spec §5.3). The `template-marker` element itself
  * carries no text or shape kind, so it is never drawn even on a
- * non-utility slide that happened to carry one. */
+ * non-utility slide that happened to carry one.
+ *
+ * The page ALWAYS gets a full-bleed background fill in `themeBgHex`
+ * FIRST, before any element — this does not depend on the slide
+ * carrying an explicit `background`-kind element. The real styleDeck
+ * API prompt (apps/api/src/narrative/styleDeck.ts's
+ * STYLE_SYSTEM_PROMPT) never requires one, so relying solely on an
+ * element left the PDF's page background undrawn (default white)
+ * whenever Arm P omitted it — invisible ink text on a dark theme is
+ * the direct, user-visible consequence (Task 10's live-browser
+ * verification caught this). The pptx writer (deckWriter.ts) never had
+ * this problem: it sets `slide.background` directly from
+ * `deck.theme.palette[0]`, independent of any element — this mirrors
+ * that. An explicit `background`-kind element, if present, still draws
+ * on top afterward (normally the same color, so a visual no-op; kept
+ * for forward-compatibility if a future device ever wants a
+ * non-uniform background). */
 function drawSlide(
   doc: PDFDocument,
   elements: readonly StyledElement[],
   font: PDFFont,
   boldFont: PDFFont,
+  themeBgHex: string,
 ): void {
   const page = doc.addPage([SLIDE_W, SLIDE_H]);
+  page.drawRectangle({ x: 0, y: 0, width: SLIDE_W, height: SLIDE_H, color: hexToRgb(themeBgHex, '#FFFFFF') });
   for (const el of elements) {
     if (el.kind === 'background') {
       drawBackground(page, el);
@@ -216,9 +234,10 @@ export async function exportStyledDeckPdf(deck: StyledSlideDeck): Promise<Uint8A
   const boldFont = await doc.embedFont(StandardFonts.HelveticaBold);
 
   const contentSlides = deck.slides.filter((s) => !isUtilitySlide(s.elements));
+  const themeBgHex = deck.theme.palette[0] ?? '#FFFFFF';
 
   for (const slide of contentSlides) {
-    drawSlide(doc, slide.elements, font, boldFont);
+    drawSlide(doc, slide.elements, font, boldFont, themeBgHex);
   }
 
   await addAckPage(doc);

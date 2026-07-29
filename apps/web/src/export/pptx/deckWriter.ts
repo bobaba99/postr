@@ -337,6 +337,25 @@ export async function exportStyledDeckPptx(
   deck: StyledSlideDeck,
   options: StyledDeckPptxOptions = {},
 ): Promise<Uint8Array> {
+  const pptx = await buildStyledDeckPptxInstance(deck, options);
+  const buffer = (await pptx.write({ outputType: 'uint8array' })) as Uint8Array;
+  return buffer;
+}
+
+/**
+ * Build the `PptxGenJS` instance for a styled deck WITHOUT writing it —
+ * the seam Task 10's export orchestration needs to append the palette
+ * and icon-library utility slides (`export/deck/paletteSlide.ts`,
+ * `export/deck/iconLibrarySlide.ts`) onto the SAME pptx before the one
+ * final `pptx.write()`, rather than producing two separate files.
+ * `exportStyledDeckPptx` above is a thin wrapper around this for
+ * callers that just want the styled slides on their own (as every
+ * existing `deckWriterStyled.test.ts` assertion does).
+ */
+export async function buildStyledDeckPptxInstance(
+  deck: StyledSlideDeck,
+  options: StyledDeckPptxOptions = {},
+): Promise<PptxGenJS> {
   const PptxGen = options.pptxgen ?? (await import('pptxgenjs')).default;
   const pptx = new PptxGen();
   pptx.defineLayout({
@@ -355,6 +374,5 @@ export async function exportStyledDeckPptx(
     addStyledSlide(pptx, s, backgroundHex);
   }
 
-  const buffer = (await pptx.write({ outputType: 'uint8array' })) as Uint8Array;
-  return buffer;
+  return pptx;
 }

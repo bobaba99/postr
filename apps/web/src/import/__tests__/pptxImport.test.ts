@@ -357,10 +357,11 @@ describe('Postr’s own template slides are not counted as skipped content', () 
   it('caps the subtraction so forged names cannot silence the warning', async () => {
     // The marker is an attribute anyone can write. Renaming a whole
     // deck must not let it claim that nothing was skipped.
-    const parsed = parsePptx(await makeForeignDeck(10, { forgeMarker: true }));
+    const parsed = parsePptx(await makeForeignDeck(12, { forgeMarker: true }));
     const warning = skipWarning(parsed);
     expect(warning).toBeDefined();
-    // 10 slides, at most 6 credited as ours → 4 user slides, 3 lost.
+    // 12 slides, at most APPENDED_SLIDE_COUNT (8) credited as ours →
+    // 4 user slides, 3 lost.
     expect(warning).toContain('4 slides');
     expect(warning).toContain('3 slides were skipped');
   });

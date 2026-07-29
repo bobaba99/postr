@@ -36,4 +36,74 @@ describe('applyTheme', () => {
     applyTheme(base, theme);
     expect(JSON.stringify(base)).toBe(before);
   });
+
+  it('assigns a theme color to a title/body/label element that starts with NO color at all — never leaves it invisible on the theme background', () => {
+    // Arm P (styleDeck) does not always set `color` on every element — it's
+    // Arm T's (applyTheme) job to colorize. An element with no color must
+    // still get a real, theme-legible color, not stay undefined (which
+    // upstream renderers fall back to a hardcoded near-black, invisible on
+    // a dark theme background).
+    const uncoloredDeck: StyledSlideDeck = {
+      durationMinutes: 10,
+      theme: base.theme,
+      slides: [
+        {
+          role: 'title',
+          device: 'plain',
+          elements: [{ kind: 'title', text: 'Spaced practice', x: 0.7, y: 0.5, fontSize: 40 }],
+        },
+      ],
+    };
+    const darkTheme: Theme = {
+      palette: ['#111111', '#FFFFFF', '#FFD700', '#999999'],
+      typeScale: { heading: 48, body: 20, label: 13 },
+      accentTreatment: 'bold',
+    };
+    const out = applyTheme(uncoloredDeck, darkTheme);
+    const title = out.slides[0]!.elements[0]!;
+    expect(title.color).toBe(darkTheme.palette[1]); // ink, not the bg color, not undefined
+  });
+
+  it('re-vibe (a SECOND applyTheme pass with a different theme) never strands ink text on the new background color', () => {
+    // The bug this locks in: theme A's ink color (palette[1]) can
+    // legitimately equal theme B's BACKGROUND color (palette[0]) — hex
+    // strings recur across arbitrary palettes. A naive "keep the color
+    // if it's already somewhere in the new palette" check would then
+    // leave title text stuck in the new background's own color,
+    // invisible. This is exactly SlidesWizard.tsx's handleVibeSubmit
+    // path: re-run generateTheme, re-apply to the ALREADY-styled deck.
+    const themeA: Theme = {
+      palette: ['#FFFFFF', '#111111', '#7C6AED', '#6B7280'],
+      typeScale: { heading: 40, body: 18, label: 12 },
+      accentTreatment: 'light',
+    };
+    const themeB: Theme = {
+      // Deliberately reuses themeA's ink color (#111111) as ITS OWN
+      // background slot — the exact collision that breaks a naive fix.
+      palette: ['#111111', '#FFFFFF', '#FFD700', '#999999'],
+      typeScale: { heading: 48, body: 20, label: 13 },
+      accentTreatment: 'bold',
+    };
+    const uncoloredDeck: StyledSlideDeck = {
+      durationMinutes: 10,
+      theme: themeA,
+      slides: [
+        {
+          role: 'title',
+          device: 'plain',
+          elements: [{ kind: 'title', text: 'Spaced practice', x: 0.7, y: 0.5, fontSize: 40 }],
+        },
+      ],
+    };
+
+    const afterFirstStyle = applyTheme(uncoloredDeck, themeA);
+    expect(afterFirstStyle.slides[0]!.elements[0]!.color).toBe(themeA.palette[1]); // '#111111'
+
+    const afterReVibe = applyTheme(afterFirstStyle, themeB);
+    const title = afterReVibe.slides[0]!.elements[0]!;
+    // Must be theme B's ink (#FFFFFF), never theme B's background
+    // (#111111) — even though #111111 is technically "in the palette".
+    expect(title.color).toBe(themeB.palette[1]);
+    expect(title.color).not.toBe(themeB.palette[0]);
+  });
 });

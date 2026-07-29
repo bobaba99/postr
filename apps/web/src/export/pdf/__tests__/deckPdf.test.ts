@@ -10,7 +10,15 @@
  * omits it (spec: PDF renders content + references + ack ONLY).
  */
 import { describe, expect, it } from 'vitest';
-import { PDFDict, PDFDocument, PDFName, type PDFPage } from 'pdf-lib';
+import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFRawStream,
+  decodePDFRawStream,
+  type PDFPage,
+} from 'pdf-lib';
 import { exportStyledDeckPdf } from '../deckPdf';
 import type { StyledSlideDeck } from '../../../manuscript/deck/styledTypes';
 import { ackMarkPngDataUri } from '../../ackMarkPng';
@@ -24,6 +32,37 @@ function hasEmbeddedImage(page: PDFPage): boolean {
   const resources = page.node.Resources();
   const xobjectDict = resources?.lookup(PDFName.of('XObject'));
   return xobjectDict instanceof PDFDict && xobjectDict.keys().length > 0;
+}
+
+/** Decode a reloaded page's content stream(s) into the raw PDF operator
+ * text, so a test can assert on drawing commands directly (e.g. "was a
+ * full-bleed background rectangle actually filled, and in what color").
+ * `Contents()` returns either a single `PDFStream` or a `PDFArray` of
+ * stream refs (pdf-lib may split large pages into several streams);
+ * handle both, concatenating in order, matching how a PDF renderer
+ * processes the page. */
+function decodePageContent(page: PDFPage): string {
+  const contents = page.node.Contents();
+  if (!contents) return '';
+  const streams =
+    contents instanceof PDFArray
+      ? contents.asArray().map((ref) => page.node.context.lookup(ref) as PDFRawStream)
+      : [contents as PDFRawStream];
+  return streams
+    .map((stream) => new TextDecoder().decode(decodePDFRawStream(stream).decode()))
+    .join('\n');
+}
+
+/** `rg` sets fill color from 0-1 components; convert a hex string to the
+ * exact full-precision components pdf-lib emits (no rounding — pdf-lib
+ * writes the raw float), so a test can substring-match the operator
+ * pdf-lib would have written for that hex. */
+function hexToRgOperator(hex: string): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  return `${r} ${g} ${b} rg`;
 }
 
 const theme: StyledSlideDeck['theme'] = {
@@ -249,5 +288,51 @@ describe('exportStyledDeckPdf', () => {
     const bytes = await exportStyledDeckPdf(onlyUtility);
     const reloaded = await PDFDocument.load(bytes);
     expect(reloaded.getPageCount()).toBe(1); // just the appended ack page
+  });
+
+  it('fills the theme background color even when the slide has NO "background"-kind element', async () => {
+    // The real styleDeck API prompt (apps/api/src/narrative/styleDeck.ts's
+    // STYLE_SYSTEM_PROMPT) never requires or even mentions a "background"
+    // element kind — so Arm P frequently will not emit one, exactly like
+    // this fixture's own "references" slide above, which already omits
+    // it. Without a fallback, the PDF page keeps its default (white)
+    // background regardless of the deck's theme — on a dark theme, ink
+    // text mapped to a light color (applyTheme.ts's remapColor) becomes
+    // invisible against the undrawn white page. The pptx writer
+    // (deckWriter.ts) never has this problem: it sets
+    // `slide.background = { color: backgroundHex }` directly from
+    // `deck.theme.palette[0]`, independent of any element. The PDF writer
+    // must do the same.
+    const darkTheme: StyledSlideDeck['theme'] = {
+      palette: ['#111111', '#FFFFFF', '#FFD700', '#999999'],
+      typeScale: { heading: 48, body: 20, label: 13 },
+      accentTreatment: 'bold',
+    };
+    const deckWithoutBackgroundElement: StyledSlideDeck = {
+      durationMinutes: 10,
+      theme: darkTheme,
+      slides: [
+        {
+          role: 'title',
+          device: 'plain',
+          // Deliberately NO { kind: 'background', ... } element — the
+          // realistic case per the API prompt above.
+          elements: [
+            { kind: 'title', text: 'Spaced practice', x: 0.7, y: 0.5, fontSize: 48, color: '#FFFFFF' },
+          ],
+        },
+      ],
+    };
+
+    const bytes = await exportStyledDeckPdf(deckWithoutBackgroundElement);
+    const reloaded = await PDFDocument.load(bytes);
+    const firstPage = reloaded.getPages()[0]!;
+    const content = decodePageContent(firstPage);
+
+    // A full-bleed rectangle-and-fill in the theme's background color
+    // (palette[0], #111111) must be present, exactly matching what
+    // drawBackground would emit from an explicit background element.
+    expect(content).toContain(hexToRgOperator(darkTheme.palette[0]!));
+    expect(content).toMatch(/\bf\b/); // the fill operator was actually invoked
   });
 });

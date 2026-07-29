@@ -42,18 +42,37 @@ function kindToTypeScaleKey(kind: string): 'heading' | 'body' | 'label' | undefi
 }
 
 /**
- * Remaps a color to the theme palette based on element kind (for text elements).
- * If the element is a title, heading, body, quote, or label, and the color
- * is not already in the theme palette, map it to the appropriate palette slot.
- * Otherwise, return the color as-is or undefined if it's not in the palette.
+ * Remaps a color to the theme palette based on element kind. Runs
+ * whether or not the element already had a color — Arm P (styleDeck)
+ * does not promise every element carries one, and an uncolored text
+ * element must still land on a real, theme-legible color rather than
+ * staying undefined (every downstream renderer — the live preview in
+ * SlideViewer.tsx, the pptx writer, the pdf writer — falls back to a
+ * single hardcoded near-black when `color` is undefined, which is
+ * invisible on a dark theme background).
+ *
+ * For any kind this function KNOWS how to map (title/body/label/quote
+ * via `kindToTypeScaleKey`, or a role-prefixed kind via
+ * `roleToColorSlot`), the mapping always wins — deterministically, even
+ * if the element already carries a color. This is what makes a re-vibe
+ * (a second `applyTheme` pass with a DIFFERENT theme, over an
+ * already-themed deck — SlidesWizard.tsx's handleVibeSubmit) safe: a
+ * palette is not a stable set of colors across themes, only a stable
+ * set of SLOT semantics (ink is always palette[1], background always
+ * palette[0], etc). Trusting "the color happens to already be
+ * somewhere in the new palette" would keep an old ink color that now
+ * sits in the new theme's BACKGROUND slot — invisible-on-background is
+ * exactly the bug this guards against.
+ *
+ * Only a kind with NO mapping at all falls back to "keep the existing
+ * color as-is if it's already in this theme's palette, else clear it" —
+ * there, preserving a plausible custom color is more useful than
+ * clearing it, since there is no structural slot to recompute from.
  */
 function remapColor(color: string | undefined, kind: string, theme: Theme): string | undefined {
-  if (!color) return undefined;
-
-  // If the color is already in the theme palette, keep it
-  if (theme.palette.includes(color)) return color;
-
-  // For title/body/label/quote elements, map to an appropriate slot
+  // For title/body/label/quote elements, map to an appropriate slot —
+  // regardless of whether they started with a color, and regardless of
+  // whether that color happens to appear elsewhere in the new palette.
   const typeScaleKey = kindToTypeScaleKey(kind);
   if (typeScaleKey) {
     // Map text elements to ink (palette[1])
@@ -66,7 +85,11 @@ function remapColor(color: string | undefined, kind: string, theme: Theme): stri
     return theme.palette[roleSlot];
   }
 
-  // If no mapping applies, clear the color
+  // No structural mapping applies for this kind. If the element already
+  // carries a color that happens to be one of this theme's own colors,
+  // trust it (there's no slot semantics to contradict); otherwise clear
+  // an off-palette color rather than carry a stale one forward.
+  if (color && theme.palette.includes(color)) return color;
   return undefined;
 }
 

@@ -38,8 +38,13 @@ import {
 import { extractRankedFindings } from '../deck/extractFindings';
 import type { RankedFinding } from '../deck/extractFindings';
 import type { SlideDeck } from '../deck/types';
+import type { StyledSlide, StyledSlideDeck } from '../deck/styledTypes';
+import { styleDeck } from '../deck/styleClient';
+import { generateTheme, type ThemeGenResult } from '../deck/themeClient';
+import { applyTheme } from '../deck/applyTheme';
 import type { DocumentModel } from '@postr/shared';
-import { exportDeckPptx } from '@/export/pptx/deckWriter';
+import { exportStyledDeckPdf } from '@/export/pdf/deckPdf';
+import { exportStyledDeckWithUtilitySlides } from '@/export/deck/exportStyledDeckWithUtilitySlides';
 import { parseConstraints, type ConstraintsValue } from './ConstraintsStep';
 import { ExportDrawer } from './ExportDrawer';
 import { ProgressBar } from './ProgressBar';
@@ -55,13 +60,16 @@ import {
 } from './stepConfig';
 
 /**
- * Injectable clients for the end-to-end wiring (Task 12). The e2e test feeds
- * a fake `extractClient` so no network is touched; in production the wizard
- * falls back to the real `extractRankedFindings`. The client takes the
- * results text and returns the same `{ findings }` shape as the API.
+ * Injectable clients for the end-to-end wiring (Task 12, extended Task 10).
+ * The e2e tests feed fake clients so no network is touched; in production
+ * the wizard falls back to the real `extractRankedFindings` /
+ * `styleDeck` / `generateTheme`. Each client mirrors its production
+ * adapter's signature exactly (see `styleClient.ts` / `themeClient.ts`).
  */
 export interface SlidesWizardTestHooks {
   extractClient?: (resultsText: string) => Promise<{ findings: RankedFinding[] }>;
+  styleClient?: (plainDeck: SlideDeck) => Promise<StyledSlide[]>;
+  themeClient?: (topic: string, vibe: string | undefined) => Promise<ThemeGenResult>;
 }
 
 interface SlidesWizardProps {
@@ -97,6 +105,24 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
   const [extractLoading, setExtractLoading] = useState(false);
   const [extractError, setExtractError] = useState(false);
   const [builtDeck, setBuiltDeck] = useState<SlideDeck | null>(null);
+
+  // Task 10 — the Phase-2 design pass: styleDeck + generateTheme run
+  // automatically the moment the plain deck is built, then applyTheme
+  // merges them into one StyledSlideDeck. `palettes` (the 4-row curated
+  // set) is held alongside for the palette utility slide and for re-vibe.
+  // `styledDeck` stays null on failure — the viewer degrades to the plain
+  // deck rather than a dead end (spec §1); it is never cleared once set,
+  // so a later re-vibe failure keeps the last-good styled deck visible.
+  const [styledDeck, setStyledDeck] = useState<StyledSlideDeck | null>(null);
+  const [palettes, setPalettes] = useState<string[][]>([]);
+  const [designLoading, setDesignLoading] = useState(false);
+  const [designError, setDesignError] = useState(false);
+  const [vibe, setVibe] = useState('');
+  // Guards both runDesignPass and handleVibeSubmit against a stale
+  // response clobbering a fresher one (e.g. a fast double-submit of the
+  // vibe field): each call captures the counter at its own start and only
+  // commits state if it is still the most recent call when it resolves.
+  const designPassSeq = useRef(0);
 
   const [placeholder] = useState<SlideDeck>(placeholderDeck);
   const deck = builtDeck ?? placeholder;
@@ -172,9 +198,76 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
       durationMinutes: constraints.durationMinutes,
       rankedFindings: ordered,
     });
-    setBuiltDeck(buildDeck(input));
+    const plainDeck = buildDeck(input);
+    setBuiltDeck(plainDeck);
     setActiveSlideIndex(0);
     goToStep('narrative');
+
+    // Task 10 §1 — AUTOMATIC design pass: style + theme the moment the
+    // plain deck exists, so the viewer shows the styled deck, never a
+    // plain dead-end. Fire-and-forget from the caller's perspective;
+    // internally awaited so loading/error state is accurate.
+    void runDesignPass(plainDeck, docModel.title || 'Untitled manuscript');
+  };
+
+  // ── The Phase-2 design pass: styleDeck(P) + generateTheme(T) → applyTheme.
+  // Runs P and T in parallel (P doesn't need T's output, and vice versa —
+  // applyTheme is a pure post-merge). On any failure, styledDeck simply
+  // stays whatever it already was (null on first run) — the viewer falls
+  // back to the plain deck rather than a dead end (spec §1), and the error
+  // line is generic (house rule: never raw error text).
+  const runDesignPass = async (plainDeck: SlideDeck, topic: string) => {
+    const seq = ++designPassSeq.current;
+    setDesignLoading(true);
+    setDesignError(false);
+    try {
+      const styleFn = testHooks?.styleClient ?? styleDeck;
+      const themeFn = testHooks?.themeClient ?? generateTheme;
+      const [slides, themeResult] = await Promise.all([
+        styleFn(plainDeck),
+        themeFn(topic, undefined),
+      ]);
+      // A newer call (a fast vibe-submit, or the user rebuilding the deck
+      // again) started after this one — let IT win; applying this stale
+      // result now would clobber fresher state.
+      if (seq !== designPassSeq.current) return;
+      const unthemed: StyledSlideDeck = {
+        slides,
+        theme: themeResult.theme,
+        durationMinutes: plainDeck.durationMinutes,
+      };
+      setStyledDeck(applyTheme(unthemed, themeResult.theme));
+      setPalettes(themeResult.palettes);
+    } catch {
+      // Generic — StyleDeckError / ThemeGenError kinds never reach the UI.
+      if (seq === designPassSeq.current) setDesignError(true);
+    } finally {
+      if (seq === designPassSeq.current) setDesignLoading(false);
+    }
+  };
+
+  // ── VibeField → re-theme only (spec §1: "re-run T only, structure kept").
+  // Re-runs generateTheme(topic, vibe) and re-applies it to the EXISTING
+  // styled structure via applyTheme — styleDeck (Arm P) never re-runs, so
+  // this stays cheap. No-op if there is no styled deck yet to re-theme.
+  const handleVibeSubmit = async (submittedVibe: string) => {
+    if (!styledDeck || !docModel) return;
+    const seq = ++designPassSeq.current;
+    setVibe(submittedVibe);
+    setDesignLoading(true);
+    setDesignError(false);
+    try {
+      const themeFn = testHooks?.themeClient ?? generateTheme;
+      const topic = docModel.title || 'Untitled manuscript';
+      const themeResult = await themeFn(topic, submittedVibe || undefined);
+      if (seq !== designPassSeq.current) return;
+      setStyledDeck((prev) => (prev ? applyTheme(prev, themeResult.theme) : prev));
+      setPalettes(themeResult.palettes);
+    } catch {
+      if (seq === designPassSeq.current) setDesignError(true);
+    } finally {
+      if (seq === designPassSeq.current) setDesignLoading(false);
+    }
   };
 
   // The step cards document what the user has told the wizard so far.
@@ -195,9 +288,18 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
 
   const activeIndex = WIZARD_STEPS.indexOf(activeStep);
 
-  // ── Exports (Phase 1 — display-only paywall, no Stripe) ──────────────
+  // ── Exports (Task 10 — the styled writers, display-only paywall) ─────
+  // Both formats render the SAME styled deck (spec §3, "one model → pptx
+  // + pdf"). `window.print` is retired: PDF is now the real client-side
+  // styled writer, not the browser print dialog. Neither handler can run
+  // without a styled deck — the export drawer only offers them once one
+  // exists (see the JSX below), so this is a defensive no-op, not the
+  // primary guard.
   const handleExportPptx = async () => {
-    const bytes = await exportDeckPptx(deck);
+    if (!styledDeck) return;
+    // exportStyledDeckWithUtilitySlides awaits addIconLibrarySlide
+    // internally (it rasterizes SVG→PNG) before the one final pptx.write.
+    const bytes = await exportStyledDeckWithUtilitySlides(styledDeck, palettes);
     downloadBytes(
       bytes,
       'presentation.pptx',
@@ -205,10 +307,13 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
     );
   };
 
-  // PDF is the free print flow. The full deck-print window is Phase 2; the
-  // browser print dialog is a correct, free Phase-1 stand-in.
-  const handleExportPdf = () => {
-    if (typeof window !== 'undefined') window.print();
+  // PDF omits the pptx-only utility slides (palette, icon library) —
+  // exportStyledDeckPdf never sees them (they're appended straight to the
+  // pptxgenjs instance, never through StyledSlideDeck).
+  const handleExportPdf = async () => {
+    if (!styledDeck) return;
+    const bytes = await exportStyledDeckPdf(styledDeck);
+    downloadBytes(bytes, 'presentation.pdf', 'application/pdf');
   };
 
   return (
@@ -270,6 +375,12 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
             deck={deck}
             activeSlideIndex={activeSlideIndex}
             onSelectSlide={setActiveSlideIndex}
+            styledDeck={styledDeck}
+            designLoading={designLoading}
+            designError={designError}
+            vibe={vibe}
+            onVibeChange={setVibe}
+            onVibeSubmit={(v) => void handleVibeSubmit(v)}
           />
         </div>
 
@@ -277,7 +388,8 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
           open={exportOpen}
           onToggle={() => setExportOpen((o) => !o)}
           deck={deck}
-          onExportPdf={handleExportPdf}
+          exportReady={Boolean(styledDeck)}
+          onExportPdf={() => void handleExportPdf()}
           onExportPptx={() => void handleExportPptx()}
         />
       </section>
