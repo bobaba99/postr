@@ -223,6 +223,23 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
       const cancelUrl = billingUrl('cancel');
 
       try {
+        if (sku === 'review_addon') {
+          const { data, error } = await supabase
+            .from('users')
+            .select('review_addon')
+            .eq('id', user.id)
+            .maybeSingle();
+          if (error) {
+            throw new Error(`review add-on entitlement lookup: ${error.message}`);
+          }
+          if ((data as { review_addon?: boolean } | null)?.review_addon === true) {
+            return res.status(409).json({
+              error: 'review_addon_already_active',
+              message: 'Your weekly review add-on is already active.',
+            });
+          }
+        }
+
         // Shared params. The SKUs differ ONLY in mode:
         //   - term / review_addon = recurring subscriptions → mode
         //     'subscription'.
