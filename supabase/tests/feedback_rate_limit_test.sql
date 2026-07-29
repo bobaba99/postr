@@ -59,6 +59,11 @@ select
   now() - interval '23 hours'
 from generate_series(1, 9) as n;
 
+-- Let the fixture role reach RLS + the rate-limit trigger even when the local
+-- Supabase stack has not installed its environment-owned API table grants.
+-- Rollback removes this test-only privilege.
+grant select, insert on public.feedback to authenticated;
+
 -- 1 ·
 select is(
   (select count(*) from public.feedback

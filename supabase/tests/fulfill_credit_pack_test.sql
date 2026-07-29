@@ -25,6 +25,12 @@ values
    'authenticated', 'authenticated', 'missing-profile@example.com', '', now(),
    '{"provider":"email","providers":["email"]}', '{}', false, now(), now());
 
+-- The local CLI does not consistently seed PostgREST's service_role table
+-- grants. Supply only this fixture's direct-read/delete privileges so the
+-- test reaches the SECURITY DEFINER fulfillment RPC. Rollback removes them.
+grant select, update, delete on public.users to service_role;
+grant select, insert, delete on public.billing_fulfilled_sessions to service_role;
+
 set local role service_role;
 delete from public.users
  where id = 'f1000000-0000-4000-a000-000000000002';
