@@ -143,18 +143,54 @@ export type Database = {
       }
       billing_fulfilled_sessions: {
         Row: {
+          credits_granted: number
           fulfilled_at: string
           session_id: string
           user_id: string
         }
         Insert: {
+          credits_granted?: number
           fulfilled_at?: string
           session_id: string
           user_id: string
         }
         Update: {
+          credits_granted?: number
           fulfilled_at?: string
           session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      billing_refunds: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          credits_revoked: number
+          id: string
+          kind: string
+          session_id: string | null
+          stripe_refund_id: string
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          credits_revoked?: number
+          id?: string
+          kind: string
+          session_id?: string | null
+          stripe_refund_id: string
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          credits_revoked?: number
+          id?: string
+          kind?: string
+          session_id?: string | null
+          stripe_refund_id?: string
           user_id?: string
         }
         Relationships: []
@@ -342,6 +378,59 @@ export type Database = {
           },
           {
             foreignKeyName: "poster_comments_poster_id_fkey"
+            columns: ["poster_id"]
+            isOneToOne: false
+            referencedRelation: "posters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      poster_reviews: {
+        Row: {
+          created_at: string
+          credit_source: string | null
+          followup_findings: Json | null
+          id: string
+          initial_findings: Json | null
+          poster_id: string | null
+          source_kind: string
+          source_meta: Json
+          stage: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credit_source?: string | null
+          followup_findings?: Json | null
+          id?: string
+          initial_findings?: Json | null
+          poster_id?: string | null
+          source_kind: string
+          source_meta?: Json
+          stage?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credit_source?: string | null
+          followup_findings?: Json | null
+          id?: string
+          initial_findings?: Json | null
+          poster_id?: string | null
+          source_kind?: string
+          source_meta?: Json
+          stage?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poster_reviews_poster_id_fkey"
             columns: ["poster_id"]
             isOneToOne: false
             referencedRelation: "posters"
@@ -562,12 +651,19 @@ export type Database = {
           display_name: string | null
           email: string | null
           export_credits: number
+          first_paid_export_at: string | null
           id: string
           is_anonymous: boolean
+          marketing_consent_at: string | null
           plan: string
           plan_expires_at: string | null
           research_consent_at: string | null
+          review_addon: boolean
+          review_addon_subscription_id: string | null
+          review_credits: number
           stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_status: string | null
         }
         Insert: {
           cookie_consent_at?: string | null
@@ -575,12 +671,19 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           export_credits?: number
+          first_paid_export_at?: string | null
           id: string
           is_anonymous?: boolean
+          marketing_consent_at?: string | null
           plan?: string
           plan_expires_at?: string | null
           research_consent_at?: string | null
+          review_addon?: boolean
+          review_addon_subscription_id?: string | null
+          review_credits?: number
           stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string | null
         }
         Update: {
           cookie_consent_at?: string | null
@@ -588,12 +691,19 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           export_credits?: number
+          first_paid_export_at?: string | null
           id?: string
           is_anonymous?: boolean
+          marketing_consent_at?: string | null
           plan?: string
           plan_expires_at?: string | null
           research_consent_at?: string | null
+          review_addon?: boolean
+          review_addon_subscription_id?: string | null
+          review_credits?: number
           stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string | null
         }
         Relationships: []
       }
@@ -603,13 +713,26 @@ export type Database = {
     }
     Functions: {
       consume_export_credit: { Args: { p_user_id: string }; Returns: number }
+      consume_review_credit: { Args: { p_user_id: string }; Returns: number }
       delete_own_account: { Args: never; Returns: undefined }
       export_my_data: { Args: never; Returns: Json }
       grant_export_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: number
       }
+      grant_review_credits: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: number
+      }
       is_gallery_admin: { Args: { uid: string }; Returns: boolean }
+      mark_first_paid_export: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      revoke_export_credits: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: number
+      }
     }
     Enums: {
       gallery_field:

@@ -15,7 +15,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(19);
+select plan(31);
 
 -- --------------------------------------------------------------------------
 -- Functions exist
@@ -26,6 +26,10 @@ select has_function('public', 'delete_own_account', array[]::name[],
   'delete_own_account() exists');
 select has_function('public', 'enforce_feedback_rate_limit', array[]::name[],
   'enforce_feedback_rate_limit() exists');
+select has_function('public', 'consume_review_credit', array['uuid']::name[],
+  'consume_review_credit(uuid) exists');
+select has_function('public', 'grant_review_credits', array['uuid', 'integer']::name[],
+  'grant_review_credits(uuid, integer) exists');
 
 -- --------------------------------------------------------------------------
 -- Return types
@@ -36,6 +40,10 @@ select function_returns('public', 'delete_own_account', array[]::name[], 'void',
   'delete_own_account() returns void');
 select function_returns('public', 'enforce_feedback_rate_limit', array[]::name[], 'trigger',
   'enforce_feedback_rate_limit() returns trigger');
+select function_returns('public', 'consume_review_credit', array['uuid']::name[], 'integer',
+  'consume_review_credit(uuid) returns integer');
+select function_returns('public', 'grant_review_credits', array['uuid', 'integer']::name[], 'integer',
+  'grant_review_credits(uuid, integer) returns integer');
 
 -- --------------------------------------------------------------------------
 -- security definer — all three read/write across RLS boundaries on purpose
@@ -46,6 +54,10 @@ select is_definer('public', 'delete_own_account', array[]::name[],
   'delete_own_account() is security definer');
 select is_definer('public', 'enforce_feedback_rate_limit', array[]::name[],
   'enforce_feedback_rate_limit() is security definer');
+select is_definer('public', 'consume_review_credit', array['uuid']::name[],
+  'consume_review_credit(uuid) is security definer');
+select is_definer('public', 'grant_review_credits', array['uuid', 'integer']::name[],
+  'grant_review_credits(uuid, integer) is security definer');
 
 -- --------------------------------------------------------------------------
 -- Pinned search_path — a security definer function without one is open to
@@ -75,6 +87,22 @@ select ok(
       and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
   ),
   'enforce_feedback_rate_limit() pins search_path');
+select ok(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'consume_review_credit'
+      and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+  ),
+  'consume_review_credit() pins search_path');
+select ok(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'grant_review_credits'
+      and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+  ),
+  'grant_review_credits() pins search_path');
 
 -- --------------------------------------------------------------------------
 -- Wiring + grants
@@ -110,6 +138,20 @@ select ok(
 select ok(
   not has_function_privilege('anon', 'public.is_gallery_admin(uuid)', 'EXECUTE'),
   'anon cannot execute is_gallery_admin(uuid)');
+
+-- service_role-only RPCs: BOTH browser-facing roles must lack EXECUTE.
+select ok(
+  not has_function_privilege('anon', 'public.consume_review_credit(uuid)', 'EXECUTE'),
+  'anon cannot execute consume_review_credit(uuid)');
+select ok(
+  not has_function_privilege('anon', 'public.grant_review_credits(uuid, integer)', 'EXECUTE'),
+  'anon cannot execute grant_review_credits(uuid, integer)');
+select ok(
+  not has_function_privilege('authenticated', 'public.consume_review_credit(uuid)', 'EXECUTE'),
+  'authenticated cannot execute consume_review_credit(uuid)');
+select ok(
+  not has_function_privilege('authenticated', 'public.grant_review_credits(uuid, integer)', 'EXECUTE'),
+  'authenticated cannot execute grant_review_credits(uuid, integer)');
 
 select * from finish();
 rollback;
