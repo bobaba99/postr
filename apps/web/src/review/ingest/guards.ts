@@ -11,6 +11,11 @@ import {
   INGEST_MAX_PAGES,
 } from './types';
 
+interface IngestFile {
+  size: number;
+  type: string;
+}
+
 /** Page cap — checked BEFORE rendering or uploading anything. */
 export function assertPageCap(pageCount: number): void {
   if (pageCount > INGEST_MAX_PAGES) {
@@ -23,7 +28,7 @@ export function assertPageCap(pageCount: number): void {
 
 /** Size + MIME allowlist — checked before reading the file's bytes. */
 export function assertFileAllowed(
-  file: { size: number; type: string },
+  file: IngestFile,
   allowedMime: readonly string[] = INGEST_ALLOWED_MIME,
 ): void {
   if (file.size > INGEST_MAX_FILE_BYTES) {
