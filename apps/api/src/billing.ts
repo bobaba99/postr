@@ -40,6 +40,13 @@ export type BillingSku = 'term' | 'pack';
 
 /** How many export credits a pack purchase grants. */
 const PACK_EXPORT_CREDITS = 3;
+/** The pack price in cents (CA$9.99) — the basis for the per-credit refund. */
+const PACK_PRICE_CENTS = 999;
+/** Buyer's-remorse refund window for the term (days). 14 = EU/UK legal floor. */
+const TERM_REFUND_WINDOW_DAYS = 14;
+
+/** What a user can ask to refund. */
+export type RefundKind = 'term' | 'pack';
 // The term's 4-month cadence now lives in the Stripe recurring price
 // (interval_count=4 months), not here — Stripe drives the billing period
 // and the webhook derives plan_expires_at from the subscription.
@@ -129,6 +136,17 @@ export function createBillingWebhookRouter(deps: BillingDeps = {}): Router {
           await handleSubscriptionChange(
             supabase,
             event.data.object as Stripe.Subscription,
+          );
+        } else if (event.type === 'charge.refunded') {
+          // A refund happened — possibly via OUR button, possibly via Link
+          // (Managed Payments = Stripe is MoR, so a customer can be refunded
+          // directly by Link). Reconcile it into our DB so a Link-side
+          // refund also revokes entitlement. Idempotent on stripe_refund_id,
+          // so a refund our button already recorded is a no-op here.
+          await handleChargeRefunded(
+            supabase,
+            stripe,
+            event.data.object as Stripe.Charge,
           );
         }
         // Every other event type (including async_payment_failed) is
@@ -267,6 +285,74 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
         // eslint-disable-next-line no-console
         console.error('[billing] consume-credit failed:', message);
         return res.status(500).json({ error: 'consume_failed' });
+      }
+    },
+  );
+
+  // ── Mark that a TERM holder took a paid export.
+  //    A term holder's exports are unlimited (they never spend a credit),
+  //    so nothing else records that they exported. This stamps
+  //    first_paid_export_at once, which the refund eligibility check reads
+  //    ("no export since the charge"). Best-effort from the client's view —
+  //    the write is server-side (the column is guarded), and a failure must
+  //    never make a completed export look failed.
+  router.post(
+    '/billing/mark-export',
+    requireAuth(getSupabaseAdmin, { requirePermanent: true }),
+    consumeLimiter,
+    async (_req: Request, res: Response) => {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) {
+        return res.status(500).json({ error: 'billing_not_configured' });
+      }
+      const user = (res.locals as AuthLocals).user;
+      try {
+        const { error } = await supabase.rpc(
+          'mark_first_paid_export' as never,
+          { p_user_id: user.id } as never,
+        );
+        if (error) throw new Error(error.message);
+        return res.json({ ok: true });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'mark_export_failed';
+        // eslint-disable-next-line no-console
+        console.error('[billing] mark-export failed:', message);
+        return res.status(500).json({ error: 'mark_export_failed' });
+      }
+    },
+  );
+
+  // ── Self-serve refund for the signed-in user.
+  //    Eligibility is computed SERVER-SIDE against server-owned state (a
+  //    client can't assert its own eligibility). See refundForUser().
+  //    Race-safe against Link's own refund path via the billing_refunds
+  //    ledger (stripe_refund_id UNIQUE) and the charge.refunded webhook.
+  router.post(
+    '/billing/refund',
+    requireAuth(getSupabaseAdmin, { requirePermanent: true }),
+    checkoutLimiter,
+    async (req: Request, res: Response) => {
+      const stripe = getStripe();
+      const supabase = getSupabaseAdmin();
+      if (!stripe || !supabase) {
+        return res.status(500).json({ error: 'billing_not_configured' });
+      }
+      const user = (res.locals as AuthLocals).user;
+      const kind = req.body?.kind as RefundKind | undefined;
+      if (kind !== 'term' && kind !== 'pack') {
+        return res.status(400).json({ error: 'invalid_kind' });
+      }
+      try {
+        const result = await refundForUser(supabase, stripe, user.id, kind);
+        if (!result.ok) {
+          return res.status(409).json({ error: result.reason });
+        }
+        return res.json({ ok: true, amount_cents: result.amountCents });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'refund_failed';
+        // eslint-disable-next-line no-console
+        console.error('[billing] refund failed:', message);
+        return res.status(500).json({ error: 'refund_failed' });
       }
     },
   );
@@ -469,7 +555,7 @@ export async function fulfillCheckout(
       .eq('id', userId);
   }
 
-  await markSessionFulfilled(supabase, session.id, userId);
+  await markSessionFulfilled(supabase, session.id, userId, PACK_EXPORT_CREDITS);
 }
 
 /**
@@ -663,6 +749,346 @@ async function findUserIdForSubscriptionEvent(
 }
 
 /**
+ * Reconcile a charge.refunded event (a Link- or button-initiated refund)
+ * into our DB. Idempotent via the billing_refunds ledger: if our button
+ * already recorded this refund, this is a no-op. If Link initiated it, this
+ * is where the entitlement gets revoked.
+ *
+ * We can't always know term-vs-pack or credit counts from a Link-side
+ * refund, so we reconcile conservatively: full-amount refunds of a term
+ * revoke the term; refunds referencing a pack session revoke that pack's
+ * unused credits (best-effort). The ledger row is always written so the
+ * refund is never processed twice.
+ */
+async function handleChargeRefunded(
+  supabase: SupabaseClient,
+  stripe: Stripe,
+  charge: Stripe.Charge,
+): Promise<void> {
+  // The refund id: Stripe returns charge.refunds most-recent-FIRST, so the
+  // newest refund is data[0]. (charge.refunds can be truncated on the
+  // webhook payload; if it's empty we can't act — the button path or a
+  // later event will reconcile.)
+  const refunds = charge.refunds?.data ?? [];
+  const latest = refunds[0];
+  const refundId = latest?.id;
+  if (!refundId) return; // nothing actionable
+
+  // Already recorded (our button did it)? Then nothing to do.
+  const { data: existing } = await supabase
+    .from('billing_refunds')
+    .select('stripe_refund_id')
+    .eq('stripe_refund_id', refundId)
+    .maybeSingle();
+  if (existing) return;
+
+  // Reconcile to a user by the Stripe customer.
+  const customerId =
+    typeof charge.customer === 'string' ? charge.customer : charge.customer?.id ?? null;
+  if (!customerId) return;
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('id, plan, stripe_subscription_id')
+    .eq('stripe_customer_id', customerId)
+    .maybeSingle();
+  const user = userRow as
+    | { id?: string; plan?: string | null; stripe_subscription_id?: string | null }
+    | null;
+  if (!user?.id) return;
+
+  // A subscription charge → term refund → revoke the term. Otherwise treat
+  // it as a pack refund: revoke credits proportional to the refunded amount.
+  // Use THIS refund's amount (not charge.amount_refunded, which is the
+  // CUMULATIVE total across all refunds on the charge — that would
+  // over-count credits when a pack was refunded more than once).
+  const thisRefundAmount = typeof latest.amount === 'number' ? latest.amount : 0;
+
+  const isSubscriptionCharge = !!(charge as Stripe.Charge & { invoice?: unknown }).invoice;
+  if (isSubscriptionCharge) {
+    await recordRefundAndRevoke(supabase, stripe, {
+      userId: user.id,
+      kind: 'term',
+      refundId,
+      amountCents: thisRefundAmount,
+      creditsRevoked: 0,
+      sessionId: null,
+    });
+    return;
+  }
+
+  // Pack refund via Link: revoke credits proportional to THIS refund's
+  // amount (per-credit rate), capped at one pack and floored at the user's
+  // remaining balance (by the RPC).
+  const perCredit = PACK_PRICE_CENTS / PACK_EXPORT_CREDITS;
+  const creditsToRevoke = Math.min(
+    PACK_EXPORT_CREDITS,
+    Math.round(thisRefundAmount / perCredit),
+  );
+  await recordRefundAndRevoke(supabase, stripe, {
+    userId: user.id,
+    kind: 'pack',
+    refundId,
+    amountCents: thisRefundAmount,
+    creditsRevoked: creditsToRevoke,
+    sessionId: null,
+  });
+}
+
+type RefundResult =
+  | { ok: true; amountCents: number }
+  | { ok: false; reason: string };
+
+/**
+ * Pure eligibility test for a TERM refund. Exported for tests.
+ * Eligible iff within the 14-day window AND no paid export was taken since
+ * the charge (firstExportMs null or strictly before the charge).
+ */
+export function termRefundEligible(args: {
+  chargedAtMs: number;
+  firstExportMs: number | null;
+  nowMs: number;
+}): { ok: true } | { ok: false; reason: string } {
+  const windowMs = TERM_REFUND_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  if (args.nowMs - args.chargedAtMs > windowMs) {
+    return { ok: false, reason: 'window_expired' };
+  }
+  if (args.firstExportMs !== null && args.firstExportMs >= args.chargedAtMs) {
+    return { ok: false, reason: 'already_used' };
+  }
+  return { ok: true };
+}
+
+/**
+ * Pure per-credit refund amount for a PACK, in cents. Exported for tests.
+ * Flat rate = PACK_PRICE_CENTS / PACK_EXPORT_CREDITS, rounded to the cent,
+ * for `unused` credits (already capped at the pack size by the caller).
+ */
+export function packRefundAmountCents(unusedCredits: number): number {
+  if (unusedCredits <= 0) return 0;
+  const perCredit = PACK_PRICE_CENTS / PACK_EXPORT_CREDITS;
+  return Math.round(perCredit * unusedCredits);
+}
+
+/**
+ * Issue a self-serve refund for a user, computing eligibility SERVER-SIDE.
+ *
+ * Policy (docs project_refund_policy):
+ *   - TERM: full refund of the last charge, only within 14 days AND only
+ *     if the user took NO paid export since that charge (first_paid_export_at
+ *     is null or predates the charge). Cancelling is separate and keeps
+ *     access to period end — not handled here.
+ *   - PACK: refund the UNUSED credits at a flat CA$3.33/credit
+ *     (PACK_PRICE_CENTS / 3), capped at one pack (3). Credits never expire,
+ *     so there's no window on the partial.
+ *
+ * Race-safe against Link's own refund path and double-clicks: each
+ * stripe.refunds.create passes a DETERMINISTIC idempotency key (term keyed
+ * on the payment intent, pack on the session id), so a retried/raced call
+ * returns the SAME Stripe refund rather than minting a second one. The
+ * billing_refunds ledger then records stripe_refund_id UNIQUE, so a refund
+ * already recorded (by the button OR the charge.refunded webhook) is not
+ * double-revoked.
+ */
+export async function refundForUser(
+  supabase: SupabaseClient,
+  stripe: Stripe,
+  userId: string,
+  kind: RefundKind,
+): Promise<RefundResult> {
+  if (kind === 'term') return refundTerm(supabase, stripe, userId);
+  return refundPack(supabase, stripe, userId);
+}
+
+async function refundTerm(
+  supabase: SupabaseClient,
+  stripe: Stripe,
+  userId: string,
+): Promise<RefundResult> {
+  const { data } = await supabase
+    .from('users')
+    .select('plan, stripe_subscription_id, first_paid_export_at')
+    .eq('id', userId)
+    .maybeSingle();
+  const row = data as
+    | { plan?: string | null; stripe_subscription_id?: string | null; first_paid_export_at?: string | null }
+    | null;
+  const subscriptionId = row?.stripe_subscription_id;
+  if (!subscriptionId) return { ok: false, reason: 'no_subscription' };
+
+  // The most recent invoice's charge is what we refund. Retrieve the sub's
+  // latest invoice → payment intent → charge, and the charge's created time
+  // (the "last charge" the 14-day window is measured from).
+  const sub = await stripe.subscriptions.retrieve(subscriptionId, {
+    expand: ['latest_invoice.payment_intent'],
+  });
+  const invoice = sub.latest_invoice;
+  if (!invoice || typeof invoice === 'string') {
+    return { ok: false, reason: 'no_invoice' };
+  }
+  const pi = (invoice as Stripe.Invoice & { payment_intent?: Stripe.PaymentIntent | string })
+    .payment_intent;
+  const paymentIntentId = typeof pi === 'string' ? pi : pi?.id;
+  if (!paymentIntentId) return { ok: false, reason: 'no_payment' };
+
+  // Eligibility: within the 14-day window AND no paid export since the
+  // charge (pure, unit-tested logic).
+  const chargedAtMs = (invoice as Stripe.Invoice).created * 1000;
+  const firstExportMs = row?.first_paid_export_at
+    ? new Date(row.first_paid_export_at).getTime()
+    : null;
+  const eligible = termRefundEligible({ chargedAtMs, firstExportMs, nowMs: Date.now() });
+  if (!eligible.ok) return eligible;
+
+  // Idempotency: a deterministic key so a double-click or a button-vs-
+  // webhook race returns the SAME Stripe refund object instead of minting a
+  // second real refund. Stripe does NOT dedup refunds by payment_intent, so
+  // this key is what makes the money movement idempotent; the ledger's
+  // UNIQUE(stripe_refund_id) then dedups the revoke.
+  const amountCents = (invoice as Stripe.Invoice).amount_paid ?? 0;
+  const refund = await stripe.refunds.create(
+    { payment_intent: paymentIntentId },
+    { idempotencyKey: `term-refund:${paymentIntentId}` },
+  );
+  await recordRefundAndRevoke(supabase, stripe, {
+    userId,
+    kind: 'term',
+    refundId: refund.id,
+    amountCents: typeof refund.amount === 'number' ? refund.amount : amountCents,
+    creditsRevoked: 0,
+    sessionId: null,
+  });
+  return { ok: true, amountCents: typeof refund.amount === 'number' ? refund.amount : amountCents };
+}
+
+async function refundPack(
+  supabase: SupabaseClient,
+  stripe: Stripe,
+  userId: string,
+): Promise<RefundResult> {
+  // Find the most recent pack purchase that still has unused credits and
+  // hasn't been refunded. Attribution is per fulfilled session (Option A);
+  // remaining credits are the single user counter, capped at the pack size.
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('export_credits')
+    .eq('id', userId)
+    .maybeSingle();
+  const remaining = (userRow as { export_credits?: number } | null)?.export_credits ?? 0;
+  if (remaining <= 0) return { ok: false, reason: 'no_unused_credits' };
+
+  // The pack session to refund: THIS user's newest pack (credits_granted>0
+  // excludes term rows) that hasn't already been refunded. Scoping to
+  // user_id is critical — without it this would pick the globally-newest
+  // session of ANY user and refund the wrong person's charge.
+  const { data: refundedRows } = await supabase
+    .from('billing_refunds')
+    .select('session_id')
+    .eq('user_id', userId)
+    .not('session_id', 'is', null);
+  const refundedSessionIds = new Set(
+    ((refundedRows as { session_id?: string }[] | null) ?? [])
+      .map((r) => r.session_id)
+      .filter(Boolean) as string[],
+  );
+
+  const { data: sessionRows } = await supabase
+    .from('billing_fulfilled_sessions')
+    .select('session_id, credits_granted')
+    .eq('user_id', userId)
+    .gt('credits_granted', 0)
+    .order('fulfilled_at', { ascending: false });
+  const session = ((sessionRows as { session_id?: string; credits_granted?: number }[] | null) ?? [])
+    .find((s) => s.session_id && !refundedSessionIds.has(s.session_id));
+  if (!session?.session_id) return { ok: false, reason: 'no_pack_purchase' };
+
+  const granted = session.credits_granted ?? PACK_EXPORT_CREDITS;
+  const unused = Math.min(remaining, granted);
+  if (unused <= 0) return { ok: false, reason: 'no_unused_credits' };
+
+  // Refund amount: flat per-credit rate (pure, unit-tested).
+  const amountCents = packRefundAmountCents(unused);
+
+  // Resolve the pack session's payment intent to refund against.
+  const checkout = await stripe.checkout.sessions.retrieve(session.session_id);
+  const pi =
+    typeof checkout.payment_intent === 'string'
+      ? checkout.payment_intent
+      : checkout.payment_intent?.id;
+  if (!pi) return { ok: false, reason: 'no_payment' };
+
+  // Idempotency keyed on the SESSION → one pack can only be refunded once,
+  // even across double-clicks or a button-vs-webhook race (pack refunds are
+  // PARTIAL, so without this a raced second create would mint a real second
+  // refund against the remaining captured amount).
+  const refund = await stripe.refunds.create(
+    {
+      payment_intent: pi,
+      amount: amountCents,
+    },
+    { idempotencyKey: `pack-refund:${session.session_id}` },
+  );
+  await recordRefundAndRevoke(supabase, stripe, {
+    userId,
+    kind: 'pack',
+    refundId: refund.id,
+    amountCents: typeof refund.amount === 'number' ? refund.amount : amountCents,
+    creditsRevoked: unused,
+    sessionId: session.session_id,
+  });
+  return { ok: true, amountCents: typeof refund.amount === 'number' ? refund.amount : amountCents };
+}
+
+/**
+ * Record a refund in the ledger and apply its side effects (revoke term
+ * access / remove credits) EXACTLY ONCE. Idempotent on stripe_refund_id:
+ * if the ledger already has this refund (e.g. the charge.refunded webhook
+ * beat the button, or vice versa), this is a no-op — no double-revoke.
+ */
+async function recordRefundAndRevoke(
+  supabase: SupabaseClient,
+  _stripe: Stripe,
+  r: {
+    userId: string;
+    kind: RefundKind;
+    refundId: string;
+    amountCents: number;
+    creditsRevoked: number;
+    sessionId: string | null;
+  },
+): Promise<void> {
+  // Insert the ledger row first — the UNIQUE(stripe_refund_id) makes this
+  // the idempotency gate. If it's a duplicate, stop (already applied).
+  const { error: insErr } = await supabase.from('billing_refunds').insert({
+    user_id: r.userId,
+    kind: r.kind,
+    stripe_refund_id: r.refundId,
+    amount_cents: r.amountCents,
+    credits_revoked: r.creditsRevoked,
+    session_id: r.sessionId,
+  });
+  if (insErr) {
+    if (/duplicate key|unique/i.test(insErr.message)) return; // already applied
+    throw new Error(`refund ledger insert: ${insErr.message}`);
+  }
+
+  if (r.kind === 'term') {
+    // Revoke term access immediately (a refunded term is over).
+    const { error } = await supabase
+      .from('users')
+      .update({ plan: 'free', plan_expires_at: new Date().toISOString() })
+      .eq('id', r.userId);
+    if (error) throw new Error(`term refund revoke: ${error.message}`);
+  } else if (r.creditsRevoked > 0) {
+    // Remove the refunded credits atomically.
+    const { error } = await supabase.rpc(
+      'revoke_export_credits' as never,
+      { p_user_id: r.userId, p_amount: r.creditsRevoked } as never,
+    );
+    if (error) throw new Error(`pack refund revoke: ${error.message}`);
+  }
+}
+
+/**
  * Idempotency ledger for pack purchases — a session id that has already
  * granted credits must not grant again. Uses a dedicated table so a
  * webhook retry (or a duplicate delivery) is a no-op. The term path is
@@ -684,10 +1110,11 @@ async function markSessionFulfilled(
   supabase: SupabaseClient,
   sessionId: string,
   userId: string,
+  creditsGranted: number,
 ): Promise<void> {
   const { error } = await supabase
     .from('billing_fulfilled_sessions')
-    .insert({ session_id: sessionId, user_id: userId });
+    .insert({ session_id: sessionId, user_id: userId, credits_granted: creditsGranted });
   // A unique-violation here means a concurrent retry already recorded it
   // — benign, so it's not re-thrown.
   if (error && !/duplicate key|unique/i.test(error.message)) {

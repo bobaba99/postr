@@ -17,7 +17,11 @@ import {
   subscriptionPeriodEnd,
   handleInvoicePaid,
   handleSubscriptionChange,
+  termRefundEligible,
+  packRefundAmountCents,
 } from '../billing.js';
+
+const DAY = 24 * 60 * 60 * 1000;
 
 /**
  * A fake Supabase that records `.update(...)` payloads and serves canned
@@ -329,5 +333,53 @@ describe('handleSubscriptionChange — status transitions', () => {
     await expect(
       handleSubscriptionChange(fake.client, fakeSub({ id: 'sub_x', status: 'canceled', customer: null as unknown as string, metadata: {} })),
     ).rejects.toThrow(/no user for subscription/);
+  });
+});
+
+describe('termRefundEligible — 14-day window + no-export', () => {
+  const now = 1_800_000_000_000; // fixed "now"
+
+  it('eligible: within window, no export', () => {
+    expect(termRefundEligible({ chargedAtMs: now - 3 * DAY, firstExportMs: null, nowMs: now }))
+      .toEqual({ ok: true });
+  });
+
+  it('ineligible: past the 14-day window', () => {
+    expect(termRefundEligible({ chargedAtMs: now - 15 * DAY, firstExportMs: null, nowMs: now }))
+      .toEqual({ ok: false, reason: 'window_expired' });
+  });
+
+  it('eligible exactly at 14 days (boundary inclusive)', () => {
+    expect(termRefundEligible({ chargedAtMs: now - 14 * DAY, firstExportMs: null, nowMs: now }))
+      .toEqual({ ok: true });
+  });
+
+  it('ineligible: an export was taken AFTER the charge', () => {
+    expect(termRefundEligible({ chargedAtMs: now - 3 * DAY, firstExportMs: now - 1 * DAY, nowMs: now }))
+      .toEqual({ ok: false, reason: 'already_used' });
+  });
+
+  it('eligible: the only export predates the charge (a prior period)', () => {
+    // firstExportMs is BEFORE this charge → not "used since the charge".
+    expect(termRefundEligible({ chargedAtMs: now - 3 * DAY, firstExportMs: now - 90 * DAY, nowMs: now }))
+      .toEqual({ ok: true });
+  });
+});
+
+describe('packRefundAmountCents — flat per-credit rate', () => {
+  it('3 unused → full CA$9.99 (999¢)', () => {
+    expect(packRefundAmountCents(3)).toBe(999);
+  });
+  it('2 unused → CA$6.66 (666¢)', () => {
+    expect(packRefundAmountCents(2)).toBe(666);
+  });
+  it('1 unused → CA$3.33 (333¢)', () => {
+    expect(packRefundAmountCents(1)).toBe(333);
+  });
+  it('0 unused → 0', () => {
+    expect(packRefundAmountCents(0)).toBe(0);
+  });
+  it('never exceeds the full pack price for a single pack', () => {
+    expect(packRefundAmountCents(3)).toBeLessThanOrEqual(999);
   });
 });

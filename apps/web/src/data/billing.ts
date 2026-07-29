@@ -37,6 +37,32 @@ export async function consumeExportCredit(): Promise<number | null> {
   return credits;
 }
 
+/**
+ * Mark that a term holder took a paid export (stamps first_paid_export_at
+ * server-side, used by the refund eligibility check). Best-effort: the
+ * export already happened, so a failure here is logged, not surfaced.
+ */
+export async function markPaidExport(): Promise<void> {
+  await postJson('/billing/mark-export', {}, { auth: true });
+}
+
+/**
+ * Request a self-serve refund. `kind` is 'term' (14-day, no-export) or
+ * 'pack' (unused credits). The server computes eligibility; on success it
+ * returns the refunded amount in cents. Throws on an ineligible/failed
+ * request so the caller can show why.
+ */
+export async function requestRefund(
+  kind: 'term' | 'pack',
+): Promise<{ amountCents: number }> {
+  const { amount_cents } = await postJson<{ ok: boolean; amount_cents: number }>(
+    '/billing/refund',
+    { kind },
+    { auth: true },
+  );
+  return { amountCents: amount_cents };
+}
+
 /** Where a user manages their subscription when the portal isn't available. */
 export const LINK_MANAGE_URL = 'https://link.com';
 

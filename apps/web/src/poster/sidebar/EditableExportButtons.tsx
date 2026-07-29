@@ -22,7 +22,11 @@ import { usePosterStore } from '@/stores/posterStore';
 import type { CitationStyleKey } from '@/poster/citations';
 import { PPTX_MAX_DIMENSION_IN } from '@/export/units';
 import { usePlan } from '@/hooks/usePlan';
-import { createCheckout, consumeExportCredit as consumeCreditApi } from '@/data/billing';
+import {
+  createCheckout,
+  consumeExportCredit as consumeCreditApi,
+  markPaidExport,
+} from '@/data/billing';
 import { stashCheckoutIntent, type CheckoutPlan } from '@/data/checkoutIntent';
 
 type ExportKind = 'latex' | 'pptx';
@@ -113,9 +117,15 @@ export function EditableExportButtons({
       const notes = await job();
       // Credit-based export: spend one credit AFTER the bytes are
       // produced, so a failed export never burns a credit. Server-side,
-      // because export_credits is server-owned. A term export skips this.
+      // because export_credits is server-owned.
       if (usesCredit) {
         await consumeExportCredit();
+      } else if (plan.hasActiveTerm) {
+        // Term export: exports are unlimited (no credit), but record that a
+        // paid export was taken so the refund eligibility check ("no export
+        // since the charge") is accurate. Best-effort — never fails the
+        // export.
+        void markPaidExportSafe();
       }
       setState({ busy: null, done: kind, notes, failed: false });
       setTimeout(() => setState((s) => ({ ...s, done: null })), 2500);
@@ -142,6 +152,16 @@ export function EditableExportButtons({
       await consumeCreditApi();
     } catch (err) {
       console.error('[billing] consume-credit failed (export already done):', err);
+    }
+  }
+
+  // Record a term export (for refund eligibility). Best-effort, same
+  // posture as the credit spend — a failure never fails the export.
+  async function markPaidExportSafe() {
+    try {
+      await markPaidExport();
+    } catch (err) {
+      console.error('[billing] mark-export failed (export already done):', err);
     }
   }
 
