@@ -25,6 +25,17 @@ export interface PlanState {
   hasActiveTerm: boolean;
   /** Remaining consumable export credits from the pack. */
   credits: number;
+  /** Remaining review credits from the review pack. Never expire (§5.3). */
+  reviewCredits: number;
+  /** Whether the weekly review add-on rides on the user's subscription. */
+  hasReviewAddon: boolean;
+  /**
+   * True if the user may run a review right now (mirrors D4's
+   * server-side resolution): an active term WITH the review add-on
+   * (weekly window), or at least one review credit. The follow-up is
+   * included in the initial credit — it never needs a second one.
+   */
+  canReview: boolean;
   /**
    * True if the user may take a clean editable export right now — an
    * active term (unlimited) or at least one credit. Drives both the
@@ -53,6 +64,9 @@ const INITIAL: PlanState = {
   loading: true,
   hasActiveTerm: false,
   credits: 0,
+  reviewCredits: 0,
+  hasReviewAddon: false,
+  canReview: false,
   canExport: false,
   isGuest: true,
   subscriptionStatus: null,
@@ -62,6 +76,8 @@ interface BillingRow {
   plan?: string | null;
   plan_expires_at?: string | null;
   export_credits?: number | null;
+  review_credits?: number | null;
+  review_addon?: boolean | null;
   subscription_status?: string | null;
 }
 
@@ -69,7 +85,13 @@ interface BillingRow {
  *  which come from the auth check, not the billing row). */
 type BillingDerived = Pick<
   PlanState,
-  'hasActiveTerm' | 'credits' | 'canExport' | 'subscriptionStatus'
+  | 'hasActiveTerm'
+  | 'credits'
+  | 'reviewCredits'
+  | 'hasReviewAddon'
+  | 'canReview'
+  | 'canExport'
+  | 'subscriptionStatus'
 >;
 
 function derive(row: BillingRow | null): BillingDerived {
@@ -77,9 +99,16 @@ function derive(row: BillingRow | null): BillingDerived {
   const hasActiveTerm =
     row?.plan === 'term' && expires !== null && expires.getTime() > Date.now();
   const credits = row?.export_credits ?? 0;
+  const reviewCredits = row?.review_credits ?? 0;
+  const hasReviewAddon = row?.review_addon === true;
   return {
     hasActiveTerm,
     credits,
+    reviewCredits,
+    hasReviewAddon,
+    // D4 client mirror: add-on path needs the term active; the pack path
+    // needs a credit. The server re-resolves this authoritatively.
+    canReview: (hasReviewAddon && hasActiveTerm) || reviewCredits > 0,
     canExport: hasActiveTerm || credits > 0,
     subscriptionStatus: row?.subscription_status ?? null,
   };
@@ -103,7 +132,9 @@ export function usePlan(): PlanState {
       // generated Database type in some builds; cast the projection.
       const { data } = await supabase
         .from('users')
-        .select('plan, plan_expires_at, export_credits, subscription_status' as never)
+        .select(
+          'plan, plan_expires_at, export_credits, review_credits, review_addon, subscription_status' as never,
+        )
         .eq('id', auth.user.id)
         .maybeSingle();
       if (cancelled) return;
