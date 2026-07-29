@@ -140,7 +140,17 @@ export function ExportDrawer({
                 { included: true, label: 'No watermark' },
               ]}
               action={
+                // Pricing + account note sit ABOVE the button so the button
+                // is the last element in the card — flush to the bottom,
+                // bottom-aligned with the PDF card's "Download PDF". Keeps the
+                // two export CTAs on the same baseline (cleaner, per review).
                 <div className="mt-4">
+                  <p className="text-center text-xs font-medium text-[#c8cad0]">
+                    {PRICE_LINE}
+                  </p>
+                  <p className="mt-1 mb-3 text-center text-[11px] text-[#6b7280]">
+                    Account asked only here — no card to preview.
+                  </p>
                   <button
                     type="button"
                     onClick={onExportPptx}
@@ -149,12 +159,6 @@ export function ExportDrawer({
                   >
                     Export PowerPoint (.pptx)
                   </button>
-                  <p className="mt-2 text-center text-xs font-medium text-[#c8cad0]">
-                    {PRICE_LINE}
-                  </p>
-                  <p className="mt-1 text-center text-[11px] text-[#6b7280]">
-                    Account asked only here — no card to preview.
-                  </p>
                 </div>
               }
             />

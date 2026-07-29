@@ -86,6 +86,29 @@ describe('ExportDrawer', () => {
     ).toBeInTheDocument();
   });
 
+  it('renders the price + account note ABOVE the PPTX button so the two export buttons bottom-align', () => {
+    // The PDF card's CTA is a lone button; the PPTX card's CTA is a button
+    // plus two lines of pricing/account copy. For both buttons to land on
+    // the same baseline (equal-height grid cards, each flex-col), the button
+    // must be the LAST element in its action block — i.e. the price copy
+    // comes first. This locks that document order (a layout regression that
+    // moved the copy back below the button would misalign the buttons again).
+    render(
+      <ExportDrawer
+        open
+        deck={emptyDeck}
+        onToggle={() => {}}
+        onExportPdf={() => {}}
+        onExportPptx={() => {}}
+      />,
+    );
+    const pptxButton = screen.getByRole('button', { name: /export powerpoint|\.pptx/i });
+    const priceLine = screen.getByText(/\$18\.99 CAD/i);
+    // DOCUMENT_POSITION_FOLLOWING (4) set on the button → the price line
+    // precedes the button in the DOM. That is the bottom-aligning order.
+    expect(priceLine.compareDocumentPosition(pptxButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it('fires the export callbacks when the format buttons are clicked', () => {
     const onExportPdf = vi.fn();
     const onExportPptx = vi.fn();
