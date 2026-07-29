@@ -53,7 +53,7 @@ function Success() {
     return () => clearTimeout(t);
   }, []);
 
-  const granted = plan.hasActiveTerm || plan.credits > 0;
+  const granted = plan.hasActiveTerm || plan.credits > 0 || plan.canReview;
   const stillProcessing = !granted && !waited;
 
   return (
@@ -74,13 +74,17 @@ function Success() {
         </h1>
 
         <p className="mt-3 text-sm leading-relaxed text-[#9ca3af]">
-          {plan.hasActiveTerm
-            ? 'Your term is active. Editable PowerPoint and LaTeX exports are unlocked — no watermark.'
-            : plan.credits > 0
-              ? `Your export pack is ready — ${plan.credits} export${plan.credits === 1 ? '' : 's'} to use whenever. Credits never expire.`
-              : stillProcessing
-                ? 'Payment received — finalizing your account. This takes just a moment.'
-                : 'Payment received. Your access will appear shortly — head back in and it’ll be ready.'}
+          {plan.reviewCredits > 0
+            ? `Your review pack is ready — ${plan.reviewCredits} review${plan.reviewCredits === 1 ? '' : 's'} to use whenever. Review credits never expire.`
+            : plan.hasReviewAddon && plan.hasActiveTerm
+              ? 'Your weekly review add-on is active. Your review quota refreshes every week while your term stays active.'
+              : plan.hasActiveTerm
+                ? 'Your term is active. Editable PowerPoint and LaTeX exports are unlocked — no watermark.'
+                : plan.credits > 0
+                  ? `Your export pack is ready — ${plan.credits} export${plan.credits === 1 ? '' : 's'} to use whenever. Credits never expire.`
+                  : stillProcessing
+                    ? 'Payment received — finalizing your account. This takes just a moment.'
+                    : 'Payment received. Your access will appear shortly — head back in and it’ll be ready.'}
         </p>
 
         <button

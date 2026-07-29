@@ -12683,7 +12683,7 @@ git commit -m "docs(review): checker entries in feature-graph + manual test flow
 - Create (generated): `docs/plans/experiments/presentation-checker/analysis/gate-report.md`
 - Create (manual, after the live run): `docs/plans/experiments/presentation-checker/analysis/gate-decision-production.md`
 - Create (launch checklist only, and only on GO): `docs/plans/experiments/presentation-checker/analysis/launch-checklist.md`
-- Modify (launch checklist only, and only on GO): `apps/web/src/seo/routes.json`, `apps/web/vercel.json`, `apps/web/src/components/PublicHeader.tsx`, `apps/web/src/pages/Pricing.tsx`, `apps/web/src/pages/BillingResult.tsx`, `apps/web/src/pages/PresentationChecker.tsx` + its test if PPTX remains unavailable, `apps/api/src/review/config.ts`, the spec's living-document sections
+- Modify (launch checklist only, and only on GO): `apps/web/src/seo/routes.json`, `apps/web/vercel.json`, `apps/web/src/components/PublicHeader.tsx`, `apps/web/src/pages/Pricing.tsx`, `apps/web/src/pages/PresentationChecker.tsx` + its test if PPTX remains unavailable, `apps/api/src/review/config.ts`, the spec's living-document sections
 
 **Interfaces:**
 - Consumes: `composeReviewSystemPrompt(rubric?)` + `buildInitialUserMessage({ pageCount, sourceKind, signals?, posterDocPresent })` from `apps/api/src/review/prompt.ts` (Task 11); `callAnthropicCritique(anthropic, { systemPrompt, userMessage, pages })` → `{ critique, usage }` from `apps/api/src/review/critique.ts` (Task 13); `enforceFindings(findings, { blockIds?, pageCount, maxFindings? })` from `apps/api/src/review/enforce.ts` (Task 14); `computeReviewSignals(blocks)` from `apps/api/src/review/signals.ts` (Task 10); `FetchedPage { mediaType, imageData }` from `apps/api/src/review/fetchPages.ts` (Task 12); the frozen corpus `corpus/manifest.json` (Task 3); the analyzer's `--results` / `--out` flags (Task 6 — added for exactly this reuse); the §7.5 ship-criterion numbers Gavin must set in `gate-decision.md` (Task 7) before the full run; `ANTHROPIC_API_KEY` (Preflight P3).
@@ -12897,7 +12897,7 @@ Date: <…> · Rubric: <version stamped in results> · Corpus: frozen 20 (`froze
   date of record.
 - [ ] **Stripe LIVE prices.** Create the `review_pack` (payment mode) and `review_addon` (subscription mode) prices in the LIVE Stripe account; set `STRIPE_PRICE_REVIEW_PACK` / `STRIPE_PRICE_REVIEW_ADDON` in Render. Review-SKU refunds stay manual via the Stripe dashboard (D8 — deferred, no code).
 - [ ] **Price from real numbers.** Set `REVIEW_PACK_CREDITS` (the pack-grant const from the Milestone-3 billing task, beside the `PACK_EXPORT_CREDITS` precedent) and `REVIEW_ADDON_WEEKLY_QUOTA` (`apps/api/src/review/config.ts`) from the day-one `[review.critique]` cost lines (Task 27 Step 4 + dogfood) and the p50/p95 of `results-production/costs.jsonl` — not the placeholders (`3` / `4`).
-- [ ] **Checkout landing covers review SKUs.** In `apps/web/src/pages/BillingResult.tsx` extend the `granted` check with `|| plan.canReview` (and its copy) so a review-pack buyer sees the confirmation instead of the "will appear shortly" fallback.
+- [x] **Checkout landing covers review SKUs.** `apps/web/src/pages/BillingResult.tsx` recognizes `plan.canReview` and gives review packs and weekly add-ons their own fulfillment copy; `BillingResult.test.tsx` pins both cases. This safe checkout confirmation landed before GO and is not part of the indexing launch diff.
 - [ ] **Choose truthful PPTX availability (non-blocking for the other three inputs).** Run the Docker-based Render service with `libreoffice-impress` + `poppler-utils` and smoke one PPTX review before claiming PPTX support. If that smoke has not passed, remove `.pptx` from the file input and launch copy in `PresentationChecker.tsx`, add visible “PPTX coming next” copy, and pin it in the page test. Continue the PDF/image/Postr-native launch; track the Docker deployment + PPTX smoke as a separate rollout item. If the smoke passes, keep the current PPTX input. PPTX ships last (§6.2.2).
 - [ ] **Living spec.** If the rubric changed since Task 1 and the living-spec
   file is present, update its rubric-version and §7.5 criterion record with
@@ -12964,7 +12964,7 @@ Launch-checklist edits (GO only) land as their own commit when executed:
 # there (the PACK_EXPORT_CREDITS precedent) — git add of an unchanged
 # tracked file is a no-op, so stage both candidates.
 git add apps/web/src/seo/routes.json apps/web/src/components/PublicHeader.tsx \
-        apps/web/src/pages/Pricing.tsx apps/web/src/pages/BillingResult.tsx \
+        apps/web/src/pages/Pricing.tsx \
         apps/web/src/pages/PresentationChecker.tsx \
         apps/web/src/pages/PresentationChecker.test.tsx \
         apps/web/vercel.json apps/api/src/review/config.ts \
