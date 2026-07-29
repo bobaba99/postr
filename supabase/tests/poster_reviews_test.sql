@@ -31,7 +31,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(56);
+select plan(84);
 
 -- --------------------------------------------------------------------------
 -- Fixtures (as superuser): two users (handle_new_user auto-creates their
@@ -50,12 +50,20 @@ from (values
   ('d1000000-0000-4000-a000-000000000002'::uuid, 'john.smith@example.com')
 ) as u (id, email);
 
+insert into public.posters (id, user_id, title)
+values (
+  'c1000000-0000-4000-a000-000000000002',
+  'd1000000-0000-4000-a000-000000000002',
+  'John''s poster'
+);
+
 -- The historical schema predates Supabase's generated API grants. Give this
 -- transaction's service_role fixture only the legacy privileges exercised by
 -- the pre-existing poster-review tests; rollback removes these fixture grants.
 -- The new quota ledger's production least-privilege grants are asserted
 -- independently below and are not supplemented here.
 grant select, update, delete on public.users to service_role;
+grant select on public.posters to service_role;
 grant select, insert, update on public.poster_reviews to service_role;
 grant select, update on public.poster_review_requests to service_role;
 grant execute on function public.consume_review_credit(uuid) to service_role;
@@ -418,42 +426,403 @@ select is(
   1,
   'a stale finalizer leaves the credit untouched');
 
--- 29 · the insert error escapes the RPC
-select throws_ok(
-  $q$
-    select public.finalize_initial_review(
-      'd1000000-0000-4000-a000-000000000001',
-      'a1000000-0000-4000-a000-000000000002',
-      (select (payload->>'claimToken')::uuid
-         from review_claim_fixtures
-        where name = 'replacement'),
-      'ffffffff-ffff-4fff-8fff-ffffffffffff',
-      'postr',
-      '{}'::jsonb,
-      '{"dimensionScores":{"narrative":4,"design":3,"content":4},"attentionSummary":"Results first.","findings":[]}'::jsonb,
-      'pack'
-    )
-  $q$,
-  '23503',
-  null,
-  'a poster FK failure aborts finalization');
+-- 29 · a user cannot attach a paid review to another user's poster
+select is(
+  public.finalize_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000002',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'replacement'),
+    'c1000000-0000-4000-a000-000000000002',
+    'postr',
+    '{}'::jsonb,
+    '{"dimensionScores":{"narrative":4,"design":3,"content":4},"attentionSummary":"Results first.","findings":[]}'::jsonb,
+    'pack'
+  )->>'outcome',
+  'poster_not_owned',
+  'finalization rejects a poster not owned by the review user');
 
--- 30 · transaction rollback means the failed insert cannot lose a credit
+-- 30 · ownership denial happens before the paid credit boundary
 select is(
   (select review_credits
      from public.users
     where id = 'd1000000-0000-4000-a000-000000000001'),
   1,
-  'an insert/FK failure rolls the credit spend back');
+  'poster ownership denial leaves the credit untouched');
 
--- 31 · and no partially finalized review exists
+-- 31 · ownership denial creates no review
 select is(
   (select count(*)
      from public.poster_reviews
     where user_id = 'd1000000-0000-4000-a000-000000000001'
       and request_key = 'a1000000-0000-4000-a000-000000000002'),
   0::bigint,
-  'an insert/FK failure leaves no partial review row');
+  'poster ownership denial leaves no review row');
+
+-- 32 · ownership denial settles the exact in-flight initial claim
+select is(
+  (select count(*)
+     from public.poster_review_requests
+    where user_id = 'd1000000-0000-4000-a000-000000000001'
+      and request_key = 'a1000000-0000-4000-a000-000000000002'),
+  0::bigint,
+  'poster ownership denial settles the exact initial claim');
+
+-- --------------------------------------------------------------------------
+-- Leased, replay-safe follow-up protocol
+-- --------------------------------------------------------------------------
+
+-- 33–35 · follow-up coordination is persisted on the review row
+select has_column(
+  'public',
+  'poster_reviews',
+  'followup_request_id',
+  'poster_reviews persists the logical follow-up request id');
+select has_column(
+  'public',
+  'poster_reviews',
+  'followup_lease_token',
+  'poster_reviews persists the follow-up fencing token');
+select has_column(
+  'public',
+  'poster_reviews',
+  'followup_lease_expires_at',
+  'poster_reviews persists the follow-up lease expiry');
+
+insert into public.poster_reviews (
+  id,
+  user_id,
+  source_kind,
+  status,
+  stage,
+  initial_findings
+)
+values
+  (
+    'e1000000-0000-4000-a000-000000000003',
+    'd1000000-0000-4000-a000-000000000001',
+    'pdf',
+    'complete',
+    'initial',
+    '{"dimensionScores":{"narrative":3,"design":3,"content":3},"attentionSummary":"Initial baseline.","findings":[]}'::jsonb
+  ),
+  (
+    'e1000000-0000-4000-a000-000000000004',
+    'd1000000-0000-4000-a000-000000000001',
+    'pdf',
+    'complete',
+    'initial',
+    null
+  );
+
+create temporary table review_followup_fixtures (
+  name text primary key,
+  payload jsonb not null
+);
+
+-- 36 · a missing review cannot be claimed
+select is(
+  public.claim_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'ffffffff-ffff-4fff-8fff-ffffffffffff',
+    'b1000000-0000-4000-a000-000000000001'
+  )->>'outcome',
+  'not_found',
+  'follow-up claim distinguishes a missing review');
+
+-- 37 · another user cannot claim an owner's review
+select is(
+  public.claim_review_followup(
+    'd1000000-0000-4000-a000-000000000002',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000001'
+  )->>'outcome',
+  'not_owner',
+  'follow-up claim distinguishes a non-owner');
+
+-- 38 · a nominally complete row still needs its initial critique
+select is(
+  public.claim_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000004',
+    'b1000000-0000-4000-a000-000000000001'
+  )->>'outcome',
+  'not_complete',
+  'follow-up claim rejects a review missing its initial critique');
+
+insert into review_followup_fixtures (name, payload)
+values (
+  'first',
+  public.claim_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000001'
+  )
+);
+
+-- 39 · the first follow-up claimant receives the lease
+select is(
+  (select payload->>'outcome'
+     from review_followup_fixtures
+    where name = 'first'),
+  'claimed',
+  'the first follow-up request is claimed');
+
+-- 40 · provider work receives the stored initial critique as its baseline
+select is(
+  (select payload#>>'{initialCritique,attentionSummary}'
+     from review_followup_fixtures
+    where name = 'first'),
+  'Initial baseline.',
+  'the follow-up claim returns the initial critique');
+
+-- 41 · an active lease deduplicates a concurrent request
+select is(
+  public.claim_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000002'
+  )->>'outcome',
+  'in_progress',
+  'an active follow-up lease reports in progress');
+
+update public.poster_reviews
+   set followup_lease_expires_at = pg_catalog.now() - interval '1 second'
+ where id = 'e1000000-0000-4000-a000-000000000003';
+
+insert into review_followup_fixtures (name, payload)
+values (
+  'takeover',
+  public.claim_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000002'
+  )
+);
+
+-- 42 · an expired lease can be taken over
+select is(
+  (select payload->>'outcome'
+     from review_followup_fixtures
+    where name = 'takeover'),
+  'claimed',
+  'an expired follow-up lease can be taken over');
+
+-- 43 · takeover rotates the fencing token
+select isnt(
+  (select payload->>'leaseToken'
+     from review_followup_fixtures
+    where name = 'first'),
+  (select payload->>'leaseToken'
+     from review_followup_fixtures
+    where name = 'takeover'),
+  'an expired follow-up takeover receives a fresh fencing token');
+
+-- 44 · takeover replaces the logical request id
+select is(
+  (select followup_request_id
+     from public.poster_reviews
+    where id = 'e1000000-0000-4000-a000-000000000003'),
+  'b1000000-0000-4000-a000-000000000002'::uuid,
+  'an expired follow-up takeover replaces the request id');
+
+-- 45 · a stale worker cannot release the takeover
+select is(
+  public.release_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000001',
+    (select (payload->>'leaseToken')::uuid
+       from review_followup_fixtures
+      where name = 'first')
+  ),
+  false,
+  'a stale follow-up worker cannot release its replacement');
+
+-- 46 · the replacement token remains fenced after stale release
+select is(
+  (select followup_lease_token
+     from public.poster_reviews
+    where id = 'e1000000-0000-4000-a000-000000000003'),
+  (select (payload->>'leaseToken')::uuid
+     from review_followup_fixtures
+    where name = 'takeover'),
+  'stale release leaves the replacement token intact');
+
+-- 47 · a stale worker cannot complete the takeover
+select is(
+  public.complete_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000001',
+    (select (payload->>'leaseToken')::uuid
+       from review_followup_fixtures
+      where name = 'first'),
+    '{"dimensionScores":{"narrative":1,"design":1,"content":1},"attentionSummary":"Stale result.","findings":[]}'::jsonb
+  )->>'outcome',
+  'claim_missing',
+  'a stale follow-up worker cannot complete its replacement');
+
+-- 48 · a fenced stale completion cannot close the review
+select is(
+  (select stage
+     from public.poster_reviews
+    where id = 'e1000000-0000-4000-a000-000000000003'),
+  'followup',
+  'stale completion leaves the replacement in progress');
+
+update public.poster_reviews
+   set followup_lease_expires_at = pg_catalog.now() - interval '1 second'
+ where id = 'e1000000-0000-4000-a000-000000000003';
+
+-- 49 · even the exact token cannot complete after its lease expires
+select is(
+  public.complete_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000002',
+    (select (payload->>'leaseToken')::uuid
+       from review_followup_fixtures
+      where name = 'takeover'),
+    '{"dimensionScores":{"narrative":4,"design":4,"content":4},"attentionSummary":"Expired result.","findings":[]}'::jsonb
+  )->>'outcome',
+  'claim_missing',
+  'an expired follow-up lease cannot complete');
+
+insert into review_followup_fixtures (name, payload)
+values (
+  'replacement',
+  public.claim_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000002'
+  )
+);
+
+-- 50 · the expired exact request can receive a replacement lease
+select is(
+  (select payload->>'outcome'
+     from review_followup_fixtures
+    where name = 'replacement'),
+  'claimed',
+  'an expired exact request can receive a replacement lease');
+
+-- 51 · exact release resets the review for another attempt
+select is(
+  public.release_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000002',
+    (select (payload->>'leaseToken')::uuid
+       from review_followup_fixtures
+      where name = 'replacement')
+  ),
+  true,
+  'the exact follow-up worker can release its lease');
+
+-- 52 · exact release clears all coordination state
+select is(
+  (
+    select row(stage, followup_request_id, followup_lease_token, followup_lease_expires_at)::text
+      from public.poster_reviews
+     where id = 'e1000000-0000-4000-a000-000000000003'
+  ),
+  '(initial,,,)'
+  ,
+  'exact follow-up release resets stage and clears its lease');
+
+insert into review_followup_fixtures (name, payload)
+values (
+  'completion',
+  public.claim_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000002'
+  )
+);
+
+-- 53 · a released review can be reclaimed
+select is(
+  (select payload->>'outcome'
+     from review_followup_fixtures
+    where name = 'completion'),
+  'claimed',
+  'a released follow-up can be reclaimed');
+
+-- 54 · exact completion closes the review
+select is(
+  public.complete_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000002',
+    (select (payload->>'leaseToken')::uuid
+       from review_followup_fixtures
+      where name = 'completion'),
+    '{"dimensionScores":{"narrative":5,"design":4,"content":5},"attentionSummary":"Stored follow-up.","findings":[]}'::jsonb
+  )->>'outcome',
+  'complete',
+  'the exact follow-up worker completes the review');
+
+-- 55 · completion stores findings and clears only the ephemeral lease
+select is(
+  (
+    select row(
+      stage,
+      followup_request_id,
+      followup_lease_token,
+      followup_lease_expires_at,
+      followup_findings->>'attentionSummary'
+    )::text
+      from public.poster_reviews
+     where id = 'e1000000-0000-4000-a000-000000000003'
+  ),
+  '(closed,b1000000-0000-4000-a000-000000000002,,,"Stored follow-up.")',
+  'completion preserves request identity and findings while clearing the lease');
+
+insert into review_followup_fixtures (name, payload)
+values (
+  'replay',
+  public.claim_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000002'
+  )
+);
+
+-- 56 · response-loss retry replays the same completed operation
+select is(
+  (select payload->>'outcome'
+     from review_followup_fixtures
+    where name = 'replay'),
+  'replay',
+  'a closed follow-up replays the same request id');
+
+-- 57 · replay is explicitly the closed stage
+select is(
+  (select payload->>'stage'
+     from review_followup_fixtures
+    where name = 'replay'),
+  'closed',
+  'a follow-up replay reports the closed stage');
+
+-- 58 · replay returns the stored follow-up critique
+select is(
+  (select payload#>>'{critique,attentionSummary}'
+     from review_followup_fixtures
+    where name = 'replay'),
+  'Stored follow-up.',
+  'a follow-up replay returns its stored critique');
+
+-- 59 · a third logical request cannot reuse the included follow-up
+select is(
+  public.claim_review_followup(
+    'd1000000-0000-4000-a000-000000000001',
+    'e1000000-0000-4000-a000-000000000003',
+    'b1000000-0000-4000-a000-000000000003'
+  )->>'outcome',
+  'closed',
+  'a closed review rejects a different follow-up request id');
 
 -- --------------------------------------------------------------------------
 -- Persistent review add-on quota ledger + sliding-window RPC

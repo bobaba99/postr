@@ -42,6 +42,9 @@ create table if not exists public.poster_reviews (
                       check (stage in ('initial','followup','closed')),
   initial_findings  jsonb,                                 -- CritiqueResult
   followup_findings jsonb,                                 -- CritiqueResult (diffed vs initial)
+  followup_request_id uuid,                                -- durable follow-up idempotency key
+  followup_lease_token uuid,                               -- fences stale follow-up workers
+  followup_lease_expires_at timestamptz,                   -- ten-minute provider-work lease
   credit_source     text check (credit_source in ('pack','subscription_addon')),
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
@@ -50,7 +53,10 @@ create table if not exists public.poster_reviews (
 -- Existing development databases may already have the pre-idempotency table
 -- from an earlier version of this migration.
 alter table public.poster_reviews
-  add column if not exists request_key uuid;
+  add column if not exists request_key uuid,
+  add column if not exists followup_request_id uuid,
+  add column if not exists followup_lease_token uuid,
+  add column if not exists followup_lease_expires_at timestamptz;
 
 create unique index if not exists poster_reviews_user_request_key_uidx
   on public.poster_reviews (user_id, request_key)
@@ -535,6 +541,26 @@ begin
     return pg_catalog.jsonb_build_object('outcome', 'claim_missing');
   end if;
 
+  -- A caller-controlled poster id must never let a service-role insert attach
+  -- a paid review to another user's poster. FOR KEY SHARE keeps a verified
+  -- owner row stable through the insert; a missing or foreign poster settles
+  -- only this exact claim before returning, without spending a credit.
+  if p_poster_id is not null then
+    perform 1
+      from public.posters
+     where id = p_poster_id
+       and user_id = p_user_id
+       for key share;
+
+    if not found then
+      delete from public.poster_review_requests
+       where user_id = p_user_id
+         and request_key = p_request_key
+         and claim_token = p_claim_token;
+      return pg_catalog.jsonb_build_object('outcome', 'poster_not_owned');
+    end if;
+  end if;
+
   if p_credit_source = 'pack' then
     update public.users
        set review_credits = review_credits - 1
@@ -602,3 +628,240 @@ revoke execute on function public.finalize_initial_review(
 grant execute on function public.finalize_initial_review(
   uuid, uuid, uuid, uuid, text, jsonb, jsonb, text
 ) to service_role;
+
+-- =========================================================================
+-- 7. Leased, replay-safe included follow-up
+-- =========================================================================
+-- Follow-up provider work uses the same claim/fence/replay pattern as the
+-- initial operation, but the coordination and durable request identity live
+-- directly on the already-paid poster_reviews row:
+--   initial  -> followup (request id + active ten-minute lease)
+--   followup -> initial  (exact-token release after provider/API failure)
+--   followup -> closed   (exact-token completion; request id retained)
+-- A closed row replays only the request that completed it. A different
+-- request sees `closed`, so the included follow-up cannot be farmed.
+create or replace function public.claim_review_followup(
+  p_user_id uuid,
+  p_review_id uuid,
+  p_request_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_review public.poster_reviews%rowtype;
+  v_lease_token uuid := gen_random_uuid();
+  v_expires_at timestamptz := pg_catalog.now() + interval '10 minutes';
+begin
+  if p_user_id is null or p_review_id is null or p_request_id is null then
+    raise exception 'user id, review id, and request id are required'
+      using errcode = '22004';
+  end if;
+
+  select *
+    into v_review
+    from public.poster_reviews
+   where id = p_review_id
+   for update;
+
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'not_found');
+  end if;
+  if v_review.user_id <> p_user_id then
+    return pg_catalog.jsonb_build_object('outcome', 'not_owner');
+  end if;
+  if v_review.status <> 'complete' or v_review.initial_findings is null then
+    return pg_catalog.jsonb_build_object('outcome', 'not_complete');
+  end if;
+
+  if v_review.stage = 'closed' then
+    if v_review.followup_request_id = p_request_id then
+      return pg_catalog.jsonb_build_object(
+        'outcome', 'replay',
+        'reviewId', v_review.id,
+        'stage', 'closed',
+        'critique', v_review.followup_findings
+      );
+    end if;
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'closed',
+      'reviewId', v_review.id,
+      'stage', 'closed'
+    );
+  end if;
+
+  if v_review.stage = 'followup'
+     and v_review.followup_lease_expires_at > pg_catalog.now() then
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'in_progress',
+      'reviewId', v_review.id,
+      'expiresAt', v_review.followup_lease_expires_at
+    );
+  end if;
+
+  update public.poster_reviews
+     set stage = 'followup',
+         followup_request_id = p_request_id,
+         followup_lease_token = v_lease_token,
+         followup_lease_expires_at = v_expires_at,
+         updated_at = pg_catalog.now()
+   where id = p_review_id;
+
+  return pg_catalog.jsonb_build_object(
+    'outcome', 'claimed',
+    'reviewId', v_review.id,
+    'stage', 'followup',
+    'leaseToken', v_lease_token,
+    'expiresAt', v_expires_at,
+    'initialCritique', v_review.initial_findings
+  );
+end;
+$$;
+
+comment on function public.claim_review_followup(uuid, uuid, uuid) is
+  'Claims an included follow-up, takes over an expired lease, or replays the '
+  'same completed follow-up request. service_role only.';
+
+revoke execute on function public.claim_review_followup(uuid, uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.claim_review_followup(uuid, uuid, uuid)
+  to service_role;
+
+create or replace function public.complete_review_followup(
+  p_user_id uuid,
+  p_review_id uuid,
+  p_request_id uuid,
+  p_lease_token uuid,
+  p_followup_findings jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_review public.poster_reviews%rowtype;
+begin
+  if p_user_id is null
+     or p_review_id is null
+     or p_request_id is null
+     or p_lease_token is null
+     or p_followup_findings is null then
+    raise exception 'user id, review id, request id, lease token, and findings are required'
+      using errcode = '22004';
+  end if;
+
+  select *
+    into v_review
+    from public.poster_reviews
+   where id = p_review_id
+   for update;
+
+  if not found then
+    return pg_catalog.jsonb_build_object('outcome', 'not_found');
+  end if;
+  if v_review.user_id <> p_user_id then
+    return pg_catalog.jsonb_build_object('outcome', 'not_owner');
+  end if;
+  if v_review.status <> 'complete' then
+    return pg_catalog.jsonb_build_object('outcome', 'not_complete');
+  end if;
+
+  if v_review.stage = 'closed' then
+    if v_review.followup_request_id = p_request_id then
+      return pg_catalog.jsonb_build_object(
+        'outcome', 'replay',
+        'reviewId', v_review.id,
+        'stage', 'closed',
+        'critique', v_review.followup_findings
+      );
+    end if;
+    return pg_catalog.jsonb_build_object(
+      'outcome', 'closed',
+      'reviewId', v_review.id,
+      'stage', 'closed'
+    );
+  end if;
+
+  if v_review.stage <> 'followup'
+     or v_review.followup_request_id is distinct from p_request_id
+     or v_review.followup_lease_token is distinct from p_lease_token
+     or v_review.followup_lease_expires_at is null
+     or v_review.followup_lease_expires_at <= pg_catalog.now() then
+    return pg_catalog.jsonb_build_object('outcome', 'claim_missing');
+  end if;
+
+  update public.poster_reviews
+     set stage = 'closed',
+         followup_findings = p_followup_findings,
+         followup_lease_token = null,
+         followup_lease_expires_at = null,
+         updated_at = pg_catalog.now()
+   where id = p_review_id;
+
+  return pg_catalog.jsonb_build_object(
+    'outcome', 'complete',
+    'reviewId', v_review.id,
+    'stage', 'closed',
+    'critique', p_followup_findings
+  );
+end;
+$$;
+
+comment on function public.complete_review_followup(uuid, uuid, uuid, uuid, jsonb) is
+  'Completes a follow-up only for its exact active fencing token and preserves '
+  'the request id for response-loss replay. service_role only.';
+
+revoke execute on function public.complete_review_followup(uuid, uuid, uuid, uuid, jsonb)
+  from public, anon, authenticated;
+grant execute on function public.complete_review_followup(uuid, uuid, uuid, uuid, jsonb)
+  to service_role;
+
+create or replace function public.release_review_followup(
+  p_user_id uuid,
+  p_review_id uuid,
+  p_request_id uuid,
+  p_lease_token uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_released boolean;
+begin
+  if p_user_id is null
+     or p_review_id is null
+     or p_request_id is null
+     or p_lease_token is null then
+    return false;
+  end if;
+
+  update public.poster_reviews
+     set stage = 'initial',
+         followup_request_id = null,
+         followup_lease_token = null,
+         followup_lease_expires_at = null,
+         updated_at = pg_catalog.now()
+   where id = p_review_id
+     and user_id = p_user_id
+     and stage = 'followup'
+     and followup_request_id = p_request_id
+     and followup_lease_token = p_lease_token
+  returning true into v_released;
+
+  return coalesce(v_released, false);
+end;
+$$;
+
+comment on function public.release_review_followup(uuid, uuid, uuid, uuid) is
+  'Releases only an exact follow-up fencing token; a stale worker cannot undo '
+  'a newer takeover. service_role only.';
+
+revoke execute on function public.release_review_followup(uuid, uuid, uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.release_review_followup(uuid, uuid, uuid, uuid)
+  to service_role;

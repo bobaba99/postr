@@ -414,6 +414,9 @@ export type Database = {
           created_at: string
           credit_source: string | null
           followup_findings: Json | null
+          followup_lease_expires_at: string | null
+          followup_lease_token: string | null
+          followup_request_id: string | null
           id: string
           initial_findings: Json | null
           poster_id: string | null
@@ -429,6 +432,9 @@ export type Database = {
           created_at?: string
           credit_source?: string | null
           followup_findings?: Json | null
+          followup_lease_expires_at?: string | null
+          followup_lease_token?: string | null
+          followup_request_id?: string | null
           id?: string
           initial_findings?: Json | null
           poster_id?: string | null
@@ -444,6 +450,9 @@ export type Database = {
           created_at?: string
           credit_source?: string | null
           followup_findings?: Json | null
+          followup_lease_expires_at?: string | null
+          followup_lease_token?: string | null
+          followup_request_id?: string | null
           id?: string
           initial_findings?: Json | null
           poster_id?: string | null
@@ -769,6 +778,20 @@ export type Database = {
         Args: { p_request_key: string; p_user_id: string }
         Returns: Json
       }
+      claim_review_followup: {
+        Args: { p_request_id: string; p_review_id: string; p_user_id: string }
+        Returns: Json
+      }
+      complete_review_followup: {
+        Args: {
+          p_followup_findings: Json
+          p_lease_token: string
+          p_request_id: string
+          p_review_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       consume_export_credit: { Args: { p_user_id: string }; Returns: number }
       consume_review_addon_slot: {
         Args: { p_quota: number; p_user_id: string }
@@ -816,6 +839,15 @@ export type Database = {
         Args: {
           p_claim_token: string
           p_request_key: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      release_review_followup: {
+        Args: {
+          p_lease_token: string
+          p_request_id: string
+          p_review_id: string
           p_user_id: string
         }
         Returns: boolean

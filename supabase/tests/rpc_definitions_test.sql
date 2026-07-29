@@ -15,7 +15,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(64);
+select plan(79);
 
 -- --------------------------------------------------------------------------
 -- Functions exist
@@ -44,6 +44,21 @@ select has_function(
   'finalize_initial_review',
   array['uuid', 'uuid', 'uuid', 'uuid', 'text', 'jsonb', 'jsonb', 'text']::name[],
   'finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text) exists');
+select has_function(
+  'public',
+  'claim_review_followup',
+  array['uuid', 'uuid', 'uuid']::name[],
+  'claim_review_followup(uuid, uuid, uuid) exists');
+select has_function(
+  'public',
+  'complete_review_followup',
+  array['uuid', 'uuid', 'uuid', 'uuid', 'jsonb']::name[],
+  'complete_review_followup(uuid, uuid, uuid, uuid, jsonb) exists');
+select has_function(
+  'public',
+  'release_review_followup',
+  array['uuid', 'uuid', 'uuid', 'uuid']::name[],
+  'release_review_followup(uuid, uuid, uuid, uuid) exists');
 select has_function(
   'public',
   'fulfill_credit_pack',
@@ -81,6 +96,24 @@ select function_returns(
   'finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text) returns jsonb');
 select function_returns(
   'public',
+  'claim_review_followup',
+  array['uuid', 'uuid', 'uuid']::name[],
+  'jsonb',
+  'claim_review_followup(uuid, uuid, uuid) returns jsonb');
+select function_returns(
+  'public',
+  'complete_review_followup',
+  array['uuid', 'uuid', 'uuid', 'uuid', 'jsonb']::name[],
+  'jsonb',
+  'complete_review_followup(uuid, uuid, uuid, uuid, jsonb) returns jsonb');
+select function_returns(
+  'public',
+  'release_review_followup',
+  array['uuid', 'uuid', 'uuid', 'uuid']::name[],
+  'boolean',
+  'release_review_followup(uuid, uuid, uuid, uuid) returns boolean');
+select function_returns(
+  'public',
   'fulfill_credit_pack',
   array['text', 'uuid', 'integer', 'text']::name[],
   'integer',
@@ -113,6 +146,21 @@ select is_definer(
   'finalize_initial_review',
   array['uuid', 'uuid', 'uuid', 'uuid', 'text', 'jsonb', 'jsonb', 'text']::name[],
   'finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text) is security definer');
+select is_definer(
+  'public',
+  'claim_review_followup',
+  array['uuid', 'uuid', 'uuid']::name[],
+  'claim_review_followup(uuid, uuid, uuid) is security definer');
+select is_definer(
+  'public',
+  'complete_review_followup',
+  array['uuid', 'uuid', 'uuid', 'uuid', 'jsonb']::name[],
+  'complete_review_followup(uuid, uuid, uuid, uuid, jsonb) is security definer');
+select is_definer(
+  'public',
+  'release_review_followup',
+  array['uuid', 'uuid', 'uuid', 'uuid']::name[],
+  'release_review_followup(uuid, uuid, uuid, uuid) is security definer');
 select is_definer(
   'public',
   'fulfill_credit_pack',
@@ -206,6 +254,30 @@ select ok(
       and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
   ),
   'finalize_initial_review() pins search_path');
+select ok(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'claim_review_followup'
+      and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+  ),
+  'claim_review_followup() pins search_path');
+select ok(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'complete_review_followup'
+      and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+  ),
+  'complete_review_followup() pins search_path');
+select ok(
+  exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'release_review_followup'
+      and exists (select 1 from unnest(p.proconfig) c where c like 'search_path=%')
+  ),
+  'release_review_followup() pins search_path');
 select ok(
   exists (
     select 1 from pg_proc p
@@ -305,6 +377,54 @@ select ok(
     'public.finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text)',
     'EXECUTE'),
   'authenticated cannot execute finalize_initial_review(uuid, uuid, uuid, uuid, text, jsonb, jsonb, text)');
+select ok(
+  coalesce(
+    not has_function_privilege(
+      'anon',
+      to_regprocedure('public.claim_review_followup(uuid, uuid, uuid)'),
+      'EXECUTE')
+    and not has_function_privilege(
+      'authenticated',
+      to_regprocedure('public.claim_review_followup(uuid, uuid, uuid)'),
+      'EXECUTE')
+    and has_function_privilege(
+      'service_role',
+      to_regprocedure('public.claim_review_followup(uuid, uuid, uuid)'),
+      'EXECUTE'),
+    false),
+  'claim_review_followup(uuid, uuid, uuid) is service_role only');
+select ok(
+  coalesce(
+    not has_function_privilege(
+      'anon',
+      to_regprocedure('public.complete_review_followup(uuid, uuid, uuid, uuid, jsonb)'),
+      'EXECUTE')
+    and not has_function_privilege(
+      'authenticated',
+      to_regprocedure('public.complete_review_followup(uuid, uuid, uuid, uuid, jsonb)'),
+      'EXECUTE')
+    and has_function_privilege(
+      'service_role',
+      to_regprocedure('public.complete_review_followup(uuid, uuid, uuid, uuid, jsonb)'),
+      'EXECUTE'),
+    false),
+  'complete_review_followup(uuid, uuid, uuid, uuid, jsonb) is service_role only');
+select ok(
+  coalesce(
+    not has_function_privilege(
+      'anon',
+      to_regprocedure('public.release_review_followup(uuid, uuid, uuid, uuid)'),
+      'EXECUTE')
+    and not has_function_privilege(
+      'authenticated',
+      to_regprocedure('public.release_review_followup(uuid, uuid, uuid, uuid)'),
+      'EXECUTE')
+    and has_function_privilege(
+      'service_role',
+      to_regprocedure('public.release_review_followup(uuid, uuid, uuid, uuid)'),
+      'EXECUTE'),
+    false),
+  'release_review_followup(uuid, uuid, uuid, uuid) is service_role only');
 select ok(
   not has_function_privilege(
     'anon',
