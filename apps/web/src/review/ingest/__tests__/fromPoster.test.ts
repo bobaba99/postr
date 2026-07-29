@@ -56,10 +56,10 @@ describe('reviewPixelDims', () => {
   });
 
   it('never undershoots the 1024px short-edge audit floor for extreme aspects', () => {
-    const dims = reviewPixelDims({ widthIn: 60, heightIn: 20 });
-    expect(dims.widthPx).toBeGreaterThanOrEqual(1024);
-    expect(dims.heightPx).toBeGreaterThanOrEqual(1024);
-    expect(Math.min(dims.widthPx, dims.heightPx)).toBeGreaterThanOrEqual(1024);
+    expect(reviewPixelDims({ widthIn: 60, heightIn: 20 })).toEqual({
+      widthPx: 3072,
+      heightPx: 1024,
+    });
   });
 });
 

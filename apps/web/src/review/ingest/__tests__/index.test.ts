@@ -63,3 +63,15 @@ describe('ingestPosterForReview', () => {
     );
   });
 });
+
+describe('resolveIngestContext failures', () => {
+  it('throws unreadable-file when ensureSession returns null', async () => {
+    mockEnsureSession.mockResolvedValue(null);
+    const pdf = new File(['x'], 'deck.pdf', { type: 'application/pdf' });
+    await expect(ingestFileForReview(pdf)).rejects.toMatchObject({
+      name: 'IngestError',
+      kind: 'unreadable-file',
+    });
+    expect(mockNormalize).not.toHaveBeenCalled();
+  });
+});
