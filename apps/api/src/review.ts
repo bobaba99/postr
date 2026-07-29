@@ -17,6 +17,7 @@ import { randomUUID } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import express, {
+  type NextFunction,
   type Request,
   type RequestHandler,
   type Response,
@@ -127,10 +128,20 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
       maxPerDay: Number.MAX_SAFE_INTEGER,
     });
 
+  const critiqueBurstLimiter = createRateLimiter({ maxPerWindow: 10, maxPerDay: 20 });
+
   router.post(
     '/api/review/critique',
     requireAuth(getSupabase),
-    createRateLimiter({ maxPerWindow: 4, maxPerDay: 20 }),
+    // Included follow-ups (body.reviewId) skip burst — one per review,
+    // state-machine bounded; add-on users may run quota initials back-to-back.
+    (req: Request, res: Response, next: NextFunction) => {
+      if (typeof req.body?.reviewId === 'string' && req.body.reviewId.length > 0) {
+        next();
+        return;
+      }
+      critiqueBurstLimiter(req, res, next);
+    },
     async (req: Request, res: Response) => {
       const parsed = CritiqueRequest.safeParse(req.body);
       if (!parsed.success) {
