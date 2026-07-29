@@ -82,7 +82,7 @@ function buildGateIdentity(input: {
   manifestText: string;
   manifestItems: Array<{ id: string; pages: string[] }>;
   systemPrompt: string;
-}): { fingerprint: string; pageBytes: Map<string, Buffer> } {
+}): { fingerprint: string; pageDigests: Map<string, string> } {
   const hash = createHash('sha256');
   const repositoryRoot = resolve(input.root, '../../../..');
   const pipelineSources = [
@@ -126,16 +126,19 @@ function buildGateIdentity(input: {
     );
   }
 
-  const pageBytes = new Map<string, Buffer>();
+  const pageDigests = new Map<string, string>();
   for (const item of input.manifestItems) {
     for (const page of item.pages) {
       const pagePath = join(input.corpusDir, page);
       const bytes = readFileSync(pagePath);
-      pageBytes.set(pagePath, bytes);
+      pageDigests.set(
+        pagePath,
+        createHash('sha256').update(bytes).digest('hex'),
+      );
       addFingerprintPart(hash, `page:${item.id}:${page}`, bytes);
     }
   }
-  return { fingerprint: hash.digest('hex'), pageBytes };
+  return { fingerprint: hash.digest('hex'), pageDigests };
 }
 
 export interface GateRunOptions {
@@ -173,7 +176,7 @@ export async function runProductionGate(
 
   const anthropic = new Anthropic({ apiKey });
   const systemPrompt = composeReviewSystemPrompt();
-  const { fingerprint, pageBytes } = buildGateIdentity({
+  const { fingerprint, pageDigests } = buildGateIdentity({
     root,
     corpusDir,
     manifestText,
@@ -201,10 +204,18 @@ export async function runProductionGate(
   });
 
   for (const item of items) {
-    const pages: FetchedPage[] = item.pages.map((p) => ({
-      mediaType: mediaType(p),
-      imageData: pageBytes.get(join(corpusDir, p))!.toString('base64'),
-    }));
+    const pages: FetchedPage[] = item.pages.map((p) => {
+      const pagePath = join(corpusDir, p);
+      const bytes = readFileSync(pagePath);
+      const digest = createHash('sha256').update(bytes).digest('hex');
+      if (digest !== pageDigests.get(pagePath)) {
+        throw new Error(`corpus page changed after preflight: ${p}`);
+      }
+      return {
+        mediaType: mediaType(p),
+        imageData: bytes.toString('base64'),
+      };
+    });
 
     const userMessage = buildInitialUserMessage({
       pageCount: item.pages.length,
