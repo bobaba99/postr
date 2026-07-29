@@ -12,7 +12,13 @@
  * enforce → credit consume AFTER success (D6) → single poster_reviews
  * write (success-only, D16).
  *
- * The follow-up flow (body.reviewId set) lands in Task 16.
+ * POST /api/review/critique — FOLLOW-UP flow (body.reviewId set):
+ * a diff critique against the stored initial findings, then the review
+ * closes (stage 'closed' is terminal, enforced HERE, not just hidden
+ * in UI). Included in the initial credit: no entitlement check, no
+ * second consume, no second weekly slot (§5.2/§5.3, D6). Ownership is
+ * checked MANUALLY — the service_role client bypasses the table's
+ * owner-SELECT RLS (D3).
  *
  * Stack mirrors the import/narrative routers: requireAuth (anonymous
  * sessions accepted) → rate limit → zod → provider call → generic
@@ -44,7 +50,11 @@ import {
 } from './review/config.js';
 import { CURRENT_RUBRIC_VERSION } from './review/rubric/index.js';
 import { computeReviewSignals } from './review/signals.js';
-import { buildInitialUserMessage, composeReviewSystemPrompt } from './review/prompt.js';
+import {
+  buildFollowupUserMessage,
+  buildInitialUserMessage,
+  composeReviewSystemPrompt,
+} from './review/prompt.js';
 import { fetchReviewPages, PageFetchError, type FetchedPage } from './review/fetchPages.js';
 import {
   callAnthropicCritique,
@@ -164,14 +174,9 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
       }
       const user = (res.locals as AuthLocals).user;
 
-      // The follow-up branch (Task 16) lives behind body.reviewId;
-      // until it lands, a reviewId on this route is a client error.
-      if (body.reviewId) {
-        return res
-          .status(400)
-          .json({ error: 'bad_request', message: 'followup_not_implemented' });
-      }
-      return runInitial({ req, res, supabase, anthropic, fetchFn, now, weeklyLimiter, user, body });
+      return body.reviewId
+        ? runFollowup({ res, supabase, anthropic, fetchFn, now, user, body })
+        : runInitial({ req, res, supabase, anthropic, fetchFn, now, weeklyLimiter, user, body });
     },
   );
 
@@ -342,6 +347,144 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
     stage: 'initial',
     critique: enforced,
   });
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Follow-up critique (§5.2)
+// ─────────────────────────────────────────────────────────────────────
+
+interface ReviewRow {
+  id: string;
+  user_id: string;
+  status: 'pending' | 'complete' | 'failed';
+  stage: 'initial' | 'followup' | 'closed';
+  initial_findings: CritiqueResult | null;
+}
+
+interface FollowupCtx {
+  res: Response;
+  supabase: SupabaseClient;
+  anthropic: Anthropic;
+  fetchFn: typeof fetch;
+  now: () => number;
+  user: User;
+  body: CritiqueBody;
+}
+
+/**
+ * One follow-up per review: judge the revised artifact AGAINST the
+ * stored initial findings ("did they address these? what's still
+ * open?"), then close the review. Included in the initial credit —
+ * no entitlement check, no consume, no weekly slot (D6).
+ */
+async function runFollowup(ctx: FollowupCtx): Promise<Response> {
+  const { res, supabase, anthropic, fetchFn, now, user, body } = ctx;
+  const reviewId = body.reviewId!;
+
+  // The API reads/writes poster_reviews through the service_role
+  // client, which BYPASSES the table's owner-SELECT RLS (D3).
+  // Ownership is therefore enforced HERE, manually — without this
+  // check any authenticated user could drive another user's review
+  // by id.
+  const { data: reviewRaw, error: loadErr } = await supabase
+    .from('poster_reviews')
+    .select('id, user_id, status, stage, initial_findings')
+    .eq('id', reviewId)
+    .maybeSingle();
+  if (loadErr) {
+    // eslint-disable-next-line no-console
+    console.error('[review.critique] review load failed', {
+      reviewId,
+      message: loadErr.message,
+    });
+    return res.status(500).json({ error: 'review_internal' });
+  }
+  const review = reviewRaw as unknown as ReviewRow | null;
+  if (!review) {
+    return res.status(404).json({ error: 'review_not_found' });
+  }
+  if (review.user_id !== user.id) {
+    return res.status(403).json({ error: 'not_review_owner' });
+  }
+  // `closed` is terminal (§5.2): a further critique needs a new credit.
+  if (review.stage !== 'initial') {
+    return res.status(409).json({ error: 'review_closed' });
+  }
+  if (review.status !== 'complete' || !review.initial_findings) {
+    return res.status(409).json({ error: 'review_not_complete' });
+  }
+
+  // Fetch the REVISED pages (SSRF-guarded inside fetchReviewPages).
+  let fetched: FetchedPage[];
+  try {
+    fetched = await fetchReviewPages(body.pages, {
+      supabaseUrl: process.env.SUPABASE_URL,
+      fetchFn,
+      maxBytes: REVIEW_IMAGE_MAX_BYTES,
+    });
+  } catch (err) {
+    return replyPageFetchError(res, err);
+  }
+
+  const signals = body.posterDoc ? computeReviewSignals(body.posterDoc.blocks) : undefined;
+
+  let callResult: CritiqueCallResult;
+  try {
+    callResult = await callAnthropicCritique(anthropic, {
+      systemPrompt: composeReviewSystemPrompt(),
+      userMessage: buildFollowupUserMessage({
+        initialFindings: review.initial_findings,
+        pageCount: body.pages.length,
+        sourceKind: body.sourceKind,
+        signals,
+      }),
+      pages: fetched,
+    });
+  } catch (err) {
+    return replyCritiqueError(res, err, { userId: user.id, reviewId, stage: 'followup' });
+  }
+  const { critique, usage } = callResult;
+
+  const enforced: CritiqueResult = {
+    ...critique,
+    findings: enforceFindings(critique.findings, {
+      blockIds: body.posterDoc ? new Set(body.posterDoc.blocks.map((b) => b.id)) : undefined,
+      pageCount: body.pages.length,
+    }),
+  };
+
+  // §6.2.4 cost instrumentation — follow-ups are part of the true
+  // cost per review credit.
+  // eslint-disable-next-line no-console
+  console.log('[review.critique] critique done', {
+    userId: user.id,
+    reviewId,
+    stage: 'followup',
+    model: REVIEW_MODEL,
+    inputTokens: usage.inputTokens,
+    outputTokens: usage.outputTokens,
+    findings: enforced.findings.length,
+  });
+
+  // One write: follow-up findings + terminal close, a single UPDATE.
+  const { error: updateErr } = await supabase
+    .from('poster_reviews')
+    .update({
+      followup_findings: enforced,
+      stage: 'closed',
+      updated_at: new Date(now()).toISOString(),
+    })
+    .eq('id', reviewId);
+  if (updateErr) {
+    // eslint-disable-next-line no-console
+    console.error('[review.critique] follow-up update failed', {
+      reviewId,
+      message: updateErr.message,
+    });
+    return res.status(500).json({ error: 'review_internal' });
+  }
+
+  return res.status(200).json({ reviewId, stage: 'closed', critique: enforced });
 }
 
 // ─────────────────────────────────────────────────────────────────────
