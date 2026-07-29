@@ -20,6 +20,18 @@ export interface FetchedPage {
   imageData: string;
 }
 
+function parsePageMediaType(
+  contentType: string,
+): FetchedPage['mediaType'] | null {
+  if (contentType.includes('jpeg')) {
+    return 'image/jpeg';
+  }
+  if (contentType.includes('png')) {
+    return 'image/png';
+  }
+  return null;
+}
+
 /**
  * Typed failure the route maps to a status (url_not_allowed→400,
  * unsupported_media→400, too_large→413, fetch_failed→502). `pageNumber`
@@ -112,11 +124,7 @@ export async function fetchReviewPages(
     }
 
     const contentType = response.headers.get('content-type') ?? '';
-    const mediaType = contentType.includes('jpeg')
-      ? ('image/jpeg' as const)
-      : contentType.includes('png')
-        ? ('image/png' as const)
-        : null;
+    const mediaType = parsePageMediaType(contentType);
     if (!mediaType) {
       throw new PageFetchError(
         'unsupported_media',
