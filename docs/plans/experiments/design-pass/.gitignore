@@ -1,0 +1,3 @@
+# Generated design samples — keep the small theme/styled JSON as reference,
+# ignore the large rasterized image (regenerate from the script).
+out/*.png
