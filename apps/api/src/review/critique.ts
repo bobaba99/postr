@@ -1,4 +1,5 @@
 import type Anthropic from '@anthropic-ai/sdk';
+import { APIConnectionTimeoutError } from '@anthropic-ai/sdk';
 import type { CritiqueResult } from '@postr/shared';
 import { REVIEW_MAX_TOKENS, REVIEW_MODEL } from './config.js';
 import type { FetchedPage } from './fetchPages.js';
@@ -61,6 +62,7 @@ function buildMessageContent(
 function mapAnthropicError(error: unknown): never {
   const errorName = error instanceof Error ? error.name : '';
   if (
+    error instanceof APIConnectionTimeoutError ||
     errorName === 'TimeoutError' ||
     errorName === 'APIConnectionTimeoutError'
   ) {
@@ -103,7 +105,8 @@ function parseCritiqueResponse(
   response: Anthropic.Message,
 ): CritiqueCallResult {
   const toolUse = response.content.find(
-    (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
+    (block): block is Anthropic.ToolUseBlock =>
+      block.type === 'tool_use' && block.name === 'emit_critique',
   );
 
   console.log('[review.critique] anthropic done', {
