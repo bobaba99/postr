@@ -12640,7 +12640,13 @@ Expected: one row — `status=complete`, `stage=initial`, `credit_source=pack` �
 
 - [ ] **Step 5: Internal dogfood in the §6.2.2 order (MANUAL CHECKLIST — Gavin)**
 
-Internal enable order — Postr-native first (richest input), PPTX last (fiddliest ingest). All four are launch scope; this is the *internal* order. Each pass = the full loop: initial critique → eyeball the fix-cards → revise → included follow-up → review closes; and a `402` eyeballed once with an exhausted balance (paywall copy names the workflow, never "AI" — D15).
+Internal enable order — Postr-native first (richest input), PPTX last
+(fiddliest ingest). All four are implementation scope; the public checker may
+launch for Postr-native, PDF, and image inputs while PPTX is visibly “coming
+next” until its production toolchain passes the Task-28 smoke. Each pass = the
+full loop: initial critique → eyeball the fix-cards → revise → included
+follow-up → review closes; and a `402` eyeballed once with an exhausted balance
+(paywall copy names the workflow, never "AI" — D15).
 
 - [ ] **Postr-native poster** — from the editor's `review` sidebar tab on a real poster: block-anchored fix-cards jump to the right blocks (`onJumpToBlock`), the follow-up assesses progress against the initial findings, the third critique is refused.
 - [ ] **Image upload** — single-page poster PNG/photo through `/presentation-checker`: region anchors only, same loop.
@@ -12670,15 +12676,34 @@ git commit -m "docs(review): checker entries in feature-graph + manual test flow
 
 **Files:**
 - Create: `docs/plans/experiments/presentation-checker/analysis/run-production-gate.mts`
-- Create (generated): `docs/plans/experiments/presentation-checker/results-production/<id>.json` (× 20) + `docs/plans/experiments/presentation-checker/results-production/costs.jsonl`
+- Create: `docs/plans/experiments/presentation-checker/analysis/production-gate-support.mts`
+- Create: `docs/plans/experiments/presentation-checker/analysis/production-gate-support.test.mts`
+- Create: `docs/plans/experiments/presentation-checker/analysis/run-production-gate.test.mts`
+- Create (generated): `docs/plans/experiments/presentation-checker/results-production/<id>.json` (× 20) + `docs/plans/experiments/presentation-checker/results-production/costs.jsonl` + `docs/plans/experiments/presentation-checker/results-production/run-metadata.json`
 - Create (generated): `docs/plans/experiments/presentation-checker/analysis/gate-report.md`
-- Modify (launch checklist only, and only on GO): `apps/web/src/seo/routes.json`, `apps/web/src/components/PublicHeader.tsx`, `apps/web/src/pages/Pricing.tsx`, `apps/api/src/review/config.ts`, the spec's living-document sections
+- Create (manual, after the live run): `docs/plans/experiments/presentation-checker/analysis/gate-decision-production.md`
+- Create (launch checklist only, and only on GO): `docs/plans/experiments/presentation-checker/analysis/launch-checklist.md`
+- Modify (launch checklist only, and only on GO): `apps/web/src/seo/routes.json`, `apps/web/vercel.json`, `apps/web/src/components/PublicHeader.tsx`, `apps/web/src/pages/Pricing.tsx`, `apps/web/src/pages/BillingResult.tsx`, `apps/web/src/pages/PresentationChecker.tsx` + its test if PPTX remains unavailable, `apps/api/src/review/config.ts`, the spec's living-document sections
 
 **Interfaces:**
-- Consumes: `composeReviewSystemPrompt(rubric?)` + `buildInitialUserMessage({ pageCount, sourceKind, signals?, posterDocPresent })` from `apps/api/src/review/prompt.ts` (Task 11); `callAnthropicCritique(anthropic, { systemPrompt, userMessage, pages })` → `{ critique, usage }` from `apps/api/src/review/critique.ts` (Task 13); `enforceFindings(findings, { blockIds?, pageCount, maxFindings? })` from `apps/api/src/review/enforce.ts` (Task 14); `computeReviewSignals(blocks)` from `apps/api/src/review/signals.ts` (Task 10); `FetchedPage { mediaType, imageData }` from `apps/api/src/review/fetchPages.ts` (Task 12); the frozen corpus `corpus/manifest.json` (Task 3); the analyzer's `--results` / `--out` flags (Task 6 — added for exactly this reuse); the §7.5 ship-criterion numbers Gavin set in `gate-decision.md` (Task 7); `ANTHROPIC_API_KEY` (Preflight P3).
+- Consumes: `composeReviewSystemPrompt(rubric?)` + `buildInitialUserMessage({ pageCount, sourceKind, signals?, posterDocPresent })` from `apps/api/src/review/prompt.ts` (Task 11); `callAnthropicCritique(anthropic, { systemPrompt, userMessage, pages })` → `{ critique, usage }` from `apps/api/src/review/critique.ts` (Task 13); `enforceFindings(findings, { blockIds?, pageCount, maxFindings? })` from `apps/api/src/review/enforce.ts` (Task 14); `computeReviewSignals(blocks)` from `apps/api/src/review/signals.ts` (Task 10); `FetchedPage { mediaType, imageData }` from `apps/api/src/review/fetchPages.ts` (Task 12); the frozen corpus `corpus/manifest.json` (Task 3); the analyzer's `--results` / `--out` flags (Task 6 — added for exactly this reuse); the §7.5 ship-criterion numbers Gavin must set in `gate-decision.md` (Task 7) before the full run; `ANTHROPIC_API_KEY` (Preflight P3).
 - Produces: `results-production/` (same `{ posterId, critique, usage }` shape `analysis/analyze.mts` already reads), `analysis/gate-report.md` (the three §7.4 lenses on the PRODUCTION pipeline), the GO/NO-GO record, and the launch checklist.
 
-- [ ] **Step 1: Write the gate script**
+- [ ] **Step 1: Write and harden the gate runner**
+
+The checked-in runner and support module are authoritative over the compact
+scaffold below. Before any live request or output mutation they must validate:
+the exact CLI grammar; a valid `frozenAt`; exactly 20 unique, path-safe item
+IDs; 1–24 existing, corpus-contained images per item within the production
+5 MiB/page limit; and a non-empty, known selection. It must reject symlinked
+output directories. Before merging a partial rerun, it validates a persisted
+SHA-256 fingerprint over the frozen manifest and page bytes plus the model,
+rubric, prompt/schema, limits, and production pipeline sources. A full run
+removes only prior gate JSON/cost artifacts. A partial rerun removes only the
+selected result/cost rows, and malformed cost logs fail without mutating prior
+output. The support and subprocess tests pin those guarantees, including the
+no-key preflight and an injected unfrozen-corpus failure that cannot touch the
+real result directory.
 
 `docs/plans/experiments/presentation-checker/analysis/run-production-gate.mts`:
 
@@ -12815,11 +12840,19 @@ Expected: the `[gate] zero-signals baseline:` line, then one line per item (`<id
 
 - [ ] **Step 3: Full run over the frozen 20 + the Task-6 analyzer**
 
+**Manual prerequisite — Gavin, before spending on the full run:** replace
+`<X>` and `<Y>` in `gate-decision.md` with the seeded-recall and
+all-dimensions weighted-kappa thresholds. They are still placeholders in the
+checked-in file. Freeze those values before Step 3 so the pass criterion
+cannot move after the results are known.
+
 ```bash
 ANTHROPIC_API_KEY=... npx tsx docs/plans/experiments/presentation-checker/analysis/run-production-gate.mts
 ```
 
-Expected: 20 `results-production/<id>.json` files + 20 fresh `costs.jsonl` lines, `[gate] wrote 20 production result(s)`.
+Expected: 20 `results-production/<id>.json` files + 20 fresh `costs.jsonl`
+lines + `run-metadata.json` carrying the run fingerprint, then
+`[gate] wrote 20 production result(s)`.
 
 ```bash
 cd docs/plans/experiments/presentation-checker
@@ -12830,7 +12863,13 @@ Expected: `wrote analysis/gate-report.md` — the same three §7.4 lenses (score
 
 - [ ] **Step 4: GO/NO-GO against the Task-7 criterion, then the launch checklist (MANUAL CHECKPOINT — Gavin)**
 
-Fill the decision block below from `analysis/gate-report.md` and the §7.5 numbers Gavin set in `gate-decision.md` (Task 7), and copy it into the launch doc. On **NO-GO**: back to the prompt/rubric loop (Task 6 Step 3) and re-run this gate on the same frozen 20 — do not touch the launch checklist. On **GO**: execute the launch checklist in order.
+Fill the decision block below from `analysis/gate-report.md` and the frozen
+§7.5 numbers in `gate-decision.md` (Task 7), and save it first as
+`analysis/gate-decision-production.md`. On **NO-GO**: retain that decision
+record, return to the prompt/rubric loop (Task 6 Step 3), and re-run this gate
+on the same frozen 20 — do not create or touch the launch checklist. On
+**GO**: copy the signed result into `analysis/launch-checklist.md` and execute
+that checklist in order.
 
 ````markdown
 # Presentation Checker — pre-ship gate + launch checklist
@@ -12852,37 +12891,68 @@ Date: <…> · Rubric: <version stamped in results> · Corpus: frozen 20 (`froze
 
 ## Launch checklist (GO only, in order)
 
-- [ ] **Index the page (D12 flip).** In `apps/web/src/seo/routes.json` move `/presentation-checker` out of `app` (noindex) into `static` with this record (workflow-named, never "AI" — D15; slug rationale §8):
+- [ ] **Record the launch run.** Copy this gate-result table and checklist to
+  `analysis/launch-checklist.md`; fill its date, rubric version, frozen-corpus
+  timestamp, gate numbers, and explicit GO signature. This file is the launch
+  date of record.
+- [ ] **Stripe LIVE prices.** Create the `review_pack` (payment mode) and `review_addon` (subscription mode) prices in the LIVE Stripe account; set `STRIPE_PRICE_REVIEW_PACK` / `STRIPE_PRICE_REVIEW_ADDON` in Render. Review-SKU refunds stay manual via the Stripe dashboard (D8 — deferred, no code).
+- [ ] **Price from real numbers.** Set `REVIEW_PACK_CREDITS` (the pack-grant const from the Milestone-3 billing task, beside the `PACK_EXPORT_CREDITS` precedent) and `REVIEW_ADDON_WEEKLY_QUOTA` (`apps/api/src/review/config.ts`) from the day-one `[review.critique]` cost lines (Task 27 Step 4 + dogfood) and the p50/p95 of `results-production/costs.jsonl` — not the placeholders (`3` / `4`).
+- [ ] **Checkout landing covers review SKUs.** In `apps/web/src/pages/BillingResult.tsx` extend the `granted` check with `|| plan.canReview` (and its copy) so a review-pack buyer sees the confirmation instead of the "will appear shortly" fallback.
+- [ ] **Choose truthful PPTX availability (non-blocking for the other three inputs).** Run the Docker-based Render service with `libreoffice-impress` + `poppler-utils` and smoke one PPTX review before claiming PPTX support. If that smoke has not passed, remove `.pptx` from the file input and launch copy in `PresentationChecker.tsx`, add visible “PPTX coming next” copy, and pin it in the page test. Continue the PDF/image/Postr-native launch; track the Docker deployment + PPTX smoke as a separate rollout item. If the smoke passes, keep the current PPTX input. PPTX ships last (§6.2.2).
+- [ ] **Living spec.** If the rubric changed since Task 1 and the living-spec
+  file is present, update its rubric-version and §7.5 criterion record with
+  the final version and gate numbers. If the file is absent, record that fact
+  in `analysis/launch-checklist.md`; do not invent a replacement path.
+- [ ] **Production smoke while still noindex.** Run one Postr-native critique
+  end-to-end in production and verify the `[review.critique]` cost line,
+  `source_meta`, stored result, and included follow-up. The registered route
+  is directly reachable for this smoke even though it is unlinked and
+  noindex. Do not expose it publicly until this passes.
+- [ ] **Index the page (D12 flip).** In `apps/web/src/seo/routes.json` move `/presentation-checker` out of `app` (noindex) into `static` with this record (workflow-named, never "AI" — D15; measured slug rationale in `docs/plans/2026-07-26-seo-plan.md` §4.0.2):
 
   ```json
   "/presentation-checker": {
-    "title": "Presentation Checker — Poster & Talk Review | Postr",
-    "description": "Get feedback on your research poster or talk before the conference: narrative, design and content scores, plus anchored fix-cards that show exactly what to cut, demote or show visually.",
+    "title": "Presentation Checker for Posters & Talks | Postr",
+    "description": "Get feedback on your research poster or talk before the conference: narrative, design and content scores, plus anchored fix cards that show exactly what to cut, demote or show visually.",
     "robots": "index,follow",
-    "h1": "Feedback on your poster or talk, before you're in front of it.",
+    "h1": "Check your presentation before the room does.",
     "copy": [
-      "Upload a poster, a PDF or a deck — or check the poster you're already editing — and get a reviewer-style read: what a first-time viewer's eye lands on, whether your key result survives the scan path, and what to do about it.",
+      "Upload a poster, an exported talk PDF or an image — or check the poster you're already editing — and get a reviewer-style read: what a first-time viewer's eye lands on, whether your key result survives the scan path, and what to do about it.",
       "Every finding is anchored to a block, slide or region of your artifact and comes with a personalized fix: the line to rewrite, the table to demote to an appendix, the plot to make primary.",
       "One follow-up is included with every review: revise, re-check, and see your scores move. Review packs never expire; the add-on gives you a weekly quota on top of your term."
     ]
   }
   ```
 
+- [ ] **Remove the HTTP noindex.** Delete the
+  `/presentation-checker` `X-Robots-Tag: noindex, nofollow` header block from
+  `apps/web/vercel.json`. The static record's `index,follow` meta cannot
+  override a noindex response header.
 - [ ] **Prerender + sitemap via the normal build.** `npm run build` — the apps/web build already runs `scripts/prerender.mjs` (prerenders every `static` route) and `scripts/gen-sitemap.mjs` (regenerates the sitemap); verify `/presentation-checker` appears in both outputs.
 - [ ] **Link it.** Add the nav entry in `apps/web/src/components/PublicHeader.tsx` and the review pack + add-on tiers/links on `apps/web/src/pages/Pricing.tsx`.
-- [ ] **Checkout landing covers review SKUs.** In `apps/web/src/pages/BillingResult.tsx` extend the `granted` check with `|| plan.canReview` (and its copy) so a review-pack buyer sees the confirmation instead of the "will appear shortly" fallback.
-- [ ] **Stripe LIVE prices.** Create the `review_pack` (payment mode) and `review_addon` (subscription mode) prices in the LIVE Stripe account; set `STRIPE_PRICE_REVIEW_PACK` / `STRIPE_PRICE_REVIEW_ADDON` in Render. Review-SKU refunds stay manual via the Stripe dashboard (D8 — deferred, no code).
-- [ ] **Price from real numbers.** Set `REVIEW_PACK_CREDITS` (the pack-grant const from the Milestone-3 billing task, beside the `PACK_EXPORT_CREDITS` precedent) and `REVIEW_ADDON_WEEKLY_QUOTA` (`apps/api/src/review/config.ts`) from the day-one `[review.critique]` cost lines (Task 27 Step 4 + dogfood) and the p50/p95 of `results-production/costs.jsonl` — not the placeholders (`3` / `4`).
-- [ ] **PPTX infrastructure (D10).** Switch the API to the Docker-based Render service with `libreoffice-impress` + `poppler-utils` (soffice + pdftoppm for `/api/review/render-pptx`) and smoke one PPTX review in prod BEFORE enabling the PPTX input in the UI. PPTX ships last (§6.2.2) — it must never block the other three inputs.
-- [ ] **Living spec.** If the rubric changed since Task 1, update the spec's living-document sections (`docs/plans/2026-07-29-presentation-checker-review.md`: §2.0 rubric-version note, §7.5 criterion record) with the final rubric version and the gate numbers above.
-- [ ] **Prod smoke, then announce.** One Postr-native critique end-to-end in production (cost line + `source_meta` per Task 27 Step 4), then the launch note.
+- [ ] **Deploy and verify indexability before announcing.** Against the
+  production URL, verify: status 200; no `X-Robots-Tag: noindex`; HTML
+  contains the canonical title, description, H1, and self-canonical;
+  `/presentation-checker` is present in the sitemap; the nav/Pricing links
+  resolve; and the page still completes a non-PPTX review. Record the commands
+  and results in `analysis/launch-checklist.md`, then publish the launch note.
 ````
 
-- [ ] **Step 5: Commit the gate artifacts**
+- [ ] **Step 5: Commit the tested runner, then the live artifacts separately**
 
 ```bash
 git add docs/plans/experiments/presentation-checker/analysis/run-production-gate.mts \
-        docs/plans/experiments/presentation-checker/analysis/gate-report.md \
+        docs/plans/experiments/presentation-checker/analysis/production-gate-support.mts \
+        docs/plans/experiments/presentation-checker/analysis/production-gate-support.test.mts \
+        docs/plans/experiments/presentation-checker/analysis/run-production-gate.test.mts
+git commit -m "test(review): harden the production pre-ship gate runner"
+```
+
+After the frozen-corpus run and signed decision exist:
+
+```bash
+git add docs/plans/experiments/presentation-checker/analysis/gate-report.md \
+        docs/plans/experiments/presentation-checker/analysis/gate-decision-production.md \
         docs/plans/experiments/presentation-checker/results-production
 git commit -m "test(review): pre-ship gate — frozen 20 through the production pipeline + gate report (§7.1)"
 ```
@@ -12894,7 +12964,11 @@ Launch-checklist edits (GO only) land as their own commit when executed:
 # there (the PACK_EXPORT_CREDITS precedent) — git add of an unchanged
 # tracked file is a no-op, so stage both candidates.
 git add apps/web/src/seo/routes.json apps/web/src/components/PublicHeader.tsx \
-        apps/web/src/pages/Pricing.tsx apps/api/src/review/config.ts \
-        apps/api/src/billing.ts
+        apps/web/src/pages/Pricing.tsx apps/web/src/pages/BillingResult.tsx \
+        apps/web/src/pages/PresentationChecker.tsx \
+        apps/web/src/pages/PresentationChecker.test.tsx \
+        apps/web/vercel.json apps/api/src/review/config.ts \
+        apps/api/src/billing.ts \
+        docs/plans/experiments/presentation-checker/analysis/launch-checklist.md
 git commit -m "feat(review): launch the checker — index /presentation-checker, nav + pricing links, final pack/quota numbers"
 ```
