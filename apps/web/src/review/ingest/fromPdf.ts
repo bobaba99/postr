@@ -1,5 +1,8 @@
 import * as pdfjs from 'pdfjs-dist';
-import type { PDFDocumentProxy } from 'pdfjs-dist/types/src/display/api';
+import type {
+  PDFDocumentProxy,
+  PDFPageProxy,
+} from 'pdfjs-dist/types/src/display/api';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — Vite provides the `?url` import shape at build time.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?url';
@@ -75,6 +78,70 @@ function ensureAuditDimensions(sourceCanvas: HTMLCanvasElement): HTMLCanvasEleme
   return outputCanvas;
 }
 
+async function normalizePdfPage(
+  page: PDFPageProxy,
+  pageNumber: number,
+  ingestContext: IngestContext,
+): Promise<PageImage> {
+  const baseViewport = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({
+    scale: calculateRenderScale(baseViewport.width, baseViewport.height),
+  });
+  const sourceCanvas = document.createElement('canvas');
+  sourceCanvas.width = Math.ceil(viewport.width);
+  sourceCanvas.height = Math.ceil(viewport.height);
+  let cappedCanvas = sourceCanvas;
+  let reviewCanvas = sourceCanvas;
+
+  try {
+    const sourceContext = sourceCanvas.getContext('2d');
+    if (!sourceContext) {
+      throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+    }
+    await page.render({ canvasContext: sourceContext, viewport }).promise;
+    cappedCanvas = downscaleForVision(sourceCanvas);
+    reviewCanvas = cappedCanvas;
+
+    const reviewContext = cappedCanvas.getContext('2d');
+    if (!reviewContext) {
+      throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+    }
+    const imageData = reviewContext.getImageData(
+      0,
+      0,
+      cappedCanvas.width,
+      cappedCanvas.height,
+    );
+    if (isCanvasBlank(imageData)) {
+      throw new IngestError(
+        `Page ${pageNumber} of that PDF looks blank — the checker needs something to read. Check the file and try again.`,
+        'blank-render',
+      );
+    }
+
+    reviewCanvas = ensureAuditDimensions(cappedCanvas);
+    const blob = await canvasToBlob(reviewCanvas, 'image/jpeg', JPEG_QUALITY);
+    if (!blob) {
+      throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+    }
+    return uploadReviewPage(
+      ingestContext.userId,
+      ingestContext.sessionId,
+      pageNumber,
+      blob,
+      { widthPx: reviewCanvas.width, heightPx: reviewCanvas.height },
+    );
+  } finally {
+    releaseCanvas(sourceCanvas);
+    if (cappedCanvas !== sourceCanvas) {
+      releaseCanvas(cappedCanvas);
+    }
+    if (reviewCanvas !== sourceCanvas && reviewCanvas !== cappedCanvas) {
+      releaseCanvas(reviewCanvas);
+    }
+  }
+}
+
 export async function fromPdf(
   file: File,
   ingestContext: IngestContext,
@@ -95,71 +162,7 @@ export async function fromPdf(
 
     for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
       const page = await pdfDocument.getPage(pageNumber);
-      const baseViewport = page.getViewport({ scale: 1 });
-      const viewport = page.getViewport({
-        scale: calculateRenderScale(baseViewport.width, baseViewport.height),
-      });
-      const sourceCanvas = document.createElement('canvas');
-      sourceCanvas.width = Math.ceil(viewport.width);
-      sourceCanvas.height = Math.ceil(viewport.height);
-      let cappedCanvas = sourceCanvas;
-      let reviewCanvas = sourceCanvas;
-
-      try {
-        const sourceContext = sourceCanvas.getContext('2d');
-        if (!sourceContext) {
-          throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
-        }
-        await page.render({ canvasContext: sourceContext, viewport }).promise;
-        cappedCanvas = downscaleForVision(sourceCanvas);
-        reviewCanvas = cappedCanvas;
-
-        const reviewContext = cappedCanvas.getContext('2d');
-        if (!reviewContext) {
-          throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
-        }
-
-        const imageData = reviewContext.getImageData(
-          0,
-          0,
-          cappedCanvas.width,
-          cappedCanvas.height,
-        );
-        if (isCanvasBlank(imageData)) {
-          throw new IngestError(
-            `Page ${pageNumber} of that PDF looks blank — the checker needs something to read. Check the file and try again.`,
-            'blank-render',
-          );
-        }
-
-        reviewCanvas = ensureAuditDimensions(cappedCanvas);
-        const dimensions = {
-          widthPx: reviewCanvas.width,
-          heightPx: reviewCanvas.height,
-        };
-        const blob = await canvasToBlob(reviewCanvas, 'image/jpeg', JPEG_QUALITY);
-        if (!blob) {
-          throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
-        }
-
-        pages.push(
-          await uploadReviewPage(
-            ingestContext.userId,
-            ingestContext.sessionId,
-            pageNumber,
-            blob,
-            dimensions,
-          ),
-        );
-      } finally {
-        releaseCanvas(sourceCanvas);
-        if (cappedCanvas !== sourceCanvas) {
-          releaseCanvas(cappedCanvas);
-        }
-        if (reviewCanvas !== sourceCanvas && reviewCanvas !== cappedCanvas) {
-          releaseCanvas(reviewCanvas);
-        }
-      }
+      pages.push(await normalizePdfPage(page, pageNumber, ingestContext));
     }
 
     return {
