@@ -32,6 +32,8 @@ const DAY = 24 * 60 * 60 * 1000;
 function fakeSupabase(opts: {
   currentCredits?: number;
   currentExpiry?: string | null;
+  currentReviewAddon?: boolean;
+  currentReviewAddonSubscriptionId?: string | null;
   fulfillResult?: number | null;
   /** The user id the reconciliation lookup should resolve to (by sub/customer). */
   lookupUserId?: string | null;
@@ -71,6 +73,7 @@ function fakeSupabase(opts: {
         },
         select(cols?: string) {
           const selectingId = cols === 'id';
+          const selectingReviewAddon = cols?.includes('review_addon');
           return {
             eq: () => ({
               single: () =>
@@ -85,6 +88,12 @@ function fakeSupabase(opts: {
                       opts.lookupUserId
                       ? { id: opts.lookupUserId }
                       : null
+                    : selectingReviewAddon
+                      ? {
+                          review_addon: opts.currentReviewAddon ?? false,
+                          review_addon_subscription_id:
+                            opts.currentReviewAddonSubscriptionId ?? null,
+                        }
                     : { plan_expires_at: opts.currentExpiry ?? null },
                   error: null,
                 }),
@@ -108,6 +117,65 @@ function fakeSupabase(opts: {
   } as unknown as SupabaseClient;
 
   return { client, updates, inserts, rpcs };
+}
+
+function statefulAddOnSupabase(initial: {
+  review_addon: boolean;
+  review_addon_subscription_id: string | null;
+}) {
+  const state = {
+    id: 'user-1',
+    stripe_customer_id: 'cus_1',
+    ...initial,
+  };
+
+  function matches(filters: Record<string, unknown>): boolean {
+    return Object.entries(filters).every(
+      ([column, value]) =>
+        state[column as keyof typeof state] === value,
+    );
+  }
+
+  const client = {
+    from(table: string) {
+      if (table !== 'users') throw new Error(`unexpected table ${table}`);
+      return {
+        select(columns: string) {
+          return {
+            eq(column: string, value: unknown) {
+              return {
+                maybeSingle: async () => {
+                  if (!matches({ [column]: value })) {
+                    return { data: null, error: null };
+                  }
+                  const selected = Object.fromEntries(
+                    columns.split(',').map((name) => {
+                      const key = name.trim() as keyof typeof state;
+                      return [key, state[key]];
+                    }),
+                  );
+                  return { data: selected, error: null };
+                },
+              };
+            },
+          };
+        },
+        update(payload: Record<string, unknown>) {
+          const apply = (filters: Record<string, unknown>) => {
+            if (matches(filters)) Object.assign(state, payload);
+            return Promise.resolve({ data: null, error: null });
+          };
+          return {
+            eq: (column: string, value: unknown) =>
+              apply({ [column]: value }),
+            match: apply,
+          };
+        },
+      };
+    },
+  } as unknown as SupabaseClient;
+
+  return { client, state };
 }
 
 /** Build a fake Stripe.Subscription with an item-level period end. */
@@ -487,7 +555,11 @@ describe('fulfillCheckout — review_addon (subscription)', () => {
     await fulfillCheckout(
       fake.client,
       fakeStripe({ id: 'sub_addon_1', status: 'active', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
-      session({ metadata: { user_id: 'user-1', sku: 'review_addon' }, subscription: 'sub_addon_1' }),
+      session({
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+        subscription: 'sub_addon_1',
+        payment_status: 'no_payment_required',
+      }),
     );
     expect(fake.updates).toHaveLength(1);
     const { table, payload } = fake.updates[0]!;
@@ -514,6 +586,55 @@ describe('fulfillCheckout — review_addon (subscription)', () => {
     );
     expect(fake.updates).toHaveLength(0);
     expect(fake.rpcs).toHaveLength(0);
+  });
+
+  it('waits for async payment settlement before activating the add-on', async () => {
+    const fake = fakeSupabase();
+    const stripe = fakeStripe({
+      id: 'sub_addon_1',
+      status: 'active',
+      metadata: { user_id: 'user-1', sku: 'review_addon' },
+    });
+    const checkoutSession = session({
+      metadata: { user_id: 'user-1', sku: 'review_addon' },
+      subscription: 'sub_addon_1',
+      status: 'complete',
+      payment_status: 'unpaid',
+    });
+
+    // checkout.session.completed for a delayed payment is not fulfillment.
+    await fulfillCheckout(fake.client, stripe, checkoutSession);
+    expect(fake.updates).toHaveLength(0);
+
+    // checkout.session.async_payment_succeeded later carries settled payment.
+    await fulfillCheckout(fake.client, stripe, {
+      ...checkoutSession,
+      payment_status: 'paid',
+    });
+    expect(fake.updates).toHaveLength(1);
+    expect(fake.updates[0]!.payload).toMatchObject({
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_1',
+    });
+  });
+
+  it('does not activate for a non-entitlement-bearing subscription status', async () => {
+    const fake = fakeSupabase();
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({
+        id: 'sub_addon_1',
+        status: 'incomplete',
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+      }),
+      session({
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+        subscription: 'sub_addon_1',
+        payment_status: 'paid',
+      }),
+    );
+
+    expect(fake.updates).toHaveLength(0);
   });
 });
 
@@ -544,7 +665,52 @@ describe('handleSubscriptionChange — review_addon', () => {
     expect(fake.updates[0]!.payload).toEqual({ review_addon: false });
     expect(fake.updates[0]!.filters).toEqual({
       id: 'user-1',
+      review_addon: true,
       review_addon_subscription_id: 'sub_addon_1',
+    });
+  });
+
+  it('ignores a stale active event for a different add-on subscription', async () => {
+    const fake = statefulAddOnSupabase({
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_current',
+    });
+
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({
+        id: 'sub_addon_stale',
+        status: 'active',
+        customer: 'cus_1',
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+      }),
+    );
+
+    expect(fake.state).toMatchObject({
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_current',
+    });
+  });
+
+  it('ignores a stale terminal event for a different current add-on subscription', async () => {
+    const fake = statefulAddOnSupabase({
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_current',
+    });
+
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({
+        id: 'sub_addon_stale',
+        status: 'canceled',
+        customer: 'cus_1',
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+      }),
+    );
+
+    expect(fake.state).toMatchObject({
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_current',
     });
   });
 });

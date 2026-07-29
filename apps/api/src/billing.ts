@@ -280,7 +280,19 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
           };
         }
 
-        const session = await stripe.checkout.sessions.create(params);
+        const session = await stripe.checkout.sessions.create(
+          params,
+          sku === 'review_addon'
+            ? {
+                // Stripe serializes concurrent creates carrying the same
+                // key. The entitlement read above remains the fast-path;
+                // this provider-side key closes the read/create race across
+                // API instances without making repeatable pack purchases
+                // idempotent.
+                idempotencyKey: `postr:review-addon:${user.id}:${priceId}`,
+              }
+            : undefined,
+        );
 
         return res.json({ url: session.url });
       } catch (err) {
@@ -566,14 +578,14 @@ export async function fulfillCheckout(
 
   if (sku === 'review_addon') {
     // The weekly-quota add-on is a subscription, so it uses the term's
-    // completion semantics (status 'complete', not payment_status) — but
-    // it grants ONLY the review_addon flag. plan / plan_expires_at /
-    // subscription_status belong to the term and are never written here.
-    const paid =
-      session.status === 'complete' ||
+    // provider object — but unlike a free trial, a delayed payment must
+    // settle before it grants anything. It writes ONLY the review_addon
+    // flag; plan / plan_expires_at / subscription_status belong to the
+    // term and are never written here.
+    const settled =
       session.payment_status === 'paid' ||
       session.payment_status === 'no_payment_required';
-    if (!paid) return;
+    if (!settled) return;
 
     const subscriptionId =
       typeof session.subscription === 'string'
@@ -586,20 +598,17 @@ export async function fulfillCheckout(
     // Retrieve so the stored id is Stripe's real object (a replayed or
     // malformed session without a live subscription throws → 500 → retry).
     const sub = await stripe.subscriptions.retrieve(subscriptionId);
+    if (!TERM_ACTIVE_STATUSES.has(sub.status)) return;
 
     // Absolute-value write = naturally idempotent (like the term), so no
     // billing_fulfilled_sessions marker is needed. stripe_customer_id is
     // recorded alongside (not part of the entitlement) so later add-on
     // lifecycle events can also reconcile by customer id.
-    const { error } = await supabase
-      .from('users')
-      .update({
-        review_addon: true,
-        review_addon_subscription_id: sub.id,
-        ...(customerId ? { stripe_customer_id: customerId } : {}),
-      })
-      .eq('id', userId);
-    if (error) throw new Error(`review_addon grant update: ${error.message}`);
+    await activateReviewAddon(supabase, userId, {
+      subscriptionId: sub.id,
+      customerId,
+      errorLabel: 'review_addon grant update',
+    });
     return;
   }
 
@@ -700,6 +709,52 @@ const TERM_ACTIVE_STATUSES = new Set([
 ]);
 
 /**
+ * Activate one add-on subscription without allowing a delayed event for an
+ * older subscription to replace a different subscription that is already
+ * granting access. The final update includes `review_addon=false`, so two
+ * concurrent activation events cannot both win after reading an inactive
+ * row.
+ */
+async function activateReviewAddon(
+  supabase: SupabaseClient,
+  userId: string,
+  opts: {
+    subscriptionId: string;
+    customerId?: string | null;
+    errorLabel: string;
+  },
+): Promise<void> {
+  const { data, error: lookupError } = await supabase
+    .from('users')
+    .select('review_addon, review_addon_subscription_id')
+    .eq('id', userId)
+    .maybeSingle();
+  if (lookupError) {
+    throw new Error(`${opts.errorLabel}: ${lookupError.message}`);
+  }
+
+  const current = data as {
+    review_addon?: boolean | null;
+    review_addon_subscription_id?: string | null;
+  } | null;
+  if (current?.review_addon === true) {
+    // Same subscription is already applied (idempotent), or a different
+    // subscription has superseded this delayed event (stale).
+    return;
+  }
+
+  const { error } = await supabase
+    .from('users')
+    .update({
+      review_addon: true,
+      review_addon_subscription_id: opts.subscriptionId,
+      ...(opts.customerId ? { stripe_customer_id: opts.customerId } : {}),
+    })
+    .match({ id: userId, review_addon: false });
+  if (error) throw new Error(`${opts.errorLabel}: ${error.message}`);
+}
+
+/**
  * A term renewal — `invoice.paid` fires on the first invoice AND every
  * 4-month renewal. Review add-on invoices return early below. Extend the
  * user's access to the subscription's new period end. Absolute-value +
@@ -778,14 +833,11 @@ export async function handleSubscriptionChange(
     if (TERM_ACTIVE_STATUSES.has(sub.status)) {
       // Still entitled — (re)set the flag and record WHICH subscription
       // grants it (absolute values, so redelivery is safe).
-      const { error } = await supabase
-        .from('users')
-        .update({
-          review_addon: true,
-          review_addon_subscription_id: sub.id,
-        })
-        .eq('id', addOnUserId);
-      if (error) throw new Error(`review_addon update: ${error.message}`);
+      await activateReviewAddon(supabase, addOnUserId, {
+        subscriptionId: sub.id,
+        customerId: addOnCustomerId,
+        errorLabel: 'review_addon update',
+      });
       return;
     }
 
@@ -797,6 +849,7 @@ export async function handleSubscriptionChange(
       .update({ review_addon: false })
       .match({
         id: addOnUserId,
+        review_addon: true,
         review_addon_subscription_id: sub.id,
       });
     if (error) throw new Error(`review_addon revoke update: ${error.message}`);
