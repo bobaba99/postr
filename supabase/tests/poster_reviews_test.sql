@@ -31,7 +31,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(84);
+select plan(104);
 
 -- --------------------------------------------------------------------------
 -- Fixtures (as superuser): two users (handle_new_user auto-creates their
@@ -234,6 +234,12 @@ select ok(
   ),
   'poster_reviews uniquely indexes (user_id, request_key)');
 
+select has_column(
+  'public',
+  'poster_review_requests',
+  'pack_credit_reserved',
+  'initial-review claims persist whether a pack credit is reserved');
+
 -- Set an exact one-credit fixture for transactional finalization.
 update public.users
    set review_credits = 1
@@ -269,6 +275,28 @@ select is(
   )->>'outcome',
   'in_progress',
   'a second claimant sees the request in progress');
+
+select is(
+  public.reserve_initial_review_credit(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000001',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'first')
+  ),
+  true,
+  'the exact initial-review claimant reserves its pack credit before provider work');
+
+select is(
+  public.reserve_initial_review_credit(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000001',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'first')
+  ),
+  true,
+  'reserving the same exact claim is idempotent');
 
 -- 19 · pack finalization atomically spends + inserts
 select is(
@@ -366,6 +394,22 @@ values (
 );
 
 update public.poster_review_requests
+   set expires_at = pg_catalog.now() - interval '1 second'
+ where user_id = 'd1000000-0000-4000-a000-000000000001'
+   and request_key = 'a1000000-0000-4000-a000-000000000012';
+
+select is(
+  public.reserve_initial_review_credit(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000002',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'stale')
+  ),
+  true,
+  'a claimant can reserve the only pack credit');
+
+update public.poster_review_requests
    set expires_at = now() - interval '1 second'
  where user_id = 'd1000000-0000-4000-a000-000000000001'
    and request_key = 'a1000000-0000-4000-a000-000000000002';
@@ -389,6 +433,24 @@ select isnt(
     where name = 'replacement'),
   'an expired-lease takeover receives a new claim token');
 
+select is(
+  (select review_credits
+     from public.users
+    where id = 'd1000000-0000-4000-a000-000000000001'),
+  1,
+  'an expired-claim takeover refunds the abandoned reservation exactly once');
+
+select is(
+  public.reserve_initial_review_credit(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000002',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'stale')
+  ),
+  false,
+  'a stale claim token cannot reserve against its replacement');
+
 -- 26 · an old worker cannot release the newer claimant's lease
 select is(
   public.release_initial_review(
@@ -400,6 +462,13 @@ select is(
   ),
   false,
   'a stale claim token cannot release its replacement');
+
+select is(
+  (select review_credits
+     from public.users
+    where id = 'd1000000-0000-4000-a000-000000000001'),
+  1,
+  'a stale release cannot refund the replacement claim');
 
 -- 27 · an old worker cannot finalize the newer claimant's lease
 select is(
@@ -425,6 +494,17 @@ select is(
     where id = 'd1000000-0000-4000-a000-000000000001'),
   1,
   'a stale finalizer leaves the credit untouched');
+
+select is(
+  public.reserve_initial_review_credit(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000002',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'replacement')
+  ),
+  true,
+  'the replacement claim reserves the refunded pack credit');
 
 -- 29 · a user cannot attach a paid review to another user's poster
 select is(
@@ -468,6 +548,179 @@ select is(
       and request_key = 'a1000000-0000-4000-a000-000000000002'),
   0::bigint,
   'poster ownership denial settles the exact initial claim');
+
+-- --------------------------------------------------------------------------
+-- Pack-credit reservation fencing
+-- --------------------------------------------------------------------------
+update public.users
+   set review_credits = 1
+ where id = 'd1000000-0000-4000-a000-000000000001';
+
+insert into review_claim_fixtures (name, payload)
+values
+  (
+    'reservation_a',
+    public.claim_initial_review(
+      'd1000000-0000-4000-a000-000000000001',
+      'a1000000-0000-4000-a000-000000000010'
+    )
+  ),
+  (
+    'reservation_b',
+    public.claim_initial_review(
+      'd1000000-0000-4000-a000-000000000001',
+      'a1000000-0000-4000-a000-000000000011'
+    )
+  );
+
+select is(
+  public.reserve_initial_review_credit(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000010',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'reservation_a')
+  ),
+  true,
+  'one of two distinct initial claims reserves the only pack credit');
+
+select is(
+  public.reserve_initial_review_credit(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000011',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'reservation_b')
+  ),
+  false,
+  'a second distinct claim cannot reserve the already-held pack credit');
+
+select is(
+  (select review_credits
+     from public.users
+    where id = 'd1000000-0000-4000-a000-000000000001'),
+  0,
+  'two distinct reservation attempts spend the one credit at most once');
+
+select is(
+  public.release_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000010',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'reservation_a')
+  ),
+  true,
+  'releasing the exact reserved claim succeeds');
+
+select is(
+  (select review_credits
+     from public.users
+    where id = 'd1000000-0000-4000-a000-000000000001'),
+  1,
+  'releasing the exact reserved claim refunds its credit');
+
+select is(
+  public.release_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000010',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'reservation_a')
+  ),
+  false,
+  'releasing the same stale claim token a second time fails');
+
+select is(
+  (select review_credits
+     from public.users
+    where id = 'd1000000-0000-4000-a000-000000000001'),
+  1,
+  'a stale release never refunds twice');
+
+select is(
+  public.finalize_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000011',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'reservation_b'),
+    null,
+    'pdf',
+    '{}'::jsonb,
+    '{"dimensionScores":{"narrative":4,"design":4,"content":4},"attentionSummary":"Must not run.","findings":[]}'::jsonb,
+    'pack'
+  )->>'outcome',
+  'no_credit',
+  'pack finalization requires the exact claim to hold a reservation');
+
+insert into review_claim_fixtures (name, payload)
+values (
+  'expiry_exact',
+  public.claim_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000012'
+  )
+);
+
+select is(
+  public.reserve_initial_review_credit(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000012',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'expiry_exact')
+  ),
+  true,
+  'an exact initial claim reserves after wall-clock expiry when no takeover occurred');
+
+select is(
+  public.finalize_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000012',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'expiry_exact'),
+    null,
+    'pdf',
+    '{}'::jsonb,
+    '{"dimensionScores":{"narrative":4,"design":4,"content":4},"attentionSummary":"Exact token wins.","findings":[]}'::jsonb,
+    'pack'
+  )->>'outcome',
+  'complete',
+  'an exact initial token finalizes after wall-clock expiry when no takeover occurred');
+
+insert into review_claim_fixtures (name, payload)
+values (
+  'addon',
+  public.claim_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000013'
+  )
+);
+
+select is(
+  public.finalize_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000013',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'addon'),
+    null,
+    'pdf',
+    '{}'::jsonb,
+    '{"dimensionScores":{"narrative":4,"design":4,"content":4},"attentionSummary":"Add-on path.","findings":[]}'::jsonb,
+    'subscription_addon'
+  )->>'outcome',
+  'complete',
+  'subscription add-on finalization does not require a pack reservation');
+
+select is(
+  (select review_credits
+     from public.users
+    where id = 'd1000000-0000-4000-a000-000000000001'),
+  0,
+  'subscription add-on finalization leaves the pack balance unchanged');
 
 -- --------------------------------------------------------------------------
 -- Leased, replay-safe follow-up protocol
@@ -676,7 +929,7 @@ update public.poster_reviews
    set followup_lease_expires_at = pg_catalog.now() - interval '1 second'
  where id = 'e1000000-0000-4000-a000-000000000003';
 
--- 49 · even the exact token cannot complete after its lease expires
+-- 49 · expiry alone does not invalidate an exact fencing token
 select is(
   public.complete_review_followup(
     'd1000000-0000-4000-a000-000000000001',
@@ -687,8 +940,18 @@ select is(
       where name = 'takeover'),
     '{"dimensionScores":{"narrative":4,"design":4,"content":4},"attentionSummary":"Expired result.","findings":[]}'::jsonb
   )->>'outcome',
-  'claim_missing',
-  'an expired follow-up lease cannot complete');
+  'complete',
+  'an exact follow-up token completes after expiry when no takeover occurred');
+
+-- Reset only this service-role fixture so the remaining assertions can
+-- exercise release and replay independently from the expiry-completion case.
+update public.poster_reviews
+   set stage = 'initial',
+       followup_request_id = null,
+       followup_lease_token = null,
+       followup_lease_expires_at = null,
+       followup_findings = null
+ where id = 'e1000000-0000-4000-a000-000000000003';
 
 insert into review_followup_fixtures (name, payload)
 values (

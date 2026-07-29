@@ -390,6 +390,7 @@ export type Database = {
           claim_token: string
           claimed_at: string
           expires_at: string
+          pack_credit_reserved: boolean
           request_key: string
           user_id: string
         }
@@ -397,6 +398,7 @@ export type Database = {
           claim_token?: string
           claimed_at?: string
           expires_at?: string
+          pack_credit_reserved?: boolean
           request_key: string
           user_id: string
         }
@@ -404,6 +406,7 @@ export type Database = {
           claim_token?: string
           claimed_at?: string
           expires_at?: string
+          pack_credit_reserved?: boolean
           request_key?: string
           user_id?: string
         }
@@ -848,6 +851,14 @@ export type Database = {
           p_lease_token: string
           p_request_id: string
           p_review_id: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      reserve_initial_review_credit: {
+        Args: {
+          p_claim_token: string
+          p_request_key: string
           p_user_id: string
         }
         Returns: boolean

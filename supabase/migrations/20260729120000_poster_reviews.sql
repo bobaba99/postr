@@ -340,13 +340,17 @@ grant execute on function public.consume_review_addon_slot(uuid, integer)
 -- browser-generated key from both reaching the model. The durable result
 -- lives on poster_reviews.request_key; claims are only coordination state.
 create table if not exists public.poster_review_requests (
-  user_id      uuid not null references auth.users(id) on delete cascade,
-  request_key  uuid not null,
-  claim_token  uuid not null default gen_random_uuid(),
-  claimed_at   timestamptz not null default now(),
-  expires_at   timestamptz not null default (now() + interval '10 minutes'),
+  user_id              uuid not null references auth.users(id) on delete cascade,
+  request_key          uuid not null,
+  claim_token          uuid not null default gen_random_uuid(),
+  pack_credit_reserved boolean not null default false,
+  claimed_at           timestamptz not null default now(),
+  expires_at           timestamptz not null default (now() + interval '10 minutes'),
   primary key (user_id, request_key)
 );
+
+alter table public.poster_review_requests
+  add column if not exists pack_credit_reserved boolean not null default false;
 
 comment on table public.poster_review_requests is
   'Service-role-only claims for in-flight initial presentation reviews. '
@@ -371,6 +375,7 @@ as $$
 declare
   v_review public.poster_reviews%rowtype;
   v_claimed boolean;
+  v_expired_reservation boolean;
   v_claim_token uuid := gen_random_uuid();
   v_expires_at timestamptz := pg_catalog.now() + interval '10 minutes';
 begin
@@ -403,7 +408,14 @@ begin
   delete from public.poster_review_requests
    where user_id = p_user_id
      and request_key = p_request_key
-     and expires_at <= pg_catalog.now();
+     and expires_at <= pg_catalog.now()
+  returning pack_credit_reserved into v_expired_reservation;
+
+  if coalesce(v_expired_reservation, false) then
+    update public.users
+       set review_credits = review_credits + 1
+     where id = p_user_id;
+  end if;
 
   insert into public.poster_review_requests (
     user_id,
@@ -435,6 +447,76 @@ revoke execute on function public.claim_initial_review(uuid, uuid)
 grant execute on function public.claim_initial_review(uuid, uuid)
   to service_role;
 
+-- Reserve the scarce pack credit before provider work. Exact-token fencing
+-- makes this idempotent for a retry of the same worker. Distinct request keys
+-- serialize on the public.users row through the conditional decrement, so a
+-- one-credit balance can permit at most one provider call.
+create or replace function public.reserve_initial_review_credit(
+  p_user_id uuid,
+  p_request_key uuid,
+  p_claim_token uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, pg_catalog
+as $$
+declare
+  v_reserved boolean;
+  v_remaining integer;
+begin
+  if p_user_id is null or p_request_key is null or p_claim_token is null then
+    return false;
+  end if;
+
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_user_id::text || ':' || p_request_key::text, 0)
+  );
+
+  select pack_credit_reserved
+    into v_reserved
+    from public.poster_review_requests
+   where user_id = p_user_id
+     and request_key = p_request_key
+     and claim_token = p_claim_token
+   for update;
+
+  if not found then
+    return false;
+  end if;
+  if v_reserved then
+    return true;
+  end if;
+
+  update public.users
+     set review_credits = review_credits - 1
+   where id = p_user_id
+     and review_credits > 0
+  returning review_credits into v_remaining;
+
+  if v_remaining is null then
+    return false;
+  end if;
+
+  update public.poster_review_requests
+     set pack_credit_reserved = true
+   where user_id = p_user_id
+     and request_key = p_request_key
+     and claim_token = p_claim_token;
+
+  return true;
+end;
+$$;
+
+comment on function public.reserve_initial_review_credit(uuid, uuid, uuid) is
+  'Atomically reserves one pack credit for an exact initial-review claim '
+  'before provider work. Exact-token retries are idempotent. service_role only.';
+
+revoke execute on function public.reserve_initial_review_credit(uuid, uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.reserve_initial_review_credit(uuid, uuid, uuid)
+  to service_role;
+
 create or replace function public.release_initial_review(
   p_user_id uuid,
   p_request_key uuid,
@@ -446,7 +528,7 @@ security definer
 set search_path = public, pg_catalog
 as $$
 declare
-  v_released boolean;
+  v_reserved boolean;
 begin
   if p_user_id is null or p_request_key is null or p_claim_token is null then
     return false;
@@ -460,9 +542,19 @@ begin
    where user_id = p_user_id
      and request_key = p_request_key
      and claim_token = p_claim_token
-  returning true into v_released;
+  returning pack_credit_reserved into v_reserved;
 
-  return coalesce(v_released, false);
+  if not found then
+    return false;
+  end if;
+
+  if v_reserved then
+    update public.users
+       set review_credits = review_credits + 1
+     where id = p_user_id;
+  end if;
+
+  return true;
 end;
 $$;
 
@@ -475,11 +567,10 @@ revoke execute on function public.release_initial_review(uuid, uuid, uuid)
 grant execute on function public.release_initial_review(uuid, uuid, uuid)
   to service_role;
 
--- This is the paid-review transaction boundary. For pack reviews the
--- conditional decrement and completed review insert execute in one database
--- transaction. Any insert/constraint failure aborts the statement and rolls
--- the credit decrement back. Subscription add-on reviews use the same durable
--- idempotency path without decrementing pack credits.
+-- This is the paid-review completion boundary. Pack reviews must arrive with
+-- a credit reserved before provider work; the completed insert consumes that
+-- reservation without a second decrement. Subscription add-on reviews use the
+-- same durable idempotency path without reserving pack credits.
 create or replace function public.finalize_initial_review(
   p_user_id uuid,
   p_request_key uuid,
@@ -497,6 +588,7 @@ set search_path = public, pg_catalog
 as $$
 declare
   v_review public.poster_reviews%rowtype;
+  v_claim public.poster_review_requests%rowtype;
   v_review_id uuid;
   v_remaining integer;
 begin
@@ -530,14 +622,15 @@ begin
     );
   end if;
 
-  if not exists (
-    select 1
-      from public.poster_review_requests
-     where user_id = p_user_id
-       and request_key = p_request_key
-       and claim_token = p_claim_token
-       and expires_at > pg_catalog.now()
-  ) then
+  select *
+    into v_claim
+    from public.poster_review_requests
+   where user_id = p_user_id
+     and request_key = p_request_key
+     and claim_token = p_claim_token
+   for update;
+
+  if not found then
     return pg_catalog.jsonb_build_object('outcome', 'claim_missing');
   end if;
 
@@ -553,6 +646,11 @@ begin
        for key share;
 
     if not found then
+      if v_claim.pack_credit_reserved then
+        update public.users
+           set review_credits = review_credits + 1
+         where id = p_user_id;
+      end if;
       delete from public.poster_review_requests
        where user_id = p_user_id
          and request_key = p_request_key
@@ -562,19 +660,24 @@ begin
   end if;
 
   if p_credit_source = 'pack' then
-    update public.users
-       set review_credits = review_credits - 1
-     where id = p_user_id
-       and review_credits > 0
-    returning review_credits into v_remaining;
-
-    if v_remaining is null then
+    if not v_claim.pack_credit_reserved then
       delete from public.poster_review_requests
        where user_id = p_user_id
          and request_key = p_request_key
          and claim_token = p_claim_token;
       return pg_catalog.jsonb_build_object('outcome', 'no_credit');
     end if;
+
+    select review_credits
+      into v_remaining
+      from public.users
+     where id = p_user_id;
+  elsif v_claim.pack_credit_reserved then
+    -- Defensive reconciliation: the add-on path never consumes a pack
+    -- reservation, even if a caller mixed the two protocols.
+    update public.users
+       set review_credits = review_credits + 1
+     where id = p_user_id;
   end if;
 
   insert into public.poster_reviews (
@@ -619,8 +722,9 @@ $$;
 comment on function public.finalize_initial_review(
   uuid, uuid, uuid, uuid, text, jsonb, jsonb, text
 ) is
-  'Atomically spends a pack credit (when applicable) and inserts the keyed '
-  'completed review. Replays a prior completed key. service_role only.';
+  'Consumes a previously reserved pack credit (when applicable) while '
+  'inserting the keyed completed review. Replays a prior completed key. '
+  'service_role only.';
 
 revoke execute on function public.finalize_initial_review(
   uuid, uuid, uuid, uuid, text, jsonb, jsonb, text
@@ -787,9 +891,7 @@ begin
 
   if v_review.stage <> 'followup'
      or v_review.followup_request_id is distinct from p_request_id
-     or v_review.followup_lease_token is distinct from p_lease_token
-     or v_review.followup_lease_expires_at is null
-     or v_review.followup_lease_expires_at <= pg_catalog.now() then
+     or v_review.followup_lease_token is distinct from p_lease_token then
     return pg_catalog.jsonb_build_object('outcome', 'claim_missing');
   end if;
 
