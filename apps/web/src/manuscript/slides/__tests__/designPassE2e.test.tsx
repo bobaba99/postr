@@ -329,4 +329,97 @@ describe('design pass e2e (Task 10)', () => {
     expect(exportStyledDeckPdfSpy).not.toHaveBeenCalled();
     expect(exportStyledDeckPptxSpy).not.toHaveBeenCalled();
   });
+
+  it('a rebuild to a SAME-length new deck does not trust the PRIOR build\'s stale styled deck while its own design pass is in flight', async () => {
+    // buildFromFindings (SlidesWizard.tsx) sets the new plain deck
+    // immediately but the design pass (styleDeck + generateTheme) that
+    // styles IT is async. Before the fix, `styledDeck` from the PRIOR
+    // build was never cleared, so `alignedStyledDeck`'s length-only guard
+    // (styledDeck.slides.length === deck.slides.length) stayed truthy for
+    // the whole in-flight window whenever the new build happened to have
+    // the SAME slide count as the old one — the exact case here (both
+    // builds parse the same MANUSCRIPT/injectedFindings fixture, so both
+    // are 7 plain slides). The result: the narrative step would render
+    // deck B's plain thumbnails/notes but deck A's STYLED stage, the
+    // VibeField would show, export would be enabled, and a vibe-submit
+    // would re-theme stale deck A — "previewed one thing, exported a
+    // mix", the exact failure the alignment guard exists to prevent.
+    //
+    // First style call resolves immediately (deck A, styled + aligned).
+    // Second style call (deck B, the rebuild) is held open with a
+    // manually-resolved deferred promise so the test can inspect the
+    // in-flight window before letting it resolve.
+    let resolveSecondStyle!: (slides: StyledSlide[]) => void;
+    const secondStylePromise = new Promise<StyledSlide[]>((resolve) => {
+      resolveSecondStyle = resolve;
+    });
+    const styleClient = vi
+      .fn<(plainDeck: SlideDeck) => Promise<StyledSlide[]>>()
+      .mockResolvedValueOnce(STYLED_SLIDES) // deck A's design pass
+      .mockReturnValueOnce(secondStylePromise); // deck B's — held open
+    const themeClient = vi.fn(async () => THEME_V1);
+
+    await buildDeckThroughWizard({
+      testHooks: { extractClient: async () => injectedFindings, styleClient, themeClient },
+    });
+
+    // Deck A's design pass resolved: styled stage is showing, aligned.
+    await waitFor(() => {
+      expect(screen.getByLabelText(/slide 1 preview \(styled\)/i)).toBeInTheDocument();
+    });
+    expect(screen.getByPlaceholderText(/describe the vibe/i)).toBeInTheDocument();
+
+    // Trigger the rebuild: navigate back to the star-finding step (its
+    // StepBar header is the 2nd of 6 — stepConfig.ts's WIZARD_STEPS order
+    // is constraints, starFinding, narrative, …), pick a DIFFERENT star,
+    // then click "Build the deck" again. deriveDeckInput + buildDeck are
+    // deterministic over the same MANUSCRIPT/injectedFindings fixture
+    // regardless of which finding leads, so deck B is also 7 plain slides
+    // — the same length as deck A, the scenario this guard must handle.
+    const starFindingHeader = screen.getByRole('button', { name: /star finding/i });
+    fireEvent.click(starFindingHeader);
+
+    const findingButtons = screen
+      .getAllByRole('button')
+      .filter((btn) => btn.getAttribute('aria-pressed') !== null);
+    // Pick the finding that is NOT already the star (index 0 is the star
+    // after the first build promoted it to front).
+    fireEvent.click(findingButtons[1]!);
+    fireEvent.click(screen.getByRole('button', { name: /build the deck/i }));
+
+    // Deck B's (2nd) design pass has now fired but not yet resolved —
+    // this is the in-flight window under test.
+    await waitFor(() => expect(styleClient).toHaveBeenCalledTimes(2));
+
+    // (a) Preview: must show PLAIN, not deck A's stale styled stage. The
+    // fix resets styledDeck to null on rebuild, so alignedStyledDeck is
+    // null until deck B's OWN design pass resolves.
+    expect(screen.queryByLabelText(/preview \(styled\)/i)).not.toBeInTheDocument();
+
+    // (b) VibeField: must be absent — re-theming nothing (or worse, deck
+    // A under deck B's hood) must not be offered mid-rebuild.
+    expect(screen.queryByPlaceholderText(/describe the vibe/i)).not.toBeInTheDocument();
+
+    // (c) Export: both buttons disabled, and clicking them (a no-op on a
+    // disabled button, but assert the real guard too) must not invoke
+    // either writer with deck A's stale styled content.
+    fireEvent.click(screen.getByRole('button', { name: /^export/i }));
+    const downloadPdfButton = await screen.findByRole('button', { name: /download pdf/i });
+    const exportPptxButton = screen.getByRole('button', { name: /powerpoint|\.pptx/i });
+    expect(downloadPdfButton).toBeDisabled();
+    expect(exportPptxButton).toBeDisabled();
+    fireEvent.click(downloadPdfButton);
+    fireEvent.click(exportPptxButton);
+    expect(exportStyledDeckPdfSpy).not.toHaveBeenCalled();
+    expect(exportStyledDeckPptxSpy).not.toHaveBeenCalled();
+
+    // Now let deck B's design pass resolve — the styled stage returns,
+    // this time genuinely aligned with deck B, proving the reset only
+    // gates the in-flight window and doesn't wedge the feature.
+    resolveSecondStyle(STYLED_SLIDES);
+    await waitFor(() => {
+      expect(screen.getByLabelText(/slide 1 preview \(styled\)/i)).toBeInTheDocument();
+    });
+    expect(screen.getByPlaceholderText(/describe the vibe/i)).toBeInTheDocument();
+  });
 });

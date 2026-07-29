@@ -210,6 +210,20 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
       rankedFindings: ordered,
     });
     const plainDeck = buildDeck(input);
+    // Reset the PRIOR build's styled state before swapping in the new
+    // plain deck. Without this, a rebuild (e.g. picking a different star)
+    // that happens to produce the SAME slide count as the previous build
+    // leaves `alignedStyledDeck`'s length-only check (below) truthy for
+    // the OLD styled deck during the new (slow) design pass's in-flight
+    // window — the preview would show the new plain deck's thumbnails
+    // under the old deck's styled stage, the VibeField would re-theme
+    // stale content, and export would ship a mix of two different builds.
+    // `seqRef`/`designPassSeq` guards which RESPONSE wins; this guards
+    // what's DISPLAYED in the gap before either response lands — the two
+    // are complementary, not redundant. Harmless on the very first build,
+    // where styledDeck is already null.
+    setStyledDeck(null);
+    setPalettes([]);
     setBuiltDeck(plainDeck);
     setActiveSlideIndex(0);
     goToStep('narrative');
