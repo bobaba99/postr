@@ -34,19 +34,19 @@ export class CritiqueUpstreamError extends Error {
   }
 }
 
-export async function callAnthropicCritique(
-  anthropic: Anthropic,
-  ctx: CritiqueCallCtx,
-): Promise<CritiqueCallResult> {
-  const tool = {
-    name: 'emit_critique',
-    description: 'Emit the structured poster/presentation critique as JSON.',
-    input_schema:
-      CRITIQUE_TOOL_INPUT_SCHEMA as unknown as Anthropic.Tool.InputSchema,
-  } satisfies Anthropic.Tool;
+const CRITIQUE_TOOL = {
+  name: 'emit_critique',
+  description: 'Emit the structured poster/presentation critique as JSON.',
+  input_schema:
+    CRITIQUE_TOOL_INPUT_SCHEMA as unknown as Anthropic.Tool.InputSchema,
+} satisfies Anthropic.Tool;
 
-  const content: Anthropic.MessageParam['content'] = [
-    ...ctx.pages.map((page) => ({
+function buildMessageContent(
+  pages: FetchedPage[],
+  userMessage: string,
+): Anthropic.MessageParam['content'] {
+  return [
+    ...pages.map((page) => ({
       type: 'image' as const,
       source: {
         type: 'base64' as const,
@@ -54,41 +54,54 @@ export async function callAnthropicCritique(
         data: page.imageData,
       },
     })),
-    { type: 'text', text: ctx.userMessage },
+    { type: 'text', text: userMessage },
   ];
+}
 
-  let response: Anthropic.Message;
+function mapAnthropicError(error: unknown): never {
+  const errorName = error instanceof Error ? error.name : '';
+  if (
+    errorName === 'TimeoutError' ||
+    errorName === 'APIConnectionTimeoutError'
+  ) {
+    throw new CritiqueUpstreamError('timeout');
+  }
+
+  const status = (error as { status?: unknown } | null)?.status;
+  if (typeof status === 'number') {
+    const detail = error instanceof Error ? error.message : undefined;
+    throw new CritiqueUpstreamError('http_error', status, detail?.slice(0, 500));
+  }
+
+  throw error;
+}
+
+async function requestAnthropicCritique(
+  anthropic: Anthropic,
+  ctx: CritiqueCallCtx,
+): Promise<Anthropic.Message> {
   try {
-    response = await anthropic.messages.create({
+    return await anthropic.messages.create({
       model: REVIEW_MODEL,
       max_tokens: REVIEW_MAX_TOKENS,
       system: ctx.systemPrompt,
-      tools: [tool],
+      tools: [CRITIQUE_TOOL],
       tool_choice: { type: 'tool', name: 'emit_critique' },
-      messages: [{ role: 'user', content }],
+      messages: [
+        {
+          role: 'user',
+          content: buildMessageContent(ctx.pages, ctx.userMessage),
+        },
+      ],
     });
   } catch (error) {
-    const errorName = error instanceof Error ? error.name : '';
-    if (
-      errorName === 'TimeoutError' ||
-      errorName === 'APIConnectionTimeoutError'
-    ) {
-      throw new CritiqueUpstreamError('timeout');
-    }
-
-    const status = (error as { status?: unknown } | null)?.status;
-    if (typeof status === 'number') {
-      const detail = error instanceof Error ? error.message : undefined;
-      throw new CritiqueUpstreamError(
-        'http_error',
-        status,
-        detail?.slice(0, 500),
-      );
-    }
-
-    throw error;
+    return mapAnthropicError(error);
   }
+}
 
+function parseCritiqueResponse(
+  response: Anthropic.Message,
+): CritiqueCallResult {
   const toolUse = response.content.find(
     (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use',
   );
@@ -116,4 +129,12 @@ export async function callAnthropicCritique(
       outputTokens: response.usage?.output_tokens ?? 0,
     },
   };
+}
+
+export async function callAnthropicCritique(
+  anthropic: Anthropic,
+  ctx: CritiqueCallCtx,
+): Promise<CritiqueCallResult> {
+  const response = await requestAnthropicCritique(anthropic, ctx);
+  return parseCritiqueResponse(response);
 }
