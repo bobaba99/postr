@@ -124,6 +124,11 @@ const CritiqueRequest = z.object({
 
 type CritiqueBody = z.infer<typeof CritiqueRequest>;
 
+type ReviewAuthLocals = AuthLocals & {
+  /** Another request still owns these temp pages; polling must not delete them. */
+  deferReviewTempCleanup?: boolean;
+};
+
 const RenderPptxRequest = z.object({
   fileUrl: z.string().url(),
 });
@@ -190,7 +195,8 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
           message: 'SUPABASE_URL and SUPABASE_SECRET_KEY must both be set for review.',
         });
       }
-      const user = (res.locals as AuthLocals).user;
+      const locals = res.locals as ReviewAuthLocals;
+      const user = locals.user;
 
       // Every valid request owns the lifecycle of its rendered temp pages.
       // Keep cleanup outside the entitlement/fetch/model branches so 402s,
@@ -223,7 +229,9 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
               body,
             }));
       } finally {
-        await cleanupFetchedReviewTempPages(supabase, user.id, body.pages);
+        if (!locals.deferReviewTempCleanup) {
+          await cleanupFetchedReviewTempPages(supabase, user.id, body.pages);
+        }
       }
     },
   );
@@ -459,7 +467,13 @@ interface InitialCtx {
 
 type InitialReviewRpcResult =
   | { outcome: 'claimed'; claimToken: string; expiresAt: string }
-  | { outcome: 'in_progress' | 'no_credit' | 'claim_missing' }
+  | {
+      outcome:
+        | 'in_progress'
+        | 'no_credit'
+        | 'claim_missing'
+        | 'poster_not_owned';
+    }
   | {
       outcome: 'complete' | 'replay';
       reviewId: string;
@@ -491,7 +505,7 @@ function parseReviewAddonSlotRpcResult(
 }
 
 function parseInitialReviewRpcResult(raw: unknown): InitialReviewRpcResult | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const value = raw as Record<string, unknown>;
   if (value.outcome === 'claimed') {
     if (
@@ -509,7 +523,8 @@ function parseInitialReviewRpcResult(raw: unknown): InitialReviewRpcResult | nul
   if (
     value.outcome === 'in_progress' ||
     value.outcome === 'no_credit' ||
-    value.outcome === 'claim_missing'
+    value.outcome === 'claim_missing' ||
+    value.outcome === 'poster_not_owned'
   ) {
     return { outcome: value.outcome };
   }
@@ -587,6 +602,7 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
     });
   }
   if (claim.outcome === 'in_progress') {
+    (res.locals as ReviewAuthLocals).deferReviewTempCleanup = true;
     return res.status(409).json({ error: 'review_in_progress' });
   }
   if (claim.outcome !== 'claimed') {
@@ -761,6 +777,10 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
         error: 'review_payment_required',
         reason: 'no_credit',
       });
+    }
+    if (finalized.outcome === 'poster_not_owned') {
+      claimSettled = true;
+      return res.status(403).json({ error: 'not_poster_owner' });
     }
     if (
       finalized.outcome !== 'complete' &&

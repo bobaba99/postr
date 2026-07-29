@@ -18,6 +18,7 @@ const SUPABASE_URL = 'https://testref.supabase.co';
 const PAGE_URL =
   `${SUPABASE_URL}/storage/v1/object/sign/poster-assets/u/p/review.jpg?token=abc`;
 const REQUEST_KEY = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const FOREIGN_POSTER_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 
 const CRITIQUE = {
   dimensionScores: { narrative: 4, design: 3, content: 4 },
@@ -160,6 +161,10 @@ function fakeSupabase(initialCredits = 2) {
         if (claims.get(requestKey) !== args.p_claim_token) {
           return { data: { outcome: 'claim_missing' }, error: null };
         }
+        if (args.p_poster_id === FOREIGN_POSTER_ID) {
+          claims.delete(requestKey);
+          return { data: { outcome: 'poster_not_owned' }, error: null };
+        }
         if (args.p_credit_source === 'pack') {
           if (reviewCredits <= 0) {
             claims.delete(requestKey);
@@ -208,6 +213,7 @@ function fakeSupabase(initialCredits = 2) {
     inserts,
     reviews,
     rpcs,
+    remove,
     get reviewCredits() {
       return reviewCredits;
     },
@@ -383,6 +389,36 @@ describe('POST /api/review/critique — initial request idempotency', () => {
     expect(supabase.reviewCredits).toBe(1);
   });
 
+  it('does not delete pages owned by an in-progress request-key retry', async () => {
+    const supabase = fakeSupabase(1);
+    supabase.claims.set(
+      REQUEST_KEY,
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    );
+    const app = buildApp(
+      supabase.client,
+      fakeAnthropic().client,
+      vi.fn() as unknown as typeof fetch,
+    );
+
+    const response = await request(app)
+      .post('/api/review/critique')
+      .set('Authorization', 'Bearer test-token')
+      .send({
+        ...body(),
+        pages: [
+          {
+            ...body().pages[0],
+            storagePath: 'user-1/review-temp/session-1/page-1.jpg',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error).toBe('review_in_progress');
+    expect(supabase.remove).not.toHaveBeenCalled();
+  });
+
   it('replays the original initial result after the review later closes', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const supabase = fakeSupabase(2);
@@ -428,5 +464,27 @@ describe('POST /api/review/critique — initial request idempotency', () => {
     expect(release?.args.p_claim_token).toBe(
       'bbbbbbbb-bbbb-4bbb-8bbb-000000000001',
     );
+  });
+
+  it('rejects a foreign poster without spending credit or inserting a review', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const supabase = fakeSupabase(1);
+    const anthropic = fakeAnthropic();
+    const app = buildApp(
+      supabase.client,
+      anthropic.client,
+      vi.fn().mockResolvedValue(imageResponse()) as unknown as typeof fetch,
+    );
+
+    const response = await request(app)
+      .post('/api/review/critique')
+      .set('Authorization', 'Bearer test-token')
+      .send({ ...body(), posterId: FOREIGN_POSTER_ID });
+
+    expect(response.status).toBe(403);
+    expect(response.body).toEqual({ error: 'not_poster_owner' });
+    expect(supabase.reviewCredits).toBe(1);
+    expect(supabase.reviews.size).toBe(0);
+    expect(supabase.claims.has(REQUEST_KEY)).toBe(false);
   });
 });
