@@ -93,6 +93,7 @@ const ARTIFACT = {
       storagePath: 'user-1/review-temp/session-1/page-1.jpg',
       signedUrl:
         'https://example.supabase.co/storage/v1/object/sign/poster-assets/user-1/review-temp/session-1/page-1.jpg?token=x',
+      previewUrl: 'blob:https://postr.test/review-page-1',
       widthPx: 1650,
       heightPx: 1275,
     },
@@ -101,6 +102,7 @@ const ARTIFACT = {
       storagePath: 'user-1/review-temp/session-1/page-2.jpg',
       signedUrl:
         'https://example.supabase.co/storage/v1/object/sign/poster-assets/user-1/review-temp/session-1/page-2.jpg?token=x',
+      previewUrl: 'blob:https://postr.test/review-page-2',
       widthPx: 1650,
       heightPx: 1275,
     },
@@ -156,7 +158,64 @@ const CRITIQUE = {
 const POSTER_ROW = {
   id: 'poster-1',
   title: 'Research poster',
-  data: { widthIn: 48, heightIn: 36 },
+  data: {
+    version: 1 as const,
+    widthIn: 48,
+    heightIn: 36,
+    blocks: [],
+    fontFamily: 'Source Sans 3',
+    palette: {
+      bg: '#ffffff',
+      primary: '#0f172a',
+      accent: '#2563eb',
+      accent2: '#0ea5e9',
+      muted: '#64748b',
+      headerBg: '#0f172a',
+      headerFg: '#ffffff',
+    },
+    styles: {
+      title: {
+        size: 72,
+        weight: 700 as const,
+        italic: false,
+        lineHeight: 1.1,
+        color: null,
+        highlight: null,
+      },
+      heading: {
+        size: 28,
+        weight: 600 as const,
+        italic: false,
+        lineHeight: 1.2,
+        color: null,
+        highlight: null,
+      },
+      authors: {
+        size: 18,
+        weight: 400 as const,
+        italic: false,
+        lineHeight: 1.3,
+        color: null,
+        highlight: null,
+      },
+      body: {
+        size: 14,
+        weight: 400 as const,
+        italic: false,
+        lineHeight: 1.4,
+        color: null,
+        highlight: null,
+      },
+    },
+    headingStyle: {
+      border: 'bottom' as const,
+      fill: false,
+      align: 'left' as const,
+    },
+    institutions: [],
+    authors: [],
+    references: [],
+  },
 };
 
 const POSTER_ARTIFACT = {
@@ -276,6 +335,22 @@ describe('PresentationChecker page', () => {
     });
   });
 
+  it('shows the local page preview after temporary signed files are cleaned', async () => {
+    requestCritiqueMock.mockResolvedValue(CRITIQUE);
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+    uploadFile();
+    await screen.findByTestId('score-narrative');
+
+    expect(screen.getByAltText('Page 1')).toHaveAttribute(
+      'src',
+      'blob:https://postr.test/review-page-1',
+    );
+  });
+
   it('402 renders the paywall panel instead of results', async () => {
     requestCritiqueMock.mockRejectedValue(
       new ReviewPaymentRequiredError('no_credit'),
@@ -293,6 +368,32 @@ describe('PresentationChecker page', () => {
     ).toBeTruthy();
     expect(screen.getByText(/Get the review pack/i)).toBeTruthy();
     expect(screen.queryByTestId('score-narrative')).toBeNull();
+  });
+
+  it('does not sell a second weekly add-on when the active add-on quota is exhausted', async () => {
+    planState.value = {
+      ...planState.value,
+      hasActiveTerm: true,
+      hasReviewAddon: true,
+    };
+    requestCritiqueMock.mockRejectedValue(
+      new ReviewPaymentRequiredError('weekly_quota_exceeded', 3600),
+    );
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    uploadFile();
+
+    expect(await screen.findByText(/used this week's reviews/i)).toBeTruthy();
+    expect(screen.getByText(/Get the review pack/i)).toBeTruthy();
+    expect(
+      screen.queryByRole('button', {
+        name: /Add weekly reviews to your term/i,
+      }),
+    ).toBeNull();
   });
 
   it('the follow-up button reveals the up-front disclosure before anything runs', async () => {
@@ -344,6 +445,53 @@ describe('PresentationChecker page', () => {
     );
   });
 
+  it('clicking a slide-anchored card focuses its page and clears a stale region', async () => {
+    requestCritiqueMock.mockResolvedValue(CRITIQUE);
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+    uploadFile();
+    await screen.findByTestId('score-narrative');
+
+    fireEvent.click(
+      screen.getByText(
+        'The decorative header photo outranks the results figure.',
+      ),
+    );
+    expect(await screen.findByTestId('region-overlay')).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByText('The deck ends on methods details with no take-home.'),
+    );
+
+    expect(screen.queryByTestId('region-overlay')).toBeNull();
+    expect(screen.getByTestId('review-page-2')).toHaveFocus();
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('status')).toHaveTextContent('Showing page 2.');
+  });
+
+  it('activates a slide-anchored card from the keyboard', async () => {
+    requestCritiqueMock.mockResolvedValue(CRITIQUE);
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+    uploadFile();
+    await screen.findByTestId('score-narrative');
+
+    const finding = screen
+      .getByText('The deck ends on methods details with no take-home.')
+      .closest('[role="button"]');
+    expect(finding).not.toBeNull();
+    fireEvent.keyDown(finding!, { key: 'Enter' });
+
+    expect(screen.getByTestId('review-page-2')).toHaveFocus();
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+  });
+
   it('coalesces rapid activation while a Postr poster is loading', async () => {
     const loadingPoster = deferred<typeof POSTER_ROW>();
     listPostersMock.mockResolvedValue([POSTER_ROW]);
@@ -370,6 +518,32 @@ describe('PresentationChecker page', () => {
     expect(await screen.findByTestId('score-narrative')).toBeTruthy();
     expect(ingestPosterMock).toHaveBeenCalledTimes(1);
     expect(requestCritiqueMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('mounts the selected Postr poster canvas before its capture starts', async () => {
+    listPostersMock.mockResolvedValue([POSTER_ROW]);
+    loadPosterMock.mockResolvedValue(POSTER_ROW);
+    ingestPosterMock.mockImplementation(async () => {
+      expect(document.getElementById('poster-canvas')).not.toBeNull();
+      return POSTER_ARTIFACT;
+    });
+    requestCritiqueMock.mockResolvedValue(CRITIQUE);
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(
+      await screen.findByLabelText(/review one of your Postr posters/i),
+      { target: { value: POSTER_ROW.id } },
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Review this poster' }),
+    );
+
+    expect(await screen.findByTestId('score-narrative')).toBeTruthy();
+    expect(document.getElementById('poster-canvas')).toBeNull();
   });
 
   it('coalesces rapid activation of the one Postr follow-up', async () => {

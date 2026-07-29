@@ -30,6 +30,7 @@ beforeEach(() => {
   mockCaptureReviewImage.mockResolvedValue({
     path: 'u1/p1/review-capture.jpg',
     signedUrl: 'https://signed/review-capture',
+    blob: new Blob(['jpeg'], { type: 'image/jpeg' }),
   });
 });
 
@@ -68,6 +69,7 @@ describe('fromPoster', () => {
         pageNumber: 1,
         storagePath: 'u1/p1/review-capture.jpg',
         signedUrl: 'https://signed/review-capture',
+        previewUrl: expect.stringMatching(/^blob:/),
         widthPx: 2048,
         heightPx: 1536,
       },

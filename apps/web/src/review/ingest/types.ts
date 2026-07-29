@@ -15,6 +15,8 @@ export interface PageImage {
   pageNumber: number; // 1-based, reading order
   storagePath: string; // poster-assets path ('' for server-owned PPTX pages)
   signedUrl: string;
+  /** Browser-local preview that survives immediate review-temp cleanup. */
+  previewUrl?: string;
   widthPx: number;
   heightPx: number;
 }

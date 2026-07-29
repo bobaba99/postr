@@ -74,7 +74,20 @@ describe('fromPptx', () => {
       ],
     });
 
-    const artifact = await fromPptx(pptxFile(), CTX);
+    const fetchFn = vi.fn().mockImplementation(async () =>
+      new Response(new Blob(['jpeg'], { type: 'image/jpeg' }), {
+        status: 200,
+        headers: { 'content-type': 'image/jpeg' },
+      }),
+    );
+    const createObjectUrl = vi
+      .fn()
+      .mockReturnValueOnce('blob:https://postr.test/pptx-page-1')
+      .mockReturnValueOnce('blob:https://postr.test/pptx-page-2');
+    const artifact = await fromPptx(pptxFile(), CTX, {
+      fetchFn: fetchFn as unknown as typeof fetch,
+      createObjectUrl,
+    });
 
     expect(mockUpload).toHaveBeenCalledWith(
       RAW_PATH,
@@ -92,6 +105,7 @@ describe('fromPptx', () => {
         pageNumber: 1,
         storagePath: 'u1/review-temp/rendered/page-1.jpg',
         signedUrl: 'https://signed/p1',
+        previewUrl: 'blob:https://postr.test/pptx-page-1',
         widthPx: 1280,
         heightPx: 720,
       },
@@ -99,6 +113,7 @@ describe('fromPptx', () => {
         pageNumber: 2,
         storagePath: 'u1/review-temp/rendered/page-2.jpg',
         signedUrl: 'https://signed/p2',
+        previewUrl: 'blob:https://postr.test/pptx-page-2',
         widthPx: 1280,
         heightPx: 720,
       },
@@ -109,6 +124,36 @@ describe('fromPptx', () => {
       pageCount: 2,
     });
     expect(mockRemove).toHaveBeenCalledWith([RAW_PATH]);
+  });
+
+  it('downloads browser-local previews before critique cleanup removes rendered pages', async () => {
+    mockPostJson.mockResolvedValue({ pages: [VALID_RENDERED_PAGE] });
+    const previewBlob = new Blob(['jpeg'], { type: 'image/jpeg' });
+    const fetchFn = vi.fn().mockResolvedValue(
+      new Response(previewBlob, {
+        status: 200,
+        headers: { 'content-type': 'image/jpeg' },
+      }),
+    );
+    const createObjectUrl = vi
+      .fn()
+      .mockReturnValue('blob:https://postr.test/pptx-page-1');
+
+    const artifact = await fromPptx(pptxFile(), CTX, {
+      fetchFn: fetchFn as unknown as typeof fetch,
+      createObjectUrl,
+    });
+
+    expect(fetchFn).toHaveBeenCalledWith('https://signed/p1', {
+      credentials: 'omit',
+      redirect: 'error',
+    });
+    expect(createObjectUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'image/jpeg' }),
+    );
+    expect(artifact.pages[0]!.previewUrl).toBe(
+      'blob:https://postr.test/pptx-page-1',
+    );
   });
 
   it("maps the route's too_many_pages body to too-many-pages", async () => {

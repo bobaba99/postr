@@ -17,6 +17,10 @@ import { IngestError, type IngestContext, type NormalizedArtifact } from './type
 import { uploadReviewPage } from './uploadReviewPage';
 
 const IMAGE_MIME = ['image/png', 'image/jpeg'] as const;
+const REVIEW_LONG_EDGE_PX = 2048;
+// Bounds decoder memory to roughly 160 MB of RGBA pixels before the
+// browser touches an attacker-controlled compressed image.
+const REVIEW_MAX_SOURCE_PIXELS = 40_000_000;
 const JPEG_QUALITY = 0.85;
 const UNREADABLE_COPY =
   "We couldn't read that file. Try exporting it as a PDF and upload that instead.";
@@ -29,7 +33,10 @@ export async function fromImage(
 
   let canvas: HTMLCanvasElement;
   try {
-    ({ canvas } = await rasterizeImage(file));
+    ({ canvas } = await rasterizeImage(file, {
+      maxDimension: REVIEW_LONG_EDGE_PX,
+      maxSourcePixels: REVIEW_MAX_SOURCE_PIXELS,
+    }));
   } catch {
     throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
   }

@@ -6,6 +6,7 @@
  */
 import type { PosterDoc } from '@postr/shared';
 import { captureReviewImage } from '@/data/thumbnails';
+import { createLocalPreviewUrl } from './localPreview';
 import { IngestError, type NormalizedArtifact, type PageImage } from './types';
 
 /** captureReviewImage lands the long edge at 2048px (D11). */
@@ -36,10 +37,12 @@ export async function fromPoster(
     );
   }
 
+  const previewUrl = createLocalPreviewUrl(capture.blob);
   const page: PageImage = {
     pageNumber: 1,
     storagePath: capture.path,
     signedUrl: capture.signedUrl,
+    ...(previewUrl ? { previewUrl } : {}),
     ...reviewPixelDims(doc),
   };
   return {

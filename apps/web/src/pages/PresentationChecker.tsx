@@ -5,6 +5,7 @@
  * renders the paywall, while client plan state only shapes checkout.
  */
 import { useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router';
 import type {
   PosterDoc,
@@ -17,6 +18,10 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { createCheckout } from '@/data/billing';
 import { stashCheckoutIntent } from '@/data/checkoutIntent';
 import { listPosters, loadPoster, type PosterListRow } from '@/data/posters';
+import {
+  isStoragePath,
+  resolveStorageUrl,
+} from '@/data/posterImages';
 import { usePlan } from '@/hooks/usePlan';
 import { ApiError, formatRetryAfter } from '@/lib/apiClient';
 import {
@@ -31,6 +36,7 @@ import {
   type IngestErrorKind,
   type NormalizedArtifact,
 } from '@/review/ingest/types';
+import { revokePagePreviews } from '@/review/ingest/localPreview';
 import {
   listMyReviews,
   requestCritique,
@@ -38,6 +44,7 @@ import {
   type CritiqueResponse,
   type PosterReviewSummary,
 } from '@/review/reviewApi';
+import { PosterSnapshotCanvas } from '@/poster/PosterSnapshotCanvas';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
@@ -94,6 +101,51 @@ function critiqueErrorMessage(error: unknown): string {
   return 'Something went wrong reviewing your file. Try again, or use Send Feedback if it keeps happening.';
 }
 
+async function preparePosterSnapshot(doc: PosterDoc): Promise<PosterDoc> {
+  const blocks = await Promise.all(
+    doc.blocks.map(async (block) => {
+      if (!block.imageSrc || !isStoragePath(block.imageSrc)) return block;
+      const imageSrc = await resolveStorageUrl(block.imageSrc);
+      if (!imageSrc) {
+        throw new IngestError(
+          "We couldn't load one of that poster's images for review.",
+          'unreadable-file',
+        );
+      }
+      return { ...block, imageSrc };
+    }),
+  );
+  return { ...doc, blocks };
+}
+
+async function waitForPosterSnapshotAssets(): Promise<void> {
+  try {
+    await document.fonts?.ready;
+  } catch {
+    // Font loading is best effort; the CSS fallback remains capturable.
+  }
+
+  const canvas = document.getElementById('poster-canvas');
+  if (!canvas) {
+    throw new IngestError(
+      "We couldn't prepare that poster for review.",
+      'unreadable-file',
+    );
+  }
+  await Promise.all(
+    Array.from(canvas.querySelectorAll('img')).map(async (image) => {
+      try {
+        await image.decode();
+      } catch {
+        throw new IngestError(
+          "We couldn't load one of that poster's images for review.",
+          'unreadable-file',
+        );
+      }
+    }),
+  );
+}
+
 export default function PresentationChecker() {
   useDocumentMeta(APP_ROUTE_META['/presentation-checker'] ?? null);
   const plan = usePlan();
@@ -115,6 +167,7 @@ export default function PresentationChecker() {
   const [pastReviews, setPastReviews] = useState<PosterReviewSummary[]>([]);
   const [myPosters, setMyPosters] = useState<PosterListRow[]>([]);
   const [pickedPosterId, setPickedPosterId] = useState('');
+  const [posterSnapshot, setPosterSnapshot] = useState<PosterDoc | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const posterActivationInFlightRef = useRef(false);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
@@ -141,6 +194,13 @@ export default function PresentationChecker() {
     void refreshPosters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan.loading, plan.isGuest]);
+
+  useEffect(
+    () => () => {
+      if (artifact) revokePagePreviews(artifact.pages);
+    },
+    [artifact],
+  );
 
   async function startReview(
     job: () => Promise<NormalizedArtifact>,
@@ -224,7 +284,16 @@ export default function PresentationChecker() {
       }
       const doc: PosterDoc = row.data;
       await startReview(
-        () => ingestPosterForReview({ doc, posterId: row.id }),
+        async () => {
+          const snapshot = await preparePosterSnapshot(doc);
+          flushSync(() => setPosterSnapshot(snapshot));
+          try {
+            await waitForPosterSnapshotAssets();
+            return await ingestPosterForReview({ doc, posterId: row.id });
+          } finally {
+            flushSync(() => setPosterSnapshot(null));
+          }
+        },
         {
           posterId: row.id,
           reviewId,
@@ -252,6 +321,16 @@ export default function PresentationChecker() {
   ) {
     setActiveRegion({ page, bbox });
     setRegionAnnouncement(`Showing the highlighted issue on page ${page}.`);
+    focusPage(page);
+  }
+
+  function showPage(page: number) {
+    setActiveRegion(null);
+    setRegionAnnouncement(`Showing page ${page}.`);
+    focusPage(page);
+  }
+
+  function focusPage(page: number) {
     const pageElement = pageRefs.current.get(page);
     if (!pageElement) return;
     pageElement.focus({ preventScroll: true });
@@ -277,6 +356,7 @@ export default function PresentationChecker() {
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
+      {posterSnapshot && <PosterSnapshotCanvas doc={posterSnapshot} />}
       <PublicHeader />
       <div className="mx-auto w-full max-w-4xl flex-1 px-4 pb-8 pt-6">
         <h1 className="text-2xl font-bold text-white">
@@ -306,6 +386,7 @@ export default function PresentationChecker() {
             error={paywall}
             isGuest={plan.isGuest}
             hasActiveTerm={plan.hasActiveTerm}
+            hasReviewAddon={plan.hasReviewAddon}
             onDismiss={() => setPaywall(null)}
           />
         ) : phase === 'done' && result && artifact ? (
@@ -356,7 +437,7 @@ export default function PresentationChecker() {
                   className="relative shrink-0 focus:outline-none focus:ring-2 focus:ring-[#f97316] focus:ring-offset-2 focus:ring-offset-[#0a0a12]"
                 >
                   <img
-                    src={page.signedUrl}
+                    src={page.previewUrl ?? page.signedUrl}
                     alt={`Page ${page.pageNumber}`}
                     className="block w-40 rounded border border-[#1f1f2e]"
                   />
@@ -407,7 +488,9 @@ export default function PresentationChecker() {
                       const onJump =
                         anchor.kind === 'region'
                           ? () => showRegion(anchor.page, anchor.bbox)
-                          : undefined;
+                          : anchor.kind === 'slide'
+                            ? () => showPage(anchor.page)
+                            : undefined;
                       return (
                         <FindingCard
                           key={`${finding.category}-${index}`}
@@ -643,11 +726,13 @@ function ReviewPaywallPanel({
   error,
   isGuest,
   hasActiveTerm,
+  hasReviewAddon,
   onDismiss,
 }: {
   error: ReviewPaymentRequiredError;
   isGuest: boolean;
   hasActiveTerm: boolean;
+  hasReviewAddon: boolean;
   onDismiss: () => void;
 }) {
   const navigate = useNavigate();
@@ -702,7 +787,7 @@ function ReviewPaywallPanel({
         >
           Get the review pack
         </button>
-        {hasActiveTerm ? (
+        {hasActiveTerm && !hasReviewAddon ? (
           <button
             type="button"
             onClick={() => void buy('review_addon')}
@@ -710,7 +795,7 @@ function ReviewPaywallPanel({
           >
             Add weekly reviews to your term
           </button>
-        ) : (
+        ) : !hasActiveTerm ? (
           <span className="text-xs leading-relaxed text-[#6b7280]">
             The weekly review add-on rides on the semester term —{' '}
             <a
@@ -721,7 +806,7 @@ function ReviewPaywallPanel({
             </a>{' '}
             to add it.
           </span>
-        )}
+        ) : null}
       </div>
       {isGuest && (
         <p className="mt-3 text-xs leading-relaxed text-[#8b8f99]">

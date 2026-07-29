@@ -18,6 +18,11 @@ import {
   type NormalizedArtifact,
   type PageImage,
 } from './types';
+import {
+  downloadLocalPreviewUrl,
+  revokePagePreviews,
+} from './localPreview';
+import { removeReviewPages } from './uploadReviewPage';
 
 const BUCKET = 'poster-assets';
 const PPTX_MIME =
@@ -104,6 +109,10 @@ async function removeRawUpload(rawPath: string): Promise<void> {
 export async function fromPptx(
   file: File,
   ctx: IngestContext,
+  previewOpts: {
+    fetchFn?: typeof fetch;
+    createObjectUrl?: (blob: Blob) => string;
+  } = {},
 ): Promise<NormalizedArtifact> {
   assertFileAllowed(file, [PPTX_MIME]);
 
@@ -142,13 +151,27 @@ export async function fromPptx(
       { auth: true },
     );
     const pages = parseRenderedPages(response, ctx.userId);
-    const pageImages: PageImage[] = pages.map((page) => ({
-      pageNumber: page.pageNumber,
-      storagePath: page.storagePath,
-      signedUrl: page.url,
-      widthPx: page.widthPx,
-      heightPx: page.heightPx,
-    }));
+    const pageImages: PageImage[] = [];
+    try {
+      for (const page of pages) {
+        const previewUrl = await downloadLocalPreviewUrl(page.url, previewOpts);
+        pageImages.push({
+          pageNumber: page.pageNumber,
+          storagePath: page.storagePath,
+          signedUrl: page.url,
+          ...(previewUrl ? { previewUrl } : {}),
+          widthPx: page.widthPx,
+          heightPx: page.heightPx,
+        });
+      }
+    } catch {
+      revokePagePreviews(pageImages);
+      await removeReviewPages(pages.map((page) => page.storagePath));
+      throw new IngestError(
+        SERVER_RENDER_FAILED_MESSAGE,
+        'server-render-failed',
+      );
+    }
     return {
       pages: pageImages,
       meta: {

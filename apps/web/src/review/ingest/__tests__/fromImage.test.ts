@@ -90,6 +90,10 @@ describe('fromImage', () => {
       pageCount: 1,
     });
     expect(typeof artifact.meta.ingestedAt).toBe('string');
+    expect(mockRasterizeImage).toHaveBeenCalledWith(file, {
+      maxDimension: 2048,
+      maxSourcePixels: 40_000_000,
+    });
     expect(mockUploadReviewPage).toHaveBeenCalledWith(
       'u1',
       'sess-1',

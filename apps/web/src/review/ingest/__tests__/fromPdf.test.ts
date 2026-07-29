@@ -59,12 +59,12 @@ interface FakePage {
   render: ReturnType<typeof vi.fn>;
 }
 
-/** A fake pdfjs page: 612×792pt (letter) at scale 1; render resolves immediately. */
-function fakePdfPage(): FakePage {
+/** A fake pdfjs page: letter by default; render resolves immediately. */
+function fakePdfPage(width = 612, height = 792): FakePage {
   return {
     getViewport: ({ scale }: { scale: number }) => ({
-      width: 612 * scale,
-      height: 792 * scale,
+      width: width * scale,
+      height: height * scale,
     }),
     render: vi.fn(() => ({ promise: Promise.resolve() })),
   };
@@ -137,6 +137,23 @@ afterEach(() => {
 });
 
 describe('fromPdf', () => {
+  it('bounds a hostile page viewport before allocating its render canvas', async () => {
+    const page = fakePdfPage(100_000, 50_000);
+    const doc = fakePdfDoc(1, [page]);
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(doc) });
+    const canvas = fakeCanvas(NON_BLANK);
+    canvases = [canvas];
+
+    await fromPdf(pdfFile('huge-mediabox.pdf'), CTX);
+
+    expect(canvas.width).toBe(2048);
+    expect(canvas.height).toBe(1024);
+    expect(page.render).toHaveBeenCalledWith({
+      canvasContext: expect.anything(),
+      viewport: { width: 2048, height: 1024 },
+    });
+  });
+
   it('rejects a 30-page PDF before rendering any page', async () => {
     const pages = Array.from({ length: 30 }, () => fakePdfPage());
     const doc = fakePdfDoc(30, pages);

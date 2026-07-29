@@ -168,7 +168,7 @@ export async function captureThumbnail(
 export async function captureReviewImage(
   userId: string,
   posterId: string,
-): Promise<{ path: string; signedUrl: string } | null> {
+): Promise<{ path: string; signedUrl: string; blob: Blob } | null> {
   if (capturing) return null;
   capturing = true;
 
@@ -204,7 +204,7 @@ export async function captureReviewImage(
       .createSignedUrl(path, REVIEW_SIGNED_URL_TTL);
     if (signErr || !data) return null;
 
-    return { path, signedUrl: data.signedUrl };
+    return { path, signedUrl: data.signedUrl, blob };
   } catch {
     return null;
   } finally {

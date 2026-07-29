@@ -28,6 +28,7 @@ import {
   type NormalizedArtifact,
   type PageImage,
 } from './types';
+import { revokePagePreviews } from './localPreview';
 import { removeReviewPages, uploadReviewPage } from './uploadReviewPage';
 
 // pdfjs needs a worker URL. Vite resolves this with `?url`; the vitest
@@ -38,6 +39,7 @@ if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
 }
 
 const RENDER_SCALE = 2; // same rasterize idiom as imageImport.ts:623-631
+const REVIEW_LONG_EDGE_PX = 2048;
 const JPEG_QUALITY = 0.85;
 const UNREADABLE_COPY =
   "We couldn't read that file. Try exporting it as a PDF and upload that instead.";
@@ -69,7 +71,12 @@ export async function fromPdf(
         // crosses the same release boundary.
         canvas = document.createElement('canvas');
         const pdfPage = await pdf.getPage(n);
-        const viewport = pdfPage.getViewport({ scale: RENDER_SCALE });
+        const baseViewport = pdfPage.getViewport({ scale: 1 });
+        const renderScale = Math.min(
+          RENDER_SCALE,
+          REVIEW_LONG_EDGE_PX / Math.max(baseViewport.width, baseViewport.height),
+        );
+        const viewport = pdfPage.getViewport({ scale: renderScale });
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         const renderCtx = canvas.getContext('2d');
@@ -117,6 +124,7 @@ export async function fromPdf(
     };
   } catch (err) {
     if (pages.length > 0) {
+      revokePagePreviews(pages);
       await removeReviewPages(pages.map((page) => page.storagePath)).catch(() => undefined);
     }
     throw err;

@@ -57,6 +57,7 @@ describe('uploadReviewPage', () => {
       pageNumber: 3,
       storagePath: 'u1/review-temp/sess-1/page-3.jpg',
       signedUrl: 'https://signed/page-3',
+      previewUrl: expect.stringMatching(/^blob:/),
       widthPx: 1755,
       heightPx: 2048,
     });

@@ -26,6 +26,8 @@ import { formatRetryAfter } from '@/lib/apiClient';
 import { createCheckout } from '@/data/billing';
 import { stashCheckoutIntent } from '@/data/checkoutIntent';
 import { ingestPosterForReview } from '@/review/ingest';
+import { revokePagePreviews } from '@/review/ingest/localPreview';
+import type { PageImage } from '@/review/ingest/types';
 import {
   requestCritique,
   ReviewPaymentRequiredError,
@@ -92,8 +94,10 @@ export function ReviewTab({
     setRunning(true);
     setFailed(false);
     setPaywall(null);
+    let previewPages: PageImage[] = [];
     try {
       const artifact = await ingestPosterForReview({ doc, posterId });
+      previewPages = artifact.pages;
       const response = await requestCritique({
         sourceKind: 'postr',
         pages: artifact.pages.map((page) => ({
@@ -117,6 +121,7 @@ export function ReviewTab({
       console.error('[review] poster review failed:', err);
       setFailed(true);
     } finally {
+      revokePagePreviews(previewPages);
       inFlightRef.current = false;
       setRunning(false);
     }
@@ -150,6 +155,7 @@ export function ReviewTab({
       <PaywallPanel
         error={paywall ?? new ReviewPaymentRequiredError('no_credit')}
         hasActiveTerm={plan.hasActiveTerm}
+        hasReviewAddon={plan.hasReviewAddon}
         checkoutFailed={checkoutFailed}
         onBuy={(sku) => void buy(sku)}
       />
@@ -426,11 +432,13 @@ export function ReviewTab({
 function PaywallPanel({
   error,
   hasActiveTerm,
+  hasReviewAddon,
   checkoutFailed,
   onBuy,
 }: {
   error: ReviewPaymentRequiredError;
   hasActiveTerm: boolean;
+  hasReviewAddon: boolean;
   checkoutFailed: boolean;
   onBuy: (sku: 'review_pack' | 'review_addon') => void;
 }) {
@@ -491,7 +499,7 @@ function PaywallPanel({
         >
           Get the review pack
         </button>
-        {hasActiveTerm && (
+        {hasActiveTerm && !hasReviewAddon && (
           <button
             type="button"
             onClick={() => onBuy('review_addon')}

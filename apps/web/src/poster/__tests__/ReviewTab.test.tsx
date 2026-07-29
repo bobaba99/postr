@@ -317,6 +317,34 @@ describe('ReviewTab', () => {
     expect(screen.getByText(/Sleep loss impairs recall/i)).toBeTruthy();
   });
 
+  it('releases the editor-only local capture preview after the request settles', async () => {
+    const revoke = vi
+      .spyOn(URL, 'revokeObjectURL')
+      .mockImplementation(() => undefined);
+    ingestMock.mockResolvedValue({
+      ...ARTIFACT,
+      pages: [
+        {
+          ...ARTIFACT.pages[0]!,
+          previewUrl: 'blob:https://postr.test/editor-review',
+        },
+      ],
+    });
+    requestCritiqueMock.mockResolvedValue(CRITIQUE);
+    render(
+      <MemoryRouter>
+        <ReviewTab />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByText('Review this poster'));
+    await screen.findByTestId('score-design');
+
+    expect(revoke).toHaveBeenCalledWith(
+      'blob:https://postr.test/editor-review',
+    );
+  });
+
   it('clicking a block-anchored card calls onJumpToBlock with the blockId', async () => {
     requestCritiqueMock.mockResolvedValue(CRITIQUE);
     const onJumpToBlock = vi.fn();
@@ -351,6 +379,23 @@ describe('ReviewTab', () => {
     expect(screen.getByText(/Get the review pack/i)).toBeTruthy();
     expect(screen.queryByText('Review this poster')).toBeNull();
     expect(requestCritiqueMock).not.toHaveBeenCalled();
+  });
+
+  it('does not sell a second weekly add-on to an active add-on subscriber', () => {
+    planState.value = {
+      ...planState.value,
+      canReview: false,
+      reviewCredits: 0,
+      hasReviewAddon: true,
+    };
+    render(
+      <MemoryRouter>
+        <ReviewTab />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText(/Get the review pack/i)).toBeTruthy();
+    expect(screen.queryByText('Add weekly reviews')).toBeNull();
   });
 
   it('coalesces same-tick initial review activations into one request', async () => {

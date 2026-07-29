@@ -11,6 +11,7 @@
  * completes (Milestone 5).
  */
 import { supabase } from '@/lib/supabase';
+import { createLocalPreviewUrl } from './localPreview';
 import { IngestError, type PageImage } from './types';
 
 const BUCKET = 'poster-assets';
@@ -56,10 +57,12 @@ export async function uploadReviewPage(
       throw new Error('signing failed');
     }
 
+    const previewUrl = createLocalPreviewUrl(blob);
     return {
       pageNumber,
       storagePath,
       signedUrl: data.signedUrl,
+      ...(previewUrl ? { previewUrl } : {}),
       widthPx: dims.widthPx,
       heightPx: dims.heightPx,
     };
