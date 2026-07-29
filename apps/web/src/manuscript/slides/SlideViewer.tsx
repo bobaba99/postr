@@ -91,7 +91,13 @@ export function SlideViewer({
   const alignedStyledDeck =
     styledDeck && styledDeck.slides.length === deck.slides.length ? styledDeck : undefined;
   const activeStyledSlide = alignedStyledDeck?.slides[activeIndex];
-  const showVibeField = Boolean(styledDeck) && onVibeChange && onVibeSubmit;
+  // Gate on the SAME alignment guard the display path uses, not raw
+  // `styledDeck` presence — a count-mismatched styled response already
+  // falls back to the plain stage above; offering re-theme on a deck the
+  // UI doesn't trust enough to preview would let the user re-vibe (and,
+  // via SlidesWizard.tsx's `exportReady`, export) a styled deck they
+  // never actually saw. Preview, vibe, and export must all agree.
+  const showVibeField = Boolean(alignedStyledDeck) && onVibeChange && onVibeSubmit;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">

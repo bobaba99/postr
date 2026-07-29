@@ -129,6 +129,17 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [exportOpen, setExportOpen] = useState(false);
 
+  // The SAME alignment guard SlideViewer.tsx's display path uses (styled
+  // slide count must match the plain deck's — styleClient.ts's documented
+  // "one styled slide per input slide, in the same order" contract isn't
+  // enforced by the response schema itself). Preview, vibe re-theme, and
+  // export must all agree on trust: if a count-mismatched styled response
+  // makes the viewer fall back to the plain stage, the vibe field and the
+  // export buttons must ALSO fall back — never "previewed plain, but
+  // exported styled".
+  const alignedStyledDeck =
+    styledDeck && styledDeck.slides.length === deck.slides.length ? styledDeck : null;
+
   const rootRef = useRef<HTMLDivElement>(null);
   useWizardMotion(rootRef, { reducedMotion, activeStep, exportOpen });
 
@@ -292,14 +303,17 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
   // Both formats render the SAME styled deck (spec §3, "one model → pptx
   // + pdf"). `window.print` is retired: PDF is now the real client-side
   // styled writer, not the browser print dialog. Neither handler can run
-  // without a styled deck — the export drawer only offers them once one
-  // exists (see the JSX below), so this is a defensive no-op, not the
-  // primary guard.
+  // without an ALIGNED styled deck — gated on the same guard as the
+  // preview and the vibe field, not raw `styledDeck` presence, so a
+  // count-mismatched styled response can never be exported when the
+  // viewer didn't trust it enough to show. The export drawer only offers
+  // these once `exportReady` (below) is true, so this is defense in
+  // depth, not the primary guard.
   const handleExportPptx = async () => {
-    if (!styledDeck) return;
+    if (!alignedStyledDeck) return;
     // exportStyledDeckWithUtilitySlides awaits addIconLibrarySlide
     // internally (it rasterizes SVG→PNG) before the one final pptx.write.
-    const bytes = await exportStyledDeckWithUtilitySlides(styledDeck, palettes);
+    const bytes = await exportStyledDeckWithUtilitySlides(alignedStyledDeck, palettes);
     downloadBytes(
       bytes,
       'presentation.pptx',
@@ -311,8 +325,8 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
   // exportStyledDeckPdf never sees them (they're appended straight to the
   // pptxgenjs instance, never through StyledSlideDeck).
   const handleExportPdf = async () => {
-    if (!styledDeck) return;
-    const bytes = await exportStyledDeckPdf(styledDeck);
+    if (!alignedStyledDeck) return;
+    const bytes = await exportStyledDeckPdf(alignedStyledDeck);
     downloadBytes(bytes, 'presentation.pdf', 'application/pdf');
   };
 
@@ -388,7 +402,7 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
           open={exportOpen}
           onToggle={() => setExportOpen((o) => !o)}
           deck={deck}
-          exportReady={Boolean(styledDeck)}
+          exportReady={Boolean(alignedStyledDeck)}
           onExportPdf={() => void handleExportPdf()}
           onExportPptx={() => void handleExportPptx()}
         />

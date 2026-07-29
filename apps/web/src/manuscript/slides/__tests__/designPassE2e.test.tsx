@@ -127,6 +127,11 @@ describe('design pass e2e (Task 10)', () => {
   let exportStyledDeckPdfSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
+    // vi.spyOn on an already-spied module export reuses the same
+    // underlying mock, so its call history otherwise carries over from
+    // the previous test in this file. Restore first so each test starts
+    // from a clean, unspied module and gets a fresh spy + call count.
+    vi.restoreAllMocks();
     exportStyledDeckPptxSpy = vi
       .spyOn(utilitySlidesModule, 'exportStyledDeckWithUtilitySlides')
       .mockResolvedValue(new Uint8Array([1, 2, 3]));
@@ -274,5 +279,54 @@ describe('design pass e2e (Task 10)', () => {
     expect(pptxDeckArg).toHaveProperty('theme');
 
     window.print = originalPrint;
+  });
+
+  it('a count-mismatched styled response (schema-valid but wrong slide count) keeps preview, vibe, and export ALL on the plain path — never "previewed plain, exported styled"', async () => {
+    // A schema-valid style-deck response the server's zod schema doesn't
+    // rule out: fewer slides than the plain deck (e.g. the model dropped
+    // one). SlideViewer.tsx's display already falls back to the plain
+    // stage for this; this test locks that the VibeField and the export
+    // buttons agree — none of the three trusts an unaligned styled deck.
+    const MISMATCHED_STYLED_SLIDES = STYLED_SLIDES.slice(0, 3); // 3, not 7
+    const styleClient = vi.fn(async () => MISMATCHED_STYLED_SLIDES);
+    const themeClient = vi.fn(async () => THEME_V1);
+
+    await buildDeckThroughWizard({
+      testHooks: { extractClient: async () => injectedFindings, styleClient, themeClient },
+    });
+
+    await waitFor(() => {
+      expect(styleClient).toHaveBeenCalledTimes(1);
+      expect(themeClient).toHaveBeenCalledTimes(1);
+    });
+
+    // (a) Preview: the plain stage rendered, not the styled one — the
+    // count mismatch means SlideViewer never trusts styledDeck.slides[i].
+    await waitFor(() => {
+      expect(screen.getAllByText(/spacing \+34% recall/i).length).toBeGreaterThanOrEqual(1);
+    });
+    expect(screen.queryByLabelText(/preview \(styled\)/i)).not.toBeInTheDocument();
+
+    // (b) Vibe: the VibeField is not rendered at all — re-theming a deck
+    // the UI doesn't trust enough to preview must not be offered.
+    expect(screen.queryByPlaceholderText(/describe the vibe/i)).not.toBeInTheDocument();
+
+    // (c) Export: the drawer shows the "styling in progress" note and
+    // both export buttons are disabled — the export path must not allow
+    // exporting the untrusted styled deck just because styledDeck itself
+    // is non-null.
+    fireEvent.click(screen.getByRole('button', { name: /^export/i }));
+    const downloadPdfButton = await screen.findByRole('button', { name: /download pdf/i });
+    const exportPptxButton = screen.getByRole('button', { name: /powerpoint|\.pptx/i });
+    expect(downloadPdfButton).toBeDisabled();
+    expect(exportPptxButton).toBeDisabled();
+
+    // Clicking a disabled button is a no-op in the DOM, but assert the
+    // writers were never invoked either, as the real guard (not just the
+    // disabled attribute).
+    fireEvent.click(downloadPdfButton);
+    fireEvent.click(exportPptxButton);
+    expect(exportStyledDeckPdfSpy).not.toHaveBeenCalled();
+    expect(exportStyledDeckPptxSpy).not.toHaveBeenCalled();
   });
 });
