@@ -16,12 +16,14 @@ const {
   mockCanvasToBlob,
   mockReleaseCanvas,
   mockUploadReviewPage,
+  mockRemove,
 } = vi.hoisted(() => ({
   mockGetDocument: vi.fn(),
   mockDownscale: vi.fn(),
   mockCanvasToBlob: vi.fn(),
   mockReleaseCanvas: vi.fn(),
   mockUploadReviewPage: vi.fn(),
+  mockRemove: vi.fn(),
 }));
 
 vi.mock('pdfjs-dist', () => ({
@@ -39,8 +41,18 @@ vi.mock('../uploadReviewPage', () => ({
   uploadReviewPage: mockUploadReviewPage,
 }));
 
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    storage: {
+      from: () => ({
+        remove: mockRemove,
+      }),
+    },
+  },
+}));
+
 import { fromPdf } from '../fromPdf';
-import type { PageImage } from '../types';
+import { IngestError, type PageImage } from '../types';
 
 const CTX = { userId: 'u1', sessionId: 'sess-1' };
 
@@ -103,6 +115,7 @@ beforeEach(() => {
     }) as typeof document.createElement);
   mockDownscale.mockImplementation((c: HTMLCanvasElement) => c);
   mockCanvasToBlob.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
+  mockRemove.mockResolvedValue({ error: null });
   mockUploadReviewPage.mockImplementation(
     async (
       u: string,
@@ -198,6 +211,64 @@ describe('fromPdf', () => {
     expect(artifact.pages[0]!.heightPx).toBeGreaterThanOrEqual(1024);
     expect(artifact.pages[0]!.widthPx).toBeLessThanOrEqual(2048);
     expect(artifact.pages[0]!.heightPx).toBeLessThanOrEqual(2048);
+  });
+
+  it('keeps both dimensions within the audit ceiling for an oversized page', async () => {
+    const doc = fakePdfDoc(1, [fakePdfPage(3000, 2000)]);
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(doc) });
+    canvases = [fakeCanvas(NON_BLANK)];
+    const file = new File(['pdf-bytes'], 'oversized.pdf', {
+      type: 'application/pdf',
+    });
+
+    const artifact = await fromPdf(file, CTX);
+
+    expect(artifact.pages[0]!.widthPx).toBeLessThanOrEqual(2048);
+    expect(artifact.pages[0]!.heightPx).toBeLessThanOrEqual(2048);
+    expect(artifact.pages[0]!.widthPx).toBeGreaterThanOrEqual(1024);
+    expect(artifact.pages[0]!.heightPx).toBeGreaterThanOrEqual(1024);
+  });
+
+  it('removes prior uploads and preserves a typed error when a later page fails', async () => {
+    const doc = fakePdfDoc(3, [
+      fakePdfPage(),
+      fakePdfPage(),
+      fakePdfPage(),
+    ]);
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(doc) });
+    canvases = [fakeCanvas(NON_BLANK), fakeCanvas(NON_BLANK)];
+    const uploadError = new IngestError('Page 2 upload failed.', 'upload-failed');
+    mockUploadReviewPage.mockImplementationOnce(
+      async (
+        userId: string,
+        sessionId: string,
+        pageNumber: number,
+        _blob: Blob,
+        dimensions: { widthPx: number; heightPx: number },
+      ): Promise<PageImage> => ({
+        pageNumber,
+        storagePath: `${userId}/review-temp/${sessionId}/page-${pageNumber}.jpg`,
+        signedUrl: `https://signed/page-${pageNumber}`,
+        ...dimensions,
+      }),
+    );
+    mockUploadReviewPage.mockRejectedValueOnce(uploadError);
+    const file = new File(['pdf-bytes'], 'partial.pdf', {
+      type: 'application/pdf',
+    });
+
+    let caughtError: unknown;
+    try {
+      await fromPdf(file, CTX);
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(mockRemove).toHaveBeenCalledWith([
+      'u1/review-temp/sess-1/page-1.jpg',
+    ]);
+    expect(caughtError).toBe(uploadError);
+    expect(doc.getPage).toHaveBeenCalledTimes(2);
   });
 
   it('maps render failures to unreadable-file and releases the page canvas', async () => {

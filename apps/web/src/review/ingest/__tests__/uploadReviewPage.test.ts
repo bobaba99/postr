@@ -5,9 +5,10 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockUpload, mockCreateSignedUrl } = vi.hoisted(() => ({
+const { mockUpload, mockCreateSignedUrl, mockRemove } = vi.hoisted(() => ({
   mockUpload: vi.fn(),
   mockCreateSignedUrl: vi.fn(),
+  mockRemove: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase', () => ({
@@ -16,6 +17,7 @@ vi.mock('@/lib/supabase', () => ({
       from: () => ({
         upload: mockUpload,
         createSignedUrl: mockCreateSignedUrl,
+        remove: mockRemove,
       }),
     },
   },
@@ -30,6 +32,7 @@ beforeEach(() => {
     data: { signedUrl: 'https://signed/page-3' },
     error: null,
   });
+  mockRemove.mockResolvedValue({ error: null });
 });
 
 describe('uploadReviewPage', () => {
@@ -81,5 +84,25 @@ describe('uploadReviewPage', () => {
     await expect(
       uploadReviewPage('u1', 'sess-1', 1, new Blob(['x']), { widthPx: 1, heightPx: 1 }),
     ).rejects.toMatchObject({ name: 'IngestError', kind: 'upload-failed' });
+  });
+
+  it('removes the uploaded object and preserves a rejected signing error', async () => {
+    const signingError = new Error('signing unavailable');
+    mockCreateSignedUrl.mockRejectedValue(signingError);
+
+    let caughtError: unknown;
+    try {
+      await uploadReviewPage('u1', 'sess-1', 1, new Blob(['x']), {
+        widthPx: 1024,
+        heightPx: 1024,
+      });
+    } catch (error) {
+      caughtError = error;
+    }
+
+    expect(mockRemove).toHaveBeenCalledWith([
+      'u1/review-temp/sess-1/page-1.jpg',
+    ]);
+    expect(caughtError).toBe(signingError);
   });
 });
