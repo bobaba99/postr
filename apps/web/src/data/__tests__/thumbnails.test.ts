@@ -56,4 +56,11 @@ describe('reviewTargetWidthPx', () => {
     expect(targetWidthPx).toBe(1024);
     expect((3000 * targetWidthPx) / 1000).toBe(3072);
   });
+
+  it('never undershoots the short-edge floor for non-integral ratios', () => {
+    const targetWidthPx = reviewTargetWidthPx(3001, 1000);
+
+    expect(targetWidthPx).toBe(3074);
+    expect((1000 * targetWidthPx) / 3001).toBeGreaterThanOrEqual(1024);
+  });
 });

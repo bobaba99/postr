@@ -43,7 +43,8 @@ export function reviewTargetWidthPx(w: number, h: number): number {
     REVIEW_LONG_EDGE_PX / Math.max(w, h),
     REVIEW_SHORT_EDGE_PX / Math.min(w, h),
   );
-  return Math.round(w * scale);
+  // ceil, not round: a floor that rounding can undershoot is not a floor.
+  return Math.ceil(w * scale);
 }
 
 /**
