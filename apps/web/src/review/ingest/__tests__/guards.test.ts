@@ -175,4 +175,20 @@ describe('isCanvasBlank', () => {
   it('treats a large uniform render as blank (sampling stride > 1)', () => {
     expect(isCanvasBlank({ data: makePixels(200, 200) })).toBe(true);
   });
+
+  it('samples no more than 1024 pixels from a large render', () => {
+    let channelReads = 0;
+    const pixels = new Uint8ClampedArray(2047 * 4);
+    const observedPixels = new Proxy(pixels, {
+      get(target, property) {
+        if (typeof property === 'string' && /^\d+$/.test(property)) {
+          channelReads += 1;
+        }
+        return Reflect.get(target, property, target);
+      },
+    });
+
+    expect(isCanvasBlank({ data: observedPixels })).toBe(true);
+    expect(channelReads).toBeLessThanOrEqual(1024 * 3);
+  });
 });
