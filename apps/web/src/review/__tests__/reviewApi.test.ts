@@ -162,6 +162,72 @@ describe('requestCritique', () => {
     ]);
   });
 
+  it('keeps polling the same key through a rate-limit wait without cleaning pages', async () => {
+    vi.useFakeTimers();
+    const response = {
+      reviewId: 'rev-1',
+      stage: 'initial' as const,
+      critique: {
+        dimensionScores: { narrative: 4, design: 3, content: 5 },
+        attentionSummary: 'The original request completed.',
+        findings: [],
+      },
+    };
+    postJsonMock.mockImplementation(async () => {
+      const attempt = postJsonMock.mock.calls.length;
+      if (attempt === 1) throw new TypeError('Failed to fetch');
+      if (attempt <= 8) {
+        throw new ApiError(
+          'review_in_progress',
+          409,
+          { error: 'review_in_progress' },
+          2,
+        );
+      }
+      if (attempt === 9) {
+        throw new ApiError(
+          'rate_limited',
+          429,
+          { error: 'rate_limited' },
+          60,
+        );
+      }
+      return response;
+    });
+    const body = {
+      ...BODY,
+      pages: [
+        {
+          ...BODY.pages[0]!,
+          storagePath: 'user-1/review-temp/session-1/page-1.jpg',
+        },
+      ],
+    };
+
+    const pending = requestCritique(body);
+    await vi.waitFor(() => expect(postJsonMock).toHaveBeenCalledTimes(2));
+    for (let attempt = 3; attempt <= 9; attempt += 1) {
+      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.waitFor(() =>
+        expect(postJsonMock).toHaveBeenCalledTimes(attempt),
+      );
+    }
+
+    expect(removeMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60_000);
+    await expect(pending).resolves.toBe(response);
+
+    expect(postJsonMock).toHaveBeenCalledTimes(10);
+    expect(
+      postJsonMock.mock.calls.every(
+        (call) =>
+          JSON.stringify(call[1]) ===
+          JSON.stringify(postJsonMock.mock.calls[0]![1]),
+      ),
+    ).toBe(true);
+    expect(removeMock).toHaveBeenCalledTimes(1);
+  });
+
   it('adds one stable idempotency key to a follow-up', async () => {
     postJsonMock.mockResolvedValue({
       reviewId: 'rev-1',

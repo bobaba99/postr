@@ -33,6 +33,7 @@ import { removeReviewPages } from './ingest/uploadReviewPage';
 
 const IN_PROGRESS_POLL_MS = 2_000;
 const IN_PROGRESS_MAX_POLLS = 300; // ten minutes: matches the server lease
+const IN_PROGRESS_MAX_WAIT_MS = 10 * 60 * 1_000;
 
 export interface CritiqueRequestBody {
   sourceKind: ReviewSourceKind;
@@ -85,6 +86,10 @@ export async function requestCritique(
   try {
     return await post();
   } catch (err) {
+    const pollDeadline = Date.now() + IN_PROGRESS_MAX_WAIT_MS;
+    let shouldPoll =
+      isTransportError(err) || isReviewInProgressError(err);
+
     // A transport failure is ambiguous: the server may have completed the
     // review after the connection disappeared. Retry once with the exact same
     // key so the API replays instead of charging/calling the provider again.
@@ -93,6 +98,7 @@ export async function requestCritique(
         return await post();
       } catch (retryErr) {
         err = retryErr;
+        shouldPoll = isAmbiguousPollError(retryErr);
       }
     }
     // The first request may still be running when an ambiguous retry reaches
@@ -103,15 +109,20 @@ export async function requestCritique(
     let polls = 0;
     while (
       polls < IN_PROGRESS_MAX_POLLS &&
-      (isTransportError(err) ||
-        (err instanceof ApiError && isReviewInProgress(err)))
+      Date.now() < pollDeadline &&
+      shouldPoll
     ) {
       polls += 1;
-      await wait(IN_PROGRESS_POLL_MS);
+      const remainingMs = pollDeadline - Date.now();
+      await wait(Math.min(reviewPollDelayMs(err), remainingMs));
       try {
         return await post();
       } catch (pollError) {
         err = pollError;
+        // Once a request is known to be ambiguous, the route's outer
+        // per-minute limiter is also transient: wait its Retry-After and keep
+        // the same key alive instead of deleting pages and minting a new key.
+        shouldPoll = isAmbiguousPollError(pollError);
       }
     }
     if (err instanceof ApiError && err.status === 402) {
@@ -151,6 +162,28 @@ export async function requestCritique(
 
 function isTransportError(error: unknown): error is TypeError {
   return error instanceof TypeError;
+}
+
+function isReviewInProgressError(error: unknown): error is ApiError {
+  return error instanceof ApiError && isReviewInProgress(error);
+}
+
+function isAmbiguousPollError(error: unknown): boolean {
+  return (
+    isTransportError(error) ||
+    isReviewInProgressError(error) ||
+    (error instanceof ApiError && error.status === 429)
+  );
+}
+
+function reviewPollDelayMs(error: unknown): number {
+  if (error instanceof ApiError && error.status === 429) {
+    return Math.max(
+      IN_PROGRESS_POLL_MS,
+      (error.retryAfterSec ?? 60) * 1_000,
+    );
+  }
+  return IN_PROGRESS_POLL_MS;
 }
 
 function isReviewInProgress(error: ApiError): boolean {
