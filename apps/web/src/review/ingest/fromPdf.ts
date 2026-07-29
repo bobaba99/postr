@@ -24,6 +24,8 @@ if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
 const PDF_MIME_TYPES = ['application/pdf'] as const;
 const RENDER_SCALE = 2;
 const JPEG_QUALITY = 0.85;
+const MIN_AUDIT_DIMENSION_PX = 1024;
+const MAX_AUDIT_DIMENSION_PX = 2048;
 const UNREADABLE_COPY =
   "We couldn't read that file. Try exporting it as a PDF and upload that instead.";
 
@@ -40,6 +42,37 @@ function readFileBuffer(file: File): Promise<ArrayBuffer> {
     };
     reader.readAsArrayBuffer(file);
   });
+}
+
+function calculateRenderScale(widthPt: number, heightPt: number): number {
+  const shortEdge = Math.min(widthPt, heightPt);
+  const longEdge = Math.max(widthPt, heightPt);
+  return Math.min(
+    MAX_AUDIT_DIMENSION_PX / longEdge,
+    Math.max(RENDER_SCALE, MIN_AUDIT_DIMENSION_PX / shortEdge),
+  );
+}
+
+function ensureAuditDimensions(sourceCanvas: HTMLCanvasElement): HTMLCanvasElement {
+  if (Math.min(sourceCanvas.width, sourceCanvas.height) >= MIN_AUDIT_DIMENSION_PX) {
+    return sourceCanvas;
+  }
+
+  const outputCanvas = document.createElement('canvas');
+  outputCanvas.width = Math.max(MIN_AUDIT_DIMENSION_PX, sourceCanvas.width);
+  outputCanvas.height = Math.max(MIN_AUDIT_DIMENSION_PX, sourceCanvas.height);
+  const outputContext = outputCanvas.getContext('2d');
+  if (!outputContext) {
+    throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+  }
+  outputContext.fillStyle = '#ffffff';
+  outputContext.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+  outputContext.drawImage(
+    sourceCanvas,
+    Math.round((outputCanvas.width - sourceCanvas.width) / 2),
+    Math.round((outputCanvas.height - sourceCanvas.height) / 2),
+  );
+  return outputCanvas;
 }
 
 export async function fromPdf(
@@ -62,20 +95,24 @@ export async function fromPdf(
 
     for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
       const page = await pdfDocument.getPage(pageNumber);
-      const viewport = page.getViewport({ scale: RENDER_SCALE });
+      const baseViewport = page.getViewport({ scale: 1 });
+      const viewport = page.getViewport({
+        scale: calculateRenderScale(baseViewport.width, baseViewport.height),
+      });
       const sourceCanvas = document.createElement('canvas');
-      sourceCanvas.width = viewport.width;
-      sourceCanvas.height = viewport.height;
+      sourceCanvas.width = Math.ceil(viewport.width);
+      sourceCanvas.height = Math.ceil(viewport.height);
       const sourceContext = sourceCanvas.getContext('2d');
       if (!sourceContext) {
         throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
       }
 
       await page.render({ canvasContext: sourceContext, viewport }).promise;
-      const reviewCanvas = downscaleForVision(sourceCanvas);
+      const cappedCanvas = downscaleForVision(sourceCanvas);
+      let reviewCanvas = cappedCanvas;
 
       try {
-        const reviewContext = reviewCanvas.getContext('2d');
+        const reviewContext = cappedCanvas.getContext('2d');
         if (!reviewContext) {
           throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
         }
@@ -83,8 +120,8 @@ export async function fromPdf(
         const imageData = reviewContext.getImageData(
           0,
           0,
-          reviewCanvas.width,
-          reviewCanvas.height,
+          cappedCanvas.width,
+          cappedCanvas.height,
         );
         if (isCanvasBlank(imageData)) {
           throw new IngestError(
@@ -93,6 +130,7 @@ export async function fromPdf(
           );
         }
 
+        reviewCanvas = ensureAuditDimensions(cappedCanvas);
         const dimensions = {
           widthPx: reviewCanvas.width,
           heightPx: reviewCanvas.height,
@@ -113,7 +151,10 @@ export async function fromPdf(
         );
       } finally {
         releaseCanvas(sourceCanvas);
-        if (reviewCanvas !== sourceCanvas) {
+        if (cappedCanvas !== sourceCanvas) {
+          releaseCanvas(cappedCanvas);
+        }
+        if (reviewCanvas !== sourceCanvas && reviewCanvas !== cappedCanvas) {
           releaseCanvas(reviewCanvas);
         }
       }

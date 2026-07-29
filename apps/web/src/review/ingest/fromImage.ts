@@ -10,10 +10,47 @@ import { uploadReviewPage } from './uploadReviewPage';
 
 const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg'] as const;
 const JPEG_QUALITY = 0.85;
+const MIN_AUDIT_DIMENSION_PX = 1024;
+const MAX_AUDIT_DIMENSION_PX = 2048;
 const UNREADABLE_COPY =
   "We couldn't read that file. Try exporting it as a PDF and upload that instead.";
 const BLANK_IMAGE_COPY =
   'That image looks blank — the checker needs something to read. Check the file and try again.';
+
+function ensureAuditDimensions(sourceCanvas: HTMLCanvasElement): HTMLCanvasElement {
+  const shortEdge = Math.min(sourceCanvas.width, sourceCanvas.height);
+  if (shortEdge >= MIN_AUDIT_DIMENSION_PX) {
+    return sourceCanvas;
+  }
+
+  const longEdge = Math.max(sourceCanvas.width, sourceCanvas.height);
+  const scale = Math.min(
+    MAX_AUDIT_DIMENSION_PX / longEdge,
+    MIN_AUDIT_DIMENSION_PX / shortEdge,
+  );
+  const drawWidth = Math.round(sourceCanvas.width * scale);
+  const drawHeight = Math.round(sourceCanvas.height * scale);
+  const outputCanvas = document.createElement('canvas');
+  outputCanvas.width = Math.max(MIN_AUDIT_DIMENSION_PX, drawWidth);
+  outputCanvas.height = Math.max(MIN_AUDIT_DIMENSION_PX, drawHeight);
+
+  const outputContext = outputCanvas.getContext('2d');
+  if (!outputContext) {
+    throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+  }
+  outputContext.fillStyle = '#ffffff';
+  outputContext.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+  outputContext.imageSmoothingEnabled = true;
+  outputContext.imageSmoothingQuality = 'high';
+  outputContext.drawImage(
+    sourceCanvas,
+    Math.round((outputCanvas.width - drawWidth) / 2),
+    Math.round((outputCanvas.height - drawHeight) / 2),
+    drawWidth,
+    drawHeight,
+  );
+  return outputCanvas;
+}
 
 export async function fromImage(
   file: File,
@@ -28,9 +65,10 @@ export async function fromImage(
     throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
   }
 
-  const reviewCanvas = downscaleForVision(sourceCanvas);
+  const cappedCanvas = downscaleForVision(sourceCanvas);
+  let reviewCanvas = cappedCanvas;
   try {
-    const reviewContext = reviewCanvas.getContext('2d');
+    const reviewContext = cappedCanvas.getContext('2d');
     if (!reviewContext) {
       throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
     }
@@ -38,13 +76,14 @@ export async function fromImage(
     const imageData = reviewContext.getImageData(
       0,
       0,
-      reviewCanvas.width,
-      reviewCanvas.height,
+      cappedCanvas.width,
+      cappedCanvas.height,
     );
     if (isCanvasBlank(imageData)) {
       throw new IngestError(BLANK_IMAGE_COPY, 'blank-render');
     }
 
+    reviewCanvas = ensureAuditDimensions(cappedCanvas);
     const dimensions = {
       widthPx: reviewCanvas.width,
       heightPx: reviewCanvas.height,
@@ -72,7 +111,10 @@ export async function fromImage(
     };
   } finally {
     releaseCanvas(sourceCanvas);
-    if (reviewCanvas !== sourceCanvas) {
+    if (cappedCanvas !== sourceCanvas) {
+      releaseCanvas(cappedCanvas);
+    }
+    if (reviewCanvas !== sourceCanvas && reviewCanvas !== cappedCanvas) {
       releaseCanvas(reviewCanvas);
     }
   }
