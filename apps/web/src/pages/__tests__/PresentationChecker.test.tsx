@@ -492,6 +492,37 @@ describe('PresentationChecker page', () => {
     expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
   });
 
+  it('jumps a native block-anchored card to the single poster page', async () => {
+    requestCritiqueMock.mockResolvedValue({
+      ...CRITIQUE,
+      critique: {
+        ...CRITIQUE.critique,
+        findings: [
+          {
+            ...CRITIQUE.critique.findings[0]!,
+            anchor: { kind: 'block' as const, blockId: 'results-block' },
+          },
+        ],
+      },
+    });
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+    uploadFile();
+    await screen.findByTestId('score-narrative');
+
+    fireEvent.click(
+      screen.getByText(
+        'The decorative header photo outranks the results figure.',
+      ),
+    );
+
+    expect(screen.getByTestId('review-page-1')).toHaveFocus();
+    expect(screen.getByRole('status')).toHaveTextContent('Showing page 1.');
+  });
+
   it('coalesces rapid activation while a Postr poster is loading', async () => {
     const loadingPoster = deferred<typeof POSTER_ROW>();
     listPostersMock.mockResolvedValue([POSTER_ROW]);

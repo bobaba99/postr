@@ -490,7 +490,7 @@ export default function PresentationChecker() {
                           ? () => showRegion(anchor.page, anchor.bbox)
                           : anchor.kind === 'slide'
                             ? () => showPage(anchor.page)
-                            : undefined;
+                            : () => showPage(1);
                       return (
                         <FindingCard
                           key={`${finding.category}-${index}`}
