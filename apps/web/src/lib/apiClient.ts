@@ -24,6 +24,16 @@ export class ApiError extends Error {
   }
 }
 
+/** A 2xx response whose JSON body could not be read is ambiguous: the server
+ * may already have committed the operation, so idempotent callers must retry
+ * the same logical request rather than treating it as a successful `null`. */
+export class ApiResponseDecodeError extends TypeError {
+  constructor(message = 'Successful API response body could not be decoded.') {
+    super(message);
+    this.name = 'ApiResponseDecodeError';
+  }
+}
+
 /** Convert a `Retry-After` seconds value into a human-readable
  *  duration: "37 seconds", "2 minutes", "3 hours", "tomorrow".
  *  Each unit rolls over cleanly — 60 seconds becomes "1 minute"
@@ -77,10 +87,11 @@ export async function postJson<T = unknown>(
   });
 
   let payload: unknown = null;
+  let decodeFailed = false;
   try {
     payload = await res.json();
   } catch {
-    // Non-JSON response — leave payload null.
+    decodeFailed = true;
   }
 
   if (!res.ok) {
@@ -108,6 +119,10 @@ export async function postJson<T = unknown>(
         ? parseInt(retryAfterRaw, 10)
         : undefined;
     throw new ApiError(message, res.status, payload, retryAfterSec);
+  }
+
+  if (decodeFailed) {
+    throw new ApiResponseDecodeError();
   }
 
   return payload as T;

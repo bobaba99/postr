@@ -22,22 +22,27 @@ import PresentationChecker from '../../pages/PresentationChecker';
 const {
   requestCritiqueMock,
   listMyReviewsMock,
+  getMyReviewMock,
   ingestFileMock,
   ingestPosterMock,
   listPostersMock,
   loadPosterMock,
+  createCheckoutMock,
 } = vi.hoisted(() => ({
   requestCritiqueMock: vi.fn(),
-  listMyReviewsMock: vi.fn(async () => []),
+  listMyReviewsMock: vi.fn(async (): Promise<unknown[]> => []),
+  getMyReviewMock: vi.fn(),
   ingestFileMock: vi.fn(),
   ingestPosterMock: vi.fn(),
   listPostersMock: vi.fn(async (): Promise<unknown[]> => []),
   loadPosterMock: vi.fn(),
+  createCheckoutMock: vi.fn(),
 }));
 
 vi.mock('@/review/reviewApi', () => ({
   requestCritique: requestCritiqueMock,
   listMyReviews: listMyReviewsMock,
+  getMyReview: getMyReviewMock,
   ReviewPaymentRequiredError: class extends Error {
     readonly reason: string;
     readonly retryAfterSec?: number;
@@ -74,7 +79,7 @@ vi.mock('@/data/posters', () => ({
   listPosters: listPostersMock,
   loadPoster: loadPosterMock,
 }));
-vi.mock('@/data/billing', () => ({ createCheckout: vi.fn() }));
+vi.mock('@/data/billing', () => ({ createCheckout: createCheckoutMock }));
 vi.mock('@/data/checkoutIntent', () => ({ stashCheckoutIntent: vi.fn() }));
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -260,9 +265,11 @@ function uploadFile(name = 'talk.pdf') {
 }
 
 beforeEach(() => {
+  vi.stubEnv('VITE_ENABLE_REVIEW_PPTX', 'true');
   requestCritiqueMock.mockReset();
   listMyReviewsMock.mockReset();
   listMyReviewsMock.mockResolvedValue([]);
+  getMyReviewMock.mockReset();
   ingestFileMock.mockReset();
   ingestFileMock.mockResolvedValue(ARTIFACT);
   ingestPosterMock.mockReset();
@@ -270,6 +277,7 @@ beforeEach(() => {
   listPostersMock.mockReset();
   listPostersMock.mockResolvedValue([]);
   loadPosterMock.mockReset();
+  createCheckoutMock.mockReset();
   scrollIntoViewMock.mockReset();
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
     configurable: true,
@@ -289,10 +297,41 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
 describe('PresentationChecker page', () => {
+  it('hides PPTX and explains the PDF fallback until the worker smoke passes', async () => {
+    vi.stubEnv('VITE_ENABLE_REVIEW_PPTX', 'false');
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText('File to review')).toHaveAttribute(
+      'accept',
+      '.pdf,.png,.jpg',
+    );
+    expect(screen.getByText(/PPTX is coming next/i)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('File to review'), {
+      target: {
+        files: [
+          new File(['pptx'], 'talk.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          }),
+        ],
+      },
+    });
+
+    expect(
+      await screen.findByRole('alert'),
+    ).toHaveTextContent(/Export the deck as a PDF/i);
+    expect(ingestFileMock).not.toHaveBeenCalled();
+  });
+
   it('happy path: upload → scores, finding cards, and the personalized example', async () => {
     requestCritiqueMock.mockResolvedValue(CRITIQUE);
     render(
@@ -404,6 +443,36 @@ describe('PresentationChecker page', () => {
         name: /Add weekly reviews to your term/i,
       }),
     ).toBeNull();
+  });
+
+  it('synchronously disables add-on checkout and coalesces a double click', async () => {
+    planState.value = {
+      ...planState.value,
+      hasActiveTerm: true,
+    };
+    requestCritiqueMock.mockRejectedValue(
+      new ReviewPaymentRequiredError('no_credit'),
+    );
+    const checkoutGate = deferred<string>();
+    createCheckoutMock.mockReturnValue(checkoutGate.promise);
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+    uploadFile();
+
+    const button = await screen.findByRole('button', {
+      name: /Add weekly reviews to your term/i,
+    }) as HTMLButtonElement;
+    act(() => {
+      button.click();
+      button.click();
+    });
+
+    expect(createCheckoutMock).toHaveBeenCalledTimes(1);
+    expect(createCheckoutMock).toHaveBeenCalledWith('review_addon');
+    expect(button).toBeDisabled();
   });
 
   it('stops a guest PPTX before the permanent-account render endpoint', async () => {
@@ -772,5 +841,130 @@ describe('PresentationChecker page', () => {
       expect.any(Error),
     );
     consoleError.mockRestore();
+  });
+
+  it('reopens an uploaded review after reload and resumes its follow-up with the revised file', async () => {
+    const summary = {
+      id: 'rev-upload',
+      posterId: null,
+      sourceKind: 'pdf' as const,
+      status: 'complete' as const,
+      stage: 'initial' as const,
+      filename: 'conference-talk.pdf',
+      pageCount: 2,
+      dimensionScores: CRITIQUE.critique.dimensionScores,
+      createdAt: '2026-07-29T10:00:00Z',
+    };
+    listMyReviewsMock.mockResolvedValue([summary]);
+    getMyReviewMock.mockResolvedValue({
+      ...summary,
+      critique: CRITIQUE.critique,
+    });
+    requestCritiqueMock.mockResolvedValue({
+      ...CRITIQUE,
+      reviewId: summary.id,
+      stage: 'closed',
+    });
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Open review: conference-talk.pdf',
+      }),
+    );
+
+    expect(getMyReviewMock).toHaveBeenCalledWith('rev-upload');
+    expect(await screen.findByTestId('score-narrative')).toHaveTextContent(
+      '4/5',
+    );
+    expect(
+      screen.getByText(/original temporary file is no longer available/i),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByText(/Request your one follow-up/i));
+    expect(
+      screen.getByText(/Pick the revised file/i),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Choose the revised file' }),
+    );
+
+    ingestFileMock.mockResolvedValue({
+      ...ARTIFACT,
+      meta: {
+        ...ARTIFACT.meta,
+        filename: 'conference-talk-revised.pdf',
+      },
+    });
+    uploadFile('conference-talk-revised.pdf');
+
+    await waitFor(() =>
+      expect(requestCritiqueMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filename: 'conference-talk-revised.pdf',
+          reviewId: 'rev-upload',
+        }),
+      ),
+    );
+  });
+
+  it('reopens a Postr review after reload and regenerates the poster for its included follow-up', async () => {
+    const summary = {
+      id: 'rev-poster',
+      posterId: POSTER_ROW.id,
+      sourceKind: 'postr' as const,
+      status: 'complete' as const,
+      stage: 'initial' as const,
+      filename: null,
+      pageCount: 1,
+      dimensionScores: CRITIQUE.critique.dimensionScores,
+      createdAt: '2026-07-29T10:00:00Z',
+    };
+    listMyReviewsMock.mockResolvedValue([summary]);
+    getMyReviewMock.mockResolvedValue({
+      ...summary,
+      critique: CRITIQUE.critique,
+    });
+    loadPosterMock.mockResolvedValue(POSTER_ROW);
+    requestCritiqueMock.mockResolvedValue({
+      ...CRITIQUE,
+      reviewId: summary.id,
+      stage: 'closed',
+    });
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Open review: Postr poster',
+      }),
+    );
+    expect(await screen.findByTestId('score-design')).toHaveTextContent('2/5');
+    fireEvent.click(screen.getByText(/Request your one follow-up/i));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Run the follow-up on my poster',
+      }),
+    );
+
+    await waitFor(() =>
+      expect(requestCritiqueMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          posterId: POSTER_ROW.id,
+          reviewId: 'rev-poster',
+        }),
+      ),
+    );
+    expect(loadPosterMock).toHaveBeenCalledWith(POSTER_ROW.id);
+    expect(ingestPosterMock).toHaveBeenCalledWith({
+      doc: POSTER_ROW.data,
+      posterId: POSTER_ROW.id,
+    });
   });
 });

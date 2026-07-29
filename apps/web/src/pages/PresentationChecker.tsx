@@ -37,7 +37,9 @@ import {
   type NormalizedArtifact,
 } from '@/review/ingest/types';
 import { revokePagePreviews } from '@/review/ingest/localPreview';
+import { isReviewPptxEnabled } from '@/review/flags';
 import {
+  getMyReview,
   listMyReviews,
   requestCritique,
   ReviewPaymentRequiredError,
@@ -69,7 +71,7 @@ const INGEST_ERROR_MESSAGES: Record<IngestErrorKind, string> = {
   'too-many-pages':
     'That file has more than 24 pages — trim it to 24 pages or fewer and try again.',
   'unsupported-mime':
-    'That file type is not supported — upload a PDF, PPTX, PNG, or JPG.',
+    'That file type is not supported — upload a PDF, PNG, or JPG.',
   'file-too-large':
     'That file is too large to review — export a lighter copy and try again.',
   'unreadable-file':
@@ -159,6 +161,7 @@ async function waitForPosterSnapshotAssets(): Promise<void> {
 export default function PresentationChecker() {
   useDocumentMeta(APP_ROUTE_META['/presentation-checker'] ?? null);
   const plan = usePlan();
+  const pptxEnabled = isReviewPptxEnabled();
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -178,7 +181,10 @@ export default function PresentationChecker() {
   const [myPosters, setMyPosters] = useState<PosterListRow[]>([]);
   const [pickedPosterId, setPickedPosterId] = useState('');
   const [posterSnapshot, setPosterSnapshot] = useState<PosterDoc | null>(null);
+  const [reopenedFromHistory, setReopenedFromHistory] = useState(false);
+  const [openingReviewId, setOpeningReviewId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingFollowupReviewIdRef = useRef<string | null>(null);
   const posterActivationInFlightRef = useRef(false);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
 
@@ -237,6 +243,7 @@ export default function PresentationChecker() {
     }
 
     setArtifact(nextArtifact);
+    setReopenedFromHistory(false);
     setSourcePosterId(options.posterId ?? null);
     setPhase('reviewing');
     try {
@@ -257,6 +264,7 @@ export default function PresentationChecker() {
       setResult(nextResult);
       setFollowupConfirm(false);
       setPendingFollowup(false);
+      pendingFollowupReviewIdRef.current = null;
       setPhase('done');
       void refreshHistory();
     } catch (error) {
@@ -277,6 +285,14 @@ export default function PresentationChecker() {
       file.type ===
         'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
       file.name.toLowerCase().endsWith('.pptx');
+    if (isPptx && !pptxEnabled) {
+      setPaywall(null);
+      setErrorMessage(
+        'PPTX review is coming next. Export the deck as a PDF to review it now.',
+      );
+      setPhase('error');
+      return;
+    }
     if (plan.isGuest && isPptx) {
       setErrorMessage(null);
       setPaywall(new ReviewPaymentRequiredError('no_credit'));
@@ -284,7 +300,9 @@ export default function PresentationChecker() {
       return;
     }
     await startReview(() => ingestFileForReview(file), {
-      reviewId: pendingFollowup ? result?.reviewId : undefined,
+      reviewId:
+        pendingFollowupReviewIdRef.current ??
+        (pendingFollowup ? result?.reviewId : undefined),
     });
   }
 
@@ -336,6 +354,41 @@ export default function PresentationChecker() {
     await runPosterReview(sourcePosterId, result.reviewId);
   }
 
+  async function openPastReview(review: PosterReviewSummary) {
+    if (openingReviewId) return;
+    setOpeningReviewId(review.id);
+    setPaywall(null);
+    setErrorMessage(null);
+    try {
+      const detail = await getMyReview(review.id);
+      if (!detail || detail.status !== 'complete') {
+        throw new Error('review is not available');
+      }
+      setArtifact(null);
+      setSourcePosterId(detail.posterId);
+      setResult({
+        reviewId: detail.id,
+        stage: detail.stage === 'initial' ? 'initial' : 'closed',
+        critique: detail.critique,
+      });
+      setReopenedFromHistory(true);
+      setFollowupConfirm(false);
+      setPendingFollowup(false);
+      pendingFollowupReviewIdRef.current = null;
+      setActiveRegion(null);
+      setRegionAnnouncement('');
+      setPhase('done');
+    } catch (error) {
+      console.error('[review] history detail read failed:', error);
+      setErrorMessage(
+        'That saved review could not be opened. Refresh and try again.',
+      );
+      setPhase('error');
+    } finally {
+      setOpeningReviewId(null);
+    }
+  }
+
   function showRegion(
     page: number,
     bbox: [number, number, number, number],
@@ -365,9 +418,11 @@ export default function PresentationChecker() {
   function resetForNewReview() {
     setResult(null);
     setArtifact(null);
+    setReopenedFromHistory(false);
     setSourcePosterId(null);
     setFollowupConfirm(false);
     setPendingFollowup(false);
+    pendingFollowupReviewIdRef.current = null;
     setActiveRegion(null);
     setRegionAnnouncement('');
     setPhase('idle');
@@ -392,7 +447,11 @@ export default function PresentationChecker() {
           id="review-file"
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.pptx,.png,.jpg"
+          accept={
+            pptxEnabled
+              ? '.pdf,.pptx,.png,.jpg'
+              : '.pdf,.png,.jpg'
+          }
           aria-label="File to review"
           className="sr-only"
           onChange={(event) => {
@@ -410,12 +469,23 @@ export default function PresentationChecker() {
             hasReviewAddon={plan.hasReviewAddon}
             onDismiss={() => setPaywall(null)}
           />
-        ) : phase === 'done' && result && artifact ? (
+        ) : phase === 'done' && result ? (
           <section
             aria-label="Review results"
             className="mt-5 flex flex-col gap-5"
           >
             <ReviewScoreHeader scores={result.critique.dimensionScores} />
+
+            {reopenedFromHistory && !artifact && (
+              <div
+                role="note"
+                className="rounded-md border border-[#3a3050] bg-[#17142a] px-4 py-3 text-sm leading-relaxed text-[#c8cad0]"
+              >
+                {sourcePosterId
+                  ? 'This saved critique is ready. Its old preview is no longer retained; the follow-up will capture your current saved poster.'
+                  : 'The original temporary file is no longer available. Your critique is saved; select the revised file when you are ready to use the included follow-up.'}
+              </div>
+            )}
 
             <div className="rounded-lg border border-[#1f1f2e] bg-[#0d0d15] p-4">
               <h2 className="text-sm font-semibold text-[#e2e2e8]">
@@ -437,47 +507,49 @@ export default function PresentationChecker() {
               </div>
             )}
 
-            <div
-              aria-label="Reviewed pages"
-              className="flex gap-2 overflow-x-auto pb-1"
-            >
-              {artifact.pages.map((page) => (
-                <div
-                  key={page.pageNumber}
-                  ref={(element) => {
-                    if (element) {
-                      pageRefs.current.set(page.pageNumber, element);
-                    } else {
-                      pageRefs.current.delete(page.pageNumber);
-                    }
-                  }}
-                  role="group"
-                  aria-label={`Reviewed page ${page.pageNumber}`}
-                  data-testid={`review-page-${page.pageNumber}`}
-                  tabIndex={-1}
-                  className="relative shrink-0 focus:outline-none focus:ring-2 focus:ring-[#f97316] focus:ring-offset-2 focus:ring-offset-[#0a0a12]"
-                >
-                  <img
-                    src={page.previewUrl ?? page.signedUrl}
-                    alt={`Page ${page.pageNumber}`}
-                    className="block w-40 rounded border border-[#1f1f2e]"
-                  />
-                  {activeRegion &&
-                    activeRegion.page === page.pageNumber && (
-                      <div
-                        data-testid="region-overlay"
-                        className="pointer-events-none absolute rounded-sm border-2 border-[#f97316] bg-[#f9731622]"
-                        style={{
-                          left: `${activeRegion.bbox[0] * 100}%`,
-                          top: `${activeRegion.bbox[1] * 100}%`,
-                          width: `${activeRegion.bbox[2] * 100}%`,
-                          height: `${activeRegion.bbox[3] * 100}%`,
-                        }}
-                      />
-                    )}
-                </div>
-              ))}
-            </div>
+            {artifact && (
+              <div
+                aria-label="Reviewed pages"
+                className="flex gap-2 overflow-x-auto pb-1"
+              >
+                {artifact.pages.map((page) => (
+                  <div
+                    key={page.pageNumber}
+                    ref={(element) => {
+                      if (element) {
+                        pageRefs.current.set(page.pageNumber, element);
+                      } else {
+                        pageRefs.current.delete(page.pageNumber);
+                      }
+                    }}
+                    role="group"
+                    aria-label={`Reviewed page ${page.pageNumber}`}
+                    data-testid={`review-page-${page.pageNumber}`}
+                    tabIndex={-1}
+                    className="relative shrink-0 focus:outline-none focus:ring-2 focus:ring-[#f97316] focus:ring-offset-2 focus:ring-offset-[#0a0a12]"
+                  >
+                    <img
+                      src={page.previewUrl ?? page.signedUrl}
+                      alt={`Page ${page.pageNumber}`}
+                      className="block w-40 rounded border border-[#1f1f2e]"
+                    />
+                    {activeRegion &&
+                      activeRegion.page === page.pageNumber && (
+                        <div
+                          data-testid="region-overlay"
+                          className="pointer-events-none absolute rounded-sm border-2 border-[#f97316] bg-[#f9731622]"
+                          style={{
+                            left: `${activeRegion.bbox[0] * 100}%`,
+                            top: `${activeRegion.bbox[1] * 100}%`,
+                            width: `${activeRegion.bbox[2] * 100}%`,
+                            height: `${activeRegion.bbox[3] * 100}%`,
+                          }}
+                        />
+                      )}
+                  </div>
+                ))}
+              </div>
+            )}
             <p
               role="status"
               aria-live="polite"
@@ -571,6 +643,8 @@ export default function PresentationChecker() {
                         <button
                           type="button"
                           onClick={() => {
+                            pendingFollowupReviewIdRef.current =
+                              result.reviewId;
                             setPendingFollowup(true);
                             fileInputRef.current?.click();
                           }}
@@ -648,9 +722,18 @@ export default function PresentationChecker() {
                     Upload a poster PDF, talk deck, or image
                   </div>
                   <p className="mt-1 text-xs text-[#6b7280]">
-                    PDF, PPTX, PNG, or JPG — up to 24 pages. Nothing is
-                    published; the review is only for you.
+                    {pptxEnabled
+                      ? 'PDF, PPTX, PNG, or JPG'
+                      : 'PDF, PNG, or JPG'}{' '}
+                    — up to 24 pages. Nothing is published; the review is only
+                    for you.
                   </p>
+                  {!pptxEnabled && (
+                    <p className="mt-1 text-xs text-[#8b8f99]">
+                      PPTX is coming next. Export your deck as a PDF to review
+                      it now.
+                    </p>
+                  )}
                   <button
                     type="button"
                     disabled={plan.loading}
@@ -713,24 +796,38 @@ export default function PresentationChecker() {
                 </h2>
                 <ul className="mt-2 space-y-2">
                   {pastReviews.map((review) => (
-                    <li
-                      key={review.id}
-                      className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-[#1f1f2e] bg-[#0d0d15] px-3 py-2 text-xs text-[#9ca3af]"
-                    >
-                      <span className="font-semibold text-[#c8cad0]">
-                        {review.filename ?? SOURCE_LABELS[review.sourceKind]}
-                      </span>
-                      <span>
-                        {new Date(review.createdAt).toLocaleDateString()}
-                      </span>
-                      <span>{STAGE_LABELS[review.stage]}</span>
-                      {review.dimensionScores && (
-                        <span>
-                          Narrative {review.dimensionScores.narrative}/5 ·
-                          Design {review.dimensionScores.design}/5 · Content{' '}
-                          {review.dimensionScores.content}/5
+                    <li key={review.id}>
+                      <button
+                        type="button"
+                        aria-label={`Open review: ${review.filename ?? SOURCE_LABELS[review.sourceKind]}`}
+                        disabled={
+                          review.status !== 'complete' ||
+                          openingReviewId !== null
+                        }
+                        onClick={() => void openPastReview(review)}
+                        className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-[#1f1f2e] bg-[#0d0d15] px-3 py-2 text-left text-xs text-[#9ca3af] hover:border-[#7c6aed] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9b8cf0]"
+                      >
+                        <span className="font-semibold text-[#c8cad0]">
+                          {review.filename ??
+                            SOURCE_LABELS[review.sourceKind]}
                         </span>
-                      )}
+                        <span>
+                          {new Date(review.createdAt).toLocaleDateString()}
+                        </span>
+                        <span>{STAGE_LABELS[review.stage]}</span>
+                        {review.dimensionScores && (
+                          <span>
+                            Narrative {review.dimensionScores.narrative}/5 ·
+                            Design {review.dimensionScores.design}/5 · Content{' '}
+                            {review.dimensionScores.content}/5
+                          </span>
+                        )}
+                        <span>
+                          {openingReviewId === review.id
+                            ? 'Opening…'
+                            : 'Open review'}
+                        </span>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -759,9 +856,15 @@ function ReviewPaywallPanel({
 }) {
   const navigate = useNavigate();
   const [checkoutFailed, setCheckoutFailed] = useState(false);
+  const [checkoutPending, setCheckoutPending] = useState(false);
+  const checkoutInFlightRef = useRef(false);
   const quotaHit = error.reason === 'weekly_quota_exceeded';
 
   async function buy(sku: 'review_pack' | 'review_addon') {
+    if (checkoutInFlightRef.current) return;
+    checkoutInFlightRef.current = true;
+    setCheckoutPending(true);
+    setCheckoutFailed(false);
     if (isGuest) {
       stashCheckoutIntent(sku);
       navigate(`/auth?plan=${sku}`);
@@ -772,6 +875,8 @@ function ReviewPaywallPanel({
     } catch (checkoutError) {
       console.error('[billing] review checkout failed:', checkoutError);
       setCheckoutFailed(true);
+      checkoutInFlightRef.current = false;
+      setCheckoutPending(false);
     }
   }
 
@@ -804,6 +909,7 @@ function ReviewPaywallPanel({
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
+          disabled={checkoutPending}
           onClick={() => void buy('review_pack')}
           className="inline-flex min-h-11 items-center rounded-md bg-[#5641b8] px-4 text-sm font-semibold text-white hover:bg-[#4c39a6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b5aaff]"
         >
@@ -812,6 +918,7 @@ function ReviewPaywallPanel({
         {hasActiveTerm && !hasReviewAddon ? (
           <button
             type="button"
+            disabled={checkoutPending}
             onClick={() => void buy('review_addon')}
             className="inline-flex min-h-11 items-center rounded-md border border-[#3a3050] bg-[#1a1a26] px-4 text-sm font-semibold text-[#c8cad0] hover:border-[#7c6aed] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9b8cf0]"
           >

@@ -20,9 +20,10 @@ import { ReviewTab } from '../sidebar/ReviewTab';
 import { Sidebar, type SidebarTab } from '../Sidebar';
 import { usePosterStore } from '@/stores/posterStore';
 
-const { requestCritiqueMock, ingestMock } = vi.hoisted(() => ({
+const { requestCritiqueMock, ingestMock, createCheckoutMock } = vi.hoisted(() => ({
   requestCritiqueMock: vi.fn(),
   ingestMock: vi.fn(),
+  createCheckoutMock: vi.fn(),
 }));
 
 vi.mock('@/review/reviewApi', () => ({
@@ -56,7 +57,7 @@ const planState = {
 };
 vi.mock('@/hooks/usePlan', () => ({ usePlan: () => planState.value }));
 
-vi.mock('@/data/billing', () => ({ createCheckout: vi.fn() }));
+vi.mock('@/data/billing', () => ({ createCheckout: createCheckoutMock }));
 vi.mock('@/data/checkoutIntent', () => ({ stashCheckoutIntent: vi.fn() }));
 vi.mock('@/components/UpdateAvailableToast', () => ({
   UpdateAvailableBanner: () => null,
@@ -263,10 +264,12 @@ function SidebarHarness() {
 }
 
 beforeEach(() => {
+  vi.stubEnv('VITE_ENABLE_PRESENTATION_CHECKER', 'true');
   seedPoster();
   requestCritiqueMock.mockReset();
   ingestMock.mockReset();
   ingestMock.mockResolvedValue(ARTIFACT);
+  createCheckoutMock.mockReset();
   planState.value = {
     loading: false,
     hasActiveTerm: true,
@@ -281,6 +284,24 @@ beforeEach(() => {
 });
 
 describe('ReviewTab', () => {
+  it('keeps the editor entry point hidden until the rollout flag is enabled', async () => {
+    vi.stubEnv('VITE_ENABLE_PRESENTATION_CHECKER', 'false');
+    render(
+      <MemoryRouter>
+        <SidebarHarness />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'review' }),
+    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'layout' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
+
   it('run renders the score header and finding cards from the fromPoster ingest', async () => {
     requestCritiqueMock.mockResolvedValue(CRITIQUE);
     render(
@@ -396,6 +417,34 @@ describe('ReviewTab', () => {
 
     expect(screen.getByText(/Get the review pack/i)).toBeTruthy();
     expect(screen.queryByText('Add weekly reviews')).toBeNull();
+  });
+
+  it('synchronously disables add-on checkout and coalesces a double click', () => {
+    planState.value = {
+      ...planState.value,
+      canReview: false,
+      reviewCredits: 0,
+      hasReviewAddon: false,
+    };
+    const checkoutGate = deferred<string>();
+    createCheckoutMock.mockReturnValue(checkoutGate.promise);
+    render(
+      <MemoryRouter>
+        <ReviewTab />
+      </MemoryRouter>,
+    );
+
+    const button = screen.getByRole('button', {
+      name: 'Add weekly reviews',
+    }) as HTMLButtonElement;
+    act(() => {
+      button.click();
+      button.click();
+    });
+
+    expect(createCheckoutMock).toHaveBeenCalledTimes(1);
+    expect(createCheckoutMock).toHaveBeenCalledWith('review_addon');
+    expect(button).toBeDisabled();
   });
 
   it('coalesces same-tick initial review activations into one request', async () => {

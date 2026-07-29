@@ -83,6 +83,8 @@ export function ReviewTab({
     useState<ReviewPaymentRequiredError | null>(null);
   const [failed, setFailed] = useState(false);
   const [checkoutFailed, setCheckoutFailed] = useState(false);
+  const [checkoutPending, setCheckoutPending] = useState(false);
+  const checkoutInFlightRef = useRef(false);
   const [followupConfirm, setFollowupConfirm] = useState(false);
 
   async function run(reviewId?: string) {
@@ -128,6 +130,10 @@ export function ReviewTab({
   }
 
   async function buy(sku: 'review_pack' | 'review_addon') {
+    if (checkoutInFlightRef.current) return;
+    checkoutInFlightRef.current = true;
+    setCheckoutPending(true);
+    setCheckoutFailed(false);
     if (plan.isGuest) {
       stashCheckoutIntent(sku);
       navigate(`/auth?plan=${sku}`);
@@ -138,6 +144,8 @@ export function ReviewTab({
     } catch (err) {
       console.error('[billing] review checkout failed:', err);
       setCheckoutFailed(true);
+      checkoutInFlightRef.current = false;
+      setCheckoutPending(false);
     }
   }
 
@@ -157,6 +165,7 @@ export function ReviewTab({
         hasActiveTerm={plan.hasActiveTerm}
         hasReviewAddon={plan.hasReviewAddon}
         checkoutFailed={checkoutFailed}
+        checkoutPending={checkoutPending}
         onBuy={(sku) => void buy(sku)}
       />
     );
@@ -434,12 +443,14 @@ function PaywallPanel({
   hasActiveTerm,
   hasReviewAddon,
   checkoutFailed,
+  checkoutPending,
   onBuy,
 }: {
   error: ReviewPaymentRequiredError;
   hasActiveTerm: boolean;
   hasReviewAddon: boolean;
   checkoutFailed: boolean;
+  checkoutPending: boolean;
   onBuy: (sku: 'review_pack' | 'review_addon') => void;
 }) {
   const quotaHit = error.reason === 'weekly_quota_exceeded';
@@ -494,6 +505,7 @@ function PaywallPanel({
       >
         <button
           type="button"
+          disabled={checkoutPending}
           onClick={() => onBuy('review_pack')}
           style={secondaryButton}
         >
@@ -502,6 +514,7 @@ function PaywallPanel({
         {hasActiveTerm && !hasReviewAddon && (
           <button
             type="button"
+            disabled={checkoutPending}
             onClick={() => onBuy('review_addon')}
             style={secondaryButton}
           >

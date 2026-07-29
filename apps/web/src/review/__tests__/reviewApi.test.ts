@@ -9,7 +9,7 @@
  * network.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError } from '@/lib/apiClient';
+import { ApiError, ApiResponseDecodeError } from '@/lib/apiClient';
 
 const { postJsonMock, fromMock, removeMock } = vi.hoisted(() => ({
   postJsonMock: vi.fn(),
@@ -31,6 +31,7 @@ vi.mock('@/lib/supabase', () => ({
 
 import {
   ReviewPaymentRequiredError,
+  getMyReview,
   listMyReviews,
   requestCritique,
 } from '../reviewApi';
@@ -111,6 +112,26 @@ describe('requestCritique', () => {
       postJsonMock.mock.calls[0]![1],
     );
     expect(globalThis.crypto.randomUUID).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries an invalid successful payload with the same generated request key', async () => {
+    const response = {
+      reviewId: 'rev-1',
+      stage: 'initial' as const,
+      critique: {
+        dimensionScores: { narrative: 4, design: 3, content: 5 },
+        attentionSummary: 'The eye lands on the results figure first.',
+        findings: [],
+      },
+    };
+    postJsonMock.mockResolvedValueOnce(null).mockResolvedValueOnce(response);
+
+    await expect(requestCritique(BODY)).resolves.toBe(response);
+
+    expect(postJsonMock).toHaveBeenCalledTimes(2);
+    expect(postJsonMock.mock.calls[1]![1]).toEqual(
+      postJsonMock.mock.calls[0]![1],
+    );
   });
 
   it('polls an ambiguous in-progress retry to replay before cleaning temp pages', async () => {
@@ -248,6 +269,34 @@ describe('requestCritique', () => {
       { auth: true },
     );
     expect(globalThis.crypto.randomUUID).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a truncated successful follow-up response with the same request ID', async () => {
+    const response = {
+      reviewId: 'rev-1',
+      stage: 'closed' as const,
+      critique: {
+        dimensionScores: { narrative: 4, design: 4, content: 5 },
+        attentionSummary: 'The revision lands the result first.',
+        findings: [],
+      },
+    };
+    postJsonMock
+      .mockRejectedValueOnce(
+        new ApiResponseDecodeError('Successful response body was truncated.'),
+      )
+      .mockResolvedValueOnce(response);
+    const followup = { ...BODY, reviewId: 'rev-1' };
+
+    await expect(requestCritique(followup)).resolves.toBe(response);
+
+    expect(postJsonMock).toHaveBeenCalledTimes(2);
+    expect(postJsonMock.mock.calls[1]![1]).toEqual(
+      postJsonMock.mock.calls[0]![1],
+    );
+    expect(postJsonMock.mock.calls[0]![1]).toMatchObject({
+      followupRequestId: REQUEST_KEY,
+    });
   });
 
   it('maps a 402 ApiError to ReviewPaymentRequiredError with the server reason', async () => {
@@ -394,5 +443,140 @@ describe('listMyReviews', () => {
     chainResolving({ data: null, error: { message: 'rls denied' } });
 
     await expect(listMyReviews()).rejects.toThrow('rls denied');
+  });
+});
+
+describe('getMyReview', () => {
+  function detailChainResolving(response: {
+    data: unknown;
+    error: unknown;
+  }) {
+    const chain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn(async () => response),
+    };
+    fromMock.mockReturnValue(chain);
+    return chain;
+  }
+
+  it('reads one owner-visible row and returns its validated initial critique', async () => {
+    const critique = {
+      dimensionScores: { narrative: 4, design: 2, content: 4 },
+      attentionSummary: 'The title leads into the primary result.',
+      findings: [
+        {
+          dimension: 'design',
+          severity: 'high',
+          category: 'buried-key-result',
+          anchor: { kind: 'slide', page: 2 },
+          action: 'keep-as-primary',
+          problem: 'The primary result is visually buried.',
+          fix: 'Move the result into the first viewport.',
+          example: 'Lead with “Recall fell 20% after sleep loss.”',
+        },
+      ],
+    };
+    const chain = detailChainResolving({
+      data: {
+        id: 'rev-1',
+        poster_id: null,
+        source_kind: 'pdf',
+        source_meta: { filename: 'talk.pdf', pageCount: 12 },
+        status: 'complete',
+        stage: 'initial',
+        initial_findings: critique,
+        followup_findings: null,
+        created_at: '2026-07-29T10:00:00Z',
+      },
+      error: null,
+    });
+
+    await expect(getMyReview('rev-1')).resolves.toEqual({
+      id: 'rev-1',
+      posterId: null,
+      sourceKind: 'pdf',
+      status: 'complete',
+      stage: 'initial',
+      filename: 'talk.pdf',
+      pageCount: 12,
+      critique,
+      createdAt: '2026-07-29T10:00:00Z',
+    });
+
+    expect(fromMock).toHaveBeenCalledWith('poster_reviews');
+    expect(chain.select).toHaveBeenCalledWith(
+      'id, poster_id, source_kind, source_meta, status, stage, initial_findings, followup_findings, created_at',
+    );
+    expect(chain.eq).toHaveBeenCalledWith('id', 'rev-1');
+    expect(chain.maybeSingle).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the saved follow-up critique when reopening a closed review', async () => {
+    const followup = {
+      dimensionScores: { narrative: 5, design: 4, content: 4 },
+      attentionSummary: 'The revised result now leads.',
+      findings: [],
+    };
+    detailChainResolving({
+      data: {
+        id: 'rev-closed',
+        poster_id: 'poster-1',
+        source_kind: 'postr',
+        source_meta: { pageCount: 1 },
+        status: 'complete',
+        stage: 'closed',
+        initial_findings: {
+          dimensionScores: { narrative: 3, design: 2, content: 4 },
+          attentionSummary: 'The old header led.',
+          findings: [],
+        },
+        followup_findings: followup,
+        created_at: '2026-07-29T10:00:00Z',
+      },
+      error: null,
+    });
+
+    await expect(getMyReview('rev-closed')).resolves.toMatchObject({
+      id: 'rev-closed',
+      stage: 'closed',
+      critique: followup,
+    });
+  });
+
+  it('rejects a malformed stored critique before the UI can render it', async () => {
+    detailChainResolving({
+      data: {
+        id: 'rev-invalid',
+        poster_id: null,
+        source_kind: 'pdf',
+        source_meta: { filename: 'talk.pdf', pageCount: 2 },
+        status: 'complete',
+        stage: 'initial',
+        initial_findings: {
+          dimensionScores: { narrative: 4, design: 2, content: 4 },
+          attentionSummary: 'Looks plausible until its anchor is used.',
+          findings: [
+            {
+              dimension: 'design',
+              severity: 'high',
+              category: 'buried-key-result',
+              anchor: { kind: 'region', page: 1, bbox: ['bad'] },
+              action: 'keep-as-primary',
+              problem: 'The result is buried.',
+              fix: 'Move it.',
+              example: 'Lead with the result.',
+            },
+          ],
+        },
+        followup_findings: null,
+        created_at: '2026-07-29T10:00:00Z',
+      },
+      error: null,
+    });
+
+    await expect(getMyReview('rev-invalid')).rejects.toThrow(
+      'stored critique is invalid',
+    );
   });
 });

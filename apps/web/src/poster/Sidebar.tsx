@@ -62,6 +62,7 @@ import { ImportSection } from './sidebar/ImportSection';
 import { PostrExportButton } from './sidebar/PostrExportButton';
 import { EditableExportButtons } from './sidebar/EditableExportButtons';
 import { ReviewTab } from './sidebar/ReviewTab';
+import { isPresentationCheckerEditorEnabled } from '@/review/flags';
 import { VersionPanel } from './VersionPanel';
 import { CopyDesignModal } from '@/components/CopyDesignModal';
 import {
@@ -302,6 +303,9 @@ const iconBtnStyle: CSSProperties = {
 export function Sidebar(props: SidebarProps) {
   const tab = props.activeTab;
   const setTab = props.onChangeTab;
+  const presentationCheckerEnabled =
+    isPresentationCheckerEditorEnabled();
+  const reviewTabActive = presentationCheckerEnabled && tab === 'review';
   const [presetName, setPresetName] = useState('');
   // Transient "just saved" flash on the Save-as-preset button so
   // users get an explicit confirmation instead of having to spot the
@@ -327,6 +331,12 @@ export function Sidebar(props: SidebarProps) {
   // dumped authors selections into the Edit tab's placeholder and
   // forced a second click to reach the real controls.
   useEffect(() => {
+    if (!presentationCheckerEnabled && tab === 'review') {
+      setTab('layout');
+    }
+  }, [presentationCheckerEnabled, setTab, tab]);
+
+  useEffect(() => {
     if (!props.selectedBlock) return;
     const t = props.selectedBlock.type;
     // Selecting an image keeps the Figure tab up (its dimensions
@@ -338,7 +348,7 @@ export function Sidebar(props: SidebarProps) {
     // reading findings and clicking them to jump to blocks — each jump
     // selects a block, and without this exemption the first click would
     // bounce the sidebar straight back to Edit.
-    if (tab === 'review') return;
+    if (reviewTabActive) return;
     if (t === 'authors') {
       setTab('authors');
       return;
@@ -626,7 +636,10 @@ export function Sidebar(props: SidebarProps) {
                   ['comments', 'comments'],
                   ['versions', 'versions'],
                   ['export', 'export'],
-                ] as Array<[SidebarTab, string]>))
+                ] as Array<[SidebarTab, string]>).filter(
+                  ([candidate]) =>
+                    candidate !== 'review' || presentationCheckerEnabled,
+                ))
           ).map(([t, label]) => {
             const issueCount = props.issues.length;
             const errorCount = props.issues.filter((i) => i.severity === 'error').length;
@@ -635,6 +648,7 @@ export function Sidebar(props: SidebarProps) {
                 key={t}
                 data-postr-tab
                 type="button"
+                aria-pressed={tab === t}
                 onClick={() => setTab(t)}
                 style={tabStyle(tab === t)}
               >
@@ -674,8 +688,8 @@ export function Sidebar(props: SidebarProps) {
         <div
           key={tab}
           className="postr-tab-enter"
-          hidden={tab === 'review'}
-          aria-hidden={tab === 'review'}
+          hidden={reviewTabActive}
+          aria-hidden={reviewTabActive}
         >
         {tab === 'layout' && (
           <LayoutTab
@@ -822,11 +836,11 @@ export function Sidebar(props: SidebarProps) {
           />
         )}
         </div>
-        {!props.readOnly && (
+        {!props.readOnly && presentationCheckerEnabled && (
           <div
-            hidden={tab !== 'review'}
-            aria-hidden={tab !== 'review'}
-            className={tab === 'review' ? 'postr-tab-enter' : undefined}
+            hidden={!reviewTabActive}
+            aria-hidden={!reviewTabActive}
+            className={reviewTabActive ? 'postr-tab-enter' : undefined}
           >
             <ReviewTab onJumpToBlock={props.onJumpToBlock} />
           </div>
