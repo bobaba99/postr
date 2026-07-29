@@ -61,6 +61,7 @@ import type { PosterTableRef } from '@/charts/ladder/DataStep';
 import { ImportSection } from './sidebar/ImportSection';
 import { PostrExportButton } from './sidebar/PostrExportButton';
 import { EditableExportButtons } from './sidebar/EditableExportButtons';
+import { ReviewTab } from './sidebar/ReviewTab';
 import { VersionPanel } from './VersionPanel';
 import { CopyDesignModal } from '@/components/CopyDesignModal';
 import {
@@ -77,6 +78,7 @@ export type SidebarTab =
   | 'insert'
   | 'check'
   | 'issues'
+  | 'review'
   | 'comments'
   | 'versions'
   | 'export';
@@ -332,6 +334,11 @@ export function Sidebar(props: SidebarProps) {
     // confirmation isn't yanked away the moment the picker selects
     // its own freshly inserted block.
     if ((t === 'image' || t === 'chart') && tab === 'check') return;
+    // The Review tab is never yanked away on selection: the user is
+    // reading findings and clicking them to jump to blocks — each jump
+    // selects a block, and without this exemption the first click would
+    // bounce the sidebar straight back to Edit.
+    if (tab === 'review') return;
     if (t === 'authors') {
       setTab('authors');
       return;
@@ -615,6 +622,7 @@ export function Sidebar(props: SidebarProps) {
                   ['refs', 'references'],
                   ['check', 'figure'],
                   ['issues', 'issues'],
+                  ['review', 'review'],
                   ['comments', 'comments'],
                   ['versions', 'versions'],
                   ['export', 'export'],
@@ -663,7 +671,12 @@ export function Sidebar(props: SidebarProps) {
           * container's own layout so scroll position survives switches
           * without re-animating. */}
         <div style={{ flex: 1, overflow: 'auto', padding: '4px 20px 24px', minWidth: 0 }}>
-        <div key={tab} className="postr-tab-enter">
+        <div
+          key={tab}
+          className="postr-tab-enter"
+          hidden={tab === 'review'}
+          aria-hidden={tab === 'review'}
+        >
         {tab === 'layout' && (
           <LayoutTab
             posterTitle={props.posterTitle}
@@ -809,6 +822,15 @@ export function Sidebar(props: SidebarProps) {
           />
         )}
         </div>
+        {!props.readOnly && (
+          <div
+            hidden={tab !== 'review'}
+            aria-hidden={tab !== 'review'}
+            className={tab === 'review' ? 'postr-tab-enter' : undefined}
+          >
+            <ReviewTab onJumpToBlock={props.onJumpToBlock} />
+          </div>
+        )}
         </div>
       </div>
     </div>
