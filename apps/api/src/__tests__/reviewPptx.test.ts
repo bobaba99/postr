@@ -51,8 +51,8 @@ function fakeExec(
 ) {
   const calls: ExecCall[] = [];
   const pages = opts.pages ?? [
-    { widthPx: 2550, heightPx: 3300 },
-    { widthPx: 2550, heightPx: 3300 },
+    { widthPx: 1582, heightPx: 2048 },
+    { widthPx: 1582, heightPx: 2048 },
   ];
   let sawInputBytes: Buffer | null = null;
   const execFileFn: ExecFileFn = async (file, args) => {
@@ -186,6 +186,8 @@ describe('createLibreOfficeRenderer', () => {
       '-jpeg',
       '-r',
       '150',
+      '-scale-to',
+      '2048',
       '-f',
       '1',
       '-l',
@@ -199,8 +201,8 @@ describe('createLibreOfficeRenderer', () => {
 
     // pages come back in page order, with SOF0-parsed dimensions
     expect(pages.map((p) => p.pageNumber)).toEqual([1, 2]);
-    expect(pages[0]).toMatchObject({ widthPx: 2550, heightPx: 3300 });
-    expect(pages[0]!.jpeg.equals(fakeJpeg(2550, 3300))).toBe(true);
+    expect(pages[0]).toMatchObject({ widthPx: 1582, heightPx: 2048 });
+    expect(pages[0]!.jpeg.equals(fakeJpeg(1582, 2048))).toBe(true);
 
     // finally-cleanup removed the whole temp dir
     expect(existsSync(dir)).toBe(false);
@@ -279,6 +281,20 @@ describe('createLibreOfficeRenderer', () => {
 
     await expect(renderer.render(Buffer.from('x'))).rejects.toThrow(
       /1201x100.*1200px/,
+    );
+  });
+
+  it('enforces the 2048px vision ceiling on rendered slides by default', async () => {
+    const fake = fakeExec({
+      pages: [{ widthPx: 2049, heightPx: 100 }],
+    });
+    const renderer = createLibreOfficeRenderer({
+      workDir,
+      execFileFn: fake.execFileFn,
+    });
+
+    await expect(renderer.render(Buffer.from('x'))).rejects.toThrow(
+      /2049x100.*2048px/,
     );
   });
 

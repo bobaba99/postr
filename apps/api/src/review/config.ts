@@ -23,6 +23,18 @@ export const REVIEW_MAX_TOKENS = 8192;
 /** Hard page cap (spec §1) — over → typed error, never silent truncation. */
 export const REVIEW_MAX_PAGES = 24;
 
+/** Per-page network deadline; 24 sequential pages are bounded to six minutes. */
+export const REVIEW_PAGE_FETCH_TIMEOUT_MS = 15_000;
+
+/** Provider deadline; retries are disabled so the claim lease cannot be overrun. */
+export const REVIEW_PROVIDER_TIMEOUT_MS = 120_000;
+
+/**
+ * Mirrors the SQL claim lease. Worst-case page fetch + provider work is
+ * 24×15s + 120s = 8 minutes, strictly below this ten-minute lease.
+ */
+export const REVIEW_INITIAL_CLAIM_LEASE_MS = 10 * 60 * 1000;
+
 /**
  * Per-page raw-byte cap, checked BEFORE base64 (which inflates 4/3) so the
  * caller gets a clean typed error instead of an opaque upstream rejection
@@ -55,8 +67,12 @@ export const REVIEW_PPTX_RENDERED_PAGE_MAX_BYTES = 8 * 1024 * 1024;
 /** Maximum encoded bytes retained across all rendered page JPEGs. */
 export const REVIEW_PPTX_RENDERED_TOTAL_MAX_BYTES = 48 * 1024 * 1024;
 
-/** Maximum width or height accepted from a rendered page JPEG. */
-export const REVIEW_PPTX_RENDERED_MAX_DIMENSION_PX = 8192;
+/**
+ * Vision-resolution ceiling for every rendered slide. pdftoppm is asked to
+ * fit pages inside this box and the post-render check fails closed if the
+ * converter ever emits a larger image.
+ */
+export const REVIEW_PPTX_RENDERED_MAX_DIMENSION_PX = 2048;
 
 /** Maximum decoded pixel area accepted from a rendered page JPEG. */
 export const REVIEW_PPTX_RENDERED_MAX_PIXELS = 40_000_000;

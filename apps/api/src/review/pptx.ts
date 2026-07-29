@@ -384,12 +384,15 @@ export function createLibreOfficeRenderer(
           inPath,
         ]);
 
-        // PDF → one JPEG per slide at 150 DPI (page-1.jpg, page-2.jpg, …).
+        // PDF → one JPEG per slide (page-1.jpg, page-2.jpg, …), fitted inside
+        // the same 2048px long-edge ceiling as every browser ingest path.
         const outPrefix = join(dir, 'page');
         await execFileFn(pdftoppmPath, [
           '-jpeg',
           '-r',
           '150',
+          '-scale-to',
+          String(REVIEW_PPTX_RENDERED_MAX_DIMENSION_PX),
           '-f',
           '1',
           '-l',
