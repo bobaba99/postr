@@ -65,7 +65,7 @@ select throws_ok(
   $q$ update public.users set plan = 'term'
       where id = '0b000000-0000-4000-a000-000000000001' $q$,
   'P0001',
-  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits) are server-owned and cannot be changed by the client',
+  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits, stripe_subscription_id, subscription_status, first_paid_export_at) are server-owned and cannot be changed by the client',
   'authenticated user cannot set plan = term');
 
 -- 4 · cannot self-grant credits
@@ -73,7 +73,7 @@ select throws_ok(
   $q$ update public.users set export_credits = 99
       where id = '0b000000-0000-4000-a000-000000000001' $q$,
   'P0001',
-  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits) are server-owned and cannot be changed by the client',
+  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits, stripe_subscription_id, subscription_status, first_paid_export_at) are server-owned and cannot be changed by the client',
   'authenticated user cannot set export_credits');
 
 -- 5 · cannot self-set an expiry
@@ -81,7 +81,7 @@ select throws_ok(
   $q$ update public.users set plan_expires_at = now() + interval '4 months'
       where id = '0b000000-0000-4000-a000-000000000001' $q$,
   'P0001',
-  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits) are server-owned and cannot be changed by the client',
+  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits, stripe_subscription_id, subscription_status, first_paid_export_at) are server-owned and cannot be changed by the client',
   'authenticated user cannot set plan_expires_at');
 
 -- 6 · a non-billing update still works (the guard is column-scoped)
