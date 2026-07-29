@@ -176,7 +176,15 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
     return ctx.res.status(500).json({ error: 'review_internal' });
   }
 
-  const entitlementDecision = resolveCreditSource(entitlement.row, ctx);
+  // Decide the credit source WITHOUT consuming anything — weekly-slot
+  // consumption waits until after the deterministic page guards pass
+  // so a 400/413 never burns an add-on slot. D17 still holds: a later
+  // model-call failure does consume the slot (soft cap).
+  const entitlementDecision = resolveCreditSource(
+    entitlement.row,
+    ctx.now(),
+    ctx.res,
+  );
   if (!entitlementDecision.ok) {
     return entitlementDecision.response;
   }
@@ -191,6 +199,19 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
     });
   } catch (error) {
     return replyPageFetchError(ctx.res, error);
+  }
+
+  if (creditSource === 'subscription_addon') {
+    const slot = weeklySlotAllowed(ctx.weeklyLimiter, ctx.req, ctx.res);
+    if (!slot.allowed) {
+      return ctx.res.status(402).json({
+        error: 'review_payment_required',
+        reason: 'weekly_quota_exceeded',
+        ...(slot.retryAfterSec !== undefined
+          ? { retryAfterSec: slot.retryAfterSec }
+          : {}),
+      });
+    }
   }
 
   const signals = ctx.body.posterDoc
@@ -228,6 +249,8 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
 
   logCompletedCritique(ctx.user.id, creditSource, callResult, enforcedCritique);
 
+  // Pack path: consume AFTER success (D6). Persistence failure below
+  // compensates via grant_review_credits so a retry cannot double-charge.
   const consumeFailure = await consumePackCredit(ctx, creditSource);
   if (consumeFailure) {
     return consumeFailure;
@@ -270,10 +293,17 @@ async function persistInitialReview(
     .single();
 
   if (insertError || !inserted) {
+    const persistenceMessage = insertError?.message ?? 'no row returned';
     console.error('[review.critique] poster_reviews insert failed', {
       userId: ctx.user.id,
-      message: insertError?.message ?? 'no row returned',
+      message: persistenceMessage,
     });
+    if (creditSource === 'pack') {
+      await compensatePackCredit(ctx, persistenceMessage);
+    }
+    // Weekly add-on slots are a soft cap (D17) — not compensated. The
+    // slot was only recorded after guards passed, so a persistence
+    // failure is rare and the retry burns at most one soft-cap unit.
     return ctx.res.status(500).json({ error: 'review_internal' });
   }
 
@@ -282,6 +312,25 @@ async function persistInitialReview(
     stage: 'initial',
     critique,
   });
+}
+
+async function compensatePackCredit(
+  ctx: InitialCtx,
+  persistenceMessage: string,
+): Promise<void> {
+  const { error } = await ctx.supabase.rpc('grant_review_credits' as never, {
+    p_user_id: ctx.user.id,
+    p_amount: 1,
+  } as never);
+  if (error) {
+    console.error('[review.critique] credit compensation failed', {
+      userId: ctx.user.id,
+      stage: 'initial',
+      creditSource: 'pack',
+      persistenceMessage,
+      compensationMessage: error.message,
+    });
+  }
 }
 
 interface EntitlementRow {
@@ -296,34 +345,22 @@ type CreditSource = 'pack' | 'subscription_addon';
 
 function resolveCreditSource(
   row: EntitlementRow,
-  ctx: InitialCtx,
+  nowMs: number,
+  res: Response,
 ):
   | { ok: true; creditSource: CreditSource }
   | { ok: false; response: Response } {
-  if (row.review_addon === true && isTermActive(row, ctx.now())) {
-    const slot = weeklySlotAllowed(ctx.weeklyLimiter, ctx.req, ctx.res);
-    if (!slot.allowed) {
-      return {
-        ok: false,
-        response: ctx.res.status(402).json({
-          error: 'review_payment_required',
-          reason: 'weekly_quota_exceeded',
-          ...(slot.retryAfterSec !== undefined
-            ? { retryAfterSec: slot.retryAfterSec }
-            : {}),
-        }),
-      };
-    }
+  // Eligibility only — weekly-slot consumption for add-ons happens after
+  // the page-fetch guards succeed (see runInitial).
+  if (row.review_addon === true && isTermActive(row, nowMs)) {
     return { ok: true, creditSource: 'subscription_addon' };
   }
-
   if ((row.review_credits ?? 0) > 0) {
     return { ok: true, creditSource: 'pack' };
   }
-
   return {
     ok: false,
-    response: ctx.res
+    response: res
       .status(402)
       .json({ error: 'review_payment_required', reason: 'no_credit' }),
   };
@@ -465,18 +502,12 @@ function replyCritiqueError(
     upstream &&
     (upstream.code === 'no_tool_call' || upstream.code === 'bad_tool_json')
   ) {
-    return res
-      .status(502)
-      .json({ error: 'bad_model_output', message: upstream.code });
+    return res.status(502).json({ error: 'bad_model_output' });
   }
 
-  const upstreamStatus =
-    upstream?.code === 'http_error' ? upstream.status : undefined;
-  const responseStatus =
-    upstreamStatus === 401 || upstreamStatus === 429 || upstreamStatus === 529
-      ? upstreamStatus
-      : 502;
-  return res.status(responseStatus).json({ error: 'review_upstream' });
+  // Provider statuses (401/429/529/…) stay in the log above — clients
+  // always see a generic 502 so internal upstream detail never leaks.
+  return res.status(502).json({ error: 'review_upstream' });
 }
 
 function defaultGetSupabaseAdmin(): SupabaseClient | null {
