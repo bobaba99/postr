@@ -69,6 +69,7 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
   const inserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
   const updates: Array<{ table: string; payload: Record<string, unknown>; eqVal: unknown }> = [];
   const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = [];
+  const remove = vi.fn().mockResolvedValue({ data: [], error: null });
   const client = {
     auth: {
       getUser: async () => ({
@@ -107,8 +108,11 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
       rpcs.push({ fn, args });
       return Promise.resolve({ data: 1, error: null });
     },
+    storage: {
+      from: (_bucket: string) => ({ remove }),
+    },
   } as unknown as SupabaseClient;
-  return { client, inserts, updates, rpcs };
+  return { client, inserts, updates, rpcs, remove };
 }
 
 function fakeAnthropic(critique: unknown = VALID_CRITIQUE) {
@@ -200,6 +204,41 @@ describe('POST /api/review/critique — follow-up (§5.2)', () => {
     // included in the initial credit (D6).
     expect(inserts).toHaveLength(0);
     expect(rpcs).toHaveLength(0);
+  });
+
+  it('removes revised review-temp pages after fetching and before the follow-up model call', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const anthropic = fakeAnthropic();
+    const { client, remove } = fakeSupabase({ reviewRow: REVIEW_ROW });
+    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const res = await post(
+      app,
+      validBody({
+        pages: [
+          {
+            pageNumber: 1,
+            url: PAGE_URL,
+            widthPx: 2048,
+            heightPx: 1152,
+            storagePath: 'user-1/review-temp/revised/page-1.jpg',
+          },
+        ],
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(remove).toHaveBeenCalledWith([
+      'user-1/review-temp/revised/page-1.jpg',
+    ]);
+    expect(remove.mock.invocationCallOrder[0]).toBeLessThan(
+      anthropic.create.mock.invocationCallOrder[0]!,
+    );
   });
 
   it('rejects a third critique on a closed review with 409 review_closed', async () => {

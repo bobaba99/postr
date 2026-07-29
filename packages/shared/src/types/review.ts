@@ -99,4 +99,6 @@ export interface ReviewPageRef {
   url: string;
   widthPx: number;
   heightPx: number;
+  /** Private poster-assets object path, when the page is temporary. */
+  storagePath?: string;
 }

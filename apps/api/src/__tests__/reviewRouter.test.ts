@@ -44,11 +44,16 @@ interface FakeSupabaseOpts {
   userRow?: Record<string, unknown> | null;
   consumeResult?: number | null;
   insertedId?: string;
+  removeError?: boolean;
 }
 
 function fakeSupabase(opts: FakeSupabaseOpts = {}) {
   const inserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
   const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = [];
+  const remove = vi.fn(async (_paths: string[]) => ({
+    data: [],
+    error: opts.removeError ? { message: 'cleanup failed' } : null,
+  }));
   const client = {
     auth: {
       getUser: async () => ({
@@ -85,8 +90,11 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
         error: null,
       });
     },
+    storage: {
+      from: (_bucket: string) => ({ remove }),
+    },
   } as unknown as SupabaseClient;
-  return { client, inserts, rpcs };
+  return { client, inserts, rpcs, remove };
 }
 
 function fakeAnthropic(critique: unknown = VALID_CRITIQUE) {
@@ -313,7 +321,7 @@ describe('POST /api/review/critique — initial critique', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
     const { client, rpcs, inserts } = fakeSupabase({ userRow: PACK_USER });
-    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
+    const fetchFn = vi.fn().mockImplementation(async () => imageResponse());
     const app = buildApp({
       supabase: client,
       anthropic: anthropic.client,
@@ -345,6 +353,86 @@ describe('POST /api/review/critique — initial critique', () => {
       output_tokens: 80,
       filename: 'poster.pdf',
     });
+  });
+
+  it('removes only user-owned review-temp pages after fetching and before the model call', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const anthropic = fakeAnthropic();
+    const { client, remove } = fakeSupabase({ userRow: PACK_USER });
+    const fetchFn = vi.fn().mockImplementation(async () => imageResponse());
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+    const pages = [
+      {
+        pageNumber: 1,
+        url: PAGE_URL,
+        widthPx: 2048,
+        heightPx: 1152,
+        storagePath: 'user-1/review-temp/session-1/page-1.jpg',
+      },
+      {
+        pageNumber: 2,
+        url: PAGE_URL,
+        widthPx: 2048,
+        heightPx: 1152,
+        storagePath: 'user-1/poster-1/review-capture.jpg',
+      },
+      {
+        pageNumber: 3,
+        url: PAGE_URL,
+        widthPx: 2048,
+        heightPx: 1152,
+        storagePath: 'user-2/review-temp/session-2/page-3.jpg',
+      },
+    ];
+
+    const res = await post(app, validBody({ pages }));
+
+    expect(res.status).toBe(200);
+    expect(remove).toHaveBeenCalledWith([
+      'user-1/review-temp/session-1/page-1.jpg',
+    ]);
+    expect(remove.mock.invocationCallOrder[0]).toBeLessThan(
+      anthropic.create.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('continues the critique when best-effort temp cleanup fails', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const anthropic = fakeAnthropic();
+    const { client, remove } = fakeSupabase({
+      userRow: PACK_USER,
+      removeError: true,
+    });
+    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const res = await post(
+      app,
+      validBody({
+        pages: [
+          {
+            pageNumber: 1,
+            url: PAGE_URL,
+            widthPx: 2048,
+            heightPx: 1152,
+            storagePath: 'user-1/review-temp/session-1/page-1.jpg',
+          },
+        ],
+      }),
+    );
+
+    expect(remove).toHaveBeenCalledOnce();
+    expect(res.status).toBe(200);
+    expect(anthropic.create).toHaveBeenCalledOnce();
   });
 
   it('runs the add-on path through the weekly limiter and never touches credits', async () => {
