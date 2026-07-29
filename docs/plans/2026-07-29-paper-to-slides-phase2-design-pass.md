@@ -195,3 +195,11 @@ tracked for later (NOT a Phase-2 blocker):
 This is pure library growth + a domain grouping — no change to the generation
 pipeline (still pick, never generate per deck). Do it when the 11-icon starter
 proves too thin in real use.
+
+**Target size: ~50 icons (Gavin, locked 2026-07-29).** Not more — over-populating
+the library introduces decision fatigue when the user scans the icon-library
+slide for one to reuse. Not fewer — too few fails to capture enough variety
+across the two domains + shared presentation icons. ~50 is the balance: roughly
+~15 bio/med, ~15 social science, ~20 shared presentation, tag-grouped by domain,
+`pickIcons` surfacing ~8–12 relevant ones per deck. The 11-icon starter ships
+Phase 2; this expansion to ~50 is the fast-follow.
