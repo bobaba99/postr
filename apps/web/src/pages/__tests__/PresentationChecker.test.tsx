@@ -396,6 +396,37 @@ describe('PresentationChecker page', () => {
     ).toBeNull();
   });
 
+  it('stops a guest PPTX before the permanent-account render endpoint', async () => {
+    planState.value = {
+      ...planState.value,
+      isGuest: true,
+      canReview: false,
+      reviewCredits: 0,
+    };
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(screen.getByLabelText('File to review'), {
+      target: {
+        files: [
+          new File(['pptx'], 'talk.pptx', {
+            type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          }),
+        ],
+      },
+    });
+
+    expect(
+      await screen.findByRole('heading', {
+        name: /Get feedback on your poster or talk/i,
+      }),
+    ).toBeTruthy();
+    expect(ingestFileMock).not.toHaveBeenCalled();
+  });
+
   it('the follow-up button reveals the up-front disclosure before anything runs', async () => {
     requestCritiqueMock.mockResolvedValue(CRITIQUE);
     render(

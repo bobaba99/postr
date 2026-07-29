@@ -262,6 +262,16 @@ export default function PresentationChecker() {
   }
 
   async function handleFile(file: File) {
+    const isPptx =
+      file.type ===
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+      file.name.toLowerCase().endsWith('.pptx');
+    if (plan.isGuest && isPptx) {
+      setErrorMessage(null);
+      setPaywall(new ReviewPaymentRequiredError('no_credit'));
+      setPhase('idle');
+      return;
+    }
     await startReview(() => ingestFileForReview(file), {
       reviewId: pendingFollowup ? result?.reviewId : undefined,
     });
