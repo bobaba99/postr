@@ -66,9 +66,20 @@ MCP search returns titles/abstracts/URLs, so it is used to *find* candidates, no
 to supply the text. Assemble the set as:
 - **6–8 well-written** papers across psychology + medicine (the target domains),
   as PDFs or pasted text Gavin provides.
-- **≥2 badly-written** — either genuinely poorly-structured papers Gavin has seen,
-  or a well-written one Gavin lightly mangles (bury the finding, strip section
-  headers) to simulate the hard case honestly.
+- **≥2 badly-written — SIMULATED** from a well-written paper by degrading its
+  introduction into an **over-comprehensive umbrella background**. The canonical
+  failure pattern (Gavin, 2026-07-29): the intro stops being about the specific
+  research target and instead sweeps the whole umbrella around it. Worked example
+  — an Alzheimer's **language-deficits** study whose intro should motivate a
+  language gap, but a bad version instead spends paragraphs on **behavioural
+  deficits**, then **biological deficits**, then **caregiving costs** — all true,
+  all background, none of it the actual gap. To simulate: take a clean paper, keep
+  Results/Methods intact, and **rewrite the Introduction** to bury the specific
+  gap under two-to-three paragraphs of adjacent-but-off-target umbrella
+  background. The test: does each arm still surface the *real* finding and the
+  *real* gap when the intro points everywhere at once? Keep the original clean
+  version paired with each simulated one so degradation is measured on the same
+  underlying study.
 
 ### The human gold set
 
