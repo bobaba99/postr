@@ -10,6 +10,7 @@ import { chmod, mkdtemp, rm, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { crc32, deflateRawSync } from 'node:zlib';
 import {
   createLibreOfficeRenderer,
   inspectPptxArchive,
@@ -90,6 +91,15 @@ interface ZipEntry {
   compressionMethod?: number;
   compressedBytes?: number;
   uncompressedBytes?: number;
+  data?: Buffer;
+  compressedData?: Buffer;
+  crc?: number;
+  localName?: string;
+  localFlags?: number;
+  localCompressionMethod?: number;
+  localCompressedBytes?: number;
+  localUncompressedBytes?: number;
+  localCrc?: number;
 }
 
 function zipWithEntries(entries: ZipEntry[]): Buffer {
@@ -97,21 +107,35 @@ function zipWithEntries(entries: ZipEntry[]): Buffer {
   const centralParts: Buffer[] = [];
   let localOffset = 0;
   for (const entry of entries) {
+    const data = entry.data ?? Buffer.alloc(0);
     const nameBytes = Buffer.from(entry.name);
+    const localNameBytes = Buffer.from(entry.localName ?? entry.name);
     const flags = entry.flags ?? 0;
     const method = entry.compressionMethod ?? 0;
-    const compressedBytes = entry.compressedBytes ?? 0;
-    const uncompressedBytes = entry.uncompressedBytes ?? 0;
-    const local = Buffer.alloc(30 + nameBytes.length);
+    const compressedData =
+      entry.compressedData ??
+      (method === 8 ? deflateRawSync(data) : Buffer.from(data));
+    const compressedBytes = entry.compressedBytes ?? compressedData.length;
+    const uncompressedBytes = entry.uncompressedBytes ?? data.length;
+    const expectedCrc = entry.crc ?? crc32(data);
+    const localFlags = entry.localFlags ?? flags;
+    const localMethod = entry.localCompressionMethod ?? method;
+    const localCompressedBytes =
+      entry.localCompressedBytes ?? compressedBytes;
+    const localUncompressedBytes =
+      entry.localUncompressedBytes ?? uncompressedBytes;
+    const localCrc = entry.localCrc ?? expectedCrc;
+    const local = Buffer.alloc(30 + localNameBytes.length);
     local.writeUInt32LE(0x04034b50, 0);
     local.writeUInt16LE(20, 4);
-    local.writeUInt16LE(flags, 6);
-    local.writeUInt16LE(method, 8);
-    local.writeUInt32LE(compressedBytes, 18);
-    local.writeUInt32LE(uncompressedBytes, 22);
-    local.writeUInt16LE(nameBytes.length, 26);
-    nameBytes.copy(local, 30);
-    localParts.push(local);
+    local.writeUInt16LE(localFlags, 6);
+    local.writeUInt16LE(localMethod, 8);
+    local.writeUInt32LE(localCrc, 14);
+    local.writeUInt32LE(localCompressedBytes, 18);
+    local.writeUInt32LE(localUncompressedBytes, 22);
+    local.writeUInt16LE(localNameBytes.length, 26);
+    localNameBytes.copy(local, 30);
+    localParts.push(local, compressedData);
 
     const central = Buffer.alloc(46 + nameBytes.length);
     central.writeUInt32LE(0x02014b50, 0);
@@ -119,13 +143,14 @@ function zipWithEntries(entries: ZipEntry[]): Buffer {
     central.writeUInt16LE(20, 6);
     central.writeUInt16LE(flags, 8);
     central.writeUInt16LE(method, 10);
+    central.writeUInt32LE(expectedCrc, 16);
     central.writeUInt32LE(compressedBytes, 20);
     central.writeUInt32LE(uncompressedBytes, 24);
     central.writeUInt16LE(nameBytes.length, 28);
     central.writeUInt32LE(localOffset, 42);
     nameBytes.copy(central, 46);
     centralParts.push(central);
-    localOffset += local.length;
+    localOffset += local.length + compressedData.length;
   }
   const locals = Buffer.concat(localParts);
   const central = Buffer.concat(centralParts);
@@ -142,9 +167,21 @@ function requiredPptxEntries(
   overrides: Partial<ZipEntry> = {},
 ): ZipEntry[] {
   return [
-    { name: '[Content_Types].xml', ...overrides },
-    { name: 'ppt/presentation.xml', ...overrides },
-    { name: 'ppt/slides/slide1.xml', ...overrides },
+    {
+      name: '[Content_Types].xml',
+      data: Buffer.from('<Types/>'),
+      ...overrides,
+    },
+    {
+      name: 'ppt/presentation.xml',
+      data: Buffer.from('<p:presentation/>'),
+      ...overrides,
+    },
+    {
+      name: 'ppt/slides/slide1.xml',
+      data: Buffer.from('<p:sld/>'),
+      ...overrides,
+    },
   ];
 }
 
@@ -333,23 +370,33 @@ describe('createLibreOfficeRenderer', () => {
 });
 
 describe('inspectPptxArchive', () => {
-  it('rejects encrypted ZIP entries', () => {
-    const pptx = zipWithEntries(requiredPptxEntries({ flags: 0x0001 }));
+  it('accepts a structurally valid archive after streaming every entry', async () => {
+    const pptx = zipWithEntries(
+      requiredPptxEntries({ compressionMethod: 8 }),
+    );
 
-    expect(() => inspectPptxArchive(pptx, 24)).toThrow(/encrypted/i);
+    await expect(inspectPptxArchive(pptx, 24)).resolves.toEqual({
+      slideCount: 1,
+    });
   });
 
-  it('rejects ZIP entries using unsupported compression methods', () => {
+  it('rejects encrypted ZIP entries', async () => {
+    const pptx = zipWithEntries(requiredPptxEntries({ flags: 0x0001 }));
+
+    await expect(inspectPptxArchive(pptx, 24)).rejects.toThrow(/encrypted/i);
+  });
+
+  it('rejects ZIP entries using unsupported compression methods', async () => {
     const pptx = zipWithEntries(
       requiredPptxEntries({ compressionMethod: 12 }),
     );
 
-    expect(() => inspectPptxArchive(pptx, 24)).toThrow(
+    await expect(inspectPptxArchive(pptx, 24)).rejects.toThrow(
       /compression method 12/i,
     );
   });
 
-  it('rejects archives whose declared uncompressed total exceeds the cap', () => {
+  it('rejects archives whose declared uncompressed total exceeds the cap', async () => {
     const pptx = zipWithEntries(
       requiredPptxEntries({
         compressionMethod: 8,
@@ -358,15 +405,15 @@ describe('inspectPptxArchive', () => {
       }),
     );
 
-    expect(() =>
+    await expect(
       inspectPptxArchive(pptx, 24, {
         maxUncompressedBytes: 179,
         maxCompressionRatio: 100,
       }),
-    ).toThrow(/uncompressed.*179 bytes/i);
+    ).rejects.toThrow(/uncompressed.*179 bytes/i);
   });
 
-  it('rejects entries whose declared compression ratio exceeds the cap', () => {
+  it('rejects entries whose declared compression ratio exceeds the cap', async () => {
     const entries = requiredPptxEntries();
     entries[2] = {
       ...entries[2]!,
@@ -376,11 +423,110 @@ describe('inspectPptxArchive', () => {
     };
     const pptx = zipWithEntries(entries);
 
-    expect(() =>
+    await expect(
       inspectPptxArchive(pptx, 24, {
         maxUncompressedBytes: 1000,
         maxCompressionRatio: 100,
       }),
-    ).toThrow(/compression ratio.*100/i);
+    ).rejects.toThrow(/compression ratio.*100/i);
+  });
+
+  it('rejects forged central and local sizes using actual streamed output', async () => {
+    const entries = requiredPptxEntries({ compressionMethod: 8 });
+    entries[2] = {
+      ...entries[2]!,
+      data: Buffer.alloc(4096, 0x41),
+      uncompressedBytes: 1,
+      localUncompressedBytes: 1,
+    };
+    const pptx = zipWithEntries(entries);
+
+    await expect(
+      inspectPptxArchive(pptx, 24, {
+        maxUncompressedBytes: 128,
+        maxCompressionRatio: 10_000,
+      }),
+    ).rejects.toThrow(/actual.*uncompressed.*128 bytes/i);
+  });
+
+  it('rejects forged central and local sizes using the actual compression ratio', async () => {
+    const entries = requiredPptxEntries({ compressionMethod: 8 });
+    entries[2] = {
+      ...entries[2]!,
+      data: Buffer.alloc(4096, 0x41),
+      uncompressedBytes: 1,
+      localUncompressedBytes: 1,
+    };
+    const pptx = zipWithEntries(entries);
+
+    await expect(
+      inspectPptxArchive(pptx, 24, {
+        maxUncompressedBytes: 10_000,
+        maxCompressionRatio: 10,
+      }),
+    ).rejects.toThrow(/actual.*compression ratio.*10/i);
+  });
+
+  it('rejects when both central and local compressed and uncompressed sizes are forged', async () => {
+    const entries = requiredPptxEntries({ compressionMethod: 8 });
+    entries[2] = {
+      ...entries[2]!,
+      data: Buffer.alloc(4096, 0x41),
+      compressedBytes: 1,
+      localCompressedBytes: 1,
+      uncompressedBytes: 1,
+      localUncompressedBytes: 1,
+    };
+    const pptx = zipWithEntries(entries);
+
+    await expect(inspectPptxArchive(pptx, 24)).rejects.toThrow(
+      /local entry layout|unexpected data/i,
+    );
+  });
+
+  it('rejects CRC corruption even when local and central metadata agree', async () => {
+    const pptx = zipWithEntries(
+      requiredPptxEntries({
+        compressionMethod: 8,
+        crc: 0xdeadbeef,
+        localCrc: 0xdeadbeef,
+      }),
+    );
+
+    await expect(inspectPptxArchive(pptx, 24)).rejects.toThrow(/CRC/i);
+  });
+
+  it('rejects malformed deflate streams', async () => {
+    const entries = requiredPptxEntries({ compressionMethod: 8 });
+    entries[2] = {
+      ...entries[2]!,
+      compressedData: Buffer.from([0xff, 0xff, 0xff, 0xff]),
+    };
+    const pptx = zipWithEntries(entries);
+
+    await expect(inspectPptxArchive(pptx, 24)).rejects.toThrow(
+      /malformed deflated/i,
+    );
+  });
+
+  it('rejects data descriptors before decompression', async () => {
+    const pptx = zipWithEntries(requiredPptxEntries({ flags: 0x0008 }));
+
+    await expect(inspectPptxArchive(pptx, 24)).rejects.toThrow(
+      /data descriptor/i,
+    );
+  });
+
+  it('rejects mismatched local and central entry metadata', async () => {
+    const pptx = zipWithEntries(
+      requiredPptxEntries({
+        compressionMethod: 8,
+        localCompressionMethod: 0,
+      }),
+    );
+
+    await expect(inspectPptxArchive(pptx, 24)).rejects.toThrow(
+      /local.*central.*metadata/i,
+    );
   });
 });

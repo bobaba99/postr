@@ -25,6 +25,8 @@ import {
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { createInflateRaw, crc32 } from 'node:zlib';
 import {
   REVIEW_PPTX_MAX_COMPRESSION_RATIO,
   REVIEW_PPTX_MAX_UNCOMPRESSED_BYTES,
@@ -36,10 +38,24 @@ import {
 
 const ZIP_EOCD_SIGNATURE = 0x06054b50;
 const ZIP_CENTRAL_FILE_SIGNATURE = 0x02014b50;
+const ZIP_LOCAL_FILE_SIGNATURE = 0x04034b50;
 const ZIP_EOCD_MIN_BYTES = 22;
 const ZIP_MAX_COMMENT_BYTES = 65_535;
 const MAX_CENTRAL_DIRECTORY_ENTRIES = 10_000;
 const MAX_CENTRAL_DIRECTORY_BYTES = 16 * 1024 * 1024;
+const ZIP_STREAM_CHUNK_BYTES = 64 * 1024;
+
+interface PptxZipEntry {
+  name: string;
+  nameBytes: Buffer;
+  flags: number;
+  compressionMethod: number;
+  crc: number;
+  compressedBytes: number;
+  uncompressedBytes: number;
+  localHeaderOffset: number;
+  dataOffset: number;
+}
 
 /** One rendered slide: the JPEG bytes plus their pixel dimensions. */
 export interface RenderedPage {
@@ -145,18 +161,21 @@ export async function readPptxResponse(
 }
 
 /**
- * Validate the bounded ZIP central directory without inflating attacker
- * controlled data. A PPTX must contain its OOXML roots and at least one
- * numbered slide; the slide count is known before LibreOffice runs.
+ * Validate the bounded ZIP directory and stream every entry through CRC,
+ * emitted-byte, and compression-ratio checks. No expanded entry is retained:
+ * zlib output is consumed in bounded chunks before LibreOffice runs.
+ *
+ * A PPTX must contain its OOXML roots and at least one numbered slide; the
+ * slide count is known before conversion starts.
  */
-export function inspectPptxArchive(
+export async function inspectPptxArchive(
   pptx: Buffer,
   maxSlides: number,
   options: {
     maxUncompressedBytes?: number;
     maxCompressionRatio?: number;
   } = {},
-): { slideCount: number } {
+): Promise<{ slideCount: number }> {
   const maxUncompressedBytes =
     options.maxUncompressedBytes ?? REVIEW_PPTX_MAX_UNCOMPRESSED_BYTES;
   const maxCompressionRatio =
@@ -202,9 +221,10 @@ export function inspectPptxArchive(
   }
 
   const names = new Set<string>();
+  const entries: PptxZipEntry[] = [];
   let cursor = centralOffset;
   let totalCompressedBytes = 0;
-  let totalUncompressedBytes = 0;
+  let totalDeclaredUncompressedBytes = 0;
   for (let index = 0; index < totalEntries; index++) {
     if (
       cursor + 46 > centralEnd ||
@@ -219,15 +239,27 @@ export function inspectPptxArchive(
     if (nameLength === 0 || entryEnd > centralEnd) {
       throw new PptxArchiveError('invalid_pptx', 'Malformed PPTX central directory lengths');
     }
-    const name = pptx.toString('utf8', cursor + 46, cursor + 46 + nameLength);
+    const nameBytes = pptx.subarray(
+      cursor + 46,
+      cursor + 46 + nameLength,
+    );
+    const name = nameBytes.toString('utf8');
     const flags = pptx.readUInt16LE(cursor + 8);
     const compressionMethod = pptx.readUInt16LE(cursor + 10);
+    const expectedCrc = pptx.readUInt32LE(cursor + 16);
     const compressedBytes = pptx.readUInt32LE(cursor + 20);
     const uncompressedBytes = pptx.readUInt32LE(cursor + 24);
+    const localHeaderOffset = pptx.readUInt32LE(cursor + 42);
     if ((flags & 0x0001) !== 0) {
       throw new PptxArchiveError(
         'invalid_pptx',
         `Encrypted PPTX entry is not supported: ${name}`,
+      );
+    }
+    if ((flags & 0x0008) !== 0) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `PPTX data descriptor is not supported: ${name}`,
       );
     }
     if (compressionMethod !== 0 && compressionMethod !== 8) {
@@ -238,7 +270,8 @@ export function inspectPptxArchive(
     }
     if (
       compressedBytes === 0xffffffff ||
-      uncompressedBytes === 0xffffffff
+      uncompressedBytes === 0xffffffff ||
+      localHeaderOffset === 0xffffffff
     ) {
       throw new PptxArchiveError(
         'invalid_pptx',
@@ -246,8 +279,8 @@ export function inspectPptxArchive(
       );
     }
     totalCompressedBytes += compressedBytes;
-    totalUncompressedBytes += uncompressedBytes;
-    if (totalUncompressedBytes > maxUncompressedBytes) {
+    totalDeclaredUncompressedBytes += uncompressedBytes;
+    if (totalDeclaredUncompressedBytes > maxUncompressedBytes) {
       throw new PptxArchiveError(
         'invalid_pptx',
         `PPTX uncompressed size exceeds ${maxUncompressedBytes} bytes`,
@@ -263,16 +296,33 @@ export function inspectPptxArchive(
         `PPTX entry compression ratio exceeds ${maxCompressionRatio}: ${name}`,
       );
     }
+    if (names.has(name)) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `Duplicate PPTX entry is not supported: ${name}`,
+      );
+    }
     names.add(name);
+    entries.push({
+      name,
+      nameBytes,
+      flags,
+      compressionMethod,
+      crc: expectedCrc,
+      compressedBytes,
+      uncompressedBytes,
+      localHeaderOffset,
+      dataOffset: -1,
+    });
     cursor = entryEnd;
   }
   if (cursor !== centralEnd) {
     throw new PptxArchiveError('invalid_pptx', 'PPTX central directory entry count is invalid');
   }
   if (
-    totalUncompressedBytes > 0 &&
+    totalDeclaredUncompressedBytes > 0 &&
     (totalCompressedBytes === 0 ||
-      totalUncompressedBytes >
+      totalDeclaredUncompressedBytes >
         totalCompressedBytes * maxCompressionRatio)
   ) {
     throw new PptxArchiveError(
@@ -296,7 +346,226 @@ export function inspectPptxArchive(
       `PPTX contains ${slides.length} slides; maximum is ${maxSlides}`,
     );
   }
+
+  reconcileLocalEntries(pptx, entries, centralOffset);
+  await validateActualEntryData(
+    pptx,
+    entries,
+    maxUncompressedBytes,
+    maxCompressionRatio,
+    totalCompressedBytes,
+  );
+
   return { slideCount: slides.length };
+}
+
+function reconcileLocalEntries(
+  pptx: Buffer,
+  entries: PptxZipEntry[],
+  centralOffset: number,
+): void {
+  const localOrder = [...entries].sort(
+    (left, right) => left.localHeaderOffset - right.localHeaderOffset,
+  );
+  let expectedOffset = 0;
+
+  for (const entry of localOrder) {
+    const offset = entry.localHeaderOffset;
+    if (
+      offset !== expectedOffset ||
+      offset + 30 > centralOffset ||
+      pptx.readUInt32LE(offset) !== ZIP_LOCAL_FILE_SIGNATURE
+    ) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `Malformed PPTX local entry layout: ${entry.name}`,
+      );
+    }
+
+    const localFlags = pptx.readUInt16LE(offset + 6);
+    const localCompressionMethod = pptx.readUInt16LE(offset + 8);
+    const localCrc = pptx.readUInt32LE(offset + 14);
+    const localCompressedBytes = pptx.readUInt32LE(offset + 18);
+    const localUncompressedBytes = pptx.readUInt32LE(offset + 22);
+    const localNameLength = pptx.readUInt16LE(offset + 26);
+    const localExtraLength = pptx.readUInt16LE(offset + 28);
+    const localNameStart = offset + 30;
+    const dataOffset =
+      localNameStart + localNameLength + localExtraLength;
+    const dataEnd = dataOffset + entry.compressedBytes;
+
+    if (
+      localNameLength === 0 ||
+      dataOffset > centralOffset ||
+      dataEnd > centralOffset
+    ) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `Malformed PPTX local entry bounds: ${entry.name}`,
+      );
+    }
+
+    const localNameBytes = pptx.subarray(
+      localNameStart,
+      localNameStart + localNameLength,
+    );
+    if (
+      !localNameBytes.equals(entry.nameBytes) ||
+      localFlags !== entry.flags ||
+      localCompressionMethod !== entry.compressionMethod ||
+      localCrc !== entry.crc ||
+      localCompressedBytes !== entry.compressedBytes ||
+      localUncompressedBytes !== entry.uncompressedBytes
+    ) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `PPTX local and central metadata differ: ${entry.name}`,
+      );
+    }
+    if (
+      localCompressedBytes === 0xffffffff ||
+      localUncompressedBytes === 0xffffffff
+    ) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `ZIP64 PPTX entry is not supported: ${entry.name}`,
+      );
+    }
+    if (
+      entry.compressionMethod === 0 &&
+      entry.compressedBytes !== entry.uncompressedBytes
+    ) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `Stored PPTX entry size mismatch: ${entry.name}`,
+      );
+    }
+
+    entry.dataOffset = dataOffset;
+    expectedOffset = dataEnd;
+  }
+
+  if (expectedOffset !== centralOffset) {
+    throw new PptxArchiveError(
+      'invalid_pptx',
+      'Unexpected data exists between PPTX entries and the central directory',
+    );
+  }
+}
+
+async function validateActualEntryData(
+  pptx: Buffer,
+  entries: PptxZipEntry[],
+  maxUncompressedBytes: number,
+  maxCompressionRatio: number,
+  totalCompressedBytes: number,
+): Promise<void> {
+  let actualTotalBytes = 0;
+
+  for (const entry of entries) {
+    let actualEntryBytes = 0;
+    let actualCrc = 0;
+
+    const consume = (chunk: Buffer): void => {
+      actualEntryBytes += chunk.byteLength;
+      actualTotalBytes += chunk.byteLength;
+      if (actualEntryBytes > maxUncompressedBytes) {
+        throw new PptxArchiveError(
+          'invalid_pptx',
+          `PPTX entry actual uncompressed size exceeds ${maxUncompressedBytes} bytes: ${entry.name}`,
+        );
+      }
+      if (actualTotalBytes > maxUncompressedBytes) {
+        throw new PptxArchiveError(
+          'invalid_pptx',
+          `PPTX actual uncompressed size exceeds ${maxUncompressedBytes} bytes`,
+        );
+      }
+      if (
+        actualEntryBytes > 0 &&
+        (entry.compressedBytes === 0 ||
+          actualEntryBytes >
+            entry.compressedBytes * maxCompressionRatio)
+      ) {
+        throw new PptxArchiveError(
+          'invalid_pptx',
+          `PPTX entry actual compression ratio exceeds ${maxCompressionRatio}: ${entry.name}`,
+        );
+      }
+      actualCrc = crc32(chunk, actualCrc);
+    };
+
+    if (entry.compressionMethod === 0) {
+      for (const chunk of archiveChunks(
+        pptx,
+        entry.dataOffset,
+        entry.compressedBytes,
+      )) {
+        consume(chunk);
+      }
+    } else {
+      const inflater = createInflateRaw({
+        chunkSize: ZIP_STREAM_CHUNK_BYTES,
+      });
+      const input = Readable.from(
+        archiveChunks(pptx, entry.dataOffset, entry.compressedBytes),
+        { objectMode: false },
+      );
+      try {
+        for await (const chunk of input.pipe(inflater)) {
+          consume(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        }
+      } catch (error) {
+        if (error instanceof PptxArchiveError) throw error;
+        throw new PptxArchiveError(
+          'invalid_pptx',
+          `Malformed deflated PPTX entry: ${entry.name}`,
+        );
+      }
+      if (inflater.bytesWritten !== entry.compressedBytes) {
+        throw new PptxArchiveError(
+          'invalid_pptx',
+          `Trailing data in deflated PPTX entry: ${entry.name}`,
+        );
+      }
+    }
+
+    if (actualEntryBytes !== entry.uncompressedBytes) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `PPTX entry actual size differs from declared uncompressed size: ${entry.name}`,
+      );
+    }
+    if ((actualCrc >>> 0) !== entry.crc) {
+      throw new PptxArchiveError(
+        'invalid_pptx',
+        `PPTX entry CRC mismatch: ${entry.name}`,
+      );
+    }
+  }
+
+  if (
+    actualTotalBytes > 0 &&
+    (totalCompressedBytes === 0 ||
+      actualTotalBytes >
+        totalCompressedBytes * maxCompressionRatio)
+  ) {
+    throw new PptxArchiveError(
+      'invalid_pptx',
+      `PPTX aggregate actual compression ratio exceeds ${maxCompressionRatio}`,
+    );
+  }
+}
+
+function* archiveChunks(
+  pptx: Buffer,
+  offset: number,
+  byteLength: number,
+): Generator<Buffer> {
+  const end = offset + byteLength;
+  for (let cursor = offset; cursor < end; cursor += ZIP_STREAM_CHUNK_BYTES) {
+    yield pptx.subarray(cursor, Math.min(end, cursor + ZIP_STREAM_CHUNK_BYTES));
+  }
 }
 
 function findEndOfCentralDirectory(pptx: Buffer): number {
