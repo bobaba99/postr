@@ -263,6 +263,56 @@ describe('POST /api/review/render-pptx', () => {
     expect(renderCalls).toBe(1);
   });
 
+  it('keeps the conversion lease after the client disconnects until rendering settles', async () => {
+    let renderCalls = 0;
+    let releaseFirst!: () => void;
+    let markFirstStarted!: () => void;
+    const firstStarted = new Promise<void>((resolve) => {
+      markFirstStarted = resolve;
+    });
+    const firstRelease = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const renderedPage: RenderedPage = {
+      pageNumber: 1,
+      jpeg: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+      widthPx: 2048,
+      heightPx: 1152,
+    };
+    const renderer: PptxRenderer = {
+      async render(): Promise<RenderedPage[]> {
+        renderCalls++;
+        if (renderCalls === 1) {
+          markFirstStarted();
+          await firstRelease;
+        }
+        return [renderedPage];
+      },
+    };
+    const { app: firstApp } = buildApp({ renderer });
+    const { app: secondApp } = buildApp({ renderer });
+
+    const firstRequest = postRender(firstApp, VALID_FILE_URL);
+    const firstPromise = Promise.resolve(firstRequest).catch((error) => error);
+    await firstStarted;
+    firstRequest.abort();
+    await firstPromise;
+
+    let second;
+    try {
+      second = await postRender(secondApp, VALID_FILE_URL);
+    } finally {
+      releaseFirst();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
+    const third = await postRender(secondApp, VALID_FILE_URL);
+
+    expect(second.status).toBe(503);
+    expect(second.body.error).toBe('pptx_render_busy');
+    expect(third.status).toBe(200);
+    expect(renderCalls).toBe(2);
+  });
+
   it('renders the deck, uploads page JPEGs to review-temp, returns signed URLs', async () => {
     const { renderer, calls } = fakeRenderer([
       { widthPx: 2048, heightPx: 1152 },

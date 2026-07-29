@@ -34,7 +34,6 @@
 import { randomUUID } from 'node:crypto';
 import express, {
   type Request,
-  type RequestHandler,
   type Response,
   type Router,
 } from 'express';
@@ -149,27 +148,19 @@ function defaultGetPptxRenderer(): PptxRenderer {
 
 let activePptxRenders = 0;
 
-const limitPptxRenderConcurrency: RequestHandler = (_req, res, next) => {
+function tryAcquirePptxRenderLease(): (() => void) | null {
   if (activePptxRenders >= REVIEW_PPTX_MAX_CONCURRENT_RENDERS) {
-    res.setHeader('Retry-After', '5');
-    res.status(503).json({
-      error: 'pptx_render_busy',
-      message: 'Presentation conversion is busy. Try again shortly.',
-    });
-    return;
+    return null;
   }
 
   activePptxRenders++;
   let released = false;
-  const release = () => {
+  return () => {
     if (released) return;
     released = true;
     activePptxRenders--;
   };
-  res.once('finish', release);
-  res.once('close', release);
-  next();
-};
+}
 
 export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
   const router = express.Router();
@@ -245,7 +236,6 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
     requireAuth(getSupabase, { requirePermanent: true }),
     // Conversion is CPU-heavy (LibreOffice) — a tight burst + daily cap.
     createRateLimiter({ maxPerWindow: 2, maxPerDay: 10 }),
-    limitPptxRenderConcurrency,
     async (req: Request, res: Response) => {
       const parsed = RenderPptxRequest.safeParse(req.body);
       if (!parsed.success) {
@@ -310,6 +300,15 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
         throw err;
       }
 
+      const releasePptxRenderLease = tryAcquirePptxRenderLease();
+      if (!releasePptxRenderLease) {
+        res.setHeader('Retry-After', '5');
+        return res.status(503).json({
+          error: 'pptx_render_busy',
+          message: 'Presentation conversion is busy. Try again shortly.',
+        });
+      }
+
       let rendered: RenderedPage[];
       try {
         rendered = await getPptxRenderer().render(pptx);
@@ -318,6 +317,8 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
         // eslint-disable-next-line no-console
         console.error('[review.render-pptx] render failed:', message);
         return res.status(502).json({ error: 'pptx_render_failed' });
+      } finally {
+        releasePptxRenderLease();
       }
 
       if (rendered.length === 0) {
