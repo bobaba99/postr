@@ -233,6 +233,20 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
     return consumeFailure;
   }
 
+  return persistInitialReview(
+    ctx,
+    creditSource,
+    callResult,
+    enforcedCritique,
+  );
+}
+
+async function persistInitialReview(
+  ctx: InitialCtx,
+  creditSource: CreditSource,
+  callResult: CritiqueCallResult,
+  critique: CritiqueResult,
+): Promise<Response> {
   const { data: inserted, error: insertError } = await ctx.supabase
     .from('poster_reviews')
     .insert({
@@ -249,7 +263,7 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
       },
       status: 'complete',
       stage: 'initial',
-      initial_findings: enforcedCritique,
+      initial_findings: critique,
       credit_source: creditSource,
     })
     .select('id')
@@ -266,7 +280,7 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
   return ctx.res.status(200).json({
     reviewId: inserted.id as string,
     stage: 'initial',
-    critique: enforcedCritique,
+    critique,
   });
 }
 
