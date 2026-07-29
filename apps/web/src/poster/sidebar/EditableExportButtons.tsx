@@ -270,7 +270,7 @@ export function EditableExportButtons({
             <span style={{ fontSize: 11.5, color: '#8b8f99', lineHeight: 1.45 }}>
               I want access right away and understand I lose my 14-day refund
               right once I take a paid export.{' '}
-              <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: '#9b8cf0' }}>
+              <a href="/terms#refunds" target="_blank" rel="noopener noreferrer" style={{ color: '#9b8cf0' }}>
                 Refund terms
               </a>
               .

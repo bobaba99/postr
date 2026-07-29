@@ -17,7 +17,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = 'April 10, 2026';
+const LAST_UPDATED = 'July 28, 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Terms() {
@@ -199,12 +199,70 @@ export default function Terms() {
           written permission.
         </Body>
 
-        <SectionHeading n="7" title="Fees" />
+        <SectionHeading n="7" title="Fees, subscriptions, and refunds" />
         <Body>
-          Postr is currently free to use. If we introduce paid plans in the future,
-          we will update these Terms and notify signed-in users before any charge is
-          made. Use of the service while it is free does not grant you any right to
-          continued free use in the future.
+          Building and editing posters, and exporting a print-ready PDF, are free.
+          Some features are paid, in Canadian dollars (CAD):
+        </Body>
+        <List
+          items={[
+            'Term — CA$18.99 billed every 4 months. A recurring subscription that unlocks unlimited PowerPoint and LaTeX export with no watermark. It renews automatically every 4 months until you cancel.',
+            'Export pack — CA$9.99, one time, for 3 export credits. Each PowerPoint or LaTeX export uses one credit. Credits never expire.',
+          ]}
+        />
+        <Body>
+          Prices are shown at checkout before you pay and may change from time to
+          time; a price change never affects a purchase you have already made.
+          Payments are processed by our payment provider, which acts as the merchant
+          of record and handles billing, receipts, and applicable taxes.
+        </Body>
+
+        <SubHeading>7.1 Cancelling your subscription</SubHeading>
+        <Body>
+          You can cancel the term at any time — through the “Manage subscription” link
+          on your Profile page. Cancelling stops the next renewal; your term stays
+          active until the end of the period you already paid for. There is no fee to
+          cancel, and cancelling is not a refund.
+        </Body>
+
+        <SubHeading id="refunds">7.2 Refunds</SubHeading>
+        <CalloutBox>
+          <strong className="text-[#e2e2e8]">Term — 14-day money-back guarantee.</strong>
+          <br />
+          If you change your mind, we will refund your most recent term charge in
+          full within 14 days of that charge, as long as you have not completed a
+          PowerPoint or LaTeX export in that period. Taking a paid export uses the
+          product you paid for, so the guarantee ends there. After 14 days, or once
+          you have exported, that charge is not refundable — you can still cancel at
+          any time to stop future renewals.
+        </CalloutBox>
+        <CalloutBox>
+          <strong className="text-[#e2e2e8]">Export pack — unused credits are refundable.</strong>
+          <br />
+          If you have not used all of your pack credits, we will refund the value of
+          the credits you have not used, at CA$3.33 per credit (CA$9.99 ÷ 3).
+          Refunding your unused credits removes them from your account. Used credits
+          are not refundable.
+        </CalloutBox>
+        <Body>
+          You can request a refund from the Subscription section of your Profile page,
+          or by emailing{' '}
+          <a className="text-[#7c6aed] underline" href={`mailto:${CONTACT_EMAIL}`}>
+            {CONTACT_EMAIL}
+          </a>
+          . Refunds are returned to your original payment method and may take a few
+          business days to appear.
+        </Body>
+        <Body>
+          <strong className="text-[#c8cad0]">If you are in the EU, the EEA, or the UK:</strong>{' '}
+          you have a statutory 14-day right to withdraw from a distance purchase. When
+          you buy a paid feature you are asked to confirm that you want access
+          immediately and that you understand you lose this 14-day withdrawal right
+          once you take a paid export (for the term) or use a credit (for the pack).
+          Where that confirmation was not obtained, your statutory 14-day right
+          applies regardless of use. Nothing in this section limits any refund or
+          cancellation right you have under the mandatory consumer-protection law of
+          your country of residence.
         </Body>
 
         <SectionHeading n="8" title="Feedback" />
@@ -297,9 +355,11 @@ function SectionHeading({ n, title }: { n: string; title: string }) {
   );
 }
 
-function SubHeading({ children }: { children: React.ReactNode }) {
+function SubHeading({ children, id }: { children: React.ReactNode; id?: string }) {
   return (
-    <h3 className="mt-6 mb-3 text-[15px] font-semibold text-[#c8cad0]">{children}</h3>
+    <h3 id={id} className="mt-6 mb-3 scroll-mt-24 text-[15px] font-semibold text-[#c8cad0]">
+      {children}
+    </h3>
   );
 }
 
@@ -328,10 +388,9 @@ function CalloutBox({ children }: { children: React.ReactNode }) {
 function Disclaimer() {
   return (
     <div className="mt-6 rounded-lg border border-[#f59e0b]/30 bg-[#f59e0b]/5 p-5 text-[14pt] leading-relaxed text-[#f59e0b]">
-      <strong>Draft — pending legal review.</strong> This document should still be
-      reviewed by qualified counsel before Postr launches to paying users, and a
-      French version must be provided to Quebec residents under the Charter of
-      the French language.
+      <strong>Draft — pending legal review.</strong> This document should be
+      reviewed by qualified counsel, and a French version must be provided to
+      Quebec residents under the Charter of the French language.
     </div>
   );
 }
