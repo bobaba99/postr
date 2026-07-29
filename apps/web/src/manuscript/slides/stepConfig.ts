@@ -18,6 +18,9 @@ export const WIZARD_STEPS = [
 
 export type StepId = (typeof WIZARD_STEPS)[number];
 
+/** How many steps the spine has — the progress bar counts against this. */
+export const STEP_TOTAL = WIZARD_STEPS.length;
+
 export const STEP_LABELS: Record<StepId, string> = {
   constraints: 'Constraints',
   starFinding: 'Star finding',

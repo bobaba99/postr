@@ -58,6 +58,7 @@ const CLIENT_ROUTES = [
   '/privacy',
   '/cookies',
   '/terms',
+  '/paper-to-slides',
   '/auth',
   '/s/:slug',
   '/dashboard',
@@ -76,7 +77,8 @@ const CLIENT_ROUTES = [
 const ALIAS_REDIRECTS: Array<[string, string]> = [
   ['/plot-picker', '/chart-chooser'],
   ['/manuscript-to-poster', '/paper-to-poster'],
-  ['/paper-to-present', '/paper-to-poster'],
+  ['/paper-to-present', '/paper-to-slides'],
+  ['/paper-to-presentation', '/paper-to-slides'],
 ];
 
 /** Paths that must fall through to the platform 404. */
