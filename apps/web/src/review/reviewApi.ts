@@ -3,9 +3,9 @@
  * (spec §5; the naming trap is why nothing here says "feedback").
  *
  * `requestCritique` wraps POST /api/review/critique in the shared
- * postJson helper. Initial calls carry one browser-generated request key;
- * an ambiguous transport failure retries once with the same key so the
- * API can replay instead of charging twice. It also translates the two
+ * postJson helper. Initial and follow-up calls carry browser-generated
+ * idempotency keys; an ambiguous transport failure retries with the same key
+ * so the API can replay instead of charging or judging twice. It also translates the two
  * statuses the UI handles specially:
  *   402 → ReviewPaymentRequiredError (the paywall; `reason` tells the
  *         panel which pitch to show — 'no_credit' buys a pack,
@@ -31,6 +31,9 @@ import { ApiError, formatRetryAfter, postJson } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabase';
 import { removeReviewPages } from './ingest/uploadReviewPage';
 
+const IN_PROGRESS_POLL_MS = 2_000;
+const IN_PROGRESS_MAX_POLLS = 300; // ten minutes: matches the server lease
+
 export interface CritiqueRequestBody {
   sourceKind: ReviewSourceKind;
   pages: ReviewPageRef[];
@@ -39,6 +42,8 @@ export interface CritiqueRequestBody {
   reviewId?: string;
   /** Stable idempotency key for one logical initial review. */
   requestKey?: string;
+  /** Stable idempotency key for the one included follow-up. */
+  followupRequestId?: string;
   /** Upload filename — the API stamps it into source_meta (shown in the past-reviews list). */
   filename?: string;
 }
@@ -66,7 +71,11 @@ export async function requestCritique(
   body: CritiqueRequestBody,
 ): Promise<CritiqueResponse> {
   const requestBody: CritiqueRequestBody = body.reviewId
-    ? body
+    ? {
+        ...body,
+        followupRequestId:
+          body.followupRequestId ?? crypto.randomUUID(),
+      }
     : { ...body, requestKey: body.requestKey ?? crypto.randomUUID() };
   const post = () =>
     postJson<CritiqueResponse>('/api/review/critique', requestBody, {
@@ -79,11 +88,30 @@ export async function requestCritique(
     // A transport failure is ambiguous: the server may have completed the
     // review after the connection disappeared. Retry once with the exact same
     // key so the API replays instead of charging/calling the provider again.
-    if (!(err instanceof ApiError)) {
+    if (isTransportError(err)) {
       try {
         return await post();
       } catch (retryErr) {
         err = retryErr;
+      }
+    }
+    // The first request may still be running when an ambiguous retry reaches
+    // the API. Keep the original key alive until the server can replay a
+    // terminal result; returning the 409 would make the next UI attempt mint a
+    // new key and could duplicate paid work. Cleanup remains deferred by the
+    // outer finally while this loop is active.
+    let polls = 0;
+    while (
+      polls < IN_PROGRESS_MAX_POLLS &&
+      (isTransportError(err) ||
+        (err instanceof ApiError && isReviewInProgress(err)))
+    ) {
+      polls += 1;
+      await wait(IN_PROGRESS_POLL_MS);
+      try {
+        return await post();
+      } catch (pollError) {
+        err = pollError;
       }
     }
     if (err instanceof ApiError && err.status === 402) {
@@ -119,6 +147,22 @@ export async function requestCritique(
     ];
     await removeReviewPages(tempPaths);
   }
+}
+
+function isTransportError(error: unknown): error is TypeError {
+  return error instanceof TypeError;
+}
+
+function isReviewInProgress(error: ApiError): boolean {
+  return (
+    error.status === 409 &&
+    (error.body as { error?: unknown } | null)?.error ===
+      'review_in_progress'
+  );
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function isReviewTempStoragePath(path: string): boolean {

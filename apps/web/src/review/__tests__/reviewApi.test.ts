@@ -59,6 +59,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -112,7 +113,56 @@ describe('requestCritique', () => {
     expect(globalThis.crypto.randomUUID).toHaveBeenCalledTimes(1);
   });
 
-  it('does not add a request key to a follow-up', async () => {
+  it('polls an ambiguous in-progress retry to replay before cleaning temp pages', async () => {
+    vi.useFakeTimers();
+    const response = {
+      reviewId: 'rev-1',
+      stage: 'initial' as const,
+      critique: {
+        dimensionScores: { narrative: 4, design: 3, content: 5 },
+        attentionSummary: 'The original request completed.',
+        findings: [],
+      },
+    };
+    postJsonMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockRejectedValueOnce(
+        new ApiError(
+          'review_in_progress',
+          409,
+          { error: 'review_in_progress' },
+          2,
+        ),
+      )
+      .mockResolvedValueOnce(response);
+    const body = {
+      ...BODY,
+      pages: [
+        {
+          ...BODY.pages[0]!,
+          storagePath: 'user-1/review-temp/session-1/page-1.jpg',
+        },
+      ],
+    };
+
+    const pending = requestCritique(body);
+    await vi.waitFor(() => expect(postJsonMock).toHaveBeenCalledTimes(2));
+    expect(removeMock).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expect(pending).resolves.toBe(response);
+
+    expect(postJsonMock).toHaveBeenCalledTimes(3);
+    expect(postJsonMock.mock.calls[2]![1]).toEqual(
+      postJsonMock.mock.calls[0]![1],
+    );
+    expect(removeMock).toHaveBeenCalledTimes(1);
+    expect(removeMock).toHaveBeenCalledWith([
+      'user-1/review-temp/session-1/page-1.jpg',
+    ]);
+  });
+
+  it('adds one stable idempotency key to a follow-up', async () => {
     postJsonMock.mockResolvedValue({
       reviewId: 'rev-1',
       stage: 'closed',
@@ -128,10 +178,10 @@ describe('requestCritique', () => {
 
     expect(postJsonMock).toHaveBeenCalledWith(
       '/api/review/critique',
-      followup,
+      { ...followup, followupRequestId: REQUEST_KEY },
       { auth: true },
     );
-    expect(globalThis.crypto.randomUUID).not.toHaveBeenCalled();
+    expect(globalThis.crypto.randomUUID).toHaveBeenCalledTimes(1);
   });
 
   it('maps a 402 ApiError to ReviewPaymentRequiredError with the server reason', async () => {
