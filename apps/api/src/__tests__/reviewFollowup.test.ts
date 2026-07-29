@@ -206,7 +206,7 @@ describe('POST /api/review/critique — follow-up (§5.2)', () => {
     expect(rpcs).toHaveLength(0);
   });
 
-  it('removes revised review-temp pages after fetching and before the follow-up model call', async () => {
+  it('removes revised review-temp pages before replying', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
     const { client, remove } = fakeSupabase({ reviewRow: REVIEW_ROW });
@@ -236,14 +236,11 @@ describe('POST /api/review/critique — follow-up (§5.2)', () => {
     expect(remove).toHaveBeenCalledWith([
       'user-1/review-temp/revised/page-1.jpg',
     ]);
-    expect(remove.mock.invocationCallOrder[0]).toBeLessThan(
-      anthropic.create.mock.invocationCallOrder[0]!,
-    );
   });
 
   it('rejects a third critique on a closed review with 409 review_closed', async () => {
     const anthropic = fakeAnthropic();
-    const { client, updates } = fakeSupabase({
+    const { client, updates, remove } = fakeSupabase({
       reviewRow: { ...REVIEW_ROW, stage: 'closed' },
     });
     const fetchFn = vi.fn();
@@ -253,10 +250,26 @@ describe('POST /api/review/critique — follow-up (§5.2)', () => {
       fetchFn: fetchFn as unknown as typeof fetch,
     });
 
-    const res = await post(app, validBody());
+    const res = await post(
+      app,
+      validBody({
+        pages: [
+          {
+            pageNumber: 1,
+            url: PAGE_URL,
+            widthPx: 2048,
+            heightPx: 1152,
+            storagePath: 'user-1/review-temp/closed/page-1.jpg',
+          },
+        ],
+      }),
+    );
 
     expect(res.status).toBe(409);
     expect(res.body.error).toBe('review_closed');
+    expect(remove).toHaveBeenCalledWith([
+      'user-1/review-temp/closed/page-1.jpg',
+    ]);
     expect(fetchFn).not.toHaveBeenCalled();
     expect(anthropic.create).not.toHaveBeenCalled();
     expect(updates).toHaveLength(0);

@@ -11,9 +11,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { ApiError } from '@/lib/apiClient';
 
-const { postJsonMock, fromMock } = vi.hoisted(() => ({
+const { postJsonMock, fromMock, removeMock } = vi.hoisted(() => ({
   postJsonMock: vi.fn(),
   fromMock: vi.fn(),
+  removeMock: vi.fn(),
 }));
 
 vi.mock('@/lib/apiClient', async (importOriginal) => {
@@ -22,7 +23,10 @@ vi.mock('@/lib/apiClient', async (importOriginal) => {
 });
 
 vi.mock('@/lib/supabase', () => ({
-  supabase: { from: fromMock },
+  supabase: {
+    from: fromMock,
+    storage: { from: () => ({ remove: removeMock }) },
+  },
 }));
 
 import {
@@ -46,6 +50,8 @@ const BODY = {
 beforeEach(() => {
   postJsonMock.mockReset();
   fromMock.mockReset();
+  removeMock.mockReset();
+  removeMock.mockResolvedValue({ data: [], error: null });
 });
 
 describe('requestCritique', () => {
@@ -111,6 +117,32 @@ describe('requestCritique', () => {
     expect((err as ApiError).status).toBe(429);
     expect((err as ApiError).message).toContain('2 minutes');
     expect((err as ApiError).retryAfterSec).toBe(90);
+  });
+
+  it('best-effort removes review-temp pages even when the critique is rate-limited', async () => {
+    postJsonMock.mockRejectedValue(
+      new ApiError('rate_limited', 429, { error: 'rate_limited' }, 90),
+    );
+    const body = {
+      ...BODY,
+      pages: [
+        {
+          ...BODY.pages[0],
+          storagePath: 'user-1/review-temp/session-1/page-1.jpg',
+        },
+        {
+          ...BODY.pages[0],
+          pageNumber: 2,
+          storagePath: 'user-1/poster-1/review-capture.jpg',
+        },
+      ],
+    };
+
+    await requestCritique(body).catch(() => undefined);
+
+    expect(removeMock).toHaveBeenCalledWith([
+      'user-1/review-temp/session-1/page-1.jpg',
+    ]);
   });
 
   it('propagates other ApiErrors untouched', async () => {

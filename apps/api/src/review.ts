@@ -177,12 +177,6 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
         return res.status(400).json({ error: 'bad_request', details: parsed.error.flatten() });
       }
       const body = parsed.data;
-      // Hard page cap (§1): a typed error, never a silent truncation.
-      if (body.pages.length > REVIEW_MAX_PAGES) {
-        return res
-          .status(400)
-          .json({ error: 'too_many_pages', maxPages: REVIEW_MAX_PAGES });
-      }
 
       const supabase = getSupabase();
       if (!supabase) {
@@ -191,18 +185,44 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
           message: 'SUPABASE_URL and SUPABASE_SECRET_KEY must both be set for review.',
         });
       }
-      const anthropic = getAnthropic();
-      if (!anthropic) {
-        return res.status(500).json({
-          error: 'provider_not_configured',
-          message: 'ANTHROPIC_API_KEY is missing on the server.',
-        });
-      }
       const user = (res.locals as AuthLocals).user;
 
-      return body.reviewId
-        ? runFollowup({ res, supabase, anthropic, fetchFn, now, user, body })
-        : runInitial({ req, res, supabase, anthropic, fetchFn, now, weeklyLimiter, user, body });
+      // Every valid request owns the lifecycle of its rendered temp pages.
+      // Keep cleanup outside the entitlement/fetch/model branches so 402s,
+      // closed follow-ups, fetch failures, and provider failures cannot leak
+      // user-owned review-temp objects. Cleanup is path-scoped and best-effort.
+      try {
+        // Hard page cap (§1): a typed error, never a silent truncation.
+        if (body.pages.length > REVIEW_MAX_PAGES) {
+          return res
+            .status(400)
+            .json({ error: 'too_many_pages', maxPages: REVIEW_MAX_PAGES });
+        }
+
+        const anthropic = getAnthropic();
+        if (!anthropic) {
+          return res.status(500).json({
+            error: 'provider_not_configured',
+            message: 'ANTHROPIC_API_KEY is missing on the server.',
+          });
+        }
+
+        return await (body.reviewId
+          ? runFollowup({ res, supabase, anthropic, fetchFn, now, user, body })
+          : runInitial({
+              req,
+              res,
+              supabase,
+              anthropic,
+              fetchFn,
+              now,
+              weeklyLimiter,
+              user,
+              body,
+            }));
+      } finally {
+        await cleanupFetchedReviewTempPages(supabase, user.id, body.pages);
+      }
     },
   );
 
@@ -472,7 +492,6 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
   } catch (err) {
     return replyPageFetchError(res, err);
   }
-  await cleanupFetchedReviewTempPages(supabase, user.id, body.pages);
 
   const signals = body.posterDoc ? computeReviewSignals(body.posterDoc.blocks) : undefined;
 
@@ -653,7 +672,6 @@ async function runFollowup(ctx: FollowupCtx): Promise<Response> {
   } catch (err) {
     return replyPageFetchError(res, err);
   }
-  await cleanupFetchedReviewTempPages(supabase, user.id, body.pages);
 
   const signals = body.posterDoc ? computeReviewSignals(body.posterDoc.blocks) : undefined;
 

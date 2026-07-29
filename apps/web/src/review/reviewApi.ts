@@ -27,6 +27,7 @@ import type {
 } from '@postr/shared';
 import { ApiError, formatRetryAfter, postJson } from '@/lib/apiClient';
 import { supabase } from '@/lib/supabase';
+import { removeReviewPages } from './ingest/uploadReviewPage';
 
 export interface CritiqueRequestBody {
   sourceKind: ReviewSourceKind;
@@ -81,7 +82,34 @@ export async function requestCritique(
       );
     }
     throw err;
+  } finally {
+    // The API also cleans valid requests, but its outer rate limiter can
+    // reject before the critique handler runs and a network failure may
+    // leave the browser unsure whether the request arrived. Deleting the
+    // caller's review-temp paths here is an idempotent, best-effort fallback.
+    const tempPaths = [
+      ...new Set(
+        body.pages
+          .map((page) => page.storagePath)
+          .filter(
+            (path): path is string =>
+              typeof path === 'string' && isReviewTempStoragePath(path),
+          ),
+      ),
+    ];
+    await removeReviewPages(tempPaths);
   }
+}
+
+function isReviewTempStoragePath(path: string): boolean {
+  const segments = path.split('/');
+  return (
+    segments.length >= 4 &&
+    segments[1] === 'review-temp' &&
+    segments.every(
+      (segment) => segment.length > 0 && segment !== '.' && segment !== '..',
+    )
+  );
 }
 
 /** One row of the signed-in user's review history (past-reviews list). */

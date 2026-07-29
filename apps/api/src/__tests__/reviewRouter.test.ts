@@ -249,16 +249,32 @@ describe('POST /api/review/critique — auth and validation', () => {
 describe('POST /api/review/critique — entitlement (D4)', () => {
   it('rejects with 402 no_credit before the model call when the user has neither add-on nor credits', async () => {
     const anthropic = fakeAnthropic();
-    const { client, rpcs, inserts } = fakeSupabase({ userRow: BROKE_USER });
+    const { client, rpcs, inserts, remove } = fakeSupabase({ userRow: BROKE_USER });
     const fetchFn = vi.fn();
     const app = buildApp({
       supabase: client,
       anthropic: anthropic.client,
       fetchFn: fetchFn as unknown as typeof fetch,
     });
-    const res = await post(app, validBody());
+    const res = await post(
+      app,
+      validBody({
+        pages: [
+          {
+            pageNumber: 1,
+            url: PAGE_URL,
+            widthPx: 2048,
+            heightPx: 1152,
+            storagePath: 'user-1/review-temp/no-credit/page-1.jpg',
+          },
+        ],
+      }),
+    );
     expect(res.status).toBe(402);
     expect(res.body).toMatchObject({ error: 'review_payment_required', reason: 'no_credit' });
+    expect(remove).toHaveBeenCalledWith([
+      'user-1/review-temp/no-credit/page-1.jpg',
+    ]);
     expect(fetchFn).not.toHaveBeenCalled();
     expect(anthropic.create).not.toHaveBeenCalled();
     expect(rpcs).toHaveLength(0);
@@ -355,7 +371,7 @@ describe('POST /api/review/critique — initial critique', () => {
     });
   });
 
-  it('removes only user-owned review-temp pages after fetching and before the model call', async () => {
+  it('removes only user-owned review-temp pages before replying', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
     const { client, remove } = fakeSupabase({ userRow: PACK_USER });
@@ -395,9 +411,6 @@ describe('POST /api/review/critique — initial critique', () => {
     expect(remove).toHaveBeenCalledWith([
       'user-1/review-temp/session-1/page-1.jpg',
     ]);
-    expect(remove.mock.invocationCallOrder[0]).toBeLessThan(
-      anthropic.create.mock.invocationCallOrder[0]!,
-    );
   });
 
   it('continues the critique when best-effort temp cleanup fails', async () => {
