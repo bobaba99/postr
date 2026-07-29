@@ -25,5 +25,6 @@
     "The HiFi Cas9 20-fold single-site INDEL reduction ('reduced INDEL frequency at the dominant off-target site by 20 fold') must NOT be #1: it is a single-locus figure, not a genome-wide summary of the effect."
   ],
   "draftedBy": "workflow",
-  "approved": false
+  "approved": true,
+  "approvedBy": "Gavin"
 }
