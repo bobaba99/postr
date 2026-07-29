@@ -31,6 +31,8 @@ interface UserBucket {
   dailyEvents: number[];
 }
 
+const BUCKET_PRUNE_INTERVAL_MS = 60_000;
+
 export function createRateLimiter(
   options: RateLimitOptions = {},
 ): RequestHandler {
@@ -39,8 +41,20 @@ export function createRateLimiter(
   const dailyMs = options.dailyMs ?? 24 * 60 * 60 * 1000;
   const maxPerDay = options.maxPerDay ?? 20;
   const now = options.now ?? Date.now;
+  const windowEnabled = maxPerWindow < Number.MAX_SAFE_INTEGER;
+  const dailyEnabled = maxPerDay < Number.MAX_SAFE_INTEGER;
 
   const buckets = new Map<string, UserBucket>();
+  let nextBucketPruneAt = 0;
+
+  const pruneBucket = (bucket: UserBucket, t: number) => {
+    bucket.windowEvents = windowEnabled
+      ? bucket.windowEvents.filter((ts) => t - ts < windowMs)
+      : [];
+    bucket.dailyEvents = dailyEnabled
+      ? bucket.dailyEvents.filter((ts) => t - ts < dailyMs)
+      : [];
+  };
 
   return (req: Request, res: Response, next: NextFunction) => {
     const user = (res.locals as AuthLocals).user as User | undefined;
@@ -52,20 +66,28 @@ export function createRateLimiter(
     }
 
     const t = now();
+    if (t >= nextBucketPruneAt) {
+      for (const [userId, candidate] of buckets) {
+        pruneBucket(candidate, t);
+        if (
+          candidate.windowEvents.length === 0 &&
+          candidate.dailyEvents.length === 0
+        ) {
+          buckets.delete(userId);
+        }
+      }
+      nextBucketPruneAt = t + BUCKET_PRUNE_INTERVAL_MS;
+    }
+
     let bucket = buckets.get(user.id);
     if (!bucket) {
       bucket = { windowEvents: [], dailyEvents: [] };
       buckets.set(user.id, bucket);
     }
 
-    bucket.windowEvents = bucket.windowEvents.filter(
-      (ts) => t - ts < windowMs,
-    );
-    bucket.dailyEvents = bucket.dailyEvents.filter(
-      (ts) => t - ts < dailyMs,
-    );
+    pruneBucket(bucket, t);
 
-    if (bucket.windowEvents.length >= maxPerWindow) {
+    if (windowEnabled && bucket.windowEvents.length >= maxPerWindow) {
       const retryAfter = Math.ceil(
         (windowMs - (t - bucket.windowEvents[0]!)) / 1000,
       );
@@ -76,7 +98,7 @@ export function createRateLimiter(
       });
       return;
     }
-    if (bucket.dailyEvents.length >= maxPerDay) {
+    if (dailyEnabled && bucket.dailyEvents.length >= maxPerDay) {
       const retryAfter = Math.ceil(
         (dailyMs - (t - bucket.dailyEvents[0]!)) / 1000,
       );
@@ -88,8 +110,8 @@ export function createRateLimiter(
       return;
     }
 
-    bucket.windowEvents.push(t);
-    bucket.dailyEvents.push(t);
+    if (windowEnabled) bucket.windowEvents.push(t);
+    if (dailyEnabled) bucket.dailyEvents.push(t);
     next();
   };
 }
