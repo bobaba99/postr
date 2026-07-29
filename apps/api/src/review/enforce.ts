@@ -100,28 +100,29 @@ function guardAddDistribution(findings: ReviewFinding[]): ReviewFinding[] {
     return findings;
   }
 
-  const addFindingsInDropOrder = findings
+  const addIndexesInDropOrder = findings
     .map((finding, index) => ({ finding, index }))
     .filter(({ finding }) => finding.action === 'add')
     .sort(
       (left, right) =>
         SEVERITY_RANK[right.finding.severity] - SEVERITY_RANK[left.finding.severity] ||
         right.index - left.index,
-    );
-  const droppedIndexes = selectAddIndexesToDrop(addFindingsInDropOrder, findings.length);
+    )
+    .map(({ index }) => index);
+  const droppedIndexes = selectAddIndexesToDrop(addIndexesInDropOrder, findings.length);
 
   return findings.filter((_, index) => !droppedIndexes.has(index));
 }
 
 function selectAddIndexesToDrop(
-  addFindingsInDropOrder: Array<{ finding: ReviewFinding; index: number }>,
+  addIndexesInDropOrder: readonly number[],
   findingCount: number,
 ): ReadonlySet<number> {
   const droppedIndexes = new Set<number>();
-  let addCount = addFindingsInDropOrder.length;
+  let addCount = addIndexesInDropOrder.length;
   let remainingCount = findingCount;
 
-  for (const { index } of addFindingsInDropOrder) {
+  for (const index of addIndexesInDropOrder) {
     if (addCount * 2 <= remainingCount) {
       break;
     }
