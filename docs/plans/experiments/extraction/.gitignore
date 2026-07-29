@@ -1,0 +1,6 @@
+# Experiment harness — commit the SCRIPTS + paper INPUTS (text.md, gold.json)
+# only. Never commit deps or generated run artifacts.
+node_modules/
+RESULTS.json
+RESULTS.md
+papers/*/findings.*.json
