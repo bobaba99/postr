@@ -290,6 +290,62 @@ describe('exportStyledDeckPdf', () => {
     expect(reloaded.getPageCount()).toBe(1); // just the appended ack page
   });
 
+  it('draws a shape-kind element carrying `text` as a shape, not text — matches pptx + preview dispatch', async () => {
+    // The styleDeck tool schema PERMITS `text` on every element kind —
+    // the prompt only discourages it on shape kinds like `callout-box`
+    // — so Arm P can legally emit a shape-kind element that also carries
+    // text. Both the pptx writer (deckWriter.ts's addKnownElement) and
+    // the preview (SlideViewer.tsx's StyledElementView) dispatch on
+    // `kind` FIRST: a shape-kind element is always drawn as a shape and
+    // any `text` on it is ignored. The PDF writer must match, or the
+    // same StyledSlideDeck renders selectable text in the PDF while the
+    // pptx and preview render a plain rectangle — three surfaces, two
+    // results.
+    const deck: StyledSlideDeck = {
+      durationMinutes: 5,
+      theme,
+      slides: [
+        {
+          role: 'takeaway',
+          device: 'callout',
+          elements: [
+            {
+              kind: 'callout-box',
+              text: 'Key caveat',
+              x: 0.72,
+              y: 2.0,
+              fontSize: 20,
+              color: '#D9875D',
+            },
+          ],
+        },
+      ],
+    };
+
+    const bytes = await exportStyledDeckPdf(deck);
+    const reloaded = await PDFDocument.load(bytes);
+    const firstPage = reloaded.getPages()[0]!;
+    const content = decodePageContent(firstPage);
+
+    // No selectable text was ever drawn for this element: pdf-lib emits
+    // a `BT…Tj/TJ…ET` text-showing block for every drawText call
+    // (`<4B657920636176656174> Tj` is "Key caveat" as the hex string
+    // pdf-lib encodes drawText's argument into) — a substring match on
+    // the literal word would miss this encoding, so assert on the
+    // absence of the text-show operators/block themselves.
+    expect(content).not.toMatch(/\bTj\b/);
+    expect(content).not.toMatch(/\bTJ\b/);
+    expect(content).not.toContain('BT');
+
+    // A shape WAS drawn instead: pdf-lib's drawRectangle emits a
+    // moveto/lineto/closepath path (`m`/`l`/`h`) filled (`f`) in the
+    // element's color — a distinct, non-text drawing sequence that a
+    // drawText call could never emit.
+    expect(content).toMatch(/\bm\b[\s\S]*\bl\b[\s\S]*\bh\b[\s\S]*\bf\b/);
+    expect(content).toContain(hexToRgOperator('#D9875D'));
+    expect(hasEmbeddedImage(firstPage)).toBe(false);
+  });
+
   it('fills the theme background color even when the slide has NO "background"-kind element', async () => {
     // The real styleDeck API prompt (apps/api/src/narrative/styleDeck.ts's
     // STYLE_SYSTEM_PROMPT) never requires or even mentions a "background"

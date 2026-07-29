@@ -157,12 +157,33 @@ function drawShapeElement(page: PDFPage, el: StyledElement): void {
 
 /** Render every element of one styled slide onto a fresh PDF page.
  * Mirrors the Task-0 spike's dispatch: background → full-bleed rect,
- * text elements → drawText, recognized shape-kind elements → drawRectangle.
- * An element that is neither (no text, not a shape kind) is silently
- * skipped — never thrown, matching the pptx writer's graceful
- * degradation contract (spec §5.3). The `template-marker` element itself
- * carries no text or shape kind, so it is never drawn even on a
- * non-utility slide that happened to carry one.
+ * recognized shape-kind elements → drawRectangle, remaining text
+ * elements → drawText. An element that is neither (no text, not a
+ * shape kind) is silently skipped — never thrown, matching the pptx
+ * writer's graceful degradation contract (spec §5.3). The
+ * `template-marker` element itself carries no text or shape kind, so
+ * it is never drawn even on a non-utility slide that happened to
+ * carry one.
+ *
+ * ── Kind wins over text ───────────────────────────────────────────────
+ * `isShapeKind` is checked BEFORE `el.text`, deliberately mirroring the
+ * pptx writer's dispatch (`deckWriter.ts`'s `addKnownElement`, which
+ * switches on `el.kind` and never inspects `text` for a recognized
+ * shape kind) and the on-screen preview
+ * (`manuscript/slides/SlideViewer.tsx`'s `isStyledShapeKind`-gated
+ * `StyledElementView`). The styleDeck tool schema *permits* `text` on
+ * every element, including shape kinds like `callout-box` — the prompt
+ * only discourages it — so Arm P can legally emit a `callout-box` that
+ * also carries a `text` field. If this writer checked `el.text` first,
+ * that element would render as SELECTABLE TEXT here while the pptx and
+ * the preview both draw it as a plain colored rectangle with the text
+ * silently dropped: same `StyledSlideDeck`, three surfaces, two
+ * different results. That breaks the locked Global Constraint that "the
+ * two writers consume the SAME styled model so PDF and PPTX match by
+ * construction" and the preview's what-you-see-is-what-exports
+ * contract. Checking kind first keeps all three surfaces in agreement:
+ * a shape-kind element is ALWAYS a shape, and any `text` it happens to
+ * carry is ignored, exactly as the pptx writer and preview do.
  *
  * The page ALWAYS gets a full-bleed background fill in `themeBgHex`
  * FIRST, before any element — this does not depend on the slide
@@ -191,10 +212,14 @@ function drawSlide(
   for (const el of elements) {
     if (el.kind === 'background') {
       drawBackground(page, el);
+    } else if (isShapeKind(el.kind)) {
+      // Shape-kind wins over text — matches deckWriter.ts's
+      // addKnownElement and the preview's StyledElementView, so any
+      // `text` this element carries (schema-legal but prompt-
+      // discouraged) is ignored here exactly as it is there.
+      drawShapeElement(page, el);
     } else if (el.text) {
       drawTextElement(page, el, font, boldFont);
-    } else if (isShapeKind(el.kind)) {
-      drawShapeElement(page, el);
     }
   }
 }
