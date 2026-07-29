@@ -34,8 +34,6 @@ export default function Terms() {
         <h1 className="text-4xl font-bold leading-tight text-white">Terms of Service</h1>
         <p className="mt-4 text-sm text-[#6b7280]">Last updated: {LAST_UPDATED}</p>
 
-        <Disclaimer />
-
         <SectionHeading n="1" title="Agreement" />
         <Body>
           These Terms of Service (“Terms”) form a legal agreement between you and
@@ -385,12 +383,3 @@ function CalloutBox({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Disclaimer() {
-  return (
-    <div className="mt-6 rounded-lg border border-[#f59e0b]/30 bg-[#f59e0b]/5 p-5 text-[14pt] leading-relaxed text-[#f59e0b]">
-      <strong>Draft — pending legal review.</strong> This document should be
-      reviewed by qualified counsel, and a French version must be provided to
-      Quebec residents under the Charter of the French language.
-    </div>
-  );
-}

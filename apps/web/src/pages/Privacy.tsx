@@ -30,7 +30,6 @@ export default function Privacy() {
         <h1 className="text-4xl font-bold leading-tight text-white">Privacy Policy</h1>
         <p className="mt-4 text-sm text-[#6b7280]">Last updated: {LAST_UPDATED}</p>
 
-        <Disclaimer />
 
         <SectionHeading n="1" title="Who we are" />
         <Body>
@@ -421,19 +420,3 @@ function CalloutBox({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Disclaimer() {
-  return (
-    <div className="mt-6 rounded-lg border border-[#f59e0b]/30 bg-[#f59e0b]/5 p-5 text-[14pt] leading-relaxed text-[#f59e0b]">
-      <strong>Draft — pending legal review.</strong> This notice was drafted using
-      standard GDPR Art. 13/14 disclosures and adapted for Canadian privacy law
-      (PIPEDA + Quebec Law 25). It should still be reviewed by qualified
-      data-protection counsel before Postr launches to paying users, and a French
-      version must be provided to Quebec residents under the Charter of the
-      French language. Questions:{' '}
-      <a className="underline" href={`mailto:${CONTACT_EMAIL}`}>
-        {CONTACT_EMAIL}
-      </a>
-      .
-    </div>
-  );
-}
