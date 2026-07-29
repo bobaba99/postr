@@ -1,0 +1,286 @@
+{
+  "A": {
+    "component": 0.7333333333333333,
+    "operation": 0.7333333333333333,
+    "relations": 0.7333333333333333,
+    "overall": 0.7333333333333333
+  },
+  "B": {
+    "component": 1,
+    "operation": 0.8666666666666667,
+    "relations": 0.8,
+    "overall": 0.888888888888889
+  },
+  "rows": [
+    {
+      "id": "T01",
+      "text": "the callout is crowding the footer",
+      "A": {
+        "component_correct": 0,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "includes extra callout subcomponents"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "Correct pair, spacing operation, and bindings preserved"
+      },
+      "resA": "Target: callout-box, callout-label, callout-text, footer  \nOperation: Increase vertical separation; move/compact the callout upward to preserve bottom margin.  \nConstraint: Maintain clear gap above footer and align callout to the left content grid.",
+      "resB": "Targets: callout-box (with callout-label/text) and footer (with accent-dot).  \nOperation: increase the vertical gap; move the callout-box upward, preserving its children.  \nConcern: maintain stack order and avoid collision; footer/accent-dot remain bound and anchored bottom-left."
+    },
+    {
+      "id": "T02",
+      "text": "push everything up a bit, there's dead space at the bottom",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "Correctly shifts content stack up while preserving footer"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "Correct stack shift with preserved structural elements"
+      },
+      "resA": "Targets: all content components; preserve footer and slide number.  \nOperation: reduce bottom margin and shift the main content group upward.  \nConcern: maintain top-left alignment; keep clear separation from footer and avoid collisions.",
+      "resB": "Targets: Main content stack — section-label, title, body, callout-box (with label/text).  \nOperation: Shift the stack upward slightly; preserve bottom footer, accent-dot, and slide-number.  \nConcern: Maintain stack spacing and avoid collision with the section label or structural bottom elements."
+    },
+    {
+      "id": "T03",
+      "text": "the body text is hanging too far left",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "correct target and rightward indent adjustment"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 0,
+        "why": "unnecessary alignment concern"
+      },
+      "resA": "Target: body  \nOperation: shift body text right to align with the title/content grid.  \nConcern: preserve left-edge alignment and spacing from the callout box; no collision expected.",
+      "resB": "Target: body  \nOperation: shift body right toward the shared left-margin alignment.  \nConcern: preserve alignment with section-label, title, and footer; clarify if they want only the body offset."
+    },
+    {
+      "id": "T04",
+      "text": "center the callout box",
+      "A": {
+        "component_correct": 0,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "includes children as targets instead of carrying them"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "correct target, centering, and child preservation"
+      },
+      "resA": "Target: callout-box, callout-label, callout-text  \nOperation: center the callout group horizontally within the slide content area  \nAlignment concern: preserve internal label/text alignment and clear spacing from body and footer",
+      "resB": "Target: callout-box (with callout-label and callout-text).  \nOperation: move the callout group to the middle-center zone; preserve internal layout.  \nConcern: keep it below the title/body stack and avoid overlap with footer/accent-dot."
+    },
+    {
+      "id": "T05",
+      "text": "the accent dot is stranded way below everything else",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 0,
+        "relations_respected": 0,
+        "why": "moves bound dot alone instead of preserving pair"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "correctly identifies bound footer-dot unit"
+      },
+      "resA": "Targets: accent-dot, footer  \nOperation: move the accent-dot up to sit adjacent to the footer/content baseline  \nConcern: align it with the bottom-left footer group; maintain bottom margin and avoid overlap",
+      "resB": "Target: `accent-dot` and its bound parent `footer`.\nOperation: Move the footer–dot unit upward to align with the bottom-left footer area.\nConcern: Keep `accent-dot` bound to `footer`; preserve bottom margin and avoid collision with callout content."
+    },
+    {
+      "id": "T06",
+      "text": "move the footnote away from the dot",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 0,
+        "relations_respected": 0,
+        "why": "separates a bound pair instead of flagging ambiguity"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 0,
+        "relations_respected": 0,
+        "why": "should flag ambiguity or keep pair together"
+      },
+      "resA": "Targets: accent-dot and footer  \nOperation: increase spacing between the dot and footer; keep both bottom-left  \nConcern: maintain bottom margin and left-edge alignment; no collision between dot and footer",
+      "resB": "Target: footer and accent-dot.  \nOperation: increase the spacing between the footer text and its adjacent accent-dot.  \nConcern: they are a bound pair; adjust their internal offset while keeping both anchored bottom-left."
+    },
+    {
+      "id": "T07",
+      "text": "the slide number is too close to the edge",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "Correct target, inset adjustment, and alignment handling"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "correct target and inset adjustment"
+      },
+      "resA": "Target: slide-number (bottom-right).  \nOperation: increase its inset from the right and bottom slide margins.  \nAlignment/collision: maintain bottom-right alignment; ensure consistent footer clearance.",
+      "resB": "Target: `slide-number` (bottom-right).  \nOperation: Increase its right/bottom inset to align with the slide’s safe margin.  \nConcern: Preserve bottom-right anchoring; no collision expected."
+    },
+    {
+      "id": "T08",
+      "text": "scoot the title down so it's not right at the top",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "targets title, lowers it, preserves surrounding layout"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "Targets title, lowers it, and handles stack spacing"
+      },
+      "resA": "Target: title (top-left)  \nOperation: Move the title lower within the top-left header area; preserve the section label above it.  \nRelationship: Maintain top margin and title–section-label spacing; avoid collision with body content.",
+      "resB": "Target: title (with section-label spacing considered)  \nOperation: Move title lower; increase the section-label → title vertical gap.  \nConcern: Preserve left alignment and push lower stack content if needed to prevent overlap."
+    },
+    {
+      "id": "T09",
+      "text": "the label above the title feels detached",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "correct pair, gap reduction, and alignment preserved"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "correct pair, gap adjustment, and alignment preservation"
+      },
+      "resA": "Target: section-label and title  \nOperation: reduce vertical gap; group them as a tighter heading block  \nRelationship: preserve shared left alignment and clear separation from body",
+      "resB": "Target: section-label and title.  \nOperation: decrease the vertical gap between the section-label and title.  \nConcern: preserve their shared left alignment; adjust only this stack gap."
+    },
+    {
+      "id": "T10",
+      "text": "nothing lines up on the left",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "correct group alignment with constraints"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "Correct left-alignment group with preserved bound elements"
+      },
+      "resA": "Targets: section-label, title, body, callout-box/label/text, accent-dot, footer  \nOperation: align all left-side components to one shared left grid/margin  \nConcern: alignment applies; preserve callout internal padding and avoid text-box collisions",
+      "resB": "Targets: section-label, title, body, callout-box, footer (left-aligned group).  \nOperation: snap all targets to the shared left margin/grid (x≈0.72) and equalize left edges.  \nConcern: preserve callout children within the callout-box and keep accent-dot aligned with footer."
+    },
+    {
+      "id": "T11",
+      "text": "the evidence box is floating, give it an anchor",
+      "A": {
+        "component_correct": 0,
+        "operation_correct": 0,
+        "relations_respected": 0,
+        "why": "should flag subjective anchor ambiguity"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 0,
+        "relations_respected": 0,
+        "why": "Should flag subjective anchor ambiguity"
+      },
+      "resA": "Targets: callout-box, callout-label, callout-text  \nOperation: Align the evidence box to the body/content grid and visually attach it beneath the body with consistent spacing.  \nRelationship: Ensure shared left edge and clear vertical separation; avoid overlap with footer/accent-dot.",
+      "resB": "Target: callout-box, callout-label, callout-text  \nOperation: move the callout box upward to sit directly beneath the body/title stack, with a consistent vertical gap.  \nConcern: move its child text with the box; preserve left-edge alignment and avoid collision with footer/accent-dot."
+    },
+    {
+      "id": "T12",
+      "text": "even out the space around the middle chunk",
+      "A": {
+        "component_correct": 0,
+        "operation_correct": 0,
+        "relations_respected": 1,
+        "why": "extra targets and internal spacing added"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "correct targets and spacing intent"
+      },
+      "resA": "Targets: body; callout-box, callout-label, callout-text  \nOperation: Equalize vertical spacing above, within, and below the middle content group.  \nRelationship: Preserve left alignment and ensure the callout does not collide with the footer.",
+      "resB": "Targets: body and callout-box group (including callout-label and callout-text).  \nOperation: equalize vertical gaps above, between, and below these middle-left elements.  \nConcern: preserve stack order and left-edge alignment; avoid collision with title or footer."
+    },
+    {
+      "id": "T13",
+      "text": "shift the section tag and heading as one unit to the right",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 0,
+        "why": "failed to flag broken left-alignment group"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "flags left-alignment concern"
+      },
+      "resA": "Targets: section-label and title  \nOperation: move both right together as a grouped top-left header unit  \nConcern: preserve their alignment and spacing; clarify that pixel-level shifts aren’t supported, so choose a grid-aligned header offset",
+      "resB": "Targets: `section-label` and `title`  \nOperation: Move both right together as a grouped top-left unit.  \nConcern: This changes their shared left-edge alignment; preserve their internal spacing and avoid collision with other content."
+    },
+    {
+      "id": "T14",
+      "text": "tuck the page number into the corner properly",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "Correct target, corner alignment, and inset/collision handling"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "matches bottom-right margin alignment"
+      },
+      "resA": "Target: slide-number (bottom-right).  \nOperation: align it to the bottom-right margin/corner using the slide grid.  \nRelationship: preserve consistent inset from bottom and right edges; no collision with footer.",
+      "resB": "Target: slide-number  \nOperation: Snap to the bottom-right corner with consistent inset margins.  \nConcern: Maintain edge alignment and safe margin; no collision expected."
+    },
+    {
+      "id": "T15",
+      "text": "the title runs into the box below it when it's long",
+      "A": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "matches components, reflow, spacing, alignment"
+      },
+      "B": {
+        "component_correct": 1,
+        "operation_correct": 1,
+        "relations_respected": 1,
+        "why": "matches requested collision reflow"
+      },
+      "resA": "Target: title; callout-box (middle-lower-left).  \nOperation: constrain or auto-fit title text; increase vertical gap before the callout box.  \nConcern: prevent title–callout collision; preserve left alignment and minimum spacing.",
+      "resB": "Target: title and callout-box (including callout-label and callout-text).  \nOperation: increase the title-to-callout vertical gap; when the title wraps, push the callout-box stack downward.  \nConcern: preserve vertical stack order and prevent collision; keep callout children bound to the box."
+    }
+  ]
+}
