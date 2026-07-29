@@ -1,0 +1,29 @@
+{
+  "id": "SS5",
+  "question": "Does a universal basic income reduce recipients labor supply?",
+  "starFinding": {
+    "text": "A PRISMA systematic review of 38 studies found no evidence that universal basic income significantly reduces labor supply; instead labor supply increases globally across adults, men and women, and young and old, with only minor functional exceptions.",
+    "sourceQuote": "Despite a detailed search, we have not found any evidence of a significant reduction in labour supply. Instead, we found evidence that labour supply increases globally among adults, men and women, young and old, and the existence of some insignificant and functional reductions to the system such as a decrease in workers from the following categories: Children, the elderly, the sick, those with disabilities, women with young children to look after, or young people who continued studying."
+  },
+  "top3": [
+    {
+      "text": "A PRISMA systematic review of 38 studies found no evidence of a significant reduction in labor supply and instead found labor supply increases globally, with only minor functional exceptions.",
+      "sourceQuote": "Despite a detailed search, we have not found any evidence of a significant reduction in labour supply. Instead, we found evidence that labour supply increases globally among adults, men and women, young and old, and the existence of some insignificant and functional reductions to the system such as a decrease in workers from the following categories: Children, the elderly, the sick, those with disabilities, women with young children to look after, or young people who continued studying."
+    },
+    {
+      "text": "A review of U.S. unconditional cash transfer programs found no statistically significant effect on the probability of working, and where an effect existed it was small: a 10% income increase reduces labor supply by only about 1%, with no evidence workers drop out even for large transfers.",
+      "sourceQuote": "Many studies find no statistically significant effect of an unconditional cash transfer on the probability of working. In the studies that do find an effect on labor supply, the effect is small: a 10% income increase induced by an unconditional cash transfer decreases labor supply by about 1%. The evidence does not suggest an average worker will drop out of the labor force when provided with unconditional cash, even when the transfer is large."
+    },
+    {
+      "text": "A universal child benefit in Poland produced very small labor supply effects on both margins, with a $100 monthly transfer reducing earnings by only $14 (a marginal propensity to earn of -0.14) and almost no impact on parental labor supply.",
+      "sourceQuote": "I find very small labor supply effects on both the intensive and extensive margin. The estimated labor supply effects of receiving the unconditional transfer are small. For every extra 100 dollars in monthly child benefit transfer households receive, they reduce their monthly earnings by 14 dollars. The marginal propensity to earn out of unearned income was equal to -0.14, similar to the estimates obtained by Cesarini et al. (2017) for Sweden. At the individual level, the introduction of the child benefit had almost no impact on parental labor supply at the extensive and the intensive margin."
+    }
+  ],
+  "doNotPromote": [
+    "The German neoclassical simulation finding that a basic income increases labor market participation by abolishing the unemployment trap (Gilroy 2012/2013) — this is off-target as the #1 answer: it is a theoretical simulation predicting an INCREASE via a specific welfare-trap mechanism, not direct empirical evidence on whether UBI reduces labor supply, and would misrepresent the review consensus if ranked first.",
+    "Bibler et al. 2019's mixed result of a 0.7% annual labor market contraction / 1.25 fewer weekly hours among employed women — must not be #1: it is a narrow short-term, single-group (Alaska PFD, employed women) effect that overstates the overall answer relative to the null/no-significant-reduction consensus.",
+    "Ren 2026's finding that UBI leads to a 'small and short-run reduction' in labor supply — must not be #1: it is a single mixed-direction study emphasizing a temporary reduction and would contradict the review-level answer that there is no significant reduction."
+  ],
+  "draftedBy": "workflow",
+  "approved": false
+}

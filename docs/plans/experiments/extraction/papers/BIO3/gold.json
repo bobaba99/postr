@@ -1,0 +1,28 @@
+{
+  "id": "BIO3",
+  "question": "Does chronic sleep restriction impair memory consolidation?",
+  "starFinding": {
+    "text": "Yes — chronic sleep restriction impairs memory consolidation, with the hippocampus emerging as selectively vulnerable across all eight studies.",
+    "sourceQuote": "Sleep deprivation is detrimental to hippocampus-dependent memory."
+  },
+  "top3": [
+    {
+      "text": "Sleep deprivation during the first 5 hours after training impairs consolidation of contextual fear conditioning, establishing a critical early consolidation window.",
+      "sourceQuote": "Graves et al. demonstrated that sleep deprivation from 0-5 hours after training impaired memory consolidation for contextual fear conditioning, whereas sleep deprivation from 5-10 hours post-training had no effect [Graves et al., 2003]."
+    },
+    {
+      "text": "The impairment is molecularly reversible: restoring hippocampal mTORC1 signaling prevented the memory deficits caused by sleep loss, demonstrating a causal pathway.",
+      "sourceQuote": "Increasing 4EBP2 protein levels restored hippocampal mTORC1 signaling in sleep-deprived mice and prevented memory deficits associated with sleep loss [Havekes & Abel, 2017], demonstrating causal involvement of this pathway."
+    },
+    {
+      "text": "Sleep restriction impaired hippocampus-dependent learning and abolished learning-induced neurogenesis, while selectively sparing (even improving) non-hippocampal tasks.",
+      "sourceQuote": "Hairston et al. demonstrated that sleep restriction not only impaired hippocampus-dependent learning but also abolished learning-induced neurogenesis [Hairston et al., 2005]."
+    }
+  ],
+  "doNotPromote": [
+    "Diekelmann & Born (2010) — 'Not mentioned' per Elicit; a background claim that sleep optimizes consolidation of newly acquired information, which does not address the impact of chronic sleep restriction and must not be ranked #1.",
+    "Graves et al. (2003) null result — sleep deprivation from 5-10 hours after training had no effect; this off-window negative finding must not be promoted as the headline answer."
+  ],
+  "draftedBy": "workflow",
+  "approved": false
+}

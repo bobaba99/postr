@@ -4,3 +4,5 @@ node_modules/
 RESULTS.json
 RESULTS.md
 papers/*/findings.*.json
+# Raw Elicit extraction material used to draft gold.json — data, not a committed fixture.
+papers/*/source.json

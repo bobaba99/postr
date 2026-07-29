@@ -1,0 +1,28 @@
+{
+  "id": "SS3",
+  "question": "Does class size reduction improve student academic achievement?",
+  "starFinding": {
+    "text": "Reducing class size has at best a small effect on reading achievement (a 53% chance a student from a smaller class outscores one from a larger class) and no significant effect on mathematics achievement.",
+    "sourceQuote": "Overall, the evidence suggests at best a small effect on reading achievement, with a 53% chance that a student from a smaller class will score higher than one from a larger class. However, there is no significant effect on mathematics achievement."
+  },
+  "top3": [
+    {
+      "text": "The most comprehensive assessment (a meta-analysis of 127 studies across 41 countries) finds at best a small effect on reading achievement and no significant effect on mathematics.",
+      "sourceQuote": "Overall, the evidence suggests at best a small effect on reading achievement, with a 53% chance that a student from a smaller class will score higher than one from a larger class. However, there is no significant effect on mathematics achievement."
+    },
+    {
+      "text": "Quasi-experimental evidence using Maimonides' rule shows class size reductions cause a significant increase in reading and math scores for 5th graders and a smaller increase in reading for 4th graders.",
+      "sourceQuote": "The results of this application show that reductions in class size induce a significant increase in reading and math scores for 5th graders and a smaller increase in reading scores for 4th graders."
+    },
+    {
+      "text": "Even where positive effects exist, the magnitude is modest and often outweighed by cost, with substantial reductions averaging only about 13% of a standard deviation.",
+      "sourceQuote": "Even in studies that made such substantial reductions, achievement differences were slight, averaging only 13% of a standard deviation. Not until class size approaches one is there evidence of meaningful effects."
+    }
+  ],
+  "doNotPromote": [
+    "Hoxby (2000)'s null result — 'class size does not have a statistically significant effect on student achievement' — is one study's finding and must NOT be ranked #1, since it would misrepresent the balance of evidence, which shows a small positive reading effect overall.",
+    "The teacher-quality confound from the California studies (benefits offset by inexperienced/non-certified teachers) is a moderating/mechanism finding about large-scale implementation, not the direct answer to whether class size reduction improves achievement, and must not be promoted to #1."
+  ],
+  "draftedBy": "workflow",
+  "approved": false
+}

@@ -1,0 +1,28 @@
+{
+  "id": "SS1",
+  "question": "Does higher social media use cause lower well-being in adolescents?",
+  "starFinding": {
+    "text": "Longitudinal and within-person studies find little evidence that higher social media use causes lower well-being (or later mental health problems) in adolescents; effects are small and often null once time-order is respected.",
+    "sourceQuote": "In adjusted analysis, no association between time spent on social media and poorer mental health was identified (n=2603; b=0·21 [95% CI -0·43 to 0·84]; p=0·52)."
+  },
+  "top3": [
+    {
+      "text": "In a UK longitudinal analysis there was little evidence of a causal link between social media use and mental health problems two years later, with no adjusted association detected.",
+      "sourceQuote": "This study shows the importance of longitudinal evidence, as we found there was little evidence to suggest a causal relationship between social media use and mental health issues two years later. This longitudinal study found little evidence to suggest that more time spent on social media is associated with later mental health problems in UK adolescents."
+    },
+    {
+      "text": "A within-person study reversed the assumed causal arrow: depressive symptoms predicted small increases in active social media use, with no evidence that use led to increased depressive symptoms.",
+      "sourceQuote": "The results indicate that depressive symptoms predicted small increases in active social media use during both early and late adolescence, whereas no evidence of the reverse relationship was found. The results provide support for the growing notion that the previously reported direct links between social media use and depressive symptoms might be exaggerated."
+    },
+    {
+      "text": "The largest study found a U-shaped (non-linear) association: both the heaviest use and abstinence were tied to lower well-being, with the highest users showing markedly greater odds of low well-being than moderate users.",
+      "sourceQuote": "Compared with moderate users, adolescents with the highest use had greater odds of low well-being (grades 7-9, girls: odds ratio [OR], 3.13 [95% CI, 2.88-3.39]; boys: OR, 2.25 [95% CI, 1.86-2.72])."
+    }
+  ],
+  "doNotPromote": [
+    "The neuroimaging finding that higher use is associated with brain-structure changes — it is off-target (its own supporting quote is 'Not mentioned') and the associations did not survive statistical correction, so it cannot be the #1 answer to the causal question.",
+    "The cross-sectional / between-person negative association (adolescents who use more report lower well-being than peers) must not be ranked #1 as the causal answer, because in the same study the within-person effect was on average null and person-specific effects were heterogeneous (45% no change, 28% declines, 26% increases)."
+  ],
+  "draftedBy": "workflow",
+  "approved": false
+}

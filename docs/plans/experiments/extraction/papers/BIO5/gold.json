@@ -1,0 +1,28 @@
+{
+  "id": "BIO5",
+  "question": "Does amyloid-beta accumulation drive cognitive decline in Alzheimer disease?",
+  "starFinding": {
+    "text": "Amyloid-beta accumulation drives cognitive decline in Alzheimer's disease as a causal driver rather than a mere correlate: clearing intraneuronal Aβ pathology by immunotherapy rescues cognitive deficits, and its reemergence brings the deficits back.",
+    "sourceQuote": "Clearance of intraneuronal Aβ pathology by immunotherapy rescued early cognitive deficits in transgenic mice, and reemergence of Aβ pathology led to return of cognitive deficits[L. Billings et al., 2005]. This bidirectional relationship strongly implicates intraneuronal Aβ as a driver rather than merely a correlate of cognitive dysfunction[L. Billings et al., 2005]."
+  },
+  "top3": [
+    {
+      "text": "In human brain, amyloid-beta levels are elevated early in dementia and strongly correlate with cognitive decline, supporting a driving role for Aβ in the initial pathogenic events of AD.",
+      "sourceQuote": "In this study, levels of total A(beta)x-40 and A(beta)x-42 were elevated early in dementia and levels of both peptides were strongly correlated with cognitive decline. These results support an important role for Abeta in mediating initial pathogenic events in AD dementia and suggest that treatment strategies targeting the formation, accumulation, or cytotoxic effects of Abeta should be pursued."
+    },
+    {
+      "text": "Amyloid-beta acts as a very early, often initiating factor in Alzheimer's disease, with an imbalance between production and clearance of Aβ42 setting the disease cascade in motion.",
+      "sourceQuote": "new lines of evidence from laboratories and clinics worldwide support the concept that an imbalance between production and clearance of Aβ42 and related Aβ peptides is a very early, often initiating factor in Alzheimer's disease (AD)."
+    },
+    {
+      "text": "Soluble Aβ (rather than insoluble plaques) drives cognitive decline by depressing long-term potentiation, producing the synaptic failure and cognitive deficits characteristic of AD.",
+      "sourceQuote": "Soluble Aβ accumulation results in depression of long-term potentiation leading to cognitive deficits commonly characterized in AD."
+    }
+  ],
+  "doNotPromote": [
+    "Roda et al. 2022 (contradicts): 'the poor correlation between insoluble amyloid plaques and cognitive decline' and the claim that 'Aβ is the trigger and tau the bullet' with tau as the effector molecule — a contrary/qualifying result that must NOT be ranked #1 as the answer to whether Aβ drives cognitive decline.",
+    "Solis et al. 2020 background/off-target claim that 'vascular dysfunction may precede Aβ accumulation' — this reverses the causal direction of the research question (positing neurovascular dysfunction as the antecedent) and is a mechanistic side-channel, not the direct answer."
+  ],
+  "draftedBy": "workflow",
+  "approved": false
+}
