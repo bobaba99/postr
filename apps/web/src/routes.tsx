@@ -71,8 +71,11 @@ import About from '@/pages/About';
 import WhyPosters from '@/pages/WhyPosters';
 import Pricing from '@/pages/Pricing';
 import Privacy from '@/pages/Privacy';
+import PrivacyFr from '@/pages/PrivacyFr';
 import Cookies from '@/pages/Cookies';
+import CookiesFr from '@/pages/CookiesFr';
 import Terms from '@/pages/Terms';
+import TermsFr from '@/pages/TermsFr';
 import Debug from '@/pages/Debug';
 import Auth from '@/pages/Auth';
 import Home from '@/pages/Home';
@@ -113,8 +116,11 @@ export function AppRoutes() {
         <Route path="/gallery" element={<Navigate to="/" replace />} />
         <Route path="/gallery/:entryId" element={<Navigate to="/" replace />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/privacy/fr" element={<PrivacyFr />} />
         <Route path="/cookies" element={<Cookies />} />
+        <Route path="/cookies/fr" element={<CookiesFr />} />
         <Route path="/terms" element={<Terms />} />
+        <Route path="/terms/fr" element={<TermsFr />} />
         {/* Standalone chart chooser — public, indexable, and creates
             no Supabase session (not even anonymous) on load. */}
         <Route path="/chart-chooser" element={<ChartChooserPage />} />

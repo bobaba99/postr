@@ -35,7 +35,18 @@ Charter requirement for the legal documents. **Still to do:** have the French
 translations proofread by a francophone / counsel — machine translation of a
 legal document is a strong starting point, not a certified translation.
 
-## 3. Translate the UI editor to French (MEDIUM — future)
+## 3. Spanish legal docs (MEDIUM — future, raised 2026-07-28)
+
+Add **Spanish** versions of Terms, Privacy, and Cookies (same mirror-page +
+language-toggle pattern as the French ones: `/terms/es`, `/privacy/es`,
+`/cookies/es`, and add "Español" to the EN/FR toggle group). Not a Charter
+obligation like French — this is market reach (Spanish-speaking researchers).
+Lower legal severity than the French docs, which were the Quebec compliance
+requirement. When done, the language toggle on all six existing pages should
+grow to EN / FR / ES. Same caveat: have a native/legal Spanish speaker
+proofread — machine translation is a starting point, not certified.
+
+## 4. Translate the UI editor to French (MEDIUM — future)
 
 Localize the **product UI itself** (the poster editor and app chrome) into
 French — not just the legal docs. This is a larger effort:

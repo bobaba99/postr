@@ -24,8 +24,13 @@ export default function Privacy() {
       <PublicHeader />
 
       <article className="mx-auto max-w-3xl px-8 py-16">
-        <div className="mb-4 text-[11px] font-semibold uppercase tracking-[0.3em] text-[#7c6aed]">
-          Legal
+        <div className="mb-4 flex items-center justify-between">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#7c6aed]">
+            Legal
+          </div>
+          <Link to="/privacy/fr" className="text-[13px] text-[#7c6aed] underline">
+            Français
+          </Link>
         </div>
         <h1 className="text-4xl font-bold leading-tight text-white">Privacy Policy</h1>
         <p className="mt-4 text-sm text-[#6b7280]">Last updated: {LAST_UPDATED}</p>
