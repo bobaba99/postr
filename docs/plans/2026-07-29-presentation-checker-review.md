@@ -1,6 +1,7 @@
 # Presentation Checker (LLM Review) — Design Spec
 
 > **Status:** Design agreed in brainstorming 2026-07-29; spec pending Gavin's review. Next step after review: implementation plan (superpowers:writing-plans).
+> **LIVING DOCUMENT — keep open for revision.** This spec is intentionally not frozen at v1. Gavin builds v1 first, validates against himself (§7 Phase 0), then **expands the ground-truth panel to domain experts — professors, grad students, post-docs — for external validation** (§7.6). The architecture is designed *now* so their criteria fold in later without a rewrite (see §2.0 — rubric-as-versioned-config). Revise this doc as the rubric and validation evolve.
 > **Author flow:** brainstormed with Gavin 2026-07-29. This is the design; the build order lives in the implementation plan (which front-loads the Section 7 validation spike — see §7).
 > **Framing rule (hard):** every user-facing string names the *workflow* ("get feedback on your poster / talk"), never "AI". See `feedback_marketing_no_ai_framing`.
 
@@ -42,6 +43,21 @@ Because "feedback" is overloaded, the **URL, table, and code names use "review" 
 
 ## 2. Architecture
 
+### 2.0 Durability criterion — the rubric is versioned CONFIG, not hardcoded logic
+
+**The single most important architecture decision for longevity.** The critique's *criteria* — the perception rules, the economy principles, the issue-checklist taxonomy, and the scoring dimensions — must live in a **versioned rubric artifact**, not baked into `prompt.ts` as inline prose or into `enforce.ts` as branchy code. Why: Gavin builds v1 against his own judgment, then later expands the ground-truth panel to **professors / grad students / post-docs** (§7.6). When those experts disagree with the checker, the fix must be **"add/adjust a rubric entry + re-run the frozen corpus,"** never "refactor the critique engine."
+
+Concretely:
+- A `review/rubric/` module holds the criteria as **structured, versioned data** (e.g. `rubric.vN.ts` exporting typed rule sets: perception rules, economy rules, the issue taxonomy, dimension definitions + score anchors). Each rule carries an id, the rule text, and its research/expert provenance.
+- `prompt.ts` **composes** the system prompt *from* the rubric — it does not contain the criteria itself.
+- The **issue-checklist taxonomy is shared** between the rubric and the §7 validation harness (single source of truth), so expert-rating checklists and the checker's `Finding` categories can never drift.
+- The rubric version is **stamped into every `poster_reviews` row** (`source_meta.rubric_version`), so any historical review is reproducible and agreement metrics are always tied to a known rubric.
+- Adding an expert-derived criterion = a new rubric entry (+ optional new `action`/checklist enum value) + re-running the frozen 20-corpus to confirm it didn't regress. No engine change.
+
+This is the seam that makes §7.6 (expert validation) a *config change*, and keeps this document a living spec.
+
+### 2.1 Reuse map
+
 The vision-critique loop is *almost free* — most plumbing already exists. New work is concentrated in five areas.
 
 ```
@@ -81,7 +97,7 @@ Supabase
 ### Genuinely new (the five build areas)
 1. **Ingest / normalization layer** (§3) — the biggest net-new piece; PPTX is the fiddly part.
 2. **Higher-res poster capture** — current thumbnail is 400px (too small to read poster text).
-3. **`review/` proxy module** — config / prompt / critique / enforce.
+3. **`review/` proxy module** — config / prompt / critique / enforce, **+ the versioned `review/rubric/` criteria module** (§2.0) that `prompt.ts` composes from.
 4. **`poster_reviews` table + `review_credits` column + `consume_review_credit` RPC + guard-trigger extension.**
 5. **Review UI surface** — `/presentation-checker` page + `ReviewPanel` sidebar tab, scored summary + anchored cards.
 
@@ -125,7 +141,7 @@ The critique runs **two ordered stages inside one structured call** (v1). The or
 
 ### 4.1 Stage 1 — Perceptual-attention pass (free-viewing simulation)
 
-Before any judgment, the model describes *how a first-time viewer's eye would actually move* across the artifact, grounded in a research rubric baked into the system prompt (citations in §9):
+Before any judgment, the model describes *how a first-time viewer's eye would actually move* across the artifact, grounded in the **perception rules from the versioned `review/rubric/` module** (§2.0; research citations in §9), which `prompt.ts` composes into the system prompt:
 
 - **Entry point & salience hotspots** — what grabs the eye first. Figures/plots capture attention fastest and most; *but* on text-heavy layouts the headline can be the entry point, and center-placed content dominates. Predict the *actual* first fixation, don't assume figure-first.
 - **Faces / social cues** — flag any face / photo / social icon as a strong attention magnet that pulls gaze regardless of layout intent (faces are fixated with >80% probability within the first two fixations, and override low-level saliency).
@@ -303,10 +319,21 @@ Gavin rates by **commenting**, not just ticking — comments are first-class. Fo
 3. **Comments** → qualitative reconciliation (align Gavin's prose with checker findings); catches wrong-element / missed-why even when the checkbox agrees. This is where real polish opportunities surface.
 
 ### 7.5 Decision gate
-- Triage disagreements → **prompt gap** (tune `prompt.ts` + re-run) vs **genuine judgment call** (log, no fix).
+- Triage disagreements → **rubric gap** (add/adjust a `review/rubric/` entry + re-run) vs **genuine judgment call** (log, no fix).
 - **Ship criterion is Gavin's to set** after round 1; proposed shape: *recall ≥ X on seeded ground-truth issues AND score-kappa ≥ Y AND no systematic comment-level failure mode*.
 - Iterate: tune prompt → re-run on the **same frozen 20** → re-measure (frozen corpus = comparable across iterations).
 - **Lives in:** a validation harness (`docs/plans/experiments/` + script), run before the flag flips.
+
+### 7.6 Future phase — expert panel validation (post-v1, roadmap)
+
+**This is why the architecture is built the way §2.0 describes.** After v1 ships and clears the solo (Gavin-only) gate, the ground-truth panel expands to **domain experts — professors, grad students, post-docs**. They rate the same style of frozen corpus (their own field's posters may be added), and their criteria become **new/adjusted rubric entries**, not code changes.
+
+- **Multi-rater agreement.** With >2 raters, move from pairwise agreement to a panel statistic (e.g. Fleiss' / Krippendorff's on the checklist; ICC on scores). The checker is treated as one more rater and scored against the *expert consensus*.
+- **Disagreement triage feeds the rubric.** Where experts systematically diverge from the checker, the resolution is a rubric edit (add a criterion, re-anchor a score, split an issue category) → re-run the frozen corpus → confirm no regression. The versioned rubric + shared taxonomy (§2.0) make this a config loop.
+- **Field-specificity may emerge.** Experts might reveal that "economy" or "one clear graph" has field-dependent nuances (a stats poster vs a wet-lab poster). If so, the rubric gains field-scoped rule variants — still config, still no engine change.
+- **Recruiting is out of scope for this spec** — Gavin will source the panel. What the spec guarantees is that when the panel exists, folding their judgment in is cheap.
+
+**Keep this document open and revise it** as the rubric and the validation panel evolve. v1 is the first version, not the last.
 
 ---
 
@@ -336,4 +363,5 @@ The Stage-1 rubric is citation-grounded (via Consensus / paper-search, 2026-07-2
 - Confirm how the existing checkout wires a new pack SKU + a subscription add-on line item (against the Stripe billing router / webhook), so review entitlements reconcile the same way exports do.
 - Set the concrete ship-criterion numbers (§7.5) after Phase-0 round one.
 - Price the pack + weekly quota from Phase-0 / day-one cost instrumentation.
+- Design the `review/rubric/` schema (§2.0) so a criterion is addable as data — rule id, text, provenance, dimension, checklist-category, score anchors — and the issue taxonomy is the single source shared with the §7 validation harness. This is the seam that makes the §7.6 expert panel a config change.
 ```
