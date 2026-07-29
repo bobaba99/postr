@@ -24,11 +24,49 @@ import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-// The model + tool the REAL call would use — mirrors the shipped condense
-// provider (apps/api/src/narrative/condense.ts + config.ts). Recorded so the
-// output's meta.model is honest even while stubbed.
+// The model + tool the REAL call uses — mirrors the shipped condense
+// provider (apps/api/src/narrative/condense.ts + config.ts).
 const ARM_B_MODEL = 'gpt-5.6-terra';
 const EXTRACT_TOOL_NAME = 'extract_findings';
+const OPENAI_BASE_URL = 'https://api.openai.com/v1';
+const REQUEST_TIMEOUT_MS = 60_000;
+
+// gpt-5.6-terra pricing per 1M tokens (config.ts, verified 2026-07-27):
+// $2.50 in / $15.00 out. Recorded for context only — cost is never a decider.
+const USD_PER_1M_INPUT = 2.5;
+const USD_PER_1M_OUTPUT = 15.0;
+
+/** Forced-tool schema — the model MUST emit findings in the common shape. */
+const EXTRACT_TOOL_SCHEMA = {
+  type: 'object',
+  properties: {
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          text: { type: 'string', description: 'A short, self-contained statement of the finding.' },
+          sourceQuote: {
+            type: 'string',
+            description:
+              'A VERBATIM span copied from the paper text that supports the finding. Do not paraphrase — copy exact words.',
+          },
+          sourceSection: { type: 'string', description: 'The section the quote is from (e.g. "Results").' },
+          rank: { type: 'number', description: '1-based importance; 1 is the single most important finding.' },
+        },
+        required: ['text', 'sourceQuote', 'sourceSection', 'rank'],
+      },
+    },
+  },
+  required: ['findings'],
+};
+
+const EXTRACT_SYSTEM_PROMPT =
+  'You extract the empirical findings from a research paper. For each finding, ' +
+  'copy a VERBATIM quote from the provided text that supports it — never paraphrase ' +
+  'the quote, and never invent a finding the text does not state. Rank findings by ' +
+  'importance to the paper’s central claim (rank 1 = most important). If a candidate ' +
+  'finding has no supporting sentence in the text, omit it. Return 3–7 findings.';
 
 /** Collapse whitespace, trim, lowercase — the normalization the verbatim gate
  *  and the scorer both use. Keep this identical to score.mjs `norm()`. */
@@ -106,38 +144,84 @@ async function callRealLlm(paperText) {
       'EXTRACTION_LLM_LIVE is set but OPENAI_API_KEY is not. Refusing to call the LLM.',
     );
   }
-  // TODO(bake-off): implement the forced-tool-use request below. Left unimplemented
-  // on purpose so a stray env flag cannot silently spend money or hit prod. Shape:
-  //
-  //   const res = await fetch(`${baseUrl}/v1/chat/completions`, {
-  //     method: 'POST',
-  //     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-  //     body: JSON.stringify({
-  //       model: ARM_B_MODEL,
-  //       messages: [{ role: 'system', content: EXTRACT_SYSTEM_PROMPT },
-  //                  { role: 'user', content: paperText }],
-  //       tools: [{ type: 'function', function: {
-  //         name: EXTRACT_TOOL_NAME, description: 'Emit ranked findings, each with a verbatim sourceQuote.',
-  //         parameters: EXTRACT_TOOL_SCHEMA } }],
-  //       tool_choice: { type: 'function', function: { name: EXTRACT_TOOL_NAME } },
-  //     }),
-  //   });
-  //   const payload = await res.json();
-  //   return JSON.parse(payload.choices[0].message.tool_calls[0].function.arguments);
-  void paperText;
-  throw new Error(
-    'callRealLlm is not implemented in the scaffold. Implement the forced-tool ' +
-      'request (see the block above) before running the live bake-off.',
-  );
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let payload;
+  try {
+    const res = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: ARM_B_MODEL,
+        // gpt-5.6-terra rejects function tools on /chat/completions unless
+        // reasoning_effort is 'none' (the alternative is the /v1/responses API).
+        // Extraction is a read-and-list task, not a reasoning one, so 'none' is
+        // the right setting anyway. NOTE: the shipped condense.ts uses the same
+        // model + forced tool on the same endpoint — verify it sets this too.
+        reasoning_effort: 'none',
+        messages: [
+          { role: 'system', content: EXTRACT_SYSTEM_PROMPT },
+          { role: 'user', content: paperText },
+        ],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: EXTRACT_TOOL_NAME,
+              description: 'Emit ranked findings, each with a verbatim sourceQuote from the paper text.',
+              parameters: EXTRACT_TOOL_SCHEMA,
+            },
+          },
+        ],
+        tool_choice: { type: 'function', function: { name: EXTRACT_TOOL_NAME } },
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(`OpenAI HTTP ${res.status}: ${detail.slice(0, 300)}`);
+    }
+    payload = await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+
+  const toolCall = payload?.choices?.[0]?.message?.tool_calls?.[0];
+  if (!toolCall?.function?.arguments) {
+    throw new Error('No forced tool_call in the OpenAI response.');
+  }
+  let args;
+  try {
+    args = JSON.parse(toolCall.function.arguments);
+  } catch (err) {
+    throw new Error(`Tool-call arguments were not valid JSON: ${err.message}`);
+  }
+
+  const usage = payload.usage ?? {};
+  const costUsd =
+    ((usage.prompt_tokens ?? 0) / 1e6) * USD_PER_1M_INPUT +
+    ((usage.completion_tokens ?? 0) / 1e6) * USD_PER_1M_OUTPUT;
+
+  return { findings: Array.isArray(args.findings) ? args.findings : [], costUsd };
 }
 
-/** Get raw findings from the LLM (or the stub). Records wall-time latency. */
+/** Get raw findings from the LLM (or the stub). Records wall-time latency and,
+ *  for the live call, the token cost. The stub reports zero cost. */
 async function extract(paperText) {
   const live = process.env.EXTRACTION_LLM_LIVE === '1';
   const startNs = process.hrtime.bigint();
-  const raw = live ? await callRealLlm(paperText) : stubLlmFindings();
+  let raw;
+  let costUsd = 0;
+  if (live) {
+    const result = await callRealLlm(paperText);
+    raw = { findings: result.findings };
+    costUsd = result.costUsd;
+  } else {
+    raw = stubLlmFindings();
+  }
   const latencyMs = Number(process.hrtime.bigint() - startNs) / 1e6;
-  return { raw, latencyMs, live };
+  return { raw, latencyMs, live, costUsd };
 }
 
 /** Apply the verbatim-quote presence gate and re-rank contiguously by rank. */
@@ -179,9 +263,9 @@ async function main() {
     process.exit(1);
   }
 
-  let raw, latencyMs, live;
+  let raw, latencyMs, live, costUsd;
   try {
-    ({ raw, latencyMs, live } = await extract(paperText));
+    ({ raw, latencyMs, live, costUsd } = await extract(paperText));
   } catch (err) {
     console.error(`Arm B extraction failed for ${paper}: ${err.message}`);
     process.exit(1);
@@ -198,7 +282,7 @@ async function main() {
     findings: kept,
     meta: {
       latencyMs: Math.round(latencyMs * 1000) / 1000,
-      costUsd: 0, // filled by the real call from usage; 0 while stubbed
+      costUsd: Math.round(costUsd * 1e6) / 1e6, // from token usage on the live call; 0 while stubbed
       droppedForMissingQuote: dropped,
     },
   };

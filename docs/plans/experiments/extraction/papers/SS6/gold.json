@@ -1,0 +1,29 @@
+{
+  "id": "SS6",
+  "question": "Does bilingualism improve executive function in children?",
+  "starFinding": {
+    "text": "The evidence is mixed and the effect is weak: a meta-analysis of this literature finds only a marginal bilingual advantage in overall executive function (g = 0.06) that is undermined by publication bias and large heterogeneity, so bilingualism does not robustly improve children's executive function overall — the positive studies are confined to specific conflict/interference-suppression tasks.",
+    "sourceQuote": "The bilingual advantage in overall EF was significant, albeit marginal (g = 0.06), and there were indications of publication bias. The EF components of cold inhibition, switching, and monitoring expressed significant bilingual advantages, but monitoring and cold inhibition were affected by publication bias. Thus, given the small mean effect size and small-study effects, this meta-analysis gives little support for a bilingual advantage on overall EF. Still, also after the moderator analysis, there was a large heterogeneity of true effects and a large amount of unexplained heterogeneity in the effect sizes."
+  },
+  "top3": [
+    {
+      "text": "The pooled meta-analytic advantage in overall executive function is only marginal (g = 0.06) and shows indications of publication bias, giving little support for a general bilingual EF advantage.",
+      "sourceQuote": "Thus, given the small mean effect size and small-study effects, this meta-analysis gives little support for a bilingual advantage on overall EF."
+    },
+    {
+      "text": "Where an advantage does appear in individual studies, it is domain-specific — bilingual children are faster on inhibitory-control and cognitive-flexibility (conflict) tasks but show no difference on response suppression.",
+      "sourceQuote": "The bilingual children in both settings were faster than monolinguals in conditions based on inhibitory control and cognitive flexibility but there was no significant difference between groups in response suppression or on a control condition that did not involve executive control."
+    },
+    {
+      "text": "The bilingual advantage is confined to tasks that require managing conflicting attentional demands, not impulse control, even after adjusting for socio-economic and verbal ability differences.",
+      "sourceQuote": "The relative advantage was significant for tasks that appear to call for managing conflicting attentional demands (Conflict tasks); there was no advantage on impulse-control (Delay tasks)."
+    }
+  ],
+  "doNotPromote": [
+    "The single-study 'brain-training' claim that bilingualism 'provides a powerful form of brain-training that improves children's development of executive control' must not be ranked #1: it is one small ERP study and it overstates a global advantage that the meta-analysis (g = 0.06, publication bias, large heterogeneity) does not support.",
+    "A blanket claim that bilingual children have better executive function overall must not be the #1 answer, because the strongest evidence (the systematic review and meta-analysis) finds the overall-EF advantage marginal and confounded by publication bias, and the positive individual studies repeatedly report 'no difference between groups on the other tasks' / 'no advantage on impulse-control (Delay tasks)'."
+  ],
+  "draftedBy": "workflow",
+  "approved": true,
+  "approvedBy": "Gavin"
+}
