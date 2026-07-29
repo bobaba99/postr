@@ -40,22 +40,27 @@ function ensureAuditDimensions(sourceCanvas: HTMLCanvasElement): HTMLCanvasEleme
   outputCanvas.width = Math.max(MIN_AUDIT_DIMENSION_PX, drawWidth);
   outputCanvas.height = Math.max(MIN_AUDIT_DIMENSION_PX, drawHeight);
 
-  const outputContext = outputCanvas.getContext('2d');
-  if (!outputContext) {
-    throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+  try {
+    const outputContext = outputCanvas.getContext('2d');
+    if (!outputContext) {
+      throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+    }
+    outputContext.fillStyle = '#ffffff';
+    outputContext.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+    outputContext.imageSmoothingEnabled = true;
+    outputContext.imageSmoothingQuality = 'high';
+    outputContext.drawImage(
+      sourceCanvas,
+      Math.round((outputCanvas.width - drawWidth) / 2),
+      Math.round((outputCanvas.height - drawHeight) / 2),
+      drawWidth,
+      drawHeight,
+    );
+    return outputCanvas;
+  } catch (error) {
+    releaseCanvas(outputCanvas);
+    throw error;
   }
-  outputContext.fillStyle = '#ffffff';
-  outputContext.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
-  outputContext.imageSmoothingEnabled = true;
-  outputContext.imageSmoothingQuality = 'high';
-  outputContext.drawImage(
-    sourceCanvas,
-    Math.round((outputCanvas.width - drawWidth) / 2),
-    Math.round((outputCanvas.height - drawHeight) / 2),
-    drawWidth,
-    drawHeight,
-  );
-  return outputCanvas;
 }
 
 export async function fromImage(

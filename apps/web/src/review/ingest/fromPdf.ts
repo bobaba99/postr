@@ -64,18 +64,23 @@ function ensureAuditDimensions(sourceCanvas: HTMLCanvasElement): HTMLCanvasEleme
   const outputCanvas = document.createElement('canvas');
   outputCanvas.width = Math.max(MIN_AUDIT_DIMENSION_PX, sourceCanvas.width);
   outputCanvas.height = Math.max(MIN_AUDIT_DIMENSION_PX, sourceCanvas.height);
-  const outputContext = outputCanvas.getContext('2d');
-  if (!outputContext) {
-    throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+  try {
+    const outputContext = outputCanvas.getContext('2d');
+    if (!outputContext) {
+      throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+    }
+    outputContext.fillStyle = '#ffffff';
+    outputContext.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+    outputContext.drawImage(
+      sourceCanvas,
+      Math.round((outputCanvas.width - sourceCanvas.width) / 2),
+      Math.round((outputCanvas.height - sourceCanvas.height) / 2),
+    );
+    return outputCanvas;
+  } catch (error) {
+    releaseCanvas(outputCanvas);
+    throw error;
   }
-  outputContext.fillStyle = '#ffffff';
-  outputContext.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
-  outputContext.drawImage(
-    sourceCanvas,
-    Math.round((outputCanvas.width - sourceCanvas.width) / 2),
-    Math.round((outputCanvas.height - sourceCanvas.height) / 2),
-  );
-  return outputCanvas;
 }
 
 async function normalizePdfPage(
@@ -156,6 +161,8 @@ export async function fromPdf(
     throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
   }
 
+  let artifact: NormalizedArtifact | undefined;
+  let ingestError: IngestError | undefined;
   try {
     assertPageCap(pdfDocument.numPages);
     const pages: PageImage[] = [];
@@ -165,7 +172,7 @@ export async function fromPdf(
       pages.push(await normalizePdfPage(page, pageNumber, ingestContext));
     }
 
-    return {
+    artifact = {
       pages,
       meta: {
         sourceKind: 'pdf',
@@ -175,15 +182,23 @@ export async function fromPdf(
       },
     };
   } catch (error) {
-    if (error instanceof IngestError) {
-      throw error;
-    }
-    throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
-  } finally {
-    try {
-      await pdfDocument.destroy();
-    } catch {
-      throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
-    }
+    ingestError =
+      error instanceof IngestError
+        ? error
+        : new IngestError(UNREADABLE_COPY, 'unreadable-file');
   }
+
+  try {
+    await pdfDocument.destroy();
+  } catch {
+    ingestError ??= new IngestError(UNREADABLE_COPY, 'unreadable-file');
+  }
+
+  if (ingestError) {
+    throw ingestError;
+  }
+  if (!artifact) {
+    throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+  }
+  return artifact;
 }
