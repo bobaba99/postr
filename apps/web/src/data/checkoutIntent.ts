@@ -21,7 +21,7 @@ import { createCheckout, type BillingSku } from '@/data/billing';
 export type CheckoutPlan = BillingSku;
 
 const STORAGE_KEY = 'postr.checkoutIntent';
-const VALID: readonly CheckoutPlan[] = ['term', 'pack'];
+const VALID: readonly CheckoutPlan[] = ['term', 'pack', 'review_pack', 'review_addon'];
 
 /** Narrow an untrusted string (query param / storage) to a valid plan. */
 export function parseCheckoutPlan(value: string | null | undefined): CheckoutPlan | null {
