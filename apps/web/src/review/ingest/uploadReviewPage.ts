@@ -25,7 +25,14 @@ export async function uploadReviewPage(
     if (uploadError) {
       throw new IngestError(UPLOAD_FAILED_COPY, 'upload-failed');
     }
+  } catch (error) {
+    if (error instanceof IngestError) {
+      throw error;
+    }
+    throw new IngestError(UPLOAD_FAILED_COPY, 'upload-failed');
+  }
 
+  try {
     const { data, error: signingError } = await supabase.storage
       .from(BUCKET)
       .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
@@ -42,9 +49,16 @@ export async function uploadReviewPage(
       heightPx: dimensions.heightPx,
     };
   } catch (error) {
-    if (error instanceof IngestError) {
-      throw error;
+    try {
+      const { error: removalError } = await supabase.storage
+        .from(BUCKET)
+        .remove([storagePath]);
+      if (removalError) {
+        console.error('Failed to remove unsigned review page:', removalError);
+      }
+    } catch (removalError) {
+      console.error('Failed to remove unsigned review page:', removalError);
     }
-    throw new IngestError(UPLOAD_FAILED_COPY, 'upload-failed');
+    throw error;
   }
 }

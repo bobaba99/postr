@@ -11,6 +11,7 @@ import {
   downscaleForVision,
   releaseCanvas,
 } from '@/import/imageImport';
+import { supabase } from '@/lib/supabase';
 import { assertFileAllowed, assertPageCap, isCanvasBlank } from './guards';
 import {
   IngestError,
@@ -25,6 +26,7 @@ if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
 }
 
 const PDF_MIME_TYPES = ['application/pdf'] as const;
+const BUCKET = 'poster-assets';
 const RENDER_SCALE = 2;
 const JPEG_QUALITY = 0.85;
 const MIN_AUDIT_DIMENSION_PX = 1024;
@@ -147,6 +149,21 @@ async function normalizePdfPage(
   }
 }
 
+async function removeUploadedPages(storagePaths: string[]): Promise<void> {
+  if (storagePaths.length === 0) {
+    return;
+  }
+
+  try {
+    const { error } = await supabase.storage.from(BUCKET).remove(storagePaths);
+    if (error) {
+      console.error('Failed to remove partially ingested PDF pages:', error);
+    }
+  } catch (error) {
+    console.error('Failed to remove partially ingested PDF pages:', error);
+  }
+}
+
 export async function fromPdf(
   file: File,
   ingestContext: IngestContext,
@@ -163,13 +180,16 @@ export async function fromPdf(
 
   let artifact: NormalizedArtifact | undefined;
   let ingestError: IngestError | undefined;
+  const uploadedStoragePaths: string[] = [];
   try {
     assertPageCap(pdfDocument.numPages);
     const pages: PageImage[] = [];
 
     for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
       const page = await pdfDocument.getPage(pageNumber);
-      pages.push(await normalizePdfPage(page, pageNumber, ingestContext));
+      const normalizedPage = await normalizePdfPage(page, pageNumber, ingestContext);
+      pages.push(normalizedPage);
+      uploadedStoragePaths.push(normalizedPage.storagePath);
     }
 
     artifact = {
@@ -194,11 +214,12 @@ export async function fromPdf(
     ingestError ??= new IngestError(UNREADABLE_COPY, 'unreadable-file');
   }
 
-  if (ingestError) {
-    throw ingestError;
-  }
   if (!artifact) {
-    throw new IngestError(UNREADABLE_COPY, 'unreadable-file');
+    ingestError ??= new IngestError(UNREADABLE_COPY, 'unreadable-file');
+  }
+  if (ingestError) {
+    await removeUploadedPages(uploadedStoragePaths);
+    throw ingestError;
   }
   return artifact;
 }
