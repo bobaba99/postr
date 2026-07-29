@@ -12,10 +12,7 @@
  * folded open, the deck, the selected slide, and whether the export drawer
  * is open — and hands each piece exactly the props it needs.
  *
- * PHASE 1 SCOPE. Two deliberate deferrals:
- *   • Motion (Task 10) is NOT wired here. `reducedMotion` is read once and
- *     held so the components can consume it via `useWizardMotion` later; the
- *     shell itself renders statically and correctly without GSAP.
+ * PHASE 1 SCOPE. One deliberate deferral:
  *   • The real extraction → buildDeck pipeline (Task 12) is NOT wired. A
  *     placeholder deck renders so the viewer and drawer have something to
  *     show. `testHooks` is accepted now (injectable clients for Task 12) but
@@ -27,7 +24,7 @@
  *   • the privacy line — "Your manuscript is never stored on our servers,
  *     and is never used to train AI." — quiet and persistent.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { buildDeck } from '../deck/buildDeck';
 import type { SlideDeck } from '../deck/types';
 import { exportDeckPptx } from '@/export/pptx/deckWriter';
@@ -35,6 +32,7 @@ import { ExportDrawer } from './ExportDrawer';
 import { ProgressBar } from './ProgressBar';
 import { SlideViewer } from './SlideViewer';
 import { StepBar, type StepInputRow } from './StepBar';
+import { useWizardMotion } from './useWizardMotion';
 import {
   STEP_LABELS,
   STEP_TOTAL,
@@ -87,8 +85,8 @@ function placeholderDeck(): SlideDeck {
 }
 
 export function SlidesWizard(_props: SlidesWizardProps = {}) {
-  // Motion preference, read once and held. Task 10 passes this into
-  // useWizardMotion; Phase 1 only computes and stores it.
+  // Motion preference, read once and held, then handed to useWizardMotion
+  // as the reduced-motion gate. All GSAP lives in that one scoped hook.
   const [reducedMotion] = useState(prefersReducedMotion);
 
   const [activeStep, setActiveStep] = useState<StepId>('constraints');
@@ -96,6 +94,12 @@ export function SlidesWizard(_props: SlidesWizardProps = {}) {
   const [deck] = useState<SlideDeck>(placeholderDeck);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
   const [exportOpen, setExportOpen] = useState(false);
+
+  // The wizard root scopes every GSAP selector to this subtree — the hook's
+  // first-mount stagger, active-card reveal, and drawer reveal all resolve
+  // against elements inside it and never reach the rest of the page.
+  const rootRef = useRef<HTMLDivElement>(null);
+  useWizardMotion(rootRef, { reducedMotion, activeStep, exportOpen });
 
   // Fold state is a set toggle: clicking a step's header opens or closes
   // its documented-input card without disturbing the others.
@@ -132,6 +136,7 @@ export function SlidesWizard(_props: SlidesWizardProps = {}) {
 
   return (
     <div
+      ref={rootRef}
       data-reduced-motion={reducedMotion ? 'true' : 'false'}
       className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(200px,260px)_1fr]"
     >

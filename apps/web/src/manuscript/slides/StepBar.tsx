@@ -12,9 +12,14 @@
  * a ✓ for completed steps — a step counts complete when it sits BEFORE the
  * active step in `WIZARD_STEPS` order. The active card is accent-highlighted.
  *
- * Presentational ON PURPOSE — no local state, no motion. GSAP entrance /
- * fold animation is layered in Task 10 via `useWizardMotion`; this
- * component is static and correct on its own.
+ * Presentational ON PURPOSE — no local state, no motion logic. It exposes
+ * two hooks the shell's `useWizardMotion` drives from the wizard root:
+ * `data-motion-card` on each card (first-mount stagger) and
+ * `data-step-body` + `data-active` on the open body (active-card reveal).
+ * The GSAP owns those entrances, so the card no longer carries the CSS
+ * `postr-rise-in` — one entrance, not two fighting each other. The
+ * component still renders static and correct if the hook never runs
+ * (reduced motion, hidden tab, JS-light crawler).
  */
 import { WIZARD_STEPS, STEP_LABELS, type StepId } from './stepConfig';
 
@@ -53,7 +58,8 @@ export function StepBar({
         return (
           <div
             key={id}
-            className={`postr-rise-in overflow-hidden rounded-lg border transition-colors ${
+            data-motion-card
+            className={`overflow-hidden rounded-lg border transition-colors ${
               active
                 ? 'border-[#7c6aed] bg-[#16161f]'
                 : 'border-[#2a2a3a] bg-[#0f0f16]'
@@ -84,7 +90,11 @@ export function StepBar({
             </button>
 
             {open && (
-              <div className="border-t border-[#2a2a3a] px-3 py-2.5">
+              <div
+                data-step-body
+                data-active={active ? 'true' : 'false'}
+                className="border-t border-[#2a2a3a] px-3 py-2.5"
+              >
                 {rows.length === 0 ? (
                   <p className="text-xs text-[#6b7280]">
                     Nothing recorded yet.

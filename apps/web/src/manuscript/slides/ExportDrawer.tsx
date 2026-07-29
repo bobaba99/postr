@@ -18,8 +18,12 @@
  * reached from here — real plumbing is Plan 3. The "no card to preview"
  * note states that plainly so the offer never reads as a trap.
  *
- * Motion (upward slide-in / faster exit) is layered in Task 10 via
- * `useWizardMotion`; this component is static and correct on its own.
+ * Motion: the shell's `useWizardMotion` reveals the open body (opacity + a
+ * short upward rise, `--ease-drawer`, 280ms) by targeting `data-export-body`
+ * from the wizard root. Close is an immediate React unmount — no lingering
+ * exit tween to keep the surface honest and the code un-fussy. Under
+ * reduced motion / a hidden tab the body simply appears. The component is
+ * static and correct on its own.
  */
 import type { SlideDeck } from '../deck/types';
 
@@ -72,7 +76,7 @@ export function ExportDrawer({
       </button>
 
       {open && (
-        <div className="px-5 pb-5">
+        <div data-export-body className="px-5 pb-5">
           {/* The promise, stated first and loud — spec §6's non-negotiable
               line. Everything below is the honest split beneath it. */}
           <p className="mb-4 text-sm leading-relaxed text-[#c8cad0]">
