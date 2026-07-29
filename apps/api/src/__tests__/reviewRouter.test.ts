@@ -50,6 +50,9 @@ interface FakeSupabaseOpts {
   };
   addonSlotThrows?: boolean;
   claimResult?: unknown;
+  claimThrows?: boolean;
+  entitlementThrows?: boolean;
+  finalizeThrows?: boolean;
 }
 
 function fakeSupabase(opts: FakeSupabaseOpts = {}) {
@@ -58,6 +61,13 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
   const remove = vi.fn(async (_paths: string[]) => ({
     data: [],
     error: opts.removeError ? { message: 'cleanup failed' } : null,
+  }));
+  const createSignedUrl = vi.fn(async (path: string, _ttlSec: number) => ({
+    data: {
+      signedUrl:
+        `${SUPABASE_URL}/storage/v1/object/sign/poster-assets/${path}?token=refreshed`,
+    },
+    error: null,
   }));
   const client = {
     auth: {
@@ -71,7 +81,9 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
         select: (_cols?: string) => ({
           eq: (_col: string, _val: unknown) => ({
             single: () =>
-              Promise.resolve({
+              opts.entitlementThrows && table === 'users'
+                ? Promise.reject(new Error('entitlement lookup crashed'))
+                : Promise.resolve({
                 data: table === 'users' ? (opts.userRow ?? null) : null,
                 error: null,
               }),
@@ -91,6 +103,9 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
     rpc(fn: string, args: Record<string, unknown>) {
       rpcs.push({ fn, args });
       if (fn === 'claim_initial_review') {
+        if (opts.claimThrows) {
+          return Promise.reject(new Error('claim rpc crashed'));
+        }
         return Promise.resolve({
           data:
             opts.claimResult ??
@@ -113,7 +128,16 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
       if (fn === 'release_initial_review') {
         return Promise.resolve({ data: true, error: null });
       }
+      if (fn === 'reserve_initial_review_credit') {
+        return Promise.resolve({
+          data: opts.consumeResult !== null,
+          error: null,
+        });
+      }
       if (fn === 'finalize_initial_review') {
+        if (opts.finalizeThrows) {
+          return Promise.reject(new Error('finalize rpc crashed'));
+        }
         if (
           args.p_credit_source === 'pack' &&
           opts.consumeResult === null
@@ -153,10 +177,10 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
       });
     },
     storage: {
-      from: (_bucket: string) => ({ remove }),
+      from: (_bucket: string) => ({ remove, createSignedUrl }),
     },
   } as unknown as SupabaseClient;
-  return { client, inserts, rpcs, remove };
+  return { client, inserts, rpcs, remove, createSignedUrl };
 }
 
 function fakeAnthropic(critique: unknown = VALID_CRITIQUE) {
@@ -395,9 +419,10 @@ describe('POST /api/review/critique — entitlement (D4)', () => {
     expect(res.status).toBe(200);
     expect(rpcs.map((rpc) => rpc.fn)).toEqual([
       'claim_initial_review',
+      'reserve_initial_review_credit',
       'finalize_initial_review',
     ]);
-    expect(rpcs[1]!.args.p_credit_source).toBe('pack');
+    expect(rpcs[2]!.args.p_credit_source).toBe('pack');
   });
 
   it.each([
@@ -487,6 +512,94 @@ describe('POST /api/review/critique — entitlement (D4)', () => {
 });
 
 describe('POST /api/review/critique — initial critique', () => {
+  it.each([
+    {
+      name: 'claim',
+      opts: { claimThrows: true },
+      expectedRpcs: ['claim_initial_review'],
+    },
+    {
+      name: 'entitlement',
+      opts: { entitlementThrows: true },
+      expectedRpcs: [
+        'claim_initial_review',
+        'release_initial_review',
+      ],
+    },
+    {
+      name: 'finalizer',
+      opts: { finalizeThrows: true },
+      expectedRpcs: [
+        'claim_initial_review',
+        'reserve_initial_review_credit',
+        'finalize_initial_review',
+        'release_initial_review',
+      ],
+    },
+  ])(
+    'turns a rejected $name SDK/RPC promise into a bounded 500 response',
+    async ({ opts, expectedRpcs }) => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const anthropic = fakeAnthropic();
+      const { client, rpcs } = fakeSupabase({
+        userRow: PACK_USER,
+        ...opts,
+      });
+      const app = buildApp({
+        supabase: client,
+        anthropic: anthropic.client,
+        fetchFn: vi
+          .fn()
+          .mockResolvedValue(imageResponse()) as unknown as typeof fetch,
+      });
+
+      const res = await post(app, validBody());
+
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ error: 'review_internal' });
+      expect(rpcs.map(({ fn }) => fn)).toEqual(expectedRpcs);
+    },
+  );
+
+  it('refreshes an owned storage path before fetching a possibly expired signed URL', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const anthropic = fakeAnthropic();
+    const { client, createSignedUrl } = fakeSupabase({
+      userRow: PACK_USER,
+    });
+    const fetchFn = vi.fn(async (url: string | URL | Request) => {
+      expect(String(url)).toContain('token=refreshed');
+      return imageResponse();
+    });
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const res = await post(
+      app,
+      validBody({
+        pages: [
+          {
+            pageNumber: 1,
+            url: `${PAGE_URL}&token=expired`,
+            widthPx: 2048,
+            heightPx: 1152,
+            storagePath:
+              'user-1/review-temp/session-1/page-1.jpg',
+          },
+        ],
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(createSignedUrl).toHaveBeenCalledWith(
+      'user-1/review-temp/session-1/page-1.jpg',
+      600,
+    );
+  });
+
   it('runs the pack path and transactionally finalizes AFTER success', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
@@ -507,9 +620,10 @@ describe('POST /api/review/critique — initial critique', () => {
 
     expect(rpcs.map((rpc) => rpc.fn)).toEqual([
       'claim_initial_review',
+      'reserve_initial_review_credit',
       'finalize_initial_review',
     ]);
-    expect(rpcs[1]!.args).toMatchObject({
+    expect(rpcs[2]!.args).toMatchObject({
       p_user_id: 'user-1',
       p_claim_token: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       p_credit_source: 'pack',
@@ -533,7 +647,7 @@ describe('POST /api/review/critique — initial critique', () => {
     });
   });
 
-  it('removes only user-owned review-temp pages before replying', async () => {
+  it('rejects foreign storage metadata but removes only the owned temp page', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
     const { client, remove } = fakeSupabase({ userRow: PACK_USER });
@@ -569,10 +683,12 @@ describe('POST /api/review/critique — initial critique', () => {
 
     const res = await post(app, validBody({ pages }));
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'invalid_storage_path' });
     expect(remove).toHaveBeenCalledWith([
       'user-1/review-temp/session-1/page-1.jpg',
     ]);
+    expect(anthropic.create).not.toHaveBeenCalled();
   });
 
   it('continues the critique when best-effort temp cleanup fails', async () => {
@@ -660,6 +776,29 @@ describe('POST /api/review/critique — initial critique', () => {
     expect(inserts).toHaveLength(0);
   });
 
+  it('maps a failed page fetch to 502 and refunds the reserved pack claim', async () => {
+    const anthropic = fakeAnthropic();
+    const { client, rpcs } = fakeSupabase({ userRow: PACK_USER });
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: vi
+        .fn()
+        .mockRejectedValue(new Error('signed URL expired')) as unknown as typeof fetch,
+    });
+
+    const res = await post(app, validBody());
+
+    expect(res.status).toBe(502);
+    expect(res.body).toEqual({ error: 'fetch_failed' });
+    expect(anthropic.create).not.toHaveBeenCalled();
+    expect(rpcs.map(({ fn }) => fn)).toEqual([
+      'claim_initial_review',
+      'reserve_initial_review_credit',
+      'release_initial_review',
+    ]);
+  });
+
   it('maps an invalid model payload to 502 bad_model_output and charges nothing', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const anthropic = fakeAnthropic({ dimensionScores: { narrative: 3 }, findings: 'not-an-array' });
@@ -677,6 +816,7 @@ describe('POST /api/review/critique — initial critique', () => {
     expect(res.body.error).toBe('bad_model_output');
     expect(rpcs.map((rpc) => rpc.fn)).toEqual([
       'claim_initial_review',
+      'reserve_initial_review_credit',
       'release_initial_review',
     ]);
     expect(inserts).toHaveLength(0);

@@ -165,7 +165,16 @@ function fakeSupabase(options: FakeSupabaseOptions = {}) {
       return { data: null, error: { message: `unexpected rpc ${fn}` } };
     },
     storage: {
-      from: (_bucket: string) => ({ remove }),
+      from: (_bucket: string) => ({
+        remove,
+        createSignedUrl: async (path: string) => ({
+          data: {
+            signedUrl:
+              `${SUPABASE_URL}/storage/v1/object/sign/poster-assets/${path}?token=refreshed`,
+          },
+          error: null,
+        }),
+      }),
     },
   } as unknown as SupabaseClient;
 
@@ -433,7 +442,7 @@ describe('POST /api/review/critique — durable follow-up lease', () => {
       fetchFn: fetchFn as unknown as typeof fetch,
     }));
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(502);
     expect(supabase.rpcs.at(-1)).toMatchObject({
       fn: 'release_review_followup',
       args: {
@@ -497,6 +506,31 @@ describe('POST /api/review/critique — durable follow-up lease', () => {
         p_lease_token: LEASE_TOKEN,
       },
     });
+  });
+
+  it('does not delete pages after a stale worker loses its follow-up lease', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const supabase = fakeSupabase({
+      complete: () => ({
+        data: { outcome: 'claim_missing' },
+        error: null,
+      }),
+      release: () => ({ data: false, error: null }),
+    });
+    const response = await post(
+      buildApp({ supabase: supabase.client }),
+    );
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'review_internal' });
+    expect(supabase.rpcs.at(-1)).toMatchObject({
+      fn: 'release_review_followup',
+      args: {
+        p_request_id: FOLLOWUP_REQUEST_ID,
+        p_lease_token: LEASE_TOKEN,
+      },
+    });
+    expect(supabase.remove).not.toHaveBeenCalled();
   });
 
   it('generates one UUID request ID for legacy clients and reuses it through completion', async () => {

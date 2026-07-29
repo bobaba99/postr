@@ -34,6 +34,7 @@
 import { randomUUID } from 'node:crypto';
 import express, {
   type Request,
+  type RequestHandler,
   type Response,
   type Router,
 } from 'express';
@@ -146,6 +147,8 @@ export interface ReviewRouterDeps {
   now?: () => number;
   /** PPTX render seam (Task 18). Default: LibreOffice headless via review/pptx.ts. */
   getPptxRenderer?: () => PptxRenderer;
+  /** Rollout gate: disabled unless REVIEW_PPTX_ENABLED is exactly "true". */
+  isPptxEnabled?: () => boolean;
 }
 
 /** Built per call — createLibreOfficeRenderer() is a cheap closure. */
@@ -169,21 +172,48 @@ function tryAcquirePptxRenderLease(): (() => void) | null {
   };
 }
 
+function asyncReviewHandler(
+  handler: (req: Request, res: Response) => Promise<unknown>,
+): RequestHandler {
+  return (req, res, next) => {
+    void handler(req, res).catch((error) => {
+      // eslint-disable-next-line no-console
+      console.error('[review] unhandled route failure', {
+        path: req.path,
+        message:
+          error instanceof Error ? error.message : 'unknown route failure',
+      });
+      if (res.headersSent) {
+        next(error);
+        return;
+      }
+      res.status(500).json({ error: 'review_internal' });
+    });
+  };
+}
+
 export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
   const router = express.Router();
   const getSupabase = deps.getSupabaseAdmin ?? defaultGetSupabaseAdmin;
   const getAnthropic = deps.getAnthropic ?? defaultGetAnthropic;
   const getPptxRenderer = deps.getPptxRenderer ?? defaultGetPptxRenderer;
+  const isPptxEnabled =
+    deps.isPptxEnabled ??
+    (() => process.env.REVIEW_PPTX_ENABLED === 'true');
   const fetchFn = deps.fetchFn ?? fetch;
   const now = deps.now ?? Date.now;
+  // Count only requests that successfully claim fresh provider work.
+  // Same-key in-progress polls and durable replays are free coordination
+  // traffic and must not exhaust the model-work budget.
+  const reviewWorkLimiter = createRateLimiter({
+    maxPerWindow: 8,
+    maxPerDay: 20,
+  });
 
   router.post(
     '/api/review/critique',
     requireAuth(getSupabase),
-    // 8/min leaves room for the included follow-up plus the full four-review
-    // add-on sequence; 20/day still bounds the per-user LLM bill.
-    createRateLimiter({ maxPerWindow: 8, maxPerDay: 20 }),
-    async (req: Request, res: Response) => {
+    asyncReviewHandler(async (req: Request, res: Response) => {
       const parsed = CritiqueRequest.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: 'bad_request', details: parsed.error.flatten() });
@@ -215,13 +245,24 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
         const anthropic = getAnthropic();
 
         return await (body.reviewId
-          ? runFollowup({ res, supabase, anthropic, fetchFn, user, body })
+          ? runFollowup({
+              req,
+              res,
+              supabase,
+              anthropic,
+              fetchFn,
+              workLimiter: reviewWorkLimiter,
+              user,
+              body,
+            })
           : runInitial({
+              req,
               res,
               supabase,
               anthropic,
               fetchFn,
               now,
+              workLimiter: reviewWorkLimiter,
               user,
               body,
             }));
@@ -230,7 +271,7 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
           await cleanupFetchedReviewTempPages(supabase, user.id, body.pages);
         }
       }
-    },
+    }),
   );
 
   // ── Render an uploaded .pptx to page JPEGs (D10). No credit is consumed
@@ -239,9 +280,18 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
   router.post(
     '/api/review/render-pptx',
     requireAuth(getSupabase, { requirePermanent: true }),
+    (_req: Request, res: Response, next) => {
+      if (!isPptxEnabled()) {
+        return res.status(503).json({
+          error: 'pptx_unavailable',
+          message: 'PPTX review is coming next.',
+        });
+      }
+      next();
+    },
     // Conversion is CPU-heavy (LibreOffice) — a tight burst + daily cap.
     createRateLimiter({ maxPerWindow: 2, maxPerDay: 10 }),
-    async (req: Request, res: Response) => {
+    asyncReviewHandler(async (req: Request, res: Response) => {
       const parsed = RenderPptxRequest.safeParse(req.body);
       if (!parsed.success) {
         return res
@@ -297,7 +347,7 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
       }
 
       try {
-        inspectPptxArchive(pptx, REVIEW_MAX_PAGES);
+        await inspectPptxArchive(pptx, REVIEW_MAX_PAGES);
       } catch (err) {
         if (err instanceof PptxArchiveError) {
           return res.status(400).json({ error: err.code });
@@ -346,46 +396,60 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
       const batchId = randomUUID();
       const pages: ReviewPageRef[] = [];
       const uploadedPaths: string[] = [];
-      for (const page of rendered) {
-        const path = `${user.id}/review-temp/${batchId}/page-${page.pageNumber}.jpg`;
-        const { error: uploadErr } = await supabase.storage
-          .from('poster-assets')
-          .upload(path, page.jpeg, { contentType: 'image/jpeg' });
-        if (uploadErr) {
-          // eslint-disable-next-line no-console
-          console.error('[review.render-pptx] page upload failed:', uploadErr.message);
-          await bestEffortRemoveStoragePaths(
-            supabase,
-            uploadedPaths,
-            'review.render-pptx rollback',
-          );
-          return res.status(502).json({ error: 'page_upload_failed' });
+      try {
+        for (const page of rendered) {
+          const path = `${user.id}/review-temp/${batchId}/page-${page.pageNumber}.jpg`;
+          const { error: uploadErr } = await supabase.storage
+            .from('poster-assets')
+            .upload(path, page.jpeg, { contentType: 'image/jpeg' });
+          if (uploadErr) {
+            // eslint-disable-next-line no-console
+            console.error('[review.render-pptx] page upload failed:', uploadErr.message);
+            await bestEffortRemoveStoragePaths(
+              supabase,
+              uploadedPaths,
+              'review.render-pptx rollback',
+            );
+            return res.status(502).json({ error: 'page_upload_failed' });
+          }
+          uploadedPaths.push(path);
+          const { data: signed, error: signErr } = await supabase.storage
+            .from('poster-assets')
+            .createSignedUrl(path, REVIEW_SIGNED_URL_TTL_SEC);
+          if (signErr || !signed?.signedUrl) {
+            // eslint-disable-next-line no-console
+            console.error('[review.render-pptx] sign failed:', signErr?.message);
+            await bestEffortRemoveStoragePaths(
+              supabase,
+              uploadedPaths,
+              'review.render-pptx rollback',
+            );
+            return res.status(502).json({ error: 'page_upload_failed' });
+          }
+          pages.push({
+            pageNumber: page.pageNumber,
+            url: signed.signedUrl,
+            widthPx: page.widthPx,
+            heightPx: page.heightPx,
+            storagePath: path,
+          });
         }
-        uploadedPaths.push(path);
-        const { data: signed, error: signErr } = await supabase.storage
-          .from('poster-assets')
-          .createSignedUrl(path, REVIEW_SIGNED_URL_TTL_SEC);
-        if (signErr || !signed?.signedUrl) {
-          // eslint-disable-next-line no-console
-          console.error('[review.render-pptx] sign failed:', signErr?.message);
-          await bestEffortRemoveStoragePaths(
-            supabase,
-            uploadedPaths,
-            'review.render-pptx rollback',
-          );
-          return res.status(502).json({ error: 'page_upload_failed' });
-        }
-        pages.push({
-          pageNumber: page.pageNumber,
-          url: signed.signedUrl,
-          widthPx: page.widthPx,
-          heightPx: page.heightPx,
-          storagePath: path,
-        });
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error(
+          '[review.render-pptx] storage SDK failed:',
+          error instanceof Error ? error.message : 'unknown',
+        );
+        await bestEffortRemoveStoragePaths(
+          supabase,
+          uploadedPaths,
+          'review.render-pptx rollback',
+        );
+        return res.status(502).json({ error: 'page_upload_failed' });
       }
 
       return res.json({ pages });
-    },
+    }),
   );
 
   return router;
@@ -448,16 +512,103 @@ function isOwnedReviewTempPath(path: string, userId: string): boolean {
   );
 }
 
+class ReviewPageSigningError extends Error {
+  constructor(
+    readonly code: 'invalid_storage_path' | 'page_sign_failed',
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ReviewPageSigningError';
+  }
+}
+
+function isOwnedPosterReviewCapturePath(
+  path: string,
+  userId: string,
+  posterId: string | undefined,
+): boolean {
+  return (
+    typeof posterId === 'string' &&
+    path === `${userId}/${posterId}/review-capture.jpg`
+  );
+}
+
+/**
+ * Re-sign first-party page objects after a fresh/taken-over lease is claimed.
+ * Browser URLs may have expired while a prior worker held the ten-minute
+ * lease; the service-role client validates the owner-scoped object path and
+ * mints a fresh URL immediately before the page fetch.
+ */
+async function refreshReviewPageUrls(
+  supabase: SupabaseClient,
+  userId: string,
+  posterId: string | undefined,
+  pages: CritiqueBody['pages'],
+): Promise<CritiqueBody['pages']> {
+  return Promise.all(
+    pages.map(async (page) => {
+      if (!page.storagePath) return page;
+      if (
+        !isOwnedReviewTempPath(page.storagePath, userId) &&
+        !isOwnedPosterReviewCapturePath(
+          page.storagePath,
+          userId,
+          posterId,
+        )
+      ) {
+        throw new ReviewPageSigningError(
+          'invalid_storage_path',
+          `page ${page.pageNumber}: storage path is not owned by the caller`,
+        );
+      }
+
+      try {
+        const { data, error } = await supabase.storage
+          .from('poster-assets')
+          .createSignedUrl(page.storagePath, REVIEW_SIGNED_URL_TTL_SEC);
+        if (error || !data?.signedUrl) {
+          throw new Error(error?.message ?? 'signed URL missing');
+        }
+        return { ...page, url: data.signedUrl };
+      } catch (error) {
+        throw new ReviewPageSigningError(
+          'page_sign_failed',
+          `page ${page.pageNumber}: ${
+            error instanceof Error ? error.message : 'storage signing failed'
+          }`,
+        );
+      }
+    }),
+  );
+}
+
+function replyPageSigningError(
+  res: Response,
+  error: unknown,
+): Response | null {
+  if (!(error instanceof ReviewPageSigningError)) return null;
+  if (error.code === 'invalid_storage_path') {
+    return res.status(400).json({ error: error.code });
+  }
+  // eslint-disable-next-line no-console
+  console.error('[review.critique] page signing failed', {
+    message: error.message,
+  });
+  return res.status(502).json({ error: error.code });
+}
+
 // ─────────────────────────────────────────────────────────────────────
 // Initial critique
 // ─────────────────────────────────────────────────────────────────────
 
 interface InitialCtx {
+  req: Request;
   res: Response;
   supabase: SupabaseClient;
   anthropic: Anthropic | null;
   fetchFn: typeof fetch;
   now: () => number;
+  workLimiter: RequestHandler;
   user: User;
   body: CritiqueBody;
 }
@@ -543,9 +694,9 @@ async function releaseInitialReviewClaim(
   userId: string,
   requestKey: string,
   claimToken: string,
-): Promise<void> {
+): Promise<boolean> {
   try {
-    const { error } = await supabase.rpc(
+    const { data, error } = await supabase.rpc(
       'release_initial_review' as never,
       {
         p_user_id: userId,
@@ -560,7 +711,9 @@ async function releaseInitialReviewClaim(
         requestKey,
         message: error.message,
       });
+      return false;
     }
+    return data === true;
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[review.critique] release_initial_review rpc crashed', {
@@ -568,11 +721,22 @@ async function releaseInitialReviewClaim(
       requestKey,
       message: err instanceof Error ? err.message : 'unknown',
     });
+    return false;
   }
 }
 
 async function runInitial(ctx: InitialCtx): Promise<Response> {
-  const { res, supabase, anthropic, fetchFn, now, user, body } = ctx;
+  const {
+    req,
+    res,
+    supabase,
+    anthropic,
+    fetchFn,
+    now,
+    workLimiter,
+    user,
+    body,
+  } = ctx;
   // Legacy first-party callers that predate requestKey remain functional,
   // while the web client always supplies and reuses its own key on retry.
   const requestKey = body.requestKey ?? randomUUID();
@@ -609,6 +773,10 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
 
   let claimSettled = false;
   try {
+    if (!reviewWorkAllowed(workLimiter, req, res)) {
+      return res;
+    }
+
     // Reject a caller-controlled foreign/missing poster before quota,
     // page-fetch, or provider work. The finalization RPC repeats this check
     // under a database lock so ownership remains authoritative across races.
@@ -704,6 +872,47 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
       }
       creditSource = 'subscription_addon';
     } else if ((row.review_credits ?? 0) > 0) {
+      // Reserve the pack credit under the exact claim token before page or
+      // provider work. The database serializes this per user, so two distinct
+      // request keys cannot both spend one remaining credit on model calls.
+      // Exact release refunds the reservation on any pre-finalize failure.
+      let reserved = false;
+      let reserveError: { message?: string } | null = null;
+      try {
+        const response = await supabase.rpc(
+          'reserve_initial_review_credit' as never,
+          {
+            p_user_id: user.id,
+            p_request_key: requestKey,
+            p_claim_token: claimToken,
+          } as never,
+        );
+        reserved = response.data === true;
+        reserveError = response.error;
+      } catch (err) {
+        reserveError = {
+          message:
+            err instanceof Error ? err.message : 'reservation rpc crashed',
+        };
+      }
+      if (reserveError) {
+        // eslint-disable-next-line no-console
+        console.error(
+          '[review.critique] reserve_initial_review_credit rpc failed',
+          {
+            userId: user.id,
+            requestKey,
+            message: reserveError.message,
+          },
+        );
+        return res.status(500).json({ error: 'review_internal' });
+      }
+      if (!reserved) {
+        return res.status(402).json({
+          error: 'review_payment_required',
+          reason: 'no_credit',
+        });
+      }
       creditSource = 'pack';
     } else {
       return res.status(402).json({
@@ -712,10 +921,24 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
       });
     }
 
-    // ── Fetch the page bytes (SSRF-guarded inside fetchReviewPages).
+    // ── Refresh owner-scoped URLs, then fetch the page bytes
+    // (SSRF-guarded inside fetchReviewPages).
+    let pages: CritiqueBody['pages'];
+    try {
+      pages = await refreshReviewPageUrls(
+        supabase,
+        user.id,
+        body.posterId,
+        body.pages,
+      );
+    } catch (error) {
+      const reply = replyPageSigningError(res, error);
+      if (reply) return reply;
+      throw error;
+    }
     let fetched: FetchedPage[];
     try {
-      fetched = await fetchReviewPages(body.pages, {
+      fetched = await fetchReviewPages(pages, {
         supabaseUrl: process.env.SUPABASE_URL,
         fetchFn,
         maxBytes: REVIEW_IMAGE_MAX_BYTES,
@@ -771,8 +994,9 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
       findings: enforced.findings.length,
     });
 
-    // The decrement and insert happen in one database transaction. If the
-    // insert (including its poster FK) fails, Postgres rolls the spend back.
+    // Finalization consumes the exact reservation and inserts the review in
+    // one transaction. A missing/stale token cannot consume another claim's
+    // reserved credit.
     const { data: finalRaw, error: finalErr } = await supabase.rpc(
       'finalize_initial_review' as never,
       {
@@ -829,12 +1053,15 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
     });
   } finally {
     if (!claimSettled) {
-      await releaseInitialReviewClaim(
+      const released = await releaseInitialReviewClaim(
         supabase,
         user.id,
         requestKey,
         claimToken,
       );
+      if (!released) {
+        (res.locals as ReviewAuthLocals).deferReviewTempCleanup = true;
+      }
     }
   }
 }
@@ -844,10 +1071,12 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
 // ─────────────────────────────────────────────────────────────────────
 
 interface FollowupCtx {
+  req: Request;
   res: Response;
   supabase: SupabaseClient;
   anthropic: Anthropic | null;
   fetchFn: typeof fetch;
+  workLimiter: RequestHandler;
   user: User;
   body: CritiqueBody;
 }
@@ -971,9 +1200,9 @@ async function releaseFollowupClaim(
   reviewId: string,
   requestId: string,
   leaseToken: string,
-): Promise<void> {
+): Promise<boolean> {
   try {
-    const { error } = await supabase.rpc(
+    const { data, error } = await supabase.rpc(
       'release_review_followup' as never,
       {
         p_user_id: userId,
@@ -990,7 +1219,9 @@ async function releaseFollowupClaim(
         requestId,
         message: error.message,
       });
+      return false;
     }
+    return data === true;
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error('[review.critique] release_review_followup rpc crashed', {
@@ -999,6 +1230,7 @@ async function releaseFollowupClaim(
       requestId,
       message: err instanceof Error ? err.message : 'unknown',
     });
+    return false;
   }
 }
 
@@ -1033,7 +1265,16 @@ function replyFollowupState(
  * no entitlement check, no consume, no weekly slot (D6).
  */
 async function runFollowup(ctx: FollowupCtx): Promise<Response> {
-  const { res, supabase, anthropic, fetchFn, user, body } = ctx;
+  const {
+    req,
+    res,
+    supabase,
+    anthropic,
+    fetchFn,
+    workLimiter,
+    user,
+    body,
+  } = ctx;
   const reviewId = body.reviewId!;
   // Legacy first-party callers remain functional, while current web clients
   // always generate and reuse their own request id across transport retries.
@@ -1086,6 +1327,10 @@ async function runFollowup(ctx: FollowupCtx): Promise<Response> {
   const { leaseToken, initialCritique } = claim;
   let claimSettled = false;
   try {
+    if (!reviewWorkAllowed(workLimiter, req, res)) {
+      return res;
+    }
+
     if (!anthropic) {
       return res.status(500).json({
         error: 'provider_not_configured',
@@ -1093,10 +1338,26 @@ async function runFollowup(ctx: FollowupCtx): Promise<Response> {
       });
     }
 
+    // Refresh owner-scoped URLs after claiming the follow-up so a retry that
+    // takes over an expired lease does not inherit an expired browser URL.
+    let pages: CritiqueBody['pages'];
+    try {
+      pages = await refreshReviewPageUrls(
+        supabase,
+        user.id,
+        body.posterId,
+        body.pages,
+      );
+    } catch (error) {
+      const reply = replyPageSigningError(res, error);
+      if (reply) return reply;
+      throw error;
+    }
+
     // Fetch the REVISED pages (SSRF-guarded inside fetchReviewPages).
     let fetched: FetchedPage[];
     try {
-      fetched = await fetchReviewPages(body.pages, {
+      fetched = await fetchReviewPages(pages, {
         supabaseUrl: process.env.SUPABASE_URL,
         fetchFn,
         maxBytes: REVIEW_IMAGE_MAX_BYTES,
@@ -1192,15 +1453,30 @@ async function runFollowup(ctx: FollowupCtx): Promise<Response> {
     });
   } finally {
     if (!claimSettled) {
-      await releaseFollowupClaim(
+      const released = await releaseFollowupClaim(
         supabase,
         user.id,
         reviewId,
         requestId,
         leaseToken,
       );
+      if (!released) {
+        (res.locals as ReviewAuthLocals).deferReviewTempCleanup = true;
+      }
     }
   }
+}
+
+function reviewWorkAllowed(
+  limiter: RequestHandler,
+  req: Request,
+  res: Response,
+): boolean {
+  let allowed = false;
+  limiter(req, res, () => {
+    allowed = true;
+  });
+  return allowed;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -1246,8 +1522,11 @@ function replyPageFetchError(res: Response, err: unknown): Response {
     if (err.code === 'too_large') {
       return res.status(413).json({ error: 'image_too_large' });
     }
-    // url_not_allowed | fetch_failed | unsupported_media — the typed
-    // code IS the client-facing error string.
+    if (err.code === 'fetch_failed') {
+      return res.status(502).json({ error: err.code });
+    }
+    // url_not_allowed | unsupported_media — the typed code is the
+    // client-facing error string.
     return res.status(400).json({ error: err.code });
   }
   // eslint-disable-next-line no-console

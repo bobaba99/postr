@@ -50,6 +50,7 @@ function fakeSupabase(initialCredits = 2) {
   let reviewSequence = 0;
   let claimSequence = 0;
   const claims = new Map<string, string>();
+  const reservations = new Set<string>();
   const reviews = new Map<
     string,
     {
@@ -158,10 +159,28 @@ function fakeSupabase(initialCredits = 2) {
 
       if (fn === 'release_initial_review') {
         const matches = claims.get(requestKey) === args.p_claim_token;
+        if (matches && reservations.delete(requestKey)) {
+          reviewCredits += 1;
+        }
         return {
           data: matches ? claims.delete(requestKey) : false,
           error: null,
         };
+      }
+
+      if (fn === 'reserve_initial_review_credit') {
+        if (claims.get(requestKey) !== args.p_claim_token) {
+          return { data: false, error: null };
+        }
+        if (reservations.has(requestKey)) {
+          return { data: true, error: null };
+        }
+        if (reviewCredits <= 0) {
+          return { data: false, error: null };
+        }
+        reviewCredits -= 1;
+        reservations.add(requestKey);
+        return { data: true, error: null };
       }
 
       if (fn === 'finalize_initial_review') {
@@ -181,15 +200,15 @@ function fakeSupabase(initialCredits = 2) {
           return { data: { outcome: 'claim_missing' }, error: null };
         }
         if (args.p_poster_id === FOREIGN_POSTER_ID) {
+          if (reservations.delete(requestKey)) reviewCredits += 1;
           claims.delete(requestKey);
           return { data: { outcome: 'poster_not_owned' }, error: null };
         }
         if (args.p_credit_source === 'pack') {
-          if (reviewCredits <= 0) {
+          if (!reservations.has(requestKey)) {
             claims.delete(requestKey);
             return { data: { outcome: 'no_credit' }, error: null };
           }
-          reviewCredits -= 1;
         }
         reviewSequence += 1;
         const stored = {
@@ -199,6 +218,7 @@ function fakeSupabase(initialCredits = 2) {
           initialCritique: args.p_initial_findings,
         };
         reviews.set(requestKey, stored);
+        reservations.delete(requestKey);
         claims.delete(requestKey);
         return {
           data: {
@@ -222,7 +242,16 @@ function fakeSupabase(initialCredits = 2) {
       return { data: null, error: { message: `unexpected rpc ${fn}` } };
     },
     storage: {
-      from: (_bucket: string) => ({ remove }),
+      from: (_bucket: string) => ({
+        remove,
+        createSignedUrl: async (path: string) => ({
+          data: {
+            signedUrl:
+              `${SUPABASE_URL}/storage/v1/object/sign/poster-assets/${path}?token=refreshed`,
+          },
+          error: null,
+        }),
+      }),
     },
   } as unknown as SupabaseClient;
 
@@ -307,6 +336,16 @@ function post(app: ReturnType<typeof buildApp>) {
     .send(body());
 }
 
+function postWithKey(
+  app: ReturnType<typeof buildApp>,
+  requestKey: string,
+) {
+  return request(app)
+    .post('/api/review/critique')
+    .set('Authorization', 'Bearer test-token')
+    .send({ ...body(), requestKey });
+}
+
 beforeEach(() => {
   vi.stubEnv('SUPABASE_URL', SUPABASE_URL);
 });
@@ -350,9 +389,13 @@ describe('POST /api/review/critique — initial request idempotency', () => {
     const anthropic = fakeAnthropic();
     const modelStarted = deferred<void>();
     const releaseModel = deferred<void>();
+    let providerCalls = 0;
     anthropic.create.mockImplementation(async () => {
-      modelStarted.resolve();
-      await releaseModel.promise;
+      providerCalls += 1;
+      if (providerCalls === 1) {
+        modelStarted.resolve();
+        await releaseModel.promise;
+      }
       return {
         content: [
           {
@@ -408,6 +451,62 @@ describe('POST /api/review/critique — initial request idempotency', () => {
     expect(supabase.reviewCredits).toBe(1);
   });
 
+  it('reserves one pack credit before provider work across distinct concurrent keys', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const supabase = fakeSupabase(1);
+    const anthropic = fakeAnthropic();
+    const modelStarted = deferred<void>();
+    const releaseModel = deferred<void>();
+    let providerCalls = 0;
+    anthropic.create.mockImplementation(async () => {
+      providerCalls += 1;
+      if (providerCalls === 1) {
+        modelStarted.resolve();
+        await releaseModel.promise;
+      }
+      return {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'toolu_test',
+            name: 'emit_critique',
+            input: CRITIQUE,
+          },
+        ],
+        stop_reason: 'tool_use',
+        usage: { input_tokens: 120, output_tokens: 80 },
+      };
+    });
+    const app = buildApp(
+      supabase.client,
+      anthropic.client,
+      vi.fn().mockResolvedValue(imageResponse()) as unknown as typeof fetch,
+    );
+
+    const first = Promise.resolve(
+      postWithKey(
+        app,
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      ),
+    );
+    await modelStarted.promise;
+    const second = await postWithKey(
+      app,
+      'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    );
+    releaseModel.resolve();
+    const completed = await first;
+
+    expect([completed.status, second.status].sort()).toEqual([200, 402]);
+    expect(anthropic.create).toHaveBeenCalledTimes(1);
+    expect(supabase.reviewCredits).toBe(0);
+    expect(
+      supabase.rpcs.filter(
+        ({ fn }) => fn === 'reserve_initial_review_credit',
+      ),
+    ).toHaveLength(1);
+  });
+
   it('does not delete pages owned by an in-progress request-key retry', async () => {
     const supabase = fakeSupabase(1);
     supabase.claims.set(
@@ -436,6 +535,29 @@ describe('POST /api/review/critique — initial request idempotency', () => {
     expect(response.status).toBe(409);
     expect(response.body.error).toBe('review_in_progress');
     expect(supabase.remove).not.toHaveBeenCalled();
+  });
+
+  it('does not spend provider rate-limit capacity on same-key status polls', async () => {
+    const supabase = fakeSupabase(1);
+    supabase.claims.set(
+      REQUEST_KEY,
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    );
+    const anthropic = fakeAnthropic();
+    const app = buildApp(
+      supabase.client,
+      anthropic.client,
+      vi.fn() as unknown as typeof fetch,
+    );
+
+    const responses = await Promise.all(
+      Array.from({ length: 25 }, () => post(app)),
+    );
+
+    expect(responses.map(({ status }) => status)).toEqual(
+      Array.from({ length: 25 }, () => 409),
+    );
+    expect(anthropic.create).not.toHaveBeenCalled();
   });
 
   it('replays the original initial result after the review later closes', async () => {
@@ -510,5 +632,52 @@ describe('POST /api/review/critique — initial request idempotency', () => {
       'claim_initial_review',
       'release_initial_review',
     ]);
+  });
+
+  it('does not delete pages after a stale worker loses its claim lease', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const supabase = fakeSupabase(1);
+    const anthropic = fakeAnthropic();
+    anthropic.create.mockImplementation(async () => {
+      supabase.claims.delete(REQUEST_KEY);
+      return {
+        content: [
+          {
+            type: 'tool_use',
+            id: 'toolu_test',
+            name: 'emit_critique',
+            input: CRITIQUE,
+          },
+        ],
+        stop_reason: 'tool_use',
+        usage: { input_tokens: 120, output_tokens: 80 },
+      };
+    });
+    const app = buildApp(
+      supabase.client,
+      anthropic.client,
+      vi.fn().mockResolvedValue(imageResponse()) as unknown as typeof fetch,
+    );
+
+    const response = await request(app)
+      .post('/api/review/critique')
+      .set('Authorization', 'Bearer test-token')
+      .send({
+        ...body(),
+        pages: [
+          {
+            ...body().pages[0],
+            storagePath: 'user-1/review-temp/session-1/page-1.jpg',
+          },
+        ],
+      });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'review_internal' });
+    expect(
+      supabase.rpcs.find((rpc) => rpc.fn === 'release_initial_review'),
+    ).toBeDefined();
+    expect(supabase.remove).not.toHaveBeenCalled();
   });
 });

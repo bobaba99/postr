@@ -68,6 +68,8 @@ function fakeSupabase(
   storageOpts: {
     failUploadAt?: number;
     failSignAt?: number;
+    throwUploadAt?: number;
+    throwSignAt?: number;
     userIsAnonymous?: boolean;
   } = {},
 ) {
@@ -108,6 +110,9 @@ function fakeSupabase(
               contentType: uploadOptions?.contentType,
               byteLength: body.length,
             });
+            if (uploadCount === storageOpts.throwUploadAt) {
+              throw new Error('upload crashed');
+            }
             if (uploadCount === storageOpts.failUploadAt) {
               return { data: null, error: { message: 'upload failed' } };
             }
@@ -116,6 +121,9 @@ function fakeSupabase(
           createSignedUrl: async (path: string, ttlSec: number) => {
             signCount++;
             signed.push({ bucket, path, ttlSec });
+            if (signCount === storageOpts.throwSignAt) {
+              throw new Error('sign crashed');
+            }
             if (signCount === storageOpts.failSignAt) {
               return { data: null, error: { message: 'sign failed' } };
             }
@@ -154,9 +162,12 @@ function fakeRenderer(pages: Array<{ widthPx: number; heightPx: number }>) {
 function buildApp(deps: {
   renderer: PptxRenderer;
   fetchFn?: typeof fetch;
+  pptxEnabled?: boolean;
   storageOpts?: {
     failUploadAt?: number;
     failSignAt?: number;
+    throwUploadAt?: number;
+    throwSignAt?: number;
     userIsAnonymous?: boolean;
   };
 }) {
@@ -178,6 +189,7 @@ function buildApp(deps: {
       getSupabaseAdmin: () => fake.client,
       fetchFn,
       getPptxRenderer: () => deps.renderer,
+      isPptxEnabled: () => deps.pptxEnabled ?? true,
     }),
   );
   return { app, fake };
@@ -200,6 +212,28 @@ afterEach(() => {
 });
 
 describe('POST /api/review/render-pptx', () => {
+  it('fails closed before fetch or conversion until the isolated worker is enabled', async () => {
+    const fetchFn = vi.fn();
+    const { renderer, calls } = fakeRenderer([
+      { widthPx: 2048, heightPx: 1152 },
+    ]);
+    const { app } = buildApp({
+      renderer,
+      fetchFn: fetchFn as unknown as typeof fetch,
+      pptxEnabled: false,
+    });
+
+    const res = await postRender(app, VALID_FILE_URL);
+
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({
+      error: 'pptx_unavailable',
+      message: 'PPTX review is coming next.',
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(calls).toHaveLength(0);
+  });
+
   it('requires a permanent account before fetching or converting a deck', async () => {
     const fetchFn = vi.fn();
     const { renderer, calls } = fakeRenderer([
@@ -517,6 +551,42 @@ describe('POST /api/review/render-pptx', () => {
       },
     ]);
   });
+
+  it.each([
+    {
+      name: 'upload',
+      storageOpts: { throwUploadAt: 2 },
+      expectedUploaded: 1,
+    },
+    {
+      name: 'sign',
+      storageOpts: { throwSignAt: 2 },
+      expectedUploaded: 2,
+    },
+  ])(
+    'rolls back prior pages when the storage SDK rejects during $name',
+    async ({ storageOpts, expectedUploaded }) => {
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const { renderer } = fakeRenderer([
+        { widthPx: 2048, heightPx: 1152 },
+        { widthPx: 2048, heightPx: 1152 },
+      ]);
+      const { app, fake } = buildApp({ renderer, storageOpts });
+
+      const res = await postRender(app, VALID_FILE_URL);
+
+      expect(res.status).toBe(502);
+      expect(res.body).toEqual({ error: 'page_upload_failed' });
+      expect(fake.removes).toEqual([
+        {
+          bucket: 'poster-assets',
+          paths: fake.uploads
+            .slice(0, expectedUploaded)
+            .map(({ path }) => path),
+        },
+      ]);
+    },
+  );
 
   it('rejects a fileUrl on a foreign host with 400 before any fetch or render', async () => {
     const fetchFn = vi.fn();

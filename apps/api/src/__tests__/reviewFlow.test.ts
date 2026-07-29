@@ -93,6 +93,7 @@ function fakeReviewSupabase(
   const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = [];
   const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
   const claims = new Map<string, string>();
+  const reservations = new Set<string>();
   const addonUsage: number[] = [];
   let reviewSeq = 0;
   let claimSeq = 0;
@@ -254,10 +255,27 @@ function fakeReviewSupabase(
       }
       if (fn === 'release_initial_review') {
         const matches = claims.get(requestKey) === args.p_claim_token;
+        if (matches && reservations.delete(requestKey)) {
+          users.review_credits += 1;
+        }
         return Promise.resolve({
           data: matches ? claims.delete(requestKey) : false,
           error: null,
         });
+      }
+      if (fn === 'reserve_initial_review_credit') {
+        if (claims.get(requestKey) !== args.p_claim_token) {
+          return Promise.resolve({ data: false, error: null });
+        }
+        if (reservations.has(requestKey)) {
+          return Promise.resolve({ data: true, error: null });
+        }
+        if (users.review_credits <= 0) {
+          return Promise.resolve({ data: false, error: null });
+        }
+        users.review_credits -= 1;
+        reservations.add(requestKey);
+        return Promise.resolve({ data: true, error: null });
       }
       if (fn === 'claim_review_followup') {
         const review = reviews.get(String(args.p_review_id));
@@ -432,14 +450,13 @@ function fakeReviewSupabase(
         });
       }
       if (args.p_credit_source === 'pack') {
-        if (users.review_credits <= 0) {
+        if (!reservations.has(requestKey)) {
           claims.delete(requestKey);
           return Promise.resolve({
             data: { outcome: 'no_credit' },
             error: null,
           });
         }
-        users.review_credits -= 1;
       }
       reviewSeq += 1;
       const timestamp = new Date().toISOString();
@@ -459,6 +476,7 @@ function fakeReviewSupabase(
         updated_at: timestamp,
       } as FakeReviewRow;
       reviews.set(row.id, row);
+      reservations.delete(requestKey);
       claims.delete(requestKey);
       return Promise.resolve({
         data: {
