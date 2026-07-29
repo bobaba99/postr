@@ -1,0 +1,31 @@
+{
+  "id": "BIO2",
+  "question": "Do high-fidelity CRISPR-Cas9 variants reduce genome-wide off-target editing?",
+  "starFinding": {
+    "text": "Yes: the high-fidelity variant SpCas9-HF1 reduces genome-wide off-target editing to undetectable levels for standard non-repetitive sequences while retaining on-target activity comparable to wild-type SpCas9 for over 85% of sgRNAs tested.",
+    "sourceQuote": "SpCas9-HF1 retains on-target activities comparable to wild-type SpCas9 with >85% of single-guide RNAs (sgRNAs) tested in human cells. Notably, with sgRNAs targeted to standard non-repetitive sequences, SpCas9-HF1 rendered all or nearly all off-target events undetectable by genome-wide break capture and targeted sequencing methods."
+  },
+  "top3": [
+    {
+      "text": "SpCas9-HF1 renders all or nearly all off-target events undetectable by genome-wide break capture and targeted sequencing while keeping on-target activity comparable to wild-type SpCas9 for >85% of sgRNAs.",
+      "sourceQuote": "SpCas9-HF1 retains on-target activities comparable to wild-type SpCas9 with >85% of single-guide RNAs (sgRNAs) tested in human cells. Notably, with sgRNAs targeted to standard non-repetitive sequences, SpCas9-HF1 rendered all or nearly all off-target events undetectable by genome-wide break capture and targeted sequencing methods."
+    },
+    {
+      "text": "The paired double-nicking strategy using a Cas9 nickase reduces off-target activity by 50- to 1,000-fold in cell lines without sacrificing on-target cleavage efficiency.",
+      "sourceQuote": "We demonstrate that paired nicking can be used to reduce off-target activity by 50–1,000 fold in cell lines and facilitate gene knockout in mouse zygotes without sacrificing on-target cleavage efficiency."
+    },
+    {
+      "text": "The hyper-accurate variant HypaCas9 achieves dramatically improved genome-wide specificity over wild-type SpCas9 by GUIDE-seq, matching or exceeding SpCas9-HF1 and eSpCas9(1.1), without compromising on-target activity.",
+      "sourceQuote": "we design a new hyper-accurate Cas9 variant (HypaCas9) that demonstrates high genome-wide specificity without compromising on-target activity in human cells. Our GUIDE-seq analysis revealed that HypaCas9 exhibits dramatically improved genome-wide specificity compared to WT SpCas9, and shows equivalent or better genome-wide specificity relative to both SpCas9-HF1 and eSpCas9(1.1) for all sgRNAs examined."
+    }
+  ],
+  "doNotPromote": [
+    "The Kulcsár et al. (2017) supporting quote — 'The propensity for off-target activity of Streptococcus pyogenes Cas9 (SpCas9) has been considerably decreased by rationally engineered variants with increased fidelity (eSpCas9; SpCas9-HF1)' — must NOT be ranked #1: it is a background/introductory statement crediting prior variants (eSpCas9, SpCas9-HF1), not this paper's own novel result about HeFSpCas9.",
+    "The fCas9 result — 'Fusions of catalytically inactive Cas9 with FokI nuclease domain (fCas9) ... edits target DNA sites with >140-fold higher specificity than wild-type Cas9 and at least fourfold than that of paired nickases' — must NOT be #1: it is a narrower alternative-approach fold-specificity claim from a review, not the central genome-wide answer.",
+    "The HiFi Cas9 20-fold single-site INDEL reduction ('reduced INDEL frequency at the dominant off-target site by 20 fold') must NOT be #1: it is a single-locus figure, not a genome-wide summary of the effect."
+  ],
+  "draftedBy": "workflow",
+  "approved": true,
+  "approvedBy": "Gavin",
+  "wellWritten": true
+}
