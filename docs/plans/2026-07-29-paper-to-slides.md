@@ -121,7 +121,7 @@ knowledge that both features depend on it.
 | Ingest (paste/`.docx`) | `manuscript/docxIngest.ts`, `parseManuscriptText.ts` | none |
 | Document model (IR) | `manuscript/buildDocumentModel.ts` | none |
 | Section mapping | `manuscript/mapper.ts` | none |
-| **Extraction** | `manuscript/coreRelevance.ts` | **refactor to LLM-driven (see §3.1)** |
+| **Extraction** | `manuscript/coreRelevance.ts` | **approach decided by experiment (see §3.1)** |
 | Interviewer | `manuscript/interviewer.ts` | shared question set, output-type branch |
 | Budgets | `manuscript/rubric.ts` | slide budgets + the ≤30-word slide gate |
 | Condense | `apps/api/src/narrative/*` | same call, slide-shaped roles |
@@ -137,18 +137,27 @@ viewer (§5); the design pass (§4.2).
 These are the traps a future editor must know about. Record them in the code
 (reuse-ledger comment) as well as here.
 
-1. **Extraction becomes LLM-driven for BOTH poster and talk.** Today the poster
-   path (`coreRelevance.ts` + mapper) extracts deterministically. We are
-   **refactoring it to an LLM call** so it survives badly-written manuscripts.
-   Consequence: a **live feature (`/paper-to-poster`) gains an LLM cost/latency
-   line and a hallucination surface.** This refactor therefore:
-   - carries a **fidelity gate** (a mandatory verbatim `sourceQuote` per
-     extracted finding; null-results and methods papers are the highest invention
-     risk and must be graded before ship);
-   - gets its **own regression pass** on the poster path, not just the talk path;
-   - **RECOMMENDATION (open, §7):** ship the extraction refactor as its own small
-     hardening task *before* Phase 1, so paper-to-slides builds on already-LLM
-     extraction rather than flipping a live feature mid-feature.
+1. **Extraction approach is DECIDED BY EXPERIMENT — do not build it until the
+   experiment picks a winner.** The talk needs *ranked findings with a verbatim
+   quote each* for the star-finding cards. Two candidate approaches:
+   - **(A) Upgrade the deterministic engine** (`coreRelevance.ts`) with stronger
+     signals — semantic relatedness, semantic/word-content frequency,
+     informational density — so it extracts and ranks findings well without an
+     LLM. Keeps the poster path deterministic, zero added cost/latency.
+     `coreRelevance` stays the structure decider regardless.
+   - **(B) Add an LLM extraction layer** (server-side, `apps/api`) that reads the
+     results text and returns ranked findings, each with a mandatory verbatim
+     `sourceQuote` (fidelity gate). Survives badly-written papers better, but adds
+     cost/latency/hallucination surface.
+   **The experiment (§4 Phase 0) runs BEFORE any implementation** and scores both
+   arms on three axes: (1) **ranking agreement** with a human gold set (star
+   finding + top-3 on N real papers), (2) **fidelity** — every claimed finding is
+   supported by a verbatim span actually in the paper, none invented or
+   misattributed, and (3) **robustness on badly-written papers** (≥2 deliberately
+   poorly-structured manuscripts). Whichever wins is what gets built; if the
+   deterministic upgrade wins, `/paper-to-poster` gains nothing risky at all.
+   IMPORTANT: this reverses the earlier "refactor to LLM" assumption — that was
+   never validated, and the experiment exists precisely to validate it.
 2. **Poster PPTX loses its 5 empty layout slides.** Those layout slides
    (`export/pptx/templateSlides.ts`: three-col, two-col, billboard, sidebar,
    blank + explainer) are **presentation scaffolding** — they exist so a user can
