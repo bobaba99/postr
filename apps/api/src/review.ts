@@ -437,6 +437,9 @@ function replyPageFetchError(res: Response, error: unknown): Response {
     if (error.code === 'too_large') {
       return res.status(413).json({ error: 'image_too_large' });
     }
+    if (error.code === 'fetch_failed') {
+      return res.status(502).json({ error: error.code });
+    }
     return res.status(400).json({ error: error.code });
   }
   console.error('[review.critique] page fetch crashed', {
