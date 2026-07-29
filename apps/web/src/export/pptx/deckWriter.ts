@@ -207,7 +207,14 @@ function addStyledRect(
 
 /** Element kinds understood by no device-specific renderer, but still
  * meaningfully drawable as a positioned shape/text pair. Kept small and
- * declarative so new device vocabularies stay easy to extend. */
+ * declarative so new device vocabularies stay easy to extend.
+ *
+ * THIS SWITCH IS THE AUTHORITY for which kinds are shapes: the shared
+ * `SHAPE_KINDS` set in `manuscript/deck/styledTypes.ts` (consumed by the
+ * PDF writer and the live preview) MUST list exactly the 8 `case` labels
+ * below that return a shape (not text). If you add/remove a shape case
+ * here, update `SHAPE_KINDS` too, or the three surfaces will disagree on
+ * the same `StyledSlideDeck` again. */
 function addKnownElement(slide: PptxGenJS.Slide, el: StyledElement): boolean {
   switch (el.kind) {
     // Full-bleed-ish background swatch — draw as a large rect so it

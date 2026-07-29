@@ -29,7 +29,7 @@
 import { countWords } from '../buildDocumentModel';
 import { SLIDE_WORD_CAP } from '../deck/slideBudget';
 import type { Slide, SlideDeck, SlideRole } from '../deck/types';
-import type { StyledElement, StyledSlide, StyledSlideDeck } from '../deck/styledTypes';
+import { isShapeKind, type StyledElement, type StyledSlide, type StyledSlideDeck } from '../deck/styledTypes';
 import { VibeField } from './VibeField';
 
 interface SlideViewerProps {
@@ -199,21 +199,6 @@ function ThumbnailRail({
 const STYLED_CANVAS_W_IN = 13.333;
 const STYLED_CANVAS_H_IN = 7.5;
 
-/** Shape-kind elements (rules, tracks, fills, boxes, dots) vs. text —
- *  mirrors deckWriter.ts's `addKnownElement` / deckPdf.ts's `isShapeKind`
- *  grouping so the live preview agrees with what gets exported. */
-function isStyledShapeKind(kind: string): boolean {
-  return (
-    kind === 'background' ||
-    kind.includes('rule') ||
-    kind.includes('track') ||
-    kind.includes('box') ||
-    kind.includes('line') ||
-    kind.includes('fill') ||
-    kind.includes('dot')
-  );
-}
-
 function toCssHex(color: string | undefined, fallback: string): string {
   if (!color) return fallback;
   return color.startsWith('#') ? color : `#${color}`;
@@ -225,6 +210,11 @@ function StyledElementView({ element }: { element: StyledElement }) {
   const left = `${(element.x / STYLED_CANVAS_W_IN) * 100}%`;
   const top = `${(element.y / STYLED_CANVAS_H_IN) * 100}%`;
 
+  // `background` gets the special full-bleed treatment below and is
+  // checked first even though it is itself a member of the shared
+  // `SHAPE_KINDS` set (imported as `isShapeKind` from styledTypes.ts) —
+  // every other shape kind falls through to the generic small-rect
+  // treatment right after.
   if (element.kind === 'background') {
     return (
       <div
@@ -234,7 +224,7 @@ function StyledElementView({ element }: { element: StyledElement }) {
     );
   }
 
-  if (isStyledShapeKind(element.kind)) {
+  if (isShapeKind(element.kind)) {
     return (
       <div
         className="absolute h-2 w-16 rounded-sm"

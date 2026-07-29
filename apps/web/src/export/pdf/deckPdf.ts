@@ -38,7 +38,7 @@
  * top of a content slide.
  */
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import type { StyledElement, StyledSlideDeck } from '../../manuscript/deck/styledTypes';
+import { isShapeKind, type StyledElement, type StyledSlideDeck } from '../../manuscript/deck/styledTypes';
 import { ackMarkPngDataUri } from '../ackMarkPng';
 
 // pdf points per inch; slide = 13.33 x 7.5 in (matches deckWriter.ts's
@@ -72,21 +72,6 @@ function hexToRgb(hex: string | undefined, fallback: string) {
     parseInt(n.slice(0, 2), 16) / 255,
     parseInt(n.slice(2, 4), 16) / 255,
     parseInt(n.slice(4, 6), 16) / 255,
-  );
-}
-
-/** Element kinds rendered as vector shapes (rules, tracks, fills, boxes,
- * dots) rather than text — mirrors deckWriter.ts's `addKnownElement`
- * shape-kind grouping so the two writers agree on what counts as a
- * "device" shape vs. a text element. */
-function isShapeKind(kind: string): boolean {
-  return (
-    kind.includes('rule') ||
-    kind.includes('track') ||
-    kind.includes('box') ||
-    kind.includes('line') ||
-    kind.includes('fill') ||
-    kind.includes('dot')
   );
 }
 
@@ -170,7 +155,7 @@ function drawShapeElement(page: PDFPage, el: StyledElement): void {
  * pptx writer's dispatch (`deckWriter.ts`'s `addKnownElement`, which
  * switches on `el.kind` and never inspects `text` for a recognized
  * shape kind) and the on-screen preview
- * (`manuscript/slides/SlideViewer.tsx`'s `isStyledShapeKind`-gated
+ * (`manuscript/slides/SlideViewer.tsx`'s `isShapeKind`-gated
  * `StyledElementView`). The styleDeck tool schema *permits* `text` on
  * every element, including shape kinds like `callout-box` — the prompt
  * only discourages it — so Arm P can legally emit a `callout-box` that
@@ -210,6 +195,11 @@ function drawSlide(
   const page = doc.addPage([SLIDE_W, SLIDE_H]);
   page.drawRectangle({ x: 0, y: 0, width: SLIDE_W, height: SLIDE_H, color: hexToRgb(themeBgHex, '#FFFFFF') });
   for (const el of elements) {
+    // `background` is checked explicitly BEFORE the generic `isShapeKind`
+    // branch even though `background` is itself a member of the shared
+    // `SHAPE_KINDS` set: it needs the full-bleed `drawBackground` treatment,
+    // not the small representative rect `shapeDims`/`drawShapeElement` give
+    // every other shape kind. This ordering must stay put.
     if (el.kind === 'background') {
       drawBackground(page, el);
     } else if (isShapeKind(el.kind)) {

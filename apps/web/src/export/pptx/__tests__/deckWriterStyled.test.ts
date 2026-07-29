@@ -266,6 +266,42 @@ describe('exportStyledDeckPptx', () => {
     expect(fallbackXml).toContain('Unrecognized kind, still exports');
   });
 
+  it('renders a free-form text kind that merely CONTAINS a shape substring ("headline" contains "line") as real text — matches the PDF writer and preview', async () => {
+    // deckWriter.ts's addKnownElement is the AUTHORITY: an EXACT switch
+    // over 8 shape kinds, with everything else falling to `default` →
+    // addStyledText. 'headline' was never one of those 8 cases, so this
+    // writer always rendered it correctly as text — this test locks that
+    // continued behavior and cross-checks it against deckPdf.test.ts's
+    // matching assertion for the identical element, proving all three
+    // surfaces now agree on the same free-form kind.
+    const deck: StyledSlideDeck = {
+      durationMinutes: 5,
+      theme,
+      slides: [
+        {
+          role: 'result',
+          device: 'plain',
+          elements: [
+            {
+              kind: 'headline',
+              text: 'Faster convergence',
+              x: 0.72,
+              y: 1.0,
+              fontSize: 30,
+              color: '#17252A',
+            },
+          ],
+        },
+      ],
+    };
+    const bytes = await exportStyledDeckPptx(deck);
+    const files = unzipSync(bytes);
+    const xmls = slideXmls(files);
+    const xml = strFromU8(files[xmls[0]!]!);
+    expect(xml).toContain('<a:t>');
+    expect(xml).toContain('Faster convergence');
+  });
+
   it('is defensive against a device value outside SUPPORTED_DEVICES — renders as plain', async () => {
     const deck = fixtureStyledDeck();
     const mutated: StyledSlideDeck = {

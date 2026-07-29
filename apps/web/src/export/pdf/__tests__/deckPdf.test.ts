@@ -346,6 +346,61 @@ describe('exportStyledDeckPdf', () => {
     expect(hasEmbeddedImage(firstPage)).toBe(false);
   });
 
+  it('renders a free-form text kind that merely CONTAINS a shape substring as real text, not an empty shape', async () => {
+    // The classifier bug (pre-fix): deckPdf.ts's own `isShapeKind` used a
+    // loose SUBSTRING match (`kind.includes('line')`, etc.), diverging from
+    // the pptx writer's EXACT switch (deckWriter.ts's addKnownElement,
+    // which has no `case 'headline'`). Arm P's `kind` field is free-form
+    // LLM output (apps/api/src/narrative/styleDeck.ts validates it only as
+    // z.string().min(1)), so it can legally emit `{kind:'headline', ...}`.
+    // 'headline'.includes('line') is true, so the OLD substring classifier
+    // (and the preview's matching one) treated it as a shape — an empty
+    // colored rectangle — and silently DROPPED the text, while the pptx
+    // writer's exact switch fell to `default` and rendered it as text. Same
+    // StyledSlideDeck, three surfaces, two different results: the paid
+    // .pptx showed the headline, the free PDF and the preview showed an
+    // empty box. This must now render as real, selectable text in the PDF,
+    // matching the pptx writer and the shared `isShapeKind` classifier
+    // (manuscript/deck/styledTypes.ts).
+    const deck: StyledSlideDeck = {
+      durationMinutes: 5,
+      theme,
+      slides: [
+        {
+          role: 'result',
+          device: 'plain',
+          elements: [
+            {
+              kind: 'headline',
+              text: 'Faster convergence',
+              x: 0.72,
+              y: 1.0,
+              fontSize: 30,
+              color: '#17252A',
+            },
+          ],
+        },
+      ],
+    };
+
+    const bytes = await exportStyledDeckPdf(deck);
+    const reloaded = await PDFDocument.load(bytes);
+    const firstPage = reloaded.getPages()[0]!;
+    const content = decodePageContent(firstPage);
+
+    // Real text-show operators were emitted (pdf-lib's drawText call) — a
+    // naive ASCII substring search for "Faster convergence" would miss
+    // this since pdf-lib hex-encodes glyphs; assert on the BT/Tj block
+    // itself instead, the same way the shape-wins-over-text test above
+    // asserts their ABSENCE.
+    expect(content).toContain('BT');
+    expect(content).toMatch(/\bTj\b|\bTJ\b/);
+
+    // No shape rectangle was drawn for this element — the "empty box, text
+    // dropped" failure mode is the thing being ruled out here.
+    expect(hasEmbeddedImage(firstPage)).toBe(false);
+  });
+
   it('fills the theme background color even when the slide has NO "background"-kind element', async () => {
     // The real styleDeck API prompt (apps/api/src/narrative/styleDeck.ts's
     // STYLE_SYSTEM_PROMPT) never requires or even mentions a "background"
