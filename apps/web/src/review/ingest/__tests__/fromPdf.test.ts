@@ -218,4 +218,33 @@ describe('fromPdf', () => {
     expect(mockReleaseCanvas).toHaveBeenCalledWith(sourceCanvas);
     expect(doc.destroy).toHaveBeenCalledTimes(1);
   });
+
+  it('releases a padded audit canvas when drawing into it fails', async () => {
+    const doc = fakePdfDoc(1, [fakePdfPage(3000, 300)]);
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(doc) });
+    const sourceCanvas = fakeCanvas(NON_BLANK);
+    const auditCanvas = fakeCanvas(NON_BLANK);
+    auditCanvas.getContext = () => null;
+    canvases = [sourceCanvas, auditCanvas];
+    const file = new File(['pdf-bytes'], 'wide.pdf', { type: 'application/pdf' });
+
+    await expect(fromPdf(file, CTX)).rejects.toMatchObject({
+      name: 'IngestError',
+      kind: 'unreadable-file',
+    });
+    expect(mockReleaseCanvas).toHaveBeenCalledWith(auditCanvas);
+  });
+
+  it('preserves a primary ingest error when PDF cleanup fails', async () => {
+    const doc = fakePdfDoc(1, [fakePdfPage()]);
+    doc.destroy.mockRejectedValue(new Error('worker cleanup failed'));
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(doc) });
+    canvases = [fakeCanvas(ALL_WHITE)];
+    const file = new File(['pdf-bytes'], 'blank.pdf', { type: 'application/pdf' });
+
+    await expect(fromPdf(file, CTX)).rejects.toMatchObject({
+      name: 'IngestError',
+      kind: 'blank-render',
+    });
+  });
 });

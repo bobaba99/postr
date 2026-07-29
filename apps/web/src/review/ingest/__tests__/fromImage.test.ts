@@ -196,4 +196,22 @@ describe('fromImage', () => {
     });
     expect(mockReleaseCanvas).toHaveBeenCalledWith(sourceCanvas);
   });
+
+  it('releases an audit canvas when drawing into it fails', async () => {
+    const auditCanvas = fakeCanvas(NON_BLANK, 0, 0);
+    auditCanvas.getContext = () => null;
+    createElementSpy.mockReturnValueOnce(auditCanvas);
+    mockRasterizeImage.mockResolvedValue({
+      canvas: fakeCanvas(NON_BLANK),
+      pageWidthPt: 288,
+      pageHeightPt: 144,
+    });
+    const file = new File(['png-bytes'], 'poster.png', { type: 'image/png' });
+
+    await expect(fromImage(file, CTX)).rejects.toMatchObject({
+      name: 'IngestError',
+      kind: 'unreadable-file',
+    });
+    expect(mockReleaseCanvas).toHaveBeenCalledWith(auditCanvas);
+  });
 });
