@@ -440,6 +440,35 @@ describe('POST /api/review/critique — no charge on model failure (D6)', () => 
   });
 });
 
+describe('POST /api/review/critique — burst limiter security', () => {
+  it('malformed reviewId still consumes initial burst (400 then 429)', async () => {
+    const sb = fakeReviewSupabase({ review_credits: 99 });
+    const { create, client: anthropic } = fakeAnthropic();
+    create.mockResolvedValue(toolReply(INITIAL_CRITIQUE));
+    const app = buildApp({ supabase: sb.client, anthropic });
+
+    const burstCap = REVIEW_ADDON_WEEKLY_QUOTA + 2;
+    for (let i = 0; i < burstCap; i++) {
+      const res = await postCritique(app, {
+        sourceKind: 'image',
+        pages: ONE_PAGE,
+        reviewId: 'not-a-uuid',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('bad_request');
+    }
+
+    const limited = await postCritique(app, {
+      sourceKind: 'image',
+      pages: ONE_PAGE,
+      reviewId: 'not-a-uuid',
+    });
+    expect(limited.status).toBe(429);
+    expect(limited.body.error).toBe('rate_limited');
+    expect(create).not.toHaveBeenCalled();
+  });
+});
+
 describe('POST /api/review/critique — add-on weekly window (D5/D17)', () => {
   it('initials consume weekly slots, the follow-up does not, exhaustion 402s, reset re-opens', async () => {
     let nowMs = 1_800_000_000_000; // fixed fake clock, injected everywhere
@@ -504,5 +533,36 @@ describe('POST /api/review/critique — add-on weekly window (D5/D17)', () => {
     const afterReset = await postCritique(app, { sourceKind: 'image', pages: ONE_PAGE });
     expect(afterReset.status).toBe(200);
     expect(afterReset.body.stage).toBe('initial');
+  });
+
+  it(`${REVIEW_ADDON_WEEKLY_QUOTA + 1} back-to-back add-on initials hit 402 before 429`, async () => {
+    let nowMs = 1_800_000_000_000;
+    const weeklyLimiter = createRateLimiter({
+      windowMs: WEEK_MS,
+      maxPerWindow: REVIEW_ADDON_WEEKLY_QUOTA,
+      dailyMs: Number.MAX_SAFE_INTEGER,
+      maxPerDay: Number.MAX_SAFE_INTEGER,
+      now: () => nowMs,
+    });
+    const sb = fakeReviewSupabase({
+      plan: 'term',
+      plan_expires_at: new Date(nowMs + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      subscription_status: 'active',
+      review_addon: true,
+      review_credits: 0,
+    });
+    const { create, client: anthropic } = fakeAnthropic();
+    create.mockResolvedValue(toolReply(INITIAL_CRITIQUE));
+    const app = buildApp({ supabase: sb.client, anthropic, weeklyLimiter, now: () => nowMs });
+
+    for (let i = 1; i <= REVIEW_ADDON_WEEKLY_QUOTA; i++) {
+      const res = await postCritique(app, { sourceKind: 'image', pages: ONE_PAGE });
+      expect(res.status).toBe(200);
+    }
+
+    const exhausted = await postCritique(app, { sourceKind: 'image', pages: ONE_PAGE });
+    expect(exhausted.status).toBe(402);
+    expect(exhausted.body.error).toBe('review_payment_required');
+    expect(exhausted.body.reason).toBe('weekly_quota_exceeded');
   });
 });

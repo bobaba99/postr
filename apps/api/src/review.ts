@@ -128,16 +128,24 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
       maxPerDay: Number.MAX_SAFE_INTEGER,
     });
 
-  const critiqueBurstLimiter = createRateLimiter({ maxPerWindow: 10, maxPerDay: 20 });
+  const critiqueBurstLimiter = createRateLimiter({
+    maxPerWindow: REVIEW_ADDON_WEEKLY_QUOTA + 2,
+    maxPerDay: 20,
+  });
+  const critiqueFollowupBurstLimiter = createRateLimiter({
+    maxPerWindow: 2,
+    maxPerDay: 10,
+  });
 
   router.post(
     '/api/review/critique',
     requireAuth(getSupabase),
-    // Included follow-ups (body.reviewId) skip burst — one per review,
-    // state-machine bounded; add-on users may run quota initials back-to-back.
+    // UUID follow-ups use a lighter limiter; malformed reviewId strings
+    // stay on the initial burst path (then fail zod 400).
     (req: Request, res: Response, next: NextFunction) => {
-      if (typeof req.body?.reviewId === 'string' && req.body.reviewId.length > 0) {
-        next();
+      const reviewId = req.body?.reviewId;
+      if (typeof reviewId === 'string' && z.string().uuid().safeParse(reviewId).success) {
+        critiqueFollowupBurstLimiter(req, res, next);
         return;
       }
       critiqueBurstLimiter(req, res, next);
