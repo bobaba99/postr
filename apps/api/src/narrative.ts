@@ -23,12 +23,20 @@ import { createRateLimiter } from './rateLimit.js';
 import {
   CONDENSER_MODEL,
   CONDENSER_PROVIDER,
+  EXTRACTION_MODEL,
 } from './narrative/config.js';
 import {
   CondenseUpstreamError,
   createOpenAiProvider,
   type CondenseProvider,
 } from './narrative/condense.js';
+import {
+  ExtractUpstreamError,
+  createOpenAiExtractionProvider,
+  rankAndGate,
+  type ExtractionProvider,
+  type RawFinding,
+} from './narrative/extractFindings.js';
 import { enforceBudget } from './narrative/enforceBudgets.js';
 
 // ─────────────────────────────────────────────────────────────────────
@@ -103,14 +111,49 @@ const CondenseRequest = z
   );
 
 // ─────────────────────────────────────────────────────────────────────
+// Findings-extraction request schema (talk path)
+// ─────────────────────────────────────────────────────────────────────
+
+/** Results-text cap. The talk path sends the paper's results/findings
+ *  passage, not the whole manuscript — 200k chars (~35k words) covers
+ *  even a long multi-section results block and bounds the token bill. */
+const MAX_RESULTS_CHARS = 200_000;
+
+/** The response finding shape — matches buildDeck.ts's RankedFinding
+ *  (plus `rank`), so the client can hand it straight to the deck
+ *  builder. Declared here as the route's public contract. */
+export interface RankedFinding {
+  text: string;
+  sourceQuote: string;
+  sourceSection: string;
+  rank: number;
+}
+
+const ExtractRequest = z.object({
+  // Trimmed to reject whitespace-only input; the cap bounds the upstream
+  // token bill. The text is quoted as DATA in the prompt, never as
+  // instructions.
+  resultsText: z
+    .string()
+    .trim()
+    .min(1)
+    .max(MAX_RESULTS_CHARS),
+  context: z.string().max(2000).optional(),
+});
+
+// ─────────────────────────────────────────────────────────────────────
 // Router factory
 // ─────────────────────────────────────────────────────────────────────
 
 export interface NarrativeRouterDeps {
   getSupabaseAdmin?: () => SupabaseClient | null;
-  /** Provider registry — inject for tests or to add vendors. Defaults
-   *  to the OpenAI adapter built from OPENAI_API_KEY. */
+  /** Condense provider registry — inject for tests or to add vendors.
+   *  Defaults to the OpenAI adapter built from OPENAI_API_KEY. */
   getProviders?: () => Record<string, CondenseProvider>;
+  /** Extraction provider registry (talk path) — same shape and default
+   *  as the condense registry, a separate map so the two LLM steps can
+   *  register different vendors independently. */
+  getExtractionProviders?: () => Record<string, ExtractionProvider>;
   /** Inject a fetch impl for tests. Defaults to global fetch. */
   fetchFn?: typeof fetch;
 }
@@ -120,6 +163,9 @@ export function createNarrativeRouter(deps: NarrativeRouterDeps = {}): Router {
   const getSupabase = deps.getSupabaseAdmin ?? defaultGetSupabaseAdmin;
   const getProviders =
     deps.getProviders ?? (() => defaultProviders(deps.fetchFn));
+  const getExtractionProviders =
+    deps.getExtractionProviders ??
+    (() => defaultExtractionProviders(deps.fetchFn));
 
   router.post(
     '/api/narrative/condense',
@@ -207,6 +253,76 @@ export function createNarrativeRouter(deps: NarrativeRouterDeps = {}): Router {
     },
   );
 
+  // ───────────────────────────────────────────────────────────────────
+  // POST /api/narrative/extract-findings — talk-path LLM extraction.
+  //
+  // Same middleware stack as /condense (requireAuth anonymous-ok → rate
+  // limit → zod validation → provider call → generic errors). ADDITIVE:
+  // it produces ranked star-finding cards for the talk deck and does not
+  // touch the deterministic poster path. The verbatim fidelity gate runs
+  // HERE, after the model replies — the prompt asks for a verbatim quote,
+  // this route GUARANTEES it (rankAndGate drops any finding whose quote
+  // is not in the results text).
+  // ───────────────────────────────────────────────────────────────────
+  router.post(
+    '/api/narrative/extract-findings',
+    requireAuth(getSupabase),
+    // One extraction per paper; 6/min absorbs a retry after an edit,
+    // 30/day bounds the per-user LLM bill — matched to /condense.
+    createRateLimiter({ maxPerWindow: 6, maxPerDay: 30 }),
+    async (req: Request, res: Response) => {
+      const parsed = ExtractRequest.safeParse(req.body);
+      if (!parsed.success) {
+        return res
+          .status(400)
+          .json({ error: 'bad_request', details: parsed.error.flatten() });
+      }
+
+      const provider = getExtractionProviders()[CONDENSER_PROVIDER];
+      if (!provider) {
+        return res.status(500).json({
+          error: 'provider_not_configured',
+          message: 'The extraction provider API key is missing on the server.',
+        });
+      }
+
+      const { resultsText, context } = parsed.data;
+      try {
+        const raw = await provider.extract({ resultsText, context });
+
+        // THE FIDELITY GATE. Drop any finding whose sourceQuote is not a
+        // verbatim substring of the results text, sort by rank, re-rank
+        // contiguously. An empty result is legitimate — better no cards
+        // than a fabricated one.
+        const findings: RankedFinding[] = rankAndGate(
+          raw.findings as RawFinding[],
+          resultsText,
+        );
+        return res.json({ findings });
+      } catch (err) {
+        const upstream = err instanceof ExtractUpstreamError ? err : null;
+        // eslint-disable-next-line no-console
+        console.error('[narrative.extract-findings] provider call failed', {
+          provider: provider.id,
+          model: EXTRACTION_MODEL,
+          code: upstream?.code,
+          status: upstream?.status,
+          message: err instanceof Error ? err.message : 'unknown',
+        });
+        // Same passthrough set as /condense: 401/429/529 reach the client
+        // (retry-after on 429); everything else is a generic 502. The
+        // machine-readable code is all the client sees.
+        const status = upstream?.status;
+        const passthroughStatus =
+          status === 401 || status === 429 || status === 529 ? status : 502;
+        return res.status(passthroughStatus).json({
+          error: 'extract_failed',
+          message: upstream?.code ?? 'upstream_error',
+        });
+      }
+    },
+  );
+
   return router;
 }
 
@@ -223,6 +339,22 @@ function defaultProviders(
     providers.openai = createOpenAiProvider({
       apiKey: openAiKey,
       model: CONDENSER_MODEL,
+      fetchFn,
+    });
+  }
+  // Phase 2: register the Anthropic adapter here for the bake-off.
+  return providers;
+}
+
+function defaultExtractionProviders(
+  fetchFn?: typeof fetch,
+): Record<string, ExtractionProvider> {
+  const providers: Record<string, ExtractionProvider> = {};
+  const openAiKey = process.env.OPENAI_API_KEY;
+  if (openAiKey) {
+    providers.openai = createOpenAiExtractionProvider({
+      apiKey: openAiKey,
+      model: EXTRACTION_MODEL,
       fetchFn,
     });
   }
