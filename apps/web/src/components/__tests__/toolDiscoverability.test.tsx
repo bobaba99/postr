@@ -12,7 +12,7 @@
  * to a tool fails the suite.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 const authSpies = vi.hoisted(() => ({
@@ -350,6 +350,24 @@ describe('Landing page', () => {
     const { container } = renderIn(<Landing />);
     const main = container.querySelector('main');
     expect(main?.textContent ?? '').not.toMatch(/\bAI\b/);
+  });
+
+  it('limits the core feature section to four concise supporting messages', () => {
+    renderIn(<Landing />);
+    const sectionHeading = screen.getByRole('heading', {
+      level: 2,
+      name: 'Core poster tools',
+    });
+    const section = sectionHeading.closest('section');
+    expect(section).not.toBeNull();
+
+    const featureHeadings = within(section!).getAllByRole('heading', { level: 3 });
+    expect(featureHeadings).toHaveLength(4);
+
+    for (const heading of featureHeadings) {
+      const description = heading.parentElement?.querySelector('p')?.textContent ?? '';
+      expect(description.trim().split(/\s+/).length).toBeLessThanOrEqual(15);
+    }
   });
 });
 

@@ -216,7 +216,7 @@ function FeatureRow({ included, label }: Feature) {
       <span
         aria-hidden="true"
         className={`mt-0.5 shrink-0 font-semibold ${
-          included ? 'text-[#4ade80]' : 'text-[#4b5563]'
+          included ? 'text-[#4ade80]' : 'text-[#8b8f99]'
         }`}
       >
         {included ? '✓' : '—'}

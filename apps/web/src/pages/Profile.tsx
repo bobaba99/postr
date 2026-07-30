@@ -339,6 +339,8 @@ export default function Profile() {
           </div>
         )}
 
+        <h1 className="mb-6 text-2xl font-bold text-white">Profile & settings</h1>
+
         {/*
           Bento grid — two equal columns, no wide boxes. Collapses to
           a single column on mobile. The Create Account banner (shown
@@ -372,7 +374,7 @@ export default function Profile() {
             </button>
             <div className="flex items-center gap-3 my-3">
               <div className="h-px flex-1 bg-[#2a2a3a]" />
-              <span className="text-[13px] text-[#555]">or use email</span>
+              <span className="text-[13px] text-[#8b8f99]">or use email</span>
               <div className="h-px flex-1 bg-[#2a2a3a]" />
             </div>
             <EmailSignUp
@@ -406,7 +408,7 @@ export default function Profile() {
               <div className="mt-1 text-[14pt] text-[#8b8f99]">
                 {presetCount} preset{presetCount === 1 ? '' : 's'} saved locally.
               </div>
-              <div className="mt-1 text-[12pt] text-[#555]">
+              <div className="mt-1 text-[12pt] text-[#8b8f99]">
                 Create new presets from the <strong className="text-[#9ca3af]">Style tab</strong> inside the editor — use the "Save as style preset" row to name your font + palette + typography combo.
               </div>
             </div>
@@ -1238,7 +1240,7 @@ function EmailSignUp({ onSuccess, onError }: { onSuccess: () => void; onError: (
         onChange={(e) => setEmail(e.target.value)}
         placeholder="Email address"
         required
-        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
+        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
       />
       <input
         type="password"
@@ -1247,7 +1249,7 @@ function EmailSignUp({ onSuccess, onError }: { onSuccess: () => void; onError: (
         placeholder="Create password"
         required
         minLength={8}
-        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
+        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
       />
       <PasswordStrength password={password} />
       <button
@@ -1308,9 +1310,9 @@ function ProfileFields({ user, onStatusMessage }: { user: User | null; onStatusM
         value={profile[field]}
         onChange={(e) => update(field, e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-2.5 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
+        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-2.5 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
       />
-      {hint && <div className="text-[13px] text-[#555] mt-1">{hint}</div>}
+      {hint && <div className="text-[13px] text-[#8b8f99] mt-1">{hint}</div>}
     </div>
   );
 

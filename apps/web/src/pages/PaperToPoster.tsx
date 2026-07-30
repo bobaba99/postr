@@ -403,7 +403,7 @@ export default function PaperToPoster() {
 
             {!entries && phase !== 'condense-error' && (
               <div
-                className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[#1f1f2e] p-8 text-center text-sm text-[#4b5563]"
+                className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[#1f1f2e] p-8 text-center text-sm text-[#8b8f99]"
                 {...busyProps(phase === 'condensing')}
               >
                 {phase === 'condensing' ? (

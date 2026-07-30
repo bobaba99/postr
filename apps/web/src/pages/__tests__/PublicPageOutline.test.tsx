@@ -25,6 +25,7 @@ const auditedFiles = [
   'routes.tsx',
   'components/PublicHeader.tsx',
   'components/PublicFooter.tsx',
+  'pages/Home.tsx',
   'pages/Landing.tsx',
   'pages/About.tsx',
   'pages/PaperToPoster.tsx',
@@ -64,12 +65,23 @@ describe('audited public-page outline and contrast', () => {
     ).toBeTruthy();
   });
 
-  it('does not use the audited low-contrast muted text token', () => {
+  it('does not use the audited low-contrast muted text tokens', () => {
+    const lowContrastTokens = [
+      'text-[#6b7280]',
+      'text-[#4b5563]',
+      'text-[#555]',
+    ];
     const offenders = auditedFiles.filter((file) =>
-      sourceOf(file).includes('text-[#6b7280]'),
+      lowContrastTokens.some((token) => sourceOf(file).includes(token)),
     );
 
     expect(offenders).toEqual([]);
+  });
+
+  it('gives the authenticated profile page a level-one heading', () => {
+    expect(sourceOf('pages/Profile.tsx')).toMatch(
+      /<h1[^>]*>\s*Profile & settings\s*<\/h1>/,
+    );
   });
 
   it('does not place white text on the bright violet surface', () => {

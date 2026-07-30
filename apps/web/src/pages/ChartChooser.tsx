@@ -192,6 +192,7 @@ export default function ChartChooserPage() {
         )}
 
         <div className="mt-10">
+          <h2 className="sr-only">Build your chart</h2>
           <ChartChooser
             layout="page"
             palette={palette}
