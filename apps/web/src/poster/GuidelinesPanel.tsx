@@ -654,6 +654,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                       value={item.text}
                       onChange={(e) => updateItemText(item.id, e.target.value)}
                       placeholder="New item..."
+                      aria-label="Checklist item"
                       style={{
                         all: 'unset',
                         flex: 1,

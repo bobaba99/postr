@@ -74,6 +74,11 @@ it('saves with the typed name and clears the input', async () => {
   await waitFor(() => expect((input as HTMLInputElement).value).toBe(''));
 });
 
+it('exposes the version-name input to assistive tech by name', () => {
+  render(<VersionPanel posterId="p1" onSaveVersion={vi.fn()} onRestoreVersion={vi.fn()} />);
+  expect(screen.getByRole('textbox', { name: 'Version name (optional)' })).toBeInTheDocument();
+});
+
 it('disables saving at the version cap', async () => {
   listVersionsMock.mockResolvedValue(
     Array.from({ length: 20 }, (_, i) => makeVersion({ id: `v${i}` })),

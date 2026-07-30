@@ -838,7 +838,10 @@ export function Sidebar(props: SidebarProps) {
 // Layout tab
 // =========================================================================
 
-function LayoutTab(props: {
+// Exported for the a11yKeyboard test suite — the tab renders fine in
+// isolation (props + the store-backed ImportSection), and exporting
+// avoids having to mount the whole 4k-line Sidebar to reach it.
+export function LayoutTab(props: {
   posterTitle: string;
   onChangePosterTitle: (title: string) => void;
   posterSizeKey: PosterSizeKey;
@@ -885,6 +888,7 @@ function LayoutTab(props: {
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <input
           value={localTitle}
+          aria-label="Poster name"
           onChange={(e) => {
             setLocalTitle(e.target.value);
             setTitleSaved(false);
@@ -953,6 +957,7 @@ function LayoutTab(props: {
           <input
             type="number"
             value={props.posterWidthIn}
+            aria-label="Poster width in inches"
             onChange={(e) => {
               const w = parseFloat(e.target.value);
               if (w > 0) props.onChangeCustomSize(w, props.posterHeightIn);
@@ -969,6 +974,7 @@ function LayoutTab(props: {
           <input
             type="number"
             value={props.posterHeightIn}
+            aria-label="Poster height in inches"
             onChange={(e) => {
               const h = parseFloat(e.target.value);
               if (h > 0) props.onChangeCustomSize(props.posterWidthIn, h);

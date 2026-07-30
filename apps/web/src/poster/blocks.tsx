@@ -223,9 +223,17 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
 
   return (
     <>
-      <div
+      <button
+        type="button"
         onClick={() => setPickerOpen(true)}
         style={{
+          // Reset native button chrome (same `all: unset` pattern the
+          // "+ row"/"+ col" append buttons below use) so the tile
+          // keeps its custom dashed-placeholder styling. A real
+          // <button> gives keyboard users Enter/Space activation
+          // natively — the previous div was click-only.
+          all: 'unset',
+          boxSizing: 'border-box',
           width: '100%',
           height: '100%',
           display: 'flex',
@@ -249,7 +257,7 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
         <span style={{ fontSize: 5, opacity: 0.8 }}>
           presets · upload · reuse
         </span>
-      </div>
+      </button>
       <LogoPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
@@ -400,37 +408,51 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
   }
 
   return (
-    <div
-      onClick={() => ref.current?.click()}
-      style={{
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        border: `1.5px dashed ${palette.muted}44`,
-        borderRadius: 4,
-        // Inherit the BlockFrame's cursor: move so the user sees
-        // the block is draggable. The click-to-upload path still
-        // fires through the onClick handler — drag-vs-click
-        // disambiguation is handled by the BlockFrame's
-        // didDragRef in onClickCapture.
-        cursor: 'inherit',
-        color: palette.muted,
-        // Placeholder font size halved (was 13) so the "+ Upload
-        // figure" prompt doesn't dominate small image blocks and
-        // the preview reads as subtle chrome rather than content.
-        fontSize: 7,
-        gap: 2,
-        textAlign: 'center',
-        padding: '0 8px',
-      }}
-    >
-      <span style={{ fontWeight: 600 }}>+ Upload figure</span>
-      <span style={{ fontSize: 6, opacity: 0.7 }}>click to browse · drag to move</span>
+    <>
+      <button
+        type="button"
+        onClick={() => ref.current?.click()}
+        style={{
+          // Reset native button chrome (same `all: unset` pattern the
+          // "+ row"/"+ col" append buttons use) so the tile keeps its
+          // custom dashed-placeholder styling. A real <button> gives
+          // keyboard users Enter/Space activation natively — the
+          // previous div was click-only.
+          all: 'unset',
+          boxSizing: 'border-box',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          border: `1.5px dashed ${palette.muted}44`,
+          borderRadius: 4,
+          // Inherit the BlockFrame's cursor: move so the user sees
+          // the block is draggable. The click-to-upload path still
+          // fires through the onClick handler — drag-vs-click
+          // disambiguation is handled by the BlockFrame's
+          // didDragRef in onClickCapture.
+          cursor: 'inherit',
+          color: palette.muted,
+          // Placeholder font size halved (was 13) so the "+ Upload
+          // figure" prompt doesn't dominate small image blocks and
+          // the preview reads as subtle chrome rather than content.
+          fontSize: 7,
+          gap: 2,
+          textAlign: 'center',
+          padding: '0 8px',
+        }}
+      >
+        <span style={{ fontWeight: 600 }}>+ Upload figure</span>
+        <span style={{ fontSize: 6, opacity: 0.7 }}>click to browse · drag to move</span>
+      </button>
+      {/* The hidden file input lives OUTSIDE the button — interactive
+          content inside a <button> is invalid HTML. Sibling order
+          doesn't matter: the input is display:none and only ever
+          activated programmatically via ref.click(). */}
       <input ref={ref} type="file" accept="image/*" onChange={handleFile} style={{ display: 'none' }} />
-    </div>
+    </>
   );
 }
 
@@ -1058,8 +1080,22 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
             role="button"
             aria-label={`Select row ${r + 1}`}
             title={`Select row ${r + 1} (Delete to remove)`}
+            tabIndex={0}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
+              e.stopPropagation();
+              setSelectedRow((prev) => (prev === r ? null : r));
+              setSelectedCol(null);
+              setActiveCell(null);
+            }}
+            // Keyboard parity for the click toggle — Enter/Space
+            // selects/deselects the row; once selected, the existing
+            // window-level Delete/Backspace listener removes it
+            // (the strip is not contentEditable, so it passes the
+            // listener's editable-target guard).
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              e.preventDefault();
               e.stopPropagation();
               setSelectedRow((prev) => (prev === r ? null : r));
               setSelectedCol(null);
@@ -1104,8 +1140,21 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
             role="button"
             aria-label={`Select column ${c + 1}`}
             title={`Select column ${c + 1} (Delete to remove)`}
+            tabIndex={0}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
+              e.stopPropagation();
+              setSelectedCol((prev) => (prev === c ? null : c));
+              setSelectedRow(null);
+              setActiveCell(null);
+            }}
+            // Keyboard parity for the click toggle — Enter/Space
+            // selects/deselects the column; once selected, the
+            // existing window-level Delete/Backspace listener
+            // removes it.
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter' && e.key !== ' ') return;
+              e.preventDefault();
               e.stopPropagation();
               setSelectedCol((prev) => (prev === c ? null : c));
               setSelectedRow(null);

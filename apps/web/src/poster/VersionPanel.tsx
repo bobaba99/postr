@@ -153,6 +153,7 @@ export function VersionPanel({ posterId, onSaveVersion, onRestoreVersion }: Prop
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Optional name (e.g. Before advisor review)"
+          aria-label="Version name (optional)"
           disabled={busy || atLimit}
           onKeyDown={(e) => {
             if (e.key === 'Enter') void handleSave();

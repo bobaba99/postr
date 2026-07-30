@@ -514,12 +514,26 @@ function ThreadCard({
   }
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label="Highlight where this thread is pinned on the poster"
       onMouseEnter={() => broadcast('hover')}
       onMouseLeave={() => broadcast('blur')}
       onClick={(e) => {
         // Ignore clicks that bubbled from inner inputs/buttons.
         const tag = (e.target as HTMLElement).tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+        broadcast('focus');
+      }}
+      // Keyboard parity for the card click: Enter/Space on the card
+      // itself promotes to the persistent "focus" highlight. Keys
+      // aimed at inner inputs/buttons (target !== currentTarget) are
+      // left to those controls. The card can't be a real <button>
+      // because it legitimately contains inputs and buttons.
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        if (e.target !== e.currentTarget) return;
+        e.preventDefault();
         broadcast('focus');
       }}
       style={{
@@ -582,6 +596,7 @@ function ThreadCard({
             }
           }}
           placeholder="Reply…"
+          aria-label="Write a reply"
           style={{ ...inputStyle, flex: 1 }}
         />
         <button
