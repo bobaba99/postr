@@ -54,6 +54,9 @@ describe('audited public-page outline and contrast', () => {
       name: /postr milestones/i,
     });
     const firstMilestone = screen.getAllByRole('heading', { level: 3 })[0];
+    if (!firstMilestone) {
+      throw new Error('Expected at least one milestone heading');
+    }
 
     expect(
       timelineHeading.compareDocumentPosition(firstMilestone) &
