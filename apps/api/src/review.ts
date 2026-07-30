@@ -165,9 +165,11 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
   router.post(
     '/api/review/critique',
     requireAuth(getSupabase),
-    // 4/min absorbs an impatient retry; 20/day bounds the per-user LLM
-    // bill on top of the credit checks below.
-    createRateLimiter({ maxPerWindow: 4, maxPerDay: 20 }),
+    // Burst limit must fit one full §5.2 cycle: a weekly add-on quota of
+    // initials plus their included follow-ups (2× quota) is legitimate
+    // rapid traffic and must never see a generic 429. 20/day bounds the
+    // per-user LLM bill on top of the credit/quota checks below.
+    createRateLimiter({ maxPerWindow: REVIEW_ADDON_WEEKLY_QUOTA * 2, maxPerDay: 20 }),
     async (req: Request, res: Response) => {
       const parsed = CritiqueRequest.safeParse(req.body);
       if (!parsed.success) {
