@@ -107,6 +107,14 @@ export function PublicHeader() {
 
   const signedIn = ready && user !== null;
 
+  // The workspace link's destination and label depend on the session.
+  // Signed in → their dashboard; signed out → the guest editor (the
+  // landing page's "Try as guest" entry, ?guest=1), so a visitor lands
+  // in the editor without a signup wall.
+  const workspaceLink = signedIn
+    ? { to: '/dashboard', label: 'My posters' }
+    : { to: '/auth?guest=1', label: 'Editor' };
+
   // Minimum font size for nav chrome is 14pt, matching the design
   // plan's readability minimum (docs/plans/2026-04-10-figure-
   // readability-checker.md — "tick labels: min 14pt"). 14pt ≈ 18.67px
@@ -142,13 +150,32 @@ export function PublicHeader() {
           sign-in button, and the footer was the only route to any of
           this. Nav that vanishes is not responsive, it is missing.
         */}
+        {/*
+          The auth-aware workspace link. One link whose destination and
+          label flip with the session, so it can't live in the static
+          NAV_LINKS array: signed in it points at the dashboard ("My
+          posters"); signed out it drops the visitor straight into a
+          guest editor ("Editor") via the same one-tap guest entry the
+          landing page uses. Rendered only once the auth state has
+          resolved so the label never flips under the user mid-read.
+        */}
+        {ready && (
+          <Link to={workspaceLink.to} className={NAV_LINK_CLASS}>
+            {workspaceLink.label}
+          </Link>
+        )}
+
         {NAV_LINKS.map((link) => (
           <Link key={link.to} to={link.to} className={NAV_LINK_CLASS}>
             {link.label}
           </Link>
         ))}
 
-        <MobileNav signedIn={signedIn} onFeedback={() => openFeedback('feature')} />
+        <MobileNav
+          signedIn={signedIn}
+          workspaceLink={ready ? workspaceLink : null}
+          onFeedback={() => openFeedback('feature')}
+        />
 
         {signedIn ? (
           <>
@@ -210,9 +237,13 @@ export function PublicHeader() {
  */
 function MobileNav({
   signedIn,
+  workspaceLink,
   onFeedback,
 }: {
   signedIn: boolean;
+  /** Auth-aware workspace link (Editor / My posters), or null until
+   *  the session has resolved. */
+  workspaceLink: { to: string; label: string } | null;
   onFeedback: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -310,6 +341,20 @@ function MobileNav({
           style={{ transformOrigin: 'top right' }}
           className="postr-popover-enter fixed left-4 right-4 top-[4.5rem] z-50 list-none rounded-xl border border-[#2a2a3a] bg-[#111118] p-2 shadow-xl shadow-black/40"
         >
+          {/* Workspace link first — the primary destination on a phone,
+              above the tools and Learn pages. */}
+          {workspaceLink && (
+            <li>
+              <Link
+                to={workspaceLink.to}
+                onClick={() => setOpen(false)}
+                className="block rounded-lg px-3 py-3 text-[14pt] font-medium text-[#c8cad0] no-underline hover:bg-[#1a1a26]"
+              >
+                {workspaceLink.label}
+              </Link>
+            </li>
+          )}
+
           {TOOL_LINKS.map((tool) => (
             <li key={tool.to}>
               <Link

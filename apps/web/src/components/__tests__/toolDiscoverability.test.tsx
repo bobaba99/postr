@@ -16,7 +16,11 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 const authSpies = vi.hoisted(() => ({
-  getSession: vi.fn(async () => ({ data: { session: null } })),
+  // `session` is typed loosely so tests can hand back a signed-in
+  // session (a partial user) without fighting the real Supabase types.
+  getSession: vi.fn(async (): Promise<{ data: { session: unknown } }> => ({
+    data: { session: null },
+  })),
   signInAnonymously: vi.fn(),
   onAuthStateChange: vi.fn(() => ({
     data: { subscription: { unsubscribe: vi.fn() } },
@@ -190,6 +194,54 @@ describe('PublicHeader mobile menu', () => {
     fireEvent.click(panel.querySelector('a[href]') as HTMLElement);
 
     expect(screen.queryByRole('list')).toBeNull();
+  });
+});
+
+/**
+ * The auth-aware workspace link. One header link whose destination and
+ * label flip with the session: signed out it drops a visitor into the
+ * guest editor (?guest=1), signed in it points at their dashboard.
+ * These assert the destination per state so a regression that sends a
+ * logged-out visitor to a signup wall — or a signed-in user back to the
+ * guest entry — is caught here.
+ */
+describe('PublicHeader workspace link', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default mock: signed out.
+    authSpies.getSession.mockResolvedValue({ data: { session: null } });
+  });
+
+  it('sends a logged-out visitor to the guest editor', async () => {
+    const { container } = renderIn(<PublicHeader />);
+    // Wait for the auth state to resolve (the link renders once ready).
+    const link = await screen.findByRole('link', { name: /^editor$/i });
+    expect(link.getAttribute('href')).toBe('/auth?guest=1');
+    // And it does NOT point at the auth-gated dashboard while signed out.
+    expect(hrefsOf(container)).not.toContain('/dashboard');
+  });
+
+  it('sends a signed-in user to their dashboard', async () => {
+    authSpies.getSession.mockResolvedValue({
+      data: { session: { user: { id: 'u1' } } },
+    });
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <PublicHeader />
+      </MemoryRouter>,
+    );
+    const link = await screen.findByRole('link', { name: /my posters/i });
+    expect(link.getAttribute('href')).toBe('/dashboard');
+    expect(screen.queryByRole('link', { name: /^editor$/i })).toBeNull();
+  });
+
+  it('reaches the workspace link from the mobile menu (signed out)', async () => {
+    renderIn(<PublicHeader />);
+    // Let auth resolve first so the mobile link is present.
+    await screen.findByRole('link', { name: /^editor$/i });
+    fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+    const panel = await screen.findByRole('list');
+    expect(hrefsOf(panel)).toContain('/auth?guest=1');
   });
 });
 
