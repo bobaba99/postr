@@ -2333,9 +2333,9 @@ flowchart LR
 - [ ] `Just the measure` — chip — `ChartChooser.tsx:52` (rendered :301-307) — `answer('grouping', { vars: 0 })`
 - [ ] `One grouping variable` — chip — `ChartChooser.tsx:53` — `vars: 1`
 - [ ] `Two grouping variables` — chip — `ChartChooser.tsx:54` — `vars: 2`
-- [ ] `Pick up to two grouping columns` chips (dynamic grouping column names, multi, max 2) — chip buttons — `ChartChooser.tsx:310-322` — toggles `pendingGroups`
-- [ ] `Use selected` — button — `ChartChooser.tsx:324-340` — `answer('grouping', { groupings: pendingGroups })`; disabled when none picked
-- [ ] `No grouping` — button — `ChartChooser.tsx:341-355` — `answer('grouping', { groupings: [] })`
+- [ ] `Pick up to two columns to compare across` chips (dynamic grouping column names, multi, max 2) — chip buttons — `ChartChooser.tsx:310-322` — toggles `pendingGroups`
+- [ ] `Use these` — button — `ChartChooser.tsx:324-340` — `answer('grouping', { groupings: pendingGroups })`; disabled when none picked
+- [ ] `Don't split` — button — `ChartChooser.tsx:341-355` — `answer('grouping', { groupings: [] })`
 - [ ] `What do you want people to take away?` chips from `EMPHASIS_OPTIONS` (5 labels, enumerated at `steps.ts:262-268`) — chip buttons — `ChartChooser.tsx:366-371` — `answer('emphasis', { emphasis })`
 
 **Copy**
@@ -2343,7 +2343,7 @@ flowchart LR
 - [ ] "What are you showing?" — step 2 title, synthetic branch — `ChartChooser.tsx:194`
 - [ ] "What did you measure?" — step 2 title, data branch — `ChartChooser.tsx:194`
 - [ ] "How many variables?" — step 3 title, synthetic branch — `ChartChooser.tsx:196`
-- [ ] "What are you breaking it down by?" — step 3 title, data branch — `ChartChooser.tsx:196`
+- [ ] "Compare across which columns?" — step 3 title, data branch — `ChartChooser.tsx:196` (+ helper line via StepSection `hint`)
 - [ ] "What should the figure emphasise?" — step 4 title — `ChartChooser.tsx:198`
 - [ ] "Pick your figure" — step 5 title — `ChartChooser.tsx:200`
 - [ ] "Worked example — swap in your numbers after inserting" — step-1 collapsed summary after "I don't have data yet" — `ChartChooser.tsx:132`
