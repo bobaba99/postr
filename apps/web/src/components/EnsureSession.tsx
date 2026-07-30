@@ -11,7 +11,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ensureSession } from '@/lib/auth';
+import { ensureSession, resetEnsureSession } from '@/lib/auth';
 
 type State = 'preparing' | 'ready' | 'error';
 
@@ -32,6 +32,11 @@ export function EnsureSession({ children }: { children: ReactNode }) {
       // A wipe (sign-out / account deletion) must not dead-end the
       // editor — re-ensure an anonymous session instead of bouncing.
       if (event === 'SIGNED_OUT') {
+        // Clear the cached in-flight promise first — otherwise
+        // ensureSession() would just hand back the stale resolved
+        // value instead of truly re-bootstrapping a fresh anonymous
+        // session.
+        resetEnsureSession();
         ensureSession(supabase).catch(() => {
           if (!cancelled) setState('error');
         });
