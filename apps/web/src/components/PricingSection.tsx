@@ -39,44 +39,36 @@ import { Link, useNavigate } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { isOnTalkWaitlist, joinTalkWaitlist } from '@/data/talkWaitlist';
 
-interface Tier {
-  id: string;
-  name: string;
-  price: string;
-  cadence: string;
-  tagline: string;
+export interface PricingTier {
+  readonly id: string;
+  readonly name: string;
+  readonly price: string;
+  readonly cadence: string;
   /** Rendered as the primary (recommended) column. */
-  featured?: boolean;
-  /**
-   * Marks a tier as not-yet-purchasable (dashed border, "Coming soon"
-   * badge, no live checkout). Currently unused — all three tiers sell
-   * live products (the pack sells poster PPTX/LaTeX exports, which ship
-   * today). Kept for when a genuinely-staged tier is needed again.
-   */
-  comingSoon?: boolean;
-  cta: string;
-  ctaTo: string;
+  readonly featured?: boolean;
+  readonly cta: string;
+  readonly ctaTo: string;
   /** Plain-language "who is this for". */
-  forWho: string;
-  features: string[];
+  readonly forWho: string;
+  /** Essential purchase condition that must remain visible. */
+  readonly condition: string;
+  /** The two core capabilities; secondary details stay out of the card. */
+  readonly features: readonly [string, string];
 }
 
-const TIERS: Tier[] = [
+export const PRICING_TIERS = [
   {
     id: 'free',
     name: 'Free',
     price: '$0',
     cadence: 'always',
-    tagline: 'Everything you need to build and print a poster.',
     cta: 'Start free',
     ctaTo: '/auth?guest=1',
-    forWho: 'Making a poster and printing or presenting it.',
+    forWho: 'For one poster you can print or present.',
+    condition: 'Includes a small Postr mark.',
     features: [
-      'Unlimited editing, every tool',
-      'PDF export — print-ready',
-      'Paper to poster',
-      'Plot picker & figure checker',
-      'A small “made with postr.sh” mark on the PDF',
+      'Unlimited editing and every design tool.',
+      'Print-ready PDF export.',
     ],
   },
   {
@@ -84,20 +76,14 @@ const TIERS: Tier[] = [
     name: 'Term',
     price: 'CA$18.99',
     cadence: 'every 4 months',
-    tagline: 'The full workflow, all term. About CA$4.75 a month, cancel anytime.',
     featured: true,
     cta: 'Get the term',
     ctaTo: '/auth?plan=term',
-    forWho: 'Presenting through the term, or making several posters.',
-    // Only shipped features. "Turn a paper into a talk" is deliberately
-    // NOT listed here — it isn't built, and the term must advertise only
-    // what a buyer gets today (PPTX + LaTeX export both ship). The talk
-    // feature lives in the coming-soon pack below.
+    forWho: 'For repeated posters and editable exports all term.',
+    condition: 'Renews every four months. Cancel anytime.',
     features: [
-      'Everything in Free — no watermark',
-      'Export to PowerPoint & LaTeX',
-      'Keep editing your poster anywhere',
-      'Renews every 4 months — cancel anytime',
+      'PowerPoint and LaTeX exports with no watermark.',
+      'Keep editing your posters anywhere.',
     ],
   },
   {
@@ -105,19 +91,16 @@ const TIERS: Tier[] = [
     name: 'Export pack',
     price: 'CA$9.99',
     cadence: 'one-time · 3 exports',
-    tagline: 'Just need a couple of clean exports? Pay only for those — credits never expire.',
     cta: 'Get the pack',
     ctaTo: '/auth?plan=pack',
-    forWho: 'A one-off export, without committing to a term.',
+    forWho: 'For a few editable exports without a subscription.',
+    condition: 'One-time purchase. Credits never expire.',
     features: [
-      'Export 3 posters to PowerPoint or LaTeX',
-      'No watermark on those exports',
-      'Credits never expire — use them whenever',
-      'No subscription, no term',
-      'Talk export counts too, when it lands',
+      'Three PowerPoint or LaTeX exports.',
+      'Purchased exports have no watermark.',
     ],
   },
-];
+] as const satisfies readonly PricingTier[];
 
 export function PricingSection() {
   return (
@@ -127,45 +110,28 @@ export function PricingSection() {
           id="pricing-heading"
           className="text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8] sm:text-3xl"
         >
-          Simple pricing, no surprises
+          Choose your export access
         </h2>
-        <p className="mx-auto mt-3 max-w-[54ch] text-sm leading-relaxed text-[#8b8f99]">
-          Editing and PDF export are <span className="text-[#c8cad0]">always free</span> — with a
-          small “made with postr.sh” mark. You only pay to export to PowerPoint or LaTeX.
-        </p>
       </div>
 
-      <div className="mt-10 grid grid-cols-1 items-start gap-5 md:grid-cols-3">
-        {TIERS.map((tier) => (
+      <div
+        data-pricing-grid
+        className="mt-10 grid grid-cols-1 items-start gap-5 md:grid-cols-2 lg:grid-cols-3"
+      >
+        {PRICING_TIERS.map((tier) => (
           <PricingCard key={tier.id} tier={tier} />
         ))}
       </div>
-
-      {/*
-        The one-line "which should I pick?" helper — the research-backed
-        replacement for a plan-selector quiz. Answers the single variable
-        (one-off vs. repeated use) in a sentence, with no extra step.
-      */}
-      <p className="mx-auto mt-8 max-w-[60ch] text-center text-sm leading-relaxed text-[#8b8f99]">
-        <span className="font-semibold text-[#c8cad0]">Which should I pick?</span>{' '}
-        Just printing a poster? Free covers it. Need one or two clean exports? Grab the pack.
-        Exporting through the term, or making several? The term pays for itself after two.
-      </p>
 
       <TalkWaitlistCallout />
     </section>
   );
 }
 
-function PricingCard({ tier }: { tier: Tier }) {
-  // Card background sets which "check" the features use; the coming-soon
-  // tier is dimmed and its checks become a "planned" clock so it never
-  // reads as already-available.
+function PricingCard({ tier }: { tier: PricingTier }) {
   const base = tier.featured
-    ? 'relative rounded-2xl border-2 border-[#7c6aed] bg-[#14121e] p-6 shadow-[0_0_0_1px_rgba(124,106,237,0.15),0_18px_50px_-12px_rgba(124,106,237,0.35)] md:-mt-3 md:mb-3'
-    : tier.comingSoon
-      ? 'relative rounded-2xl border border-dashed border-[#33334a] bg-[#0e0e16] p-6'
-      : 'relative rounded-2xl border border-[#1f1f2e] bg-[#111118] p-6';
+    ? 'relative rounded-2xl border-2 border-[#7c6aed] bg-[#14121e] p-6 shadow-[0_0_0_1px_rgba(124,106,237,0.15),0_18px_50px_-12px_rgba(124,106,237,0.35)] lg:-mt-3 lg:mb-3'
+    : 'relative rounded-2xl border border-[#1f1f2e] bg-[#111118] p-6';
 
   return (
     <div className={base}>
@@ -177,18 +143,15 @@ function PricingCard({ tier }: { tier: Tier }) {
           Recommended
         </span>
       )}
-      {tier.comingSoon && (
-        <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-[#33334a] bg-[#1a1a26] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-[#a3a7b3]">
-          Coming soon
-        </span>
-      )}
-
       <h3 className="text-lg font-semibold text-[#e2e2e8]">{tier.name}</h3>
-      <div className="mt-3 flex items-baseline gap-1.5">
+      <div className="mt-3 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
         <span className="text-3xl font-bold tracking-tight text-white">{tier.price}</span>
         <span className="text-sm text-[#8b8f99]">{tier.cadence}</span>
       </div>
-      <p className="mt-3 min-h-[2.5rem] text-sm leading-relaxed text-[#a3a7b3]">{tier.tagline}</p>
+      <p className="mt-3 text-sm leading-relaxed text-[#a3a7b3]">{tier.forWho}</p>
+      <p className="mt-3 text-sm font-medium leading-relaxed text-[#c8cad0]">
+        {tier.condition}
+      </p>
 
       <Link
         to={tier.ctaTo}
@@ -201,39 +164,52 @@ function PricingCard({ tier }: { tier: Tier }) {
         {tier.cta}
       </Link>
 
-      {/* #8b8f99 (5.8:1), not #6b7280 (3.9:1 — below AA for this 12px text). */}
-      <p className="mt-5 text-xs font-medium uppercase tracking-wider text-[#8b8f99]">
-        {tier.forWho}
-      </p>
-      <ul className="mt-3 flex flex-col gap-2.5">
-        {tier.features.map((f) => (
-          <li key={f} className="flex items-start gap-2.5 text-sm leading-snug text-[#a3a7b3]">
-            <svg
-              className={tier.comingSoon ? 'mt-0.5 shrink-0 text-[#6b6b85]' : 'mt-0.5 shrink-0 text-[#7c6aed]'}
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              {tier.comingSoon ? (
-                <>
-                  <circle cx="12" cy="12" r="9" />
-                  <polyline points="12 7 12 12 15 14" />
-                </>
-              ) : (
-                <polyline points="20 6 9 17 4 12" />
-              )}
-            </svg>
-            <span>{f}</span>
-          </li>
-        ))}
-      </ul>
+      <details className="mt-4 rounded-lg border border-[#2a2a3a] px-3 py-2 sm:hidden">
+        <summary className="cursor-pointer text-sm font-semibold text-[#c8cad0]">
+          What’s included
+        </summary>
+        <FeatureList features={tier.features} className="mt-3 flex flex-col gap-2.5" />
+      </details>
+      <FeatureList
+        features={tier.features}
+        className="mt-4 hidden flex-col gap-2.5 sm:flex"
+      />
     </div>
+  );
+}
+
+function FeatureList({
+  features,
+  className,
+}: {
+  features: PricingTier['features'];
+  className: string;
+}) {
+  return (
+    <ul className={className}>
+      {features.map((feature) => (
+        <li
+          key={feature}
+          className="flex items-start gap-2.5 text-sm leading-snug text-[#a3a7b3]"
+        >
+          <svg
+            className="mt-0.5 shrink-0 text-[#7c6aed]"
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>{feature}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -280,27 +256,26 @@ function TalkWaitlistCallout() {
   }
 
   return (
-    <div className="mx-auto mt-10 max-w-2xl rounded-2xl border border-[#2a2a3a] bg-[#0f0f18] p-6 text-center">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7c6aed]">
-        Coming soon
+    <div className="mx-auto mt-8 flex max-w-2xl flex-col items-start justify-between gap-4 rounded-xl border border-[#2a2a3a] bg-[#0f0f18] p-4 text-left sm:flex-row sm:items-center">
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#7c6aed]">
+          Coming soon
+        </div>
+        <h3 className="mt-1 text-base font-semibold text-[#e2e2e8]">
+          Paper-to-talk is next
+        </h3>
+        <p className="mt-1 text-sm text-[#9ca3af]">Join the launch list.</p>
       </div>
-      <h3 className="mt-2 text-lg font-semibold text-[#e2e2e8]">
-        Turn a paper into a conference talk
-      </h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-[#9ca3af]">
-        We&apos;re building paper-to-talk generation next. Want to know the moment
-        it lands?
-      </p>
       {joined ? (
-        <p className="mt-4 text-sm font-medium text-[#4cc48c]">
-          ✓ You&apos;re on the list — we&apos;ll email you when talks are ready.
+        <p className="text-sm font-medium text-[#4cc48c]">
+          ✓ You&apos;re on the list.
         </p>
       ) : (
         <button
           type="button"
           onClick={handleJoin}
           disabled={busy || signedIn === null}
-          className="mt-4 rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-5 py-2.5 text-sm font-semibold text-[#c8cad0] transition-colors hover:border-[#7c6aed] disabled:opacity-60"
+          className="shrink-0 rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-2.5 text-sm font-semibold text-[#c8cad0] transition-colors hover:border-[#7c6aed] disabled:opacity-60"
         >
           {busy ? 'Joining…' : signedIn === false ? 'Sign in to join the waitlist' : 'Join the waitlist'}
         </button>
