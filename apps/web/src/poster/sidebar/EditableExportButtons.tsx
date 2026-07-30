@@ -344,16 +344,6 @@ export function EditableExportButtons({
               Get the pack
             </button>
           </div>
-          {/* Guests can't check out (payment needs a real account). Set the
-              expectation up front so the redirect to sign-up reads as the
-              next step, not a surprise. */}
-          {plan.isGuest && (
-            <div style={{ fontSize: 11.5, color: '#8b8f99', lineHeight: 1.5, marginTop: 10 }}>
-              You&apos;re working as a guest — you&apos;ll create a free account
-              (or sign in with Google) first, so your purchase and posters stay
-              yours across devices.
-            </div>
-          )}
         </div>
       )}
       {/* Credit-holder reassurance: show the remaining count so a pack
