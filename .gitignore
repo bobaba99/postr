@@ -29,3 +29,6 @@ docs/debug/
 docs/screenshots/
 # Sample .postr archives are multi-MB zips — keep them out of git.
 docs/*.postr
+
+# Agent scratch (wave reports, plans) — keep on disk, out of git.
+.superpowers/

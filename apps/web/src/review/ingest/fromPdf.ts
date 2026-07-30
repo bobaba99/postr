@@ -234,11 +234,20 @@ export async function fromPdf(
 
   try {
     // Always release the worker-side document — otherwise each ingest
-    // leaks its transport + page buffers until the tab reloads. A
-    // destroy failure must not clobber the primary ingest error.
+    // leaks its transport + page buffers until the tab reloads.
     await pdf.destroy();
-  } catch {
-    ingestError ??= new IngestError(UNREADABLE_COPY, 'unreadable-file');
+  } catch (error) {
+    if (artifact) {
+      // destroy is hygiene, not ingest failure: a worker-cleanup hiccup
+      // must not discard a fully built artifact (or its uploaded pages)
+      // behind a "couldn't read that file" error.
+      console.warn('PDF worker cleanup failed after a successful ingest:', error);
+    } else {
+      // Fail-closed on the primary-error path: with no artifact, a
+      // destroy failure only fills an error-less hole — it never
+      // clobbers the primary ingest error.
+      ingestError ??= new IngestError(UNREADABLE_COPY, 'unreadable-file');
+    }
   }
 
   if (ingestError || !artifact) {

@@ -322,4 +322,23 @@ describe('fromPdf', () => {
       kind: 'blank-render',
     });
   });
+
+  it('returns the artifact when PDF cleanup fails after a successful build', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const doc = fakePdfDoc(1, [fakePdfPage()]);
+    doc.destroy.mockRejectedValue(new Error('worker cleanup failed'));
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(doc) });
+    canvases = [fakeCanvas(NON_BLANK)];
+    const file = new File(['pdf-bytes'], 'poster.pdf', { type: 'application/pdf' });
+
+    const artifact = await fromPdf(file, CTX);
+
+    // destroy is hygiene, not ingest failure — a worker-cleanup hiccup
+    // must not discard a valid ingest (or its uploaded pages).
+    expect(artifact.pages.map((p) => p.pageNumber)).toEqual([1]);
+    expect(artifact.meta).toMatchObject({ sourceKind: 'pdf', pageCount: 1 });
+    expect(mockRemove).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledOnce();
+    warnSpy.mockRestore();
+  });
 });
