@@ -159,6 +159,15 @@ describe('FigureTab', () => {
     expect(screen.queryByText('Chart colours')).not.toBeInTheDocument();
   });
 
+  it('hides the palette picker for a single-series chart (nothing to recolour)', () => {
+    // A chart with no `series` encoding fills from one slot, so the
+    // picker would only persist a no-op seriesPaletteId.
+    const single = chartBlock();
+    single.chartSpec = { ...single.chartSpec!, encoding: { x: 'grp', y: 'val' } };
+    render(<Harness selectedChartBlock={single} />);
+    expect(screen.queryByText('Chart colours')).not.toBeInTheDocument();
+  });
+
   it('shows the palette picker for a selected chart and persists a pick', () => {
     const onUpdateChartSpec = vi.fn();
     render(

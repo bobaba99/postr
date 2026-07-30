@@ -18,6 +18,7 @@ import type { Block, ChartSpec, Palette } from '@postr/shared';
 import { ChartChooser } from '@/charts/ladder/ChartChooser';
 import type { PosterTableRef } from '@/charts/ladder/DataStep';
 import { ChartPalettePicker } from '@/charts/ChartPalettePicker';
+import { distinctSeries } from '@/charts/plotOptions';
 import { ReadabilityPanel } from '../ReadabilityPanel';
 
 export type FigureMode = 'make' | 'check';
@@ -65,14 +66,19 @@ export function FigureTab({
   onUpdateChartSpec,
 }: FigureTabProps) {
   const selectedChartSpec = selectedChartBlock?.chartSpec ?? null;
+  // Only multi-series charts colour from the categorical palette; a
+  // single-series chart fills from one slot, so the picker would
+  // persist a seriesPaletteId that changes nothing. Gate it out.
+  const chartHasSeries =
+    selectedChartSpec !== null && distinctSeries(selectedChartSpec).length >= 2;
   return (
     <div>
       {/* Per-chart palette control — contextual to the current
           selection, so it sits above the make/check modes and shows
-          only when a chart block is selected. Recolours that one
-          chart's series fills; clearing hands it back to the poster
-          theme. */}
-      {selectedChartBlock && selectedChartSpec && (
+          only when a multi-series chart block is selected. Recolours
+          that one chart's series fills; clearing hands it back to the
+          poster theme. */}
+      {selectedChartBlock && selectedChartSpec && chartHasSeries && (
         <div
           style={{
             marginTop: 12,
