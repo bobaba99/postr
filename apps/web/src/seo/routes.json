@@ -193,6 +193,11 @@
       "description": "Manage your Postr account details, security, billing status, export access, and saved preferences from one private settings page.",
       "robots": "noindex,nofollow"
     },
+    "/presentation-checker": {
+      "title": "Presentation Checker — Poster & Talk Review | Postr",
+      "description": "Upload a poster or talk (PDF, PPTX, PNG) and get narrative, design, and content scores with anchored, personalized fix cards you apply by hand.",
+      "robots": "noindex,nofollow"
+    },
     "/debug": {
       "title": "Postr Application Diagnostics | Postr",
       "description": "Review private Postr application diagnostics, browser capabilities, authentication state, and service connectivity while troubleshooting.",

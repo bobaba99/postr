@@ -36,7 +36,11 @@ function fakeSupabase(opts: {
   /** The user id the reconciliation lookup should resolve to (by sub/customer). */
   lookupUserId?: string | null;
 } = {}) {
-  const updates: Array<{ table: string; payload: Record<string, unknown> }> = [];
+  const updates: Array<{
+    table: string;
+    payload: Record<string, unknown>;
+    filters?: Record<string, unknown>;
+  }> = [];
   const inserts: Array<{ table: string; payload: Record<string, unknown> }> = [];
   const rpcs: Array<{ fn: string; args: Record<string, unknown> }> = [];
 
@@ -44,8 +48,22 @@ function fakeSupabase(opts: {
     from(table: string) {
       return {
         update(payload: Record<string, unknown>) {
-          updates.push({ table, payload });
-          return { eq: () => Promise.resolve({ error: null }) };
+          const update = { table, payload } as {
+            table: string;
+            payload: Record<string, unknown>;
+            filters?: Record<string, unknown>;
+          };
+          updates.push(update);
+          return {
+            eq: (column: string, value: unknown) => {
+              update.filters = { [column]: value };
+              return Promise.resolve({ error: null });
+            },
+            match: (filters: Record<string, unknown>) => {
+              update.filters = filters;
+              return Promise.resolve({ error: null });
+            },
+          };
         },
         insert(payload: Record<string, unknown>) {
           inserts.push({ table, payload });
@@ -86,6 +104,78 @@ function fakeSupabase(opts: {
   } as unknown as SupabaseClient;
 
   return { client, updates, inserts, rpcs };
+}
+
+/**
+ * A stateful single-user fake for the review add-on lifecycle: reads and
+ * conditional writes hit one in-memory row, so a conditional `.match()`
+ * that does NOT match is observable (state stays untouched) — unlike the
+ * recording fake above, which cannot tell a matched write from a no-op.
+ * Ported from the codex branch's billing tests.
+ */
+function statefulAddOnSupabase(initial: {
+  review_addon: boolean;
+  review_addon_subscription_id: string | null;
+  plan?: string | null;
+  plan_expires_at?: string | null;
+  subscription_status?: string | null;
+}) {
+  const state = {
+    id: 'user-1',
+    stripe_customer_id: 'cus_1',
+    plan: 'term' as string | null,
+    plan_expires_at: new Date(Date.now() + DAY).toISOString() as string | null,
+    subscription_status: 'active' as string | null,
+    ...initial,
+  };
+
+  function matches(filters: Record<string, unknown>): boolean {
+    return Object.entries(filters).every(
+      ([column, value]) =>
+        state[column as keyof typeof state] === value,
+    );
+  }
+
+  const client = {
+    from(table: string) {
+      if (table !== 'users') throw new Error(`unexpected table ${table}`);
+      return {
+        select(columns: string) {
+          return {
+            eq(column: string, value: unknown) {
+              return {
+                maybeSingle: async () => {
+                  if (!matches({ [column]: value })) {
+                    return { data: null, error: null };
+                  }
+                  const selected = Object.fromEntries(
+                    columns.split(',').map((name) => {
+                      const key = name.trim() as keyof typeof state;
+                      return [key, state[key]];
+                    }),
+                  );
+                  return { data: selected, error: null };
+                },
+              };
+            },
+          };
+        },
+        update(payload: Record<string, unknown>) {
+          const apply = (filters: Record<string, unknown>) => {
+            if (matches(filters)) Object.assign(state, payload);
+            return Promise.resolve({ data: null, error: null });
+          };
+          return {
+            eq: (column: string, value: unknown) =>
+              apply({ [column]: value }),
+            match: apply,
+          };
+        },
+      };
+    },
+  } as unknown as SupabaseClient;
+
+  return { client, state };
 }
 
 /** Build a fake Stripe.Subscription with an item-level period end. */
@@ -381,5 +471,184 @@ describe('packRefundAmountCents — flat per-credit rate', () => {
   });
   it('never exceeds the full pack price for a single pack', () => {
     expect(packRefundAmountCents(3)).toBeLessThanOrEqual(999);
+  });
+});
+
+describe('fulfillCheckout — review_pack (one-time)', () => {
+  it('grants 3 review credits atomically via the grant_review_credits RPC', async () => {
+    const fake = fakeSupabase();
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({}),
+      session({ mode: 'payment', subscription: undefined, metadata: { user_id: 'user-1', sku: 'review_pack' } }),
+    );
+    const grant = fake.rpcs.find((r) => r.fn === 'grant_review_credits');
+    expect(grant).toBeTruthy();
+    expect(grant?.args).toEqual({ p_user_id: 'user-1', p_amount: 3 });
+    // never touches the export-credit pool
+    expect(fake.rpcs.some((r) => r.fn === 'grant_export_credits')).toBe(false);
+    // The fulfilled-session marker records 0 export credits: the
+    // export-pack refund selection (`credits_granted > 0`) must never
+    // pick a review purchase — review-SKU refunds are manual (D8).
+    const marker = fake.inserts.find((i) => i.table === 'billing_fulfilled_sessions');
+    expect(marker?.payload.credits_granted).toBe(0);
+  });
+
+  it('is idempotent — an already-fulfilled session grants nothing', async () => {
+    const fake = fakeSupabase({ alreadyFulfilled: true });
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({}),
+      session({ mode: 'payment', subscription: undefined, metadata: { user_id: 'user-1', sku: 'review_pack' } }),
+    );
+    expect(fake.rpcs).toHaveLength(0);
+    expect(fake.inserts).toHaveLength(0);
+  });
+
+  it('does nothing for an unpaid review_pack session', async () => {
+    const fake = fakeSupabase();
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({}),
+      session({ mode: 'payment', subscription: undefined, payment_status: 'unpaid', metadata: { user_id: 'user-1', sku: 'review_pack' } }),
+    );
+    expect(fake.updates).toHaveLength(0);
+    expect(fake.rpcs).toHaveLength(0);
+  });
+});
+
+describe('fulfillCheckout — review_addon (subscription)', () => {
+  it('sets review_addon + review_addon_subscription_id — never the plan columns', async () => {
+    const fake = fakeSupabase();
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({ id: 'sub_addon_1', status: 'active', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
+      session({ metadata: { user_id: 'user-1', sku: 'review_addon' }, subscription: 'sub_addon_1' }),
+    );
+    expect(fake.updates).toHaveLength(1);
+    const { table, payload } = fake.updates[0]!;
+    expect(table).toBe('users');
+    expect(payload.review_addon).toBe(true);
+    expect(payload.review_addon_subscription_id).toBe('sub_addon_1');
+    expect(payload.stripe_customer_id).toBe('cus_1');
+    // Conditional activation: only a row NOT already granted is written,
+    // so a redelivered/stale activate cannot clobber a newer grant.
+    expect(fake.updates[0]!.filters).toEqual({ id: 'user-1', review_addon: false });
+    // the term's columns are the term's — an add-on never writes them
+    expect(payload).not.toHaveProperty('plan');
+    expect(payload).not.toHaveProperty('plan_expires_at');
+    expect(payload).not.toHaveProperty('subscription_status');
+    expect(payload).not.toHaveProperty('stripe_subscription_id');
+    // absolute-value write, naturally idempotent: no credit RPC, no ledger row
+    expect(fake.rpcs).toHaveLength(0);
+    expect(fake.inserts).toHaveLength(0);
+  });
+
+  it('does nothing for an incomplete review_addon session', async () => {
+    const fake = fakeSupabase();
+    await fulfillCheckout(
+      fake.client,
+      fakeStripe({}),
+      session({ status: 'open', payment_status: 'unpaid', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
+    );
+    expect(fake.updates).toHaveLength(0);
+    expect(fake.rpcs).toHaveLength(0);
+  });
+});
+
+describe('handleSubscriptionChange — review_addon', () => {
+  it('a live add-on status sets the flag + subscription id (no plan columns)', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({ id: 'sub_addon_1', status: 'active', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
+    );
+    expect(fake.updates).toHaveLength(1);
+    const { payload } = fake.updates[0]!;
+    expect(payload.review_addon).toBe(true);
+    expect(payload.review_addon_subscription_id).toBe('sub_addon_1');
+    expect(payload).not.toHaveProperty('plan');
+    expect(payload).not.toHaveProperty('plan_expires_at');
+    expect(payload).not.toHaveProperty('subscription_status');
+    // Conditional activation: forward-only, idempotent on redelivery.
+    expect(fake.updates[0]!.filters).toEqual({ id: 'user-1', review_addon: false });
+  });
+
+  it('a deleted (canceled) add-on clears the flag but KEEPS the subscription id for reconciliation', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({ id: 'sub_addon_1', status: 'canceled', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
+    );
+    expect(fake.updates).toHaveLength(1);
+    // exactly { review_addon: false } — sub id kept, plan columns untouched
+    expect(fake.updates[0]!.payload).toEqual({ review_addon: false });
+    // Conditional revoke: only the subscription that GRANTED the flag can
+    // clear it (see the stale-event test below for why this matters).
+    expect(fake.updates[0]!.filters).toEqual({
+      id: 'user-1',
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_1',
+    });
+  });
+
+  it('a terminal event for a STALE (old) add-on subscription does NOT clear access granted by a newer one', async () => {
+    // The user's flag is currently granted by sub_addon_current; a
+    // late-arriving canceled event for sub_addon_stale must be a no-op.
+    const fake = statefulAddOnSupabase({
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_current',
+    });
+
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({
+        id: 'sub_addon_stale',
+        status: 'canceled',
+        customer: 'cus_1',
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+      }),
+    );
+
+    expect(fake.state).toMatchObject({
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_current',
+    });
+  });
+
+  it('a terminal event for the CURRENT add-on subscription clears the flag', async () => {
+    const fake = statefulAddOnSupabase({
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_1',
+    });
+
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({
+        id: 'sub_addon_1',
+        status: 'canceled',
+        customer: 'cus_1',
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+      }),
+    );
+
+    expect(fake.state.review_addon).toBe(false);
+  });
+});
+
+describe('handleInvoicePaid — review_addon invoice', () => {
+  it('is NOT treated as a term renewal — no writes at all', async () => {
+    const fake = fakeSupabase({ lookupUserId: 'user-1' });
+    const stripe = {
+      subscriptions: {
+        retrieve: () =>
+          Promise.resolve(
+            fakeSub({ id: 'sub_addon_1', status: 'active', metadata: { user_id: 'user-1', sku: 'review_addon' } }),
+          ),
+      },
+    } as unknown as Stripe;
+    const invoice = { subscription: 'sub_addon_1', customer: 'cus_1' } as unknown as Stripe.Invoice;
+    await handleInvoicePaid(fake.client, stripe, invoice);
+    expect(fake.updates).toHaveLength(0);
   });
 });

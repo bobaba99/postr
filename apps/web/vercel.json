@@ -36,7 +36,8 @@
     { "source": "/profile", "destination": "/" },
     { "source": "/admin/gallery", "destination": "/" },
     { "source": "/billing/success", "destination": "/" },
-    { "source": "/billing/cancel", "destination": "/" }
+    { "source": "/billing/cancel", "destination": "/" },
+    { "source": "/presentation-checker", "destination": "/" }
   ],
   "headers": [
     {
@@ -69,6 +70,10 @@
     },
     {
       "source": "/auth",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
+      "source": "/presentation-checker",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     },
     {

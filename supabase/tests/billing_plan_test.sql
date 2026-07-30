@@ -2,10 +2,13 @@
 -- pgTAP · billing-column guard (guard_billing_columns trigger)
 -- ==========================================================================
 --
--- The plan / plan_expires_at / stripe_customer_id / export_credits columns
--- are SERVER-OWNED — only the Stripe webhook (service_role) may write them.
--- A user updating their own row (as PostgREST's `authenticated` role) must
--- NOT be able to grant themselves a paid plan or credits.
+-- The billing columns (plan, plan_expires_at, stripe_customer_id,
+-- export_credits, stripe_subscription_id, subscription_status,
+-- first_paid_export_at, review_credits, review_addon,
+-- review_addon_subscription_id) are SERVER-OWNED — only the API / Stripe
+-- webhook (service_role) may write them. A user updating their own row (as
+-- PostgREST's `authenticated` role) must NOT be able to grant themselves a
+-- paid plan, credits, or the review add-on.
 --
 --   * authenticated user CANNOT set plan='term'                (raises)
 --   * authenticated user CANNOT set export_credits             (raises)
@@ -39,6 +42,11 @@ values
    'jane.doe@example.com', '', now(),
    '{"provider":"email","providers":["email"]}', '{}', false, now(), now());
 
+-- Supabase API grants are environment-owned rather than migration-owned in
+-- some local CLI versions. Grant only the fixture privileges needed to reach
+-- the trigger/RLS behavior under test; this transaction rolls them back.
+grant select, update on public.users to authenticated, service_role;
+
 -- 1 · defaults
 select is(
   (select plan from public.users where id = '0b000000-0000-4000-a000-000000000001'),
@@ -65,7 +73,7 @@ select throws_ok(
   $q$ update public.users set plan = 'term'
       where id = '0b000000-0000-4000-a000-000000000001' $q$,
   'P0001',
-  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits, stripe_subscription_id, subscription_status, first_paid_export_at) are server-owned and cannot be changed by the client',
+  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits, stripe_subscription_id, subscription_status, first_paid_export_at, review_credits, review_addon, review_addon_subscription_id) are server-owned and cannot be changed by the client',
   'authenticated user cannot set plan = term');
 
 -- 4 · cannot self-grant credits
@@ -73,7 +81,7 @@ select throws_ok(
   $q$ update public.users set export_credits = 99
       where id = '0b000000-0000-4000-a000-000000000001' $q$,
   'P0001',
-  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits, stripe_subscription_id, subscription_status, first_paid_export_at) are server-owned and cannot be changed by the client',
+  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits, stripe_subscription_id, subscription_status, first_paid_export_at, review_credits, review_addon, review_addon_subscription_id) are server-owned and cannot be changed by the client',
   'authenticated user cannot set export_credits');
 
 -- 5 · cannot self-set an expiry
@@ -81,7 +89,7 @@ select throws_ok(
   $q$ update public.users set plan_expires_at = now() + interval '4 months'
       where id = '0b000000-0000-4000-a000-000000000001' $q$,
   'P0001',
-  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits, stripe_subscription_id, subscription_status, first_paid_export_at) are server-owned and cannot be changed by the client',
+  'billing columns (plan, plan_expires_at, stripe_customer_id, export_credits, stripe_subscription_id, subscription_status, first_paid_export_at, review_credits, review_addon, review_addon_subscription_id) are server-owned and cannot be changed by the client',
   'authenticated user cannot set plan_expires_at');
 
 -- 6 · a non-billing update still works (the guard is column-scoped)

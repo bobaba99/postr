@@ -12,6 +12,9 @@
  *   /cookies            → Cookies Policy (public)
  *   /terms              → Terms of Service (public)
  *   /paper-to-poster    → Paper→poster standalone flow (public, code-split)
+ *   /presentation-checker → Presentation Checker review flow (public,
+ *                           code-split, noindex; registered but not
+ *                           linked from nav — D12)
  *   /manuscript-to-poster → redirect to /paper-to-poster (old live URL)
  *   /paper-to-slides    → Paper→slides standalone flow (public, code-split)
  *   /paper-to-present   → redirect to /paper-to-slides (canonical is slides)
@@ -100,6 +103,9 @@ const ChartChooserPage = lazy(() => import('@/pages/ChartChooser'));
 // Standalone paper→poster flow — pulls in the ingest parsers and
 // block renderers, so it loads on demand like the editor.
 const PaperToPoster = lazy(() => import('@/pages/PaperToPoster'));
+// Presentation Checker — the review upload surface. Kept out of the
+// initial bundle for the same reason as the other standalone tools.
+const PresentationChecker = lazy(() => import('@/pages/PresentationChecker'));
 // Standalone paper→slides flow — pulls the deck builder and the lazy
 // pptx writer, so it loads on demand like its poster sibling.
 const PaperToSlides = lazy(() => import('@/pages/PaperToSlides'));
@@ -134,6 +140,10 @@ export function AppRoutes() {
             no Supabase session (not even anonymous) on load. */}
         <Route path="/chart-chooser" element={<ChartChooserPage />} />
         <Route path="/paper-to-poster" element={<PaperToPoster />} />
+        {/* Presentation Checker — public but noindex (D12): registered
+            now, deliberately NOT linked from nav; the indexed static
+            record + nav links are the Milestone-6 launch checklist. */}
+        <Route path="/presentation-checker" element={<PresentationChecker />} />
         <Route path="/paper-to-slides" element={<PaperToSlides />} />
         {/* Alias redirects — see the "Slug aliases" note in the header. */}
         <Route path="/plot-picker" element={<Navigate to="/chart-chooser" replace />} />

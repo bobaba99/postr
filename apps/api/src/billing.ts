@@ -1,9 +1,18 @@
 /**
  * Billing — Stripe Managed Payments (a Merchant of Record).
  *
- * Two paid products, both ONE-TIME (never subscriptions):
- *   - Term:  $18.99, unlocks unlimited editable exports for 4 months.
- *   - Pack:  $9.99, grants 3 export credits (consumable).
+ * Four paid products:
+ *   - Term:  $18.99, a recurring subscription (4-month cadence), unlocks
+ *     unlimited editable exports.
+ *   - Pack:  $9.99 one-time, grants 3 export credits (consumable).
+ *   - Review pack:  one-time, grants REVIEW_PACK_CREDITS presentation-
+ *     review credits (consumable, never expire).
+ *   - Review add-on:  a recurring add-on subscription granting a weekly
+ *     presentation-review quota (the 7-day window is enforced in
+ *     review.ts, not here).
+ * Review-SKU refunds are handled MANUALLY via the Stripe dashboard
+ * (deferred — Presentation Checker plan D8); the self-serve
+ * /billing/refund route covers term and export pack only.
  *
  * Managed Payments makes Stripe the merchant of record, so Stripe files
  * and remits tax worldwide. That requires:
@@ -13,9 +22,9 @@
  *
  * The plan/credits columns on public.users are SERVER-OWNED (a DB
  * trigger rejects any non-service_role write — see
- * 20260728120000_billing_plan.sql). This webhook, running with the
- * service_role key, is the ONLY writer. A client can start a checkout
- * but can never grant itself a plan.
+ * 20260728120000_billing_plan.sql and the review-column migration). This
+ * webhook, running with the service_role key, is the ONLY writer. A
+ * client can start a checkout but can never grant itself a plan.
  *
  * Provider swap note: this is wired for the Stripe SANDBOX for testing;
  * flipping to production is only an env-var change (STRIPE_SECRET_KEY,
@@ -35,11 +44,14 @@ import { createRateLimiter } from './rateLimit.js';
  */
 const STRIPE_API_VERSION = '2026-02-25.preview';
 
-/** The two SKUs the client can ask to buy. */
-export type BillingSku = 'term' | 'pack';
+/** The SKUs the client can ask to buy. */
+export type BillingSku = 'term' | 'pack' | 'review_pack' | 'review_addon';
 
 /** How many export credits a pack purchase grants. */
 const PACK_EXPORT_CREDITS = 3;
+/** How many review credits a review-pack purchase grants. Placeholder —
+ * repriced from Phase-0 token-cost numbers in Task 28. */
+const REVIEW_PACK_CREDITS = 3;
 /** The pack price in cents (CA$9.99) — the basis for the per-credit refund. */
 const PACK_PRICE_CENTS = 999;
 /** Buyer's-remorse refund window for the term (days). 14 = EU/UK legal floor. */
@@ -201,7 +213,8 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
       if (!sku || !priceId) {
         return res.status(400).json({
           error: 'invalid_sku',
-          message: 'sku must be "term" or "pack", and its price id env var must be set.',
+          message:
+            'sku must be "term", "pack", "review_pack" or "review_addon", and its price id env var must be set.',
         });
       }
 
@@ -210,14 +223,14 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
       const cancelUrl = billingUrl('cancel');
 
       try {
-        // Shared params. The term and the pack differ ONLY in mode:
-        //   - term = a recurring subscription (billed every 4 months by the
-        //     Stripe price; auto-renews) → mode 'subscription'.
-        //   - pack = a one-time purchase of 3 export credits → mode 'payment'.
+        // Shared params. The SKUs differ ONLY in mode:
+        //   - term / review_addon = recurring subscriptions → mode
+        //     'subscription'.
+        //   - pack / review_pack = one-time purchases → mode 'payment'.
         // A single mode is wrong: mode 'payment' with a recurring price is
         // rejected by Stripe ("passed a recurring price").
         const params: Stripe.Checkout.SessionCreateParams = {
-          mode: sku === 'term' ? 'subscription' : 'payment',
+          mode: sku === 'term' || sku === 'review_addon' ? 'subscription' : 'payment',
           line_items: [{ price: priceId, quantity: 1 }],
           // Managed Payments — Stripe becomes the merchant of record and
           // handles tax filing/remittance worldwide. Composes with both
@@ -227,8 +240,8 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
           // even before a Stripe customer exists. NOTE: client_reference_id
           // exists ONLY on the checkout.session — later subscription
           // lifecycle events (invoice.paid, customer.subscription.*) do not
-          // carry it, which is why the term also stamps the user id into
-          // subscription_data.metadata below.
+          // carry it, which is why the subscription SKUs also stamp the
+          // user id into subscription_data.metadata below.
           client_reference_id: user.id,
           customer_email: user.email ?? undefined,
           // Carried onto the completed event so the webhook knows the SKU.
@@ -237,13 +250,16 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
           cancel_url: cancelUrl,
         };
 
-        if (sku === 'term') {
-          // Copy the user id onto the Subscription object so later
-          // lifecycle events (which lack client_reference_id) can still be
-          // reconciled to this user. No client-side expiry — Stripe drives
-          // the billing period from the recurring price.
+        if (sku === 'term' || sku === 'review_addon') {
+          // Copy the user id AND the sku onto the Subscription object so
+          // later lifecycle events (which lack client_reference_id) can
+          // still be reconciled to this user — and so
+          // handleSubscriptionChange / handleInvoicePaid can tell a review
+          // add-on (weekly-quota flag only) apart from the term (plan
+          // columns). No client-side expiry — Stripe drives the billing
+          // period from the recurring price.
           params.subscription_data = {
-            metadata: { user_id: user.id, sku: 'term' },
+            metadata: { user_id: user.id, sku },
           };
         }
 
@@ -471,12 +487,14 @@ export function subscriptionPeriodEnd(sub: Stripe.Subscription): number {
 /**
  * Apply a completed checkout to the user's billing state. Idempotent:
  * safe to run twice for the same session (a webhook can fire more than
- * once) — the pack grant is guarded by a per-session marker, and the term
- * writes absolute values derived from the retrieved subscription.
+ * once) — the credit grants are guarded by a per-session marker, and the
+ * term / add-on paths write absolute values derived from the retrieved
+ * subscription.
  *
- * The `stripe` client is needed for the term path: a subscription-mode
- * session carries only the subscription id, so we retrieve the
- * subscription to read its status and period end. The pack path ignores it.
+ * The `stripe` client is needed for the subscription paths (term and
+ * review_addon): a subscription-mode session carries only the
+ * subscription id, so we retrieve the subscription to read its status
+ * and period end. The pack paths ignore it.
  *
  * Exported for tests.
  */
@@ -526,6 +544,87 @@ export async function fulfillCheckout(
       subscriptionId: sub.id,
       customerId: customerId ?? (typeof sub.customer === 'string' ? sub.customer : null),
     });
+    return;
+  }
+
+  if (sku === 'review_addon') {
+    // The weekly-quota add-on is a subscription, so it uses the term's
+    // completion semantics (status 'complete', not payment_status) — but
+    // it grants ONLY the review_addon flag. plan / plan_expires_at /
+    // subscription_status belong to the term and are never written here.
+    const paid =
+      session.status === 'complete' ||
+      session.payment_status === 'paid' ||
+      session.payment_status === 'no_payment_required';
+    if (!paid) return;
+
+    const subscriptionId =
+      typeof session.subscription === 'string'
+        ? session.subscription
+        : session.subscription?.id;
+    if (!subscriptionId) {
+      throw new Error('review_addon checkout session missing subscription id');
+    }
+
+    // Retrieve so the stored id is Stripe's real object (a replayed or
+    // malformed session without a live subscription throws → 500 → retry).
+    const sub = await stripe.subscriptions.retrieve(subscriptionId);
+
+    // Absolute-value write = naturally idempotent (like the term), so no
+    // billing_fulfilled_sessions marker is needed. stripe_customer_id is
+    // recorded alongside (not part of the entitlement) so later add-on
+    // lifecycle events can also reconcile by customer id. The conditional
+    // match makes the activation forward-only: a row whose flag is
+    // already set (by THIS or a NEWER add-on subscription) is left
+    // untouched, so a redelivered/stale checkout cannot clobber it.
+    const { error } = await supabase
+      .from('users')
+      .update({
+        review_addon: true,
+        review_addon_subscription_id: sub.id,
+        ...(customerId ? { stripe_customer_id: customerId } : {}),
+      })
+      .match({ id: userId, review_addon: false });
+    if (error) throw new Error(`review_addon grant update: ${error.message}`);
+    return;
+  }
+
+  // review_pack — grant review credits. Mirrors the pack branch exactly:
+  // paid-only, idempotent via billing_fulfilled_sessions, atomic RPC grant.
+  if (sku === 'review_pack') {
+    if (session.payment_status !== 'paid') return;
+
+    // Idempotency: record fulfilled session ids so a retry can't double-grant.
+    const alreadyFulfilled = await sessionAlreadyFulfilled(supabase, session.id);
+    if (alreadyFulfilled) return;
+
+    // Grant credits atomically (SET review_credits = review_credits + N in
+    // one statement, via the Task-8 RPC) so two distinct concurrent
+    // fulfillments can't lose a grant on a stale read. service_role can
+    // run it; the billing-column guard permits the write.
+    const { error: grantErr } = await supabase.rpc(
+      'grant_review_credits' as never,
+      { p_user_id: userId, p_amount: REVIEW_PACK_CREDITS } as never,
+    );
+    if (grantErr) throw new Error(`review_pack credit grant: ${grantErr.message}`);
+
+    // Record the Stripe customer id separately (not part of the atomic
+    // credit math). Guarded write, service_role.
+    if (customerId) {
+      await supabase
+        .from('users')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', userId);
+    }
+
+    // Record 0 (not REVIEW_PACK_CREDITS): the export-pack refund flow
+    // picks the newest fulfilled session with credits_granted > 0, so a
+    // nonzero marker here would let a review purchase be mistaken for an
+    // export pack — refunding the wrong charge and revoking export
+    // credits. Review-SKU refunds are manual via the dashboard (D8), so
+    // this row must stay out of that selection; it exists ONLY for
+    // idempotency.
+    await markSessionFulfilled(supabase, session.id, userId, 0);
     return;
   }
 
@@ -626,8 +725,9 @@ const TERM_ACTIVE_STATUSES = new Set([
 
 /**
  * A term renewal — `invoice.paid` fires on the first invoice AND every
- * 4-month renewal. Extend the user's access to the subscription's new
- * period end. Absolute-value + forward-only write, so redelivery is safe.
+ * 4-month renewal. Review add-on invoices return early below. Extend the
+ * user's access to the subscription's new period end. Absolute-value +
+ * forward-only write, so redelivery is safe.
  */
 export async function handleInvoicePaid(
   supabase: SupabaseClient,
@@ -643,6 +743,12 @@ export async function handleInvoicePaid(
   if (!subscriptionId) return;
 
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
+  // A review add-on invoice is NOT a term renewal: the add-on's weekly
+  // quota needs no period-end write, and routing it through
+  // advanceTermAccess would grant plan='term' to a user who never bought
+  // it (and clobber stripe_subscription_id with the add-on's id).
+  if (sub.metadata?.sku === 'review_addon') return;
+
   const customerId =
     typeof invoice.customer === 'string' ? invoice.customer : null;
 
@@ -679,6 +785,55 @@ export async function handleSubscriptionChange(
   supabase: SupabaseClient,
   sub: Stripe.Subscription,
 ): Promise<void> {
+  // Review add-on subscriptions are not the term: they only flip the
+  // weekly-quota flag. Checked FIRST so an add-on event can never rewrite
+  // plan / plan_expires_at / subscription_status. The user resolves via
+  // the metadata user_id stamped at checkout (or the shared customer id)
+  // — findUserIdForSubscriptionEvent needs no change for add-on subs.
+  if (sub.metadata?.sku === 'review_addon') {
+    const addOnCustomerId =
+      typeof sub.customer === 'string' ? sub.customer : null;
+    const addOnUserId = await findUserIdForSubscriptionEvent(supabase, {
+      subscriptionId: sub.id,
+      customerId: addOnCustomerId,
+      metadataUserId: sub.metadata?.user_id ?? null,
+    });
+
+    if (TERM_ACTIVE_STATUSES.has(sub.status)) {
+      // Still entitled — (re)set the flag and record WHICH subscription
+      // grants it (absolute values, so redelivery is safe). The
+      // conditional match keeps activation forward-only: an add-on row
+      // already granted (by this or a newer subscription) is not
+      // re-pointed by a stale event.
+      const { error } = await supabase
+        .from('users')
+        .update({
+          review_addon: true,
+          review_addon_subscription_id: sub.id,
+        })
+        .match({ id: addOnUserId, review_addon: false });
+      if (error) throw new Error(`review_addon update: ${error.message}`);
+      return;
+    }
+
+    // Terminal (canceled / unpaid / incomplete_expired) — clear the flag,
+    // but ONLY if this subscription is the one currently granting it:
+    // a stale terminal event for an OLD add-on subscription must not
+    // revoke access granted by a NEWER one.
+    // review_addon_subscription_id is KEPT (not nulled) so a late-arriving
+    // event for this same subscription can still reconcile the user.
+    const { error } = await supabase
+      .from('users')
+      .update({ review_addon: false })
+      .match({
+        id: addOnUserId,
+        review_addon: true,
+        review_addon_subscription_id: sub.id,
+      });
+    if (error) throw new Error(`review_addon revoke update: ${error.message}`);
+    return;
+  }
+
   const customerId =
     typeof sub.customer === 'string' ? sub.customer : null;
   const userId = await findUserIdForSubscriptionEvent(supabase, {
@@ -1126,6 +1281,8 @@ async function markSessionFulfilled(
 function priceIdForSku(sku: BillingSku | undefined): string | null {
   if (sku === 'term') return process.env.STRIPE_PRICE_TERM ?? null;
   if (sku === 'pack') return process.env.STRIPE_PRICE_PACK ?? null;
+  if (sku === 'review_pack') return process.env.STRIPE_PRICE_REVIEW_PACK ?? null;
+  if (sku === 'review_addon') return process.env.STRIPE_PRICE_REVIEW_ADDON ?? null;
   return null;
 }
 
