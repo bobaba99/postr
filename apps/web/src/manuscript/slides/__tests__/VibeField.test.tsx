@@ -25,6 +25,11 @@ describe('VibeField', () => {
     expect(input).toBeInTheDocument();
   });
 
+  it('renders the text input with an accessible label', () => {
+    render(<VibeField {...defaultProps} />);
+    expect(screen.getByLabelText('Describe the vibe')).toBeInTheDocument();
+  });
+
   it('renders 2 default suggestions when none provided', () => {
     render(<VibeField {...defaultProps} />);
     const buttons = screen.getAllByRole('button');
