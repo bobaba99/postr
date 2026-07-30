@@ -4,7 +4,7 @@
  * changes the copy. Conversion is in place (convertGuest*), never a
  * fresh signUp, so the poster carries over.
  */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { convertGuestWithGoogle, convertGuestWithEmail } from '@/lib/convertGuest';
 
 interface Props {
@@ -35,6 +35,21 @@ export function SecureWorkModal({ reason, onClose, onConverted }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [confirmSent, setConfirmSent] = useState(false);
+
+  // Close on Escape, same window-keydown idiom as the other app modals
+  // (ConfirmModal & siblings). Close is unconditional here — the backdrop
+  // click and dismiss button stay active while `pending`, so Escape does
+  // too. No `open` prop: the parent mounts/unmounts this component.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   async function handleGoogle() {
     setError(null);
