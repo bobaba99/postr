@@ -1963,9 +1963,10 @@ Mounted from: imported `Sidebar.tsx:64`, rendered `Sidebar.tsx:794-800` under `t
 - [ ] `▤` / `⌨` — unicode glyphs — `EditableExportButtons.tsx:354,400` — pptx/latex button labels
 - [ ] `BusyIndicator` spinner (inline, tone-colored) — icon-component — `EditableExportButtons.tsx:352,398` — busy states of both buttons
 
-#### `poster/sidebar/FigureTab.tsx` — Figure tab's two-mode segmented workbench ("Make a figure" chart chooser / "Check a figure" readability)
+#### `poster/sidebar/FigureTab.tsx` — Figure tab's two-mode segmented workbench ("Make a figure" chart chooser / "Check a figure" readability) + per-chart palette picker
 
 **Elements**
+- [ ] `ChartPalettePicker` — panel render site (above the mode toggle), shown only when the selected block is a **multi-series** chart (`distinctSeries(spec).length >= 2`) — `FigureTab.tsx` — `onChange` writes/clears `seriesPaletteId` via `onUpdateChartSpec(id, spec)` → `updateBlock` (§6.10)
 - [ ] `Make a figure` — segmented-control button (aria-pressed) — `FigureTab.tsx:76-83` — `onChangeMode('make')`
 - [ ] `Check a figure` — segmented-control button (aria-pressed) — `FigureTab.tsx:84-91` — `onChangeMode('check')`
 - [ ] `ChartChooser` (action button label `Insert selected figures`, busy label `Inserting {n} figures…` / `Inserting…`) — panel render site — `FigureTab.tsx:96-117` — insert loops `onInsertChart(spec, caption)` per selected figure (§6.10)
@@ -2245,7 +2246,9 @@ Storage: localStorage `postr.welcome-seeded:{userId}` (prefix const `:36`; read 
 
 ### 6.10 Charts
 
-The plot-picker engine: standalone `/chart-chooser` page, the embedded ladder questionnaire (`charts/ladder/*`), recommender + design-shape copy, SVG rendering (`renderChart`/`plotOptions`), the on-canvas `ChartBlock`, sample-data labels, and the (dead) series-palette constants. `ChartChooser` is embedded in three places: the standalone page, the sidebar Figure tab Make mode (§6.8), and the manuscript ChartPanel (§6.12).
+The plot-picker engine: standalone `/chart-chooser` page, the embedded ladder questionnaire (`charts/ladder/*`), recommender + design-shape copy, SVG rendering (`renderChart`/`plotOptions`), the on-canvas `ChartBlock`, sample-data labels, the CVD-tested series palettes, and the per-chart `ChartPalettePicker`. `ChartChooser` is embedded in three places: the standalone page, the sidebar Figure tab Make mode (§6.8), and the manuscript ChartPanel (§6.12).
+
+**Series-palette override (wired 2026-07-29):** a chart's categorical series fills normally resolve from the poster theme's `paletteSlots` at render time ("restyle poster → restyle charts"). An optional `ChartSpec.seriesPaletteId` overrides that for one chart, pinning its series fills to a fixed CVD-tested palette from `seriesPalettes.ts` (Simplified Science + Okabe-Ito + Paul Tol). `chartColors.ts::resolveSeriesColors` resolves it (categorical fills only — heatmap/Likert ramps stay slot-based); a stale/removed id falls back to slots, visibly. The `ChartPalettePicker` (Figure tab, shown only for a selected **multi-series** chart) writes the choice into `posters.data` via `updateBlock`; "Poster theme (default)" clears it.
 
 ```mermaid
 flowchart LR
@@ -2553,9 +2556,9 @@ flowchart LR
 - [ ] sample-table headers (appear as axis labels/ticks in previews + captions): "Condition", "Mean reaction time (ms)" (:99); "Week", "Symptom severity (0–10)" (:116); "Month", "Site", "Participants enrolled" (:137); "Sleep duration (h)", "Recall accuracy (%)" (:154); "Response time (ms)" (:171); "Condition", "Timepoint", "Mean anxiety score" (:196); "Activity", "Share of shift" (:209); "Statement", "Response", "Respondents (%)" (:238); "Outcome", "Baseline (T-score)", "Follow-up (T-score)" (:257)
 - [ ] sample category values (visible as ticks/legend entries in previews): "Control", "Placebo", "Low dose", "High dose", "Combined", "Waitlist" (:90,179); "Acme State University", "Sample Research Institute", "Acme Community Clinic" (:124,286-290); "The intervention was easy to follow", "I would recommend it to others", "The sessions fit my schedule", "The materials were clear" (:216-221); "Strongly disagree", "Disagree", "Neutral", "Agree", "Strongly agree" (:222); "Anxiety", "Depression", "Sleep quality", "Fatigue", "Pain interference" (:246); "Direct care", "Documentation", "Coordination", "Training", "Other" (:203); "Baseline", "Week 6" (:180); "Group A"–"Group F" (:277-284); "John Smith", "Jane Doe" (:292)
 
-#### `charts/seriesPalettes.ts` — CVD-tested series-palette constants — no DOM UI
+#### `charts/seriesPalettes.ts` — CVD-tested series-palette constants — rendered by `ChartPalettePicker`
 
-- [ ] ⚠️ **Dead/pre-wired UI copy** (§10): `seriesPalettesFor()` is referenced only by tests; no production picker renders these. Names/notes below would show "in the picker" per the docblock.
+- [ ] **Wired (2026-07-29):** `seriesPalettesFor(seriesCount)` feeds the `ChartPalettePicker` (Figure tab); `findSeriesPalette(id)` resolves a chart's `seriesPaletteId` at render time. Names/notes below render as swatch labels in that picker. Simplified Science sets (3/6) plus the named CVD-safe sets: Okabe-Ito (8), Tol bright (7), Tol muted (9), Tol high-contrast (3) — `SERIES_PALETTES_NAMED`.
 
 **Copy**
 - [ ] "Blue · Orange · Gray" / note "The most robust pair under red-green CVD, plus a neutral." — `seriesPalettes.ts:62,65`
@@ -2569,9 +2572,16 @@ flowchart LR
 - [ ] "Teal ramp" / "Six ordered levels, light to dark." — `seriesPalettes.ts:125,128`
 - [ ] "Grayscale" / "Mono printing, or when colour carries no meaning." — `seriesPalettes.ts:132,135`
 
-**Graphics** — 40 palette hex colours (`seriesPalettes.ts:64,71,78,85,92,99,113,120,127,134`) — color swatches, currently unrendered
+**Graphics** — palette hex colours across all sets (Simplified Science + `SERIES_PALETTES_NAMED`) — rendered as swatch strips in `ChartPalettePicker`.
 
-#### `charts/chartColors.ts` — palette-slot resolution/color math — no UI, logic only
+#### `charts/ChartPalettePicker.tsx` — per-chart series-palette picker (Figure tab)
+
+- [ ] "Chart colours" — section label — `ChartPalettePicker.tsx`
+- [ ] "Poster theme (default)" — reset option (clears `seriesPaletteId`) — `ChartPalettePicker.tsx`
+- [ ] "This chart's saved palette is no longer available — showing the poster theme." — stale-id note — `ChartPalettePicker.tsx`
+- [ ] Multi-colour swatch buttons — one per `seriesPalettesFor(seriesCount)` entry; `aria-pressed` on the active palette. Shown only for a selected **multi-series** chart (single-series charts fill from one slot, so the picker is gated out in `FigureTab.tsx`).
+
+#### `charts/chartColors.ts` — palette-slot resolution/color math (incl. `resolveSeriesColors` override) — no UI, logic only
 
 ---
 
@@ -4758,7 +4768,6 @@ Things that exist in code but are unreachable, unused, stale, or drifted — che
 - [ ] **Public gallery (`GALLERY_PUBLIC_ENABLED = false`, `config/features.ts:21`)** — full surface: routes `/gallery`, `/gallery/:entryId` redirect to `/` (`routes.tsx:116-117`); `pages/Gallery.tsx` + `pages/GalleryEntry.tsx` unreachable but kept for reactivation; flag gates Home Gallery link (`Home.tsx:148`), Profile upload button + entry links (`Profile.tsx:571-595,814`), Sidebar "Share to gallery" (`Sidebar.tsx:1183-1202`), `?publish=1` auto-open (`PosterEditor.tsx:1314-1329`), OnboardingTour step-7 flag-ON body (`OnboardingTour.tsx:85`); dead flow: `PublishFlow` (mounted `App.tsx:15`), `PublishConsentModal`, `PublishGalleryModal`, `stores/publishFlowStore.ts`, `data/gallery.ts` publish path; `PublishConsentModal` `mode="share"` has NO caller anywhere; PosterCard "Publish" hover action was DELETED not gated (comment `PosterCard.tsx:262-271`); gallery siteMeta templates (`siteMeta.ts:213-219`) unused; reactivation checklist in `features.ts:4-19` header comment. `/admin/gallery` + `data/gallery.ts` read paths remain live.
 - [ ] **Dead `AuthBootstrap`** — `components/AuthBootstrap.tsx` defined but never mounted in `src/`; referenced only by a comment in `pages/Share.tsx:4` and the consumer list in `lib/auth.ts`.
 - [ ] **Unused `SORT_MODE_LABELS`** — `poster/citations.ts:111-115` ("Manual order" / "Alphabetical (first author)" / "Year (newest first)" / "Year (oldest first)"); `sortMode` is hardcoded `'alpha'` with "no user-facing toggle" (`PosterEditor.tsx:653-655`) — labels have no live render site.
-- [ ] **Unused `charts/seriesPalettes.ts`** — `seriesPalettesFor()` referenced only by tests; 10 palette names/notes + 40 CVD swatches unrendered (§6.10).
 - [ ] **Unused DB tables** — `public.presets` (`20260408000200_presets.sql`), `public.authors_lib` / `public.institutions_lib` / `public.references_lib` (`20260408000300_library.sql`, PRD §21) — nothing in `apps/web/src` reads or writes them (style presets live in localStorage `postr.style-presets`).
 - [ ] **Missing GC edge function** — `supabase/functions/` contains only `delete-account`; no storage garbage-collection function exists (AdminGallery copy even says image files "stay in storage until the owner hard-deletes", `AdminGallery.tsx:168-172`); the only GC is `POST /cron/cleanup-anonymous-users` for guest accounts.
 - [ ] **Unpublish promised but missing** — `pages/Share.tsx:93-95` tells visitors "the owner may have unpublished it", and `PublishConsentModal` share clause 3 (`PublishConsentModal.tsx:98-101`) promises "I can revoke the share link at any time from my dashboard" — no unpublish/revoke UI exists anywhere (no dashboard share-link manager).
