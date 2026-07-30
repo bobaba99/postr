@@ -639,9 +639,91 @@ export async function rasterizePdfFirstPage(
   }
 }
 
+export interface RasterizeImageOptions {
+  maxDimension?: number;
+  maxSourcePixels?: number;
+}
+
+interface EncodedImageDimensions {
+  width: number;
+  height: number;
+}
+
+const JPEG_SOF_MARKERS = new Set([
+  0xc0,
+  0xc1,
+  0xc2,
+  0xc3,
+  0xc5,
+  0xc6,
+  0xc7,
+  0xc9,
+  0xca,
+  0xcb,
+  0xcd,
+  0xce,
+  0xcf,
+]);
+
+function encodedImageDimensions(bytes: Uint8Array): EncodedImageDimensions | null {
+  if (
+    bytes.length >= 24 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[12] === 0x49 &&
+    bytes[13] === 0x48 &&
+    bytes[14] === 0x44 &&
+    bytes[15] === 0x52
+  ) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const width = view.getUint32(16);
+    const height = view.getUint32(20);
+    return width > 0 && height > 0 ? { width, height } : null;
+  }
+
+  if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+    return null;
+  }
+
+  let offset = 2;
+  while (offset + 3 < bytes.length) {
+    if (bytes[offset] !== 0xff) {
+      offset++;
+      continue;
+    }
+    while (bytes[offset] === 0xff) offset++;
+    const marker = bytes[offset++]!;
+    if (marker === 0xd8 || marker === 0xd9 || marker === 0x01) continue;
+    if (marker >= 0xd0 && marker <= 0xd7) continue;
+    if (offset + 1 >= bytes.length) return null;
+    const segmentLength = (bytes[offset]! << 8) | bytes[offset + 1]!;
+    if (segmentLength < 2 || offset + segmentLength > bytes.length) return null;
+    if (JPEG_SOF_MARKERS.has(marker) && segmentLength >= 7) {
+      const height = (bytes[offset + 3]! << 8) | bytes[offset + 4]!;
+      const width = (bytes[offset + 5]! << 8) | bytes[offset + 6]!;
+      return width > 0 && height > 0 ? { width, height } : null;
+    }
+    offset += segmentLength;
+  }
+  return null;
+}
+
 export async function rasterizeImage(
   file: File,
+  options: RasterizeImageOptions = {},
 ): Promise<{ canvas: HTMLCanvasElement; pageWidthPt: number; pageHeightPt: number }> {
+  if (options.maxSourcePixels) {
+    const dimensions = encodedImageDimensions(new Uint8Array(await file.arrayBuffer()));
+    if (!dimensions) {
+      throw new Error('Image dimensions could not be read safely.');
+    }
+    if (dimensions.width > options.maxSourcePixels / dimensions.height) {
+      throw new Error('Image dimensions exceed the safe pixel limit.');
+    }
+  }
+
   const url = URL.createObjectURL(file);
   try {
     const img = new Image();
@@ -653,12 +735,23 @@ export async function rasterizeImage(
     if (!img.naturalWidth || !img.naturalHeight) {
       throw new Error('Image has no dimensions — it may be corrupt or unsupported.');
     }
+    const targetScale = options.maxDimension
+      ? Math.min(1, options.maxDimension / Math.max(img.naturalWidth, img.naturalHeight))
+      : 1;
+    const targetWidth = Math.round(img.naturalWidth * targetScale);
+    const targetHeight = Math.round(img.naturalHeight * targetScale);
     const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth;
-    canvas.height = img.naturalHeight;
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('No 2D context available.');
-    ctx.drawImage(img, 0, 0);
+    if (targetScale < 1) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+    } else {
+      ctx.drawImage(img, 0, 0);
+    }
     // Assume 300 dpi as a baseline — typical for poster JPGs. The
     // synthesizer snaps to the nearest curated poster size anyway.
     const DPI = 300;
@@ -687,4 +780,3 @@ export function releaseCanvas(c: HTMLCanvasElement): void {
   c.width = 0;
   c.height = 0;
 }
-

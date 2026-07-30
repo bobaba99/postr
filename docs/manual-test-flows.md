@@ -1,8 +1,8 @@
 # Postr — Manual Admin Testing Flow Map
 
-Walk-through checklist for the **admin surfaces** (payment, sign-up, delete account, download data). Editor is already tested — not covered here. Priority order leads with the **nested payment + sign-up** journeys.
+Walk-through checklist for the **admin and launch-gated surfaces**. Parts 1–6 cover payment, sign-up, account deletion, and data download; Part 7 covers the Presentation Checker direct route and its flag-gated editor Review tab. Priority order leads with the **nested payment + sign-up** journeys.
 
-> **Route legend:** `/auth`, `/pricing`, `/p/:posterId` (editor), `/profile`, `/billing/success`, `/billing/cancel`.
+> **Route legend:** `/auth`, `/pricing`, `/p/:posterId` (editor), `/profile`, `/billing/success`, `/billing/cancel`, `/presentation-checker`.
 > **All copy in quotes is verbatim from the code** — if what you see on screen differs, that's a finding.
 
 ---
@@ -18,6 +18,7 @@ Walk-through checklist for the **admin surfaces** (payment, sign-up, delete acco
 | E | **Permanent free** (0 credits, no term) | Any of C/D with plan='free' | Paywall shown, forced-signup branch |
 | F | **Paid — active term** | C/D that completed a `term` checkout in Stripe sandbox | Unlocked exports, renewal, cancel, revoke, **delete-with-live-sub** |
 | G | **Paid — export pack** (credits>0) | C/D that completed a `pack` checkout | Credit consume, credit hint, idempotency |
+| H | **Presentation review buyer** | C/D with a `review_pack` checkout; repeat with an active `review_addon` | Initial review reservation/refund, weekly quota, duplicate checkout protection |
 
 **Before deleting or buying anything, write down the `user_id` (Supabase Auth) and poster IDs** — you can't query them after deletion. Keep the Stripe sandbox dashboard + link.com open in another tab.
 
@@ -39,6 +40,10 @@ These steps have **no Postr UI** — don't waste time clicking for them. Drive t
 - [ ] **Stripe orphan on account-delete** — delete an account holding an **active sub**, then confirm in Stripe sandbox the subscription **keeps renewing** (see Delete §18 risk).
 - [ ] **`plan`/`plan_expires_at`/`subscription_status`/`stripe_*` columns** — client can't write these (guard trigger). Query Supabase directly to verify grants.
 - [ ] **Supabase Auth Site URL / Redirect URLs** — confirmation-link + OAuth-return destinations depend on these. Recurring post-deploy miss. Verify `https://www.postr.sh` is set. Redirect URLs must include `{origin}/auth` and `{origin}/dashboard`.
+- [ ] **Presentation Checker quality gate** — the frozen corpus manifest currently has no rated items and no freeze timestamp. Do not enable or index the feature until real Gavin ratings, live-provider results, costs, and threshold decisions are recorded.
+- [ ] **Review Stripe products** — configure and manually exercise `STRIPE_PRICE_REVIEW_PACK` and `STRIPE_PRICE_REVIEW_ADDON`, including paid/async success, duplicate delivery, stale subscription events, and cancellation.
+- [ ] **PPTX review worker** — requires an isolated LibreOffice-capable Render worker plus server `REVIEW_PPTX_ENABLED=true` and client `VITE_ENABLE_REVIEW_PPTX=true`. Keep both false until deploy and smoke tests pass.
+- [ ] **Review temporary storage** — verify an object-lifecycle policy removes `poster-assets/{user_id}/review-temp/*`; application rollback is not a substitute for lifecycle cleanup.
 
 ---
 
@@ -512,3 +517,74 @@ The standalone talk flow — sibling of `/paper-to-poster`. One chat-style wizar
 - [ ] **§32 rebuild guard** — `setStyledDeck(null)` reset (display gap) + `designPassSeq` (response race) together prevent stale styled deck A shipping over deck B. Regression-prone.
 - [ ] **§33 re-import** — Postr's 8 appended template slides must NOT be reported as skipped; subtraction capped at 8; identity by `<p:cSld name>` marker, not position.
 - [ ] **§29 PDF** — free PDF is the full polished deck with the ack-slide mark and **no utility slides**; distinct from the always-watermarked editor PDF in §22 (different pipeline).
+
+---
+
+# PART 7 — PRESENTATION CHECKER (`/presentation-checker`)
+
+The direct QA route is intentionally public, unlinked, and `noindex,nofollow`. Keep `VITE_ENABLE_PRESENTATION_CHECKER=false` in production until every launch gate below passes; setting it true exposes the editor Review tab. PPTX remains a separate two-sided rollout gate.
+
+## 34. Hidden rollout and metadata posture
+
+- [ ] With `VITE_ENABLE_PRESENTATION_CHECKER` unset/false, open an editor: the **Review** tab is absent.
+- [ ] Load `/presentation-checker` directly: the checker renders, but no marketing header/footer/editor link leads to it.
+- [ ] Inspect the document head: robots is exactly `noindex,nofollow` and no canonical is emitted.
+- [ ] Enable only `VITE_ENABLE_PRESENTATION_CHECKER=true`, reload the editor, and confirm Review appears without changing PPTX acceptance.
+- [ ] Re-disable the flag after QA. Do not add links or change robots until the frozen-corpus evaluator records GO and production dogfood passes.
+
+## 35. Initial review — PDF, image, and native Postr source
+
+- **Set up:** confirmed account C/D with one review pack credit, plus a native poster the user owns.
+- [ ] Upload a valid PDF, PNG, or JPEG. Confirm local preview/preflight completes, temporary pages upload privately, and the initial critique returns overall plus narrative/design/content scores and anchored finding cards.
+- [ ] From the editor Review tab, review the native poster capture. Confirm the API accepts only the exact owned `{user_id}/{poster_id}/review-capture.jpg` path.
+- [ ] Refresh after completion: the saved history row is present and reopening it reproduces validated scores/findings without rerunning the provider.
+- **Edges:** oversize pages, too many pages, wrong MIME, foreign-user storage paths, expired signing, provider timeout, malformed provider JSON, and failed upload/signing each show bounded generic failures; no raw provider/storage error and no partial result row.
+
+## 36. Pack credit reservation, failure refund, and request idempotency
+
+- **Set up:** account H with exactly one review credit; capture the request key from the browser network panel.
+- [ ] Start one initial review and confirm the credit is reserved **before** Anthropic work starts.
+- [ ] Replay the same request key concurrently and after completion: at most one provider call and one `poster_reviews` row exist; polling/replay does not consume rate-limit work slots or a second credit.
+- [ ] Force provider/page-fetch/finalization failure. Confirm the exact reservation is released and the credit is refunded once.
+- [ ] Let a claim become stale, then retry with a new claim token. Confirm the stale worker cannot finalize or refund the new worker's reservation.
+- [ ] Successful finalization consumes exactly one credit and the saved result can be reopened.
+
+## 37. Review add-on checkout and weekly quota
+
+- [ ] Buy `review_pack`: provision only after a paid or `no_payment_required` fulfillment event; async/unpaid completion grants nothing.
+- [ ] Buy `review_addon`: a second checkout attempt while active returns the already-active error and double-clicking the UI mints one checkout session.
+- [ ] Replay webhook deliveries and send stale subscription updates/deletions. Confirm credits are not duplicated and an old subscription cannot revoke/overwrite a newer add-on.
+- [ ] Consume the configured weekly add-on allowance while one pack credit remains. Confirm the next fresh request falls back to that pack credit and succeeds; replay its request key and confirm the replay consumes neither another pack credit nor another weekly slot.
+- [ ] With the weekly allowance exhausted **and zero pack credits**, confirm the next fresh initial review is denied before provider work. Advance beyond the rolling window and confirm add-on access resumes.
+- [ ] Cancel/revoke the current add-on in Stripe sandbox and confirm new reviews stop while already saved reviews remain readable.
+
+## 38. Included follow-up and terminal state
+
+- [ ] Open a completed saved review and submit the included follow-up. Confirm one response is persisted on that same review and no pack/add-on credit is consumed.
+- [ ] Double-submit/replay the follow-up and force a stale lease: only the current lease can complete; no duplicate provider work becomes a second result.
+- [ ] After successful completion the review is terminal/closed and another follow-up is rejected with stable UI copy.
+- [ ] Force the follow-up provider call to fail, then retry. Confirm the lease releases and the single included follow-up remains available.
+
+## 39. History reopen and resume after reload
+
+- [ ] Complete uploaded and native-poster reviews, reload the page, and select each history row. Before opening, confirm the row shows its source label or filename, date, stage, and scores. After opening, both must restore validated scores, findings, and follow-up state; the native review retains its poster ID for recapture, while an uploaded review explains that its temporary preview is no longer retained.
+- [ ] Reload while a follow-up remains available; reopen the review and submit it successfully.
+- [ ] Inject malformed saved JSON in a test/staging row. The UI must reject it through runtime validation with a safe error rather than rendering partial or unsafe fields.
+- [ ] Expire an uploaded page signed URL before a retry. The server must re-sign the owned `storagePath` after claiming work instead of relying on the stale client URL.
+
+## 40. PPTX remains “coming next” until isolated-worker GO
+
+- [ ] With both PPTX flags false, the file picker excludes `.pptx`; helper copy says slides/PPTX are coming next and suggests exporting PDF. Direct `.pptx` drop is rejected client-side.
+- [ ] With only the client flag true but server flag false, the render endpoint returns `503 pptx_unavailable`; no provider critique runs.
+- [ ] Only in an isolated smoke environment, enable both flags and upload a valid deck. Verify archive CRC/inflation/ratio limits, LibreOffice render concurrency, rendered-page dimensions/bytes, private upload paths, and rollback on upload/sign failure.
+- [ ] Exercise zip bomb, corrupt CRC, oversized raw/compressed deck, too many/oversized rendered pages, and worker timeout cases. Each must fail closed without leaving a usable partial batch.
+- [ ] Restore both flags to false after the smoke. Production rollout still requires the worker deploy record and `review-temp` lifecycle verification.
+
+## Quick findings summary — PART 7 launch blockers
+
+- [ ] Frozen evaluator corpus is empty/unrated; no quality GO exists.
+- [ ] No recorded live Anthropic quality/cost run or threshold decision exists.
+- [ ] No recorded live Stripe review-price checkout/webhook run exists.
+- [ ] No isolated PPTX worker deploy/smoke exists; both PPTX flags stay off.
+- [ ] No verified production lifecycle policy for `review-temp` exists.
+- [ ] No production dogfood, linking, indexing, or deployment is authorized by this implementation PR.

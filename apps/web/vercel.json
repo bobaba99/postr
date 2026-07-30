@@ -38,6 +38,7 @@
     { "source": "/admin/gallery", "destination": "/" },
     { "source": "/billing/success", "destination": "/" },
     { "source": "/billing/cancel", "destination": "/" },
+    { "source": "/presentation-checker", "destination": "/" },
     { "source": "/terms/fr", "destination": "/" },
     { "source": "/privacy/fr", "destination": "/" },
     { "source": "/cookies/fr", "destination": "/" }
@@ -73,6 +74,10 @@
     },
     {
       "source": "/auth",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
+      "source": "/presentation-checker",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     },
     {

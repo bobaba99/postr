@@ -58,11 +58,10 @@ describe('STATIC_ROUTE_META', () => {
     ]);
   });
 
-  it('/paper-to-poster promises no slide output — that conversion does not exist', () => {
-    // This flow emits a poster draft (PDF / .postr) only, and
-    // /paper-to-present redirects here purely to reserve the slug —
-    // so visitors arriving from that URL must not be told a deck is
-    // waiting at the end of it.
+  it('/paper-to-poster promises only the poster output it produces', () => {
+    // This route emits a poster draft (PDF / .postr) only. The
+    // /paper-to-present aliases now route to /paper-to-slides, so the
+    // poster route should remain unambiguous about its own output.
     //
     // Scoped to this one route on purpose. A site-wide ban on the word
     // "PowerPoint" would fire on the landing page's "no PowerPoint",

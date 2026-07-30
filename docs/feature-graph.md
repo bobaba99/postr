@@ -1,6 +1,6 @@
 # Postr — Feature Graph & Refactoring Checklist (v2)
 
-**Revised 2026-07-28** (second pass, same day — supersedes v1 from earlier on 2026-07-28; updated same day with the `CommentsPanel`/`VersionPanel`/`ReadabilityPanel` gap-fill — coverage is now complete). Source of truth: `apps/web/src/` (React 19 + react-router 8 + Vite SPA) plus `apps/api/src/` for the external-services map. Every file:line reference and verbatim UI string below was extracted from the code as of **2026-07-28 ~16:00 local**. If the doc and the code disagree, **the code wins** — regenerate this doc.
+**Revised 2026-07-29** (Presentation Checker and Paper-to-Slides integration pass). Source of truth: `apps/web/src/` (React 19 + react-router 8 + Vite SPA) plus `apps/api/src/` and `supabase/` for the external-services map. Older file:line references were extracted during the 2026-07-28 inventory and can drift; if the doc and the code disagree, **the code wins** — regenerate this doc.
 
 All paths are relative to `apps/web/src/` unless noted otherwise. All quoted strings are verbatim user-visible copy.
 
@@ -13,6 +13,7 @@ What changed in the repo since v1 was generated:
 - **French legal page variants shipped** — `/privacy/fr`, `/cookies/fr`, `/terms/fr` (`pages/PrivacyFr.tsx`, `CookiesFr.tsx`, `TermsFr.tsx`), cross-linked from the EN pages.
 - **Always-visible `ConsentNotice`** mounted in `App.tsx:24` — bottom-left, non-dismissible, on every route.
 - **Persona-testing docs deleted** from `docs/`; **MCP / public-API plans ditched**; **business-model experiments archived** to `docs/archive/`.
+- **Presentation Checker implemented behind rollout gates** — direct `/presentation-checker` is public but unlinked and `noindex,nofollow`; the editor entry point is hidden unless `VITE_ENABLE_PRESENTATION_CHECKER=true`, and PPTX input remains disabled unless both client and server PPTX flags are enabled. See §6.17.
 
 What changed in the doc:
 
@@ -38,19 +39,19 @@ What changed in the doc:
 
 ## 3. Coverage audit
 
-Counts as reported by each inventory slice ("Files covered / Elements / Copy / Graphics" lines), plus the 2026-07-28 gap-fill pass that added `poster/CommentsPanel.tsx`, `poster/VersionPanel.tsx`, `poster/ReadabilityPanel.tsx` to the sidebar slice (+3 files, +37 elements, +63 copy, +17 graphics), plus the 2026-07-29 pass that added the **Manuscript → Slides** feature (§6.16 — the `/paper-to-slides` pipeline: wizard, deck model, design pass, styled exports; it had shipped but was never inventoried). Cross-slice host files (`pages/PaperToPoster.tsx`, `poster/sidebar/EditableExportButtons.tsx`, `components/ConsentNotice.tsx`) are counted in two slices each, so file totals double-count ~4 files.
+Counts as reported by each inventory slice ("Files covered / Elements / Copy / Graphics" lines), plus the 2026-07-28 gap-fill pass that added `poster/CommentsPanel.tsx`, `poster/VersionPanel.tsx`, `poster/ReadabilityPanel.tsx` to the sidebar slice (+3 files, +37 elements, +63 copy, +17 graphics), plus the 2026-07-29 passes that added **Manuscript → Slides** (§6.16) and **Presentation Checker** (§6.17). The sidebar now has 11 default tabs plus the flag-gated Review tab; the legacy numeric totals below retain their original counting method and call out the newer feature slices instead of inventing element/copy counts for them. Cross-slice host files (`pages/PaperToPoster.tsx`, `poster/sidebar/EditableExportButtons.tsx`, `components/ConsentNotice.tsx`) are counted in two slices each, so file totals double-count ~4 files.
 
 | Slice / feature area | Files covered | Elements | Copy strings | Graphics |
 |---|---|---|---|---|
 | App shell + routing + pages + SEO | 30 | 118 | 486 | 27 |
 | Poster editor core (excl. sidebar) | 14 (+18 logic-only noted) | 112 | ~175 | 34 |
-| Poster sidebar (11 tabs) | 9 | 168 | 171 | 45 |
+| Poster sidebar (11 default tabs + 1 flag-gated Review tab) | 10 | 168 + Review elements (§6.17) | 171 + Review copy (§6.17) | 45 |
 | Shared components + motion | 39 | 205 | 304 | 66 |
 | Import + data + charts | 48 | 30 | 196 | 4 |
 | Export + manuscript (poster) | 42 | 41 | ~190 | 9 |
 | Manuscript → Slides (§6.16) | 23 (10 wizard/UI + 9 deck/model + 4 export/api) | see §6.16 | see §6.16 | icon-library set (§6.16) |
 | Stores + hooks + lib + analytics + config | 17 | 0 (+1 browser-native beforeunload dialog) | 17 | 0 (18 storage keys + 1 BroadcastChannel) |
-| **Totals** | **222** | **674+ (+1 native dialog; +§6.16)** | **~1,539+ (+§6.16)** | **185+ (+§6.16)** |
+| **Legacy totals** | **222 + §6.17 checker files** | **674+ (+1 native dialog; +§6.16/§6.17)** | **~1,539+ (+§6.16/§6.17)** | **185+ (+§6.16/§6.17)** |
 
 All of `apps/web/src/` is covered (test files excluded by rule) — the earlier `CommentsPanel`/`VersionPanel`/`ReadabilityPanel` gap was closed by the gap-fill pass.
 
@@ -110,6 +111,7 @@ flowchart LR
     R_cc["/chart-chooser"]
     R_p2p["/paper-to-poster"]
     R_p2s["/paper-to-slides"]
+    R_review["/presentation-checker"]
     R_pp["/plot-picker"]
     R_m2p["/manuscript-to-poster"]
     R_p2pr["/paper-to-present"]
@@ -140,6 +142,7 @@ flowchart LR
     S_cc["ChartChooserPage"]
     S_p2p["PaperToPoster"]
     S_p2s["PaperToSlides"]
+    S_review["PresentationChecker"]
     S_auth["Auth"]
     S_bill["BillingResult (outcome prop)"]
     S_share["Share (PosterEditor readOnly)"]
@@ -175,6 +178,7 @@ flowchart LR
   R_cc --> S_cc
   R_p2p --> S_p2p
   R_p2s --> S_p2s
+  R_review --> S_review
   R_dbg --> S_dbg
   R_auth --> S_auth
   R_billok --> S_bill
@@ -231,6 +235,7 @@ flowchart LR
 | `/chart-chooser` | `pages/ChartChooser.tsx` | yes | public, no session created |
 | `/paper-to-poster` | `pages/PaperToPoster.tsx` | yes | — |
 | `/paper-to-slides` | `pages/PaperToSlides.tsx` (lazy, code-split) | yes | public, no session created (§6.16) |
+| `/presentation-checker` | `pages/PresentationChecker.tsx` (lazy, code-split) | yes | public direct route; unlinked and `noindex,nofollow`; editor entry flag defaults off (§6.17) |
 | `/plot-picker` | redirect → `/chart-chooser` | — | alias (vercel.json 308 is canonical layer) |
 | `/manuscript-to-poster` | redirect → `/paper-to-poster` | — | alias |
 | `/paper-to-present` | redirect → `/paper-to-slides` | — | alias (canonical is slides; changed from `/paper-to-poster`) |
@@ -1454,19 +1459,19 @@ flowchart LR
 
 ---
 
-### 6.8 Poster Sidebar (11 tabs)
+### 6.8 Poster Sidebar (11 default tabs + 1 flag-gated Review tab)
 
-`poster/Sidebar.tsx` (4,263 lines — 11-tab control panel) + tab panels `CommentsPanel.tsx`, `VersionPanel.tsx`, `ReadabilityPanel.tsx` + `poster/sidebar/` satellite files: `EditableExportButtons.tsx` (paid export + paywall), `FigureTab.tsx`, `ImportSection.tsx`, `ImportTile.tsx`, `PostrExportButton.tsx`.
+`poster/Sidebar.tsx` (11 tabs in the default rollout posture; 12 when `VITE_ENABLE_PRESENTATION_CHECKER=true`) + tab panels `CommentsPanel.tsx`, `VersionPanel.tsx`, `ReadabilityPanel.tsx` + `poster/sidebar/` satellite files: `EditableExportButtons.tsx` (paid export + paywall), `FigureTab.tsx`, `ImportSection.tsx`, `ImportTile.tsx`, `PostrExportButton.tsx`, and the gated `ReviewTab.tsx`.
 
 Slice-wide notes:
 - `GALLERY_PUBLIC_ENABLED = false` (`config/features.ts:21`) → the Export tab's "Share to gallery" section (`Sidebar.tsx:1183-1202`) is **currently dead UI**, and the Layout tab footer tip uses the non-gallery copy branch.
 - `HIGHLIGHT_PRESETS` imported at `Sidebar.tsx:29` but **never used** in the file — dead import (block-level highlight UI intentionally removed, see comment `Sidebar.tsx:4036-4044`).
-- Stale header comment `Sidebar.tsx:1-4` says "5-tab control panel / Tabs: Layout · Authors · Refs · Style · Edit" — there are actually 11 tabs (§10).
-- Out-of-slice components rendered from this slice (internals covered elsewhere): `CopyDesignModal` (`:2393`), `UpdateAvailableBanner`/`JustRefreshedBanner` (`:581-582`), `ChartChooser` (via `FigureTab`, §6.10), `RichTextEditor`/`DockedFormatToolbar`/`FloatingFormatToolbar` (`:3865,3881,3890`), `AuthorLine` (`:1245`), `ImportPosterModal`/`ImportConfirmReplaceModal` (via `ImportSection`), `BusyIndicator` (via `EditableExportButtons`). In-slice panels: `CommentsPanel`, `VersionPanel`, `ReadabilityPanel` — inventoried below.
+- Stale header comment `Sidebar.tsx:1-4` says "5-tab control panel / Tabs: Layout · Authors · Refs · Style · Edit" — there are actually 11 default tabs and 12 when Presentation Checker is enabled (§10).
+- Out-of-slice components rendered from this slice (internals covered elsewhere): `CopyDesignModal` (`:2393`), `UpdateAvailableBanner`/`JustRefreshedBanner` (`:581-582`), `ChartChooser` (via `FigureTab`, §6.10), `RichTextEditor`/`DockedFormatToolbar`/`FloatingFormatToolbar` (`:3865,3881,3890`), `AuthorLine` (`:1245`), `ImportPosterModal`/`ImportConfirmReplaceModal` (via `ImportSection`), `BusyIndicator` (via `EditableExportButtons` and `ReviewTab`). In-slice panels: `CommentsPanel`, `VersionPanel`, `ReadabilityPanel`, and `ReviewTab` — inventoried below and in §6.17.
 
 ```mermaid
 flowchart LR
-  PE["PosterEditor"] -->|"renders :2332-2420"| SB["Sidebar (11 tabs)"]
+  PE["PosterEditor"] -->|"renders :2332-2420"| SB["Sidebar (11 default + 1 gated tab)"]
   SB --> L1["layout"] --> SB
   SB --> S1["style"] --> SB
   SB --> A1["authors"] --> SB
@@ -1475,6 +1480,7 @@ flowchart LR
   SB --> R1["references"] --> SB
   SB --> F1["figure (check)"] --> SB
   SB --> I2["issues (count badge)"] --> SB
+  SB -->|"VITE_ENABLE_PRESENTATION_CHECKER=true"| RV["review"] --> RVP["ReviewTab"]
   SB --> C1["comments"] --> CP["CommentsPanel :769"]
   SB --> V1["versions"] --> VP["VersionPanel :795"]
   SB --> X1["export"] --> EEB["EditableExportButtons :1162"]
@@ -1595,7 +1601,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] ✓ / ! / ✗ status glyphs — `ReadabilityPanel.tsx:992` — scan table status column
 - [ ] Line-number gutters (aria-hidden, decorative) — `ReadabilityPanel.tsx:214-235` (editor), `:324-343` (CodeView)
 
-#### `poster/Sidebar.tsx` — 11-tab editor control panel: tab rail + per-tab panels (layout/style/authors/insert/edit/refs/figure/issues/comments/versions/export)
+#### `poster/Sidebar.tsx` — 11 default tabs + flag-gated Review: tab rail + per-tab panels (layout/style/authors/insert/edit/refs/figure/issues/review/comments/versions/export)
 
 **Elements**
 
@@ -1612,10 +1618,26 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] `references` — tab-rail button (key `refs`) — `Sidebar.tsx:615` — switches to Refs tab
 - [ ] `figure` — tab-rail button (key `check`) — `Sidebar.tsx:616` — switches to Figure tab
 - [ ] `issues` — tab-rail button — `Sidebar.tsx:617` — switches to Issues tab; shows count badge (below)
+- [ ] `review` — tab-rail button — `Sidebar.tsx:635-642` — present only when `VITE_ENABLE_PRESENTATION_CHECKER=true`; switches to the Review panel
 - [ ] `comments` — tab-rail button — `Sidebar.tsx:618` — switches to Comments tab (only tab shown in `readOnly` mode, `:607-608`)
 - [ ] `versions` — tab-rail button — `Sidebar.tsx:619` — switches to Versions tab
 - [ ] `export` — tab-rail button — `Sidebar.tsx:620` — switches to Export tab
 - [ ] issue-count badge `{issueCount}` (non-interactive span inside issues tab button) — `Sidebar.tsx:634-654` — red bg if errors else yellow
+
+*Review tab (`ReviewTab`, flag-gated mount `Sidebar.tsx:839-846`; full feature in §6.17)*
+- [ ] Rollout fallback — `Sidebar.tsx:333-337` — if the flag turns off while `review` is active, returns to Layout instead of leaving an unreachable panel selected
+- [ ] Selection auto-switch exemption — `Sidebar.tsx:339-351` — finding-card jumps may select blocks without bouncing the user from Review to Edit
+- [ ] "Get a scored review of this poster — narrative, design, and content — with fix cards that jump to the block they affect. One follow-up is included." — intro copy — `ReviewTab.tsx:179-192`
+- [ ] `Review this poster` / `Reading your poster…` — primary action/busy state — `ReviewTab.tsx:193-207`; synchronous in-flight guard prevents duplicate captures and credit spends
+- [ ] "Uses one review credit, or your weekly add-on review." — entitlement disclosure — `ReviewTab.tsx:208-210`
+- [ ] `ReviewScoreHeader` + attention summary + shared `FindingCard` list — result panel — `ReviewTab.tsx:224-315`; block anchors call `onJumpToBlock`
+- [ ] `Your one follow-up` / `Request your one follow-up` — follow-up entry — `ReviewTab.tsx:317-347`
+- [ ] "This is your one follow-up — the review closes after it." / `Run the follow-up` / `Not yet` — terminal-state disclosure and confirmation — `ReviewTab.tsx:349-404`
+- [ ] "This review is closed — the follow-up was its last pass. A fresh review uses a new credit." / `Start a new review` — closed state — `ReviewTab.tsx:406-427`
+- [ ] `Get feedback on your poster` + workflow description — paywall heading/body — `ReviewTab.tsx:466-480`; user-facing copy never names the model
+- [ ] "You've used this week's reviews … A review pack works right away." — rolling-quota state — `ReviewTab.tsx:481-496`
+- [ ] `Get the review pack` / `Add weekly reviews` — checkout actions — `ReviewTab.tsx:498-523`; add-on is offered only to active-term users without the add-on
+- [ ] "Something went wrong starting checkout. Try again, or use Send Feedback so we can look into it." — checkout error — `ReviewTab.tsx:525-532`
 
 *Layout tab (`LayoutTab`, :822-1098)*
 - [ ] poster-name input (placeholder `e.g. Smith Lab — APA 2026`) — text input — `Sidebar.tsx:867-878` — local state; Enter commits via `saveTitle` → `onChangePosterTitle`; border turns red when empty / amber when dirty
@@ -4551,6 +4573,45 @@ No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) 
 
 ---
 
+### 6.17 Presentation Checker
+
+The review pipeline accepts an uploaded PDF or image, or a native Postr poster capture, and returns a persisted rubric score plus anchored narrative, design, and content findings. `pages/PresentationChecker.tsx` owns the standalone upload/review/history flow; `poster/sidebar/ReviewTab.tsx` reuses `review/FindingCards.tsx` inside the editor. Saved `poster_reviews` can be reopened after reload and an initial review includes one idempotent follow-up.
+
+```mermaid
+flowchart LR
+  PC["PresentationChecker /presentation-checker"] --> ING["review/ingest normalizeInput"]
+  RT["Editor Review tab"] --> ING
+  PC --> CARDS["shared FindingCards"]
+  RT --> CARDS
+  ING --> API["POST /api/review/critique"]
+  API --> CLAUDE["Anthropic structured critique"]
+  API --> DB["poster_reviews + credit/quota RPCs"]
+  PC --> HIST["Saved review history + resume"]
+  HIST -->|"owner SELECT via Supabase RLS"| DB
+  PPTX["PPTX input (flags off by default)"] --> RENDER["POST /api/review/render-pptx"]
+  RENDER --> ING
+```
+
+**Primary files and behavior**
+
+- [ ] `pages/PresentationChecker.tsx` — public, lazy standalone surface; uses `APP_ROUTE_META['/presentation-checker']`, which is `noindex,nofollow`; the route is intentionally absent from marketing navigation during the manual rollout gate.
+- [ ] `poster/sidebar/ReviewTab.tsx` — editor entry point; hidden unless `VITE_ENABLE_PRESENTATION_CHECKER=true`.
+- [ ] `review/FindingCards.tsx` — shared score/finding/follow-up display for standalone and editor surfaces.
+- [ ] `review/reviewApi.ts` — runtime-validates saved and fresh responses; bounded retry behavior; lists and loads review history.
+- [ ] `review/ingest/*` — PDF/image/Postr normalization, browser preflight guards, local previews, private Storage upload, and rollback on upload/signing failure.
+- [ ] `apps/api/src/review.ts` + `apps/api/src/review/*` — authenticated critique/follow-up state machine, request idempotency, ownership checks, page-fetch limits, provider timeout, schema enforcement, and PPTX render isolation.
+- [ ] `supabase/migrations/20260729120000_poster_reviews.sql` — owner-readable/server-written review rows, pack-credit reservation/finalization/release, weekly add-on quota, and follow-up lease RPCs.
+
+**Rollout constraints**
+
+- [ ] Keep `VITE_ENABLE_PRESENTATION_CHECKER` false until the frozen-corpus evaluator and production dogfood gates record GO.
+- [ ] Keep `VITE_ENABLE_REVIEW_PPTX` and server `REVIEW_PPTX_ENABLED` false until the isolated LibreOffice worker is deployed and smoke-tested; the UI says PPTX is coming next while disabled.
+- [ ] Keep `/presentation-checker` unlinked and `noindex,nofollow` until the SEO/quality gate in `docs/plans/2026-07-26-seo-plan.md` passes.
+- [ ] Configure Stripe review-pack and review-add-on prices before enabling paid entry points.
+- [ ] Add and verify an object-lifecycle policy for `poster-assets/{user_id}/review-temp/*` before production rollout.
+
+---
+
 ## 7. Cross-reference index
 
 ### Feature → files → shared imports
@@ -4564,11 +4625,12 @@ No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) 
 | Auth & Session | `pages/Auth.tsx`, `components/AuthGuard.tsx`, `components/AuthBootstrap.tsx` (dead), `components/SessionExpiredModal.tsx`, `lib/auth.ts` | `lib/supabase`, `components/PasswordStrength`, `data/consent`, `data/checkoutIntent` |
 | Dashboard & Profile | `pages/Home.tsx`, `pages/Profile.tsx`, `pages/Gallery.tsx` (dead), `pages/GalleryEntry.tsx` (dead), `pages/AdminGallery.tsx` | `components/NewPosterButton/PosterCard/ConfirmModal/PresetEditModal/PasswordStrength`, `data/posters/gallery/feedback`, `stores/feedbackStore`, `stores/publishFlowStore` (dead), `config/features` |
 | Poster Editor Core | `pages/Editor.tsx`, `pages/Share.tsx`, `poster/blocks.tsx`, `boundsCheck.ts`, `CropOverlay.tsx`, `FloatingFormatToolbar.tsx`, `GroupFrame.tsx`, `GuidelinesPanel.tsx`, `PosterEditor.tsx`, `resizeHandles.tsx`, `RichTextEditor.tsx`, `SelectionRect.tsx`, `symbols.ts`, `templates.ts`, `constants.ts`, `UndoToast.tsx` | `stores/posterStore`, `hooks/*` (all), `components/{Sidebar→§6.8, PaletteDesigner, StaplesPrintModal, ConfirmModal, AutosaveStatusPill, OnboardingTour, InputModal, LogoPicker}`, `charts/ChartBlock`, `export/*` (print, attribution, blockLock), `data/posters/posterVersions/posterImages`, `motion/timelines/{editorEntrance,blockSelection}` |
-| Poster Sidebar (11 tabs) | `poster/Sidebar.tsx`, `poster/{CommentsPanel,VersionPanel,ReadabilityPanel}.tsx`, `poster/sidebar/{EditableExportButtons,FigureTab,ImportSection,ImportTile,PostrExportButton}.tsx` | `poster/constants/templates`, `components/{CopyDesignModal, ImportPosterModal, ImportConfirmReplaceModal, BusyIndicator, UpdateAvailableToast}`, `charts/ladder/ChartChooser`, `hooks/usePlan`, `data/billing`, `lib/apiClient`, `config/features` |
+| Poster Sidebar (11 default tabs + 1 gated Review tab) | `poster/Sidebar.tsx`, `poster/{CommentsPanel,VersionPanel,ReadabilityPanel}.tsx`, `poster/sidebar/{EditableExportButtons,FigureTab,ImportSection,ImportTile,PostrExportButton,ReviewTab}.tsx` | `poster/constants/templates`, `components/{CopyDesignModal, ImportPosterModal, ImportConfirmReplaceModal, BusyIndicator, UpdateAvailableToast}`, `charts/ladder/ChartChooser`, `review/{FindingCards,ingest,reviewApi,flags}`, `hooks/usePlan`, `data/billing`, `lib/apiClient`, `config/features` |
 | Import & Data | `import/*` (14 files), `data/*` (13 files) | `lib/apiClient`, `lib/supabase`, `hooks/useComments` (comments consumers), rendered by `components/ImportPosterModal` + `poster/Sidebar` |
 | Charts | `pages/ChartChooser.tsx`, `charts/*` (21 files) | `poster/constants` (PALETTES), `components/BusyIndicator`, `stores/feedbackStore`, `poster/PosterEditor` (poster tables) |
 | Export & Attribution | `export/*` (20 files) | `export/attribution.ts` (single ack source), `import/postrFile.ts` (.postr), `hooks/usePlan` (paidPlan seam) |
 | Manuscript → Poster | `pages/PaperToPoster.tsx`, `manuscript/*` (20 files) | `charts/ladder/ChartChooser`, `components/BusyIndicator`, `lib/apiClient`, `lib/auth`, `manuscript/figureCheck.ts` |
+| Presentation Checker | `pages/PresentationChecker.tsx`, `review/FindingCards.tsx`, `review/reviewApi.ts`, `review/flags.ts`, `review/ingest/*`, `poster/PosterSnapshotCanvas.tsx`, `poster/sidebar/ReviewTab.tsx` | `hooks/usePlan`, `stores/posterStore`, `data/{billing,checkoutIntent,posters}`, `lib/{apiClient,supabase}`, shared review types; server `apps/api/src/review.ts` + `apps/api/src/review/*`; DB `public.poster_reviews` + review RPCs |
 | Shared Components & Motion | `components/*` (30 files), `motion/*` (9 files) | `hooks/useModalTransition`, `stores/feedbackStore`, `stores/publishFlowStore`, `data/*`, `import/*`, `poster/logoPresets`, `poster/paletteTools` |
 | Stores, Hooks & Storage Keys | `stores/*` (3), `hooks/*` (7), `lib/*` (4), `config/features.ts`, `globals.d.ts` | — (base layer) |
 | SEO & Analytics | `seo/routes.json`, `seo/siteMeta.ts`, `seo/useDocumentMeta.ts`, `analytics/redactUrl.ts` | consumed by every page via `useDocumentMeta`; `App.tsx:38` |
@@ -4611,6 +4673,7 @@ No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) 
 | `UpdateAvailableBanner` / `JustRefreshedBanner` | Sidebar (:581-582) |
 | `StyleMiniPreview` | CopyDesignModal (:257,:263) |
 | `Sidebar` | PosterEditor (:2332-2420) |
+| `FindingCards` (`ReviewScoreHeader`, `FindingCard`) | PresentationChecker; sidebar/ReviewTab |
 | `GuidelinesPanel` | PosterEditor (:3305) |
 | `FloatingFormatToolbar` | blocks.tsx (:2537); docked variant in Sidebar Edit tab (:3865,:3890) |
 | `RichTextEditor` | Sidebar Edit tab TextBlockEditor (:3881-3888); block text editors in blocks.tsx |
@@ -4681,6 +4744,8 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 | `public.poster_versions` | `data/posterVersions.ts` (⌘S saveVersionNow; Versions tab) | MAX_VERSIONS_PER_POSTER = 20 |
 | `public.user_logos` | `data/userLogos.ts`, LogoPicker "My Logos" | max 25/account, 10 MB each |
 | `public.talk_waitlist` | `data/talkWaitlist.ts` ← PricingSection "Join the waitlist" | shipped 2026-07-28 (`20260728160000_talk_waitlist.sql`) |
+| `public.poster_reviews` | `pages/PresentationChecker.tsx` via `review/reviewApi.ts` | owner SELECT-only; API/service role owns writes, request idempotency, result JSON, and one included follow-up |
+| `public.review_addon_usage` | server RPC only | private rolling-week quota ledger for the review add-on |
 | billing fulfillment rows | written ONLY by the Stripe webhook (service_role) | `20260728130000_billing_fulfilled_sessions.sql`, `20260728140000_consume_export_credit.sql`, `20260728150000_grant_export_credits.sql`, `20260728170000_billing_subscription.sql`, `20260728190000_billing_refunds.sql` |
 | `public.presets` | — | **UNUSED** (`20260408000200_presets.sql`; app presets live in localStorage `postr.style-presets`) — §10 |
 | `public.authors_lib` / `public.institutions_lib` / `public.references_lib` | — | **UNUSED** (`20260408000300_library.sql` — PRD §21 library never wired to UI) — §10 |
@@ -4691,9 +4756,13 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 - [ ] `is_gallery_admin` — Home Admin link gate, AdminGallery gate
 - [ ] admin retract/unretract — `data/gallery.ts` (`adminRetractEntry`, `adminUnretractEntry`) ← AdminGallery
 - [ ] `consume_export_credit` / `grant_export_credits` — server-side only (billing webhook + `/billing/consume-credit`)
+- [ ] `claim_initial_review` / `reserve_initial_review_credit` / `release_initial_review` / `finalize_initial_review` — server-side, token-fenced initial-review idempotency and exact pack-credit accounting
+- [ ] `consume_review_credit` / `grant_review_credits` / `consume_review_addon_slot` — server-side review entitlements and weekly add-on quota
+- [ ] `claim_review_followup` / `complete_review_followup` / `release_review_followup` — server-side included-follow-up lease and terminal state
 
 **Storage buckets**
 - [ ] `poster-assets` — PRIVATE, signed URLs (`storage://` refs resolved by `hooks/useStorageUrl`); poster images (`data/posterImages.ts`), thumbnails (`data/thumbnails.ts`), import/vision upload staging
+- [ ] `poster-assets/{user_id}/review-temp/*` — private Presentation Checker upload/render staging; signed URLs are short-lived and the production lifecycle policy is a rollout blocker
 - [ ] `user-logos` — user logo library (`data/userLogos.ts`)
 - [ ] `gallery` — gallery entry images/PDFs (`data/gallery.ts`)
 
@@ -4712,6 +4781,8 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 | `POST /api/narrative/extract-findings` | `manuscript/deck/extractFindings.ts:63` ← PaperToSlides (§6.16) | Phase-1 LLM star-finding extraction for the slide deck (OpenAI); same middleware as `/condense` |
 | `POST /api/narrative/style-deck` | `manuscript/deck/styleClient.ts:59` ← PaperToSlides (§6.16) | Phase-2 Arm P — styles each slide into structured editable layout (OpenAI); same middleware as `/condense` |
 | `POST /api/narrative/theme` | `manuscript/deck/themeClient.ts:79` ← PaperToSlides (§6.16) | Phase-2 Arm T — field theme + 4 palette variations (OpenAI); same middleware as `/condense`; re-run alone on a vibe change |
+| `POST /api/review/critique` | `review/reviewApi.ts` ← PresentationChecker / ReviewTab (§6.17) | Authenticated initial critique and included follow-up; reserves entitlement before provider work, validates owned page paths, persists idempotent results |
+| `POST /api/review/render-pptx` | `review/ingest/fromPptx.ts` (§6.17) | Flag-gated LibreOffice render path with compressed/uncompressed/ratio/page limits; disabled by default |
 | `POST /billing/create-checkout` | `data/billing.ts:17` ← EditableExportButtons (term/pack), Auth (`startCheckoutForPlan`) | Creates Stripe Checkout Session → redirect URL |
 | `POST /billing/consume-credit` | `data/billing.ts:33` ← EditableExportButtons post-export | Consumes 1 export credit |
 | `POST /billing/mark-export` | `data/billing.ts:46` ← EditableExportButtons (term users) | Marks a paid export taken (refund-right forfeiture) |
@@ -4723,7 +4794,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 ### Stripe (billing provider)
 
 - [ ] Managed Payments (Stripe = merchant of record, files/remits tax); API version `2026-02-25.preview` (`apps/api/src/billing.ts:36`)
-- [ ] Products: **Term** CA$18.99 recurring every 4 months (Stripe recurring price, `interval_count=4 months`); **Export pack** CA$9.99 one-time for 3 credits (`PACK_EXPORT_CREDITS = 3`, `PACK_PRICE_CENTS = 999`, `TERM_REFUND_WINDOW_DAYS = 14` — `apps/api/src/billing.ts:42-46`)
+- [ ] Products: **Term** CA$18.99 recurring every 4 months; **Export pack** CA$9.99 one-time for 3 export credits; Presentation Checker **review pack** (one-time, 3 reviews) and **review add-on** (recurring, weekly quota). Review price IDs must be configured and manually exercised before rollout.
 - [ ] Checkout success/cancel URLs → `/billing/success`, `/billing/cancel` (`pages/BillingResult.tsx`)
 - [ ] Currently wired to the Stripe SANDBOX; production flip is env-vars only (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, price ids) — `apps/api/src/billing.ts:20-22`
 - [ ] Client fallback: `LINK_MANAGE_URL = "https://link.com"` (`data/billing.ts:67`)
@@ -4737,6 +4808,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 ### Anthropic (Claude)
 
 - [ ] Model `claude-sonnet-4-5-20250929` — `apps/api/src/import.ts:914,975,1016,1058,1099,1152,1208` (vision extraction, small-region verification, logo splitting, author/reference parsing) and `apps/api/src/extractStyle.ts:220` (copy-a-design). Reached only via `/api/import/*` endpoints above; web copy: "Calling Claude Vision…" (`import/imageImport.ts:257`)
+- [ ] Presentation Checker uses the same pinned Claude model through `apps/api/src/review/critique.ts` for structured rubric output; live corpus quality, cost, and threshold calibration remain manual launch gates.
 
 ### OpenAI
 
@@ -4756,6 +4828,8 @@ Things that exist in code but are unreachable, unused, stale, or drifted — che
 ### Deactivated / dead features
 
 - [ ] **Public gallery (`GALLERY_PUBLIC_ENABLED = false`, `config/features.ts:21`)** — full surface: routes `/gallery`, `/gallery/:entryId` redirect to `/` (`routes.tsx:116-117`); `pages/Gallery.tsx` + `pages/GalleryEntry.tsx` unreachable but kept for reactivation; flag gates Home Gallery link (`Home.tsx:148`), Profile upload button + entry links (`Profile.tsx:571-595,814`), Sidebar "Share to gallery" (`Sidebar.tsx:1183-1202`), `?publish=1` auto-open (`PosterEditor.tsx:1314-1329`), OnboardingTour step-7 flag-ON body (`OnboardingTour.tsx:85`); dead flow: `PublishFlow` (mounted `App.tsx:15`), `PublishConsentModal`, `PublishGalleryModal`, `stores/publishFlowStore.ts`, `data/gallery.ts` publish path; `PublishConsentModal` `mode="share"` has NO caller anywhere; PosterCard "Publish" hover action was DELETED not gated (comment `PosterCard.tsx:262-271`); gallery siteMeta templates (`siteMeta.ts:213-219`) unused; reactivation checklist in `features.ts:4-19` header comment. `/admin/gallery` + `data/gallery.ts` read paths remain live.
+- [ ] **Presentation Checker rollout is intentionally unreachable from normal navigation** — direct route remains for QA, but editor entry is flag-gated off and the route is `noindex,nofollow` until frozen-corpus, live-provider, Stripe, and production dogfood gates pass.
+- [ ] **Review staging lifecycle is external configuration** — code rolls back known upload failures, but no repository migration can prove a production object-lifecycle rule for `poster-assets/*/review-temp/*`; verify it before enabling rollout.
 - [ ] **Dead `AuthBootstrap`** — `components/AuthBootstrap.tsx` defined but never mounted in `src/`; referenced only by a comment in `pages/Share.tsx:4` and the consumer list in `lib/auth.ts`.
 - [ ] **Unused `SORT_MODE_LABELS`** — `poster/citations.ts:111-115` ("Manual order" / "Alphabetical (first author)" / "Year (newest first)" / "Year (oldest first)"); `sortMode` is hardcoded `'alpha'` with "no user-facing toggle" (`PosterEditor.tsx:653-655`) — labels have no live render site.
 - [ ] **Unused `charts/seriesPalettes.ts`** — `seriesPalettesFor()` referenced only by tests; 10 palette names/notes + 40 CVD swatches unrendered (§6.10).

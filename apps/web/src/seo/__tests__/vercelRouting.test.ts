@@ -65,6 +65,7 @@ const CLIENT_ROUTES = [
   '/p/:posterId',
   '/profile',
   '/admin/gallery',
+  '/presentation-checker',
 ];
 
 /**

@@ -143,18 +143,54 @@ export type Database = {
       }
       billing_fulfilled_sessions: {
         Row: {
+          credits_granted: number
           fulfilled_at: string
           session_id: string
           user_id: string
         }
         Insert: {
+          credits_granted?: number
           fulfilled_at?: string
           session_id: string
           user_id: string
         }
         Update: {
+          credits_granted?: number
           fulfilled_at?: string
           session_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      billing_refunds: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          credits_revoked: number
+          id: string
+          kind: string
+          session_id: string | null
+          stripe_refund_id: string
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          credits_revoked?: number
+          id?: string
+          kind: string
+          session_id?: string | null
+          stripe_refund_id: string
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          credits_revoked?: number
+          id?: string
+          kind?: string
+          session_id?: string | null
+          stripe_refund_id?: string
           user_id?: string
         }
         Relationships: []
@@ -349,6 +385,98 @@ export type Database = {
           },
         ]
       }
+      poster_review_requests: {
+        Row: {
+          claim_token: string
+          claimed_at: string
+          expires_at: string
+          pack_credit_reserved: boolean
+          request_key: string
+          user_id: string
+        }
+        Insert: {
+          claim_token?: string
+          claimed_at?: string
+          expires_at?: string
+          pack_credit_reserved?: boolean
+          request_key: string
+          user_id: string
+        }
+        Update: {
+          claim_token?: string
+          claimed_at?: string
+          expires_at?: string
+          pack_credit_reserved?: boolean
+          request_key?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      poster_reviews: {
+        Row: {
+          created_at: string
+          credit_source: string | null
+          followup_findings: Json | null
+          followup_lease_expires_at: string | null
+          followup_lease_token: string | null
+          followup_request_id: string | null
+          id: string
+          initial_findings: Json | null
+          poster_id: string | null
+          request_key: string | null
+          source_kind: string
+          source_meta: Json
+          stage: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credit_source?: string | null
+          followup_findings?: Json | null
+          followup_lease_expires_at?: string | null
+          followup_lease_token?: string | null
+          followup_request_id?: string | null
+          id?: string
+          initial_findings?: Json | null
+          poster_id?: string | null
+          request_key?: string | null
+          source_kind: string
+          source_meta?: Json
+          stage?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credit_source?: string | null
+          followup_findings?: Json | null
+          followup_lease_expires_at?: string | null
+          followup_lease_token?: string | null
+          followup_request_id?: string | null
+          id?: string
+          initial_findings?: Json | null
+          poster_id?: string | null
+          request_key?: string | null
+          source_kind?: string
+          source_meta?: Json
+          stage?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "poster_reviews_poster_id_fkey"
+            columns: ["poster_id"]
+            isOneToOne: false
+            referencedRelation: "posters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       poster_versions: {
         Row: {
           created_at: string
@@ -513,6 +641,32 @@ export type Database = {
           },
         ]
       }
+      review_addon_usage: {
+        Row: {
+          consumed_at: string
+          id: number
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string
+          id?: never
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string
+          id?: never
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_addon_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       talk_waitlist: {
         Row: {
           email: string | null
@@ -562,12 +716,19 @@ export type Database = {
           display_name: string | null
           email: string | null
           export_credits: number
+          first_paid_export_at: string | null
           id: string
           is_anonymous: boolean
+          marketing_consent_at: string | null
           plan: string
           plan_expires_at: string | null
           research_consent_at: string | null
+          review_addon: boolean
+          review_addon_subscription_id: string | null
+          review_credits: number
           stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_status: string | null
         }
         Insert: {
           cookie_consent_at?: string | null
@@ -575,12 +736,19 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           export_credits?: number
+          first_paid_export_at?: string | null
           id: string
           is_anonymous?: boolean
+          marketing_consent_at?: string | null
           plan?: string
           plan_expires_at?: string | null
           research_consent_at?: string | null
+          review_addon?: boolean
+          review_addon_subscription_id?: string | null
+          review_credits?: number
           stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string | null
         }
         Update: {
           cookie_consent_at?: string | null
@@ -588,12 +756,19 @@ export type Database = {
           display_name?: string | null
           email?: string | null
           export_credits?: number
+          first_paid_export_at?: string | null
           id?: string
           is_anonymous?: boolean
+          marketing_consent_at?: string | null
           plan?: string
           plan_expires_at?: string | null
           research_consent_at?: string | null
+          review_addon?: boolean
+          review_addon_subscription_id?: string | null
+          review_credits?: number
           stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string | null
         }
         Relationships: []
       }
@@ -602,14 +777,96 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_initial_review: {
+        Args: { p_request_key: string; p_user_id: string }
+        Returns: Json
+      }
+      claim_review_followup: {
+        Args: { p_request_id: string; p_review_id: string; p_user_id: string }
+        Returns: Json
+      }
+      complete_review_followup: {
+        Args: {
+          p_followup_findings: Json
+          p_lease_token: string
+          p_request_id: string
+          p_review_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       consume_export_credit: { Args: { p_user_id: string }; Returns: number }
+      consume_review_addon_slot: {
+        Args: { p_quota: number; p_user_id: string }
+        Returns: Json
+      }
+      consume_review_credit: { Args: { p_user_id: string }; Returns: number }
       delete_own_account: { Args: never; Returns: undefined }
       export_my_data: { Args: never; Returns: Json }
+      finalize_initial_review: {
+        Args: {
+          p_claim_token: string
+          p_credit_source: string
+          p_initial_findings: Json
+          p_poster_id: string
+          p_request_key: string
+          p_source_kind: string
+          p_source_meta: Json
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      fulfill_credit_pack: {
+        Args: {
+          p_amount: number
+          p_session_id: string
+          p_sku: string
+          p_user_id: string
+        }
+        Returns: number
+      }
       grant_export_credits: {
         Args: { p_amount: number; p_user_id: string }
         Returns: number
       }
+      grant_review_credits: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: number
+      }
       is_gallery_admin: { Args: { uid: string }; Returns: boolean }
+      mark_first_paid_export: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      release_initial_review: {
+        Args: {
+          p_claim_token: string
+          p_request_key: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      release_review_followup: {
+        Args: {
+          p_lease_token: string
+          p_request_id: string
+          p_review_id: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      reserve_initial_review_credit: {
+        Args: {
+          p_claim_token: string
+          p_request_key: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      revoke_export_credits: {
+        Args: { p_amount: number; p_user_id: string }
+        Returns: number
+      }
     }
     Enums: {
       gallery_field:
@@ -772,4 +1029,3 @@ export const Constants = {
     },
   },
 } as const
-

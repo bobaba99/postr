@@ -376,7 +376,16 @@ export default function Auth() {
         {checkoutPlan ? (
           <div className="rounded-xl border border-[#7c6aed]/40 bg-[#14121e] p-5 mb-4 text-center">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-[#9b8cf0]">
-              {checkoutPlan === 'term' ? 'Term · CA$18.99 / 4 months' : 'Export pack · CA$9.99'}
+              {
+                (
+                  {
+                    term: 'Term · CA$18.99 / 4 months',
+                    pack: 'Export pack · CA$9.99',
+                    review_pack: 'Review pack · credits never expire',
+                    review_addon: 'Review add-on · weekly reviews',
+                  } as Record<CheckoutPlan, string>
+                )[checkoutPlan]
+              }
             </div>
             <p className="mt-2 text-sm leading-relaxed text-[#c8cad0]">
               {checkingOut
