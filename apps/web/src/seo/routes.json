@@ -122,6 +122,11 @@
       "description": "Your Postr profile and settings.",
       "robots": "noindex,nofollow"
     },
+    "/presentation-checker": {
+      "title": "Presentation Checker: Get Feedback on Your Poster or Talk | Postr",
+      "description": "Upload a poster PDF, talk deck, or image — or pick one of your Postr posters — and get narrative, design, and content scores with anchored fix cards.",
+      "robots": "noindex,nofollow"
+    },
     "/debug": {
       "title": "Debug | Postr",
       "description": "Diagnostics.",
