@@ -150,6 +150,23 @@ export interface ChartSpec {
   };
   /** Palette slot names resolved against `PosterDoc.palette`. */
   paletteSlots: string[];
+  /**
+   * Optional override: when set, the chart's CATEGORICAL series fills
+   * come from the fixed CVD-tested science palette with this id
+   * (see charts/seriesPalettes.ts) instead of from `paletteSlots`.
+   * That chart is then pinned to the tested set and is immune to
+   * poster restyle for its series fills — a deliberate, per-chart
+   * opt-out of the "restyle poster → restyle charts" invariant.
+   *
+   * Sequential (heatmap) and diverging (Likert) ramps ignore this and
+   * always follow `paletteSlots`. Unset (the default, and every chart
+   * created before this field) = full slot-based colouring. A stale id
+   * (palette no longer in the file) falls back to slots, visibly.
+   *
+   * Optional (not `| null`) so pre-existing specs stay valid without a
+   * migration — same reasoning as `paletteSlots`.
+   */
+  seriesPaletteId?: string;
   title?: string;
   xLabel?: string;
   yLabel?: string;
