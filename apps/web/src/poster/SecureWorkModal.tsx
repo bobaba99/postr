@@ -87,7 +87,7 @@ export function SecureWorkModal({ reason, onClose, onConverted }: Props) {
     <div
       data-postr-modal-backdrop
       data-state="open"
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={overlayStyle}
     >
       <div
@@ -96,7 +96,6 @@ export function SecureWorkModal({ reason, onClose, onConverted }: Props) {
         aria-label={copy.title}
         data-postr-modal-content
         data-state="open"
-        onClick={(e) => e.stopPropagation()}
         style={panelStyle}
       >
         <h3 style={titleStyle}>{copy.title}</h3>

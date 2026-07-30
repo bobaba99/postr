@@ -63,7 +63,7 @@ export function ConfirmModal({
   return (
     <div
       data-postr-modal-backdrop data-state={state}
-      onClick={onCancel}
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -77,7 +77,6 @@ export function ConfirmModal({
     >
       <div
         data-postr-modal-content data-state={state}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: 440,
@@ -118,6 +117,7 @@ export function ConfirmModal({
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               placeholder={typedConfirmation}
+              aria-label={`Type ${typedConfirmation} to confirm`}
               autoFocus
               style={{
                 width: '100%',

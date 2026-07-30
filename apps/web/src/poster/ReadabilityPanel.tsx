@@ -384,7 +384,7 @@ function FullCodeModal({ open, code, onClose, onCopied }: FullCodeModalProps) {
 
   return (
     <div
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -397,7 +397,6 @@ function FullCodeModal({ open, code, onClose, onCopied }: FullCodeModalProps) {
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           background: '#1e1e2e',
           border: '1px solid #45475a',

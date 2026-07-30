@@ -52,7 +52,7 @@ export function InputModal({
   return (
     <div
       data-postr-modal-backdrop data-state={state}
-      onClick={onCancel}
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -66,7 +66,6 @@ export function InputModal({
     >
       <div
         data-postr-modal-content data-state={state}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: 400,
@@ -88,6 +87,7 @@ export function InputModal({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={placeholder}
+          aria-label={title}
           style={{
             width: '100%',
             padding: '10px 12px',

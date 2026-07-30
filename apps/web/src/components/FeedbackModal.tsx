@@ -84,7 +84,7 @@ export function FeedbackModal() {
   return (
     <div
       data-postr-modal-backdrop data-state={state}
-      onClick={close}
+      onClick={(e) => { if (e.target === e.currentTarget) close(); }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -99,7 +99,6 @@ export function FeedbackModal() {
     >
       <div
         data-postr-modal-content data-state={state}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: 520,

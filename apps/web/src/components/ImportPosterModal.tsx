@@ -318,10 +318,10 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
   return (
     <div
       data-postr-modal-backdrop data-state={state}
-      onClick={phase === 'committing' ? undefined : onClose}
+      onClick={phase === 'committing' ? undefined : (e) => { if (e.target === e.currentTarget) onClose(); }}
       style={overlayStyle}
     >
-      <div data-postr-modal-content data-state={state} onClick={(e) => e.stopPropagation()} style={modalStyle}>
+      <div data-postr-modal-content data-state={state} style={modalStyle}>
         <Header onClose={onClose} disabled={phase === 'committing'} mode={mode} />
 
         {importFailed && (

@@ -181,13 +181,12 @@ export function CopyDesignModal({ open, onClose }: Props) {
     <div
       data-postr-modal-backdrop
       data-state={state}
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={overlayStyle}
     >
       <div
         data-postr-modal-content
         data-state={state}
-        onClick={(e) => e.stopPropagation()}
         style={modalStyle}
         role="dialog"
         aria-label="Copy a design"
