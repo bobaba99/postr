@@ -17,6 +17,7 @@ import type { CSSProperties } from 'react';
 import type { Block, ChartSpec, Palette } from '@postr/shared';
 import { ChartChooser } from '@/charts/ladder/ChartChooser';
 import type { PosterTableRef } from '@/charts/ladder/DataStep';
+import { ChartPalettePicker } from '@/charts/ChartPalettePicker';
 import { ReadabilityPanel } from '../ReadabilityPanel';
 
 export type FigureMode = 'make' | 'check';
@@ -33,6 +34,9 @@ interface FigureTabProps {
   fontFamily: string;
   posterTables: PosterTableRef[];
   onInsertChart: (spec: ChartSpec, caption: string) => void;
+  /** Selected chart block, if any — enables the per-chart palette picker. */
+  selectedChartBlock: Block | null;
+  onUpdateChartSpec: (blockId: string, spec: ChartSpec) => void;
 }
 
 const segmentStyle = (active: boolean): CSSProperties => ({
@@ -57,9 +61,43 @@ export function FigureTab({
   fontFamily,
   posterTables,
   onInsertChart,
+  selectedChartBlock,
+  onUpdateChartSpec,
 }: FigureTabProps) {
+  const selectedChartSpec = selectedChartBlock?.chartSpec ?? null;
   return (
     <div>
+      {/* Per-chart palette control — contextual to the current
+          selection, so it sits above the make/check modes and shows
+          only when a chart block is selected. Recolours that one
+          chart's series fills; clearing hands it back to the poster
+          theme. */}
+      {selectedChartBlock && selectedChartSpec && (
+        <div
+          style={{
+            marginTop: 12,
+            padding: 12,
+            background: '#0f0f17',
+            border: '1px solid #2a2a3a',
+            borderRadius: 8,
+          }}
+        >
+          <ChartPalettePicker
+            spec={selectedChartSpec}
+            onChange={(seriesPaletteId) => {
+              // Clearing drops the key entirely (spread of `undefined`
+              // is omitted by JSON.stringify on autosave), so a reset
+              // chart serializes identically to one never overridden.
+              const { seriesPaletteId: _drop, ...rest } = selectedChartSpec;
+              onUpdateChartSpec(
+                selectedChartBlock.id,
+                seriesPaletteId ? { ...rest, seriesPaletteId } : rest,
+              );
+            }}
+          />
+        </div>
+      )}
+
       <div
         role="group"
         aria-label="Figure tools"

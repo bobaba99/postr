@@ -2403,6 +2403,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         onChangeFigureMode={setFigureModeChoice}
         posterTables={posterTables}
         onInsertChart={insertChartBlock}
+        onUpdateChartSpec={(blockId, spec) => updateBlock(blockId, { chartSpec: spec })}
         issues={posterIssues}
         onJumpToBlock={(id) => {
           selectOne(id);
