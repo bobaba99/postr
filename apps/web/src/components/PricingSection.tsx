@@ -69,7 +69,7 @@ const TIERS: Tier[] = [
     cadence: 'always',
     tagline: 'Everything you need to build and print a poster.',
     cta: 'Start free',
-    ctaTo: '/auth?guest=1',
+    ctaTo: '/p/new',
     forWho: 'Making a poster and printing or presenting it.',
     features: [
       'Unlimited editing, every tool',

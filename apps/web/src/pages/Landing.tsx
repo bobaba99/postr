@@ -158,7 +158,7 @@ export default function Landing() {
             Get started
           </Link>
           <Link
-            to="/auth?guest=1"
+            to="/p/new"
             className="rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-8 py-3 text-base font-semibold text-[#c8cad0] no-underline hover:border-[#7c6aed] transition-colors"
           >
             Try as guest
