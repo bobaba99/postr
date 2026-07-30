@@ -19,7 +19,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { PasswordStrength, isPasswordValid } from '@/components/PasswordStrength';
-import { PublicFooter } from '@/components/PublicFooter';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 import {
@@ -374,26 +373,36 @@ export default function Auth() {
             real account, so we lead with "create an account to continue to
             checkout", not "no account needed". */}
         {checkoutPlan ? (
-          <div className="rounded-xl border border-[#7c6aed]/40 bg-[#14121e] p-5 mb-4 text-center">
-            <div className="text-[11px] font-semibold uppercase tracking-wider text-[#9b8cf0]">
-              {checkoutPlan === 'term' ? 'Term · CA$18.99 / 4 months' : 'Export pack · CA$9.99'}
+          <div className="mb-4 rounded-xl border border-[#7c6aed]/40 bg-[#14121e] p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-[#9b8cf0]">
+                  {checkoutPlan === 'term' ? 'Term · CA$18.99 / 4 months' : 'Export pack · CA$9.99'}
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-[#c8cad0]">
+                  {checkingOut
+                    ? 'Continuing to secure checkout…'
+                    : 'Create your account to continue.'}
+                </p>
+              </div>
+              <Link
+                to="/pricing"
+                className="shrink-0 text-sm font-semibold text-[#b4a9f5] underline decoration-[#7c6aed] underline-offset-4"
+              >
+                Change plan
+              </Link>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-[#c8cad0]">
-              {checkingOut
-                ? 'Continuing to secure checkout…'
-                : 'Create your account below to continue to secure checkout.'}
-            </p>
           </div>
         ) : (
         <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 mb-4">
           <button
             onClick={handleGuest}
             disabled={loading}
-            className="w-full rounded-lg bg-[#7c6aed] px-4 py-3.5 text-base font-semibold text-white hover:bg-[#6c5ce7] transition-colors disabled:opacity-50"
+            className="w-full rounded-lg bg-[#5641b8] px-4 py-3.5 text-base font-semibold text-white hover:bg-[#4c39a6] transition-colors disabled:opacity-50"
           >
             {loading ? 'Loading…' : 'Start creating — no account needed'}
           </button>
-          <p className="mt-3 text-[14pt] text-[#6b7280] text-center leading-relaxed">
+          <p className="mt-3 text-center text-[14pt] leading-relaxed text-[#8b8f99]">
             Jump straight into the editor as a guest. Your work saves in this browser.
             Link an account anytime to sync across devices.
           </p>
@@ -402,17 +411,17 @@ export default function Auth() {
 
         {/* Sign in / Sign up card */}
         <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
-          <h2 className="text-base font-bold text-[#e2e2e8] mb-1">
+          <h1 className="mb-1 text-base font-bold text-[#e2e2e8]">
             {mode === 'signin'
               ? 'Sign in'
               : checkoutPlan
                 ? 'Create your account'
                 : 'Or create an account'}
-          </h2>
-          <p className="text-[14pt] text-[#6b7280] mb-5">
+          </h1>
+          <p className="mb-5 text-[14pt] text-[#8b8f99]">
             {mode === 'signin'
               ? 'Access your posters from any device.'
-              : 'Save your work across devices.'}
+              : 'Save posters and continue on any device.'}
           </p>
 
           {confirmEmail && (
@@ -456,7 +465,7 @@ export default function Auth() {
 
           <div className="my-4 flex items-center gap-3">
             <div className="h-px flex-1 bg-[#2a2a3a]" />
-            <span className="text-[13px] text-[#555]">or use email</span>
+            <span className="text-[13px] text-[#8b8f99]">or use email</span>
             <div className="h-px flex-1 bg-[#2a2a3a]" />
           </div>
 
@@ -468,7 +477,7 @@ export default function Auth() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email address"
               required
-              className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
+              className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
             />
             <div>
               <input
@@ -478,7 +487,7 @@ export default function Auth() {
                 placeholder={mode === 'signup' ? 'Create password' : 'Password'}
                 required
                 minLength={8}
-                className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
+                className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
               />
               {mode === 'signup' && <PasswordStrength password={password} />}
               {mode === 'signin' && (
@@ -505,47 +514,43 @@ export default function Auth() {
                 valid consent under GDPR (no pre-ticking) and CASL (express
                 opt-in). Governs whichever signup method the user picks. */}
             {mode === 'signup' && (
-              <fieldset className="rounded-lg border border-[#2a2a3a] bg-[#0f0f18] px-3 py-2.5">
-                <legend className="px-1 text-[11px] font-semibold uppercase tracking-wider text-[#8b8f99]">
-                  Stay in touch (optional)
-                </legend>
-                <label htmlFor="consent-research" className="flex items-start gap-2.5 py-1 cursor-pointer">
-                  <input
-                    id="consent-research"
-                    type="checkbox"
-                    checked={researchOptIn}
-                    onChange={(e) => setResearchOptIn(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#7c6aed]"
-                  />
-                  <span className="text-[13px] leading-snug text-[#c8cad0]">
-                    Occasionally invite me to a short interview or survey about Postr.
-                    <span className="block text-[12px] text-[#6b7280]">
-                      Turn off anytime in settings. Never affects your access.
+              <details className="rounded-lg border border-[#2a2a3a] bg-[#0f0f18] px-3 py-2.5">
+                <summary className="cursor-pointer text-[13px] font-semibold text-[#c8cad0]">
+                  Email preferences (optional)
+                </summary>
+                <div className="mt-2 space-y-1">
+                  <label htmlFor="consent-research" className="flex cursor-pointer items-start gap-2.5 py-1">
+                    <input
+                      id="consent-research"
+                      type="checkbox"
+                      checked={researchOptIn}
+                      onChange={(e) => setResearchOptIn(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[#7c6aed]"
+                    />
+                    <span className="text-[13px] leading-snug text-[#c8cad0]">
+                      Invite me to occasional research interviews or surveys.
                     </span>
-                  </span>
-                </label>
-                <label htmlFor="consent-marketing" className="flex items-start gap-2.5 py-1 cursor-pointer">
-                  <input
-                    id="consent-marketing"
-                    type="checkbox"
-                    checked={marketingOptIn}
-                    onChange={(e) => setMarketingOptIn(e.target.checked)}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#7c6aed]"
-                  />
-                  <span className="text-[13px] leading-snug text-[#c8cad0]">
-                    Email me product updates and new features.
-                    <span className="block text-[12px] text-[#6b7280]">
-                      Occasional only. Unsubscribe anytime.
+                  </label>
+                  <label htmlFor="consent-marketing" className="flex cursor-pointer items-start gap-2.5 py-1">
+                    <input
+                      id="consent-marketing"
+                      type="checkbox"
+                      checked={marketingOptIn}
+                      onChange={(e) => setMarketingOptIn(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[#7c6aed]"
+                    />
+                    <span className="text-[13px] leading-snug text-[#c8cad0]">
+                      Email me product updates and new features.
                     </span>
-                  </span>
-                </label>
-              </fieldset>
+                  </label>
+                </div>
+              </details>
             )}
 
             <button
               type="submit"
               disabled={loading || checkingOut || !email.trim() || !password || (mode === 'signup' && !isPasswordValid(password))}
-              className="w-full rounded-lg border border-[#7c6aed] bg-transparent px-4 py-3 text-sm font-semibold text-[#7c6aed] hover:bg-[#7c6aed] hover:text-white transition-colors disabled:opacity-50"
+              className="w-full rounded-lg border border-[#7c6aed] bg-transparent px-4 py-3 text-sm font-semibold text-[#7c6aed] hover:bg-[#5641b8] hover:text-white transition-colors disabled:opacity-50"
             >
               {checkingOut
                 ? 'Continuing to checkout…'
@@ -559,7 +564,7 @@ export default function Auth() {
             </button>
           </form>
 
-          <div className="mt-4 text-center text-[14pt] text-[#6b7280]">
+          <div className="mt-4 text-center text-[14pt] text-[#8b8f99]">
             {mode === 'signin' ? (
               <>
                 Don't have an account?{' '}
@@ -580,7 +585,33 @@ export default function Auth() {
       </div>
       </div>
 
-      <PublicFooter />
+      <AuthLegalFooter />
     </main>
+  );
+}
+
+function AuthLegalFooter() {
+  return (
+    <footer className="border-t border-[#1f1f2e] px-4 py-5 text-sm text-[#8b8f99]">
+      <nav aria-label="Legal" className="mx-auto max-w-sm">
+        <ul className="flex list-none flex-wrap justify-center gap-x-5 gap-y-2">
+          <li>
+            <Link className="text-[#9ca3af] underline-offset-4 hover:underline" to="/privacy">
+              Privacy
+            </Link>
+          </li>
+          <li>
+            <Link className="text-[#9ca3af] underline-offset-4 hover:underline" to="/terms">
+              Terms
+            </Link>
+          </li>
+          <li>
+            <Link className="text-[#9ca3af] underline-offset-4 hover:underline" to="/cookies">
+              Cookies
+            </Link>
+          </li>
+        </ul>
+      </nav>
+    </footer>
   );
 }
