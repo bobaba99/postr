@@ -103,6 +103,91 @@ describe('classifyColumns — statistical type and design role', () => {
     expect(shape.label).toBe('1 outcome × 2 factors');
   });
 
+  it('reads Likert 1–5 columns as outcomes, not factors (the reported bug)', () => {
+    // The reported symptom: a survey of Likert items named Q1..Q6, each
+    // an integer 1–5, came back as "0 outcomes × 6 factors" because the
+    // old heuristic flagged any low-cardinality repeating integer as a
+    // code. Five distinct levels are a scale someone answered, not five
+    // arms — every Q column must be an outcome.
+    const rows: RawTable['rows'] = Array.from({ length: 50 }, (_, i) => [
+      `R${i + 1}`,
+      String((i % 5) + 1),
+      String(((i + 1) % 5) + 1),
+      String(((i + 2) % 5) + 1),
+      String(((i + 3) % 5) + 1),
+      String(((i + 4) % 5) + 1),
+      String((i % 5) + 1),
+    ]);
+    const shape = shapeOf(raw(['Respondent', 'Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6'], rows));
+    expect(shape.dvCount).toBe(6);
+    expect(shape.ivCount).toBe(0);
+    expect(shape.dvNames).toEqual(['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6']);
+    expect(shape.treatment).toBe('small-multiples');
+    expect(isUnchartable(shape)).toBe(false);
+  });
+
+  it('reads small integer counts as outcomes (start-high and gapped)', () => {
+    // Counts that start above 1 (Colonies 3,5,8) or skip values
+    // (Gene 2,4,5,7,9) fail the "gapless run anchored at 0/1" code
+    // shape, so they stay measurements.
+    const shape = shapeOf(
+      raw(
+        ['Site', 'Colonies', 'Gene'],
+        [
+          ['North', '3', '2'],
+          ['South', '5', '4'],
+          ['East', '8', '5'],
+          ['West', '3', '7'],
+          ['North', '5', '9'],
+          ['South', '8', '2'],
+        ],
+      ),
+    );
+    const byName = new Map(shape.columns.map((c) => [c.name, c]));
+    expect(byName.get('Colonies')?.role).toBe('dependent');
+    expect(byName.get('Gene')?.role).toBe('dependent');
+  });
+
+  it('reclaims numeric columns as outcomes when the guess erases them all', () => {
+    // Safety net: a survey of yes/no items coded 0/1 passes the
+    // gapless-anchored code shape, so every column classifies as a
+    // factor and dvCount would be 0 — a dead-end. With no genuine
+    // (non-numeric) grouping column present, the net reclaims them as
+    // outcomes so the table still charts.
+    const rows: RawTable['rows'] = Array.from({ length: 40 }, (_, i) => [
+      String(i % 2),
+      String((i + 1) % 2),
+      String(i % 2),
+    ]);
+    const shape = shapeOf(raw(['Q1', 'Q2', 'Q3'], rows));
+    expect(shape.dvCount).toBe(3);
+    expect(shape.treatment).not.toBe('summary-table');
+    expect(isUnchartable(shape)).toBe(false);
+  });
+
+  it('does NOT reclaim a numeric code sitting beside a real text factor', () => {
+    // The Case-8 gate: `group` is a genuine 1/2 code and `outcome` is a
+    // text label (never a measure), so dvCount is 0. Reclaiming `group`
+    // would fabricate a chart of "average group code". With a real
+    // grouping column present, the honest summary-table verdict stands.
+    const shape = shapeOf(
+      raw(
+        ['group', 'outcome'],
+        [
+          ['1', 'low'],
+          ['2', 'high'],
+          ['1', 'low'],
+          ['2', 'mid'],
+          ['1', 'high'],
+          ['2', 'low'],
+        ],
+      ),
+    );
+    expect(shape.dvCount).toBe(0);
+    expect(shape.treatment).toBe('summary-table');
+    expect(isUnchartable(shape)).toBe(true);
+  });
+
   it('keeps an outcome-named integer column an outcome', () => {
     // A 1–5 Likert "Rating" repeats its levels exactly like a coded
     // factor does — the NAME is what separates them.
@@ -332,6 +417,57 @@ describe('recommendFigures — treatment gates the figure set', () => {
           [
             ['Control', 'F'],
             ['Drug', 'M'],
+          ],
+        ),
+      ),
+    );
+    expect(advice.recommendations).toEqual([]);
+    expect(advice.note).toMatch(/table, not a chart/i);
+  });
+
+  it('resolves the MEASURE to the real outcome, not a group code (SPSS)', () => {
+    // The layers must agree on which column is the measure, not just on
+    // the counts: without this, resolveRoles took the first numeric
+    // column (the code Condition) and plotted the group code on the
+    // value axis, even though the shape correctly called Score the DV.
+    const advice = recommendFigures(
+      inferTable(
+        raw(
+          ['Condition', 'Arm', 'Score'],
+          [
+            ['1', '1', '4.2'],
+            ['2', '2', '5.1'],
+            ['1', '3', '6.0'],
+            ['2', '1', '4.8'],
+            ['1', '2', '5.5'],
+            ['2', '3', '6.3'],
+          ],
+        ),
+      ),
+    );
+    const top = advice.recommendations[0];
+    expect(top).toBeDefined();
+    expect(top?.roles.measure?.name).toBe('Score');
+    // The coded factors become groupings, not extra measures.
+    const groupNames = [top?.roles.cat1?.name, top?.roles.cat2?.name, top?.roles.time?.name];
+    expect(groupNames).toContain('Condition');
+    expect(groupNames).toContain('Arm');
+  });
+
+  it('does not fabricate a figure for a code + text-label table (Case 8)', () => {
+    // dvCount 0 with a real (text) factor present → summary-table →
+    // unchartable. The ranked set must be empty, not a bar of the code.
+    const advice = recommendFigures(
+      inferTable(
+        raw(
+          ['group', 'outcome'],
+          [
+            ['1', 'low'],
+            ['2', 'high'],
+            ['1', 'low'],
+            ['2', 'mid'],
+            ['1', 'high'],
+            ['2', 'low'],
           ],
         ),
       ),

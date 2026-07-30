@@ -193,7 +193,7 @@ export function ChartChooser({
       case 'measure':
         return synthetic ? 'What are you showing?' : 'What did you measure?';
       case 'grouping':
-        return synthetic ? 'How many variables?' : 'What are you breaking it down by?';
+        return synthetic ? 'How many variables?' : 'Compare across which columns?';
       case 'emphasis':
         return 'What should the figure emphasise?';
       case 'preview':
@@ -201,15 +201,36 @@ export function ChartChooser({
     }
   };
 
+  /**
+   * Plain-language helper under each active step's title. The step
+   * titles are terse questions; without a helper, "Compare across which
+   * columns?" left users unsure what a "grouping column" even is. The
+   * synthetic branch asks its own self-explanatory questions, so it
+   * gets no hints.
+   */
+  const hintFor = (step: StepId): string | undefined => {
+    if (synthetic) return undefined;
+    switch (step) {
+      case 'measure':
+        return 'Your numeric result — the values you recorded, like score, latency, or concentration.';
+      case 'grouping':
+        return 'Columns that split your data into groups to compare — like treatment vs. control, sex, or timepoint. Pick up to two, or none.';
+      default:
+        return undefined;
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
       {visibleSteps.map((step, i) => {
         const state = step === plan.active ? 'active' : 'answered';
+        const hint = hintFor(step);
         const common = {
           index: i + 1,
           title: titleFor(step),
           state,
           shouldFocusOnMount: hasInteracted.current,
+          ...(hint !== undefined ? { hint } : {}),
         } as const;
 
         if (step === 'data') {
@@ -308,7 +329,7 @@ export function ChartChooser({
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <ChipRow
-                    label="Pick up to two grouping columns"
+                    label="Pick up to two columns to compare across"
                     options={groupingChips}
                     selected={pendingGroups}
                     multi
@@ -336,7 +357,7 @@ export function ChartChooser({
                         cursor: pendingGroups.length > 0 ? 'pointer' : 'default',
                       }}
                     >
-                      Use selected
+                      Use these
                     </button>
                     <button
                       type="button"
@@ -351,7 +372,7 @@ export function ChartChooser({
                         cursor: 'pointer',
                       }}
                     >
-                      No grouping
+                      Don’t split
                     </button>
                   </div>
                 </div>

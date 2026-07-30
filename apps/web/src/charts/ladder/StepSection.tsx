@@ -21,6 +21,13 @@ interface StepSectionProps {
   state: 'active' | 'answered';
   /** One-line answer summary shown when collapsed. */
   summary?: string;
+  /**
+   * Plain-language helper shown under the title of the ACTIVE step —
+   * the one line that turns a terse question ("Compare across which
+   * columns?") into something a reader without dataviz vocabulary can
+   * answer. Omitted on answered/collapsed steps.
+   */
+  hint?: string;
   /** Re-open this step (invalidates everything below it). */
   onReopen?: () => void;
   /** True once the user has interacted — gates scroll AND focus. */
@@ -50,6 +57,7 @@ export function StepSection({
   title,
   state,
   summary,
+  hint,
   onReopen,
   shouldFocusOnMount,
   children,
@@ -165,6 +173,20 @@ export function StepSection({
         <span style={indexStyle}>{index}</span>
         <h3 style={{ fontSize: 15, fontWeight: 600, color: '#e8e8ee', margin: 0 }}>{title}</h3>
       </div>
+      {hint && (
+        <p
+          style={{
+            margin: '6px 0 0',
+            // Sits under the index gutter, aligned with the title.
+            paddingLeft: 20,
+            fontSize: 13,
+            lineHeight: 1.45,
+            color: '#8a8a95',
+          }}
+        >
+          {hint}
+        </p>
+      )}
       <div className="postr-step-reveal" data-revealed={revealed ? 'true' : 'false'}>
         <div ref={contentRef} style={{ overflow: 'hidden', minHeight: 0 }}>
           <div style={{ paddingTop: 12 }}>{children}</div>

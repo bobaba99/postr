@@ -10,8 +10,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   SERIES_PALETTES,
+  SERIES_PALETTES_2,
   SERIES_PALETTES_3,
+  SERIES_PALETTES_4,
   SERIES_PALETTES_6,
+  SERIES_PALETTES_8,
   findSeriesPalette,
   seriesPalettesFor,
 } from '../seriesPalettes';
@@ -34,11 +37,16 @@ function luminance(hex: string): number {
 
 describe('series palettes', () => {
   it('declares the sizes it claims', () => {
-    for (const p of SERIES_PALETTES_3) {
-      expect(p.colors, `${p.id} should have 3 colours`).toHaveLength(3);
-    }
-    for (const p of SERIES_PALETTES_6) {
-      expect(p.colors, `${p.id} should have 6 colours`).toHaveLength(6);
+    for (const [size, set] of [
+      [2, SERIES_PALETTES_2],
+      [3, SERIES_PALETTES_3],
+      [4, SERIES_PALETTES_4],
+      [6, SERIES_PALETTES_6],
+      [8, SERIES_PALETTES_8],
+    ] as const) {
+      for (const p of set) {
+        expect(p.colors, `${p.id} should have ${size} colours`).toHaveLength(size);
+      }
     }
   });
 
