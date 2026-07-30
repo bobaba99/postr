@@ -141,9 +141,10 @@ describe('isCanvasBlank', () => {
     expect(isCanvasBlank({ data: makePixels(16, 16) })).toBe(true);
   });
 
-  it('treats any near-uniform color as blank (all-black, flat gray)', () => {
+  it('treats any near-uniform color as blank (all-black, flat gray, solid red)', () => {
     expect(isCanvasBlank({ data: makePixels(16, 16, () => [0, 0, 0]) })).toBe(true);
     expect(isCanvasBlank({ data: makePixels(16, 16, () => [250, 250, 250]) })).toBe(true);
+    expect(isCanvasBlank({ data: makePixels(16, 16, () => [255, 0, 0]) })).toBe(true);
   });
 
   it('tolerates JPEG-level noise within the ±8 channel range', () => {
@@ -173,5 +174,21 @@ describe('isCanvasBlank', () => {
 
   it('treats a large uniform render as blank (sampling stride > 1)', () => {
     expect(isCanvasBlank({ data: makePixels(200, 200) })).toBe(true);
+  });
+
+  it('samples no more than 1024 pixels from a large render', () => {
+    let channelReads = 0;
+    const pixels = new Uint8ClampedArray(2047 * 4);
+    const observedPixels = new Proxy(pixels, {
+      get(target, property) {
+        if (typeof property === 'string' && /^\d+$/.test(property)) {
+          channelReads += 1;
+        }
+        return Reflect.get(target, property, target);
+      },
+    });
+
+    expect(isCanvasBlank({ data: observedPixels })).toBe(true);
+    expect(channelReads).toBeLessThanOrEqual(1024 * 3);
   });
 });

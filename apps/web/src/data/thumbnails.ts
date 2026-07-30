@@ -19,6 +19,7 @@ const JPEG_QUALITY = 0.7;
 const SIGNED_URL_TTL = 3600; // 1 hour
 
 const REVIEW_LONG_EDGE_PX = 2048; // matches the vision ceiling (imageImport.ts downscaleForVision)
+const REVIEW_SHORT_EDGE_PX = 1024; // spec audit minimum on both axes
 const REVIEW_JPEG_QUALITY = 0.85;
 const REVIEW_SIGNED_URL_TTL = 600; // 10 minutes — the critique call re-fetches within this window
 
@@ -30,6 +31,20 @@ let capturing = false;
 /** html-to-image pixelRatio that lands the capture width on targetWidthPx. */
 export function pixelRatioFor(canvasWidthPx: number, targetWidthPx: number): number {
   return targetWidthPx / canvasWidthPx;
+}
+
+/**
+ * Width target for the review capture: long edge >= 2048 AND short
+ * edge >= 1024 (the audit minimum). capturePosterJpeg scales by
+ * width, so solve the width scale for both floors and take the max.
+ */
+export function reviewTargetWidthPx(w: number, h: number): number {
+  const scale = Math.max(
+    REVIEW_LONG_EDGE_PX / Math.max(w, h),
+    REVIEW_SHORT_EDGE_PX / Math.min(w, h),
+  );
+  // ceil, not round: a floor that rounding can undershoot is not a floor.
+  return Math.ceil(w * scale);
 }
 
 /**
@@ -160,10 +175,10 @@ export async function captureThumbnail(
 
 /**
  * Capture the poster at critique resolution and upload it for the
- * presentation checker (D11): 2048px long edge, JPEG q0.85, 600s
- * signed URL. Returns the storage path + signed URL, or null on
- * failure. The poster must be open in the editor (#poster-canvas
- * mounted).
+ * presentation checker (D11): at least 2048px long edge and 1024px
+ * short edge, JPEG q0.85, 600s signed URL. Returns the storage path +
+ * signed URL, or null on failure. The poster must be open in the
+ * editor (#poster-canvas mounted).
  */
 export async function captureReviewImage(
   userId: string,
@@ -175,16 +190,14 @@ export async function captureReviewImage(
   try {
     // capturePosterJpeg scales by WIDTH. offsetWidth/offsetHeight are
     // layout sizes — unaffected by the editor's zoom transform — so
-    // the live element's aspect ratio matches the clone's. Shrink the
-    // width target on portrait posters so the LONG edge lands at
-    // 2048px.
+    // the live element's aspect ratio matches the clone's. Target both
+    // review dimension floors through the width scale.
     const el = document.getElementById('poster-canvas');
     if (!el) return null;
     const w = el.offsetWidth;
     const h = el.offsetHeight;
     if (w === 0 || h === 0) return null;
-    const targetWidthPx =
-      w >= h ? REVIEW_LONG_EDGE_PX : Math.round((REVIEW_LONG_EDGE_PX * w) / h);
+    const targetWidthPx = reviewTargetWidthPx(w, h);
 
     const blob = await capturePosterJpeg({ targetWidthPx, quality: REVIEW_JPEG_QUALITY });
     if (!blob) return null;

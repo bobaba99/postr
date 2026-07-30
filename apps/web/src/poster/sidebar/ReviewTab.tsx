@@ -80,6 +80,10 @@ export function ReviewTab({
   const [failed, setFailed] = useState(false);
   const [checkoutFailed, setCheckoutFailed] = useState(false);
   const [followupConfirm, setFollowupConfirm] = useState(false);
+  // Synchronous in-flight lock for run() — React batches the `running`
+  // state, so two activations in the same tick would both pass a
+  // state-based guard. The ref is check-and-set before any await.
+  const inFlightRef = useRef(false);
   // review-temp storage paths of every capture this tab ingested —
   // deleted on unmount and on "Start a new review" (the tab renders no
   // images; nothing re-reads them after that).
@@ -96,7 +100,11 @@ export function ReviewTab({
   }, []);
 
   async function run(reviewId?: string) {
-    if (!doc || !posterId || running) return;
+    // State updates are batched, so `running` can remain false for two
+    // activations in the same tick. The ref is the synchronous lock that
+    // prevents duplicate captures and, critically, duplicate credit spends.
+    if (!doc || !posterId || inFlightRef.current) return;
+    inFlightRef.current = true;
     setRunning(true);
     setFailed(false);
     setPaywall(null);
@@ -127,6 +135,7 @@ export function ReviewTab({
       console.error('[review] poster review failed:', err);
       setFailed(true);
     } finally {
+      inFlightRef.current = false;
       setRunning(false);
     }
   }

@@ -10,11 +10,19 @@ import type { PosterDoc } from '@postr/shared';
 import { ensureSession } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { normalizeInput } from './normalizeInput';
-import type { IngestContext, NormalizedArtifact } from './types';
+import { IngestError, type IngestContext, type NormalizedArtifact } from './types';
 
 async function resolveIngestContext(): Promise<IngestContext> {
   const session = await ensureSession(supabase);
-  if (!session) throw new Error('No session returned by Supabase');
+  if (!session) {
+    // Typed like every other ingest failure (spec §3) — the UI maps
+    // kinds to copy, and a raw Error would skip that handling. Copy
+    // names the workflow, never "AI" (D15).
+    throw new IngestError(
+      "We couldn't start a session — refresh the page and try again.",
+      'unreadable-file',
+    );
+  }
   return { userId: session.user.id, sessionId: crypto.randomUUID() };
 }
 

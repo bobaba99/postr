@@ -54,6 +54,13 @@ describe('reviewPixelDims', () => {
       heightPx: 2048,
     });
   });
+
+  it('never undershoots the 1024px short-edge audit floor for extreme aspects', () => {
+    expect(reviewPixelDims({ widthIn: 60, heightIn: 20 })).toEqual({
+      widthPx: 3072,
+      heightPx: 1024,
+    });
+  });
 });
 
 describe('fromPoster', () => {

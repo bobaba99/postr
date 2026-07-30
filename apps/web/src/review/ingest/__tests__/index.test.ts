@@ -70,6 +70,26 @@ describe('ingestPosterForReview', () => {
   });
 });
 
+describe('resolveIngestContext failures', () => {
+  it('throws a typed unreadable-file when ensureSession returns null', async () => {
+    mockEnsureSession.mockResolvedValue(null);
+    const pdf = new File(['x'], 'deck.pdf', { type: 'application/pdf' });
+
+    let caught: unknown;
+    try {
+      await ingestFileForReview(pdf);
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toMatchObject({ name: 'IngestError', kind: 'unreadable-file' });
+    expect((caught as Error).message).toBe(
+      "We couldn't start a session — refresh the page and try again.",
+    );
+    expect(mockNormalize).not.toHaveBeenCalled();
+  });
+});
+
 describe('cleanupReviewTemp', () => {
   it('removes the given poster-assets paths', async () => {
     await cleanupReviewTemp([

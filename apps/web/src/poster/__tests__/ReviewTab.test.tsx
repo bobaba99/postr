@@ -7,7 +7,7 @@
  * the component and the test share the same mocked binding.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { ReviewTab } from '../sidebar/ReviewTab';
 import { usePosterStore } from '@/stores/posterStore';
@@ -145,6 +145,16 @@ function seedPoster() {
   } as never);
 }
 
+/** A promise the test resolves by hand — holds an async gate open
+ *  while a second same-tick activation attempts to enter run(). */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 beforeEach(() => {
   seedPoster();
   requestCritiqueMock.mockReset();
@@ -271,5 +281,31 @@ describe('ReviewTab', () => {
 
     expect(cleanupMock).toHaveBeenCalledWith([ARTIFACT.pages[0]!.storagePath]);
     await waitFor(() => expect(ingestMock).toHaveBeenCalledTimes(2));
+  });
+
+  it('coalesces same-tick double clicks into one ingest + one critique', async () => {
+    requestCritiqueMock.mockResolvedValue(CRITIQUE);
+    const ingestGate = deferred<typeof ARTIFACT>();
+    ingestMock.mockReturnValue(ingestGate.promise);
+    render(
+      <MemoryRouter>
+        <ReviewTab />
+      </MemoryRouter>,
+    );
+
+    // React batches the `running` state update, so without a
+    // synchronous in-flight lock both clicks enter run() and the user
+    // pays two credits for one gesture.
+    const runButton = screen.getByText('Review this poster') as HTMLButtonElement;
+    act(() => {
+      runButton.click();
+      runButton.click();
+    });
+
+    expect(ingestMock).toHaveBeenCalledTimes(1);
+    ingestGate.resolve(ARTIFACT);
+    await waitFor(() => {
+      expect(requestCritiqueMock).toHaveBeenCalledTimes(1);
+    });
   });
 });

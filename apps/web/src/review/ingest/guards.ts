@@ -48,24 +48,31 @@ const BLANK_SAMPLE_COUNT = 1024;
 
 /**
  * True when the render is near-uniform (all-white, all-black, flat
- * gray) — nothing for the checker to read. Samples up to 1024 pixels
- * evenly across the image and compares the min→max channel range.
- * Structural input: works with ImageData or any { data } RGBA buffer.
+ * gray, a solid brand color) — nothing for the checker to read.
+ * Samples up to 1024 pixels evenly across the image and compares the
+ * min→max range PER CHANNEL: a single global range misses a
+ * single-channel-uniform page (solid red has a 0→255 global range but
+ * zero per-channel variation). Structural input: works with ImageData
+ * or any { data } RGBA buffer.
  */
 export function isCanvasBlank(imageData: { data: Uint8ClampedArray }): boolean {
   const { data } = imageData;
   const totalPixels = Math.floor(data.length / 4);
   if (totalPixels === 0) return true;
-  const stride = Math.max(1, Math.floor(totalPixels / BLANK_SAMPLE_COUNT));
-  let min = 255;
-  let max = 0;
+  // ceil, not floor: floor undershoots the stride and can sample every
+  // pixel on large renders (the sample count is the O(1) guarantee).
+  const stride = Math.max(1, Math.ceil(totalPixels / BLANK_SAMPLE_COUNT));
+  const minimumChannels: [number, number, number] = [255, 255, 255];
+  const maximumChannels: [number, number, number] = [0, 0, 0];
   for (let p = 0; p < totalPixels; p += stride) {
     const i = p * 4;
     for (let c = 0; c < 3; c++) {
       const v = data[i + c]!;
-      if (v < min) min = v;
-      if (v > max) max = v;
+      if (v < minimumChannels[c]!) minimumChannels[c] = v;
+      if (v > maximumChannels[c]!) maximumChannels[c] = v;
     }
   }
-  return max - min <= BLANK_CHANNEL_RANGE;
+  return minimumChannels.every(
+    (minimum, channel) => maximumChannels[channel]! - minimum <= BLANK_CHANNEL_RANGE,
+  );
 }

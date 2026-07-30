@@ -3,7 +3,7 @@
  * Canvas + storage seams are module mocks (jsdom has no 2D canvas);
  * the guards themselves are covered in guards.test.ts.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const {
   mockRasterizeImage,
@@ -43,6 +43,8 @@ function fakeCanvas(data: Uint8ClampedArray, widthPx = 100, heightPx = 50): HTML
     height: heightPx,
     getContext: () => ({
       getImageData: () => ({ data }),
+      fillRect: vi.fn(),
+      drawImage: vi.fn(),
     }),
   } as unknown as HTMLCanvasElement;
 }
@@ -62,17 +64,32 @@ function uploadedPage(pageNumber: number): PageImage {
   };
 }
 
+let createElementSpy: ReturnType<typeof vi.spyOn>;
+
 beforeEach(() => {
   vi.clearAllMocks();
-  mockDownscale.mockImplementation((c: HTMLCanvasElement) => c); // identity
+  const realCreateElement = document.createElement.bind(document);
+  createElementSpy = vi
+    .spyOn(document, 'createElement')
+    .mockImplementation(((tagName: string, options?: ElementCreationOptions) => {
+      if (tagName === 'canvas') {
+        return fakeCanvas(NON_BLANK, 0, 0);
+      }
+      return realCreateElement(tagName, options);
+    }) as typeof document.createElement);
+  mockDownscale.mockImplementation((c: HTMLCanvasElement) => c);
   mockCanvasToBlob.mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' }));
   mockUploadReviewPage.mockImplementation(
     async (_u: string, _s: string, pageNumber: number) => uploadedPage(pageNumber),
   );
 });
 
+afterEach(() => {
+  createElementSpy.mockRestore();
+});
+
 describe('fromImage', () => {
-  it('normalizes a PNG to a single-page artifact', async () => {
+  it('normalizes and upscales a PNG to the audit resolution floor', async () => {
     mockRasterizeImage.mockResolvedValue({
       canvas: fakeCanvas(NON_BLANK),
       pageWidthPt: 288,
@@ -95,7 +112,7 @@ describe('fromImage', () => {
       'sess-1',
       1,
       expect.any(Blob),
-      { widthPx: 100, heightPx: 50 },
+      { widthPx: 2048, heightPx: 1024 },
     );
   });
 
@@ -140,5 +157,61 @@ describe('fromImage', () => {
       kind: 'blank-render',
     });
     expect(mockUploadReviewPage).not.toHaveBeenCalled();
+  });
+
+  it('enforces the 2048px ceiling when the shared downscale falls back', async () => {
+    mockRasterizeImage.mockResolvedValue({
+      canvas: fakeCanvas(NON_BLANK, 4000, 3000),
+      pageWidthPt: 960,
+      pageHeightPt: 720,
+    });
+    const file = new File(['png-bytes'], 'oversized.png', { type: 'image/png' });
+
+    await fromImage(file, CTX);
+
+    expect(mockUploadReviewPage).toHaveBeenCalledWith(
+      'u1',
+      'sess-1',
+      1,
+      expect.any(Blob),
+      { widthPx: 2048, heightPx: 1536 },
+    );
+  });
+
+  it('maps scaling failures to unreadable-file and releases the source canvas', async () => {
+    const sourceCanvas = fakeCanvas(NON_BLANK);
+    mockRasterizeImage.mockResolvedValue({
+      canvas: sourceCanvas,
+      pageWidthPt: 288,
+      pageHeightPt: 144,
+    });
+    mockDownscale.mockImplementation(() => {
+      throw new Error('canvas allocation failed');
+    });
+    const file = new File(['png-bytes'], 'poster.png', { type: 'image/png' });
+
+    await expect(fromImage(file, CTX)).rejects.toMatchObject({
+      name: 'IngestError',
+      kind: 'unreadable-file',
+    });
+    expect(mockReleaseCanvas).toHaveBeenCalledWith(sourceCanvas);
+  });
+
+  it('releases an audit canvas when drawing into it fails', async () => {
+    const auditCanvas = fakeCanvas(NON_BLANK, 0, 0);
+    auditCanvas.getContext = () => null;
+    createElementSpy.mockReturnValueOnce(auditCanvas);
+    mockRasterizeImage.mockResolvedValue({
+      canvas: fakeCanvas(NON_BLANK),
+      pageWidthPt: 288,
+      pageHeightPt: 144,
+    });
+    const file = new File(['png-bytes'], 'poster.png', { type: 'image/png' });
+
+    await expect(fromImage(file, CTX)).rejects.toMatchObject({
+      name: 'IngestError',
+      kind: 'unreadable-file',
+    });
+    expect(mockReleaseCanvas).toHaveBeenCalledWith(auditCanvas);
   });
 });
