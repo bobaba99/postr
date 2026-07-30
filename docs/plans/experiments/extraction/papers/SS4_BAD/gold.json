@@ -1,0 +1,30 @@
+{
+  "id": "SS4_BAD",
+  "question": "Does exposure to urban green space reduce depression and anxiety?",
+  "starFinding": {
+    "text": "Greater residential green space is associated with lower odds of both depression and anxiety: a 0.1 NDVI increase within 500m was linked to 15% lower odds of a depression diagnosis and 19% lower odds of moderate anxiety.",
+    "sourceQuote": "In fully adjusted analyses, a 0.1 increase in residential normalized difference vegetation index within 500 m was associated with an odds ratio of 0.85 (95% CI: 0.76, 0.95) for a self-reported doctor diagnosis of depression and 0.81 (95% CI: 0.70, 0.93) for moderate anxiety assessed using the Generalized Anxiety Disorder 7 scale."
+  },
+  "top3": [
+    {
+      "text": "A meta-analysis across multiple populations confirmed that more green space lowers the risk of depression and anxiety, with a 10% increase in green space proportion linked to a merged OR of 0.963.",
+      "sourceQuote": "a 10% increase in the proportion of green space was linked to a lower risk of depression and anxiety (merged OR (95% CI) = 0.963 (0.948, 0.979))"
+    },
+    {
+      "text": "A genetically-informed twin study found the green space–depression association held even within monozygotic pairs, providing strong causal evidence for depression (though not for anxiety or stress).",
+      "sourceQuote": "The results of this study suggest that greater access to green space in the home neighbourhood is associated with less depression, even when controlling for genetic and shared environmental confounds. These results suggest that greater access to green space is associated with less depression, but provide less evidence for effects on stress or anxiety."
+    },
+    {
+      "text": "In a population survey, higher neighborhood green space was associated with significantly lower symptom levels for depression, anxiety, and stress after adjusting for many confounders.",
+      "sourceQuote": "Higher levels of neighborhood green space were associated with significantly lower levels of symptomology for depression, anxiety and stress, after controlling for a wide range of confounding factors."
+    }
+  ],
+  "doNotPromote": [
+    "The Cohen-Cline twin study's null within-pair result for anxiety and stress must not be ranked #1 — it is a qualified/partial finding (depression only) and framing it as the headline would understate the overall protective evidence for anxiety found across the other studies.",
+    "Off-target mechanism/background claims (e.g., Roe on natural stimuli promoting 'involuntary attention' and cognitive recovery, or Bray on mindfulness mediators) explain how green space may work but do not directly answer whether it reduces depression and anxiety."
+  ],
+  "draftedBy": "workflow",
+  "approved": true,
+  "approvedBy": "Gavin",
+  "wellWritten": false
+}

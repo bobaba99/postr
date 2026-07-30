@@ -12,7 +12,7 @@
  * simply cannot be produced.
  */
 import type { ChartForm } from '@postr/shared';
-import { detectDesignShape, isUnchartable, type DesignShape } from './designShape';
+import { classifyColumns, detectDesignShape, isUnchartable, type DesignShape } from './designShape';
 import type { InferredColumn, InferredTable } from './inferColumns';
 
 export type Emphasis = 'difference' | 'trend' | 'spread' | 'relationship' | 'share';
@@ -115,17 +115,54 @@ export const FORM_FAMILY: Record<ChartForm, Emphasis> = {
 // even render.
 // ────────────────────────────────────────────────────────────────────
 
-/** Columns that could plausibly be the outcome measure. */
+/**
+ * Columns that could plausibly be the outcome measure.
+ *
+ * A measure is a non-ordered number. But when the design classifier
+ * calls one of those numbers a coded FACTOR (the SPSS 1=control/2=
+ * treatment idiom), it must not be the DEFAULT measure — otherwise a
+ * `[Condition(1/2), Arm(1/2/3), Score]` table plots the group code on
+ * the value axis, because `resolveRoles` takes the first candidate.
+ * So the two layers are reconciled here: classifier-dependent columns
+ * are offered FIRST, coded factors only as a last resort (kept in the
+ * list so a table of nothing-but-codes still has something to chart).
+ * Table order is preserved within each group.
+ */
 export function measureCandidates(table: InferredTable): InferredColumn[] {
-  return table.columns.filter((c) => c.kind === 'number' && !c.ordered);
+  const numeric = table.columns.filter((c) => c.kind === 'number' && !c.ordered);
+  if (numeric.length <= 1) return numeric;
+  const roleByName = new Map(classifyColumns(table).map((c) => [c.name, c.role]));
+  const dependent = numeric.filter((c) => roleByName.get(c.name) === 'dependent');
+  const rest = numeric.filter((c) => roleByName.get(c.name) !== 'dependent');
+  return [...dependent, ...rest];
 }
 
-/** Columns that could plausibly group the measure. */
+/**
+ * Columns that could plausibly group the measure.
+ *
+ * Dates and ordered numbers are axes; text categories are factors. The
+ * fourth case is a numerically CODED factor — a non-ordered number the
+ * design classifier reads as `independent` (1=control, 2=treatment).
+ * Without it, an SPSS-style `[Condition(1/2), Arm(1/2/3), Score]` table
+ * would offer no groupings at all and draw a bare distribution of
+ * Score, silently dropping both factors. Consulting the classifier
+ * here is the grouping-side half of the same reconciliation
+ * `measureCandidates` does on the measure side.
+ */
 export function groupingCandidates(table: InferredTable): InferredColumn[] {
+  const roleByName = new Map(classifyColumns(table).map((c) => [c.name, c.role]));
   return table.columns.filter(
     (c) =>
       c.kind === 'date' ||
       (c.kind === 'number' && c.ordered) ||
+      // `distinct` here is already 2–3 (isNumericFactor is the only
+      // path to `independent` for a non-ordered number); the bounds are
+      // defensive, not a claim that wider coded factors are reachable.
+      (c.kind === 'number' &&
+        !c.ordered &&
+        roleByName.get(c.name) === 'independent' &&
+        c.distinct >= 2 &&
+        c.distinct <= MAX_GROUP_LEVELS) ||
       (c.kind === 'category' && c.distinct >= 2 && c.distinct <= MAX_GROUP_LEVELS),
   );
 }
@@ -195,7 +232,12 @@ export function resolveRoles(table: InferredTable, choice: RoleChoice = {}): Res
   ).filter((c) => c !== measure);
 
   const time = groupPool.find((c) => c.kind === 'date' || (c.kind === 'number' && c.ordered)) ?? null;
-  const cats = groupPool.filter((c) => c.kind === 'category');
+  // Categorical groupings are everything in the pool that is not the
+  // ordered/time axis — text categories AND numerically coded factors
+  // (which are kind === 'number' but were admitted to the pool by
+  // groupingCandidates as `independent`). Excluding the latter here
+  // would drop the factors from an SPSS-coded design.
+  const cats = groupPool.filter((c) => c !== time && !(c.kind === 'number' && c.ordered));
   const likertCol = cats.find(isLikertColumn) ?? null;
   const cat1 = cats[0] ?? null;
   const cat2 = cats[1] ?? null;

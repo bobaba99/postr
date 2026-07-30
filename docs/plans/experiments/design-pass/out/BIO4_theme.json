@@ -1,0 +1,18 @@
+{
+  "palette": [
+    "#F7F4ED",
+    "#1F2D2A",
+    "#4E6E5D",
+    "#A8BFA3",
+    "#C98B55",
+    "#6B6258"
+  ],
+  "typeScale": {
+    "heading": 30,
+    "body": 17,
+    "label": 12
+  },
+  "layoutRules": "Use a warm off-white background with generous margins and a consistent 12-column grid. Set section titles left-aligned; keep body text in short, evidence-oriented blocks. Use one primary figure or chart per slide, with direct labels rather than legends where possible. Reserve a narrow top rule or small section marker for navigation; avoid dense boxed panels, gradients, and decorative illustrations. For study-comparison slides, use aligned rows and ample whitespace to distinguish organism, fasting regimen, and lifespan outcome.",
+  "accentTreatment": "Use muted sage green for positive or mechanistic pathways, charcoal for core text and axes, and restrained amber only to flag uncertainty, mixed evidence, or methodological caveats. Use thin line icons or simple organism silhouettes sparingly; favor clean experimental timelines, survival curves, and pathway diagrams.",
+  "rationale": "The palette evokes metabolism, physiology, and ecological model-organism research without becoming clinical or promotional. Warm neutrals support extended reading, while sage conveys biological regulation and amber clearly separates cautionary findings\u2014appropriate for a nuanced question about lifespan extension across heterogeneous model systems."
+}

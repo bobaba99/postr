@@ -21,9 +21,9 @@ import type { ChartSpec, Palette } from '@postr/shared';
 import {
   divergingRamp,
   mixHex,
+  resolveSeriesColors,
   resolveSlot,
   sequentialRamp,
-  seriesColors,
 } from './chartColors';
 
 /** Loose view of the Plot module — only what we call. */
@@ -99,6 +99,15 @@ function longestLabelChars(data: DataRow[], field: string | undefined): number {
   return data.reduce((max, row) => Math.max(max, String(row[field] ?? '').length), 0);
 }
 
+/**
+ * Distinct values of a spec's `series` encoding, first-seen order.
+ * Shared by the palette picker (swatch count) and buildPlotOptions so
+ * the two never disagree on how many series a chart has.
+ */
+export function distinctSeries(spec: ChartSpec): string[] {
+  return distinctStrings(toObjects(spec), spec.encoding.series);
+}
+
 const LIKERT_NEGATIVE = /disagree/i;
 const LIKERT_NEUTRAL = /^(neutral|neither)/i;
 
@@ -137,7 +146,12 @@ export function buildPlotOptions(spec: ChartSpec, theme: ChartTheme, plot: PlotL
   };
 
   const seriesValues = distinctStrings(data, e.series);
-  const colors = seriesColors(Math.max(1, seriesValues.length), spec.paletteSlots, palette);
+  const colors = resolveSeriesColors(
+    spec.seriesPaletteId,
+    Math.max(1, seriesValues.length),
+    spec.paletteSlots,
+    palette,
+  );
   const colorScale = { domain: seriesValues, range: colors };
 
   const sortByValue = spec.options.sort === 'value';

@@ -3,8 +3,10 @@ import type { Palette } from '@postr/shared';
 import { inferTable } from '../inferColumns';
 import { buildChartSpec } from '../buildSpec';
 import { recommend } from '../recommend';
-import { buildPlotOptions, type ChartTheme, type PlotLike } from '../plotOptions';
+import { buildPlotOptions, distinctSeries, type ChartTheme, type PlotLike } from '../plotOptions';
 import { sampleDatasets } from '../sampleData';
+import { resolveSeriesColors } from '../chartColors';
+import { findSeriesPalette } from '../seriesPalettes';
 
 const palette: Palette = {
   bg: '#ffffff',
@@ -107,5 +109,52 @@ describe('buildPlotOptions', () => {
     const bar = calls.find((c) => c.mark === 'barY' || c.mark === 'barX');
     const options = bar!.args[1] as Record<string, unknown>;
     expect(options['fill']).toBe(palette.accent);
+  });
+});
+
+describe('seriesPaletteId override', () => {
+  it('colours grouped bars from the fixed palette when set', () => {
+    const spec = specFor('two-category');
+    const withId = { ...spec, seriesPaletteId: 'qualitative-6' };
+    const { plot } = recordingPlot();
+    const build = buildPlotOptions(withId, theme, plot);
+    const range = (build.options['color'] as { range: string[] }).range;
+    const expected = resolveSeriesColors(
+      'qualitative-6',
+      range.length,
+      withId.paletteSlots,
+      palette,
+    );
+    expect(range).toEqual(expected);
+    // And it differs from the slot-based colouring (proves override took effect).
+    const slotColors = resolveSeriesColors(undefined, range.length, spec.paletteSlots, palette);
+    expect(range).not.toEqual(slotColors);
+  });
+
+  it('is byte-identical to today when no id is set (invariant guard)', () => {
+    const spec = specFor('two-category');
+    const { plot } = recordingPlot();
+    const build = buildPlotOptions(spec, theme, plot);
+    const range = (build.options['color'] as { range: string[] }).range;
+    expect(range).toEqual(
+      resolveSeriesColors(undefined, range.length, spec.paletteSlots, palette),
+    );
+  });
+
+  it('leaves the Likert diverging ramp on poster slots even with an id set', () => {
+    const spec = { ...specFor('likert'), seriesPaletteId: 'qualitative-6' };
+    const { plot } = recordingPlot();
+    const build = buildPlotOptions(spec, theme, plot);
+    // Likert range must NOT equal the science palette — it stays slot-derived.
+    const range = (build.options['color'] as { range: string[] }).range;
+    const science = findSeriesPalette('qualitative-6')!.colors;
+    expect(range).not.toEqual([...science].slice(0, range.length));
+  });
+
+  it('distinctSeries lists the series values in first-seen order', () => {
+    const spec = specFor('two-category');
+    const series = distinctSeries(spec);
+    expect(series.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(series).size).toBe(series.length);
   });
 });

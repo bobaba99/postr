@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import type { Palette } from '@postr/shared';
+import type { Block, ChartSpec, Palette } from '@postr/shared';
 import { FigureTab, type FigureMode } from '../sidebar/FigureTab';
 
 const palette: Palette = {
@@ -23,12 +23,52 @@ function pasteTable(text: string) {
   });
 }
 
+/** A minimal chart block for the palette-picker path. */
+function chartBlock(seriesPaletteId?: string): Block {
+  const spec: ChartSpec = {
+    version: 1,
+    form: 'bar',
+    data: {
+      columns: [
+        { name: 'grp', kind: 'category' },
+        { name: 'val', kind: 'number' },
+      ],
+      rows: [
+        ['A', 1],
+        ['B', 2],
+        ['C', 3],
+      ],
+    },
+    encoding: { x: 'grp', y: 'val', series: 'grp' },
+    options: { legend: true, sort: 'none', horizontal: false, directLabel: 'auto' },
+    paletteSlots: ['accent', 'accent2'],
+    ...(seriesPaletteId ? { seriesPaletteId } : {}),
+  };
+  return {
+    id: 'chart-1',
+    type: 'chart',
+    x: 0,
+    y: 0,
+    w: 100,
+    h: 70,
+    content: '',
+    imageSrc: null,
+    imageFit: 'contain',
+    tableData: null,
+    chartSpec: spec,
+  };
+}
+
 function Harness({
   initialMode = 'make',
   onInsertChart = vi.fn(),
+  selectedChartBlock = null,
+  onUpdateChartSpec = vi.fn(),
 }: {
   initialMode?: FigureMode;
   onInsertChart?: (spec: unknown, caption: string) => void;
+  selectedChartBlock?: Block | null;
+  onUpdateChartSpec?: (blockId: string, spec: ChartSpec) => void;
 }) {
   const [mode, setMode] = useState<FigureMode>(initialMode);
   return (
@@ -42,6 +82,8 @@ function Harness({
       fontFamily="Georgia, serif"
       posterTables={[]}
       onInsertChart={onInsertChart}
+      selectedChartBlock={selectedChartBlock}
+      onUpdateChartSpec={onUpdateChartSpec}
     />
   );
 }
@@ -110,5 +152,45 @@ describe('FigureTab', () => {
     );
     expect(new Set(forms).size).toBe(2);
     expect(await screen.findByText(/2 figures — Inserted/)).toBeInTheDocument();
+  });
+
+  it('hides the palette picker when no chart block is selected', () => {
+    render(<Harness />);
+    expect(screen.queryByText('Chart colours')).not.toBeInTheDocument();
+  });
+
+  it('hides the palette picker for a single-series chart (nothing to recolour)', () => {
+    // A chart with no `series` encoding fills from one slot, so the
+    // picker would only persist a no-op seriesPaletteId.
+    const single = chartBlock();
+    single.chartSpec = { ...single.chartSpec!, encoding: { x: 'grp', y: 'val' } };
+    render(<Harness selectedChartBlock={single} />);
+    expect(screen.queryByText('Chart colours')).not.toBeInTheDocument();
+  });
+
+  it('shows the palette picker for a selected chart and persists a pick', () => {
+    const onUpdateChartSpec = vi.fn();
+    render(
+      <Harness selectedChartBlock={chartBlock()} onUpdateChartSpec={onUpdateChartSpec} />,
+    );
+    expect(screen.getByText('Chart colours')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /blue . orange . gray/i }));
+    expect(onUpdateChartSpec).toHaveBeenCalledTimes(1);
+    const [blockId, spec] = onUpdateChartSpec.mock.calls[0]! as [string, ChartSpec];
+    expect(blockId).toBe('chart-1');
+    expect(spec.seriesPaletteId).toBe('blue-orange-gray');
+  });
+
+  it('clearing a chart palette drops seriesPaletteId from the spec', () => {
+    const onUpdateChartSpec = vi.fn();
+    render(
+      <Harness
+        selectedChartBlock={chartBlock('blue-orange-gray')}
+        onUpdateChartSpec={onUpdateChartSpec}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /poster theme \(default\)/i }));
+    const [, spec] = onUpdateChartSpec.mock.calls[0]! as [string, ChartSpec];
+    expect('seriesPaletteId' in spec).toBe(false);
   });
 });

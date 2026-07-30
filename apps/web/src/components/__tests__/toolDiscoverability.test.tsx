@@ -12,11 +12,15 @@
  * to a tool fails the suite.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 
 const authSpies = vi.hoisted(() => ({
-  getSession: vi.fn(async () => ({ data: { session: null } })),
+  // `session` is typed loosely so tests can hand back a signed-in
+  // session (a partial user) without fighting the real Supabase types.
+  getSession: vi.fn(async (): Promise<{ data: { session: unknown } }> => ({
+    data: { session: null },
+  })),
   signInAnonymously: vi.fn(),
   onAuthStateChange: vi.fn(() => ({
     data: { subscription: { unsubscribe: vi.fn() } },
@@ -78,6 +82,28 @@ describe('PublicHeader tool links', () => {
       expect(link?.getAttribute('tabindex')).toBeNull();
     }
   });
+
+  /**
+   * The two sibling manuscript flows must BOTH be listed. Paper-to-Poster
+   * is live; Paper-to-Slides is a not-yet-open flow whose nav link is
+   * placed now so the entry exists the moment the route lands (spec §7).
+   * Asserted by href — the flat listing serves both from the same source.
+   */
+  it('lists both Paper-to-Poster and Paper-to-Slides', () => {
+    const { container } = renderIn(<PublicHeader />);
+    const hrefs = hrefsOf(container);
+    expect(hrefs).toContain('/paper-to-poster');
+    expect(hrefs).toContain('/paper-to-slides');
+  });
+
+  it('waits until the wide breakpoint to show the flat navigation', () => {
+    const { container } = renderIn(<PublicHeader />);
+    const pricing = container.querySelector('header a[href="/pricing"]');
+
+    expect(pricing).not.toBeNull();
+    expect(pricing?.className).toContain('xl:inline');
+    expect(pricing?.className).not.toContain('sm:inline');
+  });
 });
 
 /**
@@ -95,8 +121,11 @@ describe('PublicHeader mobile menu', () => {
   }
 
   it('offers a menu control on small screens', () => {
-    renderIn(<PublicHeader />);
-    expect(screen.getByRole('button', { name: /menu/i })).toBeTruthy();
+    const { container } = renderIn(<PublicHeader />);
+    const trigger = screen.getByRole('button', { name: /menu/i });
+
+    expect(trigger).toBeTruthy();
+    expect(container.querySelector('.xl\\:hidden')).toContainElement(trigger);
   });
 
   it.each(TOOL_PATHS)('reaches %s from the mobile menu', async (path) => {
@@ -178,6 +207,61 @@ describe('PublicHeader mobile menu', () => {
 
     expect(screen.queryByRole('list')).toBeNull();
   });
+
+  it('uses accessible supporting text in tool descriptions', async () => {
+    renderIn(<PublicHeader />);
+    openMobileMenu();
+
+    const description = await screen.findByText(/turn a manuscript into a poster draft/i);
+    expect(description.className).toContain('text-[#8b8f99]');
+    expect(description.className).not.toContain('text-[#6b7280]');
+  });
+});
+
+/**
+ * The auth-aware workspace link. One header link whose destination and
+ * label flip with the session: signed out it drops a visitor straight
+ * into the editor (/p/new — the no-auth editor), signed in it points at
+ * their dashboard.
+ * These assert the destination per state so a regression that sends a
+ * logged-out visitor to a signup wall — or a signed-in user back to the
+ * guest entry — is caught here.
+ */
+describe('PublicHeader workspace link', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default mock: signed out.
+    authSpies.getSession.mockResolvedValue({ data: { session: null } });
+  });
+
+  it('sends a logged-out visitor straight into the editor', async () => {
+    const { container } = renderIn(<PublicHeader />);
+    const link = await screen.findByRole('link', { name: /^editor$/i });
+    expect(link.getAttribute('href')).toBe('/p/new');
+    expect(hrefsOf(container)).not.toContain('/dashboard');
+  });
+
+  it('sends a signed-in user to their dashboard', async () => {
+    authSpies.getSession.mockResolvedValue({
+      data: { session: { user: { id: 'u1' } } },
+    });
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <PublicHeader />
+      </MemoryRouter>,
+    );
+    const link = await screen.findByRole('link', { name: /my posters/i });
+    expect(link.getAttribute('href')).toBe('/dashboard');
+    expect(screen.queryByRole('link', { name: /^editor$/i })).toBeNull();
+  });
+
+  it('reaches the editor from the mobile menu (signed out)', async () => {
+    renderIn(<PublicHeader />);
+    await screen.findByRole('link', { name: /^editor$/i });
+    fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+    const panel = await screen.findByRole('list');
+    expect(hrefsOf(panel)).toContain('/p/new');
+  });
 });
 
 describe('PublicFooter', () => {
@@ -199,6 +283,31 @@ describe('PublicFooter', () => {
       expect.arrayContaining(TOOL_PATHS),
     );
     expect(hrefsOf(container)).toEqual(expect.arrayContaining(TOOL_PATHS));
+  });
+
+  it('lists Paper-to-Slides under Product alongside Paper-to-Poster', () => {
+    const { container } = renderIn(<PublicFooter />);
+    const productHeading = screen.getByRole('heading', { name: /product/i });
+    const column = productHeading.parentElement;
+
+    expect(column).not.toBeNull();
+    expect(hrefsOf(column as HTMLElement)).toEqual(
+      expect.arrayContaining(['/paper-to-poster', '/paper-to-slides']),
+    );
+  });
+
+  it('uses level-two headings for its landmark sections', () => {
+    renderIn(<PublicFooter />);
+
+    for (const name of ['Product', 'Learn', 'Account', 'Legal']) {
+      expect(screen.getByRole('heading', { name })).toHaveProperty('tagName', 'H2');
+    }
+  });
+
+  it('uses an accessible default text color', () => {
+    const { container } = renderIn(<PublicFooter />);
+
+    expect(container.querySelector('footer')?.className).toContain('text-[#8b8f99]');
   });
 });
 
@@ -239,6 +348,24 @@ describe('Landing page', () => {
     const { container } = renderIn(<Landing />);
     const main = container.querySelector('main');
     expect(main?.textContent ?? '').not.toMatch(/\bAI\b/);
+  });
+
+  it('limits the core feature section to four concise supporting messages', () => {
+    renderIn(<Landing />);
+    const sectionHeading = screen.getByRole('heading', {
+      level: 2,
+      name: 'Core poster tools',
+    });
+    const section = sectionHeading.closest('section');
+    expect(section).not.toBeNull();
+
+    const featureHeadings = within(section!).getAllByRole('heading', { level: 3 });
+    expect(featureHeadings).toHaveLength(4);
+
+    for (const heading of featureHeadings) {
+      const description = heading.parentElement?.querySelector('p')?.textContent ?? '';
+      expect(description.trim().split(/\s+/).length).toBeLessThanOrEqual(15);
+    }
   });
 });
 

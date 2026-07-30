@@ -1,0 +1,30 @@
+{
+  "paper": "EXAMPLE",
+  "wellWritten": true,
+  "simulatedFrom": null,
+  "note": "BOGUS placeholder study. Human gold ranking recorded before seeing either arm. Every sourceQuote below is a verbatim substring of text.md.",
+  "star": {
+    "text": "A single restricted night causes a large next-day loss of declarative memory.",
+    "sourceQuote": "Restricted sleepers recalled fewer word pairs than normal sleepers the next morning"
+  },
+  "top3": [
+    {
+      "text": "A single restricted night causes a large next-day loss of declarative memory.",
+      "sourceQuote": "Restricted sleepers recalled fewer word pairs than normal sleepers the next morning"
+    },
+    {
+      "text": "The size of the deficit tracks how much slow-wave sleep was lost.",
+      "sourceQuote": "The size of the memory deficit tracked the amount of slow-wave sleep obtained"
+    },
+    {
+      "text": "The effect is specific to memory, not general alertness.",
+      "sourceQuote": "A control test of simple reaction time showed no group difference the next morning (p = .48)"
+    }
+  ],
+  "doNotPromote": [
+    {
+      "text": "Encoding at learning did not differ between groups. This is a matched-baseline null, not a headline finding.",
+      "sourceQuote": "Encoding performance did not differ between groups at learning (p = .71)"
+    }
+  ]
+}

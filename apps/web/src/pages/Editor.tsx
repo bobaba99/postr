@@ -13,13 +13,15 @@ import { useNavigate, useParams } from 'react-router';
 import { loadOrCreateMostRecentPoster, loadPoster } from '@/data/posters';
 import { usePosterStore } from '@/stores/posterStore';
 import { PosterEditor } from '@/poster/PosterEditor';
+import { SecureWorkModal } from '@/poster/SecureWorkModal';
 import { makeBlocks } from '@/poster/templates';
 import { DEFAULT_STYLES, PALETTES } from '@/poster/constants';
 import { useTwoTabGuard } from '@/hooks/useTwoTabGuard';
+import { useLeaveGuard } from '@/hooks/useLeaveGuard';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
 import { uploadBase64Image } from '@/data/posterImages';
 import { supabase } from '@/lib/supabase';
-import { noindexMeta } from '@/seo/siteMeta';
+import { editorMeta } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 /**
@@ -135,12 +137,7 @@ export default function Editor() {
 
   // Noindex, and named after the poster so a user with several editor
   // tabs open can tell them apart.
-  useDocumentMeta(
-    noindexMeta(
-      posterTitle ? `${posterTitle} | Postr` : 'Poster editor | Postr',
-      'The Postr poster editor.',
-    ),
-  );
+  useDocumentMeta(editorMeta(posterTitle, posterId));
 
   useEffect(() => {
     let cancelled = false;
@@ -208,6 +205,7 @@ export default function Editor() {
   if (status.kind === 'loading') {
     return (
       <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
+        <h1 className="sr-only">Poster editor</h1>
         <div className="animate-pulse text-sm tracking-wide">Loading poster…</div>
       </main>
     );
@@ -217,7 +215,7 @@ export default function Editor() {
     return (
       <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
         <div className="max-w-md space-y-3 text-center">
-          <p className="text-base font-medium">Poster not found</p>
+          <h1 className="text-base font-medium">Poster not found</h1>
           <p className="text-xs text-[#888]">
             The poster you're looking for doesn't exist or you don't have access to it.
           </p>
@@ -236,18 +234,35 @@ export default function Editor() {
     return (
       <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
         <div className="max-w-md space-y-3 text-center">
-          <p className="text-base font-medium">Couldn’t load this poster</p>
+          <h1 className="text-base font-medium">Couldn’t load this poster</h1>
           <p className="text-xs text-[#888]">{status.message}</p>
         </div>
       </main>
     );
   }
 
-  return <EditorWithGuards posterId={posterId ?? null} />;
+  return (
+    <>
+      <h1 className="sr-only">
+        {posterTitle ? `Editing ${posterTitle}` : 'Poster editor'}
+      </h1>
+      <EditorWithGuards posterId={posterId ?? null} />
+    </>
+  );
 }
 
-function EditorWithGuards({ posterId }: { posterId: string | null }) {
+export function EditorWithGuards({ posterId }: { posterId: string | null }) {
   const { collision, dismiss } = useTwoTabGuard(posterId);
+  // Leave guard: a guest who has edited this session gets nudged to
+  // secure their poster before leaving. The hook arms a `beforeunload`
+  // handler (the only thing the platform allows on a real tab-close /
+  // refresh — and it also catches the editor's own full-page nav exits,
+  // the logo and "Back to My Posters" links, which are plain <a href>
+  // navigations). `leaveModalOpen` drives our own SecureWorkModal for the
+  // in-app path once a `requestLeave()` caller is wired in. Only guests
+  // with unsaved-session edits ever arm it — a permanent user is never
+  // touched, so the logged-in editor is unchanged.
+  const { leaveModalOpen, cancelLeave, confirmLeave } = useLeaveGuard();
   return (
     <>
       {collision && (
@@ -301,6 +316,13 @@ function EditorWithGuards({ posterId }: { posterId: string | null }) {
             ×
           </button>
         </div>
+      )}
+      {leaveModalOpen && (
+        <SecureWorkModal
+          reason="leave"
+          onClose={cancelLeave}
+          onConverted={confirmLeave}
+        />
       )}
       <PosterEditor />
     </>

@@ -67,12 +67,23 @@ function MiniPreview({ row }: { row: PosterListRow }) {
     );
   }
 
-  // Fallback: letter initial when no thumbnail and no data
+  // Fallback: initial + label when there is neither a thumbnail nor
+  // block data to synthesise a preview from. The list query omits the
+  // heavy `data` column, so this is the common case for a poster that
+  // was never opened in the editor (it has no captured thumbnail yet) —
+  // e.g. the seeded welcome poster. The previous version drew a 10px
+  // initial in #3a3a4a on the #0f0f17 card, which measured 1.7:1 —
+  // below the WCAG floor and effectively invisible, so the card read as
+  // a blank white/dark rectangle. Give it a legible initial and a
+  // one-word label so it reads as a poster, not a rendering bug.
   const doc = 'data' in row ? (row as PosterRow).data : null;
   if (!doc?.blocks?.length) {
     return (
-      <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-widest text-[#3a3a4a]">
-        {row.title?.trim() ? row.title.trim().charAt(0).toUpperCase() : 'P'}
+      <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#12121c] text-[#9aa0b4]">
+        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[#20202e] text-lg font-bold uppercase text-[#c8b6ff]">
+          {row.title?.trim() ? row.title.trim().charAt(0).toUpperCase() : 'P'}
+        </div>
+        <span className="text-[10px] uppercase tracking-widest text-[#6b7280]">Poster</span>
       </div>
     );
   }

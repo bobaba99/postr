@@ -16,10 +16,13 @@
  *                           code-split, noindex; registered but not
  *                           linked from nav — D12)
  *   /manuscript-to-poster → redirect to /paper-to-poster (old live URL)
- *   /paper-to-present   → redirect to /paper-to-poster (reserved alias)
+ *   /paper-to-slides    → Paper→slides standalone flow (public, code-split)
+ *   /paper-to-present   → redirect to /paper-to-slides (canonical is slides)
+ *   /paper-to-presentation → redirect to /paper-to-slides (alias)
  *   /auth               → Auth (sign in / sign up / guest)
  *   /dashboard          → My Posters (auth-gated)
- *   /p/:posterId        → Editor (auth-gated, code-split)
+ *   /p/:posterId        → Editor (anonymous-first, code-split — EnsureSession
+ *                         creates a guest session instead of bouncing to /auth)
  *   /profile            → Profile (auth-gated)
  *   /admin/gallery      → Admin gallery moderation (admin-gated, code-split)
  *   /s/:slug            → Share (public read-only)
@@ -43,8 +46,10 @@
  *   /paper-to-poster canonical ("paper to poster" 140/mo · KD 0)
  *     ← /manuscript-to-poster  (the previously live URL — it is in the
  *                               production sitemap and must not 404)
- *     ← /paper-to-present      (reserved; note this flow outputs a
- *                               poster draft, never slides)
+ *   /paper-to-slides canonical (the talk flow — editable deck out)
+ *     ← /paper-to-present      (a talk-intent spelling; slides is the
+ *                               output, so it consolidates here)
+ *     ← /paper-to-presentation (the same intent, longer spelling)
  *
  * The <Navigate replace> entries below only cover in-app navigation.
  * A cold hit on an alias never reaches this router: vercel.json issues
@@ -68,6 +73,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router';
 import { AuthGuard } from '@/components/AuthGuard';
+import { EnsureSession } from '@/components/EnsureSession';
 import { EditorErrorBoundary } from '@/components/EditorErrorBoundary';
 import Landing from '@/pages/Landing';
 import About from '@/pages/About';
@@ -100,10 +106,13 @@ const PaperToPoster = lazy(() => import('@/pages/PaperToPoster'));
 // Presentation Checker — the review upload surface. Kept out of the
 // initial bundle for the same reason as the other standalone tools.
 const PresentationChecker = lazy(() => import('@/pages/PresentationChecker'));
+// Standalone paper→slides flow — pulls the deck builder and the lazy
+// pptx writer, so it loads on demand like its poster sibling.
+const PaperToSlides = lazy(() => import('@/pages/PaperToSlides'));
 
 function LazyFallback() {
   return (
-    <main className="flex min-h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#6b7280]">
+    <main className="flex min-h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#8b8f99]">
       <div className="text-[14pt]">Loading…</div>
     </main>
   );
@@ -135,6 +144,7 @@ export function AppRoutes() {
             now, deliberately NOT linked from nav; the indexed static
             record + nav links are the Milestone-6 launch checklist. */}
         <Route path="/presentation-checker" element={<PresentationChecker />} />
+        <Route path="/paper-to-slides" element={<PaperToSlides />} />
         {/* Alias redirects — see the "Slug aliases" note in the header. */}
         <Route path="/plot-picker" element={<Navigate to="/chart-chooser" replace />} />
         <Route
@@ -143,7 +153,11 @@ export function AppRoutes() {
         />
         <Route
           path="/paper-to-present"
-          element={<Navigate to="/paper-to-poster" replace />}
+          element={<Navigate to="/paper-to-slides" replace />}
+        />
+        <Route
+          path="/paper-to-presentation"
+          element={<Navigate to="/paper-to-slides" replace />}
         />
         {/*
           Dev only. This was publicly routable with no guard, which put
@@ -163,11 +177,11 @@ export function AppRoutes() {
         <Route
           path="/p/:posterId"
           element={
-            <AuthGuard>
+            <EnsureSession>
               <EditorErrorBoundary>
                 <Editor />
               </EditorErrorBoundary>
-            </AuthGuard>
+            </EnsureSession>
           }
         />
         <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />

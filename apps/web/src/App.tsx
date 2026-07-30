@@ -4,11 +4,13 @@ import { AppRoutes } from '@/routes';
 import { FeedbackModal } from '@/components/FeedbackModal';
 import { PublishFlow } from '@/components/PublishFlow';
 import { SessionExpiredModal } from '@/components/SessionExpiredModal';
+import { RouteScrollManager } from '@/components/RouteScrollManager';
 import { redactUrl } from '@/analytics/redactUrl';
 
 export default function App() {
   return (
     <BrowserRouter>
+      <RouteScrollManager />
       <AppRoutes />
       <FeedbackModal />
       <PublishFlow />

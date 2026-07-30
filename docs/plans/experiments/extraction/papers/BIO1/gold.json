@@ -1,0 +1,32 @@
+{
+  "id": "BIO1",
+  "question": "Does reduced gut microbiome diversity cause metabolic dysfunction and obesity?",
+  "starFinding": {
+    "text": "In animal models, altering gut microbiota causally drives obesity and metabolic dysfunction: germ-free mice are protected from diet-induced obesity, and transplanting certain microbiota confers obesity and metabolic disorders — establishing that microbiota changes cause disease rather than merely resulting from it.",
+    "sourceQuote": "conventionalization studies, studies in germ-free mice, and studies using antibiotics provided evidence that changes in gut microbiota may be causally involved in metabolic disease, rather than merely being a consequence of it"
+  },
+  "top3": [
+    {
+      "text": "Microbiota transplant experiments provide direct causal evidence: some gut microbiota could confer obesity and associated metabolic disorders when transferred to mice.",
+      "sourceQuote": "some gut microbiota could confer obesity and associated metabolic disorders to mice, suggesting a causative link between gut bacteria and metabolic diseases"
+    },
+    {
+      "text": "In humans, reduced gut microbiome diversity is consistently associated with (not proven to cause) an elevated relative risk of obesity and metabolic disorders, with gut dysbiosis implicated in metabolic disease etiology.",
+      "sourceQuote": "reduced gut microbiome diversity associated with an elevated relative risk of obesity and metabolic disorders"
+    },
+    {
+      "text": "Human observational studies link obesity to low microbial diversity and taxon depletion, where loss of certain taxa leaves an empty functional niche that promotes dysbiosis and compromised metabolic functionality.",
+      "sourceQuote": "obesity is related to low microbial diversity and taxon depletion, sometimes resulting from interaction with host dietary habits and genotype"
+    }
+  ],
+  "doNotPromote": [
+    "Zhang et al. 2024's supporting quote ('Obesity has been shown to cause alterations in the gut microbiome, including a reduction in bacterial diversity') describes the REVERSE direction (obesity causing reduced diversity) and must not be ranked #1 as the causal answer to the question.",
+    "Meijnikman et al. 2018 provides no empirical finding ('Not mentioned' / mixed) — it only outlines the review's scope and must not be promoted as a top finding.",
+    "Harley & Karp 2012 is classified null or negligible and merely notes that a causal role 'has been proposed' — a background/framing claim, not an affirmative finding, so it must not be ranked #1.",
+    "Human association findings must not be promoted as establishing causation; the text is explicit that human evidence shows associations only and that causality in humans remains unproven."
+  ],
+  "draftedBy": "workflow",
+  "approved": true,
+  "approvedBy": "Gavin",
+  "wellWritten": true
+}

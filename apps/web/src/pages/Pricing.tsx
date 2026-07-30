@@ -35,9 +35,7 @@ export default function Pricing() {
           <span className="text-[#7c6aed]">Pay only to take it further.</span>
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-[14pt] leading-relaxed text-[#9ca3af]">
-          A finished, print-ready poster costs nothing. You pay when you want to
-          keep editing in PowerPoint or LaTeX, or turn a paper into a talk — the
-          parts that go beyond the free workflow.
+          Build and print free. Pay only for editable PowerPoint or LaTeX exports.
         </p>
       </section>
 

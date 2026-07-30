@@ -1,0 +1,133 @@
+{
+  "note": "Held-out spatial/relational edit requests. Grounded in web-confirmed real edit vocabulary (reposition, overlap, crowd, spacing, distribute, hanging off edge, not centered) \u2014 phrased into test cases. VERIFIED not present as examples in crosswalk.md or component-relations.md (leakage check run).",
+  "slide_context": "Arm P slide 3 (stat-emphasis): section-label(top-left), title(top-left, large), body(middle-left), callout-box+callout-label+callout-text(middle-lower-left), accent-dot+footer(bottom-left), slide-number(bottom-right).",
+  "phrases": [
+    {
+      "id": "T01",
+      "text": "the callout is crowding the footer",
+      "expect_components": [
+        "callout-box",
+        "footer"
+      ],
+      "expect_op": "increase vertical gap between the pair"
+    },
+    {
+      "id": "T02",
+      "text": "push everything up a bit, there's dead space at the bottom",
+      "expect_components": [
+        "content-stack"
+      ],
+      "expect_op": "shift stack up / reduce bottom margin"
+    },
+    {
+      "id": "T03",
+      "text": "the body text is hanging too far left",
+      "expect_components": [
+        "body"
+      ],
+      "expect_op": "increase left margin / indent"
+    },
+    {
+      "id": "T04",
+      "text": "center the callout box",
+      "expect_components": [
+        "callout-box"
+      ],
+      "expect_op": "move x to center band + carry its children"
+    },
+    {
+      "id": "T05",
+      "text": "the accent dot is stranded way below everything else",
+      "expect_components": [
+        "accent-dot",
+        "footer"
+      ],
+      "expect_op": "accent-dot is bound to footer; move together or note orphan"
+    },
+    {
+      "id": "T06",
+      "text": "move the footnote away from the dot",
+      "expect_components": [
+        "footer",
+        "accent-dot"
+      ],
+      "expect_op": "AMBIGUOUS-bound-pair: dot is bound to footer; ask or keep together"
+    },
+    {
+      "id": "T07",
+      "text": "the slide number is too close to the edge",
+      "expect_components": [
+        "slide-number"
+      ],
+      "expect_op": "increase right/bottom margin for that element"
+    },
+    {
+      "id": "T08",
+      "text": "scoot the title down so it's not right at the top",
+      "expect_components": [
+        "title"
+      ],
+      "expect_op": "increase y (lower) + push stack below"
+    },
+    {
+      "id": "T09",
+      "text": "the label above the title feels detached",
+      "expect_components": [
+        "section-label",
+        "title"
+      ],
+      "expect_op": "decrease gap between the pair"
+    },
+    {
+      "id": "T10",
+      "text": "nothing lines up on the left",
+      "expect_components": [
+        "alignment-group"
+      ],
+      "expect_op": "snap left-margin group to a common edge"
+    },
+    {
+      "id": "T11",
+      "text": "the evidence box is floating, give it an anchor",
+      "expect_components": [
+        "callout-box"
+      ],
+      "expect_op": "AMBIGUOUS: subjective; ask what 'anchor' means (align to margin? add rule?)"
+    },
+    {
+      "id": "T12",
+      "text": "even out the space around the middle chunk",
+      "expect_components": [
+        "body",
+        "callout-box"
+      ],
+      "expect_op": "equalize gaps above/below the mid content"
+    },
+    {
+      "id": "T13",
+      "text": "shift the section tag and heading as one unit to the right",
+      "expect_components": [
+        "section-label",
+        "title"
+      ],
+      "expect_op": "move the top pair together, but this breaks the left-alignment group \u2192 flag"
+    },
+    {
+      "id": "T14",
+      "text": "tuck the page number into the corner properly",
+      "expect_components": [
+        "slide-number"
+      ],
+      "expect_op": "align to bottom-right corner margin"
+    },
+    {
+      "id": "T15",
+      "text": "the title runs into the box below it when it's long",
+      "expect_components": [
+        "title",
+        "callout-box"
+      ],
+      "expect_op": "increase gap / reflow to prevent collision on long titles"
+    }
+  ]
+}

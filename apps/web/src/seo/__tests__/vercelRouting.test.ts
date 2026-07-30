@@ -56,8 +56,12 @@ const CLIENT_ROUTES = [
   '/gallery',
   '/gallery/:entryId',
   '/privacy',
+  '/privacy/fr',
   '/cookies',
+  '/cookies/fr',
   '/terms',
+  '/terms/fr',
+  '/paper-to-slides',
   '/auth',
   '/s/:slug',
   '/dashboard',
@@ -77,7 +81,8 @@ const CLIENT_ROUTES = [
 const ALIAS_REDIRECTS: Array<[string, string]> = [
   ['/plot-picker', '/chart-chooser'],
   ['/manuscript-to-poster', '/paper-to-poster'],
-  ['/paper-to-present', '/paper-to-poster'],
+  ['/paper-to-present', '/paper-to-slides'],
+  ['/paper-to-presentation', '/paper-to-slides'],
 ];
 
 /** Paths that must fall through to the platform 404. */
@@ -92,7 +97,12 @@ const UNKNOWN_PATHS = [
   '/admin/anything-else',
 ];
 
-const PRERENDERED = new Set(Object.keys(routes.static));
+const PRERENDERED = new Set([
+  ...Object.keys(routes.static),
+  ...Object.entries(routes.app)
+    .filter(([, record]) => (record as { prerender?: boolean }).prerender)
+    .map(([path]) => path),
+]);
 
 /**
  * Convert a vercel.json rewrite source to a matcher. Only the simple
@@ -174,6 +184,19 @@ describe('vercel.json rewrites', () => {
         `${route} is prerendered; a rewrite would mask a broken prerender as a silent 200`,
       ).toBeUndefined();
     }
+  });
+
+  it('serves /auth from a dedicated noindex prerender instead of the home shell', () => {
+    const auth = routes.app['/auth'] as {
+      prerender?: boolean;
+      h1?: string;
+      copy?: string[];
+    };
+
+    expect(auth.prerender).toBe(true);
+    expect(auth.h1).toBeTruthy();
+    expect(auth.copy?.length).toBeGreaterThan(0);
+    expect(rewriteMatching('/auth')).toBeUndefined();
   });
 
   it('sends /s/:slug to the share edge shell', () => {

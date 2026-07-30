@@ -1,23 +1,22 @@
 /**
- * The appended template slides — an explainer plus one empty slide per
- * named layout, for the user to duplicate.
+ * The poster PPTX export is a SINGLE slide — the poster canvas, nothing
+ * else.
  *
- * The load-bearing assertion here is the NO-REGRESSION one: adding six
- * slides after the poster must leave `slide1.xml` BYTE-identical to a
- * deck exported without them. It is checked by exact byte comparison
- * against a poster-only export, not by shape.
+ * The empty talk-layout template slides (an explainer plus one slide per
+ * named layout) used to be appended after the poster. They belong to the
+ * talk deck, not the poster, and have been removed from the poster export
+ * path. `export/pptx/templateSlides.ts` stays intact for the talk deck to
+ * reuse; this file guards that the POSTER path no longer calls it.
+ *
+ * The load-bearing assertion is the one at the top: a poster `.pptx` has
+ * exactly one `ppt/slides/slideN.xml`. The rest confirm that dropping the
+ * appended slides did not disturb the poster slide itself — background
+ * fill, the selectable acknowledgement picture, the half-size note the
+ * importer reads — and that the archive is still well-formed.
  */
 import { describe, expect, it } from 'vitest';
 import { unzipSync } from 'fflate';
 import { exportPosterPptx } from '../pptx/writer';
-import {
-  APPENDED_SLIDE_COUNT,
-  EXPLAINER_BODY,
-  EXPLAINER_HEADING,
-  EXPLAINER_SLIDE_NAME,
-  TEMPLATE_SLIDE_LAYOUTS,
-  TEMPLATE_SLIDE_PREFIX,
-} from '../pptx/templateSlides';
 import { POSTER_LAYOUT, resolveMasterPalette } from '../pptx/masters';
 import { makeFixtureDoc, TINY_PNG_BYTES } from './fixtures';
 
@@ -38,12 +37,6 @@ const slidePaths = (entries: Record<string, Uint8Array>): string[] =>
     .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
     .sort((a, b) => Number(a.replace(/\D+/g, '')) - Number(b.replace(/\D+/g, '')));
 
-/** The `<p:cSld name>` of each slide, in deck order. */
-const slideNames = (entries: Record<string, Uint8Array>): string[] =>
-  slidePaths(entries).map(
-    (p) => /<p:cSld name="([^"]*)"/.exec(decode(entries[p]))?.[1] ?? '',
-  );
-
 /** The layout part a given slide is attached to, by its `<p:cSld name>`. */
 function layoutNameForSlide(entries: Record<string, Uint8Array>, path: string): string {
   const n = path.replace(/\D+/g, '');
@@ -54,79 +47,44 @@ function layoutNameForSlide(entries: Record<string, Uint8Array>, path: string): 
   return /<p:cSld name="([^"]*)"/.exec(layout)?.[1] ?? '';
 }
 
-describe('the exported deck ships template slides after the poster', () => {
-  it('has exactly seven slides', async () => {
+describe('the poster export is a single slide', () => {
+  it('emits exactly one ppt/slides/slideN.xml — no appended talk templates', async () => {
     const { entries } = await generate();
-    expect(slidePaths(entries).length).toBe(1 + APPENDED_SLIDE_COUNT);
-    expect(slidePaths(entries).length).toBe(7);
+    expect(slidePaths(entries)).toEqual(['ppt/slides/slide1.xml']);
   });
 
-  it('orders them poster, explainer, then the five layouts', async () => {
-    const { entries } = await generate();
-    expect(slideNames(entries)).toEqual([
-      'Slide 1',
-      EXPLAINER_SLIDE_NAME,
-      `${TEMPLATE_SLIDE_PREFIX}3-Column Classic`,
-      `${TEMPLATE_SLIDE_PREFIX}2-Col Wide Figure`,
-      `${TEMPLATE_SLIDE_PREFIX}Billboard`,
-      `${TEMPLATE_SLIDE_PREFIX}Sidebar + Focus`,
-      `${TEMPLATE_SLIDE_PREFIX}Blank`,
-    ]);
+  it('stays a single slide for a HALVED poster too', async () => {
+    const { entries } = await generate({ widthIn: 96, heightIn: 48 });
+    expect(slidePaths(entries).length).toBe(1);
   });
 
-  it('appends exactly the number of slides the importer’s cap assumes', async () => {
-    // The importer caps how many slides it will treat as ours at
-    // APPENDED_SLIDE_COUNT. If the exporter ever appends more, that
-    // cap silently starts under-counting — so pin them together.
+  it('registers exactly one slide in the presentation part', async () => {
     const { entries } = await generate();
-    expect(slidePaths(entries).length - 1).toBe(APPENDED_SLIDE_COUNT);
-    expect(APPENDED_SLIDE_COUNT).toBe(1 + TEMPLATE_SLIDE_LAYOUTS.length);
-  });
-
-  it('attaches each template slide to its own named layout', async () => {
-    const { entries } = await generate();
-    const paths = slidePaths(entries);
-    TEMPLATE_SLIDE_LAYOUTS.forEach((layout, i) => {
-      // slide1 = poster, slide2 = explainer, slides 3..7 = layouts.
-      expect(layoutNameForSlide(entries, paths[i + 2]!)).toBe(layout);
-    });
+    const presentation = decode(entries['ppt/presentation.xml']);
+    expect((presentation.match(/<p:sldId /g) ?? []).length).toBe(1);
   });
 
   it('keeps the poster slide on the empty poster layout', async () => {
     const { entries } = await generate();
     expect(layoutNameForSlide(entries, 'ppt/slides/slide1.xml')).toBe(POSTER_LAYOUT);
   });
+
+  it('opting out of templateSlides is now a no-op — still one slide', async () => {
+    // `templateSlides: false` was the no-regression seam that diffed
+    // slide1.xml against a poster-only deck. With the poster path no
+    // longer appending anything, the flag can only ever produce the same
+    // single slide — asserted so a future re-wiring cannot quietly
+    // reintroduce the appended slides behind the default.
+    const withFlag = await generate({}, { templateSlides: false });
+    const withoutFlag = await generate();
+    expect(slidePaths(withFlag.entries).length).toBe(1);
+    expect(withFlag.entries['ppt/slides/slide1.xml']).toEqual(
+      withoutFlag.entries['ppt/slides/slide1.xml'],
+    );
+  });
 });
 
-describe('slide 1 is unchanged by the appended slides', () => {
-  it('is BYTE-identical to a deck exported without templates', async () => {
-    const withTemplates = await generate();
-    const posterOnly = await generate({}, { templateSlides: false });
-    expect(slidePaths(posterOnly.entries).length).toBe(1);
-    expect(withTemplates.entries['ppt/slides/slide1.xml']).toEqual(
-      posterOnly.entries['ppt/slides/slide1.xml'],
-    );
-  });
-
-  it('keeps slide 1 byte-identical for a HALVED poster too', async () => {
-    const withTemplates = await generate({ widthIn: 96, heightIn: 48 });
-    const posterOnly = await generate(
-      { widthIn: 96, heightIn: 48 },
-      { templateSlides: false },
-    );
-    expect(withTemplates.entries['ppt/slides/slide1.xml']).toEqual(
-      posterOnly.entries['ppt/slides/slide1.xml'],
-    );
-  });
-
-  it('keeps slide 1 rels byte-identical, so its media still resolves', async () => {
-    const withTemplates = await generate();
-    const posterOnly = await generate({}, { templateSlides: false });
-    expect(withTemplates.entries['ppt/slides/_rels/slide1.xml.rels']).toEqual(
-      posterOnly.entries['ppt/slides/_rels/slide1.xml.rels'],
-    );
-  });
-
+describe('the single poster slide is unchanged', () => {
   it('still carries the acknowledgement mark as a selectable picture', async () => {
     const { entries } = await generate();
     expect(decode(entries['ppt/slides/slide1.xml'])).toContain('<p:pic>');
@@ -147,97 +105,20 @@ describe('slide 1 is unchanged by the appended slides', () => {
   });
 });
 
-describe('the explainer slide', () => {
-  const explainer = (entries: Record<string, Uint8Array>): string =>
-    decode(entries['ppt/slides/slide2.xml']);
-
-  it('tells the user what the next slides are and to duplicate one', async () => {
+describe('the appended slides no longer exist', () => {
+  it('ships no explainer or layout template slide', async () => {
     const { entries } = await generate();
-    const xml = explainer(entries);
-    expect(xml).toContain('empty templates');
-    expect(xml).toContain('Duplicate Slide');
-  });
-
-  it('stays in the house voice — no marketing, no AI', async () => {
-    for (const copy of [EXPLAINER_HEADING, EXPLAINER_BODY]) {
-      expect(copy).not.toMatch(/\bAI\b|artificial intelligence|magic|powerful|seamless/i);
-    }
-    // Terse enough to read at a glance on a poster-sized canvas.
-    expect(`${EXPLAINER_HEADING} ${EXPLAINER_BODY}`.length).toBeLessThan(320);
-  });
-
-  it('uses the poster font and palette so it reads as part of the deck', async () => {
-    const { doc, entries } = await generate();
-    const p = resolveMasterPalette(doc.palette);
-    const xml = explainer(entries);
-    expect(xml).toContain(`typeface="${doc.fontFamily}"`);
-    expect(xml).toContain(`val="${p.accent}"`);
-    expect(xml).toContain(`<a:solidFill><a:srgbClr val="${p.bg}"/></a:solidFill>`);
-  });
-
-  it('tracks a custom font rather than hardcoding the default', async () => {
-    const { entries } = await generate({ fontFamily: 'Lora' });
-    expect(explainer(entries)).toContain('typeface="Lora"');
-  });
-
-  it('routes the font through the safeFontFamily allowlist', async () => {
-    // A hostile family can arrive from an imported deck; pptxgenjs
-    // interpolates it into `typeface="…"` unescaped.
-    const { entries } = await generate({ fontFamily: 'Ampers & <Sons>' });
-    const xml = explainer(entries);
-    expect(xml).not.toContain('Ampers & <Sons>');
-    expect(xml).toContain('typeface="Source Sans 3"');
-  });
-});
-
-describe('the template slides are empty', () => {
-  /** The template slide carrying a given layout's name. */
-  const templateSlideXml = (
-    entries: Record<string, Uint8Array>,
-    layout: string,
-  ): string => {
-    const path = slidePaths(entries).find((p) =>
-      decode(entries[p]).includes(`name="${TEMPLATE_SLIDE_PREFIX}${layout}"`),
-    );
-    expect(path, `no slide for ${layout}`).toBeDefined();
-    return decode(entries[path!]);
-  };
-
-  it('carries no authored text beyond its own layout label', async () => {
-    const { entries } = await generate();
-    for (const layout of TEMPLATE_SLIDE_LAYOUTS) {
-      const xml = templateSlideXml(entries, layout);
-      // pptxgenjs materializes each layout placeholder onto the slide
-      // as an EMPTY, click-to-type shape — that is what makes the
-      // slide usable. The only actual <a:t> run is the label.
-      const runs = xml.match(/<a:t>([\s\S]*?)<\/a:t>/g) ?? [];
-      expect(runs.length, `${layout} has stray text`).toBe(1);
-      expect(runs[0]).toBe(`<a:t>${layout.replace(/&/g, '&amp;')}</a:t>`);
-      // No pictures, tables or charts of its own.
-      expect(xml).not.toContain('<p:pic>');
-      expect(xml).not.toContain('<a:tbl>');
-    }
-  });
-
-  it('gives every layout placeholder an empty, click-to-type shape', async () => {
-    const { entries } = await generate();
-    // 3-Column Classic: title + authors + 3 heading/body pairs = 8.
-    const xml = templateSlideXml(entries, '3-Column Classic');
-    expect((xml.match(/<p:ph\b[\s\S]*?type="(?:title|body)"/g) ?? []).length).toBe(8);
-    // None of the layout's prompt text is baked onto the slide.
-    expect(xml).not.toContain('Click to add title');
-    expect(xml).not.toContain('Click to add text');
-  });
-
-  it('does not repeat the poster content on any template slide', async () => {
-    const { entries } = await generate();
-    for (const path of slidePaths(entries).slice(1)) {
-      expect(decode(entries[path])).not.toContain('Whisker Maps');
+    const onlySlide = decode(entries['ppt/slides/slide1.xml']);
+    // The old explainer copy and its Postr-template marker must be gone.
+    expect(onlySlide).not.toContain('empty templates');
+    expect(onlySlide).not.toContain('Duplicate Slide');
+    for (const path of slidePaths(entries)) {
+      expect(decode(entries[path])).not.toContain('Postr template - ');
     }
   });
 });
 
-describe('the appended slides keep the archive well-formed', () => {
+describe('the poster export keeps the archive well-formed', () => {
   const expectAllPartsParse = (entries: Record<string, Uint8Array>): void => {
     const parser = new DOMParser();
     for (const part of Object.keys(entries).filter((n) => /\.(xml|rels)$/.test(n))) {
@@ -249,7 +130,7 @@ describe('the appended slides keep the archive well-formed', () => {
     }
   };
 
-  it('parses every XML part of a seven-slide export', async () => {
+  it('parses every XML part of a single-slide export', async () => {
     const { entries } = await generate();
     expectAllPartsParse(entries);
   });
@@ -257,11 +138,5 @@ describe('the appended slides keep the archive well-formed', () => {
   it('parses every XML part when the poster is halved', async () => {
     const { entries } = await generate({ widthIn: 96, heightIn: 48 });
     expectAllPartsParse(entries);
-  });
-
-  it('registers all seven slides in the presentation part', async () => {
-    const { entries } = await generate();
-    const presentation = decode(entries['ppt/presentation.xml']);
-    expect((presentation.match(/<p:sldId /g) ?? []).length).toBe(7);
   });
 });

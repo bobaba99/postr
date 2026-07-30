@@ -10,13 +10,21 @@
  */
 import { injectHead } from '../../scripts/lib/headTags.mjs';
 
-const SITE = { siteName: 'Postr', locale: 'en_US' };
+const SITE = {
+  siteOrigin: 'https://www.postr.sh',
+  siteName: 'Postr',
+  language: 'en',
+  locale: 'en_US',
+  defaultOgImage: '/og-card.png',
+};
 
 export interface ShellMeta {
   title: string;
   description: string;
   robots: string;
   canonical: string | null;
+  language: string;
+  locale: string;
   ogType: string;
   ogImage: string | null;
   ogImageAlt: string | null;
@@ -77,18 +85,37 @@ export function injectOrPassThrough(
 
 /** Mirrors shareMeta() in src/seo/siteMeta.ts. Never indexable. */
 export function buildShareMeta(input: {
+  slug: string;
   title: string | null;
   imageUrl: string | null;
 }): ShellMeta {
-  const title = input.title?.trim() || 'Untitled poster';
+  const posterTitle = input.title?.trim();
+  const title = posterTitle
+    ? `${clampText(posterTitle, 28)} — Shared Poster Review | Postr`
+    : 'Shared Research Poster Review | Postr';
+  const image =
+    input.imageUrl ?? `${SITE.siteOrigin}${SITE.defaultOgImage}`;
   return {
-    title: `${title} · Shared on Postr`,
+    title,
     description:
-      'A research poster shared for review on Postr. Comment on it, or make your own conference poster free.',
+      "Review a private research poster shared through Postr. Add comments, return to the owner's read-only poster, or create your own conference poster for free.",
     robots: 'noindex,nofollow',
-    canonical: null,
+    canonical: `${SITE.siteOrigin}/s/${input.slug.toLowerCase()}`,
+    language: SITE.language,
+    locale: SITE.locale,
     ogType: 'article',
-    ogImage: input.imageUrl,
-    ogImageAlt: `Research poster: ${title}`,
+    ogImage: image,
+    ogImageAlt:
+      input.imageUrl && posterTitle
+        ? `Research poster: ${posterTitle}`
+        : 'Postr: free conference poster maker',
   };
+}
+
+function clampText(text: string, max: number): string {
+  const collapsed = text.replace(/\s+/g, ' ').trim();
+  if (collapsed.length <= max) return collapsed;
+  const cut = collapsed.slice(0, max - 1);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }

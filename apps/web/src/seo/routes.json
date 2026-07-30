@@ -1,6 +1,7 @@
 {
   "siteOrigin": "https://www.postr.sh",
   "siteName": "Postr",
+  "language": "en",
   "locale": "en_US",
   "themeColor": "#0a0a12",
   "defaultOgImage": "/og-card.png",
@@ -11,7 +12,7 @@
       "robots": "index,follow",
       "h1": "Academic posters, without the hassle.",
       "copy": [
-        "A poster editor that handles the fiddly parts — micro-edits, text that reflows when you resize, conference size specs, figures too small to read in print, authors and affiliations, BibTeX citations — so you can work on the science.",
+        "A poster editor that handles the fiddly parts — micro-edits, text that reflows when you resize, conference size specs, figures too small to read in print, authors and affiliations, BibTeX citations — so you can work on the science. Start with a conference-ready layout, then keep every design decision under your control.",
         "Smart templates: conference-ready layouts with discipline-specific palettes, and APA, SfN and ECNP size presets built in.",
         "Figure readability: paste your R or Python plotting code and see whether the axis labels will still be readable at print size, with a copy-ready fix.",
         "Writing guide: section-by-section tips, word count targets, and a checklist to follow from intro to conclusion."
@@ -23,10 +24,10 @@
       "robots": "index,follow",
       "h1": "About Postr",
       "copy": [
-        "Postr is a free academic poster editor for students and researchers. It exists because the usual tools were built for something else.",
+        "Postr is a free academic poster editor for students and researchers. It exists because the usual tools were built for something else. Research structure, print constraints, and editable output stay in one focused workflow.",
         "Enter institutions once, then click to assign them to authors. Superscript numbering stays in sync when you add or remove an affiliation.",
-        "Export a .bib from your reference manager and drop it in. Postr reads BibTeX, RIS and EndNote files and formats the reference list for you.",
-        "Every poster starts at a real print size, so what you see on screen is what the print shop produces."
+        "Export a .bib from your reference manager and drop it in. Postr reads BibTeX, RIS and EndNote files and formats the reference list for you. The result remains editable without rebuilding citations by hand.",
+        "Every poster starts at a real print size, so what you see on screen is what the print shop actually produces at full scale."
       ]
     },
     "/why-posters": {
@@ -48,7 +49,7 @@
       "robots": "index,follow",
       "h1": "Free to build. Pay only to take it further.",
       "copy": [
-        "A finished, print-ready poster costs nothing on Postr. Editing and PDF export are always free, with a small \"made with postr.sh\" mark.",
+        "A finished, print-ready poster costs nothing on Postr. Editing and PDF export are always free, with a small \"made with postr.sh\" mark. No card or account is required to finish and print your work.",
         "The CA$18.99 term unlocks unlimited PowerPoint and LaTeX export with no watermark. It renews every four months and you can cancel anytime.",
         "The CA$9.99 pack exports three posters to PowerPoint or LaTeX — a one-time purchase whose credits never expire, for anyone who doesn't need a full term.",
         "You only pay to export to PowerPoint or LaTeX. The free poster workflow — editor, tools, and watermarked PDF — has no limits."
@@ -67,30 +68,81 @@
       ]
     },
     "/privacy": {
-      "title": "Privacy Policy | Postr",
+      "title": "Privacy Policy for Postr Researchers",
       "description": "How Postr collects, stores, and protects your data, including anonymous sessions, poster documents, and cookies. Plain language, no dark patterns.",
       "robots": "index,follow",
       "h1": "Privacy Policy",
       "copy": [
-        "How Postr collects, stores and protects your data, including anonymous sessions, the posters you create, and the cookies the app sets."
+        "Postr collects account details and poster documents only when needed to provide, secure, and support the service. You control your research content, and private posters are not used to train models.",
+        "Anonymous editor sessions use essential authentication storage. Page counting is cookieless, creates no advertising profile, and does not assign a persistent visitor identifier.",
+        "Hosting, authentication, payment, email, and operations providers receive only the data required for their role, subject to contractual and technical safeguards.",
+        "You may request access, correction, export, or deletion of personal data. The full privacy policy explains retention, international processing, security, legal bases, children's privacy, policy changes, complaints, and how to contact Postr with a question or request."
+      ]
+    },
+    "/privacy/fr": {
+      "title": "Politique de confidentialité de Postr",
+      "description": "Découvrez comment Postr collecte, utilise, protège et supprime vos renseignements personnels, y compris les comptes, affiches, témoins et fournisseurs.",
+      "robots": "index,follow",
+      "language": "fr-CA",
+      "locale": "fr_CA",
+      "h1": "Politique de confidentialité",
+      "copy": [
+        "Postr recueille les renseignements de compte et les documents d’affiche nécessaires pour fournir, sécuriser et soutenir le service. Vous gardez le contrôle de votre contenu de recherche.",
+        "Les sessions anonymes utilisent un stockage d’authentification essentiel. Le comptage des pages fonctionne sans témoins, sans profil publicitaire et sans identifiant persistant attribué aux visiteurs.",
+        "Les fournisseurs d’hébergement, d’authentification, de paiement, de courriel et d’exploitation reçoivent uniquement les données requises pour leur rôle, avec des garanties contractuelles et techniques.",
+        "Vous pouvez demander l’accès, la rectification, l’exportation ou la suppression de vos renseignements. La politique complète explique la conservation, les transferts internationaux, la sécurité, les plaintes et les coordonnées."
       ]
     },
     "/cookies": {
-      "title": "Cookie Policy | Postr",
+      "title": "Cookie Policy and Analytics | Postr",
       "description": "What Postr stores on your device and what it does not. Essential authentication only — page counting is cookieless, with no persistent identifier.",
       "robots": "index,follow",
       "h1": "Cookies Policy",
       "copy": [
-        "What Postr stores on your device, why, and what it deliberately does not. Postr sets essential authentication storage only. Page views are counted without cookies and without any identifier that persists between visits, so there is nothing optional to opt out of and no consent banner to dismiss."
+        "Postr uses essential browser storage to maintain signed-in and anonymous editor sessions, protect accounts, remember the poster currently being edited, and keep requested features working between page loads.",
+        "Page views are counted without cookies, advertising profiles, fingerprinting, cross-site tracking, or an identifier that persists between visits. Postr does not use optional analytics or advertising cookies.",
+        "Payment providers may set storage required to complete checkout, prevent fraud, verify a transaction, and manage billing. Their own policies govern that limited provider-controlled storage.",
+        "Blocking essential storage can prevent sign-in, saving, checkout, export access, or other requested features. The full policy lists each storage category, purpose, duration, responsible provider, and available browser control in plain language."
+      ]
+    },
+    "/cookies/fr": {
+      "title": "Politique relative aux témoins | Postr",
+      "description": "Découvrez le stockage essentiel utilisé par Postr pour les sessions et paiements, ainsi que l’analyse sans témoins, profil publicitaire ni suivi persistant.",
+      "robots": "index,follow",
+      "language": "fr-CA",
+      "locale": "fr_CA",
+      "h1": "Politique relative aux témoins",
+      "copy": [
+        "Postr utilise le stockage essentiel du navigateur pour maintenir les sessions connectées et anonymes, protéger les comptes, mémoriser l’affiche ouverte et conserver les fonctions demandées.",
+        "Les pages sont comptées sans témoins, profil publicitaire, empreinte numérique, suivi intersite ou identifiant persistant. Postr n’utilise aucun témoin facultatif d’analyse ou de publicité.",
+        "Les fournisseurs de paiement peuvent définir le stockage requis pour effectuer une transaction, prévenir la fraude et gérer la facturation. Leurs politiques encadrent ce stockage limité.",
+        "Bloquer le stockage essentiel peut empêcher la connexion, l’enregistrement, le paiement ou l’accès aux exportations. La politique complète précise chaque catégorie, finalité, durée, fournisseur et contrôle disponible."
       ]
     },
     "/terms": {
-      "title": "Terms of Service | Postr",
+      "title": "Terms of Service for Postr Users",
       "description": "The terms that govern your use of Postr, including who owns the posters you create (you) and what we can and cannot do with them.",
       "robots": "index,follow",
       "h1": "Terms of Service",
       "copy": [
-        "The terms that govern your use of Postr, including who owns the posters you create. You do."
+        "You keep ownership of the posters, manuscripts, figures, and other content you create or upload. Postr receives only the permissions needed to provide the service.",
+        "Use Postr lawfully and only with content you have permission to use. Respect intellectual property, personal privacy, platform security, and other users.",
+        "Free and paid features may change, and uninterrupted availability is not guaranteed. Payment, renewal, cancellation, refunds, and export access follow the terms shown at checkout.",
+        "Postr may suspend harmful or unlawful use. The full terms explain account termination, service disclaimers, liability limits, indemnity, governing law, dispute handling, policy changes, and how to contact us about a legal, billing, account, accessibility, privacy, or service question."
+      ]
+    },
+    "/terms/fr": {
+      "title": "Conditions d’utilisation de Postr",
+      "description": "Consultez les conditions d’utilisation de Postr : propriété de vos affiches, usages permis, paiements, remboursements, disponibilité et responsabilités.",
+      "robots": "index,follow",
+      "language": "fr-CA",
+      "locale": "fr_CA",
+      "h1": "Conditions d’utilisation",
+      "copy": [
+        "Vous conservez la propriété des affiches, manuscrits, figures et autres contenus créés ou téléversés. Postr reçoit uniquement les autorisations nécessaires pour fournir le service demandé.",
+        "Utilisez Postr légalement et seulement avec du contenu que vous êtes autorisé à employer. Respectez la propriété intellectuelle, la vie privée, la sécurité et les autres utilisateurs.",
+        "Les fonctions gratuites et payantes peuvent changer, et une disponibilité ininterrompue n’est pas garantie. Les paiements, renouvellements, annulations, remboursements et exportations suivent les conditions affichées.",
+        "Postr peut suspendre un usage nuisible ou illégal. Les conditions complètes expliquent la résiliation, les exclusions, la responsabilité, le droit applicable, les différends, les changements et les coordonnées."
       ]
     },
     "/paper-to-poster": {
@@ -104,47 +156,76 @@
         "You choose the emphasis: the finding to lead with, the audience, what the poster is for, and any section that must not be cut.",
         "Check the outline before you download — every panel shows which manuscript section it came from. Export a print-ready PDF, or a .postr file to keep editing in Postr."
       ]
+    },
+    "/paper-to-slides": {
+      "title": "Paper to Slides: Turn a Manuscript into a Deck | Postr",
+      "description": "Turn a paper into an editable slide deck. Paste a manuscript or upload a Word file, answer a few short questions, and download a free PDF or a PowerPoint.",
+      "robots": "index,follow",
+      "h1": "From paper to slides",
+      "copy": [
+        "Turn a paper into a slide deck. Paste your manuscript or upload a .docx, answer a few short questions about your talk, and build an ordered deck — no editor session required.",
+        "The deck follows the arc a research talk needs: the most important result first, the gap and tension it resolves, then methods and figures as fill-ins. One finding per slide, each under a hard word budget so the slide never competes with the speaker.",
+        "Every slide carries speaker notes taken from your paper, each showing which section it came from, so nothing on a slide is invented.",
+        "Your manuscript is never stored on our servers and is never used to train models. Download a free PDF, or an editable PowerPoint you can open in PowerPoint, Keynote, Google Slides, or LibreOffice."
+      ]
     }
   },
   "app": {
     "/auth": {
-      "title": "Sign in | Postr",
-      "description": "Sign in to Postr, or start a poster as a guest with no account.",
-      "robots": "noindex,nofollow"
+      "title": "Sign in or create an account | Postr",
+      "description": "Sign in to Postr, create an account, or continue as a guest to build, save, and export conference posters securely from your browser.",
+      "robots": "noindex,nofollow",
+      "shareImage": true,
+      "prerender": true,
+      "h1": "Sign in or create your account",
+      "copy": [
+        "Sign in, create an account, or continue as a guest to start building a conference poster.",
+        "Poster editing and print-ready PDF export are free. Paid plans only unlock editable PowerPoint and LaTeX exports."
+      ]
     },
     "/dashboard": {
-      "title": "My posters | Postr",
-      "description": "Your Postr dashboard.",
+      "title": "Conference Poster Dashboard | Postr",
+      "description": "Create, manage, and reopen conference posters in Postr, then export print-ready PDFs or unlock editable PowerPoint and LaTeX files.",
       "robots": "noindex,nofollow"
     },
     "/profile": {
-      "title": "Profile and settings | Postr",
-      "description": "Your Postr profile and settings.",
+      "title": "Profile, Billing, and Settings | Postr",
+      "description": "Manage your Postr account details, security, billing status, export access, and saved preferences from one private settings page.",
       "robots": "noindex,nofollow"
     },
     "/presentation-checker": {
-      "title": "Presentation Checker: Get Feedback on Your Poster or Talk | Postr",
-      "description": "Upload a poster PDF, talk deck, or image — or pick one of your Postr posters — and get narrative, design, and content scores with anchored fix cards.",
+      "title": "Presentation Checker — Poster & Talk Review | Postr",
+      "description": "Upload a poster or talk (PDF, PPTX, PNG) and get narrative, design, and content scores with anchored, personalized fix cards you apply by hand.",
       "robots": "noindex,nofollow"
     },
     "/debug": {
-      "title": "Debug | Postr",
-      "description": "Diagnostics.",
+      "title": "Postr Application Diagnostics | Postr",
+      "description": "Review private Postr application diagnostics, browser capabilities, authentication state, and service connectivity while troubleshooting.",
       "robots": "noindex,nofollow"
     },
     "/admin/gallery": {
-      "title": "Gallery moderation | Postr",
-      "description": "Gallery moderation queue.",
+      "title": "Conference Poster Gallery Moderation | Postr",
+      "description": "Review submitted conference posters, verify gallery details, and approve or reject public listings from the private moderation queue.",
       "robots": "noindex,nofollow"
     },
     "/p": {
-      "title": "Poster editor | Postr",
-      "description": "The Postr poster editor.",
+      "title": "Conference Poster Editor | Postr",
+      "description": "Build and edit a conference poster with print sizing, structured authors, citations, readable figures, and free print-ready PDF export.",
+      "robots": "noindex,nofollow"
+    },
+    "/billing/success": {
+      "title": "Payment Confirmed and Access Updated | Postr",
+      "description": "Your Postr payment was received. Review the confirmed purchase, wait for export access to update, then return to your conference poster.",
+      "robots": "noindex,nofollow"
+    },
+    "/billing/cancel": {
+      "title": "Checkout Cancelled — Return to Postr",
+      "description": "No charge was made. Return to your conference poster, continue with free PDF export, or review editable PowerPoint and LaTeX options.",
       "robots": "noindex,nofollow"
     },
     "/404": {
-      "title": "Page not found | Postr",
-      "description": "That page does not exist.",
+      "title": "Page Not Found — Return to Postr",
+      "description": "This Postr page does not exist. Check the address, return to the home page, or start building a free print-ready conference poster.",
       "robots": "noindex,nofollow",
       "h1": "Page not found",
       "copy": [

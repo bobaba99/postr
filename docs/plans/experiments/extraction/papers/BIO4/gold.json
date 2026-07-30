@@ -1,0 +1,31 @@
+{
+  "id": "BIO4",
+  "question": "Does intermittent fasting extend lifespan in model organisms?",
+  "starFinding": {
+    "text": "Yes — intermittent fasting extends lifespan in model organisms, extending rodent lifespan by up to 30% independent of total food intake and weight loss, which shows the temporal pattern of feeding rather than caloric reduction drives the benefit.",
+    "sourceQuote": "In rodents, both fasting for 24 hr every other day or twice weekly extends lifespan up to 30%, independent of both total food intake and weight loss."
+  },
+  "top3": [
+    {
+      "text": "A controlled study in C. elegans measured intermittent fasting extending mean worm lifespan by 28%, the most precise single quantitative estimate in the review.",
+      "sourceQuote": "CR and IF extend the mean lifespan of worms by 40% and 28%, respectively."
+    },
+    {
+      "text": "Across invertebrate model organisms such as worms and flies, intermittent fasting extends lifespan by 20-40%, showing the effect holds across evolutionarily divergent species.",
+      "sourceQuote": "In organisms such as worms and flies, intermittent fasting has been shown to extend lifespan by 20-40%."
+    },
+    {
+      "text": "A defined intermittent-fasting regimen effectively extends the lifespan of Caenorhabditis elegans, providing direct experimental evidence in a primary study.",
+      "sourceQuote": "Here we establish an IF regimen that effectively extends the lifespan of Caenorhabditis elegans"
+    }
+  ],
+  "doNotPromote": [
+    "Lin et al. 2002 — 'Calorie restriction (CR) extends lifespan in a wide spectrum of organisms and is the only regimen known to lengthen the lifespan of mammals.' This is a caloric-restriction (not intermittent-fasting) result in yeast and is off-target for the IF question; it must not be ranked #1.",
+    "Fontana 2017 — the claim that CR effects 'may be due, at least in part, to intermittent fasting or daily time-restricted feeding' is a hedged background caveat about reinterpreting CR, not a direct measurement of IF extending lifespan.",
+    "Anton & Leeuwenburgh 2013 — 'intermittent fasting regimens can trigger similar biological pathways as caloric restriction, which may lead to beneficial effects on longevity' is a mechanism-analogy claim with a 'may lead to' hedge, weaker than the direct quantified lifespan findings."
+  ],
+  "draftedBy": "workflow",
+  "approved": true,
+  "approvedBy": "Gavin",
+  "wellWritten": true
+}

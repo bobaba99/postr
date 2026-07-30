@@ -16,12 +16,21 @@
 export const TEMPLATE_SLIDE_PREFIX = 'Postr template - ';
 
 /**
- * How many slides the exporter appends after the poster: the
- * explainer, plus one empty slide per named layout.
+ * How many `TEMPLATE_SLIDE_PREFIX`-named slides a single export can
+ * legitimately append: the explainer + one empty slide per named
+ * layout (`templateSlides.ts`, 6) plus the two Phase-2 styled-deck
+ * utility slides — the palette swatch slide (`paletteSlide.ts`) and
+ * the icon-library slide (`iconLibrarySlide.ts`), appended together by
+ * the styled-deck pptx export path (`SlidesWizard.tsx`'s
+ * `handleExportPptx`, Task 10).
  *
  * The importer uses it as a CAP on how many slides it will treat as
  * ours, so a deck full of forged names cannot claim that nothing was
- * skipped. `templateSlides.ts` asserts this matches the layout list it
- * actually writes.
+ * skipped (see `parsePptx.ts`). It must stay ≥ the true maximum a
+ * single export can produce across EVERY utility-slide source in the
+ * codebase, even sources not wired into today's export path — a
+ * future caller combining `addTemplateSlides` with the styled-deck
+ * utility slides in one file must not silently under-count. Bump this
+ * again if a new utility-slide appender is added anywhere.
  */
-export const APPENDED_SLIDE_COUNT = 6;
+export const APPENDED_SLIDE_COUNT = 8;

@@ -200,6 +200,7 @@ interface SidebarProps {
   // sources in the chart chooser's first step.
   posterTables: PosterTableRef[];
   onInsertChart: (spec: ChartSpec, caption: string) => void;
+  onUpdateChartSpec: (blockId: string, spec: ChartSpec) => void;
 
   // Pre-computed validation issues for the Issues tab. Shared with
   // the in-canvas warning banner so both surfaces stay in sync.
@@ -763,6 +764,12 @@ export function Sidebar(props: SidebarProps) {
             fontFamily={FONTS[props.fontFamily]?.css ?? props.fontFamily}
             posterTables={props.posterTables}
             onInsertChart={props.onInsertChart}
+            selectedChartBlock={
+              props.selectedBlock && props.selectedBlock.type === 'chart'
+                ? props.selectedBlock
+                : null
+            }
+            onUpdateChartSpec={props.onUpdateChartSpec}
           />
         )}
 

@@ -153,12 +153,12 @@ export default function Landing() {
         <div data-postr-hero-item className="mt-10 flex items-center justify-center gap-4">
           <Link
             to="/auth"
-            className="rounded-lg bg-[#7c6aed] px-8 py-3 text-base font-semibold text-white no-underline hover:bg-[#6c5ce7] transition-colors"
+            className="rounded-lg bg-[#5641b8] px-8 py-3 text-base font-semibold text-white no-underline hover:bg-[#4c39a6] transition-colors"
           >
             Get started
           </Link>
           <Link
-            to="/auth?guest=1"
+            to="/p/new"
             className="rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-8 py-3 text-base font-semibold text-[#c8cad0] no-underline hover:border-[#7c6aed] transition-colors"
           >
             Try as guest
@@ -184,7 +184,10 @@ export default function Landing() {
       </section>
 
       <section className="mx-auto w-full max-w-4xl flex-1 px-8 pb-24">
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+        <h2 className="text-center text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8]">
+          Core poster tools
+        </h2>
+        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div
             data-postr-reveal
             className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
@@ -192,8 +195,8 @@ export default function Landing() {
             <div className="text-2xl mb-3">📐</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Smart templates</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              5 conference-ready layouts with discipline-specific palettes.
-              APA, SfN, ECNP size presets built in.
+              Five conference-ready layouts with disciplinary palettes and
+              standard academic size presets.
             </p>
           </div>
           <div
@@ -203,8 +206,7 @@ export default function Landing() {
             <div className="text-2xl mb-3">📊</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Figure readability</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Paste your R or Python code. See if axis labels will be readable
-              at print size. Get a copy-ready fix.
+              Check chart labels at final print size and get a copy-ready fix.
             </p>
           </div>
           <div
@@ -214,8 +216,7 @@ export default function Landing() {
             <div className="text-2xl mb-3">✍️</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Writing guide</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Section-by-section tips, word count targets, and a checklist
-              to follow from intro to conclusion.
+              Follow section prompts, word targets, and a poster-ready checklist.
             </p>
           </div>
           <div
@@ -223,32 +224,9 @@ export default function Landing() {
             className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
           >
             <div className="text-2xl mb-3">🎞️</div>
-            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">PowerPoint, both ways</h3>
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Editable exports</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Open an existing .pptx poster and keep editing it here, or
-              export one back out with every block still editable.
-            </p>
-          </div>
-          <div
-            data-postr-reveal
-            className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
-          >
-            <div className="text-2xl mb-3">📐</div>
-            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">LaTeX source</h3>
-            <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Download a compilable poster.tex with your figures and a
-              references.bib — keep working in Overleaf if you prefer.
-            </p>
-          </div>
-          <div
-            data-postr-reveal
-            className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
-          >
-            <div className="text-2xl mb-3">🎨</div>
-            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Copy a design</h3>
-            <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Upload a poster you admire and apply its colours and type to
-              yours. Copies the look, never the content.
+              Import, edit, and export PowerPoint, or continue in LaTeX.
             </p>
           </div>
         </div>

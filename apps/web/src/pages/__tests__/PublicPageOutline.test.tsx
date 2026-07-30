@@ -1,0 +1,117 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
+import { describe, expect, it, vi } from 'vitest';
+
+const authSpies = vi.hoisted(() => ({
+  getSession: vi.fn(() => new Promise<never>(() => {})),
+  onAuthStateChange: vi.fn(() => ({
+    data: { subscription: { unsubscribe: vi.fn() } },
+  })),
+}));
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: { auth: authSpies },
+}));
+
+vi.mock('@/motion/timelines/aboutRoadtrip', () => ({
+  aboutRoadtrip: vi.fn(() => ({ revert: vi.fn() })),
+}));
+
+import About from '../About';
+
+const srcRoot = `${process.cwd()}/src`;
+const auditedFiles = [
+  'routes.tsx',
+  'components/PublicHeader.tsx',
+  'components/PublicFooter.tsx',
+  'pages/Home.tsx',
+  'pages/Landing.tsx',
+  'pages/About.tsx',
+  'pages/PaperToPoster.tsx',
+  'pages/PaperToSlides.tsx',
+  'pages/ChartChooser.tsx',
+  'pages/WhyPosters.tsx',
+  'pages/Editor.tsx',
+  'pages/Privacy.tsx',
+  'pages/PrivacyFr.tsx',
+  'pages/Cookies.tsx',
+  'pages/CookiesFr.tsx',
+  'pages/Terms.tsx',
+  'pages/TermsFr.tsx',
+  'pages/Profile.tsx',
+  ...readdirSync(`${srcRoot}/manuscript/slides`)
+    .filter((name) => name.endsWith('.tsx'))
+    .map((name) => `manuscript/slides/${name}`),
+];
+
+function sourceOf(relativePath: string): string {
+  return readFileSync(`${srcRoot}/${relativePath}`, 'utf8');
+}
+
+describe('audited public-page outline and contrast', () => {
+  it('introduces milestone h3 elements with a timeline h2', () => {
+    render(
+      <MemoryRouter>
+        <About />
+      </MemoryRouter>,
+    );
+
+    const timelineHeading = screen.getByRole('heading', {
+      level: 2,
+      name: /postr milestones/i,
+    });
+    const firstMilestone = screen.getAllByRole('heading', { level: 3 })[0];
+    if (!firstMilestone) {
+      throw new Error('Expected at least one milestone heading');
+    }
+
+    expect(
+      timelineHeading.compareDocumentPosition(firstMilestone) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('does not use the audited low-contrast muted text tokens', () => {
+    const lowContrastTokens = [
+      'text-[#6b7280]',
+      'text-[#4b5563]',
+      'text-[#555]',
+    ];
+    const offenders = auditedFiles.filter((file) =>
+      lowContrastTokens.some((token) => sourceOf(file).includes(token)),
+    );
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('gives the authenticated profile page a level-one heading', () => {
+    expect(sourceOf('pages/Profile.tsx')).toMatch(
+      /<h1[^>]*>\s*Profile & settings\s*<\/h1>/,
+    );
+  });
+
+  it('gives every poster-editor state a level-one heading', () => {
+    const editor = sourceOf('pages/Editor.tsx');
+    expect(editor.match(/<h1\b/g)).toHaveLength(4);
+    expect(editor).toContain('editorMeta(posterTitle, posterId)');
+  });
+
+  it.each([
+    ['pages/PrivacyFr.tsx', '/privacy/fr'],
+    ['pages/CookiesFr.tsx', '/cookies/fr'],
+    ['pages/TermsFr.tsx', '/terms/fr'],
+  ])('%s uses metadata for its own localized URL', (file, path) => {
+    expect(sourceOf(file)).toContain(`STATIC_ROUTE_META['${path}']`);
+  });
+
+  it('does not place white text on the bright violet surface', () => {
+    const failingPair =
+      /bg-\[#7c6aed\][^"'`\n}]*text-white|text-white[^"'`\n}]*bg-\[#7c6aed\]/;
+    const offenders = auditedFiles.filter((file) =>
+      failingPair.test(sourceOf(file)),
+    );
+
+    expect(offenders).toEqual([]);
+  });
+});

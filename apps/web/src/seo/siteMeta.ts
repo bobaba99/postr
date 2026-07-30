@@ -19,6 +19,7 @@ import routes from './routes.json';
 
 export const SITE_ORIGIN = routes.siteOrigin;
 export const SITE_NAME = routes.siteName;
+export const SITE_LANGUAGE = routes.language;
 export const SITE_LOCALE = routes.locale;
 export const THEME_COLOR = routes.themeColor;
 /**
@@ -52,14 +53,14 @@ export interface PageMeta {
   /** Full robots directive, already including preview hints when indexable. */
   robots: string;
   /**
-   * Absolute canonical URL, or null to emit none.
-   *
-   * Null is meaningful, not a placeholder: a noindex page must never
-   * carry rel=canonical. The two directives contradict each other, and
-   * Google resolves the conflict unpredictably — sometimes by honouring
-   * the canonical and indexing the page you meant to hide.
+   * Absolute preferred URL, or null for dynamic records with no stable URL.
+   * Private app pages use a self-canonical while robots remains noindex.
    */
   canonical: string | null;
+  /** BCP 47 language for the document's <html lang> attribute. */
+  language: string;
+  /** Open Graph locale for this route. */
+  locale: string;
   ogType: string;
   ogImage: string | null;
   ogImageAlt: string | null;
@@ -69,6 +70,9 @@ interface StaticRouteRecord {
   title: string;
   description: string;
   robots: string;
+  language?: string;
+  locale?: string;
+  shareImage?: boolean;
   h1: string;
   copy: string[];
 }
@@ -77,6 +81,12 @@ interface AppRouteRecord {
   title: string;
   description: string;
   robots: string;
+  language?: string;
+  locale?: string;
+  shareImage?: boolean;
+  prerender?: boolean;
+  h1?: string;
+  copy?: string[];
 }
 
 const STATIC_RECORDS = routes.static as Record<string, StaticRouteRecord>;
@@ -101,21 +111,29 @@ function withPreviewDirectives(robots: string): string {
 
 function toPageMeta(
   path: string,
-  record: { title: string; description: string; robots: string },
+  record: {
+    title: string;
+    description: string;
+    robots: string;
+    language?: string;
+    locale?: string;
+    shareImage?: boolean;
+  },
 ): PageMeta {
-  const indexable = record.robots === INDEXABLE;
+  const hasShareImage = record.shareImage !== false && DEFAULT_OG_IMAGE;
   return {
     title: record.title,
     description: record.description,
     robots: withPreviewDirectives(record.robots),
-    canonical: indexable ? canonicalFor(path) : null,
+    // A self-canonical identifies the preferred URL; robots remains the
+    // authoritative indexing control for private app routes.
+    canonical: canonicalFor(path),
+    language: record.language ?? SITE_LANGUAGE,
+    locale: record.locale ?? SITE_LOCALE,
     ogType: path === '/' ? 'website' : 'article',
-    ogImage:
-      indexable && DEFAULT_OG_IMAGE ? `${SITE_ORIGIN}${DEFAULT_OG_IMAGE}` : null,
+    ogImage: hasShareImage ? `${SITE_ORIGIN}${DEFAULT_OG_IMAGE}` : null,
     ogImageAlt:
-      indexable && DEFAULT_OG_IMAGE
-        ? `${SITE_NAME}: free conference poster maker`
-        : null,
+      hasShareImage ? `${SITE_NAME}: free conference poster maker` : null,
   };
 }
 
@@ -172,15 +190,49 @@ export function clampDescription(text: string, max = 155): string {
  * visiting a gallery entry means `robots: index,follow` and a canonical
  * pointing at someone else's poster.
  */
-export function noindexMeta(title: string, description: string): PageMeta {
+export function noindexMeta(
+  title: string,
+  description: string,
+  path = '/p',
+): PageMeta {
   return {
     title,
     description,
     robots: NOINDEX,
-    canonical: null,
+    canonical: canonicalFor(path),
+    language: SITE_LANGUAGE,
+    locale: SITE_LOCALE,
     ogType: 'website',
-    ogImage: null,
-    ogImageAlt: null,
+    ogImage: DEFAULT_OG_IMAGE ? `${SITE_ORIGIN}${DEFAULT_OG_IMAGE}` : null,
+    ogImageAlt: DEFAULT_OG_IMAGE
+      ? `${SITE_NAME}: free conference poster maker`
+      : null,
+  };
+}
+
+/**
+ * Private editor metadata that remains useful in browser history and tab
+ * switchers without allowing an arbitrary poster title to overflow the head.
+ */
+export function editorMeta(
+  posterTitle: string | null,
+  posterId: string | null | undefined,
+): PageMeta {
+  const base =
+    APP_ROUTE_META['/p'] ??
+    noindexMeta(
+      'Conference Poster Editor | Postr',
+      'Build and edit a conference poster with print sizing, structured authors, citations, readable figures, and free print-ready PDF export.',
+    );
+  const trimmed = posterTitle?.trim();
+  const title = trimmed
+    ? `${clampDescription(trimmed, 24)} — Conference Poster Editor | Postr`
+    : base.title;
+
+  return {
+    ...base,
+    title,
+    canonical: canonicalFor(posterId ? `/p/${posterId}` : '/p'),
   };
 }
 
@@ -214,6 +266,8 @@ export function galleryEntryMeta(entry: GalleryEntryMetaInput): PageMeta {
     description: clampDescription(descriptionParts.join(' ')),
     robots: withPreviewDirectives(INDEXABLE),
     canonical: canonicalFor(`/gallery/${entry.id}`),
+    language: SITE_LANGUAGE,
+    locale: SITE_LOCALE,
     ogType: 'article',
     ogImage: entry.imageUrl,
     ogImageAlt: `Conference poster: ${entry.title}`,
@@ -234,17 +288,30 @@ export function galleryEntryMeta(entry: GalleryEntryMetaInput): PageMeta {
  * renegotiating the noindex contract.
  */
 export function shareMeta(input: {
+  slug: string;
   title: string | null;
   imageUrl: string | null;
 }): PageMeta {
-  const title = input.title?.trim() || 'Untitled poster';
+  const posterTitle = input.title?.trim();
+  const title = posterTitle
+    ? `${clampDescription(posterTitle, 28)} — Shared Poster Review | ${SITE_NAME}`
+    : `Shared Research Poster Review | ${SITE_NAME}`;
+  const image =
+    input.imageUrl ??
+    (DEFAULT_OG_IMAGE ? `${SITE_ORIGIN}${DEFAULT_OG_IMAGE}` : null);
   return {
-    title: `${title} · Shared on ${SITE_NAME}`,
-    description: `A research poster shared for review on ${SITE_NAME}. Comment on it, or make your own conference poster free.`,
+    title,
+    description: `Review a private research poster shared through ${SITE_NAME}. Add comments, return to the owner's read-only poster, or create your own conference poster for free.`,
     robots: NOINDEX,
-    canonical: null,
+    canonical: canonicalFor(`/s/${input.slug}`),
+    language: SITE_LANGUAGE,
+    locale: SITE_LOCALE,
     ogType: 'article',
-    ogImage: input.imageUrl,
-    ogImageAlt: `Research poster: ${title}`,
+    ogImage: image,
+    ogImageAlt: image
+      ? input.imageUrl && posterTitle
+        ? `Research poster: ${posterTitle}`
+        : `${SITE_NAME}: free conference poster maker`
+      : null,
   };
 }

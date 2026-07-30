@@ -49,7 +49,7 @@ export default function Cookies() {
           </Link>
         </div>
         <h1 className="text-4xl font-bold leading-tight text-white">Cookies Policy</h1>
-        <p className="mt-4 text-sm text-[#6b7280]">Last updated: {LAST_UPDATED}</p>
+        <p className="mt-4 text-sm text-[#8b8f99]">Last updated: {LAST_UPDATED}</p>
 
 
         <SectionHeading n="1" title="Scope" />
@@ -304,4 +304,3 @@ function CalloutBox({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-

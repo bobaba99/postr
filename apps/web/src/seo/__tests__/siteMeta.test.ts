@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   APP_ROUTE_META,
@@ -7,6 +8,7 @@ import {
   STATIC_ROUTE_META,
   canonicalFor,
   clampDescription,
+  editorMeta,
   galleryEntryMeta,
   metaFor,
   shareMeta,
@@ -49,12 +51,27 @@ describe('STATIC_ROUTE_META', () => {
       '/about',
       '/chart-chooser',
       '/cookies',
+      '/cookies/fr',
       '/paper-to-poster',
+      '/paper-to-slides',
       '/pricing',
       '/privacy',
+      '/privacy/fr',
       '/terms',
+      '/terms/fr',
       '/why-posters',
     ]);
+  });
+
+  it.each([
+    ['/privacy/fr', 'fr-CA', 'fr_CA'],
+    ['/cookies/fr', 'fr-CA', 'fr_CA'],
+    ['/terms/fr', 'fr-CA', 'fr_CA'],
+  ])('%s has French language and locale signals', (path, language, locale) => {
+    const meta = STATIC_ROUTE_META[path];
+    expect(meta?.language).toBe(language);
+    expect(meta?.locale).toBe(locale);
+    expect(meta?.canonical).toBe(canonicalFor(path));
   });
 
   it('/paper-to-poster promises no slide output — that conversion does not exist', () => {
@@ -91,12 +108,12 @@ describe('STATIC_ROUTE_META', () => {
   });
 
   it.each(entries)('%s has a unique, budget-sized title', (_p, meta) => {
-    expect(meta.title.length).toBeGreaterThan(10);
+    expect(meta.title.length).toBeGreaterThanOrEqual(30);
     expect(meta.title.length).toBeLessThanOrEqual(60);
   });
 
   it.each(entries)('%s has a budget-sized description', (_p, meta) => {
-    expect(meta.description.length).toBeGreaterThan(50);
+    expect(meta.description.length).toBeGreaterThanOrEqual(120);
     expect(meta.description.length).toBeLessThanOrEqual(160);
   });
 
@@ -124,14 +141,28 @@ describe('APP_ROUTE_META', () => {
     expect(meta.robots).toBe(NOINDEX);
   });
 
-  it.each(entries)('%s emits no canonical', (_p, meta) => {
-    // A noindex page carrying rel=canonical sends contradictory signals
-    // and Google may resolve the conflict by indexing it anyway.
-    expect(meta.canonical).toBeNull();
+  it.each(entries)('%s emits a self-canonical without becoming indexable', (path, meta) => {
+    expect(meta.canonical).toBe(canonicalFor(path));
   });
 
-  it.each(entries)('%s advertises no OG image', (_p, meta) => {
-    expect(meta.ogImage).toBeNull();
+  it.each(entries)('%s has complete share metadata', (_path, meta) => {
+    expect(meta.ogImage).toBe(`${SITE_ORIGIN}/og-card.png`);
+    expect(meta.ogImageAlt).toBeTruthy();
+  });
+
+  it.each(entries)('%s has budget-sized metadata without becoming indexable', (
+    _path,
+    meta,
+  ) => {
+    expect(meta.title.length).toBeGreaterThanOrEqual(30);
+    expect(meta.title.length).toBeLessThanOrEqual(60);
+    expect(meta.description.length).toBeGreaterThanOrEqual(120);
+    expect(meta.description.length).toBeLessThanOrEqual(160);
+  });
+
+  it('defines metadata for both billing return states', () => {
+    expect(APP_ROUTE_META['/billing/success']).toBeDefined();
+    expect(APP_ROUTE_META['/billing/cancel']).toBeDefined();
   });
 });
 
@@ -231,15 +262,36 @@ describe('galleryEntryMeta', () => {
   });
 });
 
+describe('editorMeta', () => {
+  it.each([null, 'Untitled poster', 'A'.repeat(200)])(
+    'keeps private editor metadata complete for %s',
+    (posterTitle) => {
+      const meta = editorMeta(posterTitle, 'poster-123');
+
+      expect(meta.robots).toBe(NOINDEX);
+      expect(meta.canonical).toBe(canonicalFor('/p/poster-123'));
+      expect(meta.title.length).toBeGreaterThanOrEqual(30);
+      expect(meta.title.length).toBeLessThanOrEqual(60);
+      expect(meta.description.length).toBeGreaterThanOrEqual(120);
+      expect(meta.description.length).toBeLessThanOrEqual(160);
+    },
+  );
+});
+
 describe('shareMeta', () => {
-  const meta = shareMeta({ title: 'My WIP poster', imageUrl: 'https://x/y.png' });
+  const meta = shareMeta({
+    slug: 'review-abc',
+    title: 'My WIP poster',
+    imageUrl: 'https://x/y.png',
+  });
 
   it('is never indexable — these are unpublished research posters', () => {
     expect(meta.robots).toBe(NOINDEX);
   });
 
-  it('emits no canonical', () => {
-    expect(meta.canonical).toBeNull();
+  it('emits a self-canonical without weakening noindex', () => {
+    expect(meta.canonical).toBe(canonicalFor('/s/review-abc'));
+    expect(meta.robots).toBe(NOINDEX);
   });
 
   it('carries an image through when one is supplied, so the edge shell can unfurl richly', () => {
@@ -252,15 +304,37 @@ describe('shareMeta', () => {
 
   it('stays noindex even when an image is supplied', () => {
     expect(meta.robots).toBe(NOINDEX);
-    expect(meta.canonical).toBeNull();
+    expect(meta.canonical).toBe(canonicalFor('/s/review-abc'));
+  });
+
+  it('uses the real default social card when no poster image exists', () => {
+    expect(
+      shareMeta({ slug: 'review-abc', title: null, imageUrl: null }).ogImage,
+    ).toBe(`${SITE_ORIGIN}/og-card.png`);
   });
 
   it('falls back to a placeholder title for an untitled poster', () => {
-    expect(shareMeta({ title: null, imageUrl: null }).title).toContain(
-      'Untitled poster',
-    );
-    expect(shareMeta({ title: '   ', imageUrl: null }).title).toContain(
-      'Untitled poster',
-    );
+    expect(
+      shareMeta({ slug: 'review-abc', title: null, imageUrl: null }).title,
+    ).toContain('Shared');
+    expect(
+      shareMeta({ slug: 'review-abc', title: '   ', imageUrl: null }).title,
+    ).toContain('Shared');
+  });
+
+  it.each([null, 'My WIP poster', 'A'.repeat(200)])(
+    'keeps private share metadata within title and description budgets for %s',
+    (title) => {
+      const result = shareMeta({ slug: 'review-abc', title, imageUrl: null });
+      expect(result.title.length).toBeGreaterThanOrEqual(30);
+      expect(result.title.length).toBeLessThanOrEqual(60);
+      expect(result.description.length).toBeGreaterThanOrEqual(120);
+      expect(result.description.length).toBeLessThanOrEqual(160);
+    },
+  );
+
+  it('is applied while the share record loads instead of inheriting an indexable page', () => {
+    const source = readFileSync(`${process.cwd()}/src/pages/Share.tsx`, 'utf8');
+    expect(source).toMatch(/useDocumentMeta\(\s*shareMeta\(\{/);
   });
 });

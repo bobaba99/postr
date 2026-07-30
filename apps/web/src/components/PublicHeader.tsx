@@ -45,6 +45,11 @@ const TOOL_LINKS = [
     blurb: 'Turn a manuscript into a poster draft',
   },
   {
+    to: '/paper-to-slides',
+    label: 'Paper to slides',
+    blurb: 'Turn a manuscript into a talk (coming soon)',
+  },
+  {
     to: '/chart-chooser',
     label: 'Plot picker',
     blurb: 'Find the figure that fits your data',
@@ -69,9 +74,9 @@ export const NAV_LINKS = [
   { to: '/about', label: 'About' },
 ] as const;
 
-/** Shared styling for a top-level nav link, `sm:`-gated. */
+/** Shared styling for a top-level nav link, gated until it fits flat. */
 export const NAV_LINK_CLASS =
-  'hidden text-[14pt] font-normal text-[#6b7280] no-underline hover:text-[#c8cad0] sm:inline';
+  'hidden text-[14pt] font-normal text-[#8b8f99] no-underline hover:text-[#c8cad0] xl:inline';
 
 export function PublicHeader() {
   const [user, setUser] = useState<User | null>(null);
@@ -102,6 +107,14 @@ export function PublicHeader() {
 
   const signedIn = ready && user !== null;
 
+  // The workspace link's destination and label depend on the session.
+  // Signed in → their dashboard; signed out → the editor directly at
+  // /p/new, which EnsureSession will recognise and create an anonymous
+  // session behind, so a visitor lands in the editor without a signup wall.
+  const workspaceLink = signedIn
+    ? { to: '/dashboard', label: 'My posters' }
+    : { to: '/p/new', label: 'Editor' };
+
   // Minimum font size for nav chrome is 14pt, matching the design
   // plan's readability minimum (docs/plans/2026-04-10-figure-
   // readability-checker.md — "tick labels: min 14pt"). 14pt ≈ 18.67px
@@ -131,26 +144,45 @@ export function PublicHeader() {
           click instead of two, and both names are readable from the
           page rather than after a hover.
 
-          Below `sm` these move into the overflow menu rather than
-          disappearing: every nav item used to be `sm:`-gated, so a
+          Below `xl` these move into the overflow menu rather than
+          disappearing: every nav item used to be breakpoint-gated, so a
           phone saw a header with nothing in it but the wordmark and a
           sign-in button, and the footer was the only route to any of
           this. Nav that vanishes is not responsive, it is missing.
         */}
+        {/*
+          The auth-aware workspace link. One link whose destination and
+          label flip with the session, so it can't live in the static
+          NAV_LINKS array: signed in it points at the dashboard ("My
+          posters"); signed out it drops the visitor straight into a
+          guest editor ("Editor") via the same one-tap guest entry the
+          landing page uses. Rendered only once the auth state has
+          resolved so the label never flips under the user mid-read.
+        */}
+        {ready && (
+          <Link to={workspaceLink.to} className={NAV_LINK_CLASS}>
+            {workspaceLink.label}
+          </Link>
+        )}
+
         {NAV_LINKS.map((link) => (
           <Link key={link.to} to={link.to} className={NAV_LINK_CLASS}>
             {link.label}
           </Link>
         ))}
 
-        <MobileNav signedIn={signedIn} onFeedback={() => openFeedback('feature')} />
+        <MobileNav
+          signedIn={signedIn}
+          workspaceLink={ready ? workspaceLink : null}
+          onFeedback={() => openFeedback('feature')}
+        />
 
         {signedIn ? (
           <>
             <button
               type="button"
               onClick={() => openFeedback('feature')}
-              className="hidden h-10 items-center gap-2 rounded-md border border-[#2a2a3a] bg-[#111118] px-4 text-[14pt] font-normal text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] sm:flex"
+              className="hidden h-10 items-center gap-2 rounded-md border border-[#2a2a3a] bg-[#111118] px-4 text-[14pt] font-normal text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] xl:flex"
               title="Send feedback"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -160,7 +192,7 @@ export function PublicHeader() {
             </button>
             <Link
               to="/profile"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-[#2a2a3a] text-[#6b7280] hover:border-[#7c6aed] hover:text-[#c8cad0]"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-[#2a2a3a] text-[#8b8f99] hover:border-[#7c6aed] hover:text-[#c8cad0]"
               title="Profile & Settings"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -172,7 +204,7 @@ export function PublicHeader() {
         ) : (
           <Link
             to="/auth"
-            className="rounded-md border border-[#7c6aed] px-5 py-2 text-[14pt] font-semibold text-[#7c6aed] no-underline hover:bg-[#7c6aed] hover:text-white transition-colors"
+            className="rounded-md border border-[#7c6aed] px-5 py-2 text-[14pt] font-semibold text-[#7c6aed] no-underline hover:bg-[#5641b8] hover:text-white transition-colors"
           >
             Sign in
           </Link>
@@ -183,14 +215,14 @@ export function PublicHeader() {
 }
 
 /**
- * Below-`sm` overflow menu.
+ * Below-`xl` overflow menu.
  *
- * Every nav item in this header is `sm:`-gated, which on a phone left
+ * Every nav item in this header is breakpoint-gated, which once left
  * the header with nothing but the wordmark and a sign-in button — the
  * tools, About, and Feedback were reachable only by scrolling to the
  * footer. This is the phone-sized route to the same set.
  *
- * Hidden at `sm` and up, where the flat row takes over, so the two are
+ * Hidden at `xl` and up, where the flat row takes over, so the two are
  * never on screen at once.
  *
  * Deliberately NOT the WAI-ARIA menu pattern, for the same reason the
@@ -205,9 +237,13 @@ export function PublicHeader() {
  */
 function MobileNav({
   signedIn,
+  workspaceLink,
   onFeedback,
 }: {
   signedIn: boolean;
+  /** Auth-aware workspace link (Editor / My posters), or null until
+   *  the session has resolved. */
+  workspaceLink: { to: string; label: string } | null;
   onFeedback: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -241,7 +277,7 @@ function MobileNav({
   }, [open]);
 
   return (
-    <div ref={containerRef} className="relative sm:hidden">
+    <div ref={containerRef} className="relative xl:hidden">
       <button
         ref={triggerRef}
         id={triggerId}
@@ -305,6 +341,20 @@ function MobileNav({
           style={{ transformOrigin: 'top right' }}
           className="postr-popover-enter fixed left-4 right-4 top-[4.5rem] z-50 list-none rounded-xl border border-[#2a2a3a] bg-[#111118] p-2 shadow-xl shadow-black/40"
         >
+          {/* Workspace link first — the primary destination on a phone,
+              above the tools and Learn pages. */}
+          {workspaceLink && (
+            <li>
+              <Link
+                to={workspaceLink.to}
+                onClick={() => setOpen(false)}
+                className="block rounded-lg px-3 py-3 text-[14pt] font-medium text-[#c8cad0] no-underline hover:bg-[#1a1a26]"
+              >
+                {workspaceLink.label}
+              </Link>
+            </li>
+          )}
+
           {TOOL_LINKS.map((tool) => (
             <li key={tool.to}>
               <Link
@@ -315,7 +365,7 @@ function MobileNav({
                 <span className="block text-[14pt] font-medium text-[#c8cad0]">
                   {tool.label}
                 </span>
-                <span className="mt-0.5 block text-[12pt] text-[#6b7280]">
+                <span className="mt-0.5 block text-[12pt] text-[#8b8f99]">
                   {tool.blurb}
                 </span>
               </Link>

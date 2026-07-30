@@ -69,6 +69,13 @@ describe('ChartChooserPage', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(record.h1);
   });
 
+  it('places the embedded chart ladder under a level-two section heading', () => {
+    renderPage();
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Build your chart' }),
+    ).toBeInTheDocument();
+  });
+
   it('creates no Supabase session on load', () => {
     renderPage();
     // Reading an existing session (PublicHeader) is allowed;

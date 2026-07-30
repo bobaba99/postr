@@ -45,22 +45,23 @@ export function canonicalFor(path, siteOrigin) {
 export function buildPageMeta(path, record, site) {
   const indexable = record.robots === INDEXABLE;
   const hasDefaultImage = Boolean(site.defaultOgImage);
+  const hasShareImage =
+    record.shareImage !== false && hasDefaultImage;
   return {
     title: record.title,
     description: record.description,
     robots: indexable
       ? `${INDEXABLE},${PREVIEW_DIRECTIVES}`
       : record.robots,
-    canonical: indexable ? canonicalFor(path, site.siteOrigin) : null,
+    canonical: canonicalFor(path, site.siteOrigin),
+    language: record.language ?? site.language,
+    locale: record.locale ?? site.locale,
     ogType: path === '/' ? 'website' : 'article',
-    ogImage:
-      indexable && hasDefaultImage
-        ? `${site.siteOrigin}${site.defaultOgImage}`
-        : null,
+    ogImage: hasShareImage
+      ? `${site.siteOrigin}${site.defaultOgImage}`
+      : null,
     ogImageAlt:
-      indexable && hasDefaultImage
-        ? `${site.siteName}: free conference poster maker`
-        : null,
+      hasShareImage ? `${site.siteName}: free conference poster maker` : null,
   };
 }
 
@@ -81,7 +82,7 @@ export function tagSpecsFor(meta, site) {
     { kind: 'meta', key: 'property', id: 'og:description', value: meta.description },
     { kind: 'meta', key: 'property', id: 'og:type', value: meta.ogType },
     { kind: 'meta', key: 'property', id: 'og:site_name', value: site.siteName },
-    { kind: 'meta', key: 'property', id: 'og:locale', value: site.locale },
+    { kind: 'meta', key: 'property', id: 'og:locale', value: meta.locale },
     { kind: 'meta', key: 'property', id: 'og:url', value: meta.canonical },
     { kind: 'meta', key: 'property', id: 'og:image', value: image },
     { kind: 'meta', key: 'property', id: 'og:image:alt', value: image ? meta.ogImageAlt : null },
@@ -133,11 +134,24 @@ function stripOwnedTags(html, specs) {
  * @param shell    contents of the Vite-built dist/index.html
  * @param meta     PageMeta-shaped object
  * @param site     { siteName, locale }
- * @param bodyCopy optional { h1, copy[] } rendered into a <noscript>
+ * @param bodyCopy optional { h1, copy[], links[] } rendered as a temporary
+ *                 progressive-enhancement fallback next to #root
  */
 export function injectHead(shell, meta, site, bodyCopy = null) {
   const specs = tagSpecsFor(meta, site);
   let html = stripOwnedTags(shell, specs);
+
+  if (/<html\b[^>]*\blang=["'][^"']*["']/i.test(html)) {
+    html = html.replace(
+      /(<html\b[^>]*\blang=)["'][^"']*["']/i,
+      `$1"${escapeAttr(meta.language)}"`,
+    );
+  } else {
+    html = html.replace(
+      /<html\b([^>]*)>/i,
+      `<html$1 lang="${escapeAttr(meta.language)}">`,
+    );
+  }
 
   html = html.replace(
     /<title>[\s\S]*?<\/title>/i,
@@ -148,19 +162,25 @@ export function injectHead(shell, meta, site, bodyCopy = null) {
   html = html.replace('</head>', `  ${tags}\n  </head>`);
 
   if (bodyCopy) {
-    // <noscript> rather than markup inside #root. React mounts with
-    // createRoot(), which clears the container, so anything placed there
-    // would flash unstyled for real users before being discarded. A
-    // noscript block is invisible to every browser that runs scripts and
-    // fully visible to the crawlers that do not — which is precisely the
-    // audience this content exists for. It is not hidden text: clients
-    // that execute JavaScript receive the same words from React.
+    // Keep the fallback outside #root so React can mount normally. It is
+    // honest, visible progressive enhancement: no-script clients and raw
+    // crawlers receive the same primary copy and navigation as the app,
+    // while main.tsx removes this sibling immediately before React mounts.
     const paragraphs = bodyCopy.copy
       .map((p) => `<p>${escapeText(p)}</p>`)
       .join('\n      ');
+    const links = (bodyCopy.links ?? [])
+      .map(
+        ({ href, label }) =>
+          `<a href="${escapeAttr(href)}">${escapeText(label)}</a>`,
+      )
+      .join('\n        ');
+    const navigation = links
+      ? `\n      <nav aria-label="Postr pages">\n        ${links}\n      </nav>`
+      : '';
     html = html.replace(
       '<div id="root"></div>',
-      `<div id="root"></div>\n    <noscript>\n      <h1>${escapeText(bodyCopy.h1)}</h1>\n      ${paragraphs}\n    </noscript>`,
+      `<div id="root"></div>\n    <main id="prerendered-content" style="min-height:100vh;background:#0a0a12;color:#c8cad0;font-family:system-ui,sans-serif;padding:48px;box-sizing:border-box">\n      <article style="max-width:760px;margin:0 auto">\n        <h1>${escapeText(bodyCopy.h1)}</h1>\n        ${paragraphs}${navigation}\n      </article>\n    </main>`,
     );
   }
 

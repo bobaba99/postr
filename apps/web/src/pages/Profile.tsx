@@ -317,7 +317,7 @@ export default function Profile() {
       <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
         <Header />
         <div className="mx-auto max-w-2xl px-8 py-12">
-          <p className="text-[14pt] text-[#6b7280]">Loading…</p>
+          <p className="text-[14pt] text-[#8b8f99]">Loading…</p>
         </div>
       </main>
     );
@@ -339,6 +339,8 @@ export default function Profile() {
           </div>
         )}
 
+        <h1 className="mb-6 text-2xl font-bold text-white">Profile & settings</h1>
+
         {/*
           Bento grid — two equal columns, no wide boxes. Collapses to
           a single column on mobile. The Create Account banner (shown
@@ -356,7 +358,7 @@ export default function Profile() {
         {/* Link Account / Sign Up — shown only to guests */}
         {isAnonymous && (
           <Section title="Create an Account">
-            <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
+            <p className="mb-4 text-[14pt] text-[#8b8f99] leading-relaxed">
               You're using a guest account. Sign up to preserve your posters across devices
               and prevent data loss if your browser clears storage. All your current work
               will be linked to your new account automatically.
@@ -372,7 +374,7 @@ export default function Profile() {
             </button>
             <div className="flex items-center gap-3 my-3">
               <div className="h-px flex-1 bg-[#2a2a3a]" />
-              <span className="text-[13px] text-[#555]">or use email</span>
+              <span className="text-[13px] text-[#8b8f99]">or use email</span>
               <div className="h-px flex-1 bg-[#2a2a3a]" />
             </div>
             <EmailSignUp
@@ -389,7 +391,7 @@ export default function Profile() {
 
         {/* Profile Details */}
         <Section title="Profile Details">
-          <p className="mb-3 text-[14pt] text-[#6b7280] leading-relaxed">
+          <p className="mb-3 text-[14pt] text-[#8b8f99] leading-relaxed">
             Optional — helps identify your posters and auto-fill author info.
           </p>
           <ProfileFields user={user} onStatusMessage={(msg) => {
@@ -403,10 +405,10 @@ export default function Profile() {
           <div className="flex items-start justify-between py-2 gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-[14pt] text-[#c8cad0]">🎨 Saved style presets</div>
-              <div className="mt-1 text-[14pt] text-[#6b7280]">
+              <div className="mt-1 text-[14pt] text-[#8b8f99]">
                 {presetCount} preset{presetCount === 1 ? '' : 's'} saved locally.
               </div>
-              <div className="mt-1 text-[12pt] text-[#555]">
+              <div className="mt-1 text-[12pt] text-[#8b8f99]">
                 Create new presets from the <strong className="text-[#9ca3af]">Style tab</strong> inside the editor — use the "Save as style preset" row to name your font + palette + typography combo.
               </div>
             </div>
@@ -434,7 +436,7 @@ export default function Profile() {
           <div className="flex items-center justify-between py-2 border-t border-[#1f1f2e]">
             <div>
               <div className="text-sm text-[#c8cad0]">Onboarding tour</div>
-              <div className="text-[13px] text-[#6b7280]">
+              <div className="text-[13px] text-[#8b8f99]">
                 Click-through tutorial of the editor interface
               </div>
             </div>
@@ -461,7 +463,7 @@ export default function Profile() {
               <div className="flex items-start justify-between gap-3 py-2 border-t border-[#1f1f2e]">
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-[#c8cad0]">Product-research emails</div>
-                  <div className="text-[13px] text-[#6b7280]">
+                  <div className="text-[13px] text-[#8b8f99]">
                     Let us occasionally email you to invite you to a short
                     interview or survey about Postr. Turn it on or off anytime.
                     It never affects your access.
@@ -477,7 +479,7 @@ export default function Profile() {
                   onClick={() => handleResearchConsent(!researchConsent)}
                   className={
                     'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ' +
-                    (researchConsent ? 'bg-[#7c6aed]' : 'bg-[#2a2a3a]')
+                    (researchConsent ? 'bg-[#5641b8]' : 'bg-[#2a2a3a]')
                   }
                 >
                   <span
@@ -491,7 +493,7 @@ export default function Profile() {
               <div className="flex items-start justify-between gap-3 py-2 border-t border-[#1f1f2e]">
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-[#c8cad0]">Product-update emails</div>
-                  <div className="text-[13px] text-[#6b7280]">
+                  <div className="text-[13px] text-[#8b8f99]">
                     Occasional emails about new Postr features and updates.
                     Turn it on or off anytime; unsubscribe links are in every
                     email too.
@@ -507,7 +509,7 @@ export default function Profile() {
                   onClick={() => handleMarketingConsent(!marketingConsent)}
                   className={
                     'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ' +
-                    (marketingConsent ? 'bg-[#7c6aed]' : 'bg-[#2a2a3a]')
+                    (marketingConsent ? 'bg-[#5641b8]' : 'bg-[#2a2a3a]')
                   }
                 >
                   <span
@@ -522,7 +524,7 @@ export default function Profile() {
           )}
           <div className="py-2 border-t border-[#1f1f2e]">
             <div className="text-sm text-[#c8cad0] mb-2">Checklist templates</div>
-            <div className="text-[13px] text-[#6b7280] mb-3">
+            <div className="text-[13px] text-[#8b8f99] mb-3">
               Custom templates you saved from the Scratch Pad. Built-in templates cannot be deleted.
             </div>
             {(() => {
@@ -535,9 +537,9 @@ export default function Profile() {
                       <div>
                         <div className="text-[13px] font-medium text-[#c8cad0]">
                           {t.name}
-                          {t.builtIn && <span className="ml-2 text-[13px] text-[#6b7280]">(built-in)</span>}
+                          {t.builtIn && <span className="ml-2 text-[13px] text-[#8b8f99]">(built-in)</span>}
                         </div>
-                        <div className="text-[13px] text-[#6b7280]">{t.items.length} items</div>
+                        <div className="text-[13px] text-[#8b8f99]">{t.items.length} items</div>
                       </div>
                       {!t.builtIn && (
                         <button
@@ -555,7 +557,7 @@ export default function Profile() {
                     </div>
                   ))}
                   {custom.length === 0 && (
-                    <div className="text-[13px] text-[#6b7280]">
+                    <div className="text-[13px] text-[#8b8f99]">
                       No custom templates yet. Use "Save as..." in the editor's Scratch Pad to create one.
                     </div>
                   )}
@@ -571,7 +573,7 @@ export default function Profile() {
         {(GALLERY_PUBLIC_ENABLED || myGallery.length > 0) && (
         <Section title="Gallery submissions">
           {GALLERY_PUBLIC_ENABLED ? (
-            <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
+            <p className="mb-4 text-[14pt] text-[#8b8f99] leading-relaxed">
               Posters you have published to the{' '}
               <Link to="/gallery" className="text-[#7c6aed] underline">
                 public gallery
@@ -580,7 +582,7 @@ export default function Profile() {
               public listing immediately.
             </p>
           ) : (
-            <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
+            <p className="mb-4 text-[14pt] text-[#8b8f99] leading-relaxed">
               Posters you published while the gallery was open. The gallery is
               currently offline, but you can still retract any entry at any
               time — the entry row and stored image are deleted.
@@ -595,7 +597,7 @@ export default function Profile() {
           )}
 
           {myGallery.length === 0 ? (
-            <div className="rounded-md border border-dashed border-[#2a2a3a] bg-[#0a0a12] p-6 text-center text-[13px] text-[#6b7280]">
+            <div className="rounded-md border border-dashed border-[#2a2a3a] bg-[#0a0a12] p-6 text-center text-[13px] text-[#8b8f99]">
               {GALLERY_PUBLIC_ENABLED ? (
                 <>
                   You haven’t published anything yet. Use the{' '}
@@ -631,7 +633,7 @@ export default function Profile() {
 
         {/* Feedback */}
         <Section title="Feedback">
-          <p className="mb-4 text-[14pt] text-[#6b7280] leading-relaxed">
+          <p className="mb-4 text-[14pt] text-[#8b8f99] leading-relaxed">
             Found a bug? Have an idea? Send it in — everything lands in the developer's
             queue and shapes what ships next.
           </p>
@@ -649,7 +651,7 @@ export default function Profile() {
 
           {myFeedback.length > 0 && (
             <>
-              <div className="mb-2 mt-6 text-[12px] font-semibold uppercase tracking-widest text-[#6b7280]">
+              <div className="mb-2 mt-6 text-[12px] font-semibold uppercase tracking-widest text-[#8b8f99]">
                 Your submissions
               </div>
               <div className="space-y-2">
@@ -672,7 +674,7 @@ export default function Profile() {
         {/* Data export — GDPR Art. 15 / 20 */}
         <Section title="Your data">
           <div className="space-y-3">
-            <p className="text-[14pt] text-[#6b7280]">
+            <p className="text-[14pt] text-[#8b8f99]">
               Download everything Postr has stored for your account as a
               single JSON file — your posters (with full contents),
               gallery submissions, feedback you've sent, and your
@@ -824,7 +826,7 @@ function GallerySubmissionRow({
             </span>
           )}
         </div>
-        <div className="mt-0.5 text-[11px] text-[#6b7280]">
+        <div className="mt-0.5 text-[11px] text-[#8b8f99]">
           Published {date}
           {entry.conference && ` · ${entry.conference}`}
           {entry.year && ` · ${entry.year}`}
@@ -857,11 +859,11 @@ const FEEDBACK_STATUS_LABEL: Record<FeedbackRow['status'], string> = {
 };
 
 const FEEDBACK_STATUS_COLOR: Record<FeedbackRow['status'], string> = {
-  new: '#6b7280',
+  new: '#8b8f99',
   triaged: '#7c6aed',
   in_progress: '#f59e0b',
   done: '#a6e3a1',
-  wontfix: '#6b7280',
+  wontfix: '#8b8f99',
 };
 
 function FeedbackHistoryRow({ row }: { row: FeedbackRow }) {
@@ -880,7 +882,7 @@ function FeedbackHistoryRow({ row }: { row: FeedbackRow }) {
           </span>
           <span className="truncate text-[13px] font-medium text-[#c8cad0]">{row.title}</span>
         </div>
-        <div className="mt-0.5 text-[11px] text-[#6b7280]">{date}</div>
+        <div className="mt-0.5 text-[11px] text-[#8b8f99]">{date}</div>
       </div>
       <span
         className="shrink-0 rounded px-2 py-0.5 text-[11px] font-medium"
@@ -908,7 +910,7 @@ function Header() {
         </svg>
         Postr
       </Link>
-      <Link to="/dashboard" className="text-sm text-[#6b7280] no-underline hover:text-[#c8cad0]">
+      <Link to="/dashboard" className="text-sm text-[#8b8f99] no-underline hover:text-[#c8cad0]">
         ← Back to posters
       </Link>
     </header>
@@ -928,7 +930,7 @@ function Section({
     <section className="flex flex-col">
       <h2
         className={`mb-3 text-[12pt] font-semibold uppercase tracking-widest ${
-          danger ? 'text-[#f87171]' : 'text-[#6b7280]'
+          danger ? 'text-[#f87171]' : 'text-[#8b8f99]'
         }`}
       >
         {title}
@@ -979,7 +981,7 @@ function AccountCelebrationCard({
 
   return (
     <section className="flex flex-col">
-      <h2 className="mb-3 text-[12pt] font-semibold uppercase tracking-widest text-[#6b7280]">
+      <h2 className="mb-3 text-[12pt] font-semibold uppercase tracking-widest text-[#8b8f99]">
         Account
       </h2>
       <div
@@ -1019,14 +1021,14 @@ function AccountCelebrationCard({
 
         <div className="relative mt-5 space-y-1.5 text-[14pt] leading-relaxed text-[#9ca3af]">
           <div>
-            <span className="text-[#6b7280]">📧 </span>
+            <span className="text-[#8b8f99]">📧 </span>
             {email ?? 'Guest (no email linked yet)'}
           </div>
           <div>
-            <span className="text-[#6b7280]">📅 </span>
+            <span className="text-[#8b8f99]">📅 </span>
             Member since {createdAt}
             {daysActive > 0 && (
-              <span className="text-[#6b7280]"> · {daysActive}d</span>
+              <span className="text-[#8b8f99]"> · {daysActive}d</span>
             )}
           </div>
         </div>
@@ -1052,7 +1054,7 @@ function DangerAction({
     <div className="flex items-start justify-between gap-4">
       <div>
         <div className="text-[14pt] font-medium text-[#c8cad0]">{title}</div>
-        <div className="text-[14pt] text-[#6b7280] mt-1">{description}</div>
+        <div className="text-[14pt] text-[#8b8f99] mt-1">{description}</div>
       </div>
       <button onClick={onClick} disabled={disabled} className={btnDanger}>
         {buttonText}
@@ -1102,7 +1104,7 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
   };
 
   if (plan.loading) {
-    return <p className="text-[14pt] text-[#6b7280]">Loading your plan…</p>;
+    return <p className="text-[14pt] text-[#8b8f99]">Loading your plan…</p>;
   }
 
   if (plan.hasActiveTerm) {
@@ -1118,7 +1120,7 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
             </span>
           )}
         </p>
-        <p className="text-[14pt] text-[#6b7280]">
+        <p className="text-[14pt] text-[#8b8f99]">
           The term renews every 4 months. Manage it — update your card, see
           receipts, or cancel — through Stripe, which handles billing for Postr.
         </p>
@@ -1140,7 +1142,7 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
             {refunding ? 'Processing…' : 'Request refund'}
           </button>
         </div>
-        <p className="text-[13pt] text-[#6b7280]">
+        <p className="text-[13pt] text-[#8b8f99]">
           Refundable in full within 14 days of your charge if you haven’t
           taken a paid export.
         </p>
@@ -1169,7 +1171,7 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
             {plan.credits}
           </span>
         </div>
-        <p className="mt-1 text-[13pt] text-[#6b7280]">
+        <p className="mt-1 text-[13pt] text-[#8b8f99]">
           {hasCredits
             ? `${plan.credits} PowerPoint or LaTeX export${plan.credits === 1 ? '' : 's'} left — credits never expire.`
             : 'From a $9.99 export pack. Credits never expire once purchased.'}
@@ -1184,7 +1186,7 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
             >
               {refunding ? 'Processing…' : `Refund ${plan.credits} unused credit${plan.credits === 1 ? '' : 's'}`}
             </button>
-            <p className="mt-1 text-[12pt] text-[#6b7280]">
+            <p className="mt-1 text-[12pt] text-[#8b8f99]">
               CA$3.33 per unused credit. Refunding removes them from your account.
             </p>
             {refundMsg && <p className="mt-1 text-[13pt] text-[#a3a7b3]">{refundMsg}</p>}
@@ -1192,13 +1194,13 @@ function SubscriptionPanel({ plan }: { plan: PlanState }) {
         )}
       </div>
 
-      <p className="text-[14pt] text-[#6b7280]">
+      <p className="text-[14pt] text-[#8b8f99]">
         Unlock clean PowerPoint &amp; LaTeX export with the term, or a one-time
         export pack whose credits never expire.
       </p>
       <Link
         to="/pricing"
-        className="inline-block rounded-md border border-[#7c6aed] bg-transparent px-4 py-2 text-[14pt] font-semibold text-[#7c6aed] no-underline hover:bg-[#7c6aed] hover:text-white"
+        className="inline-block rounded-md border border-[#7c6aed] bg-transparent px-4 py-2 text-[14pt] font-semibold text-[#7c6aed] no-underline hover:bg-[#5641b8] hover:text-white"
       >
         Get a subscription
       </Link>
@@ -1238,7 +1240,7 @@ function EmailSignUp({ onSuccess, onError }: { onSuccess: () => void; onError: (
         onChange={(e) => setEmail(e.target.value)}
         placeholder="Email address"
         required
-        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
+        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
       />
       <input
         type="password"
@@ -1247,13 +1249,13 @@ function EmailSignUp({ onSuccess, onError }: { onSuccess: () => void; onError: (
         placeholder="Create password"
         required
         minLength={8}
-        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
+        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
       />
       <PasswordStrength password={password} />
       <button
         type="submit"
         disabled={loading || !email.trim() || !isPasswordValid(password)}
-        className="w-full cursor-pointer rounded-lg border border-[#7c6aed] bg-transparent px-4 py-3 text-sm font-semibold text-[#7c6aed] hover:bg-[#7c6aed] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full cursor-pointer rounded-lg border border-[#7c6aed] bg-transparent px-4 py-3 text-sm font-semibold text-[#7c6aed] hover:bg-[#5641b8] hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? 'Creating account…' : 'Create account with email'}
       </button>
@@ -1308,9 +1310,9 @@ function ProfileFields({ user, onStatusMessage }: { user: User | null; onStatusM
         value={profile[field]}
         onChange={(e) => update(field, e.target.value)}
         placeholder={placeholder}
-        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-2.5 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#555]"
+        className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-2.5 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
       />
-      {hint && <div className="text-[13px] text-[#555] mt-1">{hint}</div>}
+      {hint && <div className="text-[13px] text-[#8b8f99] mt-1">{hint}</div>}
     </div>
   );
 
@@ -1324,7 +1326,7 @@ function ProfileFields({ user, onStatusMessage }: { user: User | null; onStatusM
       <button
         onClick={save}
         disabled={!dirty}
-        className={`mt-2 ${dirty ? 'cursor-pointer rounded-md bg-[#7c6aed] px-4 py-2 text-sm font-medium text-white hover:bg-[#6c5ce7]' : 'cursor-not-allowed rounded-md bg-[#2d6a4f] px-4 py-2 text-sm font-medium text-white opacity-80'}`}
+        className={`mt-2 ${dirty ? 'cursor-pointer rounded-md bg-[#5641b8] px-4 py-2 text-sm font-medium text-white hover:bg-[#4c39a6]' : 'cursor-not-allowed rounded-md bg-[#2d6a4f] px-4 py-2 text-sm font-medium text-white opacity-80'}`}
       >
         {dirty ? 'Save profile' : '✓ Saved'}
       </button>
@@ -1335,7 +1337,7 @@ function ProfileFields({ user, onStatusMessage }: { user: User | null; onStatusM
 // ── Button styles (Tailwind classes) ───────────────────────────────
 
 const btnPrimary =
-  'cursor-pointer rounded-md bg-[#7c6aed] px-4 py-2 text-sm font-medium text-white hover:bg-[#6c5ce7] disabled:opacity-50 disabled:cursor-not-allowed';
+  'cursor-pointer rounded-md bg-[#5641b8] px-4 py-2 text-sm font-medium text-white hover:bg-[#4c39a6] disabled:opacity-50 disabled:cursor-not-allowed';
 
 const btnSecondary =
   'cursor-pointer rounded-md border border-[#2a2a3a] bg-[#1a1a26] px-3 py-1.5 text-[13px] text-[#c8cad0] hover:bg-[#1e1e2e] disabled:opacity-50 disabled:cursor-not-allowed';

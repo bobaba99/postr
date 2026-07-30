@@ -8,6 +8,7 @@
  * 4-slot palette still gets distinguishable hues.
  */
 import type { Palette } from '@postr/shared';
+import { findSeriesPalette } from './seriesPalettes';
 
 const HEX = /^#?([0-9a-f]{6})$/i;
 
@@ -51,6 +52,33 @@ export function resolveSlot(slot: string, palette: Palette): string {
  */
 export function seriesColors(count: number, slots: string[], palette: Palette): string[] {
   const base = (slots.length > 0 ? slots : ['accent']).map((s) => resolveSlot(s, palette));
+  const out: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const color = base[i % base.length] ?? palette.accent;
+    const lap = Math.floor(i / base.length);
+    out.push(lap === 0 ? color : mixHex(color, '#ffffff', Math.min(0.7, lap * 0.4)));
+  }
+  return out;
+}
+
+/**
+ * Categorical series colours for a chart, honouring an optional fixed
+ * science palette. With `seriesPaletteId` set and resolvable, the
+ * palette's colours are used (truncated to `count`, or cycled with the
+ * same white-mix `seriesColors` uses once the set is exhausted). With
+ * it unset or stale (`findSeriesPalette` → null), falls back to
+ * slot-based colouring so a removed palette degrades to the poster
+ * theme rather than a crash. Always returns exactly `count` colours.
+ */
+export function resolveSeriesColors(
+  seriesPaletteId: string | undefined,
+  count: number,
+  slots: string[],
+  palette: Palette,
+): string[] {
+  const fixed = seriesPaletteId ? findSeriesPalette(seriesPaletteId) : null;
+  if (!fixed) return seriesColors(count, slots, palette);
+  const base = fixed.colors;
   const out: string[] = [];
   for (let i = 0; i < count; i++) {
     const color = base[i % base.length] ?? palette.accent;
