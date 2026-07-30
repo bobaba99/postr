@@ -199,8 +199,9 @@ describe('PublicHeader mobile menu', () => {
 
 /**
  * The auth-aware workspace link. One header link whose destination and
- * label flip with the session: signed out it drops a visitor into the
- * guest editor (?guest=1), signed in it points at their dashboard.
+ * label flip with the session: signed out it drops a visitor straight
+ * into the editor (/p/new — the no-auth editor), signed in it points at
+ * their dashboard.
  * These assert the destination per state so a regression that sends a
  * logged-out visitor to a signup wall — or a signed-in user back to the
  * guest entry — is caught here.
