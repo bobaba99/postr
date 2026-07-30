@@ -205,11 +205,15 @@ export default function Home() {
           Postr is designed for desktop browsers. For the best editing experience, please use a laptop or desktop computer.
         </div>
 
+        {/*
+          The New-poster / Import cluster lives in the welcome card
+          below, not here — a second copy in this header duplicated the
+          exact same buttons a few hundred pixels apart. One entry point.
+        */}
         <div className="mb-6 flex items-center justify-between gap-4">
           <h2 className="text-[12pt] font-semibold uppercase tracking-widest text-[#6b7280]">
             My posters
           </h2>
-          <NewPosterButton />
         </div>
 
         {actionError && (
@@ -238,20 +242,6 @@ export default function Home() {
               <div>
                 <h3 className="text-lg font-bold text-[#e2e2e8]">Welcome to Postr</h3>
                 <p className="text-[14pt] text-[#6b7280]">Create conference-quality research posters in minutes, not hours.</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
-              <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
-                <div className="text-[14pt] font-semibold text-[#c8cad0] mb-1">Pick a template</div>
-                <div className="text-[14pt] text-[#6b7280] leading-relaxed">5 layouts — 3-column classic, billboard, sidebar + focus, and more. Start with structure, not a blank page.</div>
-              </div>
-              <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
-                <div className="text-[14pt] font-semibold text-[#c8cad0] mb-1">Write with guidance</div>
-                <div className="text-[14pt] text-[#6b7280] leading-relaxed">Built-in writing guide, conference size specs, and a checklist to keep you on track from intro to references.</div>
-              </div>
-              <div className="rounded-lg bg-[#1a1a26] p-4 border border-[#2a2a3a]">
-                <div className="text-[14pt] font-semibold text-[#c8cad0] mb-1">Check before you print</div>
-                <div className="text-[14pt] text-[#6b7280] leading-relaxed">Paste your R or Python code to verify figure text is readable at poster size. Out-of-bounds warnings catch layout issues.</div>
               </div>
             </div>
             <div className="mt-6">
