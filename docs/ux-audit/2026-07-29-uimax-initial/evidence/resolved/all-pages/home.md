@@ -3,30 +3,31 @@
 - Audited URL: `http://127.0.0.1:4174/`
 - Generated: 2026-07-29
 - Viewport: 1440 × 900
+- Status: post-main-merge regression
 
 # UIMax Data Collection Complete
 
 **URL:** http://127.0.0.1:4174/
 **Code Directory:** /Users/zihaogeng/development/postr-ux-audit-flow-map/apps/web/src
-**Timestamp:** 2026-07-30T03:32:00.720Z
+**Timestamp:** 2026-07-30T03:52:55.440Z
 **Accessibility violations:** 0
 **Accessibility passes:** 30
-**Load time:** 68ms
+**Load time:** 74ms
 **DOM nodes:** 164
 **Code files analyzed:** 200
-**Code findings:** 1547
+**Code findings:** 1577
 **Framework detected:** react
 
 ## Report Card
 | Section | Grade |
 |---------|-------|
 | Accessibility | **A+** (100) |
-| Performance | **A-** (91) |
+| Performance | **A-** (92) |
 | Best Practices | **A** (96) |
 | SEO | **A+** (100) |
 | Code Quality | **F** (0) |
 
-**Lighthouse Performance:** 91
+**Lighthouse Performance:** 92
 **Lighthouse Accessibility:** 100
 **Lighthouse Best Practices:** 96
 **Lighthouse SEO:** 100
@@ -43,14 +44,14 @@
 
 **URL:** http://127.0.0.1:4174/
 **Code Directory:** /Users/zihaogeng/development/postr-ux-audit-flow-map/apps/web/src
-**Generated:** 2026-07-30T03:32:00.720Z
+**Generated:** 2026-07-30T03:52:55.440Z
 
 ## Report Card
 
 | Section | Grade | Score | Rating |
 |---------|-------|-------|--------|
 | Accessibility | **A+** | 100/100 | Exceptional |
-| Performance | **A-** | 91/100 | Great |
+| Performance | **A-** | 92/100 | Great |
 | Best Practices | **A** | 96/100 | Excellent |
 | SEO | **A+** | 100/100 | Exceptional |
 | Code Quality | **F** | 0/100 | Failing |
@@ -61,7 +62,7 @@
 ## Accessibility Audit Results
 
 **URL:** http://127.0.0.1:4174/
-**Scanned:** 2026-07-30T03:31:52.404Z
+**Scanned:** 2026-07-30T03:52:47.218Z
 **Violations:** 0
 **Passes:** 30
 **Incomplete:** 0
@@ -72,17 +73,17 @@ No accessibility violations found.
 
 ## Performance Metrics
 **URL:** http://127.0.0.1:4174/
-**Measured:** 2026-07-30T03:31:54.678Z
+**Measured:** 2026-07-30T03:52:49.387Z
 ### Core Web Vitals
 | Metric | Value | Rating |
 |--------|-------|--------|
-| First Contentful Paint (FCP) | 576ms (Good) |
-| Largest Contentful Paint (LCP) | 576ms (Good) |
+| First Contentful Paint (FCP) | 644ms (Good) |
+| Largest Contentful Paint (LCP) | 644ms (Good) |
 | Cumulative Layout Shift (CLS) | 0.001 (Good) |
 | Total Blocking Time (TBT) | 0ms (Good) |
 ### Page Metrics
-- **Load Time:** 68ms
-- **DOM Content Loaded:** 68ms
+- **Load Time:** 74ms
+- **DOM Content Loaded:** 74ms
 - **DOM Nodes:** 164
 - **Resources:** 10
 - **Total Transfer Size:** 2.9 KB
@@ -94,12 +95,12 @@ No accessibility violations found.
 
 **URL:** http://127.0.0.1:4174/
 **Lighthouse Version:** 13.4.1
-**Measured:** 2026-07-30T03:31:52.605Z
+**Measured:** 2026-07-30T03:52:47.360Z
 
 ### Scores
 | Category | Score |
 |----------|-------|
-| Performance | 91 (Good) |
+| Performance | 92 (Good) |
 | Accessibility | 100 (Good) |
 | Best Practices | 96 (Good) |
 | SEO | 100 (Good) |
@@ -107,8 +108,8 @@ No accessibility violations found.
 ### Key Findings (Needs Attention)
 | Status | Audit |
 |--------|-------|
-| FAIL | Largest Contentful Paint — 3.5 s |
-| FAIL | Reduce unused JavaScript — Est savings of 289 KiB |
+| FAIL | Largest Contentful Paint — 3.3 s |
+| FAIL | Reduce unused JavaScript — Est savings of 290 KiB |
 
 ### Passing Audits
 | Status | Audit |
@@ -117,7 +118,7 @@ No accessibility violations found.
 | PASS | Total Blocking Time — 0 ms |
 | PASS | Cumulative Layout Shift — 0.001 |
 | PASS | Speed Index — 1.5 s |
-| PASS | Time to Interactive — 3.5 s |
+| PASS | Time to Interactive — 3.3 s |
 | PASS | Minify JavaScript |
 | PASS | Minify CSS |
 | PASS | Reduce unused CSS |

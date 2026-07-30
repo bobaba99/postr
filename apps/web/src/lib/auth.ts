@@ -23,9 +23,22 @@ import type { Session, SupabaseClient } from '@supabase/supabase-js';
 
 let inFlight: Promise<Session | null> | null = null;
 
+/**
+ * Clears the in-flight dedupe so the next ensureSession() call
+ * re-bootstraps from scratch instead of returning a stale resolved
+ * promise. Needed on SIGNED_OUT: ensureSession() caches its resolved
+ * promise and only clears it on failure, so without this reset a
+ * mid-session sign-out/token-wipe would hand back the old (now
+ * signed-out) session forever instead of creating a fresh anonymous
+ * one.
+ */
+export function resetEnsureSession(): void {
+  inFlight = null;
+}
+
 /** Test helper — clears the in-flight dedupe between test cases. */
 export function __resetAuthBootstrapForTests(): void {
-  inFlight = null;
+  resetEnsureSession();
 }
 
 /**

@@ -108,12 +108,12 @@ export function PublicHeader() {
   const signedIn = ready && user !== null;
 
   // The workspace link's destination and label depend on the session.
-  // Signed in → their dashboard; signed out → the guest editor (the
-  // landing page's "Try as guest" entry, ?guest=1), so a visitor lands
-  // in the editor without a signup wall.
+  // Signed in → their dashboard; signed out → the editor directly at
+  // /p/new, which EnsureSession will recognise and create an anonymous
+  // session behind, so a visitor lands in the editor without a signup wall.
   const workspaceLink = signedIn
     ? { to: '/dashboard', label: 'My posters' }
-    : { to: '/auth?guest=1', label: 'Editor' };
+    : { to: '/p/new', label: 'Editor' };
 
   // Minimum font size for nav chrome is 14pt, matching the design
   // plan's readability minimum (docs/plans/2026-04-10-figure-

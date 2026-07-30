@@ -55,12 +55,13 @@ Measured browser results:
 
 Verification:
 
-- Vitest: 133 files passed, 2,014 tests passed.
+- Vitest after merging current `main`: 139 files passed, 2,039 tests passed.
 - Production build: TypeScript, Vite build, 12-page prerender, and sitemap generation passed.
 - UIMax clean crawl: 10 pages, zero accessibility violations, zero page errors, 122ms average local load time.
 - UIMax pricing review: Accessibility 100, Best Practices 100, SEO 100.
 - UIMax paid-signup review: Accessibility 100, Best Practices 100.
 - UIMax full route pass: 25 reports, zero runtime accessibility violations, zero route-level High/Medium SEO findings.
+- Post-merge UIMax regression: landing, pricing, and the anonymous-first editor retained zero runtime accessibility violations and zero route-level High/Medium SEO findings.
 - OpenSEO production baseline: 10 pages and 39 shared prerender warnings; local raw-HTML resolution verified pending deployment.
 
 ## Coverage

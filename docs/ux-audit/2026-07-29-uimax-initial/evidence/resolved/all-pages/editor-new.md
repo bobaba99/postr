@@ -3,31 +3,31 @@
 - Audited URL: `http://127.0.0.1:4174/p/new`
 - Generated: 2026-07-29
 - Viewport: 1440 × 900
-- Status: resolved re-audit
+- Status: post-main-merge regression
 
 # UIMax Data Collection Complete
 
 **URL:** http://127.0.0.1:4174/p/new
 **Code Directory:** /Users/zihaogeng/development/postr-ux-audit-flow-map/apps/web/src
-**Timestamp:** 2026-07-30T03:48:29.352Z
+**Timestamp:** 2026-07-30T03:53:22.995Z
 **Accessibility violations:** 0
 **Accessibility passes:** 15
-**Load time:** 76ms
+**Load time:** 80ms
 **DOM nodes:** 45
 **Code files analyzed:** 200
-**Code findings:** 1547
+**Code findings:** 1577
 **Framework detected:** react
 
 ## Report Card
 | Section | Grade |
 |---------|-------|
 | Accessibility | **A+** (100) |
-| Performance | **A-** (91) |
+| Performance | **B** (84) |
 | Best Practices | **A** (96) |
 | SEO | **D** (95) |
 | Code Quality | **F** (0) |
 
-**Lighthouse Performance:** 91
+**Lighthouse Performance:** 84
 **Lighthouse Accessibility:** 100
 **Lighthouse Best Practices:** 96
 **Lighthouse SEO:** 66
@@ -44,14 +44,14 @@
 
 **URL:** http://127.0.0.1:4174/p/new
 **Code Directory:** /Users/zihaogeng/development/postr-ux-audit-flow-map/apps/web/src
-**Generated:** 2026-07-30T03:48:29.352Z
+**Generated:** 2026-07-30T03:53:22.995Z
 
 ## Report Card
 
 | Section | Grade | Score | Rating |
 |---------|-------|-------|--------|
 | Accessibility | **A+** | 100/100 | Exceptional |
-| Performance | **A-** | 91/100 | Great |
+| Performance | **B** | 84/100 | Good |
 | Best Practices | **A** | 96/100 | Excellent |
 | SEO | **D** | 95/100 | Weak |
 | Code Quality | **F** | 0/100 | Failing |
@@ -62,7 +62,7 @@
 ## Accessibility Audit Results
 
 **URL:** http://127.0.0.1:4174/p/new
-**Scanned:** 2026-07-30T03:48:20.814Z
+**Scanned:** 2026-07-30T03:53:14.919Z
 **Violations:** 0
 **Passes:** 15
 **Incomplete:** 0
@@ -73,21 +73,21 @@ No accessibility violations found.
 
 ## Performance Metrics
 **URL:** http://127.0.0.1:4174/p/new
-**Measured:** 2026-07-30T03:48:23.250Z
+**Measured:** 2026-07-30T03:53:17.379Z
 ### Core Web Vitals
 | Metric | Value | Rating |
 |--------|-------|--------|
-| First Contentful Paint (FCP) | 696ms (Good) |
-| Largest Contentful Paint (LCP) | 696ms (Good) |
+| First Contentful Paint (FCP) | 736ms (Good) |
+| Largest Contentful Paint (LCP) | 736ms (Good) |
 | Cumulative Layout Shift (CLS) | 0.000 (Good) |
 | Total Blocking Time (TBT) | 0ms (Good) |
 ### Page Metrics
-- **Load Time:** 76ms
-- **DOM Content Loaded:** 76ms
+- **Load Time:** 80ms
+- **DOM Content Loaded:** 80ms
 - **DOM Nodes:** 45
-- **Resources:** 15
+- **Resources:** 16
 - **Total Transfer Size:** 4.1 KB
-- **JS Heap Size:** 6.3 MB
+- **JS Heap Size:** 6.4 MB
 
 ---
 
@@ -95,12 +95,12 @@ No accessibility violations found.
 
 **URL:** http://127.0.0.1:4174/p/new
 **Lighthouse Version:** 13.4.1
-**Measured:** 2026-07-30T03:48:21.335Z
+**Measured:** 2026-07-30T03:53:14.626Z
 
 ### Scores
 | Category | Score |
 |----------|-------|
-| Performance | 91 (Good) |
+| Performance | 84 (Needs Improvement) |
 | Accessibility | 100 (Good) |
 | Best Practices | 96 (Good) |
 | SEO | 66 (Needs Improvement) |
@@ -108,8 +108,9 @@ No accessibility violations found.
 ### Key Findings (Needs Attention)
 | Status | Audit |
 |--------|-------|
-| FAIL | Largest Contentful Paint — 3.5 s |
-| FAIL | Reduce unused JavaScript — Est savings of 294 KiB |
+| FAIL | Largest Contentful Paint — 4.5 s |
+| FAIL | Time to Interactive — 4.5 s |
+| FAIL | Reduce unused JavaScript — Est savings of 383 KiB |
 
 ### Passing Audits
 | Status | Audit |
@@ -118,18 +119,16 @@ No accessibility violations found.
 | PASS | Total Blocking Time — 0 ms |
 | PASS | Cumulative Layout Shift — 0 |
 | PASS | Speed Index — 1.5 s |
-| PASS | Time to Interactive — 3.5 s |
 | PASS | Minify JavaScript |
 | PASS | Minify CSS |
 | PASS | Reduce unused CSS |
-| PASS | JavaScript execution time — 0.2 s |
-| PASS | Minimizes main-thread work — 0.5 s |
+| PASS | JavaScript execution time — 0.3 s |
+| PASS | Minimizes main-thread work — 0.7 s |
 | PASS | Initial server response time was short — Root document took 0 ms |
 | PASS | Avoid multiple page redirects |
 | PASS | Document has a `<title>` element |
 | PASS | Document has a meta description |
 | PASS | Page has successful HTTP status code |
-| PASS | Links have a discernible name |
 | PASS | Background and foreground colors have a sufficient contrast ratio |
 
 

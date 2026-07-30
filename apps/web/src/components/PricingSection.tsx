@@ -29,7 +29,8 @@
  * checkout flow: a signed-out user creates a REAL account (never guest,
  * for a paid plan) and is then handed straight to Stripe for the plan
  * they chose (Auth.tsx resolves the intent). A signed-in user skips the
- * form and goes straight to checkout. The free tier keeps ?guest=1. The
+ * form and goes straight to checkout. The free tier goes to /p/new (the
+ * no-auth editor — EnsureSession mints the guest session there). The
  * in-editor export paywall (EditableExportButtons) also starts checkout,
  * for users who hit the wall mid-export. The card at the bottom collects
  * paper-to-talk waitlist interest for the deferred feature.
@@ -63,7 +64,7 @@ export const PRICING_TIERS = [
     price: '$0',
     cadence: 'always',
     cta: 'Start free',
-    ctaTo: '/auth?guest=1',
+    ctaTo: '/p/new',
     forWho: 'For one poster you can print or present.',
     condition: 'Includes a small Postr mark.',
     features: [

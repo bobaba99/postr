@@ -220,8 +220,9 @@ describe('PublicHeader mobile menu', () => {
 
 /**
  * The auth-aware workspace link. One header link whose destination and
- * label flip with the session: signed out it drops a visitor into the
- * guest editor (?guest=1), signed in it points at their dashboard.
+ * label flip with the session: signed out it drops a visitor straight
+ * into the editor (/p/new — the no-auth editor), signed in it points at
+ * their dashboard.
  * These assert the destination per state so a regression that sends a
  * logged-out visitor to a signup wall — or a signed-in user back to the
  * guest entry — is caught here.
@@ -233,12 +234,10 @@ describe('PublicHeader workspace link', () => {
     authSpies.getSession.mockResolvedValue({ data: { session: null } });
   });
 
-  it('sends a logged-out visitor to the guest editor', async () => {
+  it('sends a logged-out visitor straight into the editor', async () => {
     const { container } = renderIn(<PublicHeader />);
-    // Wait for the auth state to resolve (the link renders once ready).
     const link = await screen.findByRole('link', { name: /^editor$/i });
-    expect(link.getAttribute('href')).toBe('/auth?guest=1');
-    // And it does NOT point at the auth-gated dashboard while signed out.
+    expect(link.getAttribute('href')).toBe('/p/new');
     expect(hrefsOf(container)).not.toContain('/dashboard');
   });
 
@@ -256,13 +255,12 @@ describe('PublicHeader workspace link', () => {
     expect(screen.queryByRole('link', { name: /^editor$/i })).toBeNull();
   });
 
-  it('reaches the workspace link from the mobile menu (signed out)', async () => {
+  it('reaches the editor from the mobile menu (signed out)', async () => {
     renderIn(<PublicHeader />);
-    // Let auth resolve first so the mobile link is present.
     await screen.findByRole('link', { name: /^editor$/i });
     fireEvent.click(screen.getByRole('button', { name: /menu/i }));
     const panel = await screen.findByRole('list');
-    expect(hrefsOf(panel)).toContain('/auth?guest=1');
+    expect(hrefsOf(panel)).toContain('/p/new');
   });
 });
 
