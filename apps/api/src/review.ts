@@ -52,6 +52,7 @@ import {
   REVIEW_MODEL,
   REVIEW_PPTX_MAX_CONCURRENT_RENDERS,
   REVIEW_PPTX_MAX_BYTES,
+  REVIEW_PPTX_STORAGE_TIMEOUT_MS,
   REVIEW_SIGNED_URL_TTL_SEC,
 } from './review/config.js';
 import {
@@ -149,6 +150,10 @@ export interface ReviewRouterDeps {
   getPptxRenderer?: () => PptxRenderer;
   /** Rollout gate: disabled unless REVIEW_PPTX_ENABLED is exactly "true". */
   isPptxEnabled?: () => boolean;
+  /** Archive inspection seam for deterministic work-lease tests. */
+  inspectPptxArchiveFn?: typeof inspectPptxArchive;
+  /** Storage deadline seam for deterministic work-lease tests. */
+  pptxStorageTimeoutMs?: number;
 }
 
 /** Built per call — createLibreOfficeRenderer() is a cheap closure. */
@@ -170,6 +175,98 @@ function tryAcquirePptxRenderLease(): (() => void) | null {
     released = true;
     activePptxRenders--;
   };
+}
+
+class PptxStorageTimeoutError extends Error {
+  constructor(
+    readonly operation: string,
+    readonly settlement: Promise<PromiseSettledResult<unknown>>,
+  ) {
+    super(`${operation} timed out`);
+    this.name = 'PptxStorageTimeoutError';
+  }
+}
+
+async function withPptxStorageTimeout<T>(
+  operation: PromiseLike<T>,
+  timeoutMs: number,
+  operationName: string,
+): Promise<T> {
+  const operationPromise = Promise.resolve(operation);
+  const settlement: Promise<PromiseSettledResult<T>> = operationPromise.then(
+    (value) => ({ status: 'fulfilled', value }),
+    (reason: unknown) => ({ status: 'rejected', reason }),
+  );
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timeout = setTimeout(() => {
+      reject(new PptxStorageTimeoutError(operationName, settlement));
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([operationPromise, deadline]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
+}
+
+async function removePptxStoragePaths(
+  supabase: SupabaseClient,
+  paths: string[],
+): Promise<void> {
+  if (paths.length === 0) return;
+  const { error } = await supabase.storage
+    .from('poster-assets')
+    .remove(paths);
+  if (error) {
+    throw new Error(`PPTX page rollback failed: ${error.message}`);
+  }
+}
+
+async function rollbackPptxStoragePaths(
+  supabase: SupabaseClient,
+  paths: string[],
+  timeoutMs: number,
+): Promise<void> {
+  await withPptxStorageTimeout(
+    removePptxStoragePaths(supabase, paths),
+    timeoutMs,
+    'PPTX page rollback',
+  );
+}
+
+function retainPptxLeaseUntilStorageSettles(opts: {
+  timeoutError: PptxStorageTimeoutError;
+  supabase: SupabaseClient;
+  cleanupPaths: string[];
+  cleanupAfterSettlement: boolean;
+  releaseLease: () => void;
+}): void {
+  void (async () => {
+    const settlement = await opts.timeoutError.settlement;
+    if (
+      !opts.cleanupAfterSettlement &&
+      settlement.status === 'rejected'
+    ) {
+      throw settlement.reason;
+    }
+    if (opts.cleanupAfterSettlement) {
+      await removePptxStoragePaths(
+        opts.supabase,
+        [...new Set(opts.cleanupPaths)],
+      );
+    }
+    opts.releaseLease();
+  })().catch((error) => {
+    // Fail closed: if the late operation or its required cleanup fails, the
+    // process keeps the work lease instead of overlapping another conversion
+    // with an unowned Storage mutation.
+    // eslint-disable-next-line no-console
+    console.error(
+      '[review.render-pptx] late storage cleanup failed:',
+      error instanceof Error ? error.message : 'unknown',
+    );
+  });
 }
 
 function asyncReviewHandler(
@@ -197,6 +294,10 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
   const getSupabase = deps.getSupabaseAdmin ?? defaultGetSupabaseAdmin;
   const getAnthropic = deps.getAnthropic ?? defaultGetAnthropic;
   const getPptxRenderer = deps.getPptxRenderer ?? defaultGetPptxRenderer;
+  const inspectPptxArchiveFn =
+    deps.inspectPptxArchiveFn ?? inspectPptxArchive;
+  const pptxStorageTimeoutMs =
+    deps.pptxStorageTimeoutMs ?? REVIEW_PPTX_STORAGE_TIMEOUT_MS;
   const isPptxEnabled =
     deps.isPptxEnabled ??
     (() => process.env.REVIEW_PPTX_ENABLED === 'true');
@@ -346,15 +447,6 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
         return res.status(502).json({ error: 'file_fetch_failed', message });
       }
 
-      try {
-        await inspectPptxArchive(pptx, REVIEW_MAX_PAGES);
-      } catch (err) {
-        if (err instanceof PptxArchiveError) {
-          return res.status(400).json({ error: err.code });
-        }
-        throw err;
-      }
-
       const releasePptxRenderLease = tryAcquirePptxRenderLease();
       if (!releasePptxRenderLease) {
         res.setHeader('Retry-After', '5');
@@ -364,91 +456,144 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
         });
       }
 
-      let rendered: RenderedPage[];
+      let leaseOwnershipTransferred = false;
       try {
-        rendered = await getPptxRenderer().render(pptx);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'unknown';
-        // eslint-disable-next-line no-console
-        console.error('[review.render-pptx] render failed:', message);
-        return res.status(502).json({ error: 'pptx_render_failed' });
-      } finally {
-        releasePptxRenderLease();
-      }
-
-      if (rendered.length === 0) {
-        return res.status(502).json({
-          error: 'pptx_render_failed',
-          message: 'The deck produced no pages.',
-        });
-      }
-      // Hard page cap (spec §1) — never silently truncate.
-      if (rendered.length > REVIEW_MAX_PAGES) {
-        return res.status(400).json({
-          error: 'too_many_pages',
-          message: `Presentation Checker accepts at most ${REVIEW_MAX_PAGES} pages — trim the deck and try again.`,
-        });
-      }
-
-      // Persist each page JPEG to the user's review-temp batch and mint
-      // short-lived signed URLs for the client + the critique page fetcher.
-      const user = (res.locals as AuthLocals).user;
-      const batchId = randomUUID();
-      const pages: ReviewPageRef[] = [];
-      const uploadedPaths: string[] = [];
-      try {
-        for (const page of rendered) {
-          const path = `${user.id}/review-temp/${batchId}/page-${page.pageNumber}.jpg`;
-          const { error: uploadErr } = await supabase.storage
-            .from('poster-assets')
-            .upload(path, page.jpeg, { contentType: 'image/jpeg' });
-          if (uploadErr) {
-            // eslint-disable-next-line no-console
-            console.error('[review.render-pptx] page upload failed:', uploadErr.message);
-            await bestEffortRemoveStoragePaths(
-              supabase,
-              uploadedPaths,
-              'review.render-pptx rollback',
-            );
-            return res.status(502).json({ error: 'page_upload_failed' });
+        try {
+          await inspectPptxArchiveFn(pptx, REVIEW_MAX_PAGES);
+        } catch (err) {
+          if (err instanceof PptxArchiveError) {
+            return res.status(400).json({ error: err.code });
           }
-          uploadedPaths.push(path);
-          const { data: signed, error: signErr } = await supabase.storage
-            .from('poster-assets')
-            .createSignedUrl(path, REVIEW_SIGNED_URL_TTL_SEC);
-          if (signErr || !signed?.signedUrl) {
-            // eslint-disable-next-line no-console
-            console.error('[review.render-pptx] sign failed:', signErr?.message);
-            await bestEffortRemoveStoragePaths(
-              supabase,
-              uploadedPaths,
-              'review.render-pptx rollback',
-            );
-            return res.status(502).json({ error: 'page_upload_failed' });
-          }
-          pages.push({
-            pageNumber: page.pageNumber,
-            url: signed.signedUrl,
-            widthPx: page.widthPx,
-            heightPx: page.heightPx,
-            storagePath: path,
+          throw err;
+        }
+
+        let rendered: RenderedPage[];
+        try {
+          rendered = await getPptxRenderer().render(pptx);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'unknown';
+          // eslint-disable-next-line no-console
+          console.error('[review.render-pptx] render failed:', message);
+          return res.status(502).json({ error: 'pptx_render_failed' });
+        }
+
+        if (rendered.length === 0) {
+          return res.status(502).json({
+            error: 'pptx_render_failed',
+            message: 'The deck produced no pages.',
           });
         }
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error(
-          '[review.render-pptx] storage SDK failed:',
-          error instanceof Error ? error.message : 'unknown',
-        );
-        await bestEffortRemoveStoragePaths(
-          supabase,
-          uploadedPaths,
-          'review.render-pptx rollback',
-        );
-        return res.status(502).json({ error: 'page_upload_failed' });
-      }
+        // Hard page cap (spec §1) — never silently truncate.
+        if (rendered.length > REVIEW_MAX_PAGES) {
+          return res.status(400).json({
+            error: 'too_many_pages',
+            message: `Presentation Checker accepts at most ${REVIEW_MAX_PAGES} pages — trim the deck and try again.`,
+          });
+        }
 
-      return res.json({ pages });
+        // Persist each page JPEG to the user's review-temp batch and mint
+        // short-lived signed URLs for the client + the critique page fetcher.
+        const user = (res.locals as AuthLocals).user;
+        const batchId = randomUUID();
+        const pages: ReviewPageRef[] = [];
+        const uploadedPaths: string[] = [];
+        let pendingUploadPath: string | null = null;
+        try {
+          for (const page of rendered) {
+            const path = `${user.id}/review-temp/${batchId}/page-${page.pageNumber}.jpg`;
+            pendingUploadPath = path;
+            const { error: uploadErr } = await withPptxStorageTimeout(
+              supabase.storage
+                .from('poster-assets')
+                .upload(path, page.jpeg, { contentType: 'image/jpeg' }),
+              pptxStorageTimeoutMs,
+              'PPTX page upload',
+            );
+            pendingUploadPath = null;
+            if (uploadErr) {
+              throw new Error(`page upload failed: ${uploadErr.message}`);
+            }
+            uploadedPaths.push(path);
+            const { data: signed, error: signErr } =
+              await withPptxStorageTimeout(
+                supabase.storage
+                  .from('poster-assets')
+                  .createSignedUrl(path, REVIEW_SIGNED_URL_TTL_SEC),
+                pptxStorageTimeoutMs,
+                'PPTX page signing',
+              );
+            if (signErr || !signed?.signedUrl) {
+              throw new Error(
+                `page signing failed: ${signErr?.message ?? 'signed URL missing'}`,
+              );
+            }
+            pages.push({
+              pageNumber: page.pageNumber,
+              url: signed.signedUrl,
+              widthPx: page.widthPx,
+              heightPx: page.heightPx,
+              storagePath: path,
+            });
+          }
+        } catch (error) {
+          // eslint-disable-next-line no-console
+          console.error(
+            '[review.render-pptx] storage SDK failed:',
+            error instanceof Error ? error.message : 'unknown',
+          );
+          if (error instanceof PptxStorageTimeoutError) {
+            leaseOwnershipTransferred = true;
+            retainPptxLeaseUntilStorageSettles({
+              timeoutError: error,
+              supabase,
+              cleanupPaths: [
+                ...uploadedPaths,
+                ...(pendingUploadPath ? [pendingUploadPath] : []),
+              ],
+              cleanupAfterSettlement: true,
+              releaseLease: releasePptxRenderLease,
+            });
+            return res.status(502).json({
+              error: 'page_storage_timeout',
+            });
+          }
+          try {
+            await rollbackPptxStoragePaths(
+              supabase,
+              uploadedPaths,
+              pptxStorageTimeoutMs,
+            );
+          } catch (rollbackError) {
+            if (rollbackError instanceof PptxStorageTimeoutError) {
+              leaseOwnershipTransferred = true;
+              retainPptxLeaseUntilStorageSettles({
+                timeoutError: rollbackError,
+                supabase,
+                cleanupPaths: uploadedPaths,
+                cleanupAfterSettlement: false,
+                releaseLease: releasePptxRenderLease,
+              });
+              return res.status(502).json({
+                error: 'page_storage_timeout',
+              });
+            }
+            // eslint-disable-next-line no-console
+            console.error(
+              '[review.render-pptx] rollback crashed:',
+              rollbackError instanceof Error
+                ? rollbackError.message
+                : 'unknown',
+            );
+          }
+          return res.status(502).json({ error: 'page_upload_failed' });
+        }
+
+        return res.json({ pages });
+      } finally {
+        if (!leaseOwnershipTransferred) {
+          releasePptxRenderLease();
+        }
+      }
     }),
   );
 
@@ -831,7 +976,8 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
     }
     const { row } = entitlement;
 
-    let creditSource: 'pack' | 'subscription_addon';
+    let creditSource: 'pack' | 'subscription_addon' | null = null;
+    let addonQuotaRetryAfterSec: number | null = null;
     if (row.review_addon === true && isTermActive(row, now())) {
       // The claim above makes same-key replays free. A fresh active add-on
       // request then consumes one persistent slot before page/provider work;
@@ -863,15 +1009,13 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
         return res.status(500).json({ error: 'review_internal' });
       }
       if (!slot.allowed) {
-        res.setHeader('Retry-After', String(slot.retryAfterSec));
-        return res.status(402).json({
-          error: 'review_payment_required',
-          reason: 'weekly_quota_exceeded',
-          retryAfterSec: slot.retryAfterSec,
-        });
+        addonQuotaRetryAfterSec = slot.retryAfterSec;
+      } else {
+        creditSource = 'subscription_addon';
       }
-      creditSource = 'subscription_addon';
-    } else if ((row.review_credits ?? 0) > 0) {
+    }
+
+    if (!creditSource && (row.review_credits ?? 0) > 0) {
       // Reserve the pack credit under the exact claim token before page or
       // provider work. The database serializes this per user, so two distinct
       // request keys cannot both spend one remaining credit on model calls.
@@ -914,7 +1058,17 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
         });
       }
       creditSource = 'pack';
-    } else {
+    }
+
+    if (!creditSource) {
+      if (addonQuotaRetryAfterSec !== null) {
+        res.setHeader('Retry-After', String(addonQuotaRetryAfterSec));
+        return res.status(402).json({
+          error: 'review_payment_required',
+          reason: 'weekly_quota_exceeded',
+          retryAfterSec: addonQuotaRetryAfterSec,
+        });
+      }
       return res.status(402).json({
         error: 'review_payment_required',
         reason: 'no_credit',

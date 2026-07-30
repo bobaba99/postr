@@ -70,7 +70,14 @@ function fakeSupabase(
     failSignAt?: number;
     throwUploadAt?: number;
     throwSignAt?: number;
+    failRemoveAt?: number;
     userIsAnonymous?: boolean;
+    onUploadStart?: () => void;
+    waitForUpload?: Promise<void>;
+    onSignStart?: () => void;
+    waitForSign?: Promise<void>;
+    onRemoveStart?: () => void;
+    waitForRemove?: Promise<void>;
   } = {},
 ) {
   const uploads: Array<{
@@ -83,6 +90,7 @@ function fakeSupabase(
   const removes: Array<{ bucket: string; paths: string[] }> = [];
   let uploadCount = 0;
   let signCount = 0;
+  let removeCount = 0;
   const client = {
     auth: {
       getUser: async () => ({
@@ -104,6 +112,8 @@ function fakeSupabase(
             uploadOptions?: { contentType?: string },
           ) => {
             uploadCount++;
+            storageOpts.onUploadStart?.();
+            await storageOpts.waitForUpload;
             uploads.push({
               bucket,
               path,
@@ -120,6 +130,8 @@ function fakeSupabase(
           },
           createSignedUrl: async (path: string, ttlSec: number) => {
             signCount++;
+            storageOpts.onSignStart?.();
+            await storageOpts.waitForSign;
             signed.push({ bucket, path, ttlSec });
             if (signCount === storageOpts.throwSignAt) {
               throw new Error('sign crashed');
@@ -133,7 +145,13 @@ function fakeSupabase(
             };
           },
           remove: async (paths: string[]) => {
+            removeCount++;
+            storageOpts.onRemoveStart?.();
+            await storageOpts.waitForRemove;
             removes.push({ bucket, paths });
+            if (removeCount === storageOpts.failRemoveAt) {
+              return { data: null, error: { message: 'remove failed' } };
+            }
             return { data: [], error: null };
           },
         };
@@ -168,8 +186,20 @@ function buildApp(deps: {
     failSignAt?: number;
     throwUploadAt?: number;
     throwSignAt?: number;
+    failRemoveAt?: number;
     userIsAnonymous?: boolean;
+    onUploadStart?: () => void;
+    waitForUpload?: Promise<void>;
+    onSignStart?: () => void;
+    waitForSign?: Promise<void>;
+    onRemoveStart?: () => void;
+    waitForRemove?: Promise<void>;
   };
+  pptxStorageTimeoutMs?: number;
+  inspectPptxArchiveFn?: (
+    pptx: Buffer,
+    maxSlides: number,
+  ) => Promise<{ slideCount: number }>;
 }) {
   const fake = fakeSupabase(deps.storageOpts);
   const fetchFn =
@@ -190,6 +220,8 @@ function buildApp(deps: {
       fetchFn,
       getPptxRenderer: () => deps.renderer,
       isPptxEnabled: () => deps.pptxEnabled ?? true,
+      inspectPptxArchiveFn: deps.inspectPptxArchiveFn,
+      pptxStorageTimeoutMs: deps.pptxStorageTimeoutMs,
     }),
   );
   return { app, fake };
@@ -295,6 +327,251 @@ describe('POST /api/review/render-pptx', () => {
     expect(second.headers['retry-after']).toBeDefined();
     expect(first.status).toBe(200);
     expect(renderCalls).toBe(1);
+  });
+
+  it('holds the global work lease while archive inspection is running', async () => {
+    let markInspectionStarted!: () => void;
+    let releaseInspection!: () => void;
+    const inspectionStarted = new Promise<void>((resolve) => {
+      markInspectionStarted = resolve;
+    });
+    const inspectionRelease = new Promise<void>((resolve) => {
+      releaseInspection = resolve;
+    });
+    const inspectPptxArchiveFn = vi.fn(async () => {
+      markInspectionStarted();
+      await inspectionRelease;
+      return { slideCount: 1 };
+    });
+    const { renderer } = fakeRenderer([
+      { widthPx: 2048, heightPx: 1152 },
+    ]);
+    const { app: firstApp } = buildApp({
+      renderer,
+      inspectPptxArchiveFn,
+    });
+    const { app: secondApp } = buildApp({ renderer });
+    const firstPromise = Promise.resolve(postRender(firstApp, VALID_FILE_URL));
+
+    let first;
+    try {
+      const firstPhase = await Promise.race([
+        inspectionStarted.then(() => 'inspection' as const),
+        firstPromise.then(() => 'response' as const),
+      ]);
+      expect(firstPhase).toBe('inspection');
+
+      const second = await postRender(secondApp, VALID_FILE_URL);
+      expect(second.status).toBe(503);
+      expect(second.body.error).toBe('pptx_render_busy');
+    } finally {
+      releaseInspection();
+      first = await firstPromise;
+    }
+
+    expect(first.status).toBe(200);
+    expect(inspectPptxArchiveFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds the global work lease until rendered pages finish uploading', async () => {
+    let markUploadStarted!: () => void;
+    let releaseUpload!: () => void;
+    const uploadStarted = new Promise<void>((resolve) => {
+      markUploadStarted = resolve;
+    });
+    const uploadRelease = new Promise<void>((resolve) => {
+      releaseUpload = resolve;
+    });
+    const { renderer } = fakeRenderer([
+      { widthPx: 2048, heightPx: 1152 },
+    ]);
+    const { app: firstApp } = buildApp({
+      renderer,
+      storageOpts: {
+        onUploadStart: markUploadStarted,
+        waitForUpload: uploadRelease,
+      },
+    });
+    const { app: secondApp } = buildApp({ renderer });
+    const firstPromise = Promise.resolve(postRender(firstApp, VALID_FILE_URL));
+
+    let first;
+    try {
+      await uploadStarted;
+      const second = await postRender(secondApp, VALID_FILE_URL);
+      expect(second.status).toBe(503);
+      expect(second.body.error).toBe('pptx_render_busy');
+    } finally {
+      releaseUpload();
+      first = await firstPromise;
+    }
+
+    expect(first.status).toBe(200);
+  });
+
+  it('holds the global work lease until failed-upload rollback finishes', async () => {
+    let markRemoveStarted!: () => void;
+    let releaseRemove!: () => void;
+    const removeStarted = new Promise<void>((resolve) => {
+      markRemoveStarted = resolve;
+    });
+    const removeRelease = new Promise<void>((resolve) => {
+      releaseRemove = resolve;
+    });
+    const { renderer } = fakeRenderer([
+      { widthPx: 2048, heightPx: 1152 },
+    ]);
+    const { app: firstApp } = buildApp({
+      renderer,
+      storageOpts: {
+        failSignAt: 1,
+        onRemoveStart: markRemoveStarted,
+        waitForRemove: removeRelease,
+      },
+    });
+    const { app: secondApp } = buildApp({ renderer });
+    const firstPromise = Promise.resolve(postRender(firstApp, VALID_FILE_URL));
+
+    let first;
+    try {
+      await removeStarted;
+      const second = await postRender(secondApp, VALID_FILE_URL);
+      expect(second.status).toBe(503);
+      expect(second.body.error).toBe('pptx_render_busy');
+    } finally {
+      releaseRemove();
+      first = await firstPromise;
+    }
+
+    expect(first.status).toBe(502);
+    expect(first.body.error).toBe('page_upload_failed');
+  });
+
+  it('keeps the lease and removes a late upload before allowing another conversion', async () => {
+    let markUploadStarted!: () => void;
+    let releaseUpload!: () => void;
+    const uploadStarted = new Promise<void>((resolve) => {
+      markUploadStarted = resolve;
+    });
+    const uploadRelease = new Promise<void>((resolve) => {
+      releaseUpload = resolve;
+    });
+    const { renderer } = fakeRenderer([
+      { widthPx: 2048, heightPx: 1152 },
+    ]);
+    const { app: firstApp, fake: firstFake } = buildApp({
+      renderer,
+      pptxStorageTimeoutMs: 5,
+      storageOpts: {
+        onUploadStart: markUploadStarted,
+        waitForUpload: uploadRelease,
+      },
+    });
+    const { app: secondApp } = buildApp({ renderer });
+
+    const firstPromise = Promise.resolve(postRender(firstApp, VALID_FILE_URL));
+    await uploadStarted;
+    const first = await firstPromise;
+    const second = await postRender(secondApp, VALID_FILE_URL);
+
+    expect(first.status).toBe(502);
+    expect(first.body.error).toBe('page_storage_timeout');
+    expect(second.status).toBe(503);
+    expect(second.body.error).toBe('pptx_render_busy');
+
+    releaseUpload();
+    await vi.waitFor(() => expect(firstFake.removes).toHaveLength(1));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(firstFake.uploads).toHaveLength(1);
+    expect(firstFake.removes[0]!.paths).toEqual([
+      firstFake.uploads[0]!.path,
+    ]);
+    const third = await postRender(secondApp, VALID_FILE_URL);
+    expect(third.status).toBe(200);
+  });
+
+  it('keeps the lease until a late signing call settles and cleanup completes', async () => {
+    let markSignStarted!: () => void;
+    let releaseSign!: () => void;
+    const signStarted = new Promise<void>((resolve) => {
+      markSignStarted = resolve;
+    });
+    const signRelease = new Promise<void>((resolve) => {
+      releaseSign = resolve;
+    });
+    const { renderer } = fakeRenderer([
+      { widthPx: 2048, heightPx: 1152 },
+    ]);
+    const { app: firstApp, fake: firstFake } = buildApp({
+      renderer,
+      pptxStorageTimeoutMs: 5,
+      storageOpts: {
+        onSignStart: markSignStarted,
+        waitForSign: signRelease,
+      },
+    });
+    const { app: secondApp } = buildApp({ renderer });
+
+    const firstPromise = Promise.resolve(postRender(firstApp, VALID_FILE_URL));
+    await signStarted;
+    const first = await firstPromise;
+    const second = await postRender(secondApp, VALID_FILE_URL);
+
+    expect(first.status).toBe(502);
+    expect(first.body.error).toBe('page_storage_timeout');
+    expect(second.status).toBe(503);
+    expect(second.body.error).toBe('pptx_render_busy');
+
+    releaseSign();
+    await vi.waitFor(() => expect(firstFake.removes).toHaveLength(1));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    const third = await postRender(secondApp, VALID_FILE_URL);
+    expect(third.status).toBe(200);
+  });
+
+  it('keeps the lease until a timed-out rollback settles', async () => {
+    let markRemoveStarted!: () => void;
+    let releaseRemove!: () => void;
+    const removeStarted = new Promise<void>((resolve) => {
+      markRemoveStarted = resolve;
+    });
+    const removeRelease = new Promise<void>((resolve) => {
+      releaseRemove = resolve;
+    });
+    const { renderer } = fakeRenderer([
+      { widthPx: 2048, heightPx: 1152 },
+    ]);
+    const { app: firstApp, fake: firstFake } = buildApp({
+      renderer,
+      pptxStorageTimeoutMs: 5,
+      storageOpts: {
+        failSignAt: 1,
+        onRemoveStart: markRemoveStarted,
+        waitForRemove: removeRelease,
+      },
+    });
+    const { app: secondApp } = buildApp({ renderer });
+
+    const firstPromise = Promise.resolve(postRender(firstApp, VALID_FILE_URL));
+    await removeStarted;
+    const first = await firstPromise;
+    const second = await postRender(secondApp, VALID_FILE_URL);
+
+    expect(first.status).toBe(502);
+    expect(first.body.error).toBe('page_storage_timeout');
+    expect(second.status).toBe(503);
+    expect(second.body.error).toBe('pptx_render_busy');
+
+    releaseRemove();
+    await vi.waitFor(() =>
+      expect(firstFake.removes.length).toBeGreaterThanOrEqual(1),
+    );
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    const third = await postRender(secondApp, VALID_FILE_URL);
+    expect(third.status).toBe(200);
   });
 
   it('keeps the conversion lease after the client disconnects until rendering settles', async () => {
@@ -604,5 +881,54 @@ describe('POST /api/review/render-pptx', () => {
     expect(res.body.error).toBe('url_not_allowed');
     expect(fetchFn).not.toHaveBeenCalled();
     expect(calls).toHaveLength(0);
+  });
+
+  it('fails closed when a timed-out rollback later settles with a cleanup error', async () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    let markRemoveStarted!: () => void;
+    let releaseRemove!: () => void;
+    const removeStarted = new Promise<void>((resolve) => {
+      markRemoveStarted = resolve;
+    });
+    const removeRelease = new Promise<void>((resolve) => {
+      releaseRemove = resolve;
+    });
+    const { renderer } = fakeRenderer([
+      { widthPx: 2048, heightPx: 1152 },
+    ]);
+    const { app: firstApp } = buildApp({
+      renderer,
+      pptxStorageTimeoutMs: 5,
+      storageOpts: {
+        failSignAt: 1,
+        failRemoveAt: 1,
+        onRemoveStart: markRemoveStarted,
+        waitForRemove: removeRelease,
+      },
+    });
+    const { app: secondApp } = buildApp({ renderer });
+
+    const firstPromise = Promise.resolve(postRender(firstApp, VALID_FILE_URL));
+    await removeStarted;
+    const first = await firstPromise;
+    const whilePending = await postRender(secondApp, VALID_FILE_URL);
+
+    expect(first.status).toBe(502);
+    expect(first.body.error).toBe('page_storage_timeout');
+    expect(whilePending.status).toBe(503);
+
+    releaseRemove();
+    await vi.waitFor(() =>
+      expect(consoleError).toHaveBeenCalledWith(
+        '[review.render-pptx] late storage cleanup failed:',
+        'PPTX page rollback failed: remove failed',
+      ),
+    );
+
+    const afterFailure = await postRender(secondApp, VALID_FILE_URL);
+    expect(afterFailure.status).toBe(503);
+    expect(afterFailure.body.error).toBe('pptx_render_busy');
   });
 });

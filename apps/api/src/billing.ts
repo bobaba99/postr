@@ -148,6 +148,7 @@ export function createBillingWebhookRouter(deps: BillingDeps = {}): Router {
           await handleSubscriptionChange(
             supabase,
             event.data.object as Stripe.Subscription,
+            stripe,
           );
         } else if (event.type === 'charge.refunded') {
           // A refund happened — possibly via OUR button, possibly via Link
@@ -226,13 +227,27 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
         if (sku === 'review_addon') {
           const { data, error } = await supabase
             .from('users')
-            .select('review_addon')
+            .select(
+              'review_addon, plan, plan_expires_at, subscription_status',
+            )
             .eq('id', user.id)
             .maybeSingle();
           if (error) {
             throw new Error(`review add-on entitlement lookup: ${error.message}`);
           }
-          if ((data as { review_addon?: boolean } | null)?.review_addon === true) {
+          const entitlement = data as {
+            review_addon?: boolean;
+            plan?: string | null;
+            plan_expires_at?: string | null;
+            subscription_status?: string | null;
+          } | null;
+          if (!hasActiveTerm(entitlement, Date.now())) {
+            return res.status(409).json({
+              error: 'review_addon_requires_active_term',
+              message: 'An active term is required before adding weekly reviews.',
+            });
+          }
+          if (entitlement?.review_addon === true) {
             return res.status(409).json({
               error: 'review_addon_already_active',
               message: 'Your weekly review add-on is already active.',
@@ -597,7 +612,18 @@ export async function fulfillCheckout(
 
     // Retrieve so the stored id is Stripe's real object (a replayed or
     // malformed session without a live subscription throws → 500 → retry).
-    const sub = await stripe.subscriptions.retrieve(subscriptionId);
+    // Expanding the initial invoice also lets us unwind a just-settled charge
+    // if the required term ended while an asynchronous payment was pending.
+    const sub = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['latest_invoice.payment_intent'],
+    });
+
+    const term = await readTermEntitlement(supabase, userId);
+    if (!hasActiveTerm(term, Date.now())) {
+      await unwindIneligibleReviewAddon(stripe, session, sub);
+      await revokeReviewAddon(supabase, userId, sub.id);
+      return;
+    }
     if (!TERM_ACTIVE_STATUSES.has(sub.status)) return;
 
     // Absolute-value write = naturally idempotent (like the term), so no
@@ -708,6 +734,98 @@ const TERM_ACTIVE_STATUSES = new Set([
   'past_due',
 ]);
 
+function hasActiveTerm(
+  row: {
+    plan?: string | null;
+    plan_expires_at?: string | null;
+    subscription_status?: string | null;
+  } | null,
+  nowMs: number,
+): boolean {
+  if (row?.plan !== 'term' || !row.plan_expires_at) return false;
+  const expiresAtMs = new Date(row.plan_expires_at).getTime();
+  return (
+    Number.isFinite(expiresAtMs) &&
+    expiresAtMs > nowMs &&
+    TERM_ACTIVE_STATUSES.has(row.subscription_status ?? '')
+  );
+}
+
+async function readTermEntitlement(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<{
+  plan?: string | null;
+  plan_expires_at?: string | null;
+  subscription_status?: string | null;
+} | null> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('plan, plan_expires_at, subscription_status')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(`review add-on term lookup: ${error.message}`);
+  }
+  return data as {
+    plan?: string | null;
+    plan_expires_at?: string | null;
+    subscription_status?: string | null;
+  } | null;
+}
+
+async function unwindIneligibleReviewAddon(
+  stripe: Stripe,
+  session: Stripe.Checkout.Session,
+  sub: Stripe.Subscription,
+): Promise<void> {
+  // A delayed payment can settle after the prerequisite term has ended. In
+  // that case the customer must not retain a paid but unusable subscription.
+  // Refund before cancellation so a transient refund failure leaves the
+  // subscription retryable; the deterministic key makes webhook retries safe.
+  if (session.payment_status === 'paid') {
+    const invoice = sub.latest_invoice;
+    const paymentIntent =
+      invoice && typeof invoice !== 'string'
+        ? (
+            invoice as Stripe.Invoice & {
+              payment_intent?: Stripe.PaymentIntent | string;
+            }
+          ).payment_intent
+        : null;
+    const paymentIntentId =
+      typeof paymentIntent === 'string' ? paymentIntent : paymentIntent?.id;
+    if (!paymentIntentId) {
+      throw new Error(
+        `review add-on checkout ${session.id} has no payment intent to refund`,
+      );
+    }
+    await stripe.refunds.create(
+      { payment_intent: paymentIntentId },
+      { idempotencyKey: `review-addon-ineligible:${session.id}` },
+    );
+  }
+
+  if (TERM_ACTIVE_STATUSES.has(sub.status)) {
+    await stripe.subscriptions.cancel(sub.id);
+  }
+}
+
+async function revokeReviewAddon(
+  supabase: SupabaseClient,
+  userId: string,
+  subscriptionId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('users')
+    .update({ review_addon: false })
+    .match({
+      id: userId,
+      review_addon_subscription_id: subscriptionId,
+    });
+  if (error) throw new Error(`review_addon revoke update: ${error.message}`);
+}
+
 /**
  * Activate one add-on subscription without allowing a delayed event for an
  * older subscription to replace a different subscription that is already
@@ -801,7 +919,8 @@ export async function handleInvoicePaid(
 /**
  * A subscription status change — `customer.subscription.updated` (cancel-
  * at-period-end, past_due, reactivation) and `.deleted` (final cancel).
- * The event object IS the subscription; no retrieve needed.
+ * Term subscriptions use the event snapshot; add-on subscriptions reconcile
+ * against Stripe's current state to fence delayed same-subscription events.
  *
  * Access rule (single source of truth, mirrored in usePlan):
  *   - status in {active, trialing, past_due} → keep plan='term'; expiry
@@ -815,6 +934,7 @@ export async function handleInvoicePaid(
 export async function handleSubscriptionChange(
   supabase: SupabaseClient,
   sub: Stripe.Subscription,
+  stripe?: Stripe,
 ): Promise<void> {
   // Review add-on subscriptions are not the term: they only flip the
   // weekly-quota flag. Checked FIRST so an add-on event can never rewrite
@@ -822,19 +942,42 @@ export async function handleSubscriptionChange(
   // the metadata user_id stamped at checkout (or the shared customer id)
   // — findUserIdForSubscriptionEvent needs no change for add-on subs.
   if (sub.metadata?.sku === 'review_addon') {
+    // Stripe does not guarantee webhook delivery order. Re-read this exact
+    // subscription so an older active/terminal snapshot cannot overwrite a
+    // newer provider state for the same subscription.
+    const currentSub = stripe
+      ? await stripe.subscriptions.retrieve(sub.id)
+      : sub;
     const addOnCustomerId =
-      typeof sub.customer === 'string' ? sub.customer : null;
+      typeof currentSub.customer === 'string' ? currentSub.customer : null;
     const addOnUserId = await findUserIdForSubscriptionEvent(supabase, {
-      subscriptionId: sub.id,
+      subscriptionId: currentSub.id,
       customerId: addOnCustomerId,
-      metadataUserId: sub.metadata?.user_id ?? null,
+      metadataUserId: currentSub.metadata?.user_id ?? null,
     });
 
-    if (TERM_ACTIVE_STATUSES.has(sub.status)) {
+    if (TERM_ACTIVE_STATUSES.has(currentSub.status)) {
+      const term = await readTermEntitlement(supabase, addOnUserId);
+      if (!hasActiveTerm(term, Date.now())) {
+        // The add-on can outlive its prerequisite term when cancellation
+        // deliveries race or retry. Keep the local entitlement off before
+        // touching Stripe so a failed cancellation can never reactivate an
+        // unusable paid add-on; webhook retries make both operations
+        // idempotent.
+        await revokeReviewAddon(supabase, addOnUserId, currentSub.id);
+        if (!stripe) {
+          throw new Error(
+            'Stripe client required to cancel review add-on without an active term',
+          );
+        }
+        await stripe.subscriptions.cancel(currentSub.id);
+        return;
+      }
+
       // Still entitled — (re)set the flag and record WHICH subscription
       // grants it (absolute values, so redelivery is safe).
       await activateReviewAddon(supabase, addOnUserId, {
-        subscriptionId: sub.id,
+        subscriptionId: currentSub.id,
         customerId: addOnCustomerId,
         errorLabel: 'review_addon update',
       });
@@ -850,27 +993,33 @@ export async function handleSubscriptionChange(
       .match({
         id: addOnUserId,
         review_addon: true,
-        review_addon_subscription_id: sub.id,
+        review_addon_subscription_id: currentSub.id,
       });
     if (error) throw new Error(`review_addon revoke update: ${error.message}`);
     return;
   }
 
+  // Term events can also arrive out of order. Reconcile provider state before
+  // revoking the prerequisite term, otherwise a delayed canceled snapshot
+  // could tear down a currently active term and its dependent review add-on.
+  const currentTerm = stripe
+    ? await stripe.subscriptions.retrieve(sub.id)
+    : sub;
   const customerId =
-    typeof sub.customer === 'string' ? sub.customer : null;
+    typeof currentTerm.customer === 'string' ? currentTerm.customer : null;
   const userId = await findUserIdForSubscriptionEvent(supabase, {
-    subscriptionId: sub.id,
+    subscriptionId: currentTerm.id,
     customerId,
-    metadataUserId: sub.metadata?.user_id ?? null,
+    metadataUserId: currentTerm.metadata?.user_id ?? null,
   });
 
-  if (TERM_ACTIVE_STATUSES.has(sub.status)) {
+  if (TERM_ACTIVE_STATUSES.has(currentTerm.status)) {
     // Still entitled — advance access to the (item-level) period end.
-    const periodEndSec = subscriptionPeriodEnd(sub);
+    const periodEndSec = subscriptionPeriodEnd(currentTerm);
     await advanceTermAccess(supabase, userId, {
       expiresAtIso: new Date(periodEndSec * 1000).toISOString(),
-      subscriptionStatus: sub.status,
-      subscriptionId: sub.id,
+      subscriptionStatus: currentTerm.status,
+      subscriptionId: currentTerm.id,
       customerId,
     });
     return;
@@ -882,10 +1031,38 @@ export async function handleSubscriptionChange(
     .update({
       plan: 'free',
       plan_expires_at: new Date().toISOString(),
-      subscription_status: sub.status,
+      subscription_status: currentTerm.status,
+      review_addon: false,
     })
     .eq('id', userId);
   if (error) throw new Error(`subscription revoke update: ${error.message}`);
+
+  // The review add-on is a separate Stripe subscription but requires the
+  // term. Reconcile it after revoking the term locally so no concurrent
+  // checkout can create another unusable add-on while cancellation is in
+  // flight. The stored id is intentionally retained for webhook replay.
+  const { data: addOnRow, error: addOnLookupError } = await supabase
+    .from('users')
+    .select('review_addon_subscription_id')
+    .eq('id', userId)
+    .maybeSingle();
+  if (addOnLookupError) {
+    throw new Error(`review_addon terminal lookup: ${addOnLookupError.message}`);
+  }
+  const addOnSubscriptionId = (
+    addOnRow as { review_addon_subscription_id?: string | null } | null
+  )?.review_addon_subscription_id;
+  if (!addOnSubscriptionId) return;
+  if (!stripe) {
+    throw new Error('Stripe client required to cancel terminal review add-on');
+  }
+
+  const currentAddOn =
+    await stripe.subscriptions.retrieve(addOnSubscriptionId);
+  if (TERM_ACTIVE_STATUSES.has(currentAddOn.status)) {
+    await stripe.subscriptions.cancel(addOnSubscriptionId);
+  }
+  await revokeReviewAddon(supabase, userId, addOnSubscriptionId);
 }
 
 /**

@@ -1,8 +1,8 @@
 # Postr — Manual Admin Testing Flow Map
 
-Walk-through checklist for the **admin surfaces** (payment, sign-up, delete account, download data). Editor is already tested — not covered here. Priority order leads with the **nested payment + sign-up** journeys.
+Walk-through checklist for the **admin and launch-gated surfaces**. Parts 1–6 cover payment, sign-up, account deletion, and data download; Part 7 covers the Presentation Checker direct route and its flag-gated editor Review tab. Priority order leads with the **nested payment + sign-up** journeys.
 
-> **Route legend:** `/auth`, `/pricing`, `/p/:posterId` (editor), `/profile`, `/billing/success`, `/billing/cancel`.
+> **Route legend:** `/auth`, `/pricing`, `/p/:posterId` (editor), `/profile`, `/billing/success`, `/billing/cancel`, `/presentation-checker`.
 > **All copy in quotes is verbatim from the code** — if what you see on screen differs, that's a finding.
 
 ---
@@ -554,7 +554,8 @@ The direct QA route is intentionally public, unlinked, and `noindex,nofollow`. K
 - [ ] Buy `review_pack`: provision only after a paid or `no_payment_required` fulfillment event; async/unpaid completion grants nothing.
 - [ ] Buy `review_addon`: a second checkout attempt while active returns the already-active error and double-clicking the UI mints one checkout session.
 - [ ] Replay webhook deliveries and send stale subscription updates/deletions. Confirm credits are not duplicated and an old subscription cannot revoke/overwrite a newer add-on.
-- [ ] Consume the configured weekly add-on allowance, then confirm the next initial review is denied before provider work. Advance beyond the rolling window and confirm access resumes.
+- [ ] Consume the configured weekly add-on allowance while one pack credit remains. Confirm the next fresh request falls back to that pack credit and succeeds; replay its request key and confirm the replay consumes neither another pack credit nor another weekly slot.
+- [ ] With the weekly allowance exhausted **and zero pack credits**, confirm the next fresh initial review is denied before provider work. Advance beyond the rolling window and confirm add-on access resumes.
 - [ ] Cancel/revoke the current add-on in Stripe sandbox and confirm new reviews stop while already saved reviews remain readable.
 
 ## 38. Included follow-up and terminal state
@@ -566,7 +567,7 @@ The direct QA route is intentionally public, unlinked, and `noindex,nofollow`. K
 
 ## 39. History reopen and resume after reload
 
-- [ ] Complete uploaded and native-poster reviews, reload the page, and select each history row. Both must reopen with source metadata, scores, findings, and follow-up state intact.
+- [ ] Complete uploaded and native-poster reviews, reload the page, and select each history row. Before opening, confirm the row shows its source label or filename, date, stage, and scores. After opening, both must restore validated scores, findings, and follow-up state; the native review retains its poster ID for recapture, while an uploaded review explains that its temporary preview is no longer retained.
 - [ ] Reload while a follow-up remains available; reopen the review and submit it successfully.
 - [ ] Inject malformed saved JSON in a test/staging row. The UI must reject it through runtime validation with a safe error rather than rendering partial or unsafe fields.
 - [ ] Expire an uploaded page signed URL before a retry. The server must re-sign the owned `storagePath` after claiming work instead of relying on the stale client URL.

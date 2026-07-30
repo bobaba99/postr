@@ -911,6 +911,67 @@ describe('PresentationChecker page', () => {
     );
   });
 
+  it('keeps an interrupted follow-up-stage review resumable after reload', async () => {
+    const summary = {
+      id: 'rev-interrupted-followup',
+      posterId: null,
+      sourceKind: 'pdf' as const,
+      status: 'complete' as const,
+      stage: 'followup' as const,
+      filename: 'interrupted-talk.pdf',
+      pageCount: 2,
+      dimensionScores: CRITIQUE.critique.dimensionScores,
+      createdAt: '2026-07-29T10:00:00Z',
+    };
+    listMyReviewsMock.mockResolvedValue([summary]);
+    getMyReviewMock.mockResolvedValue({
+      ...summary,
+      critique: CRITIQUE.critique,
+    });
+    ingestFileMock.mockResolvedValue({
+      ...ARTIFACT,
+      meta: {
+        ...ARTIFACT.meta,
+        filename: 'interrupted-talk-revised.pdf',
+      },
+    });
+    requestCritiqueMock.mockResolvedValue({
+      ...CRITIQUE,
+      reviewId: summary.id,
+      stage: 'closed',
+    });
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Open review: interrupted-talk.pdf',
+      }),
+    );
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Request your one follow-up',
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Choose the revised file' }),
+    );
+    uploadFile('interrupted-talk-revised.pdf');
+
+    await waitFor(() =>
+      expect(requestCritiqueMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          filename: 'interrupted-talk-revised.pdf',
+          reviewId: 'rev-interrupted-followup',
+        }),
+      ),
+    );
+  });
+
   it('reopens a Postr review after reload and regenerates the poster for its included follow-up', async () => {
     const summary = {
       id: 'rev-poster',

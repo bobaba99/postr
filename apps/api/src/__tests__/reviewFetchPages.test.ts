@@ -38,9 +38,29 @@ const deps = (fetchFn: ReturnType<typeof vi.fn>, extra?: object) => ({
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe('fetchReviewPages', () => {
+  it('uses environment, global fetch, and byte-limit defaults', async () => {
+    vi.stubEnv('SUPABASE_URL', SUPABASE_URL);
+    const fetchFn = vi.fn().mockResolvedValue(imageResponse(3));
+    vi.stubGlobal('fetch', fetchFn);
+
+    await expect(fetchReviewPages([page(1)])).resolves.toEqual([
+      {
+        mediaType: 'image/png',
+        imageData: Buffer.from(new Uint8Array(3)).toString('base64'),
+      },
+    ]);
+    expect(fetchFn).toHaveBeenCalledOnce();
+  });
+
+  it('gives PageFetchError a stable default detail', () => {
+    expect(new PageFetchError('fetch_failed').message).toBe('fetch_failed');
+  });
+
   it('fetches an allowlisted page and returns base64 + media type', async () => {
     const fetchFn = vi.fn().mockResolvedValue(imageResponse(1024));
     const out = await fetchReviewPages([page(1)], deps(fetchFn));
@@ -115,6 +135,16 @@ describe('fetchReviewPages', () => {
     ).rejects.toMatchObject({ code: 'too_large', pageNumber: 1 });
   });
 
+  it('rejects a negative aggregate budget before reading a body', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(imageResponse(1));
+    await expect(
+      fetchReviewPages(
+        [page(1)],
+        deps(fetchFn, { maxBytes: 1024, maxTotalBytes: -1 }),
+      ),
+    ).rejects.toMatchObject({ code: 'too_large', pageNumber: 1 });
+  });
+
   it('rejects a declared oversize page before reading its body', async () => {
     const cancel = vi.fn();
     const response = new Response(
@@ -138,6 +168,50 @@ describe('fetchReviewPages', () => {
       fetchReviewPages([page(1)], deps(fetchFn, { maxBytes: 1024 })),
     ).rejects.toMatchObject({ code: 'too_large', pageNumber: 1 });
     expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports a declared aggregate-budget overflow separately from the page cap', async () => {
+    const first = imageResponse(700);
+    const second = new Response(new Uint8Array(700), {
+      status: 200,
+      headers: {
+        'content-type': 'image/png',
+        'content-length': '700',
+      },
+    });
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(first)
+      .mockResolvedValueOnce(second);
+
+    await expect(
+      fetchReviewPages(
+        [page(1), page(2)],
+        deps(fetchFn, { maxBytes: 1024, maxTotalBytes: 1000 }),
+      ),
+    ).rejects.toMatchObject({
+      code: 'too_large',
+      message: expect.stringContaining('request budget'),
+    });
+  });
+
+  it('keeps the typed size failure when cancelling a declared body rejects', async () => {
+    const cancel = vi.fn().mockRejectedValue(new Error('cancel failed'));
+    const response = {
+      ok: true,
+      status: 200,
+      headers: new Headers({
+        'content-type': 'image/png',
+        'content-length': '1025',
+      }),
+      body: { cancel },
+    } as unknown as Response;
+    const fetchFn = vi.fn().mockResolvedValue(response);
+
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn, { maxBytes: 1024 })),
+    ).rejects.toMatchObject({ code: 'too_large' });
+    expect(cancel).toHaveBeenCalledOnce();
   });
 
   it('cancels a chunked page as soon as its running byte count exceeds the cap', async () => {
@@ -176,6 +250,142 @@ describe('fetchReviewPages', () => {
     expect(releaseLock).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the typed size failure when chunk-reader cancellation rejects', async () => {
+    const releaseLock = vi.fn();
+    const response = {
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'image/png' }),
+      body: {
+        getReader: () => ({
+          read: vi.fn().mockResolvedValue({
+            done: false,
+            value: new Uint8Array(1025),
+          }),
+          cancel: vi.fn().mockRejectedValue(new Error('cancel failed')),
+          releaseLock,
+        }),
+      },
+    } as unknown as Response;
+    const fetchFn = vi.fn().mockResolvedValue(response);
+
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn, { maxBytes: 1024 })),
+    ).rejects.toMatchObject({ code: 'too_large' });
+    expect(releaseLock).toHaveBeenCalledOnce();
+  });
+
+  it('skips empty chunks before retaining later image bytes', async () => {
+    const releaseLock = vi.fn();
+    const reads = vi
+      .fn()
+      .mockResolvedValueOnce({ done: false, value: new Uint8Array(0) })
+      .mockResolvedValueOnce({
+        done: false,
+        value: new Uint8Array([1, 2, 3]),
+      })
+      .mockResolvedValueOnce({ done: true, value: undefined });
+    const streamed = {
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'image/png' }),
+      body: {
+        getReader: () => ({
+          read: reads,
+          cancel: vi.fn(),
+          releaseLock,
+        }),
+      },
+    } as unknown as Response;
+    const fetchFn = vi.fn().mockResolvedValue(streamed);
+
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn, { maxBytes: 1024 })),
+    ).resolves.toEqual([
+      {
+        mediaType: 'image/png',
+        imageData: Buffer.from([1, 2, 3]).toString('base64'),
+      },
+    ]);
+    expect(reads).toHaveBeenCalledTimes(3);
+    expect(releaseLock).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a bodyless image response before provider work', async () => {
+    const bodyless = {
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'image/jpeg' }),
+      body: null,
+    } as unknown as Response;
+    const fetchFn = vi.fn().mockResolvedValue(bodyless);
+
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn, { maxBytes: 1024 })),
+    ).rejects.toMatchObject({
+      code: 'fetch_failed',
+      pageNumber: 1,
+      message: expect.stringContaining('empty body'),
+    });
+  });
+
+  it('rejects a streamed image that completes with zero bytes', async () => {
+    const releaseLock = vi.fn();
+    const response = {
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'image/png' }),
+      body: {
+        getReader: () => ({
+          read: vi
+            .fn()
+            .mockResolvedValueOnce({
+              done: false,
+              value: new Uint8Array(0),
+            })
+            .mockResolvedValueOnce({ done: true, value: undefined }),
+          cancel: vi.fn(),
+          releaseLock,
+        }),
+      },
+    } as unknown as Response;
+    const fetchFn = vi.fn().mockResolvedValue(response);
+
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn, { maxBytes: 1024 })),
+    ).rejects.toMatchObject({
+      code: 'fetch_failed',
+      pageNumber: 1,
+      message: expect.stringContaining('empty body'),
+    });
+    expect(releaseLock).toHaveBeenCalledOnce();
+  });
+
+  it('maps a non-Error stream rejection to fetch_failed', async () => {
+    const releaseLock = vi.fn();
+    const response = {
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'image/png' }),
+      body: {
+        getReader: () => ({
+          read: vi.fn().mockRejectedValue('stream exploded'),
+          cancel: vi.fn(),
+          releaseLock,
+        }),
+      },
+    } as unknown as Response;
+    const fetchFn = vi.fn().mockResolvedValue(response);
+
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn)),
+    ).rejects.toMatchObject({
+      code: 'fetch_failed',
+      message: 'page 1: unknown',
+    });
+    expect(releaseLock).toHaveBeenCalledOnce();
+  });
+
   it('accepts a page at exactly the byte cap', async () => {
     const fetchFn = vi.fn().mockResolvedValue(imageResponse(1024));
     const out = await fetchReviewPages(
@@ -190,6 +400,18 @@ describe('fetchReviewPages', () => {
     await expect(
       fetchReviewPages([page(1)], deps(fetchFn)),
     ).rejects.toMatchObject({ code: 'unsupported_media', pageNumber: 1 });
+  });
+
+  it('names a missing content type in the unsupported-media error', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValue(new Response(new Uint8Array(1), { status: 200 }));
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn)),
+    ).rejects.toMatchObject({
+      code: 'unsupported_media',
+      message: expect.stringContaining('content-type "missing"'),
+    });
   });
 
   it('rejects a failed upstream response with fetch_failed + status', async () => {
@@ -210,5 +432,15 @@ describe('fetchReviewPages', () => {
     );
     expect(err).toBeInstanceOf(PageFetchError);
     expect(err).toMatchObject({ code: 'fetch_failed' });
+  });
+
+  it('maps a non-Error fetch rejection to a stable unknown detail', async () => {
+    const fetchFn = vi.fn().mockRejectedValue('refused');
+    await expect(
+      fetchReviewPages([page(1)], deps(fetchFn)),
+    ).rejects.toMatchObject({
+      code: 'fetch_failed',
+      message: 'page 1: unknown',
+    });
   });
 });

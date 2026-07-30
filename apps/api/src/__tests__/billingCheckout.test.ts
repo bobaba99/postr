@@ -8,7 +8,18 @@ import {
   createBillingWebhookRouter,
 } from '../billing.js';
 
-function fakeSupabase(reviewAddon: boolean): SupabaseClient {
+function fakeSupabase(
+  reviewAddon: boolean,
+  term: {
+    plan: string;
+    plan_expires_at: string | null;
+    subscription_status: string | null;
+  } = {
+    plan: 'term',
+    plan_expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    subscription_status: 'active',
+  },
+): SupabaseClient {
   return {
     auth: {
       getUser: vi.fn(async () => ({
@@ -26,7 +37,7 @@ function fakeSupabase(reviewAddon: boolean): SupabaseClient {
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           maybeSingle: vi.fn(async () => ({
-            data: { review_addon: reviewAddon },
+            data: { review_addon: reviewAddon, ...term },
             error: null,
           })),
         })),
@@ -74,6 +85,11 @@ describe('POST /billing/webhook — delayed review add-on payment', () => {
                 review_addon_subscription_id: active
                   ? 'sub_addon_1'
                   : null,
+                plan: 'term',
+                plan_expires_at: new Date(
+                  Date.now() + 24 * 60 * 60 * 1000,
+                ).toISOString(),
+                subscription_status: 'active',
               },
               error: null,
             })),
@@ -157,6 +173,35 @@ describe('POST /billing/webhook — delayed review add-on payment', () => {
 });
 
 describe('POST /billing/create-checkout — review add-on', () => {
+  it('rejects a direct add-on checkout when the user has no active term', async () => {
+    const supabase = fakeSupabase(false, {
+      plan: 'free',
+      plan_expires_at: null,
+      subscription_status: null,
+    });
+    const stripe = fakeStripe();
+    const app = express();
+    app.use(express.json());
+    app.use(
+      createBillingRouter({
+        getSupabaseAdmin: () => supabase,
+        getStripe: () => stripe.stripe,
+      }),
+    );
+
+    const response = await request(app)
+      .post('/billing/create-checkout')
+      .set('Authorization', 'Bearer test-token')
+      .send({ sku: 'review_addon' });
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      error: 'review_addon_requires_active_term',
+      message: 'An active term is required before adding weekly reviews.',
+    });
+    expect(stripe.create).not.toHaveBeenCalled();
+  });
+
   it('returns a clear conflict before Stripe when the add-on is already active', async () => {
     const supabase = fakeSupabase(true);
     const stripe = fakeStripe();

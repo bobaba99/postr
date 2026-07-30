@@ -31,7 +31,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(104);
+select plan(108);
 
 -- --------------------------------------------------------------------------
 -- Fixtures (as superuser): two users (handle_new_user auto-creates their
@@ -721,6 +721,80 @@ select is(
     where id = 'd1000000-0000-4000-a000-000000000001'),
   0,
   'subscription add-on finalization leaves the pack balance unchanged');
+
+-- A process crash can abandon a reserved credit after the browser loses its
+-- in-memory request key. Any later key for the same user must recover it.
+update public.users
+   set review_credits = 1
+ where id = 'd1000000-0000-4000-a000-000000000001';
+
+insert into review_claim_fixtures (name, payload)
+values (
+  'cross_key_abandoned',
+  public.claim_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000020'
+  )
+);
+
+select is(
+  public.reserve_initial_review_credit(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000020',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'cross_key_abandoned')
+  ),
+  true,
+  'key A reserves the only pack credit before a simulated process crash');
+
+update public.poster_review_requests
+   set expires_at = pg_catalog.now() - interval '1 second'
+ where user_id = 'd1000000-0000-4000-a000-000000000001'
+   and request_key = 'a1000000-0000-4000-a000-000000000020';
+
+insert into review_claim_fixtures (name, payload)
+values (
+  'cross_key_replacement',
+  public.claim_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000021'
+  )
+);
+
+select is(
+  (select payload->>'outcome'
+     from review_claim_fixtures
+    where name = 'cross_key_replacement'),
+  'claimed',
+  'key B claims after sweeping the expired key A reservation');
+
+select is(
+  (select review_credits
+     from public.users
+    where id = 'd1000000-0000-4000-a000-000000000001'),
+  1,
+  'key B recovers the paid credit abandoned by expired key A');
+
+select is(
+  (select count(*)
+     from public.poster_review_requests
+    where user_id = 'd1000000-0000-4000-a000-000000000001'
+      and request_key = 'a1000000-0000-4000-a000-000000000020'),
+  0::bigint,
+  'the expired key A claim is removed during the cross-key sweep');
+
+do $$
+begin
+  perform public.release_initial_review(
+    'd1000000-0000-4000-a000-000000000001',
+    'a1000000-0000-4000-a000-000000000021',
+    (select (payload->>'claimToken')::uuid
+       from review_claim_fixtures
+      where name = 'cross_key_replacement')
+  );
+end
+$$;
 
 -- --------------------------------------------------------------------------
 -- Leased, replay-safe follow-up protocol

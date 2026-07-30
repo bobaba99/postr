@@ -368,10 +368,10 @@ describe('POST /api/review/critique — entitlement (D4)', () => {
     expect(inserts).toHaveLength(0);
   });
 
-  it('maps a persistent quota denial to 402 with matching Retry-After header and body', async () => {
+  it('maps quota denial with no pack credits to 402 with matching Retry-After header and body', async () => {
     const anthropic = fakeAnthropic();
     const { client, rpcs } = fakeSupabase({
-      userRow: { ...ADDON_USER, review_credits: 2 },
+      userRow: { ...ADDON_USER, review_credits: 0 },
       addonSlotResult: {
         data: { allowed: false, retryAfterSec: 3600 },
         error: null,

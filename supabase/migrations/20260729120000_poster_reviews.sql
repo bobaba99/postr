@@ -375,7 +375,7 @@ as $$
 declare
   v_review public.poster_reviews%rowtype;
   v_claimed boolean;
-  v_expired_reservation boolean;
+  v_expired_reservations integer;
   v_claim_token uuid := gen_random_uuid();
   v_expires_at timestamptz := pg_catalog.now() + interval '10 minutes';
 begin
@@ -405,15 +405,23 @@ begin
     );
   end if;
 
-  delete from public.poster_review_requests
-   where user_id = p_user_id
-     and request_key = p_request_key
-     and expires_at <= pg_catalog.now()
-  returning pack_credit_reserved into v_expired_reservation;
+  -- Recover every abandoned reservation for this user, not only this request
+  -- key. Browser keys live in memory, so a reload after an API crash can retry
+  -- with a different key. DELETE ... RETURNING makes concurrent sweep/release
+  -- contenders refund each exact row at most once.
+  with expired as (
+    delete from public.poster_review_requests
+     where user_id = p_user_id
+       and expires_at <= pg_catalog.now()
+    returning pack_credit_reserved
+  )
+  select count(*) filter (where pack_credit_reserved)::integer
+    into v_expired_reservations
+    from expired;
 
-  if coalesce(v_expired_reservation, false) then
+  if coalesce(v_expired_reservations, 0) > 0 then
     update public.users
-       set review_credits = review_credits + 1
+       set review_credits = review_credits + v_expired_reservations
      where id = p_user_id;
   end if;
 

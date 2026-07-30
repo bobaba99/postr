@@ -172,7 +172,13 @@ async function readBoundedPageBody(
     }
   }
 
-  if (!response.body) return Buffer.alloc(0);
+  if (!response.body) {
+    throw new PageFetchError(
+      'fetch_failed',
+      `page ${pageNumber}: empty body`,
+      pageNumber,
+    );
+  }
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -211,6 +217,13 @@ async function readBoundedPageBody(
     );
   } finally {
     reader.releaseLock();
+  }
+  if (total === 0) {
+    throw new PageFetchError(
+      'fetch_failed',
+      `page ${pageNumber}: empty body`,
+      pageNumber,
+    );
   }
   return Buffer.concat(chunks, total);
 }

@@ -368,7 +368,7 @@ export default function PresentationChecker() {
       setSourcePosterId(detail.posterId);
       setResult({
         reviewId: detail.id,
-        stage: detail.stage === 'initial' ? 'initial' : 'closed',
+        stage: detail.stage === 'closed' ? 'closed' : 'initial',
         critique: detail.critique,
       });
       setReopenedFromHistory(true);

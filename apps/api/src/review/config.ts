@@ -61,6 +61,12 @@ export const REVIEW_PPTX_MAX_COMPRESSION_RATIO = 100;
 /** Reject excess LibreOffice work instead of queueing unbounded conversions. */
 export const REVIEW_PPTX_MAX_CONCURRENT_RENDERS = 1;
 
+/**
+ * Deadline for each Storage upload, signed-URL mint, and rollback call made
+ * while the process-global PPTX work lease is held.
+ */
+export const REVIEW_PPTX_STORAGE_TIMEOUT_MS = 15_000;
+
 /** Maximum encoded bytes retained for one JPEG emitted by pdftoppm. */
 export const REVIEW_PPTX_RENDERED_PAGE_MAX_BYTES = 8 * 1024 * 1024;
 

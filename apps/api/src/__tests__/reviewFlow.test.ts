@@ -806,4 +806,55 @@ describe('POST /api/review/critique — add-on weekly window (D5/D17)', () => {
     expect(afterReset.status).toBe(200);
     expect(afterReset.body.stage).toBe('initial');
   });
+
+  it('falls back to one pack credit after add-on quota exhaustion and replays the same key without a second spend', async () => {
+    const nowMs = 1_800_000_000_000;
+    const sb = fakeReviewSupabase({
+      plan: 'term',
+      plan_expires_at: new Date(
+        nowMs + 30 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+      subscription_status: 'active',
+      review_addon: true,
+      review_credits: 1,
+    }, () => nowMs);
+    const { create, client: anthropic } = fakeAnthropic();
+    create.mockResolvedValue(toolReply(INITIAL_CRITIQUE));
+    const app = buildApp({ supabase: sb.client, anthropic, now: () => nowMs });
+
+    for (let i = 0; i < REVIEW_ADDON_WEEKLY_QUOTA; i++) {
+      const response = await postCritique(app, {
+        sourceKind: 'image',
+        pages: ONE_PAGE,
+      });
+      expect(response.status).toBe(200);
+    }
+    expect(sb.users.review_credits).toBe(1);
+
+    const requestKey = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const fallback = await postCritique(app, {
+      sourceKind: 'image',
+      pages: ONE_PAGE,
+      requestKey,
+    });
+
+    expect(fallback.status).toBe(200);
+    expect(sb.reviews.get(fallback.body.reviewId)).toMatchObject({
+      credit_source: 'pack',
+    });
+    expect(sb.users.review_credits).toBe(0);
+
+    const replay = await postCritique(app, {
+      sourceKind: 'image',
+      pages: ONE_PAGE,
+      requestKey,
+    });
+    expect(replay.status).toBe(200);
+    expect(replay.body.reviewId).toBe(fallback.body.reviewId);
+    expect(sb.users.review_credits).toBe(0);
+    expect(
+      sb.rpcs.filter((rpc) => rpc.fn === 'reserve_initial_review_credit'),
+    ).toHaveLength(1);
+    expect(create).toHaveBeenCalledTimes(REVIEW_ADDON_WEEKLY_QUOTA + 1);
+  });
 });

@@ -39,19 +39,19 @@ What changed in the doc:
 
 ## 3. Coverage audit
 
-Counts as reported by each inventory slice ("Files covered / Elements / Copy / Graphics" lines), plus the 2026-07-28 gap-fill pass that added `poster/CommentsPanel.tsx`, `poster/VersionPanel.tsx`, `poster/ReadabilityPanel.tsx` to the sidebar slice (+3 files, +37 elements, +63 copy, +17 graphics), plus the 2026-07-29 pass that added the **Manuscript → Slides** feature (§6.16 — the `/paper-to-slides` pipeline: wizard, deck model, design pass, styled exports; it had shipped but was never inventoried). Cross-slice host files (`pages/PaperToPoster.tsx`, `poster/sidebar/EditableExportButtons.tsx`, `components/ConsentNotice.tsx`) are counted in two slices each, so file totals double-count ~4 files.
+Counts as reported by each inventory slice ("Files covered / Elements / Copy / Graphics" lines), plus the 2026-07-28 gap-fill pass that added `poster/CommentsPanel.tsx`, `poster/VersionPanel.tsx`, `poster/ReadabilityPanel.tsx` to the sidebar slice (+3 files, +37 elements, +63 copy, +17 graphics), plus the 2026-07-29 passes that added **Manuscript → Slides** (§6.16) and **Presentation Checker** (§6.17). The sidebar now has 11 default tabs plus the flag-gated Review tab; the legacy numeric totals below retain their original counting method and call out the newer feature slices instead of inventing element/copy counts for them. Cross-slice host files (`pages/PaperToPoster.tsx`, `poster/sidebar/EditableExportButtons.tsx`, `components/ConsentNotice.tsx`) are counted in two slices each, so file totals double-count ~4 files.
 
 | Slice / feature area | Files covered | Elements | Copy strings | Graphics |
 |---|---|---|---|---|
 | App shell + routing + pages + SEO | 30 | 118 | 486 | 27 |
 | Poster editor core (excl. sidebar) | 14 (+18 logic-only noted) | 112 | ~175 | 34 |
-| Poster sidebar (11 tabs) | 9 | 168 | 171 | 45 |
+| Poster sidebar (11 default tabs + 1 flag-gated Review tab) | 10 | 168 + Review elements (§6.17) | 171 + Review copy (§6.17) | 45 |
 | Shared components + motion | 39 | 205 | 304 | 66 |
 | Import + data + charts | 48 | 30 | 196 | 4 |
 | Export + manuscript (poster) | 42 | 41 | ~190 | 9 |
 | Manuscript → Slides (§6.16) | 23 (10 wizard/UI + 9 deck/model + 4 export/api) | see §6.16 | see §6.16 | icon-library set (§6.16) |
 | Stores + hooks + lib + analytics + config | 17 | 0 (+1 browser-native beforeunload dialog) | 17 | 0 (18 storage keys + 1 BroadcastChannel) |
-| **Totals** | **222** | **674+ (+1 native dialog; +§6.16)** | **~1,539+ (+§6.16)** | **185+ (+§6.16)** |
+| **Legacy totals** | **222 + §6.17 checker files** | **674+ (+1 native dialog; +§6.16/§6.17)** | **~1,539+ (+§6.16/§6.17)** | **185+ (+§6.16/§6.17)** |
 
 All of `apps/web/src/` is covered (test files excluded by rule) — the earlier `CommentsPanel`/`VersionPanel`/`ReadabilityPanel` gap was closed by the gap-fill pass.
 
@@ -1459,19 +1459,19 @@ flowchart LR
 
 ---
 
-### 6.8 Poster Sidebar (11 tabs)
+### 6.8 Poster Sidebar (11 default tabs + 1 flag-gated Review tab)
 
-`poster/Sidebar.tsx` (4,263 lines — 11-tab control panel) + tab panels `CommentsPanel.tsx`, `VersionPanel.tsx`, `ReadabilityPanel.tsx` + `poster/sidebar/` satellite files: `EditableExportButtons.tsx` (paid export + paywall), `FigureTab.tsx`, `ImportSection.tsx`, `ImportTile.tsx`, `PostrExportButton.tsx`.
+`poster/Sidebar.tsx` (11 tabs in the default rollout posture; 12 when `VITE_ENABLE_PRESENTATION_CHECKER=true`) + tab panels `CommentsPanel.tsx`, `VersionPanel.tsx`, `ReadabilityPanel.tsx` + `poster/sidebar/` satellite files: `EditableExportButtons.tsx` (paid export + paywall), `FigureTab.tsx`, `ImportSection.tsx`, `ImportTile.tsx`, `PostrExportButton.tsx`, and the gated `ReviewTab.tsx`.
 
 Slice-wide notes:
 - `GALLERY_PUBLIC_ENABLED = false` (`config/features.ts:21`) → the Export tab's "Share to gallery" section (`Sidebar.tsx:1183-1202`) is **currently dead UI**, and the Layout tab footer tip uses the non-gallery copy branch.
 - `HIGHLIGHT_PRESETS` imported at `Sidebar.tsx:29` but **never used** in the file — dead import (block-level highlight UI intentionally removed, see comment `Sidebar.tsx:4036-4044`).
-- Stale header comment `Sidebar.tsx:1-4` says "5-tab control panel / Tabs: Layout · Authors · Refs · Style · Edit" — there are actually 11 tabs (§10).
-- Out-of-slice components rendered from this slice (internals covered elsewhere): `CopyDesignModal` (`:2393`), `UpdateAvailableBanner`/`JustRefreshedBanner` (`:581-582`), `ChartChooser` (via `FigureTab`, §6.10), `RichTextEditor`/`DockedFormatToolbar`/`FloatingFormatToolbar` (`:3865,3881,3890`), `AuthorLine` (`:1245`), `ImportPosterModal`/`ImportConfirmReplaceModal` (via `ImportSection`), `BusyIndicator` (via `EditableExportButtons`). In-slice panels: `CommentsPanel`, `VersionPanel`, `ReadabilityPanel` — inventoried below.
+- Stale header comment `Sidebar.tsx:1-4` says "5-tab control panel / Tabs: Layout · Authors · Refs · Style · Edit" — there are actually 11 default tabs and 12 when Presentation Checker is enabled (§10).
+- Out-of-slice components rendered from this slice (internals covered elsewhere): `CopyDesignModal` (`:2393`), `UpdateAvailableBanner`/`JustRefreshedBanner` (`:581-582`), `ChartChooser` (via `FigureTab`, §6.10), `RichTextEditor`/`DockedFormatToolbar`/`FloatingFormatToolbar` (`:3865,3881,3890`), `AuthorLine` (`:1245`), `ImportPosterModal`/`ImportConfirmReplaceModal` (via `ImportSection`), `BusyIndicator` (via `EditableExportButtons` and `ReviewTab`). In-slice panels: `CommentsPanel`, `VersionPanel`, `ReadabilityPanel`, and `ReviewTab` — inventoried below and in §6.17.
 
 ```mermaid
 flowchart LR
-  PE["PosterEditor"] -->|"renders :2332-2420"| SB["Sidebar (11 tabs)"]
+  PE["PosterEditor"] -->|"renders :2332-2420"| SB["Sidebar (11 default + 1 gated tab)"]
   SB --> L1["layout"] --> SB
   SB --> S1["style"] --> SB
   SB --> A1["authors"] --> SB
@@ -1480,6 +1480,7 @@ flowchart LR
   SB --> R1["references"] --> SB
   SB --> F1["figure (check)"] --> SB
   SB --> I2["issues (count badge)"] --> SB
+  SB -->|"VITE_ENABLE_PRESENTATION_CHECKER=true"| RV["review"] --> RVP["ReviewTab"]
   SB --> C1["comments"] --> CP["CommentsPanel :769"]
   SB --> V1["versions"] --> VP["VersionPanel :795"]
   SB --> X1["export"] --> EEB["EditableExportButtons :1162"]
@@ -1600,7 +1601,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] ✓ / ! / ✗ status glyphs — `ReadabilityPanel.tsx:992` — scan table status column
 - [ ] Line-number gutters (aria-hidden, decorative) — `ReadabilityPanel.tsx:214-235` (editor), `:324-343` (CodeView)
 
-#### `poster/Sidebar.tsx` — 11-tab editor control panel: tab rail + per-tab panels (layout/style/authors/insert/edit/refs/figure/issues/comments/versions/export)
+#### `poster/Sidebar.tsx` — 11 default tabs + flag-gated Review: tab rail + per-tab panels (layout/style/authors/insert/edit/refs/figure/issues/review/comments/versions/export)
 
 **Elements**
 
@@ -1617,10 +1618,26 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] `references` — tab-rail button (key `refs`) — `Sidebar.tsx:615` — switches to Refs tab
 - [ ] `figure` — tab-rail button (key `check`) — `Sidebar.tsx:616` — switches to Figure tab
 - [ ] `issues` — tab-rail button — `Sidebar.tsx:617` — switches to Issues tab; shows count badge (below)
+- [ ] `review` — tab-rail button — `Sidebar.tsx:635-642` — present only when `VITE_ENABLE_PRESENTATION_CHECKER=true`; switches to the Review panel
 - [ ] `comments` — tab-rail button — `Sidebar.tsx:618` — switches to Comments tab (only tab shown in `readOnly` mode, `:607-608`)
 - [ ] `versions` — tab-rail button — `Sidebar.tsx:619` — switches to Versions tab
 - [ ] `export` — tab-rail button — `Sidebar.tsx:620` — switches to Export tab
 - [ ] issue-count badge `{issueCount}` (non-interactive span inside issues tab button) — `Sidebar.tsx:634-654` — red bg if errors else yellow
+
+*Review tab (`ReviewTab`, flag-gated mount `Sidebar.tsx:839-846`; full feature in §6.17)*
+- [ ] Rollout fallback — `Sidebar.tsx:333-337` — if the flag turns off while `review` is active, returns to Layout instead of leaving an unreachable panel selected
+- [ ] Selection auto-switch exemption — `Sidebar.tsx:339-351` — finding-card jumps may select blocks without bouncing the user from Review to Edit
+- [ ] "Get a scored review of this poster — narrative, design, and content — with fix cards that jump to the block they affect. One follow-up is included." — intro copy — `ReviewTab.tsx:179-192`
+- [ ] `Review this poster` / `Reading your poster…` — primary action/busy state — `ReviewTab.tsx:193-207`; synchronous in-flight guard prevents duplicate captures and credit spends
+- [ ] "Uses one review credit, or your weekly add-on review." — entitlement disclosure — `ReviewTab.tsx:208-210`
+- [ ] `ReviewScoreHeader` + attention summary + shared `FindingCard` list — result panel — `ReviewTab.tsx:224-315`; block anchors call `onJumpToBlock`
+- [ ] `Your one follow-up` / `Request your one follow-up` — follow-up entry — `ReviewTab.tsx:317-347`
+- [ ] "This is your one follow-up — the review closes after it." / `Run the follow-up` / `Not yet` — terminal-state disclosure and confirmation — `ReviewTab.tsx:349-404`
+- [ ] "This review is closed — the follow-up was its last pass. A fresh review uses a new credit." / `Start a new review` — closed state — `ReviewTab.tsx:406-427`
+- [ ] `Get feedback on your poster` + workflow description — paywall heading/body — `ReviewTab.tsx:466-480`; user-facing copy never names the model
+- [ ] "You've used this week's reviews … A review pack works right away." — rolling-quota state — `ReviewTab.tsx:481-496`
+- [ ] `Get the review pack` / `Add weekly reviews` — checkout actions — `ReviewTab.tsx:498-523`; add-on is offered only to active-term users without the add-on
+- [ ] "Something went wrong starting checkout. Try again, or use Send Feedback so we can look into it." — checkout error — `ReviewTab.tsx:525-532`
 
 *Layout tab (`LayoutTab`, :822-1098)*
 - [ ] poster-name input (placeholder `e.g. Smith Lab — APA 2026`) — text input — `Sidebar.tsx:867-878` — local state; Enter commits via `saveTitle` → `onChangePosterTitle`; border turns red when empty / amber when dirty
@@ -4563,12 +4580,14 @@ The review pipeline accepts an uploaded PDF or image, or a native Postr poster c
 ```mermaid
 flowchart LR
   PC["PresentationChecker /presentation-checker"] --> ING["review/ingest normalizeInput"]
-  RT["Editor Review tab"] --> PC
+  RT["Editor Review tab"] --> ING
+  PC --> CARDS["shared FindingCards"]
+  RT --> CARDS
   ING --> API["POST /api/review/critique"]
   API --> CLAUDE["Anthropic structured critique"]
   API --> DB["poster_reviews + credit/quota RPCs"]
   PC --> HIST["Saved review history + resume"]
-  HIST --> API
+  HIST -->|"owner SELECT via Supabase RLS"| DB
   PPTX["PPTX input (flags off by default)"] --> RENDER["POST /api/review/render-pptx"]
   RENDER --> ING
 ```
@@ -4606,11 +4625,12 @@ flowchart LR
 | Auth & Session | `pages/Auth.tsx`, `components/AuthGuard.tsx`, `components/AuthBootstrap.tsx` (dead), `components/SessionExpiredModal.tsx`, `lib/auth.ts` | `lib/supabase`, `components/PasswordStrength`, `data/consent`, `data/checkoutIntent` |
 | Dashboard & Profile | `pages/Home.tsx`, `pages/Profile.tsx`, `pages/Gallery.tsx` (dead), `pages/GalleryEntry.tsx` (dead), `pages/AdminGallery.tsx` | `components/NewPosterButton/PosterCard/ConfirmModal/PresetEditModal/PasswordStrength`, `data/posters/gallery/feedback`, `stores/feedbackStore`, `stores/publishFlowStore` (dead), `config/features` |
 | Poster Editor Core | `pages/Editor.tsx`, `pages/Share.tsx`, `poster/blocks.tsx`, `boundsCheck.ts`, `CropOverlay.tsx`, `FloatingFormatToolbar.tsx`, `GroupFrame.tsx`, `GuidelinesPanel.tsx`, `PosterEditor.tsx`, `resizeHandles.tsx`, `RichTextEditor.tsx`, `SelectionRect.tsx`, `symbols.ts`, `templates.ts`, `constants.ts`, `UndoToast.tsx` | `stores/posterStore`, `hooks/*` (all), `components/{Sidebar→§6.8, PaletteDesigner, StaplesPrintModal, ConfirmModal, AutosaveStatusPill, OnboardingTour, InputModal, LogoPicker}`, `charts/ChartBlock`, `export/*` (print, attribution, blockLock), `data/posters/posterVersions/posterImages`, `motion/timelines/{editorEntrance,blockSelection}` |
-| Poster Sidebar (11 tabs) | `poster/Sidebar.tsx`, `poster/{CommentsPanel,VersionPanel,ReadabilityPanel}.tsx`, `poster/sidebar/{EditableExportButtons,FigureTab,ImportSection,ImportTile,PostrExportButton}.tsx` | `poster/constants/templates`, `components/{CopyDesignModal, ImportPosterModal, ImportConfirmReplaceModal, BusyIndicator, UpdateAvailableToast}`, `charts/ladder/ChartChooser`, `hooks/usePlan`, `data/billing`, `lib/apiClient`, `config/features` |
+| Poster Sidebar (11 default tabs + 1 gated Review tab) | `poster/Sidebar.tsx`, `poster/{CommentsPanel,VersionPanel,ReadabilityPanel}.tsx`, `poster/sidebar/{EditableExportButtons,FigureTab,ImportSection,ImportTile,PostrExportButton,ReviewTab}.tsx` | `poster/constants/templates`, `components/{CopyDesignModal, ImportPosterModal, ImportConfirmReplaceModal, BusyIndicator, UpdateAvailableToast}`, `charts/ladder/ChartChooser`, `review/{FindingCards,ingest,reviewApi,flags}`, `hooks/usePlan`, `data/billing`, `lib/apiClient`, `config/features` |
 | Import & Data | `import/*` (14 files), `data/*` (13 files) | `lib/apiClient`, `lib/supabase`, `hooks/useComments` (comments consumers), rendered by `components/ImportPosterModal` + `poster/Sidebar` |
 | Charts | `pages/ChartChooser.tsx`, `charts/*` (21 files) | `poster/constants` (PALETTES), `components/BusyIndicator`, `stores/feedbackStore`, `poster/PosterEditor` (poster tables) |
 | Export & Attribution | `export/*` (20 files) | `export/attribution.ts` (single ack source), `import/postrFile.ts` (.postr), `hooks/usePlan` (paidPlan seam) |
 | Manuscript → Poster | `pages/PaperToPoster.tsx`, `manuscript/*` (20 files) | `charts/ladder/ChartChooser`, `components/BusyIndicator`, `lib/apiClient`, `lib/auth`, `manuscript/figureCheck.ts` |
+| Presentation Checker | `pages/PresentationChecker.tsx`, `review/FindingCards.tsx`, `review/reviewApi.ts`, `review/flags.ts`, `review/ingest/*`, `poster/PosterSnapshotCanvas.tsx`, `poster/sidebar/ReviewTab.tsx` | `hooks/usePlan`, `stores/posterStore`, `data/{billing,checkoutIntent,posters}`, `lib/{apiClient,supabase}`, shared review types; server `apps/api/src/review.ts` + `apps/api/src/review/*`; DB `public.poster_reviews` + review RPCs |
 | Shared Components & Motion | `components/*` (30 files), `motion/*` (9 files) | `hooks/useModalTransition`, `stores/feedbackStore`, `stores/publishFlowStore`, `data/*`, `import/*`, `poster/logoPresets`, `poster/paletteTools` |
 | Stores, Hooks & Storage Keys | `stores/*` (3), `hooks/*` (7), `lib/*` (4), `config/features.ts`, `globals.d.ts` | — (base layer) |
 | SEO & Analytics | `seo/routes.json`, `seo/siteMeta.ts`, `seo/useDocumentMeta.ts`, `analytics/redactUrl.ts` | consumed by every page via `useDocumentMeta`; `App.tsx:38` |
@@ -4653,6 +4673,7 @@ flowchart LR
 | `UpdateAvailableBanner` / `JustRefreshedBanner` | Sidebar (:581-582) |
 | `StyleMiniPreview` | CopyDesignModal (:257,:263) |
 | `Sidebar` | PosterEditor (:2332-2420) |
+| `FindingCards` (`ReviewScoreHeader`, `FindingCard`) | PresentationChecker; sidebar/ReviewTab |
 | `GuidelinesPanel` | PosterEditor (:3305) |
 | `FloatingFormatToolbar` | blocks.tsx (:2537); docked variant in Sidebar Edit tab (:3865,:3890) |
 | `RichTextEditor` | Sidebar Edit tab TextBlockEditor (:3881-3888); block text editors in blocks.tsx |

@@ -1,6 +1,6 @@
 # Presentation Checker (LLM Review) — Design Spec
 
-> **Status:** Design agreed in brainstorming 2026-07-29; spec pending Gavin's review. Next step after review: implementation plan (superpowers:writing-plans).
+> **Status:** Implementation complete on `feat/presentation-checker-codex` behind rollout gates. The route remains unlinked and `noindex,nofollow`, the editor entry flag defaults off, and PPTX remains separately disabled until the external validation and launch gates below pass.
 > **LIVING DOCUMENT — keep open for revision.** This spec is intentionally not frozen at v1. Gavin builds v1 first, validates against himself (§7 Phase 0), then **expands the ground-truth panel to domain experts — professors, grad students, post-docs — for external validation** (§7.6). The architecture is designed *now* so their criteria fold in later without a rewrite (see §2.0 — rubric-as-versioned-config). Revise this doc as the rubric and validation evolve.
 > **Author flow:** brainstormed with Gavin 2026-07-29. This is the design; the build order lives in the implementation plan (which front-loads the Section 7 validation spike — see §7).
 > **Framing rule (hard):** every user-facing string names the *workflow* ("get feedback on your poster / talk"), never "AI". See `feedback_marketing_no_ai_framing`.
@@ -14,10 +14,10 @@ A standalone **reviewer for research posters and presentations** — Postr's com
 ## 1. Scope & shape
 
 ### In scope (v1)
-- **Inputs (all four at launch):**
+- **Inputs in implementation scope** (Postr-native, PDF, and image may launch first; PPTX remains a separately gated follow-on until its isolated-worker smoke passes):
   - **Postr-native poster** — richest input: we have both the rendered image *and* the structured `PosterDoc`.
   - **PDF** (single or multi-page).
-  - **PPTX** (single or multi-page deck).
+  - **PPTX** (single or multi-page deck; implemented behind client and server flags, shown as "coming next" while disabled).
   - **PNG / JPG** (flat image, vision-only).
   - **Hard page cap: < 25 pages (max 24).** Rationale: a 15-minute talk is the longest realistic slot (~15 content slides at ~1 min each), plus headroom for title, acknowledgements, references, and extra-plot slides. Over the cap → tell the user and let them trim. **Never silently truncate.**
 - **One unified critique** across **narrative + design + content**, produced by a two-stage reasoning flow (perceive → judge; §4).
@@ -357,11 +357,22 @@ The Stage-1 rubric is citation-grounded (via Consensus / paper-search, 2026-07-2
 
 ---
 
-## 10. Open items for the implementation plan
-- Confirm the exact PPTX render toolchain (LibreOffice headless on Render vs a hosted convert) and its cold-start behaviour.
-- Confirm the higher-res poster capture parameters (target px so poster text is legible to the model without blowing the resolution ceiling).
-- Confirm how the existing checkout wires a new pack SKU + a subscription add-on line item (against the Stripe billing router / webhook), so review entitlements reconcile the same way exports do.
-- Set the concrete ship-criterion numbers (§7.5) after Phase-0 round one.
-- Price the pack + weekly quota from Phase-0 / day-one cost instrumentation.
-- Design the `review/rubric/` schema (§2.0) so a criterion is addable as data — rule id, text, provenance, dimension, checklist-category, score anchors — and the issue taxonomy is the single source shared with the §7 validation harness. This is the seam that makes the §7.6 expert panel a config change.
-```
+## 10. Remaining validation and launch items
+
+The implementation decisions are now recorded in code: the renderer uses a
+flag-gated LibreOffice/Poppler path; native posters use a higher-resolution
+capture; review-pack and active-term add-on checkout/webhook paths are wired;
+and `review/rubric/` is the versioned source shared with the evaluator.
+
+The remaining items require owner input or external production state:
+
+- Build and freeze the 20-item corpus, complete Gavin's rating sheets, and run
+  the prompt-only and production pipelines against it.
+- Set the concrete §7.5 ship criteria, record agreement results and costs, and
+  sign the GO/NO-GO decision.
+- Price the live review pack and weekly quota from the recorded p50/p95 costs,
+  then configure and exercise the two live Stripe price IDs.
+- Deploy and smoke-test the isolated LibreOffice/Poppler worker before enabling
+  either PPTX flag; verify the `review-temp` Storage lifecycle policy.
+- Complete production dogfood while the page remains noindex. Only after GO,
+  link and index the route, deploy it, and verify indexability.

@@ -8,7 +8,7 @@
 
 **Tech Stack:** TypeScript monorepo (npm workspaces, Node 22) — apps/web (React 19 + Vite + react-router 8 + vitest/jsdom), apps/api (Express 4 + @anthropic-ai/sdk 0.30 + zod 3.23 + vitest/supertest), packages/shared (TS-source types only), Supabase (Postgres 17 + pgTAP + Storage `poster-assets`).
 
-**Spec:** `docs/plans/2026-07-29-presentation-checker-review.md` — currently on branch `docs/presentation-checker-spec-clean` (pushed); lands on main when that branch merges. Section references (§N) below point into it.
+**Spec:** `docs/plans/2026-07-29-presentation-checker-review.md` — included in this branch as the living design record. Section references (§N) below point into it.
 
 ## As-built status (2026-07-29)
 
@@ -66,11 +66,11 @@ Every task implicitly includes these (values verbatim from the spec):
 - **Review-pack credits never expire** (§5.3).
 - Repo conventions: ESM imports in apps/api use `.js` suffixes; the API imports **types only** from `@postr/shared` (runtime values break `node dist` — see `extractStyle.ts:22-29`); tests are vitest in both apps, pgTAP via `npm run db:test`; commit messages follow `feat(scope): …` style.
 
-## Working-directory rules (from the handoff — hard requirements)
+## Historical working-directory rules (superseded)
 
-- All work happens in the worktree **`/Users/zihaogeng/development/postr-presentation-checker`** on branch **`feat/presentation-checker`** (already created off `origin/main`). Every command below assumes this as CWD unless stated otherwise.
+- The original handoff targeted **`/Users/zihaogeng/development/postr-presentation-checker`** on **`feat/presentation-checker`**. Those locations are preserved below only as historical command transcripts. The as-built status above supersedes them: current work belongs in **`/Users/zihaogeng/development/postr-presentation-checker-codex`** on **`feat/presentation-checker-codex`**. Translate any literal `cd` or branch command below before running it.
 - **Never** commit, stash, discard, or switch branches in `/Users/zihaogeng/development/postr` (the main working directory — it holds other sessions' uncommitted work). Never touch branches `docs/presentation-checker-spec`, `feat/talk-extraction-layer`, `docs/paper-to-slides-consolidation`, `feat/account-first-checkout-flow`, or the other worktrees.
-- Phase 0 artifacts live in `docs/plans/experiments/presentation-checker/` **inside the worktree** (not the main dir, so they can be committed on `feat/presentation-checker`).
+- Phase 0 artifacts live in `docs/plans/experiments/presentation-checker/` inside the current `-codex` worktree, not the main working directory.
 
 ## Preflight (do once, before Task 1)
 

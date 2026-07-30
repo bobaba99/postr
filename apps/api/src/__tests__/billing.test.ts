@@ -9,7 +9,7 @@
  * expiry from the subscription's item-level period end), pack = one-time
  * credits (paid-only + idempotent), and the guards.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
 import {
@@ -34,6 +34,9 @@ function fakeSupabase(opts: {
   currentExpiry?: string | null;
   currentReviewAddon?: boolean;
   currentReviewAddonSubscriptionId?: string | null;
+  currentTermPlan?: string | null;
+  currentTermExpiry?: string | null;
+  currentTermStatus?: string | null;
   fulfillResult?: number | null;
   /** The user id the reconciliation lookup should resolve to (by sub/customer). */
   lookupUserId?: string | null;
@@ -74,6 +77,8 @@ function fakeSupabase(opts: {
         select(cols?: string) {
           const selectingId = cols === 'id';
           const selectingReviewAddon = cols?.includes('review_addon');
+          const selectingTerm =
+            cols?.includes('plan') && cols.includes('subscription_status');
           return {
             eq: () => ({
               single: () =>
@@ -93,6 +98,21 @@ function fakeSupabase(opts: {
                           review_addon: opts.currentReviewAddon ?? false,
                           review_addon_subscription_id:
                             opts.currentReviewAddonSubscriptionId ?? null,
+                        }
+                    : selectingTerm
+                      ? {
+                          plan:
+                            opts.currentTermPlan === undefined
+                              ? 'term'
+                              : opts.currentTermPlan,
+                          plan_expires_at:
+                            opts.currentTermExpiry === undefined
+                              ? new Date(Date.now() + DAY).toISOString()
+                              : opts.currentTermExpiry,
+                          subscription_status:
+                            opts.currentTermStatus === undefined
+                              ? 'active'
+                              : opts.currentTermStatus,
                         }
                     : { plan_expires_at: opts.currentExpiry ?? null },
                   error: null,
@@ -122,10 +142,16 @@ function fakeSupabase(opts: {
 function statefulAddOnSupabase(initial: {
   review_addon: boolean;
   review_addon_subscription_id: string | null;
+  plan?: string | null;
+  plan_expires_at?: string | null;
+  subscription_status?: string | null;
 }) {
   const state = {
     id: 'user-1',
     stripe_customer_id: 'cus_1',
+    plan: 'term' as string | null,
+    plan_expires_at: new Date(Date.now() + DAY).toISOString() as string | null,
+    subscription_status: 'active' as string | null,
     ...initial,
   };
 
@@ -425,6 +451,93 @@ describe('handleSubscriptionChange — status transitions', () => {
     expect(new Date(payload.plan_expires_at as string).getTime()).toBeLessThanOrEqual(Date.now() + 1000);
   });
 
+  it('cancels and revokes a separate active review add-on when the term becomes terminal', async () => {
+    const fake = fakeSupabase({
+      lookupUserId: 'user-1',
+      currentReviewAddon: true,
+      currentReviewAddonSubscriptionId: 'sub_addon_1',
+    });
+    const cancel = vi.fn(async () => fakeSub({
+      id: 'sub_addon_1',
+      status: 'canceled',
+      metadata: { user_id: 'user-1', sku: 'review_addon' },
+    }));
+    const stripe = {
+      subscriptions: {
+        retrieve: vi.fn(async (subscriptionId: string) =>
+          subscriptionId === 'sub_term_1'
+            ? fakeSub({
+                id: 'sub_term_1',
+                status: 'canceled',
+                metadata: { user_id: 'user-1', sku: 'term' },
+              })
+            : fakeSub({
+                id: 'sub_addon_1',
+                status: 'active',
+                metadata: { user_id: 'user-1', sku: 'review_addon' },
+              }),
+        ),
+        cancel,
+      },
+    } as unknown as Stripe;
+
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({ id: 'sub_term_1', status: 'canceled' }),
+      stripe,
+    );
+
+    expect(cancel).toHaveBeenCalledWith('sub_addon_1');
+    expect(fake.updates).toContainEqual({
+      table: 'users',
+      payload: { review_addon: false },
+      filters: {
+        id: 'user-1',
+        review_addon_subscription_id: 'sub_addon_1',
+      },
+    });
+  });
+
+  it('does not cancel the add-on for a stale terminal term event when Stripe says the term is active', async () => {
+    const fake = fakeSupabase({
+      lookupUserId: 'user-1',
+      currentReviewAddon: true,
+      currentReviewAddonSubscriptionId: 'sub_addon_1',
+    });
+    const cancel = vi.fn();
+    const stripe = {
+      subscriptions: {
+        retrieve: vi.fn(async (subscriptionId: string) => {
+          if (subscriptionId === 'sub_term_1') {
+            return fakeSub({
+              id: 'sub_term_1',
+              status: 'active',
+              metadata: { user_id: 'user-1', sku: 'term' },
+            });
+          }
+          return fakeSub({
+            id: 'sub_addon_1',
+            status: 'active',
+            metadata: { user_id: 'user-1', sku: 'review_addon' },
+          });
+        }),
+        cancel,
+      },
+    } as unknown as Stripe;
+
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({ id: 'sub_term_1', status: 'canceled' }),
+      stripe,
+    );
+
+    expect(fake.updates[0]?.payload).toMatchObject({
+      plan: 'term',
+      subscription_status: 'active',
+    });
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
   it('unpaid (terminal) also revokes', async () => {
     const fake = fakeSupabase({ lookupUserId: 'user-1' });
     await handleSubscriptionChange(fake.client, fakeSub({ status: 'unpaid' }));
@@ -636,6 +749,61 @@ describe('fulfillCheckout — review_addon (subscription)', () => {
 
     expect(fake.updates).toHaveLength(0);
   });
+
+  it('refunds and cancels an async-settled add-on when the term ended during checkout', async () => {
+    const fake = fakeSupabase({
+      currentTermPlan: 'free',
+      currentTermExpiry: null,
+      currentTermStatus: 'canceled',
+    });
+    const cancel = vi.fn(async () => fakeSub({
+      id: 'sub_addon_1',
+      status: 'canceled',
+      metadata: { user_id: 'user-1', sku: 'review_addon' },
+    }));
+    const createRefund = vi.fn(async () => ({
+      id: 're_addon_1',
+      amount: 999,
+    }));
+    const stripe = {
+      subscriptions: {
+        retrieve: vi.fn(async () => fakeSub({
+          id: 'sub_addon_1',
+          status: 'active',
+          metadata: { user_id: 'user-1', sku: 'review_addon' },
+          latest_invoice: {
+            id: 'in_addon_1',
+            payment_intent: 'pi_addon_1',
+            amount_paid: 999,
+          } as unknown as Stripe.Invoice,
+        })),
+        cancel,
+      },
+      refunds: { create: createRefund },
+    } as unknown as Stripe;
+
+    await fulfillCheckout(
+      fake.client,
+      stripe,
+      session({
+        id: 'cs_async_addon',
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+        subscription: 'sub_addon_1',
+        payment_status: 'paid',
+      }),
+    );
+
+    expect(createRefund).toHaveBeenCalledWith(
+      { payment_intent: 'pi_addon_1' },
+      { idempotencyKey: 'review-addon-ineligible:cs_async_addon' },
+    );
+    expect(cancel).toHaveBeenCalledWith('sub_addon_1');
+    expect(fake.updates).not.toContainEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ review_addon: true }),
+      }),
+    );
+  });
 });
 
 describe('handleSubscriptionChange — review_addon', () => {
@@ -711,6 +879,102 @@ describe('handleSubscriptionChange — review_addon', () => {
     expect(fake.state).toMatchObject({
       review_addon: true,
       review_addon_subscription_id: 'sub_addon_current',
+    });
+  });
+
+  it('does not let a stale active event reactivate a currently canceled add-on', async () => {
+    const fake = statefulAddOnSupabase({
+      review_addon: false,
+      review_addon_subscription_id: 'sub_addon_1',
+    });
+    const stripe = fakeStripe({
+      id: 'sub_addon_1',
+      status: 'canceled',
+      metadata: { user_id: 'user-1', sku: 'review_addon' },
+    });
+
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({
+        id: 'sub_addon_1',
+        status: 'active',
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+      }),
+      stripe,
+    );
+
+    expect(fake.state).toMatchObject({
+      review_addon: false,
+      review_addon_subscription_id: 'sub_addon_1',
+    });
+  });
+
+  it('does not let a stale terminal event revoke a currently active add-on', async () => {
+    const fake = statefulAddOnSupabase({
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_1',
+    });
+    const stripe = fakeStripe({
+      id: 'sub_addon_1',
+      status: 'active',
+      metadata: { user_id: 'user-1', sku: 'review_addon' },
+    });
+
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({
+        id: 'sub_addon_1',
+        status: 'canceled',
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+      }),
+      stripe,
+    );
+
+    expect(fake.state).toMatchObject({
+      review_addon: true,
+      review_addon_subscription_id: 'sub_addon_1',
+    });
+  });
+
+  it('cancels and refuses to reactivate a provider-active add-on when its prerequisite term is inactive', async () => {
+    const fake = statefulAddOnSupabase({
+      review_addon: false,
+      review_addon_subscription_id: 'sub_addon_1',
+      plan: 'free',
+      plan_expires_at: null,
+      subscription_status: 'canceled',
+    });
+    const cancel = vi.fn(async () => fakeSub({
+      id: 'sub_addon_1',
+      status: 'canceled',
+      metadata: { user_id: 'user-1', sku: 'review_addon' },
+    }));
+    const stripe = {
+      subscriptions: {
+        retrieve: vi.fn(async () => fakeSub({
+          id: 'sub_addon_1',
+          status: 'active',
+          metadata: { user_id: 'user-1', sku: 'review_addon' },
+        })),
+        cancel,
+      },
+    } as unknown as Stripe;
+
+    await handleSubscriptionChange(
+      fake.client,
+      fakeSub({
+        id: 'sub_addon_1',
+        status: 'active',
+        metadata: { user_id: 'user-1', sku: 'review_addon' },
+      }),
+      stripe,
+    );
+
+    expect(cancel).toHaveBeenCalledWith('sub_addon_1');
+    expect(fake.state).toMatchObject({
+      review_addon: false,
+      review_addon_subscription_id: 'sub_addon_1',
+      plan: 'free',
     });
   });
 });
