@@ -1,6 +1,6 @@
 # Postr — Feature Graph & Refactoring Checklist (v2)
 
-**Revised 2026-07-28** (second pass, same day — supersedes v1 from earlier on 2026-07-28; updated same day with the `CommentsPanel`/`VersionPanel`/`ReadabilityPanel` gap-fill — coverage is now complete). Source of truth: `apps/web/src/` (React 19 + react-router 8 + Vite SPA) plus `apps/api/src/` for the external-services map. Every file:line reference and verbatim UI string below was extracted from the code as of **2026-07-28 ~16:00 local**. If the doc and the code disagree, **the code wins** — regenerate this doc.
+**Revised 2026-07-29** (v2 second pass was 2026-07-28, superseding v1 from earlier that day; 2026-07-29 updates added §6.16 Manuscript → Slides and — documented from the `feat/presentation-checker` branch ahead of its launch gate — §6.17 Presentation Checker). Source of truth: `apps/web/src/` (React 19 + react-router 8 + Vite SPA) plus `apps/api/src/` for the external-services map. Every file:line reference and verbatim UI string below was extracted from the code as of **2026-07-28 ~16:00 local** (§6.16 and §6.17 extracted 2026-07-29; §6.17 from the feature branch). If the doc and the code disagree, **the code wins** — regenerate this doc.
 
 All paths are relative to `apps/web/src/` unless noted otherwise. All quoted strings are verbatim user-visible copy.
 
@@ -38,7 +38,7 @@ What changed in the doc:
 
 ## 3. Coverage audit
 
-Counts as reported by each inventory slice ("Files covered / Elements / Copy / Graphics" lines), plus the 2026-07-28 gap-fill pass that added `poster/CommentsPanel.tsx`, `poster/VersionPanel.tsx`, `poster/ReadabilityPanel.tsx` to the sidebar slice (+3 files, +37 elements, +63 copy, +17 graphics), plus the 2026-07-29 pass that added the **Manuscript → Slides** feature (§6.16 — the `/paper-to-slides` pipeline: wizard, deck model, design pass, styled exports; it had shipped but was never inventoried). Cross-slice host files (`pages/PaperToPoster.tsx`, `poster/sidebar/EditableExportButtons.tsx`, `components/ConsentNotice.tsx`) are counted in two slices each, so file totals double-count ~4 files.
+Counts as reported by each inventory slice ("Files covered / Elements / Copy / Graphics" lines), plus the 2026-07-28 gap-fill pass that added `poster/CommentsPanel.tsx`, `poster/VersionPanel.tsx`, `poster/ReadabilityPanel.tsx` to the sidebar slice (+3 files, +37 elements, +63 copy, +17 graphics), plus the 2026-07-29 pass that added the **Manuscript → Slides** feature (§6.16 — the `/paper-to-slides` pipeline: wizard, deck model, design pass, styled exports; it had shipped but was never inventoried), plus the 2026-07-29 `feat/presentation-checker` branch pass that added the **Presentation Checker** (§6.17 — the `/presentation-checker` standalone page, the editor `review` sidebar tab, and the review billing externals; pre-launch, route noindex + unlinked per D12). Cross-slice host files (`pages/PaperToPoster.tsx`, `poster/sidebar/EditableExportButtons.tsx`, `components/ConsentNotice.tsx`, `poster/Sidebar.tsx`) are counted in two slices each, so file totals double-count ~4 files.
 
 | Slice / feature area | Files covered | Elements | Copy strings | Graphics |
 |---|---|---|---|---|
@@ -49,8 +49,9 @@ Counts as reported by each inventory slice ("Files covered / Elements / Copy / G
 | Import + data + charts | 48 | 30 | 196 | 4 |
 | Export + manuscript (poster) | 42 | 41 | ~190 | 9 |
 | Manuscript → Slides (§6.16) | 23 (10 wizard/UI + 9 deck/model + 4 export/api) | see §6.16 | see §6.16 | icon-library set (§6.16) |
+| Presentation Checker (§6.17) | 13 web (4 UI/client + 9 ingest logic) + 12 api | see §6.17 | see §6.17 | region overlay + chip set (§6.17) |
 | Stores + hooks + lib + analytics + config | 17 | 0 (+1 browser-native beforeunload dialog) | 17 | 0 (18 storage keys + 1 BroadcastChannel) |
-| **Totals** | **222** | **674+ (+1 native dialog; +§6.16)** | **~1,539+ (+§6.16)** | **185+ (+§6.16)** |
+| **Totals** | **222** | **674+ (+1 native dialog; +§6.16, §6.17)** | **~1,539+ (+§6.16, §6.17)** | **185+ (+§6.16, §6.17)** |
 
 All of `apps/web/src/` is covered (test files excluded by rule) — the earlier `CommentsPanel`/`VersionPanel`/`ReadabilityPanel` gap was closed by the gap-fill pass.
 
@@ -116,6 +117,7 @@ flowchart LR
     R_m2p["/manuscript-to-poster"]
     R_p2pr["/paper-to-present"]
     R_p2prn["/paper-to-presentation"]
+    R_pchk["/presentation-checker"]
     R_dbg["/debug (dev only)"]
     R_auth["/auth"]
     R_billok["/billing/success"]
@@ -142,6 +144,7 @@ flowchart LR
     S_cc["ChartChooserPage"]
     S_p2p["PaperToPoster"]
     S_p2s["PaperToSlides"]
+    S_pchk["PresentationChecker"]
     S_auth["Auth"]
     S_bill["BillingResult (outcome prop)"]
     S_share["Share (PosterEditor readOnly)"]
@@ -177,6 +180,7 @@ flowchart LR
   R_cc --> S_cc
   R_p2p --> S_p2p
   R_p2s --> S_p2s
+  R_pchk --> S_pchk
   R_dbg --> S_dbg
   R_auth --> S_auth
   R_billok --> S_bill
@@ -237,6 +241,7 @@ flowchart LR
 | `/manuscript-to-poster` | redirect → `/paper-to-poster` | — | alias |
 | `/paper-to-present` | redirect → `/paper-to-slides` | — | alias (canonical is slides; changed from `/paper-to-poster`) |
 | `/paper-to-presentation` | redirect → `/paper-to-slides` | — | alias |
+| `/presentation-checker` | `pages/PresentationChecker.tsx` | yes | public but noindex (D12) — registered, unlinked pending the launch gate (§6.17) |
 | `/debug` | `pages/Debug.tsx` | no | `import.meta.env.DEV` only, dropped from prod bundle |
 | `/auth` | `pages/Auth.tsx` | no | — |
 | `/billing/success` | `pages/BillingResult.tsx` (`outcome="success"`) | no | — |
@@ -3667,6 +3672,185 @@ No UI — config only. Two permanent (308) redirects fold the alias spellings on
 
 ---
 
+### 6.17 Presentation Checker
+
+The standalone reviewer for posters AND talks (spec §1: one unified surface). Two surfaces share one pipeline: the `/presentation-checker` page (upload a poster PDF, a talk deck `.pptx` / `.pdf`, or an image) and the editor's `review` sidebar tab (the Postr-native input — the review gets both the rendered capture AND the structured PosterDoc, so its fix cards jump straight to the block). A review returns per-dimension scores (narrative / design / content, each /5), an attention summary, an optional priority call, and anchored fix cards with a personalized rewritten example each. Paywall (D4, resolved server-side): the one-time **review pack** (`review_pack`, payment-mode SKU → `grant_review_credits` +`REVIEW_PACK_CREDITS = 3`, `apps/api/src/billing.ts:54`) or the term-riding **weekly add-on** (`review_addon`, subscription-mode SKU → a 7-day-window quota enforced API-side, `REVIEW_ADDON_WEEKLY_QUOTA = 4` placeholder pending repricing, `apps/api/src/review/config.ts:54`). One follow-up is included in the initial credit and disclosed up front ("This is your one follow-up — the review closes after it."); the follow-up closes the review and a third critique is refused server-side (`409 review_closed`, `apps/api/src/review.ts:610` — terminal in the DB, not just hidden in UI). Credits are consumed AFTER a successful critique (D6) with compensation on a persistence failure — typed ingest/upstream failures never burn one. Route gating (D12): registered and public but deliberately unlinked + noindex until the launch checklist flips the SEO record to `static`. PPTX input renders server-side via LibreOffice + pdftoppm and ships last (D10 — needs the Docker-based Render service). User-visible copy names the workflow, never "AI" (D15).
+
+```mermaid
+flowchart LR
+  PCHK["PresentationChecker /presentation-checker"] --> ING["review/ingest: ingestFileForReview (pdf/pptx/image)"]
+  RT["ReviewTab (editor review tab)"] --> INGP["ingestPosterForReview (canvas capture + PosterDoc)"]
+  ING --> RC["requestCritique → POST /api/review/critique"]
+  INGP --> RC
+  PPTXB[".pptx bytes"] --> RP["POST /api/review/render-pptx (soffice + pdftoppm)"]
+  RP --> ING
+  RC -->|"402 no_credit / weekly_quota_exceeded"| PAY["Paywall panel → createCheckout(review_pack / review_addon)"]
+  RC --> RES["CritiqueResponse { reviewId, stage, critique }"]
+  RES --> FC["ReviewScoreHeader + FindingCards (shared)"]
+  FC -->|"region anchor"| OV["bbox overlay on page strip"]
+  FC -->|"block anchor"| JB["onJumpToBlock → selectOne + scrollIntoView"]
+  RES -->|"reviewId → included follow-up"| CL["stage closed — 3rd critique refused (review_closed)"]
+  RC --> DB["public.poster_reviews (service_role write; owner-SELECT RLS)"]
+```
+
+#### `apps/web/src/routes.tsx` — /presentation-checker route (registered, unlinked — D12)
+
+No UI — logic only. Lazy-imports `PresentationChecker` (`routes.tsx:108`) and mounts it at `/presentation-checker` (`routes.tsx:146`). Header comment marks it "public, code-split, noindex; registered but not linked from nav — D12" (`routes.tsx:15-17`).
+
+#### `apps/web/src/pages/PresentationChecker.tsx` — standalone review page: upload card, score header, finding cards with region overlays, one-follow-up flow, paywall panel, past-reviews list
+
+**Elements**
+- [ ] `<main>` page root + `<PublicHeader />` / `<PublicFooter />` chrome — `PresentationChecker.tsx:244-245`, `:543`
+- [ ] `<h1>` "Presentation Checker" — page heading — `PresentationChecker.tsx:247`
+- [ ] Always-mounted sr-only `<input id="review-file" type="file" accept=".pdf,.pptx,.png,.jpg" aria-label="File to review">` — the ONE input; every trigger is a real button forwarding the click (the follow-up needs it during the results phase) — `PresentationChecker.tsx:257-270`
+- [ ] Upload card `<section aria-label="Start a review">` with `busyProps(busy)` — `PresentationChecker.tsx:443-447`
+- [ ] "Choose a file" `<button>` — opens the picker — `PresentationChecker.tsx:483-489`
+- [ ] `<BusyIndicator>` — ingesting/reviewing busy state — `PresentationChecker.tsx:448-460`
+- [ ] Error `<p role="alert">` + "Try again" `<button>` — `PresentationChecker.tsx:461-473`
+- [ ] Results `<section aria-label="Review results">` — `PresentationChecker.tsx:280`
+- [ ] `<ReviewScoreHeader scores={…}>` — three /5 dimension tiles — `PresentationChecker.tsx:281`
+- [ ] "How a first-time viewer reads it" attention-summary block — `PresentationChecker.tsx:283-290`
+- [ ] "Priority call" banner (when `prioritization` present) — `PresentationChecker.tsx:292-301`
+- [ ] Page strip `<div aria-label="Reviewed pages">` — thumbnails + `data-testid="region-overlay"` bbox overlay (normalized [x, y, w, h] fractions, D7) — `PresentationChecker.tsx:305-327`
+- [ ] "Fix cards ({n})" severity-grouped `<FindingCard>` list — region anchors wire `onJump` → `setActiveRegion` — `PresentationChecker.tsx:329-367`
+- [ ] Follow-up `<section aria-label="Follow-up review">` (stage 'initial') — "Request your one follow-up" → disclosure → "Choose the revised file" / "Not yet" — `PresentationChecker.tsx:369-421`
+- [ ] Closed `<section aria-label="Review closed">` — "Start a new review" (`resetForNewReview`) — `PresentationChecker.tsx:422-438`
+- [ ] Past-reviews `<section aria-label="Your past reviews">` — signed-in only, non-empty only — `PresentationChecker.tsx:512-539`
+- [ ] `<ReviewPaywallPanel>` — replaces the working view on 402; the artifact stays in state so a successful purchase can simply re-run — `PresentationChecker.tsx:272-278`, def `:557-660`
+
+**Copy**
+- [ ] "Presentation Checker" — H1 — `PresentationChecker.tsx:247`
+- [ ] "Get feedback on your poster or talk — scores for narrative, design, and content, plus fix cards anchored to the exact spots to change." — lede — `PresentationChecker.tsx:248-251`
+- [ ] "Upload a poster PDF, talk deck, or image" — upload card title — `PresentationChecker.tsx:476-478`
+- [ ] "PDF, PPTX, PNG, or JPG — up to 24 pages. Nothing is published; the review is only for you." — upload helper — `PresentationChecker.tsx:479-482`
+- [ ] "Choose a file" — upload button label — `PresentationChecker.tsx:488`
+- [ ] "Preparing your file for review…" / "Reading your poster or talk…" — busy labels (ingesting / reviewing) — `PresentationChecker.tsx:449-454`
+- [ ] "Large files can take a moment." / "A full review usually takes under a minute." — busy hints — `PresentationChecker.tsx:455-459`
+- [ ] "Working on a poster in Postr? Open it in the editor and run the review from the new review tab in the sidebar." — editor cross-link (signed-in only; "review" bolded) — `PresentationChecker.tsx:491-500`
+- [ ] "You're browsing as a guest — upload a file to start; you'll create a free account to run the review." — guest note — `PresentationChecker.tsx:502-507`
+- [ ] "How a first-time viewer reads it" — attention heading — `PresentationChecker.tsx:284-286`
+- [ ] "Priority call" — prioritization label — `PresentationChecker.tsx:294-296`
+- [ ] "Fix cards ({result.critique.findings.length})" — findings heading — `PresentationChecker.tsx:330-332`
+- [ ] "Your one follow-up" — follow-up heading — `PresentationChecker.tsx:374-376`
+- [ ] "Revise against these cards, then run the follow-up — it checks your revision against these exact findings." — follow-up body — `PresentationChecker.tsx:379-382`
+- [ ] "Request your one follow-up" — follow-up arm button — `PresentationChecker.tsx:388`
+- [ ] "This is your one follow-up — the review closes after it." — disclosure (`role="note"`) — `PresentationChecker.tsx:393-395`
+- [ ] "Pick the revised file — the follow-up reads it against the findings above." — disclosure body — `PresentationChecker.tsx:396-399`
+- [ ] "Choose the revised file" / "Not yet" — disclosure buttons — `PresentationChecker.tsx:409`, `:416`
+- [ ] "This review is closed — the follow-up was its last pass. A fresh review uses a new credit." — closed body — `PresentationChecker.tsx:427-430`
+- [ ] "Start a new review" — reset button — `PresentationChecker.tsx:436`
+- [ ] "Try again" — error dismiss — `PresentationChecker.tsx:471`
+- [ ] `INGEST_ERROR_MESSAGES` — one typed line per failure kind (never a silent truncation): "That file has more than 24 pages — trim it to 24 pages or fewer and try again." (too-many-pages) · "That file type is not supported — upload a PDF, PPTX, PNG, or JPG." (unsupported-mime) · "That file is too large to review — export a lighter copy and try again." (file-too-large) · "We couldn't read that file — try exporting it again from the app that made it." (unreadable-file) · "That file rendered blank — check it opens correctly and try again." (blank-render) · "Something went wrong uploading your file. Try again, or use Send Feedback if it keeps happening." (upload-failed) · "Something went wrong preparing your file. Try again, or use Send Feedback if it keeps happening." (server-render-failed) — `PresentationChecker.tsx:73-88`
+- [ ] Critique-error mapping: "That review is already closed — start a new one instead." (`review_closed`) · "That review is not ready for its follow-up yet — run the initial review first." (`review_not_complete`) · "One of the page images is too large to review — export a lighter copy and try again." (`image_too_large`) · 429 arrives with the human wait already in the message · generic "Something went wrong reviewing your file. Try again, or use Send Feedback if it keeps happening." — `PresentationChecker.tsx:90-108`
+- [ ] "Your past reviews" — history heading — `PresentationChecker.tsx:513-516`
+- [ ] `STAGE_LABELS`: "Initial review" / "Follow-up" / "Closed" — history stage labels — `PresentationChecker.tsx:66-70`
+- [ ] `SOURCE_LABELS`: "Postr poster" / "PDF" / "Slides" / "Image" — fallback filename by source kind — `PresentationChecker.tsx:59-64`
+- [ ] "Narrative {n}/5 · Design {n}/5 · Content {n}/5" — history score line — `PresentationChecker.tsx:528-533`
+- [ ] Paywall (`aria-label="Unlock reviews"`): "Get feedback on your poster or talk" — heading — `PresentationChecker.tsx:587-593`
+- [ ] "A review scores your narrative, design, and content, then walks you through fix cards anchored to the exact spots to change — each with a rewritten example from your own content. One follow-up review is included, so you can check your revision." — paywall body — `PresentationChecker.tsx:594-599`
+- [ ] "You've used this week's reviews — your next weekly review opens up in {formatRetryAfter(retryAfterSec)}. A review pack works right away." — weekly-quota line (`role="status"`; the wait clause only with `retryAfterSec`) — `PresentationChecker.tsx:600-611`
+- [ ] "Get the review pack" — `buy('review_pack')` — `PresentationChecker.tsx:613-619`
+- [ ] "Add weekly reviews to your term" — `buy('review_addon')`, term holders only (D4 — without an active term the weekly quota unlocks nothing) — `PresentationChecker.tsx:620-627`
+- [ ] "The weekly review add-on rides on the semester term — start the term to add it." — non-term note (`<a href="/pricing">`) — `PresentationChecker.tsx:628-636`
+- [ ] "You're working as a guest — you'll create a free account (or sign in with Google) first, so your purchase and reviews stay yours across devices." — paywall guest note — `PresentationChecker.tsx:638-644`
+- [ ] "Something went wrong starting checkout. Try again, or use Send Feedback so we can look into it." — checkout-failure alert — `PresentationChecker.tsx:645-650`
+- [ ] "Back to the upload" — paywall dismiss — `PresentationChecker.tsx:651-657`
+
+**Graphics**
+- [ ] `data-testid="region-overlay"` — absolute orange bbox highlight (`border-[#f97316] bg-[#f9731622]`) over the active page thumbnail — `PresentationChecker.tsx:313-324`
+
+Logic notes (this file owns the standalone flow):
+- `startReview(job, { reviewId })` — the ONE path every review takes: ingest → critique; ingest failures map to typed messages, 402 → paywall (phase back to 'idle'), everything else console-logged first then a generic line (the export-flow house rule) — `PresentationChecker.tsx:163-219`.
+- `tempPathsRef` — review-temp storage paths of every ingested page, deleted fire-and-forget on unmount and on "Start a new review" (`cleanupReviewTemp` — never awaited; navigation must not wait on storage) — `PresentationChecker.tsx:127-130`, `:146-155`, `:227-239`.
+- Follow-up — "Choose the revised file" sets `pendingFollowup` and reuses the always-mounted input; `handleFile` forwards `result.reviewId` — `PresentationChecker.tsx:221-225`, `:400-418`.
+- Entitlements are NOT pre-gated here — the server resolves them (D4); the client plan read only decides which checkout path a button takes (guest → stash + `/auth?plan={sku}`, signed-in → `createCheckout`) — `PresentationChecker.tsx:19-22` header, `:572-584`.
+- History — `listMyReviews()` on mount (signed-in, non-guest) + after each completed review — `PresentationChecker.tsx:132-144`, `:206`.
+
+#### `apps/web/src/review/FindingCards.tsx` — shared score header + finding card (BOTH review surfaces — one component so they can never drift)
+
+**Elements**
+- [ ] `<ReviewScoreHeader>` — `aria-label="Review scores"`; three tiles `data-testid="score-narrative|score-design|score-content"` — `FindingCards.tsx:116-143`
+- [ ] `<FindingCard>` — whole card becomes `role="button"` + Enter/Space keyboard jump when `onJump` set — `FindingCards.tsx:59-113`
+- [ ] dimension + severity + action `<Chip>`s — `FindingCards.tsx:48-57`, `:89-93`
+- [ ] personalized-example `<blockquote>` — `FindingCards.tsx:100-102`
+
+**Copy**
+- [ ] `DIMENSION_LABELS`: "Narrative" / "Design" / "Content" — `FindingCards.tsx:21-25`
+- [ ] `SEVERITY_LABELS`: "High impact" / "Medium" / "Polish" — `FindingCards.tsx:27-31`
+- [ ] `ACTION_LABELS`: "Cut" / "Demote to appendix" / "Show visually" / "Condense" / "Keep as primary" / "Add" — `FindingCards.tsx:39-46`
+- [ ] "Tradeoff: {tradeoff}" — optional reviewer tradeoff line — `FindingCards.tsx:103-107`
+- [ ] "→ click to see it" — jump hint on `onJump` cards — `FindingCards.tsx:108-110`
+- [ ] "{score}/5" — per-dimension score text — `FindingCards.tsx:137-139`
+
+**Graphics** — none directly; chips are colored text (`SEVERITY_COLORS` `#f38ba8` / `#f9e2af` / `#89b4fa` — `FindingCards.tsx:33-37`).
+
+#### `apps/web/src/poster/sidebar/ReviewTab.tsx` — the editor `review` tab: Postr-native review with block-jump fix cards
+
+**Elements**
+- [ ] "Review this poster" `<button>` — runs capture + critique; disabled while `!doc || !posterId || running` — `ReviewTab.tsx:204-218`
+- [ ] `<BusyIndicator inline label="Reading your poster…">` — busy button state — `ReviewTab.tsx:213-215`
+- [ ] Failure `<div role="alert">` — `ReviewTab.tsx:225-230`
+- [ ] `<ReviewScoreHeader>` + "How a first-time viewer reads it" + "Priority call" + severity-grouped `<FindingCard>`s — block anchors wire `onJump` → `onJumpToBlock(blockId)` (`jumpFor`) — `ReviewTab.tsx:232-306`, `:160-164`
+- [ ] Follow-up block — "Request your one follow-up" → disclosure → "Run the follow-up" / "Not yet" — `ReviewTab.tsx:308-359`
+- [ ] "Start a new review" — `startFresh` (temp cleanup + `run()`) — `ReviewTab.tsx:360-375`
+- [ ] `<PaywallPanel>` — reached from the plan pre-gate (`!plan.canReview && !result`) OR a 402 — the pre-gate never hides a mid-review result (the included follow-up must stay reachable at zero credits); never flashes while the plan loads — `ReviewTab.tsx:176-190`, def `:388-447`
+
+**Copy**
+- [ ] "Get a scored review of this poster — narrative, design, and content — with fix cards that jump to the block they affect. One follow-up is included." — tab intro — `ReviewTab.tsx:199-203`
+- [ ] "Review this poster" — run button label — `ReviewTab.tsx:216`
+- [ ] "Reading your poster…" — busy label — `ReviewTab.tsx:214`
+- [ ] "Uses one review credit, or your weekly add-on review." — credit hint — `ReviewTab.tsx:219-221`
+- [ ] "Something went wrong. Try again, or use Send Feedback so we can look into it." — failure line — `ReviewTab.tsx:226-229`
+- [ ] "Revise the poster, then run the follow-up — it checks your revision against these exact findings." — follow-up body — `ReviewTab.tsx:315-318`
+- [ ] "Request your one follow-up" — follow-up arm button — `ReviewTab.tsx:324`
+- [ ] "This is your one follow-up — the review closes after it." — disclosure — `ReviewTab.tsx:329-331`
+- [ ] "The follow-up re-reads your poster exactly as it is now — make your edits first." — disclosure body — `ReviewTab.tsx:332-335`
+- [ ] "Run the follow-up" / "Not yet" — disclosure buttons — `ReviewTab.tsx:346`, `:353`
+- [ ] "This review is closed — the follow-up was its last pass. A fresh review uses a new credit." — closed body — `ReviewTab.tsx:362-365`
+- [ ] "Start a new review" — closed reset button — `ReviewTab.tsx:372`
+- [ ] Paywall: "Get feedback on your poster" — heading — `ReviewTab.tsx:409-411`
+- [ ] "A review scores narrative, design, and content, then gives you fix cards that jump to the exact block to change — each with a rewritten example from your own poster. One follow-up review is included." — paywall body — `ReviewTab.tsx:412-416`
+- [ ] "You've used this week's reviews — your next weekly review opens up in {formatRetryAfter(retryAfterSec)}. A review pack works right away." — quota line (`role="status"`) — `ReviewTab.tsx:417-428`
+- [ ] "Get the review pack" / "Add weekly reviews" — SKU buttons (add-on term-holders only) — `ReviewTab.tsx:429-438`
+- [ ] "Something went wrong starting checkout. Try again, or use Send Feedback so we can look into it." — checkout-failure alert — `ReviewTab.tsx:439-445`
+
+**Graphics** — none.
+
+Logic notes:
+- `inFlightRef` — synchronous check-and-set lock on `run()`: React batches `running`, so a state guard alone would allow duplicate captures and, critically, duplicate credit spends — `ReviewTab.tsx:83-86`, `:102-111`.
+- Guest `buy()` stashes the SKU (`stashCheckoutIntent`) and routes account-first to `/auth?plan={sku}` — same as the export paywall — `ReviewTab.tsx:143-158`.
+- `tempPathsRef` — capture paths deleted fire-and-forget on unmount and on "Start a new review" — `ReviewTab.tsx:87-100`, `:166-174`.
+
+#### `apps/web/src/poster/Sidebar.tsx` + `apps/web/src/poster/PosterEditor.tsx` — review tab wiring (host files, counted in §6.8 / §6.7)
+
+- [ ] `'review'` in the `SidebarTab` union — `Sidebar.tsx:81`
+- [ ] Rail entry `['review', 'review']` — after `['issues', 'issues']`, before `['comments', 'comments']`; absent from the `readOnly` (comments-only) rail — `Sidebar.tsx:625-627` vs `:615-616`
+- [ ] Panel mount `{tab === 'review' && (<ReviewTab onJumpToBlock={props.onJumpToBlock} />)}` — `Sidebar.tsx:783-785`
+- [ ] Auto-switch exemption `if (tab === 'review') return;` — the review tab is never yanked away on selection: finding clicks select blocks, and without the exemption the first click would bounce the sidebar to Edit — mirrors the `'check'` image/chart precedent at `Sidebar.tsx:337` — `Sidebar.tsx:338-342`
+- [ ] `onJumpToBlock` prop — `selectOne(id)` + `scrollIntoView({ behavior: 'smooth', block: 'center' })` on `[data-block-id]` — `PosterEditor.tsx:2408-2414`
+
+#### `apps/web/src/review/reviewApi.ts` — critique API client — no UI, logic only
+
+`requestCritique` wraps `POST /api/review/critique` in `postJson` and translates the two statuses the UI handles specially: 402 → `ReviewPaymentRequiredError` (`reason` `'no_credit' | 'weekly_quota_exceeded'`, optional `retryAfterSec` — tells the panel which pitch to show); 429 rethrown as an `ApiError` whose message carries the human wait from `formatRetryAfter`; everything else propagates the route's snake_case error code (`reviewApi.ts:1-17` header, `:48-58`, `:60`). `listMyReviews` reads `public.poster_reviews` directly via supabase-js — the table's RLS is owner SELECT-only (D3), all writes go through the API's service_role client, so there is nothing to wrap (`reviewApi.ts:18-21` header, `:127`). Response shape `CritiqueResponse { reviewId, stage: 'initial' | 'closed', critique }` (`reviewApi.ts:41-45`).
+
+#### `apps/web/src/review/ingest/*` — client ingest layer — no UI, logic only
+
+Nine modules (`index.ts`, `types.ts`, `normalizeInput.ts`, `guards.ts`, `fromPoster.ts`, `fromPdf.ts`, `fromPptx.ts`, `fromImage.ts`, `uploadReviewPage.ts`): normalize a PDF/PPTX/PNG/JPG (or the live poster) into `NormalizedArtifact { pages, posterDoc?, meta }` ≤ 24 pages; each page lands in the `poster-assets` bucket at `{userId}/review-temp/{sessionId}/page-{n}.jpg` (concurrent ingests never collide) with a 10-minute signed URL (`SIGNED_URL_TTL_SEC = 600`, `uploadReviewPage.ts:20-23`) that the critique call re-fetches through the SSRF guard; failures throw the typed `IngestError` kinds the page maps to `INGEST_ERROR_MESSAGES` (spec §3: typed errors, never silent nulls); `cleanupReviewTemp` best-effort deletes the temp objects (`ingest/index.ts:61`). `fromPoster.ts` is the Postr-native path (canvas capture + structured PosterDoc — the richest input; the standalone page never mounts `#poster-canvas`, so it cannot run there — `PresentationChecker.tsx:5-8` header). `fromPptx.ts` routes through `POST /api/review/render-pptx`.
+
+#### `apps/web/src/seo/routes.json` + `apps/web/vercel.json` — noindex record + edge config (D12)
+
+No UI — data/config only.
+- [ ] `app` record `"/presentation-checker"` — title "Presentation Checker — Poster & Talk Review | Postr", description "Upload a poster or talk (PDF, PPTX, PNG) and get narrative, design, and content scores with anchored, personalized fix cards you apply by hand.", robots "noindex,nofollow" — `routes.json:196-200`; consumed defensively via `APP_ROUTE_META['/presentation-checker'] ?? null` — `PresentationChecker.tsx:111`
+- [ ] SPA-shell rewrite `/presentation-checker` → `/` — `vercel.json:40`
+- [ ] `X-Robots-Tag: noindex, nofollow` header on `/presentation-checker` — `vercel.json:75-78`
+
+#### Gating note (D12) — registered, unlinked; the static flip is the launch checklist
+
+- [ ] The route is registered but deliberately NOT linked from nav; the SEO record stays an `app` (noindex) entry until the launch checklist flips it to a prerendered static record — header comment `PresentationChecker.tsx:13-17`.
+- [ ] Launch checklist (`docs/plans/experiments/presentation-checker/launch-checklist.md`, GO-only): move the record to `static` with `index,follow` + h1/copy, prerender + sitemap via the normal build, add the `PublicHeader` nav entry + `/pricing` review tiers/links, extend `BillingResult`'s granted check with `|| plan.canReview`, create the LIVE Stripe prices (`STRIPE_PRICE_REVIEW_PACK` / `STRIPE_PRICE_REVIEW_ADDON`), price `REVIEW_PACK_CREDITS` / `REVIEW_ADDON_WEEKLY_QUOTA` from day-one `[review.critique]` cost lines, and ship the PPTX Docker service (D10) before enabling the PPTX input.
+
+---
+
 ### 6.13 Shared Components & Motion
 
 Everything reusable under `components/` + the `motion/` animation module. Cross-referenced elsewhere: `ConsentNotice` (§6.1), `AuthGuard`/`AuthBootstrap`/`SessionExpiredModal` (§6.5), `PricingSection` (§6.3).
@@ -4536,7 +4720,7 @@ No UI directly; all values below are user-visible (tab titles, search snippets, 
 - [ ] "/cookies" — title "Cookie Policy | Postr", description, h1 "Cookies Policy", 1 copy line — `:78-86`
 - [ ] "/terms" — title "Terms of Service | Postr", description, h1 "Terms of Service", 1 copy line — `:87-95`
 - [ ] "/paper-to-poster" — title "Paper to Poster: Turn a Manuscript into One | Postr", description, h1 "From paper to poster", 4 copy lines — `:96-107`
-- [ ] app routes (all noindex,nofollow): "/auth" "Sign in | Postr" · "/dashboard" "My posters | Postr" · "/profile" "Profile and settings | Postr" · "/debug" "Debug | Postr" · "/admin/gallery" "Gallery moderation | Postr" · "/p" "Poster editor | Postr" — `:109-139`
+- [ ] app routes (all noindex,nofollow): "/auth" "Sign in | Postr" · "/dashboard" "My posters | Postr" · "/profile" "Profile and settings | Postr" · "/presentation-checker" "Presentation Checker — Poster & Talk Review | Postr" (D12 — registered, unlinked; §6.17) · "/debug" "Debug | Postr" · "/admin/gallery" "Gallery moderation | Postr" · "/p" "Poster editor | Postr" — `:173-235`
 - [ ] "/404" — title "Page not found | Postr", description "That page does not exist.", h1 "Page not found", 1 copy line — `:140-148`
 - [ ] Note: no entries for `/gallery`, `/why-posters` app, `/billing/*`, `/s`, or any `/fr` legal route — FR pages reuse the EN route meta (`TermsFr.tsx:23`, `PrivacyFr.tsx:18`, `CookiesFr.tsx:19`), so FR pages carry EN titles/descriptions and the EN canonical — SEO-relevant drift to flag (§10).
 
@@ -4696,6 +4880,8 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 | `public.poster_versions` | `data/posterVersions.ts` (⌘S saveVersionNow; Versions tab) | MAX_VERSIONS_PER_POSTER = 20 |
 | `public.user_logos` | `data/userLogos.ts`, LogoPicker "My Logos" | max 25/account, 10 MB each |
 | `public.talk_waitlist` | `data/talkWaitlist.ts` ← PricingSection "Join the waitlist" | shipped 2026-07-28 (`20260728160000_talk_waitlist.sql`) |
+| `public.poster_reviews` | `review/reviewApi.ts` (`listMyReviews` — past-reviews list, §6.17) | owner-SELECT-only RLS (D3) — ALL writes are API service_role after a successful critique (success-only, D16); stage machine initial → followup → closed; `20260729120000_poster_reviews.sql` |
+| `public.users` review columns (`review_credits`, `review_addon`, `review_addon_subscription_id`) | `hooks/usePlan` (`reviewCredits` / `canReview`, §6.17) | SERVER-OWNED like plan/credits — folded into `guard_billing_columns()` (10 guarded columns); `20260729120000_poster_reviews.sql` |
 | billing fulfillment rows | written ONLY by the Stripe webhook (service_role) | `20260728130000_billing_fulfilled_sessions.sql`, `20260728140000_consume_export_credit.sql`, `20260728150000_grant_export_credits.sql`, `20260728170000_billing_subscription.sql`, `20260728190000_billing_refunds.sql` |
 | `public.presets` | — | **UNUSED** (`20260408000200_presets.sql`; app presets live in localStorage `postr.style-presets`) — §10 |
 | `public.authors_lib` / `public.institutions_lib` / `public.references_lib` | — | **UNUSED** (`20260408000300_library.sql` — PRD §21 library never wired to UI) — §10 |
@@ -4706,6 +4892,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 - [ ] `is_gallery_admin` — Home Admin link gate, AdminGallery gate
 - [ ] admin retract/unretract — `data/gallery.ts` (`adminRetractEntry`, `adminUnretractEntry`) ← AdminGallery
 - [ ] `consume_export_credit` / `grant_export_credits` — server-side only (billing webhook + `/billing/consume-credit`)
+- [ ] `consume_review_credit(uuid)` / `grant_review_credits(uuid, integer)` — server-side only (§6.17: critique consume AFTER success + `review_pack` webhook grant; mirror the export-credit RPCs — security definer, pinned search_path, atomic conditional UPDATE, service_role only; `20260729120000_poster_reviews.sql`)
 
 **Storage buckets**
 - [ ] `poster-assets` — PRIVATE, signed URLs (`storage://` refs resolved by `hooks/useStorageUrl`); poster images (`data/posterImages.ts`), thumbnails (`data/thumbnails.ts`), import/vision upload staging
@@ -4733,7 +4920,11 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 | `POST /billing/refund` | `data/billing.ts:59` ← Profile (`requestRefund('term'|'pack')`) | Term 14-day / pack unused-credit refunds |
 | `POST /billing/portal` | `data/billing.ts` ← Profile "Manage subscription ↗" | Stripe customer portal URL |
 | `POST /billing/webhook` | **Stripe → server only** (`apps/api/src/billing.ts:69`, raw body, signature-verified) | Fulfills checkouts: `checkout.session.completed` + `checkout.session.async_payment_succeeded`; the ONLY writer of plan/credits |
+| `POST /api/review/critique` | `review/reviewApi.ts` (`requestCritique`) ← PresentationChecker + ReviewTab (§6.17) | Presentation Checker critique — initial + included follow-up (Claude, below); 24-page hard cap (typed `too_many_pages`); 402 `no_credit` / `weekly_quota_exceeded`; credit consume AFTER success (D6, compensated on persistence failure); burst 2×quota + 20/day |
+| `POST /api/review/render-pptx` | `review/ingest/fromPptx.ts` ← PresentationChecker (§6.17) | PPTX → page JPEGs via LibreOffice + poppler (`review/pptx.ts`); SSRF-guarded re-fetch, 413 `pptx_too_large` (50 MB), 2 burst / 10 day; ingest utility — NO credit consumed (the critique charges) |
 | `POST /cron/cleanup-anonymous-users` | scheduled caller (auth-gated cron) | Guest-account GC |
+
+- [ ] **PPTX toolchain (D10)** — `apps/api/src/review/pptx.ts` shells `soffice --convert-to pdf` + `pdftoppm -jpeg -r 150` in a per-request temp dir (always removed in `finally`). Render's native Node image has neither binary — deploy the API as a Docker-based service with `libreoffice-impress` + `poppler-utils` (or swap a hosted-convert `PptxRenderer` behind the same interface). PPTX ships last — it must never block the other three input kinds.
 
 ### Stripe (billing provider)
 
@@ -4742,6 +4933,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 - [ ] Checkout success/cancel URLs → `/billing/success`, `/billing/cancel` (`pages/BillingResult.tsx`)
 - [ ] Currently wired to the Stripe SANDBOX; production flip is env-vars only (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, price ids) — `apps/api/src/billing.ts:20-22`
 - [ ] Client fallback: `LINK_MANAGE_URL = "https://link.com"` (`data/billing.ts:67`)
+- [ ] Review SKUs (§6.17, pre-launch): `review_pack` — one-time `payment` mode → webhook `grant_review_credits` (+`REVIEW_PACK_CREDITS = 3`, `apps/api/src/billing.ts:54,594-609`); `review_addon` — `subscription` mode riding the term → `users.review_addon = true` + `review_addon_subscription_id` (`billing.ts:550-588`). Price ids from `STRIPE_PRICE_REVIEW_PACK` / `STRIPE_PRICE_REVIEW_ADDON` (`billing.ts:1284-1285`); sku union `'term' | 'pack' | 'review_pack' | 'review_addon'` (`billing.ts:48`). Review-SKU refunds stay manual via the Stripe dashboard (D8 — deferred, no code).
 
 ### Vercel Web Analytics
 
@@ -4752,6 +4944,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 ### Anthropic (Claude)
 
 - [ ] Model `claude-sonnet-4-5-20250929` — `apps/api/src/import.ts:914,975,1016,1058,1099,1152,1208` (vision extraction, small-region verification, logo splitting, author/reference parsing) and `apps/api/src/extractStyle.ts:220` (copy-a-design). Reached only via `/api/import/*` endpoints above; web copy: "Calling Claude Vision…" (`import/imageImport.ts:257`)
+- [ ] Same model `claude-sonnet-4-5-20250929` as `REVIEW_MODEL` (`apps/api/src/review/config.ts:13`) — the Presentation Checker two-stage rubric critique via `POST /api/review/critique` (§6.17); `REVIEW_MAX_TOKENS = 8192`, `REVIEW_TIMEOUT_MS = 60_000` with `maxRetries: 0`; every completed critique logs token usage with the `[review.critique]` tag so the pack price and weekly quota are set from real numbers (`apps/api/src/review.ts:31-33`).
 
 ### OpenAI
 
@@ -4797,6 +4990,6 @@ Things that exist in code but are unreachable, unused, stale, or drifted — che
 
 ## 11. Maintenance note
 
-- This doc reflects the code as of **2026-07-28 ~16:00 local** (post-billing, post-`/pricing`, post-FR-legal, post-ConsentNotice).
+- This doc reflects the code as of **2026-07-28 ~16:00 local** (post-billing, post-`/pricing`, post-FR-legal, post-ConsentNotice); §6.16 reflects main as of 2026-07-29 and §6.17 (Presentation Checker) reflects the `feat/presentation-checker` branch as of 2026-07-29 — pre-launch, route noindex + unlinked per D12.
 - **Regenerate or update this doc whenever**: a route is added/removed/redirected in `routes.tsx` (+ `seo/routes.json` + `vercel.json` aliases), a store gains/losses a field or action, a feature folder under `poster/`, `components/`, `import/`, `export/`, `manuscript/`, `charts/`, `data/` changes shape, a feature flag flips (`config/features.ts`), or a storage key is added (update §8 AND the `pages/Profile.tsx:290-295` sweep).
 - When you check off a feature's boxes during a removal, also strike its rows in §7, its keys in §8, and its externals in §9 — then add any newly-orphaned leftovers to §10.

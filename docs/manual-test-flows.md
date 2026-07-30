@@ -124,6 +124,8 @@ Suggested UIMax run per route (map to the audit dimensions):
 | E | **Permanent free** (0 credits, no term) | Any of C/D with plan='free' | Paywall shown, forced-signup branch |
 | F | **Paid — active term** | C/D that completed a `term` checkout in Stripe sandbox | Unlocked exports, renewal, cancel, revoke, **delete-with-live-sub** |
 | G | **Paid — export pack** (credits>0) | C/D that completed a `pack` checkout | Credit consume, credit hint, idempotency |
+| H | **Paid — review pack** (`review_credits`>0) | C/D that completed a `review_pack` checkout in Stripe sandbox | Review purchase, initial→follow-up loop, third-refused, no-charge-on-failure |
+| I | **Term + review add-on** (`review_addon=true`) | F that also completed a `review_addon` checkout | Weekly-quota reviews, quota exhaustion + window reset |
 
 **Before deleting or buying anything, write down the `user_id` (Supabase Auth) and poster IDs** — you can't query them after deletion. Keep the Stripe sandbox dashboard + link.com open in another tab.
 
@@ -636,3 +638,104 @@ The standalone talk flow — sibling of `/paper-to-poster`. One chat-style wizar
 - [ ] **§32 rebuild guard** — `setStyledDeck(null)` reset (display gap) + `designPassSeq` (response race) together prevent stale styled deck A shipping over deck B. Regression-prone.
 - [ ] **§33 re-import** — Postr's 8 appended template slides must NOT be reported as skipped; subtraction capped at 8; identity by `<p:cSld name>` marker, not position.
 - [ ] **§29 PDF** — free PDF is the full polished deck with the ack-slide mark and **no utility slides**; distinct from the always-watermarked editor PDF in §22 (different pipeline).
+
+---
+
+# PART 7 — PRESENTATION CHECKER (`/presentation-checker` + editor `review` tab)
+
+The standalone reviewer for posters and talks — **pre-launch: route registered, noindex, unlinked from nav (D12)**. Two surfaces over one pipeline: the `/presentation-checker` page (upload PDF / PPTX / PNG / JPG, ≤ 24 pages) and the editor sidebar **review** tab (Postr-native; fix cards jump to the block). Money: one-time **review pack** (`review_pack` → 3 credits, never expire) or the term-riding **weekly add-on** (`review_addon` → weekly quota). One follow-up is included in every review's initial credit; the follow-up closes the review and a third critique is refused server-side. Credits are consumed only AFTER a successful critique — typed failures never burn one.
+
+> **All copy in quotes is verbatim from the code** — if what you see on screen differs, that's a finding.
+> **Route note:** nothing links to `/presentation-checker` yet — type the URL directly.
+
+## ⚠ Can't fully test from the app UI (needs Stripe sandbox / SQL / server env / Docker)
+
+These steps have **no Postr UI** — don't waste time clicking for them. Drive them from the Stripe sandbox dashboard, by querying Supabase directly, or on the API host.
+
+- [ ] **Webhook fulfillment for the two review SKUs** — grant happens ONLY via the `checkout.session.completed` webhook: `review_pack` → `grant_review_credits` RPC (+3); `review_addon` → `users.review_addon=true` + `review_addon_subscription_id`. The green success page never provisions.
+- [ ] **`users.review_credits` / `review_addon` / `review_addon_subscription_id`** — server-owned (guard trigger rejects client writes — guard-blocked from the client). Verify every grant/consume by direct SQL (`select review_credits, review_addon from users where id = …`).
+- [ ] **The add-on weekly window** — a 7-day sliding window enforced API-side (in-memory rate limiter, `REVIEW_ADDON_WEEKLY_QUOTA`); there is **no per-review decrement column to inspect**. Only observable as the 402 `weekly_quota_exceeded` (+ `retryAfterSec`) once exhausted.
+- [ ] **API env requirements** — `ANTHROPIC_API_KEY` (critique 500s `provider_not_configured` without it), `STRIPE_PRICE_REVIEW_PACK` / `STRIPE_PRICE_REVIEW_ADDON` (checkout 400s without them — the error names the sku list and the missing price-id env var).
+- [ ] **PPTX input** — **not yet testable in prod**: `/api/review/render-pptx` shells out to LibreOffice `soffice` + `pdftoppm`, absent from Render's native Node image; the Docker-based service ships last (D10). Dev needs local LibreOffice + poppler.
+- [ ] **Review-SKU refunds** — manual via the Stripe dashboard (deferred, no code) — unlike term/pack there is no in-app refund path.
+- [ ] **`[review.critique]` cost lines** — per-critique token usage lives in the API logs, not the app.
+
+---
+
+## 34. Buy the REVIEW PACK (one-time, 3 review credits) — signed-in permanent
+
+- **Set up:** Account **E** (permanent free, `review_credits=0`), signed in; API env per the ⚠ section.
+- [ ] Type `/presentation-checker` into the URL bar (unlinked — D12). Page: H1 **"Presentation Checker"** + lede **"Get feedback on your poster or talk — scores for narrative, design, and content, plus fix cards anchored to the exact spots to change."**
+- [ ] Upload any poster PDF → the server 402s (zero credits) → the paywall panel replaces the working view: heading **"Get feedback on your poster or talk"**, body **"A review scores your narrative, design, and content, then walks you through fix cards anchored to the exact spots to change — each with a rewritten example from your own content. One follow-up review is included, so you can check your revision."**
+- [ ] Click **"Get the review pack"** → full-page redirect to Stripe hosted checkout (mode `payment`, no subscription). Pay with a **test card**.
+- [ ] Return to `/billing/success` → **⚠ known gap:** the `granted` check only knows term/export credits — a review buyer sees the **"Payment received. Your access will appear shortly — head back in and it'll be ready."** fallback even after the grant lands (the launch checklist extends it with `|| plan.canReview`). Not a failed purchase — verify by SQL.
+- [ ] Back on `/presentation-checker`, re-run the upload → review now completes.
+- **Edges:**
+  - [ ] **Replay the webhook event** → idempotent, credits NOT double-granted (`billing_fulfilled_sessions` unique key — same as the export pack).
+  - [ ] `createCheckout` fails → inline alert **"Something went wrong starting checkout. Try again, or use Send Feedback so we can look into it."**
+  - [ ] Guest branch → **"Get the review pack"** stashes `review_pack` and routes `/auth?plan=review_pack` (account-first — same journey as §1b/§1c); paywall guest note: **"You're working as a guest — you'll create a free account (or sign in with Google) first, so your purchase and reviews stay yours across devices."**
+  - [ ] Non-term paywall shows NO add-on button — instead: **"The weekly review add-on rides on the semester term — start the term to add it."** (link to `/pricing`).
+- **✓ verify (query Supabase):**
+  - [ ] `review_credits=3`; `plan` unchanged (still `'free'`); one `billing_fulfilled_sessions` row.
+  - [ ] "Back to the upload" dismisses the paywall without buying.
+
+## 35. Initial critique → included follow-up → stage closed → third refused (the full loop)
+
+- **Set up:** Account **H** (review pack), on `/presentation-checker`, with a real poster PDF (≤ 24 pages) and a revised second version of it.
+- [ ] Upload card: title **"Upload a poster PDF, talk deck, or image"**, helper **"PDF, PPTX, PNG, or JPG — up to 24 pages. Nothing is published; the review is only for you."** → **"Choose a file"**.
+- [ ] Busy states: **"Preparing your file for review…"** then **"Reading your poster or talk…"** (hint **"A full review usually takes under a minute."**).
+- [ ] Results: three score tiles (**Narrative / Design / Content**, each n/5), **"How a first-time viewer reads it"** summary, optional **"Priority call"** banner, page strip, then **"Fix cards (N)"** grouped **"High impact" / "Medium" / "Polish"**; each card has dimension + severity + action chips, the fix, a rewritten example blockquote, optional "Tradeoff: …".
+- [ ] Click a region-anchored card (hint **"→ click to see it"**) → the bbox overlay lights up on the matching page thumbnail.
+- [ ] Follow-up section: **"Your one follow-up"** + **"Revise against these cards, then run the follow-up — it checks your revision against these exact findings."** → **"Request your one follow-up"** → disclosure **"This is your one follow-up — the review closes after it."** → **"Choose the revised file"** (or **"Not yet"**).
+- [ ] Upload the revised PDF → the follow-up runs with `reviewId` set — **NO second credit, no second weekly slot** (included in the initial credit).
+- [ ] Stage now closed: **"This review is closed — the follow-up was its last pass. A fresh review uses a new credit."** + **"Start a new review"**.
+- [ ] Third critique attempt (re-POST with the same `reviewId` via devtools/curl) → server refuses `409 review_closed`; the client-facing line is **"That review is already closed — start a new one instead."** Closed is terminal server-side, not just hidden in UI.
+- **✓ verify (query Supabase):**
+  - [ ] Exactly ONE `poster_reviews` row for the loop: `stage='closed'`, `credit_source='pack'`, `initial_findings` + `followup_findings` both set, `source_meta.filename` stamped.
+  - [ ] `review_credits` went down by exactly **1** across the whole loop.
+  - [ ] **"Your past reviews"** lists it (stage label "Closed", score line "Narrative n/5 · Design n/5 · Content n/5").
+
+## 36. Postr-native review from the editor `review` tab (block-jump fix cards)
+
+- **Set up:** Account **H** or **I**, a poster open in the editor.
+- [ ] Sidebar rail shows **review** between **issues** and **comments**. Tab body: **"Get a scored review of this poster — narrative, design, and content — with fix cards that jump to the block they affect. One follow-up is included."** + button **"Review this poster"** + hint **"Uses one review credit, or your weekly add-on review."**
+- [ ] Run it (busy **"Reading your poster…"**) → same score header + cards; clicking a block-anchored card selects the block and smooth-scrolls it into view — and the sidebar does **NOT** bounce to another tab (the review-tab auto-switch exemption).
+- [ ] Follow-up disclosure: **"The follow-up re-reads your poster exactly as it is now — make your edits first."** → **"Run the follow-up"** → review closes.
+- [ ] Zero-credit pre-gate: with no credits/add-on AND no result on screen, the tab shows the paywall (**"Get feedback on your poster"** / **"Get the review pack"**; term holders also **"Add weekly reviews"**) — but a user mid-review at zero credits still sees their findings and the included follow-up (the pre-gate only applies with no result).
+- **✓ verify:** one credit (or one weekly slot) for the initial run; block jumps land on the right blocks; closed review refuses a third pass; "Start a new review" runs fresh.
+
+## 37. Add-on weekly quota — exhaustion + 7-day-window reset
+
+- **Set up:** Account **I** (active term + `review_addon`); weekly quota `REVIEW_ADDON_WEEKLY_QUOTA = 4` (placeholder pending repricing).
+- [ ] Run initial reviews until the quota is exhausted — 4 initials plus their included follow-ups are all legitimate (follow-ups never consume extra slots).
+- [ ] Next initial → 402 `weekly_quota_exceeded` → paywall shows the quota line (`role="status"`): **"You've used this week's reviews — your next weekly review opens up in {wait}. A review pack works right away."**
+- [ ] **"Get the review pack"** still works from the quota paywall (pack credits and the weekly window are independent).
+- **⚠ can't click through the reset:** the 7-day window is an in-memory sliding window on the API — there is no column to fast-forward. Verify the reset by waiting the window (impractical) or restarting the API (the in-memory limiter resets — a deploy also resets it; accepted single-instance posture). Confirm the `{wait}` counts down sensibly (`formatRetryAfter`).
+- **✓ verify (network + SQL):** exhausted request returns 402 with `reason: 'weekly_quota_exceeded'` + `retryAfterSec`; no `poster_reviews` row and no credit consumed for the refused run; `users.review_addon=true`, `review_addon_subscription_id` set.
+
+## 38. No-charge-on-failure — typed errors never burn a credit
+
+- **Set up:** Account **H**; note `review_credits` before EACH case.
+- [ ] **Corrupt/unreadable file** (e.g. a text file renamed `.pdf`) → **"We couldn't read that file — try exporting it again from the app that made it."** — typed error with "Try again"; credit UNCHANGED.
+- [ ] **Over-24-page PDF** → **"That file has more than 24 pages — trim it to 24 pages or fewer and try again."** (never a silent truncation; the server's `too_many_pages` maps to the same line); credit UNCHANGED.
+- [ ] Unsupported type (e.g. `.docx`) → **"That file type is not supported — upload a PDF, PPTX, PNG, or JPG."**
+- [ ] Rendered-blank PDF → **"That file rendered blank — check it opens correctly and try again."**
+- [ ] Critique upstream failure (unset `ANTHROPIC_API_KEY` → 500 `provider_not_configured`, generic line shown) → credit UNCHANGED; **no `poster_reviews` row** (success-only writes; a persistence failure after a pack consume compensates the credit back).
+- **✓ verify (query Supabase):** `review_credits` identical before/after every failure case; zero `poster_reviews` rows for the failed runs.
+
+## 39. PPTX input — ⚠ not yet testable in prod
+
+- **Set up:** Dev only, with LibreOffice (`soffice`) + poppler (`pdftoppm`) installed locally; **prod is blocked until the Docker-based Render service ships (D10 — PPTX ships last, never blocks the other three inputs).**
+- [ ] Upload a `.pptx` on `/presentation-checker` → ingest goes through `POST /api/review/render-pptx` (no credit — ingest utility; the critique charges) → per-slide page anchors (source label "Slides").
+- [ ] Over-50-MB deck → 413 `pptx_too_large`; the SSRF guard only fetches the project's own storage host.
+- **✓ verify:** per-slide anchors resolve; exactly one credit for the critique; the same follow-up loop as §35.
+
+---
+
+## Quick findings summary — PART 7 additions
+
+- [ ] **§34 billing landing** — `/billing/success` granted-check ignores the review SKUs (`hasActiveTerm || credits > 0` only) → review buyers see the "will appear shortly" fallback even after a successful grant. Launch-checklist item (`|| plan.canReview`); not a failed purchase.
+- [ ] **§37 window reset** — the 7-day add-on window is in-memory on the API; a restart/deploy resets it (accepted single-instance posture).
+- [ ] **Pricing placeholders** — `REVIEW_PACK_CREDITS = 3` / `REVIEW_ADDON_WEEKLY_QUOTA = 4` are placeholders; the launch checklist reprices from day-one `[review.critique]` cost lines.
+- [ ] **Refunds** — review SKUs have no in-app refund path (term/pack do); refunds are manual via the Stripe dashboard (deferred, D8).
+- [ ] **§39 PPTX** — untestable in prod until the Docker service (soffice + pdftoppm) ships; must never block the other three inputs.
