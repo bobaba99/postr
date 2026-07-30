@@ -18,6 +18,12 @@ Method: UIMax `review_ui` per route/state
 - Auth scores 98/100; its only remaining flag is the intentional Low-severity `noindex`.
 - Private, billing, and error states score 95/100. Their remaining findings are Low-severity `noindex` and concise private-page title/description warnings.
 
+## 2026-07-30 SEO regression
+
+After the OpenSEO remediation, UIMax `seo_audit` was rerun across the same 25-route/state inventory. All 13 indexable routes now score 100/100. The remaining 12 private or error states score 98/100, with intentional Low-severity `noindex` as their only finding. No High or Medium finding remains.
+
+See [the 25-state SEO regression report](SEO-REGRESSION-2026-07-30.md).
+
 The full UIMax report also repeats the same repository-wide heuristic code scan for every route. Those static findings are not route observations; this summary reports the runtime accessibility and SEO sections of each page review.
 
 ## Reports

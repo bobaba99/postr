@@ -21,7 +21,7 @@ import { useLeaveGuard } from '@/hooks/useLeaveGuard';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
 import { uploadBase64Image } from '@/data/posterImages';
 import { supabase } from '@/lib/supabase';
-import { noindexMeta } from '@/seo/siteMeta';
+import { editorMeta } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 /**
@@ -137,12 +137,7 @@ export default function Editor() {
 
   // Noindex, and named after the poster so a user with several editor
   // tabs open can tell them apart.
-  useDocumentMeta(
-    noindexMeta(
-      posterTitle ? `${posterTitle} | Postr` : 'Poster editor | Postr',
-      'The Postr poster editor.',
-    ),
-  );
+  useDocumentMeta(editorMeta(posterTitle, posterId));
 
   useEffect(() => {
     let cancelled = false;

@@ -44,6 +44,7 @@ const routes = JSON.parse(
 const site = {
   siteOrigin: routes.siteOrigin,
   siteName: routes.siteName,
+  language: routes.language,
   locale: routes.locale,
   defaultOgImage: routes.defaultOgImage,
 };

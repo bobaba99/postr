@@ -15,7 +15,7 @@ const LAST_UPDATED = '10 avril 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function PrivacyFr() {
-  useDocumentMeta(STATIC_ROUTE_META['/privacy'] ?? null);
+  useDocumentMeta(STATIC_ROUTE_META['/privacy/fr'] ?? null);
 
   return (
     <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">

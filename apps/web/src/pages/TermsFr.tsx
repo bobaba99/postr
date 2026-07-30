@@ -20,7 +20,7 @@ const LAST_UPDATED = '28 juillet 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function TermsFr() {
-  useDocumentMeta(STATIC_ROUTE_META['/terms'] ?? null);
+  useDocumentMeta(STATIC_ROUTE_META['/terms/fr'] ?? null);
 
   return (
     <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">

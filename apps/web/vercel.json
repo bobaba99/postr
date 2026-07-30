@@ -36,10 +36,7 @@
     { "source": "/profile", "destination": "/" },
     { "source": "/admin/gallery", "destination": "/" },
     { "source": "/billing/success", "destination": "/" },
-    { "source": "/billing/cancel", "destination": "/" },
-    { "source": "/terms/fr", "destination": "/" },
-    { "source": "/privacy/fr", "destination": "/" },
-    { "source": "/cookies/fr", "destination": "/" }
+    { "source": "/billing/cancel", "destination": "/" }
   ],
   "headers": [
     {

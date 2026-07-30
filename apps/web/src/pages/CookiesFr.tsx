@@ -16,7 +16,7 @@ const LAST_UPDATED = '27 juillet 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function CookiesFr() {
-  useDocumentMeta(STATIC_ROUTE_META['/cookies'] ?? null);
+  useDocumentMeta(STATIC_ROUTE_META['/cookies/fr'] ?? null);
 
   return (
     <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">

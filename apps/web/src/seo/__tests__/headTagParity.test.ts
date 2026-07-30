@@ -26,6 +26,7 @@ import { tagSpecsFor } from '../useDocumentMeta';
 const site = {
   siteOrigin: routes.siteOrigin,
   siteName: routes.siteName,
+  language: routes.language,
   locale: routes.locale,
   defaultOgImage: routes.defaultOgImage,
 };
@@ -97,6 +98,15 @@ describe('injectHead', () => {
     expect(out).not.toContain('<title>Postr</title>');
   });
 
+  it('sets the document language from route metadata', () => {
+    const french = STATIC_ROUTE_META['/privacy/fr'] as PageMeta;
+    const localizedShell = shell.replace('<html>', '<html lang="en">');
+    const out = mjs.injectHead(localizedShell, french, site);
+
+    expect(out).toContain('<html lang="fr-CA">');
+    expect(out).toContain('property="og:locale" content="fr_CA"');
+  });
+
   it('replaces rather than duplicates the default description', () => {
     const out = mjs.injectHead(shell, meta, site);
     expect(out.match(/name="description"/g)).toHaveLength(1);
@@ -161,6 +171,32 @@ describe('injectHead', () => {
     expect(twice.match(/name="description"/g)).toHaveLength(1);
     expect(twice.match(/rel="canonical"/g)).toHaveLength(1);
   });
+
+  it.each(staticPaths)(
+    '%s exposes at least 150 crawler-visible words and links to every public route',
+    (path) => {
+      const record = routes.static[path as keyof typeof routes.static];
+      const links = Object.entries(routes.static).map(([href, target]) => ({
+        href,
+        label: href === '/' ? 'Home' : target.h1,
+      }));
+      const out = mjs.injectHead(
+        shell,
+        STATIC_ROUTE_META[path] as PageMeta,
+        site,
+        { h1: record.h1, copy: record.copy, links },
+      );
+      const fallback =
+        out.match(/<main id="prerendered-content"[\s\S]*?<\/main>/)?.[0] ?? '';
+      const text = fallback
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      expect(text.split(' ').filter(Boolean).length).toBeGreaterThanOrEqual(150);
+      expect(fallback.match(/<a href=/g)).toHaveLength(staticPaths.length);
+    },
+  );
 });
 
 describe('browser bootstrap', () => {

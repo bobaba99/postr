@@ -54,6 +54,8 @@ export function buildPageMeta(path, record, site) {
       ? `${INDEXABLE},${PREVIEW_DIRECTIVES}`
       : record.robots,
     canonical: canonicalFor(path, site.siteOrigin),
+    language: record.language ?? site.language,
+    locale: record.locale ?? site.locale,
     ogType: path === '/' ? 'website' : 'article',
     ogImage: hasShareImage
       ? `${site.siteOrigin}${site.defaultOgImage}`
@@ -80,7 +82,7 @@ export function tagSpecsFor(meta, site) {
     { kind: 'meta', key: 'property', id: 'og:description', value: meta.description },
     { kind: 'meta', key: 'property', id: 'og:type', value: meta.ogType },
     { kind: 'meta', key: 'property', id: 'og:site_name', value: site.siteName },
-    { kind: 'meta', key: 'property', id: 'og:locale', value: site.locale },
+    { kind: 'meta', key: 'property', id: 'og:locale', value: meta.locale },
     { kind: 'meta', key: 'property', id: 'og:url', value: meta.canonical },
     { kind: 'meta', key: 'property', id: 'og:image', value: image },
     { kind: 'meta', key: 'property', id: 'og:image:alt', value: image ? meta.ogImageAlt : null },
@@ -138,6 +140,18 @@ function stripOwnedTags(html, specs) {
 export function injectHead(shell, meta, site, bodyCopy = null) {
   const specs = tagSpecsFor(meta, site);
   let html = stripOwnedTags(shell, specs);
+
+  if (/<html\b[^>]*\blang=["'][^"']*["']/i.test(html)) {
+    html = html.replace(
+      /(<html\b[^>]*\blang=)["'][^"']*["']/i,
+      `$1"${escapeAttr(meta.language)}"`,
+    );
+  } else {
+    html = html.replace(
+      /<html\b([^>]*)>/i,
+      `<html$1 lang="${escapeAttr(meta.language)}">`,
+    );
+  }
 
   html = html.replace(
     /<title>[\s\S]*?<\/title>/i,

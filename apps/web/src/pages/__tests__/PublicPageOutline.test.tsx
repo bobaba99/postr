@@ -94,6 +94,15 @@ describe('audited public-page outline and contrast', () => {
   it('gives every poster-editor state a level-one heading', () => {
     const editor = sourceOf('pages/Editor.tsx');
     expect(editor.match(/<h1\b/g)).toHaveLength(4);
+    expect(editor).toContain('editorMeta(posterTitle, posterId)');
+  });
+
+  it.each([
+    ['pages/PrivacyFr.tsx', '/privacy/fr'],
+    ['pages/CookiesFr.tsx', '/cookies/fr'],
+    ['pages/TermsFr.tsx', '/terms/fr'],
+  ])('%s uses metadata for its own localized URL', (file, path) => {
+    expect(sourceOf(file)).toContain(`STATIC_ROUTE_META['${path}']`);
   });
 
   it('does not place white text on the bright violet surface', () => {

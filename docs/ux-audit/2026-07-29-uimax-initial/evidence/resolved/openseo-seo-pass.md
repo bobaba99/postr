@@ -1,6 +1,6 @@
 # OpenSEO site-wide SEO pass
 
-Audit date: 2026-07-29 (America/Toronto)
+Audit date: 2026-07-30 (America/Toronto)
 
 Production target: `https://www.postr.sh/`
 
@@ -31,8 +31,14 @@ The build prerender placed each route's heading and summary inside `<noscript>`.
 - Generate dedicated raw HTML for `/auth`.
 - Add self-canonicals and the existing social card to app states while retaining `noindex,nofollow`.
 - Add route-specific metadata to both billing return pages.
-- Keep the generated sitemap limited to the 10 indexable public pages.
+- Keep every public fallback above OpenSEO's 150-word thin-content threshold.
+- Give all fixed routes 30–60 character titles and 120–160 character descriptions.
+- Prerender the three French legal routes with self-canonicals, `fr-CA` language, and `fr_CA` Open Graph locale.
+- Give shared posters a self-canonical and the real Postr social card while retaining `noindex,nofollow`.
+- Keep the generated sitemap limited to the 13 indexable public pages.
 
-The production build now writes 12 HTML documents: 10 indexable routes, `/auth`, and `404.html`. Local raw-HTML verification confirms an H1 and internal links on every generated route, plus complete canonical/share metadata where expected.
+The production build now writes 15 HTML documents: 13 indexable routes, `/auth`, and `404.html`. Local raw-HTML verification confirms one H1, at least 150 crawler-visible words, and links to every public route on each generated public page. The sitemap contains exactly the 13 indexable URLs.
+
+A fresh UIMax MCP SEO regression covered 25 routes and states. All 13 indexable routes scored 100/100; all private/error states scored 98/100 with intentional Low-severity `noindex` as their only finding. See [the all-page SEO regression](all-pages/SEO-REGRESSION-2026-07-30.md).
 
 OpenSEO cannot re-crawl unpushed local files. A new production audit is required after deployment to confirm the 39 production warnings are cleared.

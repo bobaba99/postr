@@ -38,6 +38,7 @@ The follow-up SEO pass used OpenSEO against all 10 indexable production pages, t
 - App states now have self-canonicals and share cards while retaining `noindex,nofollow`.
 - Billing success and cancel now set their own private-page metadata.
 - A second all-page UIMax pass found zero runtime accessibility violations and zero route-level High/Medium SEO findings.
+- The 2026-07-30 SEO regression covered the same 25 routes/states: 13 public pages scored 100/100, and every private/error state had only intentional Low `noindex`.
 - Legal-page timestamp contrast was raised from 4.07:1 after the expanded pass caught it.
 - The poster editor now exposes an H1 in loading, ready, error, and not-found states.
 
@@ -55,8 +56,8 @@ Measured browser results:
 
 Verification:
 
-- Vitest after merging current `main`: 139 files passed, 2,039 tests passed.
-- Production build: TypeScript, Vite build, 12-page prerender, and sitemap generation passed.
+- Vitest after the SEO pass: 139 files passed, 2,097 tests passed.
+- Production build: TypeScript, Vite build, 15-page prerender, and 13-URL sitemap generation passed.
 - UIMax clean crawl: 10 pages, zero accessibility violations, zero page errors, 122ms average local load time.
 - UIMax pricing review: Accessibility 100, Best Practices 100, SEO 100.
 - UIMax paid-signup review: Accessibility 100, Best Practices 100.
@@ -278,4 +279,5 @@ Run the same audit against a production build or deployed preview before assigni
 - [Resolved UIMax pricing HTML report](evidence/resolved/uimax-pricing-resolved.html)
 - [Resolved UIMax review history](evidence/resolved/uimax-reviews-resolved.json)
 - [Full 25-page UIMax resolution pass](evidence/resolved/all-pages/README.md)
+- [UIMax 25-state SEO regression](evidence/resolved/all-pages/SEO-REGRESSION-2026-07-30.md)
 - [OpenSEO site-wide SEO pass](evidence/resolved/openseo-seo-pass.md)

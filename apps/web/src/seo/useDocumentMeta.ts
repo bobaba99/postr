@@ -15,7 +15,7 @@
  * removed only when a route genuinely has no value for them.
  */
 import { useEffect } from 'react';
-import { SITE_LOCALE, SITE_NAME, type PageMeta } from './siteMeta';
+import { SITE_NAME, type PageMeta } from './siteMeta';
 
 /** Marks the nodes this hook manages, so tests and future passes can find them. */
 const OWNED = 'data-pm';
@@ -108,7 +108,7 @@ export function tagSpecsFor(meta: PageMeta): TagSpec[] {
     { kind: 'meta', key: 'property', id: 'og:description', value: meta.description },
     { kind: 'meta', key: 'property', id: 'og:type', value: meta.ogType },
     { kind: 'meta', key: 'property', id: 'og:site_name', value: SITE_NAME },
-    { kind: 'meta', key: 'property', id: 'og:locale', value: SITE_LOCALE },
+    { kind: 'meta', key: 'property', id: 'og:locale', value: meta.locale },
     { kind: 'meta', key: 'property', id: 'og:url', value: meta.canonical },
     { kind: 'meta', key: 'property', id: 'og:image', value: image },
     { kind: 'meta', key: 'property', id: 'og:image:alt', value: image ? meta.ogImageAlt : null },
@@ -149,6 +149,7 @@ export function useDocumentMeta(
     const resolved = JSON.parse(serializedMeta) as PageMeta;
 
     document.title = resolved.title;
+    document.documentElement.lang = resolved.language;
     for (const spec of tagSpecsFor(resolved)) {
       if (spec.kind === 'meta') upsertMeta(spec.key, spec.id, spec.value);
       else upsertLink(spec.rel, spec.value);

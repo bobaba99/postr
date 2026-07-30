@@ -20,12 +20,21 @@ const dashboard = APP_ROUTE_META['/dashboard'] as PageMeta;
 beforeEach(() => {
   document.head.innerHTML = '';
   document.title = '';
+  document.documentElement.lang = 'en';
 });
 
 describe('useDocumentMeta', () => {
   it('sets the document title', () => {
     render(<Probe meta={about} />);
     expect(document.title).toBe(about.title);
+  });
+
+  it('sets the document language and localized Open Graph locale', () => {
+    const french = STATIC_ROUTE_META['/privacy/fr'] as PageMeta;
+    render(<Probe meta={french} />);
+
+    expect(document.documentElement.lang).toBe('fr-CA');
+    expect(content('meta[property="og:locale"]')).toBe('fr_CA');
   });
 
   it('writes description, robots and canonical', () => {
