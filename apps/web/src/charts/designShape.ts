@@ -91,12 +91,17 @@ const MAX_FACTOR_LEVELS = 30;
 
 /**
  * Above this many distinct values, an integer column is a measurement
- * rather than a numerically coded factor. Far tighter than
- * MAX_FACTOR_LEVELS because numbers carry no label to vouch for them:
- * "1, 2" is almost certainly control/treatment, but "1 … 25" is more
- * plausibly a count than a 25-arm design.
+ * rather than a numerically coded factor. Deliberately tiny: a coded
+ * design almost never has more than a handful of arms, whereas the
+ * things that LOOK like codes but are measures — a 1–5 Likert item, a
+ * 0–10 rating, a small count — routinely have four or more levels.
+ * "1, 2" is almost certainly control/treatment; "1, 2, 3, 4, 5" is a
+ * scale someone answered, not a five-arm trial. Four-plus integer
+ * levels are therefore read as a measurement unless the NAME says
+ * outcome (handled below). This is far tighter than MAX_FACTOR_LEVELS
+ * because a number carries no label to vouch for it.
  */
-const MAX_NUMERIC_FACTOR_LEVELS = 10;
+const MAX_NUMERIC_FACTOR_LEVELS = 3;
 
 /**
  * An integer column also has to REPEAT its levels before it reads as a
@@ -168,21 +173,47 @@ function typeFromName(name: string): VariableType {
  * such factor is counted as an outcome, so a 2×3 factorial design
  * reads back as "3 outcomes × 0 factors".
  *
- * Three conditions, all required:
- *  - every value is a whole number (5.1 is a measurement, not a code);
- *  - few enough distinct levels to be a factor;
- *  - the levels actually repeat, so a short column of distinct
- *    integers stays a measurement.
+ * The hard part is the reverse mistake, which is worse: a 1–5 Likert
+ * item, a small integer count, or a rounded measure all LOOK like
+ * codes (few whole numbers that repeat), and calling them factors
+ * erases the outcome and dead-ends the user with "0 outcomes". A
+ * measurement wrongly called an outcome still charts; a measurement
+ * wrongly called a factor does not. So the bar for "this is a code"
+ * is set high, and everything uncertain falls through to outcome.
  *
- * An outcome-sounding NAME overrides all of it: a 1–5 "Rating" or a
- * 0–10 "Score" is a measured outcome that happens to be integer, and
- * the name is stronger evidence than the value shape.
+ * A column is a code only when ALL of the following hold:
+ *  - an outcome-sounding NAME does not claim it (the name is stronger
+ *    evidence than any value shape — a "Rating" of 1–5 is an outcome);
+ *  - every non-null value is a whole number (5.1 is a measurement);
+ *  - there are 2–3 distinct levels (MAX_NUMERIC_FACTOR_LEVELS) — a
+ *    four-plus-level integer column is a scale or a count, not a
+ *    handful of arms;
+ *  - the levels repeat (a short column of distinct integers is a
+ *    measurement, however few rows);
+ *  - the levels form a gapless run anchored at 0 or 1 — the shape of
+ *    a code (1=control, 2=treatment; 0/1 flags). Counts that start
+ *    high (3, 5, 8) or skip values (2, 4, 5, 7) are measurements.
  */
 function isNumericFactor(col: InferredColumn, filled: number): boolean {
   if (OUTCOME_NAME.test(col.name)) return false;
-  if (col.distinct > MAX_NUMERIC_FACTOR_LEVELS) return false;
+  if (col.distinct < 2 || col.distinct > MAX_NUMERIC_FACTOR_LEVELS) return false;
   if (filled === 0 || col.distinct / filled > NUMERIC_FACTOR_REPETITION) return false;
-  return col.values.every((v) => v === null || (typeof v === 'number' && Number.isInteger(v)));
+
+  // Restate the original all-integers check while collecting the values
+  // themselves, so the run test below has something to measure. A column
+  // with any non-integer value is a measurement, not a code.
+  const nums = col.values.filter(
+    (v): v is number => typeof v === 'number' && Number.isInteger(v),
+  );
+  if (nums.length !== filled) return false;
+
+  // Value-shape anchor: a code is a small contiguous run starting at 0
+  // or 1. `nums` is non-empty here — the repetition gate guarantees
+  // filled > 0 and nums.length === filled — so min/max are safe.
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  if (min !== 0 && min !== 1) return false;
+  return max - min === col.distinct - 1;
 }
 
 /**
@@ -349,14 +380,56 @@ function shapeLabel(dvCount: number, ivCount: number): string {
 }
 
 /**
+ * A column the recommender would offer as a measure (a non-ordered
+ * number, exactly `measureCandidates` in recommend.ts) that the
+ * numeric-factor heuristic nonetheless demoted to a categorical
+ * factor. These are the columns the safety net can reclaim as
+ * outcomes.
+ */
+function isDemotedNumericMeasure(c: ClassifiedColumn): boolean {
+  return (
+    c.column.kind === 'number' &&
+    !c.column.ordered &&
+    c.type === 'categorical' &&
+    c.role === 'independent'
+  );
+}
+
+/**
  * Recognise the design shape of a parsed table. Pure and
  * deterministic: the same table always yields the same shape and the
  * same treatment.
  */
 export function detectDesignShape(table: InferredTable): DesignShape {
-  const columns = classifyColumns(table);
+  let columns = classifyColumns(table);
+  let dvs = columns.filter((c) => c.role === 'dependent');
 
-  const dvs = columns.filter((c) => c.role === 'dependent');
+  // ── Safety net: the numeric-factor guess erased every outcome ──────
+  // classifyType can read an integer measure as a coded factor (the
+  // SPSS 1=control/2=treatment idiom). When that leaves ZERO outcomes,
+  // the user hits the "0 outcomes" dead-end even though the table has
+  // numbers to plot. Reclaim the demoted numeric columns as outcomes —
+  // BUT only when the table has no genuine grouping column of its own
+  // (every non-identifier column is a demoted number). With a real
+  // text/date factor present, a lone numeric code beside it is far more
+  // likely a true code, and reclaiming it would fabricate a nonsense
+  // chart of "average group number"; leaving it as a factor lets the
+  // honest summary-table verdict stand instead.
+  if (dvs.length === 0) {
+    const reclaimable = columns.filter(isDemotedNumericMeasure);
+    const otherFactor = columns.some(
+      (c) => (c.role === 'independent' || c.role === 'temporal') && !isDemotedNumericMeasure(c),
+    );
+    if (reclaimable.length > 0 && !otherFactor) {
+      const reclaim = new Set(reclaimable);
+      columns = columns.map((c) =>
+        reclaim.has(c) ? { ...c, type: 'continuous' as const, role: 'dependent' as const } : c,
+      );
+      dvs = columns.filter((c) => c.role === 'dependent');
+    }
+  }
+  // ───────────────────────────────────────────────────────────────────
+
   const ivs = columns.filter((c) => c.role === 'independent' || c.role === 'temporal');
   const hasTemporal = columns.some((c) => c.role === 'temporal');
 
@@ -383,9 +456,21 @@ export function detectDesignShape(table: InferredTable): DesignShape {
 /**
  * True when the honest answer is "no single chart fits". The ladder
  * shows the rationale instead of a ranked figure set.
+ *
+ * `summary-table` is unchartable for a subtler reason than the other
+ * two: it means the table has no measured outcome at all (dvCount 0),
+ * so every column is a label or a factor. Any chart drawn from it must
+ * put a FACTOR on the value axis — e.g. a bar of "average group code"
+ * — which is confidently wrong, worse than no chart. So the ranked
+ * figures are suppressed and the "belongs in a table" rationale is
+ * shown instead, exactly as the rationale itself advises.
  */
 export function isUnchartable(shape: DesignShape): boolean {
-  return shape.treatment === 'no-single-chart' || shape.treatment === 'nothing-to-plot';
+  return (
+    shape.treatment === 'no-single-chart' ||
+    shape.treatment === 'nothing-to-plot' ||
+    shape.treatment === 'summary-table'
+  );
 }
 
 /**
