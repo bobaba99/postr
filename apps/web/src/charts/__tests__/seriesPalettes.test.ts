@@ -85,6 +85,13 @@ describe('series palettes', () => {
     }
   });
 
+  it('includes the named CVD-safe sets at their published sizes', () => {
+    expect(findSeriesPalette('okabe-ito')?.colors).toHaveLength(8);
+    expect(findSeriesPalette('tol-bright')?.colors).toHaveLength(7);
+    expect(findSeriesPalette('tol-muted')?.colors).toHaveLength(9);
+    expect(findSeriesPalette('tol-high-contrast')?.colors).toHaveLength(3);
+  });
+
   it('orders sequential and grayscale ramps monotonically', () => {
     // An ordered palette whose luminance wanders is not ordered — the
     // reader cannot tell which end is "more".

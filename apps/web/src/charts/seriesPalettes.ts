@@ -20,11 +20,18 @@
  * silently discards that property while leaving the palette's name
  * claiming it. Add whole palettes rather than editing existing ones.
  *
- * Sizes are 2, 3, 4, 6, and 8 — every complete tested set the source
- * publishes. There is no 5-colour set on the page, and inventing a
- * fifth colour to pad one out would be exactly the kind of untested
- * edit the paragraph above warns about, so a 5-series chart draws from
- * the 6-colour sets instead (see `seriesPalettesFor`).
+ * The Simplified Science sets span sizes 2, 3, 4, 6, and 8 — every
+ * complete tested set that source publishes. There is no 5-colour set
+ * on the page, and inventing a fifth colour to pad one out would be
+ * exactly the kind of untested edit the paragraph above warns about,
+ * so a 5-series chart draws from the 6-colour sets instead (see
+ * `seriesPalettesFor`).
+ *
+ * Alongside them are named colourblind-safe qualitative sets from two
+ * other authorities: Okabe & Ito's Color Universal Design palette (8)
+ * and Paul Tol's schemes (SRON technical note — bright 7, muted 9,
+ * high-contrast 3). Same rule applies: verbatim source hexes, and each
+ * clears the greyscale-separation test the rest of the file enforces.
  */
 
 /** How a palette's colours relate to each other — drives which
@@ -277,13 +284,52 @@ export const SERIES_PALETTES_8: readonly SeriesPalette[] = [
   },
 ];
 
-/** Every series palette, all five sizes (2, 3, 4, 6, 8). */
+/**
+ * Named colourblind-safe qualitative sets from outside Simplified
+ * Science Publishing — Okabe & Ito's Color Universal Design palette and
+ * Paul Tol's schemes (SRON technical note). Verbatim source hexes; each
+ * clears the same greyscale-separation test as the sets above. All are
+ * `qualitative` — unordered categorical sets, not luminance ramps.
+ */
+export const SERIES_PALETTES_NAMED: readonly SeriesPalette[] = [
+  {
+    id: 'okabe-ito',
+    name: 'Okabe–Ito',
+    kind: 'qualitative',
+    colors: ['#000000', '#e69f00', '#56b4e9', '#009e73', '#f0e442', '#0072b2', '#d55e00', '#cc79a7'],
+    note: 'The standard eight-colour CVD-safe set for scientific figures.',
+  },
+  {
+    id: 'tol-bright',
+    name: 'Tol bright',
+    kind: 'qualitative',
+    colors: ['#4477aa', '#ee6677', '#228833', '#ccbb44', '#66ccee', '#aa3377', '#bbbbbb'],
+    note: 'Paul Tol’s bright scheme — seven well-separated hues.',
+  },
+  {
+    id: 'tol-muted',
+    name: 'Tol muted',
+    kind: 'qualitative',
+    colors: ['#332288', '#88ccee', '#44aa99', '#117733', '#999933', '#ddcc77', '#cc6677', '#882255', '#aa4499'],
+    note: 'Nine muted hues for many categories; softer than bright.',
+  },
+  {
+    id: 'tol-high-contrast',
+    name: 'Tol high-contrast',
+    kind: 'qualitative',
+    colors: ['#004488', '#ddaa33', '#bb5566'],
+    note: 'Three maximally distinct colours, also mono-safe.',
+  },
+];
+
+/** Every series palette, all sizes (2, 3, 4, 6, 8) plus the named sets. */
 export const SERIES_PALETTES: readonly SeriesPalette[] = [
   ...SERIES_PALETTES_2,
   ...SERIES_PALETTES_3,
   ...SERIES_PALETTES_4,
   ...SERIES_PALETTES_6,
   ...SERIES_PALETTES_8,
+  ...SERIES_PALETTES_NAMED,
 ];
 
 /** Look up by id. Returns null rather than a silent fallback, so a
