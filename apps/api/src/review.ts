@@ -7,10 +7,12 @@
  *
  * Pipeline: zod validation → 24-page hard cap (§1: typed error, never
  * silent truncation) → server-side entitlement resolution (D4:
- * term-active add-on → weekly window → pack credits → 402) →
- * SSRF-guarded page fetch → two-stage rubric critique → deterministic
- * enforce → credit consume AFTER success (D6) → single poster_reviews
- * write (success-only, D16).
+ * term-active add-on / pack credits / 402) → SSRF-guarded page fetch →
+ * add-on weekly window (deferred past ingest so a page failure burns no
+ * slot) → two-stage rubric critique → deterministic enforce → credit
+ * consume AFTER success (D6) → single poster_reviews write
+ * (success-only, D16; a persistence failure after a pack consume
+ * compensates the credit back).
  *
  * POST /api/review/critique — FOLLOW-UP flow (body.reviewId set):
  * a diff critique against the stored initial findings, then the review
@@ -109,9 +111,9 @@ const CritiqueRequest = z.object({
   pages: z.array(PageRefInput).min(1),
   posterDoc: PosterDocEnvelope.optional(),
   posterId: z.string().uuid().optional(),
-  // No .uuid() here — the id is only a lookup key for the follow-up
-  // branch, which owns the not-found/ownership errors (§5.2).
-  reviewId: z.string().min(1).optional(),
+  // uuid-gated: a malformed id 400s HERE rather than 500ing on the
+  // Postgres uuid cast in the follow-up's poster_reviews lookup.
+  reviewId: z.string().uuid().optional(),
   filename: z.string().max(255).optional(),
 });
 
@@ -368,17 +370,9 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
 
   let creditSource: 'pack' | 'subscription_addon';
   if (row.review_addon === true && isTermActive(row, now())) {
-    // Add-on path: weekly window, invoked manually (D5). The limiter
-    // records the slot at this pre-check, so a FAILED model call still
-    // consumes the slot (D17 — accepted: slots are a soft cap).
-    const slot = weeklySlotAllowed(weeklyLimiter, req, res);
-    if (!slot.allowed) {
-      return res.status(402).json({
-        error: 'review_payment_required',
-        reason: 'weekly_quota_exceeded',
-        ...(slot.retryAfterSec !== undefined ? { retryAfterSec: slot.retryAfterSec } : {}),
-      });
-    }
+    // Add-on path. The weekly slot is deliberately NOT consumed here —
+    // it is checked after the page fetch succeeds (below) so an ingest
+    // failure never burns a weekly slot.
     creditSource = 'subscription_addon';
   } else if ((row.review_credits ?? 0) > 0) {
     creditSource = 'pack';
@@ -396,6 +390,21 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
     });
   } catch (err) {
     return replyPageFetchError(res, err);
+  }
+
+  if (creditSource === 'subscription_addon') {
+    // Weekly window, invoked manually (D5) — deferred until AFTER the
+    // ingest guards passed so a 4xx/5xx page failure costs no slot. The
+    // limiter still records the slot BEFORE the model call: a failed
+    // critique consumes it (D17 — accepted: slots are a soft cap).
+    const slot = weeklySlotAllowed(weeklyLimiter, req, res);
+    if (!slot.allowed) {
+      return res.status(402).json({
+        error: 'review_payment_required',
+        reason: 'weekly_quota_exceeded',
+        ...(slot.retryAfterSec !== undefined ? { retryAfterSec: slot.retryAfterSec } : {}),
+      });
+    }
   }
 
   const signals = body.posterDoc ? computeReviewSignals(body.posterDoc.blocks) : undefined;
@@ -486,11 +495,34 @@ async function runInitial(ctx: InitialCtx): Promise<Response> {
     .select('id')
     .single();
   if (insertErr || !inserted) {
+    const persistenceMessage = insertErr?.message ?? 'no row returned';
     // eslint-disable-next-line no-console
     console.error('[review.critique] poster_reviews insert failed', {
       userId: user.id,
-      message: insertErr?.message ?? 'no row returned',
+      message: persistenceMessage,
     });
+    if (creditSource === 'pack') {
+      // The credit was consumed but the review row is lost — compensate
+      // with a grant of exactly one credit before the 500 so a
+      // persistence hiccup never bills the user for nothing.
+      const { error: grantErr } = await supabase.rpc(
+        'grant_review_credits' as never,
+        { p_user_id: user.id, p_amount: 1 } as never,
+      );
+      if (grantErr) {
+        // Loud: the user is now down one credit with no review to show
+        // for it — this needs manual reconciliation.
+        // eslint-disable-next-line no-console
+        console.error('[review.critique] credit compensation failed', {
+          userId: user.id,
+          stage: 'initial',
+          creditSource: 'pack',
+          persistenceMessage,
+          compensationMessage: grantErr.message,
+        });
+      }
+    }
+    // Weekly add-on slots are a soft cap (D17) — not compensated.
     return res.status(500).json({ error: 'review_internal' });
   }
 
@@ -715,8 +747,14 @@ function replyPageFetchError(res: Response, err: unknown): Response {
     if (err.code === 'too_large') {
       return res.status(413).json({ error: 'image_too_large' });
     }
-    // url_not_allowed | fetch_failed | unsupported_media — the typed
-    // code IS the client-facing error string.
+    if (err.code === 'fetch_failed') {
+      // 502, not 400: a storage/upstream hiccup is not a client error.
+      // url_not_allowed / unsupported_media stay 400 — those ARE the
+      // client's fault.
+      return res.status(502).json({ error: err.code });
+    }
+    // url_not_allowed | unsupported_media — the typed code IS the
+    // client-facing error string.
     return res.status(400).json({ error: err.code });
   }
   // eslint-disable-next-line no-console

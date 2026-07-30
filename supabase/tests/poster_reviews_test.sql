@@ -54,6 +54,13 @@ insert into public.poster_reviews (id, user_id, source_kind) values
   ('e1000000-0000-4000-a000-000000000001', 'd1000000-0000-4000-a000-000000000001', 'postr'),
   ('e1000000-0000-4000-a000-000000000002', 'd1000000-0000-4000-a000-000000000002', 'pdf');
 
+-- Supabase API grants are environment-owned rather than migration-owned in
+-- some local CLI versions. Grant only the fixture privileges needed to reach
+-- the RLS/trigger behavior under test (an absent table grant would 42501
+-- BEFORE the policy/guard fires); this transaction rolls them back.
+grant select, insert, update on public.poster_reviews to authenticated, service_role;
+grant select, update on public.users to authenticated, service_role;
+
 -- 1 · default status
 select is(
   (select status from public.poster_reviews where id = 'e1000000-0000-4000-a000-000000000001'),

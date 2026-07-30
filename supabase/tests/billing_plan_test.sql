@@ -42,6 +42,11 @@ values
    'jane.doe@example.com', '', now(),
    '{"provider":"email","providers":["email"]}', '{}', false, now(), now());
 
+-- Supabase API grants are environment-owned rather than migration-owned in
+-- some local CLI versions. Grant only the fixture privileges needed to reach
+-- the trigger/RLS behavior under test; this transaction rolls them back.
+grant select, update on public.users to authenticated, service_role;
+
 -- 1 · defaults
 select is(
   (select plan from public.users where id = '0b000000-0000-4000-a000-000000000001'),

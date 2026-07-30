@@ -131,7 +131,9 @@ function fakeReviewSupabase(userOverrides: Partial<FakeUserRow> = {}) {
             reviewSeq += 1;
             const now = new Date().toISOString();
             const row = {
-              id: `review-${reviewSeq}`,
+              // Real uuid shape — the route zod-gates reviewId as uuid,
+              // so follow-up requests must carry one.
+              id: `f1000000-0000-4000-a000-${String(reviewSeq).padStart(12, '0')}`,
               user_id: USER_ID,
               poster_id: null,
               source_kind: 'image',

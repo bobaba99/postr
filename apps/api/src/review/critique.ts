@@ -11,9 +11,9 @@
  * under the [review.critique] tag — the day-one cost instrumentation the
  * pack price and weekly quota are set from (spec §6.2).
  */
-import type Anthropic from '@anthropic-ai/sdk';
+import Anthropic from '@anthropic-ai/sdk';
 import type { CritiqueResult } from '@postr/shared';
-import { REVIEW_MODEL, REVIEW_MAX_TOKENS } from './config.js';
+import { REVIEW_MODEL, REVIEW_MAX_TOKENS, REVIEW_TIMEOUT_MS } from './config.js';
 import { CRITIQUE_TOOL_INPUT_SCHEMA } from './prompt.js';
 import { validateCritique } from './schema.js';
 import type { FetchedPage } from './fetchPages.js';
@@ -80,17 +80,29 @@ export async function callAnthropicCritique(
 
   let response: Anthropic.Message;
   try {
-    response = await anthropic.messages.create({
-      model: REVIEW_MODEL,
-      max_tokens: REVIEW_MAX_TOKENS,
-      system: ctx.systemPrompt,
-      tools: [tool],
-      tool_choice: { type: 'tool', name: 'emit_critique' },
-      messages: [{ role: 'user', content }],
-    });
+    response = await anthropic.messages.create(
+      {
+        model: REVIEW_MODEL,
+        max_tokens: REVIEW_MAX_TOKENS,
+        system: ctx.systemPrompt,
+        tools: [tool],
+        tool_choice: { type: 'tool', name: 'emit_critique' },
+        messages: [{ role: 'user', content }],
+      },
+      // Bounded provider work: explicit deadline per call, and no SDK
+      // retries — a retried review call would silently multiply the
+      // per-credit bill (the route already maps a timeout to a clean 502).
+      { timeout: REVIEW_TIMEOUT_MS, maxRetries: 0 },
+    );
   } catch (err) {
-    const name = err instanceof Error ? err.name : '';
-    if (name === 'TimeoutError' || name === 'APIConnectionTimeoutError') {
+    // instanceof first (the SDK's real timeout class — its `name` is not
+    // reliably 'APIConnectionTimeoutError' across SDK versions), then the
+    // name duck-type so tests can reject with a plain Error.
+    if (
+      err instanceof Anthropic.APIConnectionTimeoutError ||
+      (err instanceof Error &&
+        (err.name === 'TimeoutError' || err.name === 'APIConnectionTimeoutError'))
+    ) {
       throw new CritiqueUpstreamError('timeout');
     }
     // The SDK's APIError carries a numeric `status`; duck-typed so tests
@@ -104,8 +116,12 @@ export async function callAnthropicCritique(
     throw err;
   }
 
+  // Match OUR tool by name, not first-found: with forced tool_choice the
+  // block is always emit_critique, but a contract drift (or a stray
+  // earlier block) must fail typed, never parse the wrong payload.
   const toolUse = response.content.find(
-    (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+    (b): b is Anthropic.ToolUseBlock =>
+      b.type === 'tool_use' && b.name === 'emit_critique',
   );
   // Day-one cost instrumentation + max-tokens truncation spotting —
   // the import.ts:952-957 logging pattern.

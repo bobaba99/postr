@@ -573,7 +573,10 @@ export async function fulfillCheckout(
     // Absolute-value write = naturally idempotent (like the term), so no
     // billing_fulfilled_sessions marker is needed. stripe_customer_id is
     // recorded alongside (not part of the entitlement) so later add-on
-    // lifecycle events can also reconcile by customer id.
+    // lifecycle events can also reconcile by customer id. The conditional
+    // match makes the activation forward-only: a row whose flag is
+    // already set (by THIS or a NEWER add-on subscription) is left
+    // untouched, so a redelivered/stale checkout cannot clobber it.
     const { error } = await supabase
       .from('users')
       .update({
@@ -581,7 +584,7 @@ export async function fulfillCheckout(
         review_addon_subscription_id: sub.id,
         ...(customerId ? { stripe_customer_id: customerId } : {}),
       })
-      .eq('id', userId);
+      .match({ id: userId, review_addon: false });
     if (error) throw new Error(`review_addon grant update: ${error.message}`);
     return;
   }
@@ -614,7 +617,14 @@ export async function fulfillCheckout(
         .eq('id', userId);
     }
 
-    await markSessionFulfilled(supabase, session.id, userId, REVIEW_PACK_CREDITS);
+    // Record 0 (not REVIEW_PACK_CREDITS): the export-pack refund flow
+    // picks the newest fulfilled session with credits_granted > 0, so a
+    // nonzero marker here would let a review purchase be mistaken for an
+    // export pack — refunding the wrong charge and revoking export
+    // credits. Review-SKU refunds are manual via the dashboard (D8), so
+    // this row must stay out of that selection; it exists ONLY for
+    // idempotency.
+    await markSessionFulfilled(supabase, session.id, userId, 0);
     return;
   }
 
@@ -791,25 +801,35 @@ export async function handleSubscriptionChange(
 
     if (TERM_ACTIVE_STATUSES.has(sub.status)) {
       // Still entitled — (re)set the flag and record WHICH subscription
-      // grants it (absolute values, so redelivery is safe).
+      // grants it (absolute values, so redelivery is safe). The
+      // conditional match keeps activation forward-only: an add-on row
+      // already granted (by this or a newer subscription) is not
+      // re-pointed by a stale event.
       const { error } = await supabase
         .from('users')
         .update({
           review_addon: true,
           review_addon_subscription_id: sub.id,
         })
-        .eq('id', addOnUserId);
+        .match({ id: addOnUserId, review_addon: false });
       if (error) throw new Error(`review_addon update: ${error.message}`);
       return;
     }
 
-    // Terminal (canceled / unpaid / incomplete_expired) — clear the flag.
+    // Terminal (canceled / unpaid / incomplete_expired) — clear the flag,
+    // but ONLY if this subscription is the one currently granting it:
+    // a stale terminal event for an OLD add-on subscription must not
+    // revoke access granted by a NEWER one.
     // review_addon_subscription_id is KEPT (not nulled) so a late-arriving
     // event for this same subscription can still reconcile the user.
     const { error } = await supabase
       .from('users')
       .update({ review_addon: false })
-      .eq('id', addOnUserId);
+      .match({
+        id: addOnUserId,
+        review_addon: true,
+        review_addon_subscription_id: sub.id,
+      });
     if (error) throw new Error(`review_addon revoke update: ${error.message}`);
     return;
   }

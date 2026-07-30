@@ -43,7 +43,9 @@ const VALID_CRITIQUE = {
 interface FakeSupabaseOpts {
   userRow?: Record<string, unknown> | null;
   consumeResult?: number | null;
+  grantError?: string;
   insertedId?: string;
+  insertError?: string;
 }
 
 function fakeSupabase(opts: FakeSupabaseOpts = {}) {
@@ -72,7 +74,12 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
           return {
             select: (_cols?: string) => ({
               single: () =>
-                Promise.resolve({ data: { id: opts.insertedId ?? 'review-new-1' }, error: null }),
+                Promise.resolve({
+                  data: opts.insertError
+                    ? null
+                    : { id: opts.insertedId ?? 'review-new-1' },
+                  error: opts.insertError ? { message: opts.insertError } : null,
+                }),
             }),
           };
         },
@@ -80,6 +87,12 @@ function fakeSupabase(opts: FakeSupabaseOpts = {}) {
     },
     rpc(fn: string, args: Record<string, unknown>) {
       rpcs.push({ fn, args });
+      if (fn === 'grant_review_credits') {
+        return Promise.resolve({
+          data: null,
+          error: opts.grantError ? { message: opts.grantError } : null,
+        });
+      }
       return Promise.resolve({
         data: opts.consumeResult === undefined ? 1 : opts.consumeResult,
         error: null,
@@ -260,7 +273,9 @@ describe('POST /api/review/critique — entitlement (D4)', () => {
   it('maps a weekly-window rejection to 402 weekly_quota_exceeded with retryAfterSec', async () => {
     const anthropic = fakeAnthropic();
     const { client } = fakeSupabase({ userRow: ADDON_USER });
-    const fetchFn = vi.fn();
+    // Weekly-slot consumption is deferred until AFTER the page-fetch
+    // guards succeed, so the fetch must resolve for the limiter to run.
+    const fetchFn = vi.fn().mockResolvedValue(imageResponse());
     // Mirrors createRateLimiter's own rejection wire shape; the router
     // invokes it with a capturing response, never the real one.
     const weeklyLimiter: RequestHandler = (_req, res, _next) => {
@@ -309,6 +324,49 @@ describe('POST /api/review/critique — entitlement (D4)', () => {
 });
 
 describe('POST /api/review/critique — initial critique', () => {
+  it('does not consume an add-on weekly slot when the guarded page fetch fails', async () => {
+    const anthropic = fakeAnthropic();
+    const { client } = fakeSupabase({ userRow: ADDON_USER });
+    const fetchFn = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
+    const weeklyLimiter = vi.fn<RequestHandler>((_req, _res, next) => next());
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+      weeklyLimiter,
+    });
+
+    const res = await post(app, validBody());
+
+    // Ingest failures cost nothing (no slot burned, no model call), and a
+    // storage hiccup is a 502 — not the client's fault.
+    expect(res.status).toBe(502);
+    expect(weeklyLimiter).not.toHaveBeenCalled();
+    expect(anthropic.create).not.toHaveBeenCalled();
+  });
+
+  it('maps an upstream page-fetch failure to 502 fetch_failed and charges nothing', async () => {
+    const anthropic = fakeAnthropic();
+    const { client, rpcs, inserts } = fakeSupabase({ userRow: PACK_USER });
+    const fetchFn = vi.fn().mockResolvedValue(new Response(null, { status: 503 }));
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const res = await post(app, validBody());
+
+    // 502, not 400: a storage/upstream hiccup is not a client error
+    // (url_not_allowed and unsupported_media remain 400 — those ARE the
+    // client's fault).
+    expect(res.status).toBe(502);
+    expect(res.body.error).toBe('fetch_failed');
+    expect(anthropic.create).not.toHaveBeenCalled();
+    expect(rpcs).toHaveLength(0);
+    expect(inserts).toHaveLength(0);
+  });
+
   it('runs the pack path and consumes the credit AFTER success', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
@@ -345,6 +403,60 @@ describe('POST /api/review/critique — initial critique', () => {
       output_tokens: 80,
       filename: 'poster.pdf',
     });
+  });
+
+  it('restores a consumed pack credit when persistence fails', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const anthropic = fakeAnthropic();
+    const { client, rpcs } = fakeSupabase({
+      userRow: PACK_USER,
+      insertError: 'insert unavailable',
+    });
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: vi.fn().mockResolvedValue(imageResponse()) as unknown as typeof fetch,
+    });
+
+    const res = await post(app, validBody());
+
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'review_internal' });
+    // The credit was consumed but the review row is lost — the route
+    // compensates with a grant of exactly one credit before the 500.
+    expect(rpcs).toEqual([
+      { fn: 'consume_review_credit', args: { p_user_id: 'user-1' } },
+      { fn: 'grant_review_credits', args: { p_user_id: 'user-1', p_amount: 1 } },
+    ]);
+  });
+
+  it('logs loudly and still returns 500 when the credit restoration itself fails', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { client } = fakeSupabase({
+      userRow: PACK_USER,
+      insertError: 'insert unavailable',
+      grantError: 'grant unavailable',
+    });
+    const app = buildApp({
+      supabase: client,
+      fetchFn: vi.fn().mockResolvedValue(imageResponse()) as unknown as typeof fetch,
+    });
+
+    const res = await post(app, validBody());
+
+    expect(res.status).toBe(500);
+    expect(errorLog).toHaveBeenCalledWith(
+      '[review.critique] credit compensation failed',
+      expect.objectContaining({
+        userId: 'user-1',
+        stage: 'initial',
+        creditSource: 'pack',
+        persistenceMessage: 'insert unavailable',
+        compensationMessage: 'grant unavailable',
+      }),
+    );
   });
 
   it('runs the add-on path through the weekly limiter and never touches credits', async () => {

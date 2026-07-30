@@ -4,6 +4,7 @@
  * { create } }` plain object cast to Anthropic — no vi.mock, no network.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { APIConnectionTimeoutError } from '@anthropic-ai/sdk';
 import type Anthropic from '@anthropic-ai/sdk';
 import type { CritiqueResult } from '@postr/shared';
 import {
@@ -11,7 +12,7 @@ import {
   CritiqueUpstreamError,
   type CritiqueCallCtx,
 } from '../review/critique.js';
-import { REVIEW_MODEL, REVIEW_MAX_TOKENS } from '../review/config.js';
+import { REVIEW_MODEL, REVIEW_MAX_TOKENS, REVIEW_TIMEOUT_MS } from '../review/config.js';
 
 const VALID_CRITIQUE: CritiqueResult = {
   dimensionScores: { narrative: 4, design: 2, content: 3 },
@@ -77,6 +78,9 @@ describe('callAnthropicCritique — success', () => {
         system: 'SYS',
         tool_choice: { type: 'tool', name: 'emit_critique' },
       }),
+      // Bounded provider work: an explicit per-call deadline, and no SDK
+      // retries multiplying the per-review bill.
+      { timeout: REVIEW_TIMEOUT_MS, maxRetries: 0 },
     );
   });
 
@@ -143,6 +147,26 @@ describe('callAnthropicCritique — failure mapping', () => {
     ).rejects.toMatchObject({ code: 'bad_tool_json' });
   });
 
+  it('a tool_use block for a DIFFERENT tool → no_tool_call (matched by name, not first-found)', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const create = vi.fn().mockResolvedValue({
+      content: [
+        {
+          type: 'tool_use',
+          id: 'toolu_test',
+          name: 'wrong_tool',
+          input: VALID_CRITIQUE,
+        },
+      ],
+      stop_reason: 'tool_use',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+    const anthropic = fakeAnthropic(create);
+    await expect(
+      callAnthropicCritique(anthropic.client, CTX),
+    ).rejects.toMatchObject({ code: 'no_tool_call' });
+  });
+
   it('SDK http error → http_error with the upstream status', async () => {
     const create = vi
       .fn()
@@ -161,6 +185,17 @@ describe('callAnthropicCritique — failure mapping', () => {
     const timeoutErr = new Error('request timed out');
     timeoutErr.name = 'APIConnectionTimeoutError';
     const create = vi.fn().mockRejectedValue(timeoutErr);
+    const anthropic = fakeAnthropic(create);
+    await expect(
+      callAnthropicCritique(anthropic.client, CTX),
+    ).rejects.toMatchObject({ code: 'timeout' });
+  });
+
+  it('real SDK APIConnectionTimeoutError instance → timeout (instanceof, not just the name)', async () => {
+    const timeoutError = new APIConnectionTimeoutError({
+      message: 'request timed out',
+    });
+    const create = vi.fn().mockRejectedValue(timeoutError);
     const anthropic = fakeAnthropic(create);
     await expect(
       callAnthropicCritique(anthropic.client, CTX),

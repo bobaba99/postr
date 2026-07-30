@@ -20,6 +20,14 @@ export const REVIEW_MODEL = 'claude-sonnet-4-5-20250929';
  */
 export const REVIEW_MAX_TOKENS = 8192;
 
+/**
+ * Provider call deadline (milliseconds), passed per-call to the Anthropic
+ * SDK alongside `maxRetries: 0` — keeps provider work bounded and prevents
+ * SDK retries from silently multiplying the per-review bill. Mirrors
+ * CONDENSER_TIMEOUT_MS in narrative/config.ts.
+ */
+export const REVIEW_TIMEOUT_MS = 60_000;
+
 /** Hard page cap (spec §1) — over → typed error, never silent truncation. */
 export const REVIEW_MAX_PAGES = 24;
 

@@ -63,6 +63,12 @@ select
   'Fixture version #' || n, '{}'::jsonb
 from generate_series(1, 29) as n;
 
+-- Supply the API grants needed to exercise RLS in local CLI environments
+-- where PostgREST's environment-owned grants are absent. The surrounding
+-- transaction rolls these fixture privileges back.
+grant select on public.posters to authenticated;
+grant select, insert, update, delete on public.poster_versions to authenticated;
+
 -- --------------------------------------------------------------------------
 -- Impersonate u1 as PostgREST would: claims GUC + the authenticated role.
 -- --------------------------------------------------------------------------

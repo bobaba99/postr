@@ -38,7 +38,7 @@ const VALID_CRITIQUE = {
 
 /** The stored review the follow-up runs against (stage 'initial'). */
 const REVIEW_ROW = {
-  id: 'review-1',
+  id: 'e1000000-0000-4000-a000-000000000001',
   user_id: 'user-1',
   status: 'complete',
   stage: 'initial',
@@ -143,7 +143,7 @@ function validBody(overrides: Record<string, unknown> = {}) {
   return {
     sourceKind: 'pdf',
     pages: [{ pageNumber: 1, url: PAGE_URL, widthPx: 2048, heightPx: 1152 }],
-    reviewId: 'review-1',
+    reviewId: REVIEW_ROW.id,
     ...overrides,
   };
 }
@@ -165,6 +165,26 @@ afterEach(() => {
 });
 
 describe('POST /api/review/critique — follow-up (§5.2)', () => {
+  it('rejects a malformed (non-uuid) reviewId with 400 bad_request — never reaching the DB cast', async () => {
+    const anthropic = fakeAnthropic();
+    const { client } = fakeSupabase({ reviewRow: REVIEW_ROW });
+    const fetchFn = vi.fn();
+    const app = buildApp({
+      supabase: client,
+      anthropic: anthropic.client,
+      fetchFn: fetchFn as unknown as typeof fetch,
+    });
+
+    const res = await post(app, validBody({ reviewId: 'not-a-uuid' }));
+
+    // Zod owns this gate: a malformed id 400s here instead of 500ing on
+    // the Postgres uuid cast in the poster_reviews lookup.
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('bad_request');
+    expect(fetchFn).not.toHaveBeenCalled();
+    expect(anthropic.create).not.toHaveBeenCalled();
+  });
+
   it('runs the follow-up against the initial findings and closes the review without charging', async () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     const anthropic = fakeAnthropic();
@@ -179,7 +199,7 @@ describe('POST /api/review/critique — follow-up (§5.2)', () => {
     const res = await post(app, validBody());
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ reviewId: 'review-1', stage: 'closed' });
+    expect(res.body).toMatchObject({ reviewId: REVIEW_ROW.id, stage: 'closed' });
     expect(res.body.critique.findings).toHaveLength(1);
 
     // The follow-up is a diff, not a fresh review: the model received
@@ -190,7 +210,7 @@ describe('POST /api/review/critique — follow-up (§5.2)', () => {
     // One write: follow-up findings + terminal close.
     expect(updates).toHaveLength(1);
     expect(updates[0]!.table).toBe('poster_reviews');
-    expect(updates[0]!.eqVal).toBe('review-1');
+    expect(updates[0]!.eqVal).toBe(REVIEW_ROW.id);
     expect(updates[0]!.payload.stage).toBe('closed');
     expect(updates[0]!.payload.followup_findings).toBeDefined();
     expect(typeof updates[0]!.payload.updated_at).toBe('string');
