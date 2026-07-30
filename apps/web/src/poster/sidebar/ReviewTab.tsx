@@ -16,7 +16,7 @@
  * request, paywall, follow-up — that needs isolated tests, and
  * Sidebar.tsx is already ~4.3k lines.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { ReviewAnchor, ReviewSeverity } from '@postr/shared';
 import { BusyIndicator, busyProps } from '@/components/BusyIndicator';
@@ -25,7 +25,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { formatRetryAfter } from '@/lib/apiClient';
 import { createCheckout } from '@/data/billing';
 import { stashCheckoutIntent } from '@/data/checkoutIntent';
-import { ingestPosterForReview } from '@/review/ingest';
+import { cleanupReviewTemp, ingestPosterForReview } from '@/review/ingest';
 import {
   requestCritique,
   ReviewPaymentRequiredError,
@@ -80,6 +80,20 @@ export function ReviewTab({
   const [failed, setFailed] = useState(false);
   const [checkoutFailed, setCheckoutFailed] = useState(false);
   const [followupConfirm, setFollowupConfirm] = useState(false);
+  // review-temp storage paths of every capture this tab ingested —
+  // deleted on unmount and on "Start a new review" (the tab renders no
+  // images; nothing re-reads them after that).
+  const tempPathsRef = useRef<string[]>([]);
+
+  // Fire-and-forget on unmount — the editor must never wait on storage.
+  // Reads a ref, so the empty deps are honest.
+  useEffect(() => {
+    return () => {
+      if (tempPathsRef.current.length > 0) {
+        void cleanupReviewTemp(tempPathsRef.current);
+      }
+    };
+  }, []);
 
   async function run(reviewId?: string) {
     if (!doc || !posterId || running) return;
@@ -88,6 +102,9 @@ export function ReviewTab({
     setPaywall(null);
     try {
       const art = await ingestPosterForReview({ doc, posterId });
+      tempPathsRef.current.push(
+        ...art.pages.map((p) => p.storagePath).filter((path) => path !== ''),
+      );
       const res = await requestCritique({
         sourceKind: 'postr',
         pages: art.pages.map((p) => ({
@@ -135,6 +152,16 @@ export function ReviewTab({
     if (anchor.kind !== 'block' || !onJumpToBlock) return undefined;
     const blockId = anchor.blockId;
     return () => onJumpToBlock(blockId);
+  }
+
+  /** "Start a new review": drop the old review's temp images
+   *  (fire-and-forget — never awaited), then run fresh. */
+  function startFresh() {
+    if (tempPathsRef.current.length > 0) {
+      void cleanupReviewTemp(tempPathsRef.current);
+      tempPathsRef.current = [];
+    }
+    void run();
   }
 
   // Two gates, one panel: the plan pre-gate (saves a wasted capture)
@@ -330,7 +357,7 @@ export function ReviewTab({
               <button
                 type="button"
                 disabled={running}
-                onClick={() => void run()}
+                onClick={startFresh}
                 style={{ ...secondaryButton, marginTop: 8 }}
               >
                 Start a new review

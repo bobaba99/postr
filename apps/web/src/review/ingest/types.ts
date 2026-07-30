@@ -13,7 +13,7 @@ import type { PosterDoc, ReviewSourceKind } from '@postr/shared';
 /** One uploaded, signed page image ready for the critique call. */
 export interface PageImage {
   pageNumber: number; // 1-based, reading order
-  storagePath: string; // poster-assets path ('' for server-owned PPTX pages)
+  storagePath: string; // poster-assets review-temp path ('' if the server omitted it)
   signedUrl: string;
   widthPx: number;
   heightPx: number;

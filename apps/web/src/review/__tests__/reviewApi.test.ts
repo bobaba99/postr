@@ -88,6 +88,23 @@ describe('requestCritique', () => {
     expect((err as ReviewPaymentRequiredError).retryAfterSec).toBe(3600);
   });
 
+  it('reads retryAfterSec from the 402 body when no Retry-After header was set', async () => {
+    // The weekly-quota 402 carries retryAfterSec in its JSON body; the
+    // Retry-After HEADER (apiClient's only source) is absent on 402s.
+    postJsonMock.mockRejectedValue(
+      new ApiError('review_payment_required', 402, {
+        error: 'review_payment_required',
+        reason: 'weekly_quota_exceeded',
+        retryAfterSec: 5400,
+      }),
+    );
+
+    const err: unknown = await requestCritique(BODY).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(ReviewPaymentRequiredError);
+    expect((err as ReviewPaymentRequiredError).retryAfterSec).toBe(5400);
+  });
+
   it("defaults the 402 reason to 'no_credit' when the body lacks one", async () => {
     postJsonMock.mockRejectedValue(
       new ApiError('review_payment_required', 402, null),

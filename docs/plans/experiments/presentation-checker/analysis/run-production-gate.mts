@@ -26,6 +26,7 @@ import {
 import { callAnthropicCritique } from '../../../../../apps/api/src/review/critique.ts';
 import { enforceFindings } from '../../../../../apps/api/src/review/enforce.ts';
 import { computeReviewSignals } from '../../../../../apps/api/src/review/signals.ts';
+import { CURRENT_RUBRIC_VERSION } from '../../../../../apps/api/src/review/rubric/index.ts';
 import type { FetchedPage } from '../../../../../apps/api/src/review/fetchPages.ts';
 
 // Same pricing caveat as the prototype: CONFIRM current Sonnet 4.5 list
@@ -106,7 +107,13 @@ for (const item of items) {
 
   writeFileSync(
     join(outDir, `${item.id}.json`),
-    JSON.stringify({ posterId: item.id, critique: result, usage }, null, 2) + '\n',
+    // §2.0 provenance: every artifact is stamped with the rubric that
+    // produced it.
+    JSON.stringify(
+      { posterId: item.id, rubric_version: CURRENT_RUBRIC_VERSION, critique: result, usage },
+      null,
+      2,
+    ) + '\n',
   );
   appendFileSync(
     costsPath,

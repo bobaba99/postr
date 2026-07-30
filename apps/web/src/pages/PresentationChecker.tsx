@@ -2,11 +2,13 @@
  * /presentation-checker — the Presentation Checker standalone page
  * (spec §1: one unified surface for posters AND talks).
  *
- * Upload a poster PDF, a talk deck (.pptx / .pdf), or an image — or,
- * signed in, pick one of your Postr posters — and get per-dimension
- * scores plus anchored fix cards with a rewritten example for each.
- * One follow-up per review, disclosed up front ("This is your one
- * follow-up — the review closes after it."), then the review closes.
+ * Upload a poster PDF, a talk deck (.pptx / .pdf), or an image and get
+ * per-dimension scores plus anchored fix cards with a rewritten example
+ * for each. Postr-native reviews live in the editor's review tab — the
+ * standalone page never mounts #poster-canvas, so the capture-based
+ * poster ingest cannot run here. One follow-up per review, disclosed up
+ * front ("This is your one follow-up — the review closes after it."),
+ * then the review closes.
  *
  * The route is registered but deliberately NOT linked from nav (D12) —
  * the SEO record is an `app` (noindex) entry until the Milestone-6
@@ -20,11 +22,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import type {
-  PosterDoc,
-  ReviewSeverity,
-  ReviewSourceKind,
-} from '@postr/shared';
+import type { ReviewSeverity, ReviewSourceKind } from '@postr/shared';
 import { BusyIndicator, busyProps } from '@/components/BusyIndicator';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
@@ -34,8 +32,7 @@ import { usePlan } from '@/hooks/usePlan';
 import { ApiError, formatRetryAfter } from '@/lib/apiClient';
 import { createCheckout } from '@/data/billing';
 import { stashCheckoutIntent } from '@/data/checkoutIntent';
-import { listPosters, loadPoster, type PosterListRow } from '@/data/posters';
-import { ingestFileForReview, ingestPosterForReview } from '@/review/ingest';
+import { cleanupReviewTemp, ingestFileForReview } from '@/review/ingest';
 import {
   IngestError,
   type IngestErrorKind,
@@ -117,7 +114,6 @@ export default function PresentationChecker() {
   const [phase, setPhase] = useState<Phase>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [artifact, setArtifact] = useState<NormalizedArtifact | null>(null);
-  const [sourcePosterId, setSourcePosterId] = useState<string | null>(null);
   const [result, setResult] = useState<CritiqueResponse | null>(null);
   const [paywall, setPaywall] = useState<ReviewPaymentRequiredError | null>(null);
   const [followupConfirm, setFollowupConfirm] = useState(false);
@@ -127,9 +123,11 @@ export default function PresentationChecker() {
     bbox: [number, number, number, number];
   } | null>(null);
   const [pastReviews, setPastReviews] = useState<PosterReviewSummary[]>([]);
-  const [myPosters, setMyPosters] = useState<PosterListRow[]>([]);
-  const [pickedPosterId, setPickedPosterId] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // review-temp storage paths of every page ingested while this page is
+  // mounted — deleted on unmount and on "Start a new review" (results
+  // live in component memory; nothing re-reads the images after that).
+  const tempPathsRef = useRef<string[]>([]);
 
   async function refreshHistory() {
     try {
@@ -139,20 +137,22 @@ export default function PresentationChecker() {
     }
   }
 
-  async function refreshPosters() {
-    try {
-      setMyPosters(await listPosters());
-    } catch (err) {
-      console.error('[review] poster list read failed:', err);
-    }
-  }
-
   useEffect(() => {
     if (plan.loading || plan.isGuest) return;
     void refreshHistory();
-    void refreshPosters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan.loading, plan.isGuest]);
+
+  // Fire-and-forget on unmount: delete this session's review-temp page
+  // images. Never awaited — navigation must not wait on storage. Reads
+  // a ref, so the empty deps are honest.
+  useEffect(() => {
+    return () => {
+      if (tempPathsRef.current.length > 0) {
+        void cleanupReviewTemp(tempPathsRef.current);
+      }
+    };
+  }, []);
 
   /**
    * The one path every review takes: ingest → critique. Ingest failures
@@ -162,7 +162,7 @@ export default function PresentationChecker() {
    */
   async function startReview(
     job: () => Promise<NormalizedArtifact>,
-    opts: { posterId?: string; reviewId?: string } = {},
+    opts: { reviewId?: string } = {},
   ) {
     setPaywall(null);
     setErrorMessage(null);
@@ -182,7 +182,9 @@ export default function PresentationChecker() {
       return;
     }
     setArtifact(art);
-    setSourcePosterId(opts.posterId ?? null);
+    tempPathsRef.current.push(
+      ...art.pages.map((p) => p.storagePath).filter((path) => path !== ''),
+    );
     setPhase('reviewing');
     try {
       const res = await requestCritique({
@@ -195,7 +197,6 @@ export default function PresentationChecker() {
           heightPx: p.heightPx,
         })),
         posterDoc: art.posterDoc,
-        posterId: opts.posterId,
         reviewId: opts.reviewId,
       });
       setResult(res);
@@ -223,40 +224,14 @@ export default function PresentationChecker() {
     });
   }
 
-  async function runPosterReview(posterId: string) {
-    const row = await loadPoster(posterId);
-    if (!row) {
-      setErrorMessage('That poster could not be loaded — it may have been deleted.');
-      setPhase('error');
-      return;
-    }
-    const doc: PosterDoc = row.data;
-    await startReview(() => ingestPosterForReview({ doc, posterId }), {
-      posterId,
-    });
-  }
-
-  /** Follow-up on a Postr poster: re-read it fresh — the user revised. */
-  async function runPosterFollowup() {
-    if (!result || !sourcePosterId) return;
-    const row = await loadPoster(sourcePosterId);
-    if (!row) {
-      setErrorMessage('That poster could not be loaded — it may have been deleted.');
-      setPhase('error');
-      return;
-    }
-    const doc: PosterDoc = row.data;
-    const posterId = row.id;
-    await startReview(() => ingestPosterForReview({ doc, posterId }), {
-      posterId,
-      reviewId: result.reviewId,
-    });
-  }
-
   function resetForNewReview() {
+    // Fire-and-forget — the reset must never wait on storage.
+    if (tempPathsRef.current.length > 0) {
+      void cleanupReviewTemp(tempPathsRef.current);
+      tempPathsRef.current = [];
+    }
     setResult(null);
     setArtifact(null);
-    setSourcePosterId(null);
     setFollowupConfirm(false);
     setPendingFollowup(false);
     setActiveRegion(null);
@@ -419,31 +394,20 @@ export default function PresentationChecker() {
                       This is your one follow-up — the review closes after it.
                     </p>
                     <p className="mt-1 text-sm leading-relaxed text-[#9ca3af]">
-                      {sourcePosterId
-                        ? 'Save your revisions in the editor first — the follow-up re-reads your poster as it is now.'
-                        : 'Pick the revised file — the follow-up reads it against the findings above.'}
+                      Pick the revised file — the follow-up reads it against
+                      the findings above.
                     </p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {sourcePosterId ? (
-                        <button
-                          type="button"
-                          onClick={() => void runPosterFollowup()}
-                          className="inline-flex min-h-11 items-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110"
-                        >
-                          Run the follow-up on my poster
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPendingFollowup(true);
-                            fileInputRef.current?.click();
-                          }}
-                          className="inline-flex min-h-11 items-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110"
-                        >
-                          Choose the revised file
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPendingFollowup(true);
+                          fileInputRef.current?.click();
+                        }}
+                        className="inline-flex min-h-11 items-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110"
+                      >
+                        Choose the revised file
+                      </button>
                       <button
                         type="button"
                         onClick={() => setFollowupConfirm(false)}
@@ -524,38 +488,15 @@ export default function PresentationChecker() {
                     Choose a file
                   </button>
 
-                  {!plan.isGuest && myPosters.length > 0 && (
-                    <div className="mt-5 border-t border-[#1f1f2e] pt-4">
-                      <label
-                        htmlFor="review-poster"
-                        className="block text-sm font-semibold text-[#e2e2e8]"
-                      >
-                        …or review one of your Postr posters
-                      </label>
-                      <div className="mt-2 flex gap-2">
-                        <select
-                          id="review-poster"
-                          value={pickedPosterId}
-                          onChange={(e) => setPickedPosterId(e.target.value)}
-                          className="min-w-0 flex-1 rounded-md border border-[#3a3a4e] bg-[#111118] px-3 py-2 text-sm text-[#c8cad0]"
-                        >
-                          <option value="">Choose a poster…</option>
-                          {myPosters.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.title || 'Untitled poster'}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          disabled={!pickedPosterId}
-                          onClick={() => void runPosterReview(pickedPosterId)}
-                          className="inline-flex min-h-11 shrink-0 items-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
-                        >
-                          Review this poster
-                        </button>
-                      </div>
-                    </div>
+                  {!plan.isGuest && (
+                    <p className="mt-5 border-t border-[#1f1f2e] pt-4 text-xs leading-relaxed text-[#6b7280]">
+                      Working on a poster in Postr? Open it in the editor and
+                      run the review from the new{' '}
+                      <strong className="font-semibold text-[#c8cad0]">
+                        review
+                      </strong>{' '}
+                      tab in the sidebar.
+                    </p>
                   )}
 
                   {plan.isGuest && (

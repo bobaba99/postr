@@ -55,8 +55,20 @@ describe('fromPptx', () => {
   it('round-trips the raw file and normalizes the rendered pages', async () => {
     mockPostJson.mockResolvedValue({
       pages: [
-        { pageNumber: 1, url: 'https://signed/p1', widthPx: 1280, heightPx: 720 },
-        { pageNumber: 2, url: 'https://signed/p2', widthPx: 1280, heightPx: 720 },
+        {
+          pageNumber: 1,
+          url: 'https://signed/p1',
+          widthPx: 1280,
+          heightPx: 720,
+          storagePath: 'u1/review-temp/batch-1/page-1.jpg',
+        },
+        {
+          pageNumber: 2,
+          url: 'https://signed/p2',
+          widthPx: 1280,
+          heightPx: 720,
+          storagePath: 'u1/review-temp/batch-1/page-2.jpg',
+        },
       ],
     });
 
@@ -76,9 +88,11 @@ describe('fromPptx', () => {
       { fileUrl: 'https://signed/raw-pptx' },
       { auth: true },
     );
+    // The route's server-owned review-temp paths ride along so the
+    // caller can delete the temp pages with cleanupReviewTemp.
     expect(artifact.pages).toEqual([
-      { pageNumber: 1, storagePath: '', signedUrl: 'https://signed/p1', widthPx: 1280, heightPx: 720 },
-      { pageNumber: 2, storagePath: '', signedUrl: 'https://signed/p2', widthPx: 1280, heightPx: 720 },
+      { pageNumber: 1, storagePath: 'u1/review-temp/batch-1/page-1.jpg', signedUrl: 'https://signed/p1', widthPx: 1280, heightPx: 720 },
+      { pageNumber: 2, storagePath: 'u1/review-temp/batch-1/page-2.jpg', signedUrl: 'https://signed/p2', widthPx: 1280, heightPx: 720 },
     ]);
     expect(artifact.meta).toMatchObject({
       sourceKind: 'pptx',
@@ -86,6 +100,18 @@ describe('fromPptx', () => {
       pageCount: 2,
     });
     expect(mockRemove).toHaveBeenCalledWith(['u1/review-temp/sess-1/source.pptx']);
+  });
+
+  it("falls back to '' when the route omits storagePath", async () => {
+    mockPostJson.mockResolvedValue({
+      pages: [
+        { pageNumber: 1, url: 'https://signed/p1', widthPx: 1280, heightPx: 720 },
+      ],
+    });
+
+    const artifact = await fromPptx(pptxFile(), CTX);
+
+    expect(artifact.pages[0]!.storagePath).toBe('');
   });
 
   it("maps the route's too_many_pages body to too-many-pages", async () => {

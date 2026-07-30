@@ -66,10 +66,16 @@ export async function requestCritique(
     });
   } catch (err) {
     if (err instanceof ApiError && err.status === 402) {
-      const paymentBody = err.body as { reason?: string } | null;
+      // The route puts retryAfterSec in the 402 JSON body; the
+      // Retry-After header (apiClient's only source) is absent on 402s,
+      // so read the body first and fall back to the header value.
+      const paymentBody = err.body as {
+        reason?: string;
+        retryAfterSec?: number;
+      } | null;
       throw new ReviewPaymentRequiredError(
         paymentBody?.reason ?? 'no_credit',
-        err.retryAfterSec,
+        paymentBody?.retryAfterSec ?? err.retryAfterSec,
       );
     }
     if (err instanceof ApiError && err.status === 429) {

@@ -3,6 +3,8 @@
  * ingest context (the current session's user id — anonymous sessions are
  * fine, storage RLS scopes to auth.uid() — plus a fresh sessionId per
  * call for the temp upload prefix) and dispatch through normalizeInput.
+ * cleanupReviewTemp is the fire-and-forget delete for the temp page
+ * images, run on unmount / "start a new review".
  */
 import type { PosterDoc } from '@postr/shared';
 import { ensureSession } from '@/lib/auth';
@@ -35,4 +37,21 @@ export async function ingestPosterForReview(input: {
 }): Promise<NormalizedArtifact> {
   const ctx = await resolveIngestContext();
   return normalizeInput({ kind: 'postr', ...input }, ctx);
+}
+
+/**
+ * Best-effort delete of a review's review-temp page images. Callers
+ * fire-and-forget (`void cleanupReviewTemp(paths)`) on unmount and on
+ * "start a new review" — results live in component memory, so the
+ * images have no consumer once the view is gone. Failures are
+ * swallowed: a stranded temp object is harmless (RLS still scopes it
+ * to the owner; the post-launch scheduled sweep is the backstop).
+ */
+export async function cleanupReviewTemp(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  try {
+    await supabase.storage.from('poster-assets').remove(paths);
+  } catch {
+    // Best-effort by design — see the docblock.
+  }
 }

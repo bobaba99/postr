@@ -322,6 +322,9 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
           url: signed.signedUrl,
           widthPx: page.widthPx,
           heightPx: page.heightPx,
+          // The client deletes its review-temp pages when the review is
+          // done — the path rides along for that cleanup.
+          storagePath: path,
         });
       }
 

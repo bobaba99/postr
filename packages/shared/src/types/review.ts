@@ -99,4 +99,9 @@ export interface ReviewPageRef {
   url: string;
   widthPx: number;
   heightPx: number;
+  /** render-pptx responses only: the server-owned review-temp storage
+   *  path, so the client can delete its temp pages once the review is
+   *  done. Never sent on critique requests (the route's schema strips
+   *  it). */
+  storagePath?: string;
 }

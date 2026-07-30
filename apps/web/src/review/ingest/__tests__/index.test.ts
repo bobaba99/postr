@@ -2,20 +2,25 @@
  * The UI barrel: the wrappers resolve the ingest context (session
  * userId + a fresh sessionId per call) and dispatch through
  * normalizeInput — components never build IngestContext themselves.
+ * cleanupReviewTemp is the fire-and-forget temp-folder delete the
+ * pages run on unmount/reset.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { PosterDoc } from '@postr/shared';
 
-const { mockNormalize, mockEnsureSession } = vi.hoisted(() => ({
+const { mockNormalize, mockEnsureSession, mockRemove } = vi.hoisted(() => ({
   mockNormalize: vi.fn(),
   mockEnsureSession: vi.fn(),
+  mockRemove: vi.fn(),
 }));
 
 vi.mock('../normalizeInput', () => ({ normalizeInput: mockNormalize }));
-vi.mock('@/lib/supabase', () => ({ supabase: {} }));
+vi.mock('@/lib/supabase', () => ({
+  supabase: { storage: { from: () => ({ remove: mockRemove }) } },
+}));
 vi.mock('@/lib/auth', () => ({ ensureSession: mockEnsureSession }));
 
-import { ingestFileForReview, ingestPosterForReview } from '../index';
+import { cleanupReviewTemp, ingestFileForReview, ingestPosterForReview } from '../index';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -24,6 +29,7 @@ beforeEach(() => {
     pages: [],
     meta: { sourceKind: 'pdf', pageCount: 0, ingestedAt: '2026-07-29T00:00:00.000Z' },
   });
+  mockRemove.mockResolvedValue({ data: null, error: null });
 });
 
 describe('ingestFileForReview', () => {
@@ -61,5 +67,30 @@ describe('ingestPosterForReview', () => {
       { kind: 'postr', doc, posterId: 'p1' },
       { userId: 'u1', sessionId: expect.any(String) },
     );
+  });
+});
+
+describe('cleanupReviewTemp', () => {
+  it('removes the given poster-assets paths', async () => {
+    await cleanupReviewTemp([
+      'u1/review-temp/sess-1/page-1.jpg',
+      'u1/review-temp/sess-1/page-2.jpg',
+    ]);
+    expect(mockRemove).toHaveBeenCalledWith([
+      'u1/review-temp/sess-1/page-1.jpg',
+      'u1/review-temp/sess-1/page-2.jpg',
+    ]);
+  });
+
+  it('no-ops on an empty path list', async () => {
+    await cleanupReviewTemp([]);
+    expect(mockRemove).not.toHaveBeenCalled();
+  });
+
+  it('swallows storage failures — temp cleanup is best-effort', async () => {
+    mockRemove.mockRejectedValue(new Error('storage down'));
+    await expect(
+      cleanupReviewTemp(['u1/review-temp/sess-1/page-1.jpg']),
+    ).resolves.toBeUndefined();
   });
 });

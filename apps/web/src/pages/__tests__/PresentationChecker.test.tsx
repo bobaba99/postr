@@ -1,10 +1,10 @@
 /**
  * /presentation-checker page — the public review surface.
  *
- * reviewApi, the ingest layer, usePlan, the posters repo, billing,
- * checkout intent, and supabase are all module-mocked: these tests pin
- * the page's behaviour (happy path, paywall on 402, follow-up
- * disclosure, region-anchor overlay), never the network. The mocked
+ * reviewApi, the ingest layer, usePlan, billing, checkout intent, and
+ * supabase are all module-mocked: these tests pin the page's behaviour
+ * (happy path, paywall on 402, follow-up disclosure, region-anchor
+ * overlay, review-temp cleanup), never the network. The mocked
  * ReviewPaymentRequiredError class keeps `instanceof` working because
  * the page and the test share the same mocked binding.
  */
@@ -17,12 +17,12 @@ const {
   requestCritiqueMock,
   listMyReviewsMock,
   ingestFileMock,
-  ingestPosterMock,
+  cleanupMock,
 } = vi.hoisted(() => ({
   requestCritiqueMock: vi.fn(),
   listMyReviewsMock: vi.fn(async () => []),
   ingestFileMock: vi.fn(),
-  ingestPosterMock: vi.fn(),
+  cleanupMock: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/review/reviewApi', () => ({
@@ -42,7 +42,7 @@ vi.mock('@/review/reviewApi', () => ({
 
 vi.mock('@/review/ingest', () => ({
   ingestFileForReview: ingestFileMock,
-  ingestPosterForReview: ingestPosterMock,
+  cleanupReviewTemp: cleanupMock,
 }));
 
 const planState = {
@@ -60,10 +60,6 @@ const planState = {
 };
 vi.mock('@/hooks/usePlan', () => ({ usePlan: () => planState.value }));
 
-vi.mock('@/data/posters', () => ({
-  listPosters: vi.fn(async () => []),
-  loadPoster: vi.fn(async () => null),
-}));
 vi.mock('@/data/billing', () => ({ createCheckout: vi.fn() }));
 vi.mock('@/data/checkoutIntent', () => ({ stashCheckoutIntent: vi.fn() }));
 vi.mock('@/lib/supabase', () => ({
@@ -159,7 +155,8 @@ beforeEach(() => {
   listMyReviewsMock.mockResolvedValue([]);
   ingestFileMock.mockReset();
   ingestFileMock.mockResolvedValue(ARTIFACT);
-  ingestPosterMock.mockReset();
+  cleanupMock.mockReset();
+  cleanupMock.mockResolvedValue(undefined);
   planState.value = {
     loading: false,
     hasActiveTerm: false,
@@ -226,7 +223,6 @@ describe('PresentationChecker page', () => {
         },
       ],
       posterDoc: undefined,
-      posterId: undefined,
       reviewId: undefined,
     });
   });
@@ -296,5 +292,79 @@ describe('PresentationChecker page', () => {
     expect(overlay.style.top).toBe('20%');
     expect(overlay.style.width).toBe('30%');
     expect(overlay.style.height).toBe('40%');
+  });
+
+  it('a weekly-quota 402 renders the "opens up in" line with the retry wait', async () => {
+    requestCritiqueMock.mockRejectedValue(
+      new ReviewPaymentRequiredError('weekly_quota_exceeded', 3600),
+    );
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    uploadFile();
+
+    expect(
+      await screen.findByText(/next weekly review opens up in 1 hour/i),
+    ).toBeTruthy();
+  });
+
+  it('signed-in users are pointed at the editor review tab — no poster picker', async () => {
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByText(/review one of your Postr posters/i)).toBeNull();
+    // findBy* also flushes the mount effects inside act.
+    expect(
+      await screen.findByText(/Working on a poster in Postr/i),
+    ).toBeTruthy();
+  });
+
+  it('unmounting deletes the ingested pages’ review-temp paths', async () => {
+    requestCritiqueMock.mockResolvedValue(CRITIQUE);
+    const { unmount } = render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+    uploadFile();
+    await screen.findByTestId('score-narrative');
+
+    unmount();
+
+    expect(cleanupMock).toHaveBeenCalledWith([
+      ARTIFACT.pages[0]!.storagePath,
+      ARTIFACT.pages[1]!.storagePath,
+    ]);
+  });
+
+  it('"Start a new review" fires the temp cleanup without blocking the reset', async () => {
+    requestCritiqueMock.mockResolvedValue({ ...CRITIQUE, stage: 'closed' });
+    // A never-settling cleanup: if the reset awaited it, the upload card
+    // would never come back.
+    cleanupMock.mockReturnValue(new Promise(() => {}));
+    render(
+      <MemoryRouter>
+        <PresentationChecker />
+      </MemoryRouter>,
+    );
+    uploadFile();
+    await screen.findByTestId('score-narrative');
+
+    fireEvent.click(screen.getByText(/Start a new review/i));
+
+    expect(cleanupMock).toHaveBeenCalledWith([
+      ARTIFACT.pages[0]!.storagePath,
+      ARTIFACT.pages[1]!.storagePath,
+    ]);
+    // The reset landed immediately — the cleanup promise is still open.
+    expect(
+      screen.getByText(/Upload a poster PDF, talk deck, or image/i),
+    ).toBeTruthy();
   });
 });

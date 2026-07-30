@@ -156,6 +156,11 @@ describe('POST /api/review/render-pptx', () => {
       { bucket: 'poster-assets', path: fake.uploads[0]!.path, ttlSec: 600 },
       { bucket: 'poster-assets', path: fake.uploads[1]!.path, ttlSec: 600 },
     ]);
+
+    // each page carries its review-temp storagePath so the client can
+    // delete the temp images once the review is done
+    expect(res.body.pages[0].storagePath).toBe(fake.uploads[0]!.path);
+    expect(res.body.pages[1].storagePath).toBe(fake.uploads[1]!.path);
   });
 
   it('rejects a deck over the 24-page cap (400 too_many_pages) and uploads nothing', async () => {

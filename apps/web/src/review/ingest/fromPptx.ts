@@ -60,9 +60,9 @@ export async function fromPptx(
     );
     const pageImages: PageImage[] = pages.map((p) => ({
       pageNumber: p.pageNumber,
-      // Server-owned temp paths aren't exposed to the client; cleanup
-      // of the rendered pages is the route's job.
-      storagePath: '',
+      // The route's server-owned review-temp path — the caller deletes
+      // these with cleanupReviewTemp when the review is done.
+      storagePath: p.storagePath ?? '',
       signedUrl: p.url,
       widthPx: p.widthPx,
       heightPx: p.heightPx,

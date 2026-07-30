@@ -7,14 +7,15 @@
  * the component and the test share the same mocked binding.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { ReviewTab } from '../sidebar/ReviewTab';
 import { usePosterStore } from '@/stores/posterStore';
 
-const { requestCritiqueMock, ingestMock } = vi.hoisted(() => ({
+const { requestCritiqueMock, ingestMock, cleanupMock } = vi.hoisted(() => ({
   requestCritiqueMock: vi.fn(),
   ingestMock: vi.fn(),
+  cleanupMock: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/review/reviewApi', () => ({
@@ -31,7 +32,10 @@ vi.mock('@/review/reviewApi', () => ({
   },
 }));
 
-vi.mock('@/review/ingest', () => ({ ingestPosterForReview: ingestMock }));
+vi.mock('@/review/ingest', () => ({
+  ingestPosterForReview: ingestMock,
+  cleanupReviewTemp: cleanupMock,
+}));
 
 const planState = {
   value: {
@@ -146,6 +150,8 @@ beforeEach(() => {
   requestCritiqueMock.mockReset();
   ingestMock.mockReset();
   ingestMock.mockResolvedValue(ARTIFACT);
+  cleanupMock.mockReset();
+  cleanupMock.mockResolvedValue(undefined);
   planState.value = {
     loading: false,
     hasActiveTerm: true,
@@ -231,5 +237,39 @@ describe('ReviewTab', () => {
     expect(screen.getByText(/Get the review pack/i)).toBeTruthy();
     expect(screen.queryByText('Review this poster')).toBeNull();
     expect(requestCritiqueMock).not.toHaveBeenCalled();
+  });
+
+  it('unmounting deletes the review-temp capture paths', async () => {
+    requestCritiqueMock.mockResolvedValue(CRITIQUE);
+    const { unmount } = render(
+      <MemoryRouter>
+        <ReviewTab />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText('Review this poster'));
+    await screen.findByTestId('score-design');
+
+    unmount();
+
+    expect(cleanupMock).toHaveBeenCalledWith([ARTIFACT.pages[0]!.storagePath]);
+  });
+
+  it('"Start a new review" fires the temp cleanup without blocking the new run', async () => {
+    requestCritiqueMock.mockResolvedValue({ ...CRITIQUE, stage: 'closed' });
+    // A never-settling cleanup: if the new run awaited it, the follow-up
+    // ingest would never happen.
+    cleanupMock.mockReturnValue(new Promise(() => {}));
+    render(
+      <MemoryRouter>
+        <ReviewTab />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByText('Review this poster'));
+    await screen.findByTestId('score-design');
+
+    fireEvent.click(screen.getByText(/Start a new review/i));
+
+    expect(cleanupMock).toHaveBeenCalledWith([ARTIFACT.pages[0]!.storagePath]);
+    await waitFor(() => expect(ingestMock).toHaveBeenCalledTimes(2));
   });
 });

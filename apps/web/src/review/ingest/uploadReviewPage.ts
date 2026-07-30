@@ -7,8 +7,8 @@
  * ingest failures are typed errors, never silent nulls.
  *
  * Pages live under {userId}/review-temp/{sessionId}/ so concurrent
- * ingests never collide; the UI deletes the folder after the critique
- * completes (Milestone 5).
+ * ingests never collide; the UI deletes them via cleanupReviewTemp on
+ * unmount and on "start a new review" (Milestone 5).
  */
 import { supabase } from '@/lib/supabase';
 import { IngestError, type PageImage } from './types';
