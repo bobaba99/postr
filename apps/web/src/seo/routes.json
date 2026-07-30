@@ -120,9 +120,16 @@
   },
   "app": {
     "/auth": {
-      "title": "Sign in | Postr",
-      "description": "Sign in to Postr, or start a poster as a guest with no account.",
-      "robots": "noindex,nofollow"
+      "title": "Sign in or create an account | Postr",
+      "description": "Sign in to Postr, create an account, or continue as a guest to build, save, and export conference posters securely from your browser.",
+      "robots": "noindex,nofollow",
+      "shareImage": true,
+      "prerender": true,
+      "h1": "Sign in or create your account",
+      "copy": [
+        "Sign in, create an account, or continue as a guest to start building a conference poster.",
+        "Poster editing and print-ready PDF export are free. Paid plans only unlock editable PowerPoint and LaTeX exports."
+      ]
     },
     "/dashboard": {
       "title": "My posters | Postr",
@@ -147,6 +154,16 @@
     "/p": {
       "title": "Poster editor | Postr",
       "description": "The Postr poster editor.",
+      "robots": "noindex,nofollow"
+    },
+    "/billing/success": {
+      "title": "Payment confirmed | Postr",
+      "description": "Your Postr payment was received and your poster export access is being updated.",
+      "robots": "noindex,nofollow"
+    },
+    "/billing/cancel": {
+      "title": "Checkout cancelled | Postr",
+      "description": "No charge was made. Return to your Postr poster or review the available export plans.",
       "robots": "noindex,nofollow"
     },
     "/404": {

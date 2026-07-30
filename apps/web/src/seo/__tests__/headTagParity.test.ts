@@ -11,6 +11,7 @@
  * These tests fail the build the moment they diverge.
  */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 // @ts-expect-error — plain ESM sibling implementation, intentionally untyped.
 import * as mjs from '../../../scripts/lib/headTags.mjs';
 import routes from '../routes.json';
@@ -113,26 +114,34 @@ describe('injectHead', () => {
     );
   });
 
-  it('emits no canonical for a noindex route', () => {
+  it('emits a self-canonical and noindex for a private route', () => {
     const out = mjs.injectHead(
       shell,
       APP_ROUTE_META['/dashboard'] as PageMeta,
       site,
     );
-    expect(out).not.toContain('rel="canonical"');
+    expect(out).toContain(
+      `<link rel="canonical" href="${canonicalFor('/dashboard')}" />`,
+    );
     expect(out).toContain('content="noindex,nofollow"');
   });
 
-  it('puts body copy in <noscript>, so real users never see an unstyled flash', () => {
+  it('emits crawlable fallback copy and navigation outside noscript', () => {
     const out = mjs.injectHead(shell, meta, site, {
       h1: 'About Postr',
       copy: ['First line.', 'Second line.'],
+      links: [
+        { href: '/', label: 'Home' },
+        { href: '/pricing', label: 'Pricing' },
+      ],
     });
-    expect(out).toContain('<noscript>');
+    expect(out).toContain('id="prerendered-content"');
+    expect(out).not.toContain('<noscript>');
     expect(out).toContain('<h1>About Postr</h1>');
     expect(out).toContain('<p>First line.</p>');
+    expect(out).toContain('<a href="/pricing">Pricing</a>');
     // #root stays empty: React calls createRoot(), which clears the
-    // container, so anything placed inside would be discarded anyway.
+    // container; main.tsx removes the sibling fallback before mounting.
     expect(out).toContain('<div id="root"></div>');
   });
 
@@ -151,5 +160,21 @@ describe('injectHead', () => {
     const twice = mjs.injectHead(once, meta, site);
     expect(twice.match(/name="description"/g)).toHaveLength(1);
     expect(twice.match(/rel="canonical"/g)).toHaveLength(1);
+  });
+});
+
+describe('browser bootstrap', () => {
+  it('removes the crawlable fallback before React mounts', () => {
+    const mainSource = readFileSync(
+      `${process.cwd()}/src/main.tsx`,
+      'utf8',
+    );
+    const removal = mainSource.indexOf(
+      "document.getElementById('prerendered-content')?.remove();",
+    );
+    const mount = mainSource.indexOf('ReactDOM.createRoot');
+
+    expect(removal).toBeGreaterThanOrEqual(0);
+    expect(removal).toBeLessThan(mount);
   });
 });

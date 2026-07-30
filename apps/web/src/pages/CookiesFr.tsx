@@ -34,7 +34,7 @@ export default function CookiesFr() {
         <h1 className="text-4xl font-bold leading-tight text-white">
           Politique relative aux témoins
         </h1>
-        <p className="mt-4 text-sm text-[#6b7280]">Dernière mise à jour : {LAST_UPDATED}</p>
+        <p className="mt-4 text-sm text-[#8b8f99]">Dernière mise à jour : {LAST_UPDATED}</p>
 
         <SectionHeading n="1" title="Portée" />
         <Body>

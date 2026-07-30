@@ -208,6 +208,7 @@ export default function Editor() {
   if (status.kind === 'loading') {
     return (
       <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
+        <h1 className="sr-only">Poster editor</h1>
         <div className="animate-pulse text-sm tracking-wide">Loading poster…</div>
       </main>
     );
@@ -217,7 +218,7 @@ export default function Editor() {
     return (
       <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
         <div className="max-w-md space-y-3 text-center">
-          <p className="text-base font-medium">Poster not found</p>
+          <h1 className="text-base font-medium">Poster not found</h1>
           <p className="text-xs text-[#888]">
             The poster you're looking for doesn't exist or you don't have access to it.
           </p>
@@ -236,14 +237,21 @@ export default function Editor() {
     return (
       <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
         <div className="max-w-md space-y-3 text-center">
-          <p className="text-base font-medium">Couldn’t load this poster</p>
+          <h1 className="text-base font-medium">Couldn’t load this poster</h1>
           <p className="text-xs text-[#888]">{status.message}</p>
         </div>
       </main>
     );
   }
 
-  return <EditorWithGuards posterId={posterId ?? null} />;
+  return (
+    <>
+      <h1 className="sr-only">
+        {posterTitle ? `Editing ${posterTitle}` : 'Poster editor'}
+      </h1>
+      <EditorWithGuards posterId={posterId ?? null} />
+    </>
+  );
 }
 
 function EditorWithGuards({ posterId }: { posterId: string | null }) {

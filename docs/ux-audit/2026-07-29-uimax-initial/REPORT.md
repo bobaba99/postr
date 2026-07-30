@@ -31,6 +31,16 @@ The implementation pass resolved every confirmed high- and medium-severity findi
 - Each pricing tier exposes four supporting messages; mobile feature details start collapsed.
 - About, chart chooser, landing, profile, and the shared footer now have valid heading structure.
 
+The follow-up SEO pass used OpenSEO against all 10 indexable production pages, then ran a full UIMax report for 25 local production routes and states:
+
+- OpenSEO found the production raw HTML exposed 0 words, no H1, and no internal links on all 10 pages.
+- The prerender now emits crawlable primary copy and navigation outside `<noscript>`, then removes it before React mounts.
+- App states now have self-canonicals and share cards while retaining `noindex,nofollow`.
+- Billing success and cancel now set their own private-page metadata.
+- A second all-page UIMax pass found zero runtime accessibility violations and zero route-level High/Medium SEO findings.
+- Legal-page timestamp contrast was raised from 4.07:1 after the expanded pass caught it.
+- The poster editor now exposes an H1 in loading, ready, error, and not-found states.
+
 Measured browser results:
 
 | Viewport or flow | Resolved result |
@@ -45,11 +55,13 @@ Measured browser results:
 
 Verification:
 
-- Vitest: 133 files passed, 2,003 tests passed.
-- Production build: TypeScript, Vite build, 11-page prerender, and sitemap generation passed.
+- Vitest: 133 files passed, 2,014 tests passed.
+- Production build: TypeScript, Vite build, 12-page prerender, and sitemap generation passed.
 - UIMax clean crawl: 10 pages, zero accessibility violations, zero page errors, 122ms average local load time.
 - UIMax pricing review: Accessibility 100, Best Practices 100, SEO 100.
 - UIMax paid-signup review: Accessibility 100, Best Practices 100.
+- UIMax full route pass: 25 reports, zero runtime accessibility violations, zero route-level High/Medium SEO findings.
+- OpenSEO production baseline: 10 pages and 39 shared prerender warnings; local raw-HTML resolution verified pending deployment.
 
 ## Coverage
 
@@ -264,3 +276,5 @@ Run the same audit against a production build or deployed preview before assigni
 - [Resolved UIMax crawl](evidence/resolved/uimax-accessibility-crawl-resolved.md)
 - [Resolved UIMax pricing HTML report](evidence/resolved/uimax-pricing-resolved.html)
 - [Resolved UIMax review history](evidence/resolved/uimax-reviews-resolved.json)
+- [Full 25-page UIMax resolution pass](evidence/resolved/all-pages/README.md)
+- [OpenSEO site-wide SEO pass](evidence/resolved/openseo-seo-pass.md)

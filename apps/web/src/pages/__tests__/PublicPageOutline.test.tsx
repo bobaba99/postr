@@ -32,6 +32,13 @@ const auditedFiles = [
   'pages/PaperToSlides.tsx',
   'pages/ChartChooser.tsx',
   'pages/WhyPosters.tsx',
+  'pages/Editor.tsx',
+  'pages/Privacy.tsx',
+  'pages/PrivacyFr.tsx',
+  'pages/Cookies.tsx',
+  'pages/CookiesFr.tsx',
+  'pages/Terms.tsx',
+  'pages/TermsFr.tsx',
   'pages/Profile.tsx',
   ...readdirSync(`${srcRoot}/manuscript/slides`)
     .filter((name) => name.endsWith('.tsx'))
@@ -82,6 +89,11 @@ describe('audited public-page outline and contrast', () => {
     expect(sourceOf('pages/Profile.tsx')).toMatch(
       /<h1[^>]*>\s*Profile & settings\s*<\/h1>/,
     );
+  });
+
+  it('gives every poster-editor state a level-one heading', () => {
+    const editor = sourceOf('pages/Editor.tsx');
+    expect(editor.match(/<h1\b/g)).toHaveLength(4);
   });
 
   it('does not place white text on the bright violet surface', () => {

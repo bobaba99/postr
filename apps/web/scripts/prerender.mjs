@@ -59,6 +59,14 @@ try {
   process.exit(1);
 }
 
+const fallbackLinks = [
+  ...Object.entries(routes.static).map(([href, record]) => ({
+    href,
+    label: href === '/' ? 'Home' : record.h1,
+  })),
+  { href: '/auth', label: 'Sign in' },
+];
+
 /** Route path -> file to write. Root overwrites the shell itself. */
 function outputPathFor(routePath) {
   if (routePath === '/') return join(DIST, 'index.html');
@@ -72,8 +80,29 @@ for (const [routePath, record] of Object.entries(routes.static)) {
   const html = injectHead(shell, meta, site, {
     h1: record.h1,
     copy: record.copy,
+    links: fallbackLinks,
   });
 
+  const outPath = outputPathFor(routePath);
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, html, 'utf8');
+  written.push({ routePath, outPath, bytes: Buffer.byteLength(html) });
+}
+
+for (const [routePath, record] of Object.entries(routes.app ?? {}).filter(
+  ([, value]) => value.prerender === true,
+)) {
+  if (!record.h1 || !record.copy?.length) {
+    console.error(
+      `[prerender] routes.json app["${routePath}"] is marked prerender but has no h1/copy.`,
+    );
+    process.exit(1);
+  }
+  const html = injectHead(shell, buildPageMeta(routePath, record, site), site, {
+    h1: record.h1,
+    copy: record.copy,
+    links: fallbackLinks,
+  });
   const outPath = outputPathFor(routePath);
   mkdirSync(dirname(outPath), { recursive: true });
   writeFileSync(outPath, html, 'utf8');
@@ -95,7 +124,11 @@ const notFoundHtml = injectHead(
   shell,
   buildPageMeta('/404', notFoundRecord, site),
   site,
-  { h1: notFoundRecord.h1, copy: notFoundRecord.copy },
+  {
+    h1: notFoundRecord.h1,
+    copy: notFoundRecord.copy,
+    links: fallbackLinks,
+  },
 );
 const notFoundPath = join(DIST, '404.html');
 writeFileSync(notFoundPath, notFoundHtml, 'utf8');

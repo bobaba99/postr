@@ -31,7 +31,6 @@
     { "source": "/s/:slug", "destination": "/api/shell/share" },
     { "source": "/gallery", "destination": "/" },
     { "source": "/gallery/:entryId", "destination": "/" },
-    { "source": "/auth", "destination": "/" },
     { "source": "/dashboard", "destination": "/" },
     { "source": "/p/:posterId", "destination": "/" },
     { "source": "/profile", "destination": "/" },

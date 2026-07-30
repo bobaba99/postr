@@ -12,8 +12,7 @@
  * already contains a description, canonical and OG tags for the route.
  * This hook finds those, updates them in place, and marks them — so
  * hydration cannot produce a second <meta name="description">. Tags are
- * removed only when a route genuinely has no value for them (a noindex
- * route must drop the canonical, not keep a stale one).
+ * removed only when a route genuinely has no value for them.
  */
 import { useEffect } from 'react';
 import { SITE_LOCALE, SITE_NAME, type PageMeta } from './siteMeta';
@@ -37,9 +36,8 @@ function upsertMeta(
     // Unconditional. Every tag in tagSpecsFor is one this module owns by
     // definition, so there is nothing to protect — and gating removal on
     // the OWNED marker would let a prerendered tag survive onto a route
-    // that must not have it. That is not hypothetical: it would leave a
-    // rel=canonical on a noindex page, which is the one combination
-    // PageMeta.canonical exists to prevent.
+    // that must not have it. This matters for dynamic share records that
+    // deliberately have no stable canonical or preview image.
     existing?.remove();
     return;
   }

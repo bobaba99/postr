@@ -52,12 +52,8 @@ export interface PageMeta {
   /** Full robots directive, already including preview hints when indexable. */
   robots: string;
   /**
-   * Absolute canonical URL, or null to emit none.
-   *
-   * Null is meaningful, not a placeholder: a noindex page must never
-   * carry rel=canonical. The two directives contradict each other, and
-   * Google resolves the conflict unpredictably — sometimes by honouring
-   * the canonical and indexing the page you meant to hide.
+   * Absolute preferred URL, or null for dynamic records with no stable URL.
+   * Private app pages use a self-canonical while robots remains noindex.
    */
   canonical: string | null;
   ogType: string;
@@ -69,6 +65,7 @@ interface StaticRouteRecord {
   title: string;
   description: string;
   robots: string;
+  shareImage?: boolean;
   h1: string;
   copy: string[];
 }
@@ -77,6 +74,10 @@ interface AppRouteRecord {
   title: string;
   description: string;
   robots: string;
+  shareImage?: boolean;
+  prerender?: boolean;
+  h1?: string;
+  copy?: string[];
 }
 
 const STATIC_RECORDS = routes.static as Record<string, StaticRouteRecord>;
@@ -101,21 +102,25 @@ function withPreviewDirectives(robots: string): string {
 
 function toPageMeta(
   path: string,
-  record: { title: string; description: string; robots: string },
+  record: {
+    title: string;
+    description: string;
+    robots: string;
+    shareImage?: boolean;
+  },
 ): PageMeta {
-  const indexable = record.robots === INDEXABLE;
+  const hasShareImage = record.shareImage !== false && DEFAULT_OG_IMAGE;
   return {
     title: record.title,
     description: record.description,
     robots: withPreviewDirectives(record.robots),
-    canonical: indexable ? canonicalFor(path) : null,
+    // A self-canonical identifies the preferred URL; robots remains the
+    // authoritative indexing control for private app routes.
+    canonical: canonicalFor(path),
     ogType: path === '/' ? 'website' : 'article',
-    ogImage:
-      indexable && DEFAULT_OG_IMAGE ? `${SITE_ORIGIN}${DEFAULT_OG_IMAGE}` : null,
+    ogImage: hasShareImage ? `${SITE_ORIGIN}${DEFAULT_OG_IMAGE}` : null,
     ogImageAlt:
-      indexable && DEFAULT_OG_IMAGE
-        ? `${SITE_NAME}: free conference poster maker`
-        : null,
+      hasShareImage ? `${SITE_NAME}: free conference poster maker` : null,
   };
 }
 
@@ -172,15 +177,21 @@ export function clampDescription(text: string, max = 155): string {
  * visiting a gallery entry means `robots: index,follow` and a canonical
  * pointing at someone else's poster.
  */
-export function noindexMeta(title: string, description: string): PageMeta {
+export function noindexMeta(
+  title: string,
+  description: string,
+  path = '/p',
+): PageMeta {
   return {
     title,
     description,
     robots: NOINDEX,
-    canonical: null,
+    canonical: canonicalFor(path),
     ogType: 'website',
-    ogImage: null,
-    ogImageAlt: null,
+    ogImage: DEFAULT_OG_IMAGE ? `${SITE_ORIGIN}${DEFAULT_OG_IMAGE}` : null,
+    ogImageAlt: DEFAULT_OG_IMAGE
+      ? `${SITE_NAME}: free conference poster maker`
+      : null,
   };
 }
 

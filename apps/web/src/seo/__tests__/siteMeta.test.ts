@@ -125,14 +125,30 @@ describe('APP_ROUTE_META', () => {
     expect(meta.robots).toBe(NOINDEX);
   });
 
-  it.each(entries)('%s emits no canonical', (_p, meta) => {
-    // A noindex page carrying rel=canonical sends contradictory signals
-    // and Google may resolve the conflict by indexing it anyway.
-    expect(meta.canonical).toBeNull();
+  it.each(entries)('%s emits a self-canonical without becoming indexable', (path, meta) => {
+    expect(meta.canonical).toBe(canonicalFor(path));
   });
 
-  it.each(entries)('%s advertises no OG image', (_p, meta) => {
-    expect(meta.ogImage).toBeNull();
+  it.each(entries)('%s has complete share metadata', (_path, meta) => {
+    expect(meta.ogImage).toBe(`${SITE_ORIGIN}/og-card.png`);
+    expect(meta.ogImageAlt).toBeTruthy();
+  });
+
+  it('/auth has budget-sized metadata without becoming indexable', () => {
+    const auth = APP_ROUTE_META['/auth'];
+    expect(auth).toBeDefined();
+    expect(auth?.title.length).toBeGreaterThanOrEqual(30);
+    expect(auth?.title.length).toBeLessThanOrEqual(60);
+    expect(auth?.description.length).toBeGreaterThanOrEqual(120);
+    expect(auth?.description.length).toBeLessThanOrEqual(160);
+    expect(auth?.ogImage).toBe(`${SITE_ORIGIN}/og-card.png`);
+    expect(auth?.robots).toBe(NOINDEX);
+    expect(auth?.canonical).toBe(canonicalFor('/auth'));
+  });
+
+  it('defines metadata for both billing return states', () => {
+    expect(APP_ROUTE_META['/billing/success']).toBeDefined();
+    expect(APP_ROUTE_META['/billing/cancel']).toBeDefined();
   });
 });
 
