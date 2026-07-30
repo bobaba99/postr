@@ -18,7 +18,8 @@
  *   /paper-to-presentation → redirect to /paper-to-slides (alias)
  *   /auth               → Auth (sign in / sign up / guest)
  *   /dashboard          → My Posters (auth-gated)
- *   /p/:posterId        → Editor (auth-gated, code-split)
+ *   /p/:posterId        → Editor (anonymous-first, code-split — EnsureSession
+ *                         creates a guest session instead of bouncing to /auth)
  *   /profile            → Profile (auth-gated)
  *   /admin/gallery      → Admin gallery moderation (admin-gated, code-split)
  *   /s/:slug            → Share (public read-only)
@@ -69,6 +70,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router';
 import { AuthGuard } from '@/components/AuthGuard';
+import { EnsureSession } from '@/components/EnsureSession';
 import { EditorErrorBoundary } from '@/components/EditorErrorBoundary';
 import Landing from '@/pages/Landing';
 import About from '@/pages/About';
@@ -165,11 +167,11 @@ export function AppRoutes() {
         <Route
           path="/p/:posterId"
           element={
-            <AuthGuard>
+            <EnsureSession>
               <EditorErrorBoundary>
                 <Editor />
               </EditorErrorBoundary>
-            </AuthGuard>
+            </EnsureSession>
           }
         />
         <Route path="/profile" element={<AuthGuard><Profile /></AuthGuard>} />
