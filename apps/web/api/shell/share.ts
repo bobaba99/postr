@@ -9,14 +9,15 @@
  *      core sharing loop, and unfurlers never run JavaScript, so this
  *      function is the only place that card can come from.
  *
- * WHAT SHIPS TODAY: (1) fully, and (2) only as far as the poster's
- * title and description. There is deliberately NO og:image yet.
+ * WHAT SHIPS TODAY: (1) fully, and (2) with the poster's title,
+ * description, and Postr's non-sensitive default social card.
  * Poster thumbnails live in the `poster-assets` bucket, which is
  * private (`public: false` in 20260408000500_storage.sql), and its
  * storage RLS is keyed on a user-id path prefix, so an anon-key edge
  * function can neither read the bytes nor mint a signed URL. Emitting a
- * `/object/public/...` URL anyway would hand unfurlers a 404 and they
- * would drop the whole card, which is worse than a text-only one.
+ * `/object/public/...` URL anyway would hand unfurlers a 404. Until a
+ * synthetic poster card exists, the real site-wide card is the safe
+ * fallback and reveals nothing about the unpublished work.
  *
  * Unblocking it is a product decision, not a code change: either move
  * share thumbnails to a public bucket (they are users' unpublished
@@ -47,7 +48,11 @@ export default async function handler(request: Request): Promise<Response> {
   if (!env || !slug) {
     return injectOrPassThrough(
       shell,
-      buildShareMeta({ title: null, imageUrl: null }),
+      buildShareMeta({
+        slug: slug || 'shared-poster',
+        title: null,
+        imageUrl: null,
+      }),
     );
   }
 
@@ -77,6 +82,7 @@ export default async function handler(request: Request): Promise<Response> {
 
   // imageUrl stays null — see the note at the top of this file.
   const meta = buildShareMeta({
+    slug,
     title: (row?.title as string | null) ?? null,
     imageUrl: null,
   });

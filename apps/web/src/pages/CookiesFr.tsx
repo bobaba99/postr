@@ -16,7 +16,7 @@ const LAST_UPDATED = '27 juillet 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function CookiesFr() {
-  useDocumentMeta(STATIC_ROUTE_META['/cookies'] ?? null);
+  useDocumentMeta(STATIC_ROUTE_META['/cookies/fr'] ?? null);
 
   return (
     <main className="min-h-screen w-screen bg-[#0a0a12] text-[#c8cad0]">
@@ -34,7 +34,7 @@ export default function CookiesFr() {
         <h1 className="text-4xl font-bold leading-tight text-white">
           Politique relative aux témoins
         </h1>
-        <p className="mt-4 text-sm text-[#6b7280]">Dernière mise à jour : {LAST_UPDATED}</p>
+        <p className="mt-4 text-sm text-[#8b8f99]">Dernière mise à jour : {LAST_UPDATED}</p>
 
         <SectionHeading n="1" title="Portée" />
         <Body>

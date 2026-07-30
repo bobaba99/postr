@@ -33,7 +33,7 @@ export default function PaperToSlides() {
             heading that disagrees with the crawled one is the drift
             siteMeta.ts warns about. Change both together. */}
         <h1 className="text-2xl font-bold text-white">From paper to slides</h1>
-        <p className="mt-1 text-sm text-[#6b7280]">
+        <p className="mt-1 text-sm text-[#8b8f99]">
           Paste your manuscript, answer a few short questions, and build an
           ordered slide deck — one finding per slide, with speaker notes drawn
           from your paper. Download a free PDF, or an editable PowerPoint.

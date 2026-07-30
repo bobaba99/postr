@@ -7,6 +7,112 @@ Walk-through checklist for the **admin surfaces** (payment, sign-up, delete acco
 
 ---
 
+## STEP 0 — Playwright human-perception audit (do this FIRST, before hand-testing)
+
+Before walking the scenarios below, drive every admin screen with Playwright and **read each page as a real human would** — not to check logic, but to catch the things a code trace can't see. Run the dev server (`npm run dev --workspace=apps/web`, port 5173) and audit each route at a real desktop viewport (1440×900), then narrow (1024, 768) and mobile (375).
+
+**What to look for (perception, not logic):**
+- [ ] **Text cut-off / truncation / overflow** — clipped headings, `…` where the full string should show, copy running past its container, horizontal scrollbars that shouldn't exist. (Watch the long verbatim strings: the paywall body, the guest-note, the delete-account confirm message, the GDPR helper — they're the most likely to clip.)
+- [ ] **Over-aggressive auto-scrolling / scroll-jacking** — page jumping on load, focus-stealing that scrolls you away, the view snapping somewhere unexpected after an action (e.g. after opening the paywall, submitting the auth form, or a toast firing).
+- [ ] **Copy that doesn't make sense on screen** — a label that reads fine in code but is confusing in context, a button whose text doesn't match what it does, state copy that contradicts what the user sees (e.g. the delete-account "a new guest account will be created" line — §18 copy bug — read it as a user and confirm it misleads).
+- [ ] **Layout breakage** — overlap, cramped/invisible elements, misaligned banners, a modal that doesn't fit, disabled buttons with no visible "why".
+- [ ] **Transition/animation feel** — jank, content flashing at opacity 0, a spinner that never resolves, motion that fights the reader (cross-ref the motion-system standards).
+- [ ] **Console errors/warnings on each route** — capture them; a red console on a payment or auth screen is a finding.
+
+**Routes to sweep** (both signed-out and signed-in where relevant): `/auth`, `/auth?plan=term`, `/auth?plan=pack`, `/auth?guest=1`, `/pricing`, `/profile` (guest + permanent + paid), `/billing/success`, `/billing/cancel`, the in-editor Export tab paywall, and the delete-account confirm modal.
+
+**How (two engines — run BOTH):**
+1. **Playwright** for driving flows a human walks (navigate, click, fill, go back, scroll): `browser_navigate` → `browser_snapshot` (structure + text) → `browser_take_screenshot` (see it as a human) → `browser_console_messages` (errors) → `browser_resize` for each breakpoint.
+2. **UIMax MCP** (`mcp__uimax__*`, installed) for the structured design-system / heuristic / perf / a11y audit — see the tool-mapping subsection below.
+
+Log every issue with route + screenshot + which of the categories above, from whichever engine surfaced it.
+
+> Rationale: the scenarios below verify *behavior*; this step verifies *what a human actually perceives*. A flow can pass every logic check and still be broken for a real user because a line is clipped or the page scroll-jacks. Do this pass first so you're not distracted by cosmetics while testing behavior.
+
+### ★ Known issues to reproduce (Gavin-reported, 2026-07-29) — confirm & locate each
+
+These were noticed by a real human using the app. Treat them as **regressions to reproduce and pin down** (route + component + repro steps + screenshot), not hypotheticals. They matter a lot to real users:
+
+- [ ] **Table/figure titles stripped on parse → can't tell items apart when selecting.** Some import/parse path removes the **title/caption** from tables and figures, so when the user later has to *select* one (in a picker/list/dropdown), the options are unlabeled and indistinguishable. Find where parsing drops the title, and every selection UI that then shows untitled items. *(Likely in the import / manuscript / figure pipeline — verify which.)*
+- [ ] **No "go back" / "change my options" affordance.** A flow (import, paper-to-poster interview, checkout, plan pick, or a multi-step modal) has **no way back** to revise an earlier choice — the user is stuck going forward or starting over. Identify every multi-step flow missing a back/edit control.
+- [ ] **Scroll jumps too far when returning to change options.** When the user goes **back** to edit an earlier option, the page **scrolls too far** (overshoots the section they wanted, or resets to top/bottom) — they lose their place. This is the scroll-jacking category, specifically on the *back/edit* path. Reproduce and note which flow + what the scroll should have done.
+- [ ] **Too wordy / verbose in places.** Certain sections have **too much copy** — walls of text where a human wants a scannable line. Flag the specific sections (candidates: paywall body, GDPR helper, delete-account confirm, legal callouts, interview prompts) with a "tighten this" note.
+- [ ] **Too many fine-prints.** Excessive small-print / caveats / disclaimers stacking up and adding cognitive load. Flag where fine-print piles up and which lines could be cut, merged, or moved behind a "details" affordance.
+
+> When running the audit, capture each of the above with: exact route, the component/file responsible, a screenshot showing the problem, and a one-line "what a human expected instead."
+
+### Auditor rubric for the vision / screenshot passes (use verbatim)
+
+When analyzing the Playwright screenshots, apply the following auditor prompt. Capture screenshots across viewports (mobile 375 / tablet 768 / desktop 1440) **and** interaction states (default, hover, focus) so dimension 4 has something to compare. Emit findings in the JSON schema at the end; then translate each into a doc finding (route + component/file + screenshot ref).
+
+```
+# Role and Objective
+You are an expert UI/UX Auditor specializing in heuristic evaluations and design system integrity. Your objective is to analyze screenshots provided by a Playwright automated testing suite and identify structural, semantic, and spatial regressions typically introduced by generative "vibe-coded" UI implementations.
+
+# Inputs Provided
+1. `Screenshots`: Visual captures of the UI across various viewports (mobile, tablet, desktop) and interaction states (default, hover, focus).
+2. `Context`: The intended function of the screen or component being evaluated.
+
+# Evaluation Protocol
+Analyze the provided screenshots strictly against the following four heuristic dimensions:
+
+## 1. Typographic Volatility & Spatial Drift
+Examine the interface for dynamic content scaling failures.
+*   **Target Identifiers:** Text truncation without deliberate ellipses (`...`), text overlapping with neighboring containers, line-height clipping (descenders/ascenders cut off), and inconsistent margins/padding that violate an underlying 8pt spatial grid.
+*   **Action:** Flag any bounding box where text exceeds its intended container or where spatial rhythm is mathematically inconsistent.
+
+## 2. Semantic Exhaustion (Over-Decoration)
+Evaluate the signal-to-noise ratio of the visual elements.
+*   **Target Identifiers:** Extraneous status dots that do not map to actionable states, icons used purely for aesthetic padding rather than semiotic meaning, excessive drop shadows, or high-chroma glows that distract from data comprehension.
+*   **Action:** Flag elements that consume high visual weight but provide zero semantic utility or interactive value.
+
+## 3. Collapse of Visual Hierarchy
+Assess the interface's "color budget" and cognitive load.
+*   **Target Identifiers:** Multiple primary action buttons (e.g., solid, high-contrast fills) competing within the same viewport, lack of focal contrast, or secondary metadata formatted with the same typographic weight as primary headers.
+*   **Action:** Identify viewports where the primary user objective is visually indistinguishable from secondary or tertiary actions.
+
+## 4. Kinesthetic and Temporal Deficits (If multi-state screenshots are provided)
+Compare the `default` screenshot against `hover` or `active` screenshots.
+*   **Target Identifiers:** Missing feedback states (no visual change on hover/focus), inaccessible contrast changes, or structural shifts (e.g., adding a border on hover that causes the surrounding layout to jump).
+*   **Action:** Flag interactive nodes that fail to provide immediate, accessible visual feedback during state changes.
+
+# Output Format
+Output a structured JSON array of identified violations. For each violation, provide:
+{
+  "violation_type": "[Typographic | Semantic | Hierarchy | Kinesthetic]",
+  "severity": "[High | Medium | Low]",
+  "description": "Graduate-level, concise explanation of the architectural failure.",
+  "visual_location": "Describe the spatial location or the specific element text/icon to map back to Playwright.",
+  "remediation_recommendation": "The CSS or DOM structural fix required."
+}
+```
+
+> The two rubrics are complementary: the **★ Known-issues + perception checklist** above is the human-narrative pass (does this make sense to a person, does it scroll-jack, is it too wordy); this **auditor rubric** is the structural/design-system pass (typography, over-decoration, hierarchy, state feedback). Run both against the same screenshot set.
+
+### UIMax MCP passes (installed — run alongside Playwright)
+
+Use UIMax (`mcp__uimax__*`) as the **structured, tool-backed** counterpart to the manual vision pass. Where the auditor rubric above is *judgment on screenshots*, UIMax gives *measured* results (Lighthouse scores, axe a11y violations, responsive diffs, budget checks). Run both; reconcile findings.
+
+Suggested UIMax run per route (map to the audit dimensions):
+
+| Audit need | UIMax tool(s) | Notes |
+|---|---|---|
+| One-shot heuristic + design-system review | `review_ui`, `quick_review`, `crawl_and_review` | `crawl_and_review` to sweep multiple admin routes in one go; `review_ui` for a single deep pass. This is UIMax's version of the auditor rubric — cross-check against the vision-pass JSON. |
+| Multi-viewport capture (mobile/tablet/desktop) | `responsive_screenshots` | Feeds BOTH the vision rubric and dimension 1 (Typographic Volatility & Spatial Drift). One call → the whole breakpoint set. |
+| Hover/focus/active state feedback (dimension 4) | `screenshot` at each state + `compare_screenshots` / `semantic_compare` | This is how dimension 4 (Kinesthetic Deficits) gets real before/after evidence instead of eyeballing. |
+| Accessibility (contrast, roles, focus order) | `accessibility_audit` | Covers the a11y half of dimensions 3 & 4 (focal contrast, accessible state changes) with axe-style violations. |
+| Text cut-off / overflow / layout drift | `review_ui` + `get_element` | `get_element` to read the actual bounding box / computed style behind a suspected clip (ties to the ★ title-stripping and truncation issues). |
+| Console + network + runtime errors per route | `capture_console`, `capture_errors`, `capture_network` | A red console/network failure on a payment or auth screen is a finding — pairs with Playwright's `browser_console_messages`. |
+| Performance / LCP / perceived speed | `lighthouse_audit`, `performance_audit`, `lcp_optimization`, `check_budgets` | Perceived-speed problems (spinner that never resolves, slow paint) show up here; `check_budgets` if perf budgets are defined. |
+| Dark mode parity | `check_dark_mode` | Postr is theme-aware; verify admin screens don't break in dark. |
+| Regression over time | `save_baseline` → `compare_to_baseline`, `review_diff` | Snapshot the admin screens now; on later runs diff against baseline to catch new drift. |
+| Report out | `export_report`, `get_review_history`, `get_review_stats` | Export the consolidated UIMax findings to attach alongside this doc's checklist. |
+
+> Reconciliation rule: a finding confirmed by **both** the vision rubric and a UIMax measurement (e.g. "hierarchy collapse" + a failed contrast check) is high-confidence; a vision-only or UIMax-only finding gets verified against source before it's treated as real (same discipline as the code-trace findings).
+
+
+---
+
 ## 0. Test accounts to prepare (set up once)
 
 | # | Account state | How to create | Use it for |

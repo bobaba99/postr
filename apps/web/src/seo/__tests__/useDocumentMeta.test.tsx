@@ -20,12 +20,21 @@ const dashboard = APP_ROUTE_META['/dashboard'] as PageMeta;
 beforeEach(() => {
   document.head.innerHTML = '';
   document.title = '';
+  document.documentElement.lang = 'en';
 });
 
 describe('useDocumentMeta', () => {
   it('sets the document title', () => {
     render(<Probe meta={about} />);
     expect(document.title).toBe(about.title);
+  });
+
+  it('sets the document language and localized Open Graph locale', () => {
+    const french = STATIC_ROUTE_META['/privacy/fr'] as PageMeta;
+    render(<Probe meta={french} />);
+
+    expect(document.documentElement.lang).toBe('fr-CA');
+    expect(content('meta[property="og:locale"]')).toBe('fr_CA');
   });
 
   it('writes description, robots and canonical', () => {
@@ -121,27 +130,27 @@ describe('useDocumentMeta', () => {
       ).toBe(about.canonical);
     });
 
-    it('removes a prerendered canonical it never marked when landing on a noindex route', () => {
-      // Regression: removal used to be gated on the data-pm marker, so a
-      // canonical injected by the build script survived onto noindex
-      // pages — the exact noindex+canonical contradiction PageMeta
-      // forbids. A crawler's first view of /dashboard is unmarked HTML.
+    it('replaces an unmarked prerendered canonical on a noindex route', () => {
       document.head.innerHTML =
         '<link rel="canonical" href="https://www.postr.sh/leaked">';
 
       render(<Probe meta={dashboard} />);
 
-      expect(count('link[rel="canonical"]')).toBe(0);
+      expect(count('link[rel="canonical"]')).toBe(1);
+      expect(
+        document.head.querySelector('link[rel="canonical"]')?.getAttribute('href'),
+      ).toBe(dashboard.canonical);
       expect(content('meta[name="robots"]')).toBe('noindex,nofollow');
     });
 
-    it('removes an unmarked prerendered og:image when a route has none', () => {
+    it('replaces an unmarked prerendered og:image on a private route', () => {
       document.head.innerHTML =
         '<meta property="og:image" content="https://www.postr.sh/stale.png">';
 
       render(<Probe meta={dashboard} />);
 
-      expect(count('meta[property="og:image"]')).toBe(0);
+      expect(count('meta[property="og:image"]')).toBe(1);
+      expect(content('meta[property="og:image"]')).toBe(dashboard.ogImage);
     });
 
     it('does not duplicate tags when the same route renders twice', () => {
@@ -155,13 +164,16 @@ describe('useDocumentMeta', () => {
   });
 
   describe('navigating between routes', () => {
-    it('drops the canonical when moving to a noindex route', () => {
+    it('replaces the canonical when moving to a noindex route', () => {
       const { rerender } = render(<Probe meta={about} />);
       expect(count('link[rel="canonical"]')).toBe(1);
 
       rerender(<Probe meta={dashboard} />);
 
-      expect(count('link[rel="canonical"]')).toBe(0);
+      expect(count('link[rel="canonical"]')).toBe(1);
+      expect(
+        document.head.querySelector('link[rel="canonical"]')?.getAttribute('href'),
+      ).toBe(dashboard.canonical);
       expect(content('meta[name="robots"]')).toBe('noindex,nofollow');
     });
 

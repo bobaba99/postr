@@ -123,7 +123,7 @@ export default function About() {
           a feature. Every default is tuned to produce something print-ready — you
           just fill in the science.
         </p>
-        <p className="mt-4 text-[12pt] text-[#6b7280] leading-relaxed max-w-xl mx-auto">
+        <p className="mt-4 text-[12pt] text-[#8b8f99] leading-relaxed max-w-xl mx-auto">
           Built and maintained by{' '}
           <span className="font-semibold text-[#c8cad0]">Resila Technologies Inc.</span>{' '}
           in Quebec, Canada. Questions or bug reports land at{' '}
@@ -139,6 +139,8 @@ export default function About() {
 
       {/* Timeline */}
       <section className="relative mx-auto max-w-4xl px-8 pb-20 pt-8">
+        <h2 className="sr-only">Postr milestones</h2>
+
         {/* Dotted vertical road — SVG so the dash pattern stays crisp on any zoom. */}
         <div
           aria-hidden="true"
@@ -185,7 +187,7 @@ export default function About() {
               </button>
               <button
                 onClick={() => openFeedback('feature')}
-                className="rounded-lg bg-[#7c6aed] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#6c5ce7] transition-colors"
+                className="rounded-lg bg-[#5641b8] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#4c39a6] transition-colors"
               >
                 Suggest a feature
               </button>

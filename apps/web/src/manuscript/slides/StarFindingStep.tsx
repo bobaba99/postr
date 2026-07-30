@@ -64,7 +64,7 @@ export function StarFindingStep({
 
   if (findings.length === 0) {
     return (
-      <p className="rounded-md border border-dashed border-[#2a2a3a] px-4 py-3 text-sm text-[#6b7280]">
+      <p className="rounded-md border border-dashed border-[#2a2a3a] px-4 py-3 text-sm text-[#8b8f99]">
         No clear findings were detected in the results. Check that the
         manuscript includes a results section, then try again.
       </p>
@@ -95,7 +95,7 @@ export function StarFindingStep({
                   {isStar && (
                     <span
                       aria-hidden="true"
-                      className="rounded bg-[#7c6aed] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white"
+                      className="rounded bg-[#5641b8] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white"
                     >
                       Star
                     </span>

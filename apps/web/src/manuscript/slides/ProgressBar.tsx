@@ -43,13 +43,13 @@ export function ProgressBar({
     >
       <div className="flex items-baseline justify-between">
         <span className="text-sm font-semibold text-white">{label}</span>
-        <span className="text-xs font-medium tabular-nums text-[#6b7280]">
+        <span className="text-xs font-medium tabular-nums text-[#8b8f99]">
           {now} / {total}
         </span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-full bg-[#1f1f2e]">
         <div
-          className="h-full rounded-full bg-[#7c6aed] transition-[width] duration-300 ease-out"
+          className="h-full rounded-full bg-[#5641b8] transition-[width] duration-300 ease-out"
           style={{ width: `${percent}%` }}
         />
       </div>

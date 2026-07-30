@@ -169,7 +169,7 @@ export default function ChartChooserPage() {
               );
             })}
           </div>
-          <span className="text-sm text-[#6b7280]">
+          <span className="text-sm text-[#8b8f99]">
             {paletteName}
           </span>
         </div>
@@ -192,6 +192,7 @@ export default function ChartChooserPage() {
         )}
 
         <div className="mt-10">
+          <h2 className="sr-only">Build your chart</h2>
           <ChartChooser
             layout="page"
             palette={palette}
@@ -229,7 +230,7 @@ export default function ChartChooserPage() {
           </p>
           <Link
             to="/auth"
-            className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-[#7c6aed] px-6 text-[15px] font-semibold text-white no-underline transition-colors hover:bg-[#6c5ce7]"
+            className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-[#5641b8] px-6 text-[15px] font-semibold text-white no-underline transition-colors hover:bg-[#4c39a6]"
           >
             Start a poster
           </Link>

@@ -133,7 +133,7 @@ export function SlideViewer({
           <SlideStage slide={active} index={activeIndex} />
         )
       ) : (
-        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[#2a2a3a] text-sm text-[#6b7280]">
+        <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-[#2a2a3a] text-sm text-[#8b8f99]">
           Your slides will appear here once the deck is built.
         </div>
       )}
@@ -180,7 +180,7 @@ function ThumbnailRail({
                 : 'border-[#2a2a3a] bg-[#0f0f16] hover:border-[#3a3a4e]'
             }`}
           >
-            <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#6b7280]">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[#8b8f99]">
               {i + 1} · {ROLE_LABEL[slide.role]}
             </span>
             <span className="line-clamp-3 text-[10px] leading-tight text-[#c8cad0]">
@@ -290,7 +290,7 @@ function SlideStage({ slide, index }: { slide: Slide; index: number }) {
       aria-label={`Slide ${index + 1} preview`}
     >
       <div className="mb-3 flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#6b7280]">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8b8f99]">
           {ROLE_LABEL[slide.role]}
         </span>
         {capped && <WordCount words={words} cut={slide.wordCapCut} />}
@@ -349,11 +349,11 @@ function WordCount({ words, cut }: { words: number; cut: boolean }) {
 function SpeakerNotesStrip({ slide }: { slide: Slide }) {
   return (
     <div className="shrink-0 rounded-lg border border-[#2a2a3a] bg-[#0f0f16] p-3">
-      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b7280]">
+      <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#8b8f99]">
         Speaker notes
       </div>
       {slide.speakerNotes.length === 0 ? (
-        <p className="text-xs text-[#6b7280]">No notes for this slide.</p>
+        <p className="text-xs text-[#8b8f99]">No notes for this slide.</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {slide.speakerNotes.map((note, i) => (

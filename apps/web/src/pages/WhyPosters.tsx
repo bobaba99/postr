@@ -205,7 +205,7 @@ export default function WhyPosters() {
           <div className="flex flex-wrap gap-3">
             <Link
               to="/"
-              className="rounded-md bg-[#7c6aed] px-5 py-2.5 text-[14pt] font-semibold text-white no-underline hover:bg-[#6b5adc]"
+              className="rounded-md bg-[#5641b8] px-5 py-2.5 text-[14pt] font-semibold text-white no-underline hover:bg-[#4c39a6]"
             >
               Start a poster
             </Link>

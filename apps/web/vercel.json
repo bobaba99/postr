@@ -31,16 +31,12 @@
     { "source": "/s/:slug", "destination": "/api/shell/share" },
     { "source": "/gallery", "destination": "/" },
     { "source": "/gallery/:entryId", "destination": "/" },
-    { "source": "/auth", "destination": "/" },
     { "source": "/dashboard", "destination": "/" },
     { "source": "/p/:posterId", "destination": "/" },
     { "source": "/profile", "destination": "/" },
     { "source": "/admin/gallery", "destination": "/" },
     { "source": "/billing/success", "destination": "/" },
-    { "source": "/billing/cancel", "destination": "/" },
-    { "source": "/terms/fr", "destination": "/" },
-    { "source": "/privacy/fr", "destination": "/" },
-    { "source": "/cookies/fr", "destination": "/" }
+    { "source": "/billing/cancel", "destination": "/" }
   ],
   "headers": [
     {

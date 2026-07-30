@@ -18,10 +18,13 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { usePlan } from '@/hooks/usePlan';
 import { supabase } from '@/lib/supabase';
+import { APP_ROUTE_META } from '@/seo/siteMeta';
+import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 type Outcome = 'success' | 'cancel';
 
 export default function BillingResult({ outcome }: { outcome: Outcome }) {
+  useDocumentMeta(APP_ROUTE_META[`/billing/${outcome}`] ?? null);
   return outcome === 'success' ? <Success /> : <Cancelled />;
 }
 

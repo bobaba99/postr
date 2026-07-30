@@ -1,0 +1,2169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UIMax Report — http://127.0.0.1:4174/p/new</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #0a0e1a;
+      color: #e2e8f0;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    /* ── Header ─────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .logo {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .logo-ui { color: #e2e8f0; }
+    .logo-max { color: #f59e0b; }
+
+    .header-subtitle {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .header-meta {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .header-meta a {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+
+    .header-meta a:hover { text-decoration: underline; }
+
+    /* ── Summary Cards ──────────────────────── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    .summary-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .summary-card-value {
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .summary-card-label {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    /* ── Sections ───────────────────────────── */
+    .section {
+      margin-bottom: 48px;
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #f59e0b;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title-icon {
+      font-size: 20px;
+      width: 24px;
+      text-align: center;
+    }
+
+    /* ── Screenshot ─────────────────────────── */
+    .screenshot-wrapper {
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #111827;
+    }
+
+    .screenshot-wrapper img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* ── Severity Badge ─────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #0a0e1a;
+    }
+
+    .badge-critical { background: #ef4444; }
+    .badge-high { background: #f97316; }
+    .badge-medium { background: #eab308; }
+    .badge-low { background: #3b82f6; color: #e2e8f0; }
+
+    /* ── Accessibility ──────────────────────── */
+    .violation-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 12px;
+    }
+
+    .violation-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .violation-id {
+      font-weight: 600;
+      color: #f1f5f9;
+      font-size: 15px;
+    }
+
+    .violation-desc {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .violation-nodes {
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .violation-node {
+      margin-bottom: 8px;
+      padding: 8px 12px;
+      background: #0a0e1a;
+      border-radius: 6px;
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 12px;
+      overflow-x: auto;
+    }
+
+    .violation-link {
+      display: inline-block;
+      margin-top: 8px;
+      color: #60a5fa;
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    .violation-link:hover { text-decoration: underline; }
+
+    /* ── Performance ────────────────────────── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .metric-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .metric-name {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .metric-rating {
+      font-size: 12px;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    /* ── Code Findings ──────────────────────── */
+    .findings-table-wrapper {
+      overflow-x: auto;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+    }
+
+    .findings-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .findings-table th {
+      background: #111827;
+      text-align: left;
+      padding: 12px 16px;
+      font-weight: 600;
+      color: #94a3b8;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .findings-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #1e293b;
+      vertical-align: top;
+    }
+
+    .findings-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .findings-table tr:hover td {
+      background: #111827;
+    }
+
+    .finding-file {
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #60a5fa;
+    }
+
+    .finding-message {
+      color: #e2e8f0;
+    }
+
+    .finding-suggestion {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .category-group {
+      margin-bottom: 32px;
+    }
+
+    .category-label {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .category-count {
+      background: #1e293b;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    /* ── Footer ─────────────────────────────── */
+    .footer {
+      text-align: center;
+      padding-top: 32px;
+      border-top: 1px solid #1e293b;
+      color: #475569;
+      font-size: 13px;
+    }
+
+    .footer a {
+      color: #f59e0b;
+      text-decoration: none;
+    }
+
+    .footer a:hover { text-decoration: underline; }
+
+    /* ── Empty State ────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 32px;
+      color: #22c55e;
+      font-size: 15px;
+      background: #111827;
+      border-radius: 10px;
+      border: 1px solid #1e293b;
+    }
+
+    /* ── Grade Cards ────────────────────────── */
+    .grade-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    .grade-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 24px 16px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .grade-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+
+    .grade-letter {
+      font-size: 48px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .grade-score {
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .grade-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .grade-section-name {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 8px;
+    }
+
+    /* ── SEO Section ───────────────────────── */
+    .seo-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .seo-check:last-child {
+      border-bottom: none;
+    }
+
+    .seo-check-icon {
+      font-size: 16px;
+      min-width: 24px;
+      text-align: center;
+      margin-top: 2px;
+    }
+
+    .seo-check-content {
+      flex: 1;
+    }
+
+    .seo-check-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+
+    .seo-check-detail {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* ── Responsive ─────────────────────────── */
+    @media (max-width: 768px) {
+      .container { padding: 24px 16px; }
+      .header-meta { flex-direction: column; gap: 8px; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .metrics-grid { grid-template-columns: 1fr; }
+      .grade-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="header">
+      <div class="logo"><span class="logo-ui">UI</span><span class="logo-max">Max</span> Report</div>
+      <p class="header-subtitle">Comprehensive UI Review</p>
+      <div class="header-meta">
+        <span>URL: <a href="http://127.0.0.1:4174/p/new" target="_blank" rel="noopener">http://127.0.0.1:4174/p/new</a></span>
+        <span>Generated: 7/30/2026, 12:40:24 AM</span>
+        <span>Code: /Users/zihaogeng/development/postr-ux-audit-flow-map/apps/web/src</span>
+      </div>
+    </header>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#127942;</span>
+        Report Card
+      </h2>
+      <div class="grade-grid">
+
+        <div class="grade-card" style="border-top: 3px solid #22c55e;">
+          <div class="grade-letter" style="color: #22c55e;">A+</div>
+          <div class="grade-score">100/100</div>
+          <div class="grade-label" style="color: #22c55e;">Exceptional</div>
+          <div class="grade-section-name">Accessibility</div>
+        </div>
+
+        <div class="grade-card" style="border-top: 3px solid #a3e635;">
+          <div class="grade-letter" style="color: #a3e635;">B</div>
+          <div class="grade-score">83/100</div>
+          <div class="grade-label" style="color: #a3e635;">Good</div>
+          <div class="grade-section-name">Performance</div>
+        </div>
+
+        <div class="grade-card" style="border-top: 3px solid #22c55e;">
+          <div class="grade-letter" style="color: #22c55e;">A</div>
+          <div class="grade-score">96/100</div>
+          <div class="grade-label" style="color: #22c55e;">Excellent</div>
+          <div class="grade-section-name">Best Practices</div>
+        </div>
+
+        <div class="grade-card" style="border-top: 3px solid #fb923c;">
+          <div class="grade-letter" style="color: #fb923c;">D</div>
+          <div class="grade-score">98/100</div>
+          <div class="grade-label" style="color: #fb923c;">Weak</div>
+          <div class="grade-section-name">SEO</div>
+        </div>
+
+        <div class="grade-card" style="border-top: 3px solid #dc2626;">
+          <div class="grade-letter" style="color: #dc2626;">F</div>
+          <div class="grade-score">0/100</div>
+          <div class="grade-label" style="color: #dc2626;">Failing</div>
+          <div class="grade-section-name">Code Quality</div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #ef4444">340</div>
+        <div class="summary-card-label">Critical + High Issues</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #f59e0b">0</div>
+        <div class="summary-card-label">Accessibility Violations</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #22c55e">71ms</div>
+        <div class="summary-card-label">Load Time</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #3b82f6">1577</div>
+        <div class="summary-card-label">Code Findings</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #94a3b8">200</div>
+        <div class="summary-card-label">Files Analyzed</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #94a3b8">react</div>
+        <div class="summary-card-label">Framework</div>
+      </div>
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#128247;</span>
+        Screenshot
+      </h2>
+      <div class="screenshot-wrapper">
+        <img
+          src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAC0AAAAcICAIAAAAghtdCAAAQAElEQVR4nOzaMREAIAwAsR7H1BH/YpHxS6Ijd/cNAAAAAAAAAACdMwAAAAAAAAAApAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAA8J2VSgAAEABJREFUAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAMAAAAAAEBL4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAOCzdx9gVpR3//APSy8LS2/SexEERLH3hr3F2GISY0wxMTGPMc2oSZ6UN/WfJ71qYm+oUWMX7AioKNJ773XpIO+PHTw52cbZBRxJPp/rXFyzc+ZMue975sT8vmcGAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAABABgAAIF0CHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAE9WhFQAABAASURBVAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBl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BReen0zPmTPnx//fj3PbP47o5ptu2bp1a6YkgnPueedm38renOOdt98pNbqef+75W26+Jdn52rWq8COi444/LgmLbNq08Zvf+FbunTliDHznlu/MLnk8UK1atc8488xy1/DwQw/96Ic/kt4AAABg/yLAAQAAwP6hSVHT7PSaNesy1XLccccmE5MmTXq85I4UpUS9Pzt97LHHZvaNww8/PJmYOnXaPXffW+rdbdu2/eD7P9jtShbMnz9pUulowrRp05cvX55M53/bib2ueu0ctfn7w307X0uXLi31kS1bNi9dsmtmr959svP3SmPuialTps6dO7fUzDFjxm7btjWZ7tmzR+VrWLlyVXbhwUMGl3p38eLFjzz8SLzKbclKRONHS5aaufOeHD/6cfbPww4/LJkYMGBANnPz29/8duPGjaU+OHXqlH888o9k+ogjjqz1fiBj6dJlyUTnLl2KclJWiVEjRyU7n5s02q1jjjk2mYhmjOYt9e6GDeuffPKJZProY44qdw13331PBgAAAPY3AhwAAADsHzZv3pSdrlevbqZaer1/54YZ08svJ69duzYbHci9zcPe1b3Hror+1ClTyl1gwYIFa9fuJqQyaXL5n83uf5MmTTIp2evtXKNGjcLCRi1btUz+rFWrZvatvdKYe2Ly+8+pybVjx45lS3claVq0aFn5GrZs2Tx1yq4nklzx8Stu+e4thx9xRP0GDTJ7uGOTJpc7f+6cORs2bEime/bsmUz0yumFinotG8KIvjjggPbJ9IR33kkmmjVr+vs//P6yyy/r2KlTZs/0P7BfMpF9UEspM2fMSiaibcuO80ULF+XetAMAAAD2F1W4fSUAAACkaOXKldnp6kUToiKefdbGrJJHMJQr3kqeK9Hs/RsS7F0NGzasXbt2Mj1z5qxMhbsxc+DAgZWsZ1mZe1QkNm3alEnVnrdzly6d+/Tt27t37x49ezZtWhQt1qBBgxo1apRdyd5qzD2RvQVFKZs2b87k7Rc///mPf/qTZGAfVWL79u0zZsx85+3xzz77/ORJkzJVF0dd0VuzZ83u269vTBS9f2ObZs2bJxNr165bsWJFBSucnZ2OXps9e05m500yxjz66GNnnHF6TLds2fKTV34yXqtXr5747ruvvfbayOdHFhevz1RFDJ4G74dXkrVVvnyzZk3XrFmTO2fVqmo+YgkAAADS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SJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAAAAAAEDKBDgAAAAAAAAAAFImwAEAAAAAAAAAkDIBDgAAAAAAAACAlAlwAAAAAAAAAACkTIADAAAAAAAAACBlAhwAAAAAAAAAACkT4AAAAAAAAAAASJkABwAAAAAAAABAygQ4AAAAAAAAAABSJsABAAAAAAAAAJAyAQ4AAAAAAAAAgJQJcAAAAAAAAAAApEyAAwAAAAAAAAAgZQIcAAAAAAAAAAApE+AAAAAAAAAAAEiZAAcAAAAAAAAAQMoEOAAAAAAAAAAAUibAAQAAAAAAAACQMgEOAAAAAAAAAICUCXAAAAAAAAAAAKRMgAMAAAAAAAAAIGUCHAAAAAAAAAAAKRPgAAAAAAAAAABImQAHAAAAwP/Prh0LAAAAAAzytx7GnuIIAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzKCsKiAAAEABJREFUgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAPH8J2oAAAt5SURBVAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAALFrxwIAAAAAg/yth7GnOAIAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgFkAAAD//8uyJHEAAAAGSURBVAMAi9AhThxIFhAAAAAASUVORK5CYII="
+          alt="Screenshot of http://127.0.0.1:4174/p/new"
+          width="1440"
+          height="900"
+        />
+      </div>
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#9855;</span>
+        Accessibility
+      </h2>
+      <div style="margin-bottom: 16px; color: #94a3b8; font-size: 14px;">
+        0 violation(s) found &middot; 15 checks passed
+      </div>
+      <div class="empty-state">No accessibility violations found. 15 checks passed.</div>
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#9889;</span>
+        Performance
+      </h2>
+      <div class="metrics-grid">
+
+    <div class="metric-card">
+      <div class="metric-name">First Contentful Paint</div>
+      <div class="metric-value" style="color: #22c55e;">696ms</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-name">Largest Contentful Paint</div>
+      <div class="metric-value" style="color: #22c55e;">696ms</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-name">Cumulative Layout Shift</div>
+      <div class="metric-value" style="color: #22c55e;">0.000</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-name">Total Blocking Time</div>
+      <div class="metric-value" style="color: #22c55e;">0ms</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-name">Load Time</div>
+      <div class="metric-value" style="color: #22c55e;">71ms</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-name">DOM Content Loaded</div>
+      <div class="metric-value" style="color: #22c55e;">71ms</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+      </div>
+
+    <div style="display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; font-size: 14px; color: #94a3b8;">
+      <span>DOM Nodes: <strong style="color: #e2e8f0;">45</strong></span>
+      <span>Resources: <strong style="color: #e2e8f0;">16</strong></span>
+      <span>Total Size: <strong style="color: #e2e8f0;">4.1 KB</strong></span>
+      <span>JS Heap: <strong style="color: #e2e8f0;">6.4 MB</strong></span>
+    </div>
+
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#128270;</span>
+        SEO
+      </h2>
+      <div style="margin-bottom: 16px; color: #94a3b8; font-size: 14px;">
+        Score: <strong style="color: #e2e8f0;">98/100</strong>
+        &middot; 17 passed &middot; 1 failed
+      </div>
+      <div style="background: #111827; border: 1px solid #1e293b; border-radius: 10px; overflow: hidden;">
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Page Title</div>
+            <div class="seo-check-detail">Conference Poster Editor | Postr</div>
+
+          </div>
+          <span class="badge badge-critical">critical</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Meta Description</div>
+            <div class="seo-check-detail">Build and edit a conference poster with print sizing, structured authors, citations, readable figures, and free print-ready PDF export.</div>
+
+          </div>
+          <span class="badge badge-critical">critical</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Single H1 Tag</div>
+            <div class="seo-check-detail">1 H1 tag(s)</div>
+
+          </div>
+          <span class="badge badge-critical">critical</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Heading Hierarchy</div>
+            <div class="seo-check-detail">1 headings (proper hierarchy)</div>
+
+          </div>
+          <span class="badge badge-high">high</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Canonical URL</div>
+            <div class="seo-check-detail">https://www.postr.sh/p/new</div>
+
+          </div>
+          <span class="badge badge-high">high</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">HTML Lang Attribute</div>
+            <div class="seo-check-detail">en</div>
+
+          </div>
+          <span class="badge badge-high">high</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Viewport Meta Tag</div>
+            <div class="seo-check-detail">width=device-width, initial-scale=1.0</div>
+
+          </div>
+          <span class="badge badge-high">high</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Image Alt Text</div>
+            <div class="seo-check-detail">No images found</div>
+
+          </div>
+          <span class="badge badge-high">high</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Open Graph Title</div>
+            <div class="seo-check-detail">Conference Poster Editor | Postr</div>
+
+          </div>
+          <span class="badge badge-medium">medium</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Open Graph Description</div>
+            <div class="seo-check-detail">Build and edit a conference poster with print sizing, structured authors, citations, readable figures, and free print-ready PDF export.</div>
+
+          </div>
+          <span class="badge badge-medium">medium</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Open Graph Image</div>
+            <div class="seo-check-detail">https://www.postr.sh/og-card.png</div>
+
+          </div>
+          <span class="badge badge-medium">medium</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Twitter Card Meta</div>
+            <div class="seo-check-detail">summary_large_image</div>
+
+          </div>
+          <span class="badge badge-medium">medium</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Structured Data (JSON-LD)</div>
+            <div class="seo-check-detail">1 block(s) found</div>
+
+          </div>
+          <span class="badge badge-medium">medium</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Character Encoding</div>
+            <div class="seo-check-detail">UTF-8</div>
+
+          </div>
+          <span class="badge badge-low">low</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#10060;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Meta Robots</div>
+            <div class="seo-check-detail">noindex,nofollow</div>
+            <div class="seo-check-detail" style="color: #f59e0b;">Page has &quot;noindex&quot; in meta robots — search engines will NOT index this page. Remove if this is unintentional.</div>
+          </div>
+          <span class="badge badge-low">low</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Link Accessibility</div>
+            <div class="seo-check-detail">No links found</div>
+
+          </div>
+          <span class="badge badge-low">low</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Title Length</div>
+            <div class="seo-check-detail">32 characters</div>
+
+          </div>
+          <span class="badge badge-low">low</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Description Length</div>
+            <div class="seo-check-detail">135 characters</div>
+
+          </div>
+          <span class="badge badge-low">low</span>
+        </div>
+
+      </div>
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#128269;</span>
+        Code Analysis
+      </h2>
+
+    <div style="margin-bottom: 20px; color: #94a3b8; font-size: 14px;">
+      1577 finding(s) across 200 files
+      &middot; 100 components
+      &middot; 0 stylesheets
+      &middot; avg 305 lines/file
+    </div>
+
+
+        <div class="category-group">
+          <div class="category-label">
+            Code Quality
+            <span class="category-count">769</span>
+          </div>
+          <div class="findings-table-wrapper">
+            <table class="findings-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Severity</th>
+                  <th style="width: 250px;">Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:117</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:94</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:110</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:128</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx</td>
+            <td>
+              <div class="finding-message">File has 1347 lines (recommended max: 400)</div>
+              <div class="finding-suggestion">Split into smaller, focused modules with single responsibilities</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:547</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (14 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/PrivacyFr.tsx:426</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Privacy.tsx:406</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/PaperToPoster.tsx:372</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (11 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/CookiesFr.tsx:292</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Cookies.tsx:286</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/ChartChooser.tsx:150</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (11 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:497</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (11 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:184</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/blocks.tsx</td>
+            <td>
+              <div class="finding-message">File has 2633 lines (recommended max: 400)</div>
+              <div class="finding-suggestion">Split into smaller, focused modules with single responsibilities</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/blocks.tsx:966</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (12 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/VersionPanel.tsx:232</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (10 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/Sidebar.tsx:1951</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/Sidebar.tsx</td>
+            <td>
+              <div class="finding-message">File has 4271 lines (recommended max: 400)</div>
+              <div class="finding-suggestion">Split into smaller, focused modules with single responsibilities</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/Sidebar.tsx:1735</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (13 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/SecureWorkModal.tsx:137</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/RichTextEditor.tsx:356</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/ReadabilityPanel.tsx</td>
+            <td>
+              <div class="finding-message">File has 1035 lines (recommended max: 400)</div>
+              <div class="finding-suggestion">Split into smaller, focused modules with single responsibilities</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/ReadabilityPanel.tsx:755</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (14 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx:670</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx:1982</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx:1989</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx:3528</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx</td>
+            <td>
+              <div class="finding-message">File has 3873 lines (recommended max: 400)</div>
+              <div class="finding-suggestion">Split into smaller, focused modules with single responsibilities</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx:2985</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (17 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+                <tr><td colspan="3" style="color: #64748b; font-size: 13px; text-align: center;">+ 739 more finding(s)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="category-group">
+          <div class="category-label">
+            Accessibility
+            <span class="category-count">254</span>
+          </div>
+          <div class="findings-table-wrapper">
+            <table class="findings-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Severity</th>
+                  <th style="width: 250px;">Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:366</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:417</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:425</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:444</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:479</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:1237</td>
+            <td>
+              <div class="finding-message">Input element may be missing an associated label</div>
+              <div class="finding-suggestion">Wrap input in a &lt;label&gt;, use htmlFor/for attribute, or add aria-label/aria-labelledby</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:1245</td>
+            <td>
+              <div class="finding-message">Input element may be missing an associated label</div>
+              <div class="finding-suggestion">Wrap input in a &lt;label&gt;, use htmlFor/for attribute, or add aria-label/aria-labelledby</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:1309</td>
+            <td>
+              <div class="finding-message">Input element may be missing an associated label</div>
+              <div class="finding-suggestion">Wrap input in a &lt;label&gt;, use htmlFor/for attribute, or add aria-label/aria-labelledby</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/PaperToPoster.tsx:326</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/PaperToPoster.tsx:346</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/PaperToPoster.tsx:353</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Home.tsx:179</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Editor.tsx:304</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Debug.tsx:125</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Debug.tsx:135</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/ChartChooser.tsx:135</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/ChartChooser.tsx:185</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/BillingResult.tsx:91</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/BillingResult.tsx:119</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:399</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:453</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:502</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:571</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:578</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:474</td>
+            <td>
+              <div class="finding-message">Input element may be missing an associated label</div>
+              <div class="finding-suggestion">Wrap input in a &lt;label&gt;, use htmlFor/for attribute, or add aria-label/aria-labelledby</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:483</td>
+            <td>
+              <div class="finding-message">Input element may be missing an associated label</div>
+              <div class="finding-suggestion">Wrap input in a &lt;label&gt;, use htmlFor/for attribute, or add aria-label/aria-labelledby</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:181</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:333</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:341</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:369</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+                <tr><td colspan="3" style="color: #64748b; font-size: 13px; text-align: center;">+ 224 more finding(s)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="category-group">
+          <div class="category-label">
+            User Experience
+            <span class="category-count">115</span>
+          </div>
+          <div class="findings-table-wrapper">
+            <table class="findings-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Severity</th>
+                  <th style="width: 250px;">Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">routes.tsx:115</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">App.tsx:10</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:80</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:22</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Terms.tsx:23</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Share.tsx:30</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Profile.tsx:48</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/PrivacyFr.tsx:17</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Privacy.tsx:19</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Pricing.tsx:21</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/PaperToSlides.tsx:24</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/PaperToPoster.tsx:59</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/NotFound.tsx:5</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Landing.tsx:71</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Home.tsx:38</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/GalleryEntry.tsx:22</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Gallery.tsx:27</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Editor.tsx:131</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Editor.tsx:254</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Debug.tsx:28</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/CookiesFr.tsx:18</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Cookies.tsx:35</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/ChartChooser.tsx:56</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/BillingResult.tsx:26</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Auth.tsx:42</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:42</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/About.tsx:84</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">poster/resizeHandles.tsx:47</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">poster/blocks.tsx:133</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">poster/blocks.tsx:281</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+                <tr><td colspan="3" style="color: #64748b; font-size: 13px; text-align: center;">+ 85 more finding(s)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="category-group">
+          <div class="category-label">
+            Performance
+            <span class="category-count">12</span>
+          </div>
+          <div class="findings-table-wrapper">
+            <table class="findings-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Severity</th>
+                  <th style="width: 250px;">Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Profile.tsx:801</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/GalleryEntry.tsx:142</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:286</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">poster/blocks.tsx:178</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">poster/blocks.tsx:346</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/PublishGalleryModal.tsx:489</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/PosterCard.tsx:61</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/PosterCard.tsx:197</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/LogoPicker.tsx:498</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/LogoPicker.tsx:633</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/ImportPosterModal.tsx:826</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">manuscript/ui/PosterStatic.tsx:166</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="category-group">
+          <div class="category-label">
+            Design Consistency
+            <span class="category-count">427</span>
+          </div>
+          <div class="findings-table-wrapper">
+            <table class="findings-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Severity</th>
+                  <th style="width: 250px;">Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">routes.tsx:109</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">routes.tsx:109</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:84</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:84</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:89</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:95</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:97</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:26</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:26</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:31</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:34</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:39</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Terms.tsx:27</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Terms.tsx:27</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Terms.tsx:32</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Terms.tsx:35</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Terms.tsx:40</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Share.tsx:87</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Share.tsx:87</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Share.tsx:94</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Share.tsx:94</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Share.tsx:96</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Profile.tsx:317</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Profile.tsx:317</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Profile.tsx:320</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Profile.tsx:327</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Profile.tsx:327</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/PrivacyFr.tsx:21</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/PrivacyFr.tsx:21</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/PrivacyFr.tsx:26</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+                <tr><td colspan="3" style="color: #64748b; font-size: 13px; text-align: center;">+ 397 more finding(s)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#128202;</span>
+        Summary
+      </h2>
+      <div style="background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 24px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <span style="font-size: 48px; font-weight: 800; color: #f59e0b;">1577</span>
+          <div style="color: #94a3b8; font-size: 14px;">Total Findings</div>
+        </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
+        <span class="badge badge-critical" style="min-width: 80px; text-align: center;">critical</span>
+        <div style="flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: 0%; background: #ef4444; border-radius: 4px;"></div>
+        </div>
+        <span style="min-width: 40px; text-align: right; font-weight: 600; color: #ef4444;">0</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
+        <span class="badge badge-high" style="min-width: 80px; text-align: center;">high</span>
+        <div style="flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: 21.559923906150917%; background: #f97316; border-radius: 4px;"></div>
+        </div>
+        <span style="min-width: 40px; text-align: right; font-weight: 600; color: #f97316;">340</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
+        <span class="badge badge-medium" style="min-width: 80px; text-align: center;">medium</span>
+        <div style="flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: 27.901077996195305%; background: #eab308; border-radius: 4px;"></div>
+        </div>
+        <span style="min-width: 40px; text-align: right; font-weight: 600; color: #eab308;">440</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
+        <span class="badge badge-low" style="min-width: 80px; text-align: center;">low</span>
+        <div style="flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: 50.538998097653774%; background: #3b82f6; border-radius: 4px;"></div>
+        </div>
+        <span style="min-width: 40px; text-align: right; font-weight: 600; color: #3b82f6;">797</span>
+      </div>
+
+      </div>
+    </div>
+
+
+    <footer class="footer">
+      <p>Generated by <a href="https://github.com/prem-fission/uimax-mcp" target="_blank" rel="noopener">UIMax MCP</a></p>
+    </footer>
+
+  </div>
+</body>
+</html>

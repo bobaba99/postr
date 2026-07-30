@@ -41,13 +41,16 @@ export default function Share() {
   // unpublished research and must never appear in a search result.
   //
   // imageUrl is null because there is nothing to point at yet: the page
-  // renders a live PosterEditor canvas, not a stored image. So share
-  // links currently unfurl WITHOUT a preview card — Slackbot and
-  // friends do not run JS and receive the plain app shell. Giving them
-  // a real card needs the Phase 1 edge shell reading
-  // `posters.thumbnail_path`; see docs/plans/2026-07-26-seo-plan.md.
+  // renders a live PosterEditor canvas, not a stored image. The metadata
+  // builder uses the real site-wide card as a non-sensitive fallback;
+  // a poster-specific card still needs an edge-rendered image that does
+  // not expose unpublished research.
   useDocumentMeta(
-    status.kind === 'ready' ? shareMeta({ title: posterTitle, imageUrl: null }) : null,
+    shareMeta({
+      slug: slug ?? 'shared-poster',
+      title: status.kind === 'ready' ? posterTitle : null,
+      imageUrl: null,
+    }),
   );
 
   useEffect(() => {

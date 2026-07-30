@@ -91,7 +91,7 @@ export function WizardStepBody({
           type="button"
           onClick={onRunExtraction}
           disabled={!constraints.manuscriptText.trim() || extractLoading}
-          className="inline-flex min-h-11 w-fit items-center rounded-md bg-[#7c6aed] px-5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40"
+          className="inline-flex min-h-11 w-fit items-center rounded-md bg-[#5641b8] px-5 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-40"
         >
           Find the key findings
         </button>
@@ -114,7 +114,7 @@ export function WizardStepBody({
           <button
             type="button"
             onClick={onBuildDeck}
-            className="inline-flex min-h-11 w-fit items-center rounded-md bg-[#7c6aed] px-5 text-sm font-semibold text-white hover:brightness-110"
+            className="inline-flex min-h-11 w-fit items-center rounded-md bg-[#5641b8] px-5 text-sm font-semibold text-white hover:brightness-110"
           >
             Build the deck
           </button>

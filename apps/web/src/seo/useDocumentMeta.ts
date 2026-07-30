@@ -12,11 +12,10 @@
  * already contains a description, canonical and OG tags for the route.
  * This hook finds those, updates them in place, and marks them — so
  * hydration cannot produce a second <meta name="description">. Tags are
- * removed only when a route genuinely has no value for them (a noindex
- * route must drop the canonical, not keep a stale one).
+ * removed only when a route genuinely has no value for them.
  */
 import { useEffect } from 'react';
-import { SITE_LOCALE, SITE_NAME, type PageMeta } from './siteMeta';
+import { SITE_NAME, type PageMeta } from './siteMeta';
 
 /** Marks the nodes this hook manages, so tests and future passes can find them. */
 const OWNED = 'data-pm';
@@ -37,9 +36,8 @@ function upsertMeta(
     // Unconditional. Every tag in tagSpecsFor is one this module owns by
     // definition, so there is nothing to protect — and gating removal on
     // the OWNED marker would let a prerendered tag survive onto a route
-    // that must not have it. That is not hypothetical: it would leave a
-    // rel=canonical on a noindex page, which is the one combination
-    // PageMeta.canonical exists to prevent.
+    // that must not have it. This matters for dynamic share records that
+    // deliberately have no stable canonical or preview image.
     existing?.remove();
     return;
   }
@@ -110,7 +108,7 @@ export function tagSpecsFor(meta: PageMeta): TagSpec[] {
     { kind: 'meta', key: 'property', id: 'og:description', value: meta.description },
     { kind: 'meta', key: 'property', id: 'og:type', value: meta.ogType },
     { kind: 'meta', key: 'property', id: 'og:site_name', value: SITE_NAME },
-    { kind: 'meta', key: 'property', id: 'og:locale', value: SITE_LOCALE },
+    { kind: 'meta', key: 'property', id: 'og:locale', value: meta.locale },
     { kind: 'meta', key: 'property', id: 'og:url', value: meta.canonical },
     { kind: 'meta', key: 'property', id: 'og:image', value: image },
     { kind: 'meta', key: 'property', id: 'og:image:alt', value: image ? meta.ogImageAlt : null },
@@ -151,6 +149,7 @@ export function useDocumentMeta(
     const resolved = JSON.parse(serializedMeta) as PageMeta;
 
     document.title = resolved.title;
+    document.documentElement.lang = resolved.language;
     for (const spec of tagSpecsFor(resolved)) {
       if (spec.kind === 'meta') upsertMeta(spec.key, spec.id, spec.value);
       else upsertLink(spec.rel, spec.value);

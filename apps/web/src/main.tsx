@@ -11,6 +11,8 @@ installConsoleCapture();
 // Auth is handled per-route via AuthGuard, not globally.
 // Landing and Auth pages are public; Dashboard/Editor/Profile
 // redirect to /auth if no session exists.
+document.getElementById('prerendered-content')?.remove();
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />

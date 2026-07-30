@@ -157,7 +157,7 @@ export function ConstraintsStep({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-[#6b7280]">
+          <p className="mt-1 text-xs text-[#8b8f99]">
             One slide per minute — {value.durationMinutes} content slides.
           </p>
         </div>
