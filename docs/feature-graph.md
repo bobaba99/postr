@@ -90,7 +90,9 @@ All of `apps/web/src/` is covered (test files excluded by rule) — the earlier 
 
 ## 5. Master graph
 
-All routes from `routes.tsx` (2026-07-28). Auth gating via `AuthGuard` (`components/AuthGuard.tsx`) on `/dashboard`, `/p/:posterId`, `/profile`, `/admin/gallery`. Global mounts in `App.tsx`: `AppRoutes` (:13), `FeedbackModal` (:14), `PublishFlow` (:15), `SessionExpiredModal` (:16), `ConsentNotice` (:24), `Analytics` beacon (:38).
+All routes from `routes.tsx`. Auth gating via `AuthGuard` (`components/AuthGuard.tsx`) on `/dashboard`, `/profile`, `/admin/gallery` — these require a real account and bounce a session-less visitor to `/auth`. The editor route `/p/:posterId` instead uses `EnsureSession` (`components/EnsureSession.tsx`): it silently creates an ANONYMOUS session (`ensureSession`) so a logged-out visitor edits immediately with no signup (the no-auth editor, 2026-07-29). On `SIGNED_OUT` it re-bootstraps a fresh anonymous session (`resetEnsureSession` + `ensureSession`) rather than dead-ending. Global mounts in `App.tsx`: `AppRoutes`, `FeedbackModal`, `PublishFlow`, `SessionExpiredModal`, `ConsentNotice`, `Analytics` beacon.
+
+**No-auth editor (2026-07-29):** logged-out "Editor" nav link, the Landing "Try as guest" hero, and the Pricing free-tier CTA all point at `/p/new` → `EnsureSession` mints an anonymous session behind it → `Editor.tsx` load-or-creates a poster → edits autosave. An anonymous editor is prompted to secure their work to a permanent account only on EXPORT (`EditableExportButtons` gates `run()` on `plan.isGuest` → `SecureWorkModal reason="export"`) or on LEAVE (`useLeaveGuard` arms a `beforeunload` dialog + exposes an in-app-nav gate when `isGuest && canUndo`; `SecureWorkModal reason="leave"`). Conversion is in place via `lib/convertGuest.ts` (`convertGuestWithGoogle` → `linkIdentity`; `convertGuestWithEmail` → `updateUser`) — NEVER `signUp`, so the poster carries over. The same `PosterEditor` serves logged-in and anonymous users unchanged; a permanent user never sees either prompt.
 
 ```mermaid
 flowchart LR
@@ -241,7 +243,7 @@ flowchart LR
 | `/billing/cancel` | `pages/BillingResult.tsx` (`outcome="cancel"`) | no | — |
 | `/s/:slug` | `pages/Share.tsx` | yes | public read-only |
 | `/dashboard` | `pages/Home.tsx` | no | `AuthGuard` |
-| `/p/:posterId` | `pages/Editor.tsx` | yes | `AuthGuard` + `EditorErrorBoundary` |
+| `/p/:posterId` | `pages/Editor.tsx` | yes | `EnsureSession` + `EditorErrorBoundary` (anonymous-first — creates a guest session instead of bouncing) |
 | `/profile` | `pages/Profile.tsx` | no | `AuthGuard` |
 | `/admin/gallery` | `pages/AdminGallery.tsx` | yes | `AuthGuard` + in-page admin check |
 | `*` | `pages/NotFound.tsx` | no | — |
@@ -718,7 +720,10 @@ flowchart LR
   A -->|"checkout intent: startCheckoutForPlan"| ST["Stripe Checkout"]
   A -->|"success"| D["/dashboard"]
   AG["AuthGuard"] -->|"no session / SIGNED_OUT"| A
-  AG -->|"session ok"| P["/dashboard, /p/:id, /profile, /admin/gallery"]
+  AG -->|"session ok"| P["/dashboard, /profile, /admin/gallery"]
+  ES["EnsureSession (/p/:id)"] -->|"no session: signInAnonymously"| SB
+  ES -->|"SIGNED_OUT: resetEnsureSession + re-ensure"| SB
+  ES -->|"session ok"| ED["Editor (anonymous or permanent)"]
   SE["SessionExpiredModal (App.tsx:16)"] -->|"Reload and sign in again"| A
   LA["lib/auth.ts ensureSession"] -->|"anonymous-first bootstrap + stale-JWT self-heal"| SB
 ```

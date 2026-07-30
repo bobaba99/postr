@@ -117,7 +117,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 - **Set up:** Signed-out browser, `/auth` with **no** `?plan=`.
 - [ ] Guest card renders. Button: **"Start creating — no account needed"**. Helper: **"Jump straight into the editor as a guest. Your work saves in this browser. Link an account anytime to sync across devices."**
 - [ ] Click → button flips to **"Loading…"** → lands on `/dashboard`, Home shows **"My posters"**.
-- **Also test `/auth?guest=1`** (Landing "Try as guest"): auto-triggers guest on mount, no click.
+- **`/auth?guest=1`** still auto-triggers a guest on mount (kept for any deep links); the **Landing "Try as guest" hero, the header "Editor" link, and the Pricing free-tier CTA now point at `/p/new`** instead (no-auth editor, 2026-07-29) — those drop the visitor straight into the editor via `EnsureSession` with no `/auth` detour.
 - **Edges:**
   - [ ] Already-signed-in guest hits `/auth?guest=1` → redirected to `/dashboard`, **no second guest** (the "second guest" regression — verify only ONE anon row).
   - [ ] Anonymous sign-in disabled server-side → **raw** error banner (note: violates generic-error rule).
@@ -125,6 +125,23 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
   - [ ] Exactly one `auth.users` row, `is_anonymous=true`.
   - [ ] `public.users` row + one "Untitled Poster" auto-created.
   - [ ] `localStorage` has `sb-<ref>-auth-token`.
+
+## 2b. No-auth editor — edit first, secure on export/leave (2026-07-29)
+
+- **Set up:** signed out (no session). Use a fresh incognito window.
+- [ ] From the marketing site click **"Editor"** (header) OR **"Try as guest"** (Landing hero) OR the Pricing free-tier CTA → lands DIRECTLY on the editor canvas at `/p/<id>` (URL normalizes from `/p/new`), **no `/auth` page in between**, populated 3-column template.
+- **✓ verify (anonymous session was minted silently):** exactly one `auth.users` row `is_anonymous=true`; one auto-created poster; edits autosave (the "Saved" pill).
+- **Export prompt:**
+  - [ ] Edit at least one block, then click **Export PPTX** (or LaTeX) → the **"Create an account to export"** modal appears; the export does NOT run and NO credit/paywall/purchase is reached.
+  - [ ] Watermarked **PDF** and **Save as .postr** stay free (no prompt) — money fires at editable export only.
+- **Leave prompt:**
+  - [ ] With unsaved-to-account edits, try to **close the tab / refresh** → the browser's native "Leave site?" dialog fires (best the platform allows).
+  - [ ] A guest who lands and does NOT edit is never prompted (no `canUndo`).
+- **Convert (poster carries over):**
+  - [ ] From the export modal, **Continue with Google** → `linkIdentity` converts in place → same poster now owned by the permanent account; the modal closes; the header flips to **"My posters"**; the export paywall now applies.
+  - [ ] Email path: shows **"Check your email to finish…"** and does NOT claim saved/permanent until confirmed; the poster stays safe under the anonymous session meanwhile.
+  - [ ] After conversion the leave/export prompts no longer appear (guard disarmed).
+- **✓ verify (no orphaning):** the SAME `auth.users` row is now `is_anonymous=false` (converted in place, NOT a new user); the poster's `user_id` is unchanged. NEVER a second row.
 
 ## 3. Email sign-up (fresh, no plan) — confirmation trap
 
@@ -176,11 +193,12 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 ## 9. AuthGuard gate + session lifecycle
 
 - **Set up:** Signed-out browser.
-- [ ] Hit `/dashboard`, `/p/:id`, `/profile`, `/admin/gallery` → pulsing **"Loading…"** → redirect to `/auth`.
+- [ ] Hit `/dashboard`, `/profile`, `/admin/gallery` (the `AuthGuard` routes) while signed out → pulsing **"Loading…"** → redirect to `/auth`.
+- [ ] Hit `/p/:id` while signed out → NO redirect: `EnsureSession` mints an anonymous session and the editor renders (see §2b). This route is deliberately NOT AuthGuard-gated.
 - [ ] Signed-in → page renders after brief "Loading…".
-- [ ] Sign out on a guarded page → bounced to `/auth`.
+- [ ] Sign out on an **AuthGuard** page → bounced to `/auth`. Sign out **in the editor** → `EnsureSession` re-bootstraps a fresh anonymous session (`resetEnsureSession` + `ensureSession`), no dead-end.
 - **⚠ Findings to note:**
-  - [ ] AuthGuard uses **plain `getSession()`, no self-heal** — a stale/invalid cached JWT **passes** and renders children (the stale token only surfaces on the first real API call). Contradicts feature-graph §7's claim that `ensureSession` heals the guard. **Code wins — flag the doc.**
+  - [ ] `AuthGuard` (the `/dashboard`/`/profile`/`/admin` routes) uses **plain `getSession()`, no self-heal** — a stale/invalid cached JWT **passes** and renders children (the stale token only surfaces on the first real API call). The editor route's `EnsureSession` DOES validate via `ensureSession` (getUser + stale-JWT re-bootstrap). So the "ensureSession heals the guard" behaviour is real for `/p/:id` but NOT for the AuthGuard routes.
   - [ ] `getSession()` has **no `.catch`/timeout** — a network failure can strand the user on "Loading…" forever.
 
 ## 10. Session-expired modal (global self-heal is warn-only)
