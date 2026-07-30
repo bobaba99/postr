@@ -36,18 +36,27 @@ import express, {
   type Response,
   type Router,
 } from 'express';
+import { randomUUID } from 'node:crypto';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { z } from 'zod';
-import type { CritiqueResult } from '@postr/shared';
+import type { CritiqueResult, ReviewPageRef } from '@postr/shared';
 import { requireAuth, type AuthLocals } from './auth.js';
+import { checkImageUrl } from './imageUrlGuard.js';
 import { createRateLimiter } from './rateLimit.js';
 import {
   REVIEW_ADDON_WEEKLY_QUOTA,
   REVIEW_IMAGE_MAX_BYTES,
   REVIEW_MAX_PAGES,
   REVIEW_MODEL,
+  REVIEW_PPTX_MAX_BYTES,
+  REVIEW_SIGNED_URL_TTL_SEC,
 } from './review/config.js';
+import {
+  createLibreOfficeRenderer,
+  type PptxRenderer,
+  type RenderedPage,
+} from './review/pptx.js';
 import { CURRENT_RUBRIC_VERSION } from './review/rubric/index.js';
 import { computeReviewSignals } from './review/signals.js';
 import {
@@ -119,7 +128,18 @@ export interface ReviewRouterDeps {
   /** Add-on weekly window; default built per D5. */
   weeklyLimiter?: RequestHandler;
   now?: () => number;
+  /** PPTX render seam (Task 18). Default: LibreOffice headless via review/pptx.ts. */
+  getPptxRenderer?: () => PptxRenderer;
 }
+
+/** Built per call — createLibreOfficeRenderer() is a cheap closure. */
+function defaultGetPptxRenderer(): PptxRenderer {
+  return createLibreOfficeRenderer();
+}
+
+const RenderPptxRequest = z.object({
+  fileUrl: z.string().url(),
+});
 
 export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
   const router = express.Router();
@@ -127,6 +147,7 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
   const getAnthropic = deps.getAnthropic ?? defaultGetAnthropic;
   const fetchFn = deps.fetchFn ?? fetch;
   const now = deps.now ?? Date.now;
+  const getPptxRenderer = deps.getPptxRenderer ?? defaultGetPptxRenderer;
   // D5: the add-on weekly quota is a plain createRateLimiter instance
   // (7-day window, daily layer inert), created ONCE here so its buckets
   // persist across requests. It is invoked manually inside the handler
@@ -179,6 +200,130 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
       return body.reviewId
         ? runFollowup({ res, supabase, anthropic, fetchFn, now, user, body })
         : runInitial({ req, res, supabase, anthropic, fetchFn, now, weeklyLimiter, user, body });
+    },
+  );
+
+  // ── Render an uploaded .pptx to page JPEGs (D10). No credit is consumed
+  //    here — this is an ingest utility; the critique route charges. The
+  //    .pptx is re-fetched through the same SSRF guard as import images.
+  router.post(
+    '/api/review/render-pptx',
+    requireAuth(getSupabase),
+    // Conversion is CPU-heavy (LibreOffice) — a tight burst + daily cap.
+    createRateLimiter({ maxPerWindow: 2, maxPerDay: 10 }),
+    async (req: Request, res: Response) => {
+      const parsed = RenderPptxRequest.safeParse(req.body);
+      if (!parsed.success) {
+        return res
+          .status(400)
+          .json({ error: 'bad_request', details: parsed.error.flatten() });
+      }
+      const { fileUrl } = parsed.data;
+
+      const supabase = getSupabase();
+      if (!supabase) {
+        return res.status(500).json({
+          error: 'supabase_not_configured',
+          message: 'SUPABASE_URL and SUPABASE_SECRET_KEY must both be set.',
+        });
+      }
+
+      // SSRF guard: only ever fetch our own Supabase Storage host.
+      const urlCheck = checkImageUrl(fileUrl, process.env.SUPABASE_URL);
+      if (!urlCheck.ok) {
+        if (urlCheck.reason === 'allowlist_not_configured') {
+          return res.status(500).json({
+            error: 'supabase_not_configured',
+            message: 'SUPABASE_URL must be set to validate file sources.',
+          });
+        }
+        return res.status(400).json({
+          error: 'url_not_allowed',
+          message: 'fileUrl must be an https URL on the project storage host.',
+        });
+      }
+
+      // Re-fetch the .pptx server-side. Redirects are refused outright —
+      // the host allowlist is worthless if the allowed host can 302 to an
+      // internal address.
+      let pptx: Buffer;
+      try {
+        const r = await fetchFn(fileUrl, {
+          signal: AbortSignal.timeout(30_000),
+          redirect: 'error',
+        });
+        if (!r.ok) {
+          return res
+            .status(502)
+            .json({ error: 'file_fetch_failed', status: r.status });
+        }
+        pptx = Buffer.from(await r.arrayBuffer());
+        // Raw-byte cap BEFORE any conversion — a huge deck gets a clean
+        // 413 instead of a LibreOffice timeout.
+        if (pptx.byteLength > REVIEW_PPTX_MAX_BYTES) {
+          return res.status(413).json({ error: 'pptx_too_large' });
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'unknown';
+        return res.status(502).json({ error: 'file_fetch_failed', message });
+      }
+
+      let rendered: RenderedPage[];
+      try {
+        rendered = await getPptxRenderer().render(pptx);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'unknown';
+        // eslint-disable-next-line no-console
+        console.error('[review.render-pptx] render failed:', message);
+        return res.status(502).json({ error: 'pptx_render_failed' });
+      }
+
+      if (rendered.length === 0) {
+        return res.status(502).json({
+          error: 'pptx_render_failed',
+          message: 'The deck produced no pages.',
+        });
+      }
+      // Hard page cap (spec §1) — never silently truncate.
+      if (rendered.length > REVIEW_MAX_PAGES) {
+        return res.status(400).json({
+          error: 'too_many_pages',
+          message: `Presentation Checker accepts at most ${REVIEW_MAX_PAGES} pages — trim the deck and try again.`,
+        });
+      }
+
+      // Persist each page JPEG to the user's review-temp batch and mint
+      // short-lived signed URLs for the client + the critique page fetcher.
+      const user = (res.locals as AuthLocals).user;
+      const batchId = randomUUID();
+      const pages: ReviewPageRef[] = [];
+      for (const page of rendered) {
+        const path = `${user.id}/review-temp/${batchId}/page-${page.pageNumber}.jpg`;
+        const { error: uploadErr } = await supabase.storage
+          .from('poster-assets')
+          .upload(path, page.jpeg, { contentType: 'image/jpeg' });
+        if (uploadErr) {
+          // eslint-disable-next-line no-console
+          console.error('[review.render-pptx] page upload failed:', uploadErr.message);
+          return res.status(502).json({ error: 'page_upload_failed' });
+        }
+        const { data: signed, error: signErr } = await supabase.storage
+          .from('poster-assets')
+          .createSignedUrl(path, REVIEW_SIGNED_URL_TTL_SEC);
+        if (signErr || !signed?.signedUrl) {
+          // eslint-disable-next-line no-console
+          console.error('[review.render-pptx] sign failed:', signErr?.message);
+          return res.status(502).json({ error: 'page_upload_failed' });
+        }
+        pages.push({
+          pageNumber: page.pageNumber,
+          url: signed.signedUrl,
+          widthPx: page.widthPx,
+          heightPx: page.heightPx,
+        });
+      }
+
+      return res.json({ pages });
     },
   );
 
