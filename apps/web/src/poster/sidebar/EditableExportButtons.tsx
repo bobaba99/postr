@@ -22,6 +22,7 @@ import { usePosterStore } from '@/stores/posterStore';
 import type { CitationStyleKey } from '@/poster/citations';
 import { PPTX_MAX_DIMENSION_IN } from '@/export/units';
 import { usePlan } from '@/hooks/usePlan';
+import { SecureWorkModal } from '@/poster/SecureWorkModal';
 import {
   createCheckout,
   consumeExportCredit as consumeCreditApi,
@@ -88,8 +89,16 @@ export function EditableExportButtons({
   const doc = usePosterStore((s) => s.doc);
   const posterTitle = usePosterStore((s) => s.posterTitle);
   const plan = usePlan();
+  const { isGuest } = plan;
   const navigate = useNavigate();
   const [state, setState] = useState<ExportState>(IDLE);
+  // Anonymous export gate: a guest can edit and preview, but taking an
+  // editable file means securing the poster to a real account first. The
+  // click opens SecureWorkModal instead of running the writer — the
+  // conversion is in place, so the poster carries over. Never shown to a
+  // permanent user (the run() gate is on isGuest), keeping the logged-in
+  // export path unchanged.
+  const [securePrompt, setSecurePrompt] = useState(false);
   // EU right-of-withdrawal waiver: to enforce "no refund once you've
   // exported" against EU buyers, they must expressly consent to immediate
   // performance and acknowledge losing the 14-day withdrawal right. Gate
@@ -115,6 +124,13 @@ export function EditableExportButtons({
 
   async function run(kind: ExportKind, job: () => Promise<string[]>) {
     if (!doc || state.busy) return;
+    // Anonymous gate (before the paywall): a guest never runs the writer.
+    // Securing the poster to a real account comes first — the modal drives
+    // the in-place conversion, so the work carries over.
+    if (isGuest) {
+      setSecurePrompt(true);
+      return;
+    }
     // Paywall gate: a user without an active term or a credit can't run
     // an editable export — the button is disabled and the upgrade prompt
     // is shown instead, so this is a belt-and-suspenders guard.
@@ -224,19 +240,35 @@ export function EditableExportButtons({
       return warnings;
     });
 
-  const pptxDisabled = !doc || state.busy !== null || beyondHalf || !canExport;
-  const latexDisabled = !doc || state.busy !== null || !canExport;
+  // A guest's export buttons stay CLICKABLE — the click is what trips the
+  // secure-work modal (the guest's gate is account creation, not the
+  // paywall). The paywall/credit machinery only applies once they have a
+  // real account, so `!canExport` disables buttons for permanent users
+  // only. The permanent-user path is unchanged: for a non-guest,
+  // `exportUnlocked === canExport` exactly as before.
+  const exportUnlocked = isGuest || canExport;
+  const pptxDisabled = !doc || state.busy !== null || beyondHalf || !exportUnlocked;
+  const latexDisabled = !doc || state.busy !== null || !exportUnlocked;
 
   return (
     <div {...busyProps(state.busy !== null)}>
+      {securePrompt && (
+        <SecureWorkModal
+          reason="export"
+          onClose={() => setSecurePrompt(false)}
+        />
+      )}
       {/*
         Paywall (docs/plans/2026-07-28-payment-and-paywall.md): editable
         exports are the paid line. Shown only once the plan has loaded and
         the user can't export — never flashes during the initial read.
         Copy names what they GET ("keep editing in PowerPoint or
         Overleaf"), not what they're blocked from (marketing rule).
+        Suppressed for guests: their next step is creating an account (the
+        secure-work modal on export click), not paying — the paywall would
+        only apply after they convert.
       */}
-      {!plan.loading && !canExport && (
+      {!plan.loading && !canExport && !isGuest && (
         <div
           style={{
             padding: '14px 16px',

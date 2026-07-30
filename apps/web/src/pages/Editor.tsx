@@ -13,9 +13,11 @@ import { useNavigate, useParams } from 'react-router';
 import { loadOrCreateMostRecentPoster, loadPoster } from '@/data/posters';
 import { usePosterStore } from '@/stores/posterStore';
 import { PosterEditor } from '@/poster/PosterEditor';
+import { SecureWorkModal } from '@/poster/SecureWorkModal';
 import { makeBlocks } from '@/poster/templates';
 import { DEFAULT_STYLES, PALETTES } from '@/poster/constants';
 import { useTwoTabGuard } from '@/hooks/useTwoTabGuard';
+import { useLeaveGuard } from '@/hooks/useLeaveGuard';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
 import { uploadBase64Image } from '@/data/posterImages';
 import { supabase } from '@/lib/supabase';
@@ -246,8 +248,18 @@ export default function Editor() {
   return <EditorWithGuards posterId={posterId ?? null} />;
 }
 
-function EditorWithGuards({ posterId }: { posterId: string | null }) {
+export function EditorWithGuards({ posterId }: { posterId: string | null }) {
   const { collision, dismiss } = useTwoTabGuard(posterId);
+  // Leave guard: a guest who has edited this session gets nudged to
+  // secure their poster before leaving. The hook arms a `beforeunload`
+  // handler (the only thing the platform allows on a real tab-close /
+  // refresh — and it also catches the editor's own full-page nav exits,
+  // the logo and "Back to My Posters" links, which are plain <a href>
+  // navigations). `leaveModalOpen` drives our own SecureWorkModal for the
+  // in-app path once a `requestLeave()` caller is wired in. Only guests
+  // with unsaved-session edits ever arm it — a permanent user is never
+  // touched, so the logged-in editor is unchanged.
+  const { leaveModalOpen, cancelLeave, confirmLeave } = useLeaveGuard();
   return (
     <>
       {collision && (
@@ -301,6 +313,13 @@ function EditorWithGuards({ posterId }: { posterId: string | null }) {
             ×
           </button>
         </div>
+      )}
+      {leaveModalOpen && (
+        <SecureWorkModal
+          reason="leave"
+          onClose={cancelLeave}
+          onConverted={confirmLeave}
+        />
       )}
       <PosterEditor />
     </>
