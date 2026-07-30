@@ -95,6 +95,15 @@ describe('PublicHeader tool links', () => {
     expect(hrefs).toContain('/paper-to-poster');
     expect(hrefs).toContain('/paper-to-slides');
   });
+
+  it('waits until the wide breakpoint to show the flat navigation', () => {
+    const { container } = renderIn(<PublicHeader />);
+    const pricing = container.querySelector('header a[href="/pricing"]');
+
+    expect(pricing).not.toBeNull();
+    expect(pricing?.className).toContain('xl:inline');
+    expect(pricing?.className).not.toContain('sm:inline');
+  });
 });
 
 /**
@@ -112,8 +121,11 @@ describe('PublicHeader mobile menu', () => {
   }
 
   it('offers a menu control on small screens', () => {
-    renderIn(<PublicHeader />);
-    expect(screen.getByRole('button', { name: /menu/i })).toBeTruthy();
+    const { container } = renderIn(<PublicHeader />);
+    const trigger = screen.getByRole('button', { name: /menu/i });
+
+    expect(trigger).toBeTruthy();
+    expect(container.querySelector('.xl\\:hidden')).toContainElement(trigger);
   });
 
   it.each(TOOL_PATHS)('reaches %s from the mobile menu', async (path) => {
@@ -195,6 +207,15 @@ describe('PublicHeader mobile menu', () => {
 
     expect(screen.queryByRole('list')).toBeNull();
   });
+
+  it('uses accessible supporting text in tool descriptions', async () => {
+    renderIn(<PublicHeader />);
+    openMobileMenu();
+
+    const description = await screen.findByText(/turn a manuscript into a poster draft/i);
+    expect(description.className).toContain('text-[#8b8f99]');
+    expect(description.className).not.toContain('text-[#6b7280]');
+  });
 });
 
 /**
@@ -275,6 +296,20 @@ describe('PublicFooter', () => {
     expect(hrefsOf(column as HTMLElement)).toEqual(
       expect.arrayContaining(['/paper-to-poster', '/paper-to-slides']),
     );
+  });
+
+  it('uses level-two headings for its landmark sections', () => {
+    renderIn(<PublicFooter />);
+
+    for (const name of ['Product', 'Learn', 'Account', 'Legal']) {
+      expect(screen.getByRole('heading', { name })).toHaveProperty('tagName', 'H2');
+    }
+  });
+
+  it('uses an accessible default text color', () => {
+    const { container } = renderIn(<PublicFooter />);
+
+    expect(container.querySelector('footer')?.className).toContain('text-[#8b8f99]');
   });
 });
 

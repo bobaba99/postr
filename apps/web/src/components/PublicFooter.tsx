@@ -17,7 +17,7 @@ export function PublicFooter() {
   const openFeedback = useFeedbackStore((s) => s.open);
 
   return (
-    <footer className="border-t border-[#1f1f2e] bg-[#0a0a12] px-8 py-12 text-[#6b7280]">
+    <footer className="border-t border-[#1f1f2e] bg-[#0a0a12] px-8 py-12 text-[#8b8f99]">
       <div className="mx-auto max-w-6xl">
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-[1.2fr_1fr_1fr_1fr_1fr]">
           {/* Brand column */}
@@ -37,7 +37,7 @@ export function PublicFooter() {
           </div>
 
           {/* The two standalone tools live here as well as in the
-              header's Tools menu. The header menu is `sm:`-gated, so
+              header's overflow menu. The flat header nav is `xl:`-gated, so
               on phones this column is the only route to them. */}
           <FooterColumn title="Product">
             <FooterLink to="/">Home</FooterLink>
@@ -84,9 +84,9 @@ function FooterColumn({
 }) {
   return (
     <div>
-      <h3 className="mb-3 text-[12pt] font-semibold uppercase tracking-[0.15em] text-[#7c6aed]">
+      <h2 className="mb-3 text-[12pt] font-semibold uppercase tracking-[0.15em] text-[#7c6aed]">
         {title}
-      </h3>
+      </h2>
       <ul className="flex flex-col gap-2 text-[14pt]">{children}</ul>
     </div>
   );
