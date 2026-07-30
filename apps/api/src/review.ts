@@ -296,6 +296,21 @@ export function createReviewRouter(deps: ReviewRouterDeps = {}): Router {
         });
       }
 
+      // Audit floor: every page must render at least 1024×1024 px so the
+      // critique model has enough pixels to read slide content (Task 18).
+      // The PDF path upscales small pages via render scale, so the fix for
+      // a small-render deck is to export it as a PDF and upload that.
+      const pageTooSmall = rendered.some(
+        (page) => Math.min(page.widthPx, page.heightPx) < 1024,
+      );
+      if (pageTooSmall) {
+        return res.status(400).json({
+          error: 'page_too_small',
+          message:
+            'Each slide must render at least 1024×1024 pixels for Presentation Checker. Use a larger slide size or export as PDF and upload that instead.',
+        });
+      }
+
       // Persist each page JPEG to the user's review-temp batch and mint
       // short-lived signed URLs for the client + the critique page fetcher.
       const user = (res.locals as AuthLocals).user;

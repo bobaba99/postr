@@ -139,6 +139,18 @@ describe('add-distribution guard', () => {
     ];
     expect(enforceFindings(fs, { pageCount: 1 })).toHaveLength(4);
   });
+
+  // The rule's fixed point for a ≥4 all-add list is empty: dropping one
+  // add shrinks both counts, so adds stay above half until none remain.
+  it('drops every finding from an all-add list of 4 or more', () => {
+    const fs = [
+      addFinding('high', 'add one'),
+      addFinding('medium', 'add two'),
+      addFinding('medium', 'add three'),
+      addFinding('low', 'add four'),
+    ];
+    expect(enforceFindings(fs, { pageCount: 1 })).toEqual([]);
+  });
 });
 
 describe('count clamp', () => {
@@ -199,5 +211,11 @@ describe('composition (all rules in pipeline order)', () => {
       'solid medium',
       'add one',
     ]);
+  });
+});
+
+describe('edge cases', () => {
+  it('returns [] for empty input', () => {
+    expect(enforceFindings([], { pageCount: 1 })).toEqual([]);
   });
 });

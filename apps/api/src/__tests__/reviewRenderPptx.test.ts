@@ -163,6 +163,18 @@ describe('POST /api/review/render-pptx', () => {
     expect(res.body.pages[1].storagePath).toBe(fake.uploads[1]!.path);
   });
 
+  it('rejects any page below the 1024×1024 audit floor (400 page_too_small) and uploads nothing', async () => {
+    const { renderer } = fakeRenderer([{ widthPx: 900, heightPx: 900 }]);
+    const { app, fake } = buildApp({ renderer });
+
+    const res = await postRender(app, VALID_FILE_URL);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('page_too_small');
+    expect(res.body.message).toContain('1024×1024');
+    expect(fake.uploads).toHaveLength(0);
+  });
+
   it('rejects a deck over the 24-page cap (400 too_many_pages) and uploads nothing', async () => {
     const { renderer } = fakeRenderer(
       Array.from({ length: 25 }, () => ({ widthPx: 2048, heightPx: 1152 })),
