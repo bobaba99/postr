@@ -1,0 +1,2169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UIMax Report — http://127.0.0.1:4174/billing/success</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #0a0e1a;
+      color: #e2e8f0;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    /* ── Header ─────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .logo {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    .logo-ui { color: #e2e8f0; }
+    .logo-max { color: #f59e0b; }
+
+    .header-subtitle {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .header-meta {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .header-meta a {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+
+    .header-meta a:hover { text-decoration: underline; }
+
+    /* ── Summary Cards ──────────────────────── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    .summary-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .summary-card-value {
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .summary-card-label {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    /* ── Sections ───────────────────────────── */
+    .section {
+      margin-bottom: 48px;
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid #f59e0b;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-title-icon {
+      font-size: 20px;
+      width: 24px;
+      text-align: center;
+    }
+
+    /* ── Screenshot ─────────────────────────── */
+    .screenshot-wrapper {
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #111827;
+    }
+
+    .screenshot-wrapper img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* ── Severity Badge ─────────────────────── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #0a0e1a;
+    }
+
+    .badge-critical { background: #ef4444; }
+    .badge-high { background: #f97316; }
+    .badge-medium { background: #eab308; }
+    .badge-low { background: #3b82f6; color: #e2e8f0; }
+
+    /* ── Accessibility ──────────────────────── */
+    .violation-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 12px;
+    }
+
+    .violation-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .violation-id {
+      font-weight: 600;
+      color: #f1f5f9;
+      font-size: 15px;
+    }
+
+    .violation-desc {
+      color: #94a3b8;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .violation-nodes {
+      font-size: 13px;
+      color: #64748b;
+    }
+
+    .violation-node {
+      margin-bottom: 8px;
+      padding: 8px 12px;
+      background: #0a0e1a;
+      border-radius: 6px;
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 12px;
+      overflow-x: auto;
+    }
+
+    .violation-link {
+      display: inline-block;
+      margin-top: 8px;
+      color: #60a5fa;
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    .violation-link:hover { text-decoration: underline; }
+
+    /* ── Performance ────────────────────────── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 16px;
+    }
+
+    .metric-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .metric-name {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .metric-rating {
+      font-size: 12px;
+      margin-top: 4px;
+      font-weight: 600;
+    }
+
+    /* ── Code Findings ──────────────────────── */
+    .findings-table-wrapper {
+      overflow-x: auto;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+    }
+
+    .findings-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .findings-table th {
+      background: #111827;
+      text-align: left;
+      padding: 12px 16px;
+      font-weight: 600;
+      color: #94a3b8;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .findings-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #1e293b;
+      vertical-align: top;
+    }
+
+    .findings-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .findings-table tr:hover td {
+      background: #111827;
+    }
+
+    .finding-file {
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 12px;
+      color: #60a5fa;
+    }
+
+    .finding-message {
+      color: #e2e8f0;
+    }
+
+    .finding-suggestion {
+      color: #94a3b8;
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .category-group {
+      margin-bottom: 32px;
+    }
+
+    .category-label {
+      font-size: 16px;
+      font-weight: 600;
+      color: #f1f5f9;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .category-count {
+      background: #1e293b;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    /* ── Footer ─────────────────────────────── */
+    .footer {
+      text-align: center;
+      padding-top: 32px;
+      border-top: 1px solid #1e293b;
+      color: #475569;
+      font-size: 13px;
+    }
+
+    .footer a {
+      color: #f59e0b;
+      text-decoration: none;
+    }
+
+    .footer a:hover { text-decoration: underline; }
+
+    /* ── Empty State ────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 32px;
+      color: #22c55e;
+      font-size: 15px;
+      background: #111827;
+      border-radius: 10px;
+      border: 1px solid #1e293b;
+    }
+
+    /* ── Grade Cards ────────────────────────── */
+    .grade-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    .grade-card {
+      background: #111827;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 24px 16px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .grade-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+    }
+
+    .grade-letter {
+      font-size: 48px;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+
+    .grade-score {
+      font-size: 14px;
+      color: #64748b;
+      margin-bottom: 8px;
+    }
+
+    .grade-label {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .grade-section-name {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 8px;
+    }
+
+    /* ── SEO Section ───────────────────────── */
+    .seo-check {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 16px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .seo-check:last-child {
+      border-bottom: none;
+    }
+
+    .seo-check-icon {
+      font-size: 16px;
+      min-width: 24px;
+      text-align: center;
+      margin-top: 2px;
+    }
+
+    .seo-check-content {
+      flex: 1;
+    }
+
+    .seo-check-title {
+      font-weight: 600;
+      font-size: 14px;
+      color: #e2e8f0;
+    }
+
+    .seo-check-detail {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* ── Responsive ─────────────────────────── */
+    @media (max-width: 768px) {
+      .container { padding: 24px 16px; }
+      .header-meta { flex-direction: column; gap: 8px; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
+      .metrics-grid { grid-template-columns: 1fr; }
+      .grade-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="header">
+      <div class="logo"><span class="logo-ui">UI</span><span class="logo-max">Max</span> Report</div>
+      <p class="header-subtitle">Comprehensive UI Review</p>
+      <div class="header-meta">
+        <span>URL: <a href="http://127.0.0.1:4174/billing/success" target="_blank" rel="noopener">http://127.0.0.1:4174/billing/success</a></span>
+        <span>Generated: 7/30/2026, 12:39:02 AM</span>
+        <span>Code: /Users/zihaogeng/development/postr-ux-audit-flow-map/apps/web/src</span>
+      </div>
+    </header>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#127942;</span>
+        Report Card
+      </h2>
+      <div class="grade-grid">
+
+        <div class="grade-card" style="border-top: 3px solid #22c55e;">
+          <div class="grade-letter" style="color: #22c55e;">A+</div>
+          <div class="grade-score">100/100</div>
+          <div class="grade-label" style="color: #22c55e;">Exceptional</div>
+          <div class="grade-section-name">Accessibility</div>
+        </div>
+
+        <div class="grade-card" style="border-top: 3px solid #4ade80;">
+          <div class="grade-letter" style="color: #4ade80;">A-</div>
+          <div class="grade-score">91/100</div>
+          <div class="grade-label" style="color: #4ade80;">Great</div>
+          <div class="grade-section-name">Performance</div>
+        </div>
+
+        <div class="grade-card" style="border-top: 3px solid #22c55e;">
+          <div class="grade-letter" style="color: #22c55e;">A</div>
+          <div class="grade-score">96/100</div>
+          <div class="grade-label" style="color: #22c55e;">Excellent</div>
+          <div class="grade-section-name">Best Practices</div>
+        </div>
+
+        <div class="grade-card" style="border-top: 3px solid #fb923c;">
+          <div class="grade-letter" style="color: #fb923c;">D</div>
+          <div class="grade-score">98/100</div>
+          <div class="grade-label" style="color: #fb923c;">Weak</div>
+          <div class="grade-section-name">SEO</div>
+        </div>
+
+        <div class="grade-card" style="border-top: 3px solid #dc2626;">
+          <div class="grade-letter" style="color: #dc2626;">F</div>
+          <div class="grade-score">0/100</div>
+          <div class="grade-label" style="color: #dc2626;">Failing</div>
+          <div class="grade-section-name">Code Quality</div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #ef4444">340</div>
+        <div class="summary-card-label">Critical + High Issues</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #f59e0b">0</div>
+        <div class="summary-card-label">Accessibility Violations</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #22c55e">99ms</div>
+        <div class="summary-card-label">Load Time</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #3b82f6">1577</div>
+        <div class="summary-card-label">Code Findings</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #94a3b8">200</div>
+        <div class="summary-card-label">Files Analyzed</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-value" style="color: #94a3b8">react</div>
+        <div class="summary-card-label">Framework</div>
+      </div>
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#128247;</span>
+        Screenshot
+      </h2>
+      <div class="screenshot-wrapper">
+        <img
+          src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAC0AAAAcICAIAAAAghtdCAAAQAElEQVR4nOzaMREAIAwAsR7H1BH/YpHxS6Ijd/cNAAAAAAAAAACdMwAAAAAAAAAApAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAA8J2VSgAAEABJREFUAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAAAEBM4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAMAAAAAAEBL4AAAAAAAAAAAiAkcAAAAAAAAAAAxgQMAAAAAAAAAICZwAAAAAAAAAADEBA4AAAAAAAAAgJjAAQAAAAAAAAAQEzgAAAAAAAAAAGICBwAAAAAAAABATOAAAAAAAAAAAIgJHAAAAAAAAAAAMYEDAAAAAAAAACAmcAAAAAAAAAAAxAQOAAAAAAAAAICYwAEAAAAAAAAAEBM4AAAAAAAAAABiAgcAAAAAAAAAQEzgAAAAAAAAAACICRwAAAAAAAAAADGBAwAAAAAAAAAgJnAAAAAAAAAAAMQEDgAAAAAAAACAmMABAAAAAAAAABATOAAAAAAAAAAAYgIHAAAAAAAA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AQAAAMAOEuAAAACA9vrrX+8577zzhg4d0rzx61//6llnndueu5900omjR49p0fjjH//0fZGEqKgob341Ho9XVFREfLiNGze2oKBT85Y335yycePGCAAAAOg4AQ4AAABor7q6uh/96Me33faH5o2jRo0++eSTHn544tbvm5GRcfXVV7dofPHFF5999tno/aC8/L8CHJWVFfF4POLD7Rvf+Po+++zTvOX88y946623IgAAAKDjUiIAAACg3V5++eXWK55cffVVGRkZW7/jJz5xQZ8+vZu31NbW/uhHP4neJ8rL/2u+jc2bTb8BAAAAsDMJcAAAAEDH/PjHP62urm7e0rt3709+8oKt3KWgoOBzn/tci8a77/7rvHnzoveJFkuoWD8FAAAAYOcS4AAAAICOWbx48V13/bFF46WXfq5z585t3eWKKy4rKOjUvGX9+vW/+c1vo/ePzZv/K8DRYkUVAAAAAHaQAAcAAAB02M0337JmzdrmLQUFna644vItdu7bt+/555/fovH663+zcePG6P2jsrIyHo83XRXgAAAAANi50iIAAACggzZt2vTrX//6//7v+80bzz//vD/96c+LFy9u0fnLX746IyOjecvs2XPuuedvW9l/enr64MGDejTo2blzwZo1a1asWLlixYoFCxZE7RCLxZpfbR68aE//tu5SXl6em5vbtB11cFdFRYVjxowZMGBA6DN16rTJkydHbejatUvfvv169+7Vs2fP8vKK8MJXrlwxZ8686uqqaBfYe+/h/fr1D08v2Ly5vKRk7erVq6dMeWcXPdwOysnJGTt2bLdu3cITDsfVunXr1q4tmT171tKly6KO276hbv0uN0lJSWl+6zaPPQAAAKCJAAcAAABsj3/8477zzjtv1KiRTS3p6elf+crVX/rS1c277bPPPieccHyL+/7oRz+qr6/f4m4HDBhw9tlnnXbax4qLi1vfumDBgr///d4HHnhg3br1URuOPPLIm266oXnLvff+49prvxO17ZVXXu7cuaDpanhuI0aMat1t8+b/BDgqKrYQ4BgyZPDDDz/UvOW111771Kc+nZqaevnll1188UU5OTmJ9kmTXrvwwk+33sPhhx/68Y9fcNhhh7aOCGzYUHr//ff/9a/3LFq0KNoZ+vbte8klnznyyMO7deve+tby8vKXXnrpz3/+y6uvTor2DMccc8x5551zwAEHtMgDJbz77sxHHnnkrrv+VFVV2Z69bfdQn3HG6T/84Q/a2u2f//yf1YXq6upGjhwdAQAAAO1jCRUAAADYHvF4/Ic//FGLxuOOO27cuLHNW77+9Wta9HnqqadeeeXV1jtMTU0NnR977JHPfObiLaY3goEDB15zzdeefvqpUESPdrvKyoqm7c2bO7CEyne/+93Pf/7KpvTGFnXv3uPee++55ZZbDj/8sC1O8NC5c8FFF306jM8Xv/iFaMeEof7yl788ceJD5557zhbTG1HjRBfHHHPMHXfc/otf/LywsDBKqj59et911x2/+c2vJ0yYsMX0RtQ4j8hXvvLlhx9+8KCDDtr63nbnUAMAAADtJ8ABAAAA2+nNN9985JFHWzRec81/EhvHHnvsvvuOa35rVVXVj3/809a7Ki4uuv32W0PVPGqHrKysH/7wB//v/303PT092o2ahzaahzm27oQTjj/33LO33mfMmDF///s9o0Zte7aGWCx2xRWX33DDb7YeB9mK1NTUX/ziZ5deeklbSYgWTjrpxN///pamqUd2v169et155x0HHnhgezr37dvnlltuOuywQ9vqsDuHGgAAAOgQAQ4AAADYfj/72c9bRBnGjRt73HHHhY20tLSvfOXqFv3vvPOPS5YsadGYmpp60003trNC3+S8885rPb3HLlVRsT0zcHzyk5/ceoc+fXrffvut3bp1jdrt6KOP/v73/zfaLl/72lePP/74Dt1l1KhRP/nJj6Ikuf76X/Xu3bt1++bNm1euXNl6LZ6MjIzGu/RqfZfdPNQAAABAh6RFAAAAwPZasWLFH/5w2+c/f2Xzxq985eqnn3763HPP7d+/f/P21avX3HLLLa13cvnll40ZM6ZFY1VV1T//+dA777y9dm1JKMYfcsiEI488skWfT3zigueee+6FF16MdotvfvNbeXnvTUSxevXa9txl5MiRzeeuCK9l0aKF+fmdamtrmhp/8IMftJjforq6+uGHJz7yyKNLlizJzMwYMmTI2WeffdBBH2ne56STTnziiScff/zxqCPCO3LBBR9v0bh48eJ77rlnzpy569dv6NGjx+jRo8LAtph24qMf/ejeew9/992Z0e511FFHjRo1qnlLfX39rbfefvfddy9fvjxcTU9PD32+/OWrmh9sWVnZV1xxxbe/fW2Lve2UoZ49e87tt9/RdFO3bt2ad5448ZHVq1c3PdUIAAAAaDcBDgAAANghf/jDrWeddWYo/De19OvX74orLj/vvHNb9PzVr361efPmFo3Dhu11+eWXtWicOXPWZZddvnLlyqaWP//5L2PH7nPzzTd17ty5ec9Qkj/22OMqKyujXW/RokVRByXiAlVVVT/5yU9feunlpj3EYrHExjnnnDN+/H9NPRKq/ldd9eWnn366qWX27DmPPPLoJz7xiW996xspKf+ZTPR73/vOc88916HXfuaZZ7ZYd+bBBx/65je/VVdXl7g6derUJ5988o9//PM//nFPt27dm/c877zzvve9/xftXscee0yLlp/85Gd33nln09WamprHH3/8zTff/Pvf72l+EJ588knh2dbW1ja17KyhntYo0b7vvuNaBDj+9Kc/v/XWWxEAAADQcZZQAQAAgB0Sqto/+9nPWzRefvllhYWFzVumTZt6//0PtL77WWedlZqa2rxl+fLln/70Rc3TGwlTprx98cWfaV6SD7p163rkkUdEe7Campovfenqv/zl7ub5j3g8ntj4+MfPb9H/pz/9WfNIQZM//elPf/7zX5q3FBUVHXHE4VFH7Lffvs2vrl696tvfvrYpvdFkzZrVP/jBj1s0DhkyONrtBgwY0PxqGLeJEx9u3W3NmjV33nlX85bMzMwWT3g3DzUAAADQUWbgAAAAgB01ceIjF1xwwb77jttKnx/84MdNqYUmKSkpJ5xwQovGX/7yug0bNmxxJzNmvHvPPX9rsQjIqaee8uijj0V7quuu+9Wzzz67xZsGDRo0fPiw5i3PPPPcHXfc2daufv3r688++8ysrOymlpNOOvGxxzqwisrdd9993333NV1duHBRTU3NFnu+8cbkFi19+vSOdrvU1Fjzq7FYLCcnN4pKWve8//4Hli1b3rylpGRd0/buH2oAAACgowQ4AAAAYCf4wQ9+dO+99zStDNLCww9P3OK6EuPHj+/Spbh5S2Vl5cSJj0Rtu+++B1oEOA455JD8/Lyysk3RHumll15q66YTT2wZXpk8+bWobZs2bXr55VeOOuqoppbDDjssPT29rRBGa+GNaGfPtWtLqqurMzIymlqys3Oj3W7y5DdHjx7TvOWb3/zmV77ylfLy8hY9N2zY8MQTT7S1n90/1AAAAEBHWUIFAAAAdoLp06dtcYWUoKKi/Oc//8UWbxoyZEiLlnnz5reeqKO5+fPntegQyur9+vWP9kjl5eVz5sxt69Zhw/Zq0TJjxsxoq958879yMJmZmd26dY12gZSUlObpjWR5/fWWE4EceeThEyc+9OUvf3nkyJHhSUbtsycPNQAAAJBgBg4AAADYOa677rpjjz0mLy+vRfutt96+cuXKLd6la9eWFfG5c9uMOyRUVFQsXbqsb98+W9/PHmLOnDn19fVt3dqtW7cWLbfffmtdXV3UttTU1BYt4bW3WDqk/UaM2HvYsGF9+vTp3bt3QUHnTp3yg/A3vIm5uUmYb6O1119/raSkpLj4v6Zp6dmz56WXXhIumzdvfuedqW+//faUKVNeV4q9wgAAEABJREFUf31yuNrWfpI+1AAAAMA2CXAAAADAzrFmzdrbbrv9i1/8QvPG1avX/P73t7Z1l9ZTGsyZMyfalrlz57YIcLQuz+8hqqqqtnLrFnMnrXMDW9etW/eogwoLCz/72UtOOOH4nj17Rnu2srJNX/3q126++abMzMzWt+bm5h500EfCJWzX1NS89dZbDz300D//+XB1dcthT9ZQAwAAAO1nCRUAAADYaebNm9+iZeXKFVVVlW3179y5c4uW5cu3PcPBsmXLWu2nIHofav3yt0NeXsemyjj99NMee+zRiy++aM9PbyS88sqrH//4BVtZiSYhPT39wAMP/P73v//UU08eddRRLW5NylADAAAAHWIGDgAAAEiaDRvWt2jp06fPNu/Vu3efVvvZEL0Pbdy4MScnp3nLVhYBScjNza2rq6us/E8mpra2Nmq3s8468/vf/99YLLb1buXl5eG59ejRI9ozTJ8+45RTTh03buxpp512wgkndOqUv5XOXbt2ufHG3/7f//3gT3/6c1Pj7h9qAAAAoKMEOAAAACBpVq9e26JlyJAh27zXkCGDW+1nTbQD0tOT898H1qxZ3TwkEY/HjzjiyLKyTdGu0bNnz+9977st0hvh4e677x/Tp89YuHBRaWnpxkZ1dXXhprfffmuLC5cky1tvTQmXH/zgRxMmHDyuwT6jRo3Mzs7ZYudvfOPrL7740sKFCxNXd/NQAwAAANtBgAMAAACSZs2alsGLwYMHb/0u2dnZffr03uZ+mtv6AitFRYW5uclZGmPNmv/Kr8RisREjRkya9Fq0a1x00YXp6enNW6ZNm3rxxZ/duHHjFvunpOyJK89WV1c90yhsp6am7r333kceecSZZ57RYr6QtLS0gw8+qFmAY7cONQAAALAd9sT/EgEAAAAfEnPnzmnRMnjwoK0v8DFo0OAWHaqrqxcvXtT8aou7tF5ypbkBAwZGSTJ37rwWLSNGjIh2mX33Hdei5Zvf/HZb6Y299x7eIu2xB6qrq5s2bdpvfvPb448/8a23prS4db/99mva3s1DDQAAAGwHM3AAAABA0kya9NratSVduhQ3tWRlZZ188kkPPfRwW3c588zTWrS8+OKLzdfCWLu25WwcAwf2LygoKC0t3dL+orPOOjNKkscee+zSSz/bvGX8+PG3337HVu4ybNheLZIHEyc+Wl1dFbVDnz59m1+trKycM2duW50PO+ywKNmGDh0ybNiw5i1vvvnW8uXLW/cMr+XWW2/77W+vb944cuR/Bmq3DXVqamoEAAAAbBcBDgAAAEia+vr6UFn/xCcuaN549dVXvfDCixs2bGjdf8SIvc8555wWjQ8/PLH51bVr17bokJWVfckll/ziF79ovcPRo0effvppUZLMmPHuwoULBwwY0NRyxBGHX3bZ526++ZYt9s/Jybnxxht69/7PCjKzZ8+5//4HovZpET7Iysrq2rXbmjWrW/csLCz82MdOjZJt0KDBP//5z5q3PPDAA9/4xre22Ln5LCwJJSUlTdu7aKjLyytatPTo0T0CAAAAtoslVAAAACCZ7r333rq6uuYtvXr1uuOO23v06NGi5z777HPrrX9IS/uvH2OsXr3m6aefad5SUrJuwYIFLe574YWf/MxnLmqx9srHPvax2267desrtuxqf/vb31u0XHXVl049dQvhia5du/7qV9c1jxQEd999d9RuS5e2nLviK1+5qnW3vn37/vWvfxk0aFCUbJMnv96i5cQTTzzggAO22PnMM89o0TJ37vzmV3fFUC9evLhFy9FHHx0BAAAA28UMHAAAAJBMM2fOuuWW311xxeXNG4cPH/bEE4899NDDb7/9TklJSc+ePSdMOOjII49sffdrr722srKyRePjjz9x2WWfa96SkZHxta997eyzz54x490lS5b07dt3772HDxw4MEq2O++864QTjhs9ekzzxh/96AfHHXfMgw8+vHjxopqamiFDhowYMeK8887r1Cm/ebcwMltZa6a1F154Yd99xzVvOe200/r06fPHP/553ry58Xg0btzYffYZ+9GPHlVYWBjtAUpK1j322GPHH398U0t4H2+++cZbb73t73+/d82aNY0tmQMH9r/88suad0tokdjYFUO9aFHLaT9OOOH4qqrKiRMfWbVqVWZm1tSpUyMAAACgfQQ4AAAAIMluuOHGww47ZNSo0c0bQ6n+zDPPaD2tQnN3333388+/0Lo9VO4/+clP5Obmtmgf0KhF4z33/C3U/gsKOkXJUFdX9/Wvf+u+++7NyspqakxNTT260VbuWFFRftllV2zatClqt3vuuedzn/tsVlZ288b9G7Xu/PDDE4877tj09PQoqX7+818cccQRzQcnvK1f/OIXwqW8vLysbGPXrt1SUrYwweojjzw6ffq05i27YqinT5/euvG0RolHHDlydAQAAAC0jyVUAAAAIMlCnTsUyCdPntyhe91zz99++MMfb/Gm5cuXh8J/1A5z5swNO4nH41HyzJ8//7Of/VxJSUn771JbW3v11V/u6OwO69at//a3v9Oenm+//fa3vnVtfX19lGxLly674orPV1ZWtL4pJyene/ceW0xvvPTSy9/61rdbt+/0oZ406bUnn3wyAgAAAHYGAQ4AAABIvrVrSy688KK77rqrPZ0rKyuvvfY73/ve/6upqWmrz913//WXv7xu6xGE2bPnfOlLV1VVVUbJ9vrrr5955tnTprUrkBE6X3DBJ5999vmo4yZOfOR73/ufLeYhmkyePPnzn/9idXVVtGd4+eWXL7rokjlz5ranczgkwlF0+eVXtl5YJ2GnD/X//u//rV69KgIAAAB2mCVUAAAAYI9QV1f3wx/++C9/+etZZ515+umnFRcXt+4zf/78e+/9xwMPPLBu3fpt7vB3v/v9O++8c8kln5kwYUIsFmt+06ZNm2644ca77vpjeNBoz7By5cqzzjr3kEMOOeecs4466qi0tJb/yaK6unrmzJk33HDDc8+9EO2Ae+65Z9KkSZdfftlHP3p0i1VmFixY8KtfXf/4449He5i33nrrYx877cwzTz/llFPGjRu3xYVdwgA+99xzt912x6JFi7a+t5071GvWrDn22BM+8YmPX3LJJZ07d44AAACA7RXLySmKAAAAgD1JqKkPHDigZ8+ePXr0KCgoWLt2bSi6L1++Ypu1+S0K+xk2bFjYVW5u9oIFi+bNm7dkyZI9YX2QtoSX3K9fv8TLj8fjixYtXLBg4bJl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AAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAknWZtAAAQAElEQVQAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEAAAAAAAAAEJiAAwAAAAAAAAAgMAEHAAAAAAAAAEBgAg4AAAAAAAAAgMAEHAAAAAAAAAAAgQk4AAAAAAAAAAACE3AAAAAAAAAAAAQm4AAAAAAAAAAACEzAAQAAAAAAAAAQmIADAAAAAAAAACAwAQcAAAAAAAAAQGACDgAAAAAAAACAwAQcAAAAAAAAAACBCTgAAAAAAAAAAAITcAAAAAAAAAAABCbgAAAAAAAAAAAITMABAAAAAAAAABCYgAMAAAAAAAAAIDABBwAAAAAAAABAYAIOAAAAAAAAAIDABBwAAAAAAAAAAIEJOAAAAAAAAAAAAhNwAAAAAAAAAAAEJuAAAAAAAAAAAAhMwAEA/P/s2rEAAAAAwCB/62HsKY4AAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEQh74/QAABQpJREFUDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAmcABAAAAAAAAADATOAAAAAAAAAAAZgIHAAAAAAAAAMBM4AAAAAAAAAAAmAkcAAAAAAAAAAAzgQMAAAAAAAAAYCZwAAAAAAAAAADMBA4AAAAAAAAAgJnAAQAAAAAAAAAwEzgAAAAAAAAAAGYCBwAAAAAAAADATOAAAAAAAAAAAJgJHAAAAAAAAAAAM4EDAAAAAAAAAGAmcAAAAAAAAAAAzAQOAAAAAAAAAICZwAEAAAAAAAAAMBM4AAAAAAAAAABmAgcAAAAAAAAAwEzgAAAAAAAAAACYCRwAAAAAAAAAADOBAwAAAAAAAABgJnAAAAAAAAAAAMwEDgAAAAAAAACAWQAAAP//npoVRwAAAAZJREFUAwB4L5DthAL2HwAAAABJRU5ErkJggg=="
+          alt="Screenshot of http://127.0.0.1:4174/billing/success"
+          width="1440"
+          height="900"
+        />
+      </div>
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#9855;</span>
+        Accessibility
+      </h2>
+      <div style="margin-bottom: 16px; color: #94a3b8; font-size: 14px;">
+        0 violation(s) found &middot; 20 checks passed
+      </div>
+      <div class="empty-state">No accessibility violations found. 20 checks passed.</div>
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#9889;</span>
+        Performance
+      </h2>
+      <div class="metrics-grid">
+
+    <div class="metric-card">
+      <div class="metric-name">First Contentful Paint</div>
+      <div class="metric-value" style="color: #22c55e;">640ms</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-name">Largest Contentful Paint</div>
+      <div class="metric-value" style="color: #22c55e;">640ms</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-name">Cumulative Layout Shift</div>
+      <div class="metric-value" style="color: #22c55e;">0.000</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-name">Total Blocking Time</div>
+      <div class="metric-value" style="color: #22c55e;">0ms</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-name">Load Time</div>
+      <div class="metric-value" style="color: #22c55e;">99ms</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+    <div class="metric-card">
+      <div class="metric-name">DOM Content Loaded</div>
+      <div class="metric-value" style="color: #22c55e;">99ms</div>
+      <div class="metric-rating" style="color: #22c55e;">Good</div>
+    </div>
+
+      </div>
+
+    <div style="display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; font-size: 14px; color: #94a3b8;">
+      <span>DOM Nodes: <strong style="color: #e2e8f0;">46</strong></span>
+      <span>Resources: <strong style="color: #e2e8f0;">10</strong></span>
+      <span>Total Size: <strong style="color: #e2e8f0;">2.9 KB</strong></span>
+      <span>JS Heap: <strong style="color: #e2e8f0;">5.7 MB</strong></span>
+    </div>
+
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#128270;</span>
+        SEO
+      </h2>
+      <div style="margin-bottom: 16px; color: #94a3b8; font-size: 14px;">
+        Score: <strong style="color: #e2e8f0;">98/100</strong>
+        &middot; 17 passed &middot; 1 failed
+      </div>
+      <div style="background: #111827; border: 1px solid #1e293b; border-radius: 10px; overflow: hidden;">
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Page Title</div>
+            <div class="seo-check-detail">Payment Confirmed and Access Updated | Postr</div>
+
+          </div>
+          <span class="badge badge-critical">critical</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Meta Description</div>
+            <div class="seo-check-detail">Your Postr payment was received. Review the confirmed purchase, wait for export access to update, then return to your conference poster.</div>
+
+          </div>
+          <span class="badge badge-critical">critical</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Single H1 Tag</div>
+            <div class="seo-check-detail">1 H1 tag(s)</div>
+
+          </div>
+          <span class="badge badge-critical">critical</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Heading Hierarchy</div>
+            <div class="seo-check-detail">1 headings (proper hierarchy)</div>
+
+          </div>
+          <span class="badge badge-high">high</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Canonical URL</div>
+            <div class="seo-check-detail">https://www.postr.sh/billing/success</div>
+
+          </div>
+          <span class="badge badge-high">high</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">HTML Lang Attribute</div>
+            <div class="seo-check-detail">en</div>
+
+          </div>
+          <span class="badge badge-high">high</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Viewport Meta Tag</div>
+            <div class="seo-check-detail">width=device-width, initial-scale=1.0</div>
+
+          </div>
+          <span class="badge badge-high">high</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Image Alt Text</div>
+            <div class="seo-check-detail">No images found</div>
+
+          </div>
+          <span class="badge badge-high">high</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Open Graph Title</div>
+            <div class="seo-check-detail">Payment Confirmed and Access Updated | Postr</div>
+
+          </div>
+          <span class="badge badge-medium">medium</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Open Graph Description</div>
+            <div class="seo-check-detail">Your Postr payment was received. Review the confirmed purchase, wait for export access to update, then return to your conference poster.</div>
+
+          </div>
+          <span class="badge badge-medium">medium</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Open Graph Image</div>
+            <div class="seo-check-detail">https://www.postr.sh/og-card.png</div>
+
+          </div>
+          <span class="badge badge-medium">medium</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Twitter Card Meta</div>
+            <div class="seo-check-detail">summary_large_image</div>
+
+          </div>
+          <span class="badge badge-medium">medium</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Structured Data (JSON-LD)</div>
+            <div class="seo-check-detail">1 block(s) found</div>
+
+          </div>
+          <span class="badge badge-medium">medium</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Character Encoding</div>
+            <div class="seo-check-detail">UTF-8</div>
+
+          </div>
+          <span class="badge badge-low">low</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#10060;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Meta Robots</div>
+            <div class="seo-check-detail">noindex,nofollow</div>
+            <div class="seo-check-detail" style="color: #f59e0b;">Page has &quot;noindex&quot; in meta robots — search engines will NOT index this page. Remove if this is unintentional.</div>
+          </div>
+          <span class="badge badge-low">low</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Link Accessibility</div>
+            <div class="seo-check-detail">0/1 links missing descriptive text</div>
+
+          </div>
+          <span class="badge badge-low">low</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Title Length</div>
+            <div class="seo-check-detail">44 characters</div>
+
+          </div>
+          <span class="badge badge-low">low</span>
+        </div>
+
+        <div class="seo-check">
+          <span class="seo-check-icon">&#9989;</span>
+          <div class="seo-check-content">
+            <div class="seo-check-title">Description Length</div>
+            <div class="seo-check-detail">136 characters</div>
+
+          </div>
+          <span class="badge badge-low">low</span>
+        </div>
+
+      </div>
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#128269;</span>
+        Code Analysis
+      </h2>
+
+    <div style="margin-bottom: 20px; color: #94a3b8; font-size: 14px;">
+      1577 finding(s) across 200 files
+      &middot; 100 components
+      &middot; 0 stylesheets
+      &middot; avg 305 lines/file
+    </div>
+
+
+        <div class="category-group">
+          <div class="category-label">
+            Code Quality
+            <span class="category-count">769</span>
+          </div>
+          <div class="findings-table-wrapper">
+            <table class="findings-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Severity</th>
+                  <th style="width: 250px;">Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:117</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:94</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:110</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:128</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx</td>
+            <td>
+              <div class="finding-message">File has 1347 lines (recommended max: 400)</div>
+              <div class="finding-suggestion">Split into smaller, focused modules with single responsibilities</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:547</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (14 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/PrivacyFr.tsx:426</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Privacy.tsx:406</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/PaperToPoster.tsx:372</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (11 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/CookiesFr.tsx:292</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Cookies.tsx:286</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/ChartChooser.tsx:150</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (11 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:497</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (11 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:184</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/blocks.tsx</td>
+            <td>
+              <div class="finding-message">File has 2633 lines (recommended max: 400)</div>
+              <div class="finding-suggestion">Split into smaller, focused modules with single responsibilities</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/blocks.tsx:966</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (12 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/VersionPanel.tsx:232</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (10 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/Sidebar.tsx:1951</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/Sidebar.tsx</td>
+            <td>
+              <div class="finding-message">File has 4271 lines (recommended max: 400)</div>
+              <div class="finding-suggestion">Split into smaller, focused modules with single responsibilities</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/Sidebar.tsx:1735</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (13 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/SecureWorkModal.tsx:137</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/RichTextEditor.tsx:356</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (9 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/ReadabilityPanel.tsx</td>
+            <td>
+              <div class="finding-message">File has 1035 lines (recommended max: 400)</div>
+              <div class="finding-suggestion">Split into smaller, focused modules with single responsibilities</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/ReadabilityPanel.tsx:755</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (14 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx:670</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx:1982</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx:1989</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx:3528</td>
+            <td>
+              <div class="finding-message">Empty catch block swallows errors silently</div>
+              <div class="finding-suggestion">Handle or log the error inside the catch block — silent failures make debugging extremely difficult</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx</td>
+            <td>
+              <div class="finding-message">File has 3873 lines (recommended max: 400)</div>
+              <div class="finding-suggestion">Split into smaller, focused modules with single responsibilities</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">poster/PosterEditor.tsx:2985</td>
+            <td>
+              <div class="finding-message">Deep nesting detected (17 levels)</div>
+              <div class="finding-suggestion">Extract nested logic into helper functions or use early returns</div>
+            </td>
+          </tr>
+
+                <tr><td colspan="3" style="color: #64748b; font-size: 13px; text-align: center;">+ 739 more finding(s)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="category-group">
+          <div class="category-label">
+            Accessibility
+            <span class="category-count">254</span>
+          </div>
+          <div class="findings-table-wrapper">
+            <table class="findings-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Severity</th>
+                  <th style="width: 250px;">Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:366</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:417</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:425</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:444</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:479</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:1237</td>
+            <td>
+              <div class="finding-message">Input element may be missing an associated label</div>
+              <div class="finding-suggestion">Wrap input in a &lt;label&gt;, use htmlFor/for attribute, or add aria-label/aria-labelledby</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:1245</td>
+            <td>
+              <div class="finding-message">Input element may be missing an associated label</div>
+              <div class="finding-suggestion">Wrap input in a &lt;label&gt;, use htmlFor/for attribute, or add aria-label/aria-labelledby</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Profile.tsx:1309</td>
+            <td>
+              <div class="finding-message">Input element may be missing an associated label</div>
+              <div class="finding-suggestion">Wrap input in a &lt;label&gt;, use htmlFor/for attribute, or add aria-label/aria-labelledby</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/PaperToPoster.tsx:326</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/PaperToPoster.tsx:346</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/PaperToPoster.tsx:353</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Home.tsx:179</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Editor.tsx:304</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Debug.tsx:125</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Debug.tsx:135</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/ChartChooser.tsx:135</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/ChartChooser.tsx:185</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/BillingResult.tsx:91</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/BillingResult.tsx:119</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:399</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:453</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:502</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:571</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:578</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:474</td>
+            <td>
+              <div class="finding-message">Input element may be missing an associated label</div>
+              <div class="finding-suggestion">Wrap input in a &lt;label&gt;, use htmlFor/for attribute, or add aria-label/aria-labelledby</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/Auth.tsx:483</td>
+            <td>
+              <div class="finding-message">Input element may be missing an associated label</div>
+              <div class="finding-suggestion">Wrap input in a &lt;label&gt;, use htmlFor/for attribute, or add aria-label/aria-labelledby</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:181</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:333</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:341</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-high">high</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:369</td>
+            <td>
+              <div class="finding-message">onClick handler without keyboard event handler (onKeyDown/onKeyUp)</div>
+              <div class="finding-suggestion">Add onKeyDown or onKeyUp handler alongside onClick, or use a &lt;button&gt; element instead</div>
+            </td>
+          </tr>
+
+                <tr><td colspan="3" style="color: #64748b; font-size: 13px; text-align: center;">+ 224 more finding(s)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="category-group">
+          <div class="category-label">
+            User Experience
+            <span class="category-count">115</span>
+          </div>
+          <div class="findings-table-wrapper">
+            <table class="findings-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Severity</th>
+                  <th style="width: 250px;">Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">routes.tsx:115</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">App.tsx:10</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:80</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:22</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Terms.tsx:23</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Share.tsx:30</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Profile.tsx:48</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/PrivacyFr.tsx:17</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Privacy.tsx:19</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Pricing.tsx:21</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/PaperToSlides.tsx:24</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/PaperToPoster.tsx:59</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/NotFound.tsx:5</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Landing.tsx:71</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Home.tsx:38</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/GalleryEntry.tsx:22</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Gallery.tsx:27</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Editor.tsx:131</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Editor.tsx:254</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Debug.tsx:28</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/CookiesFr.tsx:18</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Cookies.tsx:35</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/ChartChooser.tsx:56</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/BillingResult.tsx:26</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Auth.tsx:42</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:42</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/About.tsx:84</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">poster/resizeHandles.tsx:47</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">poster/blocks.tsx:133</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">poster/blocks.tsx:281</td>
+            <td>
+              <div class="finding-message">React component without error boundary in ancestry</div>
+              <div class="finding-suggestion">Wrap major UI sections with an ErrorBoundary component</div>
+            </td>
+          </tr>
+
+                <tr><td colspan="3" style="color: #64748b; font-size: 13px; text-align: center;">+ 85 more finding(s)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="category-group">
+          <div class="category-label">
+            Performance
+            <span class="category-count">12</span>
+          </div>
+          <div class="findings-table-wrapper">
+            <table class="findings-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Severity</th>
+                  <th style="width: 250px;">Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/Profile.tsx:801</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/GalleryEntry.tsx:142</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">pages/AdminGallery.tsx:286</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">poster/blocks.tsx:178</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">poster/blocks.tsx:346</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/PublishGalleryModal.tsx:489</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/PosterCard.tsx:61</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/PosterCard.tsx:197</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/LogoPicker.tsx:498</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/LogoPicker.tsx:633</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">components/ImportPosterModal.tsx:826</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-medium">medium</span></td>
+            <td class="finding-file">manuscript/ui/PosterStatic.tsx:166</td>
+            <td>
+              <div class="finding-message">Image without loading=&quot;lazy&quot; (may impact initial load)</div>
+              <div class="finding-suggestion">Add loading=&quot;lazy&quot; for below-the-fold images</div>
+            </td>
+          </tr>
+
+
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="category-group">
+          <div class="category-label">
+            Design Consistency
+            <span class="category-count">427</span>
+          </div>
+          <div class="findings-table-wrapper">
+            <table class="findings-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">Severity</th>
+                  <th style="width: 250px;">Location</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">routes.tsx:109</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">routes.tsx:109</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:84</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:84</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:89</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:95</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/WhyPosters.tsx:97</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:26</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:26</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:31</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:34</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/TermsFr.tsx:39</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Terms.tsx:27</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Terms.tsx:27</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Terms.tsx:32</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Terms.tsx:35</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Terms.tsx:40</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Share.tsx:87</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Share.tsx:87</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Share.tsx:94</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Share.tsx:94</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Share.tsx:96</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Profile.tsx:317</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Profile.tsx:317</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Profile.tsx:320</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Profile.tsx:327</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/Profile.tsx:327</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/PrivacyFr.tsx:21</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/PrivacyFr.tsx:21</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+          <tr>
+            <td><span class="badge badge-low">low</span></td>
+            <td class="finding-file">pages/PrivacyFr.tsx:26</td>
+            <td>
+              <div class="finding-message">Hardcoded hex color (not using design token/variable)</div>
+              <div class="finding-suggestion">Use CSS custom properties or design tokens for consistent theming</div>
+            </td>
+          </tr>
+
+                <tr><td colspan="3" style="color: #64748b; font-size: 13px; text-align: center;">+ 397 more finding(s)</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+    </div>
+
+
+    <div class="section">
+      <h2 class="section-title">
+        <span class="section-title-icon">&#128202;</span>
+        Summary
+      </h2>
+      <div style="background: #111827; border: 1px solid #1e293b; border-radius: 12px; padding: 24px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <span style="font-size: 48px; font-weight: 800; color: #f59e0b;">1577</span>
+          <div style="color: #94a3b8; font-size: 14px;">Total Findings</div>
+        </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
+        <span class="badge badge-critical" style="min-width: 80px; text-align: center;">critical</span>
+        <div style="flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: 0%; background: #ef4444; border-radius: 4px;"></div>
+        </div>
+        <span style="min-width: 40px; text-align: right; font-weight: 600; color: #ef4444;">0</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
+        <span class="badge badge-high" style="min-width: 80px; text-align: center;">high</span>
+        <div style="flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: 21.559923906150917%; background: #f97316; border-radius: 4px;"></div>
+        </div>
+        <span style="min-width: 40px; text-align: right; font-weight: 600; color: #f97316;">340</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
+        <span class="badge badge-medium" style="min-width: 80px; text-align: center;">medium</span>
+        <div style="flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: 27.901077996195305%; background: #eab308; border-radius: 4px;"></div>
+        </div>
+        <span style="min-width: 40px; text-align: right; font-weight: 600; color: #eab308;">440</span>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; padding: 8px 0;">
+        <span class="badge badge-low" style="min-width: 80px; text-align: center;">low</span>
+        <div style="flex: 1; height: 8px; background: #1e293b; border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: 50.538998097653774%; background: #3b82f6; border-radius: 4px;"></div>
+        </div>
+        <span style="min-width: 40px; text-align: right; font-weight: 600; color: #3b82f6;">797</span>
+      </div>
+
+      </div>
+    </div>
+
+
+    <footer class="footer">
+      <p>Generated by <a href="https://github.com/prem-fission/uimax-mcp" target="_blank" rel="noopener">UIMax MCP</a></p>
+    </footer>
+
+  </div>
+</body>
+</html>

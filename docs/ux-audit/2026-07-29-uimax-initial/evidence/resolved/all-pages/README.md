@@ -26,6 +26,12 @@ See [the 25-state SEO regression report](SEO-REGRESSION-2026-07-30.md).
 
 The full UIMax report also repeats the same repository-wide heuristic code scan for every route. Those static findings are not route observations; this summary reports the runtime accessibility and SEO sections of each page review.
 
+## 2026-07-30 full report bundle
+
+UIMax `export_report` was run for all 25 routes and states after the SEO remediation. The bundle includes screenshots, accessibility, performance, SEO, best-practice, and code-analysis sections for every page.
+
+See [the full 25-page UIMax report bundle](../full-reports-2026-07-30/README.md).
+
 ## Reports
 
 | Route or state | Axe violations | SEO | High/Medium |

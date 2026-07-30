@@ -62,8 +62,11 @@ Verification:
 - UIMax pricing review: Accessibility 100, Best Practices 100, SEO 100.
 - UIMax paid-signup review: Accessibility 100, Best Practices 100.
 - UIMax full route pass: 25 reports, zero runtime accessibility violations, zero route-level High/Medium SEO findings.
+- UIMax standalone exports: 25/25 full HTML reports, covering accessibility, performance, SEO, best practices, screenshots, and code analysis.
 - Post-merge UIMax regression: landing, pricing, and the anonymous-first editor retained zero runtime accessibility violations and zero route-level High/Medium SEO findings.
 - OpenSEO production baseline: 10 pages and 39 shared prerender warnings; local raw-HTML resolution verified pending deployment.
+
+Full standalone evidence: [`evidence/resolved/full-reports-2026-07-30/README.md`](evidence/resolved/full-reports-2026-07-30/README.md)
 
 ## Coverage
 
