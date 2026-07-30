@@ -104,7 +104,7 @@ const PaperToSlides = lazy(() => import('@/pages/PaperToSlides'));
 
 function LazyFallback() {
   return (
-    <main className="flex min-h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#6b7280]">
+    <main className="flex min-h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#8b8f99]">
       <div className="text-[14pt]">Loading…</div>
     </main>
   );

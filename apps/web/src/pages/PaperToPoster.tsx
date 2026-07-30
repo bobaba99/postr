@@ -278,7 +278,7 @@ export default function PaperToPoster() {
         <h1 className="text-2xl font-bold text-white">
           From paper to poster
         </h1>
-        <p className="mt-1 text-sm text-[#6b7280]">
+        <p className="mt-1 text-sm text-[#8b8f99]">
           Paste your manuscript, answer a few short questions, download a
           poster draft — a structured first pass you can print or refine in
           the editor.
@@ -324,7 +324,7 @@ export default function PaperToPoster() {
               <button
                 type="button"
                 onClick={() => void condense(interview)}
-                className="postr-rise-in inline-flex min-h-11 items-center self-start rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110"
+                className="postr-rise-in inline-flex min-h-11 items-center self-start rounded-md bg-[#5641b8] px-4 text-sm font-semibold text-white hover:brightness-110"
               >
                 Try drafting again
               </button>
@@ -344,7 +344,7 @@ export default function PaperToPoster() {
                   <button
                     type="button"
                     onClick={handleSavePdf}
-                    className="inline-flex min-h-11 items-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110"
+                    className="inline-flex min-h-11 items-center rounded-md bg-[#5641b8] px-4 text-sm font-semibold text-white hover:brightness-110"
                   >
                     Save PDF
                   </button>
@@ -355,7 +355,7 @@ export default function PaperToPoster() {
                   >
                     Download .postr
                   </button>
-                  <span className="text-xs text-[#6b7280]">
+                  <span className="text-xs text-[#8b8f99]">
                     The .postr file opens in the editor for full control.
                   </span>
                 </div>

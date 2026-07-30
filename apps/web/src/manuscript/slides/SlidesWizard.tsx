@@ -378,7 +378,7 @@ export function SlidesWizard({ testHooks }: SlidesWizardProps = {}) {
           </p>
 
           {/* Privacy line — quiet, persistent, precise (spec §1). */}
-          <p className="mt-2 text-[11px] leading-relaxed text-[#6b7280]">
+          <p className="mt-2 text-[11px] leading-relaxed text-[#8b8f99]">
             Your manuscript is never stored on our servers, and is never used to
             train AI.
           </p>

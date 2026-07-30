@@ -153,7 +153,7 @@ export default function Landing() {
         <div data-postr-hero-item className="mt-10 flex items-center justify-center gap-4">
           <Link
             to="/auth"
-            className="rounded-lg bg-[#7c6aed] px-8 py-3 text-base font-semibold text-white no-underline hover:bg-[#6c5ce7] transition-colors"
+            className="rounded-lg bg-[#5641b8] px-8 py-3 text-base font-semibold text-white no-underline hover:bg-[#4c39a6] transition-colors"
           >
             Get started
           </Link>

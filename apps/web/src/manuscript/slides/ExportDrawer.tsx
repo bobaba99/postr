@@ -67,13 +67,13 @@ export function ExportDrawer({
         <span className="text-sm font-semibold text-[#e2e2e8]">
           Export
           {slideCount > 0 && (
-            <span className="ml-2 text-xs font-normal text-[#6b7280]">
+            <span className="ml-2 text-xs font-normal text-[#8b8f99]">
               {slideCount} slide{slideCount === 1 ? '' : 's'}
             </span>
           )}
         </span>
         <span
-          className="text-[#6b7280] transition-transform"
+          className="text-[#8b8f99] transition-transform"
           aria-hidden="true"
           style={{ transform: open ? 'rotate(180deg)' : 'none' }}
         >
@@ -148,14 +148,14 @@ export function ExportDrawer({
                   <p className="text-center text-xs font-medium text-[#c8cad0]">
                     {PRICE_LINE}
                   </p>
-                  <p className="mt-1 mb-3 text-center text-[11px] text-[#6b7280]">
+                  <p className="mt-1 mb-3 text-center text-[11px] text-[#8b8f99]">
                     Account asked only here — no card to preview.
                   </p>
                   <button
                     type="button"
                     onClick={onExportPptx}
                     disabled={!exportReady}
-                    className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#7c6aed] px-4 text-sm font-semibold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:brightness-100"
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-md bg-[#5641b8] px-4 text-sm font-semibold text-white hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:brightness-100"
                   >
                     Export PowerPoint (.pptx)
                   </button>
@@ -221,7 +221,7 @@ function FeatureRow({ included, label }: Feature) {
       >
         {included ? '✓' : '—'}
       </span>
-      <span className={included ? 'text-[#c8cad0]' : 'text-[#6b7280]'}>
+      <span className={included ? 'text-[#c8cad0]' : 'text-[#8b8f99]'}>
         {label}
       </span>
     </li>

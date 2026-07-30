@@ -82,7 +82,7 @@ export function StepBar({
               </span>
               <span
                 aria-hidden="true"
-                className="text-xs text-[#6b7280] transition-transform"
+                className="text-xs text-[#8b8f99] transition-transform"
                 style={{ transform: open ? 'rotate(90deg)' : 'none' }}
               >
                 ▸
@@ -96,14 +96,14 @@ export function StepBar({
                 className="border-t border-[#2a2a3a] px-3 py-2.5"
               >
                 {rows.length === 0 ? (
-                  <p className="text-xs text-[#6b7280]">
+                  <p className="text-xs text-[#8b8f99]">
                     Nothing recorded yet.
                   </p>
                 ) : (
                   <dl className="flex flex-col gap-1.5">
                     {rows.map((row) => (
                       <div key={row.k} className="flex flex-col gap-0.5">
-                        <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#6b7280]">
+                        <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8b8f99]">
                           {row.k}
                         </dt>
                         <dd className="text-xs leading-snug text-[#c8cad0]">
@@ -149,7 +149,7 @@ function StepChip({
       aria-hidden="true"
       className={`${base} ${
         active
-          ? 'bg-[#7c6aed] text-white'
+          ? 'bg-[#5641b8] text-white'
           : 'bg-[#1f1f2e] text-[#8b8fa3]'
       }`}
     >
