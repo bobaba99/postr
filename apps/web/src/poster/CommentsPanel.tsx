@@ -528,8 +528,8 @@ function ThreadCard({
       // Keyboard parity for the card click: Enter/Space on the card
       // itself promotes to the persistent "focus" highlight. Keys
       // aimed at inner inputs/buttons (target !== currentTarget) are
-      // left to those controls. The card can't be a real <button>
-      // because it legitimately contains inputs and buttons.
+      // left to those controls. The card can't be a real button
+      // element because it legitimately contains inputs and buttons.
       onKeyDown={(e) => {
         if (e.key !== 'Enter' && e.key !== ' ') return;
         if (e.target !== e.currentTarget) return;
