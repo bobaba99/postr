@@ -262,6 +262,25 @@ Run the same audit against a production build or deployed preview before assigni
 2. Run performance against a deployed production build before assigning a performance defect.
 3. Continue payment/subscription, editor paywall, and destructive account-state coverage.
 
+## Code-scan resolution pass — repository-wide heuristics (2026-07-30)
+
+The 25-page full reports embedded a repository-wide static scan: 1,634 findings across 200 files (352 high, 455 medium, 827 low). Source-level triage and fixes landed on branch `fix/ux-audit-critical-high` (PR #13). Triage method: exact TypeScript-AST classification of every flagged location (the scan's regex truncates tags containing arrow-function attributes and matches comment text, so raw counts overstate real defects).
+
+| Rule (high) | Count | Disposition |
+| --- | ---: | --- |
+| `click-no-keyboard` | 209 | 174 false positives (native `<button>`/components are keyboard-activatable). 35 real divs fixed: picker/upload tiles converted to real `<button type="button">`; table row/column strips got `tabIndex` + Enter/Space parity; ThreadCard + two file dropzones got `role="button"` + keyboard parity; 17 modal-content `stopPropagation` handlers deleted via the backdrop `target === currentTarget` idiom; modal backdrops retained as pointer affordances with **Escape now verified/added on all 14 modals** (`SecureWorkModal`'s listener was missing and was added). Justified residuals: contentEditable caret handler, crop pointer-gesture overlay. |
+| `no-form-label` | 49 | ~30 inputs labeled (`aria-label` / `htmlFor`+`id`, incl. a checklist-item checkbox); the rest verified label-wrapped or hidden from the a11y tree (`display:none` file inputs). Many raw findings were regex artifacts (`=>` truncating the tag scan). |
+| `img-no-alt` | 6 | All false positives — matches were `<img` inside code comments. No code change. |
+| `empty-catch` | 34 | All carry a justifying comment (quota/private-mode, best-effort paths). Accepted as a documented class. |
+| `deep-nesting` | 43 | Deferred — JSX nesting-depth heuristic; not actionable without layout churn disproportionate to the gain. |
+| `large-file` | 10 | Deferred — conflicts with the repo's established large-file conventions (e.g. `Sidebar.tsx`); splitting is a dedicated refactor, not an audit fix. |
+
+Follow-ups shipped in the same wave: a house `:focus-visible` ring in the accent token (the new keyboard surfaces had no visible focus, WCAG 2.4.7) and palette-upload dropzone keyboard parity.
+
+Follow-ups deferred: ThreadCard ARIA redesign (explicit "Highlight on poster" button instead of `role="button"` card), Sidebar placeholder-only input sweep, table-strip `tabIndex` gating on selection, long accessible-name truncation, FORM-01 autocomplete.
+
+Verification: web 2,217 tests, api 363 tests, production build + 15-page prerender — all green. Scan re-run after fixes: 343 high (residuals are the justified classes above plus line-drift churn).
+
 ## Evidence
 
 - [Self-contained UIMax pricing report](evidence/uimax-pricing-report.html)
