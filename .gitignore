@@ -33,5 +33,5 @@ docs/*.postr
 .superpowers/
 .scratch/
 
-# Brainstorming visual companion (scratch, never commit)
-.superpowers/
+# Text-audit output (regenerate with scripts/text-audit/scrape.mts)
+docs/text-audit/
