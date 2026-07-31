@@ -840,6 +840,17 @@ function ImagePanel({
       <div style={sectionLabel}>Upload an image to extract its palette</div>
       <div
         onClick={() => fileInputRef.current?.click()}
+        // Keyboard parity for the upload-zone click: Enter/Space opens
+        // the same file picker (drag-and-drop stays pointer-only).
+        role="button"
+        tabIndex={0}
+        aria-label="Upload an image to extract its palette, or drop one here"
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
+          fileInputRef.current?.click();
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();

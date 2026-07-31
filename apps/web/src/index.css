@@ -793,3 +793,23 @@ body {
   width: 6px;
   height: 6px;
 }
+
+/* ===================================================================
+ * Focus visibility (WCAG 2.4.7)
+ * =================================================================== *
+ *
+ * The a11y wave made previously pointer-only surfaces keyboard-
+ * operable (tile buttons, table strips, thread cards, dropzones).
+ * Most of them use `all: 'unset'` or custom styling, which strips
+ * the UA focus ring — so keyboard focus was invisible. One house
+ * ring in the accent token, applied to native buttons and to the
+ * role="button" pattern, keeps keyboard location legible without
+ * redesigning each component's hover/active styling. Mouse users
+ * are unaffected: :focus-visible only matches keyboard focus.
+ */
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid #7c6aed;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
