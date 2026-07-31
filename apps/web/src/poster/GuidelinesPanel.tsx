@@ -648,12 +648,14 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                       type="checkbox"
                       checked={item.done}
                       onChange={() => toggleItem(item.id)}
+                      aria-label={item.text.trim() ? `Mark "${item.text.trim()}" done` : 'Mark item done'}
                       style={{ accentColor: '#7c6aed', marginTop: 2, flexShrink: 0, width: 20, height: 20, cursor: 'pointer' }}
                     />
                     <input
                       value={item.text}
                       onChange={(e) => updateItemText(item.id, e.target.value)}
                       placeholder="New item..."
+                      aria-label="Checklist item"
                       style={{
                         all: 'unset',
                         flex: 1,

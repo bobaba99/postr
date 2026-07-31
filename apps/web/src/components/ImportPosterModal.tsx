@@ -318,10 +318,10 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
   return (
     <div
       data-postr-modal-backdrop data-state={state}
-      onClick={phase === 'committing' ? undefined : onClose}
+      onClick={phase === 'committing' ? undefined : (e) => { if (e.target === e.currentTarget) onClose(); }}
       style={overlayStyle}
     >
-      <div data-postr-modal-content data-state={state} onClick={(e) => e.stopPropagation()} style={modalStyle}>
+      <div data-postr-modal-content data-state={state} style={modalStyle}>
         <Header onClose={onClose} disabled={phase === 'committing'} mode={mode} />
 
         {importFailed && (
@@ -493,6 +493,17 @@ function DropZone({
         if (f) onFile(f);
       }}
       onClick={onPick}
+      // Keyboard parity for the dropzone click: Enter/Space opens the
+      // same file picker (drag-and-drop stays pointer-only).
+      role="button"
+      tabIndex={0}
+      aria-label="Choose a file to import, or drop one here"
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        if (e.target !== e.currentTarget) return;
+        e.preventDefault();
+        onPick();
+      }}
       style={{
         border: `2px dashed ${dragActive ? '#7c6aed' : '#2a2a3a'}`,
         borderRadius: 10,

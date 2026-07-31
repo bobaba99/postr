@@ -222,7 +222,7 @@ export function PresetEditModal({ open, onClose, onChange }: Props) {
   return (
     <div
       data-postr-modal-backdrop data-state={state}
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -237,7 +237,6 @@ export function PresetEditModal({ open, onClose, onChange }: Props) {
     >
       <div
         data-postr-modal-content data-state={state}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: 640,
@@ -378,6 +377,7 @@ export function PresetEditModal({ open, onClose, onChange }: Props) {
                     setError(null);
                   }}
                   maxLength={80}
+                  aria-label="Preset name"
                   style={inputStyle}
                 />
               </Field>
@@ -521,6 +521,7 @@ export function PresetEditModal({ open, onClose, onChange }: Props) {
                               max={300}
                               step={1}
                               value={currentPt}
+                              aria-label={`${label} size (pt)`}
                               onChange={(e) => {
                                 const pt = Number(e.target.value);
                                 if (!Number.isFinite(pt)) return;

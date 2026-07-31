@@ -1239,6 +1239,7 @@ function EmailSignUp({ onSuccess, onError }: { onSuccess: () => void; onError: (
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="Email address"
+        aria-label="Email address"
         required
         className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
       />
@@ -1247,6 +1248,7 @@ function EmailSignUp({ onSuccess, onError }: { onSuccess: () => void; onError: (
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         placeholder="Create password"
+        aria-label="Create password"
         required
         minLength={8}
         className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
@@ -1305,8 +1307,9 @@ function ProfileFields({ user, onStatusMessage }: { user: User | null; onStatusM
 
   const fieldRow = (label: string, field: keyof ProfileData, placeholder: string, hint?: string) => (
     <div className="mb-3">
-      <label className="block text-sm text-[#9ca3af] mb-1">{label}</label>
+      <label htmlFor={`profile-${field}`} className="block text-sm text-[#9ca3af] mb-1">{label}</label>
       <input
+        id={`profile-${field}`}
         value={profile[field]}
         onChange={(e) => update(field, e.target.value)}
         placeholder={placeholder}

@@ -55,4 +55,11 @@ describe('SecureWorkModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /not now|leave anyway|close|×/i }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('closes on Escape', () => {
+    const onClose = vi.fn();
+    render(<SecureWorkModal reason="export" onClose={onClose} />);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
 });

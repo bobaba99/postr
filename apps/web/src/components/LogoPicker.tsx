@@ -224,7 +224,7 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
   return ReactDOM.createPortal(
     <div
       data-postr-modal-backdrop data-state={state}
-      onClick={onClose}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="logo-picker-title"
@@ -242,7 +242,6 @@ export function LogoPicker({ open, onClose, onPick }: Props) {
     >
       <div
         data-postr-modal-content data-state={state}
-        onClick={(e) => e.stopPropagation()}
         style={{
           background: '#1a1a26',
           border: '1px solid #2a2a3a',
@@ -413,6 +412,7 @@ function PresetsTab(props: {
         value={props.query}
         onChange={(e) => props.setQuery(e.target.value)}
         placeholder="Search 80+ North American universities…"
+        aria-label="Search university logos"
         style={searchInputStyle}
         autoFocus
       />

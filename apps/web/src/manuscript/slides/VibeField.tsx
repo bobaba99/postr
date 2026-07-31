@@ -47,6 +47,7 @@ export function VibeField({
       <input
         type="text"
         placeholder="Describe the vibe, or leave blank to follow your narrative"
+        aria-label="Describe the vibe"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}

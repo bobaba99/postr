@@ -98,6 +98,13 @@ describe('paid signup audit regressions', () => {
     }
   });
 
+  it('labels the email and password fields', () => {
+    renderPaidSignup();
+
+    expect(screen.getByLabelText('Email address')).toBeInTheDocument();
+    expect(screen.getByLabelText('Create password')).toBeInTheDocument();
+  });
+
   it('uses a compact legal footer instead of the public sitemap', () => {
     renderPaidSignup();
 

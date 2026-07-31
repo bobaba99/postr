@@ -269,7 +269,7 @@ export function PaletteDesigner({
 
   return (
     <div
-      onClick={onCancel}
+      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
       style={{
         position: 'fixed',
         inset: 0,
@@ -283,7 +283,6 @@ export function PaletteDesigner({
       }}
     >
       <div
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth: 720,
@@ -501,6 +500,7 @@ export function PaletteDesigner({
               setNameError(null);
             }}
             placeholder="Palette name (e.g. Lab Green)"
+            aria-label="Palette name"
             maxLength={60}
             style={{
               flex: 1,
@@ -588,6 +588,7 @@ function ManualPanel({
               type="color"
               value={palette[key]}
               onChange={(e) => onUpdate(key, e.target.value)}
+              aria-label={`${label} color`}
               style={{
                 width: 34,
                 height: 34,
@@ -603,6 +604,7 @@ function ManualPanel({
               value={palette[key]}
               onChange={(e) => onUpdate(key, e.target.value)}
               maxLength={7}
+              aria-label={`${label} hex code`}
               style={{
                 flex: 1,
                 padding: '6px 8px',
@@ -838,6 +840,17 @@ function ImagePanel({
       <div style={sectionLabel}>Upload an image to extract its palette</div>
       <div
         onClick={() => fileInputRef.current?.click()}
+        // Keyboard parity for the upload-zone click: Enter/Space opens
+        // the same file picker (drag-and-drop stays pointer-only).
+        role="button"
+        tabIndex={0}
+        aria-label="Upload an image to extract its palette, or drop one here"
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          if (e.target !== e.currentTarget) return;
+          e.preventDefault();
+          fileInputRef.current?.click();
+        }}
         onDragOver={(e) => {
           e.preventDefault();
           e.stopPropagation();

@@ -838,7 +838,10 @@ export function Sidebar(props: SidebarProps) {
 // Layout tab
 // =========================================================================
 
-function LayoutTab(props: {
+// Exported for the a11yKeyboard test suite — the tab renders fine in
+// isolation (props + the store-backed ImportSection), and exporting
+// avoids having to mount the whole 4k-line Sidebar to reach it.
+export function LayoutTab(props: {
   posterTitle: string;
   onChangePosterTitle: (title: string) => void;
   posterSizeKey: PosterSizeKey;
@@ -885,6 +888,7 @@ function LayoutTab(props: {
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <input
           value={localTitle}
+          aria-label="Poster name"
           onChange={(e) => {
             setLocalTitle(e.target.value);
             setTitleSaved(false);
@@ -953,6 +957,7 @@ function LayoutTab(props: {
           <input
             type="number"
             value={props.posterWidthIn}
+            aria-label="Poster width in inches"
             onChange={(e) => {
               const w = parseFloat(e.target.value);
               if (w > 0) props.onChangeCustomSize(w, props.posterHeightIn);
@@ -969,6 +974,7 @@ function LayoutTab(props: {
           <input
             type="number"
             value={props.posterHeightIn}
+            aria-label="Poster height in inches"
             onChange={(e) => {
               const h = parseFloat(e.target.value);
               if (h > 0) props.onChangeCustomSize(props.posterWidthIn, h);
@@ -1279,7 +1285,7 @@ function AuthorsTab(props: {
   );
 }
 
-function InstitutionManager(props: { institutions: Institution[]; onChange: (i: Institution[]) => void }) {
+export function InstitutionManager(props: { institutions: Institution[]; onChange: (i: Institution[]) => void }) {
   const update = (id: string, patch: Partial<Institution>) =>
     props.onChange(props.institutions.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const remove = (id: string) => props.onChange(props.institutions.filter((x) => x.id !== id));
@@ -1313,6 +1319,7 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
               value={inst.name}
               onChange={(e) => update(inst.id, { name: e.target.value })}
               placeholder="University"
+              aria-label={`Institution ${i + 1} name`}
               style={{ ...inputBase, fontSize: 17, fontWeight: 600, color: '#eee' }}
             />
             <button
@@ -1327,12 +1334,14 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
               value={inst.dept ?? ''}
               onChange={(e) => update(inst.id, { dept: e.target.value })}
               placeholder="Department"
+              aria-label={`Institution ${i + 1} department`}
               style={{ ...inputBase, flex: 1 }}
             />
             <input
               value={inst.location ?? ''}
               onChange={(e) => update(inst.id, { location: e.target.value })}
               placeholder="City"
+              aria-label={`Institution ${i + 1} city`}
               style={{ ...inputBase, flex: 1 }}
             />
           </div>
