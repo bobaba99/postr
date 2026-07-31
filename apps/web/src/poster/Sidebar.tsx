@@ -1285,7 +1285,7 @@ function AuthorsTab(props: {
   );
 }
 
-function InstitutionManager(props: { institutions: Institution[]; onChange: (i: Institution[]) => void }) {
+export function InstitutionManager(props: { institutions: Institution[]; onChange: (i: Institution[]) => void }) {
   const update = (id: string, patch: Partial<Institution>) =>
     props.onChange(props.institutions.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const remove = (id: string) => props.onChange(props.institutions.filter((x) => x.id !== id));
@@ -1319,6 +1319,7 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
               value={inst.name}
               onChange={(e) => update(inst.id, { name: e.target.value })}
               placeholder="University"
+              aria-label={`Institution ${i + 1} name`}
               style={{ ...inputBase, fontSize: 17, fontWeight: 600, color: '#eee' }}
             />
             <button
@@ -1333,12 +1334,14 @@ function InstitutionManager(props: { institutions: Institution[]; onChange: (i: 
               value={inst.dept ?? ''}
               onChange={(e) => update(inst.id, { dept: e.target.value })}
               placeholder="Department"
+              aria-label={`Institution ${i + 1} department`}
               style={{ ...inputBase, flex: 1 }}
             />
             <input
               value={inst.location ?? ''}
               onChange={(e) => update(inst.id, { location: e.target.value })}
               placeholder="City"
+              aria-label={`Institution ${i + 1} city`}
               style={{ ...inputBase, flex: 1 }}
             />
           </div>

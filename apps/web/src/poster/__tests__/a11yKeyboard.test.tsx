@@ -23,7 +23,7 @@ import { DEFAULT_PALETTE, DEFAULT_STYLES } from '../constants';
 import { DEFAULT_TABLE_DATA } from '../tableOps';
 import { ImageBlock, LogoBlock, TableBlock } from '../blocks';
 import { CommentsPanel } from '../CommentsPanel';
-import { LayoutTab } from '../Sidebar';
+import { InstitutionManager, LayoutTab } from '../Sidebar';
 import { GuidelinesPanel } from '../GuidelinesPanel';
 
 const { useCommentsMock } = vi.hoisted(() => ({ useCommentsMock: vi.fn() }));
@@ -237,6 +237,19 @@ describe('input accessible names', () => {
     ).toBeInTheDocument();
   });
 
+  it('labels the institution name/department/city inputs', () => {
+    render(
+      <InstitutionManager
+        institutions={[{ id: 'i1', name: 'Smith University', dept: '', location: '' }]}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('Institution 1 name')).toBeInTheDocument();
+    expect(screen.getByLabelText('Institution 1 department')).toBeInTheDocument();
+    expect(screen.getByLabelText('Institution 1 city')).toBeInTheDocument();
+  });
+
   it('labels the guidelines scratch-checklist item input', () => {
     localStorage.setItem(
       'postr.scratch-pad',
@@ -245,6 +258,7 @@ describe('input accessible names', () => {
     render(<GuidelinesPanel open onToggle={vi.fn()} />);
 
     expect(screen.getByRole('textbox', { name: 'Checklist item' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Mark "Check margins" done')).toBeInTheDocument();
     localStorage.removeItem('postr.scratch-pad');
   });
 });
