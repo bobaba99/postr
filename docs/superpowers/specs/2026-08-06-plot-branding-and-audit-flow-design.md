@@ -115,14 +115,33 @@ poster/slide acknowledgement.
 
 ## 2. Plot-picker credit — quiet branded byline on chart-chooser exports
 
-### Scope decision (approved 2026-08-06, Option 2)
+### Scope decision (settled 2026-08-06 — supersedes the 2026-07-27 no-logo freeze)
 
 - **Plots**: add a credit (net-new — chart-chooser exports carry no
-  acknowledgement today).
-- **Posters / slides**: keep the existing understated text credit from
-  `attribution.ts`; only standardize wording toward "made by postr.sh" if it
-  reads naturally. **No coloured band, no logo** on posters/slides — the frozen
-  anti-vendor-mark decision stands for wall-facing artifacts.
+  acknowledgement today). See "the mark" below.
+- **Posters / slides (PDF export)**: **HARD RULE (settled 2026-08-06).** The
+  PDF export now carries a **quiet PNG logo corner watermark** — the same square
+  mark, small, in a top or bottom corner, in the margin, **never overlapping
+  content**. This is a deliberate, settled change to the 2026-07-27 "no logo, no
+  colour" decision: a *small corner logo* is allowed; a *large coloured band* is
+  still not. The bar stays "non-attention-capturing": small, muted, cornered.
+  - **Why PNG, not the inline SVG:** the SVG colophon has hit PDF-pipeline
+    rendering issues before (Gavin, 2026-08-06); a rasterized PNG embeds
+    reliably across print/PDF engines. The PNG comes from the workstream-1
+    library (`mono` or low-contrast variant so it reads as a colophon, not a
+    sticker).
+  - The existing text credit "Poster made with postr.sh" stays as the wording
+    beside/under the mark; the reference-list software-citation behaviour is
+    unchanged.
+- **Wording** standardizes toward "made by postr.sh" for the plot credit;
+  posters keep "Poster made with postr.sh" (reads as a credit, per the module
+  note — do not shorten to a bare stamp).
+
+> **Reconciliation note.** `attribution.ts`'s module doc says "No logo, no
+> colour". Workstream 3 (below) updates that doc to record this settled change:
+> **a small muted corner logo is now part of the PDF/print colophon**; the
+> anti-"vendor sticker" intent is preserved by keeping it small, muted, and in
+> the margin. The coloured band remains forbidden.
 
 ### Decision — the mark (approved via visual companion)
 
@@ -173,6 +192,52 @@ plot credit shares one on/off switch with every other export. Defaults to on
 - PNG blob is produced without error at the new height.
 - ZIP entries each carry the credit.
 - `shouldAttribute({paidPlan:true})` suppresses it.
+
+---
+
+## 2b. Poster / slide PDF export — quiet PNG corner watermark (HARD RULE)
+
+### Decision (settled 2026-08-06)
+
+The print/PDF colophon gains a **small muted PNG logo** beside its existing
+"Poster made with postr.sh" text, in the bottom-margin band it already occupies.
+Corner placement, small, muted — **must never overlap poster content**. PNG (not
+the inline SVG) because SVG has hit PDF-pipeline rendering issues; the raster
+embeds reliably. This is the settled partial reversal of the 2026-07-27 no-logo
+rule; the *coloured band* remains forbidden.
+
+### Where it lives
+
+- **Print/PDF:** `apps/web/src/export/attribution.ts` →
+  `acknowledgementPrintHtml` / `acknowledgementPrintCss`. Add an `<img>` (a
+  base64 `data:` PNG so the print window needs no network) before the text, sized
+  ~14–18px, `opacity` tuned so it reads as a colophon mark. It stays inside the
+  existing absolutely-positioned `.postr-attribution` overlay in the bottom
+  margin — so poster `@page` size, canvas dimensions, and block coordinates are
+  still untouched (the current guarantee holds). Consumed by `printDocument.ts`.
+- **PPTX:** `acknowledgementPptxBox` already places a small text box near the
+  bottom edge; add the muted PNG as a companion picture at colophon scale. The
+  user can still select/delete it in PowerPoint (non-coercive, unchanged).
+- The PNG is a workstream-1 library asset (a muted/mono variant), imported as a
+  base64 constant so exporters have no runtime fetch.
+
+### Suppression seam
+
+Unchanged: still gated by `shouldAttribute()`. Note the existing documented
+seam quirk (manual-test-flows §22): the editor PDF hardcodes `attribution: {}`,
+so the PDF always attributes even for paid users. This workstream does **not**
+change that wiring — it only swaps text-only for text+logo. If Gavin wants the
+PDF to honor the paid seam, that's a separate change (flag it, don't fold it in).
+
+### Testing
+
+- `acknowledgementPrintHtml` output contains an `<img>` with a `data:image/png`
+  src plus the credit text; `acknowledgementPrintCss` keeps it in the bottom
+  margin, small and muted.
+- Existing print-geometry tests still pass (colophon is still a non-layout
+  overlay; canvas/block coordinates unchanged).
+- `shouldAttribute({paidPlan:true})` still returns `''` (suppressed).
+- PPTX writer emits the companion picture at colophon scale.
 
 ---
 
@@ -313,9 +378,12 @@ index docs never drift from code.
 
 ## Out of scope (explicitly)
 
-- Reversing the poster/slide acknowledgement to a branded band (Gavin chose
-  Option 2; the freeze stands for wall-facing artifacts).
+- A **coloured band** on posters/slides. The settled rule (§2b) allows a small
+  muted corner *logo*; the saturated band is still forbidden (anti-"vendor
+  sticker").
+- Rewiring the PDF paid seam so a paid term/credit drops the PDF watermark
+  (manual-test-flows §22 quirk). §2b keeps current wiring; changing it is a
+  separate decision.
 - PDF export for the chart chooser (already deferred in the v1 plan).
-- Any billing/paid-tier UI (the suppression seam already exists, unused).
 - The home-page copy edits in the audit paste (many are "remove / rethink"
   notes-to-self, not apply-ready — a separate content pass Gavin will drive).
