@@ -40,6 +40,7 @@ import {
 } from '../resolveAssets';
 import { tableCellBorders } from './tableBorders';
 import { attributionDocProperty, attributionPptxBox } from '../attribution';
+import { colophonMarkPngDataUri } from '../colophonMarkPng';
 import {
   POSTER_LAYOUT,
   buildMasters,
@@ -682,8 +683,20 @@ export async function exportPosterPptx(
     options.attribution,
   );
   if (attributionBox) {
-    slide.addText([{ text: attributionBox.text, options: {} }], {
+    // A small muted logo sits just left of the text (settled 2026-08-06).
+    // Same muted PNG as the print colophon; sized to the text so it reads
+    // as part of the colophon, not a badge. Like the text box it is an
+    // ordinary picture the user can select and delete in PowerPoint.
+    const markIn = 0.16; // ~ the text cap height at fontSize 11
+    slide.addImage({
+      data: colophonMarkPngDataUri(),
       x: attributionBox.x,
+      y: attributionBox.y + attributionBox.h - markIn - 0.02,
+      w: markIn,
+      h: markIn,
+    });
+    slide.addText([{ text: attributionBox.text, options: {} }], {
+      x: attributionBox.x + markIn + 0.04,
       y: attributionBox.y,
       w: attributionBox.w,
       h: attributionBox.h,

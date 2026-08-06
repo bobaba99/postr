@@ -20,7 +20,10 @@
  *     postr.sh" alone reads as a stamp on the artifact.
  *   - It sits with the acknowledgements, in the margin band, at
  *     acknowledgement scale — not badged in a corner.
- *   - No logo, no colour, no verb, no product claim.
+ *   - A SMALL MUTED logo now accompanies the text in the print/PDF
+ *     colophon (settled 2026-08-06). Still no colour band, no verb, no
+ *     product claim — the mark is grey and margin-scaled, so the
+ *     anti-"vendor sticker" intent holds.
  * The copy is frozen — change `ACKNOWLEDGEMENT_TEXT` and you change
  * what hangs on a conference wall.
  *
@@ -34,10 +37,18 @@
  * Per-format helpers live here too, so no caller re-derives the
  * string or invents its own wording.
  */
+import { colophonMarkPngDataUri } from './colophonMarkPng';
 
 /**
  * Frozen copy. Phrased as a credit line, not a maker's mark — see the
- * module note. Do not add a logo, a verb, or a product claim.
+ * module note. Do not add a verb or a product claim.
+ *
+ * UPDATE (settled 2026-08-06): a small MUTED logo now accompanies this
+ * text in the print/PDF colophon (see `acknowledgementPrintHtml`). This is
+ * a deliberate, settled partial change to the original "no logo, no
+ * colour" rule: a small grey corner mark is allowed; a saturated coloured
+ * band is still forbidden. The anti-"vendor sticker" intent is preserved
+ * by keeping the mark small, muted, and in the margin band.
  */
 export const ACKNOWLEDGEMENT_TEXT = 'Poster made with postr.sh';
 
@@ -87,7 +98,18 @@ export function shouldAttribute(opts: AttributionOptions = {}): boolean {
  */
 export function acknowledgementPrintHtml(opts: AttributionOptions = {}): string {
   if (!shouldAttribute(opts)) return '';
-  return `<div class="postr-attribution" aria-hidden="true">${ACKNOWLEDGEMENT_TEXT}</div>`;
+  // Settled 2026-08-06: a small MUTED logo sits before the text. It is the
+  // grey `muted` library variant (never the purple brand mark) and a PNG
+  // (not inline SVG) because some PDF print engines mis-render inline SVG
+  // in the print window. Small, muted, in the margin — reads as a colophon
+  // mark, not a vendor sticker; still governed by the same anti-"sticker"
+  // intent as the text.
+  return (
+    `<div class="postr-attribution" aria-hidden="true">` +
+    `<img class="postr-attribution-mark" src="${colophonMarkPngDataUri()}" alt="" />` +
+    `<span>${ACKNOWLEDGEMENT_TEXT}</span>` +
+    `</div>`
+  );
 }
 
 /**
@@ -126,6 +148,9 @@ export function acknowledgementPrintCss(opts: AttributionOptions = {}): string {
     left: 10px;
     bottom: 10px;
     z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-family: system-ui, -apple-system, sans-serif;
     font-size: 7px;
     /* Bold at the owner's request. The size and muted colour still do
@@ -136,6 +161,16 @@ export function acknowledgementPrintCss(opts: AttributionOptions = {}): string {
     letter-spacing: 0.02em;
     color: rgba(107, 114, 128, 0.72);
     pointer-events: none;
+  }
+  /* Small muted mark (settled 2026-08-06). Sized to the cap-height of the
+     7px text so it reads as part of the colophon, not a badge. It is a
+     grey PNG, always scaled DOWN, and lives inside the bottom-margin
+     overlay — so it cannot overlap poster content. */
+  .postr-attribution-mark {
+    width: 9px;
+    height: 9px;
+    display: block;
+    opacity: 0.72;
   }`;
 }
 
