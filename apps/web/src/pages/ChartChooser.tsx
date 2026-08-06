@@ -29,6 +29,8 @@ import { FONTS, PALETTES } from '@/poster/constants';
 import { ChartChooser } from '@/charts/ladder/ChartChooser';
 import type { SelectedFigure } from '@/charts/ladder/PreviewStep';
 import { downloadChartPng, downloadChartSvg, downloadChartsZip } from '@/charts/download';
+import { copyCode, downloadCode, type CodeLang } from '@/charts/codegen/downloadCode';
+import type { DataMode } from '@/charts/codegen/data';
 
 const CHOOSER_JSON_LD = {
   '@context': 'https://schema.org',
@@ -58,6 +60,9 @@ export default function ChartChooserPage() {
   const openFeedback = useFeedbackStore((s) => s.open);
   const [paletteName, setPaletteName] = useState(PALETTES[0]!.name);
   const [downloadFailed, setDownloadFailed] = useState(false);
+  // Code export: embed the user's real data, or same-shape sample data
+  // (privacy). Sample is the default — the safe choice for a public tool.
+  const [dataMode, setDataMode] = useState<DataMode>('sample');
 
   const palette = useMemo<Palette>(() => {
     const named = PALETTES.find((p) => p.name === paletteName) ?? PALETTES[0]!;
@@ -94,6 +99,36 @@ export default function ChartChooserPage() {
       setDownloadFailed(true);
       // Re-thrown so the panel withholds its success confirmation —
       // the banner above is the single user-facing message.
+      throw error;
+    }
+  };
+
+  // Code export (R / Python) — free, no watermark. Copy always targets a
+  // single figure; download bundles a multi-selection into a zip.
+  const runCode = async (
+    verb: 'copy' | 'download',
+    lang: CodeLang,
+    selection: readonly SelectedFigure[],
+  ) => {
+    try {
+      setDownloadFailed(false);
+      if (verb === 'copy') {
+        await copyCode(selection[0]!.spec, lang, dataMode);
+        return;
+      }
+      downloadCode(
+        selection.map((f) => ({
+          spec: f.spec,
+          stem:
+            selection.length === 1
+              ? fileSlug(f.formName)
+              : `figure-${f.letter}-${fileSlug(f.formName)}`,
+        })),
+        lang,
+        dataMode,
+      );
+    } catch (error) {
+      setDownloadFailed(true);
       throw error;
     }
   };
@@ -191,7 +226,48 @@ export default function ChartChooserPage() {
           </div>
         )}
 
-        <div className="mt-10">
+        {/* Code export uses the same figures. The toggle decides what data
+            the generated R/Python carries: fabricated sample data (default,
+            privacy) or the user's own rows inline. */}
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <span className="text-[13px] font-bold uppercase tracking-[1.2px] text-[#9ca3af]">
+            Code data
+          </span>
+          <div role="group" aria-label="Data in exported code" className="flex gap-2">
+            {(
+              [
+                ['sample', 'Sample data'],
+                ['mine', 'My data'],
+              ] as const
+            ).map(([value, label]) => {
+              const active = dataMode === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setDataMode(value)}
+                  className="min-h-11 rounded-full px-4 py-2 text-[13px] font-semibold"
+                  style={{
+                    border: `2px solid ${active ? '#7c6aed' : '#2a2a3a'}`,
+                    background: active ? '#5641b8' : '#14141f',
+                    color: active ? '#fff' : '#c8cad0',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-[12px] text-[#a3a7b3]">
+            {dataMode === 'sample'
+              ? 'Generated code uses fabricated data with your columns — swap in your own.'
+              : 'Generated code embeds your data inline (stays in your browser).'}
+          </span>
+        </div>
+
+        <div className="mt-6">
           <h2 className="sr-only">Build your chart</h2>
           <ChartChooser
             layout="page"
@@ -210,6 +286,26 @@ export default function ChartChooserPage() {
                 run: (selection) => download('png', selection),
                 busyLabel: (n) =>
                   n > 1 ? `Zipping ${n} figures…` : 'Rendering the image…',
+              },
+              {
+                label: 'Copy R',
+                run: (selection) => runCode('copy', 'r', selection),
+                busyLabel: () => 'Generating R…',
+              },
+              {
+                label: 'Copy Python',
+                run: (selection) => runCode('copy', 'py', selection),
+                busyLabel: () => 'Generating Python…',
+              },
+              {
+                label: 'Download .R',
+                run: (selection) => runCode('download', 'r', selection),
+                busyLabel: (n) => (n > 1 ? `Zipping ${n} scripts…` : 'Generating R…'),
+              },
+              {
+                label: 'Download .py',
+                run: (selection) => runCode('download', 'py', selection),
+                busyLabel: (n) => (n > 1 ? `Zipping ${n} scripts…` : 'Generating Python…'),
               },
             ]}
             confirmation="Saved — vector SVG scales to any print size"
