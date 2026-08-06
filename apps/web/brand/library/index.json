@@ -1,0 +1,85 @@
+{
+  "generated": "run scripts/rasterize-brand.mjs to refresh",
+  "variants": {
+    "transparent": {
+      "svg": "postr-mark--transparent.svg",
+      "png": [
+        "postr-mark--transparent@32.png",
+        "postr-mark--transparent@64.png",
+        "postr-mark--transparent@128.png",
+        "postr-mark--transparent@256.png",
+        "postr-mark--transparent@512.png",
+        "postr-mark--transparent@1024.png"
+      ]
+    },
+    "white-bg": {
+      "svg": "postr-mark--white-bg.svg",
+      "png": [
+        "postr-mark--white-bg@32.png",
+        "postr-mark--white-bg@64.png",
+        "postr-mark--white-bg@128.png",
+        "postr-mark--white-bg@256.png",
+        "postr-mark--white-bg@512.png",
+        "postr-mark--white-bg@1024.png"
+      ]
+    },
+    "purple-bg": {
+      "svg": "postr-mark--purple-bg.svg",
+      "png": [
+        "postr-mark--purple-bg@32.png",
+        "postr-mark--purple-bg@64.png",
+        "postr-mark--purple-bg@128.png",
+        "postr-mark--purple-bg@256.png",
+        "postr-mark--purple-bg@512.png",
+        "postr-mark--purple-bg@1024.png"
+      ]
+    },
+    "mono-dark": {
+      "svg": "postr-mark--mono-dark.svg",
+      "png": [
+        "postr-mark--mono-dark@32.png",
+        "postr-mark--mono-dark@64.png",
+        "postr-mark--mono-dark@128.png",
+        "postr-mark--mono-dark@256.png",
+        "postr-mark--mono-dark@512.png",
+        "postr-mark--mono-dark@1024.png"
+      ]
+    },
+    "mono-light": {
+      "svg": "postr-mark--mono-light.svg",
+      "png": [
+        "postr-mark--mono-light@32.png",
+        "postr-mark--mono-light@64.png",
+        "postr-mark--mono-light@128.png",
+        "postr-mark--mono-light@256.png",
+        "postr-mark--mono-light@512.png",
+        "postr-mark--mono-light@1024.png"
+      ]
+    },
+    "muted": {
+      "svg": "postr-mark--muted.svg",
+      "png": [
+        "postr-mark--muted@32.png",
+        "postr-mark--muted@64.png",
+        "postr-mark--muted@128.png",
+        "postr-mark--muted@256.png",
+        "postr-mark--muted@512.png",
+        "postr-mark--muted@1024.png"
+      ]
+    }
+  },
+  "lockups": {
+    "transparent": {
+      "svg": "postr-lockup--transparent.svg",
+      "png": "postr-lockup--transparent@2x.png"
+    },
+    "white-bg": {
+      "svg": "postr-lockup--white-bg.svg",
+      "png": "postr-lockup--white-bg@2x.png"
+    },
+    "purple-bg": {
+      "svg": "postr-lockup--purple-bg.svg",
+      "png": "postr-lockup--purple-bg@2x.png"
+    }
+  }
+}

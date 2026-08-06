@@ -56,6 +56,19 @@ describe('per-format helpers honour the seam', () => {
     expect(attributionPrintCss(paid)).toBe('');
   });
 
+  it('print colophon carries the muted PNG logo beside the text (settled 2026-08-06)', () => {
+    const html = attributionPrintHtml();
+    expect(html).toContain('postr-attribution-mark');
+    expect(html).toContain('data:image/png');
+    expect(html).toContain(ATTRIBUTION_TEXT);
+    // Suppressed → no logo either.
+    expect(attributionPrintHtml(paid)).toBe('');
+    // CSS keeps the mark small and in the bottom-margin overlay.
+    const css = attributionPrintCss();
+    expect(css).toContain('.postr-attribution-mark');
+    expect(css).toContain('bottom: 10px');
+  });
+
   it('pptx box is null when suppressed', () => {
     expect(attributionPptxBox(48, 36)).not.toBeNull();
     expect(attributionPptxBox(48, 36, paid)).toBeNull();

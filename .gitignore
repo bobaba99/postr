@@ -32,3 +32,6 @@ docs/*.postr
 # Agent scratch (wave reports, plans) — keep on disk, out of git.
 .superpowers/
 .scratch/
+
+# Text-audit output (regenerate with scripts/text-audit/scrape.mts)
+docs/text-audit/

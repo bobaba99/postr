@@ -110,7 +110,6 @@ Suggested UIMax run per route (map to the audit dimensions):
 
 > Reconciliation rule: a finding confirmed by **both** the vision rubric and a UIMax measurement (e.g. "hierarchy collapse" + a failed contrast check) is high-confidence; a vision-only or UIMax-only finding gets verified against source before it's treated as real (same discipline as the code-trace findings).
 
-
 ---
 
 ## 0. Test accounts to prepare (set up once)
@@ -124,8 +123,6 @@ Suggested UIMax run per route (map to the audit dimensions):
 | E | **Permanent free** (0 credits, no term) | Any of C/D with plan='free' | Paywall shown, forced-signup branch |
 | F | **Paid — active term** | C/D that completed a `term` checkout in Stripe sandbox | Unlocked exports, renewal, cancel, revoke, **delete-with-live-sub** |
 | G | **Paid — export pack** (credits>0) | C/D that completed a `pack` checkout | Credit consume, credit hint, idempotency |
-| H | **Paid — review pack** (`review_credits`>0) | C/D that completed a `review_pack` checkout in Stripe sandbox | Review purchase, initial→follow-up loop, third-refused, no-charge-on-failure |
-| I | **Term + review add-on** (`review_addon=true`) | F that also completed a `review_addon` checkout | Weekly-quota reviews, quota exhaustion + window reset |
 
 **Before deleting or buying anything, write down the `user_id` (Supabase Auth) and poster IDs** — you can't query them after deletion. Keep the Stripe sandbox dashboard + link.com open in another tab.
 
@@ -225,7 +222,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 - **Set up:** Signed-out browser, `/auth` with **no** `?plan=`.
 - [ ] Guest card renders. Button: **"Start creating — no account needed"**. Helper: **"Jump straight into the editor as a guest. Your work saves in this browser. Link an account anytime to sync across devices."**
 - [ ] Click → button flips to **"Loading…"** → lands on `/dashboard`, Home shows **"My posters"**.
-- **`/auth?guest=1`** still auto-triggers a guest on mount (kept for any deep links); the **Landing "Try as guest" hero, the header "Editor" link, and the Pricing free-tier CTA now point at `/p/new`** instead (no-auth editor, 2026-07-29) — those drop the visitor straight into the editor via `EnsureSession` with no `/auth` detour.
+- **Also test `/auth?guest=1`** (Landing "Try as guest"): auto-triggers guest on mount, no click.
 - **Edges:**
   - [ ] Already-signed-in guest hits `/auth?guest=1` → redirected to `/dashboard`, **no second guest** (the "second guest" regression — verify only ONE anon row).
   - [ ] Anonymous sign-in disabled server-side → **raw** error banner (note: violates generic-error rule).
@@ -233,23 +230,6 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
   - [ ] Exactly one `auth.users` row, `is_anonymous=true`.
   - [ ] `public.users` row + one "Untitled Poster" auto-created.
   - [ ] `localStorage` has `sb-<ref>-auth-token`.
-
-## 2b. No-auth editor — edit first, secure on export/leave (2026-07-29)
-
-- **Set up:** signed out (no session). Use a fresh incognito window.
-- [ ] From the marketing site click **"Editor"** (header) OR **"Try as guest"** (Landing hero) OR the Pricing free-tier CTA → lands DIRECTLY on the editor canvas at `/p/<id>` (URL normalizes from `/p/new`), **no `/auth` page in between**, populated 3-column template.
-- **✓ verify (anonymous session was minted silently):** exactly one `auth.users` row `is_anonymous=true`; one auto-created poster; edits autosave (the "Saved" pill).
-- **Export prompt:**
-  - [ ] Edit at least one block, then click **Export PPTX** (or LaTeX) → the **"Create an account to export"** modal appears; the export does NOT run and NO credit/paywall/purchase is reached.
-  - [ ] Watermarked **PDF** and **Save as .postr** stay free (no prompt) — money fires at editable export only.
-- **Leave prompt:**
-  - [ ] With unsaved-to-account edits, try to **close the tab / refresh** → the browser's native "Leave site?" dialog fires (best the platform allows).
-  - [ ] A guest who lands and does NOT edit is never prompted (no `canUndo`).
-- **Convert (poster carries over):**
-  - [ ] From the export modal, **Continue with Google** → `linkIdentity` converts in place → same poster now owned by the permanent account; the modal closes; the header flips to **"My posters"**; the export paywall now applies.
-  - [ ] Email path: shows **"Check your email to finish…"** and does NOT claim saved/permanent until confirmed; the poster stays safe under the anonymous session meanwhile.
-  - [ ] After conversion the leave/export prompts no longer appear (guard disarmed).
-- **✓ verify (no orphaning):** the SAME `auth.users` row is now `is_anonymous=false` (converted in place, NOT a new user); the poster's `user_id` is unchanged. NEVER a second row.
 
 ## 3. Email sign-up (fresh, no plan) — confirmation trap
 
@@ -301,12 +281,11 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 ## 9. AuthGuard gate + session lifecycle
 
 - **Set up:** Signed-out browser.
-- [ ] Hit `/dashboard`, `/profile`, `/admin/gallery` (the `AuthGuard` routes) while signed out → pulsing **"Loading…"** → redirect to `/auth`.
-- [ ] Hit `/p/:id` while signed out → NO redirect: `EnsureSession` mints an anonymous session and the editor renders (see §2b). This route is deliberately NOT AuthGuard-gated.
+- [ ] Hit `/dashboard`, `/p/:id`, `/profile`, `/admin/gallery` → pulsing **"Loading…"** → redirect to `/auth`.
 - [ ] Signed-in → page renders after brief "Loading…".
-- [ ] Sign out on an **AuthGuard** page → bounced to `/auth`. Sign out **in the editor** → `EnsureSession` re-bootstraps a fresh anonymous session (`resetEnsureSession` + `ensureSession`), no dead-end.
+- [ ] Sign out on a guarded page → bounced to `/auth`.
 - **⚠ Findings to note:**
-  - [ ] `AuthGuard` (the `/dashboard`/`/profile`/`/admin` routes) uses **plain `getSession()`, no self-heal** — a stale/invalid cached JWT **passes** and renders children (the stale token only surfaces on the first real API call). The editor route's `EnsureSession` DOES validate via `ensureSession` (getUser + stale-JWT re-bootstrap). So the "ensureSession heals the guard" behaviour is real for `/p/:id` but NOT for the AuthGuard routes.
+  - [ ] AuthGuard uses **plain `getSession()`, no self-heal** — a stale/invalid cached JWT **passes** and renders children (the stale token only surfaces on the first real API call). Contradicts feature-graph §7's claim that `ensureSession` heals the guard. **Code wins — flag the doc.**
   - [ ] `getSession()` has **no `.catch`/timeout** — a network failure can strand the user on "Loading…" forever.
 
 ## 10. Session-expired modal (global self-heal is warn-only)
@@ -467,7 +446,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 - **Edges:**
   - [ ] Popup blocked → blocking **`alert()`**: **"Popup blocked. Please allow popups for this site to use "Save PDF", or press Ctrl/⌘+P directly from the editor as a fallback."**
   - [ ] Fonts fail to load → dialog may not auto-trigger; use the manual print button.
-- **✓ verify:** print tab renders without overlays; **colophon "Poster made with postr.sh" appears for EVERYONE** (see seam).
+- **✓ verify:** print tab renders without overlays; the **bottom-margin colophon appears for EVERYONE** (see seam) — a **small muted Postr logo (PNG) + "Poster made with postr.sh"**, in the margin band, never overlapping poster content. (Logo added 2026-08-06; PNG rather than inline SVG for reliable PDF-engine rendering.)
 - **⚠ SEAM / intent disagreement:** the editor PDF hardcodes `attribution: {}`, so `shouldAttribute()` is always true → **the PDF ALWAYS carries the watermark, even for a paid term/credit user.** Unlike PPTX/LaTeX, the PDF path is NOT wired to `usePlan`. **Buying the term does NOT drop the PDF watermark.** Confirm whether that's intended.
 
 ## 23. Paid editable export — PPTX / LaTeX (entitled)
@@ -513,229 +492,3 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 - [ ] **§21 GDPR** — legal-promise-coupled; anon grant still un-hardened in prod.
 - [ ] **§16 cancel** — link.com root, not a customer portal deep link; unverified a user can actually cancel.
 - [ ] **Errors** — several auth flows show **raw Supabase error strings** (violates the generic-error convention).
-
-
----
-
-# PART 6 — PAPER TO SLIDES (`/paper-to-slides`)
-
-The standalone talk flow — sibling of `/paper-to-poster`. One chat-style wizard surface (`SlidesWizard`) around a public shell (`PaperToSlides`). Route `/paper-to-slides` is canonical; `/paper-to-present` and `/paper-to-presentation` **308** here. No auth gate to reach it — public + code-split.
-
-> **All copy in quotes is verbatim from the code.** If what you see differs, that's a finding.
-> **Manuscript privacy line** (persistent, under the progress bar): **"Your manuscript is never stored on our servers, and is never used to train AI."**
-> **Turn-1 tip** (persistent, under the progress bar): **"PDF export is free. PowerPoint (.pptx) export is paid."**
-
-## ⚠ Can't fully test from the app UI (needs backend / Stripe / a crafted response)
-
-- [ ] **The style pass (Arm P) and theme pass (Arm T)** call server LLM adapters (`styleDeck` / `generateTheme`). You can only observe their **effects** in the UI (styled preview appears, deck re-themes). To force the count-mismatch degradation (§32) you need a doctored style response returning ≠ N slides — not reachable by normal clicking; verify via the e2e harness (`designPassE2e.test.tsx`) or a network intercept.
-- [ ] **The PPTX paywall is DISPLAY-ONLY in Phase 1.** The "Export PowerPoint (.pptx)" button just calls `onExportPptx` and downloads — **no Stripe, no card, no account gate** is reached from here. Real payment plumbing is Phase 3. (See §31 ⚠.)
-
----
-
-## 26. Paste a manuscript → run the 6-step wizard → plain deck (Phase-1 pipeline)
-
-- **Set up:** Fresh load of `/paper-to-slides`, any session (public, no login needed). Have a manuscript with a clear Results section ready to paste.
-- [ ] Page shows H1 **"From paper to slides"** + intro **"Paste your manuscript, answer a few short questions, and build an ordered slide deck — one finding per slide, with speaker notes drawn from your paper. Download a free PDF, or an editable PowerPoint."**
-- [ ] Left step spine (StepBar) lists 6 steps in order: **Constraints → Star finding → Figures & tables → Narrative → Visuals & notes → Tweaks**. ProgressBar reads **1 / 6 · Constraints**.
-- [ ] **Constraints step:** paste into "Paste your manuscript here…" (or "Upload a .docx" → button flips to "Reading…" then fills the paste box). Set **Length** (dropdown, minutes) — helper updates: **"One slide per minute — {n} content slides."** Pick **Format** (PowerPoint / PDF).
-- [ ] Click **"Find the key findings"** (disabled while paste box empty). Advances to Star finding; body shows busy line **"Finding the key findings in your results…"**
-- [ ] **Star finding step:** ranked finding cards render. Instruction: **"Pick your star finding — it leads the talk. The rest follow in order."** First card is the star by default (`starIndex=0`, "Star" badge).
-- [ ] Click **"Build the deck"** → advances to Narrative; SlideViewer renders the built deck below.
-- **✓ verify:**
-  - [ ] Deck has **title + one slide per finding** in extracted order, star slide leading; per-slide N/30 word-count indicator present; speaker-notes strip shows provenance-tagged notes.
-  - [ ] Steps 3–6 (Figures/Narrative/Visuals/Tweaks) each show an honest **STUB note** with the live deck preview still visible below, e.g. Narrative: **"The narrative arc is derived from your paper automatically. Editing the gap and resolution comes next."**; Figures: **"Figure and table selection is coming next."**
-- **Edges:**
-  - [ ] Extraction throws → generic error surface + **Retry** (never raw error text).
-  - [ ] `.docx` read fails → generic inline error under the Upload button.
-  - [ ] Editing the paste-box text after a `.docx` upload **invalidates the cached model** — next extraction re-parses the text on screen (verify by uploading, editing, re-extracting).
-
-## 27. Auto design-pass runs on first assembly → deck shows STYLED by default (Phase 2)
-
-- **Set up:** Continue from §26 right after clicking **"Build the deck"**.
-- [ ] The moment the plain deck exists, the design pass fires **automatically** (no button): SlideViewer shows busy line **"Styling your deck…"** (italic, live-region).
-- [ ] When it resolves, the stage swaps from the plain black-and-white slide to the **themed styled slide** (positioned elements, palette colors). Thumbnail rail + speaker notes keep reading off the **plain** deck (styled model carries no notes) — this is expected.
-- **✓ verify:**
-  - [ ] Style (Arm P) and theme (Arm T) run **in parallel**, then merge via `applyTheme` — you should NOT wait for two sequential spinners.
-  - [ ] Once styled, the **vibe field appears** and the **export buttons enable** (see §29, §30).
-- **Edges:**
-  - [ ] Design pass fails → **"Something went wrong. Showing your deck unstyled for now."** and the **plain deck stays visible underneath** (never a dead end). Vibe field is **hidden** and export stays disabled (this is the same guard as §32).
-
-## 28. Vibe field — re-theme only (Arm T), structure unchanged
-
-- **Set up:** A styled deck present (§27 succeeded), so the VibeField is visible.
-- [ ] VibeField shows input placeholder **"Describe the vibe, or leave blank to follow your narrative"** + 2 tappable suggestions: **"Clean & minimal, lots of whitespace"** and **"Confident & bold, strong headline emphasis"**.
-- [ ] Type a custom vibe and press **Enter** → "Styling your deck…" → deck **re-themes** (new palette / theme).
-- [ ] Tap a suggestion → it submits immediately (fills + re-themes).
-- **✓ verify:**
-  - [ ] **Only the theme re-runs** — the styled STRUCTURE (element positions, slide order, slide count, speaker notes) is **unchanged**; only colors/theme shift. Arm P (styleDeck) does NOT re-run — the re-vibe is cheap.
-  - [ ] Fast double-submit (type-Enter, then tap a suggestion before the first resolves) → **only the latest wins** (`designPassSeq` guard); no flicker back to a stale theme.
-- **Edges:**
-  - [ ] Re-vibe fails → design-error line shows, but the **last-good styled deck stays visible** (styledDeck is never cleared on a re-vibe failure).
-
-## 29. Export — FREE PDF (polished, ack mark, NO utility slides)
-
-- **Set up:** Styled deck present; open the **Export** drawer (bottom bar, expands upward). Header shows **"Export"** + slide count.
-- [ ] Promise line at top: **"The polish is free. You never pay for beauty — you pay only for the editable file."**
-- [ ] **PDF card** (badge **Free**): subtitle **"The full polished deck, print-ready."** Included (✓): "Full polished deck — identical to paid", "Print-ready, final-form pages", **'"Made by Postr.sh" mark on the acknowledgement slide (never over your content)'**. Excluded (—): "Editable in PowerPoint", "Empty layout slides to duplicate".
-- [ ] Click **"Download PDF"** → downloads `presentation.pdf`.
-- **✓ verify:**
-  - [ ] PDF renders the **same polished/styled deck** as the preview.
-  - [ ] The **"Made by Postr.sh"** mark appears **on the acknowledgement slide only**, never over content.
-  - [ ] PDF has **NO pptx-only utility slides** — no palette slide, no icon-library slide (PDF path never sees them; they're appended straight to the pptx instance).
-
-## 30. Export — PAID PPTX (editable, +palette +icon +5 empty layouts, no watermark)
-
-- **Set up:** Same open drawer as §29.
-- [ ] **PowerPoint card** (badge **Paid**): subtitle **"The same polished deck — now yours to edit."** Included (✓): "Same polished deck — identical to the PDF", "Real, editable text boxes", **"5 empty layout slides to duplicate"**, "Icon-library slide, ready to reuse", "4-palette slide, ready to reuse", "No watermark".
-- [ ] Price line: **"$18.99 CAD / 4-month term · or $9.99 for 3 exports"**. Account note: **"Account asked only here — no card to preview."**
-- [ ] Click **"Export PowerPoint (.pptx)"** → downloads `presentation.pptx`.
-- **✓ verify:**
-  - [ ] Opens in PowerPoint with **real editable text boxes** (not flattened images).
-  - [ ] Deck carries the **8 appended utility/template slides**: palette slide + icon-library slide + 5 empty layout slides (plus the explainer). The icon slide is rasterized SVG→PNG (writer awaits `addIconLibrarySlide` before the single final `pptx.write`).
-  - [ ] **No watermark** anywhere in the .pptx.
-- **⚠ Phase-1 paywall is DISPLAY-ONLY:** clicking exports the file directly — no Stripe, no card, no account gate is reached here. The real gate is Phase 3. Do NOT treat a successful free download of the .pptx as a payment bug in Phase 1 — it's the accepted posture.
-
-## 31. Graceful degradation — count-mismatched style response → PLAIN everywhere (no "previewed plain, exported styled" mix)
-
-- **Set up:** Force a style response whose slide count **≠** the plain deck's (⚠ needs a doctored response / e2e harness — not reachable by normal clicking).
-- [ ] Build a deck (§26), let the design pass return a **mismatched** styled deck (e.g. N−1 styled slides for N plain slides).
-- **✓ verify — all three surfaces must AGREE (this is the trust guard, `alignedStyledDeck`):**
-  - [ ] **Preview falls back to the PLAIN black-and-white stage** (the styled deck is not shown).
-  - [ ] **Vibe field is HIDDEN** (no re-theming a deck the UI doesn't trust).
-  - [ ] **Export buttons are DISABLED**; the drawer shows the status line **"Styling your deck — export unlocks once it's done."** (`exportReady=false`).
-  - [ ] There is **NEVER a "previewed plain but exported styled" mix** — a count-mismatched styled response can't be exported. Both `handleExportPdf` / `handleExportPptx` early-return on the same `alignedStyledDeck` guard, so this is defense-in-depth on top of the disabled buttons.
-
-## 32. Rebuild — pick a different star → deck B must NOT ship stale styled deck A (the just-fixed guard)
-
-- **Set up:** Build deck **A** with the default star and let its design pass complete (styled preview visible).
-- [ ] Go **back to the Star finding step**, pick a **different** star finding, click **"Build the deck"** again → deck **B** builds.
-- **✓ verify:**
-  - [ ] On rebuild, the prior build's styled state is **reset first** (`setStyledDeck(null)` + `setPalettes([])`) **before** the new plain deck swaps in — so during deck B's in-flight design pass the preview shows **plain B thumbnails**, never A's styled stage laid over B's content.
-  - [ ] The **VibeField does not re-theme stale content**, and **export does not ship a mix** of A and B.
-  - [ ] After deck B's design pass resolves, only **deck B (new star leading)** is previewed and exported. Confirm the exported PDF/PPTX slide order matches deck B, not A.
-- **⚠ Two complementary guards:** `designPassSeq` decides which async RESPONSE wins; the `setStyledDeck(null)` reset decides what's DISPLAYED in the gap before either response lands. Both must hold — regression here is the "stale styled deck A over B" bug this test protects.
-
-## 33. Re-import a styled `.pptx` (with its 8 appended utility/template slides) → NO false "8 slides skipped" warning
-
-- **Set up:** Export a styled `.pptx` from §30 (or any Postr talk/poster export carrying template slides). Re-import it via the dashboard **"+ New poster ▾"** menu (the same re-import path as §25).
-- [ ] Import the file.
-- **✓ verify:**
-  - [ ] Importer recognizes Postr's own appended slides by their `<p:cSld name="Postr template - …">` marker and **subtracts them** before counting skips.
-  - [ ] For a clean Postr export (only the poster/first slide is user content + the appended templates), there is **NO "N slides were skipped" warning** — the user never authored those 8 template slides, so warning about them would be a lie.
-- **Edges (regression corners):**
-  - [ ] The appended-template subtraction is **capped at 8** (`APPENDED_SLIDE_COUNT`) — a deck full of forged/duplicate template names can under-report by at most 8, never claim "nothing skipped" for a real multi-slide deck.
-  - [ ] Add **one genuine user slide** to the end of the exported deck, re-import → warning appears reporting exactly **1 slide skipped** (identity travels by name, not position, so pasting your own slide doesn't stop recognizing the templates).
-  - [ ] **Rename** one Postr template slide in PowerPoint, re-import → that renamed slide now **counts as skipped content** (adopting it as your own is correct behavior).
-  - [ ] Delete the poster/first user slide, keep only templates → importer **refuses** with "Presentation contains no slides." (does not hand you the explainer as content).
-- **⚠ Note:** A genuine deck authored in PowerPoint (slides named `Slide 1`…`Slide 7`, or unnamed) warns exactly as before — the fix only suppresses the warning for **Postr's own** appended slides.
-
----
-
-## Quick findings summary — PART 6 additions
-
-- [ ] **§27/§31 trust guard** — preview, vibe field, and export must all agree via `alignedStyledDeck` (count match). A count-mismatched styled response must fall back to PLAIN on **all three** — never "previewed plain, exported styled".
-- [ ] **§30 paywall** — PPTX export is **display-only** in Phase 1 (no Stripe/account gate); real gate is Phase 3. Successful free .pptx download is expected posture, not a bug (yet).
-- [ ] **§32 rebuild guard** — `setStyledDeck(null)` reset (display gap) + `designPassSeq` (response race) together prevent stale styled deck A shipping over deck B. Regression-prone.
-- [ ] **§33 re-import** — Postr's 8 appended template slides must NOT be reported as skipped; subtraction capped at 8; identity by `<p:cSld name>` marker, not position.
-- [ ] **§29 PDF** — free PDF is the full polished deck with the ack-slide mark and **no utility slides**; distinct from the always-watermarked editor PDF in §22 (different pipeline).
-
----
-
-# PART 7 — PRESENTATION CHECKER (`/presentation-checker` + editor `review` tab)
-
-The standalone reviewer for posters and talks — **pre-launch: route registered, noindex, unlinked from nav (D12)**. Two surfaces over one pipeline: the `/presentation-checker` page (upload PDF / PPTX / PNG / JPG, ≤ 24 pages) and the editor sidebar **review** tab (Postr-native; fix cards jump to the block). Money: one-time **review pack** (`review_pack` → 3 credits, never expire) or the term-riding **weekly add-on** (`review_addon` → weekly quota). One follow-up is included in every review's initial credit; the follow-up closes the review and a third critique is refused server-side. Credits are consumed only AFTER a successful critique — typed failures never burn one.
-
-> **All copy in quotes is verbatim from the code** — if what you see on screen differs, that's a finding.
-> **Route note:** nothing links to `/presentation-checker` yet — type the URL directly.
-
-## ⚠ Can't fully test from the app UI (needs Stripe sandbox / SQL / server env / Docker)
-
-These steps have **no Postr UI** — don't waste time clicking for them. Drive them from the Stripe sandbox dashboard, by querying Supabase directly, or on the API host.
-
-- [ ] **Webhook fulfillment for the two review SKUs** — grant happens ONLY via the `checkout.session.completed` webhook: `review_pack` → `grant_review_credits` RPC (+3); `review_addon` → `users.review_addon=true` + `review_addon_subscription_id`. The green success page never provisions.
-- [ ] **`users.review_credits` / `review_addon` / `review_addon_subscription_id`** — server-owned (guard trigger rejects client writes — guard-blocked from the client). Verify every grant/consume by direct SQL (`select review_credits, review_addon from users where id = …`).
-- [ ] **The add-on weekly window** — a 7-day sliding window enforced API-side (in-memory rate limiter, `REVIEW_ADDON_WEEKLY_QUOTA`); there is **no per-review decrement column to inspect**. Only observable as the 402 `weekly_quota_exceeded` (+ `retryAfterSec`) once exhausted.
-- [ ] **API env requirements** — `ANTHROPIC_API_KEY` (critique 500s `provider_not_configured` without it), `STRIPE_PRICE_REVIEW_PACK` / `STRIPE_PRICE_REVIEW_ADDON` (checkout 400s without them — the error names the sku list and the missing price-id env var).
-- [ ] **PPTX input** — **not yet testable in prod**: `/api/review/render-pptx` shells out to LibreOffice `soffice` + `pdftoppm`, absent from Render's native Node image; the Docker-based service ships last (D10). Dev needs local LibreOffice + poppler.
-- [ ] **Review-SKU refunds** — manual via the Stripe dashboard (deferred, no code) — unlike term/pack there is no in-app refund path.
-- [ ] **`[review.critique]` cost lines** — per-critique token usage lives in the API logs, not the app.
-
----
-
-## 34. Buy the REVIEW PACK (one-time, 3 review credits) — signed-in permanent
-
-- **Set up:** Account **E** (permanent free, `review_credits=0`), signed in; API env per the ⚠ section.
-- [ ] Type `/presentation-checker` into the URL bar (unlinked — D12). Page: H1 **"Presentation Checker"** + lede **"Get feedback on your poster or talk — scores for narrative, design, and content, plus fix cards anchored to the exact spots to change."**
-- [ ] Upload any poster PDF → the server 402s (zero credits) → the paywall panel replaces the working view: heading **"Get feedback on your poster or talk"**, body **"A review scores your narrative, design, and content, then walks you through fix cards anchored to the exact spots to change — each with a rewritten example from your own content. One follow-up review is included, so you can check your revision."**
-- [ ] Click **"Get the review pack"** → full-page redirect to Stripe hosted checkout (mode `payment`, no subscription). Pay with a **test card**.
-- [ ] Return to `/billing/success` → **⚠ known gap:** the `granted` check only knows term/export credits — a review buyer sees the **"Payment received. Your access will appear shortly — head back in and it'll be ready."** fallback even after the grant lands (the launch checklist extends it with `|| plan.canReview`). Not a failed purchase — verify by SQL.
-- [ ] Back on `/presentation-checker`, re-run the upload → review now completes.
-- **Edges:**
-  - [ ] **Replay the webhook event** → idempotent, credits NOT double-granted (`billing_fulfilled_sessions` unique key — same as the export pack).
-  - [ ] `createCheckout` fails → inline alert **"Something went wrong starting checkout. Try again, or use Send Feedback so we can look into it."**
-  - [ ] Guest branch → **"Get the review pack"** stashes `review_pack` and routes `/auth?plan=review_pack` (account-first — same journey as §1b/§1c); paywall guest note: **"You're working as a guest — you'll create a free account (or sign in with Google) first, so your purchase and reviews stay yours across devices."**
-  - [ ] Non-term paywall shows NO add-on button — instead: **"The weekly review add-on rides on the semester term — start the term to add it."** (link to `/pricing`).
-- **✓ verify (query Supabase):**
-  - [ ] `review_credits=3`; `plan` unchanged (still `'free'`); one `billing_fulfilled_sessions` row.
-  - [ ] "Back to the upload" dismisses the paywall without buying.
-
-## 35. Initial critique → included follow-up → stage closed → third refused (the full loop)
-
-- **Set up:** Account **H** (review pack), on `/presentation-checker`, with a real poster PDF (≤ 24 pages) and a revised second version of it.
-- [ ] Upload card: title **"Upload a poster PDF, talk deck, or image"**, helper **"PDF, PPTX, PNG, or JPG — up to 24 pages. Nothing is published; the review is only for you."** → **"Choose a file"**.
-- [ ] Busy states: **"Preparing your file for review…"** then **"Reading your poster or talk…"** (hint **"A full review usually takes under a minute."**).
-- [ ] Results: three score tiles (**Narrative / Design / Content**, each n/5), **"How a first-time viewer reads it"** summary, optional **"Priority call"** banner, page strip, then **"Fix cards (N)"** grouped **"High impact" / "Medium" / "Polish"**; each card has dimension + severity + action chips, the fix, a rewritten example blockquote, optional "Tradeoff: …".
-- [ ] Click a region-anchored card (hint **"→ click to see it"**) → the bbox overlay lights up on the matching page thumbnail.
-- [ ] Follow-up section: **"Your one follow-up"** + **"Revise against these cards, then run the follow-up — it checks your revision against these exact findings."** → **"Request your one follow-up"** → disclosure **"This is your one follow-up — the review closes after it."** → **"Choose the revised file"** (or **"Not yet"**).
-- [ ] Upload the revised PDF → the follow-up runs with `reviewId` set — **NO second credit, no second weekly slot** (included in the initial credit).
-- [ ] Stage now closed: **"This review is closed — the follow-up was its last pass. A fresh review uses a new credit."** + **"Start a new review"**.
-- [ ] Third critique attempt (re-POST with the same `reviewId` via devtools/curl) → server refuses `409 review_closed`; the client-facing line is **"That review is already closed — start a new one instead."** Closed is terminal server-side, not just hidden in UI.
-- **✓ verify (query Supabase):**
-  - [ ] Exactly ONE `poster_reviews` row for the loop: `stage='closed'`, `credit_source='pack'`, `initial_findings` + `followup_findings` both set, `source_meta.filename` stamped.
-  - [ ] `review_credits` went down by exactly **1** across the whole loop.
-  - [ ] **"Your past reviews"** lists it (stage label "Closed", score line "Narrative n/5 · Design n/5 · Content n/5").
-
-## 36. Postr-native review from the editor `review` tab (block-jump fix cards)
-
-- **Set up:** Account **H** or **I**, a poster open in the editor.
-- [ ] Sidebar rail shows **review** between **issues** and **comments**. Tab body: **"Get a scored review of this poster — narrative, design, and content — with fix cards that jump to the block they affect. One follow-up is included."** + button **"Review this poster"** + hint **"Uses one review credit, or your weekly add-on review."**
-- [ ] Run it (busy **"Reading your poster…"**) → same score header + cards; clicking a block-anchored card selects the block and smooth-scrolls it into view — and the sidebar does **NOT** bounce to another tab (the review-tab auto-switch exemption).
-- [ ] Follow-up disclosure: **"The follow-up re-reads your poster exactly as it is now — make your edits first."** → **"Run the follow-up"** → review closes.
-- [ ] Zero-credit pre-gate: with no credits/add-on AND no result on screen, the tab shows the paywall (**"Get feedback on your poster"** / **"Get the review pack"**; term holders also **"Add weekly reviews"**) — but a user mid-review at zero credits still sees their findings and the included follow-up (the pre-gate only applies with no result).
-- **✓ verify:** one credit (or one weekly slot) for the initial run; block jumps land on the right blocks; closed review refuses a third pass; "Start a new review" runs fresh.
-
-## 37. Add-on weekly quota — exhaustion + 7-day-window reset
-
-- **Set up:** Account **I** (active term + `review_addon`); weekly quota `REVIEW_ADDON_WEEKLY_QUOTA = 4` (placeholder pending repricing).
-- [ ] Run initial reviews until the quota is exhausted — 4 initials plus their included follow-ups are all legitimate (follow-ups never consume extra slots).
-- [ ] Next initial → 402 `weekly_quota_exceeded` → paywall shows the quota line (`role="status"`): **"You've used this week's reviews — your next weekly review opens up in {wait}. A review pack works right away."**
-- [ ] **"Get the review pack"** still works from the quota paywall (pack credits and the weekly window are independent).
-- **⚠ can't click through the reset:** the 7-day window is an in-memory sliding window on the API — there is no column to fast-forward. Verify the reset by waiting the window (impractical) or restarting the API (the in-memory limiter resets — a deploy also resets it; accepted single-instance posture). Confirm the `{wait}` counts down sensibly (`formatRetryAfter`).
-- **✓ verify (network + SQL):** exhausted request returns 402 with `reason: 'weekly_quota_exceeded'` + `retryAfterSec`; no `poster_reviews` row and no credit consumed for the refused run; `users.review_addon=true`, `review_addon_subscription_id` set.
-
-## 38. No-charge-on-failure — typed errors never burn a credit
-
-- **Set up:** Account **H**; note `review_credits` before EACH case.
-- [ ] **Corrupt/unreadable file** (e.g. a text file renamed `.pdf`) → **"We couldn't read that file — try exporting it again from the app that made it."** — typed error with "Try again"; credit UNCHANGED.
-- [ ] **Over-24-page PDF** → **"That file has more than 24 pages — trim it to 24 pages or fewer and try again."** (never a silent truncation; the server's `too_many_pages` maps to the same line); credit UNCHANGED.
-- [ ] Unsupported type (e.g. `.docx`) → **"That file type is not supported — upload a PDF, PPTX, PNG, or JPG."**
-- [ ] Rendered-blank PDF → **"That file rendered blank — check it opens correctly and try again."**
-- [ ] Critique upstream failure (unset `ANTHROPIC_API_KEY` → 500 `provider_not_configured`, generic line shown) → credit UNCHANGED; **no `poster_reviews` row** (success-only writes; a persistence failure after a pack consume compensates the credit back).
-- **✓ verify (query Supabase):** `review_credits` identical before/after every failure case; zero `poster_reviews` rows for the failed runs.
-
-## 39. PPTX input — ⚠ not yet testable in prod
-
-- **Set up:** Dev only, with LibreOffice (`soffice`) + poppler (`pdftoppm`) installed locally; **prod is blocked until the Docker-based Render service ships (D10 — PPTX ships last, never blocks the other three inputs).**
-- [ ] Upload a `.pptx` on `/presentation-checker` → ingest goes through `POST /api/review/render-pptx` (no credit — ingest utility; the critique charges) → per-slide page anchors (source label "Slides").
-- [ ] Over-50-MB deck → 413 `pptx_too_large`; the SSRF guard only fetches the project's own storage host.
-- **✓ verify:** per-slide anchors resolve; exactly one credit for the critique; the same follow-up loop as §35.
-
----
-
-## Quick findings summary — PART 7 additions
-
-- [ ] **§34 billing landing** — `/billing/success` granted-check ignores the review SKUs (`hasActiveTerm || credits > 0` only) → review buyers see the "will appear shortly" fallback even after a successful grant. Launch-checklist item (`|| plan.canReview`); not a failed purchase.
-- [ ] **§37 window reset** — the 7-day add-on window is in-memory on the API; a restart/deploy resets it (accepted single-instance posture).
-- [ ] **Pricing placeholders** — `REVIEW_PACK_CREDITS = 3` / `REVIEW_ADDON_WEEKLY_QUOTA = 4` are placeholders; the launch checklist reprices from day-one `[review.critique]` cost lines.
-- [ ] **Refunds** — review SKUs have no in-app refund path (term/pack do); refunds are manual via the Stripe dashboard (deferred, D8).
-- [ ] **§39 PPTX** — untestable in prod until the Docker service (soffice + pdftoppm) ships; must never block the other three inputs.

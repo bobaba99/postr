@@ -138,9 +138,9 @@ export default function Home() {
         <Link to="/dashboard" className="flex items-center gap-3 no-underline">
           <svg width="36" height="36" viewBox="0 0 64 64" fill="none">
             <rect width="64" height="64" rx="12" fill="#7c6aed" />
-            <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
-            <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
-            <circle cx="32" cy="32" r="5" fill="white" />
+            <path d="M12 52 C30 52, 34 12, 52 12" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
+            <path d="M12 12 C30 12, 34 52, 52 52" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
+            <circle cx="32" cy="32" r="6" fill="white" />
           </svg>
           <h1 className="text-[20pt] font-medium tracking-tight">Postr</h1>
         </Link>
@@ -235,9 +235,9 @@ export default function Home() {
             <div className="flex items-center gap-4 mb-4">
               <svg width="48" height="48" viewBox="0 0 64 64" fill="none">
                 <rect width="64" height="64" rx="14" fill="#7c6aed" />
-                <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
-                <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
-                <circle cx="32" cy="32" r="5" fill="white" />
+                <path d="M12 52 C30 52, 34 12, 52 12" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
+                <path d="M12 12 C30 12, 34 52, 52 52" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
+                <circle cx="32" cy="32" r="6" fill="white" />
               </svg>
               <div>
                 <h3 className="text-lg font-bold text-[#e2e2e8]">Welcome to Postr</h3>
