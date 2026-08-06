@@ -25,9 +25,9 @@ export function PublicFooter() {
             <Link to="/" className="flex items-center gap-3 no-underline">
               <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
                 <rect width="64" height="64" rx="12" fill="#7c6aed" />
-                <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
-                <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
-                <circle cx="32" cy="32" r="5" fill="white" />
+                <path d="M12 52 C30 52, 34 12, 52 12" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
+                <path d="M12 12 C30 12, 34 52, 52 52" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.55" />
+                <circle cx="32" cy="32" r="6" fill="white" />
               </svg>
               <span className="text-[18pt] font-medium text-[#c8cad0]">Postr</span>
             </Link>

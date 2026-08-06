@@ -25,7 +25,7 @@
  * screenshotted at an exact viewport size, so the browser rasterizes the
  * vectors at the true target resolution instead of downscaling a bitmap.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -36,19 +36,40 @@ const BRAND_DIR = join(WEB_ROOT, 'brand');
 const PUBLIC_DIR = join(WEB_ROOT, 'public');
 
 const BRAND_COLOR = '#7c6aed';
+const LIGHT_PURPLE = '#b9a9ff';
+const MUTED = '#6b7280';
 
 /**
- * The bare weave mark for the OG card — the same geometry as
- * public/favicon.svg minus the tile, using the display-size values
- * (stroke 5, trailing curve at 0.55) rather than the small-size tweaks
- * baked into brand/icon-rounded.svg, because the card renders the mark
- * at 168px where the display values are canonical.
+ * Canonical mark geometry — kept in sync with
+ * apps/web/src/brand/markGeometry.ts (the single source for code paths).
+ * This is a .mjs run directly by node/Playwright, so it can't import the
+ * .ts module without a transpile step; the paths are duplicated here ON
+ * PURPOSE and guarded by markGeometry.test.ts + a comment on both sides.
+ * If you change the geometry, change it in BOTH places.
+ *
+ * True 40×40 square drawing area centred in the 64 viewBox; dot at centre.
  */
+const PATH_RISE = 'M12 52 C30 52, 34 12, 52 12';
+const PATH_FALL = 'M12 12 C30 12, 34 52, 52 52';
+const DOT = { cx: 32, cy: 32, r: 6 };
+
+/**
+ * The mark's inner SVG (paths + dot, no wrapper). `mono` collapses both
+ * curves to one colour (used for muted colophon variants); otherwise the
+ * two purples render, or white when `white` is passed for a dark field.
+ */
+function markInner({ rise, fall, dot, sw = 5.5 }) {
+  return [
+    `<path d="${PATH_RISE}" stroke="${rise}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
+    `<path d="${PATH_FALL}" stroke="${fall}" stroke-width="${sw}" stroke-linecap="round" fill="none"/>`,
+    `<circle cx="${DOT.cx}" cy="${DOT.cy}" r="${DOT.r}" fill="${dot}"/>`,
+  ].join('');
+}
+
+/** The white mark for the OG card / purple fields. */
 const WEAVE_MARK_SVG = `
   <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="width:168px;height:168px;flex:none">
-    <path d="M14 14 C32 14, 32 50, 50 50" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.95"/>
-    <path d="M14 50 C32 50, 32 14, 50 14" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.55"/>
-    <circle cx="32" cy="32" r="5" fill="white"/>
+    ${markInner({ rise: '#ffffff', fall: 'rgba(255,255,255,0.7)', dot: '#ffffff' })}
   </svg>`;
 
 /** Wraps an icon SVG so it fills the viewport exactly, on a transparent page. */
@@ -106,6 +127,76 @@ function ogCardPage() {
 </body></html>`;
 }
 
+// ── Comprehensive logo library ───────────────────────────────────────
+// A generated set of the mark in every variant × format the app needs, so
+// a consumer that hits an SVG-in-PDF problem can drop in the PNG instead.
+// SVG + PNG per variant; PNG at a size ladder. Written to brand/library/.
+
+const LIB_DIR = join(WEB_ROOT, 'brand', 'library');
+const LIB_SIZES = [32, 64, 128, 256, 512, 1024];
+
+/**
+ * Variant → the inner mark + optional field. Each is a standalone SVG
+ * builder taking a pixel size (viewBox stays 64).
+ */
+const VARIANTS = {
+  // Mark only, no field — the default for overlaying anywhere.
+  transparent: () => markInner({ rise: BRAND_COLOR, fall: LIGHT_PURPLE, dot: BRAND_COLOR }),
+  // White rounded tile, brand mark + thin purple border.
+  'white-bg': () =>
+    `<rect x="2" y="2" width="60" height="60" rx="15" fill="#ffffff" stroke="${BRAND_COLOR}" stroke-width="3"/>` +
+    markInner({ rise: BRAND_COLOR, fall: LIGHT_PURPLE, dot: BRAND_COLOR }),
+  // Purple rounded tile, white mark (the app-icon look).
+  'purple-bg': () =>
+    `<rect width="64" height="64" rx="15" fill="${BRAND_COLOR}"/>` +
+    markInner({ rise: '#ffffff', fall: 'rgba(255,255,255,0.7)', dot: '#ffffff' }),
+  // Single dark ink — light docs / greyscale print.
+  'mono-dark': () => markInner({ rise: '#1c1b1a', fall: '#1c1b1a', dot: '#1c1b1a' }),
+  // Single white ink — dark backgrounds.
+  'mono-light': () => markInner({ rise: '#ffffff', fall: '#ffffff', dot: '#ffffff' }),
+  // Muted grey — the acknowledgement / colophon treatment.
+  muted: () => markInner({ rise: MUTED, fall: MUTED, dot: MUTED }),
+};
+
+function variantSvg(name) {
+  return `<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Postr">${VARIANTS[name]()}</svg>`;
+}
+
+/** Lockup: mark + "Postr" wordmark, for headers / cards / colophons. */
+function lockupSvg(variant) {
+  const onDark = variant === 'purple-bg' || variant === 'mono-light';
+  const ink = onDark ? '#ffffff' : BRAND_COLOR;
+  const bg =
+    variant === 'purple-bg'
+      ? `<rect width="260" height="72" rx="14" fill="${BRAND_COLOR}"/>`
+      : variant === 'white-bg'
+        ? `<rect x="1" y="1" width="258" height="70" rx="14" fill="#ffffff" stroke="${BRAND_COLOR}" stroke-width="2"/>`
+        : '';
+  const markColor = onDark
+    ? { rise: '#ffffff', fall: 'rgba(255,255,255,0.7)', dot: '#ffffff' }
+    : { rise: BRAND_COLOR, fall: LIGHT_PURPLE, dot: BRAND_COLOR };
+  return [
+    `<svg width="260" height="72" viewBox="0 0 260 72" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Postr">`,
+    bg,
+    `<g transform="translate(12 4) scale(1)">`,
+    `<svg x="0" y="0" width="64" height="64" viewBox="0 0 64 64">${markInner(markColor)}</svg>`,
+    `</g>`,
+    `<text x="88" y="48" font-family="-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-size="40" font-weight="700" letter-spacing="-1" fill="${ink}">Postr</text>`,
+    `</svg>`,
+  ].join('');
+}
+
+/** Renders an arbitrary SVG string to a PNG at an exact size. */
+async function svgToPng(browser, svg, size, transparent = true) {
+  const page = await browser.newPage({ viewport: { width: size, height: size }, deviceScaleFactor: 1 });
+  try {
+    await page.setContent(iconPage(svg, size), { waitUntil: 'load' });
+    return await page.screenshot({ type: 'png', omitBackground: transparent });
+  } finally {
+    await page.close();
+  }
+}
+
 /** Renders one HTML page at an exact viewport size and writes the PNG. */
 async function renderPng(browser, { html, width, height, out, transparent }) {
   const page = await browser.newPage({
@@ -148,13 +239,86 @@ async function main() {
       results.push(await renderPng(browser, target));
     }
     console.log(
-      `[rasterize-brand] wrote ${results.length} files: ${results
+      `[rasterize-brand] wrote ${results.length} icon/card files: ${results
         .map((r) => `${r.out} (${r.bytes}B)`)
         .join(', ')}`,
     );
+
+    // ── Comprehensive library → brand/library/ ──
+    mkdirSync(LIB_DIR, { recursive: true });
+    const manifest = { generated: 'run scripts/rasterize-brand.mjs to refresh', variants: {}, lockups: {} };
+    let libCount = 0;
+
+    for (const name of Object.keys(VARIANTS)) {
+      const svg = variantSvg(name);
+      const svgName = `postr-mark--${name}.svg`;
+      writeFileSync(join(LIB_DIR, svgName), svg);
+      const pngs = [];
+      // white-bg / purple-bg carry their own field → not transparent.
+      const opaque = name === 'white-bg' || name === 'purple-bg';
+      for (const size of LIB_SIZES) {
+        const png = await svgToPng(browser, svg, size, !opaque);
+        const pngName = `postr-mark--${name}@${size}.png`;
+        writeFileSync(join(LIB_DIR, pngName), png);
+        pngs.push(pngName);
+        libCount++;
+      }
+      manifest.variants[name] = { svg: svgName, png: pngs };
+      libCount++;
+    }
+
+    for (const name of ['transparent', 'white-bg', 'purple-bg']) {
+      const svg = lockupSvg(name);
+      const svgName = `postr-lockup--${name}.svg`;
+      writeFileSync(join(LIB_DIR, svgName), svg);
+      // Lockup PNGs at 2× the 260×72 art (crisp for headers/cards).
+      const opaque = name === 'white-bg' || name === 'purple-bg';
+      const page = await browser.newPage({ viewport: { width: 520, height: 144 }, deviceScaleFactor: 1 });
+      await page.setContent(
+        `<!doctype html><html><head><style>html,body{margin:0;padding:0;background:transparent}svg{display:block;width:520px;height:144px}</style></head><body>${svg}</body></html>`,
+        { waitUntil: 'load' },
+      );
+      const png = await page.screenshot({ type: 'png', omitBackground: !opaque });
+      await page.close();
+      const pngName = `postr-lockup--${name}@2x.png`;
+      writeFileSync(join(LIB_DIR, pngName), png);
+      manifest.lockups[name] = { svg: svgName, png: pngName };
+      libCount += 2;
+    }
+
+    writeFileSync(join(LIB_DIR, 'index.json'), JSON.stringify(manifest, null, 2));
+    writeFileSync(join(LIB_DIR, 'README.md'), libraryReadme(manifest));
+    console.log(`[rasterize-brand] wrote ${libCount} library files + manifest to brand/library/`);
   } finally {
     await browser.close();
   }
+}
+
+/** Human index for the library folder. */
+function libraryReadme(manifest) {
+  const lines = [
+    '# Postr logo library',
+    '',
+    'Generated by `apps/web/scripts/rasterize-brand.mjs` — do not hand-edit.',
+    'Geometry source of truth: `apps/web/src/brand/markGeometry.ts`.',
+    '',
+    'Use **SVG** wherever it renders; fall back to **PNG** when SVG breaks a',
+    'pipeline (some PDF engines). Pick the variant by background:',
+    '',
+    '| Variant | Use on |',
+    '| --- | --- |',
+    '| `transparent` | overlaying on any surface (default) |',
+    '| `white-bg` | light UI, documents |',
+    '| `purple-bg` | app icon, dark hero, marketing |',
+    '| `mono-dark` | greyscale / single-colour light print |',
+    '| `mono-light` | dark backgrounds |',
+    '| `muted` | acknowledgement / colophon (never coloured) |',
+    '',
+    `Sizes (PNG): ${LIB_SIZES.join(', ')} px. Lockups (mark + wordmark): transparent / white-bg / purple-bg at 2×.`,
+    '',
+    'See `index.json` for the machine-readable file map.',
+  ];
+  return lines.join('\n');
 }
 
 main().catch((error) => {

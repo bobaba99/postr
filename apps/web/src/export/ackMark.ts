@@ -20,23 +20,32 @@
  * point, and it is the reason this mark is welcome on the poster.
  */
 
+import { markInnerSvg, MARK_COLORS } from '@/brand/markGeometry';
+
 /** Stroke/fill colour — matches the print colophon's muted grey. */
-const MARK_COLOR = '#6b7280';
+const MARK_COLOR = MARK_COLORS.muted;
 
 /**
  * The mark's drawing commands alone, in a 64-unit coordinate space
  * and with NO wrapping `<svg>` element.
+ *
+ * Geometry comes from the single source `@/brand/markGeometry` (the new
+ * square mark). Rendered MONOCHROME and MUTED here — no purple — because
+ * this is the acknowledgement colophon, which must read as a credit beside
+ * real institutional crests, not as a coloured vendor sticker. That
+ * restraint is the whole point (see the module note); do NOT swap in the
+ * brand-coloured mark.
  *
  * Exported separately so the PPTX writer can nest it inside the
  * composed slide-background SVG without parsing a full document out
  * of a string.
  */
 export function ackMarkSvgInner(): string {
+  // scale(0.62) keeps the acknowledgement's deliberately small footprint
+  // within the 64-unit box, matching the master brand tile's safe-zone scale.
   return [
     '<g transform="translate(32 32) scale(0.62) translate(-32 -32)">',
-    `<path d="M14 14 C32 14, 32 50, 50 50" stroke="${MARK_COLOR}" stroke-width="5.5" stroke-linecap="round" fill="none" opacity="0.85"/>`,
-    `<path d="M14 50 C32 50, 32 14, 50 14" stroke="${MARK_COLOR}" stroke-width="5.5" stroke-linecap="round" fill="none" opacity="0.6"/>`,
-    `<circle cx="32" cy="32" r="5" fill="${MARK_COLOR}"/>`,
+    markInnerSvg('mono', { color: MARK_COLOR }),
     '</g>',
   ].join('');
 }
