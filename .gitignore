@@ -32,3 +32,6 @@ docs/*.postr
 # Agent scratch (wave reports, plans) — keep on disk, out of git.
 .superpowers/
 .scratch/
+
+# Brainstorming visual companion (scratch, never commit)
+.superpowers/
