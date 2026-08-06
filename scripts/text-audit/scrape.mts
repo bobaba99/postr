@@ -5,9 +5,16 @@
  * Playwright, extracts all visible user-facing text with its on-page
  * location, overlays numbered markers, screenshots each page, and emits
  * a self-contained audit HTML the reviewer edits in place:
- *   - every text item is editable; edits autosave to localStorage
- *   - "Copy audit for LLM" produces a markdown prompt of original→edit
- *   - "Download JSON" saves the full edited table locally
+ *   - every text item is editable; edits mirror to localStorage
+ *   - PER-PAGE AUTO-SAVE: pick a folder once (File System Access API,
+ *     Chrome/Edge) and each page's edits are written live to its own
+ *     file (home.json, pricing.json, …) — so an interruption or a
+ *     localStorage wipe never costs more than the page in progress.
+ *     Reloading re-reads those files, resuming the session.
+ *   - "Copy this page for LLM" / "Copy all for LLM" produce a markdown
+ *     prompt of original→edit, per page or whole-audit
+ *   - "Download JSON" saves the full edited table (fallback for
+ *     browsers without the File System Access API)
  *
  * Run from the repo root of the text-audit worktree:
  *   npx tsx scripts/text-audit/scrape.mts
@@ -188,6 +195,11 @@ function auditHtml(pages) {
   tr.edited td.edit > div { border-style: solid; border-color: #7c6aed; }
   tr.edited td.orig { color: #8b8f99; text-decoration: line-through; }
   .tag { color: #6b7280; font-size: 10px; }
+  #folderState { color: #8b8f99; font-size: 11px; }
+  .pagebar { display: flex; align-items: center; gap: 10px; margin: -4px 0 12px; }
+  .pagebar .pgstatus { font-size: 11px; }
+  .pagebar .pgstatus.ok { color: #4ade80; }
+  .pagebar .pgstatus.err { color: #f87171; }
   #toast { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); background: #1a1a26; border: 1px solid #7c6aed; border-radius: 8px; padding: 8px 14px; opacity: 0; transition: opacity 160ms; pointer-events: none; }
   @media (max-width: 1100px) { .cols { grid-template-columns: 1fr; } .shot { position: static; } }
 </style>
@@ -198,7 +210,9 @@ function auditHtml(pages) {
   <span class="tag" id="counts"></span>
   <input type="search" id="q" placeholder="Filter text or location…">
   <span class="spacer"></span>
-  <button id="copy">Copy audit for LLM</button>
+  <button id="folder">Choose audit folder…</button>
+  <span class="tag" id="folderState">not saving to disk</span>
+  <button id="copy" class="ghost">Copy all for LLM</button>
   <button id="dl" class="ghost">Download JSON</button>
   <button id="reset" class="ghost">Clear edits</button>
 </header>
@@ -208,10 +222,48 @@ function auditHtml(pages) {
 <script>
 const PAGES = ${pagesJson};
 const LS = 'postr-text-audit-v1';
+// localStorage is the SECONDARY mirror; the chosen disk folder is the
+// source of truth. Both are kept in sync so global search/counts work
+// even before a folder is picked, and so a localStorage wipe can't lose
+// pages already written to disk.
 const edits = JSON.parse(localStorage.getItem(LS) || '{}');
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
 let total = 0, editedCount = 0;
+
+// route → { section elements + a per-page save-status setter }
+const pageUI = {};
+
+/** Filesystem-safe file stem for a route, e.g. "/billing/success" → "billing-success", "/" → "home". */
+function slug(route) {
+  const s = route.replace(/^\\/+|\\/+$/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return s || 'home';
+}
+
+/** All edited rows for one page, in original file order. */
+function pageEdits(p) {
+  return p.items
+    .filter((it) => edits[p.route + '|' + it.n])
+    .map((it) => ({ n: it.n, where: it.where, tag: it.tag, original: it.text, edit: edits[p.route + '|' + it.n] }));
+}
+
+/** Per-page JSON payload written to disk. */
+function pagePayload(p) {
+  return { route: p.route, savedAt: new Date().toISOString(), edits: pageEdits(p) };
+}
+
+/** Per-page markdown prompt — a paste-ready refactor instruction for just this page. */
+function pageMarkdown(p) {
+  const rows = pageEdits(p);
+  const lines = ['# Text audit — Postr — ' + p.route, ''];
+  if (!rows.length) { lines.push('(no edits on this page yet)'); return lines.join('\\n'); }
+  lines.push('Instructions: apply each edit below to the matching UI copy on ' + p.route + '. Keep tone consistent with neighbouring strings.', '');
+  for (const r of rows) {
+    lines.push('- [' + r.where + ' <' + r.tag + '>] "' + r.original.replace(/"/g, '\\\\"') + '" → "' + r.edit.replace(/"/g, '\\\\"') + '"');
+  }
+  return lines.join('\\n');
+}
+
 for (const p of PAGES) {
   const a = document.createElement('a');
   a.href = '#p' + p.n; a.textContent = p.route;
@@ -219,10 +271,22 @@ for (const p of PAGES) {
   const sec = document.createElement('section');
   sec.className = 'page'; sec.id = 'p' + p.n;
   sec.innerHTML = '<h2>' + p.n + '. ' + p.route + (p.error ? ' — ⚠ ' + p.error : '') + '</h2>'
+    + '<div class="pagebar">'
+    +   '<button class="ghost pgcopy" type="button">Copy this page for LLM</button>'
+    +   '<span class="pgstatus tag">— </span>'
+    + '</div>'
     + '<div class="cols"><div class="shot"><img src="shots/' + p.shot + '" alt=""></div>'
     + '<div><table><thead><tr><th>#</th><th>location</th><th>current text</th><th>your edit</th></tr></thead><tbody></tbody></table></div></div>';
   const tb = sec.querySelector('tbody');
-  p.items.forEach((it, i) => {
+  const statusEl = sec.querySelector('.pgstatus');
+  const setStatus = (msg, cls) => { statusEl.textContent = msg; statusEl.className = 'pgstatus tag' + (cls ? ' ' + cls : ''); };
+  pageUI[p.route] = { setStatus };
+  sec.querySelector('.pgcopy').addEventListener('click', async () => {
+    await navigator.clipboard.writeText(pageMarkdown(p));
+    toast('Copied ' + p.route + ' — paste as a refactor prompt');
+  });
+
+  p.items.forEach((it) => {
     total++;
     const id = p.route + '|' + it.n;
     const tr = document.createElement('tr');
@@ -240,6 +304,7 @@ for (const p of PAGES) {
       else { delete edits[id]; tr.classList.remove('edited'); }
       localStorage.setItem(LS, JSON.stringify(edits));
       updateCounts();
+      schedulePageSave(p);
     });
     tb.appendChild(tr);
   });
@@ -262,6 +327,106 @@ function toast(msg) {
   t.textContent = msg; t.style.opacity = 1;
   setTimeout(() => (t.style.opacity = 0), 1600);
 }
+
+// ── Per-page auto-save to a disk folder (File System Access API) ──────
+// One file per page (home.json, pricing.json, …), rewritten live as you
+// edit that page. Finished pages are isolated on disk, so a browser or
+// localStorage wipe can't lose them. Chromium only; other browsers fall
+// back to the manual "Download JSON" button, which stays available.
+const FS_SUPPORTED = typeof window.showDirectoryPicker === 'function';
+let dirHandle = null;
+const saveTimers = {};
+
+function setFolderState(msg) { document.getElementById('folderState').textContent = msg; }
+
+async function ensurePermission(handle) {
+  const opts = { mode: 'readwrite' };
+  if ((await handle.queryPermission(opts)) === 'granted') return true;
+  return (await handle.requestPermission(opts)) === 'granted';
+}
+
+/** Write one page's edits to <folder>/<slug>.json. No-op without a folder. */
+async function writePage(p) {
+  if (!dirHandle) return;
+  const ui = pageUI[p.route];
+  try {
+    const rows = pageEdits(p);
+    const name = slug(p.route) + '.json';
+    if (rows.length === 0) {
+      // Nothing to save for this page — remove any stale file so the
+      // folder reflects reality, then mark clean.
+      try { await dirHandle.removeEntry(name); } catch { /* never existed */ }
+      ui && ui.setStatus('— no edits', '');
+      return;
+    }
+    const fh = await dirHandle.getFileHandle(name, { create: true });
+    const w = await fh.createWritable();
+    await w.write(JSON.stringify(pagePayload(p), null, 2));
+    await w.close();
+    ui && ui.setStatus('saved to ' + name + ' ✓', 'ok');
+  } catch (err) {
+    ui && ui.setStatus('save failed — use Download JSON', 'err');
+  }
+}
+
+/** Debounced per-page save (typing shouldn't hammer the disk). */
+function schedulePageSave(p) {
+  if (!dirHandle) return;
+  const ui = pageUI[p.route];
+  ui && ui.setStatus('saving…', '');
+  clearTimeout(saveTimers[p.route]);
+  saveTimers[p.route] = setTimeout(() => writePage(p), 400);
+}
+
+/** Read any existing per-page files back in on load, so a session resumes. */
+async function loadFromFolder() {
+  let loaded = 0;
+  for (const p of PAGES) {
+    const name = slug(p.route) + '.json';
+    try {
+      const fh = await dirHandle.getFileHandle(name);
+      const text = await (await fh.getFile()).text();
+      const data = JSON.parse(text);
+      for (const r of (data.edits || [])) {
+        const id = p.route + '|' + r.n;
+        edits[id] = r.edit;
+        const tr = document.querySelector('tr[data-id="' + CSS.escape(id) + '"]');
+        if (tr) {
+          const ed = tr.querySelector('div[contenteditable]');
+          ed.textContent = r.edit; tr.classList.add('edited');
+        }
+      }
+      if ((data.edits || []).length) { pageUI[p.route].setStatus('loaded from ' + name, 'ok'); loaded++; }
+    } catch { /* no file for this page yet */ }
+  }
+  localStorage.setItem(LS, JSON.stringify(edits));
+  updateCounts();
+  if (loaded) toast('Resumed ' + loaded + ' page(s) from folder');
+}
+
+if (!FS_SUPPORTED) {
+  const b = document.getElementById('folder');
+  b.disabled = true; b.style.opacity = '0.5'; b.style.cursor = 'not-allowed';
+  setFolderState('auto-save needs Chrome/Edge — use Download JSON');
+  for (const p of PAGES) pageUI[p.route].setStatus('— (Download JSON to save)', '');
+} else {
+  document.getElementById('folder').addEventListener('click', async () => {
+    try {
+      const handle = await window.showDirectoryPicker({ mode: 'readwrite', id: 'postr-text-audit' });
+      if (!(await ensurePermission(handle))) { setFolderState('permission denied'); return; }
+      dirHandle = handle;
+      setFolderState('auto-saving to “' + handle.name + '” ✓');
+      await loadFromFolder();
+      // Flush the current in-memory edits to disk immediately so the
+      // folder is complete even for pages edited before it was picked.
+      for (const p of PAGES) await writePage(p);
+    } catch (err) {
+      if (err && err.name === 'AbortError') return; // user cancelled the picker
+      setFolderState('could not open folder');
+    }
+  });
+}
+
 document.getElementById('copy').addEventListener('click', async () => {
   const lines = ['# Text audit — Postr', '', 'Instructions: apply each edit below to the matching UI copy. Keep tone consistent with neighboring strings. Locations are approximate (section › context).', ''];
   for (const p of PAGES) {
@@ -290,13 +455,20 @@ document.getElementById('dl').addEventListener('click', () => {
   a.click();
   toast('Downloaded postr-text-audit.json');
 });
-document.getElementById('reset').addEventListener('click', () => {
-  if (!confirm('Clear all edits?')) return;
+document.getElementById('reset').addEventListener('click', async () => {
+  const alsoDisk = dirHandle ? ' This also deletes the per-page files in “' + dirHandle.name + '”.' : '';
+  if (!confirm('Clear all edits?' + alsoDisk)) return;
   for (const k of Object.keys(edits)) delete edits[k];
   localStorage.removeItem(LS);
   for (const tr of document.querySelectorAll('tr.edited')) {
     tr.classList.remove('edited');
     tr.querySelector('div[contenteditable]').textContent = '';
+  }
+  if (dirHandle) {
+    for (const p of PAGES) {
+      try { await dirHandle.removeEntry(slug(p.route) + '.json'); } catch { /* absent */ }
+      pageUI[p.route].setStatus('— no edits', '');
+    }
   }
   updateCounts();
   toast('Edits cleared');
