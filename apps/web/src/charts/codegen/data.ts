@@ -59,8 +59,11 @@ export function columnLiteral(
   const cells = values.map((v) => {
     if (v === null || v === undefined) return lang === 'r' ? 'NA' : 'None';
     if (kind === 'number') return String(v);
-    // strings / dates → quoted
-    const escaped = String(v).replace(/"/g, '\\"');
+    // strings / dates → quoted. Escape backslash FIRST, then the quote —
+    // both R and Python share this convention. Skipping the backslash
+    // corrupts values like "C:\new" (\n → newline) and turns a trailing
+    // backslash into an escaped closing quote, breaking the whole script.
+    const escaped = String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     return `"${escaped}"`;
   });
   return cells.join(', ');

@@ -83,3 +83,39 @@ describe('Python codegen', () => {
     expect(sample).toContain('"Condition"');
   });
 });
+
+describe('backslash-bearing values are escaped (my-data mode)', () => {
+  function backslashSpec(): ChartSpec {
+    return {
+      version: 1,
+      form: 'bar',
+      data: {
+        columns: [
+          { name: 'Path', kind: 'category' },
+          { name: 'N', kind: 'number' },
+        ],
+        rows: [
+          ['C:\\new', 3], // \n would corrupt if unescaped
+          ['ends-with\\', 5], // trailing backslash would escape the quote
+        ],
+      },
+      encoding: { x: 'Path', y: 'N' },
+      options: { legend: false, sort: 'none', horizontal: false, directLabel: 'none' },
+      paletteSlots: ['accent'],
+    };
+  }
+
+  it('R doubles backslashes so no literal is corrupted or unterminated', () => {
+    const code = chartSpecToR(backslashSpec(), 'mine');
+    expect(code).toContain('"C:\\\\new"');
+    expect(code).toContain('"ends-with\\\\"');
+    // never the raw (corrupting) forms
+    expect(code).not.toContain('"C:\\new"');
+  });
+
+  it('Python doubles backslashes identically', () => {
+    const code = chartSpecToPython(backslashSpec(), 'mine');
+    expect(code).toContain('"C:\\\\new"');
+    expect(code).toContain('"ends-with\\\\"');
+  });
+});
