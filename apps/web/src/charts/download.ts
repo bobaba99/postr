@@ -13,6 +13,8 @@ import { zipSync } from 'fflate';
 import type { ChartSpec, Palette } from '@postr/shared';
 import { renderChart } from './renderChart';
 import type { ChartTheme } from './plotOptions';
+import { plotCreditSvg, PLOT_CREDIT_BAND } from './plotCredit';
+import { shouldAttribute, type AttributionOptions } from '@/export/attribution';
 
 /**
  * Base render geometry shared by previews and downloads. 800×560 at
@@ -29,6 +31,7 @@ export async function chartToSvgString(
   spec: ChartSpec,
   palette: Palette,
   fontFamily: string,
+  attribution: AttributionOptions = {},
 ): Promise<string> {
   const svg = await renderChart(spec, { ...PREVIEW_THEME_BASE, palette, fontFamily });
   // Standalone SVG files need explicit namespaces and a white
@@ -39,7 +42,24 @@ export async function chartToSvgString(
   rect.setAttribute('height', '100%');
   rect.setAttribute('fill', '#ffffff');
   svg.insertBefore(rect, svg.firstChild);
-  return new XMLSerializer().serializeToString(svg);
+
+  const serialized = new XMLSerializer().serializeToString(svg);
+  if (!shouldAttribute(attribution)) return serialized;
+
+  // Add the "made by postr.sh" credit at the DOWNLOAD seam only (never in
+  // renderChart, so a chart inserted into a poster is not double-marked).
+  // The credit lives in ADDED canvas below the plot, so the plot's own
+  // geometry — width, height, bars, ticks, labels — is untouched.
+  const w = Number(svg.getAttribute('width')) || PREVIEW_THEME_BASE.widthPx;
+  const h = Number(svg.getAttribute('height')) || PREVIEW_THEME_BASE.heightPx;
+  const newH = h + PLOT_CREDIT_BAND;
+  const credit = plotCreditSvg(w, h);
+  // Grow height + viewBox to include the band; the white bg rect uses
+  // width/height="100%" so it fills the taller canvas automatically.
+  return serialized
+    .replace(`height="${h}"`, `height="${newH}"`)
+    .replace(`viewBox="0 0 ${w} ${h}"`, `viewBox="0 0 ${w} ${newH}"`)
+    .replace('</svg>', `${credit}</svg>`);
 }
 
 function triggerDownload(blob: Blob, filename: string): void {

@@ -40,6 +40,26 @@ describe('chartToSvgString', () => {
     const b = await chartToSvgString(spec, palette, 'Georgia, serif');
     expect(a).toBe(b);
   });
+
+  it('carries the "made by postr.sh" credit by default, below the plot', async () => {
+    const text = await chartToSvgString(fixtureSpec(), palette, 'Georgia, serif');
+    expect(text).toContain('made by postr.sh');
+    // The credit lives in ADDED canvas: the taller viewBox height must be
+    // greater than the credit-less height (paid) — i.e. the plot grew, it
+    // wasn't drawn over.
+    const paid = await chartToSvgString(fixtureSpec(), palette, 'Georgia, serif', {
+      paidPlan: true,
+    });
+    const heightOf = (svg: string) => Number(svg.match(/height="(\d+)"/)?.[1]);
+    expect(heightOf(text)).toBeGreaterThan(heightOf(paid));
+  });
+
+  it('omits the credit when the paid seam suppresses attribution', async () => {
+    const text = await chartToSvgString(fixtureSpec(), palette, 'Georgia, serif', {
+      paidPlan: true,
+    });
+    expect(text).not.toContain('made by postr.sh');
+  });
 });
 
 describe('downloadChartSvg', () => {
