@@ -176,10 +176,18 @@ function auditHtml(pages) {
   button { background: #5641b8; color: #fff; border: 0; border-radius: 8px; padding: 7px 12px; font: 600 12px system-ui; cursor: pointer; }
   button.ghost { background: #1a1a26; border: 1px solid #2a2a3a; color: #c8cad0; }
   input[type="search"] { background: #1a1a26; border: 1px solid #2a2a3a; border-radius: 8px; color: #e2e2e8; padding: 7px 10px; width: 220px; }
-  nav.pages { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 16px; background: #0d0d16; border-bottom: 1px solid #1f1f2e; }
-  nav.pages a { color: #9b8cf0; text-decoration: none; font-size: 12px; padding: 2px 6px; border-radius: 6px; }
-  nav.pages a:hover { background: #1a1a26; }
+  /* Page tabs — one tab per page; only the active page's section shows,
+     so you audit one page at a time without scrolling past the others. */
+  nav.pages { display: flex; gap: 4px; flex-wrap: wrap; padding: 8px 16px; background: #0d0d16; border-bottom: 1px solid #1f1f2e; position: sticky; top: 53px; z-index: 9; }
+  nav.pages button.tab { background: #14141f; border: 1px solid #23232f; color: #9b8cf0; font: 600 12px system-ui; padding: 5px 10px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  nav.pages button.tab:hover { background: #1a1a26; }
+  nav.pages button.tab.active { background: #5641b8; color: #fff; border-color: #7c6aed; }
+  nav.pages button.tab .badge { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: #7c6aed; color: #fff; font: 700 10px/16px system-ui; text-align: center; }
+  nav.pages button.tab.active .badge { background: #fff; color: #5641b8; }
+  nav.pages button.tab .badge.zero { background: #2a2a3a; color: #8b8f99; }
+  nav.pages button.tab.active .badge.zero { background: rgba(255,255,255,0.4); color: #fff; }
   section.page { padding: 18px 16px 30px; border-bottom: 2px solid #1f1f2e; }
+  section.page[hidden] { display: none; }
   section.page h2 { margin: 0 0 12px; font-size: 16px; color: #b4a9f5; }
   .cols { display: grid; grid-template-columns: minmax(0, 55fr) minmax(0, 45fr); gap: 16px; align-items: start; }
   .shot { border: 1px solid #2a2a3a; border-radius: 10px; overflow: hidden; position: sticky; top: 64px; }
@@ -264,10 +272,27 @@ function pageMarkdown(p) {
   return lines.join('\\n');
 }
 
+let activeRoute = null;
+
+/** Show one page's section, hide the rest, and mark its tab active. */
+function showPage(route) {
+  activeRoute = route;
+  for (const r of Object.keys(pageUI)) {
+    const ui = pageUI[r];
+    const on = r === route;
+    ui.section.hidden = !on;
+    ui.tab.classList.toggle('active', on);
+  }
+  try { localStorage.setItem(LS + ':tab', route); } catch { /* ignore */ }
+  window.scrollTo(0, 0);
+}
+
 for (const p of PAGES) {
-  const a = document.createElement('a');
-  a.href = '#p' + p.n; a.textContent = p.route;
-  nav.appendChild(a);
+  const tab = document.createElement('button');
+  tab.type = 'button'; tab.className = 'tab';
+  tab.innerHTML = '<span>' + p.route + '</span><span class="badge zero">0</span>';
+  tab.addEventListener('click', () => showPage(p.route));
+  nav.appendChild(tab);
   const sec = document.createElement('section');
   sec.className = 'page'; sec.id = 'p' + p.n;
   sec.innerHTML = '<h2>' + p.n + '. ' + p.route + (p.error ? ' — ⚠ ' + p.error : '') + '</h2>'
@@ -280,7 +305,13 @@ for (const p of PAGES) {
   const tb = sec.querySelector('tbody');
   const statusEl = sec.querySelector('.pgstatus');
   const setStatus = (msg, cls) => { statusEl.textContent = msg; statusEl.className = 'pgstatus tag' + (cls ? ' ' + cls : ''); };
-  pageUI[p.route] = { setStatus };
+  const badge = tab.querySelector('.badge');
+  const refreshBadge = () => {
+    const n = pageEdits(p).length;
+    badge.textContent = String(n);
+    badge.className = 'badge' + (n === 0 ? ' zero' : '');
+  };
+  pageUI[p.route] = { setStatus, section: sec, tab, refreshBadge };
   sec.querySelector('.pgcopy').addEventListener('click', async () => {
     await navigator.clipboard.writeText(pageMarkdown(p));
     toast('Copied ' + p.route + ' — paste as a refactor prompt');
@@ -313,11 +344,24 @@ for (const p of PAGES) {
 function updateCounts() {
   editedCount = Object.keys(edits).length;
   document.getElementById('counts').textContent = total + ' text items · ' + editedCount + ' edited';
+  for (const r of Object.keys(pageUI)) pageUI[r].refreshBadge();
 }
 updateCounts();
+
+// Open the last-viewed tab (or the first page). One page shows at a time.
+const savedTab = (() => { try { return localStorage.getItem(LS + ':tab'); } catch { return null; } })();
+showPage(PAGES.some((p) => p.route === savedTab) ? savedTab : (PAGES[0] && PAGES[0].route));
+
+// Search filters rows within the active page; if nothing matches there
+// but another page has a hit, jump to the first page that matches.
 document.getElementById('q').addEventListener('input', (e) => {
   const q = e.target.value.toLowerCase();
-  for (const tr of document.querySelectorAll('tbody tr')) {
+  if (q) {
+    const hit = PAGES.find((p) => p.items.some((it) =>
+      (it.where + ' ' + it.text + ' ' + (edits[p.route + '|' + it.n] || '')).toLowerCase().includes(q)));
+    if (hit && hit.route !== activeRoute) showPage(hit.route);
+  }
+  for (const tr of document.querySelectorAll('section.page:not([hidden]) tbody tr')) {
     const hay = (tr.children[1].textContent + ' ' + tr.children[2].textContent).toLowerCase();
     tr.style.display = !q || hay.includes(q) ? '' : 'none';
   }
@@ -500,8 +544,30 @@ async function main() {
     n++;
     const entry = { n, route, items: [], shot: `route-${String(n).padStart(2, '0')}.png` };
     try {
-      await page.goto(BASE + route, { waitUntil: 'networkidle', timeout: 30_000 });
+      // `vite preview` serves the per-route prerendered file only for the
+      // trailing-slash form (dist/pricing/index.html ← "/pricing/"); the
+      // no-slash form falls through to the root index (the home shell).
+      // Normalize here so every prerendered route lands on its own content.
+      const navPath = route === '/' ? '/' : route.replace(/\/$/, '') + '/';
+      await page.goto(BASE + navPath, { waitUntil: 'networkidle', timeout: 30_000 });
       await page.waitForTimeout(700);
+      // Guard: if a non-home route still shows the home hero, the server
+      // fell back to the root shell — record it instead of silently
+      // capturing duplicate home content across every tab.
+      if (route !== '/') {
+        const looksLikeHome = await page.evaluate(
+          () => !!document.querySelector('h1')
+            && document.querySelector('h1').textContent.includes('without the hassle'),
+        );
+        if (looksLikeHome) {
+          // Fall back to SPA client navigation from the home shell.
+          await page.evaluate((r) => {
+            window.history.pushState({}, '', r);
+            window.dispatchEvent(new PopStateEvent('popstate'));
+          }, route);
+          await page.waitForTimeout(700);
+        }
+      }
       const items = await page.evaluate(EXTRACT_FN);
       // dedupe identical (text, where) pairs within a page (repeat chrome)
       const seen = new Set();
