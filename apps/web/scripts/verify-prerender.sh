@@ -136,7 +136,7 @@ echo "Slug aliases 308 to their canonical page:"
 # ever goes missing a once-indexed URL starts returning 404. Every
 # deactivated tool's alias points at / (routes.tsx header) —
 # /plot-picker included, since its 308 to /chart-chooser was deployed
-# and must be retargeted, not dropped. /figure-check is the live one:
+# and must be retargeted, not dropped. /plot-checker is the live one:
 # it must land on the prerendered checker, not on /.
 check_alias() {
   alias_path="$1"
@@ -163,7 +163,7 @@ check_alias() {
   fi
 }
 
-check_alias /figure-check /tools/figure-readability
+check_alias /plot-checker /tools/figure-readability
 check_alias /plot-picker /
 check_alias /manuscript-to-poster /
 check_alias /paper-to-present /

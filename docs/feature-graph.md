@@ -1,6 +1,6 @@
 # Postr — Feature Graph & Refactoring Checklist (v2)
 
-**Revised 2026-09-10 — hide pass.** The manuscript pipelines (§6.12 `/paper-to-poster`, §6.16 `/paper-to-slides`), the Presentation Checker (§6.17: `/presentation-checker`, the editor `review` tab, the `review_pack` / `review_addon` SKUs), the paper-to-talk waitlist callout (§6.3) **and — same day, second pass — the standalone plot picker page (§6.10 `pages/ChartChooser.tsx`, `/chart-chooser` + alias `/plot-picker`)** are **DEACTIVATED, not deleted** — routes redirect to `/`, nav/footer/landing/dashboard/pricing entries are removed, SEO records are gone, the API routers mount only behind `FEATURE_MANUSCRIPT` / `FEATURE_REVIEW`. The product's nav carries **one standalone tool** — the figure-readability check at `/tools/figure-readability` (alias `/figure-check`), added 2026-09-11 and inventoried in §6.10 `pages/FigureReadability.tsx`; `charts/*` itself stays LIVE inside the editor's Figure tab (§6.8). Every file named in those sections still exists and stays unit-tested. Canonical restore recipe: the `apps/web/src/routes.tsx` header; summary in §10 "Deactivated features". The per-element inventories in §6.10 / §6.12 / §6.16 / §6.17 are kept verbatim as the reactivation reference and are NOT re-extracted.
+**Revised 2026-09-10 — hide pass.** The manuscript pipelines (§6.12 `/paper-to-poster`, §6.16 `/paper-to-slides`), the Presentation Checker (§6.17: `/presentation-checker`, the editor `review` tab, the `review_pack` / `review_addon` SKUs), the paper-to-talk waitlist callout (§6.3) **and — same day, second pass — the standalone plot picker page (§6.10 `pages/ChartChooser.tsx`, `/chart-chooser` + alias `/plot-picker`)** are **DEACTIVATED, not deleted** — routes redirect to `/`, nav/footer/landing/dashboard/pricing entries are removed, SEO records are gone, the API routers mount only behind `FEATURE_MANUSCRIPT` / `FEATURE_REVIEW`. The product's nav carries **one standalone tool** — the figure-readability check at `/tools/figure-readability` (alias `/plot-checker`), added 2026-09-11 and inventoried in §6.10 `pages/FigureReadability.tsx`; `charts/*` itself stays LIVE inside the editor's Figure tab (§6.8). Every file named in those sections still exists and stays unit-tested. Canonical restore recipe: the `apps/web/src/routes.tsx` header; summary in §10 "Deactivated features". The per-element inventories in §6.10 / §6.12 / §6.16 / §6.17 are kept verbatim as the reactivation reference and are NOT re-extracted.
 
 **Revised 2026-07-29** (v2 second pass was 2026-07-28, superseding v1 from earlier that day; 2026-07-29 updates added §6.16 Manuscript → Slides and — documented from the `feat/presentation-checker` branch ahead of its launch gate — §6.17 Presentation Checker). Source of truth: `apps/web/src/` (React 19 + react-router 8 + Vite SPA) plus `apps/api/src/` for the external-services map. Every file:line reference and verbatim UI string below was extracted from the code as of **2026-07-28 ~16:00 local** (§6.16 and §6.17 extracted 2026-07-29; §6.17 from the feature branch). If the doc and the code disagree, **the code wins** — regenerate this doc.
 
@@ -234,7 +234,7 @@ flowchart LR
 | `/why-posters` | `pages/WhyPosters.tsx` | no | — |
 | `/pricing` | `pages/Pricing.tsx` | no | — |
 | `/tools/figure-readability` | `pages/FigureReadability.tsx` | yes | public, no session (LIVE 2026-09-11 — the one standalone tool; static SEO record + prerender + sitemap; §6.10) |
-| `/figure-check` | redirect → `/tools/figure-readability` | — | alias of the checker (vercel.json 308 + in-app `<Navigate replace>`) |
+| `/plot-checker` | redirect → `/tools/figure-readability` | — | alias of the checker (vercel.json 308 + in-app `<Navigate replace>`) |
 | `/gallery` | `<Navigate to="/" replace>` | — | gallery deactivated (`GALLERY_PUBLIC_ENABLED=false`) |
 | `/gallery/:entryId` | `<Navigate to="/" replace>` | — | gallery deactivated |
 | `/privacy` | `pages/Privacy.tsx` | no | — |
@@ -363,7 +363,7 @@ flowchart LR
   L["Landing /"] -->|"Get started"| A["/auth"]
   L -->|"Try as guest"| AG["/auth?guest=1"]
   %% ToolCard /paper-to-poster AND ToolCard /chart-chooser removed 2026-09-10 (deactivated); the section is BACK 2026-09-11 with one card
-  L -->|"ToolCard Figure readability / feature-card link"| FR["/tools/figure-readability (§6.10)"]
+  L -->|"ToolCard Plot checker / feature-card link"| FR["/tools/figure-readability (§6.10)"]
   L -->|"signed-in auto-redirect"| D["/dashboard"]
   AB["About /about"] -->|"openFeedback bug/feature/other"| FB["FeedbackModal"]
   W["WhyPosters /why-posters"] -->|"Start a poster"| L
@@ -376,7 +376,7 @@ flowchart LR
 - [ ] `Get started` — router link — `Landing.tsx:154-159` — `/auth`
 - [ ] `Try as guest` — router link — `Landing.tsx:160-165` — `/auth?guest=1` (auto-triggers guest login)
 - [ ] ~~`ToolCard` — router link — `/chart-chooser`~~ — removed 2026-09-10 (standalone plot picker deactivated); the `/paper-to-poster` card had gone the same day. The "Tools you can use on their own" section + `ToolCard` component were removed with it and **restored 2026-09-11** for the checker (below); the picker card goes back in FRONT of the checker card when the revamp ships
-- [ ] `ToolCard` — router link — `Landing.tsx` — `/tools/figure-readability` — icon 🔍, title "Figure readability", body "Paste your R or Python plotting code and the size it will print at. See which labels fall below poster thresholds and copy the base_size fix.", cta "Check your figure →"; single card, `max-w-md mx-auto grid-cols-1`; section h2 "Tools you can use on their own", count-free intro "The parts of the poster workflow that work without an account, and without opening the editor."
+- [ ] `ToolCard` — router link — `Landing.tsx` — `/tools/figure-readability` — icon 🔍, title "Plot checker", body "Paste your R or Python plotting code and the size it will print at. See which labels fall below poster thresholds and copy the base_size fix.", cta "Check your figure →"; single card, `max-w-md mx-auto grid-cols-1`; section h2 "Tools you can use on their own", count-free intro "The parts of the poster workflow that work without an account, and without opening the editor."
 - [ ] `Try it standalone.` — inline Link inside the "Figure readability" feature card — `Landing.tsx` — `/tools/figure-readability` (card body "Check chart labels at print size and copy the fix. Try it standalone." — ≤15 words, `toolDiscoverability.test.tsx`)
 
 **Copy**
@@ -2640,9 +2640,9 @@ flowchart LR
 
 #### `charts/chartColors.ts` — palette-slot resolution/color math (incl. `resolveSeriesColors` override) — no UI, logic only
 
-#### `pages/FigureReadability.tsx` — /tools/figure-readability standalone figure-readability check (public, no session) — **LIVE 2026-09-11** (alias `/figure-check` → 308)
+#### `pages/FigureReadability.tsx` — /tools/figure-readability standalone figure-readability check (public, no session) — **LIVE 2026-09-11** (alias `/plot-checker` → 308)
 
-The editor's Figure › Check tab (`poster/ReadabilityPanel.tsx`, §6.8) as a public page: the printed figure size is TYPED (`poster/PrintSizeFields.tsx` + `poster/printSize.ts`) instead of dragged on a canvas; the image-OCR scan path is never mounted (`selectedBlock={null}` + the panel's `layout === 'page'` gate); nothing leaves the browser and no Supabase session is created (`PublicHeader` only reads one). Code-split (`lazy`). SEO: static `routes.json` record (title "Figure Font Size Checker for Posters — R & Python | Postr", description "Paste ggplot2 or matplotlib code. Get the printed point size of every label at your poster size, and the exact base_size to fix it. Free, no signup.", h1 + 4 copy lines; prerendered to `dist/tools/figure-readability/index.html`, in `sitemap-static.xml`) + `WebApplication` JSON-LD "Postr Figure Readability Check". Surfaces: `PublicHeader` `TOOL_LINKS` ({ to, label "Figure readability", blurb "Check figure text at poster print size" }), `PublicFooter` Product column, `Landing` tools section + feature-card link (§6.2). Tests: `pages/__tests__/FigureReadability.test.tsx`, `poster/__tests__/printSize.test.ts`, `src/__tests__/routes.test.tsx`, `toolDiscoverability.test.tsx` (`TOOL_PATHS`), `siteMeta.test.ts`, `vercelRouting.test.ts` (`CLIENT_ROUTES` / `ALIAS_REDIRECTS` / `UNKNOWN_PATHS` `/tools`), `PublicPageOutline.test.tsx` (`auditedFiles`), `redactUrl.test.ts`. Scripts: `verify-prerender.sh` (prerendered loop, distinct-title loop, `/tools` 404, `check_alias /figure-check /tools/figure-readability`), `mobile-audit.mjs` ROUTES, `scripts/text-audit/scrape.mts` ROUTES.
+The editor's Figure › Check tab (`poster/ReadabilityPanel.tsx`, §6.8) as a public page: the printed figure size is TYPED (`poster/PrintSizeFields.tsx` + `poster/printSize.ts`) instead of dragged on a canvas; the image-OCR scan path is never mounted (`selectedBlock={null}` + the panel's `layout === 'page'` gate); nothing leaves the browser and no Supabase session is created (`PublicHeader` only reads one). Code-split (`lazy`). SEO: static `routes.json` record (title "Figure Font Size Checker for Posters — R & Python | Postr", description "Paste ggplot2 or matplotlib code. Get the printed point size of every label at your poster size, and the exact base_size to fix it. Free, no signup.", h1 + 4 copy lines; prerendered to `dist/tools/figure-readability/index.html`, in `sitemap-static.xml`) + `WebApplication` JSON-LD "Postr Figure Readability Check". Surfaces: `PublicHeader` `TOOL_LINKS` ({ to, label "Figure readability", blurb "Check figure text at poster print size" }), `PublicFooter` Product column, `Landing` tools section + feature-card link (§6.2). Tests: `pages/__tests__/FigureReadability.test.tsx`, `poster/__tests__/printSize.test.ts`, `src/__tests__/routes.test.tsx`, `toolDiscoverability.test.tsx` (`TOOL_PATHS`), `siteMeta.test.ts`, `vercelRouting.test.ts` (`CLIENT_ROUTES` / `ALIAS_REDIRECTS` / `UNKNOWN_PATHS` `/tools`), `PublicPageOutline.test.tsx` (`auditedFiles`), `redactUrl.test.ts`. Scripts: `verify-prerender.sh` (prerendered loop, distinct-title loop, `/tools` 404, `check_alias /plot-checker /tools/figure-readability`), `mobile-audit.mjs` ROUTES, `scripts/text-audit/scrape.mts` ROUTES.
 
 **Elements**
 - [ ] `PublicHeader` / `PublicFooter` — shared chrome (§6.13)
@@ -3632,7 +3632,7 @@ No UI — logic only. Three route registrations, each `requireAuth(getSupabase)`
 - [ ] `PublicHeader` header container — `<header>` — `PublicHeader.tsx:118`
 - [ ] Brand wordmark link to `/` — `<Link>` — `PublicHeader.tsx:119`
 - [ ] `NAV_LINKS.map` top-level nav links (`/tools/figure-readability` first, then the Learn pages; no longer includes `/paper-to-poster`, `/paper-to-slides` or `/chart-chooser` — removed 2026-09-10) — `<Link>` (flat row, `xl:`-gated) — `PublicHeader.tsx`
-- [ ] `Figure readability` + blurb "Check figure text at poster print size" — mobile-menu tool row — `<Link>` `/tools/figure-readability` — `PublicHeader.tsx` `TOOL_LINKS.map`
+- [ ] `Plot checker` + blurb "Check figure text at poster print size" — mobile-menu tool row — `<Link>` `/tools/figure-readability` — `PublicHeader.tsx` `TOOL_LINKS.map`
 - [ ] `MobileNav` overflow trigger — `<MobileNav>` — `PublicHeader.tsx:151`
 - [ ] Feedback button (signed-in, desktop) — `<button>` title "Send feedback" — `PublicHeader.tsx:155-165`
 - [ ] Profile link `/profile` — `<Link>` title "Profile & Settings" — `PublicHeader.tsx:166-175`
@@ -3673,7 +3673,7 @@ No UI — logic only. Three route registrations, each `requireAuth(getSupabase)`
 - [ ] ~~`/paper-to-slides` footer link — `<FooterLink>`~~ — removed 2026-09-10 (deactivated)
 - [ ] ~~`/paper-to-poster` footer link — `<FooterLink>`~~ — removed 2026-09-10 (deactivated)
 - [ ] ~~`/chart-chooser` footer link — `<FooterLink>`~~ — removed 2026-09-10 (deactivated)
-- [ ] `/tools/figure-readability` footer link "Figure readability" — `<FooterLink>` — `PublicFooter.tsx` Product column (added 2026-09-11)
+- [ ] `/tools/figure-readability` footer link "Plot checker" — `<FooterLink>` — `PublicFooter.tsx` Product column (added 2026-09-11)
 - [ ] Learn column (About, Why posters, Send feedback) — `<FooterColumn>` — `PublicFooter.tsx:50-56`
 - [ ] Account column (Sign in, Profile) — `<FooterColumn>` — `PublicFooter.tsx:58-61`
 - [ ] Legal column (Privacy, Cookies, Terms) — `<FooterColumn>` — `PublicFooter.tsx:63-67`
@@ -4424,7 +4424,7 @@ flowchart LR
 - [ ] `Pricing` — Link — `PublicFooter.tsx:44` — `/pricing`
 - [ ] ~~`Paper to poster` — Link — `PublicFooter.tsx:45` — `/paper-to-poster`~~ — removed 2026-09-10 (deactivated)
 - [ ] ~~`Plot picker` — Link — `PublicFooter.tsx:46` — `/chart-chooser`~~ — removed 2026-09-10 (deactivated)
-- [ ] `Figure readability` — Link — `PublicFooter.tsx` — `/tools/figure-readability` (added 2026-09-11)
+- [ ] `Plot checker` — Link — `PublicFooter.tsx` — `/tools/figure-readability` (added 2026-09-11)
 - [ ] `About` — Link — `PublicFooter.tsx:50` — `/about`
 - [ ] `Why poster sessions` — Link — `PublicFooter.tsx:51` — `/why-posters`
 - [ ] `Send feedback` — button — `PublicFooter.tsx:52` — `useFeedbackStore.open('other')`
@@ -4448,7 +4448,7 @@ flowchart LR
 - [ ] logo + "Postr" — Link — `PublicHeader.tsx:114` — `/`
 - [ ] ~~`Paper to poster` — nav Link — `PublicHeader.tsx:141` (constant `NAV_LINKS :65-70`) — `/paper-to-poster` (desktop flat row + mobile menu `:310`)~~ — removed 2026-09-10 (deactivated)
 - [ ] ~~`Plot picker` — nav Link — same — `/chart-chooser` (both rows)~~ — removed 2026-09-10 (deactivated)
-- [ ] `Figure readability` — nav Link — `TOOL_LINKS` — `/tools/figure-readability` (flat row + mobile menu row with blurb "Check figure text at poster print size") — added 2026-09-11
+- [ ] `Plot checker` — nav Link — `TOOL_LINKS` — `/tools/figure-readability` (flat row + mobile menu row with blurb "Check figure text at poster print size") — added 2026-09-11
 - [ ] `Pricing` — nav Link — same — `/pricing` (both rows)
 - [ ] `Why posters` — nav Link — same — `/why-posters` (both rows)
 - [ ] `About` — nav Link — same — `/about` (both rows)

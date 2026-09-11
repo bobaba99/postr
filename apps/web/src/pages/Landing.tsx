@@ -246,7 +246,7 @@ export default function Landing() {
         without opening the editor, hence "no account needed" rather
         than a signup CTA. One card while the plot picker and the
         manuscript flows are deactivated (routes.tsx header): the
-        Figure readability check. The intro is count-free on purpose —
+        Plot checker (the standalone figure-readability check). The intro is count-free on purpose —
         "Two parts of the poster workflow…" went stale the moment a
         card left. When the picker returns, its card goes in FRONT of
         this one and the grid goes back to `sm:grid-cols-2`.
@@ -267,7 +267,7 @@ export default function Landing() {
           <ToolCard
             to="/tools/figure-readability"
             icon="🔍"
-            title="Figure readability"
+            title="Plot checker"
             body="Paste your R or Python plotting code and the size it will print at. See which labels fall below poster thresholds and copy the base_size fix."
             cta="Check your figure"
           />
