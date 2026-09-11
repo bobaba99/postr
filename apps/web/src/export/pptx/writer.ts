@@ -40,6 +40,7 @@ import {
 } from '../resolveAssets';
 import { tableCellBorders } from './tableBorders';
 import { attributionDocProperty, attributionPptxBox } from '../attribution';
+import { stripAckBlock } from '../stripAckBlock';
 import { colophonMarkPngDataUri } from '../colophonMarkPng';
 import {
   POSTER_LAYOUT,
@@ -534,9 +535,15 @@ function bytesToBase64(bytes: Uint8Array): string {
  * the user to LaTeX/PDF instead of clipping.
  */
 export async function exportPosterPptx(
-  doc: PosterDoc,
+  input: PosterDoc,
   options: PptxExportOptions = {},
 ): Promise<PptxExportResult> {
+  // Paid seam, applied BEFORE assets resolve: the seeded acknowledgement
+  // mark is an ordinary locked `logo` block, and the block loop below
+  // writes every logo as a picture shape. Dropping it here (and only
+  // here) is what makes a paid deck carry no Postr mark at all — the
+  // colophon box further down consults the same predicate.
+  const doc = stripAckBlock(input, options.attribution);
   const plan = planPptxScale(doc.widthIn, doc.heightIn);
   const { assets } = await resolvePosterAssets(doc, options.fetcher);
 
@@ -642,8 +649,9 @@ export async function exportPosterPptx(
   // That worked, and it cost every user the background-colour picker:
   // PowerPoint cannot recolour a picture fill, so a user who never
   // wanted to touch the credit could no longer restyle their poster.
-  // The mark is an ordinary picture shape again (see the block loop),
-  // and this is a plain solid fill.
+  // The mark is an ordinary picture shape again (see the block loop) —
+  // on FREE exports only; `stripAckBlock` at the entry point removes it
+  // for paid ones — and this is a plain solid fill.
   slide.background = { color: hex(doc.palette.bg, 'FFFFFF') };
 
   for (const b of doc.blocks) {

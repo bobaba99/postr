@@ -19,6 +19,7 @@ import {
 import { referencesToBib } from './bib';
 import { buildLatexDocument } from './writer';
 import type { AttributionOptions } from '../attribution';
+import { stripAckBlock } from '../stripAckBlock';
 
 export interface LatexExportOptions extends ExportContentOptions {
   /** Injectable for tests / server pipelines. */
@@ -82,9 +83,14 @@ function buildReadme(doc: PosterDoc, hasBib: boolean, hasFigures: boolean): stri
  * bytes` — safe to call on documents never opened in the editor.
  */
 export async function exportPosterLatex(
-  doc: PosterDoc,
+  input: PosterDoc,
   options: LatexExportOptions = {},
 ): Promise<LatexExportResult> {
+  // Paid seam, applied BEFORE assets resolve so the seeded acknowledgement
+  // mark is neither zipped as `figures/logo-N` nor `\includegraphics`'d.
+  // The writer applies the same step, so a direct `buildLatexDocument`
+  // caller gets the same answer.
+  const doc = stripAckBlock(input, options.attribution);
   const { assets } = await resolvePosterAssets(doc, options.fetcher);
   const captionNumbers = computeCaptionNumbers(doc.blocks);
 
