@@ -1,5 +1,7 @@
 # Presentation Checker — pre-ship gate + launch checklist
 
+> **Step 0 (added 2026-09-10 — the feature is DEACTIVATED, not deleted):** before anything below, restore the wiring per the `apps/web/src/routes.tsx` header — the `/presentation-checker` route + lazy import, the `['review', 'review']` rail tuple and mount branch in `poster/Sidebar.tsx`, the review SKUs in `data/checkoutIntent.ts` VALID, the `app` record in `seo/routes.json`, and set `FEATURE_REVIEW=1` (+ `STRIPE_PRICE_REVIEW_*`) in the API env. Flip the contract tests named there.
+
 Date: <…> · Rubric: <version stamped in results> · Corpus: frozen 20 (`frozenAt` in manifest)
 
 ## Gate result (from analysis/gate-report.md vs gate-decision.md §7.5 criterion)

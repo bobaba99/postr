@@ -10,6 +10,15 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { auth: authSpies },
 }));
 
+// The plan is swapped per-test via this mutable holder (P0-2: the term
+// CTA must not offer a second subscription to an active term holder).
+const planState = {
+  value: { loading: false, hasActiveTerm: false, isGuest: true },
+};
+vi.mock('@/hooks/usePlan', () => ({
+  usePlan: () => planState.value,
+}));
+
 import { PRICING_TIERS, PricingSection } from '../PricingSection';
 
 function wordCount(message: string): number {
@@ -27,6 +36,7 @@ function renderPricing() {
 describe('pricing content hierarchy', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    planState.value = { loading: false, hasActiveTerm: false, isGuest: true };
   });
 
   it('limits every plan to four supporting messages', () => {
@@ -65,5 +75,43 @@ describe('pricing content hierarchy', () => {
     renderPricing();
 
     expect(screen.queryByText(/which should i pick/i)).toBeNull();
+  });
+});
+
+describe('duplicate-term guard (P0-2)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('offers the term CTA to a visitor without an active term', () => {
+    planState.value = { loading: false, hasActiveTerm: false, isGuest: true };
+    renderPricing();
+
+    expect(screen.getByRole('link', { name: 'Get the term' })).toHaveAttribute(
+      'href',
+      '/auth?plan=term',
+    );
+    expect(screen.queryByText(/You already have an active term/i)).toBeNull();
+  });
+
+  it('replaces the term CTA with a notice for an active term holder', () => {
+    planState.value = { loading: false, hasActiveTerm: true, isGuest: false };
+    renderPricing();
+
+    expect(screen.queryByRole('link', { name: 'Get the term' })).toBeNull();
+    expect(screen.getByText(/You already have an active term/i)).toBeInTheDocument();
+    // The pack stays purchasable — credits stack on top of a term.
+    expect(screen.getByRole('link', { name: 'Get the pack' })).toHaveAttribute(
+      'href',
+      '/auth?plan=pack',
+    );
+  });
+
+  it('does not flash the notice while the plan is still loading', () => {
+    planState.value = { loading: true, hasActiveTerm: false, isGuest: true };
+    renderPricing();
+
+    expect(screen.getByRole('link', { name: 'Get the term' })).toBeInTheDocument();
+    expect(screen.queryByText(/You already have an active term/i)).toBeNull();
   });
 });

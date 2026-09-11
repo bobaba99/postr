@@ -5,6 +5,11 @@
  * 1. No Supabase session is created on load — not even anonymous.
  * 2. Crawler copy parity — the live h1 must match the routes.json
  *    entry the prerender script injects for non-JS crawlers.
+ *
+ * DEACTIVATED 2026-09-10 (routes.tsx header): the page is not mounted
+ * and its routes.json static record is gone, so property 2 is pinned
+ * against the literal h1 the record carried until it is restored.
+ * The component itself is rendered directly here and stays covered.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
@@ -39,6 +44,14 @@ vi.mock('@/charts/download', async (importOriginal) => ({
 import ChartChooserPage from '../ChartChooser';
 import routesJson from '../../seo/routes.json';
 
+/**
+ * The h1 of the static '/chart-chooser' record, verbatim, from before
+ * the record was deleted (git history, commit before 2026-09-10). When
+ * the record is restored, read it back from routesJson instead so the
+ * two can never drift.
+ */
+const DORMANT_RECORD_H1 = 'Which chart fits your data?';
+
 const TSV = 'Condition\tMean reaction time (ms)\nControl\t512\nPlacebo\t498\nHigh dose\t428';
 
 /** ⌘V into the ladder's textarea — typing deliberately does not parse. */
@@ -63,10 +76,15 @@ describe('ChartChooserPage', () => {
     downloadSpies.downloadChartPng.mockResolvedValue(undefined);
   });
 
-  it('renders the h1 the prerender script injects for crawlers', () => {
+  it('keeps the h1 the prerender record carried, ready for reactivation', () => {
     renderPage();
-    const record = (routesJson.static as Record<string, { h1: string }>)['/chart-chooser']!;
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(record.h1);
+    // Deactivated: no static record exists, so the live h1 is pinned
+    // to the dormant record's text rather than read from routes.json.
+    const record = (routesJson.static as Record<string, { h1: string } | undefined>)[
+      '/chart-chooser'
+    ];
+    expect(record, 'restore this test to read routes.json once the record is back').toBeUndefined();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(DORMANT_RECORD_H1);
   });
 
   it('places the embedded chart ladder under a level-two section heading', () => {

@@ -10,27 +10,18 @@
       "destination": "https://www.postr.sh/:path*",
       "permanent": true
     },
-    { "source": "/plot-picker", "destination": "/chart-chooser", "permanent": true },
-    {
-      "source": "/manuscript-to-poster",
-      "destination": "/paper-to-poster",
-      "permanent": true
-    },
-    {
-      "source": "/paper-to-present",
-      "destination": "/paper-to-slides",
-      "permanent": true
-    },
-    {
-      "source": "/paper-to-presentation",
-      "destination": "/paper-to-slides",
-      "permanent": true
-    }
+    { "source": "/plot-picker", "destination": "/", "permanent": true },
+    { "source": "/manuscript-to-poster", "destination": "/", "permanent": true },
+    { "source": "/paper-to-present", "destination": "/", "permanent": true },
+    { "source": "/paper-to-presentation", "destination": "/", "permanent": true }
   ],
   "rewrites": [
     { "source": "/s/:slug", "destination": "/api/shell/share" },
     { "source": "/gallery", "destination": "/" },
     { "source": "/gallery/:entryId", "destination": "/" },
+    { "source": "/chart-chooser", "destination": "/" },
+    { "source": "/paper-to-poster", "destination": "/" },
+    { "source": "/paper-to-slides", "destination": "/" },
     { "source": "/dashboard", "destination": "/" },
     { "source": "/p/:posterId", "destination": "/" },
     { "source": "/profile", "destination": "/" },
@@ -50,6 +41,18 @@
     },
     {
       "source": "/gallery/(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
+      "source": "/chart-chooser",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
+      "source": "/paper-to-poster",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
+      "source": "/paper-to-slides",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     },
     {

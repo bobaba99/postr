@@ -30,7 +30,7 @@ Drop a PDF or PNG of an existing poster — yours, your PI's, last year's group 
 - **PDF path** uses `pdfjs-dist` to extract real text streams + image XObjects with their original coordinates. No OCR loss for text-native PDFs.
 - **Image path** routes through a vision LLM endpoint that returns a structured block layout, not just a stylesheet.
 - **Auto-arrange** re-flows the imported result onto Postr's grid in one click.
-- **Image readability OCR** scans every figure for tiny axis labels and tells you *before the print shop* which figures will be unreadable from 3 feet away.
+- **Figure readability check** (Figure tab): paste the R or Python plotting code behind a figure at its poster size and Postr tells you *before the print shop* whether its axis labels will be readable from 3 feet away, with a copy-ready fix. It reads code, not pixels — there is no OCR pass over imported images.
 
 No other poster tool does PDF → editable. Canva and Figma can place a PDF as a flat image; PowerPoint can't even do that without losing fidelity. This single feature collapses the "I already have a poster, I just want to refresh it" workflow from 90 minutes of re-typing to 30 seconds of upload.
 
@@ -78,7 +78,7 @@ Differentiation isn't only about features no one else has. A lot of Postr's leve
 | Add a delete-cascading institution | Renumber every author by hand | Edit institution; superscripts re-cascade |
 | Insert your university logo | Google → Wikipedia → save → insert | Insert → Logo → search institution → done |
 | Crop a figure inside a block | Open Photoshop / re-export | Inline crop overlay with keyboard commit |
-| Check if your axis labels print | Pay for the print, find out at the conference | Image readability OCR flags it before export |
+| Check if your axis labels print | Pay for the print, find out at the conference | Plot-code readability check flags it before export |
 | Verify conference compliance | Cross-tab between guidelines PDF and editor | Paste guidelines → automatic pass/fail panel |
 | Reset to "fit to viewport" | Manual zoom math | One key |
 | Undo a layout disaster | Ctrl-Z, hope | Undo toast + auto-arrange fallback |
@@ -102,11 +102,10 @@ Each row is a small thing. Stacked across the few days a researcher spends on a 
 | Auto-layout / column reflow | ❌ | ❌ | Manual | Macro | ✅ One click |
 | AI scan to extract style preset | ❌ | ❌ | ❌ | ❌ | ✅ |
 | PDF → editable block import | ❌ | Image-only | Image-only | ❌ | ✅ |
-| Image OCR readability check | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Plot-code readability check (R / Python) | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Inline image cropping | ❌ basic | Basic | Yes | ❌ | ✅ |
 | Conference guidelines pass/fail panel | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Inline comments for advisor review | ❌ | Limited | Yes | ❌ | ✅ |
-| Public academic poster gallery | ❌ | Marketing only | Designer files | ❌ | ✅ |
 | Real-time autosave | ❌ | ✅ | ✅ | ❌ | ✅ |
 | Print-safe export at 300 DPI | Brittle | Brittle | Brittle | ✅ | ✅ |
 | Zero-cost for students | ❌ | Free tier limited | Free tier limited | ✅ | ✅ |
@@ -120,7 +119,7 @@ Pick one per channel; don't try to communicate all of them at once.
 - **"Drop a PDF, get an editable poster."** Lead with the reverse-import demo. It's the most visceral 15-second video.
 - **"It's 2026. Stop typing superscripts by hand."** Lead with the author/institution cascade. Instantly recognizable to anyone who has ever made a poster.
 - **"Type `/alpha`. Get α."** Lead with slash commands. Works as a sub-30-second short.
-- **"Your axis labels are too small. Postr told us before you printed."** Lead with image readability OCR. Saves people money, which is more memorable than saving them time.
+- **"Your axis labels are too small. Postr told us before you printed."** Lead with the plot-code readability check. Saves people money, which is more memorable than saving them time.
 - **"No signup. No watermark. No 'Pro' tier between you and a working poster."** Lead with the free / anonymous-first principle. Aimed at the student-budget audience.
 
 ---
@@ -138,6 +137,8 @@ If you're designing a marketing poster, an event flyer, or a movie premiere anno
 
 ## Status
 
-Pre-launch. The editor, anonymous-first auth, autosave, references, authors, scan, reverse-import, readability OCR, and gallery are live in production at [postr.sh](https://www.postr.sh). Free, no waitlist, no credit card.
+Pre-launch. Live in production at [postr.sh](https://www.postr.sh): the editor, anonymous-first auth, autosave, references, authors, copy-a-design, PDF / image / PPTX import to editable blocks, the plot-code readability check, free watermarked PDF export, and paid PowerPoint / LaTeX export (term or export pack). Editing and PDF are free, no waitlist, no credit card.
+
+Built but **deactivated** (switched off, not deleted — see `apps/web/src/routes.tsx`): the public gallery, the paper-to-poster and paper-to-slides flows, the presentation checker. Do not lead with any of them.
 
 Feedback to [@postr_sh](https://twitter.com/) on X, or open an issue at the GitHub repo.

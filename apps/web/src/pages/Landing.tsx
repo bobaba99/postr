@@ -179,7 +179,7 @@ export default function Landing() {
         >
           <strong className="font-semibold text-[#c8cad0]">Best on a laptop.</strong>{' '}
           The editor needs a bigger screen to drag blocks and see your poster at
-          full size. The plot picker and figure checker work fine on a phone.
+          full size.
         </p>
       </section>
 
@@ -233,75 +233,18 @@ export default function Landing() {
       </section>
 
       {/*
-        Standalone tools. Both shipped with nothing linking to them, so
-        they were reachable only by typing the URL. Each runs without
-        an account and stands on its own — hence "no account needed"
-        rather than a signup CTA.
-
-        Claims here are deliberately narrow: paper-to-poster produces a
-        poster draft (PDF or .postr). It does not make slides.
+        The "Tools you can use on their own" section that sat here — an
+        h2, a count-free intro and a ToolCard grid (last: the Plot
+        picker card linking /chart-chooser) — was removed when the
+        standalone plot picker was deactivated (routes.tsx header). The
+        manuscript card had already gone the same way. An h2 over an
+        empty grid is not a section, so the whole thing left with the
+        last card; the ToolCard component went with it (git history,
+        commit before 2026-09-10). Restore section + card + component
+        together with the first standalone tool that comes back.
       */}
-      <section className="mx-auto w-full max-w-4xl px-8 pb-24">
-        <h2 className="text-center text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8]">
-          Tools you can use on their own
-        </h2>
-        <p className="mx-auto mt-3 max-w-[52ch] text-center text-sm leading-relaxed text-[#8b8f99]">
-          Two parts of the poster workflow that work without an account,
-          and without opening the editor.
-        </p>
-
-        <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <ToolCard
-            to="/paper-to-poster"
-            icon="📄"
-            title="Paper to poster"
-            body="Paste your manuscript or upload a .docx, answer a few short questions about what to emphasise, and download a poster draft as a PDF."
-            cta="Start from a paper"
-          />
-          <ToolCard
-            to="/chart-chooser"
-            icon="📊"
-            title="Plot picker"
-            body="Paste a table or answer three short questions, and get ranked chart suggestions drawn as journal-style panels. Download any panel as SVG or PNG."
-            cta="Find your figure"
-          />
-        </div>
-      </section>
 
       <PublicFooter />
     </main>
-  );
-}
-
-function ToolCard({
-  to,
-  icon,
-  title,
-  body,
-  cta,
-}: {
-  to: string;
-  icon: string;
-  title: string;
-  body: string;
-  cta: string;
-}) {
-  return (
-    <Link
-      to={to}
-      data-postr-reveal
-      className="group flex flex-col rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 no-underline transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#7c6aed]"
-    >
-      <div className="mb-3 text-2xl" aria-hidden="true">
-        {icon}
-      </div>
-      <h3 className="mb-2 text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8]">
-        {title}
-      </h3>
-      <p className="flex-1 text-sm leading-relaxed text-[#8b8f99]">{body}</p>
-      <span className="mt-4 text-sm font-semibold text-[#7c6aed]">
-        {cta} →
-      </span>
-    </Link>
   );
 }

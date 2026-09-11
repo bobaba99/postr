@@ -1,7 +1,15 @@
 /**
- * Sidebar — 5-tab control panel.
+ * Sidebar — the editor's tabbed control panel.
  *
- * Tabs: Layout · Authors · Refs · Style · Edit
+ * Rail order (display labels): layout · style · authors · insert ·
+ * edit block · references · figure · issues · comments · versions ·
+ * export. The read-only share viewer shows comments only.
+ *
+ * The `review` tab (poster/sidebar/ReviewTab.tsx — the Presentation
+ * Checker's in-editor surface) is deactivated: its rail tuple and its
+ * mount branch are commented out below; the import, the SidebarTab
+ * union member and the selection guard are kept so re-enabling is one
+ * tuple + one branch. See the routes.tsx header.
  *
  * Pulls everything from props rather than the store directly so the
  * sidebar stays a pure presentation component (easier to story-test
@@ -61,7 +69,11 @@ import type { PosterTableRef } from '@/charts/ladder/DataStep';
 import { ImportSection } from './sidebar/ImportSection';
 import { PostrExportButton } from './sidebar/PostrExportButton';
 import { EditableExportButtons } from './sidebar/EditableExportButtons';
-import { ReviewTab } from './sidebar/ReviewTab';
+// `./sidebar/ReviewTab` is NOT imported while the review tab is
+// deactivated (see the header): a live import would keep the whole
+// review/* client in the editor chunk. poster/__tests__/ReviewTab.test.tsx
+// keeps the dormant module type-checked; restore the import together with
+// the rail tuple and the mount branch below.
 import { VersionPanel } from './VersionPanel';
 import { CopyDesignModal } from '@/components/CopyDesignModal';
 import {
@@ -623,7 +635,7 @@ export function Sidebar(props: SidebarProps) {
                   ['refs', 'references'],
                   ['check', 'figure'],
                   ['issues', 'issues'],
-                  ['review', 'review'],
+                  // ['review', 'review'] — deactivated, see routes.tsx header
                   ['comments', 'comments'],
                   ['versions', 'versions'],
                   ['export', 'export'],
@@ -780,9 +792,11 @@ export function Sidebar(props: SidebarProps) {
           />
         )}
 
-        {tab === 'review' && (
-          <ReviewTab onJumpToBlock={props.onJumpToBlock} />
-        )}
+        {/* Review tab mount — deactivated, see routes.tsx header:
+            {tab === 'review' && (
+              <ReviewTab onJumpToBlock={props.onJumpToBlock} />
+            )}
+        */}
 
         {tab === 'comments' && (
           <CommentsPanel

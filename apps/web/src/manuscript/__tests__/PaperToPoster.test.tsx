@@ -3,12 +3,15 @@
  * pasted manuscript, reports the deterministic summary, and walks the
  * first scripted question. The condense call itself is exercised in
  * the API tests; here we stop before the outline step.
+ *
+ * The page is deactivated (unmounted from routes.tsx — see its header)
+ * but kept on disk; these tests render the component directly so the
+ * dormant code stays green for reactivation.
  */
 import { describe, it, expect } from 'vitest';
 import { MemoryRouter } from 'react-router';
 import { fireEvent, render, screen } from '@testing-library/react';
 import PaperToPoster from '../../pages/PaperToPoster';
-import routesJson from '../../seo/routes.json';
 
 const MANUSCRIPT = `Sleep Duration and Recall Accuracy in Undergraduate Students
 
@@ -40,16 +43,14 @@ function renderPage() {
 }
 
 describe('PaperToPoster page', () => {
-  it('renders the h1 the prerender script injects for crawlers', () => {
+  it('renders the page heading', () => {
     renderPage();
-    // Crawler copy parity: the prerendered document and the hydrated
-    // page must show the same heading, or the crawled page and the
-    // human page disagree.
-    const record = (routesJson.static as Record<string, { h1: string }>)[
-      '/paper-to-poster'
-    ]!;
+    // The routes.json static record was removed with the deactivation
+    // (nothing prerenders this page any more), so the heading is pinned
+    // literally. On reactivation, restore the record and read h1 from it
+    // again so crawler and hydrated copy cannot drift.
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      record.h1,
+      'From paper to poster',
     );
   });
 

@@ -34,6 +34,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletions: {
+        Row: {
+          cancelled_subscription_ids: string[]
+          deleted_at: string
+          id: string
+          storage_objects_removed: number
+          stripe_customer_id: string | null
+          user_id: string
+        }
+        Insert: {
+          cancelled_subscription_ids?: string[]
+          deleted_at?: string
+          id?: string
+          storage_objects_removed?: number
+          stripe_customer_id?: string | null
+          user_id: string
+        }
+        Update: {
+          cancelled_subscription_ids?: string[]
+          deleted_at?: string
+          id?: string
+          storage_objects_removed?: number
+          stripe_customer_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_emails: {
         Row: {
           added_at: string
@@ -714,7 +741,6 @@ export type Database = {
     Functions: {
       consume_export_credit: { Args: { p_user_id: string }; Returns: number }
       consume_review_credit: { Args: { p_user_id: string }; Returns: number }
-      delete_own_account: { Args: never; Returns: undefined }
       export_my_data: { Args: never; Returns: Json }
       grant_export_credits: {
         Args: { p_amount: number; p_user_id: string }

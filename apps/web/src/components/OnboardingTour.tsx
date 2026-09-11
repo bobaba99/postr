@@ -65,7 +65,10 @@ const STEPS: TourStep[] = [
   },
   {
     selector: '[data-postr-sidebar]',
-    tabName: 'plot code check',
+    // Matches the rail's visible label for the `check` tab ("figure",
+    // Sidebar.tsx). It read "plot code check" after that label was
+    // renamed, so the tour silently skipped opening the tab.
+    tabName: 'figure',
     title: 'Plot code readability check',
     body: 'Paste your R or Python plotting code to verify figure text will be legible at print size. Drag the gray rectangle on the canvas, or select an image block to lock to its exact dimensions.',
     position: 'right',

@@ -10,6 +10,11 @@
  *   - Review add-on:  a recurring add-on subscription granting a weekly
  *     presentation-review quota (the 7-day window is enforced in
  *     review.ts, not here).
+ * The two review SKUs are DORMANT while the Presentation Checker is
+ * deactivated: create-checkout refuses them unless FEATURE_REVIEW is on
+ * (features.ts), regardless of the STRIPE_PRICE_REVIEW_* env. Their
+ * webhook fulfilment branches below are NOT gated, so anything sold
+ * before the switch keeps reconciling.
  * Review-SKU refunds are handled MANUALLY via the Stripe dashboard
  * (deferred — Presentation Checker plan D8); the self-serve
  * /billing/refund route covers term and export pack only.
@@ -32,33 +37,52 @@
  */
 import express, { type Router, type Request, type Response } from 'express';
 import Stripe from 'stripe';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireAuth, type AuthLocals } from './auth.js';
+import { getStripe as defaultGetStripe } from './stripeClient.js';
+import { getSupabaseAdmin as defaultGetSupabaseAdmin } from './supabaseAdmin.js';
 import { createRateLimiter } from './rateLimit.js';
+import { isSkuSellable, readFeatureFlags, type FeatureFlags } from './features.js';
+import {
+  PACK_EXPORT_CREDITS,
+  PACK_PRICE_CENTS,
+  finiteCents,
+  type RefundKind,
+} from './billing/constants.js';
+import {
+  TERM_ACTIVE_STATUSES,
+  canRevokeTerm,
+  hasActiveTerm,
+  termAdvanceDecision,
+  type TermRow,
+} from './billing/subscriptionGuard.js';
+import { readTermRow } from './billing/termRow.js';
+import { cancelSubscriptionImmediately } from './billing/termCancel.js';
+import {
+  LATEST_INVOICE_PAYMENT_INTENT_EXPAND,
+  findPaymentIntentIdForInvoice,
+  subscriptionIdFromInvoice,
+} from './billing/invoicePayments.js';
+import { recordRefundAndRevoke } from './billing/refundLedger.js';
+import {
+  handleChargeRefunded,
+  reconcileExternalRefund,
+} from './billing/refundReconcile.js';
 
-/**
- * Managed Payments requires this preview API version (or later). Set
- * explicitly per the blueprint — NOT left to the SDK default, which
- * would target the account's pinned stable version and reject the
- * `managed_payments` param.
- */
-const STRIPE_API_VERSION = '2026-02-25.preview';
+export type { RefundKind } from './billing/constants.js';
+
+// The Stripe client (and its Managed Payments API-version pin) lives in
+// stripeClient.ts, shared with account.ts; the service_role Supabase
+// client in supabaseAdmin.ts.
 
 /** The SKUs the client can ask to buy. */
 export type BillingSku = 'term' | 'pack' | 'review_pack' | 'review_addon';
 
-/** How many export credits a pack purchase grants. */
-const PACK_EXPORT_CREDITS = 3;
 /** How many review credits a review-pack purchase grants. Placeholder —
  * repriced from Phase-0 token-cost numbers in Task 28. */
 const REVIEW_PACK_CREDITS = 3;
-/** The pack price in cents (CA$9.99) — the basis for the per-credit refund. */
-const PACK_PRICE_CENTS = 999;
 /** Buyer's-remorse refund window for the term (days). 14 = EU/UK legal floor. */
 const TERM_REFUND_WINDOW_DAYS = 14;
-
-/** What a user can ask to refund. */
-export type RefundKind = 'term' | 'pack';
 // The term's 4-month cadence now lives in the Stripe recurring price
 // (interval_count=4 months), not here — Stripe drives the billing period
 // and the webhook derives plan_expires_at from the subscription.
@@ -66,6 +90,8 @@ export type RefundKind = 'term' | 'pack';
 interface BillingDeps {
   getStripe?: () => Stripe | null;
   getSupabaseAdmin?: () => SupabaseClient | null;
+  /** Feature switches (features.ts); read from the env when omitted. */
+  features?: FeatureFlags;
 }
 
 /**
@@ -155,10 +181,24 @@ export function createBillingWebhookRouter(deps: BillingDeps = {}): Router {
           // directly by Link). Reconcile it into our DB so a Link-side
           // refund also revokes entitlement. Idempotent on stripe_refund_id,
           // so a refund our button already recorded is a no-op here.
+          // (billing/refundReconcile.ts — Basil-shaped payloads.)
           await handleChargeRefunded(
             supabase,
             stripe,
             event.data.object as Stripe.Charge,
+          );
+        } else if (
+          event.type === 'refund.created' ||
+          event.type === 'refund.updated'
+        ) {
+          // The modern refund events carry the Refund itself (charge.
+          // refunded no longer embeds the refunds list). Same reconciler,
+          // same ledger idempotency — whichever event arrives first wins,
+          // the rest are no-ops.
+          await reconcileExternalRefund(
+            supabase,
+            stripe,
+            event.data.object as Stripe.Refund,
           );
         }
         // Every other event type (including async_payment_failed) is
@@ -186,6 +226,7 @@ export function createBillingWebhookRouter(deps: BillingDeps = {}): Router {
 export function createBillingRouter(deps: BillingDeps = {}): Router {
   const getStripe = deps.getStripe ?? defaultGetStripe;
   const getSupabaseAdmin = deps.getSupabaseAdmin ?? defaultGetSupabaseAdmin;
+  const features = deps.features ?? readFeatureFlags();
   const router = express.Router();
 
   // Per-user rate limits on the authed billing routes, matching the
@@ -209,18 +250,46 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
       }
 
       const sku = req.body?.sku as BillingSku | undefined;
-      const priceId = priceIdForSku(sku);
+      // A hidden SKU (the review pair while FEATURE_REVIEW is off) is
+      // refused exactly like an unknown one — before the price lookup,
+      // so a configured STRIPE_PRICE_REVIEW_* id cannot sell it.
+      const priceId =
+        sku && isSkuSellable(sku, features) ? priceIdForSku(sku) : null;
       if (!sku || !priceId) {
         return res.status(400).json({
           error: 'invalid_sku',
           message:
-            'sku must be "term", "pack", "review_pack" or "review_addon", and its price id env var must be set.',
+            'sku must be one of the plans currently on sale ("term" or "pack"), and its price id env var must be set.',
         });
       }
 
       const user = (res.locals as AuthLocals).user;
       const successUrl = billingUrl('success');
       const cancelUrl = billingUrl('cancel');
+
+      // The caller's billing row: the duplicate-term guard and the Stripe
+      // customer to reuse. Read errors fail CLOSED (a second term must
+      // never be sold on a guess), with the generic checkout_failed code.
+      const { data: billingRow, error: rowErr } = await supabase
+        .from('users')
+        .select('plan, plan_expires_at, subscription_status, stripe_customer_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (rowErr) {
+        // eslint-disable-next-line no-console
+        console.error('[billing] create-checkout plan read failed:', rowErr.message);
+        return res.status(500).json({ error: 'checkout_failed' });
+      }
+      const row = billingRow as (TermRow & { stripe_customer_id?: string | null }) | null;
+
+      // One live term per user: a term holder (plan columns live OR a
+      // non-terminal subscription status) cannot start a second term
+      // checkout — it would create a second subscription Stripe bills in
+      // parallel and the webhook could only track one.
+      if (sku === 'term' && hasActiveTerm(row)) {
+        return res.status(409).json({ error: 'already_subscribed' });
+      }
+      const existingCustomerId = row?.stripe_customer_id ?? null;
 
       try {
         // Shared params. The SKUs differ ONLY in mode:
@@ -243,7 +312,13 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
           // carry it, which is why the subscription SKUs also stamp the
           // user id into subscription_data.metadata below.
           client_reference_id: user.id,
-          customer_email: user.email ?? undefined,
+          // Reuse the Stripe customer we already hold for this user so a
+          // repeat purchase lands on ONE customer (portal, receipts and
+          // the customer-id reconciliation all key on it). Only when none
+          // is stored does Checkout create one from the email.
+          ...(existingCustomerId
+            ? { customer: existingCustomerId }
+            : { customer_email: user.email ?? undefined }),
           // Carried onto the completed event so the webhook knows the SKU.
           metadata: { user_id: user.id, sku },
           success_url: successUrl,
@@ -363,7 +438,14 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
         if (!result.ok) {
           return res.status(409).json({ error: result.reason });
         }
-        return res.json({ ok: true, amount_cents: result.amountCents });
+        // subscription_cancelled: a term refund also ends the subscription
+        // immediately (P0-1); the client says so. Additive — existing
+        // clients read only ok / amount_cents.
+        return res.json({
+          ok: true,
+          amount_cents: result.amountCents,
+          subscription_cancelled: result.subscriptionCancelled ?? false,
+        });
       } catch (err) {
         const message = err instanceof Error ? err.message : 'refund_failed';
         // eslint-disable-next-line no-console
@@ -670,6 +752,14 @@ export async function fulfillCheckout(
  * (Losing access on cancel/past_due is a separate, explicit path added with
  * the lifecycle handlers — not this function.)
  *
+ * Subscription-id scoped (billing/subscriptionGuard.ts): a late "active"
+ * for a subscription whose stored status is terminal (refunded/cancelled)
+ * is refused — it must never re-grant; an "active" for a DIFFERENT
+ * subscription while the stored one is live is a duplicate term — refused
+ * and logged for the operator (the checkout 409 guard should make this
+ * unreachable). A missing users row is acknowledged when the account was
+ * deleted through POST /account/delete, and throws otherwise (P0-3).
+ *
  * service_role write; the billing-column guard permits it.
  */
 async function advanceTermAccess(
@@ -682,14 +772,32 @@ async function advanceTermAccess(
     customerId: string | null;
   },
 ): Promise<void> {
-  // Read the current expiry so we only move it forward.
-  const { data: current } = await supabase
-    .from('users')
-    .select('plan_expires_at' as never)
-    .eq('id', userId)
-    .maybeSingle();
-  const currentIso = (current as { plan_expires_at?: string | null } | null)
-    ?.plan_expires_at;
+  // Read the current row: the forward-only expiry AND the stored
+  // subscription id/status the guard decides on.
+  const current = await readTermRow(supabase, userId, 'advanceTermAccess');
+  if (!current) return; // account deleted via POST /account/delete — acknowledged, nothing to grant
+  const decision = termAdvanceDecision(current, opts.subscriptionId);
+  if (decision === 'skip_terminal') {
+    // Cancelled / refunded sub — never re-grant. Logged so a genuine
+    // recovery that lands here (it should not: `unpaid` is recoverable
+    // and is not a terminal status) is operator-visible, not silent.
+    // eslint-disable-next-line no-console
+    console.error(
+      `[billing] refusing to re-activate subscription ${opts.subscriptionId} for user ${userId}: its stored status is ${current.subscription_status} (terminal — a late event, or a refunded sub Stripe still reports ${opts.subscriptionStatus})`,
+      { userId, eventSubscriptionId: opts.subscriptionId, eventStatus: opts.subscriptionStatus, stored: current },
+    );
+    return;
+  }
+  if (decision === 'skip_other_live') {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[billing] refusing to record subscription ${opts.subscriptionId} for user ${userId}: stored subscription ${current.stripe_subscription_id} is still ${current.subscription_status} (duplicate term — reconcile manually)`,
+      { userId, eventSubscriptionId: opts.subscriptionId, stored: current },
+    );
+    return;
+  }
+
+  const currentIso = current.plan_expires_at;
   const nextIso =
     currentIso && new Date(currentIso).getTime() >= new Date(opts.expiresAtIso).getTime()
       ? currentIso // stored expiry is already the same or later — keep it
@@ -708,20 +816,9 @@ async function advanceTermAccess(
   if (error) throw new Error(`term access update: ${error.message}`);
 }
 
-/**
- * Subscription statuses under which the user KEEPS term access. Note
- * `past_due` is intentionally included: when a renewal card fails, Stripe
- * runs dunning retries for days — revoking access the instant the status
- * flips to past_due would slam the paywall shut on a paying user mid-work,
- * then flip back when a retry succeeds. Access is lost only on a TERMINAL
- * status (canceled / unpaid / incomplete_expired) or when the period
- * actually lapses (plan_expires_at in the past, enforced by usePlan).
- */
-const TERM_ACTIVE_STATUSES = new Set([
-  'active',
-  'trialing',
-  'past_due',
-]);
+// TERM_ACTIVE_STATUSES (active / trialing / past_due — past_due keeps
+// access through Stripe's dunning window) now lives in
+// billing/subscriptionGuard.ts alongside the terminal set and the guards.
 
 /**
  * A term renewal — `invoice.paid` fires on the first invoice AND every
@@ -734,11 +831,10 @@ export async function handleInvoicePaid(
   stripe: Stripe,
   invoice: Stripe.Invoice,
 ): Promise<void> {
-  // `invoice.subscription` is a string id when the invoice belongs to a
-  // subscription. The SDK's Invoice type varies by API version, so read it
-  // defensively via unknown rather than a direct field access.
-  const rawSub = (invoice as unknown as { subscription?: unknown }).subscription;
-  const subscriptionId = typeof rawSub === 'string' ? rawSub : undefined;
+  // Basil moved the invoice's subscription to
+  // `parent.subscription_details.subscription`; the reader falls back to
+  // the legacy top-level `subscription` (billing/invoicePayments.ts).
+  const subscriptionId = subscriptionIdFromInvoice(invoice);
   // A one-time pack produces no subscription invoice we act on — guard.
   if (!subscriptionId) return;
 
@@ -777,9 +873,12 @@ export async function handleInvoicePaid(
  *     stays the period end (advanced forward-only). cancel-at-period-end
  *     is status 'active' with a flag, so the user keeps access UNTIL the
  *     period lapses — correct.
- *   - any terminal status (canceled / unpaid / incomplete_expired) → set
+ *   - any other status (canceled / unpaid / incomplete_expired / …) → set
  *     plan='free' AND plan_expires_at=now() so the two signals never
  *     contradict (no code path can grant a canceled user access).
+ *     `unpaid` revokes but is NOT irreversible: when the customer pays
+ *     the open invoice Stripe reports the SAME subscription `active`
+ *     again and advanceTermAccess re-grants it (subscriptionGuard.ts).
  */
 export async function handleSubscriptionChange(
   supabase: SupabaseClient,
@@ -844,6 +943,8 @@ export async function handleSubscriptionChange(
 
   if (TERM_ACTIVE_STATUSES.has(sub.status)) {
     // Still entitled — advance access to the (item-level) period end.
+    // advanceTermAccess applies the subscription-id guard (and throws on
+    // a missing users row).
     const periodEndSec = subscriptionPeriodEnd(sub);
     await advanceTermAccess(supabase, userId, {
       expiresAtIso: new Date(periodEndSec * 1000).toISOString(),
@@ -854,7 +955,16 @@ export async function handleSubscriptionChange(
     return;
   }
 
-  // Terminal — revoke access, keeping plan and expiry consistent.
+  // Not live (canceled / unpaid / incomplete_expired / paused…) — revoke
+  // access, keeping plan and expiry consistent, but ONLY if this
+  // subscription is the one currently granting the term (mirrors the
+  // add-on guard above): a stale terminal event for an OLD subscription
+  // must not revoke a NEWER term. The row read acknowledges an account
+  // deleted through POST /account/delete (null → nothing to revoke) and
+  // turns a genuine orphan (no row, no deletion record) into an
+  // operator-visible error (P0-3).
+  const stored = await readTermRow(supabase, userId, 'handleSubscriptionChange');
+  if (!stored || !canRevokeTerm(stored, sub.id)) return;
   const { error } = await supabase
     .from('users')
     .update({
@@ -862,7 +972,7 @@ export async function handleSubscriptionChange(
       plan_expires_at: new Date().toISOString(),
       subscription_status: sub.status,
     })
-    .eq('id', userId);
+    .match({ id: userId, stripe_subscription_id: sub.id });
   if (error) throw new Error(`subscription revoke update: ${error.message}`);
 }
 
@@ -893,6 +1003,17 @@ async function findUserIdForSubscriptionEvent(
       .select('id')
       .eq('stripe_customer_id', ids.customerId)
       .maybeSingle();
+    // maybeSingle errors when MORE than one row carries this customer id
+    // (PGRST116). That is a data fault — two accounts naming one Stripe
+    // customer — and must not fall through to the metadata uuid and
+    // fulfil whichever account the payload names: refuse (→ 500, in the
+    // delivery log) until the rows are reconciled. The partial unique
+    // index on users.stripe_customer_id (20260911000100) prevents it.
+    if (byCust.error) {
+      throw new Error(
+        `ambiguous customer ${ids.customerId} for subscription ${ids.subscriptionId}: ${byCust.error.message}`,
+      );
+    }
     if (byCust.data?.id) return byCust.data.id as string;
   }
 
@@ -903,94 +1024,12 @@ async function findUserIdForSubscriptionEvent(
   );
 }
 
-/**
- * Reconcile a charge.refunded event (a Link- or button-initiated refund)
- * into our DB. Idempotent via the billing_refunds ledger: if our button
- * already recorded this refund, this is a no-op. If Link initiated it, this
- * is where the entitlement gets revoked.
- *
- * We can't always know term-vs-pack or credit counts from a Link-side
- * refund, so we reconcile conservatively: full-amount refunds of a term
- * revoke the term; refunds referencing a pack session revoke that pack's
- * unused credits (best-effort). The ledger row is always written so the
- * refund is never processed twice.
- */
-async function handleChargeRefunded(
-  supabase: SupabaseClient,
-  stripe: Stripe,
-  charge: Stripe.Charge,
-): Promise<void> {
-  // The refund id: Stripe returns charge.refunds most-recent-FIRST, so the
-  // newest refund is data[0]. (charge.refunds can be truncated on the
-  // webhook payload; if it's empty we can't act — the button path or a
-  // later event will reconcile.)
-  const refunds = charge.refunds?.data ?? [];
-  const latest = refunds[0];
-  const refundId = latest?.id;
-  if (!refundId) return; // nothing actionable
-
-  // Already recorded (our button did it)? Then nothing to do.
-  const { data: existing } = await supabase
-    .from('billing_refunds')
-    .select('stripe_refund_id')
-    .eq('stripe_refund_id', refundId)
-    .maybeSingle();
-  if (existing) return;
-
-  // Reconcile to a user by the Stripe customer.
-  const customerId =
-    typeof charge.customer === 'string' ? charge.customer : charge.customer?.id ?? null;
-  if (!customerId) return;
-  const { data: userRow } = await supabase
-    .from('users')
-    .select('id, plan, stripe_subscription_id')
-    .eq('stripe_customer_id', customerId)
-    .maybeSingle();
-  const user = userRow as
-    | { id?: string; plan?: string | null; stripe_subscription_id?: string | null }
-    | null;
-  if (!user?.id) return;
-
-  // A subscription charge → term refund → revoke the term. Otherwise treat
-  // it as a pack refund: revoke credits proportional to the refunded amount.
-  // Use THIS refund's amount (not charge.amount_refunded, which is the
-  // CUMULATIVE total across all refunds on the charge — that would
-  // over-count credits when a pack was refunded more than once).
-  const thisRefundAmount = typeof latest.amount === 'number' ? latest.amount : 0;
-
-  const isSubscriptionCharge = !!(charge as Stripe.Charge & { invoice?: unknown }).invoice;
-  if (isSubscriptionCharge) {
-    await recordRefundAndRevoke(supabase, stripe, {
-      userId: user.id,
-      kind: 'term',
-      refundId,
-      amountCents: thisRefundAmount,
-      creditsRevoked: 0,
-      sessionId: null,
-    });
-    return;
-  }
-
-  // Pack refund via Link: revoke credits proportional to THIS refund's
-  // amount (per-credit rate), capped at one pack and floored at the user's
-  // remaining balance (by the RPC).
-  const perCredit = PACK_PRICE_CENTS / PACK_EXPORT_CREDITS;
-  const creditsToRevoke = Math.min(
-    PACK_EXPORT_CREDITS,
-    Math.round(thisRefundAmount / perCredit),
-  );
-  await recordRefundAndRevoke(supabase, stripe, {
-    userId: user.id,
-    kind: 'pack',
-    refundId,
-    amountCents: thisRefundAmount,
-    creditsRevoked: creditsToRevoke,
-    sessionId: null,
-  });
-}
+// handleChargeRefunded now lives in billing/refundReconcile.ts (Basil-
+// shaped payloads: refunds listed by charge, term/pack classified via the
+// InvoicePayment resource, unattributable refunds revoke nothing).
 
 type RefundResult =
-  | { ok: true; amountCents: number }
+  | { ok: true; amountCents: number; subscriptionCancelled?: boolean }
   | { ok: false; reason: string };
 
 /**
@@ -1071,23 +1110,23 @@ async function refundTerm(
   if (!subscriptionId) return { ok: false, reason: 'no_subscription' };
 
   // The most recent invoice's charge is what we refund. Retrieve the sub's
-  // latest invoice → payment intent → charge, and the charge's created time
-  // (the "last charge" the 14-day window is measured from).
+  // latest invoice with its payments list expanded (Basil: the PI id is
+  // at `latest_invoice.payments.data[].payment.payment_intent` — the old
+  // `latest_invoice.payment_intent` no longer exists), and the invoice's
+  // created time (the "last charge" the 14-day window is measured from).
   const sub = await stripe.subscriptions.retrieve(subscriptionId, {
-    expand: ['latest_invoice.payment_intent'],
+    expand: [LATEST_INVOICE_PAYMENT_INTENT_EXPAND],
   });
   const invoice = sub.latest_invoice;
   if (!invoice || typeof invoice === 'string') {
     return { ok: false, reason: 'no_invoice' };
   }
-  const pi = (invoice as Stripe.Invoice & { payment_intent?: Stripe.PaymentIntent | string })
-    .payment_intent;
-  const paymentIntentId = typeof pi === 'string' ? pi : pi?.id;
+  const paymentIntentId = await findPaymentIntentIdForInvoice(stripe, invoice);
   if (!paymentIntentId) return { ok: false, reason: 'no_payment' };
 
   // Eligibility: within the 14-day window AND no paid export since the
   // charge (pure, unit-tested logic).
-  const chargedAtMs = (invoice as Stripe.Invoice).created * 1000;
+  const chargedAtMs = invoice.created * 1000;
   const firstExportMs = row?.first_paid_export_at
     ? new Date(row.first_paid_export_at).getTime()
     : null;
@@ -1099,20 +1138,30 @@ async function refundTerm(
   // second real refund. Stripe does NOT dedup refunds by payment_intent, so
   // this key is what makes the money movement idempotent; the ledger's
   // UNIQUE(stripe_refund_id) then dedups the revoke.
-  const amountCents = (invoice as Stripe.Invoice).amount_paid ?? 0;
   const refund = await stripe.refunds.create(
     { payment_intent: paymentIntentId },
     { idempotencyKey: `term-refund:${paymentIntentId}` },
   );
-  await recordRefundAndRevoke(supabase, stripe, {
+  // Never a NaN/null amount in the ledger: the refund's amount, else what
+  // the invoice collected, else 0.
+  const amountCents = finiteCents(refund.amount, invoice.amount_paid);
+
+  // The money is back → the subscription ends NOW (immediate cancel,
+  // prorate:false). Done BEFORE the ledger write: if the cancel fails we
+  // throw (→ 500 refund_failed) without recording the refund, so the
+  // retry (same idempotency key → same refund) re-attempts the cancel
+  // instead of leaving a refunded-but-still-billing subscription.
+  const subscriptionCancelled = await cancelSubscriptionImmediately(stripe, subscriptionId);
+
+  await recordRefundAndRevoke(supabase, {
     userId,
     kind: 'term',
     refundId: refund.id,
-    amountCents: typeof refund.amount === 'number' ? refund.amount : amountCents,
+    amountCents,
     creditsRevoked: 0,
     sessionId: null,
   });
-  return { ok: true, amountCents: typeof refund.amount === 'number' ? refund.amount : amountCents };
+  return { ok: true, amountCents, subscriptionCancelled };
 }
 
 async function refundPack(
@@ -1182,66 +1231,21 @@ async function refundPack(
     },
     { idempotencyKey: `pack-refund:${session.session_id}` },
   );
-  await recordRefundAndRevoke(supabase, stripe, {
+  const refundedCents = finiteCents(refund.amount, amountCents);
+  await recordRefundAndRevoke(supabase, {
     userId,
     kind: 'pack',
     refundId: refund.id,
-    amountCents: typeof refund.amount === 'number' ? refund.amount : amountCents,
+    amountCents: refundedCents,
     creditsRevoked: unused,
     sessionId: session.session_id,
   });
-  return { ok: true, amountCents: typeof refund.amount === 'number' ? refund.amount : amountCents };
+  return { ok: true, amountCents: refundedCents };
 }
 
-/**
- * Record a refund in the ledger and apply its side effects (revoke term
- * access / remove credits) EXACTLY ONCE. Idempotent on stripe_refund_id:
- * if the ledger already has this refund (e.g. the charge.refunded webhook
- * beat the button, or vice versa), this is a no-op — no double-revoke.
- */
-async function recordRefundAndRevoke(
-  supabase: SupabaseClient,
-  _stripe: Stripe,
-  r: {
-    userId: string;
-    kind: RefundKind;
-    refundId: string;
-    amountCents: number;
-    creditsRevoked: number;
-    sessionId: string | null;
-  },
-): Promise<void> {
-  // Insert the ledger row first — the UNIQUE(stripe_refund_id) makes this
-  // the idempotency gate. If it's a duplicate, stop (already applied).
-  const { error: insErr } = await supabase.from('billing_refunds').insert({
-    user_id: r.userId,
-    kind: r.kind,
-    stripe_refund_id: r.refundId,
-    amount_cents: r.amountCents,
-    credits_revoked: r.creditsRevoked,
-    session_id: r.sessionId,
-  });
-  if (insErr) {
-    if (/duplicate key|unique/i.test(insErr.message)) return; // already applied
-    throw new Error(`refund ledger insert: ${insErr.message}`);
-  }
-
-  if (r.kind === 'term') {
-    // Revoke term access immediately (a refunded term is over).
-    const { error } = await supabase
-      .from('users')
-      .update({ plan: 'free', plan_expires_at: new Date().toISOString() })
-      .eq('id', r.userId);
-    if (error) throw new Error(`term refund revoke: ${error.message}`);
-  } else if (r.creditsRevoked > 0) {
-    // Remove the refunded credits atomically.
-    const { error } = await supabase.rpc(
-      'revoke_export_credits' as never,
-      { p_user_id: r.userId, p_amount: r.creditsRevoked } as never,
-    );
-    if (error) throw new Error(`pack refund revoke: ${error.message}`);
-  }
-}
+// recordRefundAndRevoke now lives in billing/refundLedger.ts (the ledger's
+// UNIQUE(stripe_refund_id) is the idempotency gate; the term revoke also
+// writes subscription_status='canceled').
 
 /**
  * Idempotency ledger for pack purchases — a session id that has already
@@ -1292,19 +1296,3 @@ function billingUrl(outcome: 'success' | 'cancel'): string {
   return `${base}/billing/${outcome}`;
 }
 
-/** Default Stripe client, pinned to the Managed Payments preview version. */
-function defaultGetStripe(): Stripe | null {
-  const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return null;
-  return new Stripe(key, { apiVersion: STRIPE_API_VERSION as Stripe.LatestApiVersion });
-}
-
-/** Default Supabase admin (service_role) client — the only billing writer. */
-function defaultGetSupabaseAdmin(): SupabaseClient | null {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
-  if (!url || !key) return null;
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}

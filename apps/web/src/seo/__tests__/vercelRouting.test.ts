@@ -36,19 +36,35 @@ interface Redirect {
   has?: Array<{ type: string; value: string }>;
 }
 
+interface HeaderRule {
+  source: string;
+  headers: Array<{ key: string; value: string }>;
+}
+
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const vercelConfig = JSON.parse(
   readFileSync(resolve(WEB_ROOT, 'vercel.json'), 'utf8'),
-) as { rewrites?: Rewrite[]; redirects?: Redirect[]; cleanUrls?: boolean };
+) as {
+  rewrites?: Rewrite[];
+  redirects?: Redirect[];
+  headers?: HeaderRule[];
+  cleanUrls?: boolean;
+};
 
 const rewrites = vercelConfig.rewrites ?? [];
 const redirects = vercelConfig.redirects ?? [];
+const headerRules = vercelConfig.headers ?? [];
 
 /**
  * Every path the client router serves in production. Mirrors the
  * <Route path=...> entries in src/routes.tsx — update both together.
  * /debug is absent on purpose: production builds drop that route
  * (import.meta.env.DEV), so it should be a real 404, not a soft one.
+ *
+ * The deactivated routes (/gallery, /paper-to-poster, /paper-to-slides,
+ * /presentation-checker, /chart-chooser) stay listed: they render a
+ * <Navigate to="/"> in the app, so a cold hit must still reach the
+ * shell via a rewrite rather than 404.
  */
 const CLIENT_ROUTES = [
   '/',
@@ -61,6 +77,8 @@ const CLIENT_ROUTES = [
   '/cookies/fr',
   '/terms',
   '/terms/fr',
+  '/chart-chooser',
+  '/paper-to-poster',
   '/paper-to-slides',
   '/auth',
   '/s/:slug',
@@ -74,15 +92,33 @@ const CLIENT_ROUTES = [
 /**
  * Slug aliases: [alias, canonical]. Each standalone tool has exactly
  * one indexed URL; every other spelling must 308 to it rather than
- * render a duplicate. /manuscript-to-poster especially — that URL is
- * live in production and in the sitemap, so losing its redirect turns
- * an indexed page into a 404.
+ * render a duplicate.
+ *
+ * Every alias now points at "/": all the canonical tool routes are
+ * deactivated (routes.tsx header), and a 308 to a route that itself
+ * only redirects would be a pointless hop. /manuscript-to-poster
+ * especially — that URL was live in production and in the sitemap, so
+ * losing its redirect turns a once-indexed page into a 404. The same
+ * goes for /plot-picker → /chart-chooser: that 308 was deployed, so it
+ * is retargeted rather than dropped.
  */
 const ALIAS_REDIRECTS: Array<[string, string]> = [
-  ['/plot-picker', '/chart-chooser'],
-  ['/manuscript-to-poster', '/paper-to-poster'],
-  ['/paper-to-present', '/paper-to-slides'],
-  ['/paper-to-presentation', '/paper-to-slides'],
+  ['/plot-picker', '/'],
+  ['/manuscript-to-poster', '/'],
+  ['/paper-to-present', '/'],
+  ['/paper-to-presentation', '/'],
+];
+
+/**
+ * Routes whose feature is deactivated: served (so the in-app redirect
+ * runs) but never indexed. The gallery precedent set this shape.
+ */
+const DEACTIVATED_ROUTES = [
+  '/gallery',
+  '/paper-to-poster',
+  '/paper-to-slides',
+  '/presentation-checker',
+  '/chart-chooser',
 ];
 
 /** Paths that must fall through to the platform 404. */
@@ -276,6 +312,28 @@ describe('vercel.json redirects', () => {
         `${route} is prerendered but a redirect matches it — the page would never be served`,
       ).toEqual([]);
     }
+  });
+});
+
+describe('vercel.json headers for deactivated routes', () => {
+  function headersFor(path: string): Array<{ key: string; value: string }> {
+    return headerRules
+      .filter((rule) => new RegExp(`^${rule.source}$`).test(path))
+      .flatMap((rule) => rule.headers);
+  }
+
+  it.each(DEACTIVATED_ROUTES)('%s is served by a rewrite, never prerendered', (route) => {
+    expect(PRERENDERED.has(route)).toBe(false);
+    expect(rewriteMatching(route)?.destination).toBe('/');
+  });
+
+  it.each(DEACTIVATED_ROUTES)('%s carries X-Robots-Tag noindex', (route) => {
+    const robots = headersFor(route).find(
+      (header) => header.key.toLowerCase() === 'x-robots-tag',
+    );
+    expect(robots?.value, `${route} must not be indexed while it only redirects`).toMatch(
+      /noindex/i,
+    );
   });
 });
 

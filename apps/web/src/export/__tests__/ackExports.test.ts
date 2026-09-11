@@ -10,11 +10,37 @@ import { unzipSync } from 'fflate';
 import type { PosterDoc } from '@postr/shared';
 import { ACKNOWLEDGEMENT_TEXT } from '../attribution';
 import { ACK_BLOCK_ID, ensureAckBlock, hasAckBlock, makeAckBlock } from '../ackBlock';
+import { stripAckBlock } from '../stripAckBlock';
 import { exportPosterLatex } from '../latex/exportLatex';
+import { buildLatexDocument } from '../latex/writer';
 import { exportPosterPptx } from '../pptx/writer';
-import { makeFixtureDoc, baseBlock, TINY_PNG_BYTES } from './fixtures';
+import { makeFixtureDoc, baseBlock, TINY_PNG_BYTES, TINY_PNG_DATA_URL } from './fixtures';
 
 const decode = (b: Uint8Array | undefined) => new TextDecoder().decode(b ?? new Uint8Array());
+
+/**
+ * The fixture's ack mark is an SVG data URI, and pptxgenjs cannot embed
+ * SVG — the writer rasterizes it first. In jsdom there is no canvas, so
+ * a real rasterizer is injected: it makes the mark a genuine picture
+ * shape + media part, which is exactly what the paid seam must remove.
+ */
+const rasterizeSvg = async () => TINY_PNG_BYTES;
+
+/** Media parts (`ppt/media/*`) in a .pptx — one per embedded picture. */
+const mediaPartsOf = (bytes: Uint8Array): string[] =>
+  Object.keys(unzipSync(bytes)).filter((n) => /^ppt\/media\/.+/.test(n));
+
+/** Picture shapes on slide 1. */
+const pictureShapesOf = (bytes: Uint8Array): number =>
+  (decode(unzipSync(bytes)['ppt/slides/slide1.xml']).match(/<p:pic>/g) ?? []).length;
+
+/** `figures/logo-N.*` entries in a LaTeX bundle. */
+const logoAssetsOf = (bytes: Uint8Array): string[] =>
+  Object.keys(unzipSync(bytes)).filter((n) => /^figures\/logo-\d+\./.test(n));
+
+/** `\includegraphics{...}` paths in poster.tex. */
+const includedGraphicsOf = (tex: string): string[] =>
+  [...tex.matchAll(/\\includegraphics\[[^\]]*\]\{([^}]+)\}/g)].map((m) => m[1]!);
 
 /**
  * The single `textblock` environment holding the references list.
@@ -76,6 +102,93 @@ describe('LaTeX export', () => {
       ACKNOWLEDGEMENT_TEXT,
     );
   });
+
+  describe('the seeded logo mark (ACK block) and the paid seam', () => {
+    const docWithAck = (): PosterDoc => ensureAckBlock(makeFixtureDoc());
+
+    it('FREE: ships the mark as figures/logo-1 and \\includegraphics it', async () => {
+      const doc = docWithAck();
+      expect(hasAckBlock(doc)).toBe(true);
+      const { bytes } = await exportPosterLatex(doc, {
+        fetcher: async () => TINY_PNG_BYTES,
+      });
+      const entries = unzipSync(bytes);
+      // Extension is sniffed from the fetched bytes (the test fetcher
+      // hands back a PNG), so assert on the name, not the extension.
+      const logos = logoAssetsOf(bytes);
+      expect(logos).toHaveLength(1);
+      expect(logos[0]).toMatch(/^figures\/logo-1\.\w+$/);
+      expect(includedGraphicsOf(decode(entries['poster.tex']))).toContain(logos[0]);
+    });
+
+    it('PAID: the zip carries NO logo asset and the .tex NO \\includegraphics for it', async () => {
+      const doc = docWithAck();
+      const { bytes } = await exportPosterLatex(doc, {
+        fetcher: async () => TINY_PNG_BYTES,
+        attribution: { paidPlan: true },
+      });
+      const entries = unzipSync(bytes);
+      const tex = decode(entries['poster.tex']);
+      expect(logoAssetsOf(bytes)).toEqual([]);
+      expect(includedGraphicsOf(tex).some((p) => /logo-/.test(p))).toBe(false);
+      // The user's own figure is untouched by the strip.
+      expect(includedGraphicsOf(tex)).toContain('figures/figure-1.png');
+      expect(entries['figures/figure-1.png']).toBeDefined();
+      // And the visible margin-band colophon is gone too (the `%%`
+      // header comment, like PPTX's generator doc-property, stays).
+      expect(tex).not.toContain(`\\textcolor{postrMuted}{${ACKNOWLEDGEMENT_TEXT}}`);
+    });
+
+    it("PAID: the user's OWN logo blocks still export — only the ack mark is dropped", async () => {
+      const own = baseBlock({
+        id: 'lab-logo',
+        type: 'logo',
+        x: 400,
+        y: 20,
+        w: 40,
+        h: 40,
+        imageSrc: TINY_PNG_DATA_URL,
+      });
+      const doc = ensureAckBlock(makeFixtureDoc({ blocks: [...makeFixtureDoc().blocks, own] }));
+      const { bytes } = await exportPosterLatex(doc, {
+        fetcher: async () => TINY_PNG_BYTES,
+        attribution: { paidPlan: true },
+      });
+      expect(logoAssetsOf(bytes)).toEqual(['figures/logo-1.png']);
+    });
+
+    it('PAID: buildLatexDocument called directly also drops the mark', () => {
+      const doc = docWithAck();
+      const assetPaths = new Map([[ACK_BLOCK_ID, 'figures/logo-1.svg']]);
+      const { tex } = buildLatexDocument(doc, { assetPaths, attribution: { paidPlan: true } });
+      expect(tex).not.toContain('figures/logo-1.svg');
+    });
+  });
+});
+
+describe('stripAckBlock', () => {
+  it('returns the SAME doc object on the free plan — the mark is kept exactly as today', () => {
+    const doc = ensureAckBlock(makeFixtureDoc());
+    expect(stripAckBlock(doc)).toBe(doc);
+    expect(stripAckBlock(doc, { paidPlan: false })).toBe(doc);
+  });
+
+  it('returns the SAME doc object when there is no mark to strip', () => {
+    const doc = makeFixtureDoc();
+    expect(stripAckBlock(doc, { paidPlan: true })).toBe(doc);
+  });
+
+  it('returns a NEW doc without the mark on a paid plan, never mutating the input', () => {
+    const doc = ensureAckBlock(makeFixtureDoc());
+    const before = JSON.stringify(doc);
+    const out = stripAckBlock(doc, { paidPlan: true });
+    expect(out).not.toBe(doc);
+    expect(hasAckBlock(out)).toBe(false);
+    expect(out.blocks).toHaveLength(doc.blocks.length - 1);
+    // Every other block survives, in order, byte-identical.
+    expect(out.blocks).toEqual(doc.blocks.filter((b) => b.id !== ACK_BLOCK_ID));
+    expect(JSON.stringify(doc)).toBe(before);
+  });
 });
 
 describe('PPTX export', () => {
@@ -93,55 +206,79 @@ describe('PPTX export', () => {
     expect(slide).toContain('Poster made with postr.sh');
   });
 
-  it('FLATTENS the mark into the slide background rather than a shape', async () => {
+  it('keeps the slide background a plain solid fill (the mark is a shape, not a background)', async () => {
+    // An earlier build flattened the mark into a picture background,
+    // which cost every user PowerPoint's background-colour picker. The
+    // mark is an ordinary picture shape now; the background stays a
+    // recolourable solid fill whether or not the mark is present.
+    for (const doc of [docWithAck(), makeFixtureDoc()]) {
+      const { bytes } = await exportPosterPptx(doc, {
+        fetcher: async () => TINY_PNG_BYTES,
+        rasterizeSvg,
+      });
+      const slide = decode(unzipSync(bytes)['ppt/slides/slide1.xml']);
+      expect(slide).toMatch(/<p:bg>[\s\S]*?<a:solidFill>/);
+      expect(slide).not.toMatch(/<p:bg>[\s\S]*?<a:blipFill>/);
+    }
+  });
+
+  it('FREE: ships the mark as exactly one picture shape + one media part', async () => {
     const doc = docWithAck();
     expect(hasAckBlock(doc)).toBe(true);
     const withMark = await exportPosterPptx(doc, {
       fetcher: async () => TINY_PNG_BYTES,
+      rasterizeSvg,
     });
     const withoutMark = await exportPosterPptx(makeFixtureDoc(), {
       fetcher: async () => TINY_PNG_BYTES,
+      rasterizeSvg,
     });
+    expect(mediaPartsOf(withMark.bytes).length).toBe(mediaPartsOf(withoutMark.bytes).length + 1);
+    expect(pictureShapesOf(withMark.bytes)).toBe(pictureShapesOf(withoutMark.bytes) + 1);
+  });
 
-    // The slide's background becomes an image fill, not a solid fill —
-    // an image background is not selectable on the PowerPoint canvas,
-    // which is what makes the mark survive "select all + Delete".
+  it('PAID: the deck has NO picture shape and NO media part for the mark', async () => {
+    const paid = { paidPlan: true };
+    const withMark = await exportPosterPptx(docWithAck(), {
+      fetcher: async () => TINY_PNG_BYTES,
+      rasterizeSvg,
+      attribution: paid,
+    });
+    const withoutMark = await exportPosterPptx(makeFixtureDoc(), {
+      fetcher: async () => TINY_PNG_BYTES,
+      rasterizeSvg,
+      attribution: paid,
+    });
+    // Seeding the mark into the doc changes nothing about a paid deck.
+    expect(mediaPartsOf(withMark.bytes)).toEqual(mediaPartsOf(withoutMark.bytes));
+    expect(pictureShapesOf(withMark.bytes)).toBe(pictureShapesOf(withoutMark.bytes));
+    // And the only picture left is the user's own figure (img1): the
+    // colophon mark is gone too, so the count is absolute, not relative.
+    expect(pictureShapesOf(withMark.bytes)).toBe(1);
+    expect(mediaPartsOf(withMark.bytes)).toHaveLength(1);
     const slide = decode(unzipSync(withMark.bytes)['ppt/slides/slide1.xml']);
-    expect(slide).toMatch(/blipFill|<a:blip/);
-
-    // And the background costs exactly one extra media part relative
-    // to the same poster without the mark.
-    const mediaOf = (b: Uint8Array) =>
-      Object.keys(unzipSync(b)).filter((n) => /^ppt\/media\/.+/.test(n));
-    expect(mediaOf(withMark.bytes).length).toBe(mediaOf(withoutMark.bytes).length + 1);
+    expect(slide).not.toContain(ACKNOWLEDGEMENT_TEXT);
   });
 
-  it('uses a plain colour background when the poster has no ack block', async () => {
-    const { bytes } = await exportPosterPptx(makeFixtureDoc(), {
-      fetcher: async () => TINY_PNG_BYTES,
+  it("PAID: the user's OWN logo blocks still export — only the ack mark is dropped", async () => {
+    const own = baseBlock({
+      id: 'lab-logo',
+      type: 'logo',
+      x: 400,
+      y: 20,
+      w: 40,
+      h: 40,
+      imageSrc: TINY_PNG_DATA_URL,
     });
-    const slide = decode(unzipSync(bytes)['ppt/slides/slide1.xml']);
-    expect(slide).toContain('solidFill');
-  });
-
-  it('does not ALSO emit the mark as a deletable picture shape', async () => {
-    const doc = docWithAck();
+    const doc = ensureAckBlock(makeFixtureDoc({ blocks: [...makeFixtureDoc().blocks, own] }));
     const { bytes } = await exportPosterPptx(doc, {
       fetcher: async () => TINY_PNG_BYTES,
-    });
-    const slide = decode(unzipSync(bytes)['ppt/slides/slide1.xml']);
-    // The ack block id must never appear as a shape name/descr.
-    expect(slide).not.toContain(ACK_BLOCK_ID);
-  });
-
-  it('honours the paid seam — no flattened background when suppressed', async () => {
-    const doc = docWithAck();
-    const { bytes } = await exportPosterPptx(doc, {
-      fetcher: async () => TINY_PNG_BYTES,
+      rasterizeSvg,
       attribution: { paidPlan: true },
     });
-    const slide = decode(unzipSync(bytes)['ppt/slides/slide1.xml']);
-    expect(slide).toContain('solidFill');
+    // img1 + lab-logo, and nothing for the mark.
+    expect(pictureShapesOf(bytes)).toBe(2);
+    expect(mediaPartsOf(bytes)).toHaveLength(2);
   });
 });
 

@@ -19,8 +19,8 @@
  *
  * ── What is kept ─────────────────────────────────────────────────
  * Everything the SEO work actually needs: page views for the marketing
- * and tool pages (/, /about, /chart-chooser, /paper-to-poster, the
- * legal pages). Identifier routes are collapsed to their shape, so a
+ * and tool pages (/, /about, /chart-chooser, the legal pages).
+ * Identifier routes are collapsed to their shape, so a
  * count of "someone opened a share link" survives while "which one"
  * does not.
  *

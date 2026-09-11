@@ -38,6 +38,7 @@ import {
   attributionLatexComment,
   type AttributionOptions,
 } from '../attribution';
+import { stripAckBlock } from '../stripAckBlock';
 
 export interface LatexWriterOptions extends ExportContentOptions {
   /** Block id → relative image path inside the bundle (figures/…). */
@@ -465,9 +466,12 @@ const EMITTERS: Partial<Record<Block['type'], (b: Block, ctx: EmitContext) => st
 
 /** Build the complete poster.tex source. */
 export function buildLatexDocument(
-  doc: PosterDoc,
+  input: PosterDoc,
   options: LatexWriterOptions = {},
 ): LatexDocument {
+  // Paid seam: the seeded acknowledgement mark is a `logo` block and
+  // would otherwise be emitted through `emitImage` like any other.
+  const doc = stripAckBlock(input, options.attribution);
   const warnings: string[] = [];
   const ctx: EmitContext = {
     doc,

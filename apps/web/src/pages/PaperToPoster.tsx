@@ -7,16 +7,22 @@
  *
  * Slug history: shipped as `/manuscript-to-poster`, renamed to
  * `/paper-to-poster` on 2026-07-27 against measured keyword data
- * ("paper to poster" 140/mo · KD 0 · transactional). The old URL and
- * `/paper-to-present` both 308 here — see vercel.json and routes.tsx.
+ * ("paper to poster" 140/mo · KD 0 · transactional).
  * Output is a poster draft only; there is no slide/deck export.
+ *
+ * DEACTIVATED 2026-09-10 — not deleted. This page is no longer mounted:
+ * routes.tsx redirects /paper-to-poster and /manuscript-to-poster to /,
+ * and the routes.json static record (prerender + sitemap) was removed,
+ * so `metaFor()` below resolves to null. The component and the whole
+ * manuscript/* pipeline stay on disk and unit-tested. Restore recipe:
+ * routes.tsx header.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CondensedNarrative } from '@postr/shared';
 import { BusyIndicator, busyProps } from '@/components/BusyIndicator';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
-import { STATIC_ROUTE_META } from '@/seo/siteMeta';
+import { metaFor } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 import { ensureFontLoaded } from '@/poster/fontLoader';
 import { DEFAULT_FONT_FAMILY, DEFAULT_PALETTE, PX } from '@/poster/constants';
@@ -57,7 +63,8 @@ const MIN_MANUSCRIPT_WORDS = 50;
 type Phase = 'interview' | 'condensing' | 'ready' | 'condense-error';
 
 export default function PaperToPoster() {
-  useDocumentMeta(STATIC_ROUTE_META['/paper-to-poster'] ?? null);
+  // Null while deactivated (no routes.json record) — see the header.
+  useDocumentMeta(metaFor('/paper-to-poster'));
 
   const [interview, setInterview] = useState<InterviewState>(createInterview);
   const [phase, setPhase] = useState<Phase>('interview');

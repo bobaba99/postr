@@ -23,8 +23,9 @@ export function AuthGuard({ children }: { children: ReactNode }) {
     });
 
     // Listen for auth state changes. SIGNED_OUT covers both explicit
-    // sign-out and account deletion (the delete-account edge function
-    // signs the user out after deleting, which fires SIGNED_OUT).
+    // sign-out and account deletion (profile/accountDeletion.ts signs
+    // the user out globally after POST /account/delete succeeds, which
+    // fires SIGNED_OUT).
     // TOKEN_REFRESHED is a no-op — the session is still valid.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'SIGNED_OUT') {

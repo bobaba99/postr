@@ -11,7 +11,10 @@
 import { chromium } from 'playwright';
 
 const BASE = 'http://localhost:5173';
-const ROUTES = ['/', '/about', '/chart-chooser', '/paper-to-poster', '/privacy', '/cookies', '/terms'];
+// /paper-to-poster left this list when the manuscript flows were
+// deactivated, and /chart-chooser when the standalone plot picker was
+// (routes.tsx header) — both now redirect to /.
+const ROUTES = ['/', '/about', '/privacy', '/cookies', '/terms'];
 const WIDTHS = [
   { w: 375, h: 812, label: 'iPhone SE/13 mini' },
   { w: 414, h: 896, label: 'iPhone Plus/Max' },
@@ -71,7 +74,8 @@ const audit = async (page) => page.evaluate(() => {
   // Deliberately does NOT use visible() — that helper skips zero-height
   // elements, which is exactly the state this check exists to catch.
   //
-  // Two independent bugs produced this on /chart-chooser: a
+  // Two independent bugs produced this on /chart-chooser (the ladder
+  // now lives only in the editor's Figure tab; the page is deactivated): a
   // requestAnimationFrame that never fired in a background tab, so
   // `revealed` stayed false; and a grid-template-rows 0fr -> 1fr
   // transition that never interpolated, so the row computed to 0px

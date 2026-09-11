@@ -30,7 +30,10 @@ echo "Verifying prerender at ${BASE}"
 echo
 
 echo "Prerendered routes carry real HTML:"
-for route in "" about chart-chooser paper-to-poster privacy cookies terms; do
+# paper-to-poster left this list when the manuscript flows were
+# deactivated, and chart-chooser when the standalone plot picker was
+# (routes.tsx header) — both are a rewrite + noindex now.
+for route in "" about privacy cookies terms; do
   url="${BASE}/${route}"
   body="$(curl -sL --max-time 20 "$url")"
   bytes="${#body}"
@@ -80,8 +83,8 @@ case "$sitemap_ct" in
 esac
 
 echo
-echo "Private routes are noindex:"
-for route in s/smoke-test-slug dashboard profile; do
+echo "Private and deactivated routes are noindex:"
+for route in s/smoke-test-slug dashboard profile gallery chart-chooser paper-to-poster paper-to-slides presentation-checker; do
   hdr="$(curl -sIL --max-time 20 "${BASE}/${route}" | tr -d '\r' | grep -i '^x-robots-tag:' | tail -1)"
   if grep -qi 'noindex' <<<"$hdr"; then
     pass "/${route} → ${hdr}"
@@ -92,7 +95,10 @@ done
 
 echo
 echo "Real client routes still serve the app (200):"
-for route in auth dashboard profile p/smoke-test-id admin/gallery gallery s/smoke-test-slug; do
+# The deactivated routes (gallery, chart-chooser, paper-to-poster,
+# paper-to-slides, presentation-checker) must serve the shell so the
+# in-app <Navigate> to / runs, not 404.
+for route in auth dashboard profile p/smoke-test-id admin/gallery gallery chart-chooser paper-to-poster paper-to-slides presentation-checker s/smoke-test-slug; do
   code="$(curl -s -o /dev/null --max-time 20 -w '%{http_code}' "${BASE}/${route}")"
   if [ "$code" = "200" ]; then
     pass "/${route} → ${code}"
@@ -121,9 +127,12 @@ done
 
 echo
 echo "Slug aliases 308 to their canonical page:"
-# /manuscript-to-poster is the load-bearing one: it is live in
+# /manuscript-to-poster is the load-bearing one: it was live in
 # production and listed in the deployed sitemap, so if this redirect
-# ever goes missing an indexed URL starts returning 404.
+# ever goes missing a once-indexed URL starts returning 404. Every
+# alias points at / while all the standalone tools are deactivated
+# (routes.tsx header) — /plot-picker included, since its 308 to
+# /chart-chooser was deployed and must be retargeted, not dropped.
 check_alias() {
   alias_path="$1"
   canonical="$2"
@@ -137,15 +146,22 @@ check_alias() {
   esac
   location="$(curl -sI --max-time 20 "${BASE}${alias_path}" | tr -d '\r' |
     awk -F': ' 'tolower($1)=="location"{print $2}' | tail -1)"
-  case "$location" in
-    *"${canonical}") pass "${alias_path} → ${code} ${location}" ;;
-    *) fail "${alias_path} → ${code} but Location is '${location}', expected ${canonical}" ;;
-  esac
+  # Vercel emits the absolute form; strip the origin and require an EXACT
+  # match. A suffix glob would make canonical "/" match ANY path ending in
+  # a slash (e.g. a mis-pointed "/gallery/"), which is precisely the
+  # mistake this gate exists to catch.
+  location_path="${location#"$BASE"}"
+  if [ "$location_path" = "$canonical" ]; then
+    pass "${alias_path} → ${code} ${location}"
+  else
+    fail "${alias_path} → ${code} but Location is '${location}', expected ${canonical}"
+  fi
 }
 
-check_alias /plot-picker /chart-chooser
-check_alias /manuscript-to-poster /paper-to-poster
-check_alias /paper-to-present /paper-to-poster
+check_alias /plot-picker /
+check_alias /manuscript-to-poster /
+check_alias /paper-to-present /
+check_alias /paper-to-presentation /
 
 echo
 echo "Apex redirect is permanent:"

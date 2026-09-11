@@ -12,26 +12,35 @@
  * builder and the lazy pptx writer, none of which belongs in the marketing
  * bundle), and sets its document meta from the shared SEO source.
  *
- * Slug: /paper-to-slides is canonical. /paper-to-present and
- * /paper-to-presentation 308 here (see vercel.json + routes.tsx).
+ * Slug: /paper-to-slides is canonical; /paper-to-present and
+ * /paper-to-presentation are its alias spellings.
+ *
+ * DEACTIVATED 2026-09-10 — not deleted. This page is no longer mounted:
+ * routes.tsx redirects the canonical route and both aliases to /, and
+ * the routes.json static record (prerender + sitemap) was removed, so
+ * `metaFor()` below resolves to null. The component, <SlidesWizard/>,
+ * the deck model and the deck exporters stay on disk and unit-tested.
+ * Restore recipe: routes.tsx header.
  */
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
 import { SlidesWizard } from '@/manuscript/slides/SlidesWizard';
-import { STATIC_ROUTE_META } from '@/seo/siteMeta';
+import { metaFor } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 export default function PaperToSlides() {
-  useDocumentMeta(STATIC_ROUTE_META['/paper-to-slides'] ?? null);
+  // Null while deactivated (no routes.json record) — see the header.
+  useDocumentMeta(metaFor('/paper-to-slides'));
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <PublicHeader />
       <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 pb-8 pt-6">
-        {/* Must match routes.json "/paper-to-slides".h1 — the prerender
-            script injects that string for non-JS crawlers, and a live
-            heading that disagrees with the crawled one is the drift
-            siteMeta.ts warns about. Change both together. */}
+        {/* On reactivation this must match routes.json
+            "/paper-to-slides".h1 again — the prerender script injects
+            that string for non-JS crawlers, and a live heading that
+            disagrees with the crawled one is the drift siteMeta.ts
+            warns about. Change both together. */}
         <h1 className="text-2xl font-bold text-white">From paper to slides</h1>
         <p className="mt-1 text-sm text-[#8b8f99]">
           Paste your manuscript, answer a few short questions, and build an

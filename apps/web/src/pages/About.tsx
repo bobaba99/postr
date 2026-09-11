@@ -56,16 +56,23 @@ const MILESTONES: Milestone[] = [
       'Paste your R or Python plotting code and Postr checks whether axis labels will actually be legible at print size. Out-of-bounds warnings catch layout slips. No more discovering typography problems at the FedEx counter.',
   },
   {
+    // The manuscript sentence this card used to open with was removed:
+    // paper-to-poster is deactivated — see routes.tsx header. The id is
+    // kept so the timeline outline and its tests stay stable.
     id: 'start-from-work',
-    title: 'Start from the work you already have',
+    title: 'Start from the poster you already have',
     body:
-      'Paste a manuscript or drop a .docx and answer a few short questions about what to emphasise — you get a structured poster draft rather than a blank canvas. Already have a poster in PowerPoint? Open the .pptx here and keep editing it, blocks and all.',
+      'Already have a poster in PowerPoint, as a PDF, or as an image? Open it here and keep editing it, blocks and all — title, headings, body text and figures land where they were, each one still yours to move and rewrite.',
   },
   {
+    // Describes the editor's Figure tab. The same ladder used to have a
+    // standalone page (/chart-chooser) this copy also covered; that page
+    // is deactivated — see routes.tsx header — so the sentence no longer
+    // promises downloads outside the editor.
     id: 'figures',
     title: 'The right figure, drawn for print',
     body:
-      'Paste a table or answer three questions and the plot picker ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once, insert them, or download SVG and PNG.',
+      'Paste a table or answer three questions in the Figure tab and Postr ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once and insert them straight onto the poster.',
   },
   {
     id: 'design',

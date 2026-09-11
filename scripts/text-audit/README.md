@@ -55,8 +55,10 @@ Notes:
 - The scrape serves the production build via `vite preview` against the
   local Supabase stack (anonymous session for `/p/new`). Start the stack
   first (`npm run db:start`) if editor/auth pages should render fully.
-- Routes covered: the 13 static/prerendered pages + `/auth`, `/dashboard`,
-  `/profile`, `/billing/success`, `/billing/cancel`,
-  `/presentation-checker`, `/p/new`, `/404` (desktop 1440×900).
+- Routes covered: the 11 static/prerendered pages + `/auth`, `/dashboard`,
+  `/profile`, `/billing/success`, `/billing/cancel`, `/p/new`, `/404`
+  (desktop 1440×900). The deactivated `/paper-to-poster`,
+  `/paper-to-slides` and `/presentation-checker` are skipped — they
+  redirect to `/`.
   Mobile widths, signed-in account states, and editor-with-real-poster
   states are future passes.
