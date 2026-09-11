@@ -26,7 +26,9 @@ import { SecureWorkModal } from '@/poster/SecureWorkModal';
 import {
   createCheckout,
   consumeExportCredit as consumeCreditApi,
+  isAlreadySubscribedError,
   markPaidExport,
+  NoExportCreditError,
 } from '@/data/billing';
 import { stashCheckoutIntent, type CheckoutPlan } from '@/data/checkoutIntent';
 
@@ -41,6 +43,12 @@ interface ExportState {
 }
 
 const IDLE: ExportState = { busy: null, done: null, notes: [], failed: false };
+
+/** Copy for a checkout the server refused because a term is already
+ *  active (409 already_subscribed, P0-2). Generic on purpose — never the
+ *  raw error text. */
+const ALREADY_SUBSCRIBED_NOTICE =
+  'You already have an active term — PowerPoint and LaTeX export are unlocked. Manage it from your profile.';
 
 function downloadBytes(bytes: Uint8Array, fileName: string, mime: string): void {
   const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
@@ -106,6 +114,9 @@ export function EditableExportButtons({
   // unaffected legally, but a single clear checkbox for everyone is simplest
   // and honest.
   const [withdrawalAck, setWithdrawalAck] = useState(false);
+  // A non-failure notice from checkout (the duplicate-term guard). Kept
+  // apart from `failed` so it never reads as "something went wrong".
+  const [checkoutNotice, setCheckoutNotice] = useState<string | null>(null);
 
   // The paywall (docs/plans/2026-07-28-payment-and-paywall.md): editable
   // exports are paid. Unlock on an active term (unlimited) or an export
@@ -165,15 +176,23 @@ export function EditableExportButtons({
     }
   }
 
-  // Spend one credit after a successful credit-based export. Best-effort:
-  // the file is already downloaded, so a failure here must NOT make the
-  // export look failed — log and move on. (Worst case the user keeps a
-  // credit they used; acceptable, and far better than a "failed" export
-  // that actually succeeded.)
+  // Spend one credit after a successful credit-based export and fold the
+  // server's remaining balance into plan state, so the "N exports left"
+  // hint decrements and the paywall rises at zero (H-8). A 409 no_credit
+  // means the balance was already spent elsewhere — zero it locally. Any
+  // other failure is best-effort: the file is already downloaded, so it
+  // must NOT make the export look failed — log and move on. (Worst case
+  // the user keeps a credit they used; acceptable, and far better than a
+  // "failed" export that actually succeeded.)
   async function consumeExportCredit() {
     try {
-      await consumeCreditApi();
+      const remaining = await consumeCreditApi();
+      if (remaining !== null) plan.applyCredits(remaining);
     } catch (err) {
+      if (err instanceof NoExportCreditError) {
+        plan.applyCredits(0);
+        return;
+      }
       console.error('[billing] consume-credit failed (export already done):', err);
     }
   }
@@ -199,10 +218,28 @@ export function EditableExportButtons({
       navigate(`/auth?plan=${sku}`);
       return;
     }
+    setCheckoutNotice(null);
     try {
       const url = await createCheckout(sku);
       window.location.href = url;
     } catch (err) {
+      // The server refused a second term (P0-2). The local plan is stale
+      // (it still says "no term") — re-read, and only claim the term is
+      // active if the fresh row agrees (the paywall then drops and the
+      // buttons unlock). If it does NOT agree — the server's guard and
+      // the row disagree (a stuck subscription status) — never tell the
+      // user they own something the app can see they cannot use: fall
+      // back to the generic failure so they reach support.
+      if (isAlreadySubscribedError(err)) {
+        const fresh = await plan.refresh().catch(() => null);
+        if (fresh?.hasActiveTerm) {
+          setCheckoutNotice(ALREADY_SUBSCRIBED_NOTICE);
+          return;
+        }
+        console.error('[billing] checkout refused as already_subscribed but the plan row shows no active term');
+        setState((s) => ({ ...s, failed: true }));
+        return;
+      }
       console.error('[billing] checkout failed:', err);
       setState((s) => ({ ...s, failed: true }));
     }
@@ -309,6 +346,7 @@ export function EditableExportButtons({
             </span>
           </label>
           <div style={{ display: 'flex', gap: 8, opacity: withdrawalAck ? 1 : 0.5 }}>
+            {!plan.hasActiveTerm && (
             <button
               disabled={!withdrawalAck}
               onClick={() => startCheckout('term')}
@@ -326,6 +364,7 @@ export function EditableExportButtons({
             >
               Get the term
             </button>
+            )}
             <button
               disabled={!withdrawalAck}
               onClick={() => startCheckout('pack')}
@@ -345,6 +384,11 @@ export function EditableExportButtons({
             </button>
           </div>
         </div>
+      )}
+      {checkoutNotice && (
+        <p role="status" style={{ ...hintStyle, color: '#a3a7b3', marginTop: 0, marginBottom: 10 }}>
+          {checkoutNotice}
+        </p>
       )}
       {/* Credit-holder reassurance: show the remaining count so a pack
           buyer knows an export will spend one of a finite number. */}

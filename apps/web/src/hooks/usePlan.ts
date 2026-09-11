@@ -16,7 +16,7 @@
  *   - `canExport` = active term OR credits > 0 → editable exports unlock
  *     and the watermark drops.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 export interface PlanState {
@@ -58,9 +58,29 @@ export interface PlanState {
    * issue"). Null when the user never subscribed.
    */
   subscriptionStatus: string | null;
+  /**
+   * Re-read the billing row on demand (after a checkout return, a
+   * refund, or any time the caller knows the server changed it).
+   * Resolves with the fresh snapshot so a handler that already holds a
+   * stale `plan` in its closure can decide on the new state at once.
+   */
+  refresh: () => Promise<PlanSnapshot>;
+  /**
+   * Fold a server-returned credit balance into local state without a
+   * round-trip — the consume-credit route answers with the remaining
+   * count, so the Export tab can decrement immediately (H-8). Clamped at
+   * zero; canExport is re-derived so the paywall rises at 0.
+   */
+  applyCredits: (credits: number) => void;
 }
 
-const INITIAL: PlanState = {
+/** The data half of PlanState — everything the hook derives, minus the
+ *  two stable callbacks it returns alongside. */
+/** The data half of PlanState — what `refresh()` resolves with. */
+export type PlanSnapshot = Omit<PlanState, 'refresh' | 'applyCredits'>;
+type PlanData = PlanSnapshot;
+
+const INITIAL: PlanData = {
   loading: true,
   hasActiveTerm: false,
   credits: 0,
@@ -114,51 +134,69 @@ function derive(row: BillingRow | null): BillingDerived {
   };
 }
 
+/** Read the signed-in user's billing row and derive the plan data. */
+async function fetchPlan(): Promise<PlanData> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) {
+    // No session at all — treated as a guest for paywall routing.
+    return { ...INITIAL, loading: false, isGuest: true };
+  }
+  const isGuest = auth.user.is_anonymous === true;
+  // `plan` / `plan_expires_at` / `export_credits` are newer than the
+  // generated Database type in some builds; cast the projection.
+  const { data } = await supabase
+    .from('users')
+    .select(
+      'plan, plan_expires_at, export_credits, review_credits, review_addon, subscription_status' as never,
+    )
+    .eq('id', auth.user.id)
+    .maybeSingle();
+  return {
+    loading: false,
+    ...derive(data as BillingRow | null),
+    isGuest,
+  };
+}
+
 export function usePlan(): PlanState {
-  const [state, setState] = useState<PlanState>(INITIAL);
+  const [data, setData] = useState<PlanData>(INITIAL);
+  // Guards state writes from a fetch that resolves after unmount.
+  const alive = useRef(true);
+
+  const refresh = useCallback(async (): Promise<PlanSnapshot> => {
+    const next = await fetchPlan();
+    if (alive.current) setData(next);
+    return next;
+  }, []);
+
+  const applyCredits = useCallback((credits: number) => {
+    const clamped = Math.max(0, Math.floor(credits));
+    setData((prev) => ({
+      ...prev,
+      credits: clamped,
+      canExport: prev.hasActiveTerm || clamped > 0,
+    }));
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) {
-        // No session at all — treated as a guest for paywall routing.
-        if (!cancelled) setState({ ...INITIAL, loading: false, isGuest: true });
-        return;
-      }
-      const isGuest = auth.user.is_anonymous === true;
-      // `plan` / `plan_expires_at` / `export_credits` are newer than the
-      // generated Database type in some builds; cast the projection.
-      const { data } = await supabase
-        .from('users')
-        .select(
-          'plan, plan_expires_at, export_credits, review_credits, review_addon, subscription_status' as never,
-        )
-        .eq('id', auth.user.id)
-        .maybeSingle();
-      if (cancelled) return;
-      setState({
-        loading: false,
-        ...derive(data as BillingRow | null),
-        isGuest,
-      });
-    }
-
-    void load();
+    alive.current = true;
+    void refresh();
 
     // Re-read on auth changes (sign-in after checkout, guest→permanent).
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(() => {
-      void load();
+      void refresh();
     });
 
     return () => {
-      cancelled = true;
+      alive.current = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [refresh]);
 
-  return state;
+  return useMemo(
+    () => ({ ...data, refresh, applyCredits }),
+    [data, refresh, applyCredits],
+  );
 }

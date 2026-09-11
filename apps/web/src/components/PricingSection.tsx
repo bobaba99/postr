@@ -34,6 +34,12 @@
  * in-editor export paywall (EditableExportButtons) also starts checkout,
  * for users who hit the wall mid-export.
  *
+ * Duplicate-term guard (P0-2): the term is a recurring subscription, so a
+ * signed-in holder of an ACTIVE term must not be offered a second one.
+ * The term card swaps its CTA for a "You already have an active term"
+ * notice once usePlan reports hasActiveTerm (never while loading — no
+ * flash). The pack stays purchasable: credits stack on top of a term.
+ *
  * <TalkWaitlistCallout /> (the paper-to-talk launch list) is no longer
  * rendered under the grid: deactivated — see routes.tsx header. The
  * component, data/talkWaitlist.ts and the talk_waitlist table remain.
@@ -42,6 +48,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { isOnTalkWaitlist, joinTalkWaitlist } from '@/data/talkWaitlist';
+import { usePlan } from '@/hooks/usePlan';
 
 export interface PricingTier {
   readonly id: string;
@@ -107,6 +114,8 @@ export const PRICING_TIERS = [
 ] as const satisfies readonly PricingTier[];
 
 export function PricingSection() {
+  const plan = usePlan();
+  const termActive = !plan.loading && plan.hasActiveTerm;
   return (
     <section className="mx-auto w-full max-w-5xl px-8 pb-24" aria-labelledby="pricing-heading">
       <div className="text-center">
@@ -123,7 +132,11 @@ export function PricingSection() {
         className="mt-10 grid grid-cols-1 items-start gap-5 md:grid-cols-2 lg:grid-cols-3"
       >
         {PRICING_TIERS.map((tier) => (
-          <PricingCard key={tier.id} tier={tier} />
+          <PricingCard
+            key={tier.id}
+            tier={tier}
+            alreadyOwned={tier.id === 'term' && termActive}
+          />
         ))}
       </div>
 
@@ -132,7 +145,14 @@ export function PricingSection() {
   );
 }
 
-function PricingCard({ tier }: { tier: PricingTier }) {
+function PricingCard({
+  tier,
+  alreadyOwned,
+}: {
+  tier: PricingTier;
+  /** The signed-in user already holds this plan — show a notice, not a CTA. */
+  alreadyOwned: boolean;
+}) {
   const base = tier.featured
     ? 'relative rounded-2xl border-2 border-[#7c6aed] bg-[#14121e] p-6 shadow-[0_0_0_1px_rgba(124,106,237,0.15),0_18px_50px_-12px_rgba(124,106,237,0.35)] lg:-mt-3 lg:mb-3'
     : 'relative rounded-2xl border border-[#1f1f2e] bg-[#111118] p-6';
@@ -157,16 +177,28 @@ function PricingCard({ tier }: { tier: PricingTier }) {
         {tier.condition}
       </p>
 
-      <Link
-        to={tier.ctaTo}
-        className={
-          tier.featured
-            ? 'mt-5 block rounded-lg bg-[#5641b8] px-5 py-2.5 text-center text-sm font-semibold text-white no-underline transition-colors hover:bg-[#4c39a6]'
-            : 'mt-5 block rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-5 py-2.5 text-center text-sm font-semibold text-[#c8cad0] no-underline transition-colors hover:border-[#7c6aed]'
-        }
-      >
-        {tier.cta}
-      </Link>
+      {alreadyOwned ? (
+        <div
+          role="status"
+          className="mt-5 rounded-lg border border-[#7c6aed]/40 bg-[#1a1a26] px-5 py-2.5 text-center text-sm text-[#c8cad0]"
+        >
+          You already have an active term.{' '}
+          <Link to="/profile" className="font-semibold text-[#b4a9f5] underline-offset-4 hover:underline">
+            Manage it
+          </Link>
+        </div>
+      ) : (
+        <Link
+          to={tier.ctaTo}
+          className={
+            tier.featured
+              ? 'mt-5 block rounded-lg bg-[#5641b8] px-5 py-2.5 text-center text-sm font-semibold text-white no-underline transition-colors hover:bg-[#4c39a6]'
+              : 'mt-5 block rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-5 py-2.5 text-center text-sm font-semibold text-[#c8cad0] no-underline transition-colors hover:border-[#7c6aed]'
+          }
+        >
+          {tier.cta}
+        </Link>
+      )}
 
       <details className="mt-4 rounded-lg border border-[#2a2a3a] px-3 py-2 sm:hidden">
         <summary className="cursor-pointer text-sm font-semibold text-[#c8cad0]">

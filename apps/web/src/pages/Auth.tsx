@@ -14,6 +14,13 @@
  * intent survives the Google OAuth round-trip via sessionStorage (see
  * data/checkoutIntent.ts). Guest accounts can be linked later from the
  * Profile page — Supabase auto-merges data when identities are linked.
+ *
+ * Duplicate-term guard (P0-2): the term is a recurring subscription. A
+ * signed-in user who already holds an ACTIVE term must not be handed to
+ * Stripe for a second one — the auto-checkout waits for usePlan, skips
+ * when hasActiveTerm, and the banner says so. If the API still answers
+ * 409 already_subscribed (a stale client), the same friendly message is
+ * shown rather than the generic checkout failure.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router';
@@ -36,6 +43,13 @@ import {
   clearStashedSignupConsent,
   type ConsentChoice,
 } from '@/data/consent';
+import { isAlreadySubscribedError } from '@/data/billing';
+import { usePlan } from '@/hooks/usePlan';
+
+/** Shown instead of starting checkout when the user already holds an
+ *  active term (P0-2). Generic on purpose — never the raw API text. */
+const ALREADY_SUBSCRIBED_MESSAGE =
+  'You already have an active term — PowerPoint and LaTeX export are unlocked.';
 
 type Mode = 'signin' | 'signup';
 
@@ -85,6 +99,14 @@ export default function Auth() {
   // before the redirect commits); without this, a signed-in user could mint
   // two Stripe sessions and race two redirects.
   const checkoutStartedRef = useRef(false);
+  // Whether the visitor arrived already holding a PERMANENT session (null
+  // until the session check resolves). Feeds the auto-checkout effect,
+  // which also has to wait for the plan read below.
+  const [permanentSession, setPermanentSession] = useState<boolean | null>(null);
+  // The signed-in user's entitlement — gates the term intent (P0-2).
+  const plan = usePlan();
+  const termAlreadyActive =
+    checkoutPlan === 'term' && !plan.loading && plan.hasActiveTerm;
 
   /**
    * Record a NEW account's signup consent from the given choice. Best-
@@ -110,19 +132,38 @@ export default function Auth() {
    * Hand a signed-in user off to Stripe for the chosen plan. Fires at most
    * once (ref-guarded). On failure, surface an error and stay put — the
    * account already exists, so they can retry without re-registering; the
-   * guard is released so a retry is possible. Returns true if a checkout
-   * was started (caller should NOT also navigate to /dashboard).
+   * guard is released so a retry is possible. Returns true when the caller
+   * should stay on this page (a checkout was started, or the term is
+   * already owned and the notice is showing) — NOT also navigate to
+   * /dashboard.
    */
   const proceedToCheckout = useCallback(
-    async (plan: CheckoutPlan): Promise<boolean> => {
+    // `sku`, not `plan`: the hook value `plan` (usePlan) is read below.
+    async (sku: CheckoutPlan): Promise<boolean> => {
       if (checkoutStartedRef.current) return true;
       checkoutStartedRef.current = true;
       setCheckingOut(true);
       setError(null);
       try {
-        await startCheckoutForPlan(plan); // full-page redirect to Stripe
+        await startCheckoutForPlan(sku); // full-page redirect to Stripe
         return true;
       } catch (err) {
+        // The server refused a second term (P0-2). Confirm against a fresh
+        // plan read before saying so: if the row agrees they own the term,
+        // nothing went wrong — say it plainly and drop the intent (there
+        // is nothing to retry). If the row does NOT agree (a stuck
+        // subscription status the server guards on), never tell them they
+        // own a term the app can see they cannot use — fall through to the
+        // generic failure so they retry or reach support.
+        if (isAlreadySubscribedError(err)) {
+          const fresh = await plan.refresh().catch(() => null);
+          if (fresh?.hasActiveTerm) {
+            clearCheckoutIntent();
+            setCheckingOut(false);
+            setError(ALREADY_SUBSCRIBED_MESSAGE);
+            return true;
+          }
+        }
         // Log for observability; the user sees only a generic message.
         // eslint-disable-next-line no-console
         console.error('[checkout] failed to start Stripe session:', err);
@@ -138,7 +179,7 @@ export default function Auth() {
         return false;
       }
     },
-    [intentFromUrl],
+    [intentFromUrl, plan],
   );
 
   // If ?guest=1, auto-trigger guest login — but NEVER when a paid checkout
@@ -177,17 +218,26 @@ export default function Auth() {
         clearStashedSignupConsent();
       }
 
-      if (checkoutPlan && permanent) {
-        void proceedToCheckout(checkoutPlan);
-        return;
-      }
-      // A permanent user with no checkout intent goes to the dashboard.
-      // A GUEST does NOT get redirected — they stay on this page so they
-      // can convert their account (with or without a checkout intent).
+      setPermanentSession(permanent);
+      // A permanent user WITH a checkout intent is handled by the effect
+      // below once the plan has loaded (P0-2: it must not start a second
+      // term). A permanent user with no intent goes to the dashboard. A
+      // GUEST does NOT get redirected — they stay on this page so they can
+      // convert their account (with or without a checkout intent).
       if (!checkoutPlan && permanent) navigate('/dashboard', { replace: true });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
+
+  // Auto-checkout for a signed-in permanent visitor with a paid intent —
+  // deferred until the plan read settles so an active term holder is
+  // never sent to Stripe for a second subscription. proceedToCheckout is
+  // ref-guarded, so re-runs of this effect cannot mint two sessions.
+  useEffect(() => {
+    if (!checkoutPlan || permanentSession !== true || plan.loading) return;
+    if (checkoutPlan === 'term' && plan.hasActiveTerm) return;
+    void proceedToCheckout(checkoutPlan);
+  }, [checkoutPlan, permanentSession, plan.loading, plan.hasActiveTerm, proceedToCheckout]);
 
   const handleGuest = useCallback(async () => {
     setLoading(true);
@@ -393,10 +443,20 @@ export default function Auth() {
                   }
                 </div>
                 <p className="mt-2 text-sm leading-relaxed text-[#c8cad0]">
-                  {checkingOut
-                    ? 'Continuing to secure checkout…'
-                    : 'Create your account to continue.'}
+                  {termAlreadyActive
+                    ? ALREADY_SUBSCRIBED_MESSAGE
+                    : checkingOut
+                      ? 'Continuing to secure checkout…'
+                      : 'Create your account to continue.'}
                 </p>
+                {termAlreadyActive && (
+                  <Link
+                    to="/profile"
+                    className="mt-2 inline-block text-sm font-semibold text-[#b4a9f5] underline decoration-[#7c6aed] underline-offset-4"
+                  >
+                    Go to your profile
+                  </Link>
+                )}
               </div>
               <Link
                 to="/pricing"

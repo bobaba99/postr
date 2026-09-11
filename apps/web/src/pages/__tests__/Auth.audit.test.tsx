@@ -28,6 +28,16 @@ vi.mock('@/data/checkoutIntent', () => ({
   startCheckoutForPlan: vi.fn(),
 }));
 
+vi.mock('@/hooks/usePlan', () => ({
+  usePlan: () => ({
+    loading: false,
+    hasActiveTerm: false,
+    isGuest: true,
+    refresh: vi.fn(),
+    applyCredits: vi.fn(),
+  }),
+}));
+
 vi.mock('@/data/consent', () => ({
   writeConsent: vi.fn(),
   stashSignupConsent: vi.fn(),
