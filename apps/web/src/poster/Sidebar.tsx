@@ -69,9 +69,11 @@ import type { PosterTableRef } from '@/charts/ladder/DataStep';
 import { ImportSection } from './sidebar/ImportSection';
 import { PostrExportButton } from './sidebar/PostrExportButton';
 import { EditableExportButtons } from './sidebar/EditableExportButtons';
-// Kept while the review tab is deactivated (see the header) so the
-// dormant module stays type-checked; its mount branch is commented out.
-import { ReviewTab } from './sidebar/ReviewTab';
+// `./sidebar/ReviewTab` is NOT imported while the review tab is
+// deactivated (see the header): a live import would keep the whole
+// review/* client in the editor chunk. poster/__tests__/ReviewTab.test.tsx
+// keeps the dormant module type-checked; restore the import together with
+// the rail tuple and the mount branch below.
 import { VersionPanel } from './VersionPanel';
 import { CopyDesignModal } from '@/components/CopyDesignModal';
 import {

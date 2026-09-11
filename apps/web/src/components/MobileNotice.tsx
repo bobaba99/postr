@@ -12,8 +12,13 @@
  * Behaviour contract (locked by __tests__/MobileNotice.test.tsx):
  *   - renders nothing on wide viewports and wherever `matchMedia` is
  *     unavailable (prerender, jsdom) — the desktop path is untouched;
- *   - shows below Tailwind's `md` breakpoint (phones; tablets in
- *     portrait land just above it and can browse comfortably);
+ *   - shows below the app's ONE phone breakpoint (`SMALL_SCREEN_QUERY`,
+ *     Tailwind `sm` = 640px — the same width every other phone branch
+ *     flips at, so the notice never contradicts the layout on screen);
+ *   - renders nothing on the read-only share route (`/s/:slug`): that
+ *     surface is purpose-built for phones (PosterEditor `mobileShare`)
+ *     and its fixed bottom bar holds the only controls a visitor has —
+ *     Comments and "Make your own" — which a bottom strip would cover;
  *   - dismissal is a real button and persists for the session, so the
  *     strip never re-appears on every route change;
  *   - storage failures (private mode, blocked site data) are ignored —
@@ -26,10 +31,24 @@
  * respects the iOS home-indicator inset.
  */
 import { useState } from 'react';
-import { useIsSmallScreen } from '@/hooks/useIsSmallScreen';
+import { useLocation } from 'react-router';
+import { SMALL_SCREEN_QUERY, useIsSmallScreen } from '@/hooks/useIsSmallScreen';
 
-/** Everything under Tailwind's `md` (768px) — phone widths. */
-export const MOBILE_NOTICE_QUERY = '(max-width: 767px)';
+/**
+ * The phone breakpoint — the app's single source of truth, NOT a second
+ * width of our own (a 700px tablet would otherwise be told it is a phone
+ * while the desktop share rail is on screen).
+ */
+export const MOBILE_NOTICE_QUERY = SMALL_SCREEN_QUERY;
+
+/**
+ * Routes that already have a phone-optimised layout, where the notice's
+ * claim is false and its strip would hide the page's own bottom bar.
+ * Today: the public read-only share view.
+ */
+export function isPhoneOptimisedPath(pathname: string): boolean {
+  return /^\/s\//.test(pathname);
+}
 
 /** sessionStorage flag: "1" once the visitor dismissed the strip. */
 export const MOBILE_NOTICE_STORAGE_KEY = 'postr.mobile-notice-dismissed';
@@ -53,9 +72,10 @@ const writeDismissed = (): void => {
 
 export function MobileNotice() {
   const isPhone = useIsSmallScreen(MOBILE_NOTICE_QUERY);
+  const { pathname } = useLocation();
   const [dismissed, setDismissed] = useState(readDismissed);
 
-  if (!isPhone || dismissed) return null;
+  if (!isPhone || dismissed || isPhoneOptimisedPath(pathname)) return null;
 
   const dismiss = () => {
     writeDismissed();

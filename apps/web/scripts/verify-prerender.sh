@@ -146,10 +146,16 @@ check_alias() {
   esac
   location="$(curl -sI --max-time 20 "${BASE}${alias_path}" | tr -d '\r' |
     awk -F': ' 'tolower($1)=="location"{print $2}' | tail -1)"
-  case "$location" in
-    *"${canonical}") pass "${alias_path} → ${code} ${location}" ;;
-    *) fail "${alias_path} → ${code} but Location is '${location}', expected ${canonical}" ;;
-  esac
+  # Vercel emits the absolute form; strip the origin and require an EXACT
+  # match. A suffix glob would make canonical "/" match ANY path ending in
+  # a slash (e.g. a mis-pointed "/gallery/"), which is precisely the
+  # mistake this gate exists to catch.
+  location_path="${location#"$BASE"}"
+  if [ "$location_path" = "$canonical" ]; then
+    pass "${alias_path} → ${code} ${location}"
+  else
+    fail "${alias_path} → ${code} but Location is '${location}', expected ${canonical}"
+  fi
 }
 
 check_alias /plot-picker /

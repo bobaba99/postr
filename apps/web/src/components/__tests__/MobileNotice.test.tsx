@@ -10,15 +10,28 @@
  * - remember the dismissal for the rest of the session so it never
  *   nags on every route change;
  * - survive a throwing `sessionStorage` (private mode, blocked site
- *   data) without crashing the app shell it is mounted in.
+ *   data) without crashing the app shell it is mounted in;
+ * - use the app's ONE phone breakpoint (`SMALL_SCREEN_QUERY`), so it
+ *   flips at the same width as every other phone branch;
+ * - stay off the read-only share route (`/s/:slug`), whose phone layout
+ *   is purpose-built and whose bottom bar it would otherwise cover.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render as rtlRender, screen, fireEvent, cleanup } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
+import type { ReactElement } from 'react';
+import { SMALL_SCREEN_QUERY } from '@/hooks/useIsSmallScreen';
 import {
   MobileNotice,
   MOBILE_NOTICE_QUERY,
   MOBILE_NOTICE_STORAGE_KEY,
+  isPhoneOptimisedPath,
 } from '../MobileNotice';
+
+/** The notice reads the route, so every render needs a router. */
+function render(ui: ReactElement, path = '/') {
+  return rtlRender(<MemoryRouter initialEntries={[path]}>{ui}</MemoryRouter>);
+}
 
 type Listener = (e: MediaQueryListEvent) => void;
 
@@ -70,6 +83,20 @@ describe('MobileNotice', () => {
     restore = stubMatchMedia(() => false);
     const { container } = render(<MobileNotice />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('uses the app-wide phone breakpoint, not a second width of its own', () => {
+    expect(MOBILE_NOTICE_QUERY).toBe(SMALL_SCREEN_QUERY);
+  });
+
+  it('renders nothing on the share route, where the phone layout is purpose-built', () => {
+    restore = stubMatchMedia(() => true);
+    const { container } = render(<MobileNotice />, '/s/abc123');
+    expect(container).toBeEmptyDOMElement();
+    expect(isPhoneOptimisedPath('/s/abc123')).toBe(true);
+    expect(isPhoneOptimisedPath('/')).toBe(false);
+    expect(isPhoneOptimisedPath('/p/some-poster')).toBe(false);
+    expect(isPhoneOptimisedPath('/share')).toBe(false);
   });
 
   it('tells a phone-width visitor to use a computer, and only on the phone query', () => {

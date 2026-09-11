@@ -54,7 +54,7 @@ jobs:
         run: npm -w @postr/web run test
 
   api:
-    name: api (typecheck + build)
+    name: api (typecheck + test + build)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -73,6 +73,12 @@ jobs:
 
       - name: Build API
         run: npm -w @postr/api run build
+
+      # The API suite covers the Stripe webhook/refund paths, the feature
+      # flags and the account-deletion route; until 2026-09-11 CI only
+      # typechecked the API, so those guards were unenforced.
+      - name: Test API
+        run: npm -w @postr/api run test
 
   db:
     name: db (migrations + pgTAP)
