@@ -432,7 +432,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
   - [ ] 6 localStorage keys cleared: `postr.style-presets`, `postr.scratch-pad`, `postr.scratch-note`, `postr.checklist-templates`, `postr.profile`, `postr.onboarding-done`.
   - [ ] Land on `/auth` sign-in screen (**no auto-guest** — bare `/auth`, not `?guest=1`).
   - [ ] Email is re-usable — sign up again with it succeeds.
-  - [ ] Browser console: `supabase.rpc('delete_own_account')` from a signed-in session now fails with **permission denied (42501)** — pgTAP `supabase/tests/account_deletions_test.sql` pins this.
+  - [ ] Browser console: `supabase.rpc('delete_own_account')` from a signed-in session now fails with **function does not exist (42883)** — the RPC was dropped, not revoked, because a revoked-function call by a browser role segfaults supabase/postgres 17.6.1.106 (reproduced 2026-09-11); pgTAP `supabase/tests/account_deletions_test.sql` pins this.
 - **✅ RESOLVED — Stripe orphan (was HIGH):** the delete path now cancels every live subscription and deletes the Stripe customer BEFORE the auth delete, and refuses to delete the account if Stripe fails. Unit-tested in `apps/api/src/__tests__/account.test.ts` (order, each failure code, guest path). Still to confirm by hand: `subscriptions.cancel` / `customers.del` work from the platform key under Managed Payments (sandbox item 18 of the audit's dashboard checklist).
 - **⚠ Doc/code disagreements still open (client-side, not this route):**
   - UI copy promises "a new guest account will be created" but code goes to **bare `/auth`** (no `?guest=1`), which does **not** auto-mint a guest → user lands on sign-in. **Copy bug.**

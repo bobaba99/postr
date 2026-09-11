@@ -100,6 +100,14 @@ jobs:
 
       # Pinned to the version the suite was developed against; `db start`
       # behavior (auto-applying migrations) is what the job relies on.
+      # 2.101.0 pulls supabase/postgres 17.6.1.106, on which anon or
+      # authenticated calling a function it lacks EXECUTE on segfaults the
+      # backend (reproduced 2026-09-11 with a one-line function; the whole
+      # pgTAP run died in recovery mode). Tests therefore assert grants via
+      # the catalog (has_function_privilege) and never execute a revoked
+      # function as a browser role. 17.6.1.143 (CLI 2.110.0) fixes the
+      # crash but changes function privileges in poster_reviews_test.sql —
+      # revisit both together when bumping.
       - uses: supabase/setup-cli@v1
         with:
           version: 2.101.0

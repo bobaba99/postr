@@ -22,13 +22,17 @@
 --       schema-public default privileges grant all three — the revoke
 --       must name them explicitly, as 20260610120000 does for functions).
 --
---   (b) delete_own_account() — EXECUTE revoked from public, anon AND
---       authenticated so a browser session can no longer bypass the
---       billing wind-down by calling the RPC directly. The function is
---       kept (not dropped: drop + create would resurrect the PUBLIC
---       default grant) and stays callable by service_role only.
---       Client call site to migrate: apps/web/src/pages/Profile.tsx
---       `supabase.rpc('delete_own_account')` → deleteAccount() from
+--   (b) delete_own_account() — DROPPED. Every caller now goes through the
+--       API route, so the RPC has no legitimate client left. It is dropped
+--       rather than kept with EXECUTE revoked because on supabase/postgres
+--       17.6.1.106 (the build CI pinned until 2026-09-11) a browser role
+--       (anon or authenticated) calling ANY function it lacks EXECUTE on
+--       segfaults the backend — the whole database restarts in recovery.
+--       Reproduced with a one-line function; fixed in 17.6.1.143. A stale
+--       client bundle calling the dropped RPC gets a plain
+--       "function does not exist" error (42883), which is harmless on
+--       every build. Client call site already migrated:
+--       apps/web/src/profile/accountDeletion.ts → deleteAccount() from
 --       apps/web/src/data/account.ts.
 
 -- --------------------------------------------------------------------------
@@ -59,10 +63,6 @@ revoke all on table public.account_deletions from public, anon, authenticated;
 grant all on table public.account_deletions to service_role;
 
 -- --------------------------------------------------------------------------
--- (b) the RPC is no longer a browser entry point
+-- (b) the RPC is gone — nothing is left for a browser session to call
 -- --------------------------------------------------------------------------
-revoke execute on function public.delete_own_account() from public, anon, authenticated;
-grant execute on function public.delete_own_account() to service_role;
-
-comment on function public.delete_own_account() is
-  'Superseded by POST /account/delete (apps/api/src/account.ts), which cancels Stripe billing and removes Storage objects first. Kept for service_role only; browser roles have no EXECUTE.';
+drop function if exists public.delete_own_account();

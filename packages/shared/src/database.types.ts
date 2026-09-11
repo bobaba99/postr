@@ -741,7 +741,6 @@ export type Database = {
     Functions: {
       consume_export_credit: { Args: { p_user_id: string }; Returns: number }
       consume_review_credit: { Args: { p_user_id: string }; Returns: number }
-      delete_own_account: { Args: never; Returns: undefined }
       export_my_data: { Args: never; Returns: Json }
       grant_export_credits: {
         Args: { p_amount: number; p_user_id: string }

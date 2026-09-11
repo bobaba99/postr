@@ -4915,7 +4915,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 | `public.authors_lib` / `public.institutions_lib` / `public.references_lib` | — | **UNUSED** (`20260408000300_library.sql` — PRD §21 library never wired to UI) — §10 |
 
 **RPCs / DB functions called from the web app**
-- [ ] ~~`delete_own_account` — Profile Delete account~~ — **no longer callable from the browser** (`20260911000000_account_delete_hardening.sql` revoked EXECUTE from anon/authenticated; service_role only). Deletion is `POST /account/delete` (§ apps/api below). pgTAP: `account_deletions_test.sql`, `delete_own_account_test.sql`, `rpc_definitions_test.sql`.
+- [ ] ~~`delete_own_account` — Profile Delete account~~ — **dropped** by `20260911000000_account_delete_hardening.sql` (not merely revoked: on supabase/postgres 17.6.1.106 a browser role calling a function it lacks EXECUTE on segfaults the backend — reproduced 2026-09-11; a stale client now gets a plain 42883). Deletion is `POST /account/delete` (`apps/api/src/account.ts`), which cancels Stripe billing and removes Storage objects before `auth.admin.deleteUser`.
 - [ ] `export_my_data` — Profile Download my data (`Profile.tsx:682-689`) → `postr-export-{ts}.json`
 - [ ] `is_gallery_admin` — Home Admin link gate, AdminGallery gate
 - [ ] admin retract/unretract — `data/gallery.ts` (`adminRetractEntry`, `adminUnretractEntry`) ← AdminGallery

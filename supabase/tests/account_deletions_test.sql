@@ -9,10 +9,10 @@
 --   * public.account_deletions is server-only — RLS on, zero policies,
 --     no table privilege for anon / authenticated, full access for
 --     service_role (the API writes the audit row with it).
---   * delete_own_account() is no longer a browser entry point — EXECUTE
---     revoked from anon AND authenticated (has_function_privilege sees
---     PUBLIC-inherited grants, so a drop+recreate that resurrects the
---     default grant is caught too), kept for service_role.
+--   * delete_own_account() no longer exists — dropped, not revoked: on
+--     supabase/postgres 17.6.1.106 a browser role calling a function it
+--     lacks EXECUTE on segfaults the backend, so a stale client must hit
+--     a plain undefined-function error (42883) instead of a grant check.
 --
 -- Both are asserted at the grant layer AND behaviourally (as the actual
 -- `authenticated` role, the way PostgREST runs browser calls).
@@ -26,7 +26,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(19);
+select plan(17);
 
 -- --------------------------------------------------------------------------
 -- Fixture (as superuser): one confirmed user, so the behavioural RPC call
@@ -73,21 +73,15 @@ select ok(
   'service_role can read account_deletions');
 
 -- --------------------------------------------------------------------------
--- 13–15 · delete_own_account() grants
+-- 13 · delete_own_account() is gone
 -- --------------------------------------------------------------------------
-select ok(
-  not has_function_privilege('anon', 'public.delete_own_account()', 'EXECUTE'),
-  'anon cannot execute delete_own_account()');
-select ok(
-  not has_function_privilege('authenticated', 'public.delete_own_account()', 'EXECUTE'),
-  'authenticated cannot execute delete_own_account() (must go through POST /account/delete)');
-select ok(
-  has_function_privilege('service_role', 'public.delete_own_account()', 'EXECUTE'),
-  'service_role keeps EXECUTE on delete_own_account()');
+select hasnt_function('public', 'delete_own_account', array[]::name[],
+  'delete_own_account() is dropped (deletion runs through POST /account/delete)');
 
 -- --------------------------------------------------------------------------
--- 16–18 · Behavioural: as the real `authenticated` role, with a matching
--- auth.uid(), every browser path is refused with 42501.
+-- 14–16 · Behavioural: as the real `authenticated` role, with a matching
+-- auth.uid(), every browser path is refused — the old RPC with 42883
+-- (undefined function, no privilege check involved), the table with 42501.
 -- --------------------------------------------------------------------------
 select set_config(
   'request.jwt.claims',
@@ -97,8 +91,8 @@ set local role authenticated;
 
 select throws_ok(
   $q$ select public.delete_own_account() $q$,
-  '42501', null,
-  'authenticated call to delete_own_account() is refused at the grant layer');
+  '42883', null,
+  'a stale client calling the old RPC gets undefined_function, not a grant check');
 select throws_ok(
   $q$ insert into public.account_deletions (user_id)
       values ('0e000000-0000-4000-a000-000000000001') $q$,
@@ -111,12 +105,12 @@ select throws_ok(
 
 reset role;
 
--- The refused RPC must not have deleted anyone.
+-- Nothing above may have deleted anyone.
 select is(
   (select count(*) from auth.users
     where id = '0e000000-0000-4000-a000-000000000001'),
   1::bigint,
-  '...and the user still exists');
+  '...and the user still exists');  -- 17
 
 select * from finish();
 rollback;
