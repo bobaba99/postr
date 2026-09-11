@@ -5,12 +5,15 @@ import { FeedbackModal } from '@/components/FeedbackModal';
 import { PublishFlow } from '@/components/PublishFlow';
 import { SessionExpiredModal } from '@/components/SessionExpiredModal';
 import { RouteScrollManager } from '@/components/RouteScrollManager';
+import { MobileNotice } from '@/components/MobileNotice';
 import { redactUrl } from '@/analytics/redactUrl';
 
 export default function App() {
   return (
     <BrowserRouter>
       <RouteScrollManager />
+      {/* Phone-width strip on every route: Postr is a desktop tool. */}
+      <MobileNotice />
       <AppRoutes />
       <FeedbackModal />
       <PublishFlow />
