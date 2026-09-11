@@ -109,12 +109,17 @@ select ok(
 --
 -- 20260610120000_rpc_grant_hardening.sql revoked the default PUBLIC
 -- EXECUTE grant, so grants are a real access boundary: only `authenticated`
--- may call the user-facing RPCs. The negative assertions below pin that —
--- has_function_privilege('anon', ...) sees privileges inherited via PUBLIC,
--- so they also catch a drop+recreate that silently resurrects the default
--- grant. The auth.uid() guards inside each body stay covered behaviorally:
--- export_my_data() raises P0001 unauthenticated (export_my_data_test.sql),
--- delete_own_account() deletes nothing (delete_own_account_test.sql).
+-- may call the user-facing RPCs — EXCEPT delete_own_account(), which
+-- 20260911000000_account_delete_hardening.sql took away from
+-- `authenticated` as well: account deletion goes through POST
+-- /account/delete (apps/api/src/account.ts, service_role), which cancels
+-- Stripe billing and removes Storage objects first. The negative
+-- assertions below pin that — has_function_privilege('anon', ...) sees
+-- privileges inherited via PUBLIC, so they also catch a drop+recreate that
+-- silently resurrects the default grant. The auth.uid() guards inside each
+-- body stay covered behaviorally: export_my_data() raises P0001
+-- unauthenticated (export_my_data_test.sql), delete_own_account() deletes
+-- nothing (delete_own_account_test.sql).
 -- --------------------------------------------------------------------------
 select has_trigger('public', 'feedback', 'feedback_rate_limit_trigger',
   'rate-limit trigger is attached to public.feedback');
@@ -123,8 +128,8 @@ select function_privs_are('public', 'export_my_data', array[]::name[],
   'authenticated', array['EXECUTE'],
   'authenticated role can execute export_my_data()');
 select function_privs_are('public', 'delete_own_account', array[]::name[],
-  'authenticated', array['EXECUTE'],
-  'authenticated role can execute delete_own_account()');
+  'authenticated', array[]::name[],
+  'authenticated can no longer execute delete_own_account() (POST /account/delete only)');
 select function_privs_are('public', 'is_gallery_admin', array['uuid']::name[],
   'authenticated', array['EXECUTE'],
   'authenticated role can execute is_gallery_admin(uuid)');

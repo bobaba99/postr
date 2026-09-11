@@ -34,6 +34,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletions: {
+        Row: {
+          cancelled_subscription_ids: string[]
+          deleted_at: string
+          id: string
+          storage_objects_removed: number
+          stripe_customer_id: string | null
+          user_id: string
+        }
+        Insert: {
+          cancelled_subscription_ids?: string[]
+          deleted_at?: string
+          id?: string
+          storage_objects_removed?: number
+          stripe_customer_id?: string | null
+          user_id: string
+        }
+        Update: {
+          cancelled_subscription_ids?: string[]
+          deleted_at?: string
+          id?: string
+          storage_objects_removed?: number
+          stripe_customer_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       admin_emails: {
         Row: {
           added_at: string

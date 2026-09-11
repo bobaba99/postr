@@ -71,6 +71,8 @@ describe('createApp — deactivated routers', () => {
     expect(checkout.status).toBe(401);
     const importExtract = await request(app).post('/api/import/extract').send({});
     expect(importExtract.status).toBe(401);
+    const accountDelete = await request(app).post('/account/delete').send({});
+    expect(accountDelete.status).toBe(401);
   });
 
   it('mounts the narrative router when FEATURE_MANUSCRIPT is on', async () => {

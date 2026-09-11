@@ -26,7 +26,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = extensions, public;
 
-select plan(12);
+select plan(13);
 
 -- --------------------------------------------------------------------------
 -- Fixtures
@@ -91,13 +91,22 @@ select set_config(
   'request.jwt.claims',
   '{"sub":"0d000000-0000-4000-a000-000000000001","role":"authenticated"}',
   true);
--- Call as the actual `authenticated` role, not the superuser: proves the
--- EXECUTE grant reaches the cascade end-to-end the way PostgREST calls it.
+-- Since 20260911000000_account_delete_hardening.sql the browser role has
+-- NO EXECUTE on the RPC (deletion runs through POST /account/delete so
+-- Stripe billing is wound down first). Pin the refusal, then run the
+-- cascade as service_role — the role the API route holds — with the same
+-- auth.uid() from request.jwt.claims.
 set local role authenticated;
+select throws_ok(
+  $q$ select public.delete_own_account() $q$,
+  '42501', null,
+  'authenticated is refused at the grant layer (must go through POST /account/delete)');
+reset role;
+set local role service_role;
 
 select lives_ok(
   $q$ select public.delete_own_account() $q$,
-  'authenticated user can delete their own account');
+  'service_role can delete the caller''s account via the RPC');
 
 -- Back to superuser so the assertions below see every row, unfiltered by RLS.
 reset role;

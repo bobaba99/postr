@@ -5,6 +5,7 @@ import { createImportRouter } from './import.js';
 import { createNarrativeRouter } from './narrative.js';
 import { createReviewRouter } from './review.js';
 import { createBillingRouter, createBillingWebhookRouter } from './billing.js';
+import { createAccountRouter } from './account.js';
 import { readFeatureFlags } from './features.js';
 
 export function createApp(): Express {
@@ -40,6 +41,11 @@ export function createApp(): Express {
   // so they mount AFTER express.json(). The flags decide whether the
   // review SKUs are sellable; the term + pack always are.
   app.use(createBillingRouter({ features }));
+
+  // Account deletion (POST /account/delete) — cancels Stripe billing and
+  // removes Storage objects BEFORE the auth delete, so a paying user can
+  // never be deleted into an orphaned subscription (account.ts).
+  app.use(createAccountRouter());
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true });
