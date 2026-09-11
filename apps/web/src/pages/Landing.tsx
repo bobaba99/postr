@@ -205,8 +205,17 @@ export default function Landing() {
           >
             <div className="text-2xl mb-3">📊</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Figure readability</h3>
+            {/* The same check runs as a public page; the trailing link
+                is the only way the four feature cards point anywhere.
+                Keep the whole paragraph at fifteen words or fewer. */}
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Check chart labels at final print size and get a copy-ready fix.
+              Check chart labels at print size and copy the fix.{' '}
+              <Link
+                to="/tools/figure-readability"
+                className="font-semibold text-[#b8a9ff] no-underline transition-colors duration-base ease-smooth hover:text-white"
+              >
+                Try it standalone.
+              </Link>
             </p>
           </div>
           <div
@@ -233,18 +242,72 @@ export default function Landing() {
       </section>
 
       {/*
-        The "Tools you can use on their own" section that sat here — an
-        h2, a count-free intro and a ToolCard grid (last: the Plot
-        picker card linking /chart-chooser) — was removed when the
-        standalone plot picker was deactivated (routes.tsx header). The
-        manuscript card had already gone the same way. An h2 over an
-        empty grid is not a section, so the whole thing left with the
-        last card; the ToolCard component went with it (git history,
-        commit before 2026-09-10). Restore section + card + component
-        together with the first standalone tool that comes back.
+        Standalone tools — everything here runs without an account and
+        without opening the editor, hence "no account needed" rather
+        than a signup CTA. One card while the plot picker and the
+        manuscript flows are deactivated (routes.tsx header): the
+        Figure readability check. The intro is count-free on purpose —
+        "Two parts of the poster workflow…" went stale the moment a
+        card left. When the picker returns, its card goes in FRONT of
+        this one and the grid goes back to `sm:grid-cols-2`.
+
+        Mirrors PublicHeader TOOL_LINKS and the PublicFooter Product
+        column; toolDiscoverability.test.tsx pins all three.
       */}
+      <section className="mx-auto w-full max-w-4xl px-8 pb-24">
+        <h2 className="text-center text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8]">
+          Tools you can use on their own
+        </h2>
+        <p className="mx-auto mt-3 max-w-[52ch] text-center text-sm leading-relaxed text-[#8b8f99]">
+          The parts of the poster workflow that work without an account,
+          and without opening the editor.
+        </p>
+
+        <div className="mx-auto mt-8 grid max-w-md grid-cols-1 gap-6">
+          <ToolCard
+            to="/tools/figure-readability"
+            icon="🔍"
+            title="Figure readability"
+            body="Paste your R or Python plotting code and the size it will print at. See which labels fall below poster thresholds and copy the base_size fix."
+            cta="Check your figure"
+          />
+        </div>
+      </section>
 
       <PublicFooter />
     </main>
+  );
+}
+
+function ToolCard({
+  to,
+  icon,
+  title,
+  body,
+  cta,
+}: {
+  to: string;
+  icon: string;
+  title: string;
+  body: string;
+  cta: string;
+}) {
+  return (
+    <Link
+      to={to}
+      data-postr-reveal
+      className="group flex flex-col rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 no-underline transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#7c6aed]"
+    >
+      <div className="mb-3 text-2xl" aria-hidden="true">
+        {icon}
+      </div>
+      <h3 className="mb-2 text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8]">
+        {title}
+      </h3>
+      <p className="flex-1 text-sm leading-relaxed text-[#8b8f99]">{body}</p>
+      <span className="mt-4 text-sm font-semibold text-[#7c6aed]">
+        {cta} →
+      </span>
+    </Link>
   );
 }

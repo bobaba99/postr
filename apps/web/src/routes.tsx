@@ -5,6 +5,10 @@
  *   /about              → About (public, feature tour)
  *   /why-posters        → Why posters (public)
  *   /pricing            → Pricing (public)
+ *   /tools/figure-readability → Figure readability check (public, no
+ *                         session, code-split — the one live standalone
+ *                         tool; the editor's Check tab as a page)
+ *   /figure-check       → redirect to /tools/figure-readability (alias)
  *   /chart-chooser      → redirect to / (standalone plot picker deactivated)
  *   /plot-picker        → redirect to / (alias of the deactivated picker)
  *   /gallery            → redirect to / (public gallery deactivated)
@@ -92,12 +96,12 @@
  *
  * ── Standalone plot picker: deactivated, not deleted ─────────────
  * Switched off 2026-09-10, after the pass above, while the picker is
- * revamped in another worktree. With it gone the product ships NO
- * standalone tools in its nav — the poster editor is the whole public
- * surface. (The standalone plot checker is a later follow-up and is
- * not mounted either.) charts/* is NOT dormant: the same ChartChooser
- * ladder stays live inside the editor's Figure tab; only the page that
- * wrapped it for the public URL is off.
+ * revamped in another worktree. The figure-readability check
+ * (/tools/figure-readability, below) is the ONE standalone tool in the
+ * nav; otherwise the poster editor is the whole public surface.
+ * charts/* is NOT dormant: the same ChartChooser ladder stays live
+ * inside the editor's Figure tab; only the page that wrapped it for
+ * the public URL is off.
  *
  * Kept on disk (dormant, still unit-tested):
  *   - pages/ChartChooser.tsx — pages/__tests__/ChartChooser.test.tsx
@@ -124,9 +128,10 @@
  *      (a prerendered file must not be shadowed by a rewrite).
  *   4. components/PublicHeader.tsx TOOL_LINKS ({ to: '/chart-chooser',
  *      label: 'Plot picker', blurb: 'Find the figure that fits your
- *      data' }), components/PublicFooter.tsx Product column,
- *      pages/Landing.tsx "Tools you can use on their own" section +
- *      ToolCard (git history) and its small-screen note,
+ *      data' } — in FRONT of the Figure readability entry),
+ *      components/PublicFooter.tsx Product column, pages/Landing.tsx
+ *      "Tools you can use on their own" ToolCard (before the checker
+ *      card; the section itself is back) and its small-screen note,
  *      pages/About.tsx 'figures' milestone copy.
  *   5. scripts: apps/web/scripts/verify-prerender.sh (prerendered
  *      loop, noindex/200 loops, check_alias /plot-picker),
@@ -135,14 +140,30 @@
  *      §6.10 + §10 "Deactivated features"; docs/manual-test-flows.md
  *      deactivated-features note.
  *
+ * ── Standalone figure-readability check: LIVE ────────────────────
+ * /tools/figure-readability (pages/FigureReadability.tsx, code-split)
+ * is the editor's Figure › Check tab as a public page: paste R/Python
+ * plotting code, type the printed size, get the point size of every
+ * label and the base_size fix. Pure client-side; creates no Supabase
+ * session. Nested under /tools so future standalone tools share the
+ * prefix; the bare /tools is a real 404 (vercelRouting.test.ts
+ * UNKNOWN_PATHS). Its alias /figure-check 308s here (vercel.json) and
+ * <Navigate>s here in-app. It is mirrored in PublicHeader TOOL_LINKS,
+ * the PublicFooter Product column and the Landing tools section, and
+ * pinned by src/__tests__/routes.test.tsx + toolDiscoverability.test.tsx
+ * (TOOL_PATHS) + siteMeta.test.ts + vercelRouting.test.ts.
+ *
  * ── Slug aliases: one canonical URL, permanent redirects ─────────
  * Each standalone tool has exactly ONE indexed URL. Alternate spellings
  * redirect rather than render, so no two URLs serve the same document.
- * While every standalone tool is deactivated there is no canonical
- * tool URL left, so every alias falls through to the landing page in
- * ONE hop rather than chaining through a route that itself redirects.
+ * With every other standalone tool deactivated, their aliases fall
+ * through to the landing page in ONE hop rather than chaining through
+ * a route that itself redirects.
  *
- *   /                          (the only destination for now)
+ *   /tools/figure-readability
+ *     ← /figure-check          (the short spelling for the checker)
+ *
+ *   /                          (every deactivated tool's alias)
  *     ← /plot-picker           (alias of /chart-chooser — the measured
  *                               slug, "chart chooser" 40/mo · KD 0; the
  *                               308 was deployed, so it is retargeted
@@ -197,6 +218,10 @@ import NotFound from '@/pages/NotFound';
 const Editor = lazy(() => import('@/pages/Editor'));
 const Share = lazy(() => import('@/pages/Share'));
 const AdminGallery = lazy(() => import('@/pages/AdminGallery'));
+// The one live standalone tool. Code-split so the readability engine
+// (ReadabilityPanel + readability.ts) stays out of the marketing
+// pages' initial bundle; the editor already loads it in its own chunk.
+const FigureReadabilityPage = lazy(() => import('@/pages/FigureReadability'));
 // Deactivated — see the header. The lazy imports for
 // pages/PaperToPoster, pages/PresentationChecker, pages/PaperToSlides
 // and pages/ChartChooser are intentionally absent so their chunks leave
@@ -230,6 +255,13 @@ export function AppRoutes() {
         <Route path="/cookies/fr" element={<CookiesFr />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/terms/fr" element={<TermsFr />} />
+        {/* Standalone figure-readability check — public, creates no
+            Supabase session (pages/FigureReadability.tsx header). */}
+        <Route path="/tools/figure-readability" element={<FigureReadabilityPage />} />
+        <Route
+          path="/figure-check"
+          element={<Navigate to="/tools/figure-readability" replace />}
+        />
         {/* Standalone plot picker is deactivated — see the header
             comment. Its canonical route and its alias both land on the
             landing page in one hop. */}

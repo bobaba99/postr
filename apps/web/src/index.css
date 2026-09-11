@@ -813,3 +813,12 @@ button:focus-visible,
   outline-offset: 2px;
   border-radius: 4px;
 }
+
+/* The readability code editor (poster/ReadabilityPanel.tsx) sits
+ * inside its own bordered frame next to a line-number gutter, so the
+ * ring is drawn INSIDE the textarea's edge — an outset ring would be
+ * clipped by the frame's overflow:hidden. Same accent token. */
+textarea.postr-code-editor:focus-visible {
+  outline: 2px solid #7c6aed;
+  outline-offset: -2px;
+}

@@ -33,7 +33,10 @@ echo "Prerendered routes carry real HTML:"
 # paper-to-poster left this list when the manuscript flows were
 # deactivated, and chart-chooser when the standalone plot picker was
 # (routes.tsx header) — both are a rewrite + noindex now.
-for route in "" about privacy cookies terms; do
+# tools/figure-readability is the one live standalone tool: a nested
+# path, prerendered to dist/tools/figure-readability/index.html and
+# served by cleanUrls exactly like the flat routes.
+for route in "" about privacy cookies terms tools/figure-readability; do
   url="${BASE}/${route}"
   body="$(curl -sL --max-time 20 "$url")"
   bytes="${#body}"
@@ -56,7 +59,7 @@ done
 
 echo
 echo "Every route has a distinct title:"
-titles="$(for route in "" about privacy cookies terms; do
+titles="$(for route in "" about privacy cookies terms tools/figure-readability; do
   curl -sL --max-time 20 "${BASE}/${route}" |
     grep -o '<title>[^<]*</title>' | head -1
 done)"
@@ -110,8 +113,9 @@ done
 echo
 echo "Unknown paths return a real 404 with the branded page:"
 # /debug is here on purpose: production builds drop the Debug route, so
-# serving the shell there would be a soft 404.
-for route in wp-admin asdf random/deep/path.php debug; do
+# serving the shell there would be a soft 404. /tools is the bare parent
+# of the figure-readability page and must not resolve to anything.
+for route in wp-admin asdf random/deep/path.php debug tools; do
   code="$(curl -s -o /dev/null --max-time 20 -w '%{http_code}' "${BASE}/${route}")"
   if [ "$code" != "404" ]; then
     fail "/${route} → ${code} (expected 404 — the soft-404 space is back)"
@@ -130,9 +134,10 @@ echo "Slug aliases 308 to their canonical page:"
 # /manuscript-to-poster is the load-bearing one: it was live in
 # production and listed in the deployed sitemap, so if this redirect
 # ever goes missing a once-indexed URL starts returning 404. Every
-# alias points at / while all the standalone tools are deactivated
-# (routes.tsx header) — /plot-picker included, since its 308 to
-# /chart-chooser was deployed and must be retargeted, not dropped.
+# deactivated tool's alias points at / (routes.tsx header) —
+# /plot-picker included, since its 308 to /chart-chooser was deployed
+# and must be retargeted, not dropped. /figure-check is the live one:
+# it must land on the prerendered checker, not on /.
 check_alias() {
   alias_path="$1"
   canonical="$2"
@@ -158,6 +163,7 @@ check_alias() {
   fi
 }
 
+check_alias /figure-check /tools/figure-readability
 check_alias /plot-picker /
 check_alias /manuscript-to-poster /
 check_alias /paper-to-present /

@@ -99,6 +99,18 @@ describe('MobileNotice', () => {
     expect(isPhoneOptimisedPath('/share')).toBe(false);
   });
 
+  it('renders nothing on the phone-first figure-readability page', () => {
+    // The page is built phone-first (16px inputs, 44px targets); the
+    // strip's "open this on a computer" claim is false there and it
+    // would sit over the results table.
+    restore = stubMatchMedia(() => true);
+    const { container } = render(<MobileNotice />, '/tools/figure-readability');
+    expect(container).toBeEmptyDOMElement();
+    expect(isPhoneOptimisedPath('/tools/figure-readability')).toBe(true);
+    expect(isPhoneOptimisedPath('/tools')).toBe(false);
+    expect(isPhoneOptimisedPath('/tools/figure-readability-guide')).toBe(false);
+  });
+
   it('tells a phone-width visitor to use a computer, and only on the phone query', () => {
     restore = stubMatchMedia((q) => q === MOBILE_NOTICE_QUERY);
     render(<MobileNotice />);

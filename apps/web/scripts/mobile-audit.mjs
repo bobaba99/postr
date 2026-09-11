@@ -13,8 +13,11 @@ import { chromium } from 'playwright';
 const BASE = 'http://localhost:5173';
 // /paper-to-poster left this list when the manuscript flows were
 // deactivated, and /chart-chooser when the standalone plot picker was
-// (routes.tsx header) — both now redirect to /.
-const ROUTES = ['/', '/about', '/privacy', '/cookies', '/terms'];
+// (routes.tsx header) — both now redirect to /. /tools/figure-readability
+// is the live standalone checker: a phone-first page with a code
+// editor, numeric inputs and preset chips — exactly what this audit is
+// for (16px inputs, 44px targets, no sideways scroll at 375px).
+const ROUTES = ['/', '/about', '/privacy', '/cookies', '/terms', '/tools/figure-readability'];
 const WIDTHS = [
   { w: 375, h: 812, label: 'iPhone SE/13 mini' },
   { w: 414, h: 896, label: 'iPhone Plus/Max' },
