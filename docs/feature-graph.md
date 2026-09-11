@@ -1,6 +1,6 @@
 # Postr — Feature Graph & Refactoring Checklist (v2)
 
-**Revised 2026-09-10 — hide pass.** The manuscript pipelines (§6.12 `/paper-to-poster`, §6.16 `/paper-to-slides`), the Presentation Checker (§6.17: `/presentation-checker`, the editor `review` tab, the `review_pack` / `review_addon` SKUs), the paper-to-talk waitlist callout (§6.3) **and — same day, second pass — the standalone plot picker page (§6.10 `pages/ChartChooser.tsx`, `/chart-chooser` + alias `/plot-picker`)** are **DEACTIVATED, not deleted** — routes redirect to `/`, nav/footer/landing/dashboard/pricing entries are removed, SEO records are gone, the API routers mount only behind `FEATURE_MANUSCRIPT` / `FEATURE_REVIEW`. The product now has **no standalone tools in its nav**; `charts/*` itself stays LIVE inside the editor's Figure tab (§6.8). Every file named in those sections still exists and stays unit-tested. Canonical restore recipe: the `apps/web/src/routes.tsx` header; summary in §10 "Deactivated features". The per-element inventories in §6.10 / §6.12 / §6.16 / §6.17 are kept verbatim as the reactivation reference and are NOT re-extracted.
+**Revised 2026-09-10 — hide pass.** The manuscript pipelines (§6.12 `/paper-to-poster`, §6.16 `/paper-to-slides`), the Presentation Checker (§6.17: `/presentation-checker`, the editor `review` tab, the `review_pack` / `review_addon` SKUs), the paper-to-talk waitlist callout (§6.3) **and — same day, second pass — the standalone plot picker page (§6.10 `pages/ChartChooser.tsx`, `/chart-chooser` + alias `/plot-picker`)** are **DEACTIVATED, not deleted** — routes redirect to `/`, nav/footer/landing/dashboard/pricing entries are removed, SEO records are gone, the API routers mount only behind `FEATURE_MANUSCRIPT` / `FEATURE_REVIEW`. The product's nav carries **one standalone tool** — the figure-readability check at `/tools/figure-readability` (alias `/figure-check`), added 2026-09-11 and inventoried in §6.10 `pages/FigureReadability.tsx`; `charts/*` itself stays LIVE inside the editor's Figure tab (§6.8). Every file named in those sections still exists and stays unit-tested. Canonical restore recipe: the `apps/web/src/routes.tsx` header; summary in §10 "Deactivated features". The per-element inventories in §6.10 / §6.12 / §6.16 / §6.17 are kept verbatim as the reactivation reference and are NOT re-extracted.
 
 **Revised 2026-07-29** (v2 second pass was 2026-07-28, superseding v1 from earlier that day; 2026-07-29 updates added §6.16 Manuscript → Slides and — documented from the `feat/presentation-checker` branch ahead of its launch gate — §6.17 Presentation Checker). Source of truth: `apps/web/src/` (React 19 + react-router 8 + Vite SPA) plus `apps/api/src/` for the external-services map. Every file:line reference and verbatim UI string below was extracted from the code as of **2026-07-28 ~16:00 local** (§6.16 and §6.17 extracted 2026-07-29; §6.17 from the feature branch). If the doc and the code disagree, **the code wins** — regenerate this doc.
 
@@ -233,6 +233,8 @@ flowchart LR
 | `/about` | `pages/About.tsx` | no | — |
 | `/why-posters` | `pages/WhyPosters.tsx` | no | — |
 | `/pricing` | `pages/Pricing.tsx` | no | — |
+| `/tools/figure-readability` | `pages/FigureReadability.tsx` | yes | public, no session (LIVE 2026-09-11 — the one standalone tool; static SEO record + prerender + sitemap; §6.10) |
+| `/figure-check` | redirect → `/tools/figure-readability` | — | alias of the checker (vercel.json 308 + in-app `<Navigate replace>`) |
 | `/gallery` | `<Navigate to="/" replace>` | — | gallery deactivated (`GALLERY_PUBLIC_ENABLED=false`) |
 | `/gallery/:entryId` | `<Navigate to="/" replace>` | — | gallery deactivated |
 | `/privacy` | `pages/Privacy.tsx` | no | — |
@@ -360,7 +362,8 @@ Public marketing surface: `/`, `/about`, `/why-posters`. Signed-in users hitting
 flowchart LR
   L["Landing /"] -->|"Get started"| A["/auth"]
   L -->|"Try as guest"| AG["/auth?guest=1"]
-  %% ToolCard /paper-to-poster AND ToolCard /chart-chooser removed 2026-09-10 (deactivated) — no standalone-tools section remains
+  %% ToolCard /paper-to-poster AND ToolCard /chart-chooser removed 2026-09-10 (deactivated); the section is BACK 2026-09-11 with one card
+  L -->|"ToolCard Figure readability / feature-card link"| FR["/tools/figure-readability (§6.10)"]
   L -->|"signed-in auto-redirect"| D["/dashboard"]
   AB["About /about"] -->|"openFeedback bug/feature/other"| FB["FeedbackModal"]
   W["WhyPosters /why-posters"] -->|"Start a poster"| L
@@ -372,7 +375,9 @@ flowchart LR
 **Elements**
 - [ ] `Get started` — router link — `Landing.tsx:154-159` — `/auth`
 - [ ] `Try as guest` — router link — `Landing.tsx:160-165` — `/auth?guest=1` (auto-triggers guest login)
-- [ ] ~~`ToolCard` — router link — `/chart-chooser`~~ — removed 2026-09-10 (standalone plot picker deactivated); the `/paper-to-poster` card had gone the same day. With the last card gone the whole "Tools you can use on their own" section AND the `ToolCard` component were removed from `Landing.tsx` (git history, commit before 2026-09-10) — restore section + card + component together with the first tool that comes back
+- [ ] ~~`ToolCard` — router link — `/chart-chooser`~~ — removed 2026-09-10 (standalone plot picker deactivated); the `/paper-to-poster` card had gone the same day. The "Tools you can use on their own" section + `ToolCard` component were removed with it and **restored 2026-09-11** for the checker (below); the picker card goes back in FRONT of the checker card when the revamp ships
+- [ ] `ToolCard` — router link — `Landing.tsx` — `/tools/figure-readability` — icon 🔍, title "Figure readability", body "Paste your R or Python plotting code and the size it will print at. See which labels fall below poster thresholds and copy the base_size fix.", cta "Check your figure →"; single card, `max-w-md mx-auto grid-cols-1`; section h2 "Tools you can use on their own", count-free intro "The parts of the poster workflow that work without an account, and without opening the editor."
+- [ ] `Try it standalone.` — inline Link inside the "Figure readability" feature card — `Landing.tsx` — `/tools/figure-readability` (card body "Check chart labels at print size and copy the fix. Try it standalone." — ≤15 words, `toolDiscoverability.test.tsx`)
 
 **Copy**
 - [ ] "Built for researchers" — hero badge — `Landing.tsx:119`
@@ -1588,17 +1593,21 @@ Mounted from: imported `Sidebar.tsx:56`, rendered `Sidebar.tsx:768-782` under `t
 
 #### `poster/ReadabilityPanel.tsx` — "Check a figure" tab: paste R/Python plotting code → readability-at-print-size table + auto-fix snippet; optional Claude-Vision OCR scan of a selected image block
 
-Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-126` when `mode === 'check'`; `FigureTab` rendered at `Sidebar.tsx:743-758` under `tab === 'check'`.
+Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-126` when `mode === 'check'`; `FigureTab` rendered at `Sidebar.tsx:743-758` under `tab === 'check'`. **Also mounted (2026-09-11) by the public page `pages/FigureReadability.tsx` (§6.10) with `layout="page"`.**
+
+**`layout` prop (added 2026-09-11):** `layout?: 'panel' | 'page'`, default `'panel'` so `FigureTab` is untouched. Tokens live in `poster/readabilityLayout.ts` (`layoutTokens(layout)`): `'page'` = 16px/24px monospace editor + gutter, 44px min-height on the language toggles / Check / Copy / "Open full edited code" / modal close, table 15px, muted `#8b8f99` (not `#6b7280`), Tab NOT intercepted in the code editor, scale suffix " (source canvas → printed size)", copied-banner tail "paste it into your script, re-run, and print at this size.", parser `defaultSizeLabel` "the print size you entered," (`readability.ts` `ParseOptions.defaultSizeLabel`, default "figure preview size"). The image-OCR scan section is hard-gated to `layout === 'panel'` (`isImage`). The sizing sentence under the intro moved to `poster/ReadabilitySizingNote.tsx` (image block / canvas overlay / page variants; re-keys the `postr-dimension-pill` on the dimensions). Results now render inside a `postr-rise-in` wrapper; language toggles carry `aria-pressed`. Pinned by `poster/__tests__/FigureTab.test.tsx` ("drag or resize it" still present in the editor) and `pages/__tests__/FigureReadability.test.tsx`.
+
+**Split + a11y pass (2026-09-11, same day, review follow-ups):** `ReadabilityPanel.tsx` is now ~790 lines; four satellites carry what moved out — `poster/readabilityStyles.ts` (`panelStyle`/`labelStyle`/`btnStyle`/`primaryBtnStyle`), `poster/readabilityFullFix.ts` (`generateFullFix`: the appended `ggsave(...)` / `plt.rcParams['figure.figsize']` + `savefig` now carry the canvas the check was SCORED against — `params.canvasWidth/Height`, i.e. the typed print size on the page or the overlay in the editor — never a hardcoded 10 × 7; `__tests__/readabilityFullFix.test.ts`), `poster/ReadabilityCodeView.tsx` (`CopyButton` — `white-space: nowrap`, motion via `--dur-base`/`--ease-standard` — and `CodeView`, which takes `layout` so the snippet/modal code renders at the page's 16px), `poster/FullCodeModal.tsx` (a real dialog: `role="dialog" aria-modal="true" aria-labelledby` → "Full edited code", `×` is `aria-label="Close"`, focus lands on × on open and returns to the opener on close, Tab wraps inside, `document.body.style.overflow` locked while open; `__tests__/FullCodeModal.test.tsx`). The code textarea carries `aria-label="Your R or Python plotting code"` + `className="postr-code-editor"` and no longer resets `outline` — `textarea.postr-code-editor:focus-visible` in `index.css` draws the accent ring inset. `checked` is stamped with `{ widthIn, heightIn }`; in `layout="page"` a result computed at a different size than the live one is treated as stale and the table is dropped until Check runs again (the editor keeps results through an overlay drag). In page layout the fix-box label uses `tableFontSize`, "Copy snippet" / "Open full edited code" use `buttonFontSize` (15px).
 
 **Elements**
-- [ ] `Auto` / `R` / `Python` — language segment buttons (3) — `ReadabilityPanel.tsx:630-644` — sets `lang` state
-- [ ] Code textarea (line-numbered CodeEditor) — `ReadabilityPanel.tsx:236-259` — keyboard: **Tab** inserts two spaces (`:180-194`); scroll syncs number gutter (`:174-178`)
+- [ ] `Auto` / `R` / `Python` — language segment buttons (3) — `ReadabilityPanel.tsx` — sets `lang` state, `aria-pressed`
+- [ ] Code textarea (line-numbered CodeEditor, `aria-label="Your R or Python plotting code"`, `.postr-code-editor` focus ring) — `ReadabilityPanel.tsx` — keyboard: **Tab** inserts two spaces (panel layout only); scroll syncs number gutter
 - [ ] `▶ Check` — primary button, disabled when code empty — `ReadabilityPanel.tsx:670-681` — `runCheck` → local `parseRCode`/`parsePythonCode`/`computeReadability`
-- [ ] `Copy snippet` / `✓ Copied` — CopyButton — `ReadabilityPanel.tsx:801-805` (component def `:282-304`) — clipboard write, 2400ms feedback, opens copied banner
-- [ ] `Open full edited code →` — button — `ReadabilityPanel.tsx:811-821` — opens FullCodeModal
-- [ ] FullCodeModal — modal — `ReadabilityPanel.tsx:385-450` — backdrop click closes (`:387`), **Escape** closes (`:374-381`)
-- [ ] `×` (`title="Close (Esc)"`) — modal close button — `ReadabilityPanel.tsx:422-433`
-- [ ] `Copy full code` / `✓ Copied` — CopyButton inside modal — `ReadabilityPanel.tsx:447`
+- [ ] `Copy snippet` / `✓ Copied` — CopyButton — `ReadabilityPanel.tsx` (component def `ReadabilityCodeView.tsx`) — clipboard write, 2400ms feedback, opens copied banner
+- [ ] `Open full edited code →` — button — `ReadabilityPanel.tsx` — opens FullCodeModal
+- [ ] FullCodeModal — `role="dialog" aria-modal` — `FullCodeModal.tsx` — backdrop click closes, **Escape** closes, Tab trapped, focus restored to opener, body scroll locked
+- [ ] `×` (`aria-label="Close"`, `title="Close (Esc)"`) — modal close button, focused on open — `FullCodeModal.tsx`
+- [ ] `Copy full code` / `✓ Copied` — CopyButton inside modal — `FullCodeModal.tsx`
 - [ ] Copied-to-clipboard banner — toast/status (`role="status" aria-live="polite"`, auto-dismiss 3s) — `ReadabilityPanel.tsx:684-701`
 - [ ] `🔎 Scan image` / `Scanning…` — button (image block selected only) — `ReadabilityPanel.tsx:939-950` — API `POST /api/import/extract` (mode `measure-text`) via `postJson` (`:542-559`)
 - [ ] `Clear` — button (after scan result) — `ReadabilityPanel.tsx:952-955` — resets scan state
@@ -1607,7 +1616,8 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] "Code Readability Check" — section label — `ReadabilityPanel.tsx:583`
 - [ ] "🔎 Paste your R or Python plotting code, then click **Check** to see if figure text will be readable at poster print size." — intro paragraph — `ReadabilityPanel.tsx:596-597`
 - [ ] `Using selected image block {W}" × {H}".` — intro variant (image selected) — `ReadabilityPanel.tsx:599-613`
-- [ ] `Sizing against the gray figure preview on the canvas {W}" × {H}" — drag or resize it to match your real figure, or click an existing image block to use its exact dimensions.` — intro variant (no image) — `ReadabilityPanel.tsx:615-625`
+- [ ] `Sizing against the gray figure preview on the canvas {W}" × {H}" — drag or resize it to match your real figure, or click an existing image block to use its exact dimensions.` — intro variant (no image, editor) — `ReadabilitySizingNote.tsx` (was `ReadabilityPanel.tsx:615-625`)
+- [ ] `Sizing against the print size you entered above {W}" × {H}". Change the width or height and click **Check** again.` — intro variant (`layout="page"`) — `ReadabilitySizingNote.tsx`
 - [ ] "# Paste your ggplot / matplotlib code here..." — editor placeholder — `ReadabilityPanel.tsx:650`
 - [ ] "Detected: R / ggplot2" / "Detected: Python / matplotlib" — detection status — `ReadabilityPanel.tsx:663`
 - [ ] "Auto-detect waiting for code…" — detection idle status — `ReadabilityPanel.tsx:667`
@@ -1618,7 +1628,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] "{n}pt" ×3 per row — source/effective/min point cells — `ReadabilityPanel.tsx:745, 760, 769`
 - [ ] "Recommended fix (base_size = {n}):" — fix section label — `ReadabilityPanel.tsx:799`
 - [ ] "All elements pass readability thresholds at this poster size." — all-pass success box — `ReadabilityPanel.tsx:835`
-- [ ] "Full edited code" — modal header — `ReadabilityPanel.tsx:421`
+- [ ] "Full edited code" — modal header (`aria-labelledby` target) — `FullCodeModal.tsx`
 - [ ] "📷 Scan Image Text" — scan section label — `ReadabilityPanel.tsx:931`
 - [ ] "Use Claude Vision to measure every text region in this image and compute its effective print size at the block's current dimensions. Useful for plots and tables you imported from a PDF or JPG and don't have the source code for." — scan explainer — `ReadabilityPanel.tsx:932-937`
 - [ ] "{p} pass · {w} warn · {f} fail · {t} total" — scan summary — `ReadabilityPanel.tsx:958-959`
@@ -1633,11 +1643,11 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] ✓ / ⚠ / ✗ status glyphs — `ReadabilityPanel.tsx:772` — code results table status column
 - [ ] ▶ glyph — `ReadabilityPanel.tsx:680` — Check button label
 - [ ] ✓ glyph — `ReadabilityPanel.tsx:698` — copied banner
-- [ ] ✓ Copied state glyph — `ReadabilityPanel.tsx:302` — CopyButton feedback
+- [ ] ✓ Copied state glyph — `ReadabilityCodeView.tsx` — CopyButton feedback
 - [ ] 📷 emoji — `ReadabilityPanel.tsx:931` — scan section label
 - [ ] 🔎 emoji — `ReadabilityPanel.tsx:949` — scan button label
 - [ ] ✓ / ! / ✗ status glyphs — `ReadabilityPanel.tsx:992` — scan table status column
-- [ ] Line-number gutters (aria-hidden, decorative) — `ReadabilityPanel.tsx:214-235` (editor), `:324-343` (CodeView)
+- [ ] Line-number gutters (aria-hidden, decorative) — `ReadabilityPanel.tsx` (editor), `ReadabilityCodeView.tsx` (CodeView)
 
 #### `poster/Sidebar.tsx` — 11-tab editor control panel: tab rail + per-tab panels (layout/style/authors/insert/edit/refs/figure/issues/comments/versions/export)
 
@@ -2291,7 +2301,7 @@ Storage: localStorage `postr.welcome-seeded:{userId}` (prefix const `:36`; read 
 
 ### 6.10 Charts
 
-**Standalone page DEACTIVATED 2026-09-10 — `charts/*` stays LIVE.** `pages/ChartChooser.tsx` (`/chart-chooser`, alias `/plot-picker`) is no longer mounted: both routes `<Navigate to="/" replace>`, the lazy import is gone, `vercel.json` rewrites `/chart-chooser` → `/` with `X-Robots-Tag: noindex` and 308s `/plot-picker` → `/`, the `routes.json` static record is deleted (out of prerender + sitemap; the page reads `metaFor()` → `null`). The file, its test (`pages/__tests__/ChartChooser.test.tsx`, renders the component directly) and the JSON-LD stay on disk. The picker is being revamped in another worktree; the standalone plot checker is a later follow-up. Restore recipe: `apps/web/src/routes.tsx` header; summary in §10. The `pages/ChartChooser.tsx` inventory below is kept verbatim as the reactivation reference.
+**Standalone page DEACTIVATED 2026-09-10 — `charts/*` stays LIVE.** `pages/ChartChooser.tsx` (`/chart-chooser`, alias `/plot-picker`) is no longer mounted: both routes `<Navigate to="/" replace>`, the lazy import is gone, `vercel.json` rewrites `/chart-chooser` → `/` with `X-Robots-Tag: noindex` and 308s `/plot-picker` → `/`, the `routes.json` static record is deleted (out of prerender + sitemap; the page reads `metaFor()` → `null`). The file, its test (`pages/__tests__/ChartChooser.test.tsx`, renders the component directly) and the JSON-LD stay on disk. The picker is being revamped in another worktree. **The standalone figure-readability check is LIVE (2026-09-11)** — `pages/FigureReadability.tsx` at `/tools/figure-readability`, inventoried at the end of this section. Restore recipe for the picker: `apps/web/src/routes.tsx` header; summary in §10. The `pages/ChartChooser.tsx` inventory below is kept verbatim as the reactivation reference.
 
 The plot-picker engine: ~~standalone `/chart-chooser` page~~ (deactivated), the embedded ladder questionnaire (`charts/ladder/*`), recommender + design-shape copy, SVG rendering (`renderChart`/`plotOptions`), the on-canvas `ChartBlock`, sample-data labels, the CVD-tested series palettes, and the per-chart `ChartPalettePicker`. `ChartChooser` is embedded in three places: the standalone page (**deactivated**), the sidebar Figure tab Make mode (§6.8 — the only LIVE render site), and the manuscript ChartPanel (§6.12 — deactivated with the manuscript pipeline).
 
@@ -2629,6 +2639,28 @@ flowchart LR
 - [ ] Multi-colour swatch buttons — one per `seriesPalettesFor(seriesCount)` entry; `aria-pressed` on the active palette. Shown only for a selected **multi-series** chart (single-series charts fill from one slot, so the picker is gated out in `FigureTab.tsx`).
 
 #### `charts/chartColors.ts` — palette-slot resolution/color math (incl. `resolveSeriesColors` override) — no UI, logic only
+
+#### `pages/FigureReadability.tsx` — /tools/figure-readability standalone figure-readability check (public, no session) — **LIVE 2026-09-11** (alias `/figure-check` → 308)
+
+The editor's Figure › Check tab (`poster/ReadabilityPanel.tsx`, §6.8) as a public page: the printed figure size is TYPED (`poster/PrintSizeFields.tsx` + `poster/printSize.ts`) instead of dragged on a canvas; the image-OCR scan path is never mounted (`selectedBlock={null}` + the panel's `layout === 'page'` gate); nothing leaves the browser and no Supabase session is created (`PublicHeader` only reads one). Code-split (`lazy`). SEO: static `routes.json` record (title "Figure Font Size Checker for Posters — R & Python | Postr", description "Paste ggplot2 or matplotlib code. Get the printed point size of every label at your poster size, and the exact base_size to fix it. Free, no signup.", h1 + 4 copy lines; prerendered to `dist/tools/figure-readability/index.html`, in `sitemap-static.xml`) + `WebApplication` JSON-LD "Postr Figure Readability Check". Surfaces: `PublicHeader` `TOOL_LINKS` ({ to, label "Figure readability", blurb "Check figure text at poster print size" }), `PublicFooter` Product column, `Landing` tools section + feature-card link (§6.2). Tests: `pages/__tests__/FigureReadability.test.tsx`, `poster/__tests__/printSize.test.ts`, `src/__tests__/routes.test.tsx`, `toolDiscoverability.test.tsx` (`TOOL_PATHS`), `siteMeta.test.ts`, `vercelRouting.test.ts` (`CLIENT_ROUTES` / `ALIAS_REDIRECTS` / `UNKNOWN_PATHS` `/tools`), `PublicPageOutline.test.tsx` (`auditedFiles`), `redactUrl.test.ts`. Scripts: `verify-prerender.sh` (prerendered loop, distinct-title loop, `/tools` 404, `check_alias /figure-check /tools/figure-readability`), `mobile-audit.mjs` ROUTES, `scripts/text-audit/scrape.mts` ROUTES.
+
+**Elements**
+- [ ] `PublicHeader` / `PublicFooter` — shared chrome (§6.13)
+- [ ] `Width` / `Height` — `<input type="text" inputMode="decimal" pattern="[0-9]*[.,]?[0-9]*" autoComplete="off">` with `<label htmlFor>`, suffix "in", 16px, `min-h-11`, 2-col grid — `PrintSizeFields.tsx` — draft while focused; commit clamped (`clampInches`, [1, 96], 0.1") on blur/Enter; Escape reverts; empty/garbage reverts. **Text, not number** (2026-09-11 follow-up): Chromium drops "," in a number input, so "7,5" committed 75; as a text field the comma reaches `parseInches` → 7.5 (pinned through the DOM in `FigureReadability.test.tsx`)
+- [ ] Preset chips — `role="group" aria-label="Print size presets"`, `aria-pressed` via `matchingPresetId` (tolerance 0.05"), 15px — `PrintSizeFields.tsx` — "Small figure — 10 × 7", "Quarter of a 48 × 36 poster — 24 × 18", "Quarter of an A0 landscape — 23.4 × 16.5", "One column of a 36 × 48 portrait — 11 × 8" (`PRINT_SIZE_PRESETS`, the quarters derived from `POSTER_SIZES` and FLOORED to a tenth — `floorTenth`, so 33.1/2 reads 16.5 as the blueprint says); default `DEFAULT_PRINT_SIZE = { w: 10, h: 7 }` = the panel defaults
+- [ ] `ReadabilityPanel layout="page" selectedBlock={null} defaultFigureWidthIn/HeightIn={size}` — embedded (its elements belong to §6.8) under `<h2 class="sr-only">Check your code</h2>` — a preset click / new number drops a results table computed at the old size (stale gate, §6.8); the full-fix `ggsave`/`figsize` carries the typed size
+- [ ] `MobileNotice` — NOT rendered here: `isPhoneOptimisedPath('/tools/figure-readability')` is true (`components/MobileNotice.tsx`, `MobileNotice.test.tsx`) — the page is phone-first and the strip would cover the results table
+- [ ] `Open the editor` — Link — `/p/new` (the header's guest entry) — editor upsell card
+
+**Copy**
+- [ ] "Will your figure labels be readable at poster size?" — h1 (= `routes.json` h1)
+- [ ] "Paste your R (ggplot2) or Python (matplotlib, seaborn) plotting code, type the size the figure will print at, and see the point size of every label on paper — axis titles need 18 pt, tick labels 14 pt, captions 12 pt. If anything falls short, copy the base_size fix. No account, and your code never leaves the browser." — lede (= `routes.json` copy[0])
+- [ ] "Printed figure size" — section label; "Measure the space the figure will fill on the printed poster, not the image file. If your code sets ggsave() or figsize, the check scales from that canvas to this size; otherwise it assumes the figure renders at this size." — helper — `PrintSizeFields.tsx`
+- [ ] "How the check works" — h2 + two paragraphs (source canvas → printed size; thresholds 18/14/12 pt; smallest passing base_size as snippet or full script)
+- [ ] "Need this check while you build the poster?" — h2; "Postr is a free academic poster editor with this same check in its Figure tab — drag a figure box on the canvas and the check sizes against it, or select an image block to use its exact print dimensions." — upsell body
+
+**Graphics**
+- [ ] 🔍 — Landing ToolCard icon (§6.2); the page itself reuses the panel's glyphs (§6.8)
 
 ---
 
@@ -3594,12 +3626,13 @@ No UI — logic only. Three route registrations, each `requireAuth(getSupabase)`
 - [ ] "The style provider API key is missing on the server." — provider-not-configured message (style-deck) — `narrative.ts:434`
 - [ ] "The theme provider API key is missing on the server." — provider-not-configured message (theme) — `narrative.ts:505`
 
-#### `apps/web/src/components/PublicHeader.tsx` — shared public-page header; Tools nav + mobile overflow menu (Paper to poster / Paper to slides / Plot picker entries ALL REMOVED 2026-09-10 — deactivated; `TOOL_LINKS` is now EMPTY (`readonly ToolLink[]`) and `NAV_LINKS` is Pricing · Why posters · About)
+#### `apps/web/src/components/PublicHeader.tsx` — shared public-page header; Tools nav + mobile overflow menu (Paper to poster / Paper to slides / Plot picker entries ALL REMOVED 2026-09-10 — deactivated; `TOOL_LINKS` = the one live tool `{ to: '/tools/figure-readability', label: 'Figure readability', blurb: 'Check figure text at poster print size' }` (2026-09-11) and `NAV_LINKS` is Figure readability · Pricing · Why posters · About)
 
 **Elements**
 - [ ] `PublicHeader` header container — `<header>` — `PublicHeader.tsx:118`
 - [ ] Brand wordmark link to `/` — `<Link>` — `PublicHeader.tsx:119`
-- [ ] `NAV_LINKS.map` top-level nav links (no longer includes `/paper-to-poster`, `/paper-to-slides` or `/chart-chooser` — removed 2026-09-10) — `<Link>` (flat row, `xl:`-gated) — `PublicHeader.tsx`
+- [ ] `NAV_LINKS.map` top-level nav links (`/tools/figure-readability` first, then the Learn pages; no longer includes `/paper-to-poster`, `/paper-to-slides` or `/chart-chooser` — removed 2026-09-10) — `<Link>` (flat row, `xl:`-gated) — `PublicHeader.tsx`
+- [ ] `Figure readability` + blurb "Check figure text at poster print size" — mobile-menu tool row — `<Link>` `/tools/figure-readability` — `PublicHeader.tsx` `TOOL_LINKS.map`
 - [ ] `MobileNav` overflow trigger — `<MobileNav>` — `PublicHeader.tsx:151`
 - [ ] Feedback button (signed-in, desktop) — `<button>` title "Send feedback" — `PublicHeader.tsx:155-165`
 - [ ] Profile link `/profile` — `<Link>` title "Profile & Settings" — `PublicHeader.tsx:166-175`
@@ -3640,6 +3673,7 @@ No UI — logic only. Three route registrations, each `requireAuth(getSupabase)`
 - [ ] ~~`/paper-to-slides` footer link — `<FooterLink>`~~ — removed 2026-09-10 (deactivated)
 - [ ] ~~`/paper-to-poster` footer link — `<FooterLink>`~~ — removed 2026-09-10 (deactivated)
 - [ ] ~~`/chart-chooser` footer link — `<FooterLink>`~~ — removed 2026-09-10 (deactivated)
+- [ ] `/tools/figure-readability` footer link "Figure readability" — `<FooterLink>` — `PublicFooter.tsx` Product column (added 2026-09-11)
 - [ ] Learn column (About, Why posters, Send feedback) — `<FooterColumn>` — `PublicFooter.tsx:50-56`
 - [ ] Account column (Sign in, Profile) — `<FooterColumn>` — `PublicFooter.tsx:58-61`
 - [ ] Legal column (Privacy, Cookies, Terms) — `<FooterColumn>` — `PublicFooter.tsx:63-67`
@@ -4390,6 +4424,7 @@ flowchart LR
 - [ ] `Pricing` — Link — `PublicFooter.tsx:44` — `/pricing`
 - [ ] ~~`Paper to poster` — Link — `PublicFooter.tsx:45` — `/paper-to-poster`~~ — removed 2026-09-10 (deactivated)
 - [ ] ~~`Plot picker` — Link — `PublicFooter.tsx:46` — `/chart-chooser`~~ — removed 2026-09-10 (deactivated)
+- [ ] `Figure readability` — Link — `PublicFooter.tsx` — `/tools/figure-readability` (added 2026-09-11)
 - [ ] `About` — Link — `PublicFooter.tsx:50` — `/about`
 - [ ] `Why poster sessions` — Link — `PublicFooter.tsx:51` — `/why-posters`
 - [ ] `Send feedback` — button — `PublicFooter.tsx:52` — `useFeedbackStore.open('other')`
@@ -4413,6 +4448,7 @@ flowchart LR
 - [ ] logo + "Postr" — Link — `PublicHeader.tsx:114` — `/`
 - [ ] ~~`Paper to poster` — nav Link — `PublicHeader.tsx:141` (constant `NAV_LINKS :65-70`) — `/paper-to-poster` (desktop flat row + mobile menu `:310`)~~ — removed 2026-09-10 (deactivated)
 - [ ] ~~`Plot picker` — nav Link — same — `/chart-chooser` (both rows)~~ — removed 2026-09-10 (deactivated)
+- [ ] `Figure readability` — nav Link — `TOOL_LINKS` — `/tools/figure-readability` (flat row + mobile menu row with blurb "Check figure text at poster print size") — added 2026-09-11
 - [ ] `Pricing` — nav Link — same — `/pricing` (both rows)
 - [ ] `Why posters` — nav Link — same — `/why-posters` (both rows)
 - [ ] `About` — nav Link — same — `/about` (both rows)
@@ -4760,7 +4796,8 @@ No UI directly; all values below are user-visible (tab titles, search snippets, 
 - [ ] "/about" — title "How Postr Works: Features for Academic Posters", description, h1 "About Postr", 4 copy lines — `:20-31` (note: h1 "About Postr" does NOT match the live About h1 "Everything you need to ship a great poster." — parity drift, §10)
 - [ ] "/why-posters" — title "Why Poster Sessions Matter: Skills That Outlast Them", description, h1 "Why poster sessions matter", 5 copy lines — `:32-44` (h1 matches eyebrow, not live h1)
 - [ ] "/pricing" — title "Postr Pricing: Free Poster Maker, Paid Export", description (CA$18.99 term / CA$9.99 pack), h1 "Free to build. Pay only to take it further.", 4 copy lines — `:45-56`
-- [ ] "/chart-chooser" — title "Chart Chooser: Which Chart Fits Your Data? | Postr", description, h1 "Which chart fits your data?", 4 copy lines — `:57-68`
+- [ ] ~~"/chart-chooser" — title "Chart Chooser: Which Chart Fits Your Data? | Postr", description, h1 "Which chart fits your data?", 4 copy lines — `:57-68`~~ — **record DELETED 2026-09-10** (deactivated)
+- [ ] "/tools/figure-readability" — title "Figure Font Size Checker for Posters — R & Python | Postr", description "Paste ggplot2 or matplotlib code. Get the printed point size of every label at your poster size, and the exact base_size to fix it. Free, no signup.", h1 "Will your figure labels be readable at poster size?", 4 copy lines (copy[0] = the page lede verbatim) — added 2026-09-11 (§6.10)
 - [ ] "/privacy" — title "Privacy Policy | Postr", description, h1 "Privacy Policy", 1 copy line — `:69-77`
 - [ ] "/cookies" — title "Cookie Policy | Postr", description, h1 "Cookies Policy", 1 copy line — `:78-86`
 - [ ] "/terms" — title "Terms of Service | Postr", description, h1 "Terms of Service", 1 copy line — `:87-95`
@@ -5051,7 +5088,7 @@ Switched off to keep the product to its core — the poster editor. After the se
 
 ## 11. Maintenance note
 
-- This doc reflects the code as of **2026-07-28 ~16:00 local** (post-billing, post-`/pricing`, post-FR-legal, post-ConsentNotice); §6.16 reflects main as of 2026-07-29 and §6.17 (Presentation Checker) reflects the `feat/presentation-checker` branch as of 2026-07-29. **2026-09-10:** §6.12 / §6.16 / §6.17, the §6.3 talk waitlist and — second pass — the §6.10 standalone plot picker page are DEACTIVATED (banners on each section, route table + §5 edges + §9 rows updated, full summary in §10 "Deactivated features"); their inventories are frozen as the reactivation reference. `charts/*` stays live in the editor.
+- This doc reflects the code as of **2026-07-28 ~16:00 local** (post-billing, post-`/pricing`, post-FR-legal, post-ConsentNotice); §6.16 reflects main as of 2026-07-29 and §6.17 (Presentation Checker) reflects the `feat/presentation-checker` branch as of 2026-07-29. **2026-09-10:** §6.12 / §6.16 / §6.17, the §6.3 talk waitlist and — second pass — the §6.10 standalone plot picker page are DEACTIVATED (banners on each section, route table + §5 edges + §9 rows updated, full summary in §10 "Deactivated features"); their inventories are frozen as the reactivation reference. `charts/*` stays live in the editor. **2026-09-11:** the standalone figure-readability check (`/tools/figure-readability`, §6.10 `pages/FigureReadability.tsx`; `ReadabilityPanel` `layout` prop, §6.8) went LIVE — route table, §6.2, §6.13 and §6.15 updated.
 - **Regenerate or update this doc whenever**: a route is added/removed/redirected in `routes.tsx` (+ `seo/routes.json` + `vercel.json` aliases), a store gains/losses a field or action, a feature folder under `poster/`, `components/`, `import/`, `export/`, `manuscript/`, `charts/`, `data/` changes shape, a feature flag flips (`config/features.ts`), or a storage key is added (update §8 AND the `pages/Profile.tsx:290-295` sweep).
 - When you check off a feature's boxes during a removal, also strike its rows in §7, its keys in §8, and its externals in §9 — then add any newly-orphaned leftovers to §10.
 

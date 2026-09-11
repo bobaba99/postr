@@ -165,6 +165,43 @@ describe('parsePythonCode', () => {
   });
 });
 
+describe('ParseOptions.defaultSizeLabel', () => {
+  // The editor's Check tab sizes against a canvas overlay ("figure
+  // preview"); the public page sizes against a typed print size. The
+  // caller names the fallback canvas so the warning reads right on both.
+  it('names the overlay by default when R code has no ggsave()', () => {
+    const p = parseRCode('ggplot(df, aes(x, y)) + geom_point()', {
+      defaultWidthIn: 10,
+      defaultHeightIn: 7,
+    });
+    expect(p.warnings).toContain(
+      'No ggsave() found — using figure preview size 10.0"×7.0" as the source canvas.',
+    );
+  });
+
+  it('uses the caller-supplied label in the R warning', () => {
+    const p = parseRCode('ggplot(df, aes(x, y)) + geom_point()', {
+      defaultWidthIn: 10,
+      defaultHeightIn: 7,
+      defaultSizeLabel: 'the print size you entered,',
+    });
+    expect(p.warnings).toContain(
+      'No ggsave() found — using the print size you entered, 10.0"×7.0" as the source canvas.',
+    );
+  });
+
+  it('uses the caller-supplied label in the Python warning', () => {
+    const p = parsePythonCode('plt.plot(x, y)', {
+      defaultWidthIn: 24,
+      defaultHeightIn: 18,
+      defaultSizeLabel: 'the print size you entered,',
+    });
+    expect(p.warnings).toContain(
+      'No figsize=(w,h) found — using the print size you entered, 24.0"×18.0" as the source canvas.',
+    );
+  });
+});
+
 describe('language detection patterns', () => {
   // ── R code that should be detected as R ──────────────────────────
 

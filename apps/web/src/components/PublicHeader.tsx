@@ -21,14 +21,15 @@
  * gallery is switched back on. The "Paper to poster" / "Paper to
  * slides" entries were removed the same way when the manuscript
  * pipelines were deactivated, and "Plot picker" followed when the
- * standalone picker was deactivated (see the routes.tsx header).
+ * standalone picker was deactivated (see the routes.tsx header). The
+ * "Figure readability" entry is the one standalone tool that is live.
  *
- * TOOL_LINKS exists because /chart-chooser once shipped with nothing
- * linking to it from anywhere in the app — not the header, not the
- * footer, not the landing page. It was only reachable by typing the
+ * TOOL_LINKS exists because the first standalone tool once shipped with
+ * nothing linking to it from anywhere in the app — not the header, not
+ * the footer, not the landing page. It was only reachable by typing the
  * URL, which is how the owner came to not be able to find it. The list
- * (and the footer/landing entries that mirrored it) was that fix, and
- * it is what a restored tool goes back into.
+ * (and the footer/landing entries that mirror it) was that fix, and it
+ * is what every tool, live or restored, goes into.
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router';
@@ -48,25 +49,31 @@ interface ToolLink {
 /**
  * The standalone tools, in the order they appear everywhere. Each is
  * public, needs no account, and is a canonical URL (never an alias
- * spelling) so internal links never bounce through a 308.
+ * spelling — /figure-check 308s to the entry below) so internal links
+ * never bounce through a 308.
  *
- * EMPTY while every standalone tool is deactivated (routes.tsx header).
- * Nothing below special-cases the empty list: the flat row and the
- * mobile menu simply render the Learn pages with no tool rows, no
- * separator and no empty group. Deactivated, and therefore absent:
+ * One entry while the other standalone tools are deactivated
+ * (routes.tsx header). Nothing below special-cases the list length:
+ * the flat row and the mobile menu render the tools, then the Learn
+ * pages, with no separator and no empty group. Deactivated, and
+ * therefore absent:
  *   { to: '/chart-chooser', label: 'Plot picker',
  *     blurb: 'Find the figure that fits your data' }
  *   { to: '/paper-to-poster', label: 'Paper to poster' }
  *   { to: '/paper-to-slides', label: 'Paper to slides' }
- * The plot checker will be appended here when its page lands, and the
- * picker goes back in front of it when its revamp ships.
+ * The picker goes back in FRONT of the checker when its revamp ships.
  *
- * Typed explicitly rather than `[] as const`: an empty `as const`
- * literal is `readonly []`, whose element type is `never`, and the
- * `.map` / `.some` callbacks below would then fail to type-check on
- * `tool.to`.
+ * Typed explicitly rather than `as const` so an empty list (if every
+ * tool is ever off again) is `readonly ToolLink[]` rather than
+ * `readonly []`, whose `never` element type breaks `.map` / `.some`.
  */
-const TOOL_LINKS: readonly ToolLink[] = [];
+const TOOL_LINKS: readonly ToolLink[] = [
+  {
+    to: '/tools/figure-readability',
+    label: 'Figure readability',
+    blurb: 'Check figure text at poster print size',
+  },
+];
 
 /**
  * The full public nav set, in display order — the tools plus the two
@@ -136,7 +143,7 @@ export function PublicHeader() {
   // same tokens so nav chrome never flickers between pages.
   return (
     <header className="flex items-center justify-between px-8 py-5">
-      <Link to="/" className="flex items-center gap-3 no-underline">
+      <Link to="/" className="flex min-h-11 items-center gap-3 no-underline">
         <svg width="36" height="36" viewBox="0 0 64 64" fill="none">
           <rect width="64" height="64" rx="12" fill="#7c6aed" />
           <path d="M12 52 C30 52, 34 12, 52 12" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
@@ -154,8 +161,8 @@ export function PublicHeader() {
           dropdown: the header has room at this width, and a menu hides
           the very thing that was invisible before. One click instead
           of two, and the names are readable from the page rather than
-          after a hover. (With TOOL_LINKS empty this is just the Learn
-          pages — same rule when a tool comes back.)
+          after a hover. (Tools first, then the Learn pages — the same
+          rule however many tools are live.)
 
           Below `xl` these move into the overflow menu rather than
           disappearing: every nav item used to be breakpoint-gated, so a
@@ -356,8 +363,7 @@ function MobileNav({
           className="postr-popover-enter fixed left-4 right-4 top-[4.5rem] z-50 list-none rounded-xl border border-[#2a2a3a] bg-[#111118] p-2 shadow-xl shadow-black/40"
         >
           {/* Workspace link first — the primary destination on a phone,
-              above the tool rows (none while deactivated) and the Learn
-              pages. */}
+              above the blurbed tool rows and the Learn pages. */}
           {workspaceLink && (
             <li>
               <Link
@@ -388,8 +394,7 @@ function MobileNav({
           ))}
 
           {/* The Learn pages — the entries NAV_LINKS carries beyond the
-              tools, which get their own blurbed rows above whenever any
-              are live. */}
+              tools, which get their own blurbed rows above. */}
           {NAV_LINKS.filter(
             (link) => !TOOL_LINKS.some((tool) => tool.to === link.to),
           ).map((link) => (

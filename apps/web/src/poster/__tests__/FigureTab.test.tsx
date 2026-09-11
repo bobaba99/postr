@@ -106,6 +106,17 @@ describe('FigureTab', () => {
     expect(screen.getByLabelText('Paste your table')).not.toBeVisible();
   });
 
+  it('keeps the canvas-overlay sizing copy in Check mode (editor layout)', () => {
+    // The public /tools/figure-readability page reuses ReadabilityPanel
+    // with layout="page" and different copy. The editor must keep the
+    // default "panel" layout: its sizing note still points at the
+    // draggable figure preview on the canvas.
+    render(<Harness />);
+    fireEvent.click(screen.getByRole('button', { name: 'Check a figure' }));
+    expect(screen.getByText(/drag or resize it/i)).toBeVisible();
+    expect(screen.queryByText(/print size you entered/i)).toBeNull();
+  });
+
   it('keeps ladder progress across a mode round-trip', async () => {
     render(<Harness />);
     pasteTable(TSV);

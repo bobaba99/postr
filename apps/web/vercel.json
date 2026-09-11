@@ -10,6 +10,7 @@
       "destination": "https://www.postr.sh/:path*",
       "permanent": true
     },
+    { "source": "/figure-check", "destination": "/tools/figure-readability", "permanent": true },
     { "source": "/plot-picker", "destination": "/", "permanent": true },
     { "source": "/manuscript-to-poster", "destination": "/", "permanent": true },
     { "source": "/paper-to-present", "destination": "/", "permanent": true },
