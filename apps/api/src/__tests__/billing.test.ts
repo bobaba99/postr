@@ -38,6 +38,9 @@ function fakeSupabase(opts: {
   alreadyFulfilled?: boolean;
   /** The user id the reconciliation lookup should resolve to (by sub/customer). */
   lookupUserId?: string | null;
+  /** The subscription id / status the users row currently stores (guards). */
+  storedSubscriptionId?: string | null;
+  storedStatus?: string | null;
 } = {}) {
   const updates: Array<{
     table: string;
@@ -92,7 +95,14 @@ function fakeSupabase(opts: {
                       ? opts.alreadyFulfilled
                         ? { session_id: 's' }
                         : null
-                      : { plan_expires_at: opts.currentExpiry ?? null },
+                      : {
+                          plan: 'term',
+                          plan_expires_at: opts.currentExpiry ?? null,
+                          stripe_subscription_id:
+                            opts.storedSubscriptionId === undefined ? 'sub_1' : opts.storedSubscriptionId,
+                          subscription_status:
+                            opts.storedStatus === undefined ? 'active' : opts.storedStatus,
+                        },
                   error: null,
                 }),
             }),
@@ -415,7 +425,7 @@ describe('handleSubscriptionChange — status transitions', () => {
   });
 
   it('reconciles the user by subscription id (lookup resolves)', async () => {
-    const fake = fakeSupabase({ lookupUserId: 'user-42' });
+    const fake = fakeSupabase({ lookupUserId: 'user-42', storedSubscriptionId: 'sub_9' });
     await handleSubscriptionChange(fake.client, fakeSub({ id: 'sub_9', status: 'canceled', metadata: {} }));
     // it updated a row (found the user); no throw
     expect(fake.updates).toHaveLength(1);
@@ -672,6 +682,16 @@ describe('POST /billing/create-checkout — hidden review SKUs', () => {
 
   function permanentUserSupabase(): SupabaseClient {
     return {
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({
+              data: { plan: 'free', plan_expires_at: null, subscription_status: null, stripe_customer_id: null },
+              error: null,
+            }),
+          }),
+        }),
+      }),
       auth: {
         getUser: async () => ({
           data: { user: { id: 'user-1', email: 'jane.doe@example.com', is_anonymous: false } },
