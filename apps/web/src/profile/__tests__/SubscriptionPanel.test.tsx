@@ -10,6 +10,10 @@
  * "Request refund" on a cancelled term (a second click would re-run the
  * refund route and report "Refunded" again). A pack refund refreshes too,
  * so the balance and the refund button update at once.
+ *
+ * Owner's rule (2026-09-11): a pack is refunded in FULL and only while no
+ * credit has been consumed — the button is "Refund export pack" (never a
+ * per-credit amount) and the server's `already_used` gets pack wording.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -90,11 +94,35 @@ describe('SubscriptionPanel — pack refund', () => {
     const p = plan({ hasActiveTerm: false, credits: 3, canExport: true, subscriptionStatus: null });
     renderPanel(p);
 
-    fireEvent.click(screen.getByRole('button', { name: /refund 3 unused credits/i }));
+    fireEvent.click(screen.getByRole('button', { name: /refund export pack/i }));
 
     expect(await screen.findByText(/Refunded CA\$9\.99/)).toBeInTheDocument();
     expect(screen.queryByText(/term has been cancelled/i)).toBeNull();
     expect(billing.requestRefund).toHaveBeenCalledWith('pack');
     await waitFor(() => expect(p.refresh).toHaveBeenCalledTimes(1));
+  });
+
+  it('states the all-or-nothing rule next to the button — never a per-credit amount', () => {
+    renderPanel(plan({ hasActiveTerm: false, credits: 2, canExport: true, subscriptionStatus: null }));
+
+    expect(screen.getByRole('button', { name: /refund export pack/i })).toBeInTheDocument();
+    expect(screen.getByText(/refundable in full \(CA\$9\.99\) only if you haven’t taken a paid export/i)).toBeInTheDocument();
+    expect(screen.queryByText(/unused credit/i)).toBeNull();
+    expect(screen.queryByText(/3\.33/)).toBeNull();
+  });
+
+  it('maps already_used to pack wording (a consumed credit blocks the whole refund) and never shows raw error text', async () => {
+    billing.requestRefund.mockRejectedValue(
+      new ApiError('already_used', 409, { error: 'already_used' }),
+    );
+    const p = plan({ hasActiveTerm: false, credits: 2, canExport: true, subscriptionStatus: null });
+    renderPanel(p);
+
+    fireEvent.click(screen.getByRole('button', { name: /refund export pack/i }));
+
+    expect(await screen.findByText(/This pack isn’t refundable once you’ve taken a paid export — not even in part/i)).toBeInTheDocument();
+    expect(screen.queryByText(/This term isn’t refundable/i)).toBeNull();
+    expect(screen.queryByText(/already_used/)).toBeNull();
+    expect(p.refresh).not.toHaveBeenCalled();
   });
 });

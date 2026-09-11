@@ -31,6 +31,7 @@ import {
   NoExportCreditError,
 } from '@/data/billing';
 import { stashCheckoutIntent, type CheckoutPlan } from '@/data/checkoutIntent';
+import { REFUND_LINE_BOTH } from '@/data/refundCopy';
 
 type ExportKind = 'latex' | 'pptx';
 
@@ -345,6 +346,12 @@ export function EditableExportButtons({
               .
             </span>
           </label>
+          {/* The refund rule, in front of the buyer BEFORE they buy (owner
+              rule, 2026-09-11): one line covering both plans, directly
+              above the buttons it governs. Wording: data/refundCopy.ts. */}
+          <p style={{ fontSize: 12, color: '#a3a7b3', lineHeight: 1.5, margin: '0 0 10px' }}>
+            {REFUND_LINE_BOTH}
+          </p>
           <div style={{ display: 'flex', gap: 8, opacity: withdrawalAck ? 1 : 0.5 }}>
             {!plan.hasActiveTerm && (
             <button

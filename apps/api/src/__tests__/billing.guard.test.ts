@@ -260,6 +260,29 @@ describe('POST /billing/create-checkout — duplicate-term guard + customer reus
     expect(created[0]?.customer_email).toBe('jane.doe@example.com');
   });
 
+  // Owner rule (2026-09-11): the refund rule is put in front of the buyer
+  // BEFORE purchase. It was to go on the Stripe page too, above the pay
+  // button (custom_text.submit) — but the sandbox refuses that together
+  // with managed_payments: StripeInvalidRequestError "You cannot use
+  // custom_text with Managed Payments." (scratchpad stripe-sandbox/
+  // run-custom-text.log, 2026-09-11). Sending it would 500 every checkout,
+  // so the session must NOT carry custom_text; the rule reaches the buyer
+  // on the client surfaces (pricing cards, paywall, /auth banner) instead.
+  // consent_collection.terms_of_service is likewise not sent: Stripe
+  // refuses it (with or without MoR) until a Terms URL is set in the
+  // Dashboard's public business details.
+  it.each(['term', 'pack'])(
+    '%s session keeps managed_payments and carries NO custom_text / consent_collection (Stripe rejects the pair)',
+    async (sku) => {
+      const { app, created } = buildApp(termRow({ plan: 'free', plan_expires_at: null, subscription_status: null }));
+      const res = await post(app, sku);
+      expect(res.status).toBe(200);
+      expect(created[0]?.managed_payments).toEqual({ enabled: true });
+      expect(created[0]).not.toHaveProperty('custom_text');
+      expect(created[0]).not.toHaveProperty('consent_collection');
+    },
+  );
+
   it('fails closed (500 checkout_failed, generic) when the plan read errors', async () => {
     const { app, created } = buildApp(termRow(), { selectError: 'connection reset' });
     const res = await post(app, 'term');

@@ -45,9 +45,9 @@ import { createRateLimiter } from './rateLimit.js';
 import { isSkuSellable, readFeatureFlags, type FeatureFlags } from './features.js';
 import {
   PACK_EXPORT_CREDITS,
-  PACK_PRICE_CENTS,
   finiteCents,
   type RefundKind,
+  type RefundResult,
 } from './billing/constants.js';
 import {
   TERM_ACTIVE_STATUSES,
@@ -64,12 +64,13 @@ import {
   subscriptionIdFromInvoice,
 } from './billing/invoicePayments.js';
 import { recordRefundAndRevoke } from './billing/refundLedger.js';
+import { refundPack } from './billing/packRefund.js';
 import {
   handleChargeRefunded,
   reconcileExternalRefund,
 } from './billing/refundReconcile.js';
 
-export type { RefundKind } from './billing/constants.js';
+export type { RefundKind, RefundResult } from './billing/constants.js';
 
 // The Stripe client (and its Managed Payments API-version pin) lives in
 // stripeClient.ts, shared with account.ts; the service_role Supabase
@@ -305,6 +306,15 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
           // handles tax filing/remittance worldwide. Composes with both
           // payment and subscription mode.
           managed_payments: { enabled: true },
+          // NOTE: no `custom_text` (the refund rule above the pay button) —
+          // Stripe refuses it together with managed_payments
+          // ("You cannot use custom_text with Managed Payments.", sandbox
+          // 2026-09-11), and sending it would fail every checkout. The
+          // refund rule is put in front of the buyer on the client surfaces
+          // BEFORE checkout instead (apps/web/src/data/refundCopy.ts).
+          // `consent_collection.terms_of_service` is likewise absent: Stripe
+          // refuses it until a Terms URL is set in the Dashboard's public
+          // business details (with or without managed_payments).
           // Bind the session to our user so the webhook can reconcile it
           // even before a Stripe customer exists. NOTE: client_reference_id
           // exists ONLY on the checkout.session — later subscription
@@ -1028,10 +1038,6 @@ async function findUserIdForSubscriptionEvent(
 // shaped payloads: refunds listed by charge, term/pack classified via the
 // InvoicePayment resource, unattributable refunds revoke nothing).
 
-type RefundResult =
-  | { ok: true; amountCents: number; subscriptionCancelled?: boolean }
-  | { ok: false; reason: string };
-
 /**
  * Pure eligibility test for a TERM refund. Exported for tests.
  * Eligible iff within the 14-day window AND no paid export was taken since
@@ -1053,27 +1059,18 @@ export function termRefundEligible(args: {
 }
 
 /**
- * Pure per-credit refund amount for a PACK, in cents. Exported for tests.
- * Flat rate = PACK_PRICE_CENTS / PACK_EXPORT_CREDITS, rounded to the cent,
- * for `unused` credits (already capped at the pack size by the caller).
- */
-export function packRefundAmountCents(unusedCredits: number): number {
-  if (unusedCredits <= 0) return 0;
-  const perCredit = PACK_PRICE_CENTS / PACK_EXPORT_CREDITS;
-  return Math.round(perCredit * unusedCredits);
-}
-
-/**
  * Issue a self-serve refund for a user, computing eligibility SERVER-SIDE.
  *
- * Policy (docs project_refund_policy):
- *   - TERM: full refund of the last charge, only within 14 days AND only
- *     if the user took NO paid export since that charge (first_paid_export_at
- *     is null or predates the charge). Cancelling is separate and keeps
- *     access to period end — not handled here.
- *   - PACK: refund the UNUSED credits at a flat CA$3.33/credit
- *     (PACK_PRICE_CENTS / 3), capped at one pack (3). Credits never expire,
- *     so there's no window on the partial.
+ * Policy (owner's rule, 2026-09-11): a refund is possible ONLY if the buyer
+ * has not taken a single paid export with what they bought — for BOTH SKUs.
+ *   - TERM: full refund of the last charge, only within 14 days (the Terms
+ *     state the window) AND only if the user took NO paid export since that
+ *     charge (first_paid_export_at is null or predates the charge).
+ *     Cancelling is separate and keeps access to period end — not here.
+ *   - PACK: the most recent unrefunded pack refunded in FULL, only while
+ *     NO credit has been consumed from the buyer's packs (export_credits
+ *     still covers every credit granted). One export → no refund at all;
+ *     there is no per-credit proration (billing/packRefund.ts).
  *
  * Race-safe against Link's own refund path and double-clicks: each
  * stripe.refunds.create passes a DETERMINISTIC idempotency key (term keyed
@@ -1164,84 +1161,8 @@ async function refundTerm(
   return { ok: true, amountCents, subscriptionCancelled };
 }
 
-async function refundPack(
-  supabase: SupabaseClient,
-  stripe: Stripe,
-  userId: string,
-): Promise<RefundResult> {
-  // Find the most recent pack purchase that still has unused credits and
-  // hasn't been refunded. Attribution is per fulfilled session (Option A);
-  // remaining credits are the single user counter, capped at the pack size.
-  const { data: userRow } = await supabase
-    .from('users')
-    .select('export_credits')
-    .eq('id', userId)
-    .maybeSingle();
-  const remaining = (userRow as { export_credits?: number } | null)?.export_credits ?? 0;
-  if (remaining <= 0) return { ok: false, reason: 'no_unused_credits' };
-
-  // The pack session to refund: THIS user's newest pack (credits_granted>0
-  // excludes term rows) that hasn't already been refunded. Scoping to
-  // user_id is critical — without it this would pick the globally-newest
-  // session of ANY user and refund the wrong person's charge.
-  const { data: refundedRows } = await supabase
-    .from('billing_refunds')
-    .select('session_id')
-    .eq('user_id', userId)
-    .not('session_id', 'is', null);
-  const refundedSessionIds = new Set(
-    ((refundedRows as { session_id?: string }[] | null) ?? [])
-      .map((r) => r.session_id)
-      .filter(Boolean) as string[],
-  );
-
-  const { data: sessionRows } = await supabase
-    .from('billing_fulfilled_sessions')
-    .select('session_id, credits_granted')
-    .eq('user_id', userId)
-    .gt('credits_granted', 0)
-    .order('fulfilled_at', { ascending: false });
-  const session = ((sessionRows as { session_id?: string; credits_granted?: number }[] | null) ?? [])
-    .find((s) => s.session_id && !refundedSessionIds.has(s.session_id));
-  if (!session?.session_id) return { ok: false, reason: 'no_pack_purchase' };
-
-  const granted = session.credits_granted ?? PACK_EXPORT_CREDITS;
-  const unused = Math.min(remaining, granted);
-  if (unused <= 0) return { ok: false, reason: 'no_unused_credits' };
-
-  // Refund amount: flat per-credit rate (pure, unit-tested).
-  const amountCents = packRefundAmountCents(unused);
-
-  // Resolve the pack session's payment intent to refund against.
-  const checkout = await stripe.checkout.sessions.retrieve(session.session_id);
-  const pi =
-    typeof checkout.payment_intent === 'string'
-      ? checkout.payment_intent
-      : checkout.payment_intent?.id;
-  if (!pi) return { ok: false, reason: 'no_payment' };
-
-  // Idempotency keyed on the SESSION → one pack can only be refunded once,
-  // even across double-clicks or a button-vs-webhook race (pack refunds are
-  // PARTIAL, so without this a raced second create would mint a real second
-  // refund against the remaining captured amount).
-  const refund = await stripe.refunds.create(
-    {
-      payment_intent: pi,
-      amount: amountCents,
-    },
-    { idempotencyKey: `pack-refund:${session.session_id}` },
-  );
-  const refundedCents = finiteCents(refund.amount, amountCents);
-  await recordRefundAndRevoke(supabase, {
-    userId,
-    kind: 'pack',
-    refundId: refund.id,
-    amountCents: refundedCents,
-    creditsRevoked: unused,
-    sessionId: session.session_id,
-  });
-  return { ok: true, amountCents: refundedCents };
-}
+// refundPack lives in billing/packRefund.ts (all-or-nothing: the most
+// recent unrefunded pack in full, only while no credit has been consumed).
 
 // recordRefundAndRevoke now lives in billing/refundLedger.ts (the ledger's
 // UNIQUE(stripe_refund_id) is the idempotency gate; the term revoke also

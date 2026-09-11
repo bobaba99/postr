@@ -52,6 +52,7 @@
         "A finished, print-ready poster costs nothing on Postr. Editing and PDF export are always free, with a small \"made with postr.sh\" mark. No card or account is required to finish and print your work.",
         "The CA$18.99 term unlocks unlimited PowerPoint and LaTeX export with no watermark. It renews every four months and you can cancel anytime.",
         "The CA$9.99 pack exports three posters to PowerPoint or LaTeX — a one-time purchase whose credits never expire, for anyone who doesn't need a full term.",
+        "Refunds are plain: a term is refundable in full within 14 days of a charge if you haven't taken a paid export, and an export pack is refundable in full until its first export — never after.",
         "You only pay to export to PowerPoint or LaTeX. The free poster workflow — editor, tools, and watermarked PDF — has no limits. All prices are in Canadian dollars, charged through Stripe."
       ]
     },

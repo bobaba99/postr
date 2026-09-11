@@ -7,16 +7,29 @@
 /** How many export credits a pack purchase grants. */
 export const PACK_EXPORT_CREDITS = 3;
 
-/** The pack price in cents (CA$9.99) — the basis for the per-credit refund. */
+/**
+ * The pack price in cents (CA$9.99). A self-serve pack refund is always
+ * the WHOLE pack (billing/packRefund.ts — never a per-credit proration);
+ * this is its ledger fallback, and the basis for attributing an external
+ * (dashboard / Link) refund amount back to credits.
+ */
 export const PACK_PRICE_CENTS = 999;
 
 /** What a user can ask to refund (and what the ledger's `kind` accepts). */
 export type RefundKind = 'term' | 'pack';
 
+/** What a self-serve refund answers (billing.ts route → 200 / 409). */
+export type RefundResult =
+  | { ok: true; amountCents: number; subscriptionCancelled?: boolean }
+  | { ok: false; reason: string };
+
 /**
- * Credits to revoke for a refund of `amountCents` on a pack: the flat
- * per-credit rate (PACK_PRICE_CENTS / PACK_EXPORT_CREDITS), rounded,
- * capped at one pack and never negative. Pure; exported for tests.
+ * Credits to revoke when an EXTERNAL pack refund of `amountCents` is
+ * reconciled (billing/refundReconcile.ts): the flat per-credit rate
+ * (PACK_PRICE_CENTS / PACK_EXPORT_CREDITS), rounded, capped at one pack
+ * and never negative. A full CA$9.99 refund → 3; an operator's partial
+ * dashboard refund → proportional. NOT used by the self-serve path, which
+ * is all-or-nothing. Pure; exported for tests.
  */
 export function packCreditsForRefundAmount(amountCents: number): number {
   if (!Number.isFinite(amountCents) || amountCents <= 0) return 0;

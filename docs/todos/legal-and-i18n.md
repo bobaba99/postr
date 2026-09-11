@@ -15,9 +15,10 @@ instead.
 Get qualified counsel to review, with particular attention to:
 
 - **Refund / consumer-law language** (Terms §7.2) — the 14-day term guarantee,
-  "no refund once exported", the pack unused-credit refund, and the EU/UK
-  right-of-withdrawal waiver captured at checkout. These are the newest and
-  highest-risk clauses.
+  "no refund once exported" (now for BOTH the term and the pack: a pack is
+  refunded in full only while no credit has been used — no per-credit
+  proration since 2026-09-11), and the EU/UK right-of-withdrawal waiver
+  captured at checkout. These are the newest and highest-risk clauses.
 - **Recurring-subscription disclosure** — auto-renewal terms (CA$18.99 every 4
   months), cancellation method, and renewal notices, against California ARL /
   FTC negative-option direction and Quebec/Ontario distance-contract rules.

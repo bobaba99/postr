@@ -21,8 +21,8 @@ import {
   handleInvoicePaid,
   handleSubscriptionChange,
   termRefundEligible,
-  packRefundAmountCents,
 } from '../billing.js';
+import { packRefundEligible } from '../billing/packRefund.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -469,21 +469,31 @@ describe('termRefundEligible — 14-day window + no-export', () => {
   });
 });
 
-describe('packRefundAmountCents — flat per-credit rate', () => {
-  it('3 unused → full CA$9.99 (999¢)', () => {
-    expect(packRefundAmountCents(3)).toBe(999);
+describe('packRefundEligible — full refund only while no credit has been consumed', () => {
+  it('eligible: one pack, all 3 credits intact', () => {
+    expect(packRefundEligible({ remainingCredits: 3, grantedCredits: 3 })).toEqual({ ok: true });
   });
-  it('2 unused → CA$6.66 (666¢)', () => {
-    expect(packRefundAmountCents(2)).toBe(666);
+  it('ineligible: one credit consumed → already_used (no partial refund, ever)', () => {
+    expect(packRefundEligible({ remainingCredits: 2, grantedCredits: 3 }))
+      .toEqual({ ok: false, reason: 'already_used' });
   });
-  it('1 unused → CA$3.33 (333¢)', () => {
-    expect(packRefundAmountCents(1)).toBe(333);
+  it('ineligible: every credit consumed → already_used, not "no credits"', () => {
+    expect(packRefundEligible({ remainingCredits: 0, grantedCredits: 3 }))
+      .toEqual({ ok: false, reason: 'already_used' });
   });
-  it('0 unused → 0', () => {
-    expect(packRefundAmountCents(0)).toBe(0);
+  it('eligible: two packs, all 6 intact', () => {
+    expect(packRefundEligible({ remainingCredits: 6, grantedCredits: 6 })).toEqual({ ok: true });
   });
-  it('never exceeds the full pack price for a single pack', () => {
-    expect(packRefundAmountCents(3)).toBeLessThanOrEqual(999);
+  it('ineligible: two packs, one credit consumed anywhere in the pooled balance', () => {
+    expect(packRefundEligible({ remainingCredits: 5, grantedCredits: 6 }))
+      .toEqual({ ok: false, reason: 'already_used' });
+  });
+  it('an out-of-band surplus credit is never counted as usage', () => {
+    expect(packRefundEligible({ remainingCredits: 4, grantedCredits: 3 })).toEqual({ ok: true });
+  });
+  it('nothing granted → no_pack_purchase', () => {
+    expect(packRefundEligible({ remainingCredits: 0, grantedCredits: 0 }))
+      .toEqual({ ok: false, reason: 'no_pack_purchase' });
   });
 });
 

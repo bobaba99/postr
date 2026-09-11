@@ -57,7 +57,21 @@ function memorySupabase(seed: {
 
   function query(table: string, mode: 'select' | 'update', payload?: Row) {
     const preds: Array<(r: Row) => boolean> = [];
-    const rows = () => tables[table]!.filter((r) => preds.every((p) => p(r)));
+    const orders: Array<{ col: string; asc: boolean }> = [];
+    const rows = () => {
+      const matched = tables[table]!.filter((r) => preds.every((p) => p(r)));
+      if (orders.length === 0) return matched;
+      return [...matched].sort((a, b) => {
+        for (const o of orders) {
+          const av = a[o.col] as string | number;
+          const bv = b[o.col] as string | number;
+          if (av === bv) continue;
+          const cmp = av < bv ? -1 : 1;
+          return o.asc ? cmp : -cmp;
+        }
+        return 0;
+      });
+    };
     const run = () => {
       const matched = rows();
       if (mode === 'update') {
@@ -71,7 +85,10 @@ function memorySupabase(seed: {
       gt(col: string, v: number) { preds.push((r) => (r[col] as number) > v); return builder; },
       not(col: string, _op: string, v: unknown) { preds.push((r) => r[col] !== v); return builder; },
       match(f: Row) { Object.entries(f).forEach(([c, v]) => preds.push((r) => r[c] === v)); return builder; },
-      order() { return builder; },
+      order(col: string, opts?: { ascending?: boolean }) {
+        orders.push({ col, asc: opts?.ascending !== false });
+        return builder;
+      },
       maybeSingle: async () => {
         const res = run();
         const data = Array.isArray(res.data) ? res.data[0] ?? null : null;
@@ -161,6 +178,8 @@ interface StripeFakeOpts {
   invoiceForPaymentIntent?: Record<string, Stripe.Invoice | null>;
   invoicePaymentsForInvoice?: Record<string, Array<Record<string, unknown>>>;
   sessionsForPaymentIntent?: Record<string, Array<Record<string, unknown>>>;
+  /** checkout.sessions.retrieve(id).payment_intent — defaults to 'pi_pack'. */
+  paymentIntentBySession?: Record<string, string>;
   charge?: Record<string, unknown>;
 }
 
@@ -217,7 +236,10 @@ function stripeFake(opts: StripeFakeOpts = {}) {
           rec('checkout.sessions.list', params);
           return { data: opts.sessionsForPaymentIntent?.[params.payment_intent ?? ''] ?? [] };
         },
-        retrieve: async (id: string) => ({ id, payment_intent: 'pi_pack' }),
+        retrieve: async (id: string) => {
+          rec('checkout.sessions.retrieve', id);
+          return { id, payment_intent: opts.paymentIntentBySession?.[id] ?? 'pi_pack', amount_total: 999 };
+        },
       },
     },
     webhooks: { constructEvent: (body: Buffer) => JSON.parse(body.toString()) },
@@ -444,6 +466,248 @@ describe('POST /billing/refund — response carries subscription_cancelled', () 
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true, amount_cents: 1899, subscription_cancelled: true });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Owner's rule (2026-09-11) — self-serve PACK refund: full refund of one
+// pack ONLY while no credit has been consumed; any export → no refund.
+// ─────────────────────────────────────────────────────────────────────────
+function packUser(over: Row = {}): Row {
+  return termUser({ plan: 'free', stripe_subscription_id: null, subscription_status: null, ...over });
+}
+
+function packSession(sessionId: string, fulfilledAt: string, over: Row = {}): Row {
+  return { session_id: sessionId, user_id: 'user-1', credits_granted: 3, fulfilled_at: fulfilledAt, ...over };
+}
+
+describe('refundForUser(pack) — full refund only while no credit has been consumed', () => {
+  it('eligible when export_credits == credits granted: refunds the pack in FULL and revokes its 3 credits', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 3 })],
+      billing_fulfilled_sessions: [packSession('cs_pack', '2026-09-01T00:00:00Z')],
+    });
+    const s = stripeFake({ refundAmount: 999 });
+
+    const result = await refundForUser(db.client, s.stripe, 'user-1', 'pack');
+
+    expect(result).toEqual({ ok: true, amountCents: 999 });
+    // a FULL refund: no `amount` (Stripe refunds the whole charge, tax included)
+    const create = s.find('refunds.create')[0]!;
+    expect(create.args[0]).toEqual({ payment_intent: 'pi_pack' });
+    expect(create.args[1]).toEqual({ idempotencyKey: 'pack-refund:cs_pack' });
+    expect(db.rpcs).toEqual([{ fn: 'revoke_export_credits', args: { p_user_id: 'user-1', p_amount: 3 } }]);
+    expect(db.tables.users![0]!.export_credits).toBe(0);
+    expect(db.tables.billing_refunds).toEqual([
+      expect.objectContaining({ user_id: 'user-1', kind: 'pack', stripe_refund_id: 're_1', amount_cents: 999, credits_revoked: 3, session_id: 'cs_pack' }),
+    ]);
+  });
+
+  it('NOT eligible after one consumed credit: already_used, no Stripe call, no ledger row, credits untouched', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 2 })],
+      billing_fulfilled_sessions: [packSession('cs_pack', '2026-09-01T00:00:00Z')],
+    });
+    const s = stripeFake({ refundAmount: 999 });
+
+    const result = await refundForUser(db.client, s.stripe, 'user-1', 'pack');
+
+    expect(result).toEqual({ ok: false, reason: 'already_used' });
+    expect(s.calls).toEqual([]);
+    expect(db.rpcs).toEqual([]);
+    expect(db.tables.billing_refunds).toEqual([]);
+    expect(db.tables.users![0]!.export_credits).toBe(2);
+  });
+
+  it('NOT eligible when every credit was consumed (0 left on an unrefunded pack): already_used, not "no credits"', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 0 })],
+      billing_fulfilled_sessions: [packSession('cs_pack', '2026-09-01T00:00:00Z')],
+    });
+    const s = stripeFake({ refundAmount: 999 });
+
+    const result = await refundForUser(db.client, s.stripe, 'user-1', 'pack');
+
+    expect(result).toEqual({ ok: false, reason: 'already_used' });
+    expect(s.calls).toEqual([]);
+  });
+
+  it('two unrefunded packs with all 6 credits intact: refunds the MOST RECENT pack only', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 6 })],
+      // seeded oldest-first so an unsorted read would pick the wrong one
+      billing_fulfilled_sessions: [
+        packSession('cs_old', '2026-08-01T00:00:00Z'),
+        packSession('cs_new', '2026-09-01T00:00:00Z'),
+      ],
+    });
+    const s = stripeFake({
+      refundAmount: 999,
+      paymentIntentBySession: { cs_old: 'pi_pack_old', cs_new: 'pi_pack_new' },
+    });
+
+    const result = await refundForUser(db.client, s.stripe, 'user-1', 'pack');
+
+    expect(result).toEqual({ ok: true, amountCents: 999 });
+    expect(s.find('refunds.create')).toEqual([
+      { method: 'refunds.create', args: [{ payment_intent: 'pi_pack_new' }, { idempotencyKey: 'pack-refund:cs_new' }] },
+    ]);
+    expect(db.rpcs).toEqual([{ fn: 'revoke_export_credits', args: { p_user_id: 'user-1', p_amount: 3 } }]);
+    expect(db.tables.users![0]!.export_credits).toBe(3);
+    expect(db.tables.billing_refunds).toEqual([
+      expect.objectContaining({ kind: 'pack', session_id: 'cs_new', credits_revoked: 3, amount_cents: 999 }),
+    ]);
+  });
+
+  it('two packs, one credit consumed (5 of 6 left): already_used — the pooled balance cannot attribute the export', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 5 })],
+      billing_fulfilled_sessions: [
+        packSession('cs_old', '2026-08-01T00:00:00Z'),
+        packSession('cs_new', '2026-09-01T00:00:00Z'),
+      ],
+    });
+    const s = stripeFake({ refundAmount: 999 });
+
+    const result = await refundForUser(db.client, s.stripe, 'user-1', 'pack');
+
+    expect(result).toEqual({ ok: false, reason: 'already_used' });
+    expect(s.calls).toEqual([]);
+  });
+
+  it('a pack already refunded is skipped: the remaining unrefunded (older) pack is the one refunded', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 3 })],
+      billing_fulfilled_sessions: [
+        packSession('cs_old', '2026-08-01T00:00:00Z'),
+        packSession('cs_new', '2026-09-01T00:00:00Z'),
+      ],
+      billing_refunds: [
+        { user_id: 'user-1', kind: 'pack', stripe_refund_id: 're_earlier', amount_cents: 999, credits_revoked: 3, session_id: 'cs_new' },
+      ],
+    });
+    const s = stripeFake({
+      refundAmount: 999,
+      paymentIntentBySession: { cs_old: 'pi_pack_old', cs_new: 'pi_pack_new' },
+    });
+
+    const result = await refundForUser(db.client, s.stripe, 'user-1', 'pack');
+
+    expect(result).toEqual({ ok: true, amountCents: 999 });
+    expect(s.find('checkout.sessions.retrieve')).toEqual([{ method: 'checkout.sessions.retrieve', args: ['cs_old'] }]);
+    expect(s.find('refunds.create')[0]?.args).toEqual([{ payment_intent: 'pi_pack_old' }, { idempotencyKey: 'pack-refund:cs_old' }]);
+    expect(db.tables.users![0]!.export_credits).toBe(0);
+    expect(db.tables.billing_refunds!.map((r) => r.session_id)).toEqual(['cs_new', 'cs_old']);
+  });
+
+  it('no unrefunded pack (never bought, or every pack already refunded) → no_pack_purchase', async () => {
+    const neverBought = memorySupabase({ users: [packUser({ export_credits: 0 })] });
+    const s1 = stripeFake({ refundAmount: 999 });
+    expect(await refundForUser(neverBought.client, s1.stripe, 'user-1', 'pack')).toEqual({ ok: false, reason: 'no_pack_purchase' });
+    expect(s1.calls).toEqual([]);
+
+    const allRefunded = memorySupabase({
+      users: [packUser({ export_credits: 0 })],
+      billing_fulfilled_sessions: [packSession('cs_pack', '2026-09-01T00:00:00Z')],
+      billing_refunds: [
+        { user_id: 'user-1', kind: 'pack', stripe_refund_id: 're_done', amount_cents: 999, credits_revoked: 3, session_id: 'cs_pack' },
+      ],
+    });
+    const s2 = stripeFake({ refundAmount: 999 });
+    expect(await refundForUser(allRefunded.client, s2.stripe, 'user-1', 'pack')).toEqual({ ok: false, reason: 'no_pack_purchase' });
+    expect(s2.calls).toEqual([]);
+  });
+
+  it('never picks another user\'s pack: sessions are scoped to user_id', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 0 })],
+      billing_fulfilled_sessions: [packSession('cs_theirs', '2026-09-01T00:00:00Z', { user_id: 'user-2' })],
+    });
+    const s = stripeFake({ refundAmount: 999 });
+
+    expect(await refundForUser(db.client, s.stripe, 'user-1', 'pack')).toEqual({ ok: false, reason: 'no_pack_purchase' });
+    expect(s.calls).toEqual([]);
+  });
+
+  it('never writes a NaN amount: a refund without `amount` falls back to the pack price', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 3 })],
+      billing_fulfilled_sessions: [packSession('cs_pack', '2026-09-01T00:00:00Z')],
+    });
+    const s = stripeFake({ refundAmount: undefined });
+
+    const result = await refundForUser(db.client, s.stripe, 'user-1', 'pack');
+
+    expect(result).toEqual({ ok: true, amountCents: 999 });
+    expect(db.tables.billing_refunds![0]!.amount_cents).toBe(999);
+  });
+
+  it('is idempotent on a double click: the same session key → same refund id → one ledger row, one revoke', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 3 })],
+      billing_fulfilled_sessions: [packSession('cs_pack', '2026-09-01T00:00:00Z')],
+    });
+    const s = stripeFake({ refundAmount: 999 });
+
+    const first = await refundForUser(db.client, s.stripe, 'user-1', 'pack');
+    // the second click sees the pack already in the ledger → nothing left to refund
+    const second = await refundForUser(db.client, s.stripe, 'user-1', 'pack');
+
+    expect(first).toEqual({ ok: true, amountCents: 999 });
+    expect(second).toEqual({ ok: false, reason: 'no_pack_purchase' });
+    expect(s.find('refunds.create')).toHaveLength(1);
+    expect(db.rpcs).toHaveLength(1);
+    expect(db.tables.billing_refunds).toHaveLength(1);
+  });
+});
+
+describe('POST /billing/refund {kind:"pack"} — route contract', () => {
+  function packApp(db: ReturnType<typeof memorySupabase>, s: ReturnType<typeof stripeFake>) {
+    const supabase = Object.assign(db.client, {
+      auth: {
+        getUser: async () => ({
+          data: { user: { id: 'user-1', email: 'jane.doe@example.com', is_anonymous: false } },
+          error: null,
+        }),
+      },
+    }) as SupabaseClient;
+    const app = express();
+    app.use(express.json());
+    app.use(createBillingRouter({ getStripe: () => s.stripe, getSupabaseAdmin: () => supabase }));
+    return app;
+  }
+
+  it('answers { ok, amount_cents: 999, subscription_cancelled: false } for an untouched pack', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 3 })],
+      billing_fulfilled_sessions: [packSession('cs_pack', '2026-09-01T00:00:00Z')],
+    });
+    const s = stripeFake({ refundAmount: 999 });
+
+    const res = await request(packApp(db, s))
+      .post('/billing/refund')
+      .set('Authorization', 'Bearer token')
+      .send({ kind: 'pack' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true, amount_cents: 999, subscription_cancelled: false });
+  });
+
+  it('answers 409 already_used once a credit has been consumed', async () => {
+    const db = memorySupabase({
+      users: [packUser({ export_credits: 2 })],
+      billing_fulfilled_sessions: [packSession('cs_pack', '2026-09-01T00:00:00Z')],
+    });
+    const s = stripeFake({ refundAmount: 999 });
+
+    const res = await request(packApp(db, s))
+      .post('/billing/refund')
+      .set('Authorization', 'Bearer token')
+      .send({ kind: 'pack' });
+
+    expect(res.status).toBe(409);
+    expect(res.body).toEqual({ error: 'already_used' });
+    expect(s.find('refunds.create')).toHaveLength(0);
   });
 });
 
