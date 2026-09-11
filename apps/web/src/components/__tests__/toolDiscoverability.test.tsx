@@ -1,15 +1,24 @@
 /**
  * Discoverability of the standalone tools.
  *
- * /chart-chooser and /paper-to-poster both shipped with NOTHING linking
- * to them — not the header, not the footer, not the landing page. They
- * were reachable only by typing the URL, and the owner could not find
- * them. These tests exist so that regression is caught here rather than
- * by someone failing to find a page again.
+ * /chart-chooser once shipped with NOTHING linking to it — not the
+ * header, not the footer, not the landing page. It was reachable only
+ * by typing the URL, and the owner could not find it. This suite was
+ * written so that regression would be caught here rather than by
+ * someone failing to find a page again.
  *
+ * As of 2026-09-10 EVERY standalone tool is deactivated (routes.tsx
+ * header): the manuscript flows, the presentation checker, and now the
+ * plot picker too (it is being revamped in another worktree). The
+ * product ships with no standalone tools in its nav, so the suite now
+ * asserts the inverse — nothing may link to a route that only
+ * redirects home — while keeping the mobile-menu and workspace-link
+ * contracts that have nothing to do with tools.
+ *
+ * TOOL_PATHS is kept (empty) so restoring a tool is a one-line flip:
+ * put its canonical path back and the reachability assertions return.
  * They assert reachability (a real anchor with the right href) rather
- * than copy, so wording can be revised freely; only removing the path
- * to a tool fails the suite.
+ * than copy, so wording can be revised freely.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
@@ -31,12 +40,34 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { auth: authSpies },
 }));
 
-import { PublicHeader } from '../PublicHeader';
+import { NAV_LINKS, PublicHeader } from '../PublicHeader';
 import { PublicFooter } from '../PublicFooter';
 import Landing from '../../pages/Landing';
 
-/** Canonical tool URLs — never the alias spellings, which 308. */
-const TOOL_PATHS = ['/paper-to-poster', '/chart-chooser'];
+/**
+ * Canonical tool URLs — never the alias spellings, which 308.
+ *
+ * EMPTY while the standalone tools are deactivated. Re-add
+ * '/chart-chooser' (and, when it lands, the plot checker) to bring the
+ * reachability assertions below back to life.
+ */
+const TOOL_PATHS: readonly string[] = [];
+
+/**
+ * Routes that now only redirect to the landing page. Linking one would
+ * send a visitor on a pointless hop and advertise a flow that is off.
+ * /plot-picker is the picker's alias spelling — it redirects too.
+ */
+const DEACTIVATED_PATHS = [
+  '/chart-chooser',
+  '/plot-picker',
+  '/paper-to-poster',
+  '/paper-to-slides',
+  '/presentation-checker',
+];
+
+/** The Learn pages — the whole public nav while no tools are live. */
+const LEARN_PATHS = ['/pricing', '/why-posters', '/about'];
 
 function renderIn(ui: React.ReactNode) {
   return render(<MemoryRouter initialEntries={['/']}>{ui}</MemoryRouter>);
@@ -49,15 +80,19 @@ function hrefsOf(container: HTMLElement): string[] {
 }
 
 /**
- * The tools were previously folded into a "Tools" dropdown. They are
- * now listed flat in the header, because a menu hides the very thing
- * that was undiscoverable in the first place — the owner's own
- * complaint, twice. These tests assert the flat listing so nobody
- * re-folds them.
+ * The tools were previously folded into a "Tools" dropdown, then
+ * listed flat, and are now absent. With TOOL_PATHS empty the header
+ * must render the Learn pages alone — no stray separator, no empty
+ * "Tools" group, no disclosure that opens onto nothing.
  */
 describe('PublicHeader tool links', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('exposes no standalone tool in NAV_LINKS while they are deactivated', () => {
+    expect(TOOL_PATHS).toHaveLength(0);
+    expect(NAV_LINKS.map((link) => link.to)).toEqual(LEARN_PATHS);
   });
 
   it.each(TOOL_PATHS)('links to %s directly, with no menu to open', (path) => {
@@ -65,35 +100,32 @@ describe('PublicHeader tool links', () => {
     expect(hrefsOf(container)).toContain(path);
   });
 
-  it('does not hide the tools behind a disclosure', () => {
+  it('does not hide anything behind a Tools disclosure', () => {
     renderIn(<PublicHeader />);
     // No "Tools" trigger, and nothing claiming a popup, at desktop
-    // width. If one comes back, the links must still be flat too.
+    // width. If the tools come back, the links must be flat too.
     expect(screen.queryByRole('button', { name: /^tools$/i })).toBeNull();
   });
 
-  it('reaches every tool in one click', () => {
+  /**
+   * Every standalone tool is deactivated (routes.tsx header): their
+   * routes redirect to /, so a nav entry would be a dead end that
+   * still advertises the feature. Checked with the mobile menu open
+   * too, so its rows are covered.
+   */
+  it.each(DEACTIVATED_PATHS)('does not link the deactivated %s', (path) => {
     const { container } = renderIn(<PublicHeader />);
-    const links = Array.from(container.querySelectorAll('a[href]'));
-    for (const path of TOOL_PATHS) {
-      const link = links.find((a) => a.getAttribute('href') === path);
-      expect(link, `${path} should be a plain anchor`).toBeTruthy();
-      // A roving tabindex or -1 would take it out of the tab order.
-      expect(link?.getAttribute('tabindex')).toBeNull();
-    }
+    fireEvent.click(screen.getByRole('button', { name: /menu/i }));
+    expect(hrefsOf(container)).not.toContain(path);
   });
 
-  /**
-   * The two sibling manuscript flows must BOTH be listed. Paper-to-Poster
-   * is live; Paper-to-Slides is a not-yet-open flow whose nav link is
-   * placed now so the entry exists the moment the route lands (spec §7).
-   * Asserted by href — the flat listing serves both from the same source.
-   */
-  it('lists both Paper-to-Poster and Paper-to-Slides', () => {
+  it('renders the Learn pages flat, in order, with no tool rows before them', () => {
     const { container } = renderIn(<PublicHeader />);
-    const hrefs = hrefsOf(container);
-    expect(hrefs).toContain('/paper-to-poster');
-    expect(hrefs).toContain('/paper-to-slides');
+    const header = container.querySelector('header') as HTMLElement;
+    const navHrefs = hrefsOf(header).filter(
+      (href) => href !== '/' && href !== '/auth' && href !== '/profile',
+    );
+    expect(navHrefs).toEqual(LEARN_PATHS);
   });
 
   it('waits until the wide breakpoint to show the flat navigation', () => {
@@ -134,6 +166,21 @@ describe('PublicHeader mobile menu', () => {
 
     const panel = await screen.findByRole('list');
     expect(hrefsOf(panel)).toContain(path);
+  });
+
+  it('lists the Learn pages and nothing else while no tool is live', async () => {
+    renderIn(<PublicHeader />);
+    // Wait for the session to resolve so the workspace row has landed
+    // and the menu content is final.
+    await screen.findByRole('link', { name: /^editor$/i });
+    openMobileMenu();
+
+    const panel = await screen.findByRole('list');
+    // Workspace row first, then the Learn pages — no blurbed tool rows
+    // in between and no empty group left behind by their removal.
+    expect(hrefsOf(panel)).toEqual(['/p/new', ...LEARN_PATHS]);
+    const rows = within(panel).getAllByRole('listitem');
+    expect(rows).toHaveLength(1 + LEARN_PATHS.length);
   });
 
   it('reports expanded state to assistive tech', () => {
@@ -208,13 +255,16 @@ describe('PublicHeader mobile menu', () => {
     expect(screen.queryByRole('list')).toBeNull();
   });
 
-  it('uses accessible supporting text in tool descriptions', async () => {
+  it('shows no tool blurb rows while the tools are deactivated', async () => {
     renderIn(<PublicHeader />);
     openMobileMenu();
+    await screen.findByRole('list');
 
-    const description = await screen.findByText(/turn a manuscript into a poster draft/i);
-    expect(description.className).toContain('text-[#8b8f99]');
-    expect(description.className).not.toContain('text-[#6b7280]');
+    // The picker's blurb was the only supporting text the menu had;
+    // with the tool gone the row must go too, not linger as an
+    // orphaned line under a missing label.
+    expect(screen.queryByText(/find the figure that fits your data/i)).toBeNull();
+    expect(screen.queryByText(/turn a manuscript into/i)).toBeNull();
   });
 });
 
@@ -270,30 +320,22 @@ describe('PublicFooter', () => {
     expect(hrefsOf(container)).toContain(path);
   });
 
-  it('keeps both tools in the footer as a second route', () => {
-    // The header's flat links are sm:-gated (the mobile menu covers
-    // phones), so the footer is the redundant path if that menu ever
-    // regresses.
+  it('keeps the Product column to Home and Pricing while no tool is live', () => {
+    // The footer is the redundant route to the tools when the header's
+    // mobile menu regresses; with none live it must not carry a link
+    // that only redirects home, and the column must not be left empty.
     const { container } = renderIn(<PublicFooter />);
     const productHeading = screen.getByRole('heading', { name: /product/i });
     const column = productHeading.parentElement;
 
     expect(column).not.toBeNull();
-    expect(hrefsOf(column as HTMLElement)).toEqual(
-      expect.arrayContaining(TOOL_PATHS),
-    );
-    expect(hrefsOf(container)).toEqual(expect.arrayContaining(TOOL_PATHS));
+    expect(hrefsOf(column as HTMLElement)).toEqual(['/', '/pricing', ...TOOL_PATHS]);
+    expect(hrefsOf(container)).toEqual(expect.arrayContaining([...TOOL_PATHS]));
   });
 
-  it('lists Paper-to-Slides under Product alongside Paper-to-Poster', () => {
+  it.each(DEACTIVATED_PATHS)('does not list the deactivated %s under Product', (path) => {
     const { container } = renderIn(<PublicFooter />);
-    const productHeading = screen.getByRole('heading', { name: /product/i });
-    const column = productHeading.parentElement;
-
-    expect(column).not.toBeNull();
-    expect(hrefsOf(column as HTMLElement)).toEqual(
-      expect.arrayContaining(['/paper-to-poster', '/paper-to-slides']),
-    );
+    expect(hrefsOf(container)).not.toContain(path);
   });
 
   it('uses level-two headings for its landmark sections', () => {
@@ -332,19 +374,33 @@ describe('Landing page', () => {
     expect(bodyHrefs).toContain(path);
   });
 
-  it('describes the paper flow without promising slides', () => {
+  it.each(DEACTIVATED_PATHS)('does not link the deactivated %s anywhere on the page', (path) => {
     const { container } = renderIn(<Landing />);
-    const card = container
-      .querySelector('a[href="/paper-to-poster"]')
-      ?.textContent;
-
-    expect(card).toBeTruthy();
-    // The deck conversion is not built. /paper-to-present redirects to
-    // this flow, so the copy must not imply one is coming.
-    expect(card).not.toMatch(/\b(slide|slides|powerpoint|deck|pptx)\b/i);
+    expect(hrefsOf(container)).not.toContain(path);
   });
 
-  it('never mentions AI in the tools section', () => {
+  it('has no standalone-tools section while every tool is deactivated', () => {
+    renderIn(<Landing />);
+    // The "Tools you can use on their own" grid advertised the picker
+    // alone once the manuscript card went; with the picker off too it
+    // would be an empty heading over nothing. It comes back with the
+    // first restored tool (routes.tsx header).
+    expect(
+      screen.queryByRole('heading', { level: 2, name: /tools you can use on their own/i }),
+    ).toBeNull();
+    expect(screen.queryByText(/without opening the editor/i)).toBeNull();
+  });
+
+  it('does not promise a standalone picker or checker in the small-screen note', () => {
+    renderIn(<Landing />);
+    const note = screen.getByRole('note');
+    expect(note).toHaveTextContent(/best on a laptop/i);
+    // The old note ended "The plot picker and figure checker work fine
+    // on a phone" — a claim about tools that no longer have a page.
+    expect(note.textContent ?? '').not.toMatch(/\b(plot picker|figure checker|chart chooser)\b/i);
+  });
+
+  it('never mentions AI on the page', () => {
     const { container } = renderIn(<Landing />);
     const main = container.querySelector('main');
     expect(main?.textContent ?? '').not.toMatch(/\bAI\b/);

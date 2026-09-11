@@ -1,5 +1,7 @@
 # Postr — Feature Graph & Refactoring Checklist (v2)
 
+**Revised 2026-09-10 — hide pass.** The manuscript pipelines (§6.12 `/paper-to-poster`, §6.16 `/paper-to-slides`), the Presentation Checker (§6.17: `/presentation-checker`, the editor `review` tab, the `review_pack` / `review_addon` SKUs), the paper-to-talk waitlist callout (§6.3) **and — same day, second pass — the standalone plot picker page (§6.10 `pages/ChartChooser.tsx`, `/chart-chooser` + alias `/plot-picker`)** are **DEACTIVATED, not deleted** — routes redirect to `/`, nav/footer/landing/dashboard/pricing entries are removed, SEO records are gone, the API routers mount only behind `FEATURE_MANUSCRIPT` / `FEATURE_REVIEW`. The product now has **no standalone tools in its nav**; `charts/*` itself stays LIVE inside the editor's Figure tab (§6.8). Every file named in those sections still exists and stays unit-tested. Canonical restore recipe: the `apps/web/src/routes.tsx` header; summary in §10 "Deactivated features". The per-element inventories in §6.10 / §6.12 / §6.16 / §6.17 are kept verbatim as the reactivation reference and are NOT re-extracted.
+
 **Revised 2026-07-29** (v2 second pass was 2026-07-28, superseding v1 from earlier that day; 2026-07-29 updates added §6.16 Manuscript → Slides and — documented from the `feat/presentation-checker` branch ahead of its launch gate — §6.17 Presentation Checker). Source of truth: `apps/web/src/` (React 19 + react-router 8 + Vite SPA) plus `apps/api/src/` for the external-services map. Every file:line reference and verbatim UI string below was extracted from the code as of **2026-07-28 ~16:00 local** (§6.16 and §6.17 extracted 2026-07-29; §6.17 from the feature branch). If the doc and the code disagree, **the code wins** — regenerate this doc.
 
 All paths are relative to `apps/web/src/` unless noted otherwise. All quoted strings are verbatim user-visible copy.
@@ -177,7 +179,7 @@ flowchart LR
   R_cookfr --> S_cookfr
   R_term --> S_term
   R_termfr --> S_termfr
-  R_cc --> S_cc
+  %% 2026-09-10: standalone plot picker deactivated — R_cc no longer reaches S_cc
   R_p2p --> S_p2p
   R_p2s --> S_p2s
   R_pchk --> S_pchk
@@ -190,10 +192,15 @@ flowchart LR
 
   R_gal -.->|"redirects_to /"| R_root
   R_galid -.->|"redirects_to /"| R_root
-  R_pp -.->|"redirects_to /chart-chooser"| R_cc
-  R_m2p -.->|"redirects_to /paper-to-poster"| R_p2p
-  R_p2pr -.->|"redirects_to /paper-to-slides"| R_p2s
-  R_p2prn -.->|"redirects_to /paper-to-slides"| R_p2s
+  %% 2026-09-10: manuscript pipelines + checker + standalone plot picker deactivated — every one of these lands on /
+  R_cc -.->|"redirects_to / (deactivated)"| R_root
+  R_pp -.->|"redirects_to / (alias of deactivated)"| R_root
+  R_p2p -.->|"redirects_to / (deactivated)"| R_root
+  R_p2s -.->|"redirects_to / (deactivated)"| R_root
+  R_pchk -.->|"redirects_to / (deactivated)"| R_root
+  R_m2p -.->|"redirects_to / (alias of deactivated)"| R_root
+  R_p2pr -.->|"redirects_to / (alias of deactivated)"| R_root
+  R_p2prn -.->|"redirects_to / (alias of deactivated)"| R_root
 
   R_dash --> AG --> S_home
   R_edit --> AG --> S_editor
@@ -234,14 +241,14 @@ flowchart LR
 | `/cookies/fr` | `pages/CookiesFr.tsx` | no | — |
 | `/terms` | `pages/Terms.tsx` | no | — |
 | `/terms/fr` | `pages/TermsFr.tsx` | no | — |
-| `/chart-chooser` | `pages/ChartChooser.tsx` | yes | public, no session created |
-| `/paper-to-poster` | `pages/PaperToPoster.tsx` | yes | — |
-| `/paper-to-slides` | `pages/PaperToSlides.tsx` (lazy, code-split) | yes | public, no session created (§6.16) |
-| `/plot-picker` | redirect → `/chart-chooser` | — | alias (vercel.json 308 is canonical layer) |
-| `/manuscript-to-poster` | redirect → `/paper-to-poster` | — | alias |
-| `/paper-to-present` | redirect → `/paper-to-slides` | — | alias (canonical is slides; changed from `/paper-to-poster`) |
-| `/paper-to-presentation` | redirect → `/paper-to-slides` | — | alias |
-| `/presentation-checker` | `pages/PresentationChecker.tsx` | yes | public but noindex (D12) — registered, unlinked pending the launch gate (§6.17) |
+| `/chart-chooser` | `<Navigate to="/" replace>` | — | **deactivated 2026-09-10** (see `routes.tsx` header); `pages/ChartChooser.tsx` kept, lazy import removed, vercel rewrite → `/` + noindex, static SEO record deleted (§6.10); `charts/*` stays live in the editor Figure tab |
+| `/paper-to-poster` | `<Navigate to="/" replace>` | — | **deactivated 2026-09-10** (see `routes.tsx` header); `pages/PaperToPoster.tsx` kept, lazy import removed, vercel rewrite → `/` + noindex, static SEO record deleted (§6.12) |
+| `/paper-to-slides` | `<Navigate to="/" replace>` | — | **deactivated 2026-09-10**; `pages/PaperToSlides.tsx` kept, lazy import removed, vercel rewrite → `/` + noindex, static SEO record deleted (§6.16) |
+| `/plot-picker` | redirect → `/` | — | alias of the deactivated picker (vercel.json 308 → `/`, retargeted from `/chart-chooser`) |
+| `/manuscript-to-poster` | redirect → `/` | — | alias of the deactivated flow (vercel.json 308 → `/`) |
+| `/paper-to-present` | redirect → `/` | — | alias of the deactivated flow (vercel.json 308 → `/`) |
+| `/paper-to-presentation` | redirect → `/` | — | alias of the deactivated flow (vercel.json 308 → `/`) |
+| `/presentation-checker` | `<Navigate to="/" replace>` | — | **deactivated 2026-09-10**; `pages/PresentationChecker.tsx` kept, lazy import removed, existing rewrite + noindex kept, app SEO record deleted (§6.17) |
 | `/debug` | `pages/Debug.tsx` | no | `import.meta.env.DEV` only, dropped from prod bundle |
 | `/auth` | `pages/Auth.tsx` | no | — |
 | `/billing/success` | `pages/BillingResult.tsx` (`outcome="success"`) | no | — |
@@ -307,7 +314,7 @@ No UI — logic only.
 
 #### `routes.tsx` — route table + lazy-load fallback
 
-Route inventory: see §5 master graph + route table. All inside `<Suspense>`; lazy chunks: Editor, Share, AdminGallery, ChartChooser, PaperToPoster.
+Route inventory: see §5 master graph + route table. All inside `<Suspense>`; lazy chunks: Editor, Share, AdminGallery (ChartChooser + PaperToPoster lazy imports removed 2026-09-10 — deactivated).
 
 **Copy**
 - [ ] "Loading…" — LazyFallback text — `routes.tsx:101`
@@ -353,8 +360,7 @@ Public marketing surface: `/`, `/about`, `/why-posters`. Signed-in users hitting
 flowchart LR
   L["Landing /"] -->|"Get started"| A["/auth"]
   L -->|"Try as guest"| AG["/auth?guest=1"]
-  L -->|"ToolCard x2"| T1["/paper-to-poster"]
-  L -->|"ToolCard x2"| T2["/chart-chooser"]
+  %% ToolCard /paper-to-poster AND ToolCard /chart-chooser removed 2026-09-10 (deactivated) — no standalone-tools section remains
   L -->|"signed-in auto-redirect"| D["/dashboard"]
   AB["About /about"] -->|"openFeedback bug/feature/other"| FB["FeedbackModal"]
   W["WhyPosters /why-posters"] -->|"Start a poster"| L
@@ -366,22 +372,22 @@ flowchart LR
 **Elements**
 - [ ] `Get started` — router link — `Landing.tsx:154-159` — `/auth`
 - [ ] `Try as guest` — router link — `Landing.tsx:160-165` — `/auth?guest=1` (auto-triggers guest login)
-- [ ] `ToolCard` ×2 — router links — props at `Landing.tsx:276-289`, render `Landing.tsx:312-327` — `/paper-to-poster` and `/chart-chooser`
+- [ ] ~~`ToolCard` — router link — `/chart-chooser`~~ — removed 2026-09-10 (standalone plot picker deactivated); the `/paper-to-poster` card had gone the same day. With the last card gone the whole "Tools you can use on their own" section AND the `ToolCard` component were removed from `Landing.tsx` (git history, commit before 2026-09-10) — restore section + card + component together with the first tool that comes back
 
 **Copy**
 - [ ] "Built for researchers" — hero badge — `Landing.tsx:119`
 - [ ] "Academic posters," + "without the hassle." — h1 — `Landing.tsx:126-127`
 - [ ] "A poster editor that handles" + rotating slot + "so you can work on the science." — hero sentence — `Landing.tsx:146-151`; rotating phrases from HERO_FRICTIONS `Landing.tsx:62-69` (rendered by `RotatingWord`, §6.13): "the fiddly block nudging" · "the text reflowing on you" · "the BibTeX citation styles" · "the conference size specs" · "the authors and affiliations" · "the unreadable tiny figures"
-- [ ] "Best on a laptop." + "The editor needs a bigger screen to drag blocks and see your poster at full size. The plot picker and figure checker work fine on a phone." — mobile notice (sm:hidden) — `Landing.tsx:176-183`
+- [ ] "Best on a laptop." + "The editor needs a bigger screen to drag blocks and see your poster at full size." — mobile notice (sm:hidden) — `Landing.tsx` (the trailing "The plot picker and figure checker work fine on a phone." sentence was cut 2026-09-10 — no standalone tool page is live)
 - [ ] Feature cards (6, each title+body) — `Landing.tsx:188-253`: "Smart templates" / "5 conference-ready layouts with discipline-specific palettes. APA, SfN, ECNP size presets built in." · "Figure readability" / "Paste your R or Python code. See if axis labels will be readable at print size. Get a copy-ready fix." · "Writing guide" / "Section-by-section tips, word count targets, and a checklist to follow from intro to conclusion." · "PowerPoint, both ways" / "Open an existing .pptx poster and keep editing it here, or export one back out with every block still editable." · "LaTeX source" / "Download a compilable poster.tex with your figures and a references.bib — keep working in Overleaf if you prefer." · "Copy a design" / "Upload a poster you admire and apply its colours and type to yours. Copies the look, never the content."
-- [ ] "Tools you can use on their own" — h2 — `Landing.tsx:268`
-- [ ] "Two parts of the poster workflow that work without an account, and without opening the editor." — lede — `Landing.tsx:270-273`
-- [ ] ToolCard props — `Landing.tsx:276-289`: "Paper to poster" / "Paste your manuscript or upload a .docx, answer a few short questions about what to emphasise, and download a poster draft as a PDF." / cta "Start from a paper" · "Plot picker" / "Paste a table or answer three short questions, and get ranked chart suggestions drawn as journal-style panels. Download any panel as SVG or PNG." / cta "Find your figure"
+- [ ] ~~"Tools you can use on their own" — h2~~ — section removed 2026-09-10 (all standalone tools deactivated)
+- [ ] ~~"Figure tools that work without an account, and without opening the editor." — lede~~ — removed 2026-09-10 (was "Two parts of the poster workflow…" before the manuscript card went)
+- [ ] ~~ToolCard props: "Paper to poster" / "Paste your manuscript or upload a .docx, answer a few short questions about what to emphasise, and download a poster draft as a PDF." / cta "Start from a paper" · "Plot picker" / "Paste a table or answer three short questions, and get ranked chart suggestions drawn as journal-style panels. Download any panel as SVG or PNG." / cta "Find your figure"~~ — removed 2026-09-10 (deactivated; kept here verbatim as the reactivation reference)
 - [ ] JSON-LD description: "A web app for making academic conference posters, built for researchers and students." — `Landing.tsx:41-42`
 
 **Graphics**
-- [ ] 📐 — emoji — `Landing.tsx:192` ("Smart templates") · [ ] 📊 — `Landing.tsx:203` ("Figure readability") · [ ] ✍️ — `Landing.tsx:214` ("Writing guide") · [ ] 🎞️ — `Landing.tsx:225` ("PowerPoint, both ways") · [ ] 📐 — `Landing.tsx:236` ("LaTeX source") · [ ] 🎨 — `Landing.tsx:247` ("Copy a design") · [ ] 📄 — `Landing.tsx:278` (ToolCard) · [ ] 📊 — `Landing.tsx:284` (ToolCard)
-- [ ] "→" — text arrow appended to ToolCard cta — `Landing.tsx:325`
+- [ ] 📐 — emoji — `Landing.tsx:192` ("Smart templates") · [ ] 📊 — `Landing.tsx:203` ("Figure readability") · [ ] ✍️ — `Landing.tsx:214` ("Writing guide") · [ ] 🎞️ — `Landing.tsx:225` ("PowerPoint, both ways") · [ ] 📐 — `Landing.tsx:236` ("LaTeX source") · [ ] 🎨 — `Landing.tsx:247` ("Copy a design") · ~~📄 / 📊 (ToolCard)~~ — removed 2026-09-10 with the ToolCard
+- [ ] ~~"→" — text arrow appended to ToolCard cta~~ — removed 2026-09-10 with the ToolCard
 
 #### `pages/About.tsx` — /about feature tour as vertical timeline + feedback CTA
 
@@ -402,7 +408,7 @@ flowchart LR
   - [ ] "Writing guidance, not a blank page" / "Each section comes with concrete prompts, word-count targets, and a built-in checklist from intro to conclusion. Rich text for emphasis, Greek-symbol shortcuts for STEM, and a reference manager with citation-style support." — `About.tsx:48-50`
   - [ ] "Figures readable from three feet" / "Paste your R or Python plotting code and Postr checks whether axis labels will actually be legible at print size. Out-of-bounds warnings catch layout slips. No more discovering typography problems at the FedEx counter." — `About.tsx:54-56`
   - [ ] "Start from the work you already have" / "Paste a manuscript or drop a .docx and answer a few short questions about what to emphasise — you get a structured poster draft rather than a blank canvas. Already have a poster in PowerPoint? Open the .pptx here and keep editing it, blocks and all." — `About.tsx:60-62`
-  - [ ] "The right figure, drawn for print" / "Paste a table or answer three questions and the plot picker ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once, insert them, or download SVG and PNG." — `About.tsx:66-68`
+  - [ ] "The right figure, drawn for print" / "Paste a table or answer three questions in the Figure tab and Postr ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once and insert them straight onto the poster." — `About.tsx` (rewritten 2026-09-10: names the editor's Figure tab instead of "the plot picker" and no longer promises SVG/PNG downloads — those lived on the deactivated standalone page)
   - [ ] "Borrow a look you like" / "Upload a poster you admire and Postr lifts its colours and type onto yours — the look, never the content. Print-safe clamping keeps the result legible on paper rather than only on screen." — `About.tsx:72-74`
   - [ ] "Share, iterate, print" / "Read-only share links for advisors and co-authors, readable on a phone. Undo and redo through the entire session. Export to PDF, to PowerPoint with every block still editable, or to LaTeX with a compilable poster.tex and references.bib for Overleaf." — `About.tsx:78-80`
 - [ ] "Shape what ships next" — eyebrow — `About.tsx:169`
@@ -492,15 +498,15 @@ flowchart LR
 **Graphics**
 - [ ] Green checkmark — inline-svg in tinted circle, aria-hidden — `BillingResult.tsx:62-70` — success only
 
-#### `components/PricingSection.tsx` — 3-tier pricing comparison + talk-waitlist callout (on /pricing)
+#### `components/PricingSection.tsx` — 3-tier pricing comparison (on /pricing); talk-waitlist callout DEACTIVATED 2026-09-10
 
-(`TalkWaitlistCallout` is not its own file — it's an internal component of `PricingSection.tsx`.)
+(`TalkWaitlistCallout` is not its own file — it's an exported-but-unmounted component of `PricingSection.tsx`. Since 2026-09-10 it is no longer rendered under the tier grid; the function, `data/talkWaitlist.ts` and the `talk_waitlist` table remain. The waitlist bullets below are kept as the reactivation reference.)
 
 **Elements**
 - [ ] `Start free` — Link (rendered `:193`) — `/auth?guest=1` (constant `:72`)
 - [ ] `Get the term` — Link — `/auth?plan=term` (constant `:90`)
 - [ ] `Get the pack` — Link — `/auth?plan=pack` (constant `:110`)
-- [ ] `Join the waitlist` / `Sign in to join the waitlist` / `Joining…` — button — `PricingSection.tsx:299` — `joinTalkWaitlist()` (`@/data/talkWaitlist`) or navigate `/auth?next=/pricing` when signed out
+- [ ] ~~`Join the waitlist` / `Sign in to join the waitlist` / `Joining…` — button — `joinTalkWaitlist()` (`@/data/talkWaitlist`) or navigate `/auth?next=/pricing` when signed out~~ — **not rendered since 2026-09-10** (callout unmounted)
 
 **Copy**
 - [ ] "Simple pricing, no surprises" — H2 — `PricingSection.tsx:130`
@@ -508,7 +514,7 @@ flowchart LR
 - [ ] "Free" / "$0" / "always" — tier 1 name/price/cadence (constant `TIERS :66-69`)
 - [ ] "Everything you need to build and print a poster." — tier 1 tagline — `:70`
 - [ ] "Making a poster and printing or presenting it." — tier 1 forWho — `:73`
-- [ ] "Unlimited editing, every tool" / "PDF export — print-ready" / "Paper to poster" / "Plot picker & figure checker" / "A small “made with postr.sh” mark on the PDF" — tier 1 features — `:74-80`
+- [ ] "Unlimited editing, every tool" / "PDF export — print-ready" / "Paper to poster" / "Unlimited editing and every design tool" / "A small “made with postr.sh” mark on the PDF" — tier 1 features — `:74-80`
 - [ ] "Term" / "$18.99 CAD" / "every 4 months" — tier 2 — `:84-86`
 - [ ] "The full workflow, all term. About CA$4.75 a month, cancel anytime." — tier 2 tagline — `:87`
 - [ ] "Presenting through the term, or making several posters." — tier 2 forWho — `:91`
@@ -547,7 +553,7 @@ Storage: sessionStorage `postr.checkoutIntent` (const `:23`; write `:40`, read `
 
 #### `data/talkWaitlist.ts` — talk waitlist join/check — no UI, logic only
 
-Writes to Supabase table `talk_waitlist` (§9). Called from `PricingSection.tsx:299`.
+Writes to Supabase table `talk_waitlist` (§9). Its only caller, `TalkWaitlistCallout` in `PricingSection.tsx`, is no longer mounted (deactivated 2026-09-10) — dormant data layer, kept like `data/gallery.ts`.
 
 ---
 
@@ -2256,13 +2262,15 @@ Storage: localStorage `postr.welcome-seeded:{userId}` (prefix const `:36`; read 
 
 ### 6.10 Charts
 
-The plot-picker engine: standalone `/chart-chooser` page, the embedded ladder questionnaire (`charts/ladder/*`), recommender + design-shape copy, SVG rendering (`renderChart`/`plotOptions`), the on-canvas `ChartBlock`, sample-data labels, the CVD-tested series palettes, and the per-chart `ChartPalettePicker`. `ChartChooser` is embedded in three places: the standalone page, the sidebar Figure tab Make mode (§6.8), and the manuscript ChartPanel (§6.12).
+**Standalone page DEACTIVATED 2026-09-10 — `charts/*` stays LIVE.** `pages/ChartChooser.tsx` (`/chart-chooser`, alias `/plot-picker`) is no longer mounted: both routes `<Navigate to="/" replace>`, the lazy import is gone, `vercel.json` rewrites `/chart-chooser` → `/` with `X-Robots-Tag: noindex` and 308s `/plot-picker` → `/`, the `routes.json` static record is deleted (out of prerender + sitemap; the page reads `metaFor()` → `null`). The file, its test (`pages/__tests__/ChartChooser.test.tsx`, renders the component directly) and the JSON-LD stay on disk. The picker is being revamped in another worktree; the standalone plot checker is a later follow-up. Restore recipe: `apps/web/src/routes.tsx` header; summary in §10. The `pages/ChartChooser.tsx` inventory below is kept verbatim as the reactivation reference.
+
+The plot-picker engine: ~~standalone `/chart-chooser` page~~ (deactivated), the embedded ladder questionnaire (`charts/ladder/*`), recommender + design-shape copy, SVG rendering (`renderChart`/`plotOptions`), the on-canvas `ChartBlock`, sample-data labels, the CVD-tested series palettes, and the per-chart `ChartPalettePicker`. `ChartChooser` is embedded in three places: the standalone page (**deactivated**), the sidebar Figure tab Make mode (§6.8 — the only LIVE render site), and the manuscript ChartPanel (§6.12 — deactivated with the manuscript pipeline).
 
 **Series-palette override (wired 2026-07-29):** a chart's categorical series fills normally resolve from the poster theme's `paletteSlots` at render time ("restyle poster → restyle charts"). An optional `ChartSpec.seriesPaletteId` overrides that for one chart, pinning its series fills to a fixed CVD-tested palette from `seriesPalettes.ts` (Simplified Science + Okabe-Ito + Paul Tol). `chartColors.ts::resolveSeriesColors` resolves it (categorical fills only — heatmap/Likert ramps stay slot-based); a stale/removed id falls back to slots, visibly. The `ChartPalettePicker` (Figure tab, shown only for a selected **multi-series** chart) writes the choice into `posters.data` via `updateBlock`; "Poster theme (default)" clears it.
 
 ```mermaid
 flowchart LR
-  P["ChartChooserPage /chart-chooser"] -->|"renders"| CC["charts/ladder/ChartChooser"]
+  P["ChartChooserPage /chart-chooser (DEACTIVATED — route → /)"] -.->|"rendered, when mounted"| CC["charts/ladder/ChartChooser"]
   FT["Sidebar FigureTab Make mode"] --> CC
   CP["manuscript ChartPanel"] --> CC
   CC --> DS["DataStep"] --> VS["VariablesStep"]
@@ -2273,7 +2281,7 @@ flowchart LR
   CB -->|"render error"| FB["FeedbackModal 'Chart failed to render'"]
 ```
 
-#### `pages/ChartChooser.tsx` — /chart-chooser standalone plot picker (public, no session)
+#### `pages/ChartChooser.tsx` — /chart-chooser standalone plot picker (public, no session) — **DEACTIVATED 2026-09-10, not mounted; inventory frozen as the reactivation reference**
 
 **Elements**
 - [ ] palette swatch buttons — one per `PALETTES` entry (from `@/poster/constants`, §6.7), `title={p.name}`, `aria-pressed` — `ChartChooser.tsx:130-168` — sets palette for previews/downloads
@@ -2835,7 +2843,9 @@ No UI — logic only.
 
 ---
 
-### 6.12 Manuscript → Poster
+### 6.12 Manuscript → Poster — DEACTIVATED 2026-09-10 (not deleted)
+
+> **DEACTIVATED 2026-09-10 — not deleted.** `/paper-to-poster` and its alias `/manuscript-to-poster` redirect to `/` (`routes.tsx` header has the restore recipe). The lazy import is gone so the chunk leaves the build; the static SEO record (prerender + sitemap) was deleted; the header/footer/landing/dashboard entries were removed; `POST /api/narrative/condense` is mounted only behind `FEATURE_MANUSCRIPT`. `pages/PaperToPoster.tsx` and every `manuscript/*` module below remain on disk and unit-tested. The inventory below is the pre-deactivation state, kept as the reactivation reference.
 
 > Sibling pipeline: **§6.16 Manuscript → Slides** (`/paper-to-slides`) — same manuscript ingest, a slide-deck output instead of a poster.
 
@@ -3108,7 +3118,7 @@ No UI — logic only.
 #### `manuscript/ui/ChartPanel.tsx` — Q2 plot-branch side panel hosting the ChartChooser inline
 
 **Elements**
-- [ ] `Open the full tool` — link (`<a href="/chart-chooser" target="_blank">`) — `ChartPanel.tsx:88-95` — opens /chart-chooser in a new tab
+- [ ] `Open the full tool` — link (`<a href="/chart-chooser" target="_blank">`) — `ChartPanel.tsx:88-95` — opens /chart-chooser in a new tab (dormant with the manuscript pipeline; while the standalone picker is also deactivated that URL lands on `/`)
 - [ ] `Close` — button, `aria-label="Close chart builder"` — `ChartPanel.tsx:96-103` — calls `onClose()` (closes panel via closeChartPanel)
 - [ ] `{table.label}` + `{table.summary}` — dynamic per-extracted-table buttons — `ChartPanel.tsx:117-127` — picks that manuscript table as chart data
 - [ ] `Use different data` — button — `ChartPanel.tsx:129-135` — dismisses the table offer, falls back to chooser's own ingest
@@ -3155,7 +3165,9 @@ No UI — logic only.
 
 ---
 
-### 6.16 Manuscript → Slides
+### 6.16 Manuscript → Slides — DEACTIVATED 2026-09-10 (not deleted)
+
+> **DEACTIVATED 2026-09-10 — not deleted.** `/paper-to-slides` and its aliases `/paper-to-present` / `/paper-to-presentation` redirect to `/` (`routes.tsx` header has the restore recipe). The lazy import is gone; the static SEO record was deleted; vercel.json now rewrites `/paper-to-slides` → `/` with `X-Robots-Tag: noindex` and the alias 308s point at `/`; the header/footer entries were removed; the three `/api/narrative/*` deck endpoints are mounted only behind `FEATURE_MANUSCRIPT`. `pages/PaperToSlides.tsx`, `manuscript/slides/*`, `manuscript/deck/*`, `export/deck/*`, `export/pdf/deckPdf.ts` and `export/pptx/deckWriter.ts` remain on disk and unit-tested. The inventory below is the pre-deactivation state.
 
 The `/paper-to-slides` standalone pipeline: a chat wizard that walks 6 steps (Constraints → Star finding → Figures & tables → Narrative → Visuals & notes → Tweaks) to turn a manuscript into an ordered slide deck. Phase 1 builds a plain deck — LLM ranked-findings extraction via `POST /api/narrative/extract-findings`, a deterministic talk arc through `buildDeck`, a hard ≤30-word-per-slide gate, and speaker notes drawn (with provenance) from the paper. Phase 2 is an automatic design pass: Arm P (`POST /api/narrative/style-deck`) picks a device + positioned elements per slide and Arm T (`POST /api/narrative/theme`) returns a field-appropriate theme + 4 palettes; the two merge through the pure `applyTheme` into one shared `StyledSlideDeck` that feeds the PPTX writer, the client-side PDF writer, and the live preview — the `vibe` field re-runs Arm T alone to re-theme, PPTX-only utility slides (palette + icon library + 5 layout templates) are appended on export, and a count-mismatched styled response degrades gracefully to the plain deck. `pages/PaperToSlides.tsx` is the page shell host and `SlidesWizard.tsx` owns the whole flow (state, auto-design-pass effect, build/vibe/export handlers, the aligned-styled-deck trust guard). Monetization split: the polish is free to both formats (PDF *and* the styled preview), and only the editable `.pptx` is paid (spec §6).
 
@@ -3194,9 +3206,9 @@ flowchart LR
 
 **Graphics** — none directly; document meta (title/description) set via `useDocumentMeta(STATIC_ROUTE_META['/paper-to-slides'])` — `PaperToSlides.tsx:25`.
 
-#### `apps/web/src/routes.tsx` — /paper-to-slides route + canonical-slug redirects
+#### `apps/web/src/routes.tsx` — /paper-to-slides route + canonical-slug redirects (DEACTIVATED 2026-09-10)
 
-No UI — logic only. Lazy-imports `PaperToSlides` (`routes.tsx:103`) and mounts it at `/paper-to-slides` (`routes.tsx:135`). Two alias redirects funnel to the canonical slug: `/paper-to-present` → `<Navigate to="/paper-to-slides" replace />` (`routes.tsx:142-145`) and `/paper-to-presentation` → `<Navigate to="/paper-to-slides" replace />` (`routes.tsx:146-149`). Header comment notes vercel.json 308s these same aliases (`routes.tsx:16-18`, `45-48`).
+No UI — logic only. **Now:** `/paper-to-slides`, `/paper-to-present` and `/paper-to-presentation` each render `<Navigate to="/" replace />`; the `PaperToSlides` lazy import is removed so the wizard/pptx chunk leaves the build. **Before:** lazy-imported `PaperToSlides` and mounted it at `/paper-to-slides`, with the two aliases funnelling to it via `<Navigate to="/paper-to-slides" replace />`. The header comment carries the restore recipe.
 
 #### `apps/web/src/manuscript/slides/SlidesWizard.tsx` — wizard shell: owns all flow state, the auto-design-pass effect, build/vibe/export handlers, and the styled-deck alignment guard
 
@@ -3552,29 +3564,29 @@ No UI — logic only. Three route registrations, each `requireAuth(getSupabase)`
 - [ ] "The style provider API key is missing on the server." — provider-not-configured message (style-deck) — `narrative.ts:434`
 - [ ] "The theme provider API key is missing on the server." — provider-not-configured message (theme) — `narrative.ts:505`
 
-#### `apps/web/src/components/PublicHeader.tsx` — shared public-page header; Tools nav (incl. Paper to slides) + mobile overflow menu
+#### `apps/web/src/components/PublicHeader.tsx` — shared public-page header; Tools nav + mobile overflow menu (Paper to poster / Paper to slides / Plot picker entries ALL REMOVED 2026-09-10 — deactivated; `TOOL_LINKS` is now EMPTY (`readonly ToolLink[]`) and `NAV_LINKS` is Pricing · Why posters · About)
 
 **Elements**
 - [ ] `PublicHeader` header container — `<header>` — `PublicHeader.tsx:118`
 - [ ] Brand wordmark link to `/` — `<Link>` — `PublicHeader.tsx:119`
-- [ ] `NAV_LINKS.map` top-level nav links (includes `/paper-to-slides`) — `<Link>` (flat row, `sm:`-gated) — `PublicHeader.tsx:145-149`
+- [ ] `NAV_LINKS.map` top-level nav links (no longer includes `/paper-to-poster`, `/paper-to-slides` or `/chart-chooser` — removed 2026-09-10) — `<Link>` (flat row, `xl:`-gated) — `PublicHeader.tsx`
 - [ ] `MobileNav` overflow trigger — `<MobileNav>` — `PublicHeader.tsx:151`
 - [ ] Feedback button (signed-in, desktop) — `<button>` title "Send feedback" — `PublicHeader.tsx:155-165`
 - [ ] Profile link `/profile` — `<Link>` title "Profile & Settings" — `PublicHeader.tsx:166-175`
 - [ ] Sign in link `/auth` (signed-out) — `<Link>` — `PublicHeader.tsx:178-184`
 - [ ] Mobile overflow trigger — `<button>` `aria-label="Menu"`, `aria-expanded`, `aria-haspopup`, `aria-controls` — `PublicHeader.tsx:250-284`
 - [ ] Mobile menu panel — `<ul>` `aria-labelledby` — `PublicHeader.tsx:287-311`
-- [ ] `TOOL_LINKS.map` blurbed tool rows (includes `/paper-to-slides`) — `<Link>` — `PublicHeader.tsx:313-328`
+- [ ] `TOOL_LINKS.map` blurbed tool rows — `<Link>` — `PublicHeader.tsx` — renders NOTHING since 2026-09-10 (list empty; no separator or empty group is left behind)
 - [ ] Learn-page rows (NAV_LINKS minus tools) — `<Link>` — `PublicHeader.tsx:332-344`
 - [ ] Mobile "Send feedback" (signed-in) — `<button>` — `PublicHeader.tsx:351-361`
 
 **Copy**
-- [ ] "Paper to slides" — tool link label (TOOL_LINKS + NAV_LINKS) — `PublicHeader.tsx:50`
-- [ ] "Turn a manuscript into a talk (coming soon)" — tool blurb (mobile menu row) — `PublicHeader.tsx:50`
-- [ ] "Paper to poster" — tool link label — `PublicHeader.tsx:46`
-- [ ] "Turn a manuscript into a poster draft" — tool blurb — `PublicHeader.tsx:47`
-- [ ] "Plot picker" — tool link label — `PublicHeader.tsx:54`
-- [ ] "Find the figure that fits your data" — tool blurb — `PublicHeader.tsx:55`
+- [ ] ~~"Paper to slides" — tool link label (TOOL_LINKS + NAV_LINKS)~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~"Turn a manuscript into a talk (coming soon)" — tool blurb (mobile menu row)~~ — removed 2026-09-10
+- [ ] ~~"Paper to poster" — tool link label~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~"Turn a manuscript into a poster draft" — tool blurb~~ — removed 2026-09-10
+- [ ] ~~"Plot picker" — tool link label~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~"Find the figure that fits your data" — tool blurb~~ — removed 2026-09-10
 - [ ] "Pricing" — nav link label — `PublicHeader.tsx:72`
 - [ ] "Why posters" — nav link label — `PublicHeader.tsx:73`
 - [ ] "About" — nav link label — `PublicHeader.tsx:74`
@@ -3589,23 +3601,23 @@ No UI — logic only. Three route registrations, each `requireAuth(getSupabase)`
 - [ ] Profile person icon — inline `<svg>` — `PublicHeader.tsx:171-174`
 - [ ] Hamburger/close icon (toggles by `open`) — inline `<svg>` — `PublicHeader.tsx:261-283`
 
-#### `apps/web/src/components/PublicFooter.tsx` — shared 4-column site footer; Product column links to Paper to slides
+#### `apps/web/src/components/PublicFooter.tsx` — shared 4-column site footer (Paper to poster / Paper to slides / Plot picker Product links ALL REMOVED 2026-09-10 — deactivated; Product column is Home · Pricing)
 
 **Elements**
 - [ ] `PublicFooter` footer container — `<footer>` — `PublicFooter.tsx:20`
 - [ ] Brand link to `/` — `<Link>` — `PublicFooter.tsx:25`
 - [ ] Product column — `<FooterColumn>` — `PublicFooter.tsx:42-48`
-- [ ] `/paper-to-slides` footer link — `<FooterLink>` — `PublicFooter.tsx:46`
-- [ ] `/paper-to-poster` footer link — `<FooterLink>` — `PublicFooter.tsx:45`
-- [ ] `/chart-chooser` footer link — `<FooterLink>` — `PublicFooter.tsx:47`
+- [ ] ~~`/paper-to-slides` footer link — `<FooterLink>`~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~`/paper-to-poster` footer link — `<FooterLink>`~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~`/chart-chooser` footer link — `<FooterLink>`~~ — removed 2026-09-10 (deactivated)
 - [ ] Learn column (About, Why posters, Send feedback) — `<FooterColumn>` — `PublicFooter.tsx:50-56`
 - [ ] Account column (Sign in, Profile) — `<FooterColumn>` — `PublicFooter.tsx:58-61`
 - [ ] Legal column (Privacy, Cookies, Terms) — `<FooterColumn>` — `PublicFooter.tsx:63-67`
 
 **Copy**
-- [ ] "Paper to slides" — Product column link — `PublicFooter.tsx:46`
-- [ ] "Paper to poster" — Product column link — `PublicFooter.tsx:45`
-- [ ] "Plot picker" — Product column link — `PublicFooter.tsx:47`
+- [ ] ~~"Paper to slides" — Product column link~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~"Paper to poster" — Product column link~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~"Plot picker" — Product column link~~ — removed 2026-09-10 (deactivated)
 - [ ] "Home" — Product column link — `PublicFooter.tsx:43`
 - [ ] "Pricing" — Product column link — `PublicFooter.tsx:44`
 - [ ] "Product" — column heading — `PublicFooter.tsx:42`
@@ -3617,14 +3629,14 @@ No UI — logic only. Three route registrations, each `requireAuth(getSupabase)`
 **Graphics**
 - [ ] Brand logo (rounded-rect + double-curve + center dot) — inline `<svg>` — `PublicFooter.tsx:26-31`
 
-#### `apps/web/src/components/NewPosterButton.tsx` — dashboard entry point; "Import manuscript" link routes to paper-to-poster (Phase-1 manuscript entry) with privacy notice
+#### `apps/web/src/components/NewPosterButton.tsx` — dashboard entry point ("Import manuscript" link + privacy notice REMOVED 2026-09-10 — deactivated; "+ New poster" / "Import…" / ▾ menu unchanged)
 
 **Elements**
 - [ ] Primary "+ New poster" button — `<button>` — `NewPosterButton.tsx:60-67`
 - [ ] "Import…" button — `<button>` `aria-label="Import an existing poster"` `data-postr-import-cta` — `NewPosterButton.tsx:68-78`
 - [ ] Chevron "more options" button — `<button>` `aria-label="More poster options"` `aria-haspopup="menu"` `aria-expanded` — `NewPosterButton.tsx:79-89`
-- [ ] "Import manuscript" link to `/paper-to-poster` — `<Link>` `data-postr-import-manuscript-cta` — `NewPosterButton.tsx:103-110`
-- [ ] Privacy-notice paragraph — `<p>` — `NewPosterButton.tsx:111-114`
+- [ ] ~~"Import manuscript" link to `/paper-to-poster` — `<Link>` `data-postr-import-manuscript-cta`~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~Privacy-notice paragraph — `<p>`~~ — removed 2026-09-10
 - [ ] Options dropdown — `<div role="menu">` — `NewPosterButton.tsx:117-149`
 - [ ] "New blank poster" menu item — `<button role="menuitem">` — `NewPosterButton.tsx:127-134`
 - [ ] "Import PDF / image / .postr…" menu item — `<button role="menuitem">` — `NewPosterButton.tsx:135-147`
@@ -3635,8 +3647,8 @@ No UI — logic only. Three route registrations, each `requireAuth(getSupabase)`
 - [ ] "+ New poster" — primary button label — `NewPosterButton.tsx:66`
 - [ ] "Creating…" — primary button busy label — `NewPosterButton.tsx:66`
 - [ ] "Import…" — import button label — `NewPosterButton.tsx:77`
-- [ ] "Import manuscript" — paper-to-poster link label — `NewPosterButton.tsx:109`
-- [ ] "Your manuscript is never stored on our servers, and is never used to train AI." — privacy notice — `NewPosterButton.tsx:112-113`
+- [ ] ~~"Import manuscript" — paper-to-poster link label~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~"Your manuscript is never stored on our servers, and is never used to train AI." — privacy notice~~ — removed 2026-09-10
 - [ ] "Failed to create poster" — fallback error message — `NewPosterButton.tsx:46`
 - [ ] "New blank poster" — menu item label — `NewPosterButton.tsx:133`
 - [ ] "Import PDF / image / .postr…" — menu item label — `NewPosterButton.tsx:142`
@@ -3648,11 +3660,11 @@ No UI — logic only. Three route registrations, each `requireAuth(getSupabase)`
 - [ ] ▾ chevron glyph — text glyph — `NewPosterButton.tsx:88`
 - [ ] ＋ glyph (New blank poster item) — text glyph — `NewPosterButton.tsx:133`
 
-#### `apps/web/src/seo/routes.json` — per-route SEO meta; `/paper-to-slides` title/description/h1/copy
+#### `apps/web/src/seo/routes.json` — per-route SEO meta; `/paper-to-slides` record DELETED 2026-09-10
 
-No UI — data only. Defines the SEO metadata injected at build time for `/paper-to-slides` (marketing group).
+No UI — data only. **Now:** the `static["/paper-to-slides"]` record is gone, so the route is no longer prerendered, no longer in `dist/sitemap-static.xml`, and no longer a fallback nav link on other prerendered pages; `pages/PaperToSlides.tsx` reads `metaFor('/paper-to-slides')` → `null`. Restore the record from git history (pre-2026-09-10) on reactivation. **Before** (kept for reference):
 
-**Copy** (verbatim from the `/paper-to-slides` entry, `routes.json:108-119`)
+**Copy** (verbatim from the deleted `/paper-to-slides` entry)
 - [ ] "Paper to Slides: Turn a Manuscript into a Deck | Postr" — title — `routes.json:109`
 - [ ] "Turn a paper into an editable slide deck. Paste a manuscript or upload a Word file, answer a few short questions, and download a free PDF or a PowerPoint." — description — `routes.json:110`
 - [ ] "index,follow" — robots — `routes.json:111`
@@ -3662,17 +3674,20 @@ No UI — data only. Defines the SEO metadata injected at build time for `/paper
 - [ ] "Every slide carries speaker notes taken from your paper, each showing which section it came from, so nothing on a slide is invented." — copy[2] — `routes.json:116`
 - [ ] "Your manuscript is never stored on our servers and is never used to train models. Download a free PDF, or an editable PowerPoint you can open in PowerPoint, Keynote, Google Slides, or LibreOffice." — copy[3] — `routes.json:117`
 
-#### `apps/web/vercel.json` — Vercel edge config; alias redirects → `/paper-to-slides`
+#### `apps/web/vercel.json` — Vercel edge config; alias redirects → `/` (DEACTIVATED 2026-09-10)
 
-No UI — config only. Two permanent (308) redirects fold the alias spellings onto the canonical route:
-- [ ] `/paper-to-present` → `/paper-to-slides` (`"permanent": true`) — `vercel.json:19-23`
-- [ ] `/paper-to-presentation` → `/paper-to-slides` (`"permanent": true`) — `vercel.json:24-28`
+No UI — config only. **Now:**
+- [ ] `/paper-to-present` → `/` (`"permanent": true`) and `/paper-to-presentation` → `/` (`"permanent": true`) — one hop to the landing page instead of a 308 onto a route that itself redirects
+- [ ] rewrite `/paper-to-slides` → `/` (the prerendered file no longer exists, so without it a cold hit would 404) + `X-Robots-Tag: noindex, nofollow` header block; the same pair exists for `/paper-to-poster`
+- [ ] `/manuscript-to-poster` → `/` (`"permanent": true`) — the previously live sitemap URL must not 404
 
-(No rewrite entry for `/paper-to-slides` itself — it is a real prerendered marketing route, not one of the SPA-shell rewrites at `vercel.json:30-44`.)
+**Before:** the two talk aliases 308'd to `/paper-to-slides`, which had no rewrite because it was a real prerendered route. Contract locked by `src/seo/__tests__/vercelRouting.test.ts` (`ALIAS_REDIRECTS`, `DEACTIVATED_ROUTES`).
 
 ---
 
-### 6.17 Presentation Checker
+### 6.17 Presentation Checker — DEACTIVATED 2026-09-10 (not deleted)
+
+> **DEACTIVATED 2026-09-10 — not deleted.** `/presentation-checker` redirects to `/` (its rewrite + noindex header stay; the `app` SEO record was deleted); the editor `review` rail tuple and its mount branch are commented out in `poster/Sidebar.tsx` (import / union member / selection guard kept); `data/checkoutIntent.ts` VALID no longer accepts `review_pack` / `review_addon`, so `/auth?plan=review_*` renders the plain auth page; `apps/api` mounts `createReviewRouter` only behind `FEATURE_REVIEW` and `/billing/create-checkout` refuses the review SKUs with `400 invalid_sku` while that flag is off (webhook fulfilment is NOT gated). `pages/PresentationChecker.tsx`, `review/*`, `poster/sidebar/ReviewTab.tsx`, `apps/api/src/review*`, the `poster_reviews` migration and every test remain. The launch checklist (`docs/plans/experiments/presentation-checker/launch-checklist.md`) is the reactivation recipe on top of the `routes.tsx` header. The inventory below is the pre-deactivation state.
 
 The standalone reviewer for posters AND talks (spec §1: one unified surface). Two surfaces share one pipeline: the `/presentation-checker` page (upload a poster PDF, a talk deck `.pptx` / `.pdf`, or an image) and the editor's `review` sidebar tab (the Postr-native input — the review gets both the rendered capture AND the structured PosterDoc, so its fix cards jump straight to the block). A review returns per-dimension scores (narrative / design / content, each /5), an attention summary, an optional priority call, and anchored fix cards with a personalized rewritten example each. Paywall (D4, resolved server-side): the one-time **review pack** (`review_pack`, payment-mode SKU → `grant_review_credits` +`REVIEW_PACK_CREDITS = 3`, `apps/api/src/billing.ts:54`) or the term-riding **weekly add-on** (`review_addon`, subscription-mode SKU → a 7-day-window quota enforced API-side, `REVIEW_ADDON_WEEKLY_QUOTA = 4` placeholder pending repricing, `apps/api/src/review/config.ts:54`). One follow-up is included in the initial credit and disclosed up front ("This is your one follow-up — the review closes after it."); the follow-up closes the review and a third critique is refused server-side (`409 review_closed`, `apps/api/src/review.ts:610` — terminal in the DB, not just hidden in UI). Credits are consumed AFTER a successful critique (D6) with compensation on a persistence failure — typed ingest/upstream failures never burn one. Route gating (D12): registered and public but deliberately unlinked + noindex until the launch checklist flips the SEO record to `static`. PPTX input renders server-side via LibreOffice + pdftoppm and ships last (D10 — needs the Docker-based Render service). User-visible copy names the workflow, never "AI" (D15).
 
@@ -3693,9 +3708,9 @@ flowchart LR
   RC --> DB["public.poster_reviews (service_role write; owner-SELECT RLS)"]
 ```
 
-#### `apps/web/src/routes.tsx` — /presentation-checker route (registered, unlinked — D12)
+#### `apps/web/src/routes.tsx` — /presentation-checker route (DEACTIVATED 2026-09-10 — redirects to /)
 
-No UI — logic only. Lazy-imports `PresentationChecker` (`routes.tsx:108`) and mounts it at `/presentation-checker` (`routes.tsx:146`). Header comment marks it "public, code-split, noindex; registered but not linked from nav — D12" (`routes.tsx:15-17`).
+No UI — logic only. **Now:** `/presentation-checker` renders `<Navigate to="/" replace />` and the `PresentationChecker` lazy import is removed (chunk leaves the build). **Before:** lazy-imported and mounted, "public, code-split, noindex; registered but not linked from nav — D12". The header comment carries the restore recipe.
 
 #### `apps/web/src/pages/PresentationChecker.tsx` — standalone review page: upload card, score header, finding cards with region overlays, one-follow-up flow, paywall panel, past-reviews list
 
@@ -4343,8 +4358,8 @@ flowchart LR
 - [ ] logo + "Postr" — Link — `PublicFooter.tsx:25` — `/`
 - [ ] `Home` — Link — `PublicFooter.tsx:43` — `/`
 - [ ] `Pricing` — Link — `PublicFooter.tsx:44` — `/pricing`
-- [ ] `Paper to poster` — Link — `PublicFooter.tsx:45` — `/paper-to-poster`
-- [ ] `Plot picker` — Link — `PublicFooter.tsx:46` — `/chart-chooser`
+- [ ] ~~`Paper to poster` — Link — `PublicFooter.tsx:45` — `/paper-to-poster`~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~`Plot picker` — Link — `PublicFooter.tsx:46` — `/chart-chooser`~~ — removed 2026-09-10 (deactivated)
 - [ ] `About` — Link — `PublicFooter.tsx:50` — `/about`
 - [ ] `Why poster sessions` — Link — `PublicFooter.tsx:51` — `/why-posters`
 - [ ] `Send feedback` — button — `PublicFooter.tsx:52` — `useFeedbackStore.open('other')`
@@ -4366,8 +4381,8 @@ flowchart LR
 
 **Elements**
 - [ ] logo + "Postr" — Link — `PublicHeader.tsx:114` — `/`
-- [ ] `Paper to poster` — nav Link — `PublicHeader.tsx:141` (constant `NAV_LINKS :65-70`) — `/paper-to-poster` (desktop flat row + mobile menu `:310`)
-- [ ] `Plot picker` — nav Link — same — `/chart-chooser` (both rows)
+- [ ] ~~`Paper to poster` — nav Link — `PublicHeader.tsx:141` (constant `NAV_LINKS :65-70`) — `/paper-to-poster` (desktop flat row + mobile menu `:310`)~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~`Plot picker` — nav Link — same — `/chart-chooser` (both rows)~~ — removed 2026-09-10 (deactivated)
 - [ ] `Pricing` — nav Link — same — `/pricing` (both rows)
 - [ ] `Why posters` — nav Link — same — `/why-posters` (both rows)
 - [ ] `About` — nav Link — same — `/about` (both rows)
@@ -4380,8 +4395,8 @@ flowchart LR
 
 **Copy**
 - [ ] "Postr" — wordmark — `PublicHeader.tsx:121-123`
-- [ ] "Turn a manuscript into a poster draft" — mobile blurb for Paper to poster (constant `TOOL_LINKS :44`) — `PublicHeader.tsx:319`
-- [ ] "Find the figure that fits your data" — mobile blurb for Plot picker (constant `:49`) — `:319`
+- [ ] ~~"Turn a manuscript into a poster draft" — mobile blurb for Paper to poster (constant `TOOL_LINKS :44`) — `PublicHeader.tsx:319`~~ — removed 2026-09-10 (deactivated)
+- [ ] ~~"Find the figure that fits your data" — mobile blurb for Plot picker (constant `:49`) — `:319`~~ — removed 2026-09-10 (deactivated)
 
 **Graphics**
 - [ ] Postr logo — inline-svg — `PublicHeader.tsx:115-120` — brand link
@@ -4719,8 +4734,8 @@ No UI directly; all values below are user-visible (tab titles, search snippets, 
 - [ ] "/privacy" — title "Privacy Policy | Postr", description, h1 "Privacy Policy", 1 copy line — `:69-77`
 - [ ] "/cookies" — title "Cookie Policy | Postr", description, h1 "Cookies Policy", 1 copy line — `:78-86`
 - [ ] "/terms" — title "Terms of Service | Postr", description, h1 "Terms of Service", 1 copy line — `:87-95`
-- [ ] "/paper-to-poster" — title "Paper to Poster: Turn a Manuscript into One | Postr", description, h1 "From paper to poster", 4 copy lines — `:96-107`
-- [ ] app routes (all noindex,nofollow): "/auth" "Sign in | Postr" · "/dashboard" "My posters | Postr" · "/profile" "Profile and settings | Postr" · "/presentation-checker" "Presentation Checker — Poster & Talk Review | Postr" (D12 — registered, unlinked; §6.17) · "/debug" "Debug | Postr" · "/admin/gallery" "Gallery moderation | Postr" · "/p" "Poster editor | Postr" — `:173-235`
+- [ ] ~~"/paper-to-poster" — title "Paper to Poster: Turn a Manuscript into One | Postr", description, h1 "From paper to poster", 4 copy lines~~ — **record DELETED 2026-09-10** (deactivated; same for "/paper-to-slides") — the route no longer prerenders or appears in the sitemap
+- [ ] app routes (all noindex,nofollow): "/auth" "Sign in | Postr" · "/dashboard" "My posters | Postr" · "/profile" "Profile and settings | Postr" · ~~"/presentation-checker"~~ (record DELETED 2026-09-10 — deactivated; §6.17) · "/debug" "Debug | Postr" · "/admin/gallery" "Gallery moderation | Postr" · "/p" "Poster editor | Postr" — `:173-235`
 - [ ] "/404" — title "Page not found | Postr", description "That page does not exist.", h1 "Page not found", 1 copy line — `:140-148`
 - [ ] Note: no entries for `/gallery`, `/why-posters` app, `/billing/*`, `/s`, or any `/fr` legal route — FR pages reuse the EN route meta (`TermsFr.tsx:23`, `PrivacyFr.tsx:18`, `CookiesFr.tsx:19`), so FR pages carry EN titles/descriptions and the EN canonical — SEO-relevant drift to flag (§10).
 
@@ -4879,7 +4894,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 | `public.poster_comments` | `data/comments.ts`, `hooks/useComments` | 15 s polling |
 | `public.poster_versions` | `data/posterVersions.ts` (⌘S saveVersionNow; Versions tab) | MAX_VERSIONS_PER_POSTER = 20 |
 | `public.user_logos` | `data/userLogos.ts`, LogoPicker "My Logos" | max 25/account, 10 MB each |
-| `public.talk_waitlist` | `data/talkWaitlist.ts` ← PricingSection "Join the waitlist" | shipped 2026-07-28 (`20260728160000_talk_waitlist.sql`) |
+| `public.talk_waitlist` | `data/talkWaitlist.ts` ← PricingSection `TalkWaitlistCallout` (**unmounted 2026-09-10 — no live UI writer**) | shipped 2026-07-28 (`20260728160000_talk_waitlist.sql`); existing rows kept for the eventual launch notify |
 | `public.poster_reviews` | `review/reviewApi.ts` (`listMyReviews` — past-reviews list, §6.17) | owner-SELECT-only RLS (D3) — ALL writes are API service_role after a successful critique (success-only, D16); stage machine initial → followup → closed; `20260729120000_poster_reviews.sql` |
 | `public.users` review columns (`review_credits`, `review_addon`, `review_addon_subscription_id`) | `hooks/usePlan` (`reviewCredits` / `canReview`, §6.17) | SERVER-OWNED like plan/credits — folded into `guard_billing_columns()` (10 guarded columns); `20260729120000_poster_reviews.sql` |
 | billing fulfillment rows | written ONLY by the Stripe webhook (service_role) | `20260728130000_billing_fulfilled_sessions.sql`, `20260728140000_consume_export_credit.sql`, `20260728150000_grant_export_credits.sql`, `20260728170000_billing_subscription.sql`, `20260728190000_billing_refunds.sql` |
@@ -4910,10 +4925,10 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 | `POST /api/import/extract` | `import/pdfImport.ts` (vision fallback), `import/imageImport.ts`, `import/styleImport.ts` | Vision-model poster extraction + copy-a-design style extraction (Claude, below); 429 daily/burst limits |
 | `POST /api/import/parse-authors` | `poster/Sidebar.tsx:1365` (Authors tab "Parse with AI") | LLM byline parser (regex fallback offline) |
 | `POST /api/import/parse-references` | `poster/Sidebar.tsx:1416` (Refs tab "Parse with AI") | LLM reference parser (line-splitter fallback) |
-| `POST /api/narrative/condense` | `manuscript/condenseClient.ts:40` ← PaperToPoster | The one manuscript LLM call (OpenAI, below); 429 daily drafting limit |
-| `POST /api/narrative/extract-findings` | `manuscript/deck/extractFindings.ts:63` ← PaperToSlides (§6.16) | Phase-1 LLM star-finding extraction for the slide deck (OpenAI); same middleware as `/condense` |
-| `POST /api/narrative/style-deck` | `manuscript/deck/styleClient.ts:59` ← PaperToSlides (§6.16) | Phase-2 Arm P — styles each slide into structured editable layout (OpenAI); same middleware as `/condense` |
-| `POST /api/narrative/theme` | `manuscript/deck/themeClient.ts:79` ← PaperToSlides (§6.16) | Phase-2 Arm T — field theme + 4 palette variations (OpenAI); same middleware as `/condense`; re-run alone on a vibe change |
+| `POST /api/narrative/condense` | `manuscript/condenseClient.ts:40` ← PaperToPoster (**no UI caller while deactivated**) | The one manuscript LLM call (OpenAI, below); 429 daily drafting limit. **Router mounted only when `FEATURE_MANUSCRIPT=1` (`apps/api/src/features.ts`) — 404 otherwise** |
+| `POST /api/narrative/extract-findings` | `manuscript/deck/extractFindings.ts:63` ← PaperToSlides (§6.16, **no UI caller while deactivated**) | Phase-1 LLM star-finding extraction for the slide deck (OpenAI); same middleware as `/condense`; same `FEATURE_MANUSCRIPT` gate |
+| `POST /api/narrative/style-deck` | `manuscript/deck/styleClient.ts:59` ← PaperToSlides (§6.16, **no UI caller while deactivated**) | Phase-2 Arm P — styles each slide into structured editable layout (OpenAI); same middleware as `/condense`; same `FEATURE_MANUSCRIPT` gate |
+| `POST /api/narrative/theme` | `manuscript/deck/themeClient.ts:79` ← PaperToSlides (§6.16, **no UI caller while deactivated**) | Phase-2 Arm T — field theme + 4 palette variations (OpenAI); same middleware as `/condense`; re-run alone on a vibe change; same `FEATURE_MANUSCRIPT` gate |
 | `POST /billing/create-checkout` | `data/billing.ts:17` ← EditableExportButtons (term/pack), Auth (`startCheckoutForPlan`) | Creates Stripe Checkout Session → redirect URL |
 | `POST /billing/consume-credit` | `data/billing.ts:33` ← EditableExportButtons post-export | Consumes 1 export credit |
 | `POST /billing/mark-export` | `data/billing.ts:46` ← EditableExportButtons (term users) | Marks a paid export taken (refund-right forfeiture) |
@@ -4961,6 +4976,21 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 
 Things that exist in code but are unreachable, unused, stale, or drifted — check here before and after any feature removal.
 
+### Deactivated features — manuscript pipelines, Presentation Checker, talk waitlist, standalone plot picker (2026-09-10)
+
+Switched off to keep the product to its core — the poster editor. After the second pass the same day (plot picker) there are **no standalone tools in the nav at all**; the standalone plot checker is a later follow-up and was never mounted. Pattern = the public-gallery precedent below: **files kept, routes redirect, records removed, flags off.** Canonical restore recipe: the `apps/web/src/routes.tsx` header (8 numbered steps for the manuscript/checker pass, 5 for the picker).
+
+- [ ] **Standalone plot picker (§6.10 `pages/ChartChooser.tsx`)** — `/chart-chooser` + alias `/plot-picker` → `<Navigate to="/" replace>`; lazy import removed; `vercel.json` alias 308 retargeted `/chart-chooser` → `/` (it was deployed, so it is kept rather than dropped), rewrite `/chart-chooser` → `/` + `X-Robots-Tag: noindex`; `routes.json` static record deleted (out of prerender + sitemap; the page now reads `metaFor()` → `null`); removed entries: `PublicHeader.tsx` `TOOL_LINKS` (now EMPTY, typed `readonly ToolLink[]`; `NAV_LINKS` = Pricing · Why posters · About; flat row + mobile menu render with no tool rows and no empty group), `PublicFooter.tsx` Product column (Home · Pricing), `Landing.tsx` "Tools you can use on their own" section + `ToolCard` component (both deleted from the file — git history), the Landing small-screen note's "The plot picker and figure checker work fine on a phone." sentence, `About.tsx` `figures` milestone rewritten to name the editor's Figure tab. Kept: `pages/ChartChooser.tsx` + `pages/__tests__/ChartChooser.test.tsx` (renders the component directly; h1 pinned to the deleted record's text), and **all of `charts/*` — LIVE in the editor Figure tab (§6.8)**. Scripts: `apps/web/scripts/verify-prerender.sh` (out of the prerendered loop, into the noindex + 200 loops, `check_alias /plot-picker /`), `apps/web/scripts/mobile-audit.mjs` ROUTES, `scripts/text-audit/scrape.mts` ROUTES. Tests flipped: `routes.test.tsx`, `toolDiscoverability.test.tsx` (`TOOL_PATHS` empty, `DEACTIVATED_PATHS` + `/chart-chooser` + `/plot-picker`), `siteMeta.test.ts`, `vercelRouting.test.ts` (`CLIENT_ROUTES` / `ALIAS_REDIRECTS` / `DEACTIVATED_ROUTES`). Reason: the picker is being revamped in another worktree.
+
+- [ ] **Paper-to-poster (§6.12)** — `/paper-to-poster` + alias `/manuscript-to-poster` → `<Navigate to="/" replace>`; lazy import removed; `vercel.json` alias 308 → `/`, rewrite `/paper-to-poster` → `/` + `X-Robots-Tag: noindex`; `routes.json` static record deleted (out of prerender + sitemap; `pages/PaperToPoster.tsx` now reads `metaFor()` → `null`); removed entries: `PublicHeader.tsx` `TOOL_LINKS`, `PublicFooter.tsx` Product column, `Landing.tsx` ToolCard (intro copy made count-free; lone card centres via `sm:only:*`), `About.tsx` `start-from-work` milestone rewritten to the PDF/PPTX/image-import sentence only, `NewPosterButton.tsx` "Import manuscript" link + fine print. Kept: `pages/PaperToPoster.tsx`, `manuscript/*`, `manuscript/__tests__/PaperToPoster.test.tsx` (renders the component directly).
+- [ ] **Paper-to-slides (§6.16)** — `/paper-to-slides` + aliases `/paper-to-present`, `/paper-to-presentation` → `<Navigate to="/" replace>`; lazy import removed; `vercel.json` alias 308s → `/`, rewrite + noindex for `/paper-to-slides`; static record deleted. Kept: `pages/PaperToSlides.tsx`, `manuscript/slides/*`, `manuscript/deck/*`, `export/deck/*`, `export/pdf/deckPdf.ts`, `export/pptx/deckWriter.ts` + their tests.
+- [ ] **Presentation Checker (§6.17)** — `/presentation-checker` → `<Navigate to="/" replace>` (rewrite + noindex kept; app SEO record deleted; lazy import removed); editor `review` rail tuple + mount branch commented out in `poster/Sidebar.tsx` (import / `SidebarTab` member / selection guard kept); `data/checkoutIntent.ts` `VALID = ['term', 'pack']` so `/auth?plan=review_pack|review_addon` renders the plain auth page (`Auth.tsx` labels kept for the exhaustive Record). Kept: `pages/PresentationChecker.tsx`, `review/*`, `poster/sidebar/ReviewTab.tsx`, `hooks/usePlan.ts` review fields, `data/billing.ts` `BillingSku` union, all component-level tests.
+- [ ] **Review SKUs (`review_pack`, `review_addon`)** — `apps/api/src/features.ts` `FEATURE_REVIEW` (default off): `createReviewRouter` not mounted (`/api/review/*` → 404) and `POST /billing/create-checkout` refuses both SKUs with `400 invalid_sku` regardless of `STRIPE_PRICE_REVIEW_*`; webhook fulfilment (`fulfillCheckout`, `handleSubscriptionChange`, `handleInvoicePaid` review branches) NOT gated; `poster_reviews` migration + `users.review_*` columns + pgTAP tests untouched. Tests: `apps/api/src/__tests__/app.test.ts` (mount gating) + `billing.test.ts` "hidden review SKUs". **Pre-deploy (dashboards, cannot be checked here):** prod users with `review_credits > 0` or `review_addon = true` lose the UI to spend what they bought — refund/communicate first; archive the review products in Stripe; leave `STRIPE_PRICE_REVIEW_*`, `FEATURE_MANUSCRIPT`, `FEATURE_REVIEW` unset in Render.
+- [ ] **Narrative API (`/api/narrative/*`)** — `FEATURE_MANUSCRIPT` (default off): `createNarrativeRouter` not mounted → 404. Router + `narrative*.test.ts` unchanged (they build the router directly). `OPENAI_API_KEY` only needed with the flag on.
+- [ ] **Talk waitlist (§6.3)** — `<TalkWaitlistCallout />` no longer rendered in `PricingSection.tsx` (function exported, not mounted); `data/talkWaitlist.ts` + `public.talk_waitlist` kept. **Pre-deploy:** existing `talk_waitlist` rows are people expecting a launch email — communicate.
+- [ ] **Copy sweep done** — `PublicHeader`/`PublicFooter` comments, Landing tools intro ("Figure tools that work without an account…"), `PricingSection` docblock, `NewPosterButton` comment, `About` milestone, `routes.tsx` header, `apps/api/.env.example`. `OnboardingTour` step-5 `tabName` fixed from `'plot code check'` to `'figure'` in passing (the tour was silently skipping the Figure tab). Scripts: `apps/web/scripts/verify-prerender.sh`, `apps/web/scripts/mobile-audit.mjs`, `scripts/text-audit/scrape.mts` route lists.
+- [ ] **Contract tests that lock the deactivation** — `src/__tests__/routes.test.tsx`, `components/__tests__/toolDiscoverability.test.tsx` (`DEACTIVATED_PATHS`), `seo/__tests__/siteMeta.test.ts`, `seo/__tests__/vercelRouting.test.ts` (`ALIAS_REDIRECTS` → `/`, `DEACTIVATED_ROUTES` noindex), `apps/api/src/__tests__/app.test.ts`. Flip these when restoring.
+
 ### Deactivated / dead features
 
 - [ ] **Public gallery (`GALLERY_PUBLIC_ENABLED = false`, `config/features.ts:21`)** — full surface: routes `/gallery`, `/gallery/:entryId` redirect to `/` (`routes.tsx:116-117`); `pages/Gallery.tsx` + `pages/GalleryEntry.tsx` unreachable but kept for reactivation; flag gates Home Gallery link (`Home.tsx:148`), Profile upload button + entry links (`Profile.tsx:571-595,814`), Sidebar "Share to gallery" (`Sidebar.tsx:1183-1202`), `?publish=1` auto-open (`PosterEditor.tsx:1314-1329`), OnboardingTour step-7 flag-ON body (`OnboardingTour.tsx:85`); dead flow: `PublishFlow` (mounted `App.tsx:15`), `PublishConsentModal`, `PublishGalleryModal`, `stores/publishFlowStore.ts`, `data/gallery.ts` publish path; `PublishConsentModal` `mode="share"` has NO caller anywhere; PosterCard "Publish" hover action was DELETED not gated (comment `PosterCard.tsx:262-271`); gallery siteMeta templates (`siteMeta.ts:213-219`) unused; reactivation checklist in `features.ts:4-19` header comment. `/admin/gallery` + `data/gallery.ts` read paths remain live.
@@ -4975,7 +5005,7 @@ Things that exist in code but are unreachable, unused, stale, or drifted — che
 ### Stale comments / docs
 
 - [ ] **`apps/api/src/billing.ts:4`** — header says "Two paid products, both ONE-TIME (never subscriptions)" but the Term is a Stripe recurring price (see the correction comment at `billing.ts:50-52`).
-- [ ] **Stale comment cluster** — `pages/Share.tsx:4` (references dead AuthBootstrap); `lib/auth.ts` consumer list includes AuthBootstrap; `lib/apiClient.ts:5` docblock mentions "future `/api/scan`"; `poster/Sidebar.tsx:1-4` header says "5-tab control panel" (there are 11 tabs); `export/attribution.ts` "no paid tier today" comment stale vs live paywall; `GuidelinesPanel.tsx:949` cheatsheet promises table context-menu "border preset, clear range" items that don't exist; `lib/consoleCapture.ts` doc claims `getCapturedCount` has a modal-preview consumer.
+- [ ] **Stale comment cluster** — `pages/Share.tsx:4` (references dead AuthBootstrap); `lib/auth.ts` consumer list includes AuthBootstrap; `lib/apiClient.ts:5` docblock mentions "future `/api/scan`"; ~~`poster/Sidebar.tsx:1-4` header says "5-tab control panel"~~ (fixed 2026-09-10 — header now lists the 11 live tabs + the deactivated review tab); `export/attribution.ts` "no paid tier today" comment stale vs live paywall; `GuidelinesPanel.tsx:949` cheatsheet promises table context-menu "border preset, clear range" items that don't exist; `lib/consoleCapture.ts` doc claims `getCapturedCount` has a modal-preview consumer.
 - [ ] **Dangling doc reference** — `apps/api/src/narrative/prompt.ts:113` points to `docs/plans/experiments/founding-cohort-cost-model.mjs` (business-model experiments were archived to `docs/archive/` — link is dead).
 
 ### Content drift (EN/FR + SEO + policy)
@@ -4990,7 +5020,7 @@ Things that exist in code but are unreachable, unused, stale, or drifted — che
 
 ## 11. Maintenance note
 
-- This doc reflects the code as of **2026-07-28 ~16:00 local** (post-billing, post-`/pricing`, post-FR-legal, post-ConsentNotice); §6.16 reflects main as of 2026-07-29 and §6.17 (Presentation Checker) reflects the `feat/presentation-checker` branch as of 2026-07-29 — pre-launch, route noindex + unlinked per D12.
+- This doc reflects the code as of **2026-07-28 ~16:00 local** (post-billing, post-`/pricing`, post-FR-legal, post-ConsentNotice); §6.16 reflects main as of 2026-07-29 and §6.17 (Presentation Checker) reflects the `feat/presentation-checker` branch as of 2026-07-29. **2026-09-10:** §6.12 / §6.16 / §6.17, the §6.3 talk waitlist and — second pass — the §6.10 standalone plot picker page are DEACTIVATED (banners on each section, route table + §5 edges + §9 rows updated, full summary in §10 "Deactivated features"); their inventories are frozen as the reactivation reference. `charts/*` stays live in the editor.
 - **Regenerate or update this doc whenever**: a route is added/removed/redirected in `routes.tsx` (+ `seo/routes.json` + `vercel.json` aliases), a store gains/losses a field or action, a feature folder under `poster/`, `components/`, `import/`, `export/`, `manuscript/`, `charts/`, `data/` changes shape, a feature flag flips (`config/features.ts`), or a storage key is added (update §8 AND the `pages/Profile.tsx:290-295` sweep).
 - When you check off a feature's boxes during a removal, also strike its rows in §7, its keys in §8, and its externals in §9 — then add any newly-orphaned leftovers to §10.
 

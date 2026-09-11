@@ -36,15 +36,17 @@ export function PublicFooter() {
             </p>
           </div>
 
-          {/* The two standalone tools live here as well as in the
-              header's overflow menu. The flat header nav is `xl:`-gated, so
-              on phones this column is the only route to them. */}
+          {/* The standalone tools live here as well as in the header's
+              overflow menu when any are live: the flat header nav is
+              `xl:`-gated, so on phones this column is the redundant
+              route to them. None are live right now — "Plot picker"
+              (/chart-chooser), "Paper to poster" and "Paper to slides"
+              were all removed here: deactivated — see routes.tsx
+              header. Re-add them after "Pricing", picker first, then
+              the plot checker when its page lands. */}
           <FooterColumn title="Product">
             <FooterLink to="/">Home</FooterLink>
             <FooterLink to="/pricing">Pricing</FooterLink>
-            <FooterLink to="/paper-to-poster">Paper to poster</FooterLink>
-            <FooterLink to="/paper-to-slides">Paper to slides</FooterLink>
-            <FooterLink to="/chart-chooser">Plot picker</FooterLink>
           </FooterColumn>
 
           <FooterColumn title="Learn">

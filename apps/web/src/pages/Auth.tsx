@@ -371,7 +371,11 @@ export default function Auth() {
 
         {/* Paid-intent banner replaces the guest pitch: a paid plan needs a
             real account, so we lead with "create an account to continue to
-            checkout", not "no account needed". */}
+            checkout", not "no account needed". The review_* labels below
+            are unreachable while the Presentation Checker is deactivated
+            (checkoutIntent.ts VALID rejects those plans — see routes.tsx
+            header); they stay so the Record<CheckoutPlan, string> remains
+            exhaustive. */}
         {checkoutPlan ? (
           <div className="mb-4 rounded-xl border border-[#7c6aed]/40 bg-[#14121e] p-5">
             <div className="flex items-start justify-between gap-4">

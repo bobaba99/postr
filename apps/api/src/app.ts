@@ -5,9 +5,12 @@ import { createImportRouter } from './import.js';
 import { createNarrativeRouter } from './narrative.js';
 import { createReviewRouter } from './review.js';
 import { createBillingRouter, createBillingWebhookRouter } from './billing.js';
+import { readFeatureFlags } from './features.js';
 
 export function createApp(): Express {
   const app = express();
+  // Read once per app — see features.ts for what each flag gates.
+  const features = readFeatureFlags();
 
   // Vite picks the next free port (5174, 5175, …) when 5173 is
   // already in use, which happens routinely in dev when an old
@@ -34,8 +37,9 @@ export function createApp(): Express {
   app.use(express.json({ limit: '2mb' }));
 
   // The authed billing routes (create-checkout) read a parsed JSON body,
-  // so they mount AFTER express.json().
-  app.use(createBillingRouter());
+  // so they mount AFTER express.json(). The flags decide whether the
+  // review SKUs are sellable; the term + pack always are.
+  app.use(createBillingRouter({ features }));
 
   app.get('/health', (_req, res) => {
     res.json({ ok: true });
@@ -50,15 +54,24 @@ export function createApp(): Express {
   // missing key returns 500 only when the route fires.
   app.use(createImportRouter());
 
-  // Manuscript narrative condenser — the one LLM step in the
-  // manuscript→poster pipeline. OPENAI_API_KEY required at request
-  // time; missing key returns 500 only when the route fires.
-  app.use(createNarrativeRouter());
+  // Manuscript narrative endpoints (condense for paper-to-poster;
+  // extract-findings / style-deck / theme for paper-to-slides). Their
+  // UI is deactivated (apps/web/src/routes.tsx header), so the router
+  // is mounted only behind FEATURE_MANUSCRIPT — otherwise every
+  // /api/narrative/* call is a plain 404. OPENAI_API_KEY required at
+  // request time; missing key returns 500 only when a route fires.
+  if (features.manuscript) {
+    app.use(createNarrativeRouter());
+  }
 
-  // Presentation Checker — poster/talk critique. ANTHROPIC_API_KEY +
-  // Supabase service key required at request time; missing config
-  // returns 500 only when the route fires.
-  app.use(createReviewRouter());
+  // Presentation Checker — poster/talk critique. Deactivated with its
+  // UI (the /presentation-checker page and the editor review tab), so
+  // it mounts only behind FEATURE_REVIEW. ANTHROPIC_API_KEY + Supabase
+  // service key required at request time; missing config returns 500
+  // only when a route fires.
+  if (features.review) {
+    app.use(createReviewRouter());
+  }
 
   return app;
 }

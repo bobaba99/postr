@@ -21,7 +21,15 @@ import { createCheckout, type BillingSku } from '@/data/billing';
 export type CheckoutPlan = BillingSku;
 
 const STORAGE_KEY = 'postr.checkoutIntent';
-const VALID: readonly CheckoutPlan[] = ['term', 'pack', 'review_pack', 'review_addon'];
+/**
+ * The plans a deep link may pre-select. The review SKUs ('review_pack',
+ * 'review_addon') are deliberately absent: the Presentation Checker is
+ * deactivated (see routes.tsx header), so /auth?plan=review_pack must
+ * fall back to the plain auth page instead of driving a checkout for a
+ * hidden SKU. The BillingSku union keeps them so the dormant ReviewTab /
+ * PresentationChecker code still compiles; widen this list to restore.
+ */
+const VALID: readonly CheckoutPlan[] = ['term', 'pack'];
 
 /** Narrow an untrusted string (query param / storage) to a valid plan. */
 export function parseCheckoutPlan(value: string | null | undefined): CheckoutPlan | null {

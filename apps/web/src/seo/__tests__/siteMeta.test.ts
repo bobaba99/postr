@@ -44,16 +44,16 @@ describe('STATIC_ROUTE_META', () => {
   const entries = Object.entries(STATIC_ROUTE_META);
 
   it('covers every public static route', () => {
-    // "/gallery" is intentionally absent: the public gallery is
-    // deactivated and its routes redirect to the landing page.
+    // "/gallery", "/paper-to-poster", "/paper-to-slides" and
+    // "/chart-chooser" are intentionally absent: those features are
+    // deactivated and their routes redirect to the landing page (see
+    // the routes.tsx header). A static record here would prerender and
+    // sitemap a page that only redirects.
     expect(Object.keys(STATIC_ROUTE_META).sort()).toEqual([
       '/',
       '/about',
-      '/chart-chooser',
       '/cookies',
       '/cookies/fr',
-      '/paper-to-poster',
-      '/paper-to-slides',
       '/pricing',
       '/privacy',
       '/privacy/fr',
@@ -74,28 +74,18 @@ describe('STATIC_ROUTE_META', () => {
     expect(meta?.canonical).toBe(canonicalFor(path));
   });
 
-  it('/paper-to-poster promises no slide output — that conversion does not exist', () => {
-    // This flow emits a poster draft (PDF / .postr) only, and
-    // /paper-to-present redirects here purely to reserve the slug —
-    // so visitors arriving from that URL must not be told a deck is
-    // waiting at the end of it.
-    //
-    // Scoped to this one route on purpose. A site-wide ban on the word
-    // "PowerPoint" would fire on the landing page's "no PowerPoint",
-    // which is a disclaimer about what Postr replaces, not a promise.
-    const meta = STATIC_ROUTE_META['/paper-to-poster'];
-    const copy = staticCopyFor('/paper-to-poster');
-    const text = [
-      meta?.title ?? '',
-      meta?.description ?? '',
-      copy?.h1 ?? '',
-      ...(copy?.copy ?? []),
-    ].join(' ');
-
-    expect(text).not.toMatch(
-      /\b(slide|slides|slide deck|powerpoint|pptx|presentation deck|keynote)\b/i,
-    );
-  });
+  it.each([
+    '/paper-to-poster',
+    '/paper-to-slides',
+    '/presentation-checker',
+    '/chart-chooser',
+  ])(
+    'has no record for the deactivated %s (it would prerender a redirect)',
+    (path) => {
+      expect(metaFor(path)).toBeNull();
+      expect(staticCopyFor(path)).toBeNull();
+    },
+  );
 
   it.each(entries)('%s is indexable and carries preview directives', (_p, meta) => {
     expect(meta.robots).toContain(INDEXABLE);

@@ -16,13 +16,23 @@
  * 2. Crawler copy parity — the h1 and lede below mirror the
  *    routes.json entry the prerender script injects for non-JS
  *    crawlers. If you change one, change both.
+ *
+ * DEACTIVATED 2026-09-10 — not deleted. This page is no longer mounted:
+ * routes.tsx redirects /chart-chooser and /plot-picker to /, and the
+ * routes.json static record (prerender + sitemap) was removed, so
+ * `metaFor()` below resolves to null and property 2 is pinned by
+ * pages/__tests__/ChartChooser.test.tsx against the record's last h1.
+ * The component stays on disk and unit-tested, and the charts/* ladder
+ * it wraps stays LIVE inside the editor's Figure tab. The picker is
+ * being revamped in another worktree; restore recipe: routes.tsx
+ * header.
  */
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import type { Palette } from '@postr/shared';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
-import { SITE_ORIGIN, STATIC_ROUTE_META } from '@/seo/siteMeta';
+import { SITE_ORIGIN, metaFor } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { FONTS, PALETTES } from '@/poster/constants';
@@ -56,7 +66,8 @@ function fileSlug(formName: string): string {
 }
 
 export default function ChartChooserPage() {
-  useDocumentMeta(STATIC_ROUTE_META['/chart-chooser'] ?? null, CHOOSER_JSON_LD);
+  // Null while deactivated (no routes.json record) — see the header.
+  useDocumentMeta(metaFor('/chart-chooser'), CHOOSER_JSON_LD);
   const openFeedback = useFeedbackStore((s) => s.open);
   const [paletteName, setPaletteName] = useState(PALETTES[0]!.name);
   const [downloadFailed, setDownloadFailed] = useState(false);

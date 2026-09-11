@@ -3,22 +3,21 @@
  *
  *   /                   → Landing (public)
  *   /about              → About (public, feature tour)
- *   /chart-chooser      → Plot picker (public, no session, code-split)
- *                         URL keeps the measured slug; label is the product name.
- *   /plot-picker        → redirect to /chart-chooser (alias)
+ *   /why-posters        → Why posters (public)
+ *   /pricing            → Pricing (public)
+ *   /chart-chooser      → redirect to / (standalone plot picker deactivated)
+ *   /plot-picker        → redirect to / (alias of the deactivated picker)
  *   /gallery            → redirect to / (public gallery deactivated)
  *   /gallery/:entryId   → redirect to / (public gallery deactivated)
  *   /privacy            → Privacy Policy (public)
  *   /cookies            → Cookies Policy (public)
  *   /terms              → Terms of Service (public)
- *   /paper-to-poster    → Paper→poster standalone flow (public, code-split)
- *   /presentation-checker → Presentation Checker review flow (public,
- *                           code-split, noindex; registered but not
- *                           linked from nav — D12)
- *   /manuscript-to-poster → redirect to /paper-to-poster (old live URL)
- *   /paper-to-slides    → Paper→slides standalone flow (public, code-split)
- *   /paper-to-present   → redirect to /paper-to-slides (canonical is slides)
- *   /paper-to-presentation → redirect to /paper-to-slides (alias)
+ *   /paper-to-poster    → redirect to / (paper-to-poster deactivated)
+ *   /manuscript-to-poster → redirect to / (alias of the deactivated flow)
+ *   /paper-to-slides    → redirect to / (paper-to-slides deactivated)
+ *   /paper-to-present   → redirect to / (alias of the deactivated flow)
+ *   /paper-to-presentation → redirect to / (alias of the deactivated flow)
+ *   /presentation-checker → redirect to / (presentation checker deactivated)
  *   /auth               → Auth (sign in / sign up / guest)
  *   /dashboard          → My Posters (auth-gated)
  *   /p/:posterId        → Editor (anonymous-first, code-split — EnsureSession
@@ -36,19 +35,121 @@
  * admin moderation page (/admin/gallery) and the database all remain
  * so it can be switched back on by restoring the two routes below.
  *
+ * ── Manuscript pipelines + Presentation Checker: deactivated, not deleted ──
+ * Switched off 2026-09-10 to keep the product to its core, the poster
+ * editor. (The standalone plot picker followed the same day — its own
+ * block is below.) Every route below redirects to the landing page;
+ * nothing was deleted.
+ *
+ * Kept on disk (dormant, still unit-tested):
+ *   - pages/PaperToPoster.tsx + manuscript/* (ingest, interviewer,
+ *     mapper, buildPoster, ui/*)
+ *   - pages/PaperToSlides.tsx + manuscript/slides/*, manuscript/deck/*,
+ *     export/deck/*, export/pdf/deckPdf.ts, export/pptx/deckWriter.ts
+ *   - pages/PresentationChecker.tsx + review/* (reviewApi, FindingCards,
+ *     ingest/*) + poster/sidebar/ReviewTab.tsx (rail entry removed in
+ *     poster/Sidebar.tsx; import/union/guard kept)
+ *   - components/PricingSection.tsx TalkWaitlistCallout (no longer
+ *     rendered) + data/talkWaitlist.ts + the talk_waitlist table
+ *   - data/checkoutIntent.ts still types the review SKUs; VALID only
+ *     accepts 'term' | 'pack' so /auth?plan=review_* shows plain auth
+ *   - apps/api: createNarrativeRouter / createReviewRouter are not
+ *     mounted unless FEATURE_MANUSCRIPT / FEATURE_REVIEW = 1; the review
+ *     SKUs are refused by /billing/create-checkout while FEATURE_REVIEW
+ *     is off; webhook fulfilment code + review/poster_reviews tables stay
+ *
+ * To restore (do every step, then re-run the contract tests —
+ * src/__tests__/routes.test.tsx, components/__tests__/
+ * toolDiscoverability.test.tsx, seo/__tests__/siteMeta.test.ts,
+ * seo/__tests__/vercelRouting.test.ts — and flip their assertions):
+ *   1. routes.tsx: re-add the three lazy imports and mount the pages at
+ *      /paper-to-poster, /paper-to-slides, /presentation-checker; point
+ *      the alias <Navigate>s back at their canonical route.
+ *   2. vercel.json: retarget the alias 308s to the canonical routes,
+ *      drop the /paper-to-poster + /paper-to-slides rewrites and their
+ *      X-Robots-Tag blocks (the checker keeps its rewrite + noindex
+ *      until its launch checklist flips it to a static record).
+ *   3. seo/routes.json: restore the static '/paper-to-poster' and
+ *      '/paper-to-slides' records (git history, commit before
+ *      2026-09-10) and the app '/presentation-checker' record; switch
+ *      pages/PaperToPoster.tsx + PaperToSlides.tsx back to
+ *      STATIC_ROUTE_META lookups.
+ *   4. components/PublicHeader.tsx TOOL_LINKS, PublicFooter.tsx Product
+ *      column, pages/Landing.tsx ToolCard, pages/About.tsx
+ *      'start-from-work' copy, components/NewPosterButton.tsx
+ *      "Import manuscript" link, components/PricingSection.tsx
+ *      <TalkWaitlistCallout /> mount — re-add the entries marked
+ *      "deactivated — see routes.tsx header".
+ *   5. poster/Sidebar.tsx: re-add the ['review', 'review'] rail tuple
+ *      and the `tab === 'review'` branch.
+ *   6. data/checkoutIntent.ts: widen VALID to the review SKUs.
+ *   7. apps/api: set FEATURE_MANUSCRIPT=1 / FEATURE_REVIEW=1 (and the
+ *      STRIPE_PRICE_REVIEW_* ids) in the Render env.
+ *   8. scripts: apps/web/scripts/verify-prerender.sh route loop + alias
+ *      checks, apps/web/scripts/mobile-audit.mjs ROUTES,
+ *      scripts/text-audit/scrape.mts ROUTES; docs/feature-graph.md
+ *      "Deactivated features" section.
+ *
+ * ── Standalone plot picker: deactivated, not deleted ─────────────
+ * Switched off 2026-09-10, after the pass above, while the picker is
+ * revamped in another worktree. With it gone the product ships NO
+ * standalone tools in its nav — the poster editor is the whole public
+ * surface. (The standalone plot checker is a later follow-up and is
+ * not mounted either.) charts/* is NOT dormant: the same ChartChooser
+ * ladder stays live inside the editor's Figure tab; only the page that
+ * wrapped it for the public URL is off.
+ *
+ * Kept on disk (dormant, still unit-tested):
+ *   - pages/ChartChooser.tsx — pages/__tests__/ChartChooser.test.tsx
+ *     renders it directly and pins the h1 the deleted routes.json
+ *     record carried
+ *
+ * To restore (do every step, then re-run the contract tests —
+ * src/__tests__/routes.test.tsx, components/__tests__/
+ * toolDiscoverability.test.tsx (TOOL_PATHS), seo/__tests__/
+ * siteMeta.test.ts, seo/__tests__/vercelRouting.test.ts
+ * (CLIENT_ROUTES / ALIAS_REDIRECTS / DEACTIVATED_ROUTES),
+ * pages/__tests__/ChartChooser.test.tsx — and flip their assertions):
+ *   1. routes.tsx: re-add the lazy import
+ *      `const ChartChooserPage = lazy(() => import('@/pages/ChartChooser'));`
+ *      and mount it at /chart-chooser; point the /plot-picker
+ *      <Navigate> back at /chart-chooser.
+ *   2. seo/routes.json: restore the static '/chart-chooser' record
+ *      (git history, commit before 2026-09-10) so it prerenders and
+ *      re-enters the sitemap; switch pages/ChartChooser.tsx back to
+ *      the STATIC_ROUTE_META['/chart-chooser'] lookup and its test
+ *      back to reading routes.json.
+ *   3. vercel.json: retarget the /plot-picker 308 to /chart-chooser;
+ *      drop the /chart-chooser rewrite and its X-Robots-Tag block
+ *      (a prerendered file must not be shadowed by a rewrite).
+ *   4. components/PublicHeader.tsx TOOL_LINKS ({ to: '/chart-chooser',
+ *      label: 'Plot picker', blurb: 'Find the figure that fits your
+ *      data' }), components/PublicFooter.tsx Product column,
+ *      pages/Landing.tsx "Tools you can use on their own" section +
+ *      ToolCard (git history) and its small-screen note,
+ *      pages/About.tsx 'figures' milestone copy.
+ *   5. scripts: apps/web/scripts/verify-prerender.sh (prerendered
+ *      loop, noindex/200 loops, check_alias /plot-picker),
+ *      apps/web/scripts/mobile-audit.mjs ROUTES,
+ *      scripts/text-audit/scrape.mts ROUTES; docs/feature-graph.md
+ *      §6.10 + §10 "Deactivated features"; docs/manual-test-flows.md
+ *      deactivated-features note.
+ *
  * ── Slug aliases: one canonical URL, permanent redirects ─────────
  * Each standalone tool has exactly ONE indexed URL. Alternate spellings
  * redirect rather than render, so no two URLs serve the same document.
+ * While every standalone tool is deactivated there is no canonical
+ * tool URL left, so every alias falls through to the landing page in
+ * ONE hop rather than chaining through a route that itself redirects.
  *
- *   /chart-chooser  canonical  ("chart chooser" 40/mo · KD 0)
- *     ← /plot-picker           (our internal name; no measured volume,
- *                               but the owner asked for the URL)
- *   /paper-to-poster canonical ("paper to poster" 140/mo · KD 0)
- *     ← /manuscript-to-poster  (the previously live URL — it is in the
+ *   /                          (the only destination for now)
+ *     ← /plot-picker           (alias of /chart-chooser — the measured
+ *                               slug, "chart chooser" 40/mo · KD 0; the
+ *                               308 was deployed, so it is retargeted
+ *                               rather than dropped and must not 404)
+ *     ← /manuscript-to-poster  (the previously live URL — it was in the
  *                               production sitemap and must not 404)
- *   /paper-to-slides canonical (the talk flow — editable deck out)
- *     ← /paper-to-present      (a talk-intent spelling; slides is the
- *                               output, so it consolidates here)
+ *     ← /paper-to-present      (a talk-intent spelling)
  *     ← /paper-to-presentation (the same intent, longer spelling)
  *
  * The <Navigate replace> entries below only cover in-app navigation.
@@ -96,19 +197,12 @@ import NotFound from '@/pages/NotFound';
 const Editor = lazy(() => import('@/pages/Editor'));
 const Share = lazy(() => import('@/pages/Share'));
 const AdminGallery = lazy(() => import('@/pages/AdminGallery'));
-// The chart chooser pulls the parsing/recommend/render stack (and
-// lazily Observable Plot beyond that), none of which belongs in the
-// marketing-page bundle.
-const ChartChooserPage = lazy(() => import('@/pages/ChartChooser'));
-// Standalone paper→poster flow — pulls in the ingest parsers and
-// block renderers, so it loads on demand like the editor.
-const PaperToPoster = lazy(() => import('@/pages/PaperToPoster'));
-// Presentation Checker — the review upload surface. Kept out of the
-// initial bundle for the same reason as the other standalone tools.
-const PresentationChecker = lazy(() => import('@/pages/PresentationChecker'));
-// Standalone paper→slides flow — pulls the deck builder and the lazy
-// pptx writer, so it loads on demand like its poster sibling.
-const PaperToSlides = lazy(() => import('@/pages/PaperToSlides'));
+// Deactivated — see the header. The lazy imports for
+// pages/PaperToPoster, pages/PresentationChecker, pages/PaperToSlides
+// and pages/ChartChooser are intentionally absent so their chunks leave
+// the production build; restore them alongside the routes below. (The
+// chart parsing/recommend/render stack still ships — the editor's
+// Figure tab uses it — but no longer as a marketing-page chunk.)
 
 function LazyFallback() {
   return (
@@ -136,29 +230,21 @@ export function AppRoutes() {
         <Route path="/cookies/fr" element={<CookiesFr />} />
         <Route path="/terms" element={<Terms />} />
         <Route path="/terms/fr" element={<TermsFr />} />
-        {/* Standalone chart chooser — public, indexable, and creates
-            no Supabase session (not even anonymous) on load. */}
-        <Route path="/chart-chooser" element={<ChartChooserPage />} />
-        <Route path="/paper-to-poster" element={<PaperToPoster />} />
-        {/* Presentation Checker — public but noindex (D12): registered
-            now, deliberately NOT linked from nav; the indexed static
-            record + nav links are the Milestone-6 launch checklist. */}
-        <Route path="/presentation-checker" element={<PresentationChecker />} />
-        <Route path="/paper-to-slides" element={<PaperToSlides />} />
+        {/* Standalone plot picker is deactivated — see the header
+            comment. Its canonical route and its alias both land on the
+            landing page in one hop. */}
+        <Route path="/chart-chooser" element={<Navigate to="/" replace />} />
+        {/* Manuscript pipelines + Presentation Checker are deactivated —
+            see the header comment. Canonical routes AND their aliases
+            all land on the landing page in one hop. */}
+        <Route path="/paper-to-poster" element={<Navigate to="/" replace />} />
+        <Route path="/presentation-checker" element={<Navigate to="/" replace />} />
+        <Route path="/paper-to-slides" element={<Navigate to="/" replace />} />
         {/* Alias redirects — see the "Slug aliases" note in the header. */}
-        <Route path="/plot-picker" element={<Navigate to="/chart-chooser" replace />} />
-        <Route
-          path="/manuscript-to-poster"
-          element={<Navigate to="/paper-to-poster" replace />}
-        />
-        <Route
-          path="/paper-to-present"
-          element={<Navigate to="/paper-to-slides" replace />}
-        />
-        <Route
-          path="/paper-to-presentation"
-          element={<Navigate to="/paper-to-slides" replace />}
-        />
+        <Route path="/plot-picker" element={<Navigate to="/" replace />} />
+        <Route path="/manuscript-to-poster" element={<Navigate to="/" replace />} />
+        <Route path="/paper-to-present" element={<Navigate to="/" replace />} />
+        <Route path="/paper-to-presentation" element={<Navigate to="/" replace />} />
         {/*
           Dev only. This was publicly routable with no guard, which put
           a diagnostics page in the crawlable URL space and shipped it

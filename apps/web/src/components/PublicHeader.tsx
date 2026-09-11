@@ -18,14 +18,17 @@
  *
  * The Gallery nav link was removed when the public gallery was
  * deactivated; restore it alongside the /gallery routes if the
- * gallery is switched back on.
+ * gallery is switched back on. The "Paper to poster" / "Paper to
+ * slides" entries were removed the same way when the manuscript
+ * pipelines were deactivated, and "Plot picker" followed when the
+ * standalone picker was deactivated (see the routes.tsx header).
  *
- * The "Tools" menu exists because /chart-chooser and /paper-to-poster
- * shipped with nothing linking to them from anywhere in the app — not
- * the header, not the footer, not the landing page. They were only
- * reachable by typing the URL, which is how the owner came to not be
- * able to find them. This menu and the footer/landing entries added
- * alongside it are that fix.
+ * TOOL_LINKS exists because /chart-chooser once shipped with nothing
+ * linking to it from anywhere in the app — not the header, not the
+ * footer, not the landing page. It was only reachable by typing the
+ * URL, which is how the owner came to not be able to find it. The list
+ * (and the footer/landing entries that mirrored it) was that fix, and
+ * it is what a restored tool goes back into.
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router';
@@ -33,28 +36,37 @@ import { supabase } from '@/lib/supabase';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import type { User } from '@supabase/supabase-js';
 
+/** One standalone tool as the nav shows it. */
+interface ToolLink {
+  /** Canonical route — never an alias spelling. */
+  readonly to: string;
+  readonly label: string;
+  /** One-line description shown under the label in the mobile menu. */
+  readonly blurb: string;
+}
+
 /**
- * The standalone tools, in the order they appear everywhere. Both are
- * public, need no account, and are canonical URLs (never the alias
- * spellings) so internal links never bounce through a 308.
+ * The standalone tools, in the order they appear everywhere. Each is
+ * public, needs no account, and is a canonical URL (never an alias
+ * spelling) so internal links never bounce through a 308.
+ *
+ * EMPTY while every standalone tool is deactivated (routes.tsx header).
+ * Nothing below special-cases the empty list: the flat row and the
+ * mobile menu simply render the Learn pages with no tool rows, no
+ * separator and no empty group. Deactivated, and therefore absent:
+ *   { to: '/chart-chooser', label: 'Plot picker',
+ *     blurb: 'Find the figure that fits your data' }
+ *   { to: '/paper-to-poster', label: 'Paper to poster' }
+ *   { to: '/paper-to-slides', label: 'Paper to slides' }
+ * The plot checker will be appended here when its page lands, and the
+ * picker goes back in front of it when its revamp ships.
+ *
+ * Typed explicitly rather than `[] as const`: an empty `as const`
+ * literal is `readonly []`, whose element type is `never`, and the
+ * `.map` / `.some` callbacks below would then fail to type-check on
+ * `tool.to`.
  */
-const TOOL_LINKS = [
-  {
-    to: '/paper-to-poster',
-    label: 'Paper to poster',
-    blurb: 'Turn a manuscript into a poster draft',
-  },
-  {
-    to: '/paper-to-slides',
-    label: 'Paper to slides',
-    blurb: 'Turn a manuscript into a talk (coming soon)',
-  },
-  {
-    to: '/chart-chooser',
-    label: 'Plot picker',
-    blurb: 'Find the figure that fits your data',
-  },
-] as const;
+const TOOL_LINKS: readonly ToolLink[] = [];
 
 /**
  * The full public nav set, in display order — the tools plus the two
@@ -138,11 +150,12 @@ export function PublicHeader() {
 
       <div className="flex items-center gap-4 sm:gap-5">
         {/*
-          The two standalone tools are listed flat rather than folded
-          into a Tools dropdown: the header has room at this width, and
-          a menu hides the very thing that was invisible before. One
-          click instead of two, and both names are readable from the
-          page rather than after a hover.
+          The nav is listed flat rather than folded into a Tools
+          dropdown: the header has room at this width, and a menu hides
+          the very thing that was invisible before. One click instead
+          of two, and the names are readable from the page rather than
+          after a hover. (With TOOL_LINKS empty this is just the Learn
+          pages — same rule when a tool comes back.)
 
           Below `xl` these move into the overflow menu rather than
           disappearing: every nav item used to be breakpoint-gated, so a
@@ -219,8 +232,9 @@ export function PublicHeader() {
  *
  * Every nav item in this header is breakpoint-gated, which once left
  * the header with nothing but the wordmark and a sign-in button — the
- * tools, About, and Feedback were reachable only by scrolling to the
- * footer. This is the phone-sized route to the same set.
+ * tools (when any are live), About, and Feedback were reachable only
+ * by scrolling to the footer. This is the phone-sized route to the
+ * same set.
  *
  * Hidden at `xl` and up, where the flat row takes over, so the two are
  * never on screen at once.
@@ -342,7 +356,8 @@ function MobileNav({
           className="postr-popover-enter fixed left-4 right-4 top-[4.5rem] z-50 list-none rounded-xl border border-[#2a2a3a] bg-[#111118] p-2 shadow-xl shadow-black/40"
         >
           {/* Workspace link first — the primary destination on a phone,
-              above the tools and Learn pages. */}
+              above the tool rows (none while deactivated) and the Learn
+              pages. */}
           {workspaceLink && (
             <li>
               <Link
@@ -373,7 +388,8 @@ function MobileNav({
           ))}
 
           {/* The Learn pages — the entries NAV_LINKS carries beyond the
-              tools, which have their own blurbed rows above. */}
+              tools, which get their own blurbed rows above whenever any
+              are live. */}
           {NAV_LINKS.filter(
             (link) => !TOOL_LINKS.some((tool) => tool.to === link.to),
           ).map((link) => (

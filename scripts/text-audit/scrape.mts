@@ -33,12 +33,15 @@ const shotsDir = join(outDir, 'shots');
 const PORT = 4174;
 const BASE = `http://localhost:${PORT}`;
 
+// /paper-to-poster, /paper-to-slides, /presentation-checker and
+// /chart-chooser are deactivated (apps/web/src/routes.tsx header) and
+// redirect to /, so scraping them would only re-record the landing page
+// under another name.
 const ROUTES = [
-  '/', '/about', '/why-posters', '/pricing', '/chart-chooser',
-  '/paper-to-poster', '/paper-to-slides',
+  '/', '/about', '/why-posters', '/pricing',
   '/privacy', '/privacy/fr', '/cookies', '/cookies/fr', '/terms', '/terms/fr',
   '/auth', '/dashboard', '/profile', '/billing/success', '/billing/cancel',
-  '/presentation-checker', '/p/new', '/404',
+  '/p/new', '/404',
 ];
 
 // ---------- in-page extraction (plain JS — runs in the browser) ----------

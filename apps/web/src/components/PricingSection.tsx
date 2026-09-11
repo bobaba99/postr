@@ -23,7 +23,7 @@
  * Copy names the workflow, never a capability, and makes no AI claim
  * (feedback_marketing_no_ai_framing). Every line is checked against what
  * the product actually does: editing + watermarked PDF are free today;
- * PPTX/LaTeX export is the paid line (talk export joins it when built).
+ * PPTX/LaTeX export is the paid line.
  *
  * The paid tier CTAs route to /auth?plan=<sku> — the account-first
  * checkout flow: a signed-out user creates a REAL account (never guest,
@@ -32,8 +32,11 @@
  * form and goes straight to checkout. The free tier goes to /p/new (the
  * no-auth editor — EnsureSession mints the guest session there). The
  * in-editor export paywall (EditableExportButtons) also starts checkout,
- * for users who hit the wall mid-export. The card at the bottom collects
- * paper-to-talk waitlist interest for the deferred feature.
+ * for users who hit the wall mid-export.
+ *
+ * <TalkWaitlistCallout /> (the paper-to-talk launch list) is no longer
+ * rendered under the grid: deactivated — see routes.tsx header. The
+ * component, data/talkWaitlist.ts and the talk_waitlist table remain.
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -124,7 +127,7 @@ export function PricingSection() {
         ))}
       </div>
 
-      <TalkWaitlistCallout />
+      {/* <TalkWaitlistCallout /> — deactivated, not deleted; see routes.tsx header. */}
     </section>
   );
 }
@@ -217,6 +220,10 @@ function FeatureList({
 /**
  * Paper-to-talk waitlist callout.
  *
+ * DEACTIVATED — not rendered anywhere (see routes.tsx header); exported
+ * so it stays a reachable, type-checked module rather than dead local
+ * code. Re-mount it under the tier grid to bring the launch list back.
+ *
  * The talk feature is deferred (docs/plans/2026-07-28-paper-to-talk.md).
  * This captures interest so there's a list to notify on launch. A
  * signed-in user joins in place; a signed-out one is sent to sign in and
@@ -224,7 +231,7 @@ function FeatureList({
  * joined). The talk feature is never advertised as buyable — only as
  * "coming, want to know?".
  */
-function TalkWaitlistCallout() {
+export function TalkWaitlistCallout() {
   const navigate = useNavigate();
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [joined, setJoined] = useState(false);

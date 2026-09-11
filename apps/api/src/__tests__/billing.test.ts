@@ -9,10 +9,13 @@
  * expiry from the subscription's item-level period end), pack = one-time
  * credits (paid-only + idempotent), and the guards.
  */
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import express from 'express';
+import request from 'supertest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
 import {
+  createBillingRouter,
   fulfillCheckout,
   subscriptionPeriodEnd,
   handleInvoicePaid,
@@ -650,5 +653,117 @@ describe('handleInvoicePaid — review_addon invoice', () => {
     const invoice = { subscription: 'sub_addon_1', customer: 'cus_1' } as unknown as Stripe.Invoice;
     await handleInvoicePaid(fake.client, stripe, invoice);
     expect(fake.updates).toHaveLength(0);
+  });
+});
+
+/**
+ * POST /billing/create-checkout — the review SKUs are hidden while the
+ * Presentation Checker is deactivated. They must be refused with the
+ * same 400 invalid_sku a garbage sku gets, REGARDLESS of whether the
+ * STRIPE_PRICE_REVIEW_* env vars happen to be set — an env-only guard
+ * would silently sell a hidden SKU the day someone re-adds the price
+ * id. The webhook fulfilment branches above stay intact so any
+ * subscription sold before the switch keeps reconciling.
+ */
+describe('POST /billing/create-checkout — hidden review SKUs', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function permanentUserSupabase(): SupabaseClient {
+    return {
+      auth: {
+        getUser: async () => ({
+          data: { user: { id: 'user-1', email: 'jane.doe@example.com', is_anonymous: false } },
+          error: null,
+        }),
+      },
+    } as unknown as SupabaseClient;
+  }
+
+  function checkoutStripe() {
+    const created: Stripe.Checkout.SessionCreateParams[] = [];
+    const stripe = {
+      checkout: {
+        sessions: {
+          create: async (params: Stripe.Checkout.SessionCreateParams) => {
+            created.push(params);
+            return { url: 'https://checkout.stripe.test/session' };
+          },
+        },
+      },
+    } as unknown as Stripe;
+    return { stripe, created };
+  }
+
+  function buildApp(features?: { manuscript: boolean; review: boolean }) {
+    const { stripe, created } = checkoutStripe();
+    const app = express();
+    app.use(express.json());
+    app.use(
+      createBillingRouter({
+        getStripe: () => stripe,
+        getSupabaseAdmin: permanentUserSupabase,
+        ...(features ? { features } : {}),
+      }),
+    );
+    return { app, created };
+  }
+
+  function checkout(app: express.Express, sku: string) {
+    return request(app)
+      .post('/billing/create-checkout')
+      .set('Authorization', 'Bearer token')
+      .send({ sku });
+  }
+
+  it.each(['review_pack', 'review_addon'])(
+    'rejects %s with 400 invalid_sku even when its price id is configured',
+    async (sku) => {
+      vi.stubEnv('FEATURE_REVIEW', undefined);
+      vi.stubEnv('STRIPE_PRICE_REVIEW_PACK', 'price_review_pack');
+      vi.stubEnv('STRIPE_PRICE_REVIEW_ADDON', 'price_review_addon');
+      const { app, created } = buildApp();
+
+      const res = await checkout(app, sku);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('invalid_sku');
+      expect(created).toEqual([]);
+    },
+  );
+
+  it.each(['term', 'pack'])('still sells %s', async (sku) => {
+    vi.stubEnv('FEATURE_REVIEW', undefined);
+    vi.stubEnv('STRIPE_PRICE_TERM', 'price_term');
+    vi.stubEnv('STRIPE_PRICE_PACK', 'price_pack');
+    const { app, created } = buildApp();
+
+    const res = await checkout(app, sku);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ url: 'https://checkout.stripe.test/session' });
+    expect(created).toHaveLength(1);
+    expect(created[0]?.metadata).toEqual({ user_id: 'user-1', sku });
+  });
+
+  it('sells the review SKUs again once FEATURE_REVIEW is on (the reactivation path)', async () => {
+    vi.stubEnv('STRIPE_PRICE_REVIEW_PACK', 'price_review_pack');
+    const { app, created } = buildApp({ manuscript: false, review: true });
+
+    const res = await checkout(app, 'review_pack');
+
+    expect(res.status).toBe(200);
+    expect(created[0]?.mode).toBe('payment');
+  });
+
+  it('with the flag on, a missing price id is still invalid_sku (env guard unchanged)', async () => {
+    vi.stubEnv('STRIPE_PRICE_REVIEW_ADDON', undefined);
+    const { app } = buildApp({ manuscript: false, review: true });
+
+    const res = await checkout(app, 'review_addon');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('invalid_sku');
   });
 });

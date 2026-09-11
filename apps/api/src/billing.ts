@@ -10,6 +10,11 @@
  *   - Review add-on:  a recurring add-on subscription granting a weekly
  *     presentation-review quota (the 7-day window is enforced in
  *     review.ts, not here).
+ * The two review SKUs are DORMANT while the Presentation Checker is
+ * deactivated: create-checkout refuses them unless FEATURE_REVIEW is on
+ * (features.ts), regardless of the STRIPE_PRICE_REVIEW_* env. Their
+ * webhook fulfilment branches below are NOT gated, so anything sold
+ * before the switch keeps reconciling.
  * Review-SKU refunds are handled MANUALLY via the Stripe dashboard
  * (deferred — Presentation Checker plan D8); the self-serve
  * /billing/refund route covers term and export pack only.
@@ -35,6 +40,7 @@ import Stripe from 'stripe';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireAuth, type AuthLocals } from './auth.js';
 import { createRateLimiter } from './rateLimit.js';
+import { isSkuSellable, readFeatureFlags, type FeatureFlags } from './features.js';
 
 /**
  * Managed Payments requires this preview API version (or later). Set
@@ -66,6 +72,8 @@ export type RefundKind = 'term' | 'pack';
 interface BillingDeps {
   getStripe?: () => Stripe | null;
   getSupabaseAdmin?: () => SupabaseClient | null;
+  /** Feature switches (features.ts); read from the env when omitted. */
+  features?: FeatureFlags;
 }
 
 /**
@@ -186,6 +194,7 @@ export function createBillingWebhookRouter(deps: BillingDeps = {}): Router {
 export function createBillingRouter(deps: BillingDeps = {}): Router {
   const getStripe = deps.getStripe ?? defaultGetStripe;
   const getSupabaseAdmin = deps.getSupabaseAdmin ?? defaultGetSupabaseAdmin;
+  const features = deps.features ?? readFeatureFlags();
   const router = express.Router();
 
   // Per-user rate limits on the authed billing routes, matching the
@@ -209,12 +218,16 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
       }
 
       const sku = req.body?.sku as BillingSku | undefined;
-      const priceId = priceIdForSku(sku);
+      // A hidden SKU (the review pair while FEATURE_REVIEW is off) is
+      // refused exactly like an unknown one — before the price lookup,
+      // so a configured STRIPE_PRICE_REVIEW_* id cannot sell it.
+      const priceId =
+        sku && isSkuSellable(sku, features) ? priceIdForSku(sku) : null;
       if (!sku || !priceId) {
         return res.status(400).json({
           error: 'invalid_sku',
           message:
-            'sku must be "term", "pack", "review_pack" or "review_addon", and its price id env var must be set.',
+            'sku must be one of the plans currently on sale ("term" or "pack"), and its price id env var must be set.',
         });
       }
 

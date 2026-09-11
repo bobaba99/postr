@@ -10,11 +10,14 @@
  * front ("This is your one follow-up — the review closes after it."),
  * then the review closes.
  *
- * The route is registered but deliberately NOT linked from nav (D12) —
- * the SEO record is an `app` (noindex) entry until the Milestone-6
- * launch checklist flips it to a prerendered static record. The record
- * is read defensively (`?? null`) because Task 26 adds it after this
- * page lands.
+ * DEACTIVATED 2026-09-10 — not deleted. The /presentation-checker
+ * route currently redirects to / (routes.tsx header) and the `app`
+ * SEO record was removed, so the meta lookup below resolves to null
+ * (it was always read defensively with `?? null`). Before that the
+ * route was registered but deliberately NOT linked from nav (D12),
+ * pending the Milestone-6 launch checklist that flips the record to a
+ * prerendered static one. This file, review/*, and the editor's
+ * ReviewTab stay on disk and unit-tested.
  *
  * Entitlements are NOT pre-gated here: the server resolves them (D4)
  * and a 402 renders the paywall panel — the client plan read only
