@@ -21,6 +21,7 @@ import { useEffect, useRef, useState } from 'react';
 import { upsertPoster } from '@/data/posters';
 import { captureThumbnail } from '@/data/thumbnails';
 import { supabase } from '@/lib/supabase';
+import { reportUiSignal } from '@/lib/diagnostics';
 import type { PosterDoc } from '@postr/shared';
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -55,6 +56,29 @@ const THUMBNAIL_COOLDOWN_MS = 3000;
  */
 const THUMBNAIL_IDLE_TIMEOUT_MS = 2000;
 
+/**
+ * Bucket a save failure into a short, stable reason for the log.
+ *
+ * Kept coarse on purpose: the raw message can vary per backend and is
+ * not safe to treat as an enum, but the distinction that matters when
+ * reading the log — could-not-reach vs. was-refused — is stable.
+ */
+function classifySaveError(
+  error: Error,
+): 'permission_denied' | 'auth' | 'network' | 'other' {
+  const m = error.message.toLowerCase();
+  if (m.includes('permission denied') || m.includes('row-level security')) {
+    return 'permission_denied';
+  }
+  if (m.includes('jwt') || m.includes('token') || m.includes('session')) {
+    return 'auth';
+  }
+  if (m.includes('failed to fetch') || m.includes('networkerror')) {
+    return 'network';
+  }
+  return 'other';
+}
+
 /** Strip HTML tags to get plain text for the poster title column. */
 function stripHtml(html: string): string {
   if (typeof document === 'undefined') return html.replace(/<[^>]+>/g, '');
@@ -63,7 +87,11 @@ function stripHtml(html: string): string {
   return div.textContent ?? '';
 }
 
-export function useAutosave(posterId: string | null, doc: PosterDoc | null, displayTitle?: string): AutosaveState {
+export function useAutosave(
+  posterId: string | null,
+  doc: PosterDoc | null,
+  displayTitle?: string,
+): AutosaveState {
   const [state, setState] = useState<Omit<AutosaveState, 'flushNow'>>({
     status: 'idle',
     lastSavedAt: null,
@@ -77,6 +105,14 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
   const pendingTitleRef = useRef<string | undefined>(displayTitle);
   const firstRenderRef = useRef(true);
   const lastPosterIdRef = useRef<string | null>(posterId);
+  /**
+   * Consecutive-failure tracking for diagnostics. A single failed save is
+   * usually a blip the next cycle recovers from; a run of them means the
+   * user has been editing against a backend that is not accepting writes,
+   * which is what needs to reach the log.
+   */
+  const saveFailStreakRef = useRef(0);
+  const saveFailFirstAtRef = useRef(0);
   // Always-current refs so flushNow() can persist even when the debounce
   // effect hasn't scheduled yet (e.g. title change → user clicks Save
   // before React has committed the next render).
@@ -133,7 +169,9 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
     }
     const idle = window.requestIdleCallback;
     if (typeof idle === 'function') {
-      idle(() => runThumbnailCapture(id), { timeout: THUMBNAIL_IDLE_TIMEOUT_MS });
+      idle(() => runThumbnailCapture(id), {
+        timeout: THUMBNAIL_IDLE_TIMEOUT_MS,
+      });
     } else {
       window.setTimeout(() => runThumbnailCapture(id), 0);
     }
@@ -165,14 +203,20 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
       let titleText = pendingTitleRef.current?.trim() ?? '';
       if (!titleText) {
         const titleBlock = data.blocks.find((b) => b.type === 'title');
-        titleText = titleBlock?.content ? stripHtml(titleBlock.content).trim() : '';
+        titleText = titleBlock?.content
+          ? stripHtml(titleBlock.content).trim()
+          : '';
       }
       // If title block content was used, also push it back to the store
       // so the sidebar Poster Name field shows the auto-filled value
       if (titleText && !pendingTitleRef.current?.trim()) {
         pendingTitleRef.current = titleText;
       }
-      await upsertPoster(id, { data, ...(titleText ? { title: titleText } : {}) });
+      await upsertPoster(id, {
+        data,
+        ...(titleText ? { title: titleText } : {}),
+      });
+      saveFailStreakRef.current = 0;
       setState({ status: 'saved', lastSavedAt: new Date(), error: null });
 
       // Fire-and-forget thumbnail capture — never blocks editing, and
@@ -180,6 +224,27 @@ export function useAutosave(posterId: string | null, doc: PosterDoc | null, disp
       scheduleThumbnail(id);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
+      const now = Date.now();
+      if (saveFailStreakRef.current === 0) saveFailFirstAtRef.current = now;
+      saveFailStreakRef.current += 1;
+      // Supabase surfaces a `status` on PostgrestError; a network failure
+      // has none. Clamp to the range the API accepts — an unclamped NaN or
+      // out-of-range value would fail validation and discard the whole
+      // batch, losing the sibling signals with it.
+      const rawStatus = Number((err as { status?: number })?.status ?? 0);
+      const status = Number.isFinite(rawStatus)
+        ? Math.min(599, Math.max(0, Math.trunc(rawStatus)))
+        : 0;
+      reportUiSignal(
+        {
+          kind: 'autosave_failed',
+          status,
+          attempt: saveFailStreakRef.current,
+          sinceFirstMs: now - saveFailFirstAtRef.current,
+          reason: classifySaveError(error),
+        },
+        { surface: 'poster-editor', posterId: id },
+      );
       setState((s) => ({ ...s, status: 'error', error }));
     }
   };

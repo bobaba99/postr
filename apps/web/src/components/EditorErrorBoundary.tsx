@@ -23,6 +23,7 @@
  */
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Link } from 'react-router';
+import { reportUiSignal } from '@/lib/diagnostics';
 
 interface Props {
   children: ReactNode;
@@ -47,14 +48,34 @@ export class EditorErrorBoundary extends Component<Props, State> {
     // Defensive Sentry hook — only fires if a global capture function
     // has been registered. Keeps the boundary portable while Sentry
     // is still being wired up.
-    const sentry = (window as unknown as {
-      __POSTR_SENTRY__?: {
-        captureException: (err: unknown, ctx?: unknown) => void;
-      };
-    }).__POSTR_SENTRY__;
+    const sentry = (
+      window as unknown as {
+        __POSTR_SENTRY__?: {
+          captureException: (err: unknown, ctx?: unknown) => void;
+        };
+      }
+    ).__POSTR_SENTRY__;
     sentry?.captureException(error, {
       componentStack: errorInfo.componentStack,
     });
+    // Also report to the API diagnostics channel. Sentry may not be
+    // wired in every environment, and this is the one crash the user
+    // definitely saw. deadEnd is false: this boundary offers both
+    // "Try again" and "Back to dashboard".
+    reportUiSignal(
+      {
+        kind: 'client_error',
+        name: error.name || 'Error',
+        // Deliberately NOT error.message: library errors serialise props
+        // into their message, and the signal contract is "no user content".
+        // The name plus the boundary identifies the crash; full detail goes
+        // to the console and Sentry above.
+        message: 'see console/sentry',
+        where: 'EditorErrorBoundary',
+        deadEnd: false,
+      },
+      { surface: 'poster-editor' },
+    );
   }
 
   reset = () => {
@@ -76,8 +97,7 @@ export class EditorErrorBoundary extends Component<Props, State> {
           padding: 32,
           background: '#0a0a12',
           color: '#e2e2e8',
-          fontFamily:
-            "'DM Sans', system-ui, -apple-system, sans-serif",
+          fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif",
           textAlign: 'center',
         }}
       >
@@ -110,9 +130,9 @@ export class EditorErrorBoundary extends Component<Props, State> {
               margin: '0 0 24px',
             }}
           >
-            Your work is safe — Postr auto-saves every few seconds,
-            so nothing you typed before the error has been lost. The
-            error details below help us track down what went wrong.
+            Your work is safe — Postr auto-saves every few seconds, so nothing
+            you typed before the error has been lost. The error details below
+            help us track down what went wrong.
           </p>
           <pre
             style={{

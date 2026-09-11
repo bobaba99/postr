@@ -5,4 +5,5 @@ export * from './types/import';
 export * from './types/style';
 export * from './types/manuscript';
 export * from './types/review';
+export * from './types/diagnostics';
 export type { Database, Json } from './database.types';

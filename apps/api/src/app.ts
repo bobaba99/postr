@@ -7,6 +7,8 @@ import { createReviewRouter } from './review.js';
 import { createBillingRouter, createBillingWebhookRouter } from './billing.js';
 import { createAccountRouter } from './account.js';
 import { readFeatureFlags } from './features.js';
+import { createDiagnosticsRouter } from './diagnostics.js';
+import { createRequestLogger } from './requestLog.js';
 
 export function createApp(): Express {
   const app = express();
@@ -28,6 +30,11 @@ export function createApp(): Express {
     .filter(Boolean);
 
   app.use(cors({ origin: origins }));
+
+  // Access log first so every request below produces exactly one outcome
+  // line — including the Stripe webhook, which mounts before the JSON
+  // parser and would otherwise be invisible.
+  app.use(createRequestLogger());
 
   // The Stripe webhook is mounted BEFORE express.json(): signature
   // verification needs the RAW request bytes, so this router applies its
@@ -78,6 +85,11 @@ export function createApp(): Express {
   if (features.review) {
     app.use(createReviewRouter());
   }
+
+  // UI diagnostics ingest. The browser talks to Supabase directly for
+  // most work, so this is the only way behavioural and layout failures in
+  // the editor become visible server-side.
+  app.use(createDiagnosticsRouter());
 
   return app;
 }

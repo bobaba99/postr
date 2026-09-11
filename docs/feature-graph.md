@@ -5082,3 +5082,43 @@ Switched off to keep the product to its core — the poster editor. After the se
 
 - [ ] `charts/codegen/` — pure `ChartSpec → string` generators: `toR.ts` (ggplot2), `toPython.ts` (matplotlib), shared `data.ts` (real vs same-shape sample data + typed literals), `downloadCode.ts` (copy / download / multi-select zip). FREE, NO watermark. Padding/spacing/label knobs are named vars at the top; commented CSV loader. All 11 `ChartForm`s mapped (approximations flagged in comments). `codegen/__tests__/codegen.test.ts` (11 forms × 2 langs); generated code verified to parse AND run under real Rscript + python3.
 - [ ] `pages/ChartChooser.tsx` — "Code data" toggle (sample/mine) + Copy R / Copy Python / Download .R / Download .py actions. Helper text uses `text-[#a3a7b3]` (NOT the audited-banned `#6b7280`, guarded by `PublicPageOutline.test.tsx`).
+
+---
+
+## 13. UI diagnostics & backend logging (added 2026-09-11, branch `claude/poster-editor-stress-test-browser`)
+
+Added so behavioural and UI failures in the editor become visible server-side.
+Postr is ~80% direct-to-Supabase, so the API cannot otherwise observe them.
+
+**Nodes**
+
+| Node | File | Kind |
+| --- | --- | --- |
+| `logger` | `apps/api/src/logger.ts` | lib — the only stdout writer; JSON lines, `LOG_LEVEL`, bounded fields |
+| `requestLog` | `apps/api/src/requestLog.ts` | middleware — one line per request on finish; skips `/health` |
+| `diagnosticsRouter` | `apps/api/src/diagnostics.ts` | route — `POST /v1/diagnostics/ui`; validate → dedup → budget → log |
+| `DiagnosticSignal` | `packages/shared/src/types/diagnostics.ts` | type — 10-kind taxonomy shared client/server |
+| `reportUiSignal` | `apps/web/src/lib/diagnostics.ts` | lib — queue, coalesce, 5s flush, never throws |
+
+**Edges**
+
+- `app.ts` → `requestLog` (mounted before every router, after `cors`)
+- `app.ts` → `diagnosticsRouter` (mounted last)
+- `diagnosticsRouter` → `requireAuth` (anonymous sessions accepted deliberately)
+- `diagnosticsRouter` → `logger`; `requestLog` → `logger`
+- `useAutosave` → `reportUiSignal` (`autosave_failed`)
+- `EditorErrorBoundary` → `reportUiSignal` (`client_error`, `deadEnd:false`)
+- `Editor` (load-error branch) → `reportUiSignal` (`session_invalid` / `client_error`, `deadEnd:true`)
+
+**Not yet wired** (taxonomy exists, call sites pending): `undo_noop`,
+`undo_exhausted`, `redo_unavailable`, `fit_overflow`, `layout_defect`,
+`paste_normalized`, `duplicate_tab`.
+
+**Storage keys / env**: `LOG_LEVEL` (api), `VITE_APP_VERSION` (web, optional —
+stamps signals with a build id).
+
+**Invariant**: signals carry only scalars — counts, pixels, ms, enums. Never
+poster content. Enforced by the zod `discriminatedUnion` and pinned by a test.
+
+See `docs/stress-test/LOGGING.md` for rationale and `docs/stress-test/FINDINGS.md`
+for the browser findings that motivated each signal.

@@ -21,6 +21,7 @@ import { useLeaveGuard } from '@/hooks/useLeaveGuard';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
 import { uploadBase64Image } from '@/data/posterImages';
 import { supabase } from '@/lib/supabase';
+import { reportUiSignal } from '@/lib/diagnostics';
 import { editorMeta } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
@@ -103,7 +104,12 @@ async function migrateBase64ToStorage(posterId: string, doc: PosterDoc) {
   const nextBlocks = await Promise.all(
     doc.blocks.map(async (b) => {
       if (!b.imageSrc || !b.imageSrc.startsWith('data:')) return b;
-      const storageSrc = await uploadBase64Image(userId, posterId, b.id, b.imageSrc);
+      const storageSrc = await uploadBase64Image(
+        userId,
+        posterId,
+        b.id,
+        b.imageSrc,
+      );
       if (!storageSrc) return b;
       mutated = true;
       return { ...b, imageSrc: storageSrc };
@@ -147,9 +153,7 @@ export default function Editor() {
         // Try the URL id first. If that fails (unknown id, RLS miss,
         // or the "/p/new" sentinel) fall through to load-or-create.
         let row =
-          posterId && posterId !== 'new'
-            ? await loadPoster(posterId)
-            : null;
+          posterId && posterId !== 'new' ? await loadPoster(posterId) : null;
 
         // If an explicit poster id was provided but doesn't exist,
         // show a not-found message instead of silently loading a
@@ -192,7 +196,8 @@ export default function Editor() {
         migrateBase64ToStorage(row.id, hydrated);
       } catch (err: unknown) {
         if (cancelled) return;
-        const message = err instanceof Error ? err.message : 'Failed to load poster';
+        const message =
+          err instanceof Error ? err.message : 'Failed to load poster';
         setStatus({ kind: 'error', message });
       }
     })();
@@ -206,7 +211,9 @@ export default function Editor() {
     return (
       <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
         <h1 className="sr-only">Poster editor</h1>
-        <div className="animate-pulse text-sm tracking-wide">Loading poster…</div>
+        <div className="animate-pulse text-sm tracking-wide">
+          Loading poster…
+        </div>
       </main>
     );
   }
@@ -217,7 +224,8 @@ export default function Editor() {
         <div className="max-w-md space-y-3 text-center">
           <h1 className="text-base font-medium">Poster not found</h1>
           <p className="text-xs text-[#888]">
-            The poster you're looking for doesn't exist or you don't have access to it.
+            The poster you're looking for doesn't exist or you don't have access
+            to it.
           </p>
           <a
             href="/dashboard"
@@ -231,14 +239,7 @@ export default function Editor() {
   }
 
   if (status.kind === 'error') {
-    return (
-      <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
-        <div className="max-w-md space-y-3 text-center">
-          <h1 className="text-base font-medium">Couldn’t load this poster</h1>
-          <p className="text-xs text-[#888]">{status.message}</p>
-        </div>
-      </main>
-    );
+    return <EditorLoadError message={status.message} />;
   }
 
   return (
@@ -289,15 +290,16 @@ export function EditorWithGuards({ posterId }: { posterId: string | null }) {
             gap: 12,
           }}
         >
-          <span aria-hidden style={{ flex: '0 0 auto', fontSize: 18 }}>⚠️</span>
+          <span aria-hidden style={{ flex: '0 0 auto', fontSize: 18 }}>
+            ⚠️
+          </span>
           <div style={{ flex: 1 }}>
             <b style={{ color: '#fef2f2' }}>
               This poster is already open in another tab.
             </b>
             <br />
-            Postr autosave is last-write-wins, so edits in one tab can
-            silently overwrite the other. Close the duplicate tab to
-            avoid losing work.
+            Postr autosave is last-write-wins, so edits in one tab can silently
+            overwrite the other. Close the duplicate tab to avoid losing work.
           </div>
           <button
             type="button"
@@ -326,5 +328,53 @@ export function EditorWithGuards({ posterId }: { posterId: string | null }) {
       )}
       <PosterEditor />
     </>
+  );
+}
+
+/**
+ * Shown when the poster could not be loaded.
+ *
+ * Split out from the render path so the failure can be reported exactly
+ * once, on mount, rather than on every re-render. The visual treatment is
+ * unchanged; see docs/stress-test/FINDINGS.md (F7) for the two open
+ * issues with this screen — it prints the raw backend message, and it
+ * offers no recovery control — which are deliberately left for a
+ * follow-up rather than folded into an instrumentation change.
+ */
+function EditorLoadError({ message }: { message: string }) {
+  useEffect(() => {
+    const permissionDenied = /permission denied|row-level security/i.test(
+      message,
+    );
+    reportUiSignal(
+      permissionDenied
+        ? {
+            kind: 'session_invalid',
+            reason: 'permission_denied',
+            route: '/p/:posterId',
+            recovered: false,
+          }
+        : {
+            kind: 'client_error',
+            name: 'PosterLoadFailed',
+            // Postgres/PostgREST messages embed row values (Key (title)=(…)),
+            // so the raw text is not safe to log. The screen still shows it
+            // to the user; only the signal is sanitised.
+            message: 'see console',
+            where: 'Editor.load',
+            // No retry, no navigation: the user cannot proceed from here.
+            deadEnd: true,
+          },
+      { surface: 'poster-editor' },
+    );
+  }, [message]);
+
+  return (
+    <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
+      <div className="max-w-md space-y-3 text-center">
+        <h1 className="text-base font-medium">Couldn’t load this poster</h1>
+        <p className="text-xs text-[#888]">{message}</p>
+      </div>
+    </main>
   );
 }
