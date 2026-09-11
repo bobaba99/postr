@@ -407,7 +407,7 @@ flowchart LR
   - [ ] "Templates tuned for conferences" / "Five layouts — three-column classic, billboard, sidebar + focus, and more. Discipline-appropriate palettes instead of freeform color pickers. APA, SfN, and ECNP size presets ship built-in so your dimensions are never a guess." — `About.tsx:42-44`
   - [ ] "Writing guidance, not a blank page" / "Each section comes with concrete prompts, word-count targets, and a built-in checklist from intro to conclusion. Rich text for emphasis, Greek-symbol shortcuts for STEM, and a reference manager with citation-style support." — `About.tsx:48-50`
   - [ ] "Figures readable from three feet" / "Paste your R or Python plotting code and Postr checks whether axis labels will actually be legible at print size. Out-of-bounds warnings catch layout slips. No more discovering typography problems at the FedEx counter." — `About.tsx:54-56`
-  - [ ] "Start from the work you already have" / "Paste a manuscript or drop a .docx and answer a few short questions about what to emphasise — you get a structured poster draft rather than a blank canvas. Already have a poster in PowerPoint? Open the .pptx here and keep editing it, blocks and all." — `About.tsx:60-62`
+  - [ ] "Start from the poster you already have" / "Already have a poster in PowerPoint, as a PDF, or as an image? Open it here and keep editing it, blocks and all — title, headings, body text and figures land where they were, each one still yours to move and rewrite." — `start-from-work` milestone — `About.tsx:63-66`. **Rewritten 2026-09-10** (paper-to-poster deactivated — see routes.tsx header): the manuscript sentence was dropped. Old copy, kept as the reactivation reference: ~~"Start from the work you already have" / "Paste a manuscript or drop a .docx and answer a few short questions about what to emphasise — you get a structured poster draft rather than a blank canvas. Already have a poster in PowerPoint? Open the .pptx here and keep editing it, blocks and all…"~~
   - [ ] "The right figure, drawn for print" / "Paste a table or answer three questions in the Figure tab and Postr ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once and insert them straight onto the poster." — `About.tsx` (rewritten 2026-09-10: names the editor's Figure tab instead of "the plot picker" and no longer promises SVG/PNG downloads — those lived on the deactivated standalone page)
   - [ ] "Borrow a look you like" / "Upload a poster you admire and Postr lifts its colours and type onto yours — the look, never the content. Print-safe clamping keeps the result legible on paper rather than only on screen." — `About.tsx:72-74`
   - [ ] "Share, iterate, print" / "Read-only share links for advisors and co-authors, readable on a phone. Undo and redo through the entire session. Export to PDF, to PowerPoint with every block still editable, or to LaTeX with a compilable poster.tex and references.bib for Overleaf." — `About.tsx:78-80`
@@ -465,7 +465,19 @@ flowchart LR
   EEB -->|"reads entitlements"| UP["usePlan hook"]
   PROF["Profile Subscription section"] -->|"openBillingPortal"| PORTAL["POST /billing/portal"]
   PROF -->|"requestRefund term/pack"| REF["POST /billing/refund"]
+  API -->|"409 already_subscribed (term holder)"| EEB
+  REF -->|"term: cancels the Stripe sub NOW, plan→free"| PROF
 ```
+
+**Lifecycle guards — added 2026-09-11 (lifecycle audit, `docs/plans/2026-09-10-lifecycle-evaluation.md`).** The paid path is now guarded server-side; the client mirrors each rule:
+
+- **P0-1 term refund cancels the subscription.** `POST /billing/refund` (`apps/api/src/billing.ts` refundTerm → `billing/termCancel.ts` `cancelSubscriptionImmediately`, `prorate:false`) cancels the Stripe subscription immediately, and `billing/refundLedger.ts` writes `plan='free', plan_expires_at=now(), subscription_status='canceled'` in the same update (the sub id is kept for reconciliation). The response carries `subscription_cancelled: true`; `data/billing.ts requestRefund` returns `{ amountCents, subscriptionCancelled }` and `profile/SubscriptionPanel.tsx` shows "Refunded CA$… — … Your term has been cancelled and PowerPoint/LaTeX export is locked again." then `plan.refresh()`es into the free state.
+- **P0-2 one term per user.** `POST /billing/create-checkout` refuses `sku:'term'` with `409 already_subscribed` when `billing/subscriptionGuard.ts hasActiveTerm(row)` — `plan='term'` with a future expiry, OR a live `subscription_status` (active/trialing/past_due) whose `plan_expires_at` is absent or still in the future (a status stuck past a lapsed expiry is logged, not enforced, so a missed terminal webhook can never dead-end a repurchase). Checkout passes the stored `stripe_customer_id` as `customer` (one Stripe customer per account — partial unique index `users_stripe_customer_id_unique_idx`, `20260911000100`). Client: `data/billing.ts` throws `AlreadySubscribedError`; `EditableExportButtons.startCheckout` and `Auth.proceedToCheckout` re-read the plan (`usePlan().refresh()` resolves the fresh snapshot) and show "You already have an active term — PowerPoint and LaTeX export are unlocked…" ONLY when the fresh row agrees, else the generic failure; `PricingSection` / `/auth?plan=term` hide the term CTA when `hasActiveTerm`.
+- **P0-2 subscription-id-scoped webhooks.** `handleSubscriptionChange` revokes only when the event's sub id IS the stored one (`canRevokeTerm`); `advanceTermAccess` re-grants the same sub unless its stored status is irreversibly terminal (`canceled` / `incomplete_expired` — `unpaid` is recoverable: paying the dunning invoice re-activates the SAME sub), refuses a DIFFERENT sub while the stored one is live (duplicate term, operator-logged), and logs a refused `skip_terminal`.
+- **P0-3 deleted accounts.** `POST /account/delete` (`apps/api/src/account.ts`, client `data/account.ts` + `profile/accountDeletion.ts`) cancels every live sub, deletes the Stripe customer, removes Storage objects (`storageCleanup.ts`), writes `public.account_deletions`, THEN `auth.admin.deleteUser`. Nothing is deleted client-side first. A later webhook resolving that user id (`billing/termRow.ts readTermRow`) is acknowledged (200, no write) when an `account_deletions` row exists, and is an operator-visible 500 (`UserRowMissingError`) when none does — a genuine orphan.
+- **H-8 live credit balance.** `POST /billing/consume-credit` answers the remaining balance (`409 no_credit` at zero → `NoExportCreditError`); `usePlan().applyCredits()` folds it in so the "N exports left" hint and the paywall track it.
+- **H-10 / H-11 Basil payloads.** `billing/invoicePayments.ts`: invoice → PaymentIntent via `latest_invoice.payments` (expanded 2 levels — `…payments.data.payment.payment_intent` is 5 levels and the API refuses it, sandbox-verified) with `invoicePayments.list({ invoice })` as the second chance; invoice → subscription via `parent.subscription_details.subscription` (so `handleInvoicePaid` renewals resolve on the pinned version — the legacy top-level `subscription` is absent there); PaymentIntent → invoice via `invoicePayments.list({ payment })`. `billing/refundReconcile.ts` handles `charge.refunded` + `refund.created` + `refund.updated` (**the webhook endpoint must have the two `refund.*` events enabled — dashboard item, unverified from code**): a substantially full (≥95%) term refund cancels the sub like P0-1; a PARTIAL term refund (a goodwill CA$5) is logged and revokes nothing; an unattributable refund revokes nothing. Ledger `billing_refunds` is the idempotency gate.
+- Shared clients: `apps/api/src/stripeClient.ts` (the ONE Stripe factory + `STRIPE_API_VERSION` pin, used by billing.ts and account.ts) and `apps/api/src/supabaseAdmin.ts` (service_role client for both).
 
 #### `pages/Pricing.tsx` — /pricing standalone page
 
@@ -536,7 +548,7 @@ flowchart LR
 
 #### `hooks/usePlan.ts` — billing entitlement reader (term / credits / canExport / isGuest / subscriptionStatus)
 
-No UI itself. Consumers: `poster/sidebar/EditableExportButtons.tsx` (export-button unlock + paywall), `pages/Profile.tsx`, `pages/BillingResult.tsx`. Drives watermark removal + paywall routing (guests → account creation, not Stripe — `:36-40`).
+No UI itself. Consumers: `poster/sidebar/EditableExportButtons.tsx` (export-button unlock + paywall), `pages/Profile.tsx`, `pages/BillingResult.tsx`, `pages/Auth.tsx` (the `?plan=term` resume waits for it and skips checkout for a term holder). Drives watermark removal + paywall routing (guests → account creation, not Stripe — `:36-40`). Exposes `refresh()` (re-reads the row, resolves the fresh `PlanSnapshot`) and `applyCredits(n)` (H-8) since 2026-09-11.
 **Elements** — none. **Copy** — none. **Graphics** — none.
 
 #### `data/billing.ts` — billing API wrappers — no UI, logic only
@@ -545,7 +557,7 @@ No UI itself. Consumers: `poster/sidebar/EditableExportButtons.tsx` (export-butt
 - [ ] "checkout session returned no url" — thrown error — `billing.ts:21`
 - [ ] "https://link.com" — `LINK_MANAGE_URL`, subscription-management fallback navigated to by callers — `billing.ts:67`
 
-Calls (`postJson`, §6.14 `lib/apiClient.ts`): `/billing/create-checkout` (:17), `/billing/consume-credit` (:33), `/billing/mark-export` (:46), `/billing/refund` (:59), `/billing/portal` — see §9.
+Calls (`postJson`, §6.14 `lib/apiClient.ts`): `/billing/create-checkout` (:17), `/billing/consume-credit` (:33), `/billing/mark-export` (:46), `/billing/refund` (:59), `/billing/portal` — see §9. Typed errors (2026-09-11): `AlreadySubscribedError` (409 `already_subscribed` from create-checkout) and `NoExportCreditError` (409 `no_credit` from consume-credit); `requestRefund` returns `{ amountCents, subscriptionCancelled }`.
 
 #### `data/checkoutIntent.ts` — checkout-plan stash across auth detour — no UI, logic only
 
@@ -847,7 +859,7 @@ flowchart LR
   PR -->|"Request refund(s)"| RF["POST /billing/refund"]
   PR -->|"Get a subscription"| PRC["/pricing"]
   PR -->|"Download my data"| EXP["RPC export_my_data"]
-  PR -->|"Delete account"| DEL["RPC delete_own_account"]
+  PR -->|"Delete account"| DEL["POST /account/delete (data/account.ts)"]
   AD -->|"adminRetractEntry / adminUnretractEntry"| RPC["Supabase RPC (gallery)"]
 ```
 
@@ -906,7 +918,7 @@ flowchart LR
 - [ ] `Get a subscription` — router link — `Profile.tsx:1199-1204` — `/pricing`
 - [ ] `↓ Download my data (JSON)` (busy `Preparing…`) — button — `Profile.tsx:682-689` — RPC `export_my_data` → JSON file download `postr-export-{ts}.json`
 - [ ] `Delete all posters` — DangerAction button — `Profile.tsx:704-710` — ConfirmModal → deletes all posters (disabled at 0)
-- [ ] `Delete account` — DangerAction button — `Profile.tsx:712-717` — ConfirmModal with typed confirmation `I confirm the deletion of my account` (:735) → delete posters + RPC `delete_own_account` + signOut → `/auth`
+- [ ] `Delete account` — DangerAction button (`profile/DangerZone.tsx`) — ConfirmModal with typed confirmation `I confirm the deletion of my account` → `profile/accountDeletion.ts runAccountDeletion()` → `POST /account/delete` (`data/account.ts`; server cancels Stripe subs, deletes the customer, removes Storage, writes `account_deletions`, deletes the auth user — nothing is deleted client-side first) → clear 6 localStorage keys + global signOut → `/auth`. Failure: generic "Something went wrong deleting your account. Nothing was removed — please try again or send feedback." (true: the API leaves the account intact on every pre-final-step failure). With `hasActiveTerm` the description/modal add that deleting also cancels the CA$18.99 term. **Changed 2026-09-11 (P0-3)** — was: delete posters client-side + RPC `delete_own_account`.
 - [ ] `<PresetEditModal>` — `Profile.tsx:723-727`; `<ConfirmModal>` — `Profile.tsx:729-738` (§6.13)
 
 **Copy**
@@ -4773,7 +4785,7 @@ No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) 
 |---|---|---|
 | App Shell & Routing & Consent | `App.tsx`, `main.tsx`, `routes.tsx`, `components/ConsentNotice.tsx`, `pages/Debug.tsx`, `pages/NotFound.tsx` | `lib/consoleCapture`, `analytics/redactUrl`, all global modals |
 | Landing & Marketing | `pages/Landing.tsx`, `pages/About.tsx`, `pages/WhyPosters.tsx` | `components/PublicHeader/PublicFooter/RotatingWord`, `motion/timelines/landingEntrance.ts`, `motion/timelines/aboutRoadtrip.ts`, `stores/feedbackStore` |
-| Pricing & Billing | `pages/Pricing.tsx`, `pages/BillingResult.tsx`, `components/PricingSection.tsx`, `hooks/usePlan.ts`, `data/billing.ts`, `data/checkoutIntent.ts`, `data/talkWaitlist.ts` | `lib/apiClient`, `lib/supabase`, `components/PublicHeader/PublicFooter`; server: `apps/api/src/billing.ts` |
+| Pricing & Billing | `pages/Pricing.tsx`, `pages/BillingResult.tsx`, `components/PricingSection.tsx`, `hooks/usePlan.ts`, `data/billing.ts`, `data/checkoutIntent.ts`, `data/talkWaitlist.ts`, `profile/SubscriptionPanel.tsx`; account end-of-life: `data/account.ts`, `profile/accountDeletion.ts`, `profile/DangerZone.tsx` | `lib/apiClient`, `lib/supabase`, `components/PublicHeader/PublicFooter`; server: `apps/api/src/billing.ts` + `billing/*` (guards, refund ledger/reconcile, Basil invoice readers), `account.ts`, `storageCleanup.ts`, `stripeClient.ts`, `supabaseAdmin.ts` |
 | Legal EN/FR | `pages/Privacy.tsx`, `PrivacyFr.tsx`, `Cookies.tsx`, `CookiesFr.tsx`, `Terms.tsx`, `TermsFr.tsx` | `seo/siteMeta.ts` (FR reuses EN meta) |
 | Auth & Session | `pages/Auth.tsx`, `components/AuthGuard.tsx`, `components/AuthBootstrap.tsx` (dead), `components/SessionExpiredModal.tsx`, `lib/auth.ts` | `lib/supabase`, `components/PasswordStrength`, `data/consent`, `data/checkoutIntent` |
 | Dashboard & Profile | `pages/Home.tsx`, `pages/Profile.tsx`, `pages/Gallery.tsx` (dead), `pages/GalleryEntry.tsx` (dead), `pages/AdminGallery.tsx` | `components/NewPosterButton/PosterCard/ConfirmModal/PresetEditModal/PasswordStrength`, `data/posters/gallery/feedback`, `stores/feedbackStore`, `stores/publishFlowStore` (dead), `config/features` |
@@ -4897,12 +4909,13 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 | `public.talk_waitlist` | `data/talkWaitlist.ts` ← PricingSection `TalkWaitlistCallout` (**unmounted 2026-09-10 — no live UI writer**) | shipped 2026-07-28 (`20260728160000_talk_waitlist.sql`); existing rows kept for the eventual launch notify |
 | `public.poster_reviews` | `review/reviewApi.ts` (`listMyReviews` — past-reviews list, §6.17) | owner-SELECT-only RLS (D3) — ALL writes are API service_role after a successful critique (success-only, D16); stage machine initial → followup → closed; `20260729120000_poster_reviews.sql` |
 | `public.users` review columns (`review_credits`, `review_addon`, `review_addon_subscription_id`) | `hooks/usePlan` (`reviewCredits` / `canReview`, §6.17) | SERVER-OWNED like plan/credits — folded into `guard_billing_columns()` (10 guarded columns); `20260729120000_poster_reviews.sql` |
-| billing fulfillment rows | written ONLY by the Stripe webhook (service_role) | `20260728130000_billing_fulfilled_sessions.sql`, `20260728140000_consume_export_credit.sql`, `20260728150000_grant_export_credits.sql`, `20260728170000_billing_subscription.sql`, `20260728190000_billing_refunds.sql` |
+| billing fulfillment rows | written ONLY by the Stripe webhook (service_role) | `20260728130000_billing_fulfilled_sessions.sql`, `20260728140000_consume_export_credit.sql`, `20260728150000_grant_export_credits.sql`, `20260728170000_billing_subscription.sql`, `20260728190000_billing_refunds.sql`; `users.stripe_customer_id` partial UNIQUE index `20260911000100_users_stripe_customer_id_unique.sql` (one Stripe customer per account — checkout reuses it) |
+| `public.account_deletions` | `apps/api/src/account.ts` (`POST /account/delete`, service_role) writes one row right before `auth.admin.deleteUser`; `apps/api/src/billing/termRow.ts` reads it so a webhook for a deleted account is acknowledged, not 500-retried | RLS on, zero policies, no browser privilege; `20260911000000_account_delete_hardening.sql`; pgTAP `account_deletions_test.sql` |
 | `public.presets` | — | **UNUSED** (`20260408000200_presets.sql`; app presets live in localStorage `postr.style-presets`) — §10 |
 | `public.authors_lib` / `public.institutions_lib` / `public.references_lib` | — | **UNUSED** (`20260408000300_library.sql` — PRD §21 library never wired to UI) — §10 |
 
 **RPCs / DB functions called from the web app**
-- [ ] `delete_own_account` — Profile Delete account (`Profile.tsx:712-717`)
+- [ ] ~~`delete_own_account` — Profile Delete account~~ — **no longer callable from the browser** (`20260911000000_account_delete_hardening.sql` revoked EXECUTE from anon/authenticated; service_role only). Deletion is `POST /account/delete` (§ apps/api below). pgTAP: `account_deletions_test.sql`, `delete_own_account_test.sql`, `rpc_definitions_test.sql`.
 - [ ] `export_my_data` — Profile Download my data (`Profile.tsx:682-689`) → `postr-export-{ts}.json`
 - [ ] `is_gallery_admin` — Home Admin link gate, AdminGallery gate
 - [ ] admin retract/unretract — `data/gallery.ts` (`adminRetractEntry`, `adminUnretractEntry`) ← AdminGallery
@@ -4915,8 +4928,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 - [ ] `gallery` — gallery entry images/PDFs (`data/gallery.ts`)
 
 **Edge functions** (`supabase/functions/`)
-- [ ] `delete-account` — the only deployed edge function; used by account deletion flow
-- [ ] (none else — no storage GC function exists, §10)
+- [ ] (none — `delete-account` was unreferenced and was DELETED 2026-09-11; account deletion is `POST /account/delete` on the API. No storage GC function exists, §10 — per-user Storage cleanup now happens inside the delete route, `apps/api/src/storageCleanup.ts`)
 
 ### apps/api (Express on Render) — endpoints called from the web app
 
@@ -4932,9 +4944,10 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 | `POST /billing/create-checkout` | `data/billing.ts:17` ← EditableExportButtons (term/pack), Auth (`startCheckoutForPlan`) | Creates Stripe Checkout Session → redirect URL |
 | `POST /billing/consume-credit` | `data/billing.ts:33` ← EditableExportButtons post-export | Consumes 1 export credit |
 | `POST /billing/mark-export` | `data/billing.ts:46` ← EditableExportButtons (term users) | Marks a paid export taken (refund-right forfeiture) |
-| `POST /billing/refund` | `data/billing.ts:59` ← Profile (`requestRefund('term'|'pack')`) | Term 14-day / pack unused-credit refunds |
+| `POST /billing/refund` | `data/billing.ts` ← Profile `SubscriptionPanel` (`requestRefund('term'|'pack')`) | Term 14-day / pack unused-credit refunds; a term refund cancels the Stripe subscription immediately and answers `subscription_cancelled: true` (P0-1, 2026-09-11) |
+| `POST /account/delete` | `data/account.ts` ← `profile/accountDeletion.ts` ← Profile Danger Zone | Account deletion with billing wind-down: cancel live subs → delete Stripe customer → remove Storage objects → `account_deletions` audit row → `auth.admin.deleteUser`. Codes `cancel_failed` / `customer_delete_failed` (502), `storage_cleanup_failed` / `delete_failed` (500); 3/hour. `apps/api/src/account.ts` (P0-3, 2026-09-11) |
 | `POST /billing/portal` | `data/billing.ts` ← Profile "Manage subscription ↗" | Stripe customer portal URL |
-| `POST /billing/webhook` | **Stripe → server only** (`apps/api/src/billing.ts:69`, raw body, signature-verified) | Fulfills checkouts: `checkout.session.completed` + `checkout.session.async_payment_succeeded`; the ONLY writer of plan/credits |
+| `POST /billing/webhook` | **Stripe → server only** (`apps/api/src/billing.ts`, raw body, signature-verified) | Fulfills checkouts: `checkout.session.completed` + `checkout.session.async_payment_succeeded`; lifecycle: `invoice.paid`, `customer.subscription.updated/deleted` (sub-id-scoped, §6.3 guards); refunds: `charge.refunded`, `refund.created`, `refund.updated` (`billing/refundReconcile.ts` — **enable the two `refund.*` events on the endpoint**); the ONLY writer of plan/credits. A resolved user with no row → 200 if `account_deletions` records the deletion, else 500 (orphan, operator-visible) |
 | `POST /api/review/critique` | `review/reviewApi.ts` (`requestCritique`) ← PresentationChecker + ReviewTab (§6.17) | Presentation Checker critique — initial + included follow-up (Claude, below); 24-page hard cap (typed `too_many_pages`); 402 `no_credit` / `weekly_quota_exceeded`; credit consume AFTER success (D6, compensated on persistence failure); burst 2×quota + 20/day |
 | `POST /api/review/render-pptx` | `review/ingest/fromPptx.ts` ← PresentationChecker (§6.17) | PPTX → page JPEGs via LibreOffice + poppler (`review/pptx.ts`); SSRF-guarded re-fetch, 413 `pptx_too_large` (50 MB), 2 burst / 10 day; ingest utility — NO credit consumed (the critique charges) |
 | `POST /cron/cleanup-anonymous-users` | scheduled caller (auth-gated cron) | Guest-account GC |
@@ -4997,7 +5010,7 @@ Switched off to keep the product to its core — the poster editor. After the se
 - [ ] **Dead `AuthBootstrap`** — `components/AuthBootstrap.tsx` defined but never mounted in `src/`; referenced only by a comment in `pages/Share.tsx:4` and the consumer list in `lib/auth.ts`.
 - [ ] **Unused `SORT_MODE_LABELS`** — `poster/citations.ts:111-115` ("Manual order" / "Alphabetical (first author)" / "Year (newest first)" / "Year (oldest first)"); `sortMode` is hardcoded `'alpha'` with "no user-facing toggle" (`PosterEditor.tsx:653-655`) — labels have no live render site.
 - [ ] **Unused DB tables** — `public.presets` (`20260408000200_presets.sql`), `public.authors_lib` / `public.institutions_lib` / `public.references_lib` (`20260408000300_library.sql`, PRD §21) — nothing in `apps/web/src` reads or writes them (style presets live in localStorage `postr.style-presets`).
-- [ ] **Missing GC edge function** — `supabase/functions/` contains only `delete-account`; no storage garbage-collection function exists (AdminGallery copy even says image files "stay in storage until the owner hard-deletes", `AdminGallery.tsx:168-172`); the only GC is `POST /cron/cleanup-anonymous-users` for guest accounts.
+- [ ] **Missing GC edge function** — `supabase/functions/` is empty (`delete-account` deleted 2026-09-11); no storage garbage-collection function exists (account deletion cleans the user's own objects via `apps/api/src/storageCleanup.ts`, but orphaned per-poster assets from `deletePoster` still are not swept) (AdminGallery copy even says image files "stay in storage until the owner hard-deletes", `AdminGallery.tsx:168-172`); the only GC is `POST /cron/cleanup-anonymous-users` for guest accounts.
 - [ ] **Unpublish promised but missing** — `pages/Share.tsx:93-95` tells visitors "the owner may have unpublished it", and `PublishConsentModal` share clause 3 (`PublishConsentModal.tsx:98-101`) promises "I can revoke the share link at any time from my dashboard" — no unpublish/revoke UI exists anywhere (no dashboard share-link manager).
 - [ ] **`.enw` accept-listed but no parser** — Refs tab file input accepts `.bib,.bibtex,.ris,.enw` (`Sidebar.tsx:2038`, button label `Sidebar.tsx:2017-2037`) and OnboardingTour step 4 advertises ".enw" (`OnboardingTour.tsx:63`), but only `parseBibtex`/`parseRis` exist — dropping an `.enw` file parses as garbage.
 - [ ] **Dead export/UI remnants** — `HIGHLIGHT_PRESETS` imported but unused (`Sidebar.tsx:29`; block highlight UI removed, comment `Sidebar.tsx:4036-4044`); `getCapturedCount()` dead export (`lib/consoleCapture.ts:89`); posterStore actions `addBlock`/`updateBlock`/`removeBlock`/`setPalette`/`setFont` have zero production callers (tests only); `ATTRIBUTION_TEXT` + 7 back-compat aliases (`attribution.ts:49,345-351`); PricingSection "Coming soon" badge + clock-icon variant unreachable (`PricingSection.tsx:182,223-227`); `SampleDataset.label` ×10 dead copy (`charts/sampleData.ts`); `UndoToast` misnamed (renders ALL editor toasts).
