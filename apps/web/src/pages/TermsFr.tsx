@@ -16,7 +16,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = '28 juillet 2026';
+const LAST_UPDATED = '11 septembre 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function TermsFr() {
@@ -258,13 +258,14 @@ export default function TermsFr() {
           moment pour interrompre les renouvellements futurs.
         </CalloutBox>
         <CalloutBox>
-          <strong className="text-[#e2e2e8]">Pack d’exportation — les crédits non utilisés sont remboursables.</strong>
+          <strong className="text-[#e2e2e8]">Pack d’exportation — remboursable intégralement jusqu’à votre première exportation.</strong>
           <br />
-          Si vous n’avez pas utilisé la totalité des crédits de votre pack, nous
-          rembourserons la valeur des crédits que vous n’avez pas utilisés, au tarif de
-          CA$3.33 par crédit (CA$9.99 ÷ 3). Le remboursement de vos crédits non
-          utilisés les retire de votre compte. Les crédits utilisés ne sont pas
-          remboursables.
+          Si vous changez d’avis avant d’utiliser le pack, nous rembourserons
+          intégralement la facturation de CA$9.99, à condition que vous n’ayez effectué
+          aucune exportation PowerPoint ou LaTeX avec celui-ci. Effectuer une
+          exportation payante revient à utiliser le produit que vous avez payé : dès
+          qu’un crédit a été utilisé, le pack n’est plus remboursable, même en partie.
+          Le remboursement d’un pack retire ses 3 crédits de votre compte.
         </CalloutBox>
         <Body>
           Vous pouvez demander un remboursement depuis la section Abonnement de votre

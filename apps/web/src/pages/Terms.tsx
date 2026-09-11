@@ -17,7 +17,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = 'July 28, 2026';
+const LAST_UPDATED = 'September 11, 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Terms() {
@@ -240,12 +240,13 @@ export default function Terms() {
           any time to stop future renewals.
         </CalloutBox>
         <CalloutBox>
-          <strong className="text-[#e2e2e8]">Export pack — unused credits are refundable.</strong>
+          <strong className="text-[#e2e2e8]">Export pack — refundable in full until you export.</strong>
           <br />
-          If you have not used all of your pack credits, we will refund the value of
-          the credits you have not used, at CA$3.33 per credit (CA$9.99 ÷ 3).
-          Refunding your unused credits removes them from your account. Used credits
-          are not refundable.
+          If you change your mind before using the pack, we will refund the CA$9.99
+          charge in full, as long as you have not completed a PowerPoint or LaTeX
+          export with it. Taking a paid export uses the product you paid for, so once
+          any credit has been used the pack is no longer refundable — not even in
+          part. Refunding a pack removes its 3 credits from your account.
         </CalloutBox>
         <Body>
           You can request a refund from the Subscription section of your Profile page,

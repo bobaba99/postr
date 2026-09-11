@@ -114,8 +114,10 @@ export interface RefundResult {
 }
 
 /**
- * Request a self-serve refund. `kind` is 'term' (14-day, no-export) or
- * 'pack' (unused credits). The server computes eligibility; on success it
+ * Request a self-serve refund. `kind` is 'term' (within 14 days of the
+ * charge, no paid export since) or 'pack' (the most recent pack in full,
+ * only while no credit has been used — a single export voids it). The
+ * server computes eligibility; on success it
  * returns the refunded amount and whether the subscription was cancelled
  * with it. Throws on an ineligible/failed request so the caller can show
  * why. The caller must `plan.refresh()` afterwards — the server changed

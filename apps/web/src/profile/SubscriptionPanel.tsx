@@ -26,9 +26,10 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
     setOpening(false);
   };
 
-  // Request a refund. The server decides eligibility; we surface the
-  // outcome. A generic message on failure per the house error rule, but the
-  // specific 409 reasons are mapped to something actionable.
+  // Request a refund. The server decides eligibility (no refund after any
+  // paid export — for the term AND the pack); we surface the outcome. A
+  // generic message on failure per the house error rule, but the specific
+  // 409 reasons are mapped to something actionable.
   const handleRefund = async (kind: 'term' | 'pack') => {
     setRefunding(true);
     setRefundMsg(null);
@@ -49,8 +50,10 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
       const reason = (err as { body?: { error?: string } })?.body?.error;
       const map: Record<string, string> = {
         window_expired: 'The 14-day refund window has passed. You can cancel anytime to stop renewals.',
-        already_used: 'This term isn’t refundable once you’ve taken a paid export.',
-        no_unused_credits: 'You have no unused credits to refund.',
+        already_used:
+          kind === 'term'
+            ? 'This term isn’t refundable once you’ve taken a paid export.'
+            : 'This pack isn’t refundable once you’ve taken a paid export — not even in part.',
         no_pack_purchase: 'No refundable pack purchase found.',
       };
       setRefundMsg(reason && map[reason] ? map[reason] : 'We couldn’t process that refund. Please try again or contact support.');
@@ -143,10 +146,11 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
               disabled={refunding}
               className="rounded-md border border-[#2a2a3a] bg-transparent px-3 py-1.5 text-[13pt] font-medium text-[#9ca3af] hover:border-[#7c6aed] hover:text-[#fff] disabled:opacity-50"
             >
-              {refunding ? 'Processing…' : `Refund ${plan.credits} unused credit${plan.credits === 1 ? '' : 's'}`}
+              {refunding ? 'Processing…' : 'Refund export pack'}
             </button>
             <p className="mt-1 text-[12pt] text-[#8b8f99]">
-              CA$3.33 per unused credit. Refunding removes them from your account.
+              A pack is refundable in full (CA$9.99) only if you haven’t taken a
+              paid export. Refunding removes its 3 credits from your account.
             </p>
             {refundMsg && <p className="mt-1 text-[13pt] text-[#a3a7b3]">{refundMsg}</p>}
           </div>
