@@ -19,7 +19,7 @@ vi.mock('@/hooks/usePlan', () => ({
   usePlan: () => planState.value,
 }));
 
-import { PRICING_TIERS, PricingSection } from '../PricingSection';
+import { PRICING_TIERS, PricingSection, type PricingTier } from '../PricingSection';
 
 function wordCount(message: string): number {
   return message.trim().split(/\s+/).filter(Boolean).length;
@@ -113,5 +113,67 @@ describe('duplicate-term guard (P0-2)', () => {
 
     expect(screen.getByRole('link', { name: 'Get the term' })).toBeInTheDocument();
     expect(screen.queryByText(/You already have an active term/i)).toBeNull();
+  });
+});
+
+// Owner rule (2026-09-11): the refund rule must be in front of every buyer
+// BEFORE purchase. Each paid card carries its plan-specific line next to
+// the CTA, and the section's fine print links to the Terms.
+describe('refund rule before purchase (2026-09-11)', () => {
+  const tiers: readonly PricingTier[] = PRICING_TIERS;
+  const term = tiers.find((tier) => tier.id === 'term');
+  const pack = tiers.find((tier) => tier.id === 'pack');
+  const free = tiers.find((tier) => tier.id === 'free');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    planState.value = { loading: false, hasActiveTerm: false, isGuest: true };
+  });
+
+  it('gives both paid tiers a plan-specific refund line, and the free tier none', () => {
+    expect(term?.refund).toMatch(/14 days/);
+    expect(pack?.refund).toMatch(/first export/i);
+    expect(free?.refund).toBeUndefined();
+  });
+
+  it('keeps each refund line plain: two sentences at most, 15 words, no AI mention', () => {
+    for (const tier of tiers) {
+      if (!tier.refund) continue;
+      expect(wordCount(tier.refund), `${tier.name}: ${tier.refund}`).toBeLessThanOrEqual(15);
+      expect(tier.refund.split(/[.!?](?:\s|$)/).filter(Boolean).length).toBeLessThanOrEqual(2);
+      expect(tier.refund).not.toMatch(/\bAI\b/i);
+    }
+  });
+
+  it('renders each refund line in the same card as its CTA, right after it', () => {
+    renderPricing();
+    const pairs = [
+      ['Get the term', term?.refund],
+      ['Get the pack', pack?.refund],
+    ] as const;
+    for (const [cta, line] of pairs) {
+      const ctaEl = screen.getByRole('link', { name: cta });
+      const lineEl = screen.getByText(line!);
+      expect(ctaEl.parentElement).toBe(lineEl.parentElement);
+      expect(
+        ctaEl.compareDocumentPosition(lineEl) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
+  });
+
+  it('keeps the term refund line for an active term holder (it still governs their charge)', () => {
+    planState.value = { loading: false, hasActiveTerm: true, isGuest: false };
+    renderPricing();
+    expect(screen.getByText(term!.refund!)).toBeInTheDocument();
+  });
+
+  it('links the fine print under the grid to the refund terms', () => {
+    renderPricing();
+    const link = screen.getByRole('link', { name: /refund terms/i });
+    expect(link).toHaveAttribute('href', '/terms#refunds');
+    const finePrint = link.closest('p')?.textContent ?? '';
+    expect(finePrint).toMatch(/14 days/);
+    expect(finePrint).toMatch(/first export/i);
+    expect(finePrint).not.toMatch(/\bAI\b/i);
   });
 });

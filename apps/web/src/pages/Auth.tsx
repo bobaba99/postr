@@ -44,6 +44,7 @@ import {
   type ConsentChoice,
 } from '@/data/consent';
 import { isAlreadySubscribedError } from '@/data/billing';
+import { refundLineFor } from '@/data/refundCopy';
 import { usePlan } from '@/hooks/usePlan';
 
 /** Shown instead of starting checkout when the user already holds an
@@ -107,6 +108,9 @@ export default function Auth() {
   const plan = usePlan();
   const termAlreadyActive =
     checkoutPlan === 'term' && !plan.loading && plan.hasActiveTerm;
+  // The refund rule for the plan about to be sold, under the plan label —
+  // in front of the buyer BEFORE checkout (owner rule, 2026-09-11).
+  const refundLine = checkoutPlan ? refundLineFor(checkoutPlan) : null;
 
   /**
    * Record a NEW account's signup consent from the given choice. Best-
@@ -442,6 +446,11 @@ export default function Auth() {
                     )[checkoutPlan]
                   }
                 </div>
+                {refundLine && (
+                  <p className="mt-1 text-[12px] leading-relaxed text-[#a3a7b3]">
+                    {refundLine}
+                  </p>
+                )}
                 <p className="mt-2 text-sm leading-relaxed text-[#c8cad0]">
                   {termAlreadyActive
                     ? ALREADY_SUBSCRIBED_MESSAGE

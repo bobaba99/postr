@@ -34,6 +34,11 @@
  * in-editor export paywall (EditableExportButtons) also starts checkout,
  * for users who hit the wall mid-export.
  *
+ * Refund rule in front of the buyer BEFORE purchase (owner rule,
+ * 2026-09-11): each paid card carries its plan-specific refund line right
+ * under the CTA, and the fine print under the grid links to Terms §7.2.
+ * Wording is shared with the paywall and /auth via data/refundCopy.ts.
+ *
  * Duplicate-term guard (P0-2): the term is a recurring subscription, so a
  * signed-in holder of an ACTIVE term must not be offered a second one.
  * The term card swaps its CTA for a "You already have an active term"
@@ -49,6 +54,7 @@ import { Link, useNavigate } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { isOnTalkWaitlist, joinTalkWaitlist } from '@/data/talkWaitlist';
 import { usePlan } from '@/hooks/usePlan';
+import { REFUND_LINE, REFUND_TERMS_PATH } from '@/data/refundCopy';
 
 export interface PricingTier {
   readonly id: string;
@@ -65,6 +71,8 @@ export interface PricingTier {
   readonly condition: string;
   /** The two core capabilities; secondary details stay out of the card. */
   readonly features: readonly [string, string];
+  /** The plan's refund rule, shown right under the CTA (paid tiers only). */
+  readonly refund?: string;
 }
 
 export const PRICING_TIERS = [
@@ -96,6 +104,7 @@ export const PRICING_TIERS = [
       'PowerPoint and LaTeX exports with no watermark.',
       'Keep editing your posters anywhere.',
     ],
+    refund: REFUND_LINE.term,
   },
   {
     id: 'pack',
@@ -110,6 +119,7 @@ export const PRICING_TIERS = [
       'Three PowerPoint or LaTeX exports.',
       'Purchased exports have no watermark.',
     ],
+    refund: REFUND_LINE.pack,
   },
 ] as const satisfies readonly PricingTier[];
 
@@ -139,6 +149,21 @@ export function PricingSection() {
           />
         ))}
       </div>
+
+      {/* The refund rule, in one place for the whole section, linking to
+          the full Terms wording — every buyer passes this before a CTA. */}
+      <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-relaxed text-[#a3a7b3]">
+        A term is refundable in full within 14 days of a charge, a pack until
+        its first export; taking a paid export ends either refund. Full details
+        in the{' '}
+        <Link
+          to={REFUND_TERMS_PATH}
+          className="font-medium text-[#b4a9f5] underline-offset-4 hover:underline"
+        >
+          refund terms
+        </Link>
+        .
+      </p>
 
       {/* <TalkWaitlistCallout /> — deactivated, not deleted; see routes.tsx header. */}
     </section>
@@ -198,6 +223,11 @@ function PricingCard({
         >
           {tier.cta}
         </Link>
+      )}
+      {tier.refund && (
+        <p className="mt-2.5 text-center text-xs leading-relaxed text-[#a3a7b3]">
+          {tier.refund}
+        </p>
       )}
 
       <details className="mt-4 rounded-lg border border-[#2a2a3a] px-3 py-2 sm:hidden">

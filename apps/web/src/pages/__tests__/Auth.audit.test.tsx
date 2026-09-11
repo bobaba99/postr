@@ -149,3 +149,42 @@ describe('paid signup audit regressions', () => {
     ).toBe(false);
   });
 });
+
+// Owner rule (2026-09-11): the checkout-resume banner states the refund
+// rule for the plan it is about to sell, under the plan label.
+function renderPaidSignupFor(plan: 'term' | 'pack') {
+  return render(
+    <MemoryRouter initialEntries={[`/auth?plan=${plan}`]}>
+      <Auth />
+    </MemoryRouter>,
+  );
+}
+
+describe('refund rule on the checkout-resume banner (2026-09-11)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('states the term refund line under the term label', () => {
+    renderPaidSignupFor('term');
+
+    const label = screen.getByText('Term · CA$18.99 / 4 months');
+    const line = screen.getByText(/14 days/);
+    expect(label.parentElement).toBe(line.parentElement);
+    expect(
+      label.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(line.textContent).not.toMatch(/\bAI\b/i);
+    expect(screen.queryByText(/first export/i)).toBeNull();
+  });
+
+  it('states the pack refund line under the pack label', () => {
+    renderPaidSignupFor('pack');
+
+    const label = screen.getByText('Export pack · CA$9.99');
+    const line = screen.getByText(/first export/i);
+    expect(label.parentElement).toBe(line.parentElement);
+    expect(line.textContent).toMatch(/no refund after/i);
+    expect(screen.queryByText(/14 days/)).toBeNull();
+  });
+});

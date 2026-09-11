@@ -313,6 +313,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 
 - **Set up:** Account **E** (permanent free, 0 credits), poster open. API env must have `STRIPE_SECRET_KEY`, `STRIPE_PRICE_TERM`, `STRIPE_WEBHOOK_SECRET`, `APP_ORIGIN`, service_role; `VITE_API_BASE_URL` non-empty.
 - [ ] Editor → Sidebar **Export** tab → "✎ Editable formats". Paywall heading **"Keep editing in PowerPoint or Overleaf"**, body **"Your PDF export is free. Unlock clean PowerPoint & LaTeX with the CA$18.99 term (renews every 4 months, cancel anytime), or a CA$9.99 3-export pack whose credits never expire."** Both export buttons disabled.
+- [ ] **Refund rule visible BEFORE purchase (owner rule, 2026-09-11 — wording `data/refundCopy.ts`, must match Terms §7.2 + Profile):** (1) the paywall shows, directly above the buy buttons, **"Term: full refund within 14 days of a charge if you haven’t taken a paid export. Pack: full refund until your first export, none after — even in part."**; (2) `/pricing` term card shows **"Full refund within 14 days of a charge if you haven’t taken a paid export."** right under "Get the term" (kept even when the CTA is swapped for the active-term notice), and the fine print under the grid — **"A term is refundable in full within 14 days of a charge, a pack until its first export; taking a paid export ends either refund. Full details in the refund terms."** — links **refund terms** → `/terms#refunds`; (3) `/auth?plan=term` banner shows the same term line under **"Term · CA$18.99 / 4 months"**. ⚠ The Stripe-hosted page shows NO refund text: `custom_text` is rejected together with Managed Payments (sandbox 2026-09-11, `StripeInvalidRequestError`: "You cannot use custom_text with Managed Payments.") — do not look for it there.
 - [ ] Click "Get the term" → full-page redirect to Stripe hosted checkout. Pay with a **test card**.
 - [ ] Return to `/billing/success` → check icon + **"You're all set"**. Page polls (`refreshSession` at 2.5s, "waited" at 6s).
 - [ ] Once the webhook lands + refresh fires → copy switches to **"Your term is active. Editable PowerPoint and LaTeX exports are unlocked — no watermark."**
@@ -337,6 +338,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 
 - **Set up:** Account **E**, `STRIPE_PRICE_PACK` set.
 - [ ] Same paywall → "Get the pack" → Stripe (mode `payment`, no subscription) → pay.
+- [ ] **Refund rule visible BEFORE purchase (2026-09-11):** paywall line as §11; `/pricing` pack card shows **"Full refund until your first export. No refund after, even in part."** right under "Get the pack"; `/auth?plan=pack` banner shows the same pack line under **"Export pack · CA$9.99"**; `/pricing` crawler copy (`seo/routes.json`) carries the rule too. Stripe page: none (see §11).
 - [ ] `/billing/success` → once credits show: **"Your export pack is ready — 3 exports to use whenever. Credits never expire."**
 - [ ] Editor hint: **"3 exports left in your pack — each PowerPoint or LaTeX export uses one. Credits never expire."**
 - **Edges (Stripe sandbox):**
@@ -344,6 +346,12 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
   - [ ] Unpaid async completion → no grant until `async_payment_succeeded`.
   - [ ] `grant_export_credits` RPC error → 500 → Stripe retries.
 - **✓ verify:** `export_credits=3`, `plan` **still 'free'**, `plan_expires_at` unchanged, `stripe_customer_id` set, one `billing_fulfilled_sessions` row.
+- **Self-serve pack refund (owner's rule, 2026-09-11 — no refund after ANY paid export, both SKUs):** on `/profile` with credits > 0 → "Refund export pack" → `POST /billing/refund {kind:'pack'}` → eligible ONLY while `export_credits` still covers every credit the account's unrefunded packs granted (one pack: `export_credits = 3`; `billing/packRefund.ts packRefundEligible`) → **full** refund of the MOST RECENT unrefunded pack's PaymentIntent (`refunds.create({ payment_intent })`, no `amount` — the whole charge, key `pack-refund:{session_id}`) → ledger row `kind='pack', credits_revoked=3, session_id` → `revoke_export_credits(3)` → response `{ ok, amount_cents: 999, subscription_cancelled: false }`.
+  - [ ] Copy under the button: **"A pack is refundable in full (CA$9.99) only if you haven't taken a paid export. Refunding removes its 3 credits from your account."**
+  - [ ] Success: **"Refunded CA$9.99. It may take a few days to appear."**, then the balance re-reads to 0 and the button disappears.
+  - [ ] Two untouched packs (6 credits) → first click refunds the NEWEST pack only (3 credits left), second click refunds the older one. A pack already in `billing_refunds` is skipped.
+  - [ ] Double click → idempotent (same session key → same refund id; one ledger row, one revoke).
+  - [ ] After ANY consumed credit (§13) → **409 `already_used`** → **"This pack isn't refundable once you've taken a paid export — not even in part."**; no Stripe call, no ledger row, balance untouched. There is NO per-credit proration any more (was CA$3.33 per unused credit before 2026-09-11 — abusable: export once, refund the rest).
 
 ## 13. Consume a credit (pack holder)
 
@@ -355,6 +363,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
   - [ ] Two concurrent exports racing to 0 → atomic RPC prevents negative; second gets 409 no_credit but file still downloaded.
   - [ ] Export job throws → alert, credit NOT spent.
 - **✓ verify:** `export_credits` −1 per successful export; failed export doesn't decrement; term holders never call consume-credit; exported file has no watermark.
+- [ ] **Refund now refused (2026-09-11):** `/profile` → "Refund export pack" → 409 `already_used` (§12) — one consumed credit voids the whole pack's refund.
 
 ## 14. Cancel checkout (`/billing/cancel`)
 
@@ -382,7 +391,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 - **Self-serve term refund (P0-1 + H-10, 2026-09-11):** "Request refund" within 14 days and before any paid export → `POST /billing/refund {kind:'term'}` → Stripe refund of the latest invoice's PaymentIntent (resolved Basil-style via `latest_invoice.payments` / `invoicePayments.list`) → **the subscription is cancelled immediately** (`subscriptions.cancel`, `prorate:false`) → row `plan='free', plan_expires_at=now(), subscription_status='canceled'` (sub id kept) → response `{ ok, amount_cents, subscription_cancelled: true }`.
   - [ ] Panel copy: **"Refunded CA$18.99 — it may take a few days to appear. Your term has been cancelled and PowerPoint/LaTeX export is locked again."**, then the panel re-reads the plan and drops to the FREE state (no second "Request refund" button).
   - [ ] Double click → idempotent (same refund id, cancel once). A later `customer.subscription.updated` "active" for that sub id does **not** re-grant (`termAdvanceDecision` → `skip_terminal`, logged).
-  - [ ] Eligibility 409s map to copy: `window_expired`, `already_used`, `no_unused_credits`, `no_pack_purchase`; anything else → generic.
+  - [ ] Eligibility 409s map to copy: `window_expired`, `already_used` (term AND pack — kind-specific wording), `no_pack_purchase`; anything else → generic. (`no_unused_credits` is no longer emitted — a consumed credit is `already_used`.)
 
 ## 17. Revocation / past_due / terminal — ⚠ webhook only
 
@@ -394,7 +403,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
   - [ ] **`unpaid` is recoverable (2026-09-11 review fix):** after `unpaid` revokes access, pay the open invoice from the hosted invoice page → Stripe reports the SAME sub `active` → `plan='term'` again with the new period end. (`canceled` / `incomplete_expired` remain irreversible: a late "active" for them is refused and logged.)
   - [ ] **Stale terminal event for an OLD sub id** (buy → cancel → buy again, then redeliver the old `.deleted`) → the NEW term is untouched (revoke is scoped to `stripe_subscription_id = event sub id`).
   - [ ] **Deleted account (P0-3):** after §18 the `customer.subscription.deleted` for the cancelled sub resolves the deleted uuid from sub metadata → `account_deletions` row found → **200, no write, one operator log line**. Delete that audit row by hand and redeliver → **500 `fulfillment_failed`** + `UserRowMissingError` log (a genuine orphan is never silent).
-  - [ ] **External refund (H-11, Stripe dashboard / Link):** full CA$18.99 refund → `refund.created`/`refund.updated`/`charge.refunded` → sub cancelled + `plan='free'` exactly like the button (ledger dedups whichever event lands first). **Partial** refund (e.g. CA$5.00) → NOTHING revoked, sub NOT cancelled, log `partial_term_refund`, not ledgered (a later full refund still applies). Refund of a pack payment → credits revoked at CA$3.33/credit via `billing_fulfilled_sessions`. Unattributable → logged, nothing revoked. **Dashboard prerequisite:** the webhook endpoint must have `refund.created` + `refund.updated` enabled (unverified from code).
+  - [ ] **External refund (H-11, Stripe dashboard / Link):** full CA$18.99 refund → `refund.created`/`refund.updated`/`charge.refunded` → sub cancelled + `plan='free'` exactly like the button (ledger dedups whichever event lands first). **Partial** refund (e.g. CA$5.00) → NOTHING revoked, sub NOT cancelled, log `partial_term_refund`, not ledgered (a later full refund still applies). Refund of a pack payment → credits revoked in proportion to what Stripe returned (full CA$9.99 → 3; an operator's partial dashboard refund → `round(amount ÷ CA$3.33)`, capped at 3 — `constants.ts packCreditsForRefundAmount`) via `billing_fulfilled_sessions`; external refunds are reconciled, never gated by the no-export rule. Unattributable → logged, nothing revoked. **Dashboard prerequisite:** the webhook endpoint must have `refund.created` + `refund.updated` enabled (unverified from code).
 
 ---
 

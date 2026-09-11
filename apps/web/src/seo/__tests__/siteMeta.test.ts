@@ -163,6 +163,12 @@ describe('staticCopyFor', () => {
     expect(copy?.copy.length).toBeGreaterThan(0);
   });
 
+  it('states the refund rule in the /pricing crawler copy (owner rule, 2026-09-11)', () => {
+    const copy = staticCopyFor('/pricing')?.copy.join(' ') ?? '';
+    expect(copy).toMatch(/14 days/);
+    expect(copy).toMatch(/first export/i);
+  });
+
   it('returns null for a route with no static copy', () => {
     expect(staticCopyFor('/dashboard')).toBeNull();
   });

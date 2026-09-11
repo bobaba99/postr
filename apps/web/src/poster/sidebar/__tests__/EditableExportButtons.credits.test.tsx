@@ -206,3 +206,30 @@ describe('EditableExportButtons — duplicate-term guard (P0-2)', () => {
     consoleError.mockRestore();
   });
 });
+
+// Owner rule (2026-09-11): the refund rule is in front of the buyer BEFORE
+// purchase — one line covering both plans sits directly above the buy
+// buttons, and only where the paywall (the buy surface) is shown.
+describe('EditableExportButtons — refund rule before purchase (2026-09-11)', () => {
+  it('states the term and pack refund rule directly above the buy buttons', () => {
+    renderInRouter(<EditableExportButtons citationStyle="APA 7" />);
+
+    const line = screen.getByText(/14 days/);
+    expect(line.textContent).toMatch(/first export/i);
+    expect(line.textContent).not.toMatch(/\bAI\b/i);
+    // Reading order: the rule, then the buttons it governs.
+    const termButton = screen.getByText('Get the term');
+    expect(
+      line.compareDocumentPosition(termButton) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(line.parentElement).toBe(termButton.closest('div')?.parentElement);
+  });
+
+  it('is absent for a credit holder, who sees no paywall', () => {
+    planSeed.credits = 2;
+    renderInRouter(<EditableExportButtons citationStyle="APA 7" />);
+
+    expect(screen.queryByText(/14 days/)).toBeNull();
+    expect(screen.queryByText('Get the pack')).toBeNull();
+  });
+});
