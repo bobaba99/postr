@@ -39,7 +39,7 @@ export function PublicFooter() {
           {/* The standalone tools live here as well as in the header's
               overflow menu: the flat header nav is `xl:`-gated, so on
               phones this column is the redundant route to them. Only
-              "Figure readability" is live — "Plot picker"
+              "Plot checker" is live — "Plot picker"
               (/chart-chooser), "Paper to poster" and "Paper to slides"
               were removed here: deactivated — see routes.tsx header.
               Re-add them after "Pricing", picker first, in front of
@@ -47,7 +47,7 @@ export function PublicFooter() {
           <FooterColumn title="Product">
             <FooterLink to="/">Home</FooterLink>
             <FooterLink to="/pricing">Pricing</FooterLink>
-            <FooterLink to="/tools/figure-readability">Figure readability</FooterLink>
+            <FooterLink to="/tools/figure-readability">Plot checker</FooterLink>
           </FooterColumn>
 
           <FooterColumn title="Learn">

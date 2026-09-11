@@ -130,12 +130,12 @@ describe('PublicHeader tool links', () => {
     expect(navHrefs).toEqual(PUBLIC_NAV_PATHS);
   });
 
-  it('labels the checker "Figure readability" in the flat nav', () => {
+  it('labels the checker "Plot checker" in the flat nav', () => {
     const { container } = renderIn(<PublicHeader />);
     const link = container.querySelector(
       'header a[href="/tools/figure-readability"]',
     );
-    expect(link).toHaveTextContent('Figure readability');
+    expect(link).toHaveTextContent('Plot checker');
   });
 
   it('waits until the wide breakpoint to show the flat navigation', () => {
@@ -472,7 +472,7 @@ describe('Landing page', () => {
 
 describe('internal links point at canonical URLs', () => {
   it.each([
-    '/figure-check',
+    '/plot-checker',
     '/plot-picker',
     '/manuscript-to-poster',
     '/paper-to-present',

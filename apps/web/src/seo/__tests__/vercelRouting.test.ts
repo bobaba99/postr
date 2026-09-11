@@ -95,7 +95,7 @@ const CLIENT_ROUTES = [
  * one indexed URL; every other spelling must 308 to it rather than
  * render a duplicate.
  *
- * /figure-check is the one live alias: it 308s to the figure-
+ * /plot-checker is the one live alias: it 308s to the figure-
  * readability checker, the only standalone tool currently mounted.
  * Every other alias points at "/": their canonical tool routes are
  * deactivated (routes.tsx header), and a 308 to a route that itself
@@ -106,7 +106,7 @@ const CLIENT_ROUTES = [
  * is retargeted rather than dropped.
  */
 const ALIAS_REDIRECTS: Array<[string, string]> = [
-  ['/figure-check', '/tools/figure-readability'],
+  ['/plot-checker', '/tools/figure-readability'],
   ['/plot-picker', '/'],
   ['/manuscript-to-poster', '/'],
   ['/paper-to-present', '/'],

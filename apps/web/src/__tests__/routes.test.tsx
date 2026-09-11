@@ -10,7 +10,7 @@
  * (replace) to the landing page instead of rendering the feature.
  *
  * The figure-readability checker is the one standalone tool that IS
- * mounted (/tools/figure-readability, alias /figure-check) — pinned
+ * mounted (/tools/figure-readability, alias /plot-checker) — pinned
  * at the bottom so a future hide pass has to flip it deliberately.
  */
 import { render, screen } from '@testing-library/react';
@@ -102,8 +102,8 @@ describe('standalone figure-readability routes', () => {
     );
   });
 
-  it('redirects the /figure-check alias to the canonical page', async () => {
-    renderAt('/figure-check');
+  it('redirects the /plot-checker alias to the canonical page', async () => {
+    renderAt('/plot-checker');
 
     expect(await screen.findByTestId('location-probe')).toHaveTextContent(
       /^\/tools\/figure-readability$/,

@@ -1,6 +1,6 @@
 /**
  * /tools/figure-readability — the standalone, no-auth figure-readability
- * check (alias /figure-check → 308 here).
+ * check (alias /plot-checker → 308 here).
  *
  * The editor's Figure › Check tab (poster/ReadabilityPanel.tsx), full
  * width, with the printed size typed instead of dragged on a canvas.
@@ -37,7 +37,7 @@ import { ReadabilityPanel } from '@/poster/ReadabilityPanel';
 const CHECKER_JSON_LD = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: 'Postr Figure Readability Check',
+  name: 'Postr Plot Checker',
   url: `${SITE_ORIGIN}/tools/figure-readability`,
   applicationCategory: 'DesignApplication',
   operatingSystem: 'Any (web browser)',

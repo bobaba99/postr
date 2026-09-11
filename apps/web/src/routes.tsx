@@ -5,10 +5,10 @@
  *   /about              → About (public, feature tour)
  *   /why-posters        → Why posters (public)
  *   /pricing            → Pricing (public)
- *   /tools/figure-readability → Figure readability check (public, no
+ *   /tools/figure-readability → Plot checker — the standalone figure-readability check (public, no
  *                         session, code-split — the one live standalone
  *                         tool; the editor's Check tab as a page)
- *   /figure-check       → redirect to /tools/figure-readability (alias)
+ *   /plot-checker       → redirect to /tools/figure-readability (alias)
  *   /chart-chooser      → redirect to / (standalone plot picker deactivated)
  *   /plot-picker        → redirect to / (alias of the deactivated picker)
  *   /gallery            → redirect to / (public gallery deactivated)
@@ -128,7 +128,7 @@
  *      (a prerendered file must not be shadowed by a rewrite).
  *   4. components/PublicHeader.tsx TOOL_LINKS ({ to: '/chart-chooser',
  *      label: 'Plot picker', blurb: 'Find the figure that fits your
- *      data' } — in FRONT of the Figure readability entry),
+ *      data' } — in FRONT of the Plot checker entry),
  *      components/PublicFooter.tsx Product column, pages/Landing.tsx
  *      "Tools you can use on their own" ToolCard (before the checker
  *      card; the section itself is back) and its small-screen note,
@@ -147,7 +147,7 @@
  * label and the base_size fix. Pure client-side; creates no Supabase
  * session. Nested under /tools so future standalone tools share the
  * prefix; the bare /tools is a real 404 (vercelRouting.test.ts
- * UNKNOWN_PATHS). Its alias /figure-check 308s here (vercel.json) and
+ * UNKNOWN_PATHS). Its alias /plot-checker 308s here (vercel.json) and
  * <Navigate>s here in-app. It is mirrored in PublicHeader TOOL_LINKS,
  * the PublicFooter Product column and the Landing tools section, and
  * pinned by src/__tests__/routes.test.tsx + toolDiscoverability.test.tsx
@@ -161,7 +161,7 @@
  * a route that itself redirects.
  *
  *   /tools/figure-readability
- *     ← /figure-check          (the short spelling for the checker)
+ *     ← /plot-checker          (the product name, like /plot-picker for the picker)
  *
  *   /                          (every deactivated tool's alias)
  *     ← /plot-picker           (alias of /chart-chooser — the measured
@@ -259,7 +259,7 @@ export function AppRoutes() {
             Supabase session (pages/FigureReadability.tsx header). */}
         <Route path="/tools/figure-readability" element={<FigureReadabilityPage />} />
         <Route
-          path="/figure-check"
+          path="/plot-checker"
           element={<Navigate to="/tools/figure-readability" replace />}
         />
         {/* Standalone plot picker is deactivated — see the header

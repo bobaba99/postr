@@ -22,7 +22,7 @@
  * slides" entries were removed the same way when the manuscript
  * pipelines were deactivated, and "Plot picker" followed when the
  * standalone picker was deactivated (see the routes.tsx header). The
- * "Figure readability" entry is the one standalone tool that is live.
+ * "Plot checker" entry is the one standalone tool that is live.
  *
  * TOOL_LINKS exists because the first standalone tool once shipped with
  * nothing linking to it from anywhere in the app — not the header, not
@@ -49,7 +49,7 @@ interface ToolLink {
 /**
  * The standalone tools, in the order they appear everywhere. Each is
  * public, needs no account, and is a canonical URL (never an alias
- * spelling — /figure-check 308s to the entry below) so internal links
+ * spelling — /plot-checker 308s to the entry below) so internal links
  * never bounce through a 308.
  *
  * One entry while the other standalone tools are deactivated
@@ -70,7 +70,7 @@ interface ToolLink {
 const TOOL_LINKS: readonly ToolLink[] = [
   {
     to: '/tools/figure-readability',
-    label: 'Figure readability',
+    label: 'Plot checker',
     blurb: 'Check figure text at poster print size',
   },
 ];
