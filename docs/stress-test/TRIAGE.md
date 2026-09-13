@@ -52,7 +52,7 @@ reality: intro y 120..305, sitting on top of it
 | Site | What breaks |
 |---|---|
 | `boundsCheck.checkBounds` | A block grown clear off the canvas yields **zero** warnings. The ISSUES panel's only geometry check, blind to the blocks most likely to need it. |
-| `ackPlacement.placeAckMark` | Places the colophon mark on top of a grown block — against an invariant the module documents as *"the returned rect NEVER overlaps any existing block"*. Part of the colophon overlap filed below is this, not only the template bug. |
+| `ackPlacement.placeAckMark` | Places the colophon mark on top of a grown block — against an invariant the module documents as *"the returned rect NEVER overlaps any existing block"*. Demonstrated: from stored geometry the mark goes to (10, 338); the stored Intro ends at 300 so "no overlap", the rendered Intro ends at 360 so it **does**. With true heights it would have gone to (210, 338). |
 | `PosterEditor` `titleOverflowPx` | The same defect already point-fixed **for the title block only**. Its own comment calls it the "B1 fix". |
 | F8's proposed collision check | Would have been the fourth consumer of the stale number, and would have found nothing in F8's own repro. |
 
@@ -67,6 +67,36 @@ pattern-matching: the templates placing blocks past the sheet bottom (build-time
 arithmetic, wrong before anything renders), F1's group-move undo (push
 ordering), and the 50 pt colophon (px-vs-pt confusion — same family, different
 cause).
+
+
+### ⚠ A number I reported was measured wrong — corrected here
+
+I earlier told the owner the colophon "still overlaps a block in 20 of 32
+(size × template) pairs". **That measured stored geometry, and stored geometry
+is not what prints.**
+
+`printPoster` deep-clones the live `#poster-canvas` with its inline
+`height: auto` intact and hands that to `buildPrintDocument`, so the PDF carries
+RENDERED geometry. My harness was drawing every block at `height: b.h` with
+`overflow: hidden` — a poster nobody ever sees.
+
+Harness corrected to render the way `blocks.tsx` does (`height: auto` +
+constant `minHeight` for the growing types, `overflow: visible`), with each
+block filled to roughly the height its template reserved. Re-measured:
+
+| template | sizes where the colophon overlaps a block |
+|---|---|
+| 3col (default) | **0 / 8** |
+| 2col | 1 / 8 |
+| sidebar | 1 / 8 |
+| billboard | **4 / 8** |
+
+So: **6 of 32, not 20 of 32**, and zero on the default template. The defect is
+real but far narrower than reported, and concentrated in `billboard`.
+
+The lesson generalises beyond this number: a harness that renders stored
+geometry cannot measure a product that renders computed geometry. Both browser
+harnesses in `apps/web/scripts/` now render the way the editor does.
 
 ### The remedy decision
 

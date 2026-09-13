@@ -51,17 +51,40 @@ function canvasHtml(wIn: number, hIn: number, layout: string): string {
   const tpl = (LAYOUT_TEMPLATES as Record<string, { build: (a: number, b: number) => Array<Record<string, unknown>> }>)[layout];
   const blocks = tpl.build(wIn, hIn);
 
+  // Render each block the way blocks.tsx does, NOT at its stored height.
+  // The first version of this harness drew every block at `height: b.h`
+  // with `overflow: hidden`. That is not what the editor renders and not
+  // what prints: `printPoster` clones the live #poster-canvas with its
+  // inline `height: auto` intact, so the PDF carries RENDERED geometry.
+  // Measuring overlap against stored boxes therefore measured a poster
+  // nobody ever sees.
+  const GROWS = new Set(['title', 'text', 'references', 'authors']);
+  const TIGHT_FLOOR = new Set(['title', 'authors']);
+
   const body = blocks
     .map((b) => {
       const x = Number(b.x), y = Number(b.y), bw = Number(b.w), bh = Number(b.h);
       const type = String(b.type);
       const size = type === 'title' ? 5.5 : type === 'heading' ? 3.4 : 2.6;
-      const label = String(b.content ?? '') || type;
-      const offSheet = y + bh > h;
-      return `<div style="position:absolute;left:${x}px;top:${y}px;width:${bw}px;height:${bh}px;
-        font-size:${size}px;line-height:1.3;color:#1a1a26;overflow:hidden;
-        outline:0.4px solid ${offSheet ? 'rgba(220,0,0,0.55)' : 'rgba(124,106,237,0.35)'};">
-        <strong>${label}</strong> ${'Sample body copy at the readability floor. '.repeat(18)}
+      const grows = GROWS.has(type) || type === 'heading';
+      // A filled template, not an empty one: enough copy to occupy about
+      // the height the template reserved. An empty block collapses to its
+      // minHeight and would understate every overlap.
+      const perLine = Math.max(8, Math.floor(bw / (size * 0.5)));
+      const lines = Math.max(1, Math.floor(bh / (size * 1.3)));
+      const filler = type === 'title' || type === 'heading'
+        ? String(b.content ?? '') || type
+        : 'Sample body copy at the readability floor. '.repeat(
+            Math.max(1, Math.ceil((perLine * lines) / 44)),
+          );
+      const heightCss = grows
+        ? `height:auto;min-height:${TIGHT_FLOOR.has(type) ? 6 : 12}px;overflow:visible;`
+        : `height:${bh}px;overflow:hidden;`;
+      return `<div data-block-id="${String(b.id)}" data-block-type="${type}"
+        style="position:absolute;left:${x}px;top:${y}px;width:${bw}px;${heightCss}
+        font-size:${size}px;line-height:1.3;color:#1a1a26;
+        outline:0.4px solid rgba(124,106,237,0.35);">
+        <strong>${String(b.content ?? '') || type}</strong> ${filler}
       </div>`;
     })
     .join('');
