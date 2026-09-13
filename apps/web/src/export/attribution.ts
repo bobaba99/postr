@@ -50,6 +50,7 @@
  * string or invents its own wording.
  */
 import { colophonMarkPngDataUri } from './colophonMarkPng';
+import { colophonGeometry } from './colophonGeometry';
 
 /**
  * Frozen copy. Phrased as a credit line, not a maker's mark — see the
@@ -127,65 +128,82 @@ export function acknowledgementPrintHtml(opts: AttributionOptions = {}): string 
 /**
  * The stylesheet rule for `acknowledgementPrintHtml`.
  *
- * PLACEMENT (owner decision, revised 2026-09-13): it belongs in the
- * bottom margin band, and it must never impair readability of real
- * content. It is now anchored to the band's RIGHT end (`right: M`)
- * rather than its left. The references block owns the left edge
- * (`x: M` in templates.ts); putting the credit at the opposite end
+ * PLACEMENT (owner decision, revised 2026-09-13): the bottom margin
+ * band, anchored to its RIGHT end. The references block owns the left
+ * edge (`x: M` in templates.ts); putting the credit at the opposite end
  * keeps it out of that column's optical run and reads as a colophon
  * rather than as a mis-aligned first entry.
  *
- * `bottom: M` keeps it INSIDE the margin band rather than in the
- * sheet's dead edge, which is where a funding line would sit.
+ * ── Adaptive, and why it has to be ────────────────────────────────
+ * Every number here comes from `colophonGeometry(widthIn, heightIn)` —
+ * see that module for the scaling basis and the clamps. Two bugs are
+ * fixed by making it a function of the poster rather than a constant:
  *
- * ── Sizing, and the bug this replaces ────────────────────────────
- * Sizes here are CSS pixels at the canvas's NATURAL scale, where
- * 1 poster unit = 1 px = 0.1 INCH — not 1 pt. The print window then
- * applies `zoom: 96 / PX` (9.6 at PX=10) to reach true print size.
+ *   1. A fixed size is a billboard on a 24×36 and a speck on an A0.
+ *   2. The old `bottom: M` did NOT put the line inside the margin band,
+ *      despite the comment that said so. `bottom: M` places the box's
+ *      BOTTOM edge on the band's TOP edge, so the whole box sat in
+ *      content space — measured at every poster size, and visible in
+ *      the stress harness as the credit resting on the last line of the
+ *      Results column. The geometry module now clamps `bottom` so
+ *      `bottom + mark <= M`, which is asserted per size in the tests.
  *
- * The previous values ignored that conversion. `font-size: 7px` was
- * commented as printing "around 7 pt"; it actually printed at
- * 7 × 9.6 = 67.2 CSS px = 0.7 in = **50.4 pt**, and the 9 px mark at
- * 0.9 in — a credit line set larger than most posters' body text,
- * which is exactly the "vendor sticker" failure the whole
- * acknowledgement framing exists to avoid.
+ * Sizes are CSS pixels at the canvas's NATURAL scale, where 1 poster
+ * unit = 1 px = 0.1 INCH — not 1 pt. `printDocument` then applies
+ * `zoom: 96 / PX` (9.6 at PX=10) to reach true print size. Ignoring
+ * that conversion is what made the pre-2026-09-13 colophon print at
+ * 50.4 pt while its own comment claimed "around 7 pt".
  *
- * Every dimension below is therefore the old value × 0.25, so the row
- * keeps its proportions at a quarter of its former width:
- *   font-size 7 → 1.75 px  (prints 1.75 × 9.6 / 96 in = 0.175 in ≈ 12.6 pt)
- *   mark       9 → 2.25 px (prints 0.225 in)
- *   gap        4 → 1 px
- * 12.6 pt sits below the 18 pt axis-label and (just above) the 12 pt
- * caption floors in `readability.ts`, so the line is legible to a
- * reader standing at the poster without competing with content —
- * which is what the original comment intended all along.
+ * ── What this does NOT guarantee ─────────────────────────────────
+ * It does not guarantee the credit never touches content, and the
+ * comment that used to claim so was wrong twice over. Measured on the
+ * shipped templates at 48×36 (band top = 350, sheet bottom = 360):
  *
- * It cannot overlap content: templates reserve this band as margin,
- * and no template places a block below `bodyTop + bodyHeight`.
+ *     3col      lowest block bottom 342.2  — 7.8u of slack
+ *     2col                          371.6  — 21.6u past the band top
+ *     billboard                     374.1  — 24.1u past
+ *     sidebar                       392.6  — 42.6u past
+ *
+ * Only `3col`, the default, actually reserves the band. Three of the
+ * four content templates run blocks INTO it and past the sheet edge, so
+ * on those the colophon still lands on a block — 20 of 32
+ * (size × template) pairs, down from 23 before the band-centring.
+ *
+ * The honest guarantee is narrower: the credit sits inside the band
+ * every template is SUPPOSED to reserve, is never in the canvas flow,
+ * and can never shift a block. Closing the rest is a template fix, not
+ * a colophon fix — see `docs/stress-test/TRIAGE.md`.
+ *
+ * @param widthIn  poster width in inches
+ * @param heightIn poster height in inches
  */
-export function acknowledgementPrintCss(opts: AttributionOptions = {}): string {
+export function acknowledgementPrintCss(
+  widthIn: number,
+  heightIn: number,
+  opts: AttributionOptions = {},
+): string {
   if (!shouldAttribute(opts)) return '';
+  const g = colophonGeometry(widthIn, heightIn);
   return `
-  /* Acknowledgement line — sits in the bottom margin band, anchored to
-     its RIGHT end so it stays clear of the references column that owns
-     the left edge. Never in the canvas flow, so poster dimensions and
-     block positions are unaffected. */
+  /* Acknowledgement line — sits INSIDE the bottom margin band, anchored
+     to its right end. Never in the canvas flow, so poster dimensions and
+     block positions are unaffected. Geometry from colophonGeometry(). */
   .postr-attribution {
-    /* The right edge comes from 'right: 10px' alone — the box is
-       absolutely positioned with no 'left' and no 'width', so it is
-       shrink-to-fit and there is no free space for 'justify-content'
-       to distribute. Do not "restore" a flex alignment here; removing
-       'right' is what would break the anchor. (No backticks in this
-       string: it is a template literal.) */
+    /* The right edge comes from 'right' alone — the box is absolutely
+       positioned with no 'left' and no 'width', so it is shrink-to-fit
+       and there is no free space for 'justify-content' to distribute.
+       Do not "restore" a flex alignment here; removing 'right' is what
+       would break the anchor. (No backticks in this string: it is a
+       template literal.) */
     position: absolute;
-    right: 10px;
-    bottom: 10px;
+    right: ${g.rightUnits}px;
+    bottom: ${g.bottomUnits}px;
     z-index: 1;
     display: flex;
     align-items: center;
-    gap: 1px;
+    gap: ${g.gapUnits}px;
     font-family: system-ui, -apple-system, sans-serif;
-    font-size: 1.75px;
+    font-size: ${g.fontUnits}px;
     /* Bold at the owner's request. The size and muted colour still do
        the subordinating, so the line reads as a credit with a little
        more presence rather than as something competing for attention. */
@@ -201,8 +219,8 @@ export function acknowledgementPrintCss(opts: AttributionOptions = {}): string {
      PNG, always scaled DOWN, and lives inside the bottom-margin overlay —
      so it cannot overlap poster content. */
   .postr-attribution-mark {
-    width: 2.25px;
-    height: 2.25px;
+    width: ${g.markUnits}px;
+    height: ${g.markUnits}px;
     display: block;
     flex: none;
     opacity: 0.72;
