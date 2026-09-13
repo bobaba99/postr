@@ -74,6 +74,69 @@ const SEABORN_CONTEXTS: Record<string, number> = {
   paper: 1.0, notebook: 1.2, talk: 1.5, poster: 2.0,
 };
 
+// ── Comment stripping ────────────────────────────────────────────────
+
+/**
+ * Remove `#` comments from R or Python source, leaving string literals
+ * untouched.
+ *
+ * This CANNOT be a regex. `/#.*$/gm` deletes the rest of the line from
+ * inside a hex colour — `c("#FF0000", '#00FF00')` in ggplot code, or any
+ * Python string containing `#` — taking real arguments with it. So we
+ * scan characters and track quote state, including Python triple quotes.
+ *
+ * Newlines are preserved (a stripped comment leaves its `\n`) so line
+ * numbers still line up with what the user sees in the editor.
+ *
+ * Only the PARSERS see the stripped source; the panel's "full edited
+ * code" output rewrites the user's ORIGINAL text, so their comments
+ * survive.
+ *
+ * Known limitation, accepted: a `figsize=` inside a triple-quoted
+ * docstring is still read, because that is a string literal and not a
+ * comment. Blanking string CONTENTS is not an option — `units = "cm"`
+ * and `'font.size'` are both parsed out of string literals.
+ */
+export function stripComments(code: string): string {
+  let out = '';
+  let quote: string | null = null;
+  for (let i = 0; i < code.length; i++) {
+    const ch = code[i]!;
+
+    if (quote) {
+      if (quote.length === 3) {
+        if (code.startsWith(quote, i)) { out += quote; i += 2; quote = null; continue; }
+        out += ch;
+        continue;
+      }
+      if (ch === '\\') { out += ch + (code[i + 1] ?? ''); i++; continue; }
+      if (ch === quote) quote = null;
+      out += ch;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") {
+      const triple = ch + ch + ch;
+      if (code.startsWith(triple, i)) { quote = triple; out += triple; i += 2; continue; }
+      quote = ch;
+      out += ch;
+      continue;
+    }
+
+    if (ch === '#') {
+      // Skip to end of line. `i` lands ON the newline, which we emit and
+      // let the loop's `i++` step past — consuming it here as well would
+      // silently drop the first character of the next line.
+      while (i < code.length && code[i] !== '\n') i++;
+      out += '\n';
+      continue;
+    }
+
+    out += ch;
+  }
+  return out;
+}
+
 // ── R Parser ─────────────────────────────────────────────────────────
 
 /**
@@ -164,13 +227,22 @@ const KNOWN_UNITS = new Set(['in', 'cm', 'mm', 'px']);
 
 export function parseRCode(code: string, options: ParseOptions = {}): FigureParams {
   const warnings: string[] = [];
+  // Everything below reads the comment-free source. A commented-out
+  // experiment left beside the live line used to win, because the
+  // base_size loop keeps the LAST match in the file (FR6).
+  const src = stripComments(code);
 
   // base_size from theme_*()
   let baseSize = R_DEFAULTS.baseSize;
-  const themeBase = /theme_\w+\s*\(\s*base_size\s*=\s*([\d.]+)/g;
+  // `base_size` need not be the first argument. `(?:[^()]|\([^()]*\))*?`
+  // walks the argument list lazily and allows ONE level of nesting, so
+  // `theme_bw(base_family = paste0("Hel", "vetica"), base_size = 22)`
+  // matches — while still being unable to cross a closing paren, so a
+  // loose `base_size = 30` after `theme_void()` is not captured (FR5).
+  const themeBase = /theme_\w+\s*\((?:[^()]|\([^()]*\))*?\bbase_size\s*=\s*([\d.]+)/g;
   let m: RegExpExecArray | null;
-  while ((m = themeBase.exec(code)) !== null) baseSize = parseFloat(m[1]!);
-  if (!code.match(/base_size\s*=/)) warnings.push('No font size found — assuming ggplot2 default base_size = 11pt.');
+  while ((m = themeBase.exec(src)) !== null) baseSize = parseFloat(m[1]!);
+  if (!src.match(/base_size\s*=/)) warnings.push('No font size found — assuming ggplot2 default base_size = 11pt.');
 
   // Per-element overrides from theme()
   const overrides: Partial<Record<ElementKey, number>> = {};
@@ -186,7 +258,7 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
   for (const [pat, key, rel] of elementMap) {
     const re = new RegExp(`${pat}\\s*=\\s*element_text\\s*\\([^)]*size\\s*=\\s*(rel\\s*\\(\\s*[\\d.]+\\s*\\)|[\\d.]+)`, 'g');
     let last: RegExpExecArray | null = null;
-    while ((m = re.exec(code)) !== null) last = m;
+    while ((m = re.exec(src)) !== null) last = m;
     if (last) {
       const raw = last[1]!.trim();
       if (raw.startsWith('rel')) {
@@ -208,7 +280,10 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
   let height = options.defaultHeightIn ?? R_DEFAULTS.height;
   let units = 'in';
   let dpi = 300;
-  const ggsaveArgs = extractCallArgs(code, 'ggsave');
+  // Both fixes compose: the balanced-paren scanner (FR3) reading the
+  // comment-stripped source (FR6), so a commented-out ggsave cannot win
+  // and a nested filename call cannot truncate the real one.
+  const ggsaveArgs = extractCallArgs(src, 'ggsave');
   if (ggsaveArgs !== null) {
     const g = topLevelArgs(ggsaveArgs);
     const wm = g.match(/width\s*=\s*([\d.]+)/);
@@ -258,9 +333,10 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
   // `effectiveCanvas*`.
   let facetRows = 1;
   let facetCols = 1;
-  const fwrap = code.match(/facet_wrap\s*\([^)]*nrow\s*=\s*(\d+)/);
-  const fwrapCols = code.match(/facet_wrap\s*\([^)]*ncol\s*=\s*(\d+)/);
-  const fgrid = code.match(/facet_grid\s*\(\s*[.\w]+\s*~\s*[.\w]+/);
+  const fwrap = src.match(/facet_wrap\s*\([^)]*nrow\s*=\s*(\d+)/);
+  const fwrapCols = src.match(/facet_wrap\s*\([^)]*ncol\s*=\s*(\d+)/);
+  // `[.\w]+` accepts the `.` in `facet_grid(. ~ cyl)`, a one-sided grid.
+  const fgrid = src.match(/facet_grid\s*\(\s*[.\w]+\s*~\s*[.\w]+/);
   if (fwrap) facetRows = parseInt(fwrap[1]!, 10);
   if (fwrapCols) facetCols = parseInt(fwrapCols[1]!, 10);
   if (fgrid && !fwrap && !fwrapCols) {
@@ -294,20 +370,24 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
 
 export function parsePythonCode(code: string, options: ParseOptions = {}): FigureParams {
   const warnings: string[] = [];
+  // See parseRCode: Python is the mirror image of FR6 — its `figsize`
+  // match is non-global, so the FIRST occurrence wins and a
+  // commented-out draft higher in the script became the canvas.
+  const src = stripComments(code);
 
   let baseSize = PY_DEFAULTS.baseSize;
   let fontScale = 1.0;
 
   // rcParams
-  const rc = code.match(/(?:plt|matplotlib)\.rcParams\s*\[\s*['"]font\.size['"]\s*\]\s*=\s*([\d.]+)/);
+  const rc = src.match(/(?:plt|matplotlib)\.rcParams\s*\[\s*['"]font\.size['"]\s*\]\s*=\s*([\d.]+)/);
   if (rc) baseSize = parseFloat(rc[1]!);
 
   // seaborn set_theme font_scale
-  const sns_scale = code.match(/sns\.set_theme\s*\([^)]*font_scale\s*=\s*([\d.]+)/);
+  const sns_scale = src.match(/sns\.set_theme\s*\([^)]*font_scale\s*=\s*([\d.]+)/);
   if (sns_scale) fontScale = parseFloat(sns_scale[1]!);
 
   // seaborn set_context
-  const sns_ctx = code.match(/sns\.set_context\s*\(\s*["'](\w+)["']/);
+  const sns_ctx = src.match(/sns\.set_context\s*\(\s*["'](\w+)["']/);
   if (sns_ctx) {
     fontScale = SEABORN_CONTEXTS[sns_ctx[1]!] ?? 1.0;
   }
@@ -320,22 +400,22 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
 
   // Per-element overrides
   const overrides: Partial<Record<ElementKey, number>> = {};
-  const xlabel = code.match(/set_xlabel\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
-  const ylabel = code.match(/set_ylabel\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
-  const title = code.match(/set_title\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
-  const ticks = code.match(/tick_params\s*\([^)]*labelsize\s*=\s*([\d.]+)/);
+  const xlabel = src.match(/set_xlabel\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
+  const ylabel = src.match(/set_ylabel\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
+  const title = src.match(/set_title\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
+  const ticks = src.match(/tick_params\s*\([^)]*labelsize\s*=\s*([\d.]+)/);
   if (xlabel || ylabel) overrides.axisTitle = parseFloat((xlabel ?? ylabel)![1]!);
   if (ticks) overrides.axisText = parseFloat(ticks[1]!);
   if (title) overrides.plotTitle = parseFloat(title[1]!);
 
   // figsize — same overlay-default override pattern as parseRCode.
-  // If the user's Python code doesn't set figsize=(w,h) we prefer
+  // If the user's Python src doesn't set figsize=(w,h) we prefer
   // the figure-preview overlay's dimensions over matplotlib's
   // 6.4×4.8 built-in so the analyzer and the UI agree on scale.
   let width = options.defaultWidthIn ?? PY_DEFAULTS.width;
   let height = options.defaultHeightIn ?? PY_DEFAULTS.height;
-  const figsize = code.match(/figsize\s*=\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
-  const pltFig = code.match(/plt\.figure\s*\(\s*figsize\s*=\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
+  const figsize = src.match(/figsize\s*=\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
+  const pltFig = src.match(/plt\.figure\s*\(\s*figsize\s*=\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
   const fs = figsize ?? pltFig;
   if (fs) {
     width = parseFloat(fs[1]!);
@@ -351,7 +431,7 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
   // Subplots grid
   let facetRows = 1;
   let facetCols = 1;
-  const subplots = code.match(/plt\.subplots\s*\(\s*(\d+)\s*,\s*(\d+)/);
+  const subplots = src.match(/plt\.subplots\s*\(\s*(\d+)\s*,\s*(\d+)/);
   if (subplots) {
     facetRows = parseInt(subplots[1]!, 10);
     facetCols = parseInt(subplots[2]!, 10);
