@@ -51,6 +51,73 @@ describe('parseRCode', () => {
     expect(p.warnings).toContain('No font size found — assuming ggplot2 default base_size = 11pt.');
   });
 
+  it('FR3: reads ggsave() whose filename is a nested call', () => {
+    // `/ggsave\s*\([^)]*\)/` stopped at the first ')' — the one closing
+    // file.path( — so width/height were never seen. Worse, because
+    // ggsave still MATCHED, the "no ggsave found" warning sat in an
+    // unreachable else and the canvas silently fell back to 7x7, which
+    // reads as a perfect 1.00x scale rather than as a parse failure.
+    const nested = `ggsave(filename = file.path("out", "fig.png"), plot = p,
+                           width = 12, height = 9, dpi = 300)`;
+    const plain = `ggsave("fig.png", plot = p, width = 12, height = 9, dpi = 300)`;
+    expect(parseRCode(nested).canvasWidth).toBe(12);
+    expect(parseRCode(nested).canvasHeight).toBe(9);
+    // Identical figure, identical answer.
+    expect(parseRCode(nested).canvasWidth).toBe(parseRCode(plain).canvasWidth);
+  });
+
+  it('FR3: handles here::here, paste0 and glue the same way', () => {
+    for (const fn of ['here::here("figs", "f.png")', 'paste0(dir, "/f.png")', 'glue("{dir}/f.png")']) {
+      const p = parseRCode(`ggsave(${fn}, width = 8, height = 5)`);
+      expect(p.canvasWidth).toBe(8);
+      expect(p.canvasHeight).toBe(5);
+    }
+  });
+
+  it('FR3: a parenthesis inside the filename string does not end the call', () => {
+    const p = parseRCode(`ggsave("fig (final).png", width = 8, height = 5)`);
+    expect(p.canvasWidth).toBe(8);
+    expect(p.canvasHeight).toBe(5);
+  });
+
+  it('FR3: does not read width from a nested call argument', () => {
+    // Only top-level ggsave arguments count; a `width` belonging to some
+    // inner call must not be mistaken for the canvas width.
+    const p = parseRCode(`ggsave("f.png", plot = wrap_plots(width = 3), width = 12, height = 9)`);
+    expect(p.canvasWidth).toBe(12);
+  });
+
+  it('FR3: warns when ggsave is present but its size cannot be read', () => {
+    // The fail-open case: ggsave matched, so the old code took the
+    // "we have a canvas" path while holding a default.
+    const p = parseRCode(`ggsave("fig.png", plot = p, dpi = 300)`);
+    expect(p.warnings.join(' ')).toMatch(/ggsave/i);
+  });
+
+  it('FR4: single-quoted units are read exactly like double-quoted ones', () => {
+    // R treats both quote styles identically; the units regex accepted
+    // double quotes only, so cm->in conversion was skipped and a 20x14cm
+    // canvas was read as 20x14 INCHES — a 2.54x error per axis that made
+    // the tool recommend base_size 36 instead of 15.
+    const dbl = parseRCode(`ggsave("fig.png", p, width = 20, height = 14, units = "cm", dpi = 300)`);
+    const sgl = parseRCode(`ggsave("fig.png", p, width = 20, height = 14, units = 'cm', dpi = 300)`);
+    expect(sgl.canvasWidth).toBeCloseTo(dbl.canvasWidth, 6);
+    expect(sgl.canvasHeight).toBeCloseTo(dbl.canvasHeight, 6);
+    expect(sgl.canvasWidth).toBeCloseTo(20 / 2.54, 3);
+  });
+
+  it('FR4: single-quoted mm and px convert too', () => {
+    const mm = parseRCode(`ggsave("f.png", width = 200, height = 140, units = 'mm')`);
+    expect(mm.canvasWidth).toBeCloseTo(200 / 25.4, 3);
+    const px = parseRCode(`ggsave("f.png", width = 3000, height = 2100, units = 'px', dpi = 300)`);
+    expect(px.canvasWidth).toBeCloseTo(10, 3);
+  });
+
+  it('FR4: warns rather than silently assuming inches for unknown units', () => {
+    const p = parseRCode(`ggsave("f.png", width = 20, height = 14, units = 'furlongs')`);
+    expect(p.warnings.join(' ')).toMatch(/furlongs/i);
+  });
+
   it('uses defaults when ggsave missing', () => {
     const code = `ggplot(df, aes(x, y)) + geom_point()`;
     const p = parseRCode(code);
