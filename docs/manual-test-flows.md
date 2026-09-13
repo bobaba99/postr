@@ -485,7 +485,9 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 - **Edges:**
   - [ ] Popup blocked → blocking **`alert()`**: **"Popup blocked. Please allow popups for this site to use "Save PDF", or press Ctrl/⌘+P directly from the editor as a fallback."**
   - [ ] Fonts fail to load → dialog may not auto-trigger; use the manual print button.
-- **✓ verify:** print tab renders without overlays; the **bottom-margin colophon appears for EVERYONE** (see seam) — a **small muted Postr logo (PNG) + "Poster made with postr.sh"**, in the margin band, never overlapping poster content. (Logo added 2026-08-06; PNG rather than inline SVG for reliable PDF-engine rendering.)
+- **✓ verify:** print tab renders without overlays; the **bottom-margin colophon appears for EVERYONE** (see seam) — a **small muted Postr logo (PNG) + the `ACKNOWLEDGEMENT_TEXT` credit**, in the margin band, never overlapping poster content. (Logo added 2026-08-06; PNG rather than inline SVG for reliable PDF-engine rendering.)
+- **⚠ changed 2026-09-13:** the colophon is now anchored **bottom-RIGHT** (was bottom-left) and every dimension is a **quarter** of its former size — `font-size` 7→1.75 px, mark 9→2.25 px. The old 7 px printed at **50.4 pt**, not the "~7 pt" its docstring claimed, because `printDocument.ts` applies `zoom: 96/PX = 9.6` to the whole print root. It now prints at ≈12.6 pt. Copy is whatever `ACKNOWLEDGEMENT_TEXT` holds (`export/attribution.ts`) — do not hardcode it here.
+- **⚠ format inconsistency, OPEN:** only the PDF/print colophon was resized and moved. The **PPTX** box (11 pt, bottom-left) and **LaTeX** footer (9 pt, bottom-left) are unchanged, so the credit now differs across formats. Owner decision pending — see `docs/stress-test/TRIAGE.md`.
 - **⚠ SEAM / intent disagreement:** the editor PDF hardcodes `attribution: {}`, so `shouldAttribute()` is always true → **the PDF ALWAYS carries the watermark, even for a paid term/credit user.** Unlike PPTX/LaTeX, the PDF path is NOT wired to `usePlan`. **Buying the term does NOT drop the PDF watermark.** Confirm whether that's intended.
 
 ## 23. Paid editable export — PPTX / LaTeX (entitled)
