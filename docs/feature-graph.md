@@ -1042,7 +1042,7 @@ flowchart LR
 
 The editor route hosts (`pages/Editor.tsx`, `pages/Share.tsx`) and everything under `poster/` EXCEPT the sidebar (§6.8): block renderers + selection chrome, crop UI, floating format toolbar, group frame, guidelines rail, the top-level `PosterEditor.tsx` (zoom, rulers, grid, drag guides, overlays, shortcuts), resize handles, rich-text editor + symbol library, selection marquee, layout templates, poster constants, and the toast pill.
 
-Scope note: `Sidebar.tsx`, `CommentsPanel.tsx`, `VersionPanel.tsx`, `ReadabilityPanel.tsx`, and `poster/sidebar/*` are in §6.8 — `Sidebar.tsx` imports all three panels (`Sidebar.tsx:56,64`; `sidebar/FigureTab.tsx:20` imports ReadabilityPanel). `GuidelinesPanel.tsx` IS here (imported and rendered directly by `PosterEditor.tsx:41,3305`). External components mounted from this slice but inventoried elsewhere: `Sidebar` (§6.8), `PaletteDesigner`, `StaplesPrintModal`, `ConfirmModal`, `AutosaveStatusPill`, `OnboardingTour`, `InputModal`, `LogoPicker` (§6.13), `ChartBlock` (§6.10).
+Scope note: `Sidebar.tsx`, `CommentsPanel.tsx`, `VersionPanel.tsx`, `ReadabilityPanel.tsx`, and `poster/sidebar/*` are in §6.8 — `Sidebar.tsx` imports all three panels (`Sidebar.tsx:56,64`; `sidebar/FigureTab.tsx:20` imports ReadabilityPanel). `GuidelinesPanel.tsx` IS here (imported and rendered directly by `PosterEditor.tsx:42,3305`). External components mounted from this slice but inventoried elsewhere: `Sidebar` (§6.8), `PaletteDesigner`, `StaplesPrintModal`, `ConfirmModal`, `AutosaveStatusPill`, `OnboardingTour`, `InputModal`, `LogoPicker` (§6.13), `ChartBlock` (§6.10).
 
 ```mermaid
 flowchart LR
@@ -1181,7 +1181,7 @@ flowchart LR
 #### `poster/boundsCheck.ts` — OOB detection (logic; produces user-visible message strings)
 
 **Copy**
-- [ ] `{block.type} block is completely outside the poster — it won't appear in print.` — warning message (severity full) — `boundsCheck.ts:58` — rendered in OOB banner `PosterEditor.tsx:3259` and Issues tab
+- [ ] `{block.type} block is completely outside the poster — it won't appear in print.` — warning message (severity full) — `boundsCheck.ts:58` — rendered in OOB banner `PosterEditor.tsx:3180` and Issues tab
 - [ ] `{block.type} block extends past the {edges.join(' and ')} edge{s} — content may be cut off in print.` — warning message (partial) — `boundsCheck.ts:59` — same render sites
 
 #### `poster/CropOverlay.tsx` — Inline 4-edge crop UI for image/logo blocks
@@ -1326,92 +1326,93 @@ flowchart LR
 #### `poster/PosterEditor.tsx` — Top-level editor: sidebar/canvas wiring, zoom, rulers, grid, drag guides, overlays, modals, shortcuts
 
 **Elements**
-- [ ] `Back to Editor` — button (preview mode) — `PosterEditor.tsx:1158-1172` — exits preview
-- [ ] `Print / Save PDF` — button (preview mode) — `PosterEditor.tsx:1173-1187` — exits preview + `printPoster()` (opens print window → `window.print()`)
-- [ ] `Duplicated` ConfirmModal — modal — `PosterEditor.tsx:2459-2471` — confirm navigates to `/p/{newId}`
-- [ ] `Dismiss` — button on duplicate-error toast — `PosterEditor.tsx:2495-2507` — clears error
-- [ ] `Comments` — button (mobile share bar only) — `PosterEditor.tsx:2536-2557` — opens comments sheet
-- [ ] `Make your own` — link (mobile share bar) — `PosterEditor.tsx:2558-2577` — navigates to `/`
-- [ ] `Show sidebar` / title `Show sidebar (⌘/)` — reveal-tab button (sidebar closed, desktop) — `PosterEditor.tsx:2583-2617` — opens sidebar
-- [ ] canvas rubber-band — pointer drag on workspace — `PosterEditor.tsx:2638-2705` — marquee multi-select (click = deselect)
-- [ ] pinch / `Ctrl`+wheel — gesture — `PosterEditor.tsx:1243-1298` — cursor-anchored zoom (0.2–10×)
-- [ ] two-finger scroll — native pan via overflow:auto — `PosterEditor.tsx:1214-1216` (comment), container `:2720-2721`
-- [ ] `Zoom out` (`−`) — ZoomBar button — `PosterEditor.tsx:3415-3421` — `setZoom(zoom - 0.15)`
-- [ ] `Reset zoom to fit` (`{percent}%` readout) — ZoomBar button — `PosterEditor.tsx:3422-3431` — `setZoom(null)` (auto-fit)
-- [ ] `Zoom in` (`+`) — ZoomBar button — `PosterEditor.tsx:3432-3438` — `setZoom(zoom + 0.15)`
-- [ ] `Fit poster to screen` (`FIT`) — ZoomBar button — `PosterEditor.tsx:3440-3446` — `setZoom(null)`
-- [ ] `Show poster guidelines` — toggle button (guidelines closed) — `PosterEditor.tsx:3313-3352` — opens GuidelinesPanel
-- [ ] `FigureSizeOverlay` body — draggable gray rect (Check tab active, no image selected) — `PosterEditor.tsx:3113-3123,3535-3605` — drag moves `checkFigureRect`
-- [ ] `FigureSizeOverlay` corner — resize handle — `PosterEditor.tsx:3589-3603` — drag resizes rect
-- [ ] `PendingAreaAnchor` body — draggable comment-area rect — `PosterEditor.tsx:3718-3749` — move pending/focused area anchor
-- [ ] `PendingAreaAnchor` handles ×8 (nw,n,ne,e,se,s,sw,w) — resize handles — `PosterEditor.tsx:3740-3747` — resize area anchor
-- [ ] `AreaCommentOverlay` — full-canvas drag layer (area-comment mode) — `PosterEditor.tsx:3758-3871` — drag rect → `postr:comment-area`; right-click cancels (`:3791-3794`)
-- [ ] `Escape` (area-comment mode) — keyboard — `PosterEditor.tsx:3767-3775` — cancels area comment
-- [ ] `⌘/` or `Ctrl+/` — keyboard — `PosterEditor.tsx:906-909` — toggles sidebar
-- [ ] `⌘Z` / `Ctrl+Z` — keyboard — `PosterEditor.tsx:911-918` — store `undo()` + toast "Undo"
-- [ ] `Ctrl+Y` or `⌘⇧Z` / `Ctrl+Shift+Z` — keyboard — `PosterEditor.tsx:920-930` — store `redo()` + toast "Redo"
-- [ ] `⌘S` / `Ctrl+S` — keyboard (edit mode only) — `PosterEditor.tsx:1059-1076` — `saveVersionNow()` (Supabase `poster_versions`)
-- [ ] `Delete` / `Backspace` (selection active) — keyboard — `PosterEditor.tsx:2093-2101` — batch-deletes selected blocks (`filterDeletable`)
-- [ ] `⌘D` / `Ctrl+D` — keyboard — `PosterEditor.tsx:2104-2108` — duplicates selected block
-- [ ] `ArrowLeft/Right/Up/Down` — keyboard — `PosterEditor.tsx:2110-2131` — nudge selection by SNAP_GRID (½")
-- [ ] `Shift`+Arrow — keyboard — `PosterEditor.tsx:2111` — nudge by 1 unit (1/10")
-- [ ] `Shift` during resize drag — modifier — `PosterEditor.tsx:457-467` — locks aspect ratio
-- [ ] `Shift` during rotate drag — modifier — `PosterEditor.tsx:388-390` — hard 15° snap steps
-- [ ] block pointer drag (via `useBlockDrag`) — gesture — `PosterEditor.tsx:237-525` — move/resize/rotate with grid snap
-- [ ] `Sidebar` mount — panel — `PosterEditor.tsx:2332-2420` — §6.8
-- [ ] `PaletteDesigner` mount — modal — `PosterEditor.tsx:2424-2443` — §6.13
-- [ ] `StaplesPrintModal` mount — modal — `PosterEditor.tsx:2446-2454` — `onSavePdf` → `printPoster()`
-- [ ] `GuidelinesPanel` mount — right rail — `PosterEditor.tsx:3305`
-- [ ] `AutosaveStatusPill` mount — status pill — `PosterEditor.tsx:3271-3275` — §6.13
-- [ ] `UndoToast` mount — toast — `PosterEditor.tsx:3224-3228`
-- [ ] `OnboardingTour` mount (edit mode only) — tour — `PosterEditor.tsx:3358`
-- [ ] `?publish=1` auto-open publish flow — feature-flagged (`GALLERY_PUBLIC_ENABLED`) — `PosterEditor.tsx:1314-1329` — opens `usePublishFlowStore` flow once on load
+- [ ] `Back to Editor` — button (preview mode) — `PosterPreviewOverlay.tsx:196` — calls `onExit`
+- [ ] `Print / Save PDF` — button (preview mode) — `PosterPreviewOverlay.tsx:211` — calls `onPrint` → exit preview + `printPoster()` (opens print window → `window.print()`)
+- [ ] Preview overlay — render site — `PosterEditor.tsx:3204` — `{previewMode && <PosterPreviewOverlay …/>}`, rendered from the editor's SINGLE return. Preview **hides** the editor tree (`display:none` + `inert`) and never unmounts it — `printPoster` clones `#poster-canvas` live, and four subscriptions hold its nodes. Rewritten 2026-09-13; see `PosterPreviewOverlay.tsx`'s header and `docs/stress-test/TRIAGE.md`.
+- [ ] `Duplicated` ConfirmModal — modal — `PosterEditor.tsx:2302-2314` — confirm navigates to `/p/{newId}`
+- [ ] `Dismiss` — button on duplicate-error toast — `PosterEditor.tsx:2416-2428` — clears error
+- [ ] `Comments` — button (mobile share bar only) — `PosterEditor.tsx:2457-2478` — opens comments sheet
+- [ ] `Make your own` — link (mobile share bar) — `PosterEditor.tsx:2479-2498` — navigates to `/`
+- [ ] `Show sidebar` / title `Show sidebar (⌘/)` — reveal-tab button (sidebar closed, desktop) — `PosterEditor.tsx:2504-2538` — opens sidebar
+- [ ] canvas rubber-band — pointer drag on workspace — `PosterEditor.tsx:2559-2626` — marquee multi-select (click = deselect)
+- [ ] pinch / `Ctrl`+wheel — gesture — `PosterEditor.tsx:1148-1203` — cursor-anchored zoom (0.2–10×)
+- [ ] two-finger scroll — native pan via overflow:auto — `PosterEditor.tsx:1119-1121` (comment), container `:2720-2721`
+- [ ] `Zoom out` (`−`) — ZoomBar button — `PosterEditor.tsx:3360-3366` — `setZoom(zoom - 0.15)`
+- [ ] `Reset zoom to fit` (`{percent}%` readout) — ZoomBar button — `PosterEditor.tsx:3367-3376` — `setZoom(null)` (auto-fit)
+- [ ] `Zoom in` (`+`) — ZoomBar button — `PosterEditor.tsx:3377-3383` — `setZoom(zoom + 0.15)`
+- [ ] `Fit poster to screen` (`FIT`) — ZoomBar button — `PosterEditor.tsx:3385-3391` — `setZoom(null)`
+- [ ] `Show poster guidelines` — toggle button (guidelines closed) — `PosterEditor.tsx:3234-3273` — opens GuidelinesPanel
+- [ ] `FigureSizeOverlay` body — draggable gray rect (Check tab active, no image selected) — `PosterEditor.tsx:3034-3044,3535-3605` — drag moves `checkFigureRect`
+- [ ] `FigureSizeOverlay` corner — resize handle — `PosterEditor.tsx:3534-3548` — drag resizes rect
+- [ ] `PendingAreaAnchor` body — draggable comment-area rect — `PosterEditor.tsx:3663-3694` — move pending/focused area anchor
+- [ ] `PendingAreaAnchor` handles ×8 (nw,n,ne,e,se,s,sw,w) — resize handles — `PosterEditor.tsx:3685-3692` — resize area anchor
+- [ ] `AreaCommentOverlay` — full-canvas drag layer (area-comment mode) — `PosterEditor.tsx:3703-3816` — drag rect → `postr:comment-area`; right-click cancels (`:3791-3794`)
+- [ ] `Escape` (area-comment mode) — keyboard — `PosterEditor.tsx:3712-3720` — cancels area comment
+- [ ] `⌘/` or `Ctrl+/` — keyboard — `PosterEditor.tsx:914-917` — toggles sidebar
+- [ ] `⌘Z` / `Ctrl+Z` — keyboard — `PosterEditor.tsx:919-926` — store `undo()` + toast "Undo"
+- [ ] `Ctrl+Y` or `⌘⇧Z` / `Ctrl+Shift+Z` — keyboard — `PosterEditor.tsx:928-938` — store `redo()` + toast "Redo"
+- [ ] `⌘S` / `Ctrl+S` — keyboard (edit mode only) — `PosterEditor.tsx:1067-1084` — `saveVersionNow()` (Supabase `poster_versions`)
+- [ ] `Delete` / `Backspace` (selection active) — keyboard — `PosterEditor.tsx:2005-2013` — batch-deletes selected blocks (`filterDeletable`)
+- [ ] `⌘D` / `Ctrl+D` — keyboard — `PosterEditor.tsx:2016-2020` — duplicates selected block
+- [ ] `ArrowLeft/Right/Up/Down` — keyboard — `PosterEditor.tsx:2022-2043` — nudge selection by SNAP_GRID (½")
+- [ ] `Shift`+Arrow — keyboard — `PosterEditor.tsx:2023` — nudge by 1 unit (1/10")
+- [ ] `Shift` during resize drag — modifier — `PosterEditor.tsx:458-468` — locks aspect ratio
+- [ ] `Shift` during rotate drag — modifier — `PosterEditor.tsx:389-391` — hard 15° snap steps
+- [ ] block pointer drag (via `useBlockDrag`) — gesture — `PosterEditor.tsx:238-526` — move/resize/rotate with grid snap
+- [ ] `Sidebar` mount — panel — `PosterEditor.tsx:2253-2341` — §6.8
+- [ ] `PaletteDesigner` mount — modal — `PosterEditor.tsx:2345-2364` — §6.13
+- [ ] `StaplesPrintModal` mount — modal — `PosterEditor.tsx:2367-2375` — `onSavePdf` → `printPoster()`
+- [ ] `GuidelinesPanel` mount — right rail — `PosterEditor.tsx:3226`
+- [ ] `AutosaveStatusPill` mount — status pill — `PosterEditor.tsx:3192-3196` — §6.13
+- [ ] `UndoToast` mount — toast — `PosterEditor.tsx:3145-3149`
+- [ ] `OnboardingTour` mount (edit mode only) — tour — `PosterEditor.tsx:3279`
+- [ ] `?publish=1` auto-open publish flow — feature-flagged (`GALLERY_PUBLIC_ENABLED`) — `PosterEditor.tsx:1219-1234` — opens `usePublishFlowStore` flow once on load
 
 **Copy**
-- [ ] "No poster loaded." — empty state — `PosterEditor.tsx:1081`
-- [ ] `{POSTER_SIZES[sizeKey]!.label} · {doc.fontFamily} · {palName || 'Custom'}` — preview-mode footer — `PosterEditor.tsx:1188-1190` (labels from `constants.ts:81-88`: `48"×36" Landscape`, `36"×48" Portrait`, `42"×36" Landscape`, `36"×42" Portrait`, `42"×42" Square`, `24"×36" Small`, `A0 Landscape`, `A0 Portrait`; font names from `constants.ts:110-123`)
-- [ ] "Undo" — toast — `PosterEditor.tsx:917`
-- [ ] "Redo" — toast — `PosterEditor.tsx:929`
-- [ ] "Version saved" — toast — `PosterEditor.tsx:1015`
-- [ ] "Could not save version" — toast — `PosterEditor.tsx:1019`
-- [ ] "Version restored" — toast — `PosterEditor.tsx:1053`
-- [ ] `Before restore — {stamp}` — auto-saved version name (visible in VersionPanel) — `PosterEditor.tsx:1049`
-- [ ] "Failed to duplicate poster" — duplicate-error fallback — `PosterEditor.tsx:995`
-- [ ] `{duplicateError}` — dynamic error text in toast — `PosterEditor.tsx:2494`
-- [ ] "Duplicated" — ConfirmModal title — `PosterEditor.tsx:2461`
-- [ ] `Created "{title || 'Untitled Poster'}". Open the new copy now?` — ConfirmModal message — `PosterEditor.tsx:2462`
-- [ ] "Open copy" — ConfirmModal confirm — `PosterEditor.tsx:2463`
-- [ ] "Stay here" — ConfirmModal cancel — `PosterEditor.tsx:2464`
-- [ ] "Popup blocked. Please allow popups for this site to use "Save PDF", or press Ctrl/⌘+P directly from the editor as a fallback." — alert() — `PosterEditor.tsx:2234-2236`
-- [ ] "Untitled Poster" — publish-flow fallback title — `PosterEditor.tsx:1311`
-- [ ] `{N} block{s} outside poster bounds` — OOB banner heading — `PosterEditor.tsx:3255`
-- [ ] `⛔ {message}` / `⚠️ {message}` — OOB banner lines (messages from boundsCheck.ts) — `PosterEditor.tsx:3259`
-- [ ] `+{N} more…` — OOB banner overflow line — `PosterEditor.tsx:3264`
-- [ ] `{inch}"` — ruler tick labels (top + left rulers) — `PosterEditor.tsx:3177,3205`
-- [ ] "FIGURE PREVIEW" — overlay label — `PosterEditor.tsx:3580`
-- [ ] `{widthIn}" × {heightIn}"` — overlay dimensions — `PosterEditor.tsx:3582`
-- [ ] "drag to move · corner to resize" — overlay hint — `PosterEditor.tsx:3585`
-- [ ] "Drag to mark an area · Esc to cancel" — area-comment hint pill — `PosterEditor.tsx:3867`
-- [ ] resize-warning toasts (`PosterEditor.tsx:494-498`): "Heading height is auto-sized from font", "Authors height adjusts to content", "References height adjusts to content"
-- [ ] new-block default contents (`PosterEditor.tsx:1800`): "Section Title" (heading), "Enter your text here." (text)
-- [ ] `Table {N}` — poster-table chip label for chart chooser (Figure tab, sidebar) — `PosterEditor.tsx:1487`
-- [ ] posterIssues strings (defined here, rendered in sidebar Issues tab; `PosterEditor.tsx:1505-1618`): `{blockType} out of bounds` (category); "Empty figure" / "Image block has no file attached — it will export as a dashed placeholder."; "Default title" / "Poster title is still the default placeholder."; "Placeholder text" / `A text block still contains "Enter your text here."`; "Long title" / `Poster title is {N} characters — may wrap to 3+ lines at typical poster sizes.`; "Missing authors" / "No authors have been added yet. Use the Authors tab to add them."; "Missing institutions" / "Authors are listed but no institution affiliations are set."; "Empty references" / "References block is on the canvas but the Refs tab is empty."; "Reference missing title" / `Reference "{author} {year}" has no title.`; "Reference missing authors" / `Reference "{title}" has no authors listed.`
-- [ ] "Postr is free — this credit stays on the poster." — locked-block refusal toast (constant `@/export/blockLock.ts:33`) — shown via `PosterEditor.tsx:1656,2096`
-- [ ] `Postr` — publish flow fallback handled at `PosterEditor.tsx:1311` (see above); `Poster` — print-document title fallback — `PosterEditor.tsx:2249`
+- [ ] "No poster loaded." — empty state — `PosterEditor.tsx:1089`
+- [ ] `{POSTER_SIZES[sizeKey]!.label} · {doc.fontFamily} · {palName || 'Custom'}` — preview-mode footer — `PosterPreviewOverlay.tsx:213-215` (labels from `constants.ts:81-88`: `48"×36" Landscape`, `36"×48" Portrait`, `42"×36" Landscape`, `36"×42" Portrait`, `42"×42" Square`, `24"×36" Small`, `A0 Landscape`, `A0 Portrait`; font names from `constants.ts:110-123`)
+- [ ] "Undo" — toast — `PosterEditor.tsx:925`
+- [ ] "Redo" — toast — `PosterEditor.tsx:937`
+- [ ] "Version saved" — toast — `PosterEditor.tsx:1023`
+- [ ] "Could not save version" — toast — `PosterEditor.tsx:1027`
+- [ ] "Version restored" — toast — `PosterEditor.tsx:1061`
+- [ ] `Before restore — {stamp}` — auto-saved version name (visible in VersionPanel) — `PosterEditor.tsx:1057`
+- [ ] "Failed to duplicate poster" — duplicate-error fallback — `PosterEditor.tsx:1003`
+- [ ] `{duplicateError}` — dynamic error text in toast — `PosterEditor.tsx:2415`
+- [ ] "Duplicated" — ConfirmModal title — `PosterEditor.tsx:2382`
+- [ ] `Created "{title || 'Untitled Poster'}". Open the new copy now?` — ConfirmModal message — `PosterEditor.tsx:2383`
+- [ ] "Open copy" — ConfirmModal confirm — `PosterEditor.tsx:2384`
+- [ ] "Stay here" — ConfirmModal cancel — `PosterEditor.tsx:2385`
+- [ ] "Popup blocked. Please allow popups for this site to use "Save PDF", or press Ctrl/⌘+P directly from the editor as a fallback." — alert() — `PosterEditor.tsx:2146-2148`
+- [ ] "Untitled Poster" — publish-flow fallback title — `PosterEditor.tsx:1216`
+- [ ] `{N} block{s} outside poster bounds` — OOB banner heading — `PosterEditor.tsx:3176`
+- [ ] `⛔ {message}` / `⚠️ {message}` — OOB banner lines (messages from boundsCheck.ts) — `PosterEditor.tsx:3180`
+- [ ] `+{N} more…` — OOB banner overflow line — `PosterEditor.tsx:3185`
+- [ ] `{inch}"` — ruler tick labels (top + left rulers) — `PosterEditor.tsx:3098,3205`
+- [ ] "FIGURE PREVIEW" — overlay label — `PosterEditor.tsx:3525`
+- [ ] `{widthIn}" × {heightIn}"` — overlay dimensions — `PosterEditor.tsx:3527`
+- [ ] "drag to move · corner to resize" — overlay hint — `PosterEditor.tsx:3530`
+- [ ] "Drag to mark an area · Esc to cancel" — area-comment hint pill — `PosterEditor.tsx:3812`
+- [ ] resize-warning toasts (`PosterEditor.tsx:495-499`): "Heading height is auto-sized from font", "Authors height adjusts to content", "References height adjusts to content"
+- [ ] new-block default contents (`PosterEditor.tsx:1705`): "Section Title" (heading), "Enter your text here." (text)
+- [ ] `Table {N}` — poster-table chip label for chart chooser (Figure tab, sidebar) — `PosterEditor.tsx:1392`
+- [ ] posterIssues strings (defined here, rendered in sidebar Issues tab; `PosterEditor.tsx:1410-1523`): `{blockType} out of bounds` (category); "Empty figure" / "Image block has no file attached — it will export as a dashed placeholder."; "Default title" / "Poster title is still the default placeholder."; "Placeholder text" / `A text block still contains "Enter your text here."`; "Long title" / `Poster title is {N} characters — may wrap to 3+ lines at typical poster sizes.`; "Missing authors" / "No authors have been added yet. Use the Authors tab to add them."; "Missing institutions" / "Authors are listed but no institution affiliations are set."; "Empty references" / "References block is on the canvas but the Refs tab is empty."; "Reference missing title" / `Reference "{author} {year}" has no title.`; "Reference missing authors" / `Reference "{title}" has no authors listed.`
+- [ ] "Postr is free — this credit stays on the poster." — locked-block refusal toast (constant `@/export/blockLock.ts:33`) — shown via `PosterEditor.tsx:1561,2096`
+- [ ] `Postr` — publish flow fallback handled at `PosterEditor.tsx:1216` (see above); `Poster` — print-document title fallback — `PosterEditor.tsx:2161`
 
 **Graphics**
-- [ ] hamburger icon (3 lines) — inline-svg — `PosterEditor.tsx:2614-2616` — show-sidebar tab
-- [ ] book icon — inline-svg — `PosterEditor.tsx:3347-3350` — show-guidelines button
-- [ ] workspace grid (CSS repeating background, minor+major) — css — `PosterEditor.tsx:2725-2741`
-- [ ] poster grid overlay — inline-svg lines ×(rows+cols) — `PosterEditor.tsx:2821-2851` — `data-postr-overlay="grid"`
-- [ ] drag guides (block edges, centerlines, canvas-center match ticks, dashed accent) — inline-svg — `PosterEditor.tsx:2866-2925` — visible while dragging
-- [ ] rulers (top + left bars, corner square, tick marks) — css/divs — `PosterEditor.tsx:3133-3322`
-- [ ] comment hover/focus highlight rects (area: filled; block/text: dashed outline; sticky glow) — css overlays — `PosterEditor.tsx:2949-3037`
-- [ ] ⛔ / ⚠️ — emoji — `PosterEditor.tsx:3259` — OOB banner severity icons
-- [ ] area-comment live drag rect (dashed purple) — css overlay — `PosterEditor.tsx:3838-3851`
-- [ ] pending/focused area anchor rect (purple outline + fill) — css overlay — `PosterEditor.tsx:3718-3749`
-- [ ] mobile share bar backdrop (blur bar) — css — `PosterEditor.tsx:2517-2535`
-- [ ] ZoomBar divider — css — `PosterEditor.tsx:3439`
+- [ ] hamburger icon (3 lines) — inline-svg — `PosterEditor.tsx:2535-2537` — show-sidebar tab
+- [ ] book icon — inline-svg — `PosterEditor.tsx:3268-3271` — show-guidelines button
+- [ ] workspace grid (CSS repeating background, minor+major) — css — `PosterEditor.tsx:2646-2662`
+- [ ] poster grid overlay — inline-svg lines ×(rows+cols) — `PosterEditor.tsx:2742-2772` — `data-postr-overlay="grid"`
+- [ ] drag guides (block edges, centerlines, canvas-center match ticks, dashed accent) — inline-svg — `PosterEditor.tsx:2787-2846` — visible while dragging
+- [ ] rulers (top + left bars, corner square, tick marks) — css/divs — `PosterEditor.tsx:3054-3243`
+- [ ] comment hover/focus highlight rects (area: filled; block/text: dashed outline; sticky glow) — css overlays — `PosterEditor.tsx:2870-2958`
+- [ ] ⛔ / ⚠️ — emoji — `PosterEditor.tsx:3180` — OOB banner severity icons
+- [ ] area-comment live drag rect (dashed purple) — css overlay — `PosterEditor.tsx:3783-3796`
+- [ ] pending/focused area anchor rect (purple outline + fill) — css overlay — `PosterEditor.tsx:3663-3694`
+- [ ] mobile share bar backdrop (blur bar) — css — `PosterEditor.tsx:2438-2456`
+- [ ] ZoomBar divider — css — `PosterEditor.tsx:3384`
 
 #### `poster/resizeHandles.tsx` — Shared 8-handle (or 4-corner) resize component
 
@@ -1469,7 +1470,7 @@ flowchart LR
 #### `poster/constants.ts` — Poster sizes / palettes / fonts / table border presets (constants; render sites noted)
 
 **Copy**
-- [ ] POSTER_SIZES labels (`constants.ts:81-88`) — `48"×36" Landscape`, `36"×48" Portrait`, `42"×36" Landscape`, `36"×42" Portrait`, `42"×42" Square`, `24"×36" Small`, `A0 Landscape`, `A0 Portrait` — rendered in preview footer `PosterEditor.tsx:1189` and sidebar size picker
+- [ ] POSTER_SIZES labels (`constants.ts:81-88`) — `48"×36" Landscape`, `36"×48" Portrait`, `42"×36" Landscape`, `36"×42" Portrait`, `42"×42" Square`, `24"×36" Small`, `A0 Landscape`, `A0 Portrait` — rendered in preview footer `PosterPreviewOverlay.tsx:214` and sidebar size picker
 - [ ] PALETTES names (`constants.ts:163-177`) — "Classic Academic", "Nature / Biology", "Medical / Clinical", "Engineering", "Psychology / Neuro", "Humanities / Arts", "Earth Sciences", "Clean Minimal" — rendered in sidebar Style tab; resolved name in preview footer
 - [ ] FONTS names (`constants.ts:110-123`) — "Source Sans 3", "DM Sans", "IBM Plex Sans", "Fira Sans", "Libre Franklin", "Outfit", "Charter", "Literata", "Source Serif 4", "Lora" — sidebar Style tab + preview footer
 - [ ] TABLE_BORDER_PRESETS names (`constants.ts:251-255`) — "None", "APA 3-Line", "All Lines", "H-Lines", "Header Box" — sidebar table editor (canvas reads flags only)
@@ -1483,7 +1484,7 @@ flowchart LR
 
 #### Adjunct constants whose strings render inside this slice
 
-- [ ] `@/export/blockLock.ts:33` — "Postr is free — this credit stays on the poster." (locked-delete refusal toast; render `PosterEditor.tsx:1656,2096`)
+- [ ] `@/export/blockLock.ts:33` — "Postr is free — this credit stays on the poster." (locked-delete refusal toast; render `PosterEditor.tsx:1561,2096`)
 - [ ] `@/export/attribution.ts:42,52,276` — "Poster made with postr.sh" + "https://postr.sh" (last References entry on canvas; render `blocks.tsx:1478-1498`)
 - [ ] `@/export/ackBlock.ts` — locked logo-type ack mark (`__postr_ack_mark__`, `ackMarkDataUri` image) injected onto canvas; undeletable, movable — renders as a normal LogoBlock
 
@@ -1493,13 +1494,13 @@ flowchart LR
 
 #### Flags / dead-ish UI notes (editor core)
 
-- [ ] `GALLERY_PUBLIC_ENABLED=false` → `?publish=1` auto-publish flow (`PosterEditor.tsx:1314-1329`) and `handlePublish` entry are inert when flag off.
-- [ ] `sortMode` hardcoded `'alpha'` — "no user-facing toggle" (`PosterEditor.tsx:653-655`).
-- [ ] Review mode (`sidebarTab === 'comments'`) suppresses: block selection, drag/resize/rotate, delete/nudge/duplicate keys (`PosterEditor.tsx:2079`), and hides resize/rotate handles via CSS gate (`PosterEditor.tsx:2276-2279`).
-- [ ] Mobile share view (`readOnly && isSmallScreen`) suppresses ruler, grid, guidelines rail, and desktop sidebar reveal tab (`PosterEditor.tsx:689-690,3291-3293`); ZoomBar gets 44px touch sizing.
+- [ ] `GALLERY_PUBLIC_ENABLED=false` → `?publish=1` auto-publish flow (`PosterEditor.tsx:1219-1234`) and `handlePublish` entry are inert when flag off.
+- [ ] `sortMode` hardcoded `'alpha'` — "no user-facing toggle" (`PosterEditor.tsx:654-656`).
+- [ ] Review mode (`sidebarTab === 'comments'`) suppresses: block selection, drag/resize/rotate, delete/nudge/duplicate keys (`PosterEditor.tsx:1991`), and hides resize/rotate handles via CSS gate (`PosterEditor.tsx:2197-2200`).
+- [ ] Mobile share view (`readOnly && isSmallScreen`) suppresses ruler, grid, guidelines rail, and desktop sidebar reveal tab (`PosterEditor.tsx:690-691,3291-3293`); ZoomBar gets 44px touch sizing.
 - [ ] Table context-menu docs mention "table border preset, clear range" (`GuidelinesPanel.tsx:949`) but the menu has no border-preset or clear-range items — stale cheatsheet copy.
 - [ ] `UndoToast` is misnamed — it renders ALL editor toasts (undo, redo, version, lock refusals, resize warnings).
-- [ ] `posterTables` label `Table {N}` (`PosterEditor.tsx:1487`) renders only in the sidebar Figure tab chart chooser.
+- [ ] `posterTables` label `Table {N}` (`PosterEditor.tsx:1392`) renders only in the sidebar Figure tab chart chooser.
 
 ---
 
@@ -1687,13 +1688,13 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] `Show ruler` — checkbox — `Sidebar.tsx:1065-1073` — calls `onToggleRuler`
 - [ ] `ImportSection` (tile + 2 modals) — panel render site — `Sidebar.tsx:913` — see `sidebar/ImportSection.tsx` / `ImportTile.tsx`
 
-*Export tab (`ExportTab`, :1104-1205)*
-- [ ] `👁 Preview poster` — button — `Sidebar.tsx:1114-1116` — calls `onPreview`
-- [ ] `⎙ Save PDF` — button (accent style) — `Sidebar.tsx:1123-1125` — calls `onPrint` (browser print → PDF)
-- [ ] `EditableExportButtons` — panel render site — `Sidebar.tsx:1162` — see `sidebar/EditableExportButtons.tsx`
+*Export tab (`ExportTab`, :1143-1244)*
+- [ ] `👁 Preview poster` — button — `Sidebar.tsx:1153-1155` — calls `onPreview`
+- [ ] `⎙ Save PDF` — button (accent style) — `Sidebar.tsx:1162-1164` — calls `onPrint` (browser print → PDF)
+- [ ] `EditableExportButtons` — panel render site — `Sidebar.tsx:1201` — see `sidebar/EditableExportButtons.tsx`
 - [ ] `PostrExportButton` — render site — `Sidebar.tsx:1165` — see `sidebar/PostrExportButton.tsx`
 - [ ] `🏪 Email to Staples kiosk` — button (red outline) — `Sidebar.tsx:1168-1177` — calls `onPrintAtStaples`
-- [ ] `↗ Publish to gallery` — button — `Sidebar.tsx:1186-1195` — calls `onPublish` — **DEAD UI: inside `GALLERY_PUBLIC_ENABLED &&` (flag = false)**
+- [ ] `↗ Publish to gallery` — button — `Sidebar.tsx:1225-1234` — calls `onPublish` — **DEAD UI: inside `GALLERY_PUBLIC_ENABLED &&` (flag = false)**
 
 *Authors tab (`AuthorsTab` :1211-1261, `InstitutionManager` :1263-1340, `AuthorManager` :1551-1891)*
 - [ ] `+ Logo` — button — `Sidebar.tsx:1256-1258` — calls `onAddBlock('logo')`
@@ -3906,7 +3907,7 @@ Logic notes:
 - [ ] Rail entry `['review', 'review']` — after `['issues', 'issues']`, before `['comments', 'comments']`; absent from the `readOnly` (comments-only) rail — `Sidebar.tsx:625-627` vs `:615-616`
 - [ ] Panel mount `{tab === 'review' && (<ReviewTab onJumpToBlock={props.onJumpToBlock} />)}` — `Sidebar.tsx:783-785`
 - [ ] Auto-switch exemption `if (tab === 'review') return;` — the review tab is never yanked away on selection: finding clicks select blocks, and without the exemption the first click would bounce the sidebar to Edit — mirrors the `'check'` image/chart precedent at `Sidebar.tsx:337` — `Sidebar.tsx:338-342`
-- [ ] `onJumpToBlock` prop — `selectOne(id)` + `scrollIntoView({ behavior: 'smooth', block: 'center' })` on `[data-block-id]` — `PosterEditor.tsx:2408-2414`
+- [ ] `onJumpToBlock` prop — `selectOne(id)` + `scrollIntoView({ behavior: 'smooth', block: 'center' })` on `[data-block-id]` — `PosterEditor.tsx:2329-2335`
 
 #### `apps/web/src/review/reviewApi.ts` — critique API client — no UI, logic only
 
@@ -3936,9 +3937,9 @@ Everything reusable under `components/` + the `motion/` animation module. Cross-
 
 **Slice-wide notes**
 - No `dialog primitives` file exists. Every modal hand-rolls the same pattern: `data-postr-modal-backdrop` + `data-postr-modal-content` divs driven by `useModalTransition` (§6.14). `LogoPicker` additionally portals to `document.body`.
-- **`GALLERY_PUBLIC_ENABLED = false`** (`config/features.ts:21`) makes the entire publish flow dead UI: `PublishFlow` is mounted in `App.tsx:15`, but every trigger is flag-gated (Sidebar "Share to gallery" `Sidebar.tsx:1183`, Profile "Upload external PDF or image" `Profile.tsx:589`, `?publish=1` auto-open `PosterEditor.tsx:1315`). `PublishConsentModal`'s `mode="share"` has **no caller anywhere** — also dead.
+- **`GALLERY_PUBLIC_ENABLED = false`** (`config/features.ts:21`) makes the entire publish flow dead UI: `PublishFlow` is mounted in `App.tsx:15`, but every trigger is flag-gated (Sidebar "Share to gallery" `Sidebar.tsx:1183`, Profile "Upload external PDF or image" `Profile.tsx:589`, `?publish=1` auto-open `PosterEditor.tsx:1220`). `PublishConsentModal`'s `mode="share"` has **no caller anywhere** — also dead.
 - `AuthBootstrap` is **defined but never mounted** anywhere in `src/` (only referenced in a comment in `pages/Share.tsx:4`) — dead component (§10).
-- Mount sites: `FeedbackModal`, `PublishFlow`, `SessionExpiredModal`, `ConsentNotice` in `App.tsx:14-24`; `OnboardingTour` in `PosterEditor.tsx:3358`; `UpdateAvailableBanner`/`JustRefreshedBanner` in `Sidebar.tsx:581-582`; `PasswordStrength` in `Auth.tsx:483` + `Profile.tsx:1252`; `RotatingWord` in `Landing.tsx:147`; `AuthGuard` wraps routes in `routes.tsx:152-167`.
+- Mount sites: `FeedbackModal`, `PublishFlow`, `SessionExpiredModal`, `ConsentNotice` in `App.tsx:14-24`; `OnboardingTour` in `PosterEditor.tsx:3279`; `UpdateAvailableBanner`/`JustRefreshedBanner` in `Sidebar.tsx:581-582`; `PasswordStrength` in `Auth.tsx:483` + `Profile.tsx:1252`; `RotatingWord` in `Landing.tsx:147`; `AuthGuard` wraps routes in `routes.tsx:152-167`.
 
 ```mermaid
 flowchart LR
@@ -4663,20 +4664,20 @@ flowchart LR
 #### `stores/posterStore.ts` — central editor store: current PosterDoc + undo/redo (50-entry stacks) + locked-block invariant
 
 - [ ] State fields: `posterId: string | null` (`:31`), `posterTitle: string` (`:32`), `doc: PosterDoc | null` (`:33`), `canUndo: boolean` (`:36`), `canRedo: boolean` (`:37`). Module-level (non-reactive): `undoStack`/`redoStack` (`:70-71`), `lockedBaseline` (`:87`).
-- [ ] `setPoster(posterId, doc, title?, options?)` — loads a poster; resets undo history + locked baseline; opt-in ack seeding (`seedAcknowledgement`) for editing entries only (`:131`). Callers: `pages/Editor.tsx:132` (editing), `pages/Share.tsx:32` (read-only view), `components/ImportPosterModal.tsx:291` (post-import), `poster/PosterEditor.tsx:591` (also used as doc-patch helper `:1641`)
-- [ ] `setPosterTitle(title)` — sets display title, no undo (`:163`). Caller: `poster/PosterEditor.tsx:610`
-- [ ] `addBlock(block)` — append block with undo (`:165`). **No production callers** (tests only) — PosterEditor's local `addBlock` (`PosterEditor.tsx:1775`) routes through `setBlocks`
-- [ ] `updateBlock(id, patch)` — patch one block with undo (`:173`). **No production callers** — local wrapper `PosterEditor.tsx:1644` uses `setBlocks`
-- [ ] `removeBlock(id)` — delete with undo; locked blocks refused silently, no undo entry (`:188`). **No production callers** — UI delete path is `filterDeletable` + `setBlocks` (`PosterEditor.tsx:1654-1658`)
-- [ ] `setStyle(level, patch)` — patch a TypeStyle level with undo (`:199`). Caller: `poster/PosterEditor.tsx:1334`
+- [ ] `setPoster(posterId, doc, title?, options?)` — loads a poster; resets undo history + locked baseline; opt-in ack seeding (`seedAcknowledgement`) for editing entries only (`:131`). Callers: `pages/Editor.tsx:132` (editing), `pages/Share.tsx:32` (read-only view), `components/ImportPosterModal.tsx:291` (post-import), `poster/PosterEditor.tsx:592` (also used as doc-patch helper `:1641`)
+- [ ] `setPosterTitle(title)` — sets display title, no undo (`:163`). Caller: `poster/PosterEditor.tsx:611`
+- [ ] `addBlock(block)` — append block with undo (`:165`). **No production callers** (tests only) — PosterEditor's local `addBlock` (`PosterEditor.tsx:1680`) routes through `setBlocks`
+- [ ] `updateBlock(id, patch)` — patch one block with undo (`:173`). **No production callers** — local wrapper `PosterEditor.tsx:1549` uses `setBlocks`
+- [ ] `removeBlock(id)` — delete with undo; locked blocks refused silently, no undo entry (`:188`). **No production callers** — UI delete path is `filterDeletable` + `setBlocks` (`PosterEditor.tsx:1559-1563`)
+- [ ] `setStyle(level, patch)` — patch a TypeStyle level with undo (`:199`). Caller: `poster/PosterEditor.tsx:1239`
 - [ ] `setPalette(palette)` — replace palette with undo (`:210`). **No production callers** (tests only)
 - [ ] `setFont(fontFamily)` — replace font with undo (`:213`). **No production callers** (tests only)
 - [ ] `applyExtractedStyle({palette?, fontFamily?})` — applies copied design as ONE undo step; empty patch = no-op (`:216`). Caller: `components/CopyDesignModal.tsx:54`
-- [ ] `setBlocks(blocks)` — whole-list replace with undo; re-inserts missing locked blocks (`guardLocked`) — the chokepoint for all UI delete/move/layout paths (`:237`). Caller: `poster/PosterEditor.tsx:1332`
-- [ ] `setBlocksSilent(blocks)` — same but no undo push; for drag intermediates (`:246`). Callers: `poster/PosterEditor.tsx:1333`, `pages/Editor.tsx:119`
-- [ ] `undo()` — restores previous doc, re-applies locked guard (`:264`). Caller: `poster/PosterEditor.tsx:855`
-- [ ] `redo()` — restores next doc, re-applies locked guard (`:285`). Caller: `poster/PosterEditor.tsx:856`
-- [ ] Field readers: `doc` — `PosterEditor.tsx:590`, `sidebar/ImportSection.tsx:20`, `sidebar/PostrExportButton.tsx:13`, `sidebar/EditableExportButtons.tsx:88`, `components/CopyDesignModal.tsx:52`; `posterId` — `PosterEditor.tsx:592,1305`, `ImportSection.tsx:18`, `CopyDesignModal.tsx:53`; `posterTitle` — `PosterEditor.tsx:609,1306`, `ImportSection.tsx:19`, `PostrExportButton.tsx:14`, `EditableExportButtons.tsx:89`, `Share.tsx:33`, `Editor.tsx:133`
+- [ ] `setBlocks(blocks)` — whole-list replace with undo; re-inserts missing locked blocks (`guardLocked`) — the chokepoint for all UI delete/move/layout paths (`:237`). Caller: `poster/PosterEditor.tsx:1237`
+- [ ] `setBlocksSilent(blocks)` — same but no undo push; for drag intermediates (`:246`). Callers: `poster/PosterEditor.tsx:1238`, `pages/Editor.tsx:119`
+- [ ] `undo()` — restores previous doc, re-applies locked guard (`:264`). Caller: `poster/PosterEditor.tsx:856`
+- [ ] `redo()` — restores next doc, re-applies locked guard (`:285`). Caller: `poster/PosterEditor.tsx:857`
+- [ ] Field readers: `doc` — `PosterEditor.tsx:591`, `sidebar/ImportSection.tsx:20`, `sidebar/PostrExportButton.tsx:13`, `sidebar/EditableExportButtons.tsx:88`, `components/CopyDesignModal.tsx:52`; `posterId` — `PosterEditor.tsx:593,1305`, `ImportSection.tsx:18`, `CopyDesignModal.tsx:53`; `posterTitle` — `PosterEditor.tsx:610,1306`, `ImportSection.tsx:19`, `PostrExportButton.tsx:14`, `EditableExportButtons.tsx:89`, `Share.tsx:33`, `Editor.tsx:133`
 
 **Elements** — none. **Copy** — none. **Graphics** — none.
 
@@ -4684,7 +4685,7 @@ flowchart LR
 
 - [ ] **Feature-flagged dead flow**: entry points are hidden while `GALLERY_PUBLIC_ENABLED = false` (`config/features.ts:21`), so `step` never leaves `'closed'` in production.
 - [ ] State fields: `step: 'closed' | 'consent' | 'metadata'` (`:13`), `posterId: string | null` (`:14`), `posterTitle: string | null` (`:15`).
-- [ ] `openForPoster(posterId, posterTitle)` — opens at consent step for an existing poster (`:35`). Caller: `poster/PosterEditor.tsx:1307` (flag-gated)
+- [ ] `openForPoster(posterId, posterTitle)` — opens at consent step for an existing poster (`:35`). Caller: `poster/PosterEditor.tsx:1212` (flag-gated)
 - [ ] `openForUpload()` — opens at consent step for external PDF/image (`:37`). Caller: `pages/Profile.tsx:65` (flag-gated)
 - [ ] `advanceToMetadata()` — consent accepted → metadata step (`:39`). Caller: `components/PublishFlow.tsx:24`
 - [ ] `close()` — resets to closed + clears ids (`:40`). Caller: `components/PublishFlow.tsx:25`
@@ -4924,7 +4925,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 - [ ] `postr.checklist-templates` — const `poster/GuidelinesPanel.tsx:390`; read `:457`, write `:465`
 - [ ] `postr.scratch-pad` — const `poster/GuidelinesPanel.tsx:389`; read `:478`, write `:486`; removed `pages/Profile.tsx:291`
 - [ ] `postr.scratch-note` — inline `poster/GuidelinesPanel.tsx:502` (read), `:526` (write); removed `pages/Profile.tsx:292`
-- [ ] `postr.style-presets` — inline `poster/PosterEditor.tsx:661` (read), `:669` (write); const `components/PresetEditModal.tsx:40` (read `:44`, write `:53`); read `pages/Profile.tsx:73`; removed `pages/Profile.tsx:162,290`
+- [ ] `postr.style-presets` — inline `poster/PosterEditor.tsx:662` (read), `:669` (write); const `components/PresetEditModal.tsx:40` (read `:44`, write `:53`); read `pages/Profile.tsx:73`; removed `pages/Profile.tsx:162,290`
 - [ ] `postr.profile` — const `pages/Profile.tsx:1266`; read `:1278`, write `:1299`; removed `:294`
 - [ ] `postr.onboarding-done` — const `components/OnboardingTour.tsx:97`; read `:115`, write `:125,197`, remove `:321`; removed `pages/Profile.tsx:295`
 - [ ] `postr.cb-random-pref` — const `components/PaletteDesigner.tsx:34`; read `:38`, write `:46`
@@ -4935,7 +4936,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 
 **sessionStorage**
 - [ ] `postr.tab-id` — inline `hooks/useTwoTabGuard.ts:43`; read `:44`, write `:47`
-- [ ] `postr.autoArrangeOnLoad` — inline write `components/ImportPosterModal.tsx:298-301`; read `poster/PosterEditor.tsx:1981`, remove `:1988`
+- [ ] `postr.autoArrangeOnLoad` — inline write `components/ImportPosterModal.tsx:298-301`; read `poster/PosterEditor.tsx:1886`, remove `:1988`
 - [ ] `postr-just-refreshed` — const `components/UpdateAvailableToast.tsx:18`; read `:143,259`, write `:201`, remove `:268`
 - [ ] `postr-acknowledged-build` — const `components/UpdateAvailableToast.tsx:27`; read `:91`, write `:126,208`
 - [ ] `postr.checkoutIntent` — const `data/checkoutIntent.ts:23`; write `:40`, read `:49`, remove `:58`
@@ -5061,9 +5062,9 @@ Switched off to keep the product to its core — the poster editor. After the se
 
 ### Deactivated / dead features
 
-- [ ] **Public gallery (`GALLERY_PUBLIC_ENABLED = false`, `config/features.ts:21`)** — full surface: routes `/gallery`, `/gallery/:entryId` redirect to `/` (`routes.tsx:116-117`); `pages/Gallery.tsx` + `pages/GalleryEntry.tsx` unreachable but kept for reactivation; flag gates Home Gallery link (`Home.tsx:148`), Profile upload button + entry links (`Profile.tsx:571-595,814`), Sidebar "Share to gallery" (`Sidebar.tsx:1183-1202`), `?publish=1` auto-open (`PosterEditor.tsx:1314-1329`), OnboardingTour step-7 flag-ON body (`OnboardingTour.tsx:85`); dead flow: `PublishFlow` (mounted `App.tsx:15`), `PublishConsentModal`, `PublishGalleryModal`, `stores/publishFlowStore.ts`, `data/gallery.ts` publish path; `PublishConsentModal` `mode="share"` has NO caller anywhere; PosterCard "Publish" hover action was DELETED not gated (comment `PosterCard.tsx:262-271`); gallery siteMeta templates (`siteMeta.ts:213-219`) unused; reactivation checklist in `features.ts:4-19` header comment. `/admin/gallery` + `data/gallery.ts` read paths remain live.
+- [ ] **Public gallery (`GALLERY_PUBLIC_ENABLED = false`, `config/features.ts:21`)** — full surface: routes `/gallery`, `/gallery/:entryId` redirect to `/` (`routes.tsx:116-117`); `pages/Gallery.tsx` + `pages/GalleryEntry.tsx` unreachable but kept for reactivation; flag gates Home Gallery link (`Home.tsx:148`), Profile upload button + entry links (`Profile.tsx:571-595,814`), Sidebar "Share to gallery" (`Sidebar.tsx:1183-1202`), `?publish=1` auto-open (`PosterEditor.tsx:1219-1234`), OnboardingTour step-7 flag-ON body (`OnboardingTour.tsx:85`); dead flow: `PublishFlow` (mounted `App.tsx:15`), `PublishConsentModal`, `PublishGalleryModal`, `stores/publishFlowStore.ts`, `data/gallery.ts` publish path; `PublishConsentModal` `mode="share"` has NO caller anywhere; PosterCard "Publish" hover action was DELETED not gated (comment `PosterCard.tsx:262-271`); gallery siteMeta templates (`siteMeta.ts:213-219`) unused; reactivation checklist in `features.ts:4-19` header comment. `/admin/gallery` + `data/gallery.ts` read paths remain live.
 - [ ] **Dead `AuthBootstrap`** — `components/AuthBootstrap.tsx` defined but never mounted in `src/`; referenced only by a comment in `pages/Share.tsx:4` and the consumer list in `lib/auth.ts`.
-- [ ] **Unused `SORT_MODE_LABELS`** — `poster/citations.ts:111-115` ("Manual order" / "Alphabetical (first author)" / "Year (newest first)" / "Year (oldest first)"); `sortMode` is hardcoded `'alpha'` with "no user-facing toggle" (`PosterEditor.tsx:653-655`) — labels have no live render site.
+- [ ] **Unused `SORT_MODE_LABELS`** — `poster/citations.ts:111-115` ("Manual order" / "Alphabetical (first author)" / "Year (newest first)" / "Year (oldest first)"); `sortMode` is hardcoded `'alpha'` with "no user-facing toggle" (`PosterEditor.tsx:654-656`) — labels have no live render site.
 - [ ] **Unused DB tables** — `public.presets` (`20260408000200_presets.sql`), `public.authors_lib` / `public.institutions_lib` / `public.references_lib` (`20260408000300_library.sql`, PRD §21) — nothing in `apps/web/src` reads or writes them (style presets live in localStorage `postr.style-presets`).
 - [ ] **Missing GC edge function** — `supabase/functions/` is empty (`delete-account` deleted 2026-09-11); no storage garbage-collection function exists (account deletion cleans the user's own objects via `apps/api/src/storageCleanup.ts`, but orphaned per-poster assets from `deletePoster` still are not swept) (AdminGallery copy even says image files "stay in storage until the owner hard-deletes", `AdminGallery.tsx:168-172`); the only GC is `POST /cron/cleanup-anonymous-users` for guest accounts.
 - [ ] **Unpublish promised but missing** — `pages/Share.tsx:93-95` tells visitors "the owner may have unpublished it", and `PublishConsentModal` share clause 3 (`PublishConsentModal.tsx:98-101`) promises "I can revoke the share link at any time from my dashboard" — no unpublish/revoke UI exists anywhere (no dashboard share-link manager).

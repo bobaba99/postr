@@ -22,7 +22,7 @@ import { resolveStorageUrl } from '@/data/posterImages';
 import { postJson } from '@/lib/apiClient';
 import { layoutTokens, type ReadabilityLayout } from './readabilityLayout';
 import { ReadabilitySizingNote } from './ReadabilitySizingNote';
-import { generateFullFix } from './readabilityFullFix';
+import { generateFullFix, generateTargetedFullFix } from './readabilityFullFix';
 import { CodeView, CopyButton } from './ReadabilityCodeView';
 import { FullCodeModal } from './FullCodeModal';
 import { btnStyle, labelStyle, panelStyle, primaryBtnStyle } from './readabilityStyles';
@@ -277,7 +277,13 @@ export function ReadabilityPanel({
         ? parseRCode(code, parseOpts)
         : parsePythonCode(code, parseOpts);
     const result = computeReadability(params, blockHeightIn, blockWidthIn);
-    const fullFix = generateFullFix(code, params, result.suggestedBaseSize);
+    // The user gets their OWN script back with the targeted sizes applied.
+    // Handing over a theme() fragment asks them to work out where it goes,
+    // and on a script that already has a theme() with ggsave() at the
+    // bottom, that is a real chance to paste it somewhere it does nothing.
+    const fullFix = result.fontSnippet
+      ? generateTargetedFullFix(code, params, result.fontSnippet)
+      : generateFullFix(code, params, result.suggestedBaseSize);
     setChecked({
       code,
       result,
@@ -297,6 +303,7 @@ export function ReadabilityPanel({
     checked !== null &&
     (checked.widthIn !== blockWidthIn || checked.heightIn !== blockHeightIn);
   const result = stale ? null : checked?.result ?? null;
+  const checkedParams = stale ? null : checked?.params ?? null;
   const fullFixedCode = stale ? '' : checked?.fullFix ?? '';
   const needsFix =
     result?.elements.some((e) => e.status !== 'pass') ?? false;
@@ -480,10 +487,10 @@ export function ReadabilityPanel({
             <thead>
               <tr style={{ borderBottom: '1px solid #45475a', color: '#9ca3af' }}>
                 <th style={{ textAlign: 'left', padding: '4px 0' }}>Element</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }}>Source</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }}>Print</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }}>Min</th>
-                <th style={{ textAlign: 'center', padding: '4px 0', width: 20 }}></th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="The size set in your code">Source</th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="What it measures once the figure is scaled onto the poster">Print</th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="The smallest size that stays readable at poster viewing distance">Min</th>
+                <th style={{ textAlign: 'center', padding: '4px 0', width: 20 }} aria-label="Verdict"></th>
               </tr>
             </thead>
             <tbody>
@@ -523,13 +530,75 @@ export function ReadabilityPanel({
                   >
                     {el.minPt}pt
                   </td>
-                  <td style={{ textAlign: 'center', padding: '4px 0' }}>
-                    {el.status === 'pass' ? '✓' : el.status === 'warn' ? '⚠' : '✗'}
+                  {/* Coloured to match the legend below. It used to be
+                      grey while only the Print number carried the colour,
+                      which made the legend's "yellow means..." wrong at a
+                      glance. */}
+                  <td
+                    style={{
+                      textAlign: 'center',
+                      padding: '4px 0',
+                      color: statusColor(el.status),
+                      fontWeight: 700,
+                    }}
+                  >
+                    {statusGlyph(el.status)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+
+          {/* The three flags were previously unexplained, and yellow in
+              particular reads as "fine" when it means the opposite. It is
+              a narrow band — within 15% BELOW the minimum — so it is
+              worth stating the rule numerically rather than as "close to
+              the limit". */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 5,
+              padding: '8px 10px',
+              background: '#181825',
+              border: '1px solid #313244',
+              borderRadius: 6,
+              fontSize: 12,
+              lineHeight: 1.45,
+            }}
+          >
+            <div style={{ color: '#9ca3af', fontWeight: 600, letterSpacing: 0.3 }}>
+              What the flags mean
+            </div>
+            <div>
+              <span style={{ color: '#a6e3a1', fontWeight: 700 }}>✓</span>{' '}
+              <span style={{ color: '#bac2de' }}>
+                <strong style={{ color: '#cdd6f4' }}>At or above the minimum.</strong> Readable from
+                the distance people stand at.
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#f9e2af', fontWeight: 700 }}>⚠</span>{' '}
+              <span style={{ color: '#bac2de' }}>
+                <strong style={{ color: '#cdd6f4' }}>Up to 15% below the minimum.</strong> Legible
+                close up, hard to read from the back of the room — and one small change to the
+                figure size drops it into red. Worth fixing, not safe to ignore.
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#f38ba8', fontWeight: 700 }}>✗</span>{' '}
+              <span style={{ color: '#bac2de' }}>
+                <strong style={{ color: '#cdd6f4' }}>More than 15% below.</strong> Will not be read
+                at the poster.
+              </span>
+            </div>
+            <div style={{ color: '#7f849c', marginTop: 2 }}>
+              <strong style={{ color: '#9ca3af' }}>Source</strong> is the size in your code.{' '}
+              <strong style={{ color: '#9ca3af' }}>Print</strong> is what it measures on the poster
+              after the figure is scaled to fit the block — that is the number that matters, and the
+              one compared against <strong style={{ color: '#9ca3af' }}>Min</strong>.
+            </div>
+          </div>
 
           {needsFix && (
             <div
@@ -539,44 +608,103 @@ export function ReadabilityPanel({
                 padding: 10,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 10,
+                gap: 12,
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                }}
-              >
-                <div style={{ fontSize: t.tableFontSize, color: '#9ca3af' }}>
-                  Recommended fix (base_size = {result.suggestedBaseSize}):
+              {/* PRIMARY: raise only the elements that fail.
+                  base_size scales every text element at once, including
+                  the ones already passing — and the block on the poster
+                  is a fixed size, so text the figure did not need grows
+                  into panel space the data did. Targeted sizes cost more
+                  characters to paste and less of the plot. */}
+              {result.fontFixes.length > 0 && result.fontSnippet !== null && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ fontSize: t.tableFontSize, color: '#cdd6f4', fontWeight: 600 }}>
+                      Raise these text elements
+                    </div>
+                    {/* Copies the whole corrected script, not the theme()
+                        fragment — splicing a fragment into the right place
+                        is work the tool can do, and getting it wrong gives
+                        code that runs and silently changes nothing. */}
+                    <CopyButton
+                      text={fullFixedCode}
+                      label="Copy corrected code"
+                      onCopied={handleCopied}
+                      style={{ minHeight: t.buttonMinHeight, fontSize: t.buttonFontSize }}
+                    />
+                  </div>
+                  <ul
+                    style={{
+                      margin: 0,
+                      paddingLeft: 18,
+                      fontSize: t.tableFontSize,
+                      color: '#cdd6f4',
+                    }}
+                  >
+                    {result.fontFixes.map((f) => (
+                      <li key={f.name} style={{ marginBottom: 2 }}>
+                        {f.name}: <strong>{f.currentPt}pt</strong> →{' '}
+                        <strong style={{ color: '#a6e3a1' }}>{f.neededPt}pt</strong>
+                        {f.wasOverridden && <span style={{ color: '#6b7280' }}> (you set this)</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <CodeView text={fullFixedCode} layout={layout} />
+                  <button
+                    type="button"
+                    onClick={() => setFullCodeOpen(true)}
+                    style={{
+                      ...btnStyle,
+                      alignSelf: 'flex-start',
+                      fontFamily: 'system-ui, sans-serif',
+                      minHeight: t.buttonMinHeight,
+                      fontSize: t.buttonFontSize,
+                    }}
+                  >
+                    Open full edited code →
+                  </button>
+                  <div style={{ fontSize: 12, color: '#7f849c', lineHeight: 1.5 }}>
+                    Your script with the sizes above applied — copy it whole and run it.{' '}
+                    {checkedParams?.language === 'r'
+                      ? 'The new theme() sits after your existing one; ggplot applies theme calls in order and the last wins, so it overrides only the sizes named.'
+                      : 'The rcParams block sits above the figure, because matplotlib reads it when the figure is created.'}
+                  </div>
                 </div>
-                <CopyButton
-                  text={result.copySnippet}
-                  label="Copy snippet"
-                  onCopied={handleCopied}
-                  style={{ minHeight: t.buttonMinHeight, fontSize: t.buttonFontSize }}
-                />
-              </div>
-              {/* Copy-only snippet — read-only so users can't accidentally
-                  edit it before copying. The CodeView component is just a
-                  styled <pre> with a line-number gutter. */}
-              <CodeView text={result.copySnippet} layout={layout} />
-              <button
-                type="button"
-                onClick={() => setFullCodeOpen(true)}
-                style={{
-                  ...btnStyle,
-                  alignSelf: 'flex-start',
-                  fontFamily: 'system-ui, sans-serif',
-                  minHeight: t.buttonMinHeight,
-                  fontSize: t.buttonFontSize,
-                }}
-              >
-                Open full edited code →
-              </button>
+              )}
+
+              {/* SECONDARY: the one-liner. Still offered — some people
+                  would rather change one number — it just costs more of
+                  the panel. Absent when every element is explicitly
+                  overridden, since base_size governs nothing then (FR7). */}
+              {result.suggestedBaseSize !== null && result.copySnippet !== null && (
+                <details style={{ borderTop: '1px solid #45475a', paddingTop: 10 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: t.tableFontSize, color: '#9ca3af' }}>
+                    Or change one number: base_size = {result.suggestedBaseSize}
+                  </summary>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ fontSize: 12, color: '#7f849c', lineHeight: 1.5 }}>
+                      Simpler to paste, but it scales every text element — including the
+                      ones already large enough — so it takes more room from the plot
+                      than the targeted fix above.
+                    </div>
+                    <CodeView text={result.copySnippet} layout={layout} />
+                    <CopyButton
+                      text={result.copySnippet}
+                      label="Copy snippet"
+                      onCopied={handleCopied}
+                      style={{ minHeight: t.buttonMinHeight, fontSize: t.buttonFontSize }}
+                    />
+                  </div>
+                </details>
+              )}
             </div>
           )}
 
@@ -748,7 +876,7 @@ function ImageScanSection(props: {
               {result.regions.map((r, i) => (
                 <tr key={i} style={{ borderTop: '1px solid #2a2a3a' }}>
                   <td style={{ ...tdStyle, color: statusColor(r.status) }}>
-                    {r.status === 'pass' ? '✓' : r.status === 'warn' ? '!' : '✗'}
+                    {statusGlyph(r.status)}
                   </td>
                   <td style={tdStyle}>{r.role}</td>
                   <td style={{ ...tdStyle, textAlign: 'left', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -790,4 +918,15 @@ function statusColor(s: ScanRegion['status']): string {
   if (s === 'pass') return '#a6e3a1';
   if (s === 'warn') return '#f9e2af';
   return '#f38ba8';
+}
+
+/**
+ * One glyph vocabulary for both tables. They used to disagree — the code
+ * table rendered warn as '⚠' and the scan table as '!' — so the legend
+ * could only ever be right about one of them.
+ */
+function statusGlyph(s: 'pass' | 'warn' | 'fail'): string {
+  if (s === 'pass') return '✓';
+  if (s === 'warn') return '⚠';
+  return '✗';
 }

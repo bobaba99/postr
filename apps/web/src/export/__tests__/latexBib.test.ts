@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Reference } from '@postr/shared';
 import { referencesToBib } from '../latex/bib';
+import { ACKNOWLEDGEMENT_TEXT } from '../attribution';
 
 describe('referencesToBib', () => {
   it('returns empty string for no references', () => {
@@ -19,9 +20,11 @@ describe('referencesToBib', () => {
   it('emits the credit exactly once when the list already carries it', () => {
     const bib = referencesToBib([
       { id: 'r1', authors: ['Smith, John'], year: '2026', title: 'A paper' },
-      { id: '__postr_ack__', authors: ['Postr'], rawText: 'Poster made with postr.sh https://postr.sh' },
+      { id: '__postr_ack__', authors: ['Postr'], rawText: `${ACKNOWLEDGEMENT_TEXT} https://postr.sh` },
     ]);
-    expect(bib.match(/Poster made with postr\.sh/g)).toHaveLength(1);
+    expect(
+      bib.match(new RegExp(ACKNOWLEDGEMENT_TEXT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')),
+    ).toHaveLength(1);
   });
 
   it('appends the credit LAST, after every user reference', () => {

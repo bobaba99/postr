@@ -34,6 +34,7 @@ import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
 import { useGsapContext } from '@/motion';
 import { editorEntrance } from '@/motion/timelines/editorEntrance';
 import { BlockFrame } from './blocks';
+import { PosterPreviewOverlay } from './PosterPreviewOverlay';
 import { SelectionRect } from './SelectionRect';
 import { GroupFrame, groupBounds } from './GroupFrame';
 import { UndoToast } from './UndoToast';
@@ -902,6 +903,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // ⌘/ or Ctrl+/ toggles the sidebar (Notion shortcut).
   // ⌘Z / Ctrl+Z = undo, ⌘⇧Z / Ctrl+Y = redo.
   useEffect(() => {
+    // Preview is a chromeless full-screen overlay with no visible
+    // selection, but the editor's DOM stays mounted beneath it. Without
+    // this guard a stray Backspace there deletes the still-selected block
+    // with nothing on screen to show it happened, and the confirming
+    // toast renders behind the overlay. Undo/redo and arrow-nudge are
+    // equally invisible. Bail while previewing.
+    if (previewMode) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === '/') {
         e.preventDefault();
@@ -931,7 +939,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [previewMode]);
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -1089,109 +1097,6 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   const cH = ph * PX;
   const ffc = FONTS[doc.fontFamily]?.css ?? doc.fontFamily;
   const palName = paletteNameFor(doc.palette, customPalettes);
-
-  // Preview mode — full-screen poster, no UI chrome
-  if (previewMode) {
-    // Compute scale to fit the viewport with padding
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 1440;
-    const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
-    const previewScale = Math.min((vw - 80) / cW, (vh - 80) / cH);
-
-    return (
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 50000,
-          background: '#0a0a12',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          gap: 16,
-        }}
-      >
-        <div
-          style={{
-            width: cW * previewScale,
-            height: cH * previewScale,
-            boxShadow: '0 8px 60px rgba(0,0,0,0.6)',
-            borderRadius: 2,
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              width: cW,
-              height: cH,
-              transform: `scale(${previewScale})`,
-              transformOrigin: 'top left',
-              background: doc.palette.bg,
-              position: 'relative',
-            }}
-          >
-            {doc.blocks.map((b) => (
-              <BlockFrame
-                key={b.id}
-                block={b}
-                palette={doc.palette}
-                fontFamily={ffc}
-                styles={doc.styles}
-                headingStyle={doc.headingStyle}
-                authors={doc.authors}
-                institutions={doc.institutions}
-                references={sortedRefs}
-                citationStyle={citationStyle}
-                headingNumber={headingNumbers[b.id] ?? 0}
-                selected={false}
-                onSelect={() => {}}
-                onPointerDown={() => {}}
-                didDragRef={didDragRef}
-                onUpdate={() => {}}
-                onDelete={() => {}}
-                titleOverflowPx={titleOverflowPx}
-              />
-            ))}
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <button
-            onClick={() => setPreviewMode(false)}
-            style={{
-              cursor: 'pointer',
-              padding: '10px 24px',
-              fontSize: 14,
-              fontWeight: 600,
-              color: '#fff',
-              background: '#7c6aed',
-              border: 'none',
-              borderRadius: 8,
-            }}
-          >
-            Back to Editor
-          </button>
-          <button
-            onClick={() => { setPreviewMode(false); printPoster(); }}
-            style={{
-              cursor: 'pointer',
-              padding: '10px 24px',
-              fontSize: 14,
-              fontWeight: 600,
-              color: '#c8cad0',
-              background: '#1a1a26',
-              border: '1px solid #2a2a3a',
-              borderRadius: 8,
-            }}
-          >
-            Print / Save PDF
-          </button>
-          <span style={{ fontSize: 12, color: '#6b7280' }}>
-            {POSTER_SIZES[sizeKey]!.label} · {doc.fontFamily} · {palName || 'Custom'}
-          </span>
-        </div>
-      </div>
-    );
-  }
 
   // 16px of gutter on a phone versus 60 on desktop: at 375px wide the
   // desktop gutter alone eats a sixth of the viewport, and the whole
@@ -2072,6 +1977,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   //
   //   Delete / Backspace → remove the selected block.
   useEffect(() => {
+    // Preview is a chromeless full-screen overlay with no visible
+    // selection, but the editor's DOM stays mounted beneath it. Without
+    // this guard a stray Backspace there deletes the still-selected block
+    // with nothing on screen to show it happened, and the confirming
+    // toast renders behind the overlay. Undo/redo and arrow-nudge are
+    // equally invisible. Bail while previewing.
+    if (previewMode) return;
     const handler = (e: KeyboardEvent) => {
       if (selectedIds.size === 0) return;
       // Review mode: disallow destructive/structural keyboard actions
@@ -2133,7 +2045,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIds, doc.blocks, sidebarTab]);
+  }, [selectedIds, doc.blocks, sidebarTab, previewMode]);
 
   // Track canvas overflow — when blocks with height:auto grow past
   // the declared canvas height, extend the scroll container to match.
@@ -2256,12 +2168,21 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     printWin.document.close();
   }, [doc.widthIn, doc.heightIn, doc.fontFamily, doc.palette.bg, posterDisplayName]);
 
+
   return (
+    <>
     <div
       ref={rootRef}
       data-comment-mode={sidebarTab === 'comments' ? 'true' : undefined}
+      // Preview HIDES this tree; it must never unmount it. `printPoster`
+      // clones `#poster-canvas` from the live DOM, and the pinch/wheel
+      // listener plus three ResizeObservers all capture `canvasRef.current`
+      // with only `[canvasRef]` in their deps — a stable ref object, so a
+      // remount would strand every one of them on a detached node. See
+      // PosterPreviewOverlay's header for the full account.
+      inert={previewMode ? true : undefined}
       style={{
-        display: 'flex',
+        display: previewMode ? 'none' : 'flex',
         height: '100vh',
         width: '100vw',
         background: '#0a0a12',
@@ -3358,6 +3279,30 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           gated on readOnly rather than on the phone breakpoint. */}
       {!readOnly && <OnboardingTour />}
     </div>
+    {previewMode && (
+      <PosterPreviewOverlay
+        doc={doc}
+        cW={cW}
+        cH={cH}
+        fontFamily={ffc}
+        sortedRefs={sortedRefs}
+        citationStyle={citationStyle}
+        headingNumbers={headingNumbers}
+        titleOverflowPx={titleOverflowPx}
+        didDragRef={didDragRef}
+        sizeKey={sizeKey}
+        paletteName={palName}
+        onExit={() => setPreviewMode(false)}
+        // No `flushSync` needed: the editor is hidden, not unmounted, so
+        // `#poster-canvas` — and every resolved image URL in it — is still
+        // live when `printPoster` clones it.
+        onPrint={() => {
+          setPreviewMode(false);
+          printPoster();
+        }}
+      />
+    )}
+    </>
   );
 }
 

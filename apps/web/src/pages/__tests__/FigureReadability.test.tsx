@@ -120,7 +120,12 @@ describe('FigureReadabilityPage', () => {
     clickCheck();
 
     expect(screen.getByText('Tick labels')).toBeInTheDocument();
-    expect(screen.getByText(/recommended fix \(base_size = \d+\)/i)).toBeInTheDocument();
+    // The advice leads with per-element sizes, not base_size: base_size
+    // scales every text element including the ones already passing, and
+    // the block is a fixed size, so it takes panel space the plot needs.
+    expect(screen.getByText(/raise these text elements/i)).toBeInTheDocument();
+    // base_size is still offered, one level down.
+    expect(screen.getByText(/or change one number: base_size = \d+/i)).toBeInTheDocument();
     expect(apiSpies.postJson).not.toHaveBeenCalled();
   });
 
