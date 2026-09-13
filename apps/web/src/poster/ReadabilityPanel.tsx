@@ -530,6 +530,7 @@ export function ReadabilityPanel({
   };
 
   const result = checked?.result ?? null;
+  const checkedParams = checked?.params ?? null;
   const fullFixedCode = checked?.fullFix ?? '';
   const needsFix =
     result?.elements.some((e) => e.status !== 'pass') ?? false;
@@ -730,10 +731,10 @@ export function ReadabilityPanel({
             <thead>
               <tr style={{ borderBottom: '1px solid #45475a', color: '#9ca3af' }}>
                 <th style={{ textAlign: 'left', padding: '4px 0' }}>Element</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }}>Source</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }}>Print</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }}>Min</th>
-                <th style={{ textAlign: 'center', padding: '4px 0', width: 20 }}></th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="The size set in your code">Source</th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="What it measures once the figure is scaled onto the poster">Print</th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="The smallest size that stays readable at poster viewing distance">Min</th>
+                <th style={{ textAlign: 'center', padding: '4px 0', width: 20 }} aria-label="Verdict"></th>
               </tr>
             </thead>
             <tbody>
@@ -781,6 +782,57 @@ export function ReadabilityPanel({
             </tbody>
           </table>
 
+          {/* The three flags were previously unexplained, and yellow in
+              particular reads as "fine" when it means the opposite. It is
+              a narrow band — within 15% BELOW the minimum — so it is
+              worth stating the rule numerically rather than as "close to
+              the limit". */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 5,
+              padding: '8px 10px',
+              background: '#181825',
+              border: '1px solid #313244',
+              borderRadius: 6,
+              fontSize: 12,
+              lineHeight: 1.45,
+            }}
+          >
+            <div style={{ color: '#9ca3af', fontWeight: 600, letterSpacing: 0.3 }}>
+              What the flags mean
+            </div>
+            <div>
+              <span style={{ color: '#a6e3a1', fontWeight: 700 }}>✓</span>{' '}
+              <span style={{ color: '#bac2de' }}>
+                <strong style={{ color: '#cdd6f4' }}>At or above the minimum.</strong> Readable from
+                the distance people stand at.
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#f9e2af', fontWeight: 700 }}>⚠</span>{' '}
+              <span style={{ color: '#bac2de' }}>
+                <strong style={{ color: '#cdd6f4' }}>Up to 15% below the minimum.</strong> Legible
+                close up, hard to read from the back of the room — and one small change to the
+                figure size drops it into red. Worth fixing, not safe to ignore.
+              </span>
+            </div>
+            <div>
+              <span style={{ color: '#f38ba8', fontWeight: 700 }}>✗</span>{' '}
+              <span style={{ color: '#bac2de' }}>
+                <strong style={{ color: '#cdd6f4' }}>More than 15% below.</strong> Will not be read
+                at the poster.
+              </span>
+            </div>
+            <div style={{ color: '#7f849c', marginTop: 2 }}>
+              <strong style={{ color: '#9ca3af' }}>Source</strong> is the size in your code.{' '}
+              <strong style={{ color: '#9ca3af' }}>Print</strong> is what it measures on the poster
+              after the figure is scaled to fit the block — that is the number that matters, and the
+              one compared against <strong style={{ color: '#9ca3af' }}>Min</strong>.
+            </div>
+          </div>
+
           {needsFix && (
             <div
               style={{
@@ -789,71 +841,72 @@ export function ReadabilityPanel({
                 padding: 10,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 10,
+                gap: 12,
               }}
             >
-              {/* base_size only governs elements the theme does NOT set
-                  explicitly. When every element is overridden there is no
-                  base_size worth recommending, and this whole block is
-                  suppressed rather than offering `base_size = 0` — code
-                  that would destroy the figure. */}
-              {result.suggestedBaseSize !== null && result.copySnippet !== null && (
-                <>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 8,
-                    }}
-                  >
-                    <div style={{ fontSize: 13, color: '#9ca3af' }}>
-                      Recommended fix (base_size = {result.suggestedBaseSize}):
+              {/* PRIMARY: raise only the elements that fail.
+                  base_size scales every text element at once, including
+                  the ones already passing — and the block on the poster
+                  is a fixed size, so text the figure did not need grows
+                  into panel space the data did. Targeted sizes cost more
+                  characters to paste and less of the plot. */}
+              {result.fontFixes.length > 0 && result.fontSnippet !== null && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <div style={{ fontSize: 13, color: '#cdd6f4', fontWeight: 600 }}>
+                      Raise these text elements
                     </div>
-                    <CopyButton
-                      text={result.copySnippet}
-                      label="Copy snippet"
-                      onCopied={handleCopied}
-                    />
-                  </div>
-                  {/* Copy-only snippet — read-only so users can't accidentally
-                      edit it before copying. The CodeView component is just a
-                      styled <pre> with a line-number gutter. */}
-                  <CodeView text={result.copySnippet} />
-                  <button
-                    type="button"
-                    onClick={() => setFullCodeOpen(true)}
-                    style={{
-                      ...btnStyle,
-                      alignSelf: 'flex-start',
-                      fontFamily: 'system-ui, sans-serif',
-                    }}
-                  >
-                    Open full edited code →
-                  </button>
-                </>
-              )}
-
-              {/* Elements the theme sizes explicitly. A base_size change
-                  cannot reach them — the override wins — so each needs its
-                  own number. Without this, dropping overridden rows from the
-                  recommendation left failing elements with no advice at all. */}
-              {result.overrideFixes.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ fontSize: 13, color: '#9ca3af' }}>
-                    {result.suggestedBaseSize === null
-                      ? 'Every element is sized explicitly in your theme(), so base_size would change nothing. Raise these instead:'
-                      : 'These are sized explicitly in your theme(), so base_size will not reach them. Raise them too:'}
+                    <CopyButton text={result.fontSnippet} label="Copy fix" onCopied={handleCopied} />
                   </div>
                   <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: '#cdd6f4' }}>
-                    {result.overrideFixes.map((f) => (
+                    {result.fontFixes.map((f) => (
                       <li key={f.name} style={{ marginBottom: 2 }}>
                         {f.name}: <strong>{f.currentPt}pt</strong> →{' '}
                         <strong style={{ color: '#a6e3a1' }}>{f.neededPt}pt</strong>
+                        {f.wasOverridden && (
+                          <span style={{ color: '#6b7280' }}> (you set this)</span>
+                        )}
                       </li>
                     ))}
                   </ul>
+                  <CodeView text={result.fontSnippet} />
+                  <div style={{ fontSize: 12, color: '#7f849c', lineHeight: 1.5 }}>
+                    {checkedParams?.language === 'r'
+                      ? 'Paste after your existing theme() — ggplot applies theme calls in order and the last one wins, so this overrides only the sizes named.'
+                      : 'Set this before you create the figure. rcParams applies to every Axes; ax.set_xlabel(fontsize=…) would only reach the one Axes you call it on.'}
+                  </div>
                 </div>
+              )}
+
+              {/* SECONDARY: the one-liner. Still offered, because some
+                  people would rather change one number — it just costs
+                  more of the panel. Absent when every element is
+                  explicitly overridden, since base_size governs nothing
+                  then (FR7). */}
+              {result.suggestedBaseSize !== null && result.copySnippet !== null && (
+                <details style={{ borderTop: '1px solid #45475a', paddingTop: 10 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 13, color: '#9ca3af' }}>
+                    Or change one number: base_size = {result.suggestedBaseSize}
+                  </summary>
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ fontSize: 12, color: '#7f849c', lineHeight: 1.5 }}>
+                      Simpler to paste, but it scales every text element — including
+                      the ones already large enough — so it takes more room from the
+                      plot than the targeted fix above.
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <CodeView text={result.copySnippet} />
+                      <CopyButton text={result.copySnippet} label="Copy" onCopied={handleCopied} />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFullCodeOpen(true)}
+                      style={{ ...btnStyle, alignSelf: 'flex-start', fontFamily: 'system-ui, sans-serif' }}
+                    >
+                      Open full edited code →
+                    </button>
+                  </div>
+                </details>
               )}
             </div>
           )}

@@ -42,6 +42,12 @@ interface ElementSpec {
   key: ElementKey;
   relMultiplier: number;   // relative to base_size
   minPt: number;           // minimum for readability
+  /**
+   * How the user sets THIS element directly, so targeted advice can be
+   * made copy-ready. For R it is the ggplot theme selector; for Python
+   * the matplotlib call, or null where there is no single clean one.
+   */
+  selector: string | null;
 }
 
 export interface ReadabilityElement {
@@ -65,6 +71,28 @@ export interface OverrideFix {
   neededPt: number;
 }
 
+/**
+ * A failing element and the size it needs, whether or not the user set
+ * it explicitly.
+ *
+ * This is the PRIMARY advice. Raising `base_size` inflates every text
+ * element including the ones already passing, and on a poster the figure
+ * block is a fixed size — so text the figure did not need grows into
+ * panel space the data did. Targeted sizes cost more characters to paste
+ * and less of the plot.
+ */
+export interface FontFix {
+  name: string;
+  /** ggplot theme selector, or matplotlib rcParams key. */
+  selector: string | null;
+  /** What it renders at today, in pt (source, before scaling). */
+  currentPt: number;
+  /** What it must be set to so it clears its floor once scaled. */
+  neededPt: number;
+  /** True when the user already sets this element explicitly. */
+  wasOverridden: boolean;
+}
+
 export interface ReadabilityResult {
   elements: ReadabilityElement[];
   scale: number;
@@ -79,6 +107,13 @@ export interface ReadabilityResult {
   copySnippet: string | null;
   /** Per-element advice for failing elements base_size cannot reach. */
   overrideFixes: OverrideFix[];
+  /**
+   * PRIMARY advice: every failing element and the size it needs. Empty
+   * when everything passes.
+   */
+  fontFixes: FontFix[];
+  /** Copy-ready targeted snippet for `fontFixes`, or null when empty. */
+  fontSnippet: string | null;
   warnings: string[];
 }
 
@@ -88,21 +123,26 @@ const R_DEFAULTS = { baseSize: 11, width: 7, height: 7 };
 const PY_DEFAULTS = { baseSize: 10, width: 6.4, height: 4.8 };
 
 const R_ELEMENTS: ElementSpec[] = [
-  { name: 'Plot title',   key: 'plotTitle',   relMultiplier: 1.2, minPt: 18 },
-  { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0, minPt: 18 },
-  { name: 'Tick labels',  key: 'axisText',    relMultiplier: 0.8, minPt: 14 },
-  { name: 'Legend text',  key: 'legendText',  relMultiplier: 0.8, minPt: 14 },
-  { name: 'Legend title', key: 'legendTitle', relMultiplier: 1.0, minPt: 14 },
-  { name: 'Strip text',   key: 'stripText',   relMultiplier: 0.8, minPt: 14 },
-  { name: 'Caption',      key: 'caption',     relMultiplier: 0.67, minPt: 12 },
+  { name: 'Plot title',   key: 'plotTitle',   relMultiplier: 1.2, minPt: 18, selector: 'plot.title' },
+  { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0, minPt: 18, selector: 'axis.title' },
+  { name: 'Tick labels',  key: 'axisText',    relMultiplier: 0.8, minPt: 14, selector: 'axis.text' },
+  { name: 'Legend text',  key: 'legendText',  relMultiplier: 0.8, minPt: 14, selector: 'legend.text' },
+  { name: 'Legend title', key: 'legendTitle', relMultiplier: 1.0, minPt: 14, selector: 'legend.title' },
+  { name: 'Strip text',   key: 'stripText',   relMultiplier: 0.8, minPt: 14, selector: 'strip.text' },
+  { name: 'Caption',      key: 'caption',     relMultiplier: 0.67, minPt: 12, selector: 'plot.caption' },
 ];
 
 const PY_ELEMENTS: ElementSpec[] = [
-  { name: 'Plot title',   key: 'plotTitle',   relMultiplier: 1.2, minPt: 18 },
-  { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0, minPt: 18 },
-  { name: 'Tick labels',  key: 'axisText',    relMultiplier: 0.83, minPt: 14 },
-  { name: 'Legend text',  key: 'legendText',  relMultiplier: 1.0, minPt: 14 },
-  { name: 'Caption',      key: 'caption',     relMultiplier: 0.83, minPt: 12 },
+  // `selector` is the rcParams key rather than a call, because rcParams
+  // is the one place that sets every one of these uniformly. The
+  // per-Axes calls (ax.set_xlabel(fontsize=), ax.tick_params(labelsize=))
+  // only reach the Axes they are called on, which is wrong advice for a
+  // figure with subplots — and legend text has no per-Axes setter at all.
+  { name: 'Plot title',   key: 'plotTitle',   relMultiplier: 1.2,  minPt: 18, selector: 'axes.titlesize' },
+  { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0,  minPt: 18, selector: 'axes.labelsize' },
+  { name: 'Tick labels',  key: 'axisText',    relMultiplier: 0.83, minPt: 14, selector: 'xtick.labelsize' },
+  { name: 'Legend text',  key: 'legendText',  relMultiplier: 1.0,  minPt: 14, selector: 'legend.fontsize' },
+  { name: 'Caption',      key: 'caption',     relMultiplier: 0.83, minPt: 12, selector: 'figure.titlesize' },
 ];
 
 const SEABORN_CONTEXTS: Record<string, number> = {
@@ -700,7 +740,70 @@ export function computeReadability(
     .filter((f) => f.status !== 'pass')
     .map(({ name, currentPt, neededPt }) => ({ name, currentPt, neededPt }));
 
-  return { elements, scale, suggestedBaseSize, copySnippet, overrideFixes, warnings };
+  // PRIMARY advice — every failing element, targeted. `ceil` already
+  // leaves up to a point of headroom above the floor, so a small change
+  // in block size does not immediately re-fail the fix.
+  const fontFixes: FontFix[] = specs
+    .map((spec) => {
+      const el = elements.find((e) => e.name === spec.name)!;
+      return {
+        name: spec.name,
+        selector: spec.selector,
+        currentPt: el.sourcePt,
+        neededPt: Math.ceil(spec.minPt / scale),
+        wasOverridden: overrides[spec.key] !== undefined,
+        status: el.status,
+      };
+    })
+    .filter((f) => f.status !== 'pass')
+    .map(({ status, ...f }) => f);
+
+  const fontSnippet = fontFixes.length ? buildFontSnippet(language, fontFixes) : null;
+
+  return {
+    elements,
+    scale,
+    suggestedBaseSize,
+    copySnippet,
+    overrideFixes,
+    fontFixes,
+    fontSnippet,
+    warnings,
+  };
+}
+
+/**
+ * A copy-ready snippet that sets each failing element directly.
+ *
+ * R emits ONE `theme()` call. ggplot applies theme calls left to right
+ * and later ones win, so appending this after an existing `theme(...)`
+ * is legal and overrides only the properties named — the user does not
+ * have to merge it by hand.
+ *
+ * Python emits `rcParams.update({...})` rather than per-Axes calls
+ * (`ax.set_xlabel(fontsize=)`, `ax.tick_params(labelsize=)`) because
+ * those reach only the Axes they are called on, which is wrong advice
+ * for a figure with subplots — and legend text has no per-Axes setter at
+ * all. rcParams sets every Axes uniformly, which is what the advice
+ * means. It must be set BEFORE the figure is created.
+ */
+function buildFontSnippet(language: 'r' | 'python', fixes: FontFix[]): string | null {
+  const usable = fixes.filter((f) => f.selector !== null);
+  if (!usable.length) return null;
+
+  if (language === 'r') {
+    const args = usable.map((f) => `  ${f.selector} = element_text(size = ${f.neededPt})`);
+    return `theme(\n${args.join(',\n')}\n)`;
+  }
+
+  // matplotlib splits tick label size across two keys; setting only
+  // `xtick.labelsize` would silently leave the y axis at its old size.
+  const entries = usable.flatMap((f) =>
+    f.selector === 'xtick.labelsize'
+      ? [`    'xtick.labelsize': ${f.neededPt}`, `    'ytick.labelsize': ${f.neededPt}`]
+      : [`    '${f.selector}': ${f.neededPt}`],
+  );
+  return `plt.rcParams.update({\n${entries.join(',\n')}\n})`;
 }
 
 // ── Language Detection ──────────────────────────────────────────────

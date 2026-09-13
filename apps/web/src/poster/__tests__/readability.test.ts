@@ -615,6 +615,66 @@ describe('computeReadability', () => {
     expect(result.suggestedBaseSize).toBeGreaterThanOrEqual(13);
   });
 
+  it('font-first: targets EVERY failing element, not only overridden ones', () => {
+    // base_size inflates all text including rows that already pass,
+    // eating panel space the figure needs. On a fixed display area the
+    // targeted fix is the right default.
+    const code = `theme_minimal(base_size = 11)\nggsave('f.png', width = 9, height = 6)`;
+    const r = computeReadability(parseRCode(code), 7, 10);
+
+    expect(r.fontFixes.length).toBeGreaterThan(0);
+    // Nothing here is overridden, yet every failing row still gets a target.
+    expect(r.fontFixes.every((f) => f.wasOverridden === false)).toBe(true);
+    for (const f of r.fontFixes) {
+      expect(r.elements.find((e) => e.name === f.name)!.status).not.toBe('pass');
+      expect(f.neededPt).toBeGreaterThan(f.currentPt);
+    }
+  });
+
+  it('font-first: a target actually clears its floor at the reported scale', () => {
+    const code = `theme_minimal(base_size = 11)\nggsave('f.png', width = 9, height = 6)`;
+    const r = computeReadability(parseRCode(code), 7, 10);
+    for (const f of r.fontFixes) {
+      const el = r.elements.find((e) => e.name === f.name)!;
+      expect(f.neededPt * r.scale).toBeGreaterThanOrEqual(el.minPt);
+    }
+  });
+
+  it('font-first: rows that already pass are left alone', () => {
+    const code = `theme_minimal(base_size = 40)\nggsave('f.png', width = 9, height = 6)`;
+    const r = computeReadability(parseRCode(code), 7, 10);
+    expect(r.elements.every((e) => e.status === 'pass')).toBe(true);
+    expect(r.fontFixes).toEqual([]);
+    expect(r.fontSnippet).toBeNull();
+  });
+
+  it('font-first: emits a copy-ready ggplot theme() block', () => {
+    const code = `theme_minimal(base_size = 11)\nggsave('f.png', width = 9, height = 6)`;
+    const snip = computeReadability(parseRCode(code), 7, 10).fontSnippet!;
+    expect(snip).toMatch(/^theme\(/);
+    expect(snip.trimEnd()).toMatch(/\)$/);
+    expect(snip).toContain('element_text(size =');
+    // Balanced parens — a snippet that will not parse is worse than none.
+    expect(snip.split('(').length).toBe(snip.split(')').length);
+  });
+
+  it('font-first: emits a copy-ready matplotlib rcParams block', () => {
+    const code = `plt.rcParams['font.size'] = 8\nplt.figure(figsize=(9, 6))`;
+    const snip = computeReadability(parsePythonCode(code), 7, 10).fontSnippet!;
+    expect(snip).toContain('rcParams.update');
+    // Tick labels live on two keys in matplotlib; both must be set or
+    // the y axis silently keeps the old size.
+    if (snip.includes('xtick.labelsize')) expect(snip).toContain('ytick.labelsize');
+    expect(snip.split('(').length).toBe(snip.split(')').length);
+  });
+
+  it('font-first: keeps the base_size one-liner available as the fallback', () => {
+    const code = `theme_minimal(base_size = 11)\nggsave('f.png', width = 9, height = 6)`;
+    const r = computeReadability(parseRCode(code), 7, 10);
+    expect(r.suggestedBaseSize).not.toBeNull();
+    expect(r.copySnippet).toContain('base_size');
+  });
+
   it('FR7: never recommends base_size = 0 when every element is overridden', () => {
     // `Math.max` over specs that all `return 0` yielded 0, and the panel
     // offered `theme_minimal(base_size = 0)` — code that would destroy
