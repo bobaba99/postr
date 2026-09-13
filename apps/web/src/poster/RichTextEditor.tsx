@@ -45,6 +45,7 @@ import {
   type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { breakUndoCoalescing } from '@/stores/posterStore';
 import { SYMBOLS, filterSymbols } from './symbols';
 import { matchSlashAtCaret } from './slashCommand';
 import { htmlToPlainText, sanitizeHtml } from './sanitizeHtml';
@@ -247,6 +248,11 @@ export function RichTextEditor({
   const handleFocus = () => setFocused(true);
   const handleBlur = () => {
     setFocused(false);
+    // Close the undo burst. Consecutive keystrokes in one block collapse
+    // into a single undo entry; leaving the block ends that burst, so
+    // coming back and typing again starts a new one rather than merging
+    // across a gap the user experienced as two separate edits.
+    breakUndoCoalescing();
     // Delay the slash dismiss so a click on a dropdown item still
     // registers before the menu unmounts.
     window.setTimeout(() => setSlash(INITIAL_SLASH), 120);

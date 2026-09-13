@@ -86,10 +86,69 @@ let redoStack: PosterDoc[] = [];
  */
 let lockedBaseline: Block[] = [];
 
-/** Push current doc onto undo stack, clear redo (new branch). */
-function pushUndo(doc: PosterDoc) {
+/**
+ * Longest pause inside one typing burst. A gap larger than this starts a
+ * new undo entry, so "undo" lands where the user stopped thinking.
+ */
+const COALESCE_IDLE_MS = 600;
+
+/**
+ * Longest a single burst may run. Without it, continuous typing would
+ * be one unbounded entry and undo would throw away minutes of work.
+ */
+const COALESCE_MAX_MS = 5_000;
+
+/**
+ * The burst currently being coalesced, if any. `key` identifies WHAT is
+ * being edited, so typing in one block cannot merge with typing in
+ * another.
+ */
+let lastPush: { key: string; at: number; startedAt: number } | null = null;
+
+/** End the current burst, so the next edit starts a fresh undo entry. */
+export function breakUndoCoalescing() {
+  lastPush = null;
+}
+
+/**
+ * Push the current doc onto the undo stack, clearing redo (new branch).
+ *
+ * `coalesceKey` marks an edit that arrives in a burst — a keystroke.
+ * Consecutive pushes with the SAME key, inside the idle and total
+ * windows, do not add an entry: the snapshot taken before the burst
+ * began stays as the single undo point, so one undo reverts the whole
+ * burst.
+ *
+ * Without this, every `input` event stored a whole-document snapshot
+ * and MAX_HISTORY evicted oldest-first, so roughly fifty keystrokes
+ * discarded ALL prior structural history — delete a block, type a
+ * sentence, and the deletion was unrecoverable (FINDINGS.md F3).
+ * Raising the cap alone does not fix it: 78 keystrokes would still burn
+ * 78 entries. The cap is the amplifier; the push rate is the defect.
+ */
+function pushUndo(doc: PosterDoc, coalesceKey?: string) {
+  const now = Date.now();
+  const inBurst =
+    coalesceKey !== undefined &&
+    lastPush !== null &&
+    lastPush.key === coalesceKey &&
+    now - lastPush.at < COALESCE_IDLE_MS &&
+    now - lastPush.startedAt < COALESCE_MAX_MS &&
+    // Nothing to coalesce ONTO if the stack is empty — the first push
+    // must always land, or the burst would have no undo point at all.
+    undoStack.length > 0;
+
+  if (inBurst) {
+    lastPush = { ...lastPush!, at: now };
+    // Still a new branch: redo cannot survive a fresh edit.
+    redoStack = [];
+    return;
+  }
+
   undoStack = [...undoStack, doc].slice(-MAX_HISTORY);
   redoStack = [];
+  lastPush =
+    coalesceKey === undefined ? null : { key: coalesceKey, at: now, startedAt: now };
 }
 
 /**
@@ -111,14 +170,24 @@ function guardLocked(current: readonly Block[], next: readonly Block[]): Block[]
 function withUndo(
   state: PosterStoreState,
   fn: (doc: PosterDoc) => PosterDoc,
+  coalesceKey?: string,
 ): Partial<PosterStoreState> {
   if (!state.doc) return {};
-  pushUndo(state.doc);
+  pushUndo(state.doc, coalesceKey);
   return {
     doc: fn(state.doc),
     canUndo: true,
     canRedo: false,
   };
+}
+
+/**
+ * True for the patch a text editor emits on every `input`: content and
+ * nothing else. Anything wider is a deliberate edit, not a keystroke.
+ */
+function isKeystrokePatch(patch: Partial<Block>): boolean {
+  const keys = Object.keys(patch);
+  return keys.length === 1 && keys[0] === 'content';
 }
 
 export const usePosterStore = create<PosterStoreState>((set) => ({
@@ -172,10 +241,17 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
 
   updateBlock: (id, patch) =>
     set((state) =>
-      withUndo(state, (doc) => ({
-        ...doc,
-        blocks: doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
-      })),
+      withUndo(
+        state,
+        (doc) => ({
+          ...doc,
+          blocks: doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
+        }),
+        // Only a content-only patch is a keystroke. A patch that also
+        // moves or resizes is a discrete act and keeps its own entry —
+        // otherwise a drag landing mid-burst would be swallowed by it.
+        isKeystrokePatch(patch) ? `content:${id}` : undefined,
+      ),
     ),
 
   // Locked blocks refuse deletion here too, not only at the UI call

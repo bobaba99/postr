@@ -25,6 +25,7 @@ import type {
 } from '@postr/shared';
 import type { PosterTableRef } from '@/charts/ladder/DataStep';
 import { nanoid } from 'nanoid';
+import { breakUndoCoalescing } from '@/stores/posterStore';
 import { usePosterStore } from '@/stores/posterStore';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
 import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
@@ -613,8 +614,16 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // Convenience: single selected block (null when 0 or 2+ selected).
   const selectedId = selectedIds.size === 1 ? [...selectedIds][0]! : null;
   // Convenience setter for single-select (clears previous selection).
-  const selectOne = (id: string) => setSelectedIds(new Set([id]));
-  const clearSelection = () => setSelectedIds(new Set());
+  // Selecting a different block ends the current typing burst, so undo
+  // never merges edits the user made to two different things.
+  const selectOne = (id: string) => {
+    breakUndoCoalescing();
+    setSelectedIds(new Set([id]));
+  };
+  const clearSelection = () => {
+    breakUndoCoalescing();
+    setSelectedIds(new Set());
+  };
 
   // Rubber-band selection state. Coordinates are in poster units
   // (pre-zoom) relative to the poster canvas origin.

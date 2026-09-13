@@ -259,3 +259,82 @@ describe('posterStore', () => {
     });
   });
 });
+
+describe('F3 — typing must not evict structural history', () => {
+  beforeEach(() => {
+    usePosterStore.getState().setPoster('p1', makeDoc(), 'T');
+  });
+
+  it('keeps a deletion reachable after a sentence is typed', () => {
+    // The repro from FINDINGS.md F3: delete a heading, type ~78
+    // characters, then undo. Every `input` event committed a whole-
+    // document snapshot, and MAX_HISTORY = 50 evicted oldest-first — so
+    // the deletion was gone before the user finished the sentence, with
+    // autosave having already persisted it.
+    const store = usePosterStore.getState();
+    store.addBlock(makeBlock('heading'));
+    store.addBlock(makeBlock('body'));
+    store.removeBlock('heading');
+    expect(usePosterStore.getState().doc!.blocks.find((b) => b.id === 'heading')).toBeUndefined();
+
+    const sentence = 'Participants completed the task for twelve weeks and were scored by two raters.';
+    expect(sentence.length).toBeGreaterThanOrEqual(78);
+    for (let i = 1; i <= sentence.length; i++) {
+      usePosterStore.getState().updateBlock('body', { content: sentence.slice(0, i) });
+    }
+
+    // What the user does: press undo until the heading comes back.
+    // Before coalescing, 78 keystrokes filled all 50 slots and evicted
+    // the three structural entries, so it never came back at all.
+    let recovered = false;
+    for (let i = 0; i < 200 && usePosterStore.getState().canUndo; i++) {
+      usePosterStore.getState().undo();
+      if (usePosterStore.getState().doc!.blocks.some((b) => b.id === 'heading')) {
+        recovered = true;
+        break;
+      }
+    }
+    expect(recovered).toBe(true);
+    // And it took a handful of presses, not fifty.
+    expect(usePosterStore.getState().doc!.blocks.some((b) => b.id === 'body')).toBe(true);
+  });
+
+  it('collapses a typing burst into a single undo entry', () => {
+    const store = usePosterStore.getState();
+    store.addBlock(makeBlock('body'));
+    for (let i = 1; i <= 20; i++) {
+      usePosterStore.getState().updateBlock('body', { content: 'x'.repeat(i) });
+    }
+    // One undo should clear the whole burst, not one character.
+    usePosterStore.getState().undo();
+    const content = usePosterStore.getState().doc!.blocks.find((b) => b.id === 'body')!.content;
+    expect(content).toBe('');
+  });
+
+  it('does not merge edits to two different blocks', () => {
+    const store = usePosterStore.getState();
+    store.addBlock(makeBlock('a'));
+    store.addBlock(makeBlock('b'));
+    usePosterStore.getState().updateBlock('a', { content: 'aaa' });
+    usePosterStore.getState().updateBlock('b', { content: 'bbb' });
+
+    usePosterStore.getState().undo();
+    const blocks = usePosterStore.getState().doc!.blocks;
+    // Only b's edit is undone; a's survives.
+    expect(blocks.find((x) => x.id === 'b')!.content).toBe('');
+    expect(blocks.find((x) => x.id === 'a')!.content).toBe('aaa');
+  });
+
+  it('does not merge a content edit with a structural change', () => {
+    const store = usePosterStore.getState();
+    store.addBlock(makeBlock('a'));
+    usePosterStore.getState().updateBlock('a', { content: 'hello' });
+    usePosterStore.getState().updateBlock('a', { w: 999 });
+
+    usePosterStore.getState().undo();
+    const a = usePosterStore.getState().doc!.blocks.find((x) => x.id === 'a')!;
+    // The resize is undone; the typing is not.
+    expect(a.w).not.toBe(999);
+    expect(a.content).toBe('hello');
+  });
+});
