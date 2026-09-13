@@ -30,6 +30,21 @@
  * dropping span entirely would make those commands no-ops on save.
  */
 
+/**
+ * Tags that carry a paragraph boundary. They are NOT in ALLOWED_TAGS —
+ * a poster block is a single inline run, and flattening a pasted
+ * document into one is the deliberate design. What was not deliberate
+ * was emitting NOTHING in their place, which joined two words.
+ *
+ * `LI` is absent on purpose: it is allowed, so it survives as real
+ * markup and must not also be flattened into separator-joined text.
+ */
+const BLOCK_TAGS = new Set([
+  'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
+  'BLOCKQUOTE', 'PRE', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER',
+  'TR', 'TABLE', 'ADDRESS', 'FIGURE', 'FIGCAPTION', 'DD', 'DT', 'DL',
+]);
+
 const ALLOWED_TAGS = new Set([
   'B',
   'STRONG',
@@ -108,13 +123,61 @@ function sanitizeStyleAttr(raw: string): string {
  * empty. That matches what users expect when pasting rich text
  * from a word processor or website.
  */
-function sanitizeNode(input: Node, doc: Document): DocumentFragment {
+function sanitizeNode(
+  input: Node,
+  doc: Document,
+  blockSeparator: string,
+): DocumentFragment {
   const fragment = doc.createDocumentFragment();
+
+  // Boundary bookkeeping. Deferred rather than emitted on sight, because
+  // a boundary is only real once there is content on BOTH sides of it —
+  // that is what keeps a leading/trailing block from producing a stray
+  // separator, and what stops the whitespace between `</p>` and `<p>` in
+  // pretty-printed markup from producing a second one.
+  let emittedAny = false;
+  let pendingBoundary = false;
+  let justClosedBlock = false;
+
+  const flushBoundary = (target: Node) => {
+    if (!pendingBoundary || !emittedAny || !blockSeparator) {
+      pendingBoundary = false;
+      return;
+    }
+    pendingBoundary = false;
+    // Parsed rather than string-concatenated, so `<br>` becomes a real
+    // element and a plain space becomes a text node — the caller picks
+    // which, and neither can inject markup.
+    const holder = doc.createElement('div');
+    holder.innerHTML = blockSeparator;
+    for (const n of Array.from(holder.childNodes)) target.appendChild(n);
+  };
 
   const walk = (source: Node, target: Node) => {
     for (const child of Array.from(source.childNodes)) {
       if (child.nodeType === Node.TEXT_NODE) {
-        target.appendChild(doc.createTextNode(child.textContent ?? ''));
+        const data = child.textContent ?? '';
+        // Whitespace sitting beside a block boundary is layout, not
+        // content. Dropping it is what stops `<p>a</p>\n<p>b</p>`
+        // becoming `a<br>\n<br>b` — which matters because
+        // export/richText.ts treats a literal newline as a paragraph
+        // flush too, so the blank line would survive into the export.
+        // Leading whitespace goes for the same reason.
+        //
+        // Gated on the separator being in use: with no separator this
+        // function must stay byte-identical, and it has a test pinning
+        // that `sanitizeHtml('   ')` returns the spaces untouched.
+        if (blockSeparator && (justClosedBlock || !emittedAny) && data.trim() === '') {
+          continue;
+        }
+        if (data !== '') {
+          flushBoundary(target);
+          target.appendChild(doc.createTextNode(data));
+          if (data.trim() !== '') {
+            emittedAny = true;
+            justClosedBlock = false;
+          }
+        }
         continue;
       }
       if (child.nodeType !== Node.ELEMENT_NODE) {
@@ -126,11 +189,19 @@ function sanitizeNode(input: Node, doc: Document): DocumentFragment {
       const tag = el.tagName;
 
       if (!ALLOWED_TAGS.has(tag)) {
-        // Unwrap: walk the children into the current target.
+        // Unwrap: walk the children into the current target. A
+        // block-level tag leaves a boundary behind it, because that is
+        // the information the unwrap would otherwise destroy — the
+        // original bug glued the last word of one paragraph to the
+        // first of the next (`weeks.Accuracy`).
+        const isBlock = BLOCK_TAGS.has(tag);
+        if (isBlock && emittedAny) pendingBoundary = true;
         walk(el, target);
+        if (isBlock) justClosedBlock = true;
         continue;
       }
 
+      flushBoundary(target);
       const clone = doc.createElement(tag.toLowerCase());
 
       // Only copy the style attribute on span, and only the
@@ -181,14 +252,30 @@ function sanitizeNode(input: Node, doc: Document): DocumentFragment {
  * Sanitize a piece of HTML. Returns the cleaned string.
  * Empty input returns empty string.
  */
-export function sanitizeHtml(html: string): string {
+export interface SanitizeOptions {
+  /**
+   * Emitted between two unwrapped block-level elements. Defaults to
+   * `''`, which is exactly today's behaviour — only the PASTE path asks
+   * for a separator, because that is the only place block-level HTML
+   * from another application arrives. The render, commit and .postr
+   * import paths all see already-inline content and must stay
+   * byte-identical.
+   *
+   * `'<br>'` for a multi-line block; `' '` for a single-line one, where
+   * a line break would put a break into text the editor refuses to let
+   * the user make.
+   */
+  blockSeparator?: string;
+}
+
+export function sanitizeHtml(html: string, options: SanitizeOptions = {}): string {
   if (!html) return '';
   // DOMParser with text/html wraps the input in <html><body>…</body></html>
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<div id="__root">${html}</div>`, 'text/html');
   const root = doc.getElementById('__root');
   if (!root) return '';
-  const fragment = sanitizeNode(root, doc);
+  const fragment = sanitizeNode(root, doc, options.blockSeparator ?? '');
   const container = doc.createElement('div');
   container.appendChild(fragment);
   return container.innerHTML;

@@ -194,3 +194,70 @@ describe('htmlToPlainText', () => {
     expect(htmlToPlainText('a <b>b</b> c')).toBe('a b c');
   });
 });
+
+describe('F6 — paragraph boundaries on paste', () => {
+  it('still flattens with NO separator by default', () => {
+    // The default is unchanged, deliberately: only the paste path asks
+    // for a separator. The render/commit paths and the .postr import
+    // path see already-inline HTML and must keep byte-identical output.
+    expect(sanitizeHtml('<div>a</div><p>b</p>')).toBe('ab');
+  });
+
+  it('separates paragraphs when the paste path asks for it', () => {
+    // The bug: the last word of each paragraph was glued to the first of
+    // the next — `weeks.Accuracy`, `raters.All`. The unwrap branch put
+    // nothing in place of the block boundary.
+    const word = '<p>Participants completed the task for 12 weeks.</p><p>Accuracy was scored by two raters.</p><p>All analyses used mixed models.</p>';
+    const out = sanitizeHtml(word, { blockSeparator: '<br>' });
+    expect(out).not.toContain('weeks.Accuracy');
+    expect(out).not.toContain('raters.All');
+    expect(out).toBe(
+      'Participants completed the task for 12 weeks.<br>Accuracy was scored by two raters.<br>All analyses used mixed models.',
+    );
+  });
+
+  it('does not double the separator on pretty-printed markup', () => {
+    // Real Word/Docs markup carries whitespace between the tags. A naive
+    // flush emits `a<br>\n<br>b`, and since export/richText.ts treats
+    // BOTH <br> and a literal newline as a paragraph flush, every pasted
+    // paragraph would gain a blank line.
+    const out = sanitizeHtml('<p>a</p>\n<p>b</p>', { blockSeparator: '<br>' });
+    expect(out).toBe('a<br>b');
+  });
+
+  it('emits no leading or trailing separator', () => {
+    expect(sanitizeHtml('<p>only</p>', { blockSeparator: '<br>' })).toBe('only');
+    expect(sanitizeHtml('\n<p>a</p>\n', { blockSeparator: '<br>' })).toBe('a');
+  });
+
+  it('uses a space for a single-line block, never a line break', () => {
+    // A title block refuses Enter by design; injecting <br> there would
+    // put a line break into text the editor will not let the user break.
+    const out = sanitizeHtml('<p>Effects of Treatment</p><p>On Outcomes</p>', {
+      blockSeparator: ' ',
+    });
+    expect(out).toBe('Effects of Treatment On Outcomes');
+    expect(out).not.toContain('<br>');
+  });
+
+  it('keeps inline formatting across the boundary', () => {
+    const out = sanitizeHtml('<p>a <b>bold</b></p><p><i>it</i> b</p>', {
+      blockSeparator: '<br>',
+    });
+    expect(out).toBe('a <b>bold</b><br><i>it</i> b');
+  });
+
+  it('treats div, li and headings as block boundaries too', () => {
+    expect(sanitizeHtml('<div>a</div><div>b</div>', { blockSeparator: '<br>' })).toBe('a<br>b');
+    expect(sanitizeHtml('<h1>a</h1><h2>b</h2>', { blockSeparator: '<br>' })).toBe('a<br>b');
+  });
+
+  it('leaves an allowed <li> structure alone', () => {
+    // ol/ul/li are ALLOWED, not unwrapped — the toolbar emits them and
+    // the sanitizer must not turn a real list into separator-joined text.
+    const out = sanitizeHtml('<ul><li>a</li><li>b</li></ul>', { blockSeparator: '<br>' });
+    expect(out).toContain('<li>a</li>');
+    expect(out).toContain('<li>b</li>');
+    expect(out).not.toContain('a<br>b');
+  });
+});

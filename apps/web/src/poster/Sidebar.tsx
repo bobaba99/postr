@@ -3924,7 +3924,13 @@ function TextBlockEditor(props: {
             value={block.content}
             onChange={(v) => onUpdateBlock(block.id, { content: v })}
             placeholder="Type here… (type / for symbols)"
-            multiline
+            // Was hardcoded true for EVERY block type. The canvas
+            // editors already pass `multiline={false}` for titles and
+            // headings (blocks.tsx), so the sidebar's Content box was
+            // the one place a title could be treated as multi-line —
+            // which now decides whether a paste injects a line break
+            // into text the editor otherwise refuses to let you break.
+            multiline={block.type !== 'title' && block.type !== 'heading'}
             onSelectionChange={setSidebarSelection}
             style={{ fontFamily: 'inherit', fontSize: 16, lineHeight: 1.5 }}
           />

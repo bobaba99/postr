@@ -240,7 +240,19 @@ export function RichTextEditor({
     e.preventDefault();
     const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
-    const clean = sanitizeHtml(html || text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+    // The ONLY call site that asks for block separators. Pasting from
+    // Word, Docs or a browser takes the text/html branch, whose markup
+    // is block-level — and the sanitizer's unwrap used to put NOTHING in
+    // place of those boundaries, gluing the last word of one paragraph
+    // to the first of the next (`weeks.Accuracy`).
+    //
+    // `<br>` only where the editor would let the user press Enter. In a
+    // single-line block a break is text the editor actively refuses to
+    // let them make, so the boundary becomes a space instead.
+    const clean = sanitizeHtml(
+      html || text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+      { blockSeparator: multiline ? '<br>' : ' ' },
+    );
     document.execCommand('insertHTML', false, clean);
     commit();
   };
