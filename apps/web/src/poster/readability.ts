@@ -276,8 +276,38 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
   // loose `base_size = 30` after `theme_void()` is not captured (FR5).
   const themeBase = /theme_\w+\s*\((?:[^()]|\([^()]*\))*?\bbase_size\s*=\s*([\d.]+)/g;
   let m: RegExpExecArray | null;
-  while ((m = themeBase.exec(src)) !== null) baseSize = parseFloat(m[1]!);
-  if (!src.match(/base_size\s*=/)) warnings.push('No font size found — assuming ggplot2 default base_size = 11pt.');
+  let baseSizeParsed = false;
+  while ((m = themeBase.exec(src)) !== null) {
+    baseSize = parseFloat(m[1]!);
+    baseSizeParsed = true;
+  }
+  if (!src.match(/base_size\s*=/)) {
+    warnings.push('No font size found — assuming ggplot2 default base_size = 11pt.');
+  } else if (!baseSizeParsed && /base_size\s*=\s*[A-Za-z_.]/.test(src)) {
+    // `theme_minimal(base_size = s)` — the value is a name, not a number,
+    // so there is nothing to read and the figure was silently scored at
+    // the library default. The warning above cannot catch it: `base_size =`
+    // IS present, which suppresses it exactly when it is needed. Same
+    // suppression shape as FR5.
+    warnings.push(
+      `base_size is set from a variable, not a number — scoring against the ggplot2 default ${R_DEFAULTS.baseSize}pt instead. Put the real value in to check it.`,
+    );
+  }
+
+  // In-panel text is NOT a theme element, so nothing in the element table
+  // covers it. A figure whose data labels are 2mm scored all-green.
+  // ggplot sizes these in MILLIMETRES — `size = 2` is 2 * 72.27/25.4 =
+  // 5.7pt — which is also why they are so often accidentally tiny.
+  const MM_TO_PT = 72.27 / 25.4;
+  const inPanel = src.match(
+    /\b(geom_text|geom_label|annotate)\s*\((?:[^()]|\([^()]*\))*?\bsize\s*=\s*([\d.]+)/,
+  );
+  if (inPanel) {
+    const pt = Math.round(parseFloat(inPanel[2]!) * MM_TO_PT * 10) / 10;
+    warnings.push(
+      `${inPanel[1]!}() sets in-panel text at size ${inPanel[2]!} (${pt}pt — ggplot sizes these in mm). In-panel labels are not theme elements, so they are not in the table below; check them yourself.`,
+    );
+  }
 
   // Per-element overrides from theme().
   //
@@ -496,13 +526,35 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
   const ylabel = src.match(argRe('set_ylabel', 'fontsize'));
   const title = src.match(argRe('set_title', 'fontsize'));
   const ticks = src.match(argRe('tick_params', 'labelsize'));
-  if (xlabel || ylabel) overrides.axisTitle = parseFloat((xlabel ?? ylabel)![1]!);
-  if (ticks) overrides.axisText = parseFloat(ticks[1]!);
-  if (title) overrides.plotTitle = parseFloat(title[1]!);
-  // Preserved from the per-axis branch: matplotlib has no per-axis
-  // font selector of this shape, so anything parsed here covers the
-  // element completely.
   const overrideCoversAll: Partial<Record<ElementKey, boolean>> = {};
+
+  // set_xlabel and set_ylabel each cover ONE axis. Taking
+  // `(xlabel ?? ylabel)` let whichever appeared first speak for both, so
+  // a 20pt x label hid a 6pt y label entirely — the same defect class as
+  // FR2 on the R side. Take the smaller, and only claim full coverage
+  // when both are set; otherwise the unset axis is still inheriting from
+  // font.size and must count against the score.
+  const axisTitlePts = [xlabel, ylabel]
+    .filter((mm): mm is RegExpMatchArray => mm != null)
+    .map((mm) => parseFloat(mm[1]!));
+  if (axisTitlePts.length) {
+    overrides.axisTitle = Math.min(...axisTitlePts);
+    overrideCoversAll.axisTitle = axisTitlePts.length === 2;
+  }
+
+  // These two DO cover their element completely: tick_params applies to
+  // both axes' tick labels, and there is only one title. Saying so
+  // matters — without it they score as partial and get compared against
+  // the inherited size, which would report 6.4pt for
+  // `rcParams['font.size'] = 8` + `tick_params(labelsize = 20)`.
+  if (ticks) {
+    overrides.axisText = parseFloat(ticks[1]!);
+    overrideCoversAll.axisText = true;
+  }
+  if (title) {
+    overrides.plotTitle = parseFloat(title[1]!);
+    overrideCoversAll.plotTitle = true;
+  }
 
   // figsize — same overlay-default override pattern as parseRCode.
   // If the user's Python src doesn't set figsize=(w,h) we prefer

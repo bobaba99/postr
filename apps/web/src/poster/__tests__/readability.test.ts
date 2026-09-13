@@ -353,6 +353,46 @@ describe('parsePythonCode', () => {
     expect(p.baseSize).toBe(20); // 10 * 2.0
   });
 
+  it('PY-4: a small ylabel is not hidden by a large xlabel', () => {
+    // Same defect class as FR2, still live on the Python side: the code
+    // took `(xlabel ?? ylabel)`, so whichever it found first spoke for
+    // BOTH axes. A 20pt x label hid a 6pt y label completely.
+    const p = parsePythonCode('ax.set_xlabel("A", fontsize=20)\nax.set_ylabel("B", fontsize=6)');
+    expect(p.overrides.axisTitle).toBe(6);
+  });
+
+  it('PY-4: one axis set alone still leaves the other inheriting', () => {
+    // Only the x label is sized, so the y label renders at
+    // font.size * 1.0 and must still count against the score.
+    const p = parsePythonCode('plt.rcParams["font.size"] = 8\nax.set_xlabel("A", fontsize=30)');
+    const ticks = computeReadability(p, 5, 7).elements.find((e) => e.name === 'Axis titles')!;
+    expect(ticks.sourcePt).toBeCloseTo(8, 1);
+  });
+
+  it('warns when a font size is bound to a variable rather than a literal', () => {
+    // `theme_minimal(base_size = s)` silently reported the 11pt library
+    // default. The "No font size found" warning is guarded by
+    // `!/base_size\s*=/` — and `base_size =` IS present — so it was
+    // suppressed exactly when it was needed. Same suppression shape as FR5.
+    const p = parseRCode('s <- 22\ntheme_minimal(base_size = s)');
+    expect(p.warnings.join(' ')).toMatch(/base_size/i);
+    expect(p.warnings.join(' ')).toMatch(/variable|could not read|literal/i);
+  });
+
+  it('does not warn about variables when the size is a literal', () => {
+    const p = parseRCode('theme_minimal(base_size = 22)');
+    expect(p.warnings.join(' ')).not.toMatch(/variable/i);
+  });
+
+  it('warns that in-panel geom_text labels are not checked', () => {
+    // geom_text/annotate sizes are not theme elements, so nothing in the
+    // table covers them. A figure with 2mm data labels scored all-green.
+    const p = parseRCode('geom_text(aes(label = n), size = 2) + theme_minimal(base_size = 40)');
+    expect(p.warnings.join(' ')).toMatch(/geom_text|in-panel/i);
+    // ggplot sizes geom_text in MILLIMETRES: 2 * 72.27/25.4 = 5.7pt.
+    expect(p.warnings.join(' ')).toMatch(/5\.7\s*pt/);
+  });
+
   it('PY-1: reads font.size from rcParams.update({...})', () => {
     // The most common way to set matplotlib fonts matched nothing, so a
     // 22pt figure was reported as a 10pt disaster and the offered fix
