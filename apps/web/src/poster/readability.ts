@@ -89,6 +89,79 @@ export interface ParseOptions {
   defaultHeightIn?: number;
 }
 
+/**
+ * Argument text of the first `name(...)` call, with parentheses matched
+ * so nested calls are included rather than truncating the match.
+ *
+ * `/ggsave\s*\([^)]*\)/` cannot do this: it stops at the first `)`,
+ * which for `ggsave(filename = file.path("out", "fig.png"), width = 12)`
+ * is the one closing `file.path(` — so the real arguments were never
+ * seen (FR3). String literals are tracked so a parenthesis inside a
+ * filename ("fig (final).png") does not end the call either.
+ *
+ * Returns null when the call is absent or its parens never balance.
+ */
+function extractCallArgs(code: string, name: string): string | null {
+  const open = new RegExp(`\\b${name}\\s*\\(`, 'g');
+  const m = open.exec(code);
+  if (!m) return null;
+
+  let depth = 1;
+  let quote: string | null = null;
+  for (let i = open.lastIndex; i < code.length; i++) {
+    const ch = code[i]!;
+    if (quote) {
+      if (ch === '\\') i++;              // escaped char inside a string
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === '(') depth++;
+    else if (ch === ')' && --depth === 0) return code.slice(open.lastIndex, i);
+  }
+  return null;
+}
+
+/**
+ * Drop every parenthesised group, so only TOP-LEVEL arguments remain.
+ *
+ * Without this, `ggsave("f.png", plot = wrap_plots(width = 3), width = 12)`
+ * would read the inner `width = 3` as the canvas width, since the
+ * per-key regexes take the first match.
+ */
+function topLevelArgs(args: string): string {
+  let out = '';
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = 0; i < args.length; i++) {
+    const ch = args[i]!;
+
+    if (quote) {
+      // Top-level string literals are KEPT: `units = "cm"` is an
+      // argument whose value is a string, and dropping it would defeat
+      // the very conversion FR4 is about. Strings nested inside another
+      // call are dropped along with that call.
+      if (depth === 0) out += ch;
+      if (ch === '\\') {
+        const next = args[++i];
+        if (next !== undefined && depth === 0) out += next;
+        continue;
+      }
+      if (ch === quote) quote = null;
+      continue;
+    }
+
+    if (ch === '"' || ch === "'") { quote = ch; if (depth === 0) out += ch; continue; }
+    if (ch === '(') { depth++; continue; }
+    if (ch === ')') { depth = Math.max(0, depth - 1); continue; }
+    if (depth === 0) out += ch;
+  }
+  return out;
+}
+
+/** Units ggsave understands. Anything else is reported, not guessed at. */
+const KNOWN_UNITS = new Set(['in', 'cm', 'mm', 'px']);
+
 export function parseRCode(code: string, options: ParseOptions = {}): FigureParams {
   const warnings: string[] = [];
 
@@ -135,17 +208,32 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
   let height = options.defaultHeightIn ?? R_DEFAULTS.height;
   let units = 'in';
   let dpi = 300;
-  const ggsave = code.match(/ggsave\s*\([^)]*\)/s);
-  if (ggsave) {
-    const g = ggsave[0];
+  const ggsaveArgs = extractCallArgs(code, 'ggsave');
+  if (ggsaveArgs !== null) {
+    const g = topLevelArgs(ggsaveArgs);
     const wm = g.match(/width\s*=\s*([\d.]+)/);
     const hm = g.match(/height\s*=\s*([\d.]+)/);
-    const um = g.match(/units\s*=\s*"(\w+)"/);
+    // Both quote styles: R treats them identically, and accepting only
+    // double quotes silently skipped the cm->in conversion (FR4).
+    const um = g.match(/units\s*=\s*(["'])(\w+)\1/);
     const dm = g.match(/dpi\s*=\s*([\d.]+)/);
     if (wm) width = parseFloat(wm[1]!);
     if (hm) height = parseFloat(hm[1]!);
-    if (um) units = um[1]!;
+    if (um) units = um[2]!;
     if (dm) dpi = parseFloat(dm[1]!);
+
+    // Fail loudly rather than holding a default that reads as a clean
+    // result: ggsave is present, so the user believes it was read.
+    if (!wm || !hm) {
+      warnings.push(
+        `Found ggsave() but could not read its width/height — using ${width.toFixed(1)}"×${height.toFixed(1)}" instead. Check the call.`,
+      );
+    }
+    if (um && !KNOWN_UNITS.has(units)) {
+      warnings.push(`Unrecognised units = "${units}" in ggsave() — treating the canvas as inches.`);
+      units = 'in';
+    }
+
     if (units === 'cm') { width /= 2.54; height /= 2.54; }
     else if (units === 'mm') { width /= 25.4; height /= 25.4; }
     else if (units === 'px') { width /= dpi; height /= dpi; }
