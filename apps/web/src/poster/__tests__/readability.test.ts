@@ -90,7 +90,11 @@ describe('parseRCode', () => {
     expect(p.overrides.axisText).toBe(20);
   });
 
-  it('detects facet_wrap and adjusts canvas', () => {
+  it('records the facet grid but does NOT shrink the canvas', () => {
+    // Faceting subdivides the PLOTTING area; it changes neither the
+    // figure's physical size nor its font sizes. Dividing the canvas by
+    // the grid made the scale factor grow with the panel count, which
+    // is FR1: adding a facet line flipped a failing figure to PASS.
     const code = `
       ggplot(df, aes(x, y)) + geom_point() +
       facet_wrap(~group, nrow = 2) +
@@ -98,7 +102,35 @@ describe('parseRCode', () => {
     `;
     const p = parseRCode(code);
     expect(p.facetRows).toBe(2);
-    expect(p.effectiveCanvasHeight).toBe(4);
+    expect(p.effectiveCanvasHeight).toBe(8);
+    expect(p.effectiveCanvasWidth).toBe(10);
+  });
+
+  it('FR1: a facet line does not change the reported print size', () => {
+    // The regression in its original form. Same figure, same ggsave,
+    // one extra line — the verdict must not move.
+    const base = `
+      library(ggplot2)
+      ggplot(mtcars, aes(wt, mpg)) + geom_point() +
+        theme_minimal(base_size = 11)
+      ggsave("fig.png", width = 9, height = 6)
+    `;
+    const faceted = base.replace(
+      'geom_point() +',
+      'geom_point() +\n        facet_grid(gear ~ cyl) +',
+    );
+    const plain = computeReadability(parseRCode(base), 7, 10);
+    const withFacets = computeReadability(parseRCode(faceted), 7, 10);
+
+    expect(withFacets.scale).toBeCloseTo(plain.scale, 6);
+    expect(withFacets.elements.map((e) => e.effectivePt)).toEqual(
+      plain.elements.map((e) => e.effectivePt),
+    );
+    // And the honest answer for a 9x6in figure in a 10x7in block is
+    // min(10/9, 7/6) = 1.11 — which FAILS an 11pt base.
+    expect(plain.scale).toBeCloseTo(1.11, 2);
+    expect(plain.elements.find((e) => e.name === 'Axis titles')!.status).toBe('fail');
+    expect(withFacets.elements.find((e) => e.name === 'Axis titles')!.status).toBe('fail');
   });
 });
 
@@ -147,13 +179,16 @@ describe('parsePythonCode', () => {
     expect(p.overrides.plotTitle).toBe(20);
   });
 
-  it('detects subplots grid and adjusts canvas', () => {
+  it('records the subplots grid but does NOT shrink the canvas', () => {
+    // Python mirror of FR1. plt.subplots(2, 3) on a 12x8in figure was
+    // reported at 1.75x where 0.67x is correct — a 2.6x overstatement
+    // that turned every row green.
     const code = `fig, axes = plt.subplots(2, 3, figsize=(12, 8))`;
     const p = parsePythonCode(code);
     expect(p.facetRows).toBe(2);
     expect(p.facetCols).toBe(3);
-    expect(p.effectiveCanvasHeight).toBe(4);
-    expect(p.effectiveCanvasWidth).toBe(4);
+    expect(p.effectiveCanvasHeight).toBe(8);
+    expect(p.effectiveCanvasWidth).toBe(12);
   });
 
   it('uses defaults when figsize missing', () => {

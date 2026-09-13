@@ -157,23 +157,44 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
     warnings.push('No canvas size found — assuming R default 7"×7" (ggsave).');
   }
 
-  // Facets
+  // Facets — recorded for reporting, NEVER applied to the canvas.
+  //
+  // Faceting subdivides the PLOTTING area. It changes neither the
+  // figure's physical size nor any font size, so it cannot change how
+  // much the figure is scaled when placed in a block. Dividing the
+  // canvas by the grid made the scale factor grow with the panel count:
+  // adding a single `facet_grid` line to a failing figure doubled its
+  // reported print size and flipped it to PASS (FR1). The panel count
+  // is kept on FigureParams because it is genuinely useful to report —
+  // more panels do mean denser tick labels — but it must not touch
+  // `effectiveCanvas*`.
   let facetRows = 1;
   let facetCols = 1;
   const fwrap = code.match(/facet_wrap\s*\([^)]*nrow\s*=\s*(\d+)/);
   const fwrapCols = code.match(/facet_wrap\s*\([^)]*ncol\s*=\s*(\d+)/);
-  const fgrid = code.match(/facet_grid\s*\(\s*(\w+)\s*~\s*(\w+)/);
+  const fgrid = code.match(/facet_grid\s*\(\s*[.\w]+\s*~\s*[.\w]+/);
   if (fwrap) facetRows = parseInt(fwrap[1]!, 10);
   if (fwrapCols) facetCols = parseInt(fwrapCols[1]!, 10);
-  if (fgrid) { facetRows = 2; facetCols = 2; } // conservative estimate
+  if (fgrid && !fwrap && !fwrapCols) {
+    // `facet_grid(a ~ b)` does not state its panel count — that comes
+    // from the data's factor levels, which we cannot see. Previously
+    // this guessed a 2x2 grid and fed the guess into the scale, so the
+    // inflation was not merely wrong but arbitrary. Record "faceted,
+    // count unknown" as 1x1 instead: it is the only honest value, and
+    // now that facets no longer touch the scale, nothing depends on it.
+    facetRows = 1;
+    facetCols = 1;
+  }
 
   return {
     language: 'r',
     baseSize,
     canvasWidth: width,
     canvasHeight: height,
-    effectiveCanvasWidth: width / facetCols,
-    effectiveCanvasHeight: height / facetRows,
+    // The full canvas. See the facet note above: panel count must not
+    // change the scale factor.
+    effectiveCanvasWidth: width,
+    effectiveCanvasHeight: height,
     overrides,
     facetRows,
     facetCols,
@@ -253,8 +274,10 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
     baseSize,
     canvasWidth: width,
     canvasHeight: height,
-    effectiveCanvasWidth: width / facetCols,
-    effectiveCanvasHeight: height / facetRows,
+    // The full canvas. See the facet note above: panel count must not
+    // change the scale factor.
+    effectiveCanvasWidth: width,
+    effectiveCanvasHeight: height,
     overrides,
     facetRows,
     facetCols,
