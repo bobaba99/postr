@@ -58,9 +58,9 @@ describe('per-format helpers honour the seam', () => {
 
   it('print html/css collapse to empty strings when suppressed', () => {
     expect(attributionPrintHtml()).toContain(ATTRIBUTION_TEXT);
-    expect(attributionPrintCss()).toContain('.postr-attribution');
+    expect(attributionPrintCss(48, 36)).toContain('.postr-attribution');
     expect(attributionPrintHtml(paid)).toBe('');
-    expect(attributionPrintCss(paid)).toBe('');
+    expect(attributionPrintCss(48, 36, paid)).toBe('');
   });
 
   it('print colophon carries the muted PNG logo beside the text (settled 2026-08-06)', () => {
@@ -71,37 +71,29 @@ describe('per-format helpers honour the seam', () => {
     // Suppressed → no logo either.
     expect(attributionPrintHtml(paid)).toBe('');
     // CSS keeps the mark small and in the bottom-margin overlay.
-    const css = attributionPrintCss();
+    const css = attributionPrintCss(48, 36);
     expect(css).toContain('.postr-attribution-mark');
-    expect(css).toContain('bottom: 10px');
+    // The offset is adaptive now (colophonGeometry), so assert the shape
+    // and the invariant rather than a literal that would re-break on the
+    // next tuning pass. Per-size numbers live in colophonGeometry.test.ts.
+    expect(css).toMatch(/bottom: [\d.]+px/);
   });
 
-  it('anchors the colophon bottom-RIGHT at a quarter of its pre-2026-09-13 size', () => {
-    // The whole of the 2026-09-13 change lives in these four values and
-    // nothing pinned them before, so a revert to the 50pt bottom-left
-    // colophon passed the entire suite.
-    const css = attributionPrintCss();
-    expect(css).toContain('right: 10px');
+  it('anchors the colophon bottom-RIGHT, never bottom-left', () => {
+    // A revert to the pre-2026-09-13 bottom-left colophon passed the
+    // entire suite before this existed.
+    const css = attributionPrintCss(48, 36);
+    expect(css).toMatch(/right: [\d.]+px/);
     expect(css).not.toContain('left: 10px');
+  });
+
+  it('keeps the reference poster (48x36) at the approved 12.6pt', () => {
+    // The owner approved this size on the 48x36 sheet; the adaptive
+    // geometry is anchored to it, so a change here is a change to a
+    // decision, not to a constant.
+    const css = attributionPrintCss(48, 36);
     expect(css).toContain('font-size: 1.75px');
     expect(css).toContain('width: 2.25px');
-  });
-
-  it('prints the colophon between the caption and axis-label floors', () => {
-    // Colophon sizes are CSS px at canvas scale (1px = 1 poster unit =
-    // 0.1in); printDocument applies `zoom: 96 / PX`. Getting this
-    // conversion wrong is what made the old 7px print at 50.4pt, so pin
-    // the arithmetic rather than just the literal.
-    const PX = 10;
-    const printZoom = 96 / PX;
-    const cssPx = 1.75;
-    const printedPt = (cssPx * printZoom) / 96 * 72;
-
-    expect(printedPt).toBeCloseTo(12.6, 1);
-    // Below readability.ts's 18pt axis-title floor, so it never competes
-    // with content; at/above the 12pt caption floor, so it stays legible.
-    expect(printedPt).toBeLessThan(18);
-    expect(printedPt).toBeGreaterThanOrEqual(12);
   });
 
   it('pptx box is null when suppressed', () => {

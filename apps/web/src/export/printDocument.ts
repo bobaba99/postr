@@ -176,7 +176,7 @@ export function buildPrintDocument(input: PrintDocumentInput): string {
     overflow: visible !important;
     box-shadow: none !important;
   }
-${attributionPrintCss(input.attribution)}
+${attributionPrintCss(w, h, input.attribution)}
 
   /* ── Print view ──────────────────────────────────────────── */
   @media print {
