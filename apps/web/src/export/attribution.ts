@@ -16,10 +16,22 @@
  * themselves. Postr is free; a credit is the ordinary reciprocal.
  *
  * Practical consequences, all deliberate:
- *   - "Poster made with postr.sh" reads as a credit. "Made with
- *     postr.sh" alone reads as a stamp on the artifact.
- *   - It sits with the acknowledgements, in the margin band, at
- *     acknowledgement scale — not badged in a corner.
+ *   - The copy is a credit, never a product claim: no verb of making
+ *     addressed to the reader, no tagline, no feature. Until
+ *     2026-09-13 it read "Poster made with postr.sh", on the argument
+ *     that the leading noun is what separates a credit from a stamp.
+ *     The owner shortened it to the current value that day, once the
+ *     colophon was quarter-sized and moved to the margin's right end —
+ *     at that scale it no longer reads as a badge, so the leading noun
+ *     was doing less work than the size was. `ACKNOWLEDGEMENT_TEXT` is
+ *     the only definition; do not reintroduce the old string here.
+ *   - It sits in the bottom margin band at acknowledgement scale —
+ *     the band where funding lines and logos already live. Since
+ *     2026-09-13 it is anchored to that band's RIGHT end and set at a
+ *     quarter of its former size (see `acknowledgementPrintCss`),
+ *     because at its previous size it printed larger than most
+ *     posters' body text and read as exactly the badge this framing
+ *     exists to avoid.
  *   - A SMALL MUTED logo now accompanies the text in the print/PDF
  *     colophon (settled 2026-08-06). Still no colour band, no verb, no
  *     product claim — the mark is grey and margin-scaled, so the
@@ -50,7 +62,7 @@ import { colophonMarkPngDataUri } from './colophonMarkPng';
  * band is still forbidden. The anti-"vendor sticker" intent is preserved
  * by keeping the mark small, muted, and in the margin band.
  */
-export const ACKNOWLEDGEMENT_TEXT = 'Poster made with postr.sh';
+export const ACKNOWLEDGEMENT_TEXT = 'made with postr.sh';
 
 /**
  * @deprecated Use {@link ACKNOWLEDGEMENT_TEXT}. Retained so any call
@@ -115,23 +127,38 @@ export function acknowledgementPrintHtml(opts: AttributionOptions = {}): string 
 /**
  * The stylesheet rule for `acknowledgementPrintHtml`.
  *
- * PLACEMENT (owner decision): it belongs in the band where authors
- * already put logos and the references block — the bottom margin —
- * and it must never impair readability of real content.
- *
- * `left: M` (10 units) aligns it to the same left edge every template
- * gives its references block (`x: M` in templates.ts), so it reads as
- * part of that furniture rather than as a mark stuck in a corner.
+ * PLACEMENT (owner decision, revised 2026-09-13): it belongs in the
+ * bottom margin band, and it must never impair readability of real
+ * content. It is now anchored to the band's RIGHT end (`right: M`)
+ * rather than its left. The references block owns the left edge
+ * (`x: M` in templates.ts); putting the credit at the opposite end
+ * keeps it out of that column's optical run and reads as a colophon
+ * rather than as a mis-aligned first entry.
  *
  * `bottom: M` keeps it INSIDE the margin band rather than in the
  * sheet's dead edge, which is where a funding line would sit.
  *
- * Sizes are in CSS pixels at the canvas's natural scale (1 poster unit
- * = 1 px), and the print window's `zoom` carries them to true print
- * size. At 7 units the line prints around 7 pt — legible to someone
- * standing at the poster, deliberately below the 18 pt axis-label and
- * 12 pt caption floors in `readability.ts`, so it never competes with
- * content and never reads as something the audience must read.
+ * ── Sizing, and the bug this replaces ────────────────────────────
+ * Sizes here are CSS pixels at the canvas's NATURAL scale, where
+ * 1 poster unit = 1 px = 0.1 INCH — not 1 pt. The print window then
+ * applies `zoom: 96 / PX` (9.6 at PX=10) to reach true print size.
+ *
+ * The previous values ignored that conversion. `font-size: 7px` was
+ * commented as printing "around 7 pt"; it actually printed at
+ * 7 × 9.6 = 67.2 CSS px = 0.7 in = **50.4 pt**, and the 9 px mark at
+ * 0.9 in — a credit line set larger than most posters' body text,
+ * which is exactly the "vendor sticker" failure the whole
+ * acknowledgement framing exists to avoid.
+ *
+ * Every dimension below is therefore the old value × 0.25, so the row
+ * keeps its proportions at a quarter of its former width:
+ *   font-size 7 → 1.75 px  (prints 1.75 × 9.6 / 96 in = 0.175 in ≈ 12.6 pt)
+ *   mark       9 → 2.25 px (prints 0.225 in)
+ *   gap        4 → 1 px
+ * 12.6 pt sits below the 18 pt axis-label and (just above) the 12 pt
+ * caption floors in `readability.ts`, so the line is legible to a
+ * reader standing at the poster without competing with content —
+ * which is what the original comment intended all along.
  *
  * It cannot overlap content: templates reserve this band as margin,
  * and no template places a block below `bodyTop + bodyHeight`.
@@ -139,20 +166,26 @@ export function acknowledgementPrintHtml(opts: AttributionOptions = {}): string 
 export function acknowledgementPrintCss(opts: AttributionOptions = {}): string {
   if (!shouldAttribute(opts)) return '';
   return `
-  /* Acknowledgement line — sits in the bottom margin band with the
-     logos and references, left-aligned to the references column.
-     Never in the canvas flow, so poster dimensions and block
-     positions are unaffected. */
+  /* Acknowledgement line — sits in the bottom margin band, anchored to
+     its RIGHT end so it stays clear of the references column that owns
+     the left edge. Never in the canvas flow, so poster dimensions and
+     block positions are unaffected. */
   .postr-attribution {
+    /* The right edge comes from 'right: 10px' alone — the box is
+       absolutely positioned with no 'left' and no 'width', so it is
+       shrink-to-fit and there is no free space for 'justify-content'
+       to distribute. Do not "restore" a flex alignment here; removing
+       'right' is what would break the anchor. (No backticks in this
+       string: it is a template literal.) */
     position: absolute;
-    left: 10px;
+    right: 10px;
     bottom: 10px;
     z-index: 1;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 1px;
     font-family: system-ui, -apple-system, sans-serif;
-    font-size: 7px;
+    font-size: 1.75px;
     /* Bold at the owner's request. The size and muted colour still do
        the subordinating, so the line reads as a credit with a little
        more presence rather than as something competing for attention. */
@@ -160,16 +193,18 @@ export function acknowledgementPrintCss(opts: AttributionOptions = {}): string {
     line-height: 1;
     letter-spacing: 0.02em;
     color: rgba(107, 114, 128, 0.72);
+    white-space: nowrap;
     pointer-events: none;
   }
   /* Small muted mark (settled 2026-08-06). Sized to the cap-height of the
-     7px text so it reads as part of the colophon, not a badge. It is a
-     grey PNG, always scaled DOWN, and lives inside the bottom-margin
-     overlay — so it cannot overlap poster content. */
+     text so it reads as part of the colophon, not a badge. It is a grey
+     PNG, always scaled DOWN, and lives inside the bottom-margin overlay —
+     so it cannot overlap poster content. */
   .postr-attribution-mark {
-    width: 9px;
-    height: 9px;
+    width: 2.25px;
+    height: 2.25px;
     display: block;
+    flex: none;
     opacity: 0.72;
   }`;
 }

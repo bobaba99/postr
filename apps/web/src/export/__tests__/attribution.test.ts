@@ -16,14 +16,21 @@ import {
 } from '../attribution';
 
 describe('ATTRIBUTION_TEXT', () => {
+  // The ONE place the literal is pinned. Everything else in the suite
+  // asserts against the constant, so changing the copy breaks exactly
+  // this test — a deliberate speed bump, not a wall of red.
   it('is exactly the approved copy', () => {
-    expect(ATTRIBUTION_TEXT).toBe('Poster made with postr.sh');
+    expect(ATTRIBUTION_TEXT).toBe('made with postr.sh');
   });
 
   it('carries no tagline, marketing verb, or AI mention', () => {
     expect(ATTRIBUTION_TEXT).not.toMatch(/\b(AI|GPT|powered|create|design|build|free)\b/i);
-    // A colophon is one short line, not a pitch.
-    expect(ATTRIBUTION_TEXT.split(/\s+/)).toHaveLength(4);
+    // A colophon is one short line, not a pitch. Bounded rather than
+    // pinned to an exact count: the owner may reword the credit, but a
+    // colophon that grows past a handful of words has become a tagline.
+    const words = ATTRIBUTION_TEXT.split(/\s+/);
+    expect(words.length).toBeGreaterThanOrEqual(3);
+    expect(words.length).toBeLessThanOrEqual(5);
   });
 });
 
@@ -69,6 +76,34 @@ describe('per-format helpers honour the seam', () => {
     expect(css).toContain('bottom: 10px');
   });
 
+  it('anchors the colophon bottom-RIGHT at a quarter of its pre-2026-09-13 size', () => {
+    // The whole of the 2026-09-13 change lives in these four values and
+    // nothing pinned them before, so a revert to the 50pt bottom-left
+    // colophon passed the entire suite.
+    const css = attributionPrintCss();
+    expect(css).toContain('right: 10px');
+    expect(css).not.toContain('left: 10px');
+    expect(css).toContain('font-size: 1.75px');
+    expect(css).toContain('width: 2.25px');
+  });
+
+  it('prints the colophon between the caption and axis-label floors', () => {
+    // Colophon sizes are CSS px at canvas scale (1px = 1 poster unit =
+    // 0.1in); printDocument applies `zoom: 96 / PX`. Getting this
+    // conversion wrong is what made the old 7px print at 50.4pt, so pin
+    // the arithmetic rather than just the literal.
+    const PX = 10;
+    const printZoom = 96 / PX;
+    const cssPx = 1.75;
+    const printedPt = (cssPx * printZoom) / 96 * 72;
+
+    expect(printedPt).toBeCloseTo(12.6, 1);
+    // Below readability.ts's 18pt axis-title floor, so it never competes
+    // with content; at/above the 12pt caption floor, so it stays legible.
+    expect(printedPt).toBeLessThan(18);
+    expect(printedPt).toBeGreaterThanOrEqual(12);
+  });
+
   it('pptx box is null when suppressed', () => {
     expect(attributionPptxBox(48, 36)).not.toBeNull();
     expect(attributionPptxBox(48, 36, paid)).toBeNull();
@@ -98,12 +133,12 @@ describe('attributionPptxBox geometry', () => {
 
 describe('metadata helpers', () => {
   it('doc property and bundle generator carry text plus canonical URL', () => {
-    expect(attributionDocProperty()).toBe('Poster made with postr.sh (https://postr.sh)');
+    expect(attributionDocProperty()).toBe(`${ATTRIBUTION_TEXT} (https://postr.sh)`);
     expect(attributionBundleGenerator()).toBe(attributionDocProperty());
   });
 
   it('latex comment matches the bib.ts "%% …" comment voice', () => {
-    expect(attributionLatexComment()).toBe('%% Poster made with postr.sh');
+    expect(attributionLatexComment()).toBe(`%% ${ATTRIBUTION_TEXT}`);
     expect(attributionLatexComment().startsWith('%%')).toBe(true);
   });
 });

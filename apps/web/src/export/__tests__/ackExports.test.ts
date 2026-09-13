@@ -65,7 +65,7 @@ describe('LaTeX export', () => {
       fetcher: async () => TINY_PNG_BYTES,
     });
     const tex = decode(unzipSync(bytes)['poster.tex']);
-    expect(tex).toContain('Poster made with postr.sh');
+    expect(tex).toContain(ACKNOWLEDGEMENT_TEXT);
   });
 
   it('ships the credit as a citable entry in references.bib', async () => {
@@ -203,7 +203,7 @@ describe('PPTX export', () => {
     });
     const entries = unzipSync(bytes);
     const slide = decode(entries['ppt/slides/slide1.xml']);
-    expect(slide).toContain('Poster made with postr.sh');
+    expect(slide).toContain(ACKNOWLEDGEMENT_TEXT);
   });
 
   it('keeps the slide background a plain solid fill (the mark is a shape, not a background)', async () => {
@@ -382,6 +382,6 @@ describe('no-references poster degrades to the mark alone', () => {
   it('the print/PDF path still emits the margin credit line', () => {
     // Covered in depth by attribution.test.ts; asserted here so the
     // "every output" claim is checked end to end.
-    expect(ACKNOWLEDGEMENT_TEXT).toBe('Poster made with postr.sh');
+    expect(ACKNOWLEDGEMENT_TEXT).toBe('made with postr.sh');
   });
 });

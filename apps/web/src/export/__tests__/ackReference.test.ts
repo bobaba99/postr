@@ -14,6 +14,10 @@ import {
 import { formatReferencesForExport } from '../posterContent';
 import { CITATION_STYLES } from '@/poster/citations';
 
+/** The approved copy, regex-escaped — so a copy change does not
+ *  silently turn these prefix assertions into no-ops. */
+const ACK_TEXT_RE = ACKNOWLEDGEMENT_TEXT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const userRefs = [
   { id: 'r1', authors: ['Smith, John'], year: '2020', title: 'Alpha study' },
   { id: 'r2', authors: ['Doe, Jane'], year: '2024', title: 'Beta study' },
@@ -78,10 +82,10 @@ describe('rendered in every citation style', () => {
   // string: each style renders it in its own idiom, with the right
   // prefix, automatically.
   const cases: Array<[keyof typeof CITATION_STYLES, RegExp]> = [
-    ['APA 7', /Poster made with postr\.sh/],
-    ['Vancouver', /^3\. Poster made with postr\.sh/],
-    ['IEEE', /^\[3\] Poster made with postr\.sh/],
-    ['Harvard', /Poster made with postr\.sh/],
+    ['APA 7', new RegExp(ACK_TEXT_RE)],
+    ['Vancouver', new RegExp(`^3\\. ${ACK_TEXT_RE}`)],
+    ['IEEE', new RegExp(`^\\[3\\] ${ACK_TEXT_RE}`)],
+    ['Harvard', new RegExp(ACK_TEXT_RE)],
   ];
 
   for (const [style, pattern] of cases) {
