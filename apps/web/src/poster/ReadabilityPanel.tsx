@@ -774,8 +774,19 @@ export function ReadabilityPanel({
                   >
                     {el.minPt}pt
                   </td>
-                  <td style={{ textAlign: 'center', padding: '4px 0' }}>
-                    {el.status === 'pass' ? '✓' : el.status === 'warn' ? '⚠' : '✗'}
+                  {/* Coloured to match the legend below. It used to be
+                      grey while only the Print number carried the colour,
+                      which made the legend's "yellow means..." wrong at a
+                      glance. */}
+                  <td
+                    style={{
+                      textAlign: 'center',
+                      padding: '4px 0',
+                      color: statusColor(el.status),
+                      fontWeight: 700,
+                    }}
+                  >
+                    {statusGlyph(el.status)}
                   </td>
                 </tr>
               ))}
@@ -1078,7 +1089,7 @@ function ImageScanSection(props: {
               {result.regions.map((r, i) => (
                 <tr key={i} style={{ borderTop: '1px solid #2a2a3a' }}>
                   <td style={{ ...tdStyle, color: statusColor(r.status) }}>
-                    {r.status === 'pass' ? '✓' : r.status === 'warn' ? '!' : '✗'}
+                    {statusGlyph(r.status)}
                   </td>
                   <td style={tdStyle}>{r.role}</td>
                   <td style={{ ...tdStyle, textAlign: 'left', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1120,4 +1131,15 @@ function statusColor(s: ScanRegion['status']): string {
   if (s === 'pass') return '#a6e3a1';
   if (s === 'warn') return '#f9e2af';
   return '#f38ba8';
+}
+
+/**
+ * One glyph vocabulary for both tables. They used to disagree — the code
+ * table rendered warn as '⚠' and the scan table as '!' — so the legend
+ * could only ever be right about one of them.
+ */
+function statusGlyph(s: 'pass' | 'warn' | 'fail'): string {
+  if (s === 'pass') return '✓';
+  if (s === 'warn') return '⚠';
+  return '✗';
 }
