@@ -97,8 +97,14 @@ const primaryBtnStyle: CSSProperties = {
 function generateFullFix(
   code: string,
   params: FigureParams,
-  suggested: number,
+  suggested: number | null,
 ): string {
+  // No base_size worth recommending (every element is explicitly
+  // overridden), so there is nothing to rewrite. Returning the code
+  // unchanged is the honest answer; the panel shows per-element advice
+  // instead of a "full fix" that would fix nothing.
+  if (suggested === null) return code;
+
   let fixed = code;
 
   if (params.language === 'r') {
@@ -786,38 +792,69 @@ export function ReadabilityPanel({
                 gap: 10,
               }}
             >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                }}
-              >
-                <div style={{ fontSize: 13, color: '#9ca3af' }}>
-                  Recommended fix (base_size = {result.suggestedBaseSize}):
+              {/* base_size only governs elements the theme does NOT set
+                  explicitly. When every element is overridden there is no
+                  base_size worth recommending, and this whole block is
+                  suppressed rather than offering `base_size = 0` — code
+                  that would destroy the figure. */}
+              {result.suggestedBaseSize !== null && result.copySnippet !== null && (
+                <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 8,
+                    }}
+                  >
+                    <div style={{ fontSize: 13, color: '#9ca3af' }}>
+                      Recommended fix (base_size = {result.suggestedBaseSize}):
+                    </div>
+                    <CopyButton
+                      text={result.copySnippet}
+                      label="Copy snippet"
+                      onCopied={handleCopied}
+                    />
+                  </div>
+                  {/* Copy-only snippet — read-only so users can't accidentally
+                      edit it before copying. The CodeView component is just a
+                      styled <pre> with a line-number gutter. */}
+                  <CodeView text={result.copySnippet} />
+                  <button
+                    type="button"
+                    onClick={() => setFullCodeOpen(true)}
+                    style={{
+                      ...btnStyle,
+                      alignSelf: 'flex-start',
+                      fontFamily: 'system-ui, sans-serif',
+                    }}
+                  >
+                    Open full edited code →
+                  </button>
+                </>
+              )}
+
+              {/* Elements the theme sizes explicitly. A base_size change
+                  cannot reach them — the override wins — so each needs its
+                  own number. Without this, dropping overridden rows from the
+                  recommendation left failing elements with no advice at all. */}
+              {result.overrideFixes.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: 13, color: '#9ca3af' }}>
+                    {result.suggestedBaseSize === null
+                      ? 'Every element is sized explicitly in your theme(), so base_size would change nothing. Raise these instead:'
+                      : 'These are sized explicitly in your theme(), so base_size will not reach them. Raise them too:'}
+                  </div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: '#cdd6f4' }}>
+                    {result.overrideFixes.map((f) => (
+                      <li key={f.name} style={{ marginBottom: 2 }}>
+                        {f.name}: <strong>{f.currentPt}pt</strong> →{' '}
+                        <strong style={{ color: '#a6e3a1' }}>{f.neededPt}pt</strong>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <CopyButton
-                  text={result.copySnippet}
-                  label="Copy snippet"
-                  onCopied={handleCopied}
-                />
-              </div>
-              {/* Copy-only snippet — read-only so users can't accidentally
-                  edit it before copying. The CodeView component is just a
-                  styled <pre> with a line-number gutter. */}
-              <CodeView text={result.copySnippet} />
-              <button
-                type="button"
-                onClick={() => setFullCodeOpen(true)}
-                style={{
-                  ...btnStyle,
-                  alignSelf: 'flex-start',
-                  fontFamily: 'system-ui, sans-serif',
-                }}
-              >
-                Open full edited code →
-              </button>
+              )}
             </div>
           )}
 

@@ -476,6 +476,70 @@ describe('computeReadability', () => {
     expect(result.suggestedBaseSize).toBeGreaterThanOrEqual(13);
   });
 
+  it('FR7: never recommends base_size = 0 when every element is overridden', () => {
+    // `Math.max` over specs that all `return 0` yielded 0, and the panel
+    // offered `theme_minimal(base_size = 0)` — code that would destroy
+    // the figure. There is no base_size worth recommending here: every
+    // element's size is set explicitly, so base_size governs nothing.
+    const code = `theme_minimal(base_size = 14) +
+      theme(axis.text = element_text(size = 10), axis.title = element_text(size = 12),
+            legend.text = element_text(size = 10), legend.title = element_text(size = 12),
+            plot.title = element_text(size = 16), strip.text = element_text(size = 11),
+            plot.caption = element_text(size = 8))
+      ggsave('f.png', width = 9, height = 6)`;
+    const r = computeReadability(parseRCode(code), 7, 10);
+
+    expect(r.suggestedBaseSize).toBeNull();
+    expect(r.copySnippet).toBeNull();
+  });
+
+  it('FR7: tells the user what each overridden element needs instead', () => {
+    // Dropping overridden rows from the base_size calculation is correct
+    // — but silently dropping them left failing elements with NO advice
+    // at all, which is the half of this finding that actually costs the
+    // user a reprint.
+    const code = `theme_minimal(base_size = 14) +
+      theme(axis.text = element_text(size = 10), axis.title = element_text(size = 12),
+            legend.text = element_text(size = 10), legend.title = element_text(size = 12),
+            plot.title = element_text(size = 16), strip.text = element_text(size = 11),
+            plot.caption = element_text(size = 8))
+      ggsave('f.png', width = 9, height = 6)`;
+    const r = computeReadability(parseRCode(code), 7, 10);
+
+    expect(r.overrideFixes.length).toBeGreaterThan(0);
+    const axis = r.overrideFixes.find((f) => f.name === 'Axis titles')!;
+    expect(axis).toBeDefined();
+    expect(axis.currentPt).toBe(12);
+    // Needs minPt / scale to clear the 18pt floor at this scale.
+    expect(axis.neededPt).toBeGreaterThan(axis.currentPt);
+    // Every entry must be an element that actually fails.
+    for (const f of r.overrideFixes) {
+      expect(r.elements.find((e) => e.name === f.name)!.status).not.toBe('pass');
+    }
+  });
+
+  it('FR7: still recommends a base_size when some elements are not overridden', () => {
+    // The partial case must keep working — only the all-overridden case
+    // has no answer.
+    const code = `theme_minimal(base_size = 11) +
+      theme(axis.text = element_text(size = 10))
+      ggsave('f.png', width = 9, height = 6)`;
+    const r = computeReadability(parseRCode(code), 7, 10);
+    expect(r.suggestedBaseSize).not.toBeNull();
+    expect(r.suggestedBaseSize!).toBeGreaterThan(0);
+    expect(r.copySnippet).toContain('base_size');
+    // ...and the overridden element that fails is still called out.
+    expect(r.overrideFixes.some((f) => f.name === 'Tick labels')).toBe(true);
+  });
+
+  it('FR7: offers no fixes at all when everything passes', () => {
+    const code = `theme_minimal(base_size = 40)
+      ggsave('f.png', width = 9, height = 6)`;
+    const r = computeReadability(parseRCode(code), 7, 10);
+    expect(r.elements.every((e) => e.status === 'pass')).toBe(true);
+    expect(r.overrideFixes).toEqual([]);
+  });
+
   it('uses overrides when present instead of rel() defaults', () => {
     const params: FigureParams = {
       language: 'r',
