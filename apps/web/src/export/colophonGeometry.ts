@@ -99,11 +99,22 @@ const MARK_TO_FONT = 9 / 7;
 const GAP_TO_FONT = 1 / 1.75;
 
 /**
- * Floor on the bottom offset, in poster units. Large-format printers
- * routinely trim 0.25–0.5 in, so 2.5 units (0.25 in) is the minimum at
- * which the line reliably survives the cut.
+ * Edge offset in poster units per inch of short side, anchored so a
+ * 36 in short side gives 3.9 u (0.39 in) — the value the band-centred
+ * version produced, and the one the reference sheet was reviewed at.
  */
-const MIN_BOTTOM_UNITS = 2.5;
+const OFFSET_UNITS_PER_INCH = 3.9 / 36;
+
+/**
+ * Floor and ceiling on the edge offsets, in poster units.
+ *
+ * The floor is the load-bearing one: large-format printers routinely
+ * trim 0.25–0.5 in, so 2.5 units (0.25 in) is the minimum at which the
+ * line reliably survives the cut. The ceiling stops the mark drifting
+ * away from the corner on a large sheet.
+ */
+const MIN_OFFSET_UNITS = 2.5;
+const MAX_OFFSET_UNITS = 4.5;
 
 /**
  * Clearance kept between the top of the mark and the top of the margin
@@ -171,26 +182,27 @@ export function colophonGeometry(widthIn: number, heightIn: number): ColophonGeo
   const markUnits = fontUnits * MARK_TO_FONT;
   const gapUnits = fontUnits * GAP_TO_FONT;
 
-  // Centre the line vertically in the band rather than offsetting it
-  // from the edge. This makes the in-band guarantee STRUCTURAL rather
-  // than a consequence of clamp ordering:
+  // ONE offset, used for both edges, scaled off the same short side as
+  // the size. Two consequences, both deliberate:
   //
-  //     top = bottom + mark = (M - mark)/2 + mark = (M + mark)/2
-  //     (M + mark)/2 < M  <=>  mark < M
+  //   - The mark sits the SAME distance from the bottom and right edges,
+  //     so it reads as seated in the corner. `right` used to be pinned
+  //     at M (1 in) to align with the content column, which left it
+  //     hugging the bottom while sitting an inch off the side — and,
+  //     being absolute, it did not move at all when the poster did.
+  //   - It scales. A fixed offset is proportionally huge on a 24x36 and
+  //     tight on an A0; this keeps the optical distance to the corner
+  //     roughly constant across the catalog.
   //
-  // and `mark <= MAX_FONT_UNITS * 9/7 = 2.57`, far below M = 10. No
-  // poster size can escape the band, at any clamp setting.
-  //
-  // The floor still applies: on a sheet where centring would put the
-  // line nearer the trim than 0.25in, the floor wins.
-  // `BAND_CLEARANCE_UNITS` is then a second, redundant guard — kept
-  // because a redundant guard on a physical constraint is cheap.
-  const centredInBand = (M - markUnits) / 2;
-  const maxOffsetInBand = M - markUnits - BAND_CLEARANCE_UNITS;
-  const bottomUnits = Math.min(
-    Math.max(MIN_BOTTOM_UNITS, centredInBand),
-    maxOffsetInBand,
+  // The band clamp still runs LAST, because the band is a hard physical
+  // constraint and the preference above is not.
+  const preferredOffset = clamp(
+    MIN_OFFSET_UNITS,
+    shortSideIn * OFFSET_UNITS_PER_INCH,
+    MAX_OFFSET_UNITS,
   );
+  const maxOffsetInBand = M - markUnits - BAND_CLEARANCE_UNITS;
+  const bottomUnits = Math.min(preferredOffset, maxOffsetInBand);
 
   // Round FIRST, then derive everything reported from the rounded
   // values. The CSS carries the rounded numbers, so those are what
@@ -207,12 +219,9 @@ export function colophonGeometry(widthIn: number, heightIn: number): ColophonGeo
     fontUnits: fontRounded,
     markUnits: markRounded,
     gapUnits: round2(gapUnits),
-    // The right offset is FIXED at M, not adaptive: every template puts
-    // its content's right edge at `W - M`, so this aligns the credit
-    // with the column above it. An adaptive right offset would float it
-    // a few units off that line at most sizes, which reads as a
-    // misalignment rather than as a choice.
-    rightUnits: M,
+    // Same value as `bottom`: equal distance from both edges is what
+    // makes it read as seated in the corner rather than floated near it.
+    rightUnits: offsetRounded,
     bottomUnits: offsetRounded,
     // NOT rounded: unlike the fields above it is never emitted into
     // CSS, so there is nothing to keep diff-stable — and rounding it

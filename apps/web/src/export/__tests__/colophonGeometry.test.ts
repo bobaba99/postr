@@ -44,11 +44,16 @@ describe('colophonGeometry — invariants at every poster size', () => {
     expect(g.rightUnits).toBeGreaterThanOrEqual(2.5);
   });
 
-  it.each(SIZES)('$key: is centred in the band, not pinned to its edge', ({ w, h }) => {
+  it.each(SIZES)('$key: the offset scales with the poster, not fixed', ({ w, h }) => {
     const g = colophonGeometry(w, h);
-    // Structural: top = (M + mark)/2 < M for any mark < M. The centring
-    // is what makes the in-band guarantee independent of clamp order.
-    expect(g.bottomUnits + g.markUnits / 2).toBeCloseTo(M / 2, 1);
+    const shortSide = Math.min(w, h);
+    // Inside the clamps the offset tracks the short side; at the clamps
+    // it pins. Either way it is never the old fixed 10u.
+    expect(g.bottomUnits).toBeLessThan(M);
+    expect(g.bottomUnits).toBeGreaterThanOrEqual(2.5);
+    if (shortSide * (3.9 / 36) > 2.5 && shortSide * (3.9 / 36) < 4.5) {
+      expect(g.bottomUnits).toBeCloseTo(shortSide * (3.9 / 36), 1);
+    }
   });
 
   it.each(SIZES)('$key: prints below the axis-title floor so it never reads as content', ({ w, h }) => {
@@ -64,10 +69,20 @@ describe('colophonGeometry — invariants at every poster size', () => {
     expect(g.printedPt).toBeGreaterThanOrEqual(CAPTION_FLOOR_PT);
   });
 
-  it.each(SIZES)('$key: is right-aligned to the content column', ({ w, h }) => {
-    // Every template puts its content's right edge at W - M, so the
-    // credit lines up with the column above it rather than floating.
-    expect(colophonGeometry(w, h).rightUnits).toBe(M);
+  it.each(SIZES)('$key: sits the same distance from both edges', ({ w, h }) => {
+    // Equal offsets are what make it read as seated in the CORNER.
+    // `right` was previously pinned at M (1in) to align with the content
+    // column, which left it hugging the bottom while an inch off the
+    // side — and, being absolute, it did not move when the poster did.
+    const g = colophonGeometry(w, h);
+    expect(g.rightUnits).toBe(g.bottomUnits);
+  });
+
+  it.each(SIZES)('$key: stays close to the corner at every size', ({ w, h }) => {
+    const g = colophonGeometry(w, h);
+    // Never further than 0.45in from either edge, on any poster.
+    expect(g.rightUnits).toBeLessThanOrEqual(4.5);
+    expect(g.bottomUnits).toBeLessThanOrEqual(4.5);
   });
 
   it.each(SIZES)('$key: box width stays well clear of the opposite margin', ({ w, h }) => {
@@ -94,6 +109,17 @@ describe('colophonGeometry — the adaptive behaviour itself', () => {
     expect(g.fontUnits).toBe(1.75);
     expect(g.markUnits).toBe(2.25);
     expect(g.printedPt).toBeCloseTo(12.6, 2);
+  });
+
+  it('moves the corner offset when the poster size changes', () => {
+    // The complaint that prompted this: the mark stayed at the same spot
+    // when the poster changed size.
+    const small = colophonGeometry(24, 36);
+    const mid = colophonGeometry(48, 36);
+    const large = colophonGeometry(42, 42);
+    expect(small.bottomUnits).toBeLessThan(mid.bottomUnits);
+    expect(large.bottomUnits).toBeGreaterThan(mid.bottomUnits);
+    expect(small.rightUnits).toBeLessThan(large.rightUnits);
   });
 
   it('is larger on a bigger poster and smaller on a smaller one', () => {
