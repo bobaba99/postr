@@ -22,16 +22,105 @@ on another having landed first.
 
 ---
 
+## ⚠ The systematic root cause — read this before fixing any geometry finding
+
+Added 2026-09-13, after F8 turned out not to be a local defect.
+
+**Text-like blocks do not render at their stored height.** `blocks.tsx`'s
+`growsWithContent` path (title, text, references, authors, some tables) renders
+`height: 'auto'`. The stored `b.h` never updates to match.
+
+Worse than stale — **disconnected**. Since commit `d54b70e` the frame's
+`minHeight` is a constant 12 (6 for authors/title), not `b.h`, and `overflow`
+is `visible`. So for those types `b.h` renders nothing, floors nothing and
+clips nothing. It is decorative metadata that several modules still treat as
+truth. Three comments in the codebase still assert the old contract, and one of
+them is the entire justification for a 90-line workaround.
+
+**Reproduced** — `apps/web/scripts/geometry-desync.mjs`, real layout:
+
+```
+BLOCK   stored h   rendered h   drift
+intro        100       185.44   +85.44      (8.5 inches on a real poster)
+
+model:   intro y 120..220, no overlap with the heading at 240   → "clean"
+reality: intro y 120..305, sitting on top of it
+```
+
+**Confirmed consequences**, each run rather than reasoned:
+
+| Site | What breaks |
+|---|---|
+| `boundsCheck.checkBounds` | A block grown clear off the canvas yields **zero** warnings. The ISSUES panel's only geometry check, blind to the blocks most likely to need it. |
+| `ackPlacement.placeAckMark` | Places the colophon mark on top of a grown block — against an invariant the module documents as *"the returned rect NEVER overlaps any existing block"*. Part of the colophon overlap filed below is this, not only the template bug. |
+| `PosterEditor` `titleOverflowPx` | The same defect already point-fixed **for the title block only**. Its own comment calls it the "B1 fix". |
+| F8's proposed collision check | Would have been the fourth consumer of the stale number, and would have found nothing in F8's own repro. |
+
+**Why it survived:** jsdom performs no layout, so `offsetHeight` is always 0 and
+this class of defect is invisible to the unit suite *by construction*. Every
+geometry consumer has passing tests, because every one is correct **given
+correct input**. Nothing supplies correct input. The browser harnesses
+(`geometry-desync.mjs`, `colophon-shots.mjs`) are the only things that can see it.
+
+**What it does NOT explain** — stated so this stays analysis rather than
+pattern-matching: the templates placing blocks past the sheet bottom (build-time
+arithmetic, wrong before anything renders), F1's group-move undo (push
+ordering), and the 50 pt colophon (px-vs-pt confusion — same family, different
+cause).
+
+### The remedy decision
+
+**Chosen: the smallest correct measurement fix, scoped to F8. Not the
+write-back.**
+
+One `ResizeObserver` on `canvasRef` observing every `[data-block-id]`, producing
+`Map<blockId, offsetHeight>`; fed to exactly two call sites — `checkBounds`
+gains an optional heights map, and `posterIssues` gains a pairwise overlap
+check. ~40 lines, no change to the render, store, undo, autosave or exports.
+Measured payoff: 3col at 48×36 goes from 0 warnings to a `references:bottom`
+warning at +30 units of real growth.
+
+**Writing the measured height back into `b.h` is the right end state and is a
+project, not a patch.** Four things must land together or it ships a regression:
+
+1. **It diverges** for image/logo blocks with a caption or note. `blocks.tsx:1652`
+   pins the inner content to `block.h` and the chrome is additive, so the write
+   grows unboundedly: 148 → 170 → 192 → 214, +22 per frame. No threshold or
+   equality guard fixes that; the value genuinely changes each pass.
+2. **It silently disables the B1 fix.** `titleOverflowPx = max(0, offsetHeight −
+   titleBlockH)` becomes 0 the moment `b.h` is true, so the shift that pushes
+   every other block down evaporates and a wrapped title lands back on the
+   authors row. "Every consumer becomes correct for free" is false — one of them
+   becomes wrong. Fixing it properly means reflowing siblings' stored `y`, i.e.
+   a layout engine.
+3. **Store path**: must go through `setBlocksSilent`, or one keystroke's growth
+   becomes 40 undo entries.
+4. **Mount guard**: without one, opening any poster re-saves and re-thumbnails it.
+
+Autosave is a non-issue (zero extra network writes). Exports would genuinely
+improve — PPTX/LaTeX heights would finally match the PDF — but heights only.
+
+### New findings from the sweep
+
+- **S1 — `b.h` is decorative for text-like blocks** (`blocks.tsx:2023-2040`).
+  The root cause above. Three stale comments to correct alongside it.
+- **S7 — vertical resize of a title, text or table block is a silent no-op**
+  (`PosterEditor.tsx:489-503`). The drag writes `h`, the frame ignores it, and
+  the resize-warning map covers only heading/authors/references — so those three
+  types warn and these three say nothing at all. Own branch.
+
+---
+
 ## The impact ranking at a glance
 
 | Rank | ID | What the user loses | Do they notice? | Frequency |
 |---|---|---|---|---|
 | — | PREVIEW-1..6 | Preview crashed; Print dead; images dropped; zoom killed; Backspace deleted blocks | Mixed — 2 silent | ✅ **fixed** |
 | — | WM-2 | Credit printed at 50 pt on a conference wall | Yes, at the printer | ✅ **fixed** |
-| 1 | **FR1–FR7, PY-1/2/3** | **A wrong PASS on a figure they then print** | **No — never** | Every figure check |
-| 2 | **F3** | Structural edits silently unrecoverable after ~50 keystrokes | No, until they try to undo | Every session |
-| 3 | **F6** | Pasted text corrupted — words glued together | Rarely; it looks like a typo | Every Word/Docs paste |
-| 4 | **F8** | Clipped text + overlapping blocks ship to the printer | No — ISSUES says "clean" | Any dense poster |
+| — | **FR1–FR7, PY-1/2/3/4** | A wrong PASS on a figure they then print | No — never | ✅ **fixed** |
+| — | **F3** | Structural edits silently unrecoverable after ~50 keystrokes | No, until they try to undo | ✅ **fixed** |
+| — | **F6** | Pasted text corrupted — words glued together | Rarely; it looks like a typo | ✅ **fixed** |
+| 1 | **F8** | Clipped text + overlapping blocks ship to the printer | No — ISSUES says "clean" | ⚠ see root cause above |
 | 5 | **F1** | A group move can never be undone | Yes, and it looks broken | Any multi-select edit |
 | 6 | **F5** | Poster clipped after "Fit"; a whole column hidden on a 13" laptop | Yes, looks like a rendering bug | Every fit on a small screen |
 | 7 | **FR9** | Pasted plotting script destroyed by clicking a text block | Yes, and it is infuriating | Common |

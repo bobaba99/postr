@@ -11,6 +11,14 @@ initial reading, the correction is recorded rather than quietly dropped.
 
 Severity: `data-loss` > `major` > `minor`.
 
+> **Status, 2026-09-13.** F3, F6 and the preview crash are FIXED and merged.
+> F8 turned out not to be local: it is one symptom of a stored-vs-rendered
+> geometry desync that also explains part of the colophon overlap and breaks
+> `checkBounds` outright. Read the root-cause section at the top of
+> [`TRIAGE.md`](./TRIAGE.md) before touching any geometry finding here —
+> including F1 and F5, which it does *not* explain. Reproduction:
+> `apps/web/scripts/geometry-desync.mjs`.
+
 ---
 
 ## F1 — A multi-block (group) move can never be undone · major
@@ -96,7 +104,7 @@ redo) or keep delegating (and accept no redo).
 
 ---
 
-## F3 — Undo history is one snapshot per keystroke, capped at 50 · data-loss
+## F3 — Undo history is one snapshot per keystroke, capped at 50 · data-loss · ✅ FIXED
 
 **Repro**
 1. Delete the `Hypotheses` heading (select → red ✕ *Delete block*).
@@ -168,7 +176,7 @@ scroll offset after fitting.
 
 ---
 
-## F6 — Pasting from Word/Docs/web merges paragraphs and glues words · data-loss
+## F6 — Pasting from Word/Docs/web merges paragraphs and glues words · data-loss · ✅ FIXED
 
 **Repro** Copy 2–3 paragraphs from Word, Google Docs or any web page; click into
 a text block, select all, paste.
@@ -249,6 +257,30 @@ The panel says it scans for "blocks outside the canvas, missing required
 content, empty figures, and other common problems" — but text overflowing its
 own box and blocks sitting on top of each other are the two defects most likely
 to ruin a printed poster, and the researcher finds out at the printer.
+
+**Correction and root cause, 2026-09-13.** This is not a missing check; it is a
+missing *input*. Text-like blocks render `height: auto` and the stored `b.h`
+never updates — worse, since commit `d54b70e` `b.h` is absent from their layout
+entirely (`minHeight` is a constant, `overflow` is `visible`), so it renders
+nothing, floors nothing and clips nothing.
+
+A collision check written over stored `x/y/w/h` — the obvious fix, and the one
+this entry implies — **would have found nothing in this very repro**, because
+the stored height does not change when you paste. Measured drift on a real
+render: stored 100, rendered 185.44.
+
+Two halves, and they are not equally real:
+
+- **Collisions: confirmed**, and caused by the growth described above.
+- **"30 px of text clipped": probably stale.** `overflow: visible` means a
+  grown text block does not clip. That observation likely predates the
+  auto-grow, or was taken on a block type that does not grow (images, logos).
+  Re-check in a browser before building anything for it.
+
+The fix, its cost, and why the tempting write-back remedy is a project rather
+than a patch are in `TRIAGE.md`'s root-cause section. Same section lists two
+further findings this uncovered: `b.h` being decorative (S1) and vertical
+resize being a silent no-op on title/text/table blocks (S7).
 
 ---
 
