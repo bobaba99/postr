@@ -56,6 +56,18 @@
         "You only pay to export to PowerPoint or LaTeX. The free poster workflow — editor, tools, and watermarked PDF — has no limits. All prices are in Canadian dollars, charged through Stripe."
       ]
     },
+    "/tools/figure-readability": {
+      "title": "Figure Font Size Checker for Posters — R & Python | Postr",
+      "description": "Paste ggplot2 or matplotlib code. Get the printed point size of every label at your poster size, and the exact base_size to fix it. Free, no signup.",
+      "robots": "index,follow",
+      "h1": "Will your figure labels be readable at poster size?",
+      "copy": [
+        "Paste your R (ggplot2) or Python (matplotlib, seaborn) plotting code, type the size the figure will print at, and see the point size of every label on paper — axis titles need 18 pt, tick labels 14 pt, captions 12 pt. If anything falls short, copy the base_size fix. No account, and your code never leaves the browser.",
+        "How the check works: it scales your figure from its source canvas (the ggsave() or figsize your code sets, or the typed size when it sets none) to the printed size, then scores every element against poster thresholds — 18 pt for titles and axis titles, 14 pt for tick labels, legends and strips, 12 pt for captions.",
+        "If anything falls short, the check back-calculates the smallest base_size that makes every element pass and hands it to you as a one-line snippet or as your full script with the edit already made.",
+        "Postr is a free academic poster editor with this same check built into its Figure tab, sized against the figure box on your canvas or the exact print dimensions of an image block."
+      ]
+    },
     "/privacy": {
       "title": "Privacy Policy for Postr Researchers",
       "description": "How Postr collects, stores, and protects your data, including anonymous sessions, poster documents, and cookies. Plain language, no dark patterns.",

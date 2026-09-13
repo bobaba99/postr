@@ -8,6 +8,10 @@
  * switched off (see the routes.tsx header). These tests pin the
  * deactivation contract: each route must client-side redirect
  * (replace) to the landing page instead of rendering the feature.
+ *
+ * The figure-readability checker is the one standalone tool that IS
+ * mounted (/tools/figure-readability, alias /plot-checker) — pinned
+ * at the bottom so a future hide pass has to flip it deliberately.
  */
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router';
@@ -78,6 +82,41 @@ describe('deactivated manuscript pipeline + presentation checker routes', () => 
  * spelling both land on the landing page in one hop. charts/* itself
  * stays live inside the editor's Figure tab — only the page is off.
  */
+/**
+ * The standalone figure-readability check is LIVE: its canonical route
+ * renders the page, and its alias lands there in one client-side hop
+ * (vercel.json issues the real 308 for cold hits).
+ */
+describe('standalone figure-readability routes', () => {
+  it('renders the checker at /tools/figure-readability', async () => {
+    renderAt('/tools/figure-readability');
+
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: /will your figure labels be readable at poster size/i,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('location-probe')).toHaveTextContent(
+      /^\/tools\/figure-readability$/,
+    );
+  });
+
+  it('redirects the /plot-checker alias to the canonical page', async () => {
+    renderAt('/plot-checker');
+
+    expect(await screen.findByTestId('location-probe')).toHaveTextContent(
+      /^\/tools\/figure-readability$/,
+    );
+    expect(
+      await screen.findByRole('heading', {
+        level: 1,
+        name: /will your figure labels be readable at poster size/i,
+      }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('deactivated standalone plot picker routes', () => {
   it.each(['/chart-chooser', '/plot-picker'])(
     'redirects %s to the landing page',

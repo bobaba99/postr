@@ -87,7 +87,16 @@ const SEABORN_CONTEXTS: Record<string, number> = {
 export interface ParseOptions {
   defaultWidthIn?: number;
   defaultHeightIn?: number;
+  /**
+   * How the "no canvas size in your code" warning names the fallback
+   * size. The editor's Check tab passes nothing and gets "figure
+   * preview size" (the canvas overlay); the public page names the
+   * size the user typed instead. Only read when defaultWidthIn is set.
+   */
+  defaultSizeLabel?: string;
 }
+
+const DEFAULT_SIZE_LABEL = 'figure preview size';
 
 export function parseRCode(code: string, options: ParseOptions = {}): FigureParams {
   const warnings: string[] = [];
@@ -151,7 +160,7 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
     else if (units === 'px') { width /= dpi; height /= dpi; }
   } else if (options.defaultWidthIn !== undefined) {
     warnings.push(
-      `No ggsave() found — using figure preview size ${width.toFixed(1)}"×${height.toFixed(1)}" as the source canvas.`,
+      `No ggsave() found — using ${options.defaultSizeLabel ?? DEFAULT_SIZE_LABEL} ${width.toFixed(1)}"×${height.toFixed(1)}" as the source canvas.`,
     );
   } else {
     warnings.push('No canvas size found — assuming R default 7"×7" (ggsave).');
@@ -233,7 +242,7 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
     height = parseFloat(fs[2]!);
   } else if (options.defaultWidthIn !== undefined) {
     warnings.push(
-      `No figsize=(w,h) found — using figure preview size ${width.toFixed(1)}"×${height.toFixed(1)}" as the source canvas.`,
+      `No figsize=(w,h) found — using ${options.defaultSizeLabel ?? DEFAULT_SIZE_LABEL} ${width.toFixed(1)}"×${height.toFixed(1)}" as the source canvas.`,
     );
   } else {
     warnings.push('No canvas size found — assuming matplotlib default 6.4"×4.8".');

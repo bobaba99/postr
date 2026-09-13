@@ -22,7 +22,7 @@ export function PublicFooter() {
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-[1.2fr_1fr_1fr_1fr_1fr]">
           {/* Brand column */}
           <div className="col-span-2 sm:col-span-1">
-            <Link to="/" className="flex items-center gap-3 no-underline">
+            <Link to="/" className="flex min-h-11 items-center gap-3 no-underline">
               <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
                 <rect width="64" height="64" rx="12" fill="#7c6aed" />
                 <path d="M12 52 C30 52, 34 12, 52 12" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
@@ -37,16 +37,17 @@ export function PublicFooter() {
           </div>
 
           {/* The standalone tools live here as well as in the header's
-              overflow menu when any are live: the flat header nav is
-              `xl:`-gated, so on phones this column is the redundant
-              route to them. None are live right now — "Plot picker"
+              overflow menu: the flat header nav is `xl:`-gated, so on
+              phones this column is the redundant route to them. Only
+              "Plot checker" is live — "Plot picker"
               (/chart-chooser), "Paper to poster" and "Paper to slides"
-              were all removed here: deactivated — see routes.tsx
-              header. Re-add them after "Pricing", picker first, then
-              the plot checker when its page lands. */}
+              were removed here: deactivated — see routes.tsx header.
+              Re-add them after "Pricing", picker first, in front of
+              the checker. Mirrors PublicHeader TOOL_LINKS. */}
           <FooterColumn title="Product">
             <FooterLink to="/">Home</FooterLink>
             <FooterLink to="/pricing">Pricing</FooterLink>
+            <FooterLink to="/tools/figure-readability">Plot checker</FooterLink>
           </FooterColumn>
 
           <FooterColumn title="Learn">

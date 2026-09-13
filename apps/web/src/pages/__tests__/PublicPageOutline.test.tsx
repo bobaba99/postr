@@ -31,6 +31,8 @@ const auditedFiles = [
   'pages/PaperToPoster.tsx',
   'pages/PaperToSlides.tsx',
   'pages/ChartChooser.tsx',
+  'pages/FigureReadability.tsx',
+  'poster/PrintSizeFields.tsx',
   'pages/WhyPosters.tsx',
   'pages/Editor.tsx',
   'pages/Privacy.tsx',

@@ -36,9 +36,10 @@ const BASE = `http://localhost:${PORT}`;
 // /paper-to-poster, /paper-to-slides, /presentation-checker and
 // /chart-chooser are deactivated (apps/web/src/routes.tsx header) and
 // redirect to /, so scraping them would only re-record the landing page
-// under another name.
+// under another name. /tools/figure-readability is the live standalone
+// checker.
 const ROUTES = [
-  '/', '/about', '/why-posters', '/pricing',
+  '/', '/about', '/why-posters', '/pricing', '/tools/figure-readability',
   '/privacy', '/privacy/fr', '/cookies', '/cookies/fr', '/terms', '/terms/fr',
   '/auth', '/dashboard', '/profile', '/billing/success', '/billing/cancel',
   '/p/new', '/404',

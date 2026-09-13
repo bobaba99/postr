@@ -69,6 +69,7 @@ const headerRules = vercelConfig.headers ?? [];
 const CLIENT_ROUTES = [
   '/',
   '/about',
+  '/tools/figure-readability',
   '/gallery',
   '/gallery/:entryId',
   '/privacy',
@@ -94,7 +95,9 @@ const CLIENT_ROUTES = [
  * one indexed URL; every other spelling must 308 to it rather than
  * render a duplicate.
  *
- * Every alias now points at "/": all the canonical tool routes are
+ * /plot-checker is the one live alias: it 308s to the figure-
+ * readability checker, the only standalone tool currently mounted.
+ * Every other alias points at "/": their canonical tool routes are
  * deactivated (routes.tsx header), and a 308 to a route that itself
  * only redirects would be a pointless hop. /manuscript-to-poster
  * especially — that URL was live in production and in the sitemap, so
@@ -103,6 +106,7 @@ const CLIENT_ROUTES = [
  * is retargeted rather than dropped.
  */
 const ALIAS_REDIRECTS: Array<[string, string]> = [
+  ['/plot-checker', '/tools/figure-readability'],
   ['/plot-picker', '/'],
   ['/manuscript-to-poster', '/'],
   ['/paper-to-present', '/'],
@@ -124,6 +128,8 @@ const DEACTIVATED_ROUTES = [
 /** Paths that must fall through to the platform 404. */
 const UNKNOWN_PATHS = [
   '/wp-admin',
+  // The bare parent of /tools/figure-readability is not a page.
+  '/tools',
   '/asdf',
   '/random/deep/path.php',
   '/debug',

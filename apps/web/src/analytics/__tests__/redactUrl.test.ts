@@ -44,6 +44,7 @@ describe('public routes are kept — this is the data worth having', () => {
     '/',
     '/about',
     '/chart-chooser',
+    '/tools/figure-readability',
     '/paper-to-poster',
     '/privacy',
     '/cookies',

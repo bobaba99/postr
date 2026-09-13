@@ -19,6 +19,10 @@
  *     surface is purpose-built for phones (PosterEditor `mobileShare`)
  *     and its fixed bottom bar holds the only controls a visitor has —
  *     Comments and "Make your own" — which a bottom strip would cover;
+ *   - renders nothing on the public figure-readability check
+ *     (`/tools/figure-readability`), built phone-first (16px inputs,
+ *     44px targets): "open this on a computer" is false there and the
+ *     strip would sit over the results table;
  *   - dismissal is a real button and persists for the session, so the
  *     strip never re-appears on every route change;
  *   - storage failures (private mode, blocked site data) are ignored —
@@ -41,13 +45,17 @@ import { SMALL_SCREEN_QUERY, useIsSmallScreen } from '@/hooks/useIsSmallScreen';
  */
 export const MOBILE_NOTICE_QUERY = SMALL_SCREEN_QUERY;
 
+/** The one standalone tool — a phone-first page (pages/FigureReadability.tsx). */
+const FIGURE_READABILITY_PATH = '/tools/figure-readability';
+
 /**
  * Routes that already have a phone-optimised layout, where the notice's
- * claim is false and its strip would hide the page's own bottom bar.
- * Today: the public read-only share view.
+ * claim is false and its strip would hide the page's own controls.
+ * Today: the public read-only share view and the figure-readability
+ * check.
  */
 export function isPhoneOptimisedPath(pathname: string): boolean {
-  return /^\/s\//.test(pathname);
+  return /^\/s\//.test(pathname) || pathname.replace(/\/+$/, '') === FIGURE_READABILITY_PATH;
 }
 
 /** sessionStorage flag: "1" once the visitor dismissed the strip. */

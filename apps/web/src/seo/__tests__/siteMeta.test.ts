@@ -59,8 +59,20 @@ describe('STATIC_ROUTE_META', () => {
       '/privacy/fr',
       '/terms',
       '/terms/fr',
+      '/tools/figure-readability',
       '/why-posters',
     ]);
+  });
+
+  it('describes the figure-readability checker for both R and Python users', () => {
+    // The page serves both audiences equally; a record that only named
+    // one would rank for half the query space it exists for.
+    const meta = STATIC_ROUTE_META['/tools/figure-readability'];
+    const copy = staticCopyFor('/tools/figure-readability');
+    const text = `${meta?.title} ${meta?.description} ${copy?.copy.join(' ')}`;
+    expect(text).toMatch(/\bR\b/);
+    expect(text).toMatch(/Python|matplotlib/);
+    expect(copy?.h1).toBe('Will your figure labels be readable at poster size?');
   });
 
   it.each([
