@@ -441,18 +441,40 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
   let baseSize = PY_DEFAULTS.baseSize;
   let fontScale = 1.0;
 
-  // rcParams
-  const rc = src.match(/(?:plt|matplotlib)\.rcParams\s*\[\s*['"]font\.size['"]\s*\]\s*=\s*([\d.]+)/);
-  if (rc) baseSize = parseFloat(rc[1]!);
+  // rcParams — two forms, both common. The dict form
+  // `plt.rcParams.update({'font.size': 22})` matched NOTHING, so a 22pt
+  // figure was reported as a 10pt disaster and the offered fix was a
+  // no-op (PY-1).
+  const rcItemRe = /(?:plt|matplotlib)\.rcParams\s*\[\s*['"]font\.size['"]\s*\]\s*=\s*([\d.]+)/g;
+  const rcUpdateRe = /(?:plt|matplotlib)\.rcParams\.update\s*\(\s*\{(?:[^{}]|\{[^{}]*\})*?['"]font\.size['"]\s*:\s*([\d.]+)/g;
+  // Whichever appears LATER in the source wins. That is source position,
+  // not execution order — a size set inside a branch or a function called
+  // later would be misordered — but it is strictly better than seeing
+  // only one of the two forms, and the alternative is a Python parser.
+  let rcBest: { at: number; value: number } | null = null;
+  for (const re of [rcItemRe, rcUpdateRe]) {
+    let mm: RegExpExecArray | null;
+    while ((mm = re.exec(src)) !== null) {
+      if (!rcBest || mm.index >= rcBest.at) rcBest = { at: mm.index, value: parseFloat(mm[1]!) };
+    }
+  }
+  const rc = rcBest;
+  if (rc) baseSize = rc.value;
 
   // seaborn set_theme font_scale
   const sns_scale = src.match(/sns\.set_theme\s*\([^)]*font_scale\s*=\s*([\d.]+)/);
   if (sns_scale) fontScale = parseFloat(sns_scale[1]!);
 
-  // seaborn set_context
+  // seaborn set_context. The context name and `font_scale` MULTIPLY —
+  // seaborn applies the scale on top of the context's own factor — but
+  // the name used to overwrite any scale already read, so
+  // `set_context("poster", font_scale=0.55)` reported 20pt where 11 is
+  // right, roughly doubling the figure's apparent size (PY-2).
   const sns_ctx = src.match(/sns\.set_context\s*\(\s*["'](\w+)["']/);
+  const sns_ctx_scale = src.match(/sns\.set_context\s*\([^)]*font_scale\s*=\s*([\d.]+)/);
   if (sns_ctx) {
-    fontScale = SEABORN_CONTEXTS[sns_ctx[1]!] ?? 1.0;
+    fontScale = (SEABORN_CONTEXTS[sns_ctx[1]!] ?? 1.0)
+      * (sns_ctx_scale ? parseFloat(sns_ctx_scale[1]!) : 1.0);
   }
 
   baseSize = baseSize * fontScale;
@@ -463,20 +485,24 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
 
   // Per-element overrides
   const overrides: Partial<Record<ElementKey, number>> = {};
-  // matplotlib has no per-axis font selector of this shape — set_xlabel
-  // and set_ylabel are separate calls, both folded into axisTitle below
-  // — so anything parsed here covers the element completely.
+  // `[^)]*` could not cross a ')' inside the label TEXT, so
+  // `set_xlabel("Time (min)", fontsize=10)` dropped the explicit size —
+  // and units in parentheses appear in nearly every real axis label
+  // (PY-3). One level of nesting is now allowed before the keyword.
+  const ARGS = '(?:[^()]|\\([^()]*\\))*?';
+  const argRe = (fn: string, kw: string) =>
+    new RegExp(`${fn}\\s*\\(${ARGS}${kw}\\s*=\\s*([\\d.]+)`);
+  const xlabel = src.match(argRe('set_xlabel', 'fontsize'));
+  const ylabel = src.match(argRe('set_ylabel', 'fontsize'));
+  const title = src.match(argRe('set_title', 'fontsize'));
+  const ticks = src.match(argRe('tick_params', 'labelsize'));
+  if (xlabel || ylabel) overrides.axisTitle = parseFloat((xlabel ?? ylabel)![1]!);
+  if (ticks) overrides.axisText = parseFloat(ticks[1]!);
+  if (title) overrides.plotTitle = parseFloat(title[1]!);
+  // Preserved from the per-axis branch: matplotlib has no per-axis
+  // font selector of this shape, so anything parsed here covers the
+  // element completely.
   const overrideCoversAll: Partial<Record<ElementKey, boolean>> = {};
-  const xlabel = src.match(/set_xlabel\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
-  const ylabel = src.match(/set_ylabel\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
-  const title = src.match(/set_title\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
-  const ticks = src.match(/tick_params\s*\([^)]*labelsize\s*=\s*([\d.]+)/);
-  if (xlabel || ylabel) {
-    overrides.axisTitle = parseFloat((xlabel ?? ylabel)![1]!);
-    overrideCoversAll.axisTitle = true;
-  }
-  if (ticks) { overrides.axisText = parseFloat(ticks[1]!); overrideCoversAll.axisText = true; }
-  if (title) { overrides.plotTitle = parseFloat(title[1]!); overrideCoversAll.plotTitle = true; }
 
   // figsize — same overlay-default override pattern as parseRCode.
   // If the user's Python src doesn't set figsize=(w,h) we prefer
