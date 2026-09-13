@@ -1310,6 +1310,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   const setStyle = usePosterStore((s) => s.setStyle);
   const setBlocks = (next: Block[]) => storeSetBlocks(next);
 
+  // Bound here so the typing path can reach the store action that
+  // coalesces. See `updateBlock` below for why that matters.
+  const storeUpdateBlock = usePosterStore.getState().updateBlock;
+
   // Ref to latest blocks for use in pointer event closures (rubber-band).
   const outerBlocksRef = useRef(doc.blocks);
   outerBlocksRef.current = doc.blocks;
@@ -1641,8 +1645,19 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     setPoster(posterId, { ...latest, ...patch });
   };
 
+  // Routed to the STORE's updateBlock, not to setBlocks.
+  //
+  // This wrapper used to rebuild the block list itself and hand it to
+  // `setBlocks`, which pushes an undo entry with no coalesce key. Every
+  // canvas and sidebar keystroke therefore took that path, and the
+  // coalescing added to the store's `updateBlock` never ran for typing —
+  // the one case it exists for. The store test passed because it called
+  // the store action directly; nothing tested the path the editor uses.
+  //
+  // The store action performs the identical map, so this is a pure
+  // delegation, and it removes a second copy of that logic.
   const updateBlock = (id: string, patch: Partial<Block>) =>
-    setBlocks(doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+    storeUpdateBlock(id, patch);
 
   // Single-block delete — the block frame's ✕ button, the context
   // menu's Delete entry, and the sidebar control all route here.

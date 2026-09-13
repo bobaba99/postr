@@ -339,3 +339,49 @@ describe('preview mode', () => {
     expect(screen.queryByRole('button', { name: /back to editor/i })).not.toBeInTheDocument();
   });
 });
+
+describe('undo coalescing reaches the path the editor actually uses', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', NoopResizeObserver);
+    usePosterStore.getState().setPoster('fixture-1', makeDoc(), 'Sample Poster');
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('coalesces a burst typed into the canvas, not just via the store API', () => {
+    // THE POINT OF THIS TEST. PosterEditor's `updateBlock` used to rebuild
+    // the block list and call `setBlocks`, which pushes an undo entry with
+    // NO coalesce key — so every canvas and sidebar keystroke bypassed the
+    // coalescing, the one case it exists for.
+    //
+    // My first two attempts at this test called
+    // `usePosterStore.getState().updateBlock(...)` directly and BOTH passed
+    // against the broken wrapper, because the store action was never the
+    // thing that was broken. It has to drive the contenteditable.
+    renderEditor();
+
+    const frame = document.querySelector('[data-block-id="b1"]') as HTMLElement;
+    expect(frame).not.toBeNull();
+    const editable = frame.querySelector('[contenteditable]') as HTMLElement;
+    expect(editable).not.toBeNull();
+
+    const original = usePosterStore
+      .getState()
+      .doc!.blocks.find((b) => b.id === 'b1')!.content;
+
+    // 30 keystrokes, as the browser delivers them: mutate the DOM, fire input.
+    for (let i = 1; i <= 30; i++) {
+      editable.innerHTML = `${original}${'x'.repeat(i)}`;
+      fireEvent.input(editable);
+    }
+
+    const typed = usePosterStore.getState().doc!.blocks.find((b) => b.id === 'b1')!.content;
+    expect(typed).not.toBe(original);
+
+    // One undo clears the whole burst. Uncoalesced, it would step back a
+    // single keystroke and this would fail.
+    usePosterStore.getState().undo();
+    expect(
+      usePosterStore.getState().doc!.blocks.find((b) => b.id === 'b1')!.content,
+    ).toBe(original);
+  });
+});
