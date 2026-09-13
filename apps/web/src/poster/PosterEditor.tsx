@@ -39,7 +39,7 @@ import { PosterPreviewOverlay } from './PosterPreviewOverlay';
 import { SelectionRect } from './SelectionRect';
 import { GroupFrame, groupBounds } from './GroupFrame';
 import { UndoToast } from './UndoToast';
-import { checkBounds, type OobWarning } from './boundsCheck';
+import { checkBounds, checkCollisions, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
 import {
@@ -990,6 +990,68 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     return () => ro.disconnect();
   }, [titleBlockId, titleBlockH]);
 
+
+  // ── Measured block heights ────────────────────────────────────────
+  //
+  // ONE observer for every block, not one per consumer. Text-like blocks
+  // render `height: auto` and their stored `b.h` is not in that layout at
+  // all, so anything deciding from `b.h` is deciding from a number that
+  // has been decorative since d54b70e. Measured drift on a real render:
+  // stored 100, rendered 185.44 — 8.5 inches on a poster.
+  //
+  // Offset metrics are pre-transform, so the canvas's `scale(zoom)` needs
+  // no compensation here — the same property the title-overflow effect
+  // above already relies on.
+  //
+  // Deliberately NOT written back into `b.h`. That would be the better end
+  // state and is a project, not a patch: it diverges without bound for
+  // image blocks with captions (+22 units per frame, because `b.h` IS the
+  // inner height there), and it would zero `titleOverflowPx`, re-opening
+  // the bug that shift was shipped to fix.
+  const [measuredHeights, setMeasuredHeights] = useState<ReadonlyMap<string, number>>(
+    () => new Map(),
+  );
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let raf = 0;
+    const read = () => {
+      raf = 0;
+      const next = new Map<string, number>();
+      for (const el of canvas.querySelectorAll<HTMLElement>('[data-block-id]')) {
+        const id = el.getAttribute('data-block-id');
+        if (id) next.set(id, el.offsetHeight);
+      }
+      setMeasuredHeights((prev) => {
+        // Equal maps must not re-render: this feeds the ISSUES list, and
+        // a new Map identity every frame would recompute it forever.
+        if (prev.size === next.size) {
+          let same = true;
+          for (const [k, v] of next) {
+            if (prev.get(k) !== v) { same = false; break; }
+          }
+          if (same) return prev;
+        }
+        return next;
+      });
+    };
+    const schedule = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(read);
+    };
+
+    read();
+    const ro = new ResizeObserver(schedule);
+    for (const el of canvas.querySelectorAll<HTMLElement>('[data-block-id]')) ro.observe(el);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+    // Re-attach when the block SET changes; growth within a block is the
+    // observer's job, not this effect's.
+  }, [doc?.blocks.map((b) => b.id).join(','), previewMode]);
+
   // Autosave — debounces doc changes and persists via upsertPoster.
   // Status drives the pill rendered in the top-right overlay.
   const autosave = useAutosave(readOnly ? null : posterId, doc, posterDisplayName);
@@ -1356,8 +1418,17 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
 
   // Out-of-bounds detection — warns when blocks extend past the poster canvas
   const oobWarnings = useMemo(
-    () => checkBounds(doc.blocks, cW, cH),
-    [doc.blocks, cW, cH],
+    () => checkBounds(doc.blocks, cW, cH, measuredHeights),
+    [doc.blocks, cW, cH, measuredHeights],
+  );
+
+  // F8's second half. Blocks sitting on top of each other is one of the
+  // two defects most likely to ruin a printed poster, and ISSUES never
+  // looked for it. Measured, not stored: pasting text does not change
+  // `b.h`, so a stored-geometry check finds nothing in F8's own repro.
+  const collisions = useMemo(
+    () => checkCollisions(doc.blocks, measuredHeights),
+    [doc.blocks, measuredHeights],
   );
 
   // Auto-numbered captions for figure + table blocks. Number is
@@ -1429,6 +1500,20 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         category: `${w.blockType} out of bounds`,
         message: w.message,
         blockId: w.blockId,
+      });
+    }
+
+    // Collisions — measured, so this sees the growth that stored
+    // geometry cannot. Warning rather than error: two blocks touching is
+    // sometimes deliberate (a caption tucked under a figure), and the
+    // tolerance already dropped the snap-kisses.
+    for (const c of collisions) {
+      out.push({
+        id: `collision-${c.aId}-${c.bId}`,
+        severity: 'warning',
+        category: 'Blocks overlap',
+        message: c.message,
+        blockId: c.aId,
       });
     }
 
@@ -1532,6 +1617,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     return out;
   }, [
     doc.blocks,
+    collisions,
     doc.authors,
     doc.institutions,
     doc.references,
