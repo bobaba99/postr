@@ -198,6 +198,67 @@ describe('parseRCode', () => {
     expect(p.overrides.plotTitle).toBe(28);
   });
 
+  it('FR2: reads per-axis element_text selectors', () => {
+    // `axis.text` followed by `\\s*=` could never match `axis.text.x =`
+    // — the regex hit `.x` where it needed `=` — so the single most
+    // common ggplot idiom parsed to nothing and a 7pt label was reported
+    // at 16pt PASS.
+    const code = `ggplot(mtcars, aes(wt, mpg)) + geom_point() +
+      theme_minimal(base_size = 20) +
+      theme(axis.text.x = element_text(size = 7),
+            axis.title.x = element_text(size = 26))
+      ggsave('fig.png', width = 7, height = 5)`;
+    const p = parseRCode(code);
+    expect(p.overrides.axisText).toBe(7);
+    expect(p.overrides.axisTitle).toBe(26);
+
+    const r = computeReadability(p, 5, 7);
+    expect(r.elements.find((e) => e.name === 'Tick labels')!.status).not.toBe('pass');
+  });
+
+  it('FR2: a size after a nested call argument is still read', () => {
+    // `[^)]*` could not cross the ')' of an inner call, so the explicit
+    // size was dropped.
+    const p = parseRCode('theme(axis.text = element_text(margin = margin(t = 8), size = 9))');
+    expect(p.overrides.axisText).toBe(9);
+  });
+
+  it('FR2: an un-overridden sibling axis still counts against the score', () => {
+    // The trap: overriding ONLY the x axis must not hide the y axis,
+    // which still inherits from base_size. Reporting 20pt here while the
+    // y labels render at 8 * 0.8 = 6.4pt would be a NEW wrong PASS,
+    // introduced by the fix for an old one.
+    const p = parseRCode('theme_minimal(base_size = 8) + theme(axis.text.x = element_text(size = 20))');
+    const r = computeReadability(p, 5, 7);
+    const ticks = r.elements.find((e) => e.name === 'Tick labels')!;
+    expect(ticks.sourcePt).toBeCloseTo(6.4, 1);
+    expect(ticks.status).not.toBe('pass');
+  });
+
+  it('FR2: a bare selector covers both axes', () => {
+    // `axis.text` (no suffix) sets every axis, so nothing inherits and
+    // the explicit value stands even when base_size is larger.
+    const p = parseRCode('theme_minimal(base_size = 40) + theme(axis.text = element_text(size = 9))');
+    const r = computeReadability(p, 5, 7);
+    expect(r.elements.find((e) => e.name === 'Tick labels')!.sourcePt).toBe(9);
+  });
+
+  it('FR2: both axes overridden takes the smaller — the one that fails', () => {
+    const p = parseRCode(
+      'theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 22))',
+    );
+    expect(p.overrides.axisText).toBe(7);
+  });
+
+  it('FR2: a partially-overridden element still informs the base_size advice', () => {
+    // Interaction with FR7: the y axis still depends on base_size, so
+    // this element must NOT be excluded from the recommendation the way
+    // a fully-overridden one is.
+    const p = parseRCode('theme_minimal(base_size = 8) + theme(axis.text.x = element_text(size = 20))');
+    const r = computeReadability(p, 5, 7);
+    expect(r.suggestedBaseSize).not.toBeNull();
+  });
+
   it('handles rel() as a multiplier', () => {
     const code = `
       theme_minimal(base_size = 20) +
@@ -549,6 +610,10 @@ describe('computeReadability', () => {
       effectiveCanvasWidth: 7,
       effectiveCanvasHeight: 7,
       overrides: { axisText: 20 },
+      // Declares the override reaches every axis — i.e. `axis.text`, not
+      // `axis.text.x`. Without it the score conservatively assumes a
+      // sibling axis is still inheriting; see the next case.
+      overrideCoversAll: { axisText: true },
       facetRows: 1,
       facetCols: 1,
       warnings: [],
@@ -558,6 +623,31 @@ describe('computeReadability', () => {
     // 20pt override → effective = (20/7)*10 = 28.6pt — passes easily
     expect(ticks.effectivePt).toBeCloseTo(28.6, 0);
     expect(ticks.status).toBe('pass');
+  });
+
+  it('scores a PARTIAL override against the inheriting sibling axis', () => {
+    // Same 20pt override, but not declared as covering every axis — so
+    // the y labels are still rendering at 11 * 0.8 = 8.8pt and that is
+    // what must be reported. Omitting the flag is the conservative
+    // reading on purpose: a parser that forgets it under-reports rather
+    // than hiding a failing element.
+    const params: FigureParams = {
+      language: 'r',
+      baseSize: 11,
+      canvasWidth: 7,
+      canvasHeight: 7,
+      effectiveCanvasWidth: 7,
+      effectiveCanvasHeight: 7,
+      overrides: { axisText: 20 },
+      facetRows: 1,
+      facetCols: 1,
+      warnings: [],
+    };
+    const ticks = computeReadability(params, 10, 10).elements.find(
+      (e) => e.name === 'Tick labels',
+    )!;
+    expect(ticks.sourcePt).toBeCloseTo(8.8, 1);
+    expect(ticks.status).not.toBe('pass');
   });
 
   it('handles aspect-ratio mismatch using constraining dimension', () => {

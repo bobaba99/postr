@@ -17,6 +17,19 @@ export interface FigureParams {
   effectiveCanvasWidth: number;  // after facet/subplot division
   effectiveCanvasHeight: number;
   overrides: Partial<Record<ElementKey, number>>;
+  /**
+   * Per key: does the explicit override reach EVERY axis? `false` means
+   * a sibling axis still inherits from base_size, so the element is only
+   * partially overridden — it must still count against the score and
+   * still inform the base_size advice.
+   *
+   * Optional, and its ABSENCE is deliberately the conservative reading:
+   * an unset key scores as partially overridden, which takes the smaller
+   * of the explicit and inherited sizes. A parser that forgets to set it
+   * therefore under-reports a size rather than hiding a failing element,
+   * which is the direction this whole finding is about.
+   */
+  overrideCoversAll?: Partial<Record<ElementKey, boolean>>;
   facetRows: number;
   facetCols: number;
   warnings: string[];
@@ -266,30 +279,57 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
   while ((m = themeBase.exec(src)) !== null) baseSize = parseFloat(m[1]!);
   if (!src.match(/base_size\s*=/)) warnings.push('No font size found — assuming ggplot2 default base_size = 11pt.');
 
-  // Per-element overrides from theme()
+  // Per-element overrides from theme().
+  //
+  // Two things the old pattern could not do (FR2):
+  //   - `axis.text.x = ...`. The selector was followed immediately by
+  //     `\s*=`, which hits `.x` where it needs `=`. Per-axis selectors
+  //     are THE standard ggplot idiom (rotated x labels, different y
+  //     sizing), so the exact case this tool exists to catch parsed to
+  //     nothing and a 7pt label was reported as 16pt PASS.
+  //   - `element_text(margin = margin(t = 8), size = 9)`. `[^)]*` cannot
+  //     cross the inner call's `)`, so the explicit size was dropped.
+  //
+  // `overrideCoversAll` tracks WHICH axes an explicit selector reached.
+  // A bare `axis.text` covers both; `axis.text.x` alone leaves y
+  // inheriting from base_size, and reporting only the overridden axis
+  // would swap the old silent wrong PASS for a new one.
   const overrides: Partial<Record<ElementKey, number>> = {};
-  const elementMap: [string, ElementKey, number][] = [
-    ['axis\\.text',    'axisText',    0.8],
-    ['axis\\.title',   'axisTitle',   1.0],
-    ['legend\\.text',  'legendText',  0.8],
-    ['legend\\.title', 'legendTitle', 1.0],
-    ['plot\\.title',   'plotTitle',   1.2],
-    ['strip\\.text',   'stripText',  0.8],
-    ['plot\\.caption', 'caption',     0.67],
+  const overrideCoversAll: Partial<Record<ElementKey, boolean>> = {};
+  const elementMap: [string, ElementKey, boolean][] = [
+    ['axis\\.text',    'axisText',    true],
+    ['axis\\.title',   'axisTitle',   true],
+    ['legend\\.text',  'legendText',  false],
+    ['legend\\.title', 'legendTitle', false],
+    ['plot\\.title',   'plotTitle',   false],
+    ['strip\\.text',   'stripText',   false],
+    ['plot\\.caption', 'caption',     false],
   ];
-  for (const [pat, key, rel] of elementMap) {
-    const re = new RegExp(`${pat}\\s*=\\s*element_text\\s*\\([^)]*size\\s*=\\s*(rel\\s*\\(\\s*[\\d.]+\\s*\\)|[\\d.]+)`, 'g');
-    let last: RegExpExecArray | null = null;
-    while ((m = re.exec(src)) !== null) last = m;
-    if (last) {
-      const raw = last[1]!.trim();
-      if (raw.startsWith('rel')) {
-        const relVal = parseFloat(raw.match(/[\d.]+/)![0]!);
-        overrides[key] = baseSize * relVal;
-      } else {
-        overrides[key] = parseFloat(raw);
-      }
+  for (const [pat, key, hasAxes] of elementMap) {
+    const re = new RegExp(
+      `${pat}(\\.[xy])?\\s*=\\s*element_text\\s*\\((?:[^()]|\\([^()]*\\))*?size\\s*=\\s*(rel\\s*\\(\\s*[\\d.]+\\s*\\)|[\\d.]+)`,
+      'g',
+    );
+    // Last write wins PER SELECTOR (ggplot semantics), then the smallest
+    // across selectors: a checker must report the text that fails, not
+    // the text that passes.
+    const bySelector = new Map<string, number>();
+    let mm: RegExpExecArray | null;
+    while ((mm = re.exec(src)) !== null) {
+      const axis = mm[1] ?? '';
+      const raw = mm[2]!.trim();
+      bySelector.set(
+        axis,
+        raw.startsWith('rel')
+          ? baseSize * parseFloat(raw.match(/[\d.]+/)![0]!)
+          : parseFloat(raw),
+      );
     }
+    if (bySelector.size === 0) continue;
+
+    overrides[key] = Math.min(...bySelector.values());
+    overrideCoversAll[key] =
+      !hasAxes || bySelector.has('') || (bySelector.has('.x') && bySelector.has('.y'));
   }
 
   // Canvas from ggsave() — if missing, fall back to the caller-
@@ -382,6 +422,7 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
     effectiveCanvasWidth: width,
     effectiveCanvasHeight: height,
     overrides,
+    overrideCoversAll,
     facetRows,
     facetCols,
     warnings,
@@ -422,13 +463,20 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
 
   // Per-element overrides
   const overrides: Partial<Record<ElementKey, number>> = {};
+  // matplotlib has no per-axis font selector of this shape — set_xlabel
+  // and set_ylabel are separate calls, both folded into axisTitle below
+  // — so anything parsed here covers the element completely.
+  const overrideCoversAll: Partial<Record<ElementKey, boolean>> = {};
   const xlabel = src.match(/set_xlabel\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
   const ylabel = src.match(/set_ylabel\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
   const title = src.match(/set_title\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
   const ticks = src.match(/tick_params\s*\([^)]*labelsize\s*=\s*([\d.]+)/);
-  if (xlabel || ylabel) overrides.axisTitle = parseFloat((xlabel ?? ylabel)![1]!);
-  if (ticks) overrides.axisText = parseFloat(ticks[1]!);
-  if (title) overrides.plotTitle = parseFloat(title[1]!);
+  if (xlabel || ylabel) {
+    overrides.axisTitle = parseFloat((xlabel ?? ylabel)![1]!);
+    overrideCoversAll.axisTitle = true;
+  }
+  if (ticks) { overrides.axisText = parseFloat(ticks[1]!); overrideCoversAll.axisText = true; }
+  if (title) { overrides.plotTitle = parseFloat(title[1]!); overrideCoversAll.plotTitle = true; }
 
   // figsize — same overlay-default override pattern as parseRCode.
   // If the user's Python src doesn't set figsize=(w,h) we prefer
@@ -469,6 +517,7 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
     effectiveCanvasWidth: width,
     effectiveCanvasHeight: height,
     overrides,
+    overrideCoversAll,
     facetRows,
     facetCols,
     warnings,
@@ -482,7 +531,15 @@ export function computeReadability(
   blockHeightIn: number,
   blockWidthIn: number,
 ): ReadabilityResult {
-  const { effectiveCanvasWidth, effectiveCanvasHeight, baseSize, overrides, language, warnings } = params;
+  const {
+    effectiveCanvasWidth,
+    effectiveCanvasHeight,
+    baseSize,
+    overrides,
+    overrideCoversAll = {},
+    language,
+    warnings,
+  } = params;
 
   // Scale = how much the figure scales up when placed in the block.
   // Use the constraining dimension (like object-fit: contain).
@@ -494,7 +551,18 @@ export function computeReadability(
   const specs = language === 'r' ? R_ELEMENTS : PY_ELEMENTS;
 
   const elements: ReadabilityElement[] = specs.map((spec) => {
-    const sourcePt = overrides[spec.key] ?? baseSize * spec.relMultiplier;
+    // A partially-overridden element (only `axis.text.x` set, say) still
+    // renders its other axis at the inherited size, so the score must
+    // take whichever is smaller — otherwise overriding one axis upward
+    // would HIDE a failing sibling.
+    const inheritedPt = baseSize * spec.relMultiplier;
+    const explicitPt = overrides[spec.key];
+    const sourcePt =
+      explicitPt === undefined
+        ? inheritedPt
+        : overrideCoversAll[spec.key]
+          ? explicitPt
+          : Math.min(explicitPt, inheritedPt);
     const effectivePt = sourcePt * scale;
     const status: 'pass' | 'warn' | 'fail' =
       effectivePt >= spec.minPt ? 'pass' :
@@ -515,7 +583,12 @@ export function computeReadability(
   // only they can inform the recommendation. When none are left, there
   // is no base_size to recommend — `Math.max()` over an all-zero list
   // used to yield 0 and a `base_size = 0` snippet (FR7).
-  const baseDriven = specs.filter((spec) => overrides[spec.key] === undefined);
+  // Partially-overridden elements still have an axis inheriting from
+  // base_size, so they belong in the recommendation; only a FULLY
+  // overridden element is independent of it.
+  const baseDriven = specs.filter(
+    (spec) => overrides[spec.key] === undefined || !overrideCoversAll[spec.key],
+  );
   const suggestedBaseSize = baseDriven.length
     ? Math.ceil(
         Math.max(
