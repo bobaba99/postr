@@ -853,6 +853,49 @@ describe('computeReadability', () => {
   });
 });
 
+describe('font snippet — advice that actually reaches the element', () => {
+  it('expands to per-axis selectors when only one axis was overridden', () => {
+    // ggplot inheritance: a LATER bare `axis.text` does not clear an
+    // EARLIER `axis.text.x`. Emitting the bare selector left the 7pt x
+    // labels — the exact thing flagged — untouched, while growing the y
+    // labels that already passed. Advice that looks right and does
+    // nothing is the failure mode this feature exists to prevent.
+    const code = `theme_minimal(base_size = 20) +
+      theme(axis.text.x = element_text(size = 7))
+      ggsave("f.png", width = 10, height = 7)`;
+    const snip = computeReadability(parseRCode(code), 7, 10).fontSnippet!;
+    expect(snip).toContain('axis.text.x = element_text(size =');
+    expect(snip).toContain('axis.text.y = element_text(size =');
+    expect(snip).not.toMatch(/^\s*axis\.text = /m);
+  });
+
+  it('keeps the bare selector when the override already covers both axes', () => {
+    const code = `theme_minimal(base_size = 20) +
+      theme(axis.text = element_text(size = 7))
+      ggsave("f.png", width = 10, height = 7)`;
+    const snip = computeReadability(parseRCode(code), 7, 10).fontSnippet!;
+    expect(snip).toMatch(/axis\.text = element_text\(size = /);
+    expect(snip).not.toContain('axis.text.x');
+  });
+
+  it('uses the bare selector when nothing was overridden', () => {
+    const code = `theme_minimal(base_size = 11)\nggsave("f.png", width = 9, height = 6)`;
+    const snip = computeReadability(parseRCode(code), 7, 10).fontSnippet!;
+    expect(snip).toMatch(/axis\.text = element_text/);
+    expect(snip).not.toContain('axis.text.x');
+  });
+
+  it('never offers a matplotlib key that does not move a caption', () => {
+    // `figure.titlesize` moves fig.suptitle, not a caption. Emitting it
+    // is a line that silently does nothing.
+    const code = `plt.rcParams['font.size'] = 6\nplt.figure(figsize=(9, 6))`;
+    const r = computeReadability(parsePythonCode(code), 7, 10);
+    expect(r.fontSnippet).not.toContain('figure.titlesize');
+    // Still reported in the per-element advice, just not in the snippet.
+    expect(r.fontFixes.some((f) => f.name === 'Caption')).toBe(true);
+  });
+});
+
 describe('applyFontFixes — the copy button hands back runnable code', () => {
   const rFix = 'theme(\n  axis.title = element_text(size = 17)\n)';
 

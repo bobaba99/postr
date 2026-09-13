@@ -91,6 +91,12 @@ export interface FontFix {
   neededPt: number;
   /** True when the user already sets this element explicitly. */
   wasOverridden: boolean;
+  /**
+   * True when a bare selector is enough. False means the user set ONE
+   * axis explicitly, so the snippet must name both — in ggplot a later
+   * bare `axis.text` does not clear an earlier `axis.text.x`.
+   */
+  bareSelectorReaches: boolean;
 }
 
 export interface ReadabilityResult {
@@ -142,7 +148,11 @@ const PY_ELEMENTS: ElementSpec[] = [
   { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0,  minPt: 18, selector: 'axes.labelsize' },
   { name: 'Tick labels',  key: 'axisText',    relMultiplier: 0.83, minPt: 14, selector: 'xtick.labelsize' },
   { name: 'Legend text',  key: 'legendText',  relMultiplier: 1.0,  minPt: 14, selector: 'legend.fontsize' },
-  { name: 'Caption',      key: 'caption',     relMultiplier: 0.83, minPt: 12, selector: 'figure.titlesize' },
+  // No selector: matplotlib has no rcParams key that moves a caption.
+  // `figure.titlesize` moves fig.suptitle, so emitting it would be a
+  // line that silently does nothing. It is still listed in the
+  // per-element advice — just not in the copyable block.
+  { name: 'Caption',      key: 'caption',     relMultiplier: 0.83, minPt: 12, selector: null },
 ];
 
 const SEABORN_CONTEXTS: Record<string, number> = {
@@ -761,6 +771,11 @@ export function computeReadability(
         currentPt: el.sourcePt,
         neededPt: Math.ceil(spec.minPt / scale),
         wasOverridden: overrides[spec.key] !== undefined,
+        // A bare selector reaches the element unless the user pinned a
+        // single axis: ggplot's later-wins applies between theme() calls,
+        // but a parent element never clears a child that was set.
+        bareSelectorReaches:
+          overrides[spec.key] === undefined || overrideCoversAll[spec.key] === true,
         status: el.status,
       };
     })
@@ -801,7 +816,21 @@ function buildFontSnippet(language: 'r' | 'python', fixes: FontFix[]): string | 
   if (!usable.length) return null;
 
   if (language === 'r') {
-    const args = usable.map((f) => `  ${f.selector} = element_text(size = ${f.neededPt})`);
+    const args = usable.flatMap((f) => {
+      // `axis.text` / `axis.title` have per-axis children. When the user
+      // pinned only one of them, a bare parent selector will NOT reach
+      // it — ggplot keeps the child's explicit value — so the snippet
+      // would grow the passing axis and leave the failing one alone.
+      // Name both axes in that case.
+      const perAxis = f.selector === 'axis.text' || f.selector === 'axis.title';
+      if (perAxis && !f.bareSelectorReaches) {
+        return [
+          `  ${f.selector}.x = element_text(size = ${f.neededPt})`,
+          `  ${f.selector}.y = element_text(size = ${f.neededPt})`,
+        ];
+      }
+      return [`  ${f.selector} = element_text(size = ${f.neededPt})`];
+    });
     return `theme(\n${args.join(',\n')}\n)`;
   }
 
