@@ -39,11 +39,33 @@ export interface ReadabilityElement {
   status: 'pass' | 'warn' | 'fail';
 }
 
+/**
+ * A failing element whose size is set EXPLICITLY in the user's theme.
+ * Changing base_size cannot fix these — the override wins — so each one
+ * needs its own number.
+ */
+export interface OverrideFix {
+  name: string;
+  /** The size the user's code sets, in pt. */
+  currentPt: number;
+  /** The size it must be set to in order to clear its floor at this scale. */
+  neededPt: number;
+}
+
 export interface ReadabilityResult {
   elements: ReadabilityElement[];
   scale: number;
-  suggestedBaseSize: number;
-  copySnippet: string;
+  /**
+   * `null` when there is no base_size worth recommending, i.e. every
+   * element's size is explicitly overridden so base_size governs
+   * nothing. Previously this was `Math.max()` over a list of zeros,
+   * which produced 0 and a snippet that would destroy the figure.
+   */
+  suggestedBaseSize: number | null;
+  /** `null` whenever `suggestedBaseSize` is. */
+  copySnippet: string | null;
+  /** Per-element advice for failing elements base_size cannot reach. */
+  overrideFixes: OverrideFix[];
   warnings: string[];
 }
 
@@ -298,19 +320,45 @@ export function computeReadability(
   // Back-calculate suggested base_size: the smallest base that makes
   // every element pass. For each element: base * rel * scale >= min
   // → base >= min / (rel * scale). Take the max across all.
-  const suggestedBaseSize = Math.ceil(
-    Math.max(...specs.map((spec) => {
-      // Skip elements with explicit overrides — they don't depend on base
-      if (overrides[spec.key] !== undefined) return 0;
-      return spec.minPt / (spec.relMultiplier * scale);
-    }))
-  );
+  // Only elements WITHOUT an explicit override depend on base_size, so
+  // only they can inform the recommendation. When none are left, there
+  // is no base_size to recommend — `Math.max()` over an all-zero list
+  // used to yield 0 and a `base_size = 0` snippet (FR7).
+  const baseDriven = specs.filter((spec) => overrides[spec.key] === undefined);
+  const suggestedBaseSize = baseDriven.length
+    ? Math.ceil(
+        Math.max(
+          ...baseDriven.map((spec) => spec.minPt / (spec.relMultiplier * scale)),
+        ),
+      )
+    : null;
 
-  const copySnippet = language === 'r'
-    ? `theme_minimal(base_size = ${suggestedBaseSize})`
-    : `plt.rcParams['font.size'] = ${suggestedBaseSize}`;
+  const copySnippet =
+    suggestedBaseSize === null
+      ? null
+      : language === 'r'
+        ? `theme_minimal(base_size = ${suggestedBaseSize})`
+        : `plt.rcParams['font.size'] = ${suggestedBaseSize}`;
 
-  return { elements, scale, suggestedBaseSize, copySnippet, warnings };
+  // The other half of FR7: dropping overridden rows from the base_size
+  // calculation is correct, but dropping them SILENTLY left failing
+  // elements with no advice at all. An override wins over base_size, so
+  // each one needs its own number.
+  const overrideFixes: OverrideFix[] = specs
+    .filter((spec) => overrides[spec.key] !== undefined)
+    .map((spec) => {
+      const el = elements.find((e) => e.name === spec.name)!;
+      return {
+        name: spec.name,
+        currentPt: overrides[spec.key]!,
+        neededPt: Math.ceil(spec.minPt / scale),
+        status: el.status,
+      };
+    })
+    .filter((f) => f.status !== 'pass')
+    .map(({ name, currentPt, neededPt }) => ({ name, currentPt, neededPt }));
+
+  return { elements, scale, suggestedBaseSize, copySnippet, overrideFixes, warnings };
 }
 
 // ── Language Detection ──────────────────────────────────────────────
