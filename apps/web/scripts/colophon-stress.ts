@@ -19,39 +19,57 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { buildPrintDocument } from '../src/export/printDocument';
 import { POSTER_SIZES, PX, M } from '../src/poster/constants';
+import { LAYOUT_TEMPLATES } from '../src/poster/templates';
 
 const outDir = process.argv[2] ?? 'colophon-stress';
+// Which layout to render. The default is the WORST case, not the
+// default template: a gate should be run against the layout most likely
+// to expose the defect, and `sidebar` runs 42.6u past the band top.
+const layout = process.argv[3] ?? 'sidebar';
 mkdirSync(outDir, { recursive: true });
 
 /**
- * A canvas whose content runs right up to the margin band, so any
- * colophon that escapes the band lands visibly on top of text rather
- * than in empty space. A forgiving fixture would hide the defect.
+ * A canvas built from a REAL layout template.
+ *
+ * The first version of this harness synthesised two body columns that
+ * stopped exactly at the margin band, and called that hostile. It was
+ * not — it was more forgiving than the shipped defaults. Measured at
+ * 48x36, the real templates put their lowest block bottom at:
+ *
+ *     3col      342.2   (7.8u of slack above the band top)
+ *     2col      371.6   (21.6u PAST the band top, 11.6u off the sheet)
+ *     billboard 374.1   (24.1u past, 14.1u off the sheet)
+ *     sidebar   392.6   (42.6u past, 32.6u off the sheet)
+ *
+ * So a gate built on the synthetic fixture goes green while a user who
+ * picks Sidebar still gets the credit line on their references. Render
+ * what ships instead.
  */
-function canvasHtml(wIn: number, hIn: number): string {
+function canvasHtml(wIn: number, hIn: number, layout: string): string {
   const w = wIn * PX;
   const h = hIn * PX;
-  const bodyTop = M + 26;
-  const bodyH = h - bodyTop - M; // content fills everything down to the band
-  const colW = (w - M * 2 - 12) / 2;
+  const tpl = (LAYOUT_TEMPLATES as Record<string, { build: (a: number, b: number) => Array<Record<string, unknown>> }>)[layout];
+  const blocks = tpl.build(wIn, hIn);
 
-  const block = (x: number, y: number, bw: number, bh: number, label: string, size: number) => `
-    <div style="position:absolute;left:${x}px;top:${y}px;width:${bw}px;height:${bh}px;
-                font-size:${size}px;line-height:1.35;color:#1a1a26;overflow:hidden;
-                outline:0.4px solid rgba(124,106,237,0.35);">
-      <strong style="font-size:${size * 1.4}px">${label}</strong><br/>
-      ${'Sample body copy at the readability floor. '.repeat(26)}
-    </div>`;
+  const body = blocks
+    .map((b) => {
+      const x = Number(b.x), y = Number(b.y), bw = Number(b.w), bh = Number(b.h);
+      const type = String(b.type);
+      const size = type === 'title' ? 5.5 : type === 'heading' ? 3.4 : 2.6;
+      const label = String(b.content ?? '') || type;
+      const offSheet = y + bh > h;
+      return `<div style="position:absolute;left:${x}px;top:${y}px;width:${bw}px;height:${bh}px;
+        font-size:${size}px;line-height:1.3;color:#1a1a26;overflow:hidden;
+        outline:0.4px solid ${offSheet ? 'rgba(220,0,0,0.55)' : 'rgba(124,106,237,0.35)'};">
+        <strong>${label}</strong> ${'Sample body copy at the readability floor. '.repeat(18)}
+      </div>`;
+    })
+    .join('');
 
   return `<div id="poster-canvas" style="position:relative;width:${w}px;height:${h}px;background:#ffffff;">
-    <div style="position:absolute;left:${M}px;top:${M}px;width:${w - M * 2}px;height:22px;
-                font-size:18px;font-weight:800;color:#1a1a26;">
-      Diagnostic Utility of the FTLD Module — ${wIn}in x ${hIn}in
-    </div>
-    ${block(M, bodyTop, colW, bodyH, 'Background', 3.2)}
-    ${block(M + colW + 12, bodyTop, colW, bodyH, 'Results', 3.2)}
-    <!-- A marker exactly at the top of the 1in bottom margin band. Anything
-         the colophon paints ABOVE this line is overlapping real content. -->
+    ${body}
+    <!-- Top of the 1in bottom margin band. Anything the colophon paints
+         ABOVE this line is in the region blocks are allowed to occupy. -->
     <div style="position:absolute;left:0;top:${h - M}px;width:${w}px;height:0;
                 border-top:0.6px dashed #d33;"></div>
   </div>`;
@@ -59,18 +77,22 @@ function canvasHtml(wIn: number, hIn: number): string {
 
 /**
  * Every sheet is rendered to the SAME on-screen width. That is the
- * point: it normalises away absolute size so what you are comparing is
- * the colophon's size RELATIVE to its poster — which is exactly the
- * property the adaptive geometry is supposed to control. Screenshots
- * taken at different widths would be unreadable as a comparison.
+ * point: it normalises away absolute size so what you compare is the
+ * colophon's size RELATIVE to its poster — the property the adaptive
+ * geometry controls. Screenshots at different widths would be
+ * unreadable as a comparison.
+ *
+ * NOTE this is a SCREEN-view aid only. The real print size comes from
+ * the `@media print` block's own `zoom: 96/PX`, which this does not
+ * touch — but because this rule is emitted after that block at equal
+ * specificity, it WOULD win under print emulation. Do not screenshot
+ * these files with `media: 'print'` and expect production geometry.
  */
 const PREVIEW_W = 1100;
 
 function withPreviewScale(html: string, wIn: number): string {
   const naturalW = wIn * PX;
   const zoom = PREVIEW_W / naturalW;
-  // Injected as the last rule so it wins on the screen view only; the
-  // @media print block is untouched, so this cannot affect real output.
   return html.replace(
     '</style>',
     `  /* harness-only: normalise the screen preview width */
@@ -89,8 +111,8 @@ for (const [key, size] of Object.entries(POSTER_SIZES)) {
     fontFamily: 'Source Sans 3',
     fontHref: 'https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;700&display=swap',
     bgColor: '#ffffff',
-    title: `${key} — colophon stress`,
-    canvasHtml: canvasHtml(size.w, size.h),
+    title: `${key} — ${layout} — colophon stress`,
+    canvasHtml: canvasHtml(size.w, size.h, layout),
     attribution: {},
   });
   const safe = key.replace(/[^\w.-]/g, '_');

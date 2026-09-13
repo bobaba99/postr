@@ -20,6 +20,13 @@
  * big enough to read as content), and both are clamped again against
  * the margin band so the result is provably inside it.
  *
+ * `insideMarginBand` is a real invariant but a PARTIAL one, and it must
+ * not be read as "cannot overlap content". Three of the four shipped
+ * content templates place blocks inside the band and past the sheet
+ * bottom (see `acknowledgementPrintCss`), so band-membership is
+ * necessary and not sufficient. The stress harness therefore measures
+ * actual block intersection as its gate, not this flag.
+ *
  * ── Units ─────────────────────────────────────────────────────────
  * Everything here is in POSTER UNITS: 1 unit = 1 CSS px in the print
  * stylesheet = 0.1 inch = 7.2 pt, because `printDocument` applies

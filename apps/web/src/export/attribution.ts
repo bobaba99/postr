@@ -154,9 +154,25 @@ export function acknowledgementPrintHtml(opts: AttributionOptions = {}): string 
  * that conversion is what made the pre-2026-09-13 colophon print at
  * 50.4 pt while its own comment claimed "around 7 pt".
  *
- * It cannot overlap content: templates reserve the `M` band as margin,
- * no template places a block below `bodyTop + bodyHeight`, and the
- * geometry is clamped into that band.
+ * ── What this does NOT guarantee ─────────────────────────────────
+ * It does not guarantee the credit never touches content, and the
+ * comment that used to claim so was wrong twice over. Measured on the
+ * shipped templates at 48×36 (band top = 350, sheet bottom = 360):
+ *
+ *     3col      lowest block bottom 342.2  — 7.8u of slack
+ *     2col                          371.6  — 21.6u past the band top
+ *     billboard                     374.1  — 24.1u past
+ *     sidebar                       392.6  — 42.6u past
+ *
+ * Only `3col`, the default, actually reserves the band. Three of the
+ * four content templates run blocks INTO it and past the sheet edge, so
+ * on those the colophon still lands on a block — 20 of 32
+ * (size × template) pairs, down from 23 before the band-centring.
+ *
+ * The honest guarantee is narrower: the credit sits inside the band
+ * every template is SUPPOSED to reserve, is never in the canvas flow,
+ * and can never shift a block. Closing the rest is a template fix, not
+ * a colophon fix — see `docs/stress-test/TRIAGE.md`.
  *
  * @param widthIn  poster width in inches
  * @param heightIn poster height in inches

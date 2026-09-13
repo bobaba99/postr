@@ -50,6 +50,21 @@ for (const f of readdirSync(dir).filter((x) => x.endsWith('.html'))) {
       fontPx: parseFloat(cs.fontSize),
       markPx: mark ? parseFloat(getComputedStyle(mark).width) : null,
       text: (el.textContent || '').trim(),
+      // THE GATE THAT MATTERS. "Inside the margin band" is a proxy, and a
+      // false one: 2col/billboard/sidebar place blocks past the band top
+      // (and past the sheet bottom), so a colophon can be in-band and
+      // still sitting on someone's references. Measure the intersection
+      // against the blocks actually rendered.
+      overlapping: Array.from(
+        document.querySelectorAll('#poster-canvas > div[style*="position:absolute"]'),
+      )
+        .map((b) => {
+          const br = b.getBoundingClientRect();
+          if (br.height === 0) return null; // the margin-band marker line
+          const hit = !(r.right <= br.left || br.right <= r.left || r.bottom <= br.top || br.bottom <= r.top);
+          return hit ? (b.textContent || '').trim().split(/\s+/)[0] : null;
+        })
+        .filter(Boolean),
     };
   });
 
@@ -83,17 +98,17 @@ for (const f of readdirSync(dir).filter((x) => x.endsWith('.html'))) {
   // if its TOP edge is also below that line, i.e. bottomGap + height <= M.
   // `bottom: M` alone puts the box just ABOVE the band, in content space.
   const insideBand = m ? (m.bottomGapUnits + m.hUnits) <= 10.001 : false;
-  report.push({ key, ...m, insideBand });
+  report.push({ key, ...m, insideBand, overlaps: m ? m.overlapping.length : 0 });
 }
 
 await browser.close();
 
 const fmt = (n) => (n == null ? '   -  ' : n.toFixed(2).padStart(6));
-console.log('size      fontU  ->  pt    markU   boxW   boxH   right  bottom  in-band');
+console.log('size      fontU  ->  pt    markU   boxW   boxH   right  bottom  in-band  OVERLAPS');
 for (const r of report) {
   const pt = r.fontPx == null ? null : r.fontPx * 7.2;
   console.log(
-    `${r.key.padEnd(8)} ${fmt(r.fontPx)} ${fmt(pt)}  ${fmt(r.markPx)} ${fmt(r.wUnits)} ${fmt(r.hUnits)} ${fmt(r.rightGapUnits)} ${fmt(r.bottomGapUnits)}   ${r.insideBand ? 'YES' : '** NO **'}`,
+    `${r.key.padEnd(8)} ${fmt(r.fontPx)} ${fmt(pt)}  ${fmt(r.markPx)} ${fmt(r.wUnits)} ${fmt(r.hUnits)} ${fmt(r.rightGapUnits)} ${fmt(r.bottomGapUnits)}   ${(r.insideBand ? 'YES' : 'NO ').padEnd(7)} ${r.overlaps ? '** ' + r.overlapping.join(',') + ' **' : 'none'}`,
   );
 }
 writeFileSync(join(outDir, 'measurements.json'), JSON.stringify(report, null, 2));
