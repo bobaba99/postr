@@ -59,6 +59,65 @@ describe('parseRCode', () => {
     expect(p.warnings).toContain('No canvas size found — assuming R default 7"×7" (ggsave).');
   });
 
+  it('FR6: ignores base_size inside a comment, keeping the live value', () => {
+    // The base_size loop keeps the LAST match in the file and comments
+    // were never stripped, so a commented-out experiment left beside the
+    // live line won: 30pt -> 42pt -> everything green, when the live
+    // code is 11pt -> 15.4pt and FAILS the 18pt minimum.
+    const code = `
+      p <- ggplot(mtcars, aes(wt, mpg)) + geom_point() +
+        theme_minimal(base_size = 11)
+      # tried theme_minimal(base_size = 30) first, way too large
+      ggsave("fig.png", p, width = 7, height = 5)
+    `;
+    expect(parseRCode(code).baseSize).toBe(11);
+  });
+
+  it('FR6: a hex colour is not a comment', () => {
+    // The reason this cannot be `/#.*$/gm`: a hex colour would open a
+    // "comment" and delete the rest of the line, taking real arguments
+    // with it.
+    const code = `
+      ggplot(df, aes(x, y)) +
+        scale_fill_manual(values = c("#FF0000", '#00FF00')) +
+        theme_minimal(base_size = 22)
+    `;
+    expect(parseRCode(code).baseSize).toBe(22);
+  });
+
+  it('FR6 (python): ignores figsize inside a comment', () => {
+    // Python is the mirror image — its figsize match is non-global, so
+    // the FIRST occurrence wins and a commented-out draft higher in the
+    // script became the canvas.
+    const code = `
+      # first try: plt.figure(figsize=(2, 2))
+      fig = plt.figure(figsize=(12, 8))
+    `;
+    const p = parsePythonCode(code);
+    expect(p.canvasWidth).toBe(12);
+    expect(p.canvasHeight).toBe(8);
+  });
+
+  it('FR5: reads base_size when it is not the first argument', () => {
+    // The regex required base_size immediately after the open paren, so
+    // this reported 11pt (the library default) and advised base_size 13
+    // — shrinking a real 22pt base by 41%.
+    expect(parseRCode('theme_bw(base_family = "Helvetica", base_size = 22)').baseSize).toBe(22);
+    expect(parseRCode('theme_classic(base_size = 14, base_line_size = 0.5)').baseSize).toBe(14);
+  });
+
+  it('FR5: tolerates one level of nesting in the argument list', () => {
+    const code = 'theme_bw(base_family = paste0("Hel", "vetica"), base_size = 22)';
+    expect(parseRCode(code).baseSize).toBe(22);
+  });
+
+  it('FR5: does not capture a base_size outside the theme call', () => {
+    // Must not cross a closing paren, or an unrelated variable becomes
+    // the figure's base size.
+    expect(parseRCode('theme_void()\nmy_base_size = 30').baseSize).toBe(11);
+    expect(parseRCode('p + theme_minimal() + labs(title = "x")\nbase_size = 30').baseSize).toBe(11);
+  });
+
   it('extracts individual element overrides', () => {
     const code = `
       ggplot(df, aes(x, y)) + geom_point() +
