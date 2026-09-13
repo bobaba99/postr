@@ -806,6 +806,94 @@ function buildFontSnippet(language: 'r' | 'python', fixes: FontFix[]): string | 
   return `plt.rcParams.update({\n${entries.join(',\n')}\n})`;
 }
 
+/**
+ * The user's OWN script with the targeted sizes applied — not a fragment
+ * they have to splice in themselves.
+ *
+ * A snippet asks the user to work out where it goes; on a script with an
+ * existing `theme()` call and a `ggsave()` at the bottom, that is a real
+ * chance to paste it in the wrong place and get no effect. So the copy
+ * button hands back runnable code.
+ *
+ * R: the new `theme()` is inserted immediately after the last
+ * `theme_*()` call when there is one — ggplot applies theme calls in
+ * order and the last wins, so this overrides exactly the sizes named and
+ * nothing else. With no `theme_*()` call it is appended to the end of
+ * the plot expression, which is the last non-blank line before
+ * `ggsave()`.
+ *
+ * Python: `rcParams.update({...})` is inserted BEFORE the figure is
+ * created, because rcParams is read at figure-creation time — placing it
+ * after `plt.subplots()` would silently do nothing.
+ *
+ * Returns the code unchanged when there is nothing to apply.
+ */
+export function applyFontFixes(
+  code: string,
+  language: 'r' | 'python',
+  fontSnippet: string | null,
+): string {
+  if (!fontSnippet) return code;
+
+  if (language === 'r') {
+    const themeEnd = lastCallEnd(code, /theme_\w+\s*\(/g);
+    if (themeEnd !== null) {
+      return code.slice(0, themeEnd) + ' +\n  ' + fontSnippet + code.slice(themeEnd);
+    }
+    // No theme_*() to hang it off. Attach to the end of the plot
+    // expression instead: the last non-blank line before ggsave(), or
+    // the end of the script when there is no ggsave().
+    const lines = code.split('\n');
+    let insertAfter = lines.length - 1;
+    const ggsaveAt = lines.findIndex((l) => /\bggsave\s*\(/.test(l));
+    if (ggsaveAt > 0) insertAfter = ggsaveAt - 1;
+    while (insertAfter > 0 && lines[insertAfter]!.trim() === '') insertAfter--;
+    lines[insertAfter] = lines[insertAfter]!.trimEnd() + ' +\n  ' + fontSnippet;
+    return lines.join('\n');
+  }
+
+  const lines = code.split('\n');
+  // rcParams is read when the figure is created, so this must land above
+  // it or it is a no-op the user cannot see.
+  let at = lines.findIndex((l) => /plt\.(subplots|figure)\s*\(/.test(l));
+  if (at === -1) {
+    const lastImport = lines.reduce(
+      (best, l, i) => (/^\s*(import|from)\s+\w/.test(l) ? i : best),
+      -1,
+    );
+    at = lastImport + 1;
+  }
+  lines.splice(at, 0, fontSnippet, '');
+  return lines.join('\n');
+}
+
+/**
+ * End index (just past the closing paren) of the LAST call matching
+ * `opener`, with parens balanced and string literals respected. Null when
+ * there is no such call or its parens never close.
+ */
+function lastCallEnd(code: string, opener: RegExp): number | null {
+  let end: number | null = null;
+  let m: RegExpExecArray | null;
+  const re = new RegExp(opener.source, 'g');
+  while ((m = re.exec(code)) !== null) {
+    let depth = 1;
+    let quote: string | null = null;
+    for (let i = re.lastIndex; i < code.length; i++) {
+      const ch = code[i]!;
+      if (quote) {
+        if (ch === '\\') i++;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')' && --depth === 0) { end = i + 1; break; }
+    }
+  }
+  return end;
+}
+
 // ── Language Detection ──────────────────────────────────────────────
 
 /**

@@ -10,6 +10,7 @@ import {
 import type { Block } from '@postr/shared';
 import { PX } from './constants';
 import {
+  applyFontFixes,
   parseRCode,
   parsePythonCode,
   computeReadability,
@@ -525,7 +526,13 @@ export function ReadabilityPanel({
         ? parseRCode(code, parseOpts)
         : parsePythonCode(code, parseOpts);
     const result = computeReadability(params, blockHeightIn, blockWidthIn);
-    const fullFix = generateFullFix(code, params, result.suggestedBaseSize);
+    // The user gets their OWN script back with the targeted sizes applied.
+    // Handing over a theme() fragment asks them to work out where it goes,
+    // and on a script with an existing theme() and a ggsave() at the
+    // bottom that is a real chance to paste it somewhere it does nothing.
+    const fullFix = result.fontSnippet
+      ? applyFontFixes(code, params.language, result.fontSnippet)
+      : generateFullFix(code, params, result.suggestedBaseSize);
     setChecked({ code, result, params, fullFix });
   };
 
@@ -867,7 +874,15 @@ export function ReadabilityPanel({
                     <div style={{ fontSize: 13, color: '#cdd6f4', fontWeight: 600 }}>
                       Raise these text elements
                     </div>
-                    <CopyButton text={result.fontSnippet} label="Copy fix" onCopied={handleCopied} />
+                    {/* Copies the whole corrected script, not the theme()
+                        fragment — splicing a fragment into the right place
+                        is work the tool can do for you, and getting it
+                        wrong produces code that silently changes nothing. */}
+                    <CopyButton
+                      text={fullFixedCode}
+                      label="Copy corrected code"
+                      onCopied={handleCopied}
+                    />
                   </div>
                   <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: '#cdd6f4' }}>
                     {result.fontFixes.map((f) => (
@@ -880,11 +895,12 @@ export function ReadabilityPanel({
                       </li>
                     ))}
                   </ul>
-                  <CodeView text={result.fontSnippet} />
+                  <CodeView text={fullFixedCode} />
                   <div style={{ fontSize: 12, color: '#7f849c', lineHeight: 1.5 }}>
+                    Your script with the sizes above applied — copy it whole and run it.{' '}
                     {checkedParams?.language === 'r'
-                      ? 'Paste after your existing theme() — ggplot applies theme calls in order and the last one wins, so this overrides only the sizes named.'
-                      : 'Set this before you create the figure. rcParams applies to every Axes; ax.set_xlabel(fontsize=…) would only reach the one Axes you call it on.'}
+                      ? 'The new theme() sits after your existing one; ggplot applies theme calls in order and the last wins, so it overrides only the sizes named.'
+                      : 'The rcParams block sits above the figure, because matplotlib reads it when the figure is created.'}
                   </div>
                 </div>
               )}

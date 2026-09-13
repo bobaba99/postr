@@ -1,6 +1,7 @@
 // apps/web/src/poster/__tests__/readability.test.ts
 import { describe, it, expect } from 'vitest';
 import {
+  applyFontFixes,
   parseRCode,
   parsePythonCode,
   computeReadability,
@@ -812,5 +813,61 @@ describe('computeReadability', () => {
     const result = computeReadability(params, 5, 15);
     const scale = Math.min(15 / 12, 5 / 4); // 1.25
     expect(result.elements.find(e => e.name === 'Axis titles')!.effectivePt).toBeCloseTo(10 * scale, 0);
+  });
+});
+
+describe('applyFontFixes — the copy button hands back runnable code', () => {
+  const rFix = 'theme(\n  axis.title = element_text(size = 17)\n)';
+
+  it('inserts after an existing theme_*() so ggplot lets it win', () => {
+    const code = `ggplot(mtcars, aes(wt, mpg)) + geom_point() +
+  theme_minimal(base_size = 11)
+ggsave("fig.png", width = 9, height = 6)`;
+    const out = applyFontFixes(code, 'r', rFix);
+    // Lands between the theme_minimal() call and ggsave(), not at the end.
+    expect(out.indexOf('theme(')).toBeGreaterThan(out.indexOf('theme_minimal'));
+    expect(out.indexOf('theme(')).toBeLessThan(out.indexOf('ggsave'));
+    expect(out).toContain('theme_minimal(base_size = 11) +');
+  });
+
+  it('never appends below ggsave(), where it would do nothing', () => {
+    const code = `ggplot(df, aes(x, y)) + geom_point()
+ggsave("fig.png", width = 9, height = 6)`;
+    const out = applyFontFixes(code, 'r', rFix);
+    expect(out.indexOf('theme(')).toBeLessThan(out.indexOf('ggsave'));
+    expect(out).toContain('geom_point() +');
+  });
+
+  it('handles a theme_*() containing a nested call', () => {
+    const code = `p + theme_bw(base_family = paste0("Hel", "vetica"))
+ggsave("f.png", width = 9, height = 6)`;
+    const out = applyFontFixes(code, 'r', rFix);
+    // The insert must go after the OUTER paren, or the code will not parse.
+    expect(out).toContain('vetica")) +');
+    expect(out.indexOf('theme(')).toBeLessThan(out.indexOf('ggsave'));
+  });
+
+  it('puts rcParams above the figure, where matplotlib reads it', () => {
+    const py = "plt.rcParams.update({\n    'axes.labelsize': 17\n})";
+    const code = `import matplotlib.pyplot as plt
+fig, ax = plt.subplots(figsize=(9, 6))
+ax.plot(x, y)`;
+    const out = applyFontFixes(code, 'python', py);
+    // After the figure is created, rcParams is a silent no-op.
+    expect(out.indexOf('axes.labelsize')).toBeLessThan(out.indexOf('plt.subplots'));
+    expect(out.indexOf('import matplotlib')).toBeLessThan(out.indexOf('axes.labelsize'));
+  });
+
+  it('returns the code untouched when there is nothing to apply', () => {
+    const code = 'ggplot(df) + geom_point()';
+    expect(applyFontFixes(code, 'r', null)).toBe(code);
+  });
+
+  it('produces code whose parens still balance', () => {
+    const code = `ggplot(mtcars, aes(wt, mpg)) + geom_point() +
+  theme_minimal(base_size = 11)
+ggsave("fig.png", width = 9, height = 6)`;
+    const out = applyFontFixes(code, 'r', rFix);
+    expect(out.split('(').length).toBe(out.split(')').length);
   });
 });
