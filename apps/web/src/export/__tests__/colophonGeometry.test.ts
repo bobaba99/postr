@@ -29,7 +29,7 @@ describe('colophonGeometry — invariants at every poster size', () => {
     expect(SIZES.length).toBeGreaterThanOrEqual(8);
   });
 
-  it.each(SIZES)('$key: sits entirely inside the $M-unit bottom margin band', ({ w, h }) => {
+  it.each(SIZES)('$key: sits entirely inside the bottom margin band', ({ w, h }) => {
     const g = colophonGeometry(w, h);
     // The mark is the tallest item on the line, so it governs the fit.
     expect(g.bottomUnits + g.markUnits).toBeLessThanOrEqual(M);
@@ -44,16 +44,40 @@ describe('colophonGeometry — invariants at every poster size', () => {
     expect(g.rightUnits).toBeGreaterThanOrEqual(2.5);
   });
 
+  it.each(SIZES)('$key: is centred in the band, not pinned to its edge', ({ w, h }) => {
+    const g = colophonGeometry(w, h);
+    // Structural: top = (M + mark)/2 < M for any mark < M. The centring
+    // is what makes the in-band guarantee independent of clamp order.
+    expect(g.bottomUnits + g.markUnits / 2).toBeCloseTo(M / 2, 1);
+  });
+
   it.each(SIZES)('$key: prints below the axis-title floor so it never reads as content', ({ w, h }) => {
     const g = colophonGeometry(w, h);
     expect(g.printedPt).toBeLessThan(AXIS_TITLE_FLOOR_PT);
   });
 
-  it.each(SIZES)('$key: prints large enough to be legible', ({ w, h }) => {
+  it.each(SIZES)('$key: never prints below the caption floor', ({ w, h }) => {
     const g = colophonGeometry(w, h);
-    // The smallest sheet lands slightly under the 12pt caption floor by
-    // design — it is read at close range — but never below 10pt.
-    expect(g.printedPt).toBeGreaterThanOrEqual(10);
+    // Legibility is absolute — it does not scale with the sheet — so the
+    // floor is the product's own caption minimum, not a smaller number
+    // chosen to keep small posters tidy.
+    expect(g.printedPt).toBeGreaterThanOrEqual(CAPTION_FLOOR_PT);
+  });
+
+  it.each(SIZES)('$key: is right-aligned to the content column', ({ w, h }) => {
+    // Every template puts its content's right edge at W - M, so the
+    // credit lines up with the column above it rather than floating.
+    expect(colophonGeometry(w, h).rightUnits).toBe(M);
+  });
+
+  it.each(SIZES)('$key: box width stays well clear of the opposite margin', ({ w, h }) => {
+    const g = colophonGeometry(w, h);
+    // Rough upper bound on the rendered line: mark + gap + ~22 units of
+    // text at the reference size, scaled. Measured at 21.6u on the
+    // reference sheet; the assertion is that it cannot approach W - 2M
+    // even on the narrowest poster.
+    const approxWidthUnits = g.markUnits + g.gapUnits + 22 * (g.fontUnits / 1.75);
+    expect(approxWidthUnits).toBeLessThan(w * 10 - 2 * M);
   });
 
   it.each(SIZES)('$key: printedPt is the honest conversion of fontUnits', ({ w, h }) => {
@@ -91,8 +115,7 @@ describe('colophonGeometry — the adaptive behaviour itself', () => {
   it('clamps the floor so a tiny poster still gets a legible credit', () => {
     // Unclamped, a 10in short side would give 0.49 units = 3.5pt.
     const tiny = colophonGeometry(10, 10);
-    expect(tiny.fontUnits).toBe(1.4);
-    expect(tiny.printedPt).toBeCloseTo(10.08, 2);
+    expect(tiny.printedPt).toBeCloseTo(CAPTION_FLOOR_PT, 1);
   });
 
   it('clamps the ceiling so a huge poster cannot grow a billboard', () => {
@@ -121,12 +144,14 @@ describe('colophonGeometry — the adaptive behaviour itself', () => {
     expect(a).not.toBe(b);
   });
 
-  it('caps the printed caption floor comparison honestly', () => {
-    // Documenting the one place the design knowingly dips below a
-    // readability floor, so it is a decision on the record rather than
-    // an accident someone "fixes" later.
-    const smallest = colophonGeometry(24, 36);
-    expect(smallest.printedPt).toBeLessThan(CAPTION_FLOOR_PT);
-    expect(smallest.printedPt).toBeGreaterThanOrEqual(10);
+  it('fires the floor on the smaller sheets rather than shrinking with them', () => {
+    // The three smallest catalog sizes all land on the floor. That is
+    // the point: a 24x36 read at arm's length needs the same absolute
+    // legibility as an A0 read from two metres.
+    for (const [w, h] of [[24, 36], [46.8, 33.1], [33.1, 46.8]] as const) {
+      expect(colophonGeometry(w, h).printedPt).toBeCloseTo(CAPTION_FLOOR_PT, 1);
+    }
+    // While the reference sheet is comfortably above it.
+    expect(colophonGeometry(48, 36).printedPt).toBeGreaterThan(CAPTION_FLOOR_PT);
   });
 });
