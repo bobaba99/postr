@@ -134,6 +134,44 @@ describe('parsePythonCode', () => {
     expect(p.baseSize).toBe(20); // 10 * 2.0
   });
 
+  it('PY-1: reads font.size from rcParams.update({...})', () => {
+    // The most common way to set matplotlib fonts matched nothing, so a
+    // 22pt figure was reported as a 10pt disaster and the offered fix
+    // was a no-op.
+    const p = parsePythonCode(`plt.rcParams.update({"font.size": 22, "axes.labelsize": 24})`);
+    expect(p.baseSize).toBe(22);
+  });
+
+  it('PY-1: single quotes and matplotlib.rcParams both work', () => {
+    expect(parsePythonCode("plt.rcParams.update({'font.size': 18})").baseSize).toBe(18);
+    expect(parsePythonCode('matplotlib.rcParams.update({"font.size": 14})').baseSize).toBe(14);
+  });
+
+  it('PY-1: the later of update() and item-assignment wins', () => {
+    const p = parsePythonCode(`plt.rcParams["font.size"] = 8\nplt.rcParams.update({"font.size": 22})`);
+    expect(p.baseSize).toBe(22);
+  });
+
+  it('PY-2: applies font_scale passed alongside a context name', () => {
+    // `set_context("poster", font_scale=0.55)` discarded font_scale and
+    // read only the context, roughly doubling the reported size.
+    const p = parsePythonCode('sns.set_context("poster", font_scale=0.55)');
+    // poster context is 2.0x on a 10pt default; 0.55 brings it to 11.
+    expect(p.baseSize).toBeCloseTo(11, 5);
+  });
+
+  it('PY-2: a context with no font_scale is unchanged', () => {
+    expect(parsePythonCode('sns.set_context("poster")').baseSize).toBeCloseTo(20, 5);
+  });
+
+  it('PY-3: reads fontsize when the label text contains parentheses', () => {
+    // `[^)]*` could not cross the ')' in the label, and units in
+    // parentheses appear in nearly every real axis label.
+    expect(parsePythonCode('ax.set_xlabel("Time (min)", fontsize=10)').overrides.axisTitle).toBe(10);
+    expect(parsePythonCode('ax.set_ylabel("Rate (n/s)", fontsize=9)').overrides.axisTitle).toBe(9);
+    expect(parsePythonCode('ax.set_title("Result (n=42)", fontsize=12)').overrides.plotTitle).toBe(12);
+  });
+
   it('extracts per-element overrides', () => {
     const code = `
       ax.set_xlabel("X", fontsize=14)

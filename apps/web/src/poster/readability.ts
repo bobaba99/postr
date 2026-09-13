@@ -189,18 +189,40 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
   let baseSize = PY_DEFAULTS.baseSize;
   let fontScale = 1.0;
 
-  // rcParams
-  const rc = code.match(/(?:plt|matplotlib)\.rcParams\s*\[\s*['"]font\.size['"]\s*\]\s*=\s*([\d.]+)/);
-  if (rc) baseSize = parseFloat(rc[1]!);
+  // rcParams — two forms, both common. The dict form
+  // `plt.rcParams.update({'font.size': 22})` matched NOTHING, so a 22pt
+  // figure was reported as a 10pt disaster and the offered fix was a
+  // no-op (PY-1).
+  const rcItemRe = /(?:plt|matplotlib)\.rcParams\s*\[\s*['"]font\.size['"]\s*\]\s*=\s*([\d.]+)/g;
+  const rcUpdateRe = /(?:plt|matplotlib)\.rcParams\.update\s*\(\s*\{(?:[^{}]|\{[^{}]*\})*?['"]font\.size['"]\s*:\s*([\d.]+)/g;
+  // Whichever appears LATER in the source wins. That is source position,
+  // not execution order — a size set inside a branch or a function called
+  // later would be misordered — but it is strictly better than seeing
+  // only one of the two forms, and the alternative is a Python parser.
+  let rcBest: { at: number; value: number } | null = null;
+  for (const re of [rcItemRe, rcUpdateRe]) {
+    let mm: RegExpExecArray | null;
+    while ((mm = re.exec(code)) !== null) {
+      if (!rcBest || mm.index >= rcBest.at) rcBest = { at: mm.index, value: parseFloat(mm[1]!) };
+    }
+  }
+  const rc = rcBest;
+  if (rc) baseSize = rc.value;
 
   // seaborn set_theme font_scale
   const sns_scale = code.match(/sns\.set_theme\s*\([^)]*font_scale\s*=\s*([\d.]+)/);
   if (sns_scale) fontScale = parseFloat(sns_scale[1]!);
 
-  // seaborn set_context
+  // seaborn set_context. The context name and `font_scale` MULTIPLY —
+  // seaborn applies the scale on top of the context's own factor — but
+  // the name used to overwrite any scale already read, so
+  // `set_context("poster", font_scale=0.55)` reported 20pt where 11 is
+  // right, roughly doubling the figure's apparent size (PY-2).
   const sns_ctx = code.match(/sns\.set_context\s*\(\s*["'](\w+)["']/);
+  const sns_ctx_scale = code.match(/sns\.set_context\s*\([^)]*font_scale\s*=\s*([\d.]+)/);
   if (sns_ctx) {
-    fontScale = SEABORN_CONTEXTS[sns_ctx[1]!] ?? 1.0;
+    fontScale = (SEABORN_CONTEXTS[sns_ctx[1]!] ?? 1.0)
+      * (sns_ctx_scale ? parseFloat(sns_ctx_scale[1]!) : 1.0);
   }
 
   baseSize = baseSize * fontScale;
@@ -211,10 +233,17 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
 
   // Per-element overrides
   const overrides: Partial<Record<ElementKey, number>> = {};
-  const xlabel = code.match(/set_xlabel\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
-  const ylabel = code.match(/set_ylabel\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
-  const title = code.match(/set_title\s*\([^)]*fontsize\s*=\s*([\d.]+)/);
-  const ticks = code.match(/tick_params\s*\([^)]*labelsize\s*=\s*([\d.]+)/);
+  // `[^)]*` could not cross a ')' inside the label TEXT, so
+  // `set_xlabel("Time (min)", fontsize=10)` dropped the explicit size —
+  // and units in parentheses appear in nearly every real axis label
+  // (PY-3). One level of nesting is now allowed before the keyword.
+  const ARGS = '(?:[^()]|\\([^()]*\\))*?';
+  const argRe = (fn: string, kw: string) =>
+    new RegExp(`${fn}\\s*\\(${ARGS}${kw}\\s*=\\s*([\\d.]+)`);
+  const xlabel = code.match(argRe('set_xlabel', 'fontsize'));
+  const ylabel = code.match(argRe('set_ylabel', 'fontsize'));
+  const title = code.match(argRe('set_title', 'fontsize'));
+  const ticks = code.match(argRe('tick_params', 'labelsize'));
   if (xlabel || ylabel) overrides.axisTitle = parseFloat((xlabel ?? ylabel)![1]!);
   if (ticks) overrides.axisText = parseFloat(ticks[1]!);
   if (title) overrides.plotTitle = parseFloat(title[1]!);
