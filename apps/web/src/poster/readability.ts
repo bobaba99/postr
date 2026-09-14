@@ -519,13 +519,52 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
   // ggplot sizes these in MILLIMETRES — `size = 2` is 2 * 72.27/25.4 =
   // 5.7pt — which is also why they are so often accidentally tiny.
   const MM_TO_PT = 72.27 / 25.4;
-  const inPanel = src.match(
-    /\b(geom_text|geom_label|annotate)\s*\((?:[^()]|\([^()]*\))*?\bsize\s*=\s*([\d.]+)/,
-  );
-  if (inPanel) {
-    const pt = Math.round(parseFloat(inPanel[2]!) * MM_TO_PT * 10) / 10;
+  /**
+   * ggplot2's own default for geom_text/geom_label, in mm. Measured in
+   * ggplot2 4.6.0: an unsized geom_text renders at 3.866 mm = 11.0 pt.
+   * (Since 4.x the default is theme-derived rather than a constant, so
+   * treat this as nominal — it is used only to say "about 11pt".)
+   */
+  const DEFAULT_LABEL_MM = 3.88;
+
+  // The old pattern hand-rolled ONE level of paren nesting, so the
+  // commonest way of writing a label —
+  // `geom_text(aes(label = paste0("n=", n)), size = 2)` — went unseen:
+  // `paste0(` is a second level. It also treated every `annotate()` as
+  // text, so `annotate("rect", ..., size = 1)`, where `size` is a border
+  // WIDTH, produced a fabricated "in-panel text at 2.8pt".
+  //
+  // Now the balanced scanner finds each call and `topLevelArgs` reads the
+  // size, which also means a `size` mapped inside `aes()` is correctly
+  // ignored — that is a scale, not a fixed size.
+  const inPanelFindings: Array<{ fn: string; mm: number; explicit: boolean }> = [];
+  for (const fn of ['geom_text', 'geom_label', 'geom_text_repel', 'geom_label_repel', 'annotate']) {
+    for (const args of extractAllCallArgs(src, fn)) {
+      const top = topLevelArgs(args);
+      if (fn === 'annotate') {
+        // Only the text geoms. For "rect"/"segment"/"pointrange", `size`
+        // is a line width in mm and has nothing to do with legibility.
+        const geom = top.match(/^\s*(?:geom\s*=\s*)?['"](\w+)['"]/);
+        if (!geom || (geom[1] !== 'text' && geom[1] !== 'label')) continue;
+      }
+      const m = top.match(/\bsize\s*=\s*([\d.]+)/);
+      inPanelFindings.push({
+        fn,
+        mm: m ? parseFloat(m[1]!) : DEFAULT_LABEL_MM,
+        explicit: m !== null,
+      });
+    }
+  }
+  if (inPanelFindings.length) {
+    // Report the smallest: a checker must name the text that fails, not
+    // the text that passes.
+    const worst = inPanelFindings.reduce((a, b) => (b.mm < a.mm ? b : a));
+    const pt = Math.round(worst.mm * MM_TO_PT * 10) / 10;
+    const how = worst.explicit
+      ? `sets in-panel text at size ${worst.mm}`
+      : `draws in-panel text at ggplot's default size ${DEFAULT_LABEL_MM}`;
     warnings.push(
-      `${inPanel[1]!}() sets in-panel text at size ${inPanel[2]!} (${pt}pt — ggplot sizes these in mm). In-panel labels are not theme elements, so they are not in the table below; check them yourself.`,
+      `${worst.fn}() ${how} (${pt}pt — ggplot sizes these in mm). In-panel labels are not theme elements, so they are not in the table below; check them yourself.`,
     );
   }
 

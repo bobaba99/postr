@@ -1166,3 +1166,53 @@ describe('the fix is inserted where it will actually run', () => {
     expect(commented.join('\n')).not.toContain('axis.title');
   });
 });
+
+describe('in-panel text: found when it is there, not invented when it is not', () => {
+  const warn = (code: string) => (parseRCode(code).warnings ?? []).join(' ');
+
+  it('sees a label whose aes() contains a nested call', () => {
+    // The commonest way to write a data label. The old pattern hand-rolled
+    // ONE level of paren nesting, so paste0( inside aes( was a second
+    // level and the whole call went unseen — a figure with 2mm labels
+    // scored all-green.
+    expect(warn('geom_text(aes(label = paste0("n=", n)), size = 2)')).toMatch(/in-panel/i);
+    expect(warn('geom_text(aes(label = sprintf("%.1f", v)), size = 2)')).toMatch(/in-panel/i);
+  });
+
+  it('sees ggrepel geoms', () => {
+    expect(warn('geom_text_repel(aes(label = n), size = 2)')).toMatch(/in-panel/i);
+    expect(warn('geom_label_repel(aes(label = n), size = 2)')).toMatch(/in-panel/i);
+  });
+
+  it('sees a label with no explicit size and names the default', () => {
+    // Measured in ggplot2 4.6.0: an unsized geom_text renders at 3.866mm
+    // = 11.0pt, which a heavy downscale still makes unreadable.
+    const w = warn('ggplot(d) + geom_text(aes(label = n)) + theme_minimal(base_size = 40)');
+    expect(w).toMatch(/in-panel/i);
+    expect(w).toContain('11');
+  });
+
+  it('does NOT invent a text warning for annotate("rect")', () => {
+    // `size` on a rect/segment is a border width — ggplot2 itself
+    // deprecated it in favour of `linewidth`. Reporting "in-panel text at
+    // 2.8pt" for it is a fabricated finding.
+    expect(warn('annotate("rect", xmin = 1, xmax = 2, ymin = 0, ymax = 3, alpha = 0.2, size = 1)'))
+      .not.toMatch(/in-panel/i);
+    expect(warn('annotate("segment", x = 1, xend = 2, y = 0, yend = 3, size = 2)'))
+      .not.toMatch(/in-panel/i);
+  });
+
+  it('still sees annotate("text") and the named geom = form', () => {
+    expect(warn('annotate("text", x = 2, y = 2, label = "hi", size = 2)')).toMatch(/in-panel/i);
+    expect(warn('annotate(geom = "label", x = 2, y = 2, label = "hi", size = 2)')).toMatch(/in-panel/i);
+  });
+
+  it('ignores a size MAPPED inside aes() — that is a scale, not a size', () => {
+    expect(warn('geom_point(aes(size = wt))')).not.toMatch(/in-panel/i);
+  });
+
+  it('reports the smallest label when several are drawn', () => {
+    const w = warn('geom_text(aes(label = a), size = 9) + geom_text(aes(label = b), size = 2)');
+    expect(w).toContain('size 2');
+  });
+});
