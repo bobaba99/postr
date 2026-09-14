@@ -1422,8 +1422,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
 
   // Out-of-bounds detection — warns when blocks extend past the poster canvas
   const oobWarnings = useMemo(
-    () => checkBounds(doc.blocks, cW, cH, measuredHeights),
-    [doc.blocks, cW, cH, measuredHeights],
+    () => checkBounds(doc.blocks, cW, cH, measuredHeights, titleOverflowPx),
+    [doc.blocks, cW, cH, measuredHeights, titleOverflowPx],
   );
 
   // F8's second half. Blocks sitting on top of each other is one of the
@@ -1431,8 +1431,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // looked for it. Measured, not stored: pasting text does not change
   // `b.h`, so a stored-geometry check finds nothing in F8's own repro.
   const collisions = useMemo(
-    () => checkCollisions(doc.blocks, measuredHeights),
-    [doc.blocks, measuredHeights],
+    () => checkCollisions(doc.blocks, measuredHeights, titleOverflowPx),
+    [doc.blocks, measuredHeights, titleOverflowPx],
   );
 
   // Auto-numbered captions for figure + table blocks. Number is

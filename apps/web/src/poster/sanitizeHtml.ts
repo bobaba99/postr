@@ -43,6 +43,11 @@ const BLOCK_TAGS = new Set([
   'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
   'BLOCKQUOTE', 'PRE', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER',
   'TR', 'TABLE', 'ADDRESS', 'FIGURE', 'FIGCAPTION', 'DD', 'DT', 'DL',
+  // Cells, not just rows. TR alone separated row from row while the
+  // cells inside a row ran together: a pasted two-column table gave
+  // `Mean12.4`. TD/TH are unwrapped like any other non-allowed tag, so
+  // without this they hit exactly the glue case BLOCK_TAGS exists for.
+  'TD', 'TH',
 ]);
 
 const ALLOWED_TAGS = new Set([
@@ -144,6 +149,20 @@ function sanitizeNode(
       pendingBoundary = false;
       return;
     }
+    // UL/OL may only contain LI. A boundary owed by a block INSIDE an
+    // `<li>` (Google Docs wraps every bullet's text in a `<p>`) escapes
+    // past `</li>` and would be flushed into the list itself, emitting
+    // `<ul><li>a</li><br><li>b</li></ul>`. That is invalid markup, it is
+    // PERSISTED — `<br>` is allowed, so the next no-separator re-sanitise
+    // keeps it — and `parseRichText` flushes on a bare `<br>`, breaking
+    // the bullet run into two lists in every editable export. `<li>`
+    // already carries a paragraph boundary, so nothing is lost by
+    // dropping the debt here.
+    const tag = (target as Element).tagName;
+    if (tag === 'UL' || tag === 'OL') {
+      pendingBoundary = false;
+      return;
+    }
     pendingBoundary = false;
     // Parsed rather than string-concatenated, so `<br>` becomes a real
     // element and a plain space becomes a text node — the caller picks
@@ -170,10 +189,23 @@ function sanitizeNode(
         if (blockSeparator && (justClosedBlock || !emittedAny) && data.trim() === '') {
           continue;
         }
-        if (data !== '') {
+        // The rule above only fires for a node that is whitespace ENTIRELY.
+        // Pretty-printed markup gives `</h2>\nAccuracy improved.` — one
+        // node that merely STARTS with a newline — and the separator about
+        // to be flushed would put a break in front of it. `parseRichText`
+        // flushes on a literal newline too, so the pair became a blank
+        // paragraph in the export: exactly what the whitespace rule exists
+        // to prevent, arriving by the other door. Same gating, so the
+        // no-separator path stays byte-identical.
+        let text = data;
+        if (blockSeparator && pendingBoundary && emittedAny) {
+          text = text.replace(/^\s+/, '');
+          if (text === '') continue;
+        }
+        if (text !== '') {
           flushBoundary(target);
-          target.appendChild(doc.createTextNode(data));
-          if (data.trim() !== '') {
+          target.appendChild(doc.createTextNode(text));
+          if (text.trim() !== '') {
             emittedAny = true;
             justClosedBlock = false;
           }
@@ -197,10 +229,30 @@ function sanitizeNode(
         const isBlock = BLOCK_TAGS.has(tag);
         if (isBlock && emittedAny) pendingBoundary = true;
         walk(el, target);
-        if (isBlock) justClosedBlock = true;
+        if (isBlock) {
+          justClosedBlock = true;
+          // A boundary is owed on the way OUT as well. Setting it only on
+          // the way IN covered block-to-block (`<p>a</p><p>b</p>`) and
+          // missed everything else that can follow a block: bare text,
+          // an inline element, a trailing sibling inside a wrapper. So
+          // `<h2>Results</h2>Accuracy improved.` still glued — the exact
+          // symptom the entry-side boundary was added to remove.
+          //
+          // A trailing boundary costs nothing: flushBoundary only emits
+          // when something is actually written after it, so a document
+          // ending in a block does not gain a dangling separator.
+          // No `emittedAny` guard: flushBoundary re-checks it, so the
+          // guard was measurably dead (0 divergences over 80k inputs).
+          pendingBoundary = true;
+        }
         continue;
       }
 
+      // An explicit `<br>` in the source already carries the break the
+      // pending separator would supply. Emitting both gave three breaks
+      // where the author wrote one, compounding with every
+      // block/`<br>` alternation.
+      if (tag === 'BR') pendingBoundary = false;
       flushBoundary(target);
       const clone = doc.createElement(tag.toLowerCase());
 

@@ -261,3 +261,92 @@ describe('F6 — paragraph boundaries on paste', () => {
     expect(out).not.toContain('a<br>b');
   });
 });
+
+describe('a block boundary is owed on the way out, not just on the way in', () => {
+  const sep = { blockSeparator: '<br>' };
+
+  it('text directly after a closed block is separated', () => {
+    // The original glue symptom, one shape the entry-side boundary missed.
+    expect(sanitizeHtml('<h2>Results</h2>Accuracy improved.', sep))
+      .toBe('Results<br>Accuracy improved.');
+  });
+
+  it('an inline element after a closed block is separated', () => {
+    expect(sanitizeHtml('<p>a</p><b>b</b>', sep)).toBe('a<br><b>b</b>');
+  });
+
+  it('a trailing sibling inside a wrapper is separated', () => {
+    expect(sanitizeHtml('<div><div>a</div>b</div>', sep)).toBe('a<br>b');
+  });
+
+  it('block to block still behaves as before', () => {
+    expect(sanitizeHtml('<p>a</p><p>b</p>', sep)).toBe('a<br>b');
+  });
+
+  it('a document ending in a block gains no dangling separator', () => {
+    expect(sanitizeHtml('<p>a</p>', sep)).toBe('a');
+    expect(sanitizeHtml('<p>a</p><p>b</p>', sep)).not.toMatch(/<br>$/);
+  });
+
+  it('adjacent table cells are not glued', () => {
+    const out = sanitizeHtml(
+      '<table><tr><td>Mean</td><td>12.4</td></tr><tr><td>SD</td><td>0.8</td></tr></table>',
+      sep,
+    );
+    expect(out).not.toContain('Mean12.4');
+    expect(out).not.toContain('SD0.8');
+    expect(out).not.toContain('12.4SD');
+  });
+
+  it('header cells are separated too', () => {
+    const out = sanitizeHtml('<table><tr><th>Group</th><th>n</th></tr></table>', sep);
+    expect(out).not.toContain('Groupn');
+  });
+
+  it('text BEFORE a block is separated too (the other half)', () => {
+    // The entry-side boundary had no test at all: deleting it left all 48
+    // green while changing 11,456 outputs in an 80k sweep. A commit about
+    // half-written bookkeeping should pin both halves.
+    expect(sanitizeHtml('Intro<p>a</p>', sep)).toBe('Intro<br>a');
+    expect(sanitizeHtml('text<h2>Head</h2>', sep)).toBe('text<br>Head');
+  });
+
+  it('no separator is emitted as a direct child of a list', () => {
+    // Google Docs wraps every bullet's text in a <p>. The boundary that
+    // <p> owes on exit escapes past </li> and lands in the <ul>, which is
+    // invalid, is PERSISTED (<br> is allowed, so the next no-separator
+    // re-sanitise keeps it), and splits the bullet run in every export.
+    const out = sanitizeHtml('<ul><li><p>Item one</p></li><li><p>Item two</p></li></ul>', sep);
+    expect(out).not.toMatch(/<\/li><br>/);
+    expect(out).not.toMatch(/<ul><br>/);
+  });
+
+  it('a separator does not add a break in front of the source\'s own newline', () => {
+    // Pretty-printed markup gives one text node that STARTS with a
+    // newline; the whitespace-drop rule only fires when a node is
+    // whitespace entirely. parseRichText flushes on a literal newline as
+    // well as on <br>, so the pair became a blank paragraph.
+    expect(sanitizeHtml('<h2>Results</h2>\nAccuracy improved by 12%.', sep))
+      .toBe('Results<br>Accuracy improved by 12%.');
+    expect(sanitizeHtml('<blockquote>Quoted.</blockquote>\n— Author', sep))
+      .toBe('Quoted.<br>— Author');
+  });
+
+  it('a single-space separator does not double up', () => {
+    expect(sanitizeHtml('<p>a</p> text', { blockSeparator: ' ' })).toBe('a text');
+  });
+
+  it('an explicit <br> between blocks is not tripled', () => {
+    // The author wrote one break; the pending separator and the <br>'s own
+    // break made three, compounding with every alternation.
+    expect((sanitizeHtml('<p>a</p><br><p>b</p>', sep).match(/<br>/g) ?? []).length).toBe(2);
+    expect((sanitizeHtml('<p>a</p><br><p>b</p><br><p>c</p>', sep).match(/<br>/g) ?? []).length).toBe(4);
+  });
+
+  it('with no separator configured the output is unchanged', () => {
+    // The whole boundary mechanism is gated on blockSeparator; without it
+    // this function must stay byte-identical.
+    expect(sanitizeHtml('<h2>Results</h2>Accuracy improved.')).toBe('ResultsAccuracy improved.');
+    expect(sanitizeHtml('<table><tr><td>Mean</td><td>12.4</td></tr></table>')).toBe('Mean12.4');
+  });
+});

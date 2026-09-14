@@ -30,6 +30,24 @@ export interface FigureParams {
    * which is the direction this whole finding is about.
    */
   overrideCoversAll?: Partial<Record<ElementKey, boolean>>;
+  /**
+   * Per key: did the user's OWN override use the bare selector
+   * (`axis.text`, not `axis.text.x`)? This is a different question from
+   * `overrideCoversAll` and the two were conflated, which is the bug.
+   *
+   * Pinning BOTH axes individually gives complete coverage
+   * (`overrideCoversAll = true`) while a bare selector still reaches
+   * NEITHER of them — ggplot's inheritance keeps an explicitly-set child
+   * against a later parent. So advice built on "coverage is complete"
+   * emitted `axis.text = element_text(size = 14)` into a theme where
+   * `axis.text.x` and `axis.text.y` were already pinned, and changed
+   * nothing.
+   *
+   * Absence is the conservative reading: an unset key means we do not
+   * know a bare selector reaches, so the advice names the children
+   * explicitly, which is always correct if more verbose.
+   */
+  overrideViaBareSelector?: Partial<Record<ElementKey, boolean>>;
   facetRows: number;
   facetCols: number;
   warnings: string[];
@@ -259,24 +277,140 @@ const DEFAULT_SIZE_LABEL = 'figure preview size';
  * Returns null when the call is absent or its parens never balance.
  */
 function extractCallArgs(code: string, name: string): string | null {
-  const open = new RegExp(`\\b${name}\\s*\\(`, 'g');
-  const m = open.exec(code);
-  if (!m) return null;
+  return extractAllCallArgs(code, name)[0] ?? null;
+}
 
-  let depth = 1;
-  let quote: string | null = null;
-  for (let i = open.lastIndex; i < code.length; i++) {
-    const ch = code[i]!;
-    if (quote) {
-      if (ch === '\\') i++;              // escaped char inside a string
-      else if (ch === quote) quote = null;
-      continue;
+/**
+ * Every call to `name`, each as its complete argument list.
+ *
+ * Same balanced, quote-aware scan as `extractCallArgs` — one scanner, so
+ * the two cannot drift. Needed because some calls are legitimately
+ * repeated: `tick_params` is normally written once per axis, and reading
+ * only the first said the second axis was never scoped.
+ */
+function extractAllCallArgs(code: string, name: string): string[] {
+  const open = new RegExp(`\\b${name}\\s*\\(`, 'g');
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+
+  while ((m = open.exec(code)) !== null) {
+    let depth = 1;
+    let quote: string | null = null;
+    for (let i = open.lastIndex; i < code.length; i++) {
+      const ch = code[i]!;
+      if (quote) {
+        if (ch === '\\') i++;              // escaped char inside a string
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')' && --depth === 0) {
+        out.push(code.slice(open.lastIndex, i));
+        open.lastIndex = i + 1;           // resume after this call
+        break;
+      }
     }
-    if (ch === '"' || ch === "'") quote = ch;
-    else if (ch === '(') depth++;
-    else if (ch === ')' && --depth === 0) return code.slice(open.lastIndex, i);
+    if (depth !== 0) break;               // unbalanced: stop, do not guess
   }
-  return null;
+  return out;
+}
+
+/**
+ * `plt.tick_params(...)`, `plt.gca().tick_params(...)` and a bare
+ * `tick_params(...)` all act on "the current Axes" — a name we cannot
+ * resolve from text. They share this key, and are folded into the single
+ * explicit Axes when the script names exactly one.
+ */
+const ALIAS_AXES = '<current>';
+
+interface TickCall {
+  /** Which Axes the call acts on, as written. */
+  axesKey: string;
+  /** 'x' | 'y' when the receiver itself is an Axis (`ax.xaxis.`), else null. */
+  axisFromReceiver: string | null;
+  args: string;
+}
+
+/**
+ * Every tick-size call in the source, with the object it was called on.
+ *
+ * ONE walk. Receiver and arguments are read at the same call site — a
+ * previous version matched them with two separate regexes and zipped by
+ * index, which desynchronises whenever one walker sees a call the other
+ * skips, silently attributing a scope to the wrong Axes.
+ *
+ * Covers `set_tick_params` as well as `tick_params`: `Axis.set_tick_params`
+ * is a documented matplotlib API and `ax.xaxis.set_tick_params(labelsize=)`
+ * is ordinary code. Missing it discarded the user's explicit size and
+ * reported an inherited one they had already fixed.
+ *
+ * An unbalanced call (a `tick_params(` inside a string, say) is SKIPPED,
+ * not fatal: aborting the walk there threw away every later call and
+ * reported a 6pt label as 19.9pt.
+ */
+function tickParamsCalls(src: string): TickCall[] {
+  const re = /\b(?:set_)?tick_params\s*\(/g;
+  const out: TickCall[] = [];
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(src)) !== null) {
+    // Forward: the argument list, balanced and quote-aware.
+    let depth = 1;
+    let quote: string | null = null;
+    let args: string | null = null;
+    for (let i = re.lastIndex; i < src.length; i++) {
+      const ch = src[i]!;
+      if (quote) {
+        if (ch === '\\') i++;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')' && --depth === 0) {
+        args = src.slice(re.lastIndex, i);
+        re.lastIndex = i + 1;
+        break;
+      }
+    }
+    if (args === null) continue;
+
+    // Backward: the receiver. Word characters and dots, plus whole
+    // bracketed groups, so `axes[0].` and `fig.axes[1].` stay intact —
+    // those are the idiom that actually produces several Axes, and a
+    // scanner that stopped at `]` merged them into one.
+    let j = m.index - 1;
+    while (j >= 0) {
+      const ch = src[j]!;
+      if (/[\w.]/.test(ch)) { j--; continue; }
+      if (ch === ']' || ch === ')') {
+        const open = ch === ']' ? '[' : '(';
+        let d = 1;
+        j--;
+        while (j >= 0 && d > 0) {
+          if (src[j] === ch) d++;
+          else if (src[j] === open) d--;
+          j--;
+        }
+        continue;
+      }
+      break;
+    }
+    const receiver = src.slice(j + 1, m.index);
+
+    // `ax.xaxis.set_tick_params(...)` scopes by the Axis it is called on.
+    const axisM = receiver.match(/^(.*?)\.?([xy])axis\.$/);
+    const axesText = axisM ? axisM[1]! : receiver;
+    const alias = axesText === '' || axesText === 'plt.' || /^plt\.gca\(\)\.$/.test(axesText);
+
+    out.push({
+      axesKey: alias ? ALIAS_AXES : axesText,
+      axisFromReceiver: axisM ? axisM[2]! : null,
+      args,
+    });
+  }
+  return out;
 }
 
 /**
@@ -385,6 +519,7 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
   // would swap the old silent wrong PASS for a new one.
   const overrides: Partial<Record<ElementKey, number>> = {};
   const overrideCoversAll: Partial<Record<ElementKey, boolean>> = {};
+  const overrideViaBareSelector: Partial<Record<ElementKey, boolean>> = {};
   const elementMap: [string, ElementKey, boolean][] = [
     ['axis\\.text',    'axisText',    true],
     ['axis\\.title',   'axisTitle',   true],
@@ -419,6 +554,19 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
     overrides[key] = Math.min(...bySelector.values());
     overrideCoversAll[key] =
       !hasAxes || bySelector.has('') || (bySelector.has('.x') && bySelector.has('.y'));
+    // Coverage and reachability are NOT the same. `.x` + `.y` covers
+    // everything, but a bare parent cannot override either child.
+    //
+    // And the question is not "did the user write a bare selector" — it
+    // is "is any CHILD explicitly sized". Writing both
+    // `axis.text = element_text(size = 18)` and
+    // `axis.text.x = element_text(size = 7)` is ordinary ggplot (shrink
+    // a rotated x label under a sized parent); a bare selector then
+    // still cannot move the x axis, because a parent never clears a
+    // child that was set. Verified against ggplot2 4.0.3: the bare
+    // advice left axis.text.x at 7pt while moving y to 14pt.
+    overrideViaBareSelector[key] =
+      !hasAxes || (!bySelector.has('.x') && !bySelector.has('.y'));
   }
 
   // Canvas from ggsave() — if missing, fall back to the caller-
@@ -512,6 +660,7 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
     effectiveCanvasHeight: height,
     overrides,
     overrideCoversAll,
+    overrideViaBareSelector,
     facetRows,
     facetCols,
     warnings,
@@ -584,7 +733,6 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
   const xlabel = src.match(argRe('set_xlabel', 'fontsize'));
   const ylabel = src.match(argRe('set_ylabel', 'fontsize'));
   const title = src.match(argRe('set_title', 'fontsize'));
-  const ticks = src.match(argRe('tick_params', 'labelsize'));
   const overrideCoversAll: Partial<Record<ElementKey, boolean>> = {};
 
   // set_xlabel and set_ylabel each cover ONE axis. Taking
@@ -601,14 +749,57 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
     overrideCoversAll.axisTitle = axisTitlePts.length === 2;
   }
 
-  // These two DO cover their element completely: tick_params applies to
-  // both axes' tick labels, and there is only one title. Saying so
-  // matters — without it they score as partial and get compared against
-  // the inherited size, which would report 6.4pt for
-  // `rcParams['font.size'] = 8` + `tick_params(labelsize = 20)`.
-  if (ticks) {
-    overrides.axisText = parseFloat(ticks[1]!);
-    overrideCoversAll.axisText = true;
+  // tick_params covers both axes ONLY when it is not scoped to one.
+  // `ax.tick_params(axis='x', labelsize=20)` leaves the y tick labels
+  // inheriting from font.size, and claiming full coverage for it turned
+  // a correct fail into a silent PASS — the same defect this parser
+  // already fixes for set_xlabel/set_ylabel, one call along.
+  //
+  // Every call is collected, not just the first: scoping x and y in two
+  // separate calls is the normal way to write this, and together they do
+  // cover everything.
+  // The WHOLE argument list of each call, not a regex that stops at the
+  // captured number. A `${ARGS}labelsize=([\\d.]+)` match ends AT the
+  // size, so it can only see arguments written BEFORE it — and
+  // `tick_params(labelsize=20, axis='x')` then read as unscoped and
+  // false-passed exactly like the bug this replaced. Keyword arguments
+  // have no required order.
+  // Scopes per AXES, from ONE walk. Receiver and arguments are read at
+  // the same call site instead of zipped from two regexes, which could
+  // desynchronise and attribute a scope to the wrong Axes.
+  const tickSizes: number[] = [];
+  const scopesByAxes = new Map<string, Set<string>>();
+  for (const call of tickParamsCalls(src)) {
+    const size = topLevelArgs(call.args).match(/\blabelsize\s*=\s*([\d.]+)/);
+    if (!size) continue;
+    tickSizes.push(parseFloat(size[1]!));
+    const axisArg = topLevelArgs(call.args).match(/\baxis\s*=\s*['"](x|y|both)['"]/);
+    // `ax.xaxis.set_tick_params(...)` scopes by the Axis object it is
+    // called on; `axis=` only exists on the Axes-level call.
+    const scope = call.axisFromReceiver ?? (axisArg ? axisArg[1]! : 'both');
+    const set = scopesByAxes.get(call.axesKey) ?? new Set<string>();
+    set.add(scope);
+    scopesByAxes.set(call.axesKey, set);
+  }
+
+  // `plt.` / `plt.gca().` / a bare call all mean "the current Axes". When
+  // exactly one explicit Axes is named in the script, those alias calls
+  // are that Axes — verified in matplotlib 3.10.8, where
+  // `ax.tick_params(axis='x')` + `plt.tick_params(axis='y')` gives 20/20
+  // on the same subplot. With two or more explicit receivers the alias is
+  // ambiguous, so it stays its own bucket and the answer stays
+  // conservative.
+  const explicit = [...scopesByAxes.keys()].filter((k) => k !== ALIAS_AXES);
+  if (explicit.length === 1 && scopesByAxes.has(ALIAS_AXES)) {
+    const target = scopesByAxes.get(explicit[0]!)!;
+    for (const sc of scopesByAxes.get(ALIAS_AXES)!) target.add(sc);
+    scopesByAxes.delete(ALIAS_AXES);
+  }
+  if (tickSizes.length) {
+    overrides.axisText = Math.min(...tickSizes);
+    overrideCoversAll.axisText = [...scopesByAxes.values()].some(
+      (scopes) => scopes.has('both') || (scopes.has('x') && scopes.has('y')),
+    );
   }
   if (title) {
     overrides.plotTitle = parseFloat(title[1]!);
@@ -674,6 +865,8 @@ export function computeReadability(
     baseSize,
     overrides,
     overrideCoversAll = {},
+    // A parser that does not distinguish the two keeps its old behaviour.
+    overrideViaBareSelector = overrideCoversAll,
     language,
     warnings,
   } = params;
@@ -771,11 +964,14 @@ export function computeReadability(
         currentPt: el.sourcePt,
         neededPt: Math.ceil(spec.minPt / scale),
         wasOverridden: overrides[spec.key] !== undefined,
-        // A bare selector reaches the element unless the user pinned a
-        // single axis: ggplot's later-wins applies between theme() calls,
-        // but a parent element never clears a child that was set.
+        // Reachability, NOT coverage. A parent element never clears a
+        // child that was explicitly set, so a bare selector reaches only
+        // when nothing is pinned or the user pinned the bare selector
+        // themselves. Pinning `.x` AND `.y` is complete coverage and
+        // still unreachable from the parent.
         bareSelectorReaches:
-          overrides[spec.key] === undefined || overrideCoversAll[spec.key] === true,
+          overrides[spec.key] === undefined
+          || overrideViaBareSelector[spec.key] === true,
         status: el.status,
       };
     })

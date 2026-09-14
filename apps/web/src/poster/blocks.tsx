@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { blockSelection } from '@/motion/timelines/blockSelection';
 import { LogoPicker } from '@/components/LogoPicker';
 import { stripHtmlToPlainText } from './academicMarkdown';
+import { effectiveTop as blockEffectiveTop } from './blockGeometry';
 import type {
   Author,
   Block,
@@ -1830,10 +1831,9 @@ export function BlockFrame(props: BlockFrameProps) {
   // B1 fix: every non-title block shifts DOWN by the title's overflow
   // amount so wrapped title lines no longer collide with the authors
   // row / body blocks.
-  const effectiveTop =
-    b.type !== 'title' && typeof titleOverflowPx === 'number' && titleOverflowPx > 0
-      ? b.y + titleOverflowPx
-      : b.y;
+  // B1 fix. Shared with the ISSUES pre-flight checks (boundsCheck.ts) so
+  // the warnings can never describe a layout the canvas does not paint.
+  const effectiveTop = blockEffectiveTop(b, titleOverflowPx ?? 0);
 
   const isHeading = b.type === 'heading';
   // Image/logo blocks need to grow downward whenever they have
