@@ -201,6 +201,26 @@ const SEABORN_CONTEXTS: Record<string, number> = {
  * and `'font.size'` are both parsed out of string literals.
  */
 export function stripComments(code: string): string {
+  return scanComments(code, false);
+}
+
+/**
+ * Same as `stripComments`, but comment characters become SPACES instead
+ * of disappearing, so the result is character-for-character the same
+ * length as the input and any index found in it is valid in the original.
+ *
+ * That is what `stripComments` cannot give you: choosing an insertion
+ * point in stripped code and applying it to the original lands somewhere
+ * else entirely. Insertion points were instead chosen from raw text, so a
+ * commented-out `theme_minimal(` attracted the edit and the joining `+`
+ * was written inside a `#` comment — valid-looking output that changes
+ * nothing when run.
+ */
+function maskComments(code: string): string {
+  return scanComments(code, true);
+}
+
+function scanComments(code: string, blank: boolean): string {
   let out = '';
   let quote: string | null = null;
   for (let i = 0; i < code.length; i++) {
@@ -230,8 +250,15 @@ export function stripComments(code: string): string {
       // Skip to end of line. `i` lands ON the newline, which we emit and
       // let the loop's `i++` step past — consuming it here as well would
       // silently drop the first character of the next line.
+      const start = i;
       while (i < code.length && code[i] !== '\n') i++;
-      out += '\n';
+      if (blank) {
+        // Exactly as many characters as were consumed, so offsets hold.
+        out += ' '.repeat(i - start);
+        if (i < code.length) out += '\n';
+      } else {
+        out += '\n';
+      }
       continue;
     }
 
@@ -1069,35 +1096,61 @@ export function applyFontFixes(
 ): string {
   if (!fontSnippet) return code;
 
+  // Every insertion point is located in the MASKED copy — same length as
+  // the original, comments blanked — so a commented-out call can never
+  // attract the edit and the offsets stay valid in `code` itself.
+  const masked = maskComments(code);
+  const maskedLines = masked.split('\n');
+
   if (language === 'r') {
-    const themeEnd = lastCallEnd(code, /theme_\w+\s*\(/g);
+    const themeEnd = lastCallEnd(masked, /theme_\w+\s*\(/g);
     if (themeEnd !== null) {
       return code.slice(0, themeEnd) + ' +\n  ' + fontSnippet + code.slice(themeEnd);
     }
     // No theme_*() to hang it off. Attach to the end of the plot
-    // expression instead: the last non-blank line before ggsave(), or
+    // expression instead: the last line carrying CODE before ggsave(), or
     // the end of the script when there is no ggsave().
     const lines = code.split('\n');
     let insertAfter = lines.length - 1;
-    const ggsaveAt = lines.findIndex((l) => /\bggsave\s*\(/.test(l));
+    const ggsaveAt = maskedLines.findIndex((l) => /\bggsave\s*\(/.test(l));
     if (ggsaveAt > 0) insertAfter = ggsaveAt - 1;
-    while (insertAfter > 0 && lines[insertAfter]!.trim() === '') insertAfter--;
-    lines[insertAfter] = lines[insertAfter]!.trimEnd() + ' +\n  ' + fontSnippet;
+    // A comment-only line masks to blanks, so this skips those too — a
+    // `+` appended to one would be dead text inside the comment above it.
+    while (insertAfter > 0 && maskedLines[insertAfter]!.trim() === '') insertAfter--;
+
+    // Split the chosen line at the end of its CODE, so a trailing comment
+    // stays a comment and the `+` lands in the expression. R is happy with
+    // `expr +  # note` followed by the continuation on the next line;
+    // `expr  # note +` is just a longer comment.
+    const codeEnd = maskedLines[insertAfter]!.trimEnd().length;
+    const head = lines[insertAfter]!.slice(0, codeEnd);
+    const trailing = lines[insertAfter]!.slice(codeEnd);
+    lines[insertAfter] = head + ' +' + trailing + '\n  ' + fontSnippet;
     return lines.join('\n');
   }
 
   const lines = code.split('\n');
   // rcParams is read when the figure is created, so this must land above
   // it or it is a no-op the user cannot see.
-  let at = lines.findIndex((l) => /plt\.(subplots|figure)\s*\(/.test(l));
+  let at = maskedLines.findIndex((l) => /plt\.(subplots|figure)\s*\(/.test(l));
   if (at === -1) {
-    const lastImport = lines.reduce(
+    const lastImport = maskedLines.reduce(
       (best, l, i) => (/^\s*(import|from)\s+\w/.test(l) ? i : best),
       -1,
     );
     at = lastImport + 1;
   }
-  lines.splice(at, 0, fontSnippet, '');
+  // Match the indentation of the line we are inserting above. A figure
+  // built inside a function, loop or `with` block is ordinary code, and a
+  // column-0 statement spliced under `def make_figure(x, y):` is an
+  // IndentationError — the tool handing back a script that cannot run,
+  // which is worse than handing back nothing.
+  const indent = (lines[at] ?? '').match(/^[ \t]*/)![0];
+  const indented = fontSnippet
+    .split('\n')
+    .map((l) => (l === '' ? l : indent + l))
+    .join('\n');
+  lines.splice(at, 0, indented, '');
   return lines.join('\n');
 }
 

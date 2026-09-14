@@ -1077,3 +1077,92 @@ describe('override coverage is not override reachability', () => {
     expect(snip).toContain('axis.title.y');
   });
 });
+
+describe('the fix is inserted where it will actually run', () => {
+  // Insertion points used to be chosen from raw text, so comments and
+  // indentation were invisible. Ground truth below: Python verified with
+  // ast.parse, R with Rscript 4.6.0 + ggplot2 (both the broken and fixed
+  // forms EVALUATE — only one attaches the theme, so "does it parse" is
+  // the wrong question).
+
+  it('python: a figure built inside a function stays indented', () => {
+    const code = ['import matplotlib.pyplot as plt', '', 'def make_figure(x, y):',
+      '    fig, ax = plt.subplots(figsize=(9, 6))', '    ax.plot(x, y)', '    return fig'].join('\n');
+    const out = applyFontFixes(code, 'python', "plt.rcParams.update({\n    'axes.labelsize': 17\n})");
+    // A column-0 statement under `def ...:` is an IndentationError.
+    expect(out).toContain('    plt.rcParams.update');
+    expect(out).not.toMatch(/^plt\.rcParams\.update/m);
+  });
+
+  it('python: a figure built in a loop stays indented', () => {
+    const code = ['import matplotlib.pyplot as plt', '', 'for i in range(3):',
+      '    fig, ax = plt.subplots(figsize=(9, 6))'].join('\n');
+    const out = applyFontFixes(code, 'python', "plt.rcParams.update({\n    'axes.labelsize': 17\n})");
+    expect(out).toContain('    plt.rcParams.update');
+  });
+
+  it('python: a module-level figure still gets a column-0 insert', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(9,6))';
+    const out = applyFontFixes(code, 'python', "plt.rcParams['font.size'] = 17");
+    expect(out).toMatch(/^plt\.rcParams/m);
+  });
+
+  it('python: a commented-out plt.subplots does not attract the insert', () => {
+    const code = ['import matplotlib.pyplot as plt', '# fig, ax = plt.subplots(figsize=(3,2))',
+      'fig, ax = plt.subplots(figsize=(9,6))'].join('\n');
+    const out = applyFontFixes(code, 'python', "plt.rcParams['font.size'] = 17");
+    const lines = out.split('\n');
+    const insertAt = lines.findIndex((l) => l.includes('rcParams'));
+    const realAt = lines.findIndex((l) => !l.trimStart().startsWith('#') && l.includes('plt.subplots'));
+    expect(insertAt).toBeLessThan(realAt);
+    expect(insertAt).toBeGreaterThan(lines.findIndex((l) => l.trimStart().startsWith('#')));
+  });
+
+  it('R: a trailing comment does not swallow the joining +', () => {
+    // Measured in ggplot2: with the + inside the comment the script still
+    // evaluates cleanly and the theme simply never attaches — a silent
+    // no-op, which is the failure this whole feature exists to avoid.
+    const code = ['library(ggplot2)', 'p <- ggplot(df, aes(x, y)) + geom_point()  # main plot',
+      'ggsave("f.png", width = 9, height = 6)'].join('\n');
+    const out = applyFontFixes(code, 'r', 'theme(\n  axis.title = element_text(size = 17)\n)');
+    expect(out.split('\n').some((l) => /#.*\+\s*$/.test(l))).toBe(false);
+    expect(out).toMatch(/geom_point\(\) \+\s+# main plot/);
+  });
+
+  it('R: a commented-out theme_*() does not attract the insert', () => {
+    // The commented copy must come AFTER the live one, because the
+    // insertion point is the LAST theme_*() call — put it first and the
+    // old raw-text scan picks the right one by luck.
+    const code = [
+      'p <- ggplot(df, aes(x, y)) + geom_point() + theme_minimal(base_size = 11)',
+      '# p <- p + theme_minimal(base_size = 20)   # an older version',
+      'ggsave("f.png", width = 9, height = 6)',
+    ].join('\n');
+    const out = applyFontFixes(code, 'r', 'theme(axis.title = element_text(size = 17))');
+    // The comment survives byte-for-byte...
+    expect(out).toContain('# p <- p + theme_minimal(base_size = 20)   # an older version');
+    // ...and the snippet hangs off the LIVE theme_minimal, not the dead one.
+    expect(out).toContain('theme_minimal(base_size = 11) +');
+  });
+
+  it('R: offsets survive comments around the real theme call', () => {
+    // Pins that the comment mask is length-preserving: the index is found
+    // in the masked copy and applied to the original, so any drift lands
+    // the insert mid-token. The banner sits BEFORE (so it shifts offsets)
+    // and a dead theme_*() sits AFTER (so a raw-text scan picks it).
+    const code = [
+      '# --------------------------------------------------------------',
+      '# Banner with parens ( ) and a fake theme_minimal( inside it',
+      '# --------------------------------------------------------------',
+      'p <- ggplot(df, aes(x, y)) + geom_point() + theme_minimal(base_size = 11)',
+      '# p + theme_bw(base_size = 9)',
+      'ggsave("f.png", width = 9, height = 6)',
+    ].join('\n');
+    const out = applyFontFixes(code, 'r', 'theme(axis.title = element_text(size = 17))');
+    expect(out).toContain('theme_minimal(base_size = 11) +');
+    expect(out).toContain('# Banner with parens ( ) and a fake theme_minimal( inside it');
+    expect(out).toContain('# p + theme_bw(base_size = 9)');
+    const commented = out.split('\n').filter((l) => l.trimStart().startsWith('#'));
+    expect(commented.join('\n')).not.toContain('axis.title');
+  });
+});
