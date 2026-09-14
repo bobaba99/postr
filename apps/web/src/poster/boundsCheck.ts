@@ -48,30 +48,58 @@ function effectiveH(b: Block, measured?: MeasuredHeights): number {
   return measured?.get(b.id) ?? b.h;
 }
 
+/**
+ * Where the block is actually PAINTED, vertically.
+ *
+ * `blocks.tsx` shifts every NON-title block down by `titleOverflowPx`
+ * when the title has grown past its stored height (`effectiveTop`,
+ * blocks.tsx:1833) — the body moves with the title rather than being
+ * covered by it. These checks read `b.y` and so measured half the
+ * rendered rect: the right height at the wrong top.
+ *
+ * The visible symptom was a false collision between a grown title and
+ * the block below it, reported on a poster where nothing overlaps —
+ * exactly the kind of wrong-but-confident warning that teaches users to
+ * ignore the ISSUES panel.
+ *
+ * Defaults to 0, so a caller that does not know about the shift gets
+ * the previous behaviour unchanged.
+ */
+function effectiveTop(b: Block, titleOverflow = 0): number {
+  return b.type !== 'title' && titleOverflow > 0 ? b.y + titleOverflow : b.y;
+}
+
 export function checkBounds(
   blocks: Block[],
   canvasWidth: number,
   canvasHeight: number,
   measured?: MeasuredHeights,
+  titleOverflow = 0,
 ): OobWarning[] {
   const warnings: OobWarning[] = [];
 
   for (const b of blocks) {
     const edges: OobWarning['edges'] = [];
+    const top = effectiveTop(b, titleOverflow);
+    const h = effectiveH(b, measured);
 
     if (b.x < 0) edges.push('left');
-    if (b.y < 0) edges.push('top');
+    if (top < 0) edges.push('top');
     if (b.x + b.w > canvasWidth) edges.push('right');
-    if (b.y + effectiveH(b, measured) > canvasHeight) edges.push('bottom');
+    if (top + h > canvasHeight) edges.push('bottom');
 
     if (edges.length === 0) continue;
 
-    // Full OOB = entirely outside the canvas (no visible area)
+    // Full OOB = entirely outside the canvas (no visible area).
+    // This read the STORED height while the edge test above read the
+    // measured one, so a block grown past the top edge with 50 units
+    // still on the sheet was reported as "completely outside — it won't
+    // appear in print", which the user can see is false.
     const fullyOutside =
       b.x + b.w <= 0 ||
-      b.y + b.h <= 0 ||
+      top + h <= 0 ||
       b.x >= canvasWidth ||
-      b.y >= canvasHeight;
+      top >= canvasHeight;
 
     warnings.push({
       blockId: b.id,
@@ -115,6 +143,7 @@ export interface CollisionWarning {
 export function checkCollisions(
   blocks: Block[],
   measured?: MeasuredHeights,
+  titleOverflow = 0,
   tolerance = 2,
 ): CollisionWarning[] {
   const out: CollisionWarning[] = [];
@@ -125,9 +154,11 @@ export function checkCollisions(
       const b = blocks[j]!;
       const ah = effectiveH(a, measured);
       const bh = effectiveH(b, measured);
+      const at = effectiveTop(a, titleOverflow);
+      const bt = effectiveTop(b, titleOverflow);
 
       const dx = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
-      const dy = Math.min(a.y + ah, b.y + bh) - Math.max(a.y, b.y);
+      const dy = Math.min(at + ah, bt + bh) - Math.max(at, bt);
       if (dx <= tolerance || dy <= tolerance) continue;
 
       out.push({

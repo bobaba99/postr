@@ -173,3 +173,67 @@ describe('measured heights — F8', () => {
     expect(hits).toHaveLength(0);
   });
 });
+
+describe('the checks read where a block is PAINTED, not where it is stored', () => {
+  const mk = (id: string, type: string, y: number, h: number): Block =>
+    ({ id, type, x: 10, y, w: 200, h, content: '', imageSrc: null,
+       imageFit: 'contain', tableData: null }) as Block;
+
+  it('no false collision between a grown title and the block it pushes down', () => {
+    // blocks.tsx shifts every NON-title block down by titleOverflowPx, so
+    // the body moves WITH the grown title instead of being covered by it.
+    // Reading the measured height but the stored top saw the title's new
+    // bottom (120) crossing the body's stored top (60) and reported an
+    // overlap on a poster where nothing overlaps.
+    const title = mk('t', 'title', 0, 50);
+    const body = mk('b', 'text', 60, 50);
+    const measured = new Map([['t', 120], ['b', 50]]);
+    const overflow = 120 - 50; // what PosterEditor computes
+    expect(checkCollisions([title, body], measured, overflow)).toHaveLength(0);
+  });
+
+  it('still finds a real collision once the shift is accounted for', () => {
+    // Same shift, but the body starts high enough to genuinely collide.
+    const title = mk('t', 'title', 0, 50);
+    const body = mk('b', 'text', 20, 80);
+    const measured = new Map([['t', 200], ['b', 80]]);
+    expect(checkCollisions([title, body], measured, 150).length).toBe(1);
+  });
+
+  it('with no title overflow the collision result is unchanged', () => {
+    const title = mk('t', 'title', 0, 50);
+    const body = mk('b', 'text', 60, 50);
+    const measured = new Map([['t', 120], ['b', 50]]);
+    expect(checkCollisions([title, body], measured, 0)).toHaveLength(1);
+  });
+
+  it('a grown block partly on the sheet is "partial", not "completely outside"', () => {
+    // fullyOutside read the STORED height while the edge test read the
+    // measured one: -150 + 100 <= 0 said "gone", but the block renders
+    // -150..50 and 50 units of it print.
+    const b = mk('b', 'text', -150, 100);
+    const w = checkBounds([b], 480, 360, new Map([['b', 200]]));
+    expect(w).toHaveLength(1);
+    expect(w[0]!.severity).toBe('partial');
+  });
+
+  it('a block genuinely off the top is still "full"', () => {
+    const b = mk('b', 'text', -150, 100);
+    const w = checkBounds([b], 480, 360, new Map([['b', 120]]));
+    expect(w[0]!.severity).toBe('full');
+  });
+
+  it('checkBounds applies the title shift to the bottom edge', () => {
+    // A body block that fits at its stored top can be pushed off the
+    // sheet by a grown title. Stored: 300 + 50 = 350 <= 360, fine.
+    const b = mk('b', 'text', 300, 50);
+    expect(checkBounds([b], 480, 360)).toHaveLength(0);
+    expect(checkBounds([b], 480, 360, undefined, 40)).toHaveLength(1);
+  });
+
+  it('the title itself is never shifted', () => {
+    const t = mk('t', 'title', 320, 50);
+    expect(checkBounds([t], 480, 360, undefined, 40)).toHaveLength(1);
+    expect(checkBounds([t], 480, 360, undefined, 0)).toHaveLength(1);
+  });
+});
