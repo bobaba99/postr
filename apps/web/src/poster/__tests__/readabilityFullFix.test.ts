@@ -53,3 +53,62 @@ describe('generateFullFix (Python)', () => {
     expect(fixed).toContain('figsize=(7, 5)');
   });
 });
+
+describe('a setting the user already wrote is edited, never duplicated', () => {
+  // The patterns matched only a numeric literal in one syntactic form, so
+  // any other spelling read as "not set" and the generator fell through to
+  // a branch that ADDED a second setting. Both outputs below were run
+  // through the real interpreters: the Python sets font.size to 24.0, the
+  // R renders without error.
+
+  it('python: rcParams.update({...}) is edited in place', () => {
+    const code = "import matplotlib.pyplot as plt\nplt.rcParams.update({'font.size': 8})\nfig, ax = plt.subplots(figsize=(9,6))";
+    const out = generateFullFix(code, parsePythonCode(code), 24);
+    expect((out.match(/font\.size/g) ?? []).length).toBe(1);
+    expect(out).toContain("'font.size': 24");
+  });
+
+  it('python: the item-assignment form still works', () => {
+    const code = "import matplotlib.pyplot as plt\nplt.rcParams['font.size'] = 8\nfig, ax = plt.subplots(figsize=(9,6))";
+    const out = generateFullFix(code, parsePythonCode(code), 24);
+    expect((out.match(/font\.size/g) ?? []).length).toBe(1);
+    expect(out).toContain("plt.rcParams['font.size'] = 24");
+  });
+
+  it('python: a script with no font setting still gets one added', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(9,6))';
+    const out = generateFullFix(code, parsePythonCode(code), 24);
+    expect((out.match(/font\.size/g) ?? []).length).toBe(1);
+  });
+
+  it('R: a variable-bound base_size is replaced, not duplicated', () => {
+    // theme_minimal(base_size = 24, base_size = bs) is an R error:
+    // "formal argument matched by multiple actual arguments".
+    const code = "bs <- 11\np <- ggplot(d, aes(x,y)) + geom_point() + theme_minimal(base_size = bs)\nggsave('f.png', width = 9, height = 6)";
+    const out = generateFullFix(code, parseRCode(code), 24);
+    expect((out.match(/base_size\s*=/g) ?? []).length).toBe(1);
+    expect(out).toContain('theme_minimal(base_size = 24)');
+  });
+
+  it('R: a rel() base_size keeps its parens', () => {
+    const code = "p <- ggplot(d) + theme_minimal(base_size = rel(1.1))\nggsave('f.png', width = 9, height = 6)";
+    const out = generateFullFix(code, parseRCode(code), 24);
+    expect(out).toContain('theme_minimal(base_size = 24)');
+    expect(out).not.toContain('rel(1.1)');
+    expect(out).not.toContain('))');
+  });
+
+  it('R: a theme call with no base_size gains exactly one', () => {
+    const code = "p <- ggplot(d) + theme_minimal()\nggsave('f.png', width = 9, height = 6)";
+    const out = generateFullFix(code, parseRCode(code), 24);
+    expect((out.match(/base_size\s*=/g) ?? []).length).toBe(1);
+  });
+
+  it('R: a commented-out base_size does not count as already set', () => {
+    const code = "# theme_minimal(base_size = 10)\np <- ggplot(d) + theme_minimal()\nggsave('f.png', width = 9, height = 6)";
+    const out = generateFullFix(code, parseRCode(code), 24);
+    expect(out).toContain('# theme_minimal(base_size = 10)');
+    expect(out).toMatch(/\+ theme_minimal\(base_size = 24\)/);
+    expect(out).not.toContain(', )');
+  });
+});

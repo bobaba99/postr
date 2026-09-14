@@ -10,26 +10,70 @@
  * hand back a script whose canvas has nothing to do with the base_size
  * it recommends — the exact failure the check exists to prevent.
  */
-import { applyFontFixes, type FigureParams } from './readability';
+import { applyFontFixes, maskComments, type FigureParams } from './readability';
 
 /** "24", "23.4" — never "24.0" or float noise like 16.549999. */
 function formatInches(n: number): string {
   return String(Math.round(n * 100) / 100);
 }
 
-const R_BASE_SIZE = /base_size\s*=\s*[\d.]+/;
-const R_THEME_CALL = /(theme_\w+\s*\()/;
-const PY_FONT_SIZE_RC = /(rcParams\s*\[\s*['"]font\.size['"]\s*\]\s*=\s*)[\d.]+/;
+// Every pattern below matches the VALUE loosely, not just a numeric
+// literal. Matching `[\d.]+` only meant `base_size = bs` and
+// `rcParams.update({'font.size': 8})` were not recognised as "already
+// set" — so the generator fell through to a branch that ADDED a second
+// setting, handing back `theme_minimal(base_size = 24, base_size = bs)`,
+// which is an R error, and Python with two conflicting font sizes.
+const R_BASE_SIZE = /base_size\s*=\s*(?:[\w.]+\s*\([^()]*\)|[^,)\n]+)/;
+// The second group matches only when the call is EMPTY, so an argument
+// can be added without leaving `theme_minimal(base_size = 24, )`. R
+// accepts the trailing comma, but this is code we hand back to the user
+// as "the corrected script".
+const R_THEME_CALL = /(theme_\w+\s*\()(\s*\))?/;
+const PY_FONT_SIZE_RC = /(rcParams\s*\[\s*['"]font\.size['"]\s*\]\s*=\s*)[^\n]+/;
+/** `plt.rcParams.update({... 'font.size': N ...})` — the dict form. */
+const PY_FONT_SIZE_UPDATE = /(rcParams\s*\.\s*update\s*\((?:[^()]|\([^()]*\))*?['"]font\.size['"]\s*:\s*)[^,}\n]+/;
 const PY_FONT_SCALE = /font_scale\s*=\s*[\d.]+/;
 
-function fixR(code: string, params: FigureParams, suggested: number): string {
-  const withBase = R_BASE_SIZE.test(code)
-    ? code.replace(new RegExp(R_BASE_SIZE.source, 'g'), `base_size = ${suggested}`)
-    : R_THEME_CALL.test(code)
-      ? code.replace(R_THEME_CALL, `$1base_size = ${suggested}, `)
-      : `${code.trimEnd()} +\n  theme_minimal(base_size = ${suggested})`;
+/**
+ * Find `re` in a comment-masked copy and splice the ORIGINAL.
+ *
+ * Detection has to ignore comments for the same reason the insertion
+ * points do: a commented-out `base_size = 10` would otherwise read as
+ * "already set", and the edit would land in the comment while the live
+ * call kept its old size. Returns null when there is no live match, so
+ * callers can fall through to their add-a-setting branch.
+ */
+function replaceLive(
+  code: string,
+  re: RegExp,
+  build: (m: RegExpExecArray) => string,
+  all = false,
+): string | null {
+  const masked = maskComments(code);
+  const g = new RegExp(re.source, all ? 'g' : '');
+  let out = '';
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let found = false;
+  while ((m = g.exec(masked)) !== null) {
+    found = true;
+    out += code.slice(last, m.index) + build(m);
+    last = m.index + m[0].length;
+    if (!all) break;
+    if (m[0] === '') g.lastIndex++;
+  }
+  return found ? out + code.slice(last) : null;
+}
 
-  return ensureRSave(withBase, params);
+function fixR(code: string, params: FigureParams, suggested: number): string {
+  const replaced = replaceLive(code, R_BASE_SIZE, () => `base_size = ${suggested}`, true);
+  const added =
+    replaced ??
+    replaceLive(code, R_THEME_CALL, (m) =>
+      m[2] ? `${m[1]}base_size = ${suggested})` : `${m[1]}base_size = ${suggested}, `) ??
+    `${code.trimEnd()} +\n  theme_minimal(base_size = ${suggested})`;
+
+  return ensureRSave(added, params);
 }
 
 /**
@@ -51,11 +95,23 @@ function fixPython(code: string, params: FigureParams, suggested: number): strin
   const figsizeLine = `plt.rcParams['figure.figsize'] = (${formatInches(params.canvasWidth)}, ${formatInches(params.canvasHeight)})`;
 
   let fixed: string;
-  if (PY_FONT_SIZE_RC.test(code)) {
-    fixed = code.replace(PY_FONT_SIZE_RC, `$1${suggested}`);
+  const itemForm = replaceLive(code, PY_FONT_SIZE_RC, (m) => `${m[1]}${suggested}`);
+  const dictForm = itemForm
+    ? null
+    : replaceLive(code, PY_FONT_SIZE_UPDATE, (m) => `${m[1]}${suggested}`);
+
+  if (itemForm) {
+    fixed = itemForm;
     if (!hasFigsize) {
       // Right after the font.size line, so the two rcParams read as a pair.
       fixed = fixed.replace(/^(.*rcParams\s*\[\s*['"]font\.size['"]\s*\].*)$/m, `$1\n${figsizeLine}`);
+    }
+  } else if (dictForm) {
+    // `rcParams.update({...})` already carries the size; edit it in place
+    // rather than prepending a second, conflicting `font.size`.
+    fixed = dictForm;
+    if (!hasFigsize) {
+      fixed = `import matplotlib.pyplot as plt\n${figsizeLine}\n\n${fixed}`;
     }
   } else if (PY_FONT_SCALE.test(code)) {
     fixed = code.replace(PY_FONT_SCALE, `font_scale=${(suggested / 10).toFixed(1)}`);

@@ -216,7 +216,7 @@ export function stripComments(code: string): string {
  * was written inside a `#` comment — valid-looking output that changes
  * nothing when run.
  */
-function maskComments(code: string): string {
+export function maskComments(code: string): string {
   return scanComments(code, true);
 }
 
