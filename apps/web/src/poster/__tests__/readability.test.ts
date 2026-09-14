@@ -951,3 +951,57 @@ ggsave("fig.png", width = 9, height = 6)`;
     expect(out.split('(').length).toBe(out.split(')').length);
   });
 });
+
+describe('override coverage is not override reachability', () => {
+  // Two defects, one cause: coverage was tracked as a single boolean, so
+  // "every axis is covered" and "a bare selector would reach it" could not
+  // be told apart — and on the Python side `axis=` was ignored outright.
+
+  it("tick_params(axis='x') does not hide the untouched y tick labels", () => {
+    // D2. font.size 8 -> y ticks inherit 8 * 0.8 = 6.4pt and must fail;
+    // only the x ticks were raised to 20.
+    const p = parsePythonCode("plt.rcParams['font.size'] = 8\nax.tick_params(axis='x', labelsize=20)");
+    const el = computeReadability(p, 5, 7).elements.find((e) => e.name === 'Tick labels')!;
+    expect(el.status).toBe('fail');
+    expect(el.sourcePt).toBeLessThan(20);
+  });
+
+  it('scoping x and y in separate tick_params calls DOES cover both', () => {
+    const p = parsePythonCode(
+      "plt.rcParams['font.size'] = 8\nax.tick_params(axis='x', labelsize=20)\nax.tick_params(axis='y', labelsize=20)",
+    );
+    const el = computeReadability(p, 5, 7).elements.find((e) => e.name === 'Tick labels')!;
+    expect(el.sourcePt).toBe(20);
+  });
+
+  it('an unscoped tick_params still covers both axes', () => {
+    const p = parsePythonCode("plt.rcParams['font.size'] = 8\nax.tick_params(labelsize=20)");
+    const el = computeReadability(p, 5, 7).elements.find((e) => e.name === 'Tick labels')!;
+    expect(el.sourcePt).toBe(20);
+  });
+
+  it('pinning BOTH axes still gets per-axis advice, not a bare parent', () => {
+    // D6. axis.text.x and axis.text.y are both explicit, so coverage is
+    // complete — but `axis.text = element_text(...)` would reach neither.
+    const code = 'ggplot(d, aes(x, y)) + geom_point() +\n'
+      + '  theme(axis.text.x = element_text(size = 7), axis.text.y = element_text(size = 7))\n'
+      + 'ggsave("f.png", width = 10, height = 7)';
+    const snip = computeReadability(parseRCode(code), 7, 10).fontSnippet ?? '';
+    expect(snip).toContain('axis.text.x');
+    expect(snip).toContain('axis.text.y');
+  });
+
+  it('a bare axis.text override still gets bare advice', () => {
+    const code = 'ggplot(d, aes(x, y)) + geom_point() +\n'
+      + '  theme(axis.text = element_text(size = 7))\nggsave("f.png", width = 10, height = 7)';
+    const snip = computeReadability(parseRCode(code), 7, 10).fontSnippet ?? '';
+    expect(snip).toMatch(/axis\.text\s*=/);
+    expect(snip).not.toContain('axis.text.x');
+  });
+
+  it('a non-axis element is always reachable by its bare selector', () => {
+    const code = 'ggplot(d) + theme(legend.text = element_text(size = 5))\nggsave("f.png", width = 10, height = 7)';
+    const snip = computeReadability(parseRCode(code), 7, 10).fontSnippet ?? '';
+    expect(snip).toMatch(/legend\.text\s*=/);
+  });
+});

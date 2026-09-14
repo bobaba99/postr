@@ -30,6 +30,24 @@ export interface FigureParams {
    * which is the direction this whole finding is about.
    */
   overrideCoversAll?: Partial<Record<ElementKey, boolean>>;
+  /**
+   * Per key: did the user's OWN override use the bare selector
+   * (`axis.text`, not `axis.text.x`)? This is a different question from
+   * `overrideCoversAll` and the two were conflated, which is the bug.
+   *
+   * Pinning BOTH axes individually gives complete coverage
+   * (`overrideCoversAll = true`) while a bare selector still reaches
+   * NEITHER of them — ggplot's inheritance keeps an explicitly-set child
+   * against a later parent. So advice built on "coverage is complete"
+   * emitted `axis.text = element_text(size = 14)` into a theme where
+   * `axis.text.x` and `axis.text.y` were already pinned, and changed
+   * nothing.
+   *
+   * Absence is the conservative reading: an unset key means we do not
+   * know a bare selector reaches, so the advice names the children
+   * explicitly, which is always correct if more verbose.
+   */
+  overrideViaBareSelector?: Partial<Record<ElementKey, boolean>>;
   facetRows: number;
   facetCols: number;
   warnings: string[];
@@ -385,6 +403,7 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
   // would swap the old silent wrong PASS for a new one.
   const overrides: Partial<Record<ElementKey, number>> = {};
   const overrideCoversAll: Partial<Record<ElementKey, boolean>> = {};
+  const overrideViaBareSelector: Partial<Record<ElementKey, boolean>> = {};
   const elementMap: [string, ElementKey, boolean][] = [
     ['axis\\.text',    'axisText',    true],
     ['axis\\.title',   'axisTitle',   true],
@@ -419,6 +438,9 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
     overrides[key] = Math.min(...bySelector.values());
     overrideCoversAll[key] =
       !hasAxes || bySelector.has('') || (bySelector.has('.x') && bySelector.has('.y'));
+    // Coverage and reachability are NOT the same. `.x` + `.y` covers
+    // everything, but a bare parent cannot override either child.
+    overrideViaBareSelector[key] = !hasAxes || bySelector.has('');
   }
 
   // Canvas from ggsave() — if missing, fall back to the caller-
@@ -512,6 +534,7 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
     effectiveCanvasHeight: height,
     overrides,
     overrideCoversAll,
+    overrideViaBareSelector,
     facetRows,
     facetCols,
     warnings,
@@ -584,7 +607,6 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
   const xlabel = src.match(argRe('set_xlabel', 'fontsize'));
   const ylabel = src.match(argRe('set_ylabel', 'fontsize'));
   const title = src.match(argRe('set_title', 'fontsize'));
-  const ticks = src.match(argRe('tick_params', 'labelsize'));
   const overrideCoversAll: Partial<Record<ElementKey, boolean>> = {};
 
   // set_xlabel and set_ylabel each cover ONE axis. Taking
@@ -601,14 +623,30 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
     overrideCoversAll.axisTitle = axisTitlePts.length === 2;
   }
 
-  // These two DO cover their element completely: tick_params applies to
-  // both axes' tick labels, and there is only one title. Saying so
-  // matters — without it they score as partial and get compared against
-  // the inherited size, which would report 6.4pt for
-  // `rcParams['font.size'] = 8` + `tick_params(labelsize = 20)`.
-  if (ticks) {
-    overrides.axisText = parseFloat(ticks[1]!);
-    overrideCoversAll.axisText = true;
+  // tick_params covers both axes ONLY when it is not scoped to one.
+  // `ax.tick_params(axis='x', labelsize=20)` leaves the y tick labels
+  // inheriting from font.size, and claiming full coverage for it turned
+  // a correct fail into a silent PASS — the same defect this parser
+  // already fixes for set_xlabel/set_ylabel, one call along.
+  //
+  // Every call is collected, not just the first: scoping x and y in two
+  // separate calls is the normal way to write this, and together they do
+  // cover everything.
+  const tickRe = new RegExp(`tick_params\\s*\\(${ARGS}labelsize\\s*=\\s*([\\d.]+)`, 'g');
+  const tickSizes: number[] = [];
+  const tickAxes = new Set<string>();
+  let tm: RegExpExecArray | null;
+  while ((tm = tickRe.exec(src)) !== null) {
+    tickSizes.push(parseFloat(tm[1]!));
+    // The `axis=` of THIS call — scan only its own argument list.
+    const call = tm[0]!;
+    const axisArg = call.match(/\baxis\s*=\s*['"](x|y|both)['"]/);
+    tickAxes.add(axisArg ? axisArg[1]! : 'both');
+  }
+  if (tickSizes.length) {
+    overrides.axisText = Math.min(...tickSizes);
+    overrideCoversAll.axisText =
+      tickAxes.has('both') || (tickAxes.has('x') && tickAxes.has('y'));
   }
   if (title) {
     overrides.plotTitle = parseFloat(title[1]!);
@@ -674,6 +712,8 @@ export function computeReadability(
     baseSize,
     overrides,
     overrideCoversAll = {},
+    // A parser that does not distinguish the two keeps its old behaviour.
+    overrideViaBareSelector = overrideCoversAll,
     language,
     warnings,
   } = params;
@@ -771,11 +811,14 @@ export function computeReadability(
         currentPt: el.sourcePt,
         neededPt: Math.ceil(spec.minPt / scale),
         wasOverridden: overrides[spec.key] !== undefined,
-        // A bare selector reaches the element unless the user pinned a
-        // single axis: ggplot's later-wins applies between theme() calls,
-        // but a parent element never clears a child that was set.
+        // Reachability, NOT coverage. A parent element never clears a
+        // child that was explicitly set, so a bare selector reaches only
+        // when nothing is pinned or the user pinned the bare selector
+        // themselves. Pinning `.x` AND `.y` is complete coverage and
+        // still unreachable from the parent.
         bareSelectorReaches:
-          overrides[spec.key] === undefined || overrideCoversAll[spec.key] === true,
+          overrides[spec.key] === undefined
+          || overrideViaBareSelector[spec.key] === true,
         status: el.status,
       };
     })
