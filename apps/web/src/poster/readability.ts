@@ -227,6 +227,75 @@ export function maskComments(code: string): string {
   return scanComments(code, true);
 }
 
+/**
+ * Comments AND string CONTENTS blanked (delimiters kept), same length.
+ *
+ * For the REWRITER only. The parsers must keep reading inside literals —
+ * `units = "cm"` and `'font.size'` are how they work — but a rewriter
+ * must never write there. Loosening the value patterns to match arbitrary
+ * text turned that distinction from academic into a script that will not
+ * parse: `msg <- "set base_size = 30 for posters"` had its closing quote
+ * eaten, and the Python equivalent produced an unterminated string.
+ */
+export function maskCodeForRewrite(code: string): string {
+  const noComments = scanComments(code, true);
+  let out = '';
+  let quote: string | null = null;
+  for (let i = 0; i < noComments.length; i++) {
+    const ch = noComments[i]!;
+    if (quote) {
+      if (quote.length === 3 && noComments.startsWith(quote, i)) {
+        out += quote; i += 2; quote = null; continue;
+      }
+      if (ch === '\\') { out += '  '; i++; continue; }
+      if (ch === quote) { out += ch; quote = null; continue; }
+      out += ch === '\n' ? '\n' : ' ';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const triple = ch + ch + ch;
+      if (noComments.startsWith(triple, i)) { quote = triple; out += triple; i += 2; continue; }
+      quote = ch;
+      out += ch;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/**
+ * Index just past the end of the argument VALUE starting at `from` —
+ * the next top-level `,` or the closing `)`, with nesting and quotes
+ * respected.
+ *
+ * A character class cannot do this. `[^,)\n]+` stopped at the first `)`
+ * of `if (big) 20 else 9`, leaving `20 else 9` stranded; the call
+ * alternative matched only `max(bs, 8)` of `max(bs, 8) * 1.2` and left
+ * `* 1.2` behind, so the emitted script RAN and rendered 38.4pt when the
+ * check had scored 32. Running and lying is worse than not running.
+ */
+export function argValueEnd(code: string, from: number): number {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = from; i < code.length; i++) {
+    const ch = code[i]!;
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      if (depth === 0) return i;
+      depth--;
+    } else if (ch === ',' && depth === 0) return i;
+    else if (ch === '\n' && depth === 0) return i;
+  }
+  return code.length;
+}
+
 function scanComments(code: string, blank: boolean): string {
   let out = '';
   let quote: string | null = null;
@@ -651,14 +720,16 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
       const raw = mm[2]!.trim();
       bySelector.set(
         axis,
+        // EXACT here. Rounding at parse time fed the scorer a different
+        // number from the one ggplot renders: a size of 13.950000000000001
+        // against a 14pt floor rounded up to 14 and flipped a genuine
+        // `warn` to `pass`, taking its advice row with it. Swept over
+        // plausible base/rel/canvas combinations that was 411 status
+        // flips, 397 of them in the optimistic direction — a checker
+        // reporting text as readable when it is not. The display rounding
+        // lives where the number is shown, below.
         raw.startsWith('rel')
-          // Rounded HERE, not at the point of display. `rel(1.1)` on an
-          // 11pt base is 12.100000000000001 in IEEE 754, and the element
-          // table rounds for display while the per-element advice printed
-          // the raw value — so one element showed as '12.1pt' in the table
-          // and '12.100000000000001pt' in the advice directly below it.
-          // One decimal is the precision the whole panel speaks in.
-          ? Math.round(baseSize * parseFloat(raw.match(/[\d.]+/)![0]!) * 10) / 10
+          ? baseSize * parseFloat(raw.match(/[\d.]+/)![0]!)
           : parseFloat(raw),
       );
     }
@@ -1057,7 +1128,11 @@ export function computeReadability(
       const el = elements.find((e) => e.name === spec.name)!;
       return {
         name: spec.name,
-        currentPt: overrides[spec.key]!,
+        // One decimal, the precision the whole panel speaks in. The table
+        // above already rounds for display; this row did not, so one
+        // element showed '12.1pt' and '12.100000000000001pt' on the same
+        // screen (D10).
+        currentPt: Math.round(overrides[spec.key]! * 10) / 10,
         neededPt: Math.ceil(spec.minPt / scale),
         status: el.status,
       };

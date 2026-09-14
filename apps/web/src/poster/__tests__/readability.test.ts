@@ -1291,9 +1291,20 @@ describe('language detection reads the live code, not the comments', () => {
     expect(detectLanguage(code)).toBe('python');
   });
 
-  it('signals inside string literals still count', () => {
-    // stripComments preserves strings, so this is unaffected.
-    expect(detectLanguage('p <- ggplot(d, aes(x, y)) + labs(title = "not # a comment")')).toBe('r');
+  it('a # inside a string does not truncate the line', () => {
+    // The previous version of this test put every scoring token OUTSIDE
+    // the quotes, so it passed even against a naive /#.*$/gm stripper —
+    // the exact implementation stripComments' own docstring says is
+    // wrong. Here a hex colour hides the ONLY copy of base_size behind a
+    // '#', so a naive stripper reads 11 (the ggplot default) instead.
+    const code = 'p <- ggplot(d, aes(x,y)) + geom_point(colour = "#FF0000") + theme_minimal(base_size = 24)\nggsave("f.png", p, width = 9, height = 6)';
+    expect(parseRCode(code).baseSize).toBe(24);
+    expect(detectLanguage(code)).toBe('r');
+  });
+
+  it('python: a hex colour does not truncate the line either', () => {
+    const code = "plt.rcParams.update({'axes.edgecolor': '#333333', 'font.size': 22})\nplt.figure(figsize=(9,6))";
+    expect(parsePythonCode(code).baseSize).toBe(22);
   });
 
   it('a script that is nothing but comments detects nothing', () => {
@@ -1308,14 +1319,28 @@ describe('sizes are reported at one decimal, everywhere', () => {
     // showed two different numbers on the same screen.
     const code = "theme_minimal(base_size = 11) +\n  theme(axis.title = element_text(size = rel(1.1)))\nggsave('f.png', width = 9, height = 6)";
     const r = computeReadability(parseRCode(code), 7, 10);
-    const all = [...(r.overrideFixes ?? []), ...(r.fontFixes ?? [])] as Array<{ currentPt?: number }>;
+    // Assert the VALUE is one-decimal, not merely that its string is
+    // short: a length check passes for whole points and for two decimals,
+    // so it pinned "not float noise" rather than the stated precision.
+    const all = [...(r.overrideFixes ?? []), ...(r.fontFixes ?? [])] as Array<{ name?: string; currentPt?: number }>;
     for (const f of all) {
       if (f.currentPt === undefined) continue;
-      expect(String(f.currentPt).replace('-', '').length).toBeLessThanOrEqual(6);
+      expect(f.currentPt).toBe(Math.round(f.currentPt * 10) / 10);
     }
     const axisTitle = r.elements.find((e) => e.name === 'Axis titles')!;
-    const advised = all.find((f) => f.currentPt !== undefined);
-    if (advised) expect(advised.currentPt).toBe(axisTitle.sourcePt);
+    // Select by NAME — picking "the first row with a currentPt" only
+    // coincidentally found this element.
+    const advised = all.find((f) => f.name === 'Axis titles');
+    expect(advised?.currentPt).toBe(axisTitle.sourcePt);
+  });
+
+  it('scoring uses the EXACT size, not the rounded one', () => {
+    // base_size 15.5 x rel(0.9) = 13.950000000000001, below the 14pt
+    // floor. Rounding before scoring lifted it to 14 and turned a genuine
+    // warn into a pass, dropping the advice row with it.
+    const code = "ggplot(d, aes(x, y)) + geom_point() +\n  theme_minimal(base_size = 15.5) +\n  theme(axis.text = element_text(size = rel(0.9)))\nggsave('f.png', width = 10, height = 7)";
+    const r = computeReadability(parseRCode(code), 7, 10);
+    expect(r.elements.find((e) => e.name === 'Tick labels')!.status).not.toBe('pass');
   });
 
   it('a plain numeric override is untouched', () => {

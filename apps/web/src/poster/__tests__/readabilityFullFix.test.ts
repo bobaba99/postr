@@ -9,6 +9,9 @@ import { describe, expect, it } from 'vitest';
 import { generateFullFix } from '../readabilityFullFix';
 import { parsePythonCode, parseRCode } from '../readability';
 
+const R = (c: string) => generateFullFix(c, parseRCode(c), 32);
+const P = (c: string) => generateFullFix(c, parsePythonCode(c), 32);
+
 const R_NO_SAVE = 'library(ggplot2)\nggplot(mtcars, aes(mpg, wt)) + geom_point()';
 const PY_NO_SAVE = 'import matplotlib.pyplot as plt\nplt.plot([1, 2], [3, 4])';
 
@@ -110,5 +113,58 @@ describe('a setting the user already wrote is edited, never duplicated', () => {
     expect(out).toContain('# theme_minimal(base_size = 10)');
     expect(out).toMatch(/\+ theme_minimal\(base_size = 24\)/);
     expect(out).not.toContain(', )');
+  });
+});
+
+describe('the generated script must run, and do what was asked', () => {
+  // Every case below was executed: R under Rscript 4.6.0 + ggplot2 4.0.3,
+  // Python under matplotlib 3.10.8. "It looks right" is not a verdict —
+  // the original R bug produced a script that ran cleanly and silently
+  // changed nothing.
+  it('C1 R: a string literal mentioning base_size is not truncated', () => {
+    const c = 'library(ggplot2)\nmsg <- "set base_size = 30 for posters"\np <- ggplot(d) + theme_minimal(base_size = 11)\nggsave("f.png", width = 9, height = 6)';
+    const out = R(c);
+    expect(out, out).toContain('"set base_size = 30 for posters"');
+  });
+  it('C2 py: a string literal mentioning font.size is not truncated', () => {
+    const c = 'import matplotlib.pyplot as plt\nnote = "try plt.rcParams[\'font.size\'] = 30 next time"\nfig, ax = plt.subplots(figsize=(9,6))';
+    const out = P(c);
+    expect(out, out).toContain('= 30 next time"');
+  });
+  it('C3 py: a second statement on the same line survives', () => {
+    const c = "import matplotlib.pyplot as plt\nplt.rcParams['font.size'] = 8; plt.rcParams['axes.labelsize'] = 9\nfig, ax = plt.subplots(figsize=(9,6))";
+    const out = P(c);
+    expect(out, out).toContain("plt.rcParams['axes.labelsize'] = 9");
+  });
+  it('C4 py: a line continuation is not broken', () => {
+    const c = "import matplotlib.pyplot as plt\nplt.rcParams['font.size'] = \\\n    8\nfig, ax = plt.subplots(figsize=(9,6))";
+    const out = P(c);
+    expect(out.split('\n').some((l) => /^\s+8\s*$/.test(l)), out).toBe(false);
+  });
+  it('H1 R: an if/else base_size is replaced whole', () => {
+    const c = 'p <- ggplot(d) + theme_minimal(base_size = if (big) 20 else 9)\nggsave("f.png", width = 9, height = 6)';
+    const out = R(c);
+    expect(out, out).toContain('theme_minimal(base_size = 32)');
+  });
+  it('H2 R: an arithmetic base_size is replaced whole, not left multiplied', () => {
+    const c = 'p <- ggplot(d) + theme_minimal(base_size = max(bs, 8) * 1.2)\nggsave("f.png", width = 9, height = 6)';
+    const out = R(c);
+    expect(out, out).toContain('theme_minimal(base_size = 32)');
+    expect(out, out).not.toContain('* 1.2');
+  });
+  it('M1 R: a trailing comment on the base_size line survives', () => {
+    const c = 'p <- ggplot(d) + theme_minimal(\n    base_size = 11  # deliberately small\n)\nggsave("f.png", width = 9, height = 6)';
+    const out = R(c);
+    expect(out, out).toContain('# deliberately small');
+  });
+  it('M2 py: a comment inside rcParams.update survives', () => {
+    const c = "import matplotlib.pyplot as plt\nplt.rcParams.update({\n    'axes.labelsize': 9,   # axis labels\n    'font.size': 8,\n})\nfig, ax = plt.subplots(figsize=(9,6))";
+    const out = P(c);
+    expect(out, out).toContain('# axis labels');
+  });
+  it('P1 R: the no-theme fallback must not append after ggsave()', () => {
+    const c = 'library(ggplot2)\np <- ggplot(d, aes(x,y)) + geom_point()\nggsave("f.png", p, width = 9, height = 6)';
+    const out = R(c);
+    expect(out.split('\n').some((l) => /ggsave.*\+\s*$/.test(l)), out).toBe(false);
   });
 });
