@@ -1168,34 +1168,62 @@ describe('the fix is inserted where it will actually run', () => {
 });
 
 describe('in-panel text: found when it is there, not invented when it is not', () => {
+  // Ground truth measured in ggplot2 4.0.3 on R 4.6.0, by building the
+  // plot and reading the rendered layer's size back — not from docs.
   const warn = (code: string) => (parseRCode(code).warnings ?? []).join(' ');
 
   it('sees a label whose aes() contains a nested call', () => {
     // The commonest way to write a data label. The old pattern hand-rolled
     // ONE level of paren nesting, so paste0( inside aes( was a second
-    // level and the whole call went unseen — a figure with 2mm labels
-    // scored all-green.
+    // level and the whole call went unseen.
     expect(warn('geom_text(aes(label = paste0("n=", n)), size = 2)')).toMatch(/in-panel/i);
     expect(warn('geom_text(aes(label = sprintf("%.1f", v)), size = 2)')).toMatch(/in-panel/i);
   });
 
-  it('sees ggrepel geoms', () => {
+  it('sees ggrepel geoms and a bare geom_label', () => {
     expect(warn('geom_text_repel(aes(label = n), size = 2)')).toMatch(/in-panel/i);
     expect(warn('geom_label_repel(aes(label = n), size = 2)')).toMatch(/in-panel/i);
+    expect(warn('geom_label(aes(label = n), size = 2)')).toMatch(/geom_label\(\)/);
   });
 
-  it('sees a label with no explicit size and names the default', () => {
-    // Measured in ggplot2 4.6.0: an unsized geom_text renders at 3.866mm
-    // = 11.0pt, which a heavy downscale still makes unreadable.
-    const w = warn('ggplot(d) + geom_text(aes(label = n)) + theme_minimal(base_size = 40)');
-    expect(w).toMatch(/in-panel/i);
-    expect(w).toContain('11');
+  it('sees stat_summary(geom = "text")', () => {
+    // R renders this at 5.691pt. It dispatches on a geom name exactly
+    // like annotate(), so the same guard covers it.
+    expect(warn('stat_summary(fun = length, geom = "text", aes(label = after_stat(y)), size = 2)'))
+      .toMatch(/in-panel/i);
+  });
+
+  it('a dotted argument name is NOT the font size', () => {
+    // label.size is a BORDER width — ggplot2 deprecated it in favour of
+    // linewidth — and \b matches after the dot. R renders this label at
+    // 17.1pt; reporting "size 0 (0pt)" is a fabricated finding, and the
+    // report-the-smallest rule let that zero mask every real label.
+    const w = warn('geom_label(aes(label = n), label.size = 0, size = 6)');
+    expect(w).toContain('size 6');
+    expect(w).not.toContain('size 0');
+    expect(warn('geom_text_repel(aes(label = n), segment.size = 0.2, size = 5)')).toContain('size 5');
+  });
+
+  it('honours size.unit', () => {
+    // size.unit = "pt" means the number is NOT millimetres. Without it,
+    // size = 8 renders at 22.76pt; with it, at 8pt.
+    expect(warn('geom_text(aes(label = n), size = 8, size.unit = "pt")')).toContain('(8pt');
+    expect(warn('geom_text(aes(label = n), size = 8)')).toContain('22.8pt');
+  });
+
+  it("an unsized label reports the THEME's size, which follows base_size", () => {
+    // Measured: base_size 11/22/40/5 renders 11/22/40/5 pt exactly.
+    // A hardcoded 3.88mm was right only at base 11 — it understated a
+    // poster theme 3.6x and, worse, called a genuinely unreadable 5pt
+    // label a comfortable 11pt.
+    expect(warn('ggplot(d) + geom_text(aes(label = n)) + theme_minimal(base_size = 40)')).toContain('40');
+    expect(warn('ggplot(d) + geom_text(aes(label = n)) + theme_grey(base_size = 5)')).toContain('5');
+    expect(warn('ggplot(d) + geom_text(aes(label = n)) + theme_minimal(base_size = 40)')).not.toContain('11pt');
   });
 
   it('does NOT invent a text warning for annotate("rect")', () => {
     // `size` on a rect/segment is a border width — ggplot2 itself
-    // deprecated it in favour of `linewidth`. Reporting "in-panel text at
-    // 2.8pt" for it is a fabricated finding.
+    // deprecated it in favour of `linewidth`.
     expect(warn('annotate("rect", xmin = 1, xmax = 2, ymin = 0, ymax = 3, alpha = 0.2, size = 1)'))
       .not.toMatch(/in-panel/i);
     expect(warn('annotate("segment", x = 1, xend = 2, y = 0, yend = 3, size = 2)'))
@@ -1207,8 +1235,23 @@ describe('in-panel text: found when it is there, not invented when it is not', (
     expect(warn('annotate(geom = "label", x = 2, y = 2, label = "hi", size = 2)')).toMatch(/in-panel/i);
   });
 
-  it('ignores a size MAPPED inside aes() — that is a scale, not a size', () => {
-    expect(warn('geom_point(aes(size = wt))')).not.toMatch(/in-panel/i);
+  it('a size MAPPED inside aes() is a scale, not a fixed size', () => {
+    // The previous test for this named a geom the detector never scans,
+    // so it held for every implementation including the broken one.
+    // geom_text IS scanned, so this one can actually fail.
+    // A NUMERIC mapped size is what discriminates: `aes(size = 2)` maps the
+    // constant 2 through the size SCALE, it is not 2mm of type. With a
+    // variable (`size = n`) the regex needs a digit and cannot tell the
+    // two implementations apart, so that input proved nothing.
+    const w = warn('ggplot(d) + geom_text(aes(label = n, size = 2)) + theme_minimal(base_size = 40)');
+    expect(w).not.toContain('size 2');
+    expect(w).toContain('40');
+  });
+
+  it('one unbalanced call does not silence the real ones', () => {
+    // A `geom_text(` inside a string literal used to abort the whole walk.
+    expect(warn('ggplot(d) + labs(caption = "made with geom_text(") + geom_text(aes(label = n), size = 1)'))
+      .toMatch(/in-panel/i);
   });
 
   it('reports the smallest label when several are drawn', () => {
