@@ -261,3 +261,52 @@ describe('F6 — paragraph boundaries on paste', () => {
     expect(out).not.toContain('a<br>b');
   });
 });
+
+describe('a block boundary is owed on the way out, not just on the way in', () => {
+  const sep = { blockSeparator: '<br>' };
+
+  it('text directly after a closed block is separated', () => {
+    // The original glue symptom, one shape the entry-side boundary missed.
+    expect(sanitizeHtml('<h2>Results</h2>Accuracy improved.', sep))
+      .toBe('Results<br>Accuracy improved.');
+  });
+
+  it('an inline element after a closed block is separated', () => {
+    expect(sanitizeHtml('<p>a</p><b>b</b>', sep)).toBe('a<br><b>b</b>');
+  });
+
+  it('a trailing sibling inside a wrapper is separated', () => {
+    expect(sanitizeHtml('<div><div>a</div>b</div>', sep)).toBe('a<br>b');
+  });
+
+  it('block to block still behaves as before', () => {
+    expect(sanitizeHtml('<p>a</p><p>b</p>', sep)).toBe('a<br>b');
+  });
+
+  it('a document ending in a block gains no dangling separator', () => {
+    expect(sanitizeHtml('<p>a</p>', sep)).toBe('a');
+    expect(sanitizeHtml('<p>a</p><p>b</p>', sep)).not.toMatch(/<br>$/);
+  });
+
+  it('adjacent table cells are not glued', () => {
+    const out = sanitizeHtml(
+      '<table><tr><td>Mean</td><td>12.4</td></tr><tr><td>SD</td><td>0.8</td></tr></table>',
+      sep,
+    );
+    expect(out).not.toContain('Mean12.4');
+    expect(out).not.toContain('SD0.8');
+    expect(out).not.toContain('12.4SD');
+  });
+
+  it('header cells are separated too', () => {
+    const out = sanitizeHtml('<table><tr><th>Group</th><th>n</th></tr></table>', sep);
+    expect(out).not.toContain('Groupn');
+  });
+
+  it('with no separator configured the output is unchanged', () => {
+    // The whole boundary mechanism is gated on blockSeparator; without it
+    // this function must stay byte-identical.
+    expect(sanitizeHtml('<h2>Results</h2>Accuracy improved.')).toBe('ResultsAccuracy improved.');
+    expect(sanitizeHtml('<table><tr><td>Mean</td><td>12.4</td></tr></table>')).toBe('Mean12.4');
+  });
+});

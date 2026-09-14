@@ -43,6 +43,11 @@ const BLOCK_TAGS = new Set([
   'P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6',
   'BLOCKQUOTE', 'PRE', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER',
   'TR', 'TABLE', 'ADDRESS', 'FIGURE', 'FIGCAPTION', 'DD', 'DT', 'DL',
+  // Cells, not just rows. TR alone separated row from row while the
+  // cells inside a row ran together: a pasted two-column table gave
+  // `Mean12.4`. TD/TH are unwrapped like any other non-allowed tag, so
+  // without this they hit exactly the glue case BLOCK_TAGS exists for.
+  'TD', 'TH',
 ]);
 
 const ALLOWED_TAGS = new Set([
@@ -197,7 +202,20 @@ function sanitizeNode(
         const isBlock = BLOCK_TAGS.has(tag);
         if (isBlock && emittedAny) pendingBoundary = true;
         walk(el, target);
-        if (isBlock) justClosedBlock = true;
+        if (isBlock) {
+          justClosedBlock = true;
+          // A boundary is owed on the way OUT as well. Setting it only on
+          // the way IN covered block-to-block (`<p>a</p><p>b</p>`) and
+          // missed everything else that can follow a block: bare text,
+          // an inline element, a trailing sibling inside a wrapper. So
+          // `<h2>Results</h2>Accuracy improved.` still glued — the exact
+          // symptom the entry-side boundary was added to remove.
+          //
+          // A trailing boundary costs nothing: flushBoundary only emits
+          // when something is actually written after it, so a document
+          // ending in a block does not gain a dangling separator.
+          if (emittedAny) pendingBoundary = true;
+        }
         continue;
       }
 
