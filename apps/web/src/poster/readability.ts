@@ -317,6 +317,103 @@ function extractAllCallArgs(code: string, name: string): string[] {
 }
 
 /**
+ * `plt.tick_params(...)`, `plt.gca().tick_params(...)` and a bare
+ * `tick_params(...)` all act on "the current Axes" — a name we cannot
+ * resolve from text. They share this key, and are folded into the single
+ * explicit Axes when the script names exactly one.
+ */
+const ALIAS_AXES = '<current>';
+
+interface TickCall {
+  /** Which Axes the call acts on, as written. */
+  axesKey: string;
+  /** 'x' | 'y' when the receiver itself is an Axis (`ax.xaxis.`), else null. */
+  axisFromReceiver: string | null;
+  args: string;
+}
+
+/**
+ * Every tick-size call in the source, with the object it was called on.
+ *
+ * ONE walk. Receiver and arguments are read at the same call site — a
+ * previous version matched them with two separate regexes and zipped by
+ * index, which desynchronises whenever one walker sees a call the other
+ * skips, silently attributing a scope to the wrong Axes.
+ *
+ * Covers `set_tick_params` as well as `tick_params`: `Axis.set_tick_params`
+ * is a documented matplotlib API and `ax.xaxis.set_tick_params(labelsize=)`
+ * is ordinary code. Missing it discarded the user's explicit size and
+ * reported an inherited one they had already fixed.
+ *
+ * An unbalanced call (a `tick_params(` inside a string, say) is SKIPPED,
+ * not fatal: aborting the walk there threw away every later call and
+ * reported a 6pt label as 19.9pt.
+ */
+function tickParamsCalls(src: string): TickCall[] {
+  const re = /\b(?:set_)?tick_params\s*\(/g;
+  const out: TickCall[] = [];
+  let m: RegExpExecArray | null;
+
+  while ((m = re.exec(src)) !== null) {
+    // Forward: the argument list, balanced and quote-aware.
+    let depth = 1;
+    let quote: string | null = null;
+    let args: string | null = null;
+    for (let i = re.lastIndex; i < src.length; i++) {
+      const ch = src[i]!;
+      if (quote) {
+        if (ch === '\\') i++;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')' && --depth === 0) {
+        args = src.slice(re.lastIndex, i);
+        re.lastIndex = i + 1;
+        break;
+      }
+    }
+    if (args === null) continue;
+
+    // Backward: the receiver. Word characters and dots, plus whole
+    // bracketed groups, so `axes[0].` and `fig.axes[1].` stay intact —
+    // those are the idiom that actually produces several Axes, and a
+    // scanner that stopped at `]` merged them into one.
+    let j = m.index - 1;
+    while (j >= 0) {
+      const ch = src[j]!;
+      if (/[\w.]/.test(ch)) { j--; continue; }
+      if (ch === ']' || ch === ')') {
+        const open = ch === ']' ? '[' : '(';
+        let d = 1;
+        j--;
+        while (j >= 0 && d > 0) {
+          if (src[j] === ch) d++;
+          else if (src[j] === open) d--;
+          j--;
+        }
+        continue;
+      }
+      break;
+    }
+    const receiver = src.slice(j + 1, m.index);
+
+    // `ax.xaxis.set_tick_params(...)` scopes by the Axis it is called on.
+    const axisM = receiver.match(/^(.*?)\.?([xy])axis\.$/);
+    const axesText = axisM ? axisM[1]! : receiver;
+    const alias = axesText === '' || axesText === 'plt.' || /^plt\.gca\(\)\.$/.test(axesText);
+
+    out.push({
+      axesKey: alias ? ALIAS_AXES : axesText,
+      axisFromReceiver: axisM ? axisM[2]! : null,
+      args,
+    });
+  }
+  return out;
+}
+
+/**
  * Drop every parenthesised group, so only TOP-LEVEL arguments remain.
  *
  * Without this, `ggsave("f.png", plot = wrap_plots(width = 3), width = 12)`
@@ -667,32 +764,40 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
   // `tick_params(labelsize=20, axis='x')` then read as unscoped and
   // false-passed exactly like the bug this replaced. Keyword arguments
   // have no required order.
+  // Scopes per AXES, from ONE walk. Receiver and arguments are read at
+  // the same call site instead of zipped from two regexes, which could
+  // desynchronise and attribute a scope to the wrong Axes.
   const tickSizes: number[] = [];
-  // Scopes per RECEIVER, not one global set. `ax.tick_params(axis='x')`
-  // plus `cbar.ax.tick_params(axis='y')` are two different Axes, and
-  // summing them claimed the plot's y ticks were covered when only the
-  // colourbar's were — a silent pass on the element most likely to be
-  // too small. Coverage is complete only if ONE receiver covers both.
-  const scopesByReceiver = new Map<string, Set<string>>();
-  const receivers: string[] = [];
-  const recRe = /([\w.]*)\btick_params\s*\(/g;
-  let rm: RegExpExecArray | null;
-  while ((rm = recRe.exec(src)) !== null) receivers.push(rm[1] ?? '');
-
-  extractAllCallArgs(src, 'tick_params').forEach((call, i) => {
-    const args = topLevelArgs(call);
-    const size = args.match(/\blabelsize\s*=\s*([\d.]+)/);
-    if (!size) return;
+  const scopesByAxes = new Map<string, Set<string>>();
+  for (const call of tickParamsCalls(src)) {
+    const size = topLevelArgs(call.args).match(/\blabelsize\s*=\s*([\d.]+)/);
+    if (!size) continue;
     tickSizes.push(parseFloat(size[1]!));
-    const axisArg = args.match(/\baxis\s*=\s*['"](x|y|both)['"]/);
-    const receiver = receivers[i] ?? '';
-    const set = scopesByReceiver.get(receiver) ?? new Set<string>();
-    set.add(axisArg ? axisArg[1]! : 'both');
-    scopesByReceiver.set(receiver, set);
-  });
+    const axisArg = topLevelArgs(call.args).match(/\baxis\s*=\s*['"](x|y|both)['"]/);
+    // `ax.xaxis.set_tick_params(...)` scopes by the Axis object it is
+    // called on; `axis=` only exists on the Axes-level call.
+    const scope = call.axisFromReceiver ?? (axisArg ? axisArg[1]! : 'both');
+    const set = scopesByAxes.get(call.axesKey) ?? new Set<string>();
+    set.add(scope);
+    scopesByAxes.set(call.axesKey, set);
+  }
+
+  // `plt.` / `plt.gca().` / a bare call all mean "the current Axes". When
+  // exactly one explicit Axes is named in the script, those alias calls
+  // are that Axes — verified in matplotlib 3.10.8, where
+  // `ax.tick_params(axis='x')` + `plt.tick_params(axis='y')` gives 20/20
+  // on the same subplot. With two or more explicit receivers the alias is
+  // ambiguous, so it stays its own bucket and the answer stays
+  // conservative.
+  const explicit = [...scopesByAxes.keys()].filter((k) => k !== ALIAS_AXES);
+  if (explicit.length === 1 && scopesByAxes.has(ALIAS_AXES)) {
+    const target = scopesByAxes.get(explicit[0]!)!;
+    for (const sc of scopesByAxes.get(ALIAS_AXES)!) target.add(sc);
+    scopesByAxes.delete(ALIAS_AXES);
+  }
   if (tickSizes.length) {
     overrides.axisText = Math.min(...tickSizes);
-    overrideCoversAll.axisText = [...scopesByReceiver.values()].some(
+    overrideCoversAll.axisText = [...scopesByAxes.values()].some(
       (scopes) => scopes.has('both') || (scopes.has('x') && scopes.has('y')),
     );
   }

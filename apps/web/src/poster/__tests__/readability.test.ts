@@ -1041,6 +1041,34 @@ describe('override coverage is not override reachability', () => {
     expect(snip).toContain('axis.text.y');
   });
 
+  // Ground truth for the four below measured in matplotlib 3.10.8, not
+  // reasoned: each was run and the rendered tick label size read back.
+  it('set_tick_params is honoured, not discarded', () => {
+    // ax.xaxis/yaxis.set_tick_params(labelsize=20) renders 20/20.
+    // Reporting the inherited 6.6 threw away a fix the user had made.
+    const p = parsePythonCode("plt.rcParams['font.size'] = 8\nax.xaxis.set_tick_params(labelsize=20)\nax.yaxis.set_tick_params(labelsize=20)");
+    expect(computeReadability(p, 7, 10).elements.find((e) => e.name === 'Tick labels')!.status).toBe('pass');
+  });
+
+  it('plt.tick_params and ax.tick_params are the same Axes', () => {
+    // plt.tick_params is gca(); measured 20/20 on the same subplot.
+    const p = parsePythonCode("plt.rcParams['font.size'] = 8\nax.tick_params(axis='x', labelsize=20)\nplt.tick_params(axis='y', labelsize=20)");
+    expect(computeReadability(p, 7, 10).elements.find((e) => e.name === 'Tick labels')!.status).toBe('pass');
+  });
+
+  it('axes[0] and axes[1] are different Axes and do not add up', () => {
+    // Measured: axes[0] renders x=20 y=8, axes[1] renders x=8 y=20 —
+    // BOTH subplots have an unreadable axis. The canonical subplot idiom,
+    // and the one a receiver scanner that stops at ']' merges into one.
+    const p = parsePythonCode("plt.rcParams['font.size'] = 8\nfig, axes = plt.subplots(1, 2, figsize=(10,7))\naxes[0].tick_params(axis='x', labelsize=20)\naxes[1].tick_params(axis='y', labelsize=20)");
+    expect(computeReadability(p, 7, 10).elements.find((e) => e.name === 'Tick labels')!.status).toBe('fail');
+  });
+
+  it('a phantom tick_params inside a string does not discard later calls', () => {
+    const p = parsePythonCode("plt.rcParams['font.size'] = 24\nax.set_xlabel(\"see tick_params(labelsize\", fontsize=24)\nax.tick_params(labelsize=6)");
+    expect(computeReadability(p, 7, 10).elements.find((e) => e.name === 'Tick labels')!.sourcePt).toBe(6);
+  });
+
   it('the same holds for axis.title', () => {
     const code = 'ggplot(d, aes(x,y)) + geom_point() +\n'
       + '  theme(axis.title = element_text(size = 18), axis.title.y = element_text(size = 6))\n'
