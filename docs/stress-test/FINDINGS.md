@@ -12,6 +12,10 @@ initial reading, the correction is recorded rather than quietly dropped.
 Severity: `data-loss` > `major` > `minor`.
 
 > **Status, 2026-09-13.** F3, F6 and the preview crash are FIXED and merged.
+> Those fixes were then audited — see [`AUDIT.md`](./AUDIT.md). 19 of the 21
+> fixes shipped that day have a test that fails without them; **16 confirmed
+> defects remain in the fixes themselves**, and the preview fix carries one
+> question jsdom cannot answer (`display: none` and `titleOverflowPx`).
 > F8 turned out not to be local: it is one symptom of a stored-vs-rendered
 > geometry desync that also explains part of the colophon overlap and breaks
 > `checkBounds` outright. Read the root-cause section at the top of

@@ -1,14 +1,21 @@
 # Stress-test triage — priority by user impact, and the branch plan
 
 Companion to [`FINDINGS.md`](./FINDINGS.md) (poster editor, F1–F10),
-[`FIGURE-READABILITY.md`](./FIGURE-READABILITY.md) (FR1–FR9 + Python) and
-[`LOGGING.md`](./LOGGING.md). Written 2026-09-13.
+[`FIGURE-READABILITY.md`](./FIGURE-READABILITY.md) (FR1–FR9 + Python),
+[`LOGGING.md`](./LOGGING.md) and [`AUDIT.md`](./AUDIT.md) (what the shipped
+fixes actually do). Written 2026-09-13.
 
-Every finding below was **re-verified against the code on this branch**, not
-taken from the stress-test docs on trust: each was read at its current
-`file:line`, then put through an independent adversarial pass whose brief was to
-refute it. Nothing here is "reported"; it is all reproduced. Where the original
+Every finding below was read at its current `file:line` and put through an
+independent adversarial pass whose brief was to refute it. Where the original
 docs proposed a fix that turned out to be incomplete, the gap is recorded.
+
+> **Correction, 2026-09-13.** This paragraph used to end "Nothing here is
+> 'reported'; it is all reproduced." That was an overclaim. Reading code and
+> surviving an adversarial pass is `INSPECTED`, not reproduced — when the same
+> method was later applied to the fixes themselves and every finding was written
+> as a runnable assertion, **6 of 23 died on contact** and 2 more described a
+> state a later commit had already fixed. Treat an unexecuted entry below as
+> `UNVERIFIED`. See [`AUDIT.md`](./AUDIT.md) for what survived execution.
 
 **Ordering rule for this document: user impact first**, not severity label and
 not effort. The question asked of every finding is *what does a researcher lose,
