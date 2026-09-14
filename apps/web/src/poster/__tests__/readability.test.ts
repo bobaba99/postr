@@ -1216,3 +1216,44 @@ describe('in-panel text: found when it is there, not invented when it is not', (
     expect(w).toContain('size 2');
   });
 });
+
+describe('language detection reads the live code, not the comments', () => {
+  it('an R script carrying a commented-out matplotlib draft is still R', () => {
+    // Leaving the abandoned port in comments is normal while moving a
+    // figure between languages. Scored on raw text the Python signals win,
+    // the whole script goes to parsePythonCode, and a ggplot figure gets
+    // measured against matplotlib defaults and offered a plt.rcParams fix.
+    const code = [
+      'library(ggplot2)',
+      '# python draft I abandoned:',
+      '# import matplotlib.pyplot as plt',
+      '# fig, ax = plt.subplots(1, 2, figsize=(12, 8))',
+      '# ax.set_xlabel("x"); plt.savefig("f.png")',
+      'p <- ggplot(mtcars, aes(wt, mpg)) + geom_point() + theme_minimal(base_size = 11)',
+      'ggsave("fig.png", p, width = 7, height = 5)',
+    ].join('\n');
+    expect(detectLanguage(code)).toBe('r');
+  });
+
+  it('a python script carrying a commented-out ggplot draft is still python', () => {
+    const code = [
+      'import matplotlib.pyplot as plt',
+      '# the R version this replaced:',
+      '# library(ggplot2)',
+      '# p <- ggplot(d, aes(x, y)) + geom_point() + theme_minimal()',
+      '# ggsave("f.png", p, width = 7, height = 5)',
+      "plt.rcParams['font.size'] = 10",
+      'fig, ax = plt.subplots(figsize=(7, 5))',
+    ].join('\n');
+    expect(detectLanguage(code)).toBe('python');
+  });
+
+  it('signals inside string literals still count', () => {
+    // stripComments preserves strings, so this is unaffected.
+    expect(detectLanguage('p <- ggplot(d, aes(x, y)) + labs(title = "not # a comment")')).toBe('r');
+  });
+
+  it('a script that is nothing but comments detects nothing', () => {
+    expect(detectLanguage('# import matplotlib.pyplot as plt\n# plt.plot()')).toBeNull();
+  });
+});
