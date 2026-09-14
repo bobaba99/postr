@@ -1257,3 +1257,27 @@ describe('language detection reads the live code, not the comments', () => {
     expect(detectLanguage('# import matplotlib.pyplot as plt\n# plt.plot()')).toBeNull();
   });
 });
+
+describe('sizes are reported at one decimal, everywhere', () => {
+  it('a rel() override does not leak float noise into the advice', () => {
+    // rel(1.1) on an 11pt base is 12.100000000000001. The table rounded
+    // for display, the per-element advice below it did not, so one element
+    // showed two different numbers on the same screen.
+    const code = "theme_minimal(base_size = 11) +\n  theme(axis.title = element_text(size = rel(1.1)))\nggsave('f.png', width = 9, height = 6)";
+    const r = computeReadability(parseRCode(code), 7, 10);
+    const all = [...(r.overrideFixes ?? []), ...(r.fontFixes ?? [])] as Array<{ currentPt?: number }>;
+    for (const f of all) {
+      if (f.currentPt === undefined) continue;
+      expect(String(f.currentPt).replace('-', '').length).toBeLessThanOrEqual(6);
+    }
+    const axisTitle = r.elements.find((e) => e.name === 'Axis titles')!;
+    const advised = all.find((f) => f.currentPt !== undefined);
+    if (advised) expect(advised.currentPt).toBe(axisTitle.sourcePt);
+  });
+
+  it('a plain numeric override is untouched', () => {
+    const code = "theme_minimal(base_size = 11) +\n  theme(axis.title = element_text(size = 9))\nggsave('f.png', width = 9, height = 6)";
+    const r = computeReadability(parseRCode(code), 7, 10);
+    expect(r.elements.find((e) => e.name === 'Axis titles')!.sourcePt).toBe(9);
+  });
+});

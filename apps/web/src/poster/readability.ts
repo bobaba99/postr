@@ -611,7 +611,13 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
       bySelector.set(
         axis,
         raw.startsWith('rel')
-          ? baseSize * parseFloat(raw.match(/[\d.]+/)![0]!)
+          // Rounded HERE, not at the point of display. `rel(1.1)` on an
+          // 11pt base is 12.100000000000001 in IEEE 754, and the element
+          // table rounds for display while the per-element advice printed
+          // the raw value — so one element showed as '12.1pt' in the table
+          // and '12.100000000000001pt' in the advice directly below it.
+          // One decimal is the precision the whole panel speaks in.
+          ? Math.round(baseSize * parseFloat(raw.match(/[\d.]+/)![0]!) * 10) / 10
           : parseFloat(raw),
       );
     }
