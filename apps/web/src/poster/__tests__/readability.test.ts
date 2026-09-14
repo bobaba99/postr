@@ -999,9 +999,53 @@ describe('override coverage is not override reachability', () => {
     expect(snip).not.toContain('axis.text.x');
   });
 
-  it('a non-axis element is always reachable by its bare selector', () => {
-    const code = 'ggplot(d) + theme(legend.text = element_text(size = 5))\nggsave("f.png", width = 10, height = 7)';
+  // A test for "a non-axis element is reachable by its bare selector" was
+  // removed rather than kept: it survived every mutant, including
+  // hardcoding bareSelectorReaches to false. For a non-axis key the
+  // `(\.[xy])?` group never matches, so the branch it claimed to guard
+  // is unobservable. A test that cannot fail is worse than no test — it
+  // reads as coverage.
+
+  it('keyword order does not matter: axis= after labelsize= is honoured', () => {
+    // The first fix matched `tick_params(...labelsize=N` — a pattern that
+    // ENDS at the number and so can only see arguments written before it.
+    const p = parsePythonCode("plt.rcParams['font.size'] = 8\nax.tick_params(labelsize=20, axis='x')");
+    const el = computeReadability(p, 5, 7).elements.find((e) => e.name === 'Tick labels')!;
+    expect(el.status).toBe('fail');
+  });
+
+  it('a multiline tick_params is read whole', () => {
+    const p = parsePythonCode("plt.rcParams['font.size'] = 8\nax.tick_params(labelsize=20,\n               axis='y')");
+    const el = computeReadability(p, 5, 7).elements.find((e) => e.name === 'Tick labels')!;
+    expect(el.status).toBe('fail');
+  });
+
+  it('two different Axes do not add up to full coverage', () => {
+    // ax's y ticks are still inheriting; only the colourbar's were scoped.
+    const p = parsePythonCode(
+      "plt.rcParams['font.size'] = 8\nax.tick_params(axis='x', labelsize=20)\ncbar.ax.tick_params(axis='y', labelsize=20)",
+    );
+    const el = computeReadability(p, 5, 7).elements.find((e) => e.name === 'Tick labels')!;
+    expect(el.status).toBe('fail');
+  });
+
+  it('a sized parent does not make a sized child reachable', () => {
+    // Ordinary ggplot: shrink a rotated x label under a sized parent.
+    // Measured in ggplot2 4.0.3 — the bare advice left axis.text.x at
+    // 7pt (still failing) while moving y to 14pt.
+    const code = 'ggplot(d, aes(x,y)) + geom_point() +\n'
+      + '  theme(axis.text = element_text(size = 18), axis.text.x = element_text(size = 7, angle = 45))\n'
+      + 'ggsave("f.png", width = 10, height = 7)';
     const snip = computeReadability(parseRCode(code), 7, 10).fontSnippet ?? '';
-    expect(snip).toMatch(/legend\.text\s*=/);
+    expect(snip).toContain('axis.text.x');
+    expect(snip).toContain('axis.text.y');
+  });
+
+  it('the same holds for axis.title', () => {
+    const code = 'ggplot(d, aes(x,y)) + geom_point() +\n'
+      + '  theme(axis.title = element_text(size = 18), axis.title.y = element_text(size = 6))\n'
+      + 'ggsave("f.png", width = 10, height = 7)';
+    const snip = computeReadability(parseRCode(code), 7, 10).fontSnippet ?? '';
+    expect(snip).toContain('axis.title.y');
   });
 });

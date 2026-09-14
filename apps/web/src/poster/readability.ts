@@ -277,24 +277,43 @@ const DEFAULT_SIZE_LABEL = 'figure preview size';
  * Returns null when the call is absent or its parens never balance.
  */
 function extractCallArgs(code: string, name: string): string | null {
-  const open = new RegExp(`\\b${name}\\s*\\(`, 'g');
-  const m = open.exec(code);
-  if (!m) return null;
+  return extractAllCallArgs(code, name)[0] ?? null;
+}
 
-  let depth = 1;
-  let quote: string | null = null;
-  for (let i = open.lastIndex; i < code.length; i++) {
-    const ch = code[i]!;
-    if (quote) {
-      if (ch === '\\') i++;              // escaped char inside a string
-      else if (ch === quote) quote = null;
-      continue;
+/**
+ * Every call to `name`, each as its complete argument list.
+ *
+ * Same balanced, quote-aware scan as `extractCallArgs` — one scanner, so
+ * the two cannot drift. Needed because some calls are legitimately
+ * repeated: `tick_params` is normally written once per axis, and reading
+ * only the first said the second axis was never scoped.
+ */
+function extractAllCallArgs(code: string, name: string): string[] {
+  const open = new RegExp(`\\b${name}\\s*\\(`, 'g');
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+
+  while ((m = open.exec(code)) !== null) {
+    let depth = 1;
+    let quote: string | null = null;
+    for (let i = open.lastIndex; i < code.length; i++) {
+      const ch = code[i]!;
+      if (quote) {
+        if (ch === '\\') i++;              // escaped char inside a string
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'") quote = ch;
+      else if (ch === '(') depth++;
+      else if (ch === ')' && --depth === 0) {
+        out.push(code.slice(open.lastIndex, i));
+        open.lastIndex = i + 1;           // resume after this call
+        break;
+      }
     }
-    if (ch === '"' || ch === "'") quote = ch;
-    else if (ch === '(') depth++;
-    else if (ch === ')' && --depth === 0) return code.slice(open.lastIndex, i);
+    if (depth !== 0) break;               // unbalanced: stop, do not guess
   }
-  return null;
+  return out;
 }
 
 /**
@@ -440,7 +459,17 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
       !hasAxes || bySelector.has('') || (bySelector.has('.x') && bySelector.has('.y'));
     // Coverage and reachability are NOT the same. `.x` + `.y` covers
     // everything, but a bare parent cannot override either child.
-    overrideViaBareSelector[key] = !hasAxes || bySelector.has('');
+    //
+    // And the question is not "did the user write a bare selector" — it
+    // is "is any CHILD explicitly sized". Writing both
+    // `axis.text = element_text(size = 18)` and
+    // `axis.text.x = element_text(size = 7)` is ordinary ggplot (shrink
+    // a rotated x label under a sized parent); a bare selector then
+    // still cannot move the x axis, because a parent never clears a
+    // child that was set. Verified against ggplot2 4.0.3: the bare
+    // advice left axis.text.x at 7pt while moving y to 14pt.
+    overrideViaBareSelector[key] =
+      !hasAxes || (!bySelector.has('.x') && !bySelector.has('.y'));
   }
 
   // Canvas from ggsave() — if missing, fall back to the caller-
@@ -632,21 +661,40 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
   // Every call is collected, not just the first: scoping x and y in two
   // separate calls is the normal way to write this, and together they do
   // cover everything.
-  const tickRe = new RegExp(`tick_params\\s*\\(${ARGS}labelsize\\s*=\\s*([\\d.]+)`, 'g');
+  // The WHOLE argument list of each call, not a regex that stops at the
+  // captured number. A `${ARGS}labelsize=([\\d.]+)` match ends AT the
+  // size, so it can only see arguments written BEFORE it — and
+  // `tick_params(labelsize=20, axis='x')` then read as unscoped and
+  // false-passed exactly like the bug this replaced. Keyword arguments
+  // have no required order.
   const tickSizes: number[] = [];
-  const tickAxes = new Set<string>();
-  let tm: RegExpExecArray | null;
-  while ((tm = tickRe.exec(src)) !== null) {
-    tickSizes.push(parseFloat(tm[1]!));
-    // The `axis=` of THIS call — scan only its own argument list.
-    const call = tm[0]!;
-    const axisArg = call.match(/\baxis\s*=\s*['"](x|y|both)['"]/);
-    tickAxes.add(axisArg ? axisArg[1]! : 'both');
-  }
+  // Scopes per RECEIVER, not one global set. `ax.tick_params(axis='x')`
+  // plus `cbar.ax.tick_params(axis='y')` are two different Axes, and
+  // summing them claimed the plot's y ticks were covered when only the
+  // colourbar's were — a silent pass on the element most likely to be
+  // too small. Coverage is complete only if ONE receiver covers both.
+  const scopesByReceiver = new Map<string, Set<string>>();
+  const receivers: string[] = [];
+  const recRe = /([\w.]*)\btick_params\s*\(/g;
+  let rm: RegExpExecArray | null;
+  while ((rm = recRe.exec(src)) !== null) receivers.push(rm[1] ?? '');
+
+  extractAllCallArgs(src, 'tick_params').forEach((call, i) => {
+    const args = topLevelArgs(call);
+    const size = args.match(/\blabelsize\s*=\s*([\d.]+)/);
+    if (!size) return;
+    tickSizes.push(parseFloat(size[1]!));
+    const axisArg = args.match(/\baxis\s*=\s*['"](x|y|both)['"]/);
+    const receiver = receivers[i] ?? '';
+    const set = scopesByReceiver.get(receiver) ?? new Set<string>();
+    set.add(axisArg ? axisArg[1]! : 'both');
+    scopesByReceiver.set(receiver, set);
+  });
   if (tickSizes.length) {
     overrides.axisText = Math.min(...tickSizes);
-    overrideCoversAll.axisText =
-      tickAxes.has('both') || (tickAxes.has('x') && tickAxes.has('y'));
+    overrideCoversAll.axisText = [...scopesByReceiver.values()].some(
+      (scopes) => scopes.has('both') || (scopes.has('x') && scopes.has('y')),
+    );
   }
   if (title) {
     overrides.plotTitle = parseFloat(title[1]!);
