@@ -303,6 +303,46 @@ describe('a block boundary is owed on the way out, not just on the way in', () =
     expect(out).not.toContain('Groupn');
   });
 
+  it('text BEFORE a block is separated too (the other half)', () => {
+    // The entry-side boundary had no test at all: deleting it left all 48
+    // green while changing 11,456 outputs in an 80k sweep. A commit about
+    // half-written bookkeeping should pin both halves.
+    expect(sanitizeHtml('Intro<p>a</p>', sep)).toBe('Intro<br>a');
+    expect(sanitizeHtml('text<h2>Head</h2>', sep)).toBe('text<br>Head');
+  });
+
+  it('no separator is emitted as a direct child of a list', () => {
+    // Google Docs wraps every bullet's text in a <p>. The boundary that
+    // <p> owes on exit escapes past </li> and lands in the <ul>, which is
+    // invalid, is PERSISTED (<br> is allowed, so the next no-separator
+    // re-sanitise keeps it), and splits the bullet run in every export.
+    const out = sanitizeHtml('<ul><li><p>Item one</p></li><li><p>Item two</p></li></ul>', sep);
+    expect(out).not.toMatch(/<\/li><br>/);
+    expect(out).not.toMatch(/<ul><br>/);
+  });
+
+  it('a separator does not add a break in front of the source\'s own newline', () => {
+    // Pretty-printed markup gives one text node that STARTS with a
+    // newline; the whitespace-drop rule only fires when a node is
+    // whitespace entirely. parseRichText flushes on a literal newline as
+    // well as on <br>, so the pair became a blank paragraph.
+    expect(sanitizeHtml('<h2>Results</h2>\nAccuracy improved by 12%.', sep))
+      .toBe('Results<br>Accuracy improved by 12%.');
+    expect(sanitizeHtml('<blockquote>Quoted.</blockquote>\n— Author', sep))
+      .toBe('Quoted.<br>— Author');
+  });
+
+  it('a single-space separator does not double up', () => {
+    expect(sanitizeHtml('<p>a</p> text', { blockSeparator: ' ' })).toBe('a text');
+  });
+
+  it('an explicit <br> between blocks is not tripled', () => {
+    // The author wrote one break; the pending separator and the <br>'s own
+    // break made three, compounding with every alternation.
+    expect((sanitizeHtml('<p>a</p><br><p>b</p>', sep).match(/<br>/g) ?? []).length).toBe(2);
+    expect((sanitizeHtml('<p>a</p><br><p>b</p><br><p>c</p>', sep).match(/<br>/g) ?? []).length).toBe(4);
+  });
+
   it('with no separator configured the output is unchanged', () => {
     // The whole boundary mechanism is gated on blockSeparator; without it
     // this function must stay byte-identical.
