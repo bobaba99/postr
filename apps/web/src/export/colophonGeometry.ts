@@ -167,9 +167,20 @@ export interface ColophonGeometry {
  *   3. offset clamped AGAIN so `offset + mark` fits inside the band
  *
  * Step 3 runs last because the band is a hard physical constraint and
- * the preference expressed by steps 1–2 is not. Doing it in the other
- * order would let a large poster's preferred offset push the mark out
- * of the band, which is the failure the owner asked to prevent.
+ * the preference expressed by steps 1-2 is not.
+ *
+ * BUT: with today's constants step 3 is a BACKSTOP, not a live clamp —
+ * it cannot bind for any input, and saying otherwise was wrong.
+ *
+ *     preferredOffset  <= MAX_OFFSET_UNITS                 = 4.50 u
+ *     maxOffsetInBand  >= M - MAX_FONT*9/7 - CLEARANCE     = 6.93 u
+ *     headroom                                               2.43 u
+ *
+ * Deleting line-for-line leaves every colophon test green, which is how
+ * this was found. It is kept as cheap insurance: raise
+ * MAX_OFFSET_UNITS above ~6.93, or grow the mark relative to the font,
+ * and it starts doing real work. `colophonGeometry.test.ts` pins that
+ * headroom so the day it goes live is not a surprise.
  */
 export function colophonGeometry(widthIn: number, heightIn: number): ColophonGeometry {
   const shortSideIn = Math.min(widthIn, heightIn);

@@ -166,8 +166,22 @@ export function acknowledgementPrintHtml(opts: AttributionOptions = {}): string 
  *
  * Only `3col`, the default, actually reserves the band. Three of the
  * four content templates run blocks INTO it and past the sheet edge, so
- * on those the colophon still lands on a block — 20 of 32
- * (size × template) pairs, down from 23 before the band-centring.
+ * on those the colophon can still land on a block. Re-measured
+ * 2026-09-13 across every template × every size, rendering the way the
+ * editor does (`height: auto`, not stored `b.h`):
+ *
+ *     3col (default)   0 of 8
+ *     2col             1 of 8   (A0L, on "references")
+ *     billboard        4 of 8   (24x36, 42x36, 48x36, A0L — all on "So")
+ *     sidebar          1 of 8   (A0L, on "Key")
+ *     ────────────────────────
+ *     total            6 of 32
+ *
+ * This comment previously said "20 of 32, down from 23". That number
+ * came from a harness that laid blocks out at their STORED height; the
+ * real page grows them. Re-run it with
+ * `apps/web/scripts/colophon-stress.ts` + `colophon-shots.mjs` before
+ * changing this figure — do not edit it from memory.
  *
  * The honest guarantee is narrower: the credit sits inside the band
  * every template is SUPPOSED to reserve, is never in the canvas flow,
@@ -216,8 +230,10 @@ export function acknowledgementPrintCss(
   }
   /* Small muted mark (settled 2026-08-06). Sized to the cap-height of the
      text so it reads as part of the colophon, not a badge. It is a grey
-     PNG, always scaled DOWN, and lives inside the bottom-margin overlay —
-     so it cannot overlap poster content. */
+     PNG, always scaled DOWN, and lives in the bottom-margin overlay, out
+     of the canvas flow — so it can never SHIFT a block. It can still sit
+     on top of one: three of the four templates run content into the band
+     (6 of 32 template x size pairs; see acknowledgementPrintCss). */
   .postr-attribution-mark {
     width: ${g.markUnits}px;
     height: ${g.markUnits}px;

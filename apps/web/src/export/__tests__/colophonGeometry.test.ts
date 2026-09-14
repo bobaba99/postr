@@ -23,6 +23,16 @@ const SIZES = Object.entries(POSTER_SIZES).map(([key, s]) => ({ key, w: s.w, h: 
 const AXIS_TITLE_FLOOR_PT = 18;
 const CAPTION_FLOOR_PT = 12;
 
+/**
+ * Mirrored from colophonGeometry.ts. Deliberately NOT imported: these
+ * tests exist to notice when those constants move, and importing them
+ * would make the assertions move silently along with the code.
+ */
+const MIN_OFFSET_UNITS = 2.5;
+const MAX_OFFSET_UNITS = 4.5;
+const OFFSET_UNITS_PER_INCH = 3.9 / 36;
+const BAND_CLEARANCE_UNITS = 0.5;
+
 describe('colophonGeometry — invariants at every poster size', () => {
   it('covers every size the product offers', () => {
     // Guards against a new POSTER_SIZES entry silently skipping this sweep.
@@ -155,12 +165,40 @@ describe('colophonGeometry — the adaptive behaviour itself', () => {
   });
 
   it('keeps a huge poster inside the band even at the size ceiling', () => {
-    // The band does NOT grow with the poster — it is a fixed 1 inch —
-    // so the ceiling and the band clamp have to compose. This is the
-    // case where getting the clamp order wrong would show up.
+    // The band does NOT grow with the poster — it is a fixed 1 inch — so
+    // the ceiling and the band clamp have to compose.
     const huge = colophonGeometry(200, 120);
     expect(huge.bottomUnits + huge.markUnits).toBeLessThanOrEqual(M);
     expect(huge.insideMarginBand).toBe(true);
+  });
+
+  // This test used to be described as "the case where getting the clamp
+  // order wrong would show up". It is not: deleting the band clamp
+  // outright leaves all 98 tests in this file green. The clamp cannot
+  // bind for any input the product can produce, so the honest thing to
+  // assert is the HEADROOM — which is what would actually change.
+  it.each(SIZES)('$key: the band clamp is a backstop and does not bind', ({ w, h }) => {
+    const g = colophonGeometry(w, h);
+    // The offset the size-based preference asks for, before any band clamp.
+    const preferred = Math.max(
+      MIN_OFFSET_UNITS,
+      Math.min(MAX_OFFSET_UNITS, Math.min(w, h) * OFFSET_UNITS_PER_INCH),
+    );
+    // Equal => step 3 did nothing. If this ever fails the clamp has gone
+    // live, which is allowed — but colophonGeometry's JSDoc calls it a
+    // backstop, and that sentence would then be wrong.
+    expect(g.bottomUnits).toBeCloseTo(Math.round(preferred * 100) / 100, 2);
+  });
+
+  it('states the headroom by which the band clamp is dead', () => {
+    // Ceiling on what the preference can ask for...
+    const maxPreferred = MAX_OFFSET_UNITS;
+    // ...versus the tightest the band can ever be (largest mark).
+    const maxFontUnits = (0.8 * AXIS_TITLE_FLOOR_PT) / POINTS_PER_UNIT;
+    const tightestBand = M - maxFontUnits * (9 / 7) - BAND_CLEARANCE_UNITS;
+    expect(tightestBand).toBeGreaterThan(maxPreferred);
+    // 2.43u today. Raising MAX_OFFSET_UNITS past ~6.93 makes the clamp live.
+    expect(tightestBand - maxPreferred).toBeCloseTo(2.43, 2);
   });
 
   it('is pure — same input, same output, no shared mutable state', () => {
