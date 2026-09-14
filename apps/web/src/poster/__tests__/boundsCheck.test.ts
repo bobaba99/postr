@@ -217,10 +217,39 @@ describe('the checks read where a block is PAINTED, not where it is stored', () 
     expect(w[0]!.severity).toBe('partial');
   });
 
-  it('a block genuinely off the top is still "full"', () => {
-    const b = mk('b', 'text', -150, 100);
+  it('a block genuinely off the top is still "full" — measured, not stored', () => {
+    // The earlier version of this test used h=100 with measured=120:
+    // stored says -150+100 <= 0 and measured says -150+120 <= 0, so BOTH
+    // answer 'full' and it could not fail under any mutant. Stored h=200
+    // would say 50 units are visible; only the measured height gets this
+    // right, so the assertion now distinguishes them.
+    const b = mk('b', 'text', -150, 200);
     const w = checkBounds([b], 480, 360, new Map([['b', 120]]));
     expect(w[0]!.severity).toBe('full');
+  });
+
+  it('the top edge is judged after the shift, not before', () => {
+    // y=-30 with a 40-unit shift renders at +10: fully on the sheet.
+    const b = mk('b', 'text', -30, 50);
+    expect(checkBounds([b], 480, 360, undefined, 40)).toHaveLength(0);
+    expect(checkBounds([b], 480, 360, undefined, 0)).toHaveLength(1);
+  });
+
+  it('a block pushed entirely below the sheet is "full", not "partial"', () => {
+    // y=340 h=10 with a 30-unit shift renders 370..380 — nothing on a 360
+    // sheet, so "may be cut off" would understate it.
+    const b = mk('b', 'text', 340, 10);
+    expect(checkBounds([b], 480, 360, undefined, 30)[0]!.severity).toBe('full');
+  });
+
+  it('tolerance is the FOURTH argument, titleOverflow the third', () => {
+    // Pins the parameter order. Without this, transposing the two is
+    // caught by only one assertion in this file, and another test passes
+    // against the transposition for the wrong reason.
+    const a = mk('a', 'text', 100, 50);
+    const b = mk('b', 'text', 130, 50);           // dy = 20
+    expect(checkCollisions([a, b], undefined, 0, 25)).toHaveLength(0);
+    expect(checkCollisions([a, b], undefined, 0, 2)).toHaveLength(1);
   });
 
   it('checkBounds applies the title shift to the bottom edge', () => {
@@ -232,8 +261,12 @@ describe('the checks read where a block is PAINTED, not where it is stored', () 
   });
 
   it('the title itself is never shifted', () => {
-    const t = mk('t', 'title', 320, 50);
-    expect(checkBounds([t], 480, 360, undefined, 40)).toHaveLength(1);
-    expect(checkBounds([t], 480, 360, undefined, 0)).toHaveLength(1);
+    // At y=320 the title was bottom-OOB shifted or not, so both
+    // assertions held under the very mutant this test names and only the
+    // severity moved. At y=300 it fits (300+50 = 350 <= 360) and only
+    // wrongly shifting it produces a warning.
+    const t = mk('t', 'title', 300, 50);
+    expect(checkBounds([t], 480, 360, undefined, 40)).toHaveLength(0);
+    expect(checkBounds([t], 480, 360, undefined, 0)).toHaveLength(0);
   });
 });

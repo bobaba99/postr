@@ -6,6 +6,7 @@
  * human-readable messages so the UI can render indicators.
  */
 import type { Block } from '@postr/shared';
+import { effectiveTop } from './blockGeometry';
 
 export type OobSeverity = 'partial' | 'full';
 
@@ -65,9 +66,8 @@ function effectiveH(b: Block, measured?: MeasuredHeights): number {
  * Defaults to 0, so a caller that does not know about the shift gets
  * the previous behaviour unchanged.
  */
-function effectiveTop(b: Block, titleOverflow = 0): number {
-  return b.type !== 'title' && titleOverflow > 0 ? b.y + titleOverflow : b.y;
-}
+// Re-exported from blockGeometry so the renderer and the checks cannot
+// drift apart — see that file for why this is not defined twice.
 
 export function checkBounds(
   blocks: Block[],
