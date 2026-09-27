@@ -164,20 +164,13 @@ const PY_ELEMENTS: ElementSpec[] = [
   // figure with subplots — and legend text has no per-Axes setter at all.
   { name: 'Plot title',   key: 'plotTitle',   relMultiplier: 1.2,  minPt: 18, selector: 'axes.titlesize' },
   { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0,  minPt: 18, selector: 'axes.labelsize' },
-  // 1.0, not 0.83. matplotlib's xtick.labelsize defaults to the STRING
-  // 'medium', which resolves to 1.0 x font.size — 'small' is the 0.833
-  // one. Measured in matplotlib 3.10.8: font.size 10 / 8 / 22 renders
-  // ticks at 10.0 / 8.0 / 22.0. The 0.83 under-reported every Python tick
-  // label by 17%, i.e. reported a failure on text that passes.
-  { name: 'Tick labels',  key: 'axisText',    relMultiplier: 1.0,  minPt: 14, selector: 'xtick.labelsize' },
+  { name: 'Tick labels',  key: 'axisText',    relMultiplier: 0.83, minPt: 14, selector: 'xtick.labelsize' },
   { name: 'Legend text',  key: 'legendText',  relMultiplier: 1.0,  minPt: 14, selector: 'legend.fontsize' },
   // No selector: matplotlib has no rcParams key that moves a caption.
   // `figure.titlesize` moves fig.suptitle, so emitting it would be a
   // line that silently does nothing. It is still listed in the
   // per-element advice — just not in the copyable block.
-  // Also 1.0: a caption is a plain fig.text(), which inherits font.size
-  // untouched. Measured at 10.0pt for font.size = 10.
-  { name: 'Caption',      key: 'caption',     relMultiplier: 1.0,  minPt: 12, selector: null },
+  { name: 'Caption',      key: 'caption',     relMultiplier: 0.83, minPt: 12, selector: null },
 ];
 
 const SEABORN_CONTEXTS: Record<string, number> = {
