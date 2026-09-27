@@ -1260,37 +1260,12 @@ describe('in-panel text: found when it is there, not invented when it is not', (
   });
 });
 
-describe('language detection reads the live code, not the comments', () => {
-  it('an R script carrying a commented-out matplotlib draft is still R', () => {
-    // Leaving the abandoned port in comments is normal while moving a
-    // figure between languages. Scored on raw text the Python signals win,
-    // the whole script goes to parsePythonCode, and a ggplot figure gets
-    // measured against matplotlib defaults and offered a plt.rcParams fix.
-    const code = [
-      'library(ggplot2)',
-      '# python draft I abandoned:',
-      '# import matplotlib.pyplot as plt',
-      '# fig, ax = plt.subplots(1, 2, figsize=(12, 8))',
-      '# ax.set_xlabel("x"); plt.savefig("f.png")',
-      'p <- ggplot(mtcars, aes(wt, mpg)) + geom_point() + theme_minimal(base_size = 11)',
-      'ggsave("fig.png", p, width = 7, height = 5)',
-    ].join('\n');
-    expect(detectLanguage(code)).toBe('r');
-  });
-
-  it('a python script carrying a commented-out ggplot draft is still python', () => {
-    const code = [
-      'import matplotlib.pyplot as plt',
-      '# the R version this replaced:',
-      '# library(ggplot2)',
-      '# p <- ggplot(d, aes(x, y)) + geom_point() + theme_minimal()',
-      '# ggsave("f.png", p, width = 7, height = 5)',
-      "plt.rcParams['font.size'] = 10",
-      'fig, ax = plt.subplots(figsize=(7, 5))',
-    ].join('\n');
-    expect(detectLanguage(code)).toBe('python');
-  });
-
+describe('comment stripping respects string literals', () => {
+  // Kept from the reverted detection change: these pin stripComments
+  // itself, which is still in use. The detection-from-stripped-code tests
+  // went with the revert — scoring stripped code doubled the cases where
+  // Check does nothing (5 -> 10 of 20) because the panel has no
+  // 'could not tell R from Python' state yet. They return with that state.
   it('a # inside a string does not truncate the line', () => {
     // The previous version of this test put every scoring token OUTSIDE
     // the quotes, so it passed even against a naive /#.*$/gm stripper —
@@ -1305,10 +1280,6 @@ describe('language detection reads the live code, not the comments', () => {
   it('python: a hex colour does not truncate the line either', () => {
     const code = "plt.rcParams.update({'axes.edgecolor': '#333333', 'font.size': 22})\nplt.figure(figsize=(9,6))";
     expect(parsePythonCode(code).baseSize).toBe(22);
-  });
-
-  it('a script that is nothing but comments detects nothing', () => {
-    expect(detectLanguage('# import matplotlib.pyplot as plt\n# plt.plot()')).toBeNull();
   });
 });
 

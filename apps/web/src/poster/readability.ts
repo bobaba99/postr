@@ -1342,48 +1342,38 @@ function lastCallEnd(code: string, opener: RegExp): number | null {
  * Returns 'r', 'python', or null if ambiguous / no signal.
  */
 export function detectLanguage(code: string): 'r' | 'python' | null {
-  // Score the LIVE code only. Fed the raw text, an R script carrying a
-  // commented-out matplotlib draft — a normal thing to leave behind while
-  // porting a figure — outscored R and routed the whole script to
-  // parsePythonCode, which then measured it against matplotlib's defaults
-  // (10pt, 6.4x4.8) and offered a plt.rcParams fix for a ggplot figure.
-  //
-  // Same root cause the comment-stripping fix named for base_size (FR6),
-  // left unfixed one function away on the default 'auto' path, which is
-  // what the panel uses.
-  const live = stripComments(code);
   let rScore = 0;
   let pyScore = 0;
 
   // Strong R signals
-  if (/ggplot\s*\(/.test(live)) rScore += 5;
-  if (/geom_\w+/.test(live)) rScore += 5;
-  if (/theme_\w+/.test(live)) rScore += 4;
-  if (/ggsave\s*\(/.test(live)) rScore += 5;
-  if (/aes\s*\(/.test(live)) rScore += 4;
-  if (/<-/.test(live)) rScore += 3;
-  if (/library\s*\(/.test(live)) rScore += 3;
-  if (/\b(cowplot|patchwork|ggpubr|gridExtra|lattice)\b/.test(live)) rScore += 4;
-  if (/%>%|%\+%|\|>/.test(live)) rScore += 3;
-  if (/\bc\s*\(/.test(live)) rScore += 1;
-  if (/element_text|element_blank|element_rect/.test(live)) rScore += 4;
-  if (/facet_wrap|facet_grid/.test(live)) rScore += 4;
-  if (/scale_\w+/.test(live)) rScore += 2;
-  if (/labs\s*\(/.test(live)) rScore += 2;
+  if (/ggplot\s*\(/.test(code)) rScore += 5;
+  if (/geom_\w+/.test(code)) rScore += 5;
+  if (/theme_\w+/.test(code)) rScore += 4;
+  if (/ggsave\s*\(/.test(code)) rScore += 5;
+  if (/aes\s*\(/.test(code)) rScore += 4;
+  if (/<-/.test(code)) rScore += 3;
+  if (/library\s*\(/.test(code)) rScore += 3;
+  if (/\b(cowplot|patchwork|ggpubr|gridExtra|lattice)\b/.test(code)) rScore += 4;
+  if (/%>%|%\+%|\|>/.test(code)) rScore += 3;
+  if (/\bc\s*\(/.test(code)) rScore += 1;
+  if (/element_text|element_blank|element_rect/.test(code)) rScore += 4;
+  if (/facet_wrap|facet_grid/.test(code)) rScore += 4;
+  if (/scale_\w+/.test(code)) rScore += 2;
+  if (/labs\s*\(/.test(code)) rScore += 2;
 
   // Strong Python signals
-  if (/plt\./.test(live)) pyScore += 5;
-  if (/matplotlib/.test(live)) pyScore += 5;
-  if (/import\s+\w+/.test(live)) pyScore += 3;
-  if (/seaborn|sns\./.test(live)) pyScore += 5;
-  if (/figsize\s*=/.test(live)) pyScore += 4;
-  if (/subplots\s*\(/.test(live)) pyScore += 4;
-  if (/ax\.\w+/.test(live)) pyScore += 3;
-  if (/rcParams/.test(live)) pyScore += 4;
-  if (/set_xlabel|set_ylabel|set_title/.test(live)) pyScore += 3;
-  if (/savefig\s*\(/.test(live)) pyScore += 4;
-  if (/def\s+\w+|class\s+\w+/.test(live)) pyScore += 2;
-  if (/fig,\s*ax/.test(live)) pyScore += 3;
+  if (/plt\./.test(code)) pyScore += 5;
+  if (/matplotlib/.test(code)) pyScore += 5;
+  if (/import\s+\w+/.test(code)) pyScore += 3;
+  if (/seaborn|sns\./.test(code)) pyScore += 5;
+  if (/figsize\s*=/.test(code)) pyScore += 4;
+  if (/subplots\s*\(/.test(code)) pyScore += 4;
+  if (/ax\.\w+/.test(code)) pyScore += 3;
+  if (/rcParams/.test(code)) pyScore += 4;
+  if (/set_xlabel|set_ylabel|set_title/.test(code)) pyScore += 3;
+  if (/savefig\s*\(/.test(code)) pyScore += 4;
+  if (/def\s+\w+|class\s+\w+/.test(code)) pyScore += 2;
+  if (/fig,\s*ax/.test(code)) pyScore += 3;
 
   if (rScore === 0 && pyScore === 0) return null;
   if (rScore > pyScore) return 'r';
