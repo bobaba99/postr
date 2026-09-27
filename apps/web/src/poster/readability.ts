@@ -201,6 +201,95 @@ const SEABORN_CONTEXTS: Record<string, number> = {
  * and `'font.size'` are both parsed out of string literals.
  */
 export function stripComments(code: string): string {
+  return scanComments(code, false);
+}
+
+/**
+ * Same as `stripComments`, but comment characters become SPACES instead
+ * of disappearing, so the result is character-for-character the same
+ * length as the input and any index found in it is valid in the original.
+ *
+ * That is what `stripComments` cannot give you: choosing an insertion
+ * point in stripped code and applying it to the original lands somewhere
+ * else entirely. Insertion points were instead chosen from raw text, so a
+ * commented-out `theme_minimal(` attracted the edit and the joining `+`
+ * was written inside a `#` comment — valid-looking output that changes
+ * nothing when run.
+ */
+export function maskComments(code: string): string {
+  return scanComments(code, true);
+}
+
+/**
+ * Comments AND string CONTENTS blanked (delimiters kept), same length.
+ *
+ * For the REWRITER only. The parsers must keep reading inside literals —
+ * `units = "cm"` and `'font.size'` are how they work — but a rewriter
+ * must never write there. Loosening the value patterns to match arbitrary
+ * text turned that distinction from academic into a script that will not
+ * parse: `msg <- "set base_size = 30 for posters"` had its closing quote
+ * eaten, and the Python equivalent produced an unterminated string.
+ */
+export function maskCodeForRewrite(code: string): string {
+  const noComments = scanComments(code, true);
+  let out = '';
+  let quote: string | null = null;
+  for (let i = 0; i < noComments.length; i++) {
+    const ch = noComments[i]!;
+    if (quote) {
+      if (quote.length === 3 && noComments.startsWith(quote, i)) {
+        out += quote; i += 2; quote = null; continue;
+      }
+      if (ch === '\\') { out += '  '; i++; continue; }
+      if (ch === quote) { out += ch; quote = null; continue; }
+      out += ch === '\n' ? '\n' : ' ';
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      const triple = ch + ch + ch;
+      if (noComments.startsWith(triple, i)) { quote = triple; out += triple; i += 2; continue; }
+      quote = ch;
+      out += ch;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+/**
+ * Index just past the end of the argument VALUE starting at `from` —
+ * the next top-level `,` or the closing `)`, with nesting and quotes
+ * respected.
+ *
+ * A character class cannot do this. `[^,)\n]+` stopped at the first `)`
+ * of `if (big) 20 else 9`, leaving `20 else 9` stranded; the call
+ * alternative matched only `max(bs, 8)` of `max(bs, 8) * 1.2` and left
+ * `* 1.2` behind, so the emitted script RAN and rendered 38.4pt when the
+ * check had scored 32. Running and lying is worse than not running.
+ */
+export function argValueEnd(code: string, from: number): number {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let i = from; i < code.length; i++) {
+    const ch = code[i]!;
+    if (quote) {
+      if (ch === '\\') i++;
+      else if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === '(' || ch === '[' || ch === '{') depth++;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      if (depth === 0) return i;
+      depth--;
+    } else if (ch === ',' && depth === 0) return i;
+    else if (ch === '\n' && depth === 0) return i;
+  }
+  return code.length;
+}
+
+function scanComments(code: string, blank: boolean): string {
   let out = '';
   let quote: string | null = null;
   for (let i = 0; i < code.length; i++) {
@@ -230,8 +319,15 @@ export function stripComments(code: string): string {
       // Skip to end of line. `i` lands ON the newline, which we emit and
       // let the loop's `i++` step past — consuming it here as well would
       // silently drop the first character of the next line.
+      const start = i;
       while (i < code.length && code[i] !== '\n') i++;
-      out += '\n';
+      if (blank) {
+        // Exactly as many characters as were consumed, so offsets hold.
+        out += ' '.repeat(i - start);
+        if (i < code.length) out += '\n';
+      } else {
+        out += '\n';
+      }
       continue;
     }
 
@@ -311,7 +407,12 @@ function extractAllCallArgs(code: string, name: string): string[] {
         break;
       }
     }
-    if (depth !== 0) break;               // unbalanced: stop, do not guess
+    // SKIP an unbalanced call, do not abort the walk. `open.lastIndex` is
+    // already past the failed match so `exec` still advances. Aborting
+    // here let one `geom_text(` inside a string literal silence every
+    // real call after it — the same failure this file already documents
+    // as fixed for tick_params, kept alive in the shared helper.
+    if (depth !== 0) continue;
   }
   return out;
 }
@@ -492,13 +593,81 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
   // ggplot sizes these in MILLIMETRES — `size = 2` is 2 * 72.27/25.4 =
   // 5.7pt — which is also why they are so often accidentally tiny.
   const MM_TO_PT = 72.27 / 25.4;
-  const inPanel = src.match(
-    /\b(geom_text|geom_label|annotate)\s*\((?:[^()]|\([^()]*\))*?\bsize\s*=\s*([\d.]+)/,
-  );
-  if (inPanel) {
-    const pt = Math.round(parseFloat(inPanel[2]!) * MM_TO_PT * 10) / 10;
+  /**
+   * ggplot2's default label size DERIVES FROM THE THEME, so it moves with
+   * `base_size`. Measured in ggplot2 4.0.3 (on R 4.6.0 — an earlier
+   * comment here cited 4.6.0 as the ggplot2 version, which was wrong):
+   *
+   *     base_size 11 ->  3.866 mm = 11 pt
+   *     base_size 22 ->  7.732 mm = 22 pt
+   *     base_size 40 -> 14.058 mm = 40 pt
+   *     base_size  5 ->  1.757 mm =  5 pt
+   *
+   * Exactly base_size / .pt. A hardcoded 3.88 was right only at the
+   * default base of 11: it understated a poster theme by 3.6x, and — the
+   * dangerous direction — reported a genuinely unreadable 5 pt label as
+   * a comfortable 11 pt.
+   */
+  const DEFAULT_LABEL_MM = baseSize / MM_TO_PT;
+
+  // The old pattern hand-rolled ONE level of paren nesting, so the
+  // commonest way of writing a label —
+  // `geom_text(aes(label = paste0("n=", n)), size = 2)` — went unseen:
+  // `paste0(` is a second level. It also treated every `annotate()` as
+  // text, so `annotate("rect", ..., size = 1)`, where `size` is a border
+  // WIDTH, produced a fabricated "in-panel text at 2.8pt".
+  //
+  // Now the balanced scanner finds each call and `topLevelArgs` reads the
+  // size, which also means a `size` mapped inside `aes()` is correctly
+  // ignored — that is a scale, not a fixed size.
+  const inPanelFindings: Array<{ fn: string; mm: number; explicit: boolean }> = [];
+  const TEXT_GEOMS = ['geom_text', 'geom_label', 'geom_text_repel', 'geom_label_repel'];
+  // `annotate` and `stat_summary` both dispatch on a geom NAME, so the
+  // same guard serves both: stat_summary(geom = "text", ...) draws real
+  // in-panel text and was going unseen.
+  for (const fn of [...TEXT_GEOMS, 'annotate', 'stat_summary']) {
+    for (const args of extractAllCallArgs(src, fn)) {
+      const top = topLevelArgs(args);
+      if (!TEXT_GEOMS.includes(fn)) {
+        // Only the text geoms. For "rect"/"segment"/"pointrange", `size`
+        // is a line width in mm and has nothing to do with legibility.
+        const geom = top.match(/(?:^\s*|[,(]\s*)(?:geom\s*=\s*)?['"](\w+)['"]/);
+        if (!geom || (geom[1] !== 'text' && geom[1] !== 'label')) continue;
+      }
+      // `(?<![\w.])` so a DOTTED argument name is not read as the font
+      // size. `label.size` and `segment.size` are line widths — ggplot2
+      // deprecated the former in favour of `linewidth` — and \b matches
+      // after the dot, so `geom_label(label.size = 0, size = 6)` was
+      // reported as 0pt where it renders at 17.1pt. With the
+      // report-the-smallest rule that fabricated zero also MASKED every
+      // real label.
+      const m = top.match(/(?<![\w.])size\s*=\s*([\d.]+)/);
+      // `size.unit` (ggplot2 >= 3.5) says the number is not millimetres.
+      const unit = top.match(/(?<![\w.])size\.unit\s*=\s*['"](\w+)['"]/);
+      const raw = m ? parseFloat(m[1]!) : DEFAULT_LABEL_MM;
+      const mm =
+        !m || !unit ? raw
+        : unit[1] === 'pt' ? raw / MM_TO_PT
+        : unit[1] === 'cm' ? raw * 10
+        : unit[1] === 'in' ? raw * 25.4
+        : raw;
+      inPanelFindings.push({ fn, mm, explicit: m !== null });
+    }
+  }
+  // Deliberately unconditional: the warning's job is to say the table
+  // below does NOT cover this text, which is true at any size. Gating it
+  // on the readable floor would need the figure's `scale`, which lives in
+  // computeReadability — worth moving if this proves noisy in use.
+  if (inPanelFindings.length) {
+    // Report the smallest: a checker must name the text that fails, not
+    // the text that passes.
+    const worst = inPanelFindings.reduce((a, b) => (b.mm < a.mm ? b : a));
+    const pt = Math.round(worst.mm * MM_TO_PT * 10) / 10;
+    const how = worst.explicit
+      ? `sets in-panel text at size ${Math.round(worst.mm * 100) / 100}`
+      : `draws in-panel text at the theme's default size (base_size ${baseSize})`;
     warnings.push(
-      `${inPanel[1]!}() sets in-panel text at size ${inPanel[2]!} (${pt}pt — ggplot sizes these in mm). In-panel labels are not theme elements, so they are not in the table below; check them yourself.`,
+      `${worst.fn}() ${how} (${pt}pt — ggplot sizes these in mm). In-panel labels are not theme elements, so they are not in the table below; check them yourself.`,
     );
   }
 
@@ -544,6 +713,14 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
       const raw = mm[2]!.trim();
       bySelector.set(
         axis,
+        // EXACT here. Rounding at parse time fed the scorer a different
+        // number from the one ggplot renders: a size of 13.950000000000001
+        // against a 14pt floor rounded up to 14 and flipped a genuine
+        // `warn` to `pass`, taking its advice row with it. Swept over
+        // plausible base/rel/canvas combinations that was 411 status
+        // flips, 397 of them in the optimistic direction — a checker
+        // reporting text as readable when it is not. The display rounding
+        // lives where the number is shown, below.
         raw.startsWith('rel')
           ? baseSize * parseFloat(raw.match(/[\d.]+/)![0]!)
           : parseFloat(raw),
@@ -944,7 +1121,11 @@ export function computeReadability(
       const el = elements.find((e) => e.name === spec.name)!;
       return {
         name: spec.name,
-        currentPt: overrides[spec.key]!,
+        // One decimal, the precision the whole panel speaks in. The table
+        // above already rounds for display; this row did not, so one
+        // element showed '12.1pt' and '12.100000000000001pt' on the same
+        // screen (D10).
+        currentPt: Math.round(overrides[spec.key]! * 10) / 10,
         neededPt: Math.ceil(spec.minPt / scale),
         status: el.status,
       };
@@ -1069,35 +1250,61 @@ export function applyFontFixes(
 ): string {
   if (!fontSnippet) return code;
 
+  // Every insertion point is located in the MASKED copy — same length as
+  // the original, comments blanked — so a commented-out call can never
+  // attract the edit and the offsets stay valid in `code` itself.
+  const masked = maskComments(code);
+  const maskedLines = masked.split('\n');
+
   if (language === 'r') {
-    const themeEnd = lastCallEnd(code, /theme_\w+\s*\(/g);
+    const themeEnd = lastCallEnd(masked, /theme_\w+\s*\(/g);
     if (themeEnd !== null) {
       return code.slice(0, themeEnd) + ' +\n  ' + fontSnippet + code.slice(themeEnd);
     }
     // No theme_*() to hang it off. Attach to the end of the plot
-    // expression instead: the last non-blank line before ggsave(), or
+    // expression instead: the last line carrying CODE before ggsave(), or
     // the end of the script when there is no ggsave().
     const lines = code.split('\n');
     let insertAfter = lines.length - 1;
-    const ggsaveAt = lines.findIndex((l) => /\bggsave\s*\(/.test(l));
+    const ggsaveAt = maskedLines.findIndex((l) => /\bggsave\s*\(/.test(l));
     if (ggsaveAt > 0) insertAfter = ggsaveAt - 1;
-    while (insertAfter > 0 && lines[insertAfter]!.trim() === '') insertAfter--;
-    lines[insertAfter] = lines[insertAfter]!.trimEnd() + ' +\n  ' + fontSnippet;
+    // A comment-only line masks to blanks, so this skips those too — a
+    // `+` appended to one would be dead text inside the comment above it.
+    while (insertAfter > 0 && maskedLines[insertAfter]!.trim() === '') insertAfter--;
+
+    // Split the chosen line at the end of its CODE, so a trailing comment
+    // stays a comment and the `+` lands in the expression. R is happy with
+    // `expr +  # note` followed by the continuation on the next line;
+    // `expr  # note +` is just a longer comment.
+    const codeEnd = maskedLines[insertAfter]!.trimEnd().length;
+    const head = lines[insertAfter]!.slice(0, codeEnd);
+    const trailing = lines[insertAfter]!.slice(codeEnd);
+    lines[insertAfter] = head + ' +' + trailing + '\n  ' + fontSnippet;
     return lines.join('\n');
   }
 
   const lines = code.split('\n');
   // rcParams is read when the figure is created, so this must land above
   // it or it is a no-op the user cannot see.
-  let at = lines.findIndex((l) => /plt\.(subplots|figure)\s*\(/.test(l));
+  let at = maskedLines.findIndex((l) => /plt\.(subplots|figure)\s*\(/.test(l));
   if (at === -1) {
-    const lastImport = lines.reduce(
+    const lastImport = maskedLines.reduce(
       (best, l, i) => (/^\s*(import|from)\s+\w/.test(l) ? i : best),
       -1,
     );
     at = lastImport + 1;
   }
-  lines.splice(at, 0, fontSnippet, '');
+  // Match the indentation of the line we are inserting above. A figure
+  // built inside a function, loop or `with` block is ordinary code, and a
+  // column-0 statement spliced under `def make_figure(x, y):` is an
+  // IndentationError — the tool handing back a script that cannot run,
+  // which is worse than handing back nothing.
+  const indent = (lines[at] ?? '').match(/^[ \t]*/)![0];
+  const indented = fontSnippet
+    .split('\n')
+    .map((l) => (l === '' ? l : indent + l))
+    .join('\n');
+  lines.splice(at, 0, indented, '');
   return lines.join('\n');
 }
 

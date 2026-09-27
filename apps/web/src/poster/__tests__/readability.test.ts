@@ -1077,3 +1077,246 @@ describe('override coverage is not override reachability', () => {
     expect(snip).toContain('axis.title.y');
   });
 });
+
+describe('the fix is inserted where it will actually run', () => {
+  // Insertion points used to be chosen from raw text, so comments and
+  // indentation were invisible. Ground truth below: Python verified with
+  // ast.parse, R with Rscript 4.6.0 + ggplot2 (both the broken and fixed
+  // forms EVALUATE — only one attaches the theme, so "does it parse" is
+  // the wrong question).
+
+  it('python: a figure built inside a function stays indented', () => {
+    const code = ['import matplotlib.pyplot as plt', '', 'def make_figure(x, y):',
+      '    fig, ax = plt.subplots(figsize=(9, 6))', '    ax.plot(x, y)', '    return fig'].join('\n');
+    const out = applyFontFixes(code, 'python', "plt.rcParams.update({\n    'axes.labelsize': 17\n})");
+    // A column-0 statement under `def ...:` is an IndentationError.
+    expect(out).toContain('    plt.rcParams.update');
+    expect(out).not.toMatch(/^plt\.rcParams\.update/m);
+  });
+
+  it('python: a figure built in a loop stays indented', () => {
+    const code = ['import matplotlib.pyplot as plt', '', 'for i in range(3):',
+      '    fig, ax = plt.subplots(figsize=(9, 6))'].join('\n');
+    const out = applyFontFixes(code, 'python', "plt.rcParams.update({\n    'axes.labelsize': 17\n})");
+    expect(out).toContain('    plt.rcParams.update');
+  });
+
+  it('python: a module-level figure still gets a column-0 insert', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(9,6))';
+    const out = applyFontFixes(code, 'python', "plt.rcParams['font.size'] = 17");
+    expect(out).toMatch(/^plt\.rcParams/m);
+  });
+
+  it('python: a commented-out plt.subplots does not attract the insert', () => {
+    const code = ['import matplotlib.pyplot as plt', '# fig, ax = plt.subplots(figsize=(3,2))',
+      'fig, ax = plt.subplots(figsize=(9,6))'].join('\n');
+    const out = applyFontFixes(code, 'python', "plt.rcParams['font.size'] = 17");
+    const lines = out.split('\n');
+    const insertAt = lines.findIndex((l) => l.includes('rcParams'));
+    const realAt = lines.findIndex((l) => !l.trimStart().startsWith('#') && l.includes('plt.subplots'));
+    expect(insertAt).toBeLessThan(realAt);
+    expect(insertAt).toBeGreaterThan(lines.findIndex((l) => l.trimStart().startsWith('#')));
+  });
+
+  it('R: a trailing comment does not swallow the joining +', () => {
+    // Measured in ggplot2: with the + inside the comment the script still
+    // evaluates cleanly and the theme simply never attaches — a silent
+    // no-op, which is the failure this whole feature exists to avoid.
+    const code = ['library(ggplot2)', 'p <- ggplot(df, aes(x, y)) + geom_point()  # main plot',
+      'ggsave("f.png", width = 9, height = 6)'].join('\n');
+    const out = applyFontFixes(code, 'r', 'theme(\n  axis.title = element_text(size = 17)\n)');
+    expect(out.split('\n').some((l) => /#.*\+\s*$/.test(l))).toBe(false);
+    expect(out).toMatch(/geom_point\(\) \+\s+# main plot/);
+  });
+
+  it('R: a commented-out theme_*() does not attract the insert', () => {
+    // The commented copy must come AFTER the live one, because the
+    // insertion point is the LAST theme_*() call — put it first and the
+    // old raw-text scan picks the right one by luck.
+    const code = [
+      'p <- ggplot(df, aes(x, y)) + geom_point() + theme_minimal(base_size = 11)',
+      '# p <- p + theme_minimal(base_size = 20)   # an older version',
+      'ggsave("f.png", width = 9, height = 6)',
+    ].join('\n');
+    const out = applyFontFixes(code, 'r', 'theme(axis.title = element_text(size = 17))');
+    // The comment survives byte-for-byte...
+    expect(out).toContain('# p <- p + theme_minimal(base_size = 20)   # an older version');
+    // ...and the snippet hangs off the LIVE theme_minimal, not the dead one.
+    expect(out).toContain('theme_minimal(base_size = 11) +');
+  });
+
+  it('R: offsets survive comments around the real theme call', () => {
+    // Pins that the comment mask is length-preserving: the index is found
+    // in the masked copy and applied to the original, so any drift lands
+    // the insert mid-token. The banner sits BEFORE (so it shifts offsets)
+    // and a dead theme_*() sits AFTER (so a raw-text scan picks it).
+    const code = [
+      '# --------------------------------------------------------------',
+      '# Banner with parens ( ) and a fake theme_minimal( inside it',
+      '# --------------------------------------------------------------',
+      'p <- ggplot(df, aes(x, y)) + geom_point() + theme_minimal(base_size = 11)',
+      '# p + theme_bw(base_size = 9)',
+      'ggsave("f.png", width = 9, height = 6)',
+    ].join('\n');
+    const out = applyFontFixes(code, 'r', 'theme(axis.title = element_text(size = 17))');
+    expect(out).toContain('theme_minimal(base_size = 11) +');
+    expect(out).toContain('# Banner with parens ( ) and a fake theme_minimal( inside it');
+    expect(out).toContain('# p + theme_bw(base_size = 9)');
+    const commented = out.split('\n').filter((l) => l.trimStart().startsWith('#'));
+    expect(commented.join('\n')).not.toContain('axis.title');
+  });
+});
+
+describe('in-panel text: found when it is there, not invented when it is not', () => {
+  // Ground truth measured in ggplot2 4.0.3 on R 4.6.0, by building the
+  // plot and reading the rendered layer's size back — not from docs.
+  const warn = (code: string) => (parseRCode(code).warnings ?? []).join(' ');
+
+  it('sees a label whose aes() contains a nested call', () => {
+    // The commonest way to write a data label. The old pattern hand-rolled
+    // ONE level of paren nesting, so paste0( inside aes( was a second
+    // level and the whole call went unseen.
+    expect(warn('geom_text(aes(label = paste0("n=", n)), size = 2)')).toMatch(/in-panel/i);
+    expect(warn('geom_text(aes(label = sprintf("%.1f", v)), size = 2)')).toMatch(/in-panel/i);
+  });
+
+  it('sees ggrepel geoms and a bare geom_label', () => {
+    expect(warn('geom_text_repel(aes(label = n), size = 2)')).toMatch(/in-panel/i);
+    expect(warn('geom_label_repel(aes(label = n), size = 2)')).toMatch(/in-panel/i);
+    expect(warn('geom_label(aes(label = n), size = 2)')).toMatch(/geom_label\(\)/);
+  });
+
+  it('sees stat_summary(geom = "text")', () => {
+    // R renders this at 5.691pt. It dispatches on a geom name exactly
+    // like annotate(), so the same guard covers it.
+    expect(warn('stat_summary(fun = length, geom = "text", aes(label = after_stat(y)), size = 2)'))
+      .toMatch(/in-panel/i);
+  });
+
+  it('a dotted argument name is NOT the font size', () => {
+    // label.size is a BORDER width — ggplot2 deprecated it in favour of
+    // linewidth — and \b matches after the dot. R renders this label at
+    // 17.1pt; reporting "size 0 (0pt)" is a fabricated finding, and the
+    // report-the-smallest rule let that zero mask every real label.
+    const w = warn('geom_label(aes(label = n), label.size = 0, size = 6)');
+    expect(w).toContain('size 6');
+    expect(w).not.toContain('size 0');
+    expect(warn('geom_text_repel(aes(label = n), segment.size = 0.2, size = 5)')).toContain('size 5');
+  });
+
+  it('honours size.unit', () => {
+    // size.unit = "pt" means the number is NOT millimetres. Without it,
+    // size = 8 renders at 22.76pt; with it, at 8pt.
+    expect(warn('geom_text(aes(label = n), size = 8, size.unit = "pt")')).toContain('(8pt');
+    expect(warn('geom_text(aes(label = n), size = 8)')).toContain('22.8pt');
+  });
+
+  it("an unsized label reports the THEME's size, which follows base_size", () => {
+    // Measured: base_size 11/22/40/5 renders 11/22/40/5 pt exactly.
+    // A hardcoded 3.88mm was right only at base 11 — it understated a
+    // poster theme 3.6x and, worse, called a genuinely unreadable 5pt
+    // label a comfortable 11pt.
+    expect(warn('ggplot(d) + geom_text(aes(label = n)) + theme_minimal(base_size = 40)')).toContain('40');
+    expect(warn('ggplot(d) + geom_text(aes(label = n)) + theme_grey(base_size = 5)')).toContain('5');
+    expect(warn('ggplot(d) + geom_text(aes(label = n)) + theme_minimal(base_size = 40)')).not.toContain('11pt');
+  });
+
+  it('does NOT invent a text warning for annotate("rect")', () => {
+    // `size` on a rect/segment is a border width — ggplot2 itself
+    // deprecated it in favour of `linewidth`.
+    expect(warn('annotate("rect", xmin = 1, xmax = 2, ymin = 0, ymax = 3, alpha = 0.2, size = 1)'))
+      .not.toMatch(/in-panel/i);
+    expect(warn('annotate("segment", x = 1, xend = 2, y = 0, yend = 3, size = 2)'))
+      .not.toMatch(/in-panel/i);
+  });
+
+  it('still sees annotate("text") and the named geom = form', () => {
+    expect(warn('annotate("text", x = 2, y = 2, label = "hi", size = 2)')).toMatch(/in-panel/i);
+    expect(warn('annotate(geom = "label", x = 2, y = 2, label = "hi", size = 2)')).toMatch(/in-panel/i);
+  });
+
+  it('a size MAPPED inside aes() is a scale, not a fixed size', () => {
+    // The previous test for this named a geom the detector never scans,
+    // so it held for every implementation including the broken one.
+    // geom_text IS scanned, so this one can actually fail.
+    // A NUMERIC mapped size is what discriminates: `aes(size = 2)` maps the
+    // constant 2 through the size SCALE, it is not 2mm of type. With a
+    // variable (`size = n`) the regex needs a digit and cannot tell the
+    // two implementations apart, so that input proved nothing.
+    const w = warn('ggplot(d) + geom_text(aes(label = n, size = 2)) + theme_minimal(base_size = 40)');
+    expect(w).not.toContain('size 2');
+    expect(w).toContain('40');
+  });
+
+  it('one unbalanced call does not silence the real ones', () => {
+    // A `geom_text(` inside a string literal used to abort the whole walk.
+    expect(warn('ggplot(d) + labs(caption = "made with geom_text(") + geom_text(aes(label = n), size = 1)'))
+      .toMatch(/in-panel/i);
+  });
+
+  it('reports the smallest label when several are drawn', () => {
+    const w = warn('geom_text(aes(label = a), size = 9) + geom_text(aes(label = b), size = 2)');
+    expect(w).toContain('size 2');
+  });
+});
+
+describe('comment stripping respects string literals', () => {
+  // Kept from the reverted detection change: these pin stripComments
+  // itself, which is still in use. The detection-from-stripped-code tests
+  // went with the revert — scoring stripped code doubled the cases where
+  // Check does nothing (5 -> 10 of 20) because the panel has no
+  // 'could not tell R from Python' state yet. They return with that state.
+  it('a # inside a string does not truncate the line', () => {
+    // The previous version of this test put every scoring token OUTSIDE
+    // the quotes, so it passed even against a naive /#.*$/gm stripper —
+    // the exact implementation stripComments' own docstring says is
+    // wrong. Here a hex colour hides the ONLY copy of base_size behind a
+    // '#', so a naive stripper reads 11 (the ggplot default) instead.
+    const code = 'p <- ggplot(d, aes(x,y)) + geom_point(colour = "#FF0000") + theme_minimal(base_size = 24)\nggsave("f.png", p, width = 9, height = 6)';
+    expect(parseRCode(code).baseSize).toBe(24);
+    expect(detectLanguage(code)).toBe('r');
+  });
+
+  it('python: a hex colour does not truncate the line either', () => {
+    const code = "plt.rcParams.update({'axes.edgecolor': '#333333', 'font.size': 22})\nplt.figure(figsize=(9,6))";
+    expect(parsePythonCode(code).baseSize).toBe(22);
+  });
+});
+
+describe('sizes are reported at one decimal, everywhere', () => {
+  it('a rel() override does not leak float noise into the advice', () => {
+    // rel(1.1) on an 11pt base is 12.100000000000001. The table rounded
+    // for display, the per-element advice below it did not, so one element
+    // showed two different numbers on the same screen.
+    const code = "theme_minimal(base_size = 11) +\n  theme(axis.title = element_text(size = rel(1.1)))\nggsave('f.png', width = 9, height = 6)";
+    const r = computeReadability(parseRCode(code), 7, 10);
+    // Assert the VALUE is one-decimal, not merely that its string is
+    // short: a length check passes for whole points and for two decimals,
+    // so it pinned "not float noise" rather than the stated precision.
+    const all = [...(r.overrideFixes ?? []), ...(r.fontFixes ?? [])] as Array<{ name?: string; currentPt?: number }>;
+    for (const f of all) {
+      if (f.currentPt === undefined) continue;
+      expect(f.currentPt).toBe(Math.round(f.currentPt * 10) / 10);
+    }
+    const axisTitle = r.elements.find((e) => e.name === 'Axis titles')!;
+    // Select by NAME — picking "the first row with a currentPt" only
+    // coincidentally found this element.
+    const advised = all.find((f) => f.name === 'Axis titles');
+    expect(advised?.currentPt).toBe(axisTitle.sourcePt);
+  });
+
+  it('scoring uses the EXACT size, not the rounded one', () => {
+    // base_size 15.5 x rel(0.9) = 13.950000000000001, below the 14pt
+    // floor. Rounding before scoring lifted it to 14 and turned a genuine
+    // warn into a pass, dropping the advice row with it.
+    const code = "ggplot(d, aes(x, y)) + geom_point() +\n  theme_minimal(base_size = 15.5) +\n  theme(axis.text = element_text(size = rel(0.9)))\nggsave('f.png', width = 10, height = 7)";
+    const r = computeReadability(parseRCode(code), 7, 10);
+    expect(r.elements.find((e) => e.name === 'Tick labels')!.status).not.toBe('pass');
+  });
+
+  it('a plain numeric override is untouched', () => {
+    const code = "theme_minimal(base_size = 11) +\n  theme(axis.title = element_text(size = 9))\nggsave('f.png', width = 9, height = 6)";
+    const r = computeReadability(parseRCode(code), 7, 10);
+    expect(r.elements.find((e) => e.name === 'Axis titles')!.sourcePt).toBe(9);
+  });
+});
