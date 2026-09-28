@@ -1,0 +1,395 @@
+{
+  "tests": [
+    "src/poster/__tests__/sheetSize.test.tsx",
+    "src/poster/__tests__/sheetConsumers.test.tsx",
+    "src/pages/__tests__/EditorSheetSize.test.tsx",
+    "src/poster/__tests__/previewMode.test.tsx",
+    "src/poster/__tests__/shareMobile.test.tsx",
+    "src/poster/__tests__/restoreSheetSize.test.tsx",
+    "src/stores/__tests__/posterStore.test.ts"
+  ],
+  "mutants": {
+    "sheet-from-preset": {
+      "undoes": "cause A — the sheet is the poster's own size (the old preset lookup, both sides)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const { widthIn: pw, heightIn: ph } = usableSheetSize(doc.widthIn, doc.heightIn);\n  const sizeKey = presetKeyFor(pw, ph);",
+          "  const sizeKey = presetKeyFor(doc.widthIn, doc.heightIn);\n  const { w: pw, h: ph } = POSTER_SIZES[sizeKey === 'custom' ? '48×36' : sizeKey]!;"
+        ]
+      ]
+    },
+    "height-from-preset": {
+      "undoes": "cause A in one dimension — the sheet height is the poster's own",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const { widthIn: pw, heightIn: ph } = usableSheetSize(doc.widthIn, doc.heightIn);\n  const sizeKey = presetKeyFor(pw, ph);",
+          "  const { widthIn: pw, heightIn: ph0 } = usableSheetSize(doc.widthIn, doc.heightIn);\n  const ph = presetKeyFor(pw, ph0) === 'custom' ? 36 : ph0;\n  const sizeKey = presetKeyFor(pw, ph);"
+        ]
+      ]
+    },
+    "bounds-swapped": {
+      "undoes": "ISSUES measures width against width and height against height",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "checkBounds(doc.blocks, cW, cH, measuredHeights, titleOverflowPx)",
+          "checkBounds(doc.blocks, cH, cW, measuredHeights, titleOverflowPx)"
+        ]
+      ]
+    },
+    "template-height-preset": {
+      "undoes": "a template is laid out for the poster's own height",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    setBlocks(makeBlocks(key, pw, ph));",
+          "    setBlocks(makeBlocks(key, pw, 36));"
+        ]
+      ]
+    },
+    "autoarrange-height-preset": {
+      "undoes": "Auto-Arrange fits the poster's own height",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "autoLayout(measured, cW, cH, doc.styles)",
+          "autoLayout(measured, cW, 360, doc.styles)"
+        ]
+      ]
+    },
+    "zoom-fit-from-preset": {
+      "undoes": "zoom-to-fit uses the poster's own size",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      const wRatio = (r.width - fitPadding) / (widthIn * PX);\n      const hRatio = (r.height - fitPadding) / (heightIn * PX);",
+          "      const wRatio = (r.width - fitPadding) / (48 * PX);\n      const hRatio = (r.height - fitPadding) / (36 * PX);"
+        ]
+      ]
+    },
+    "zoom-args-swapped": {
+      "undoes": "zoom-to-fit divides width by width and height by height",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      const wRatio = (r.width - fitPadding) / (widthIn * PX);\n      const hRatio = (r.height - fitPadding) / (heightIn * PX);",
+          "      const wRatio = (r.width - fitPadding) / (heightIn * PX);\n      const hRatio = (r.height - fitPadding) / (widthIn * PX);"
+        ]
+      ]
+    },
+    "zoom-deps-dropped": {
+      "undoes": "zoom refits when the size changes",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  }, [widthIn, heightIn, canvasRef, fitPadding]);",
+          "  }, [canvasRef, fitPadding]);"
+        ]
+      ]
+    },
+    "preview-sheet-preset": {
+      "undoes": "the preview draws the poster's own sheet",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        cW={cW}\n        cH={cH}",
+          "        cW={480}\n        cH={360}"
+        ]
+      ]
+    },
+    "grid-preset": {
+      "undoes": "the grid covers the poster's own sheet",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "data-postr-overlay=\"grid\"\n                  width={cW}\n                  height={cH}",
+          "data-postr-overlay=\"grid\"\n                  width={480}\n                  height={360}"
+        ]
+      ]
+    },
+    "frame-preset": {
+      "undoes": "the frame around the sheet is the poster's size",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "              width: cW * zoom,",
+          "              width: 480 * zoom,"
+        ]
+      ]
+    },
+    "guide-centre-preset": {
+      "undoes": "the drag guides' centre is the poster's centre",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "const canvasCx = cW / 2;",
+          "const canvasCx = 480 / 2;"
+        ]
+      ]
+    },
+    "area-comment-preset": {
+      "undoes": "an area comment is measured on the poster's own sheet",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "<AreaCommentOverlay canvasW={cW} canvasH={cH} />",
+          "<AreaCommentOverlay canvasW={480} canvasH={360} />"
+        ]
+      ]
+    },
+    "figure-overlay-preset": {
+      "undoes": "the Figure tab's check rectangle is clamped to the poster's own sheet",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "                    canvasWidth={cW}\n                    canvasHeight={cH}",
+          "                    canvasWidth={480}\n                    canvasHeight={360}"
+        ]
+      ]
+    },
+    "overflow-preset": {
+      "undoes": "the frame grows by the overflow past the poster's own height",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "setCanvasOverflow(Math.max(0, painted - cH));",
+          "setCanvasOverflow(Math.max(0, painted - 360));"
+        ]
+      ]
+    },
+    "menu-never-custom": {
+      "undoes": "the size menu and preview name a custom size as custom",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "  return 'custom';\n}",
+          "  return '48×36';\n}"
+        ]
+      ]
+    },
+    "preview-label-preset": {
+      "undoes": "the preview labels a custom size with its own inches",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "  if (key !== 'custom') return POSTER_SIZES[key]!.label;",
+          "  if (key !== 'custom' || true) return POSTER_SIZES[key === 'custom' ? '48×36' : key]!.label;"
+        ]
+      ]
+    },
+    "naming-half-inch": {
+      "undoes": "a size is named as a preset only when it is that preset",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "Math.abs(value.w - widthIn) < 0.05 && Math.abs(value.h - heightIn) < 0.05",
+          "Math.abs(value.w - widthIn) < 0.5 && Math.abs(value.h - heightIn) < 0.5"
+        ]
+      ]
+    },
+    "drawn-as-stored": {
+      "undoes": "an unusable stored size is not drawn (review of cause A: NaN sheet, Auto-Arrange deleted blocks)",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "  return typeof n === 'number' && Number.isFinite(n) && n >= DRAWABLE_SHEET_MIN_IN && n <= DRAWABLE_SHEET_MAX_IN\n    ? n\n    : fallback;",
+          "  return n as number;"
+        ]
+      ]
+    },
+    "no-upper-bound": {
+      "undoes": "an absurdly large stored size is treated as unusable",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          " && n <= DRAWABLE_SHEET_MAX_IN\n",
+          " && true\n"
+        ]
+      ]
+    },
+    "no-string-coercion": {
+      "undoes": "a size stored as numeric strings is read as numbers",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "typeof value === 'string' && value.trim() !== '' ? Number(value) : value",
+          "value"
+        ]
+      ]
+    },
+    "no-load-repair": {
+      "undoes": "opening a poster repairs an unusable saved size before an empty poster is laid out from it",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "hydrateIfEmpty(normalizeSheetSize(normalizeStaleStyles(raw), row))",
+          "hydrateIfEmpty(normalizeStaleStyles(raw))"
+        ]
+      ]
+    },
+    "guide-middle-preset": {
+      "undoes": "the drag guides' vertical middle is the poster's own middle",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "const canvasCy = cH / 2;",
+          "const canvasCy = 360 / 2;"
+        ]
+      ]
+    },
+    "floor-one-inch": {
+      "undoes": "a sheet narrower than 3 in is unusable (re-check of cause A: 1-inch margins leave no column)",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "export const DRAWABLE_SHEET_MIN_IN = 3;",
+          "export const DRAWABLE_SHEET_MIN_IN = 1;"
+        ]
+      ]
+    },
+    "floor-exclusive": {
+      "undoes": "the smallest usable sheet (3 in) is itself usable",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "n >= DRAWABLE_SHEET_MIN_IN",
+          "n > DRAWABLE_SHEET_MIN_IN"
+        ]
+      ]
+    },
+    "ceiling-exclusive": {
+      "undoes": "the largest usable sheet (1000 in) is itself usable",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "n <= DRAWABLE_SHEET_MAX_IN",
+          "n < DRAWABLE_SHEET_MAX_IN"
+        ]
+      ]
+    },
+    "naming-width-only": {
+      "undoes": "a preset is named only when BOTH sides match it",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "Math.abs(value.w - widthIn) < 0.05 && Math.abs(value.h - heightIn) < 0.05",
+          "Math.abs(value.w - widthIn) < 0.05"
+        ]
+      ]
+    },
+    "store-no-repair": {
+      "undoes": "every document entering the store (open, share, import, version restore) gets a usable size (re-check of cause A, RA1)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "    const sized = withUsableSheetSize(doc, options.sizeFallback);",
+          "    const sized = doc;"
+        ]
+      ]
+    },
+    "load-ignores-row": {
+      "undoes": "opening a poster whose data lost its size falls back to the row's own usable size before the default",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "return withUsableSheetSize(doc, { widthIn: row.width_in, heightIn: row.height_in });",
+          "return withUsableSheetSize(doc);"
+        ]
+      ]
+    },
+    "editor-reads-raw-size": {
+      "undoes": "BLIND SPOT at this commit: the editor draws a usable size even when the store holds an unusable one. setPoster repairs every document it receives, but a typed size still reaches the store unchecked until cause D (branch editor/size-change-keeps-blocks) limits the fields to 10-100 in; from then on no user path reaches this second guard",
+      "expect": "survive",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const { widthIn: pw, heightIn: ph } = usableSheetSize(doc.widthIn, doc.heightIn);",
+          "  const { widthIn: pw, heightIn: ph } = { widthIn: doc.widthIn, heightIn: doc.heightIn };"
+        ]
+      ]
+    },
+    "label-reads-raw-size": {
+      "undoes": "BLIND SPOT at this commit: the preview label reads a usable size even from an unrepaired document. A typed size still reaches the store unchecked until cause D limits the fields to 10-100 in; from then on no user path reaches this second guard",
+      "expect": "survive",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "  const size = usableSheetSize(widthIn, heightIn);\n  const key = presetKeyFor",
+          "  const size = { widthIn: widthIn as number, heightIn: heightIn as number };\n  const key = presetKeyFor"
+        ]
+      ]
+    },
+    "naming-tolerance-wide": {
+      "undoes": "preset naming tolerance is 0.05 in, not 0.2 (re-check of cause A, RT6)",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "Math.abs(value.w - widthIn) < 0.05 && Math.abs(value.h - heightIn) < 0.05",
+          "Math.abs(value.w - widthIn) < 0.2 && Math.abs(value.h - heightIn) < 0.2"
+        ]
+      ]
+    },
+    "naming-tolerance-tight": {
+      "undoes": "a preset stored to two decimals (33.11 × 46.81) is still named as that preset (re-check of cause A, RT6)",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "Math.abs(value.w - widthIn) < 0.05 && Math.abs(value.h - heightIn) < 0.05",
+          "Math.abs(value.w - widthIn) < 0.001 && Math.abs(value.h - heightIn) < 0.001"
+        ]
+      ]
+    },
+    "drawn-rounded": {
+      "undoes": "the sheet is drawn at its exact size, not rounded to whole inches (re-check of cause A, RT6)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const { widthIn: pw, heightIn: ph } = usableSheetSize(doc.widthIn, doc.heightIn);",
+          "  const { widthIn: pw, heightIn: ph } = usableSheetSize(Math.round(doc.widthIn), Math.round(doc.heightIn));"
+        ]
+      ]
+    },
+    "store-ignores-fallback": {
+      "undoes": "RF-4 — setPoster uses the given size fallback (the share page's row, the poster's current size on restore) before the default",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "    const sized = withUsableSheetSize(doc, options.sizeFallback);",
+          "    const sized = withUsableSheetSize(doc);"
+        ]
+      ]
+    },
+    "share-no-row-fallback": {
+      "undoes": "RF-4 — the share page falls back to the row's own size, as the editor does",
+      "edits": [
+        [
+          "src/pages/Share.tsx",
+          "        setPoster(row.id, row.data as PosterDoc, row.title, {\n          sizeFallback: { widthIn: row.width_in, heightIn: row.height_in },\n        });",
+          "        setPoster(row.id, row.data as PosterDoc, row.title);"
+        ]
+      ]
+    },
+    "restore-no-current-fallback": {
+      "undoes": "RF-4 — a restored version with no usable size takes the poster's current size",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      setPoster(currentId, restored, currentTitle, { sizeFallback: currentDoc ?? undefined });",
+          "      setPoster(currentId, restored, currentTitle);"
+        ]
+      ]
+    },
+    "restore-fallback-width-only": {
+      "undoes": "F4 (last round) — the restore fallback gives the poster's current height too",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      setPoster(currentId, restored, currentTitle, { sizeFallback: currentDoc ?? undefined });",
+          "      setPoster(currentId, restored, currentTitle, { sizeFallback: currentDoc ? { widthIn: currentDoc.widthIn } : undefined });"
+        ]
+      ]
+    }
+  }
+}

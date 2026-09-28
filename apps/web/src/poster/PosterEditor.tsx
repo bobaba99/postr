@@ -49,12 +49,13 @@ import {
   type StylePreset,
 } from './Sidebar';
 import {
-  DEFAULT_POSTER_SIZE_KEY,
   FONTS,
   PALETTES,
   POSTER_SIZES,
   PX,
   SNAP_GRID,
+  presetKeyFor,
+  usableSheetSize,
   type NamedPalette,
   type PosterSizeKey,
 } from './constants';
@@ -86,16 +87,6 @@ import { buildPrintDocument } from '@/export/printDocument';
 // Font loading (Google Fonts URL + idempotent link injection) lives in
 // fontLoader.ts, shared by the copy-a-design preview and the
 // standalone manuscript-to-poster preview.
-
-/** Find the closest poster-size key that matches the doc's dimensions. */
-function findSizeKey(widthIn: number, heightIn: number): PosterSizeKey {
-  for (const [key, value] of Object.entries(POSTER_SIZES)) {
-    if (Math.abs(value.w - widthIn) < 0.5 && Math.abs(value.h - heightIn) < 0.5) {
-      return key as PosterSizeKey;
-    }
-  }
-  return DEFAULT_POSTER_SIZE_KEY;
-}
 
 /** Resolve a Palette object to its catalog name (or empty string). */
 /** Match a Palette to its catalog name by comparing all color fields. */
@@ -537,7 +528,9 @@ function useBlockDrag(
 
 function useZoom(
   canvasRef: React.RefObject<HTMLDivElement | null>,
-  sizeKey: PosterSizeKey,
+  /** The poster's own size in inches — never a preset's. */
+  widthIn: number,
+  heightIn: number,
   /**
    * Gutter reserved around the poster when auto-fitting. The desktop
    * workspace keeps a generous 60px so blocks dragged just past the
@@ -554,14 +547,13 @@ function useZoom(
     const compute = () => {
       if (!canvasRef.current) return;
       const r = canvasRef.current.getBoundingClientRect();
-      const sz = POSTER_SIZES[sizeKey]!;
       // Fit-to-viewport picks the tighter of width vs height ratio
       // minus the canvas gutter. The 5× upper bound is a
       // safety net for pathological cases (canvas not yet measured,
       // offscreen, etc.) — it's not a "sensible max zoom", auto-fit
       // on a large monitor should happily go to 3–4×.
-      const wRatio = (r.width - fitPadding) / (sz.w * PX);
-      const hRatio = (r.height - fitPadding) / (sz.h * PX);
+      const wRatio = (r.width - fitPadding) / (widthIn * PX);
+      const hRatio = (r.height - fitPadding) / (heightIn * PX);
       const ratio = Math.min(wRatio, hRatio, 5);
       // Guard against NaN / negative when the container hasn't laid
       // out yet (width < 60).
@@ -579,7 +571,7 @@ function useZoom(
       window.removeEventListener('resize', compute);
       ro.disconnect();
     };
-  }, [sizeKey, canvasRef, fitPadding]);
+  }, [widthIn, heightIn, canvasRef, fitPadding]);
 
   return { zoom: manual ?? fit, setZoom: setManual };
 }
@@ -1127,7 +1119,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         });
         await saveVersion(currentId, `Before restore — ${stamp}`, currentDoc);
       }
-      setPoster(currentId, restored, currentTitle);
+      // A snapshot with no usable size takes the poster's current size.
+      setPoster(currentId, restored, currentTitle, { sizeFallback: currentDoc ?? undefined });
       window.dispatchEvent(new Event('postr:versions-changed'));
       showToast('Version restored');
     },
@@ -1162,8 +1155,14 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     );
   }
 
-  const sizeKey = findSizeKey(doc.widthIn, doc.heightIn);
-  const { w: pw, h: ph } = POSTER_SIZES[sizeKey]!;
+  // The sheet is the poster's OWN size. It used to come from the nearest
+  // preset, which fell back to 48×36, so a custom-size poster was drawn,
+  // laid out and checked as 48×36 while print, PDF and PPTX used its real
+  // size (docs/fixes/02-poster-size.md). `sizeKey` only names the size.
+  // A stored size that is not a usable number falls back to the default
+  // sheet (the page's load path also repairs it in the document).
+  const { widthIn: pw, heightIn: ph } = usableSheetSize(doc.widthIn, doc.heightIn);
+  const sizeKey = presetKeyFor(pw, ph);
   const cW = pw * PX;
   const cH = ph * PX;
   const ffc = FONTS[doc.fontFamily]?.css ?? doc.fontFamily;
@@ -1172,7 +1171,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // 16px of gutter on a phone versus 60 on desktop: at 375px wide the
   // desktop gutter alone eats a sixth of the viewport, and the whole
   // point of the mobile share view is that the poster arrives fitted.
-  const { zoom, setZoom } = useZoom(canvasRef, sizeKey, mobileShare ? 16 : 60);
+  const { zoom, setZoom } = useZoom(canvasRef, pw, ph, mobileShare ? 16 : 60);
 
   // ── Touchpad pinch-to-zoom + pan ───────────────────────────────────
   //
@@ -3413,7 +3412,6 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         headingNumbers={headingNumbers}
         titleOverflowPx={titleOverflowPx}
         didDragRef={didDragRef}
-        sizeKey={sizeKey}
         paletteName={palName}
         onExit={() => setPreviewMode(false)}
         // No `flushSync` needed: the editor is hidden, not unmounted, so

@@ -67,7 +67,11 @@ export default function Share() {
           setStatus({ kind: 'not-found' });
           return;
         }
-        setPoster(row.id, row.data as PosterDoc, row.title);
+        // The row's own size when the data has lost it, as the editor does,
+        // so a share link and the owner see one size (final review, RF-4).
+        setPoster(row.id, row.data as PosterDoc, row.title, {
+          sizeFallback: { widthIn: row.width_in, heightIn: row.height_in },
+        });
         setStatus({ kind: 'ready' });
       } catch (e) {
         if (cancelled) return;

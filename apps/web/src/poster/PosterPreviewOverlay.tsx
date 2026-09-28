@@ -44,7 +44,7 @@
 import { useEffect, useState } from 'react';
 import type { Block, PosterDoc } from '@postr/shared';
 import { BlockFrame } from './blocks';
-import { POSTER_SIZES, type PosterSizeKey } from './constants';
+import { posterSizeLabel } from './constants';
 import type { CitationStyleKey } from './citations';
 
 export interface PosterPreviewOverlayProps {
@@ -60,7 +60,6 @@ export interface PosterPreviewOverlayProps {
   titleOverflowPx: number;
   /** Shared with the editor so BlockFrame's drag guard behaves identically. */
   didDragRef: React.MutableRefObject<boolean>;
-  sizeKey: PosterSizeKey;
   paletteName: string;
   onExit: () => void;
   onPrint: () => void;
@@ -85,7 +84,6 @@ export function PosterPreviewOverlay({
   headingNumbers,
   titleOverflowPx,
   didDragRef,
-  sizeKey,
   paletteName,
   onExit,
   onPrint,
@@ -211,7 +209,7 @@ export function PosterPreviewOverlay({
           Print / Save PDF
         </button>
         <span style={{ fontSize: 12, color: '#6b7280' }}>
-          {POSTER_SIZES[sizeKey]!.label} · {doc.fontFamily} · {paletteName || 'Custom'}
+          {posterSizeLabel(doc.widthIn, doc.heightIn)} · {doc.fontFamily} · {paletteName || 'Custom'}
         </span>
       </div>
     </div>

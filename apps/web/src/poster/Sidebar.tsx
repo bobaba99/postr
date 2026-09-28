@@ -128,7 +128,8 @@ interface SidebarProps {
   // poster meta
   posterTitle: string;
   onChangePosterTitle: (title: string) => void;
-  posterSizeKey: PosterSizeKey;
+  /** The preset this poster's size matches, or 'custom'. */
+  posterSizeKey: PosterSizeKey | 'custom';
   posterWidthIn: number;
   posterHeightIn: number;
   onChangePosterSize: (key: PosterSizeKey) => void;
@@ -860,7 +861,8 @@ export function Sidebar(props: SidebarProps) {
 export function LayoutTab(props: {
   posterTitle: string;
   onChangePosterTitle: (title: string) => void;
-  posterSizeKey: PosterSizeKey;
+  /** The preset this poster's size matches, or 'custom'. */
+  posterSizeKey: PosterSizeKey | 'custom';
   posterWidthIn: number;
   posterHeightIn: number;
   onChangePosterSize: (k: PosterSizeKey) => void;
