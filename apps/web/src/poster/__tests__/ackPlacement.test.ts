@@ -286,3 +286,37 @@ describe('purity', () => {
     expect(placeAckMark(blocks, 480, 360)).toEqual(placeAckMark(blocks, 480, 360));
   });
 });
+
+describe('the scan reaches the last row and the last column', () => {
+  // The empty-region scan stepped by GAP from one end and stopped before the
+  // other, so a free spot in the top-margin row or the right-most column was
+  // never tried whenever the distance was not a multiple of the step. Found
+  // by the review of fix 02: a size change dropped the credit mark while its
+  // new sheet had 449 legal spots.
+  it('finds the top-margin row when nothing else is free (48 × 18 in)', () => {
+    const body = block({ id: 'body', type: 'text', x: 10, y: 22, w: 460, h: 153 });
+    const placed = placeAckMark([body], 480, 180);
+    expect(placed, 'a free row exists at y = 10').not.toBeNull();
+    expect(placed!.y).toBe(M);
+    expect(overlaps(placed!, body)).toBe(false);
+  });
+
+  it('finds the right-most column when nothing else is free', () => {
+    const body = block({ id: 'body', type: 'image', x: 0, y: 0, w: 456, h: 360 });
+    const placed = placeAckMark([body], 480, 360);
+    expect(placed, 'a free column exists at x 456..470').not.toBeNull();
+    expect(overlaps(placed!, body)).toBe(false);
+    expect(placed!.x + placed!.w).toBeLessThanOrEqual(480 - M);
+  });
+
+  it('finds the right-most column above the bottom band when the band\'s corner is taken', () => {
+    // The test above is satisfied in the bottom band. Here the band's right
+    // corner is occupied, so only the rows above can reach the free column
+    // (re-check of fix 02, probe AC1).
+    const body = block({ id: 'body', type: 'image', x: 0, y: 0, w: 456, h: 360 });
+    const corner = block({ id: 'corner', type: 'text', x: 456, y: 320, w: 24, h: 40 });
+    const placed = placeAckMark([body, corner], 480, 360);
+    expect(placed, 'a free column exists at x 456..470, above y 320').not.toBeNull();
+    expect(overlaps(placed!, body) || overlaps(placed!, corner)).toBe(false);
+  });
+});

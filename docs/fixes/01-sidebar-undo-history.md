@@ -420,18 +420,20 @@ break found through the UI. All figures MEASURED:
 
 ## 10. Limits and follow-ups
 
-- **Size preset replaces the blocks** (item 2). A preset still lays out a fresh
+- **Size preset replaces the blocks** (item 2; since fixed by fix 02, which
+  also fixed the Templates copy). A preset still lays out a fresh
   3-column template. Since this fix ⌘Z brings the blocks back, but the preset
   itself should keep them. The Layout › Templates copy says content is kept
   while applying a template discards it; that is also item 2.
 - **Typing a size keystroke by keystroke drops the credit mark until the poster
-  is reopened** (item 2, MEASURED on main and on the fix, 3/3 in Chromium).
+  is reopened** (since fixed by fix 02, cause D; item 2, MEASURED on main and on the fix, 3/3 in Chromium).
   - The height field accepts any value above 0 despite `min={10}`.
   - Typing "24" applies a 2-inch sheet at the first keystroke, and the mark is
     dropped for lack of room.
   - `replaceAckBlock` never adds it back, so the saves in between have no mark.
   - Reopening the poster re-seeds it.
-- **Custom-size sheets are drawn and laid out as 48×36** (items 3 and 4). There
+- **Custom-size sheets are drawn and laid out as 48×36** (since fixed by fix 02,
+  cause A; it was not the cause of items 3 and 4). There
   are two independent reports, neither reproduced here yet:
   - the browser confirmer: a 48×24 poster rendered 480×360 units;
   - review 2 (MEASURED): templates and Auto-Arrange put 10 of 15 blocks past

@@ -51,13 +51,11 @@ import {
 import {
   FONTS,
   PALETTES,
-  POSTER_SIZES,
   PX,
   SNAP_GRID,
   presetKeyFor,
   usableSheetSize,
   type NamedPalette,
-  type PosterSizeKey,
 } from './constants';
 import {
   deleteCustomPalette,
@@ -74,9 +72,9 @@ import {
   type SortMode,
 } from './citations';
 import { autoLayout } from './autoLayout';
-import { filterDeletable, preserveLocked } from '@/export/blockLock';
-import { replaceAckBlock } from '@/export/ackBlock';
+import { filterDeletable } from '@/export/blockLock';
 import { LAYOUT_TEMPLATES, makeBlocks, type LayoutKey } from './templates';
+import { formatSheetSize, moveOntoSheet } from './resizeSheet';
 import { snap } from './snap';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
 import { buildPrintDocument } from '@/export/printDocument';
@@ -526,6 +524,17 @@ function useBlockDrag(
 // Zoom hook
 // =========================================================================
 
+/**
+ * A modal dialog is asking the user something. The editor's own shortcuts
+ * (undo, redo, delete, nudge) wait until it is answered: they used to keep
+ * editing the poster behind a size or template dialog, so after Cancel the
+ * poster had still changed (review of fix 02, docs/fixes/02-poster-size.md).
+ */
+function modalDialogOpen(): boolean {
+  // A dialog fading out (data-state="closing") has been answered already.
+  return document.querySelector('[role="dialog"][aria-modal="true"]:not([data-state="closing"])') !== null;
+}
+
 function useZoom(
   canvasRef: React.RefObject<HTMLDivElement | null>,
   /** The poster's own size in inches — never a preset's. */
@@ -912,6 +921,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     // equally invisible. Bail while previewing.
     if (previewMode) return;
     const handler = (e: KeyboardEvent) => {
+      if (modalDialogOpen()) return;
       if ((e.metaKey || e.ctrlKey) && e.key === '/') {
         e.preventDefault();
         setSidebarOpen((v) => !v);
@@ -991,9 +1001,9 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // has been decorative since d54b70e. Measured drift on a real render:
   // stored 100, rendered 185.44 — 8.5 inches on a poster.
   //
-  // Offset metrics are pre-transform, so the canvas's `scale(zoom)` needs
-  // no compensation here — the same property the title-overflow effect
-  // above already relies on.
+  // The frame's computed height, like the offset metrics, is pre-transform,
+  // so the canvas's `scale(zoom)` needs no compensation here — the same
+  // property the title-overflow effect above already relies on.
   //
   // Deliberately NOT written back into `b.h`. That would be the better end
   // state and is a project, not a patch: it diverges without bound for
@@ -1013,7 +1023,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       const next = new Map<string, number>();
       for (const el of canvas.querySelectorAll<HTMLElement>('[data-block-id]')) {
         const id = el.getAttribute('data-block-id');
-        if (id) next.set(id, el.offsetHeight);
+        // The frame's computed height is its border box (no padding,
+        // border-box), before the zoom and rotation transforms, and keeps
+        // its fraction: offsetHeight rounds to whole pixels, and after a size
+        // change an image 248.25 tall read 248, which put a flush turned
+        // block past the edge in ISSUES (last-round verification F2).
+        const h = parseFloat(getComputedStyle(el).height);
+        if (id) next.set(id, Number.isFinite(h) ? h : el.offsetHeight);
       }
       setMeasuredHeights((prev) => {
         // Equal maps must not re-render: this feeds the ISSUES list, and
@@ -1055,6 +1071,12 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   const navigate = useNavigate();
   const [duplicatedFromEditor, setDuplicatedFromEditor] = useState<PosterRow | null>(null);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
+
+  // A size change and a template both change the whole poster, so each asks
+  // first (owner decision, docs/fixes/02-poster-size.md). These hold what is
+  // being asked about; null means no dialog.
+  const [pendingSize, setPendingSize] = useState<{ widthIn: number; heightIn: number } | null>(null);
+  const [pendingTemplate, setPendingTemplate] = useState<LayoutKey | null>(null);
   const handleDuplicateFromSidebar = useCallback(async () => {
     if (!posterId) return;
     setDuplicateError(null);
@@ -1727,8 +1749,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // collision since they're pinned to the top anyway.
   //
   // IMPORTANT: block x/y/w/h live in POSTER UNITS (1 unit = 1/10",
-  // set by the PX constant), not raw inches. `pw` / `ph` here come
-  // from POSTER_SIZES which ARE in inches — we have to multiply by
+  // set by the PX constant), not raw inches. `pw` / `ph` here are the
+  // poster's size IN INCHES — we have to multiply by
   // PX (or use `cW` / `cH` which are already pre-multiplied) or the
   // center math divides by 10× too many and every new block ends up
   // clamped to the top-left corner. The 2026-04 regression was
@@ -1853,34 +1875,45 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     });
   };
 
+  // A template REPLACES the blocks with its empty layout (what the Layout ›
+  // Templates copy now says). It used to do so with no warning while the
+  // copy promised the content was kept; now it asks first. Confirming is one
+  // undo step. The store's `setBlocks` keeps the locked credit mark.
+  // One confirmation at a time: a second request while one is open used to
+  // stack a second dialog, or change what the open one would apply.
+  const asking = pendingSize !== null || pendingTemplate !== null;
   const applyTemplate = (key: LayoutKey) => {
-    setBlocks(makeBlocks(key, pw, ph));
-    clearSelection();
+    if (asking) return;
+    setPendingTemplate(key);
+  };
+  const confirmTemplate = () => {
+    if (pendingTemplate) {
+      setBlocks(makeBlocks(pendingTemplate, pw, ph));
+      clearSelection();
+    }
+    setPendingTemplate(null);
   };
 
-  // Changing the poster size rebuilds the block list from a template,
-  // which would otherwise drop a locked block on the floor. This
-  // writes via `updateDoc` (not `setBlocks`), so it bypasses the
-  // store's guard and has to call `preserveLocked` itself.
-  //
-  // `preserveLocked` restores the mark VERBATIM — its old rect included
-  // — and that rect belongs to the OLD canvas. `replaceAckBlock` then
-  // re-places it against the new geometry, so a draft started at one
-  // preset and switched before printing cannot end up with the mark off
-  // the sheet or sitting on top of the user's content.
-  const changeSize = (key: PosterSizeKey) => {
-    const sz = POSTER_SIZES[key]!;
-    const resized = {
-      ...doc,
-      widthIn: sz.w,
-      heightIn: sz.h,
-      blocks: preserveLocked(doc.blocks, makeBlocks('3col', sz.w, sz.h)),
-    };
-    // A size change is a large, structural edit: never merge it with
-    // anything around it.
-    updateDoc(replaceAckBlock(resized));
-    clearSelection();
-    setZoom(null);
+  // Changing the size asks first, then moves every block onto the new sheet
+  // at the same relative position (`moveOntoSheet`), as one undo step. It used
+  // to rebuild the poster from the 3-column template, throwing away every
+  // block the user had written.
+  const requestSize = (widthIn: number, heightIn: number) => {
+    if (asking) return;
+    if (Math.abs(widthIn - doc.widthIn) < 0.05 && Math.abs(heightIn - doc.heightIn) < 0.05) return;
+    setPendingSize({ widthIn, heightIn });
+  };
+  const confirmSize = () => {
+    if (pendingSize) {
+      // The latest doc, not this render's: nothing else should have changed
+      // while the dialog was open, but reading the store costs nothing.
+      const latest = usePosterStore.getState().doc ?? doc;
+      // No coalesce key: a size change is its own step.
+      updateDoc(moveOntoSheet(latest, pendingSize.widthIn, pendingSize.heightIn));
+      clearSelection();
+      setZoom(null);
+    }
+    setPendingSize(null);
   };
 
   const onAutoLayout = () => {
@@ -2102,6 +2135,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     if (previewMode) return;
     const handler = (e: KeyboardEvent) => {
       if (selectedIds.size === 0) return;
+      if (modalDialogOpen()) return;
       // Review mode: disallow destructive/structural keyboard actions
       // (delete, duplicate, nudge) so reviewers can't mutate the poster.
       if (sidebarTab === 'comments') return;
@@ -2381,20 +2415,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         posterSizeKey={sizeKey}
         posterWidthIn={doc.widthIn}
         posterHeightIn={doc.heightIn}
-        onChangePosterSize={changeSize}
-        onChangeCustomSize={(w, h, field) => {
-          // A custom size keeps the existing blocks, but shrinking the sheet
-          // can strand the credit mark past the new edge, so it gets the
-          // same re-placement pass as the preset path — which drops the mark
-          // when the new sheet has no room for it.
-          // Typing "40" is two keystrokes; key them together so it's one
-          // step. Width and height are separate fields, so separate steps.
-          updateDoc(
-            replaceAckBlock({ ...doc, widthIn: w, heightIn: h }),
-            `customSize:${field}`,
-          );
-          setZoom(null);
-        }}
+        onRequestSheetSize={requestSize}
         showGrid={showGrid}
         onToggleGrid={setShowGrid}
         showRuler={showRuler}
@@ -2497,6 +2518,24 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         }}
       />
 
+      <ConfirmModal
+        open={pendingSize !== null}
+        title={pendingSize ? `Change poster to ${formatSheetSize(pendingSize.widthIn, pendingSize.heightIn)}?` : ''}
+        message="Your blocks will move onto the new sheet. You can undo this."
+        confirmLabel="Change size"
+        onConfirm={confirmSize}
+        onCancel={() => setPendingSize(null)}
+      />
+
+      <ConfirmModal
+        open={pendingTemplate !== null}
+        title={pendingTemplate ? `Apply the “${LAYOUT_TEMPLATES[pendingTemplate].name}” template?` : ''}
+        message="This replaces every block on your poster with the template's empty layout. You can undo this. To tidy the blocks you already have, use Auto-Arrange instead."
+        confirmLabel="Replace blocks"
+        onConfirm={confirmTemplate}
+        onCancel={() => setPendingTemplate(null)}
+      />
+
       {/* "Switch to the new copy?" prompt fired by the sidebar
           Duplicate pill. Stay-here keeps the user on the original
           poster; Open-copy navigates to /p/<new-id>. */}
@@ -2506,6 +2545,9 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         message={`Created "${duplicatedFromEditor?.title?.trim() || 'Untitled Poster'}". Open the new copy now?`}
         confirmLabel="Open copy"
         cancelLabel="Stay here"
+        // It opens when the copy is saved, not when the user acts: they may
+        // be typing, and a space would open the copy (final review, F2).
+        initialFocus="cancel"
         onConfirm={() => {
           const target = duplicatedFromEditor;
           setDuplicatedFromEditor(null);

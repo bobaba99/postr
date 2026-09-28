@@ -71,21 +71,68 @@ One branch per cause.
 
 Found while fixing one item, belonging to another (details in the record named):
 
-- **Item 2**, from fix 01:
-  - Typing a height one key at a time ("2", "24") drops the credit mark until
-    the poster is reopened, and the saves in between have no mark. The field
-    accepts any value above 0 despite `min={10}`, and `replaceAckBlock` never
-    re-adds a dropped mark. MEASURED on main, 3/3 in Chromium.
-  - Layout › Templates says content is kept, but applying a template discards
-    it.
-- **Items 3 and 4**, from fix 01's second confirmer and review 2: two
-  independent reports, neither reproduced here yet.
-  - A custom-size poster is drawn on the preset 48×36 canvas: a 48×24 poster
-    rendered 480×360 units.
-  - Templates and Auto-Arrange lay out for 48×36 on a custom sheet, putting
-    10 of 15 blocks past the edge of a 30-inch-wide sheet.
-  - The suspected cause of both is `findSizeKey`'s fallback. Check it first
-    when reproducing the ruler and Fit offsets.
+- **Item 2**, from fix 01. **Both fixed by fix 02:**
+  - Typing a size one key at a time dropped the credit mark. Typed sizes now
+    apply when committed (cause D).
+  - The Templates copy promised the content was kept. It now asks first and
+    says it replaces (cause C).
+- **Item 4**, from fix 02's review of cause A (MEASURED, and confirmed by a
+  skeptic with its own instruments). The rulers assume the sheet starts at
+  the 96 px workspace padding. They ignore the flex centring and the 24 px
+  ruler bar, so the 0" mark is off by (container − frame) / 2 − 96 px on any
+  centred axis:
+  - 2 in horizontally and 9.5 in vertically on a 48 × 36 poster at
+    1440 × 900;
+  - up to 52 in on extreme shapes.
+
+  Code: PosterEditor.tsx, the ruler's `pad = 96` against the flex-centred
+  workarea.
+- **Item 3**, same review: zoom-to-fit leaves 36 px of the limiting side out
+  of view (workarea padding 96 px per side against a fit gutter of 60 px in
+  total). Separately, the Zoom-out button zooms IN when the fit is below its
+  0.3 floor.
+- **Unplanned, from fix 02's reviews** (MEASURED unless marked):
+  - The area-comment label divides inches by 10 again ("Area 2×1 in" for a
+    19.2 × 14.4 in area).
+  - The print popup's on-screen view squeezes posters wider than about
+    84 in (the PDF is fine).
+  - The figure-size check's default rectangle is set for 48 × 36.
+  - The drag guide's centre uses the stored height.
+  - `PosterSizeKey` is just `string` (INSPECTED).
+  - The 3-column template overflows sheets shorter than about 30 in.
+  - Version restore drops the credit mark.
+  - A legacy poster row whose `width_in`/`height_in` are stale is corrected
+    only when the poster is next edited (autosave writes them). One that is
+    opened and left alone keeps a cropped dashboard card. Fixing it needs a
+    write on open, or a migration.
+  - The mutation checker's unloaded-file guard has no committed self-test,
+    and its two conditions overlap (checked by hand in both reviews).
+  - The credit-mark scan tries only rows maxY − 6k and columns M + 6k (plus
+    the last row and column), so it misses a free band 12–17 units tall
+    that holds no scan row. Sweep of 347,760 moves (4 templates minus one
+    block, every whole-inch sheet from 10 to 100): the mark was dropped
+    19,890 times, 7,442 of them with a legal spot; main misses all of these
+    too (fix 02 re-check, BG-5). Candidate positions at block edges found
+    the room.
+  - **Data loss (fix 02, last-round verification L-2, MEASURED in
+    Chromium, on main too):** clicking "Open copy" after Duplicate within
+    about 0.5 s of the last keystroke loses the typing on the original.
+    `useAutosave` drops the pending save when the poster id changes while
+    the editor stays mounted (the unmount flush never runs). Belongs with
+    items 8–11 (saves).
+  - **Test instrument:** the editor measures each block frame's computed
+    height. In jsdom a fixed-height frame reads its stored height, but a
+    frame that grows with its content (text, captioned images) reads "auto"
+    and falls back to offsetHeight, 0. So jsdom tests of ISSUES geometry see
+    growing blocks as 0 tall, and a changed height stays stale because the
+    ResizeObserver stub never fires. Fix 02 models a browser's readings
+    (`measureAs`, `FiringResizeObserver` in posterSize.test.tsx); other
+    suites' ISSUES tests have not been checked for tests that pass for
+    these reasons.
+- **Items 3 and 4**, from fix 01's second confirmer and review 2: a
+  custom-size poster was drawn, laid out and checked as 48 × 36. **Fixed by
+  fix 02, cause A**; it was a separate cause from the ruler and Fit offsets
+  above.
 - **New, unplanned**, from fix 01's second confirmer (UNVERIFIED here). The
   default 3-column template at 48×36 never gets a credit mark, because its
   column bottoms (338.8–342.2) overlap the bottom band the mark needs
@@ -117,3 +164,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | # | Branch | State |
 |---|---|---|
 | 1 | `editor/undo-sidebar-history` | done — `docs/fixes/01-sidebar-undo-history.md` |
+| 2 | `editor/custom-sheet-size` (causes A, E), `editor/size-change-keeps-blocks` (B–D) | done — `docs/fixes/02-poster-size.md` |

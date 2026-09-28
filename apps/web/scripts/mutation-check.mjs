@@ -31,7 +31,8 @@
  *   A mutant with `"expect": "survive"` documents a known blind spot of these
  *   tests (e.g. anything that needs real layout, which jsdom does not do):
  *   it is reported as BLIND SPOT and does not affect the exit code. If it is
- *   killed after all, that is reported too — the spec is out of date.
+ *   killed after all, the spec is out of date: that fails the run (exit 1),
+ *   so a stale blind-spot claim cannot sit in a spec unnoticed.
  *
  * RUN (from apps/web)
  *   node scripts/mutation-check.mjs ../../docs/fixes/01-sidebar-undo-history.mutants.json
@@ -159,6 +160,7 @@ console.log(`control: ${control.total}/${control.total} pass`);
 
 let survived = 0;
 let blind = 0;
+let staleBlind = 0;
 for (const n of names) {
   const r = run(n);
   if (r.error) {
@@ -179,6 +181,7 @@ for (const n of names) {
   let verdict;
   if (expectSurvive) {
     blind += 1;
+    if (killed) staleBlind += 1;
     verdict = killed ? 'KILLED?!' : 'BLIND SPOT';
   } else {
     if (!killed) survived += 1;
@@ -193,6 +196,7 @@ for (const n of names) {
 const gated = names.length - blind;
 console.log(
   `\n${gated - survived}/${gated} mutants killed${survived ? `, ${survived} SURVIVED` : ''}` +
-    (blind ? ` · ${blind} documented blind spot(s), not counted` : ''),
+    (blind ? ` · ${blind} documented blind spot(s), not counted` : '') +
+    (staleBlind ? ` · ${staleBlind} "blind spot(s)" KILLED — remove their "expect": "survive"` : ''),
 );
-process.exit(survived ? 1 : 0);
+process.exit(survived || staleBlind ? 1 : 0);
