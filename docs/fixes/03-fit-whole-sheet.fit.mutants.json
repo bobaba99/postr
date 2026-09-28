@@ -1,0 +1,162 @@
+{
+  "tests": [
+    "src/poster/__tests__/fitWholeSheet.test.tsx",
+    "src/poster/__tests__/sheetSize.test.tsx"
+  ],
+  "mutants": {
+    "padding-back-to-96": {
+      "undoes": "A \u2014 the workarea pads the sheet by the gutter the fit reserved",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "            padding: `${gutterY}px ${gutterX}px`,",
+          "            padding: mobileShare ? 8 : 96,"
+        ]
+      ]
+    },
+    "fit-reserves-one-gutter": {
+      "undoes": "A \u2014 the fit reserves the gutter on BOTH sides",
+      "edits": [
+        [
+          "src/poster/workspaceGeometry.ts",
+          "Math.min((w - 2 * gutterX) / sheetW, (h - 2 * gutterY) / sheetH, FIT_MAX)",
+          "Math.min((w - gutterX) / sheetW, (h - gutterY) / sheetH, FIT_MAX)"
+        ]
+      ]
+    },
+    "gutter-not-64": {
+      "undoes": "A \u2014 the desktop gutter is the owner's 64 px",
+      "edits": [
+        [
+          "src/poster/workspaceGeometry.ts",
+          "export const WORKSPACE_GUTTER = 64;",
+          "export const WORKSPACE_GUTTER = 96;"
+        ]
+      ]
+    },
+    "no-quarter-cap": {
+      "undoes": "A (H6) \u2014 a canvas narrower than two gutters gets a smaller gutter, not a negative fit",
+      "edits": [
+        [
+          "src/poster/workspaceGeometry.ts",
+          "  return Math.min(gutter, Math.floor(canvasPx / 4));",
+          "  return gutter;"
+        ]
+      ]
+    },
+    "lost-size-shows-100": {
+      "undoes": "A (H6) \u2014 a canvas with no size keeps the fit it had, instead of the old 100% fallback",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      if (!next) return;",
+          "      if (!next) {\n        setFit({ zoom: 1, gutterX: gutter, gutterY: gutter });\n        return;\n      }"
+        ]
+      ]
+    },
+    "no-laid-out-guard": {
+      "undoes": "A (H6) \u2014 fitSheet refuses a canvas with no size",
+      "edits": [
+        [
+          "src/poster/workspaceGeometry.ts",
+          "  if (!(w > 0 && h > 0 && sheetW > 0 && sheetH > 0)) return null;\n",
+          ""
+        ]
+      ]
+    },
+    "fit-keeps-scroll": {
+      "undoes": "A (H5) \u2014 Fit returns to the start of the scroll range",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      el.scrollLeft = 0;\n      el.scrollTop = 0;\n",
+          ""
+        ]
+      ]
+    },
+    "fit-button-keeps-scroll": {
+      "undoes": "A (H5) \u2014 the FIT button goes through fitToScreen",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        aria-label=\"Fit poster to screen\"\n        onClick={onFit}",
+          "        aria-label=\"Fit poster to screen\"\n        onClick={() => setZoom(null)}"
+        ]
+      ]
+    },
+    "readout-keeps-scroll": {
+      "undoes": "A (H5) \u2014 the zoom readout goes through fitToScreen",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        aria-label=\"Reset zoom to fit\"\n        onClick={onFit}",
+          "        aria-label=\"Reset zoom to fit\"\n        onClick={() => setZoom(null)}"
+        ]
+      ]
+    },
+    "size-change-keeps-scroll": {
+      "undoes": "A (H5) \u2014 a new poster size refits from the start of the scroll range",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      clearSelection();\n      fitToScreen();",
+          "      clearSelection();\n      setZoom(null);"
+        ]
+      ]
+    },
+    "no-whole-pixel-floor": {
+      "undoes": "A \u2014 the fit uses whole pixels, so a fractional canvas cannot round into overflow",
+      "expect": "survive",
+      "why": "UNVERIFIED as necessary: no configuration tried produces a fractional canvas. jsdom boxes are whole pixels, and in Chromium 0 of 18 states at device pixel ratios 1.25 and 1.5 had one (the mutant applied, fit-check exit 0). Kept as a cheap guard; browser page zoom is the reviewers' to try.",
+      "edits": [
+        [
+          "src/poster/workspaceGeometry.ts",
+          "  const w = Math.floor(box.width);\n  const h = Math.floor(box.height);",
+          "  const w = box.width;\n  const h = box.height;"
+        ]
+      ]
+    },
+    "ruler-origin-96": {
+      "undoes": "A \u2014 the rulers count from the gutter the workarea draws, not a copy of 96",
+      "expect": "survive",
+      "why": "the ruler's tick positions against the sheet need layout; fit-check.mjs gates them (claim Hr: the filled-axis error stays at main's 24 px)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "          const canvasOriginX = gutterX - scrollPos.x;\n          const canvasOriginY = gutterY - scrollPos.y;",
+          "          const canvasOriginX = 96 - scrollPos.x;\n          const canvasOriginY = 96 - scrollPos.y;"
+        ]
+      ]
+    },
+    "fit-keeps-manual-zoom": {
+      "undoes": "A \u2014 FIT, the readout and a new size go back to the fitted zoom",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const fitToScreen = useCallback(() => {\n    setManual(null);\n",
+          "  const fitToScreen = useCallback(() => {\n"
+        ]
+      ]
+    },
+    "phone-gutter-not-8": {
+      "undoes": "A \u2014 the phone share view keeps its own 8 px gutter",
+      "edits": [
+        [
+          "src/poster/workspaceGeometry.ts",
+          "export const PHONE_GUTTER = 8;",
+          "export const PHONE_GUTTER = 16;"
+        ]
+      ]
+    },
+    "phone-gets-desktop-gutter": {
+      "undoes": "A \u2014 only the phone share view uses the phone gutter",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    canvasRef, pw, ph, mobileShare ? PHONE_GUTTER : WORKSPACE_GUTTER,",
+          "    canvasRef, pw, ph, WORKSPACE_GUTTER,"
+        ]
+      ]
+    }
+  }
+}

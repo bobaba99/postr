@@ -181,9 +181,12 @@ function stubWorkspace(width: number, height: number) {
   });
 }
 const zoomNow = () => Number(/scale\(([\d.]+)\)/.exec(q<HTMLElement>('#poster-canvas').style.transform)![1]);
-/** The fit useZoom promises: the tighter ratio, less a 60 px gutter. */
+/**
+ * The fit useZoom promises: the tighter ratio, less the 64 px gutter on each
+ * side (fix 03, docs/fixes/03-fit-whole-sheet.md).
+ */
 const fit = (boxW: number, boxH: number, wIn: number, hIn: number) =>
-  Math.min((boxW - 60) / (wIn * 10), (boxH - 60) / (hIn * 10));
+  Math.min((boxW - 128) / (wIn * 10), (boxH - 128) / (hIn * 10));
 
 describe('A — zoom-to-fit uses the poster\'s own size', () => {
   it('a 30×40 poster fits its own size into the workspace', () => {
