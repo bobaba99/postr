@@ -92,6 +92,93 @@ export type PosterSizeKey = keyof typeof POSTER_SIZES;
 
 export const DEFAULT_POSTER_SIZE_KEY: PosterSizeKey = '48×36';
 
+/**
+ * The widest range of sizes, in inches, the editor will draw as stored.
+ * Deliberately wider than what the size fields accept: a PowerPoint slide
+ * imported at 13.33 × 7.5 in is a real poster. Outside it, or not a number
+ * at all, a stored size is treated as missing.
+ */
+// 3 in: with 1-inch margins on both sides, a narrower sheet leaves no column
+// for Auto-Arrange, which then gave every block a negative width.
+export const DRAWABLE_SHEET_MIN_IN = 3;
+export const DRAWABLE_SHEET_MAX_IN = 1000;
+
+/**
+ * A stored width or height as a usable number of inches, or `fallback`.
+ *
+ * The editor used to take every size through the preset lookup, which fell
+ * back to 48×36 and so hid a size that was missing, a string or 0. Drawn as
+ * stored, such a size made the sheet NaN and Auto-Arrange deleted every body
+ * block (docs/fixes/02-poster-size.md). Numeric strings ("30") are accepted.
+ */
+export function sheetInches(value: unknown, fallback: number): number {
+  const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  return typeof n === 'number' && Number.isFinite(n) && n >= DRAWABLE_SHEET_MIN_IN && n <= DRAWABLE_SHEET_MAX_IN
+    ? n
+    : fallback;
+}
+
+/**
+ * The poster's size as drawable inches: its own, else `fallback` (per side,
+ * itself checked), else the default sheet.
+ */
+export function usableSheetSize(
+  widthIn: unknown,
+  heightIn: unknown,
+  fallback: { widthIn?: unknown; heightIn?: unknown } = {},
+): { widthIn: number; heightIn: number } {
+  const d = POSTER_SIZES[DEFAULT_POSTER_SIZE_KEY]!;
+  return {
+    widthIn: sheetInches(widthIn, sheetInches(fallback.widthIn, d.w)),
+    heightIn: sheetInches(heightIn, sheetInches(fallback.heightIn, d.h)),
+  };
+}
+
+/**
+ * The document with a usable size (see `usableSheetSize`), or the same object
+ * when its size is already usable. Applied where every document enters the
+ * editor's store (`setPoster`), so opening, sharing, importing and restoring
+ * a version all get one real size.
+ */
+export function withUsableSheetSize<T extends { widthIn: unknown; heightIn: unknown }>(
+  doc: T,
+  fallback: { widthIn?: unknown; heightIn?: unknown } = {},
+): T {
+  const size = usableSheetSize(doc.widthIn, doc.heightIn, fallback);
+  if (size.widthIn === doc.widthIn && size.heightIn === doc.heightIn) return doc;
+  return { ...doc, ...size };
+}
+
+/**
+ * The preset a poster of this size is, or 'custom'. The match is exact to
+ * a twentieth of an inch: a 47.8 × 36 poster is drawn and printed at 47.8, so
+ * calling it "48×36" would be wrong, and would also stop the user picking
+ * 48×36 from the menu (it would already be selected).
+ *
+ * Only for NAMING a size: the Poster Size menu and the preview's label. The
+ * sheet itself is always drawn, laid out and checked at the poster's own
+ * `widthIn` × `heightIn`. The editor used to take the sheet from this lookup,
+ * falling back to 48×36, so every custom size was drawn and checked as 48×36
+ * while print, PDF and PPTX used the real size (docs/fixes/02-poster-size.md).
+ */
+export function presetKeyFor(widthIn: number, heightIn: number): PosterSizeKey | 'custom' {
+  for (const [key, value] of Object.entries(POSTER_SIZES)) {
+    if (Math.abs(value.w - widthIn) < 0.05 && Math.abs(value.h - heightIn) < 0.05) {
+      return key as PosterSizeKey;
+    }
+  }
+  return 'custom';
+}
+
+/** "36\"×48\" Portrait" for a preset, "30\"×40\" Custom" otherwise. */
+export function posterSizeLabel(widthIn: unknown, heightIn: unknown): string {
+  const size = usableSheetSize(widthIn, heightIn);
+  const key = presetKeyFor(size.widthIn, size.heightIn);
+  if (key !== 'custom') return POSTER_SIZES[key]!.label;
+  const inches = (n: number) => String(Math.round(n * 10) / 10);
+  return `${inches(size.widthIn)}"×${inches(size.heightIn)}" Custom`;
+}
+
 // =========================================================================
 // Fonts (10 curated families, all loaded via Google Fonts)
 // =========================================================================

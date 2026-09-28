@@ -15,7 +15,7 @@ import { usePosterStore } from '@/stores/posterStore';
 import { PosterEditor } from '@/poster/PosterEditor';
 import { SecureWorkModal } from '@/poster/SecureWorkModal';
 import { makeBlocks } from '@/poster/templates';
-import { DEFAULT_STYLES, PALETTES } from '@/poster/constants';
+import { DEFAULT_STYLES, PALETTES, withUsableSheetSize } from '@/poster/constants';
 import { useTwoTabGuard } from '@/hooks/useTwoTabGuard';
 import { useLeaveGuard } from '@/hooks/useLeaveGuard';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
@@ -82,6 +82,19 @@ function normalizeStaleStyles(doc: PosterDoc): PosterDoc {
   }
   if (!mutated) return doc;
   return { ...doc, styles: next };
+}
+
+/**
+ * Repair a stored size that is not a usable number of inches (missing, a
+ * string, 0, absurd) BEFORE an empty poster is laid out from it. The row's
+ * own width_in/height_in are the better fallback when they are usable;
+ * otherwise the default sheet. The store repairs every document again on
+ * entry (setPoster), without the row, so this is where the row counts.
+ * The editor used to hide such a size by drawing every sheet through a preset
+ * lookup; drawn as stored it is NaN (docs/fixes/02-poster-size.md).
+ */
+function normalizeSheetSize(doc: PosterDoc, row: { width_in: unknown; height_in: unknown }): PosterDoc {
+  return withUsableSheetSize(doc, { widthIn: row.width_in, heightIn: row.height_in });
 }
 
 /**
@@ -172,7 +185,7 @@ export default function Editor() {
         // the typography calibration fix (title:60, heading:28, etc.)
         // self-heal on load without needing a db reset.
         const raw = row.data as PosterDoc;
-        const hydrated = hydrateIfEmpty(normalizeStaleStyles(raw));
+        const hydrated = hydrateIfEmpty(normalizeSheetSize(normalizeStaleStyles(raw), row));
         // Seeding is opt-in and belongs to the EDITING entry point only.
         // Inside the editor the acknowledgement is fixed: seeded on load
         // and refused by every delete path. Exports are the opposite —

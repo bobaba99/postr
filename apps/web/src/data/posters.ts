@@ -15,6 +15,7 @@
 import { supabase } from '@/lib/supabase';
 import { isStaleJwtError } from '@/lib/auth';
 import type { Database, Json, PosterDoc } from '@postr/shared';
+import { usableSheetSize } from '@/poster/constants';
 
 type PosterUpdateRow = Database['public']['Tables']['posters']['Update'];
 
@@ -326,13 +327,21 @@ export async function duplicatePoster(id: string): Promise<PosterRow> {
     );
   }
 
+  // The poster's own size: the source row's columns can be stale (they were
+  // not written after a size change until fix 02, cause E). They are the
+  // fallback, and are checked themselves, before the default.
+  const sourceDoc = source.data as PosterDoc | null;
+  const size = usableSheetSize(sourceDoc?.widthIn, sourceDoc?.heightIn, {
+    widthIn: source.width_in,
+    heightIn: source.height_in,
+  });
   const { data, error } = await supabase
     .from('posters')
     .insert({
       user_id: user.id,
       title: `${source.title} (copy)`,
-      width_in: source.width_in,
-      height_in: source.height_in,
+      width_in: size.widthIn,
+      height_in: size.heightIn,
       data: source.data as unknown as Json,
     })
     .select('*')

@@ -417,6 +417,47 @@ describe('duplicatePoster', () => {
     expect(storageCopyMock).not.toHaveBeenCalled();
   });
 
+  it('takes the copy\'s size from the poster itself, not from stale row columns', async () => {
+    // The row's width_in/height_in were never updated after a size change
+    // (fix 02, cause E); the poster's own data is the truth.
+    const source = makeRow({
+      id: 'src',
+      width_in: 48,
+      height_in: 36,
+      data: makeDoc({ widthIn: 30, heightIn: 40 }),
+    });
+    setResponses({ data: source, error: null }, { data: makeRow({ id: 'dst' }), error: null });
+    await duplicatePoster('src');
+    const payload = traces[1]!.ops.find((o) => o.method === 'insert')!.args[0] as Record<string, unknown>;
+    expect([payload.width_in, payload.height_in]).toEqual([30, 40]);
+  });
+
+  it('a copy of a poster whose data lost its size takes the row\'s usable size', async () => {
+    const source = makeRow({
+      id: 'src',
+      width_in: 30,
+      height_in: 40,
+      data: makeDoc({ widthIn: undefined as unknown as number, heightIn: 'abc' as unknown as number }),
+    });
+    setResponses({ data: source, error: null }, { data: makeRow({ id: 'dst' }), error: null });
+    await duplicatePoster('src');
+    const payload = traces[1]!.ops.find((o) => o.method === 'insert')!.args[0] as Record<string, unknown>;
+    expect([payload.width_in, payload.height_in]).toEqual([30, 40]);
+  });
+
+  it('a copy of a poster with no usable size anywhere gets the default size', async () => {
+    const source = makeRow({
+      id: 'src',
+      width_in: 0 as unknown as number,
+      height_in: 0 as unknown as number,
+      data: makeDoc({ widthIn: 'abc' as unknown as number, heightIn: undefined as unknown as number }),
+    });
+    setResponses({ data: source, error: null }, { data: makeRow({ id: 'dst' }), error: null });
+    await duplicatePoster('src');
+    const payload = traces[1]!.ops.find((o) => o.method === 'insert')!.args[0] as Record<string, unknown>;
+    expect([payload.width_in, payload.height_in]).toEqual([48, 36]);
+  });
+
   it('copies the source thumbnail into the current user\'s folder when present', async () => {
     const source = makeRow({
       id: 'src',

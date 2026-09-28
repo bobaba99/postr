@@ -22,6 +22,7 @@ import { upsertPoster } from '@/data/posters';
 import { captureThumbnail } from '@/data/thumbnails';
 import { supabase } from '@/lib/supabase';
 import { reportUiSignal } from '@/lib/diagnostics';
+import { sheetInches } from '@/poster/constants';
 import type { PosterDoc } from '@postr/shared';
 
 export type AutosaveStatus = 'idle' | 'saving' | 'saved' | 'error';
@@ -215,9 +216,16 @@ export function useAutosave(
       if (titleText && !pendingTitleRef.current?.trim()) {
         pendingTitleRef.current = titleText;
       }
+      // The row's width_in/height_in give the dashboard card its shape. They
+      // were only ever written when a poster was created or imported, so a
+      // resized poster's thumbnail was cropped by a card of the old shape
+      // (docs/fixes/02-poster-size.md, cause E). Every save now carries them.
+      const widthIn = sheetInches(data.widthIn, NaN);
+      const heightIn = sheetInches(data.heightIn, NaN);
       await upsertPoster(id, {
         data,
         ...(titleText ? { title: titleText } : {}),
+        ...(Number.isFinite(widthIn) && Number.isFinite(heightIn) ? { widthIn, heightIn } : {}),
       });
       saveFailStreakRef.current = 0;
       setState({ status: 'saved', lastSavedAt: new Date(), error: null });

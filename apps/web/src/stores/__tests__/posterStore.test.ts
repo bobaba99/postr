@@ -75,6 +75,30 @@ describe('posterStore', () => {
     });
   });
 
+  describe('setPoster repairs an unusable sheet size (fix 02)', () => {
+    // Every document enters through setPoster — opening, sharing, importing,
+    // restoring a version. The repair used to run only on the Editor page's
+    // load, so a restored snapshot with no size drew at 48 × 36 while print got
+    // "undefinedin" and a blank Letter page (cause-A re-check, RA3).
+    it.each([
+      ['missing', undefined, undefined, 48, 36],
+      ['zero', 0, 0, 48, 36],
+      ['numeric strings', '30', '40', 30, 40],
+      ['absurd', 5000, 40, 48, 40],
+    ])('size %s', (_label, w, h, ew, eh) => {
+      const bad = { ...makeDoc(), widthIn: w, heightIn: h } as unknown as PosterDoc;
+      usePosterStore.getState().setPoster('p1', bad);
+      const d = usePosterStore.getState().doc!;
+      expect([d.widthIn, d.heightIn]).toEqual([ew, eh]);
+    });
+
+    it('a usable size is kept exactly', () => {
+      usePosterStore.getState().setPoster('p1', { ...makeDoc(), widthIn: 13.33, heightIn: 7.5 } as PosterDoc);
+      const d = usePosterStore.getState().doc!;
+      expect([d.widthIn, d.heightIn]).toEqual([13.33, 7.5]);
+    });
+  });
+
   describe('addBlock', () => {
     it('appends a block immutably', () => {
       const doc = makeDoc();

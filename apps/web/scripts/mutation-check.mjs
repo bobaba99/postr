@@ -28,11 +28,17 @@
  *   4th element says (default 1), or the run stops: a pattern that silently
  *   matches nothing would report a mutant as "survived" for the wrong reason.
  *
+ *   A mutant with `"expect": "survive"` documents a known blind spot of these
+ *   tests (e.g. anything that needs real layout, which jsdom does not do):
+ *   it is reported as BLIND SPOT and does not affect the exit code. If it is
+ *   killed after all, that is reported too — the spec is out of date.
+ *
  * RUN (from apps/web)
  *   node scripts/mutation-check.mjs ../../docs/fixes/01-sidebar-undo-history.mutants.json
  *   node scripts/mutation-check.mjs <spec> --only no-undo-burst-reset,no-noop-skip
  *
- * EXIT  0 every mutant killed · 1 at least one survived · 2 control failed or bad spec
+ * EXIT  0 every mutant killed (blind spots aside) · 1 at least one survived ·
+ *       2 control failed or bad spec
  *
  * Side effect: loading the Vite config rewrites apps/web/public/version.json.
  */
@@ -134,7 +140,10 @@ function run(name) {
   for (const f of res.testResults) {
     for (const t of f.assertionResults) if (t.status !== 'passed') failed.push(t.fullName);
   }
-  return { total: res.numTotalTests, failed };
+  // A test file that fails to load (the mutant does not compile) reports no
+  // tests at all; that must never read as "no test noticed".
+  const unloaded = res.testResults.filter((f) => f.status === 'failed' && f.assertionResults.length === 0);
+  return { total: res.numTotalTests, failed, unloaded: unloaded.map((f) => f.name) };
 }
 
 const control = run('(control)');
@@ -149,19 +158,41 @@ if (control.error || control.failed.length > 0 || control.total === 0) {
 console.log(`control: ${control.total}/${control.total} pass`);
 
 let survived = 0;
+let blind = 0;
 for (const n of names) {
   const r = run(n);
   if (r.error) {
     console.log(`ERROR     ${n}\n${r.error}`);
     process.exit(2);
   }
+  // Every mutant must run the same tests as the control; fewer means a test
+  // file failed to load, and "0 failed" would then mean nothing.
+  if (r.unloaded.length > 0 || r.total !== control.total) {
+    console.log(
+      `ERROR     ${n}: ran ${r.total} of the control's ${control.total} tests` +
+        (r.unloaded.length ? `; did not load: ${r.unloaded.map((f) => path.relative(WEB, f)).join(', ')}` : ''),
+    );
+    process.exit(2);
+  }
   const killed = r.failed.length > 0;
-  if (!killed) survived += 1;
+  const expectSurvive = spec.mutants[n].expect === 'survive';
+  let verdict;
+  if (expectSurvive) {
+    blind += 1;
+    verdict = killed ? 'KILLED?!' : 'BLIND SPOT';
+  } else {
+    if (!killed) survived += 1;
+    verdict = killed ? 'killed' : 'SURVIVED';
+  }
   console.log(
-    `${killed ? 'killed  ' : 'SURVIVED'}  ${n.padEnd(28)} ${String(r.failed.length).padStart(2)}/${r.total} fail  — undoes: ${spec.mutants[n].undoes}`,
+    `${verdict.padEnd(10)}  ${n.padEnd(28)} ${String(r.failed.length).padStart(2)}/${r.total} fail  — undoes: ${spec.mutants[n].undoes}`,
   );
   for (const t of r.failed.slice(0, 4)) console.log(`            · ${t}`);
   if (r.failed.length > 4) console.log(`            · … ${r.failed.length - 4} more`);
 }
-console.log(`\n${names.length - survived}/${names.length} mutants killed${survived ? `, ${survived} SURVIVED` : ''}`);
+const gated = names.length - blind;
+console.log(
+  `\n${gated - survived}/${gated} mutants killed${survived ? `, ${survived} SURVIVED` : ''}` +
+    (blind ? ` · ${blind} documented blind spot(s), not counted` : ''),
+);
 process.exit(survived ? 1 : 0);

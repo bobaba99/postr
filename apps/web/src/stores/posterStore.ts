@@ -8,6 +8,7 @@
 import { create } from 'zustand';
 import { filterDeletable, preserveLocked } from '@/export/blockLock';
 import { ACK_BLOCK_ID, ensureAckBlock, replaceAckBlock } from '@/export/ackBlock';
+import { withUsableSheetSize } from '@/poster/constants';
 import type {
   Block,
   Palette,
@@ -25,6 +26,12 @@ export interface SetPosterOptions {
    * page, version previews) must render the poster as stored.
    */
   seedAcknowledgement?: boolean;
+  /**
+   * The size to use for a side the document has no usable size for, before
+   * the 48 × 36 default: the poster row's own columns on the share page,
+   * the poster's current size when a version is restored.
+   */
+  sizeFallback?: { widthIn?: unknown; heightIn?: unknown };
 }
 
 export interface PosterStoreState {
@@ -304,7 +311,12 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
     //
     // This runs BEFORE the baseline snapshot, so a freshly seeded mark
     // is part of the baseline the lock enforces against.
-    const seeded = options.seedAcknowledgement ? ensureAckBlock(doc) : doc;
+    // Every document enters here, so this is where an unusable stored size
+    // (missing, 0, a string, absurd) is repaired: opening, sharing,
+    // importing and restoring a version then all draw and print one real
+    // size (docs/fixes/02-poster-size.md).
+    const sized = withUsableSheetSize(doc, options.sizeFallback);
+    const seeded = options.seedAcknowledgement ? ensureAckBlock(sized) : sized;
     lockedBaseline = seeded.blocks.filter((b) => b.locked === true);
     set({
       posterId,
