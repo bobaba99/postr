@@ -1,0 +1,371 @@
+{
+  "tests": [
+    "src/poster/__tests__/sidebarHistory.test.tsx",
+    "src/export/__tests__/blockLock.test.ts",
+    "src/stores/__tests__/posterStore.test.ts",
+    "src/hooks/__tests__/useLeaveGuard.test.ts"
+  ],
+  "mutants": {
+    "revert-to-setPoster": {
+      "undoes": "the fix itself — sidebar edits go through setPoster (the load action) again",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "storePatchDoc(patch, coalesceKey ? `doc:${coalesceKey}` : null);",
+          "void coalesceKey; setPoster(posterId!, { ...(usePosterStore.getState().doc ?? doc), ...patch });"
+        ]
+      ]
+    },
+    "name-blanked": {
+      "undoes": "H2 — the edit keeps the display name",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      if (next.doc) lockedBaseline = next.doc.blocks.filter((b) => b.locked === true);\n      // posterId",
+          "      if (next.doc) lockedBaseline = next.doc.blocks.filter((b) => b.locked === true);\n      (next as { posterTitle?: string }).posterTitle = '';\n      // posterId"
+        ]
+      ]
+    },
+    "history-reset": {
+      "undoes": "H1 — the edit keeps the undo history",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      if (next.doc) lockedBaseline = next.doc.blocks.filter((b) => b.locked === true);\n      // posterId",
+          "      if (next.doc) lockedBaseline = next.doc.blocks.filter((b) => b.locked === true);\n      undoStack = []; redoStack = []; next.canUndo = false;\n      // posterId"
+        ]
+      ]
+    },
+    "no-undo-push": {
+      "undoes": "the edit is an undo step at all",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "const next = withUndo(state, (doc) => ({ ...doc, ...patch }), keyForThisRun(coalesceKey));",
+          "const next = { doc: { ...state.doc, ...patch } } as Partial<PosterStoreState>;"
+        ]
+      ]
+    },
+    "patch-order-reversed": {
+      "undoes": "the patch wins over the current doc",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "(doc) => ({ ...doc, ...patch })",
+          "(doc) => ({ ...patch, ...doc })"
+        ]
+      ]
+    },
+    "no-run-grouping": {
+      "undoes": "one user action (bulk author paste) is one step",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "  if (runKey !== null) return runKey;\n",
+          ""
+        ]
+      ]
+    },
+    "run-key-never-cleared": {
+      "undoes": "separate user actions are separate steps",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "    runKey = null;\n  });",
+          "  });"
+        ]
+      ]
+    },
+    "field-name-default-key": {
+      "undoes": "F3 — a click is its own step (the first version keyed every edit by field)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "coalesceKey ? `doc:${coalesceKey}` : null",
+          "coalesceKey ? `doc:${coalesceKey}` : `doc:${Object.keys(patch).sort().join(',')}`"
+        ]
+      ]
+    },
+    "no-noop-skip": {
+      "undoes": "F4 — a click that changes nothing adds no step",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      if (changesNothing(state.doc, patch)) return {};\n",
+          ""
+        ]
+      ]
+    },
+    "no-undo-burst-reset": {
+      "undoes": "F2 — undo/redo end the edit in progress",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      lastPush = null;\n      return {\n",
+          "      return {\n",
+          2
+        ]
+      ]
+    },
+    "no-mark-replace-on-undo": {
+      "undoes": "F1 — a mark brought back from another sheet is re-placed for this one",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "return has(restored.blocks) && !has(target.blocks) ? replaceAckBlock(restored) : restored;",
+          "return restored;"
+        ]
+      ]
+    },
+    "mark-replaced-on-every-undo": {
+      "undoes": "F1 narrowing — a mark the restored doc already has is left where the user put it",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "return has(restored.blocks) && !has(target.blocks) ? replaceAckBlock(restored) : restored;",
+          "return replaceAckBlock(restored);"
+        ]
+      ]
+    },
+    "no-baseline-refresh": {
+      "undoes": "the locked baseline follows the edited doc (a dropped mark stays dropped)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      if (next.doc) lockedBaseline = next.doc.blocks.filter((b) => b.locked === true);\n      // posterId",
+          "      // posterId"
+        ]
+      ]
+    },
+    "no-custom-size-key": {
+      "undoes": "typing a custom width/height is one step",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "            `customSize:${field}`,\n",
+          ""
+        ]
+      ]
+    },
+    "no-author-name-key": {
+      "undoes": "typing an author name is one step",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          ", `author:${a.id}:name`)",
+          ")"
+        ]
+      ]
+    },
+    "no-institution-keys": {
+      "undoes": "typing an institution name/department/city is one step",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          ", `institution:${inst.id}:name`)",
+          ")"
+        ],
+        [
+          "src/poster/Sidebar.tsx",
+          ", `institution:${inst.id}:dept`)",
+          ")"
+        ],
+        [
+          "src/poster/Sidebar.tsx",
+          ", `institution:${inst.id}:location`)",
+          ")"
+        ]
+      ]
+    },
+    "no-institution-dept-key": {
+      "undoes": "typing an institution department is one step",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          ", `institution:${inst.id}:dept`)",
+          ")"
+        ]
+      ]
+    },
+    "no-style-tab-keys": {
+      "undoes": "typing a Style-tab size or line height is one step",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "typed ? `style:${k}:${field}` : undefined",
+          "undefined"
+        ]
+      ]
+    },
+    "no-edit-tab-keys": {
+      "undoes": "Edit-tab size, line spacing and colour bursts are one step",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "continuous ? `style:${typeKey}:${field}` : undefined",
+          "undefined"
+        ]
+      ]
+    },
+    "edit-tab-colour-unkeyed": {
+      "undoes": "dragging the Edit-tab colour picker is one step",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "onChange={(e) => onUpdateStyle('color', e.target.value, true)}",
+          "onChange={(e) => onUpdateStyle('color', e.target.value)}"
+        ]
+      ]
+    },
+    "custom-size-one-key": {
+      "undoes": "width and height are separate steps",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "`customSize:${field}`,",
+          "'customSize',"
+        ]
+      ]
+    },
+    "noop-key-order-sensitive": {
+      "undoes": "F4 — the no-op check ignores key order (jsonb reorders)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "(k) => sameValue(patch[k], doc[k])",
+          "(k) => Object.is(patch[k], doc[k]) || JSON.stringify(patch[k]) === JSON.stringify(doc[k])"
+        ]
+      ]
+    },
+    "noop-by-identity-only": {
+      "undoes": "F4 — the no-op check compares by value",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "(k) => sameValue(patch[k], doc[k])",
+          "(k) => Object.is(patch[k], doc[k])"
+        ]
+      ]
+    },
+    "undo-unguarded": {
+      "undoes": "undo re-applies the locked-block guard",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "doc: restoreFromHistory(state.doc, prev),",
+          "doc: prev,"
+        ]
+      ]
+    },
+    "redo-unguarded": {
+      "undoes": "redo re-applies the locked-block guard",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "doc: restoreFromHistory(state.doc, next),",
+          "doc: next,"
+        ]
+      ]
+    },
+    "redo-drops-reinstated-mark": {
+      "undoes": "a mark the guard brings back is re-placed, not discarded",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "return has(restored.blocks) && !has(target.blocks) ? replaceAckBlock(restored) : restored;",
+          "return has(restored.blocks) && !has(target.blocks) ? { ...restored, blocks: target.blocks } : restored;"
+        ]
+      ]
+    },
+    "palette-click-keyed": {
+      "undoes": "a palette click is its own step",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "onChangePalette={(palette) => updateDoc({ palette })}",
+          "onChangePalette={(palette) => updateDoc({ palette }, 'palette')}"
+        ]
+      ]
+    },
+    "institution-add-remove-keyed": {
+      "undoes": "adding or removing an institution is its own step",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "onChangeInstitutions={(institutions, key) => updateDoc({ institutions }, key)}",
+          "onChangeInstitutions={(institutions, key) => updateDoc({ institutions }, key ?? 'institutions')}"
+        ]
+      ]
+    },
+    "author-add-keyed": {
+      "undoes": "adding an author is its own step",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "onChangeAuthors={(authors, key) => updateDoc({ authors }, key)}",
+          "onChangeAuthors={(authors, key) => updateDoc({ authors }, key ?? 'authors')}"
+        ]
+      ]
+    },
+    "edit-tab-weight-keyed": {
+      "undoes": "the Edit-tab weight menu is a click, its own step",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "onChange={(e) => onUpdateStyle('weight', +e.target.value)}",
+          "onChange={(e) => onUpdateStyle('weight', +e.target.value, true)}"
+        ]
+      ]
+    },
+    "edit-tab-italic-keyed": {
+      "undoes": "the Edit-tab italic toggle is a click, its own step",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "onClick={() => onUpdateStyle('italic', !styleLevel.italic)}",
+          "onClick={() => onUpdateStyle('italic', !styleLevel.italic, true)}"
+        ]
+      ]
+    },
+    "edit-tab-reset-colour-keyed": {
+      "undoes": "'Reset to palette' is its own step, not part of the colour drag",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "onClick={() => onUpdateStyle('color', null)}",
+          "onClick={() => onUpdateStyle('color', null, true)}"
+        ]
+      ]
+    },
+    "samevalue-arrays-ignore-order": {
+      "undoes": "the no-op check compares arrays in order (an author reorder is a change)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      Array.isArray(a) &&\n      Array.isArray(b) &&\n      a.length === b.length &&\n      a.every((v, i) => sameValue(v, b[i]))",
+          "      Array.isArray(a) &&\n      Array.isArray(b) &&\n      a.length === b.length &&\n      a.every((v) => b.some((w) => sameValue(v, w)))"
+        ]
+      ]
+    },
+    "samevalue-arrays-length-only": {
+      "undoes": "the no-op check compares array elements at all",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      Array.isArray(a) &&\n      Array.isArray(b) &&\n      a.length === b.length &&\n      a.every((v, i) => sameValue(v, b[i]))",
+          "      Array.isArray(a) &&\n      Array.isArray(b) &&\n      a.length === b.length"
+        ]
+      ]
+    },
+    "samevalue-shallow": {
+      "undoes": "the no-op check is deep (Reset to palette on an unset colour adds no step)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "ka.every((k) => sameValue(ra[k], rb[k]))",
+          "ka.every((k) => Object.is(ra[k], rb[k]))"
+        ]
+      ]
+    }
+  }
+}

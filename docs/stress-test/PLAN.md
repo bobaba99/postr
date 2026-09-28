@@ -6,10 +6,26 @@ in Chromium with the backend faked at the network layer; real matplotlib
 3.10.8; Rscript 4.6.0 + ggplot2 4.0.3). Harnesses are committed with the fix
 they prove.
 
-**Per-fix process (owner's rule):** reproduce from the user's entry point ->
-root cause (check shared causes) -> fix -> falsify (revert, test goes red) ->
-review #1 -> address -> review #2 on the updated fix -> address -> commit ->
-merge. One branch per cause.
+**Per-fix process (owner's rule, revised 2026-09-27):**
+
+1. Symptom, reproduced from the user's entry point.
+2. Hypotheses stated explicitly, including alternatives to rule out, each with
+   the prediction that would confirm or refute it.
+3. A reusable, committed script that tests each hypothesis (a vitest file when
+   jsdom can observe it, a browser harness in `apps/web/scripts/` when it
+   needs layout). Results recorded as numbers.
+4. **Two independent reviews confirm the issue exists** before any fix — each
+   reviewer uses its own method and scripts, not the author's.
+5. Fix. Re-run the hypothesis scripts; falsify (revert the fix, confirm red).
+   For a fix with several parts, falsify each part:
+   `apps/web/scripts/mutation-check.mjs` with a mutant spec next to the record
+   (`docs/fixes/NN-slug.mutants.json`). Every mutant must be killed.
+6. Independent review of the fix.
+7. An engineering record per fix in `docs/fixes/NN-slug.md`: symptom,
+   hypotheses, method, results before, root cause, fix, results after,
+   review outcomes, what it does not cover.
+
+One branch per cause.
 
 ## Owner decisions
 
@@ -51,6 +67,45 @@ merge. One branch per cause.
 | 17 | "Copied" on failure, empty Scan image, stale language label | annoyance | S | W4 siblings |
 | 18 | Run every corrected script in real R and Python | prevents repeats | M | new |
 
+## Handed on by finished fixes
+
+Found while fixing one item, belonging to another (details in the record named):
+
+- **Item 2**, from fix 01:
+  - Typing a height one key at a time ("2", "24") drops the credit mark until
+    the poster is reopened, and the saves in between have no mark. The field
+    accepts any value above 0 despite `min={10}`, and `replaceAckBlock` never
+    re-adds a dropped mark. MEASURED on main, 3/3 in Chromium.
+  - Layout › Templates says content is kept, but applying a template discards
+    it.
+- **Items 3 and 4**, from fix 01's second confirmer and review 2: two
+  independent reports, neither reproduced here yet.
+  - A custom-size poster is drawn on the preset 48×36 canvas: a 48×24 poster
+    rendered 480×360 units.
+  - Templates and Auto-Arrange lay out for 48×36 on a custom sheet, putting
+    10 of 15 blocks past the edge of a 30-inch-wide sheet.
+  - The suspected cause of both is `findSizeKey`'s fallback. Check it first
+    when reproducing the ruler and Fit offsets.
+- **New, unplanned**, from fix 01's second confirmer (UNVERIFIED here). The
+  default 3-column template at 48×36 never gets a credit mark, because its
+  column bottoms (338.8–342.2) overlap the bottom band the mark needs
+  (338–350).
+- **Item 12**, from fix 01:
+  - ⌘Z with focus in a sidebar input runs the browser's native undo, which
+    reverted canvas typing; a second ⌘Z brought it back. MEASURED in Chromium.
+  - The caption-spacing slider goes through `updateBlock` unkeyed: 60 events
+    make 50 history entries. MEASURED on main.
+  - Version restore resets history, and drops the credit mark (review 2,
+    MEASURED; this contradicts the comment at `Editor.tsx:182-185`).
+  - Edit-tab caption and note text, and caption spacing, go through
+    `updateBlock` unkeyed. 10 events make 10 steps, and a 60-character
+    caption pushes older work out of the history (review 2, MEASURED).
+  - Auto-Arrange with font scaling takes 3 undo steps (review 2, MEASURED).
+- **Unplanned, possible data loss** (review 2, INSPECTED only).
+  `migrateBase64ToStorage` calls `setBlocksSilent` with the load-time blocks,
+  which would overwrite edits made while images upload. Reproduce before
+  planning.
+
 ## Checked and retired
 
 - F8 "text clipped in print": 0 of 14 blocks clipped. Only content past the sheet
@@ -61,4 +116,4 @@ merge. One branch per cause.
 
 | # | Branch | State |
 |---|---|---|
-| 1 | | in progress |
+| 1 | `editor/undo-sidebar-history` | done — `docs/fixes/01-sidebar-undo-history.md` |

@@ -1313,6 +1313,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // Bound here so the typing path can reach the store action that
   // coalesces. See `updateBlock` below for why that matters.
   const storeUpdateBlock = usePosterStore.getState().updateBlock;
+  const storePatchDoc = usePosterStore.getState().patchDoc;
 
   // Ref to latest blocks for use in pointer event closures (rubber-band).
   const outerBlocksRef = useRef(doc.blocks);
@@ -1629,20 +1630,24 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   ]);
 
   // -----------------------------------------------------------------------
-  // Mutators (all push back through setPoster for store immutability)
+  // Mutators
   // -----------------------------------------------------------------------
 
-  const updateDoc = (patch: Partial<PosterDoc>) => {
-    // Read the LATEST doc from the store rather than the closed-
-    // over `doc` from the current render. When a single event
-    // handler calls updateDoc twice (e.g. AuthorManager's bulk
-    // paste creates institutions, then sets authors with linked
-    // affiliationIds), the second call previously spread the
-    // stale render-time doc and overwrote the first patch — so
-    // institutions silently disappeared. Reading from getState()
-    // makes sequential patches stack correctly.
-    const latest = usePosterStore.getState().doc ?? doc;
-    setPoster(posterId, { ...latest, ...patch });
+  const updateDoc = (patch: Partial<PosterDoc>, coalesceKey?: string) => {
+    // An EDIT, so it goes through patchDoc: one undo step, display name
+    // untouched. It used to call setPoster — the action that LOADS a
+    // poster — which wiped the undo history and blanked the poster's
+    // name on every sidebar change (docs/fixes/01-sidebar-undo-history.md).
+    //
+    // patchDoc applies the patch to the store's LATEST doc, so two calls
+    // from one handler (AuthorManager's bulk paste adds institutions, then
+    // authors) still stack instead of the second overwriting the first,
+    // and they land in one undo step.
+    //
+    // A click is always its own step. Only an input that fires on every
+    // keystroke, drag or colour pick passes `coalesceKey`, so its events
+    // merge into one step — the same rule as typing on the canvas.
+    storePatchDoc(patch, coalesceKey ? `doc:${coalesceKey}` : null);
   };
 
   // Routed to the STORE's updateBlock, not to setBlocks.
@@ -1872,6 +1877,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       heightIn: sz.h,
       blocks: preserveLocked(doc.blocks, makeBlocks('3col', sz.w, sz.h)),
     };
+    // A size change is a large, structural edit: never merge it with
+    // anything around it.
     updateDoc(replaceAckBlock(resized));
     clearSelection();
     setZoom(null);
@@ -2376,11 +2383,17 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         posterWidthIn={doc.widthIn}
         posterHeightIn={doc.heightIn}
         onChangePosterSize={changeSize}
-        onChangeCustomSize={(w, h) => {
-          // A custom size keeps the existing blocks, so the mark is not
-          // dropped — but shrinking the sheet can still strand it past
-          // the new edge. Same re-placement pass as the preset path.
-          updateDoc(replaceAckBlock({ ...doc, widthIn: w, heightIn: h }));
+        onChangeCustomSize={(w, h, field) => {
+          // A custom size keeps the existing blocks, but shrinking the sheet
+          // can strand the credit mark past the new edge, so it gets the
+          // same re-placement pass as the preset path — which drops the mark
+          // when the new sheet has no room for it.
+          // Typing "40" is two keystrokes; key them together so it's one
+          // step. Width and height are separate fields, so separate steps.
+          updateDoc(
+            replaceAckBlock({ ...doc, widthIn: w, heightIn: h }),
+            `customSize:${field}`,
+          );
           setZoom(null);
         }}
         showGrid={showGrid}
@@ -2393,13 +2406,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         paletteName={palName}
         onChangePalette={(palette) => updateDoc({ palette })}
         styles={doc.styles}
-        onChangeStyles={(styles) => updateDoc({ styles })}
+        onChangeStyles={(styles, key) => updateDoc({ styles }, key)}
         headingStyle={doc.headingStyle}
         onChangeHeadingStyle={(headingStyle) => updateDoc({ headingStyle })}
         authors={doc.authors}
-        onChangeAuthors={(authors) => updateDoc({ authors })}
+        onChangeAuthors={(authors, key) => updateDoc({ authors }, key)}
         institutions={doc.institutions}
-        onChangeInstitutions={(institutions) => updateDoc({ institutions })}
+        onChangeInstitutions={(institutions, key) => updateDoc({ institutions }, key)}
         references={doc.references}
         onChangeReferences={(refs: Reference[]) => updateDoc({ references: refs })}
         citationStyle={citationStyle}

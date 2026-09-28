@@ -7,7 +7,7 @@
  */
 import { create } from 'zustand';
 import { filterDeletable, preserveLocked } from '@/export/blockLock';
-import { ensureAckBlock } from '@/export/ackBlock';
+import { ACK_BLOCK_ID, ensureAckBlock, replaceAckBlock } from '@/export/ackBlock';
 import type {
   Block,
   Palette,
@@ -43,6 +43,19 @@ export interface PosterStoreState {
     options?: SetPosterOptions,
   ) => void;
   setPosterTitle: (title: string) => void;
+  /**
+   * Change document-level fields (palette, font, size, authors,
+   * references...) as ONE undoable edit. This is the editing counterpart
+   * of `setPoster`, which LOADS a poster and therefore resets history
+   * and the display name. See docs/fixes/01-sidebar-undo-history.md.
+   *
+   * `coalesceKey`: a string merges a burst of edits to the same thing
+   * (typing an author's name) into one undo step; `null` makes this edit
+   * its own step. Calls made in the same synchronous run — one user
+   * action — always land in one step. A patch that changes nothing adds
+   * no step.
+   */
+  patchDoc: (patch: Partial<PosterDoc>, coalesceKey?: string | null) => void;
   addBlock: (block: Block) => void;
   updateBlock: (id: string, patch: Partial<Block>) => void;
   removeBlock: (id: string) => void;
@@ -71,15 +84,17 @@ let undoStack: PosterDoc[] = [];
 let redoStack: PosterDoc[] = [];
 
 /**
- * The locked blocks this poster was loaded with — the baseline the
- * lock is enforced against.
+ * The locked blocks of the poster as loaded, refreshed after each sidebar
+ * edit (`patchDoc`) — the baseline the lock is enforced against.
  *
  * Held separately from `doc` on purpose. Enforcing only against the
  * CURRENT doc means one state that has already lost the block (a doc
  * written by a build predating the guard, a hand-edited `.postr`, a
  * direct `setState` from a test or devtool) propagates that absence
- * forever: there is nothing left to restore from. Anchoring to the
- * load-time baseline makes the invariant self-healing instead.
+ * forever: there is nothing left to restore from. A baseline held outside
+ * the doc lets the guard restore a block that some other write lost. It
+ * follows sidebar edits, so a mark a size change deliberately dropped for
+ * lack of room stays dropped instead of coming back off the sheet.
  *
  * Reset in `setPoster` along with the history stacks, since a
  * different poster has a different baseline.
@@ -108,6 +123,25 @@ let lastPush: { key: string; at: number; startedAt: number } | null = null;
 /** End the current burst, so the next edit starts a fresh undo entry. */
 export function breakUndoCoalescing() {
   lastPush = null;
+}
+
+/**
+ * The coalesce key of the document edit made earlier in the SAME
+ * synchronous run, if any. One user action can patch the document more
+ * than once — pasting a list of authors adds the new institutions, then
+ * the authors — and PowerPoint-style undo treats that as one step.
+ * Cleared at the next microtask, so two separate clicks never merge.
+ */
+let runKey: string | null = null;
+let runSeq = 0;
+
+function keyForThisRun(requested: string | null): string {
+  if (runKey !== null) return runKey;
+  runKey = requested ?? `run:${++runSeq}`;
+  queueMicrotask(() => {
+    runKey = null;
+  });
+  return runKey;
 }
 
 /**
@@ -155,7 +189,7 @@ function pushUndo(doc: PosterDoc, coalesceKey?: string) {
  * Apply the locked-block invariant to a candidate block list.
  *
  * Sources are tried in order — the current doc first (so a block the
- * user just MOVED keeps its new coordinates), then the load-time
+ * user just MOVED keeps its new coordinates), then the
  * baseline (so a block already missing from current state is still
  * recoverable).
  */
@@ -179,6 +213,58 @@ function withUndo(
     canUndo: true,
     canRedo: false,
   };
+}
+
+/**
+ * The doc to adopt when undo or redo restores `target` from history.
+ *
+ * `guardLocked` puts back any locked block `target` is missing, at the
+ * coordinates it has in `current`. For the credit mark that is wrong when
+ * the step crosses a size change that DROPPED the mark: a mark from a
+ * 36-inch sheet lands past the edge of a 24-inch one. So the mark is
+ * re-placed for `target`'s sheet — ackBlock.ts asks this of every write
+ * that changes the sheet size — but ONLY when the guard brought it back.
+ * A mark `target` already has is where the user left it, even on top of
+ * other content, and an unrelated undo must not move or drop it.
+ */
+function restoreFromHistory(current: PosterDoc, target: PosterDoc): PosterDoc {
+  const restored = { ...target, blocks: guardLocked(current.blocks, target.blocks) };
+  const has = (blocks: readonly Block[]) => blocks.some((b) => b.id === ACK_BLOCK_ID);
+  return has(restored.blocks) && !has(target.blocks) ? replaceAckBlock(restored) : restored;
+}
+
+/**
+ * Deep equality by value, ignoring key order and treating an `undefined`
+ * field as absent (as JSON does). Key order matters here because Postgres
+ * jsonb does not keep it: a palette loaded from the database can list the
+ * same colours in a different order from the catalog entry a click builds,
+ * and a `JSON.stringify` comparison called that a change.
+ */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return (
+      Array.isArray(a) &&
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((v, i) => sameValue(v, b[i]))
+    );
+  }
+  const ra = a as Record<string, unknown>;
+  const rb = b as Record<string, unknown>;
+  const keys = (r: Record<string, unknown>) => Object.keys(r).filter((k) => r[k] !== undefined);
+  const ka = keys(ra);
+  return ka.length === keys(rb).length && ka.every((k) => sameValue(ra[k], rb[k]));
+}
+
+/**
+ * True when every field in `patch` already holds that value — clicking the
+ * option that is already selected. Compared by value because the sidebar
+ * rebuilds objects (`{ ...headingStyle, border }`) on every click.
+ */
+function changesNothing(doc: PosterDoc, patch: Partial<PosterDoc>): boolean {
+  return (Object.keys(patch) as Array<keyof PosterDoc>).every((k) => sameValue(patch[k], doc[k]));
 }
 
 /**
@@ -230,6 +316,26 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
   },
 
   setPosterTitle: (posterTitle) => set({ posterTitle }),
+
+  patchDoc: (patch, coalesceKey = null) =>
+    set((state) => {
+      if (!state.doc) return {};
+      // Not an edit: no undo step, and a guest who changed nothing is not
+      // asked to confirm leaving (useLeaveGuard arms on canUndo).
+      if (changesNothing(state.doc, patch)) return {};
+      const next = withUndo(state, (doc) => ({ ...doc, ...patch }), keyForThisRun(coalesceKey));
+      // Keep the locked-block baseline in step with the edited doc, as
+      // setPoster did on this path before. It matters when a size change
+      // DROPS the credit mark for lack of room: the guard restores a locked
+      // block missing from the current doc out of this baseline, so a stale
+      // one would bring the mark back at the old sheet's coordinates on the
+      // next template swap.
+      if (next.doc) lockedBaseline = next.doc.blocks.filter((b) => b.locked === true);
+      // posterId and posterTitle are deliberately untouched: routing
+      // sidebar edits through setPoster blanked the display name, and the
+      // next autosave then wrote the title block's text over it.
+      return next;
+    }),
 
   addBlock: (block) =>
     set((state) =>
@@ -336,23 +442,27 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
   //
   // Consequence, and it is the intended one: undo cannot take the
   // poster back to a state without the credit, and redo cannot
-  // advance it into one either.
+  // advance it into one either — unless the restored sheet has no
+  // room for the mark at all, the same degradation a size change makes
+  // (see `restoreFromHistory`).
+  //
+  // Both directions also end any edit in progress: without that, the
+  // next keystroke into the same field joined the undone burst, and the
+  // following undo went one step too far.
   undo: () =>
     set((state) => {
       if (undoStack.length === 0 || !state.doc) return {};
       redoStack = [...redoStack, state.doc].slice(-MAX_HISTORY);
       const prev = undoStack[undoStack.length - 1]!;
       undoStack = undoStack.slice(0, -1);
+      lastPush = null;
       return {
-        doc: {
-          ...prev,
-          // `guardLocked` consults the load-time baseline as well as
-          // the current doc: if the block is ALREADY missing from
-          // `state.doc` (a doc written by a build without this guard,
-          // or restored from a hand-edited bundle), preserving against
-          // current state alone would propagate that absence forever.
-          blocks: guardLocked(state.doc.blocks, prev.blocks),
-        },
+        // `guardLocked` (inside) consults the locked baseline as well
+        // as the current doc: if the block is ALREADY missing from
+        // `state.doc` (a doc written by a build without this guard, or
+        // restored from a hand-edited bundle), preserving against current
+        // state alone would propagate that absence forever.
+        doc: restoreFromHistory(state.doc, prev),
         canUndo: undoStack.length > 0,
         canRedo: true,
       };
@@ -364,11 +474,9 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
       undoStack = [...undoStack, state.doc].slice(-MAX_HISTORY);
       const next = redoStack[redoStack.length - 1]!;
       redoStack = redoStack.slice(0, -1);
+      lastPush = null;
       return {
-        doc: {
-          ...next,
-          blocks: guardLocked(state.doc.blocks, next.blocks),
-        },
+        doc: restoreFromHistory(state.doc, next),
         canUndo: true,
         canRedo: redoStack.length > 0,
       };

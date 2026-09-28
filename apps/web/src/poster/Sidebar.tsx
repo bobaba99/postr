@@ -132,7 +132,8 @@ interface SidebarProps {
   posterWidthIn: number;
   posterHeightIn: number;
   onChangePosterSize: (key: PosterSizeKey) => void;
-  onChangeCustomSize: (w: number, h: number) => void;
+  /** `field` says which input changed, so each field is its own undo step. */
+  onChangeCustomSize: (w: number, h: number, field: 'width' | 'height') => void;
   showGrid: boolean;
   onToggleGrid: (show: boolean) => void;
   showRuler: boolean;
@@ -145,15 +146,16 @@ interface SidebarProps {
   paletteName: string;
   onChangePalette: (palette: Palette, name: string) => void;
   styles: Styles;
-  onChangeStyles: (styles: Styles) => void;
+  /** `coalesceKey` is passed only by inputs that fire on every keystroke or drag. */
+  onChangeStyles: (styles: Styles, coalesceKey?: string) => void;
   headingStyle: HeadingStyle;
   onChangeHeadingStyle: (hs: HeadingStyle) => void;
 
   // authors / institutions
   authors: Author[];
-  onChangeAuthors: (authors: Author[]) => void;
+  onChangeAuthors: (authors: Author[], coalesceKey?: string) => void;
   institutions: Institution[];
-  onChangeInstitutions: (insts: Institution[]) => void;
+  onChangeInstitutions: (insts: Institution[], coalesceKey?: string) => void;
 
   // references
   references: Reference[];
@@ -862,7 +864,8 @@ export function LayoutTab(props: {
   posterWidthIn: number;
   posterHeightIn: number;
   onChangePosterSize: (k: PosterSizeKey) => void;
-  onChangeCustomSize: (w: number, h: number) => void;
+  /** `field` says which input changed, so each field is its own undo step. */
+  onChangeCustomSize: (w: number, h: number, field: 'width' | 'height') => void;
   showGrid: boolean;
   onToggleGrid: (show: boolean) => void;
   showRuler: boolean;
@@ -974,7 +977,7 @@ export function LayoutTab(props: {
             aria-label="Poster width in inches"
             onChange={(e) => {
               const w = parseFloat(e.target.value);
-              if (w > 0) props.onChangeCustomSize(w, props.posterHeightIn);
+              if (w > 0) props.onChangeCustomSize(w, props.posterHeightIn, 'width');
             }}
             min={10}
             max={100}
@@ -991,7 +994,7 @@ export function LayoutTab(props: {
             aria-label="Poster height in inches"
             onChange={(e) => {
               const h = parseFloat(e.target.value);
-              if (h > 0) props.onChangeCustomSize(props.posterWidthIn, h);
+              if (h > 0) props.onChangeCustomSize(props.posterWidthIn, h, 'height');
             }}
             min={10}
             max={100}
@@ -1249,9 +1252,9 @@ function ExportTab(props: {
 
 function AuthorsTab(props: {
   authors: Author[];
-  onChangeAuthors: (a: Author[]) => void;
+  onChangeAuthors: (a: Author[], coalesceKey?: string) => void;
   institutions: Institution[];
-  onChangeInstitutions: (i: Institution[]) => void;
+  onChangeInstitutions: (i: Institution[], coalesceKey?: string) => void;
   palette: Palette;
   fontFamily: string;
   styles: Styles;
@@ -1299,9 +1302,16 @@ function AuthorsTab(props: {
   );
 }
 
-export function InstitutionManager(props: { institutions: Institution[]; onChange: (i: Institution[]) => void }) {
-  const update = (id: string, patch: Partial<Institution>) =>
-    props.onChange(props.institutions.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+export function InstitutionManager(props: {
+  institutions: Institution[];
+  onChange: (i: Institution[], coalesceKey?: string) => void;
+}) {
+  // Each text field passes its own key, so typing a name is one undo step.
+  const update = (id: string, patch: Partial<Institution>, coalesceKey?: string) =>
+    props.onChange(
+      props.institutions.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+      coalesceKey,
+    );
   const remove = (id: string) => props.onChange(props.institutions.filter((x) => x.id !== id));
   const add = () =>
     props.onChange([...props.institutions, { id: `i${nanoid(6)}`, name: '', dept: '', location: '' }]);
@@ -1331,7 +1341,7 @@ export function InstitutionManager(props: { institutions: Institution[]; onChang
             </div>
             <input
               value={inst.name}
-              onChange={(e) => update(inst.id, { name: e.target.value })}
+              onChange={(e) => update(inst.id, { name: e.target.value }, `institution:${inst.id}:name`)}
               placeholder="University"
               aria-label={`Institution ${i + 1} name`}
               style={{ ...inputBase, fontSize: 17, fontWeight: 600, color: '#eee' }}
@@ -1346,14 +1356,14 @@ export function InstitutionManager(props: { institutions: Institution[]; onChang
           <div style={{ display: 'flex', gap: 4 }}>
             <input
               value={inst.dept ?? ''}
-              onChange={(e) => update(inst.id, { dept: e.target.value })}
+              onChange={(e) => update(inst.id, { dept: e.target.value }, `institution:${inst.id}:dept`)}
               placeholder="Department"
               aria-label={`Institution ${i + 1} department`}
               style={{ ...inputBase, flex: 1 }}
             />
             <input
               value={inst.location ?? ''}
-              onChange={(e) => update(inst.id, { location: e.target.value })}
+              onChange={(e) => update(inst.id, { location: e.target.value }, `institution:${inst.id}:location`)}
               placeholder="City"
               aria-label={`Institution ${i + 1} city`}
               style={{ ...inputBase, flex: 1 }}
@@ -1592,7 +1602,7 @@ function parseAuthorBlock(text: string): ParsedAuthorBlock {
 
 function AuthorManager(props: {
   authors: Author[];
-  onChange: (a: Author[]) => void;
+  onChange: (a: Author[], coalesceKey?: string) => void;
   institutions: Institution[];
   /** Optional — when supplied, the bulk-paste flow can detect a
    *  trailing institution list ("(1) X, (2) Y") and create the
@@ -1600,8 +1610,13 @@ function AuthorManager(props: {
    *  the freshly-minted institution ids. */
   onChangeInstitutions?: (i: Institution[]) => void;
 }) {
-  const update = (id: string, patch: Partial<Author>) =>
-    props.onChange(props.authors.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+  // Only the name field passes a key: typing a name is one undo step,
+  // while the checkboxes and affiliation chips are clicks, one step each.
+  const update = (id: string, patch: Partial<Author>, coalesceKey?: string) =>
+    props.onChange(
+      props.authors.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+      coalesceKey,
+    );
   const remove = (id: string) => props.onChange(props.authors.filter((x) => x.id !== id));
   const swap = (i: number, j: number) => {
     if (i < 0 || j < 0 || i >= props.authors.length || j >= props.authors.length) return;
@@ -1746,7 +1761,7 @@ function AuthorManager(props: {
             </div>
             <input
               value={a.name}
-              onChange={(e) => update(a.id, { name: e.target.value })}
+              onChange={(e) => update(a.id, { name: e.target.value }, `author:${a.id}:name`)}
               placeholder="Author name"
               style={{ ...inputBase, flex: 1, fontSize: 17 }}
             />
@@ -2252,7 +2267,7 @@ function StyleTab(props: {
   fontFamily: string;
   onChangeFont: (f: string) => void;
   styles: Styles;
-  onChangeStyles: (s: Styles) => void;
+  onChangeStyles: (s: Styles, coalesceKey?: string) => void;
   headingStyle: HeadingStyle;
   onChangeHeadingStyle: (hs: HeadingStyle) => void;
   savedPresets: StylePreset[];
@@ -2568,15 +2583,20 @@ function StyleTab(props: {
   );
 }
 
-function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
+function StyleEditor(props: { styles: Styles; onChange: (s: Styles, coalesceKey?: string) => void }) {
   const levels: Array<{ k: keyof Styles; l: string }> = [
     { k: 'title', l: 'Title' },
     { k: 'heading', l: 'Heading' },
     { k: 'authors', l: 'Authors' },
     { k: 'body', l: 'Body' },
   ];
-  const update = (k: keyof Styles, field: string, value: number | boolean) =>
-    props.onChange({ ...props.styles, [k]: { ...props.styles[k], [field]: value } });
+  // `typed` marks the number fields, which change on every keystroke: they
+  // merge into one undo step. The weight menu and italic toggle are clicks.
+  const update = (k: keyof Styles, field: string, value: number | boolean, typed = false) =>
+    props.onChange(
+      { ...props.styles, [k]: { ...props.styles[k], [field]: value } },
+      typed ? `style:${k}:${field}` : undefined,
+    );
 
   const inp: CSSProperties = {
     ...inputBase,
@@ -2602,7 +2622,7 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
                 type="number"
                 // Show/accept POINTS in the UI; store poster units underneath.
                 value={Math.round(unitsToPt(props.styles[t.k].size))}
-                onChange={(e) => update(t.k, 'size', ptToUnits(+e.target.value))}
+                onChange={(e) => update(t.k, 'size', ptToUnits(+e.target.value), true)}
                 min={12}
                 max={200}
                 step={2}
@@ -2654,7 +2674,7 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles) => void }) {
                 value={props.styles[t.k].lineHeight.toFixed(2)}
                 onChange={(e) => {
                   const v = Math.max(1, Math.min(3, +e.target.value || 1));
-                  update(t.k, 'lineHeight', v);
+                  update(t.k, 'lineHeight', v, true);
                 }}
                 min={1}
                 max={3}
@@ -2746,7 +2766,7 @@ function EditTab(props: {
   onUpdateBlock: (id: string, patch: Partial<Block>) => void;
   palette: Palette;
   styles: Styles;
-  onChangeStyles: (s: Styles) => void;
+  onChangeStyles: (s: Styles, coalesceKey?: string) => void;
 }) {
   const sb = props.selectedBlock;
   const isTextLike = sb && ['text', 'heading', 'title'].includes(sb.type);
@@ -2761,9 +2781,18 @@ function EditTab(props: {
           : null;
   const styleLevel = typeKey ? props.styles[typeKey] : null;
 
-  const updateStyle = (field: string, value: number | boolean | string | null) => {
+  // `continuous` marks inputs that fire on every keystroke, drag or colour
+  // pick; their events merge into one undo step. Clicks pass nothing.
+  const updateStyle = (
+    field: string,
+    value: number | boolean | string | null,
+    continuous = false,
+  ) => {
     if (!typeKey || !styleLevel) return;
-    props.onChangeStyles({ ...props.styles, [typeKey]: { ...styleLevel, [field]: value } });
+    props.onChangeStyles(
+      { ...props.styles, [typeKey]: { ...styleLevel, [field]: value } },
+      continuous ? `style:${typeKey}:${field}` : undefined,
+    );
   };
 
   return (
@@ -3866,7 +3895,8 @@ function TextBlockEditor(props: {
   styleLevel: TypeStyle;
   palette: Palette;
   onUpdateBlock: (id: string, patch: Partial<Block>) => void;
-  onUpdateStyle: (field: string, value: number | boolean | string | null) => void;
+  /** `continuous`: the input fires on every keystroke, drag or colour pick. */
+  onUpdateStyle: (field: string, value: number | boolean | string | null, continuous?: boolean) => void;
 }) {
   const { block, styleLevel, palette, onUpdateBlock, onUpdateStyle } = props;
   const [sidebarSelection, setSidebarSelection] = useState<SelectionInfo | null>(null);
@@ -3946,7 +3976,7 @@ function TextBlockEditor(props: {
             <input
               type="number"
               value={Math.round(unitsToPt(styleLevel.size))}
-              onChange={(e) => onUpdateStyle('size', ptToUnits(+e.target.value))}
+              onChange={(e) => onUpdateStyle('size', ptToUnits(+e.target.value), true)}
               min={12}
               max={200}
               step={2}
@@ -4018,7 +4048,7 @@ function TextBlockEditor(props: {
             max={3}
             step={0.05}
             value={styleLevel.lineHeight}
-            onChange={(e) => onUpdateStyle('lineHeight', +e.target.value)}
+            onChange={(e) => onUpdateStyle('lineHeight', +e.target.value, true)}
             style={{ flex: 1, accentColor: '#7c6aed' }}
           />
           <input
@@ -4026,7 +4056,7 @@ function TextBlockEditor(props: {
             value={styleLevel.lineHeight.toFixed(2)}
             onChange={(e) => {
               const v = Math.max(1, Math.min(3, +e.target.value || 1));
-              onUpdateStyle('lineHeight', v);
+              onUpdateStyle('lineHeight', v, true);
             }}
             min={1}
             max={3}
@@ -4050,7 +4080,7 @@ function TextBlockEditor(props: {
           <input
             type="color"
             value={styleLevel.color || palette.primary}
-            onChange={(e) => onUpdateStyle('color', e.target.value)}
+            onChange={(e) => onUpdateStyle('color', e.target.value, true)}
             style={{
               width: 40,
               height: 40,
