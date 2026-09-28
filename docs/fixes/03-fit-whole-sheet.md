@@ -266,6 +266,23 @@ commit; each finding reproduced before acting):
   `PosterEditor` (`if (!doc || !posterId) return …`), which breaks React's
   rule of hooks. INSPECTED, already there on main.
 
+### Cause B — the zoom floors (same branch, own commit)
+
+One floor for every zoom control, in `workspaceGeometry.ts`:
+- `clampZoom(next, current, fit)` keeps a requested zoom between a floor and
+  `ZOOM_MAX` (10×). The floor is `ZOOM_MIN` (0.2), lowered to the fit or to
+  the zoom on screen when either is below it. A floor above the zoom on
+  screen is what turned Zoom out into zoom in. With the fit in the floor,
+  Zoom out can always get back to the fit.
+- The Zoom out and Zoom in buttons (step 0.15) and a pinch (Ctrl + wheel) all
+  go through it. The buttons' own 0.3 floor is gone: both now go down to
+  0.2, or further, to the fit, when the fit is smaller.
+- A button step that cannot move changes nothing. Before, a click at the
+  floor still set a manual zoom, so the poster stopped refitting when the
+  window changed.
+- The pinch reads the fit from a ref kept in step with each render, as it
+  already did for the zoom.
+
 ## 8. Results after the fix
 
 ### Cause A
@@ -317,4 +334,29 @@ spots:
   the DPR 1.25 and 1.5 scenarios still pass (exit 0): 0 of 18 had a
   fractional canvas, so neither instrument exercises the floor. It stays as
   a cheap guard; browser page zoom was left to the reviewers.
+
+### Cause B
+
+**Chromium, `fit-check.mjs`** (MEASURED; 1024 × 768 with both panels open,
+100 × 72 in poster):
+
+| claim | main | fix |
+|---|---|---|
+| H2: one click on Zoom out | fit 0.16 → 0.30 | fit 0.11 → 0.11 |
+| H3: a pinch out (Ctrl + wheel, deltaY 60) | fit 0.16 → 0.20 | fit 0.11 → 0.11 |
+
+The fit differs between the columns because of cause A's larger gutter.
+
+**jsdom:** `zoomFloors.test.tsx` 6 of 6 pass (5 fail on main, section 4).
+Beyond the two claims, they check that Zoom in then Zoom out lands back on
+the fit (main: 0.3), that Zoom out never zooms in after the window grows past
+a zoom the user chose, that a Zoom out which cannot go lower keeps the poster
+refitting, and that a pinch from just above 0.2 carries on down toward a
+smaller fit. The full suite: 2947 pass; the only failures are cause C's
+four tests.
+
+**Mutation check** (`03-fit-whole-sheet.floors.mutants.json`, MEASURED):
+6 of 6 killed. One documented blind spot: Zoom in without the clamp survives,
+because reaching the 10× ceiling takes more than 60 clicks from a normal fit.
+The ceiling is `ZOOM_MAX`, shared with the pinch and unchanged from main.
 

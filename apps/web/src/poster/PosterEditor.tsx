@@ -75,7 +75,9 @@ import { autoLayout } from './autoLayout';
 import { filterDeletable } from '@/export/blockLock';
 import { LAYOUT_TEMPLATES, makeBlocks, type LayoutKey } from './templates';
 import { formatSheetSize, moveOntoSheet } from './resizeSheet';
-import { PHONE_GUTTER, WORKSPACE_GUTTER, fitSheet, type SheetFit } from './workspaceGeometry';
+import {
+  PHONE_GUTTER, WORKSPACE_GUTTER, ZOOM_STEP, clampZoom, fitSheet, type SheetFit,
+} from './workspaceGeometry';
 import { snap } from './snap';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
 import { buildPrintDocument } from '@/export/printDocument';
@@ -591,6 +593,7 @@ function useZoom(
 
   return {
     zoom: manual ?? fit.zoom,
+    fitZoom: fit.zoom,
     gutterX: fit.gutterX,
     gutterY: fit.gutterY,
     setZoom: setManual,
@@ -1206,7 +1209,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // A phone's gutter is much smaller than the desktop's: at 375 px wide
   // the desktop gutter alone eats a third of the viewport, and the whole
   // point of the mobile share view is that the poster arrives fitted.
-  const { zoom, gutterX, gutterY, setZoom, fitToScreen } = useZoom(
+  const { zoom, fitZoom, gutterX, gutterY, setZoom, fitToScreen } = useZoom(
     canvasRef, pw, ph, mobileShare ? PHONE_GUTTER : WORKSPACE_GUTTER,
   );
 
@@ -1242,15 +1245,14 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   //   on the very next line — otherwise the adjustment lags by one
   //   frame and the cursor visibly drifts.
   const zoomRef = useRef(zoom);
+  const fitZoomRef = useRef(fitZoom);
   useEffect(() => {
     zoomRef.current = zoom;
-  }, [zoom]);
+    fitZoomRef.current = fitZoom;
+  }, [zoom, fitZoom]);
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
-
-    const ZOOM_MIN = 0.2;
-    const ZOOM_MAX = 10;
 
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return; // not a pinch / Cmd+wheel — let it scroll
@@ -1276,10 +1278,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       // without feeling sluggish or runaway. Figma uses roughly
       // the same range.
       const factor = Math.exp(-e.deltaY / 240);
-      const newZoom = Math.min(
-        ZOOM_MAX,
-        Math.max(ZOOM_MIN, oldZoom * factor),
-      );
+      const newZoom = clampZoom(oldZoom * factor, oldZoom, fitZoomRef.current);
       if (newZoom === oldZoom) return;
 
       // Synchronously commit the zoom so the following scroll math
@@ -3370,7 +3369,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           </div>
         )}
 
-        <ZoomBar zoom={zoom} setZoom={setZoom} onFit={fitToScreen} touch={mobileShare} />
+        <ZoomBar zoom={zoom} fit={fitZoom} setZoom={setZoom} onFit={fitToScreen} touch={mobileShare} />
         <AutosaveStatusPill
           status={autosave.status}
           lastSavedAt={autosave.lastSavedAt}
@@ -3492,11 +3491,14 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
 
 function ZoomBar({
   zoom,
+  fit,
   setZoom,
   onFit,
   touch = false,
 }: {
   zoom: number;
+  /** The fitted zoom: Zoom out may always go down to it. */
+  fit: number;
   setZoom: (z: number | null) => void;
   /** Back to the fitted zoom and the start of the scroll range. */
   onFit: () => void;
@@ -3509,6 +3511,13 @@ function ZoomBar({
    */
   touch?: boolean;
 }) {
+  // A step that cannot move (at the floor or the ceiling) changes nothing:
+  // setting the same zoom would leave fit mode, and the poster would stop
+  // refitting when the window changes.
+  const stepTo = (next: number) => {
+    const z = clampZoom(next, zoom, fit);
+    if (z !== zoom) setZoom(z);
+  };
   // Square 44px touch targets vs the desktop's tight padding.
   const stepStyle = touch
     ? { fontSize: 20, padding: 0, minWidth: 44, minHeight: 44 }
@@ -3543,7 +3552,7 @@ function ZoomBar({
     >
       <button
         aria-label="Zoom out"
-        onClick={() => setZoom(Math.max(0.3, zoom - 0.15))}
+        onClick={() => stepTo(zoom - ZOOM_STEP)}
         style={{ all: 'unset', ...center, cursor: 'pointer', color: '#aaa', fontWeight: 700, ...stepStyle }}
       >
         −
@@ -3560,7 +3569,7 @@ function ZoomBar({
       </button>
       <button
         aria-label="Zoom in"
-        onClick={() => setZoom(Math.min(10, zoom + 0.15))}
+        onClick={() => stepTo(zoom + ZOOM_STEP)}
         style={{ all: 'unset', ...center, cursor: 'pointer', color: '#aaa', fontWeight: 700, ...stepStyle }}
       >
         +

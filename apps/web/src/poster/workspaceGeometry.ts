@@ -21,6 +21,24 @@ export const PHONE_GUTTER = 8;
 /** Fit never enlarges past this: a guard for a tiny poster on a big screen. */
 const FIT_MAX = 5;
 
+/** The zoom limits of the zoom buttons and a pinch. */
+const ZOOM_MIN = 0.2;
+const ZOOM_MAX = 10;
+/** One click on Zoom in or Zoom out. */
+export const ZOOM_STEP = 0.15;
+
+/**
+ * A zoom the user asked for (a button step, a pinch), within the limits.
+ * The floor is ZOOM_MIN, lowered to the fit or to the zoom on screen when
+ * either is below it. A floor above the zoom on screen turned Zoom out and a
+ * pinch out into zooming in (fix 03, cause B); with the fit in the floor,
+ * Zoom out can always get back to the fit.
+ */
+export function clampZoom(next: number, current: number, fit: number): number {
+  const floor = Math.min(ZOOM_MIN, fit, current);
+  return Math.min(ZOOM_MAX, Math.max(floor, next));
+}
+
 /**
  * The gutter for a canvas `canvasPx` long: the full gutter, but never more
  * than a quarter of the canvas, so a canvas narrower than two gutters still

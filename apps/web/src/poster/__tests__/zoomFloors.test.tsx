@@ -1,0 +1,127 @@
+/**
+ * Fix 03 (plan item 3), cause B — the zoom controls must never zoom the
+ * wrong way. Engineering record: docs/fixes/03-fit-whole-sheet.md.
+ *
+ *   H2  Zoom out stops at 0.3 even when the fit is smaller, so it zooms in.
+ *   H3  A pinch stops at 0.2 even when the fit is smaller, so it zooms in.
+ *
+ * Driven the way a user drives them: a click on the button, a Ctrl + wheel
+ * event on the canvas (what a trackpad pinch sends).
+ *
+ * Re-run: npx vitest run src/poster/__tests__/zoomFloors.test.tsx
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen } from '@testing-library/react';
+import type { PosterDoc } from '@postr/shared';
+
+const authSpies = vi.hoisted(() => ({
+  getUser: vi.fn(async () => ({ data: { user: { id: 'u1' } } })),
+  getSession: vi.fn(async () => ({ data: { session: null } })),
+  onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+}));
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    auth: authSpies,
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          order: () => Promise.resolve({ data: [], error: null }),
+          maybeSingle: () => Promise.resolve({ data: null, error: null }),
+        }),
+      }),
+    }),
+    storage: { from: () => ({ createSignedUrl: async () => ({ data: null }) }) },
+  },
+}));
+vi.mock('@/data/posters', async (orig) => ({
+  ...(await orig<typeof import('@/data/posters')>()),
+  upsertPoster: vi.fn(async () => ({})),
+}));
+vi.mock('@/data/thumbnails', () => ({ captureThumbnail: vi.fn(async () => null) }));
+
+import { NoopResizeObserver, click, load, makeDoc, nextTask, q, renderEditor } from './editorKit';
+import { stubScreen, zoomNow } from './workspaceKit';
+
+beforeEach(() => {
+  vi.stubGlobal('ResizeObserver', NoopResizeObserver);
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe('H2, H3 — the zoom controls never zoom the wrong way', () => {
+  // 200 px of workspace for a 100 × 72 in poster: a fit far below 0.2.
+  const smallFit = () => {
+    stubScreen({ width: 200, height: 700 });
+    load({ ...makeDoc(100, 72) } as PosterDoc);
+    renderEditor();
+    return zoomNow();
+  };
+
+  it('below the 0.3 step floor, Zoom out does not make the poster bigger', async () => {
+    const fit = smallFit();
+    expect(fit, 'precondition: a fit below 0.3').toBeLessThan(0.3);
+    await click(screen.getByRole('button', { name: 'Zoom out' }), 'Zoom out');
+    expect(zoomNow()).toBeLessThanOrEqual(fit + 1e-9);
+  });
+
+  it('below the 0.2 pinch floor, a pinch out does not make the poster bigger', async () => {
+    const fit = smallFit();
+    expect(fit, 'precondition: a fit below 0.2').toBeLessThan(0.2);
+    fireEvent.wheel(q('[data-postr-canvas-outer]'), { ctrlKey: true, deltaY: 60, clientX: 100, clientY: 100 });
+    await nextTask();
+    expect(zoomNow()).toBeLessThanOrEqual(fit + 1e-9);
+  });
+
+  it('Zoom in then Zoom out returns to the fit, and stays below every floor after the window grows', async () => {
+    const fit = smallFit();
+    await click(screen.getByRole('button', { name: 'Zoom in' }), 'Zoom in');
+    await click(screen.getByRole('button', { name: 'Zoom out' }), 'Zoom out');
+    const chosen = zoomNow();
+    expect(chosen, 'back to the fit').toBeLessThanOrEqual(fit + 1e-9);
+    // Widen the window: the fit grows past the zoom the user chose, which
+    // is now below every floor.
+    vi.restoreAllMocks();
+    stubScreen({ width: 1060, height: 700 });
+    fireEvent(window, new Event('resize'));
+    await nextTask();
+    expect(zoomNow(), 'the manual zoom is kept').toBeCloseTo(chosen, 6);
+    await click(screen.getByRole('button', { name: 'Zoom out' }), 'Zoom out');
+    expect(zoomNow()).toBeLessThanOrEqual(chosen + 1e-9);
+  });
+
+  it('a Zoom out that cannot go lower leaves the poster fitted: it still refits when the window changes', async () => {
+    const fit = smallFit();
+    await click(screen.getByRole('button', { name: 'Zoom out' }), 'Zoom out');
+    expect(zoomNow(), 'nothing moved').toBeCloseTo(fit, 6);
+    vi.restoreAllMocks();
+    stubScreen({ width: 1060, height: 700 });
+    fireEvent(window, new Event('resize'));
+    await nextTask();
+    expect(zoomNow(), 'refitted to the bigger canvas').toBeGreaterThan(fit * 2);
+  });
+
+  it('a pinch out from just above 0.2 carries on down toward a smaller fit', async () => {
+    const fit = smallFit();
+    await click(screen.getByRole('button', { name: 'Zoom in' }), 'Zoom in');
+    expect(zoomNow(), 'precondition: above 0.2').toBeGreaterThan(0.2);
+    fireEvent.wheel(q('[data-postr-canvas-outer]'), { ctrlKey: true, deltaY: 120, clientX: 100, clientY: 100 });
+    await nextTask();
+    expect(zoomNow()).toBeLessThan(0.2);
+    expect(zoomNow()).toBeGreaterThanOrEqual(fit - 1e-9);
+  });
+
+  it('control: above the floors, Zoom out and a pinch out both zoom out', async () => {
+    stubScreen({ width: 1060, height: 520 });
+    load(makeDoc(48, 36));
+    renderEditor();
+    const fit = zoomNow();
+    await click(screen.getByRole('button', { name: 'Zoom out' }), 'Zoom out');
+    const afterButton = zoomNow();
+    expect(afterButton).toBeLessThan(fit);
+    fireEvent.wheel(q('[data-postr-canvas-outer]'), { ctrlKey: true, deltaY: 60, clientX: 100, clientY: 100 });
+    await nextTask();
+    expect(zoomNow()).toBeLessThan(afterButton);
+  });
+});
