@@ -6,7 +6,7 @@
  * human-readable messages so the UI can render indicators.
  */
 import type { Block } from '@postr/shared';
-import { effectiveTop } from './blockGeometry';
+import { ON_EDGE, drawnBox, drawnOverlap, effectiveTop } from './blockGeometry';
 
 export type OobSeverity = 'partial' | 'full';
 
@@ -80,13 +80,20 @@ export function checkBounds(
 
   for (const b of blocks) {
     const edges: OobWarning['edges'] = [];
+    // The box the block covers as drawn. A rotated block is turned about its
+    // centre, so its stored box is not where it is printed: a 90° side label
+    // drawn inside the sheet was flagged, and one drawn past the edge was
+    // not (re-check of fix 02, BG-2).
     const top = effectiveTop(b, titleOverflow);
     const h = effectiveH(b, measured);
+    const box = drawnBox(b.x, top, b.w, h, b.rotation);
 
-    if (b.x < 0) edges.push('left');
-    if (top < 0) edges.push('top');
-    if (b.x + b.w > canvasWidth) edges.push('right');
-    if (top + h > canvasHeight) edges.push('bottom');
+    // Half a hundredth of tolerance (ON_EDGE): a turned block flush with an
+    // edge can be drawn that far past it (final review of fix 02, F7).
+    if (box.left < -ON_EDGE) edges.push('left');
+    if (box.top < -ON_EDGE) edges.push('top');
+    if (box.right > canvasWidth + ON_EDGE) edges.push('right');
+    if (box.bottom > canvasHeight + ON_EDGE) edges.push('bottom');
 
     if (edges.length === 0) continue;
 
@@ -96,10 +103,10 @@ export function checkBounds(
     // still on the sheet was reported as "completely outside — it won't
     // appear in print", which the user can see is false.
     const fullyOutside =
-      b.x + b.w <= 0 ||
-      top + h <= 0 ||
-      b.x >= canvasWidth ||
-      top >= canvasHeight;
+      box.right <= 0 ||
+      box.bottom <= 0 ||
+      box.left >= canvasWidth ||
+      box.top >= canvasHeight;
 
     warnings.push({
       blockId: b.id,
@@ -152,14 +159,18 @@ export function checkCollisions(
     for (let j = i + 1; j < blocks.length; j++) {
       const a = blocks[i]!;
       const b = blocks[j]!;
-      const ah = effectiveH(a, measured);
-      const bh = effectiveH(b, measured);
-      const at = effectiveTop(a, titleOverflow);
-      const bt = effectiveTop(b, titleOverflow);
+      // The blocks as drawn (see checkBounds): a turned block is not where
+      // its stored box is. Their outlines are compared exactly, at any angle
+      // (drawnOverlap); for two upright blocks this is the old x and y test.
+      const ra = { x: a.x, y: effectiveTop(a, titleOverflow), w: a.w, h: effectiveH(a, measured), rotation: a.rotation };
+      const rb = { x: b.x, y: effectiveTop(b, titleOverflow), w: b.w, h: effectiveH(b, measured), rotation: b.rotation };
+      if (!(drawnOverlap(ra, rb) > tolerance)) continue;
 
-      const dx = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
-      const dy = Math.min(at + ah, bt + bh) - Math.max(at, bt);
-      if (dx <= tolerance || dy <= tolerance) continue;
+      // The area reported is that of the drawn boxes' intersection.
+      const A = drawnBox(ra.x, ra.y, ra.w, ra.h, ra.rotation);
+      const B = drawnBox(rb.x, rb.y, rb.w, rb.h, rb.rotation);
+      const dx = Math.min(A.right, B.right) - Math.max(A.left, B.left);
+      const dy = Math.min(A.bottom, B.bottom) - Math.max(A.top, B.top);
 
       out.push({
         aId: a.id,

@@ -120,6 +120,22 @@ function snapWithin(value: number, lo: number, hi: number): number {
 }
 
 /**
+ * Scan positions from `from` to `to` in steps of `step`, always including
+ * both ends. Stepping alone stops short of the far end whenever the distance
+ * is not a multiple of the step: the empty-region scan then never tried the
+ * top-margin row or the right-most column, and a size change dropped the
+ * credit mark while its new sheet had hundreds of legal spots (review of
+ * fix 02, docs/fixes/02-poster-size.md).
+ */
+function stops(from: number, to: number, step: number): number[] {
+  const dir = to >= from ? 1 : -1;
+  const out: number[] = [];
+  for (let v = from; dir > 0 ? v < to : v > to; v += dir * step) out.push(v);
+  out.push(to);
+  return out;
+}
+
+/**
  * Clamp a candidate mark size into the range where it still reads as
  * a peer of the logo row rather than a competing element.
  */
@@ -224,11 +240,9 @@ function placeByEmptyRegion(
   const step = GAP;
 
   // 2. The rest of the bottom band, left to right.
-  // `isFree` now owns the margin bound, so the scans no longer need
-  // their own inline `> canvasW - M` guards — they clamp instead, which
-  // keeps the last column and the last row reachable rather than
-  // skipping them.
-  for (let x = M; x <= maxX; x += step) {
+  // `isFree` owns the margin bound; `stops` includes the last column and
+  // the last row, which plain stepping skipped.
+  for (const x of stops(M, maxX, step)) {
     const r: Rect = { x: snapWithin(x, M, maxX), y: bandY, w: size, h: size };
     if (isFree(r, blocks, canvasW, canvasH)) {
       return { ...r, strategy: 'empty-region' };
@@ -236,8 +250,8 @@ function placeByEmptyRegion(
   }
 
   // 3. Anywhere else, bottom-up.
-  for (let y = maxY; y >= M; y -= step) {
-    for (let x = M; x <= maxX; x += step) {
+  for (const y of stops(maxY, M, step)) {
+    for (const x of stops(M, maxX, step)) {
       const r: Rect = {
         x: snapWithin(x, M, maxX),
         y: snapWithin(y, M, maxY),

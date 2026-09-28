@@ -137,16 +137,6 @@
         ]
       ]
     },
-    "no-custom-size-key": {
-      "undoes": "typing a custom width/height is one step",
-      "edits": [
-        [
-          "src/poster/PosterEditor.tsx",
-          "            `customSize:${field}`,\n",
-          ""
-        ]
-      ]
-    },
     "no-author-name-key": {
       "undoes": "typing an author name is one step",
       "edits": [
@@ -217,16 +207,6 @@
         ]
       ]
     },
-    "custom-size-one-key": {
-      "undoes": "width and height are separate steps",
-      "edits": [
-        [
-          "src/poster/PosterEditor.tsx",
-          "`customSize:${field}`,",
-          "'customSize',"
-        ]
-      ]
-    },
     "noop-key-order-sensitive": {
       "undoes": "F4 — the no-op check ignores key order (jsonb reorders)",
       "edits": [
@@ -258,7 +238,7 @@
       ]
     },
     "redo-unguarded": {
-      "undoes": "redo re-applies the locked-block guard",
+      "undoes": "redo re-applies the locked-block guard (store contract: blockLock.test.ts, \"REDO puts back the credit mark …\", added in fix 02)",
       "edits": [
         [
           "src/stores/posterStore.ts",
@@ -268,7 +248,7 @@
       ]
     },
     "redo-drops-reinstated-mark": {
-      "undoes": "a mark the guard brings back is re-placed, not discarded",
+      "undoes": "a mark the guard brings back is re-placed, not discarded (same store contract test)",
       "edits": [
         [
           "src/stores/posterStore.ts",

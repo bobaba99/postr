@@ -304,6 +304,14 @@ async function openTab(page, label) {
   await page.waitForTimeout(350);
 }
 
+/** Since fix 02 a size change asks first: confirm the dialog it opens. */
+async function confirmSizeDialog(page) {
+  const dlg = page.getByRole('dialog', { name: /Change poster to/ });
+  await dlg.waitFor({ state: 'visible', timeout: 5000 });
+  await dlg.getByRole('button', { name: 'Change size', exact: true }).click();
+  await dlg.waitFor({ state: 'detached', timeout: 5000 });
+}
+
 /** A point on the canvas workspace that is outside the poster and not a control. */
 async function emptyCanvasPoint(page) {
   const pt = await page.evaluate(() => {
@@ -499,23 +507,23 @@ const SCENARIOS = [
     },
   },
   {
-    // Still replaces every block with the template's: plan item 2. Reported as
-    // KNOWN and excluded from the exit code until that fix lands, then this
-    // flag is removed and it must pass.
-    id: 'size-preset', knownDefect: 'plan item 2: a size preset replaces the blocks', setting: S.size, undoPushesExpected: 1, how: 'Layout tab → Poster Size <select> → 36"×48" Portrait (selectOption)',
-    act: async (page) => { await openTab(page, 'layout'); await page.locator('select', { has: page.locator('option[value="custom"]') }).selectOption('36×48'); await page.waitForTimeout(400); },
+    // Since fix 02 a size change asks first and keeps the blocks; this
+    // scenario was KNOWN (plan item 2) until then and must now pass.
+    id: 'size-preset', setting: S.size, undoPushesExpected: 1, how: 'Layout tab → Poster Size <select> → 36"×48" Portrait (selectOption), then "Change size" in the dialog',
+    act: async (page) => { await openTab(page, 'layout'); await page.locator('select', { has: page.locator('option[value="custom"]') }).selectOption('36×48'); await confirmSizeDialog(page); },
   },
   {
-    id: 'custom-width', setting: S.size, undoPushesExpected: 1, how: 'Layout tab → Width input, real ArrowUp key (48 → 48.1)',
-    act: async (page) => { await openTab(page, 'layout'); await page.locator('input[aria-label="Poster width in inches"]').click(); await page.keyboard.press('ArrowUp'); },
+    // Since fix 02 a typed size applies when committed (Enter) and confirmed.
+    id: 'custom-width', setting: S.size, undoPushesExpected: 1, how: 'Layout tab → Width input, real ArrowUp key (48 → 48.1), Enter, "Change size"',
+    act: async (page) => { await openTab(page, 'layout'); await page.locator('input[aria-label="Poster width in inches"]').click(); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Enter'); await confirmSizeDialog(page); },
   },
   {
-    id: 'custom-height', setting: S.size, undoPushesExpected: 1, how: 'Layout tab → Height input, real ArrowUp key (36 → 36.1)',
-    act: async (page) => { await openTab(page, 'layout'); await page.locator('input[aria-label="Poster height in inches"]').click(); await page.keyboard.press('ArrowUp'); },
+    id: 'custom-height', setting: S.size, undoPushesExpected: 1, how: 'Layout tab → Height input, real ArrowUp key (36 → 36.1), Enter, "Change size"',
+    act: async (page) => { await openTab(page, 'layout'); await page.locator('input[aria-label="Poster height in inches"]').click(); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Enter'); await confirmSizeDialog(page); },
   },
   {
-    id: 'custom-width-no-blur', informational: true, noBlurBeforeUndo: true, setting: S.size, undoPushesExpected: 1, how: 'as custom-width but ⌘Z #1 pressed with focus still in the width input (app ignores ⌘Z in INPUTs, so the browser\'s native undo runs — plan item 12); excluded from the exit code',
-    act: async (page) => { await openTab(page, 'layout'); await page.locator('input[aria-label="Poster width in inches"]').click(); await page.keyboard.press('ArrowUp'); },
+    id: 'custom-width-no-blur', informational: true, noBlurBeforeUndo: true, setting: S.size, undoPushesExpected: 1, how: 'as custom-width, then a click back INTO the width input so ⌘Z #1 is pressed with focus there (app ignores ⌘Z in INPUTs, so the browser\'s native undo runs — plan item 12); excluded from the exit code',
+    act: async (page) => { await openTab(page, 'layout'); const w = page.locator('input[aria-label="Poster width in inches"]'); await w.click(); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Enter'); await confirmSizeDialog(page); await w.click(); },
   },
   {
     id: 'style-preset', wantPreset: true, setting: S.preset, undoPushesExpected: 1, how: `Style tab → click saved preset "${PRESET_NAME}" (seeded in localStorage)`,

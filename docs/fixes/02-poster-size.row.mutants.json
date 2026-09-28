@@ -43,6 +43,17 @@
           "    widthIn: sheetInches(widthIn, (fallback.widthIn as number) ?? d.w),\n    heightIn: sheetInches(heightIn, (fallback.heightIn as number) ?? d.h),"
         ]
       ]
+    },
+    "autosave-sends-unusable-size": {
+      "undoes": "EQUIVALENT by design: autosave never sends an unusable size to the NOT NULL columns. Every document is repaired on entry (setPoster) and the fields accept 10 to 100 in, so no user path gives autosave an unusable size (re-check of cause A, RT7)",
+      "expect": "survive",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "Number.isFinite(widthIn) && Number.isFinite(heightIn)",
+          "Number.isFinite(widthIn) || Number.isFinite(heightIn)"
+        ]
+      ]
     }
   }
 }

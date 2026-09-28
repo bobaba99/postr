@@ -36,7 +36,6 @@ import {
   FONT_WEIGHTS,
   HIGHLIGHT_PRESETS,
   PALETTES,
-  POSTER_SIZES,
   TABLE_BORDER_PRESETS,
   ptToUnits,
   unitsToPt,
@@ -67,6 +66,7 @@ import { DockedFormatToolbar, FloatingFormatToolbar } from './FloatingFormatTool
 import { FigureTab, type FigureMode } from './sidebar/FigureTab';
 import type { PosterTableRef } from '@/charts/ladder/DataStep';
 import { ImportSection } from './sidebar/ImportSection';
+import { SheetSizeFields } from './sidebar/SheetSizeFields';
 import { PostrExportButton } from './sidebar/PostrExportButton';
 import { EditableExportButtons } from './sidebar/EditableExportButtons';
 // `./sidebar/ReviewTab` is NOT imported while the review tab is
@@ -132,9 +132,8 @@ interface SidebarProps {
   posterSizeKey: PosterSizeKey | 'custom';
   posterWidthIn: number;
   posterHeightIn: number;
-  onChangePosterSize: (key: PosterSizeKey) => void;
-  /** `field` says which input changed, so each field is its own undo step. */
-  onChangeCustomSize: (w: number, h: number, field: 'width' | 'height') => void;
+  /** A size from the menu or the fields, requested when committed; the editor asks first. */
+  onRequestSheetSize: (widthIn: number, heightIn: number) => void;
   showGrid: boolean;
   onToggleGrid: (show: boolean) => void;
   showRuler: boolean;
@@ -695,8 +694,7 @@ export function Sidebar(props: SidebarProps) {
             posterSizeKey={props.posterSizeKey}
             posterWidthIn={props.posterWidthIn}
             posterHeightIn={props.posterHeightIn}
-            onChangePosterSize={props.onChangePosterSize}
-            onChangeCustomSize={props.onChangeCustomSize}
+            onRequestSheetSize={props.onRequestSheetSize}
             showGrid={props.showGrid}
             onToggleGrid={props.onToggleGrid}
             showRuler={props.showRuler}
@@ -865,9 +863,8 @@ export function LayoutTab(props: {
   posterSizeKey: PosterSizeKey | 'custom';
   posterWidthIn: number;
   posterHeightIn: number;
-  onChangePosterSize: (k: PosterSizeKey) => void;
-  /** `field` says which input changed, so each field is its own undo step. */
-  onChangeCustomSize: (w: number, h: number, field: 'width' | 'height') => void;
+  /** A size from the menu or the fields, requested when committed; the editor asks first. */
+  onRequestSheetSize: (widthIn: number, heightIn: number) => void;
   showGrid: boolean;
   onToggleGrid: (show: boolean) => void;
   showRuler: boolean;
@@ -955,56 +952,14 @@ export function LayoutTab(props: {
       <ImportSection />
 
       <div style={labelStyle}>Poster Size</div>
-      <select
-        value={props.posterSizeKey}
-        onChange={(e) => {
-          const k = e.target.value;
-          if (k !== 'custom') props.onChangePosterSize(k as PosterSizeKey);
-        }}
-        style={selectStyle}
-      >
-        {Object.entries(POSTER_SIZES).map(([k, v]) => (
-          <option key={k} value={k}>
-            {v.label}
-          </option>
-        ))}
-        <option value="custom">Custom Size</option>
-      </select>
-      <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>Width (in)</div>
-          <input
-            type="number"
-            value={props.posterWidthIn}
-            aria-label="Poster width in inches"
-            onChange={(e) => {
-              const w = parseFloat(e.target.value);
-              if (w > 0) props.onChangeCustomSize(w, props.posterHeightIn, 'width');
-            }}
-            min={10}
-            max={100}
-            step={0.1}
-            style={{ ...inputBase, fontSize: 14, width: '100%' }}
-          />
-        </div>
-        <div style={{ fontSize: 14, color: '#6b7280', marginTop: 16 }}>×</div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 2 }}>Height (in)</div>
-          <input
-            type="number"
-            value={props.posterHeightIn}
-            aria-label="Poster height in inches"
-            onChange={(e) => {
-              const h = parseFloat(e.target.value);
-              if (h > 0) props.onChangeCustomSize(props.posterWidthIn, h, 'height');
-            }}
-            min={10}
-            max={100}
-            step={0.1}
-            style={{ ...inputBase, fontSize: 14, width: '100%' }}
-          />
-        </div>
-      </div>
+      <SheetSizeFields
+        sizeKey={props.posterSizeKey}
+        widthIn={props.posterWidthIn}
+        heightIn={props.posterHeightIn}
+        onRequestSize={props.onRequestSheetSize}
+        inputStyle={inputBase}
+        selectStyle={selectStyle}
+      />
 
       <div style={labelStyle}>Auto Layout</div>
       <button
@@ -1065,8 +1020,9 @@ export function LayoutTab(props: {
           lineHeight: 1.5,
         }}
       >
-        Pick a starting column layout. Apply anytime — blocks rearrange
-        without losing their content.
+        Pick a starting layout. Applying one replaces your blocks with its
+        empty layout; you can undo it. To tidy the blocks you already have,
+        use Auto-Arrange above.
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {(Object.keys(LAYOUT_TEMPLATES) as LayoutKey[]).map((k) => {

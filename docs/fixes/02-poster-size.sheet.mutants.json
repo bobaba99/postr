@@ -44,8 +44,8 @@
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "    setBlocks(makeBlocks(key, pw, ph));",
-          "    setBlocks(makeBlocks(key, pw, 36));"
+          "      setBlocks(makeBlocks(pendingTemplate, pw, ph));",
+          "      setBlocks(makeBlocks(pendingTemplate, pw, 36));"
         ]
       ]
     },
@@ -300,7 +300,7 @@
       ]
     },
     "editor-reads-raw-size": {
-      "undoes": "BLIND SPOT at this commit: the editor draws a usable size even when the store holds an unusable one. setPoster repairs every document it receives, but a typed size still reaches the store unchecked until cause D (branch editor/size-change-keeps-blocks) limits the fields to 10-100 in; from then on no user path reaches this second guard",
+      "undoes": "EQUIVALENT by design: the editor draws a usable size even if a document reached the store without one. setPoster repairs every document on entry, so no user path reaches this second guard",
       "expect": "survive",
       "edits": [
         [
@@ -311,7 +311,7 @@
       ]
     },
     "label-reads-raw-size": {
-      "undoes": "BLIND SPOT at this commit: the preview label reads a usable size even from an unrepaired document. A typed size still reaches the store unchecked until cause D limits the fields to 10-100 in; from then on no user path reaches this second guard",
+      "undoes": "EQUIVALENT by design: the preview label reads a usable size even from an unrepaired document. setPoster repairs every document on entry, so no user path reaches this second guard",
       "expect": "survive",
       "edits": [
         [

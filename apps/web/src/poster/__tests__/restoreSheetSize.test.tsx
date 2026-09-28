@@ -53,15 +53,18 @@ vi.mock('@/data/posterVersions', async (orig) => ({
 
 import {
   NoopResizeObserver,
+  choosePreset,
   click,
   confirmButton,
   dialog,
   doc,
+  expectMovedProportionally,
   load,
   makeDoc,
   openTab,
   q,
   renderEditor,
+  userBlocks,
 } from './editorKit';
 
 beforeEach(() => {
@@ -109,5 +112,25 @@ describe('A — a restored version with no usable height takes the poster\'s cur
   it('height missing: the poster\'s own 24 in, not the 36 in default', async () => {
     await restoreSnapshot({ ...makeDoc(48, 40), heightIn: undefined } as unknown as PosterDoc);
     expect([doc().widthIn, doc().heightIn]).toEqual([48, 24]);
+  });
+});
+
+describe('B — a size change after restoring such a version moves from the size drawn', () => {
+  // Re-check of fix 02, BG-3, measured before the store repair: the change
+  // scaled from the snapshot's raw size, so blocks stayed put (missing, 0,
+  // text) or shrank to 3% (1200 in), while the sheet was drawn at 48 × 36.
+  it.each([
+    ['missing', undefined],
+    ['zero', 0],
+    ['1200 in', 1200],
+  ])('width %s: every block moves in proportion from the size drawn', async (_label, w) => {
+    await restoreSnapshot({ ...makeDoc(48, 36), widthIn: w } as unknown as PosterDoc);
+    const before = userBlocks();
+    const drawn: [number, number] = [doc().widthIn, doc().heightIn];
+    expect(q<HTMLElement>('#poster-canvas').style.width, 'the size drawn').toBe(`${drawn[0] * 10}px`);
+    openTab(/layout/i);
+    await choosePreset('36×48');
+    await click(confirmButton(dialog(/Change poster to 36 × 48 in/)!), 'confirm');
+    expectMovedProportionally(before, drawn, [36, 48]);
   });
 });

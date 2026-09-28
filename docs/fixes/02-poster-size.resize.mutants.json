@@ -1,0 +1,940 @@
+{
+  "tests": [
+    "src/poster/__tests__/posterSize.test.tsx",
+    "src/poster/__tests__/sheetSize.test.tsx",
+    "src/poster/__tests__/sidebarHistory.test.tsx",
+    "src/components/__tests__/ConfirmModal.test.tsx",
+    "src/poster/__tests__/ackPlacement.test.ts",
+    "src/export/__tests__/blockLock.test.ts"
+  ],
+  "mutants": {
+    "size-applies-without-asking": {
+      "undoes": "B — a size change asks first",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    setPendingSize({ widthIn, heightIn });",
+          "    updateDoc(moveOntoSheet(doc, widthIn, heightIn));"
+        ]
+      ]
+    },
+    "cancel-applies-size": {
+      "undoes": "B — Cancel changes nothing",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        onCancel={() => setPendingSize(null)}",
+          "        onCancel={confirmSize}"
+        ]
+      ]
+    },
+    "one-at-a-time-dropped": {
+      "undoes": "B/C — while one confirmation is open, another request neither stacks a dialog nor retargets it",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const asking = pendingSize !== null || pendingTemplate !== null;",
+          "  const asking = false;"
+        ]
+      ]
+    },
+    "shortcuts-under-dialog": {
+      "undoes": "B/C — editor shortcuts wait while a dialog is open",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      if (modalDialogOpen()) return;\n",
+          "",
+          2
+        ]
+      ]
+    },
+    "shortcut-guard-counts-closing": {
+      "undoes": "the shortcut guard ignores a dialog that is fading out (⌘Z right after confirming works)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "'[role=\"dialog\"][aria-modal=\"true\"]:not([data-state=\"closing\"])'",
+          "'[role=\"dialog\"][aria-modal=\"true\"]'"
+        ]
+      ]
+    },
+    "size-drops-user-blocks": {
+      "undoes": "B — every block survives a size change (models the old template rebuild)",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "  return replaceAckBlock({ ...doc, widthIn, heightIn, blocks });",
+          "  return replaceAckBlock({ ...doc, widthIn, heightIn, blocks: blocks.filter((b) => b.locked) });"
+        ]
+      ]
+    },
+    "move-position-only": {
+      "undoes": "B — widths and heights scale with the sheet too",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "  let w = round(round((b.x + b.w) * sx) - x);\n  let h = round(round((b.y + b.h) * sy) - y);",
+          "  let w = b.w;\n  let h = b.h;"
+        ]
+      ]
+    },
+    "edges-rounded-separately": {
+      "undoes": "B — edges are rounded, so a flush block stays flush (x and w rounded separately put it 0.01 past)",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "  let w = round(round((b.x + b.w) * sx) - x);",
+          "  let w = round(b.w * sx);"
+        ],
+        [
+          "src/poster/resizeSheet.ts",
+          "  if (b.x + b.w <= fromW && x + w > toW) w = round(toW - x);\n",
+          ""
+        ]
+      ]
+    },
+    "rotation-ignored": {
+      "undoes": "B — a rotated block keeps its place and length on screen",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "      turn(b.rotation) % 180 === 0\n        ? scaleUpright(b, sx, sy, fromW, fromH, toW, toH)\n        : scaleTurned(b, sx, sy, fromW, fromH, toW, toH);",
+          "      scaleUpright(b, sx, sy, fromW, fromH, toW, toH);"
+        ]
+      ]
+    },
+    "mark-scaled": {
+      "undoes": "B — the credit mark keeps its size when it moves",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "    if (b.id === ACK_BLOCK_ID) return { ...b, x: round(b.x * sx), y: round(b.y * sy) };",
+          "    if (b.id === ACK_BLOCK_ID) return { ...b, x: round(b.x * sx), y: round(b.y * sy), w: round(b.w * sx), h: round(b.h * sy) };"
+        ]
+      ]
+    },
+    "no-mark-replace-after-move": {
+      "undoes": "B — the mark is placed again (or dropped) for the new sheet",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "  return replaceAckBlock({ ...doc, widthIn, heightIn, blocks });",
+          "  return { ...doc, widthIn, heightIn, blocks };"
+        ]
+      ]
+    },
+    "placement-skips-far-row": {
+      "undoes": "B — the credit-mark scan reaches the top-margin row and the last column",
+      "edits": [
+        [
+          "src/poster/ackPlacement.ts",
+          "  out.push(to);\n  return out;",
+          "  return out;"
+        ]
+      ]
+    },
+    "template-applies-without-asking": {
+      "undoes": "C — a template asks first",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    setPendingTemplate(key);",
+          "    setBlocks(makeBlocks(key, pw, ph));"
+        ]
+      ]
+    },
+    "template-key-ignored": {
+      "undoes": "C — the template you pick is the one applied",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      setBlocks(makeBlocks(pendingTemplate, pw, ph));",
+          "      setBlocks(makeBlocks('3col', pw, ph));"
+        ]
+      ]
+    },
+    "template-dialog-fixed-name": {
+      "undoes": "C — the dialog names the template you picked",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "LAYOUT_TEMPLATES[pendingTemplate].name",
+          "LAYOUT_TEMPLATES['3col'].name"
+        ]
+      ]
+    },
+    "copy-still-promises": {
+      "undoes": "C — the Templates copy says what happens",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        Pick a starting layout. Applying one replaces your blocks with its\n        empty layout; you can undo it. To tidy the blocks you already have,\n        use Auto-Arrange above.",
+          "        Pick a starting column layout. Apply anytime — blocks rearrange\n        without losing their content."
+        ]
+      ]
+    },
+    "enter-does-not-commit": {
+      "undoes": "D — Enter commits the typed size",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "      e.preventDefault();\n      commit(false);",
+          "      e.preventDefault();"
+        ]
+      ]
+    },
+    "blur-does-not-commit": {
+      "undoes": "D — leaving the field commits the typed size",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "          if (other && e.relatedTarget === other) return;\n          commit(true);",
+          "          if (other && e.relatedTarget === other) return;"
+        ]
+      ]
+    },
+    "no-range-check": {
+      "undoes": "D — a size outside 10–100 in is rejected",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "  if (!Number.isFinite(n) || n < SHEET_MIN_IN || n > SHEET_MAX_IN) return null;",
+          "  if (!Number.isFinite(n) || n <= 0) return null;"
+        ]
+      ]
+    },
+    "keystroke-asks": {
+      "undoes": "D — typing alone asks nothing",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "          setDraft((d) => ({ ...d, [field]: e.target.value }));",
+          "          setDraft((d) => ({ ...d, [field]: e.target.value }));\n          if (Number(e.target.value) > 0) props.onRequestSize(field === 'width' ? Number(e.target.value) : props.widthIn, field === 'height' ? Number(e.target.value) : props.heightIn);"
+        ]
+      ]
+    },
+    "escape-keeps-draft": {
+      "undoes": "D — Escape puts the field back",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "    } else if (e.key === 'Escape') {\n      setDraft((d) => ({ ...d, [field]: null }));",
+          "    } else if (e.key === 'Escape') {"
+        ]
+      ]
+    },
+    "menu-keyboard-asks-at-once": {
+      "undoes": "B — a keyboard change on the size menu waits for Enter or leaving it",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "          if (keyed.current) setMenuDraft(e.target.value);\n          else requestPreset(e.target.value);",
+          "          requestPreset(e.target.value);"
+        ]
+      ]
+    },
+    "menu-enter-does-not-commit": {
+      "undoes": "B — Enter on the size menu asks about the chosen preset",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "            e.preventDefault();\n            commitMenu();",
+          "            e.preventDefault();"
+        ]
+      ]
+    },
+    "menu-escape-keeps-draft": {
+      "undoes": "B — Escape on the size menu puts it back",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "          } else if (e.key === 'Escape') {\n            setMenuDraft(null);",
+          "          } else if (e.key === 'Escape') {"
+        ]
+      ]
+    },
+    "dialog-unnamed": {
+      "undoes": "the confirmation is announced as a named dialog",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "        role=\"dialog\"\n",
+          ""
+        ]
+      ]
+    },
+    "focus-before-mount": {
+      "undoes": "EQUIVALENT, not a gap: without the `mounted` check the focus effect still re-runs when `mounted` flips (it is in the deps) and focuses then; the check only skips a first run that focuses nothing (the refs are empty) and whose cleanup puts focus back on the opener, which still has it. The re-check (BT-5) killed this while the typed field used autoFocus; that attribute is gone, and the typed field is focused by the same effect.",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "    if (!open || !mounted) return;",
+          "    if (!open) return;"
+        ]
+      ],
+      "expect": "survive"
+    },
+    "focus-follows-rerender": {
+      "undoes": "a parent re-render does not move focus to the confirm button",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "  }, [open, mounted]);",
+          "  }, [open, mounted, onCancel]);"
+        ]
+      ]
+    },
+    "no-focus-trap": {
+      "undoes": "Tab stays inside the dialog",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "        trapTab(e, content, first);",
+          ""
+        ]
+      ]
+    },
+    "no-focus-restore": {
+      "undoes": "closing puts focus back where it was",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "      if (before && before.isConnected && before !== document.body) before.focus();\n",
+          ""
+        ]
+      ]
+    },
+    "title-blank-while-closing": {
+      "undoes": "the dialog keeps its text while it fades out",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "  if (open) shown.current = { title, message, confirmLabel, cancelLabel, danger, typedConfirmation, focusCancel };",
+          "  shown.current = { title, message, confirmLabel, cancelLabel, danger, typedConfirmation, focusCancel };"
+        ]
+      ]
+    },
+    "turned-not-reversible": {
+      "undoes": "BG-1 — a turned block's change is undone exactly by the reverse change (the earlier rule grew a 45° block 17% per side per round trip)",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "  const w = round(b.w * sx ** c2 * sy ** s2);\n  const h = round(b.h * sx ** s2 * sy ** c2);",
+          "  const w = round(b.w * Math.hypot(sx * Math.cos(t), sy * Math.sin(t)));\n  const h = round(b.h * Math.hypot(sx * Math.sin(t), sy * Math.cos(t)));"
+        ]
+      ]
+    },
+    "turned-not-kept-inside": {
+      "undoes": "BG-4 — a turned block drawn inside the old sheet stays inside the new one after rounding",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "  if (was.left >= -ON_EDGE && was.right <= fromW + ON_EDGE) x = round(x + backInside(now.left, now.right, toW));\n  if (was.top >= -ON_EDGE && was.bottom <= fromH + ON_EDGE) y = round(y + backInside(now.top, now.bottom, toH));\n",
+          ""
+        ]
+      ]
+    },
+    "half-turn-as-turned": {
+      "undoes": "EQUIVALENT within 0.01 units: a block turned 180° goes through the edge-based path, but the turned path with its move back inside gives the same result to within a hundredth of a unit (MEASURED: over 168 flush 180° moves between presets, the largest difference in either edge was 0.0100 units, 0.001 in; both leave the block flush and inside). Kept on the edge-based path because its drawn box is its stored box.",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "      turn(b.rotation) % 180 === 0\n",
+          "      !b.rotation\n"
+        ]
+      ],
+      "expect": "survive"
+    },
+    "issues-stored-box": {
+      "undoes": "BG-2 — ISSUES checks the box a turned block is drawn in, not its stored box",
+      "edits": [
+        [
+          "src/poster/boundsCheck.ts",
+          "    const box = drawnBox(b.x, top, b.w, h, b.rotation);",
+          "    const box = drawnBox(b.x, top, b.w, h, 0);"
+        ]
+      ]
+    },
+    "drawn-box-unsnapped": {
+      "undoes": "a quarter turn is exact: floating-point cos 90° would put a flush label a hair past the edge",
+      "edits": [
+        [
+          "src/poster/blockGeometry.ts",
+          "  const snap = (v: number) => Math.round(v * 1e12) / 1e12;",
+          "  const snap = (v: number) => v;"
+        ]
+      ]
+    },
+    "keys-reach-behind-dialog": {
+      "undoes": "BK-3 — while a dialog is open, no key reaches listeners behind it",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "      e.stopImmediatePropagation();\n",
+          ""
+        ]
+      ]
+    },
+    "every-dialog-answers": {
+      "undoes": "BK-5, L-3 — only the dialog in view (no open modal dialog after it on the page) answers a key",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "    if (content.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING) return false;\n",
+          ""
+        ]
+      ]
+    },
+    "danger-focuses-action": {
+      "undoes": "BK-1 — a dialog whose action cannot be undone opens with focus on Cancel",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "  const focusCancel = initialFocus ? initialFocus === 'cancel' : danger;",
+          "  const focusCancel = initialFocus ? initialFocus === 'cancel' : false;"
+        ]
+      ]
+    },
+    "held-key-presses": {
+      "undoes": "BK-4 — a held Enter or Space (a repeated keydown) cannot press the dialog's button",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "      } else if ((e.key === 'Enter' || e.key === ' ') && e.repeat) {",
+          "      } else if (false) {"
+        ]
+      ]
+    },
+    "trap-only-inside": {
+      "undoes": "BK-2 — Tab and Shift+Tab come back into the dialog when focus is outside it",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "  if (at === -1) {\n    e.preventDefault();\n    (e.shiftKey ? tail : head).focus();\n  } else if",
+          "  if"
+        ]
+      ]
+    },
+    "panel-not-focusable": {
+      "undoes": "BK-2 — a click on the dialog's own text keeps focus in the dialog",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "        tabIndex={-1}\n",
+          ""
+        ]
+      ]
+    },
+    "typed-autofocus": {
+      "undoes": "BK-6 — the typed-confirmation dialog gives focus back to its opener (autoFocus made the field the 'opener')",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "              ref={typedRef}\n",
+          "              ref={typedRef}\n              autoFocus\n"
+        ]
+      ]
+    },
+    "labels-not-frozen": {
+      "undoes": "BT-7 — the dialog keeps its button label and message while it fades out",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "            {view.confirmLabel}",
+          "            {confirmLabel}"
+        ]
+      ]
+    },
+    "message-not-frozen": {
+      "undoes": "BT-4 — the dialog keeps its message while it fades out",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "          {view.message}",
+          "          {message}"
+        ]
+      ]
+    },
+    "text-frozen-forever": {
+      "undoes": "BT-4 — after Cancel, the next request is asked about in its own words",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "  if (open) shown.current = { title, message, confirmLabel, cancelLabel, danger, typedConfirmation, focusCancel };",
+          "  if (open && !shown.current.title) shown.current = { title, message, confirmLabel, cancelLabel, danger, typedConfirmation, focusCancel };"
+        ]
+      ]
+    },
+    "dialog-name-dangling": {
+      "undoes": "BT-3 — the dialog is named by its title",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "        aria-labelledby={titleId}",
+          "        aria-labelledby=\"postr-dialog-title\""
+        ]
+      ]
+    },
+    "tab-between-fields-asks": {
+      "undoes": "BK-8 — moving from width to height is part of one change and asks nothing",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "          if (other && e.relatedTarget === other) return;\n",
+          ""
+        ]
+      ]
+    },
+    "commit-one-side": {
+      "undoes": "BK-8 — a commit asks about what both fields hold",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "    const w = inches('width', props.widthIn);",
+          "    const w = props.widthIn;"
+        ]
+      ]
+    },
+    "mouse-pick-keeps-draft": {
+      "undoes": "BK-7 — pressing the mouse on the menu drops a keyboard choice (a pick of the current size, or a picker that takes focus, must not ask about it)",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "          keyed.current = false;\n          setMenuDraft(null);",
+          "          keyed.current = false;"
+        ]
+      ]
+    },
+    "menu-no-mousedown-reset": {
+      "undoes": "BT-4 — after a key on the menu, a mouse pick asks at once (the mouse press marks the next change as a pick)",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "        onMouseDown={() => {\n          keyed.current = false;\n          setMenuDraft(null);\n        }}",
+          "        onMouseDown={() => {\n          setMenuDraft(null);\n        }}"
+        ]
+      ]
+    },
+    "menu-commit-keeps-draft": {
+      "undoes": "BT-4 — after keyboard Enter and Cancel, the menu shows the poster's size",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "    const key = menuDraft;\n    setMenuDraft(null);",
+          "    const key = menuDraft;"
+        ]
+      ]
+    },
+    "max-exclusive": {
+      "undoes": "BT-3 — exactly 100 in is accepted",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "n > SHEET_MAX_IN",
+          "n >= SHEET_MAX_IN"
+        ]
+      ]
+    },
+    "rejected-keeps-draft": {
+      "undoes": "BT-3 — after a rejection the field shows the poster's size again",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "      if (leaving) setDraft({ width: null, height: null });\n      else setDraft((d) => ({ ...d, [bad]: null }));\n",
+          ""
+        ]
+      ]
+    },
+    "escape-keeps-error": {
+      "undoes": "BT-3 — Escape clears the rejection message",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "      setDraft((d) => ({ ...d, [field]: null }));\n      setError(null);",
+          "      setDraft((d) => ({ ...d, [field]: null }));"
+        ]
+      ]
+    },
+    "template-message-lies": {
+      "undoes": "BT-3 — the template dialog says it replaces the blocks (cause C's own defect)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "This replaces every block on your poster",
+          "Your blocks are kept and rearranged. This replaces every block on your poster"
+        ]
+      ]
+    },
+    "rest-scan-x-plain-steps": {
+      "undoes": "BT-4 — the scan's rows above the bottom band reach the last column (probe AC1)",
+      "edits": [
+        [
+          "src/poster/ackPlacement.ts",
+          "  for (const y of stops(maxY, M, step)) {\n    for (const x of stops(M, maxX, step)) {",
+          "  for (const y of stops(maxY, M, step)) {\n    for (let x = M; x <= maxX; x += step) {"
+        ]
+      ]
+    },
+    "backinside-no-low": {
+      "undoes": "RF-6 — a turned block past the left or top edge is moved back",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "  if (lo < 0) return Math.ceil(-lo * 100) / 100;\n",
+          ""
+        ]
+      ]
+    },
+    "turned-y-check-width": {
+      "undoes": "RF-6 — the vertical inside-check uses the sheet height (portrait source sheets)",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "was.bottom <= fromH + ON_EDGE",
+          "was.bottom <= fromW + ON_EDGE"
+        ]
+      ]
+    },
+    "turned-always-inside": {
+      "undoes": "RF-6 — only a block drawn inside the old sheet is pulled inside; one the user hung off the edge keeps its place",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "  if (was.left >= -ON_EDGE && was.right <= fromW + ON_EDGE) x =",
+          "  x ="
+        ],
+        [
+          "src/poster/resizeSheet.ts",
+          "  if (was.top >= -ON_EDGE && was.bottom <= fromH + ON_EDGE) y =",
+          "  y ="
+        ]
+      ]
+    },
+    "drawn-box-signed-cos": {
+      "undoes": "RF-6 — drawnBox uses |cos| (ISSUES at 135° and -150°)",
+      "edits": [
+        [
+          "src/poster/blockGeometry.ts",
+          "  const c = Math.abs(cos);",
+          "  const c = cos;"
+        ]
+      ]
+    },
+    "drawn-box-signed-sin": {
+      "undoes": "RF-6 — drawnBox uses |sin| (ISSUES at negative angles: the rotate handle stores [-180, 180))",
+      "edits": [
+        [
+          "src/poster/blockGeometry.ts",
+          "  const s = Math.abs(sin);",
+          "  const s = sin;"
+        ]
+      ]
+    },
+    "fully-outside-stored": {
+      "undoes": "RF-6 — 'completely outside' is decided on the drawn box",
+      "edits": [
+        [
+          "src/poster/boundsCheck.ts",
+          "      box.right <= 0 ||\n      box.bottom <= 0 ||\n      box.left >= canvasWidth ||\n      box.top >= canvasHeight;",
+          "      b.x + b.w <= 0 ||\n      top + h <= 0 ||\n      b.x >= canvasWidth ||\n      top >= canvasHeight;"
+        ]
+      ]
+    },
+    "error-kept-while-typing": {
+      "undoes": "RF-6 — typing again clears the rejection message",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "          setDraft((d) => ({ ...d, [field]: e.target.value }));\n          setError(null);\n",
+          "          setDraft((d) => ({ ...d, [field]: e.target.value }));\n"
+        ]
+      ]
+    },
+    "escape-resets-both": {
+      "undoes": "RF-6 — Escape puts back only its own field",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "      setDraft((d) => ({ ...d, [field]: null }));\n      setError(null);",
+          "      setDraft({ width: null, height: null });\n      setError(null);"
+        ]
+      ]
+    },
+    "any-input-is-pair": {
+      "undoes": "RF-6 — only the other size field continues the change; leaving for any other field asks",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "if (other && e.relatedTarget === other) return;",
+          "if (e.relatedTarget instanceof HTMLInputElement) return;"
+        ]
+      ]
+    },
+    "app-shortcut-falls-through": {
+      "undoes": "F1 — ⌘S/⌘D behind a dialog do not open the browser's Save Page or bookmark dialog",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "      if (commandKey(e) && APP_SHORTCUTS.has(e.key.toLowerCase())) e.preventDefault();\n",
+          ""
+        ]
+      ]
+    },
+    "hidden-dialog-takes-keys": {
+      "undoes": "F6 — a dialog inside a hidden, inert part of the page leaves the keys alone",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "  if (content.closest('[inert]')) return false;\n",
+          ""
+        ]
+      ]
+    },
+    "async-prompt-focuses-action": {
+      "undoes": "F2 — the async Duplicated prompt opens with focus on 'Stay here'",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        initialFocus=\"cancel\"\n",
+          ""
+        ]
+      ]
+    },
+    "rejected-side-clears-other": {
+      "undoes": "F3 — a rejected side does not throw away the value typed in the other field",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "      else setDraft((d) => ({ ...d, [bad]: null }));",
+          "      else setDraft({ width: null, height: null });"
+        ]
+      ]
+    },
+    "issues-no-edge-tolerance": {
+      "undoes": "F7 — right and bottom: a turned block drawn half a hundredth past an edge it is flush with is not flagged",
+      "edits": [
+        [
+          "src/poster/boundsCheck.ts",
+          "    if (box.right > canvasWidth + ON_EDGE) edges.push('right');\n    if (box.bottom > canvasHeight + ON_EDGE) edges.push('bottom');",
+          "    if (box.right > canvasWidth) edges.push('right');\n    if (box.bottom > canvasHeight) edges.push('bottom');"
+        ]
+      ]
+    },
+    "inside-check-no-tolerance": {
+      "undoes": "a block flush with the old sheet to within half a hundredth counts as inside, and is moved back inside the new one",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "was.top >= -ON_EDGE && was.bottom <= fromH + ON_EDGE",
+          "was.top >= 0 && was.bottom <= fromH"
+        ]
+      ]
+    },
+    "overlaps-stored-box": {
+      "undoes": "logic F4 — ISSUES overlaps use the box each block is drawn in",
+      "edits": [
+        [
+          "src/poster/boundsCheck.ts",
+          "      const ra = { x: a.x, y: effectiveTop(a, titleOverflow), w: a.w, h: effectiveH(a, measured), rotation: a.rotation };\n      const rb = { x: b.x, y: effectiveTop(b, titleOverflow), w: b.w, h: effectiveH(b, measured), rotation: b.rotation };",
+          "      const ra = { x: a.x, y: effectiveTop(a, titleOverflow), w: a.w, h: effectiveH(a, measured), rotation: 0 };\n      const rb = { x: b.x, y: effectiveTop(b, titleOverflow), w: b.w, h: effectiveH(b, measured), rotation: 0 };"
+        ]
+      ]
+    },
+    "issues-left-top-no-tolerance": {
+      "undoes": "F4 (last round) — left and top: half a hundredth of tolerance",
+      "edits": [
+        [
+          "src/poster/boundsCheck.ts",
+          "    if (box.left < -ON_EDGE) edges.push('left');\n    if (box.top < -ON_EDGE) edges.push('top');",
+          "    if (box.left < 0) edges.push('left');\n    if (box.top < 0) edges.push('top');"
+        ]
+      ]
+    },
+    "on-edge-ten-times": {
+      "undoes": "F4 (last round) — the tolerance is half a hundredth, not five hundredths: 0.01 past an edge is flagged",
+      "edits": [
+        [
+          "src/poster/blockGeometry.ts",
+          "export const ON_EDGE = 0.005 + 1e-9;",
+          "export const ON_EDGE = 0.05 + 1e-9;"
+        ]
+      ]
+    },
+    "inside-check-horizontal-no-tolerance": {
+      "undoes": "F4 (last round) — the horizontal 'was it inside' check allows half a hundredth too",
+      "edits": [
+        [
+          "src/poster/resizeSheet.ts",
+          "was.left >= -ON_EDGE && was.right <= fromW + ON_EDGE",
+          "was.left >= 0 && was.right <= fromW"
+        ]
+      ]
+    },
+    "overlaps-second-stored": {
+      "undoes": "F4 (last round) — the second block of a pair is checked as drawn too",
+      "edits": [
+        [
+          "src/poster/boundsCheck.ts",
+          "h: effectiveH(b, measured), rotation: b.rotation };",
+          "h: effectiveH(b, measured), rotation: 0 };"
+        ]
+      ]
+    },
+    "overlaps-bounding-box": {
+      "undoes": "F1 (last round) — overlaps compare the drawn outlines exactly, not their bounding boxes (which reported blocks inches apart)",
+      "edits": [
+        [
+          "src/poster/boundsCheck.ts",
+          "      if (!(drawnOverlap(ra, rb) > tolerance)) continue;\n",
+          ""
+        ],
+        [
+          "src/poster/boundsCheck.ts",
+          "      const dy = Math.min(A.bottom, B.bottom) - Math.max(A.top, B.top);\n",
+          "      const dy = Math.min(A.bottom, B.bottom) - Math.max(A.top, B.top);\n      if (dx <= tolerance || dy <= tolerance) continue;\n"
+        ]
+      ]
+    },
+    "rotation-not-sanitised": {
+      "undoes": "F3 (last round) — a rotation that is not a finite number is treated as upright",
+      "edits": [
+        [
+          "src/poster/blockGeometry.ts",
+          "  return typeof n === 'number' && Number.isFinite(n) ? n : 0;",
+          "  return n as number;"
+        ]
+      ]
+    },
+    "measure-rounded-height": {
+      "undoes": "F2 (last round) — ISSUES measures a block's height with its fraction, not offsetHeight's whole pixels",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        if (id) next.set(id, Number.isFinite(h) ? h : el.offsetHeight);",
+          "        if (id) next.set(id, el.offsetHeight);"
+        ]
+      ]
+    },
+    "covered-dialog-takes-focus": {
+      "undoes": "L-3 — a dialog covered by a later modal dialog does not take focus when it opens",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "    if (contentRef.current && inView(contentRef.current)) first()?.focus();",
+          "    first()?.focus();"
+        ]
+      ]
+    },
+    "ctrl-d-blocked-on-mac": {
+      "undoes": "L-4 — on a Mac only the ⌘ shortcuts are prevented; Ctrl+D still deletes forward in the typed field",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "  /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? e.metaKey : e.ctrlKey;",
+          "  e.metaKey || e.ctrlKey;"
+        ]
+      ]
+    },
+    "leaving-keeps-draft": {
+      "undoes": "L-1 — leaving both fields after a rejection puts both back to the poster's size",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "      if (leaving) setDraft({ width: null, height: null });\n      else setDraft((d) => ({ ...d, [bad]: null }));",
+          "      setDraft((d) => ({ ...d, [bad]: null }));"
+        ]
+      ]
+    },
+    "outside-change-keeps-draft": {
+      "undoes": "L-1 — a size change from outside the fields clears a kept draft and the message",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "  useEffect(() => {\n    setDraft({ width: null, height: null });\n    setError(null);\n  }, [props.widthIn, props.heightIn]);",
+          "  useEffect(() => {}, [props.widthIn, props.heightIn]);"
+        ]
+      ]
+    },
+    "other-dialog-sees-key": {
+      "undoes": "A7-1 — the dialog that answers a key stops it for every other window listener (another dialog closed on the same Escape)",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "      e.stopImmediatePropagation();\n",
+          "      e.stopPropagation();\n"
+        ]
+      ]
+    },
+    "uncovered-dialog-no-focus": {
+      "undoes": "A7-4 — a dialog uncovered when the dialog over it closes takes focus",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "      focusDialogInView();\n",
+          ""
+        ]
+      ]
+    },
+    "closing-modal-still-covers": {
+      "undoes": "R7L-6 — a modal dialog fading out does not cover this one",
+      "edits": [
+        [
+          "src/components/ConfirmModal.tsx",
+          "    if (other.getAttribute('data-state') === 'closing') continue;\n",
+          ""
+        ]
+      ]
+    },
+    "turn-numbers-only": {
+      "undoes": "A7-6 — a rotation saved as a numeric string is read as the canvas draws it",
+      "edits": [
+        [
+          "src/poster/blockGeometry.ts",
+          "  const n = typeof rotation === 'string' && rotation.trim() !== '' ? Number(rotation) : rotation;",
+          "  const n = rotation;"
+        ]
+      ]
+    },
+    "overlap-no-exact-box-path": {
+      "undoes": "R7L-5 — two upright blocks keep the old overlap test exactly (an overlap of exactly 2.00 is not reported)",
+      "edits": [
+        [
+          "src/poster/blockGeometry.ts",
+          "  if (boxes <= 0 || (turn(a.rotation) % 90 === 0 && turn(b.rotation) % 90 === 0)) return boxes;",
+          "  if (boxes <= 0) return boxes;"
+        ]
+      ]
+    },
+    "sat-first-block-axes-only": {
+      "undoes": "R7L-6 — the exact test uses both blocks' side directions",
+      "edits": [
+        [
+          "src/poster/blockGeometry.ts",
+          "  for (const r of [a, b]) {",
+          "  for (const r of [a]) {"
+        ]
+      ]
+    },
+    "sat-tolerance-ge": {
+      "undoes": "R7L-6 — an overlap equal to the tolerance is not reported",
+      "edits": [
+        [
+          "src/poster/boundsCheck.ts",
+          "if (!(drawnOverlap(ra, rb) > tolerance)) continue;",
+          "if (!(drawnOverlap(ra, rb) >= tolerance)) continue;"
+        ]
+      ]
+    },
+    "commit-keeps-message": {
+      "undoes": "R7L-6 — a commit that succeeds clears the message",
+      "edits": [
+        [
+          "src/poster/sidebar/SheetSizeFields.tsx",
+          "    setDraft({ width: null, height: null });\n    setError(null);\n    if (w === props.widthIn",
+          "    setDraft({ width: null, height: null });\n    if (w === props.widthIn"
+        ]
+      ]
+    }
+  }
+}

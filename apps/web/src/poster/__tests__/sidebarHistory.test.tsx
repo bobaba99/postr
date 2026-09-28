@@ -204,6 +204,26 @@ function freezeClock() {
   return vi.spyOn(Date, 'now').mockImplementation(() => clock);
 }
 
+/**
+ * Confirm the dialog that is open. Since fix 02 a size change and a template
+ * ask first; the dialog mounts within the same act() as the click.
+ */
+function confirmOpenDialog() {
+  const boxes = Array.from(document.querySelectorAll<HTMLElement>('[data-postr-modal-content][data-state="open"]'));
+  const box = boxes[boxes.length - 1];
+  if (!box) throw new Error('no dialog is open');
+  const ok = Array.from(box.querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() !== 'Cancel');
+  fireEvent.click(ok!);
+}
+
+/** Type a whole value into a Layout size field, press Enter, and confirm (fix 02). */
+function commitSizeField(field: 'width' | 'height', value: string) {
+  const input = document.querySelector(`[aria-label="Poster ${field} in inches"]`) as HTMLInputElement;
+  fireEvent.change(input, { target: { value } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  confirmOpenDialog();
+}
+
 /** The sidebar controls exercised, each through a different updateDoc caller. */
 const CONTROLS: Array<{ name: string; tab: RegExp; act: () => void; read: () => unknown }> = [
   {
@@ -223,10 +243,7 @@ const CONTROLS: Array<{ name: string; tab: RegExp; act: () => void; read: () => 
     name: 'Layout › Poster width',
     tab: /layout/i,
     read: () => doc().widthIn,
-    act: () => {
-      const input = document.querySelector('[aria-label="Poster width in inches"]') as HTMLInputElement;
-      fireEvent.change(input, { target: { value: '40' } });
-    },
+    act: () => commitSizeField('width', '40'),
   },
   {
     name: 'Layout › Poster size preset',
@@ -240,6 +257,7 @@ const CONTROLS: Array<{ name: string; tab: RegExp; act: () => void; read: () => 
         (o) => o.value && o.value !== 'custom' && o.value !== select.value,
       )!;
       fireEvent.change(select, { target: { value: other.value } });
+      confirmOpenDialog();
     },
   },
 ];
@@ -277,8 +295,6 @@ const CONTINUOUS: Array<{
   { name: 'Authors › institution city', open: () => openTab(/authors/i), input: () => q('[aria-label="Institution 1 city"]'), values: ['O', 'Os', 'Osl'], read: () => doc().institutions[0]!.location },
   { name: 'Style › title size', open: () => openTab(/style/i), input: () => q('input[title="Font size (points)"]'), values: ['7', '72'], read: () => doc().styles.title.size },
   { name: 'Style › title line height', open: () => openTab(/style/i), input: () => q('input[title="Line height (1.0–3.0)"]'), values: ['1.5', '1.55'], read: () => doc().styles.title.lineHeight },
-  { name: 'Layout › custom width', open: () => openTab(/layout/i), input: () => q('[aria-label="Poster width in inches"]'), values: ['4', '40'], read: () => doc().widthIn },
-  { name: 'Layout › custom height', open: () => openTab(/layout/i), input: () => q('[aria-label="Poster height in inches"]'), values: ['3', '30'], read: () => doc().heightIn },
   { name: 'Edit block › text size', open: openEditBlockTab, input: () => q('input[title="Font size (points)"]'), values: ['2', '24'], read: () => doc().styles.body.size },
   { name: 'Edit block › line spacing slider', open: openEditBlockTab, input: () => q('input[type="range"]'), values: ['1.5', '1.6', '1.7'], read: () => doc().styles.body.lineHeight },
   { name: 'Edit block › line spacing number', open: openEditBlockTab, input: () => q('input[title="Line height (1.0–3.0)"]'), values: ['1.8', '1.85'], read: () => doc().styles.body.lineHeight },
@@ -485,11 +501,15 @@ describe('undo steps are shaped like PowerPoint: a click is one step, typing mer
     expect(row.read(), '⌘Z #2 undoes click 1').toEqual(value0);
   });
 
-  it('typing a width, then a height, is two undo steps', async () => {
+  // Since fix 02 a typed size applies once, when the field is committed and
+  // confirmed (posterSize.test.tsx covers the keystrokes).
+  it('committing a width, then a height, is two undo steps', async () => {
     renderEditor();
     openTab(/layout/i);
-    await typeKeystrokes(q('[aria-label="Poster width in inches"]'), ['4', '40']);
-    await typeKeystrokes(q('[aria-label="Poster height in inches"]'), ['3', '30']);
+    commitSizeField('width', '40');
+    await nextTask();
+    commitSizeField('height', '30');
+    await nextTask();
     await undoKey();
     expect(`${doc().widthIn}x${doc().heightIn}`, '⌘Z #1 undoes only the height').toBe('40x36');
   });
@@ -504,11 +524,11 @@ describe('undo steps are shaped like PowerPoint: a click is one step, typing mer
     expect(doc().styles.body.color, '⌘Z #1 undoes only the reset').toBe('#223344');
   });
 
-  it('a size preset right after typing a custom width is its own step', async () => {
+  it('a size preset right after a committed custom width is its own step', async () => {
     renderEditor();
     openTab(/layout/i);
-    const input = document.querySelector('[aria-label="Poster width in inches"]') as HTMLInputElement;
-    await typeKeystrokes(input, ['4', '40']);
+    commitSizeField('width', '40');
+    await nextTask();
     await actOn(CONTROLS[2]!); // size preset
     await undoKey();
     expect(`${doc().widthIn}x${doc().heightIn}`, '⌘Z #1 undoes only the preset').toBe('40x36');
@@ -599,7 +619,10 @@ describe('a click that changes nothing adds no undo step (F4)', () => {
 });
 
 describe('an undo or redo ends the edit in progress (F2)', () => {
-  const width = () => document.querySelector('[aria-label="Poster width in inches"]') as HTMLInputElement;
+  // A continuous, keyed input: the Style-tab title size. (The custom size
+  // fields were used here until fix 02 made them apply once, on commit.)
+  const size = () => document.querySelector('input[title="Font size (points)"]') as HTMLInputElement;
+  const titleSize = () => doc().styles.title.size;
 
   beforeEach(() => {
     freezeClock();
@@ -608,37 +631,42 @@ describe('an undo or redo ends the edit in progress (F2)', () => {
   it('undo, then typing into the same field again: the next undo stops there', async () => {
     renderEditor();
     typeInto('b1', ' TYPED');
-    openTab(/layout/i);
-    await typeKeystrokes(width(), ['4', '40']);
-    await undoKey(); // back to 48
-    await typeKeystrokes(width(), ['3', '30']);
-    await undoKey(); // must undo only the "30"
-    expect(doc().widthIn).toBe(48);
+    openTab(/style/i);
+    const s0 = titleSize();
+    await typeKeystrokes(size(), ['7', '72']);
+    await undoKey();
+    expect(titleSize()).toBe(s0);
+    await typeKeystrokes(size(), ['6', '64']);
+    await undoKey(); // must undo only the "64"
+    expect(titleSize()).toBe(s0);
     expect(bodyText(), 'the earlier canvas typing survives').toContain('TYPED');
   });
 
   it('redo, then typing into the same field again: the next undo stops at the redo', async () => {
     renderEditor();
     typeInto('b1', ' TYPED');
-    openTab(/layout/i);
-    await typeKeystrokes(width(), ['4', '40']);
+    openTab(/style/i);
+    await typeKeystrokes(size(), ['7', '72']);
+    const s72 = titleSize();
     await undoKey();
-    await redoKey(); // 40 again
-    await typeKeystrokes(width(), ['4', '45']);
+    await redoKey();
+    expect(titleSize()).toBe(s72);
+    await typeKeystrokes(size(), ['6', '64']);
     await undoKey();
-    expect(doc().widthIn, 'undo returns to the redone 40').toBe(40);
+    expect(titleSize(), 'undo returns to the redone 72 pt').toBe(s72);
   });
 
   it('control: with a pause longer than the window the same sequence already works', async () => {
     renderEditor();
     typeInto('b1', ' TYPED');
-    openTab(/layout/i);
-    await typeKeystrokes(width(), ['4', '40']);
+    openTab(/style/i);
+    const s0 = titleSize();
+    await typeKeystrokes(size(), ['7', '72']);
     await undoKey();
     advance(700);
-    await typeKeystrokes(width(), ['3', '30']);
+    await typeKeystrokes(size(), ['6', '64']);
     await undoKey();
-    expect(doc().widthIn).toBe(48);
+    expect(titleSize()).toBe(s0);
     expect(bodyText()).toContain('TYPED');
   });
 });
@@ -648,29 +676,41 @@ describe('undo and redo across a size change keep the credit mark on the sheet (
   /** Inside the sheet, one margin (1 inch = 10 units) in from every edge. */
   const onSheet = (b: { x: number; y: number; w: number; h: number }) =>
     b.x >= 10 && b.y >= 10 && b.x + b.w <= doc().widthIn * 10 - 10 && b.y + b.h <= doc().heightIn * 10 - 10;
-  const height = () => document.querySelector('[aria-label="Poster height in inches"]') as HTMLInputElement;
-
   beforeEach(() => {
     freezeClock();
     usePosterStore.getState().setPoster('fixture-1', makeDoc(), NAME, { seedAcknowledgement: true });
   });
 
-  it('redo after a height typed as "2", "24"', async () => {
-    expect(mark(), 'the poster starts with the mark').toBeDefined();
+  /**
+   * One block filling the sheet above the mark's bottom band. On a 48×36
+   * sheet the mark fits under it; moved onto a 10-inch-high sheet, the band
+   * shrinks below the mark's 12 units, so the size change drops the mark.
+   * (Until fix 02 the drop came from typing "2" on the way to "24"; typed
+   * sizes now apply only when committed.)
+   */
+  function loadFull() {
+    const d = makeDoc();
+    const big = { ...d.blocks[2]!, id: 'big', x: 10, y: 10, w: 460, h: 312 };
+    usePosterStore.getState().setPoster('fixture-1', { ...d, blocks: [big] } as PosterDoc, NAME, { seedAcknowledgement: true });
+    expect(mark(), 'premise: at 48×36 the mark fits under the block').toBeDefined();
+  }
+
+  it('undo and redo across a size change that left no room for the mark', async () => {
+    loadFull();
     renderEditor();
     openTab(/layout/i);
-    await typeKeystrokes(height(), ['2', '24']);
+    commitSizeField('height', '10');
+    await nextTask();
+    expect(doc().heightIn).toBe(10);
+    expect(mark(), 'premise: no room on the 10-inch sheet').toBeUndefined();
     await undoKey();
     expect(doc().heightIn).toBe(36);
     expect(mark() && onSheet(mark()!), 'after ⌘Z the mark is back on the sheet').toBe(true);
     await redoKey();
-    expect(doc().heightIn).toBe(24);
-    // The redone doc lacks the mark (typing "2" dropped it). Redo must not
-    // advance into a state without the credit while the sheet has room for
-    // it, and must put it ON this sheet.
-    const m = mark();
-    expect(m, 'redo keeps the credit').toBeDefined();
-    expect(onSheet(m!), `mark at y=${m!.y} h=${m!.h} on a ${doc().heightIn * 10}-unit sheet`).toBe(true);
+    expect(doc().heightIn).toBe(10);
+    // Redo must not bring the mark back at the tall sheet's coordinates:
+    // there is no room for it on this one.
+    expect(mark()).toBeUndefined();
   });
 
   it('an unrelated undo leaves a mark the user placed over content exactly where it is', async () => {
@@ -692,13 +732,16 @@ describe('undo and redo across a size change keep the credit mark on the sheet (
   });
 
   it('a template after a size change that dropped the mark does not bring it back off the sheet', async () => {
+    loadFull();
     renderEditor();
     openTab(/layout/i);
-    await typeKeystrokes(height(), ['2']); // a 2-inch sheet has no room for the mark
+    commitSizeField('height', '10');
+    await nextTask();
     expect(mark(), 'premise: the mark was dropped').toBeUndefined();
     await clickButton('3-Column Classic');
-    // A 2-inch sheet has no room, so the mark stays dropped rather than
-    // coming back at the old sheet's coordinates.
+    confirmOpenDialog();
+    await nextTask();
+    // Nothing brings the mark back at the tall sheet's coordinates.
     expect(mark()).toBeUndefined();
   });
 });

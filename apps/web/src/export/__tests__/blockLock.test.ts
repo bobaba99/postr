@@ -14,6 +14,7 @@ import {
   preserveLocked,
 } from '../blockLock';
 import { usePosterStore } from '@/stores/posterStore';
+import { ACK_BLOCK_ID } from '@/export/ackBlock';
 import { makeFixtureDoc, baseBlock } from './fixtures';
 
 const locked = (over: Partial<Block> = {}): Block =>
@@ -212,6 +213,22 @@ describe('undo / redo cannot remove the locked block', () => {
     usePosterStore.getState().undo();
     usePosterStore.getState().redo();
     expect(ids()).toContain('ack');
+  });
+
+  // The test above cannot fail: `setBlocks` puts the block back itself, so the
+  // redone document always has it. This one reaches the case the redo guard
+  // exists for — a redone document that LACKS the credit mark, as a size
+  // change leaves one when it drops the mark (a patchDoc without it) — on a
+  // sheet with room for it. Store contract; found by the review of fix 02.
+  it('REDO puts back the credit mark the redone document lacks, when there is room', () => {
+    const mark = locked({ id: ACK_BLOCK_ID, type: 'logo', x: 10, y: 338, w: 12, h: 12 });
+    seed([plain('a', { x: 20, y: 20, w: 200, h: 100 }), mark]);
+    usePosterStore.getState().patchDoc({ blocks: [plain('a', { x: 20, y: 20, w: 200, h: 100 })] });
+    expect(ids(), 'premise: the patch dropped the mark').not.toContain(ACK_BLOCK_ID);
+    usePosterStore.getState().undo();
+    expect(ids()).toContain(ACK_BLOCK_ID);
+    usePosterStore.getState().redo();
+    expect(ids(), 'redo keeps the credit').toContain(ACK_BLOCK_ID);
   });
 
   it('a locked block MOVED then undone keeps the move reverted but stays present', () => {
