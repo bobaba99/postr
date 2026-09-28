@@ -207,8 +207,11 @@ export function useAutosave(
           ? stripHtml(titleBlock.content).trim()
           : '';
       }
-      // If title block content was used, also push it back to the store
-      // so the sidebar Poster Name field shows the auto-filled value
+      // Does NOT write back to the store, so the sidebar's Poster name field
+      // keeps the store's value (an earlier comment said it did; it never
+      // has). The ref is re-synced from `displayTitle` on every render, so
+      // this assignment lasts only until then; later saves derive the title
+      // the same way again.
       if (titleText && !pendingTitleRef.current?.trim()) {
         pendingTitleRef.current = titleText;
       }
