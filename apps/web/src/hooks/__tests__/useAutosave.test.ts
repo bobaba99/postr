@@ -109,6 +109,9 @@ describe('useAutosave', () => {
     expect(upsertMock).toHaveBeenCalledTimes(1);
     expect(upsertMock).toHaveBeenCalledWith('poster-1', {
       data: expect.objectContaining({ fontFamily: 'Lora' }),
+      // Every save keeps the row's size columns in step (fix 02, cause E).
+      widthIn: 48,
+      heightIn: 36,
     });
   });
 
@@ -226,6 +229,9 @@ describe('useAutosave', () => {
     expect(upsertMock).toHaveBeenCalledTimes(1);
     expect(upsertMock).toHaveBeenCalledWith('poster-1', {
       data: expect.objectContaining({ fontFamily: 'Merriweather' }),
+      // Every save keeps the row's size columns in step (fix 02, cause E).
+      widthIn: 48,
+      heightIn: 36,
     });
   });
 });

@@ -1,0 +1,48 @@
+{
+  "tests": [
+    "src/poster/__tests__/autosaveSheetSize.test.tsx",
+    "src/data/__tests__/posters.test.ts"
+  ],
+  "mutants": {
+    "autosave-omits-size": {
+      "undoes": "cause E — every save writes the row's width_in/height_in",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "        ...(Number.isFinite(widthIn) && Number.isFinite(heightIn) ? { widthIn, heightIn } : {}),\n",
+          ""
+        ]
+      ]
+    },
+    "duplicate-copies-row-columns": {
+      "undoes": "cause E — a duplicate takes its size from the poster, not stale row columns",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "      width_in: size.widthIn,\n      height_in: size.heightIn,",
+          "      width_in: source.width_in,\n      height_in: source.height_in,"
+        ]
+      ]
+    },
+    "duplicate-ignores-row": {
+      "undoes": "a duplicate whose data lost its size takes the source row's usable size before the default",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  const size = usableSheetSize(sourceDoc?.widthIn, sourceDoc?.heightIn, {\n    widthIn: source.width_in,\n    heightIn: source.height_in,\n  });",
+          "  const size = usableSheetSize(sourceDoc?.widthIn, sourceDoc?.heightIn);"
+        ]
+      ]
+    },
+    "fallback-unchecked": {
+      "undoes": "a fallback size (the row's columns) is itself checked before it is used",
+      "edits": [
+        [
+          "src/poster/constants.ts",
+          "    widthIn: sheetInches(widthIn, sheetInches(fallback.widthIn, d.w)),\n    heightIn: sheetInches(heightIn, sheetInches(fallback.heightIn, d.h)),",
+          "    widthIn: sheetInches(widthIn, (fallback.widthIn as number) ?? d.w),\n    heightIn: sheetInches(heightIn, (fallback.heightIn as number) ?? d.h),"
+        ]
+      ]
+    }
+  }
+}
