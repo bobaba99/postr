@@ -1,6 +1,6 @@
 # Fix 03 — "Fit" cuts off the poster's far edge, and the zoom controls can zoom the wrong way
 
-**Plan item:** 3 · **Branches:** `editor/fit-whole-sheet` (the fit and the zoom floors), `editor/guidelines-closed-small-screens` (the panel's default) · **Status:** in progress
+**Plan item:** 3 · **Branches:** `editor/fit-whole-sheet` (A: the fit; B: the zoom floors), `editor/guidelines-closed-small-screens` (C: the panel's default; D: the house focus ring, found by C's review) · **Status:** in progress
 
 ## 1. Symptom
 
@@ -84,6 +84,18 @@ screens** (viewport narrower than 1600 px).
   a scroll on either axis. The zoom-floor scenarios now stop with an error
   when their precondition (a fit below the floor) fails, instead of
   reporting it as a field nobody reads.
+- After cause C, the first full run stopped with 20 errors (exit 2), all
+  "panel closed" scenarios below 1600 px. The harness closed the panel by
+  clicking its "Hide" button whenever that button was in the page, but a
+  closed panel keeps it, clipped to zero width, so Playwright waited 30 s
+  to click something invisible. The panel's state is now read from the
+  "Show" toggle, which exists only while it is closed.
+- The first keyboard instrument walked the whole page with Tab (400
+  presses). It was no instrument: it got stuck in a table cell on the
+  poster, which keeps Tab for itself, and where it started depended on what
+  had last been clicked (one run reported 0 for that reason alone). It now
+  focuses the rail's own reopen toggle and presses Shift+Tab, with a
+  control that an open rail's controls still take focus.
 
 ## 4. Results before the fix
 
@@ -204,6 +216,12 @@ that no longer agree.**
 - **C (the panel).** `useState(true)`: the guidelines panel opens at every
   width.
 
+- **D (the focus ring), found by cause C's third review.** The house
+  `:focus-visible` ring in `index.css` was written for buttons styled with
+  `all: 'unset'`, but that is an inline style: an inline declaration beats
+  a stylesheet rule that is not `!important`, so the ring never drew on
+  them. Cause C moves keyboard focus to two such buttons.
+
 **What these do not explain:** the fit's 100% fallback for a canvas smaller
 than the gutter (a separate guard, `ratio > 0 ? ratio : 1`, made easier to
 reach by a larger gutter, so it is fixed with A); the ruler's centring error
@@ -283,7 +301,126 @@ One floor for every zoom control, in `workspaceGeometry.ts`:
 - The pinch reads the fit from a ref kept in step with each render, as it
   already did for the zoom.
 
+### Cause C — the guidelines panel's first state (branch `editor/guidelines-closed-small-screens`)
+
+The panel starts closed when the window is narrower than 1600 px (owner
+decision). `PosterEditor` reads `matchMedia('(max-width: 1599px)')` once,
+in the state's initialiser:
+- So the first render, and the first fit, already have the wider canvas.
+- Resizing the window later never opens or closes the panel under the
+  user; the toggle does.
+- The choice is not remembered between visits, as before.
+
+The branch is stacked on `editor/fit-whole-sheet` because its tests use the
+shared `workspaceKit.ts`.
+
+**After the code review** (each finding reproduced first):
+- HIGH, reproduced with a failing test: the phone share view now rendered
+  the "Show poster guidelines" toggle. There the panel is never drawn, and
+  the share bar covers the toggle. It is gated like the sidebar's reveal
+  tab (`!mobileShare`), with a test and a desktop-share control.
+- MEDIUM: the guard read `window.matchMedia` without checking that `window`
+  exists. The panel's first state now goes through `mediaQueryMatches`,
+  exported from `useIsSmallScreen.ts`, the same guarded read every other
+  call site uses. It is not a live bug: nothing renders React outside a
+  browser (`scripts/prerender.mjs` only injects strings).
+- LOW: the constant sits next to its use, and its comment says "1599 px
+  wide or narrower".
+
+**A sibling, found by measuring** (section 8): a closed panel is clipped to
+zero width, not removed, so its 40 controls stayed in the keyboard's reach,
+invisible, on main too. Cause C makes the closed panel the default on most
+laptops, so the panel is now `inert` while closed (and always on the phone
+share view). The editor already used `inert` for preview mode.
+
+**After the second code review, with three independent reproducers.** The
+review reported two HIGH hypotheses from reading the code. Before any
+change, a workflow ran three reproducers on frozen copies of main and of the
+fix. Each had its own scope and its own instruments:
+- **T:** the onboarding tour.
+- **F:** keyboard focus when a panel closes.
+- **S:** a sweep for anything `inert` breaks.
+
+I measured the same two hypotheses with `fit-check.mjs`. Every claim below
+is MEASURED on both trees, by the reproducer and by `fit-check.mjs`, unless
+marked otherwise.
+- **The tour's last step pointed at nothing (regression from cause C).**
+  Below 1600 px the step measured the closed panel, which sits off the
+  window's right edge, and dimmed the whole editor. It now takes selectors
+  in order of preference, and points at the panel's "Show" toggle while the
+  panel is closed. The copy says "Open it when you need it; close it to give
+  the canvas more room", which is true in both states.
+- **Three more tour defects, all on main too, with the same cause** (the
+  tour measures a target without making it visible):
+  - a sidebar step after the user collapsed the sidebar mid-tour
+    highlighted an empty strip; the tour now opens the sidebar first;
+  - step 7's export button sat below its panel's scroll; the tour now
+    scrolls a target into view before measuring it;
+  - a highlight touching the window's top or left edge gave a dimming strip
+    a negative size, which the browser drops, so the previous step's strip
+    stayed over the highlight (reproducer T). The strips are now clamped to
+    the window.
+- **Keyboard focus when the panel closes or opens.** On main, closing the
+  panel from its focused "Hide" button left focus on that button,
+  invisible. With the panel inert, focus fell to `<body>`. Opening it from
+  its "Show" toggle dropped focus to `<body>` on both trees, because the
+  toggle leaves the page. `useGuidelinesFocus` now moves focus to the toggle
+  on close, and to the panel's "Hide" button on open. It only moves focus
+  that was already on the panel or its toggle; a mouse click with focus
+  elsewhere moves nothing.
+- **Reverted: the sidebar's `inert`.** The first version made the collapsed
+  sidebar inert too. Reproducer S measured what that did to ⌘/ from a
+  sidebar field with a block selected: focus fell to `<body>`, and the next
+  Backspace deleted the selected block silently (14 → 13 blocks; ⌘Z brings
+  it back). Arrow keys nudged it, and a sheet-size field committed on the
+  blur. On main the same keys edit the hidden field instead. Moving focus
+  to the "Show sidebar" tab would not help, because the canvas shortcuts
+  act whenever focus is not in a text field. Which of those behaviours is
+  right is an owner call. The sidebar's default did not change in this fix,
+  so the sidebar is back to main's behaviour and its keyboard problems are
+  handed on (section 10).
+
+**After the third review** (two reviewers, split: code correctness, and
+what users experience; each MEDIUM finding reproduced in Chromium first):
+- **The tour now follows its target every frame while a step is shown.**
+  It used to measure only on step changes. At the last step, a user who
+  clicked the highlighted toggle got a highlight 842 px from the panel it
+  opened. The step's text now matches the state: "Open it with this
+  button…" on the toggle, "Close it to give the canvas more room" on the
+  panel.
+- **A target is scrolled only vertically, inside its own panel.**
+  `scrollIntoView` also scrolled the sidebar's clipped wrapper while it
+  slid open, which put step 2's highlight 144 px off its target after the
+  tour reopened a collapsed sidebar. A target taller than its panel (the
+  canvas when zoomed in) is not scrolled at all.
+- **The sidebar is opened only when the step changes**, never on a resize
+  or when a modal closes.
+- **The dimming strips are clamped on all four sides**, each with a test.
+  The tests wait for the tour to appear instead of a fixed 900 ms.
+- **Closing the panel records where focus is** at the moment of closing,
+  in the Hide handler, rather than relying on when a browser moves focus
+  out of an inert element.
+- **In Chromium a mouse click moves focus the same way**, because Chromium
+  focuses a clicked button. A Chromium control confirms that no ring shows
+  after a click (`:focus-visible` false).
+
+### Cause D — the house focus ring (same branch, own commit)
+
+`button:focus-visible` in `index.css` now sets the outline and its offset
+`!important`, so the ring draws on buttons styled with an inline
+`all: 'unset'`, as the rule's own comment always said it should. Only the
+outline is `!important`; the radius stays each button's own. Nothing else
+sets a button's focus outline; the three inline `outline: 'none'` in the
+app are on inputs, which the rule does not touch.
+
 ## 8. Results after the fix
+
+**All three causes together** (`fit-check.mjs`, the complete run on the final
+code, MEASURED): exit 0, no scenario errored, every control passed. H1 0 of
+88; H2 0 of 1; H3 0 of 1; H4 0 of 7; H4k 0 of 4; H5 0 of 2; H6 0 of 2; the
+ruler guard Hr 0 of 88 (the filled-axis error is 24 px in 88 of 88, as on
+main). Handles under the ruler (information only): 4 of 12, as measured
+after cause A.
 
 ### Cause A
 
@@ -359,4 +496,187 @@ four tests.
 6 of 6 killed. One documented blind spot: Zoom in without the clamp survives,
 because reaching the 10× ceiling takes more than 60 clicks from a normal fit.
 The ceiling is `ZOOM_MAX`, shared with the pinch and unchanged from main.
+
+### Cause C
+
+**jsdom:** `guidelinesDefault.test.tsx` 6 of 6 pass (4 fail on main,
+section 4): closed at 1280, 1440 and 1599 px; open at 1600 and 1920 px;
+still openable on a small screen. `shareMobile.test.tsx` (the phone share
+view hides the rails) still passes.
+
+**The keyboard and the closed panel** (`fit-check.mjs`, claim H4k,
+MEASURED; 1280 and 1920 px windows). Focus on the toggle that reopens the
+closed panel, then press Shift+Tab three times:
+
+| | main | fix |
+|---|---|---|
+| guidelines panel | 40 focusable controls inside; 3 of 3 presses land inside | 0 focusable; 0 of 3 |
+| sidebar (information only, handed on) | 29 focusable; 3 of 3 | unchanged: 29; 3 of 3 |
+| control: an open rail's control takes focus | yes (both rails) | yes (both rails) |
+
+**Focus and the tour** (`fit-check.mjs`, claims Hf and Ht, MEASURED):
+
+| | main | fix |
+|---|---|---|
+| Hf: close the panel from its focused "Hide" button (1920) | focus on "Hide guidelines", invisible | on "Show poster guidelines", visible |
+| Hf: open it from its focused "Show" toggle (1280) | `<body>` | on "Hide guidelines", visible |
+| Ht: the tour's last step at 1280, 1440, 1599 px | highlight 100% visible (panel open) | 92% visible, on the toggle (panel closed) |
+| Ht: the last step at 1600 and 1920 px | 100% | 100% |
+| Ht: dimming over the last step's own highlight (1440, 1920) | 293,400 px² | 0 |
+| Ht: step 7, the export button (1280, 1440, 1920) | 0 visible (below its panel's scroll) | 86% visible |
+| Ht: a sidebar step after ⌘/ collapsed the sidebar mid-tour | 0 visible | 100% visible |
+| control: ⌘/ with focus outside the sidebar | focus stays on "Zoom in" | the same |
+
+The two sidebar focus cases (closing it with ⌘/ from a field) are recorded
+as information and handed on: on both trees focus stays on the hidden field.
+
+A Tab walk from the top of the page gets stuck in a table cell on the poster
+(the cell keeps Tab). That trap was there on main, and it is handed on
+(section 10).
+
+**jsdom:** `guidelinesDefault.test.tsx` 16 of 16 pass. That includes the
+phone share view without the toggle, with a desktop-share control; the panel
+inert only while closed; focus on close and on open, with a mouse control;
+and the tour's last step, stale dimming and collapsed-sidebar step. Each was
+red before its part of the fix. The full suite: 2961 of 2961 in 180 files.
+
+**Mutation check** (`03-fit-whole-sheet.panel.mutants.json`, MEASURED):
+11 of 11 killed:
+- always open, always closed, and the threshold off by one pixel;
+- the toggle back on the phone share view, and the panel no longer inert;
+- focus not moved on close, not moved on open, and moved on every open;
+- the tour's last step on the panel only, no sidebar reveal, and unclamped
+  strips.
+
+Two documented blind spots:
+- reading `window.matchMedia` without the guarded helper (every test
+  environment here has both);
+- the tour's scroll-into-view (jsdom does not scroll; `fit-check.mjs`
+  measures it, 0 → 86% visible).
+
+## 9. Review of the fix
+
+(Written after the independent review.)
+
+## 10. Limits and follow-ups
+
+**Owner calls made here** (each can be reversed on request):
+- **The phone share view keeps its own 8 px gutter.** The owner's 64 px is
+  for the desktop workspace; on a 375 px phone it would take a third of the
+  width.
+- **A canvas narrower than two gutters gets a smaller gutter** (a quarter of
+  the canvas per side), not the old 100% fallback. There, handles can sit
+  under the rulers.
+- **The panel's first state is read once.** Crossing 1600 px later neither
+  opens nor closes it, and the choice is not remembered between visits
+  (as before).
+- **The closed guidelines panel is inert, and focus follows it** (to the
+  toggle on close, into the panel on open, only when focus was already
+  there). The sidebar is not made inert: its focus after ⌘/ is handed on.
+- **The tour's last step points at the closed panel's toggle** rather than
+  opening the panel, so the tour leaves the panel as the owner decided it
+  should start. A sidebar step does open a sidebar the user collapsed: a
+  tab in a closed sidebar shows nothing.
+
+**Accepted limits of this fix:**
+- **The whole-pixel floor in the fit is UNVERIFIED as necessary.** Nothing
+  measured produces a fractional canvas (section 8). It costs under a pixel.
+- **A new poster size is drawn at the old fit for one render** before the
+  fit catches up (the code review's suggestion, not taken). It was already
+  so on main.
+- **Zoom in has no test of its 10× ceiling**: that takes more than 60 clicks
+  (documented blind spot). The fit is still capped at 5×.
+
+**Handed on** (existed before this fix, or outside its causes; to go into
+`docs/stress-test/PLAN.md`):
+- **Rulers (plan item 4).** On the axis where the sheet is centred, the 0"
+  mark is off, and more so after this fix: the sheet sits deeper in the
+  canvas (section 8, for example −124 → −181.5 px). On the filled axis it is
+  24 px off, the ruler bar's own inset, before and after. `fit-check.mjs`
+  guards the filled axis (Hr); item 4 must update that guard.
+- **Handles under the ruler at large fitted zooms.** The handle row is drawn
+  inside the zoomed sheet, 24 × zoom px above its block, so no fixed gutter
+  clears the 24 px ruler at every zoom. 2 of 12 measured cases on main, 4 of
+  12 after this fix; the worst is −19.7 px, where the row starts above the
+  canvas. The rulers let clicks through, so the handles still work where
+  they are visible. The options (handles at a fixed screen size, or a
+  larger gutter) are the owner's.
+- **The collapsed sidebar and the keyboard** (MEASURED by reproducers F and
+  S, and by `fit-check.mjs`; the same on main and the fix). The collapsed
+  sidebar is clipped, not removed:
+  - 29 of its controls stay in the Tab order, invisible;
+  - ⌘/ from a sidebar field leaves focus in that field, and typing edits it
+    unseen (6 of 6; with Enter the poster name is saved);
+  - making it inert (tried here, then reverted, section 7) sends focus to
+    `<body>`, and then Backspace deletes the selected block;
+  - opening it with its "Show sidebar" tab drops focus to `<body>`.
+
+  Where focus should go after ⌘/ is an owner call. Also found by S, on
+  main too:
+  - "Comment on selection" with the sidebar collapsed mounts the draft in
+    the hidden sidebar and silently switches the canvas to review mode;
+  - dialogs rendered inside the sidebar without `aria-modal`
+    (ImportConfirmReplaceModal, CopyDesignModal, ImportPosterModal) are
+    drawn inside its 484 px rail, because a GSAP entrance leaves a transform
+    on it, and ⌘/ can hide them while they are open.
+- **A table cell keeps Tab** (MEASURED by reproducer F): from a fresh load,
+  120 Tabs end stuck in a table cell on the poster, on main and the fix.
+  `blocks.tsx` `onCellKeyDown` prevents every Tab, and the last cell moves
+  nowhere. So forward Tab from the top never reaches the guidelines toggle;
+  Shift+Tab does.
+- **`PosterEditor` calls hooks after an early return** (`if (!doc ||
+  !posterId) return …`), which breaks React's rule of hooks. INSPECTED only;
+  offered as a separate task.
+- **From the confirmers** (section 5), not changed here:
+  - the phone share view's bottom bars cover 32–50 px of the fitted poster;
+  - the desktop share page shows the guidelines panel and the rulers to a
+    read-only visitor (an owner question: should read-only viewers get
+    them at all?);
+  - the "frame grows with overflowing text" mechanism (`canvasOverflow`)
+    never fires in a browser, and fix 02's test of it models a browser
+    behaviour that does not happen;
+  - undoing a size change keeps a manual zoom;
+  - the fit is capped at 5× while manual zoom goes to 10×.
+- **Browsers:** only Chromium was measured. Firefox and WebKit are not
+  installed here.
+
+**After the third review** (`fit-check.mjs`, MEASURED, before → after the
+third round, on the fix):
+
+| | before | after |
+|---|---|---|
+| Hp: step 2 after the tour reopened a collapsed sidebar, highlight's distance from the import tile | 144 px | 0 px |
+| Hp: the last step after the user opens the panel from the toggle, distance from the panel | 842 px | 0.2 px |
+| Ht: step 7, the export button | 86% visible | 100% |
+| control: a mouse click on the toggle | — | focus on "Hide guidelines", no ring |
+
+**jsdom:** `guidelinesDefault.test.tsx` 19 of 19. The full suite: 2964 of
+2964 in 180 files.
+
+**Mutation check** (`03-fit-whole-sheet.panel.mutants.json`, MEASURED): 17 of
+17 killed:
+- the default, its threshold, the phone share toggle, and the panel's
+  `inert`;
+- focus on close and on open, each "never" and "always";
+- the tour: the toggle target, the sidebar reveal, following the target,
+  the text, and each of the four strip clamps.
+
+Three documented blind spots: the unguarded media read, and the two scroll
+mutants (scrolling everything, not scrolling). jsdom cannot scroll, so
+`fit-check.mjs` guards them (Hp, Ht).
+
+### Cause D
+
+**Chromium, `fit-check.mjs`** (claim Hr2, MEASURED): every button in the
+editor with an inline `all: 'unset'` that keyboard focus can reach, focused
+after a key press so `:focus-visible` applies:
+
+| | main | fix |
+|---|---|---|
+| buttons that match `:focus-visible` but draw no ring | 11 of 11 (the sidebar tabs among them) | 0 of 11 |
+| the guidelines panel's Show toggle and Hide button, after Enter | — | outline solid, both |
+
+The instrument's first version found 0 buttons: the browser expands `all`
+into every longhand in the style attribute, so a regex on "all: unset" never
+matched. It now looks for an inline `outline-style`.
 

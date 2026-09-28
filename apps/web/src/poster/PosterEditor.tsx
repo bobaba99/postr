@@ -30,7 +30,7 @@ import { usePosterStore } from '@/stores/posterStore';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
 import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import { useAutosave } from '@/hooks/useAutosave';
-import { useIsSmallScreen } from '@/hooks/useIsSmallScreen';
+import { mediaQueryMatches, useIsSmallScreen } from '@/hooks/useIsSmallScreen';
 import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
 import { useGsapContext } from '@/motion';
 import { editorEntrance } from '@/motion/timelines/editorEntrance';
@@ -538,6 +538,32 @@ function modalDialogOpen(): boolean {
   return document.querySelector('[role="dialog"][aria-modal="true"]:not([data-state="closing"])') !== null;
 }
 
+/**
+ * Keyboard focus follows the guidelines panel (fix 03). Closing it with
+ * focus inside moves focus to its "Show" toggle: the closed panel is inert,
+ * so focus left inside would fall to <body> (before it was inert, it stayed
+ * on a button nobody could see). Opening it from a focused "Show" toggle
+ * moves focus to the panel's "Hide" button, since the toggle leaves the
+ * page as the panel opens. Whoever opens or closes the panel sets
+ * `focusFollowsRef` first, from where focus is at that moment, so this
+ * does not depend on when a browser moves focus out of an inert element.
+ * (Chromium focuses a button on a mouse click too, so a click moves focus
+ * the same way; no ring shows, as :focus-visible is for the keyboard.)
+ */
+function useGuidelinesFocus(
+  open: boolean,
+  panelRef: React.RefObject<HTMLDivElement | null>,
+  openerRef: React.RefObject<HTMLButtonElement | null>,
+  focusFollowsRef: React.RefObject<boolean>,
+) {
+  useLayoutEffect(() => {
+    if (!focusFollowsRef.current) return;
+    focusFollowsRef.current = false;
+    if (open) panelRef.current?.querySelector<HTMLElement>('[data-postr-guidelines-hide]')?.focus();
+    else openerRef.current?.focus();
+  }, [open, panelRef, openerRef, focusFollowsRef]);
+}
+
 function useZoom(
   canvasRef: React.RefObject<HTMLDivElement | null>,
   /** The poster's own size in inches — never a preset's. */
@@ -604,6 +630,9 @@ function useZoom(
 // =========================================================================
 // PosterEditor
 // =========================================================================
+
+/** Windows 1599 px wide or narrower open the editor with the guidelines panel closed. */
+const GUIDELINES_CLOSED_QUERY = '(max-width: 1599px)';
 
 export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) {
   const doc = usePosterStore((s) => s.doc);
@@ -723,7 +752,15 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   useEffect(() => {
     if (mobileShare) setSidebarOpen(false);
   }, [mobileShare]);
-  const [guidelinesOpen, setGuidelinesOpen] = useState(true);
+  // The guidelines panel takes 320 px. Below 1600 px wide that leaves too
+  // little canvas (476 px at 1280 with the sidebar also open), so it starts
+  // closed there (owner decision, fix 03). Read once: resizing the window
+  // later never opens or closes it behind the user's back.
+  const [guidelinesOpen, setGuidelinesOpen] = useState(() => !mediaQueryMatches(GUIDELINES_CLOSED_QUERY));
+  const guidelinesPanelRef = useRef<HTMLDivElement | null>(null);
+  const guidelinesOpenerRef = useRef<HTMLButtonElement | null>(null);
+  const guidelinesFocusFollowsRef = useRef(false);
+  useGuidelinesFocus(guidelinesOpen, guidelinesPanelRef, guidelinesOpenerRef, guidelinesFocusFollowsRef);
   const [previewMode, setPreviewMode] = useState(false);
   // Lifted from Sidebar so the Check tab can render a draggable
   // figure-size overlay on the canvas — needs to know which tab
@@ -2681,6 +2718,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       {/* Notion-style reveal tab when the sidebar is hidden. */}
       {!sidebarOpen && !mobileShare && (
         <button
+          data-postr-sidebar-reveal
           aria-label="Show sidebar"
           title="Show sidebar (⌘/)"
           onClick={() => setSidebarOpen(true)}
@@ -3384,6 +3422,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           `minHeight: 0` load-bearing combo as the sidebar wrapper so
           the inside panel's own scroll container bounds correctly. */}
       <div
+        // Closed (or on the phone share view), inert: clipped to zero
+        // width, its controls would otherwise stay in the keyboard's
+        // reach, invisible (fix 03).
+        ref={guidelinesPanelRef}
+        inert={guidelinesOpen && !mobileShare ? undefined : true}
         style={{
           flex: '0 0 auto',
           // Hidden outright on the mobile share view: a 320px fixed
@@ -3404,7 +3447,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
             'width 280ms var(--ease-out), min-width 280ms var(--ease-out)',
         }}
       >
-        <GuidelinesPanel open={guidelinesOpen} onToggle={() => setGuidelinesOpen((v) => !v)} />
+        <GuidelinesPanel
+          open={guidelinesOpen}
+          onToggle={() => {
+            guidelinesFocusFollowsRef.current = guidelinesPanelRef.current?.contains(document.activeElement) ?? false;
+            setGuidelinesOpen((v) => !v);
+          }}
+        />
       </div>
 
       {/* Show guidelines toggle when panel is closed.
@@ -3412,10 +3461,15 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           collide with the AutosaveStatusPill (which also lives in the
           top-right corner). The ZoomBar is centered horizontally at
           the bottom, so bottom-right is free real estate. */}
-      {!guidelinesOpen && (
+      {!guidelinesOpen && !mobileShare && (
         <button
+          ref={guidelinesOpenerRef}
+          data-postr-guidelines-toggle
           title="Show poster guidelines"
-          onClick={() => setGuidelinesOpen(true)}
+          onClick={(e) => {
+            guidelinesFocusFollowsRef.current = document.activeElement === e.currentTarget;
+            setGuidelinesOpen(true);
+          }}
           style={{
             all: 'unset',
             position: 'fixed',

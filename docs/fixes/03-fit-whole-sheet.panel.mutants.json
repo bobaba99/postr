@@ -1,0 +1,216 @@
+{
+  "tests": [
+    "src/poster/__tests__/guidelinesDefault.test.tsx",
+    "src/poster/__tests__/shareMobile.test.tsx",
+    "src/poster/__tests__/fitWholeSheet.test.tsx",
+    "src/hooks/__tests__/useIsSmallScreen.test.tsx"
+  ],
+  "mutants": {
+    "panel-always-open": {
+      "undoes": "C (H4) \u2014 below 1600 px the panel starts closed",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const [guidelinesOpen, setGuidelinesOpen] = useState(() => !mediaQueryMatches(GUIDELINES_CLOSED_QUERY));",
+          "  const [guidelinesOpen, setGuidelinesOpen] = useState(true);"
+        ]
+      ]
+    },
+    "panel-always-closed": {
+      "undoes": "C \u2014 from 1600 px up the panel still starts open",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const [guidelinesOpen, setGuidelinesOpen] = useState(() => !mediaQueryMatches(GUIDELINES_CLOSED_QUERY));",
+          "  const [guidelinesOpen, setGuidelinesOpen] = useState(false);"
+        ]
+      ]
+    },
+    "threshold-off-by-one": {
+      "undoes": "C \u2014 exactly 1600 px is a wide screen (panel open)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "const GUIDELINES_CLOSED_QUERY = '(max-width: 1599px)';",
+          "const GUIDELINES_CLOSED_QUERY = '(max-width: 1600px)';"
+        ]
+      ]
+    },
+    "toggle-on-phone-share": {
+      "undoes": "C (code review) \u2014 the phone share view, which never draws the panel, shows no toggle for it",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      {!guidelinesOpen && !mobileShare && (",
+          "      {!guidelinesOpen && ("
+        ]
+      ]
+    },
+    "unguarded-media-read": {
+      "undoes": "C (code review) \u2014 the first state is read through the guarded mediaQueryMatches (no window during a prerender, no matchMedia in some tests)",
+      "expect": "survive",
+      "why": "every test environment here has a window and matchMedia; the guard itself is useIsSmallScreen's, covered by its own tests; no code path prerenders React today (scripts/prerender.mjs only injects strings)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const [guidelinesOpen, setGuidelinesOpen] = useState(() => !mediaQueryMatches(GUIDELINES_CLOSED_QUERY));",
+          "  const [guidelinesOpen, setGuidelinesOpen] = useState(() => !window.matchMedia(GUIDELINES_CLOSED_QUERY).matches);"
+        ]
+      ]
+    },
+    "guidelines-not-inert": {
+      "undoes": "C (sibling) \u2014 the closed guidelines panel is out of the keyboard's reach",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        inert={guidelinesOpen && !mobileShare ? undefined : true}\n",
+          ""
+        ]
+      ]
+    },
+    "tour-last-step-panel-only": {
+      "undoes": "C (review 2) \u2014 the tour's last step points at the toggle while the panel is closed",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "    selector: ['[data-postr-guidelines-toggle]', '[data-postr-guidelines]'],",
+          "    selector: '[data-postr-guidelines]',"
+        ]
+      ]
+    },
+    "close-focus-not-moved": {
+      "undoes": "C (review 2) \u2014 closing the panel with focus inside moves focus to its Show toggle",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    else openerRef.current?.focus();\n",
+          ""
+        ]
+      ]
+    },
+    "open-focus-not-moved": {
+      "undoes": "C (review 2) \u2014 opening the panel from its focused toggle moves focus to its Hide button",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    if (open) panelRef.current?.querySelector<HTMLElement>('[data-postr-guidelines-hide]')?.focus();",
+          "    if (open) void 0;"
+        ]
+      ]
+    },
+    "open-focus-always": {
+      "undoes": "C (review 2) \u2014 opening moves focus only when the toggle itself had focus",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "            guidelinesFocusFollowsRef.current = document.activeElement === e.currentTarget;",
+          "            guidelinesFocusFollowsRef.current = true;"
+        ]
+      ]
+    },
+    "close-focus-always": {
+      "undoes": "C (review 3) \u2014 closing moves focus only when it was in the panel",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "            guidelinesFocusFollowsRef.current = guidelinesPanelRef.current?.contains(document.activeElement) ?? false;",
+          "            guidelinesFocusFollowsRef.current = true;"
+        ]
+      ]
+    },
+    "tour-no-sidebar-reveal": {
+      "undoes": "C (review 2, sibling) \u2014 a sidebar step opens a sidebar the user collapsed",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "      document.querySelector<HTMLElement>('[data-postr-sidebar-reveal]')?.click();\n",
+          ""
+        ]
+      ]
+    },
+    "tour-no-tracking": {
+      "undoes": "C (review 3) \u2014 the highlight follows its target while a step is shown (the panel opened from the last step)",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "      frame = requestAnimationFrame(track);\n    };",
+          "    };"
+        ]
+      ]
+    },
+    "tour-one-text": {
+      "undoes": "C (review 3) \u2014 the last step's text matches what it points at",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "{typeof current.body === 'string' ? current.body : current.body[matched] ?? current.body[0]}",
+          "{typeof current.body === 'string' ? current.body : current.body[0]}"
+        ]
+      ]
+    },
+    "tour-strip-top-unclamped": {
+      "undoes": "C (reproducer T, review 3) \u2014 the top edge of the highlight is clamped to the window",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "    const top = clamp(rect.top - pad, window.innerHeight);",
+          "    const top = rect.top - pad;"
+        ]
+      ]
+    },
+    "tour-strip-left-unclamped": {
+      "undoes": "C (reproducer T, review 3) \u2014 the left edge of the highlight is clamped to the window",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "    const left = clamp(rect.left - pad, window.innerWidth);",
+          "    const left = rect.left - pad;"
+        ]
+      ]
+    },
+    "tour-strip-bottom-unclamped": {
+      "undoes": "C (reproducer T, review 3) \u2014 the bottom edge of the highlight is clamped to the window",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "    const bottom = Math.max(top, clamp(rect.bottom + pad, window.innerHeight));",
+          "    const bottom = rect.bottom + pad;"
+        ]
+      ]
+    },
+    "tour-strip-right-unclamped": {
+      "undoes": "C (reproducer T, review 3) \u2014 the right edge of the highlight is clamped to the window",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "    const right = Math.max(left, clamp(rect.right + pad, window.innerWidth));",
+          "    const right = rect.right + pad;"
+        ]
+      ]
+    },
+    "tour-scroll-into-view-everything": {
+      "undoes": "C (review 3) \u2014 the tour scrolls a target only vertically, inside its own panel (scrollIntoView also scrolled the opening sidebar sideways)",
+      "expect": "survive",
+      "why": "jsdom has no layout or scrolling; fit-check.mjs measures it (claim Hp, tour-reopened-sidebar-step2: 144 px off with scrollIntoView, 0 with scrollIntoPanel)",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "      if (hit) scrollIntoPanel(hit.el);",
+          "      hit?.el.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });"
+        ]
+      ]
+    },
+    "tour-no-scroll": {
+      "undoes": "C (reproducer T) \u2014 the tour brings a target below its panel's fold into view",
+      "expect": "survive",
+      "why": "jsdom has no scrolling; fit-check.mjs measures it (tour-export-step: 0 visible on main, 100% on the fix)",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "      if (hit) scrollIntoPanel(hit.el);\n",
+          ""
+        ]
+      ]
+    }
+  }
+}

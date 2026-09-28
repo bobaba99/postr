@@ -569,6 +569,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
           </div>
         </div>
         <button
+          data-postr-guidelines-hide
           onClick={onToggle}
           title="Hide guidelines"
           style={{

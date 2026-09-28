@@ -78,9 +78,10 @@ function makeJwt(sub) {
 /**
  * A fake backend holding one poster row (`state.row`) and recording every
  * write (`state.saves`). Anything that is not the dev server, a data/blob URL
- * or a faked host is aborted and recorded (`state.aborted`).
+ * or a faked host is aborted and recorded (`state.aborted`). The onboarding
+ * tour is marked done unless `tour` is true.
  */
-export async function installMocks(context, state, base) {
+export async function installMocks(context, state, base, { tour = false } = {}) {
   const t = new Date().toISOString();
   const user = {
     id: state.userId, aud: 'authenticated', role: 'authenticated', email: 'jane.doe@example.test', phone: '',
@@ -140,12 +141,12 @@ export async function installMocks(context, state, base) {
     return json(route, {});
   });
   await context.route('http://localhost:3000/**', (route) => json(route, { success: false, error: 'mock' }, 404));
-  await context.addInitScript(() => {
+  await context.addInitScript((showTour) => {
     try {
-      localStorage.setItem('postr.onboarding-done', 'true');
+      if (!showTour) localStorage.setItem('postr.onboarding-done', 'true');
       localStorage.setItem('postr.mobile-notice-dismissed', 'true');
     } catch { /* ignore */ }
-  });
+  }, tour);
 }
 
 /**
@@ -182,11 +183,12 @@ export async function buildDoc(page, base, { w, h }) {
  * the poster someone else's: an owner opening their own share link is sent
  * to the editor, so a share-page check needs a poster the user does not own.
  * `editDoc(doc)` returns a changed copy of the doc before it is stored.
+ * `tour` leaves the onboarding tour to start, as for a first-time user.
  */
-export async function openEditor(h, { viewport, poster, deviceScaleFactor = 1, route, ownedByOther = false, editDoc }) {
+export async function openEditor(h, { viewport, poster, deviceScaleFactor = 1, route, ownedByOther = false, editDoc, tour = false }) {
   const context = await h.browser.newContext({ viewport, deviceScaleFactor });
   const state = { userId: randomUUID(), row: null, saves: [], aborted: [], errors: [] };
-  await installMocks(context, state, h.base);
+  await installMocks(context, state, h.base, { tour });
   const page = await context.newPage();
   page.on('pageerror', (e) => state.errors.push(String(e).slice(0, 300)));
   const built = await buildDoc(page, h.base, poster);
