@@ -806,11 +806,17 @@ body {
  * role="button" pattern, keeps keyboard location legible without
  * redesigning each component's hover/active styling. Mouse users
  * are unaffected: :focus-visible only matches keyboard focus.
+ *
+ * `!important` on the outline: `all: 'unset'` is an INLINE style, and an
+ * inline declaration beats any stylesheet rule without it, so the ring
+ * never drew on those buttons (measured in fix 03: 11 of 11 in the editor
+ * matched :focus-visible with outline-style none). Only the outline: the
+ * radius stays each button's own.
  */
 button:focus-visible,
 [role="button"]:focus-visible {
-  outline: 2px solid #7c6aed;
-  outline-offset: 2px;
+  outline: 2px solid #7c6aed !important;
+  outline-offset: 2px !important;
   border-radius: 4px;
 }
 
