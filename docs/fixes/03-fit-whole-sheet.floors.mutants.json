@@ -6,7 +6,7 @@
   ],
   "mutants": {
     "button-floor-0.3": {
-      "undoes": "B (H2) \u2014 Zoom out uses the shared floor, not its own 0.3",
+      "undoes": "B (H2) — Zoom out uses the shared floor, not its own 0.3",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -16,7 +16,7 @@
       ]
     },
     "pinch-own-floor": {
-      "undoes": "B (H3) \u2014 a pinch uses the shared floor, not a fixed 0.2",
+      "undoes": "B (H3) — a pinch uses the shared floor, not a fixed 0.2",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -26,7 +26,7 @@
       ]
     },
     "floor-ignores-fit": {
-      "undoes": "B \u2014 the floor comes down to the fit, so Zoom out can get back to it",
+      "undoes": "B — the floor comes down to the fit, so Zoom out can get back to it",
       "edits": [
         [
           "src/poster/workspaceGeometry.ts",
@@ -36,7 +36,7 @@
       ]
     },
     "floor-ignores-current": {
-      "undoes": "B \u2014 the floor never sits above the zoom on screen (after the window grows)",
+      "undoes": "B — the floor never sits above the zoom on screen (after the window grows)",
       "edits": [
         [
           "src/poster/workspaceGeometry.ts",
@@ -46,7 +46,7 @@
       ]
     },
     "noop-step-leaves-fit": {
-      "undoes": "B \u2014 a step that cannot move leaves the poster in fit mode",
+      "undoes": "B — a step that cannot move leaves the poster in fit mode",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -56,7 +56,7 @@
       ]
     },
     "stale-fit-in-pinch": {
-      "undoes": "B \u2014 the pinch reads the current fit, not the first one",
+      "undoes": "B — the pinch reads the current fit, not the first one",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -66,14 +66,22 @@
       ]
     },
     "zoom-in-unclamped": {
-      "undoes": "B \u2014 Zoom in keeps the 10x ceiling",
-      "expect": "survive",
-      "why": "reaching 10x takes 60+ clicks from a normal fit; the ceiling is ZOOM_MAX in clampZoom, shared with the pinch, and unchanged from main",
+      "undoes": "B — Zoom in keeps the 10x ceiling (a blind spot until review R8: now tested)",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
           "        onClick={() => stepTo(zoom + ZOOM_STEP)}",
           "        onClick={() => setZoom(zoom + ZOOM_STEP)}"
+        ]
+      ]
+    },
+    "no-snap-to-fit": {
+      "undoes": "B (review R4) — a zoom within 1e-9 of the fit is the fit",
+      "edits": [
+        [
+          "src/poster/workspaceGeometry.ts",
+          "  return Math.abs(z - fit) < 1e-9 ? fit : z;",
+          "  return z;"
         ]
       ]
     }
