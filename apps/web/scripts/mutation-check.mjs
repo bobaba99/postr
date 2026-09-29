@@ -48,35 +48,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { loadSpec, mutate as mutateIn, mutantPlugin } from './lib/mutants.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const WEB = path.resolve(HERE, '..');
 const REPO = path.resolve(WEB, '../..');
 
 const args = process.argv.slice(2);
+const mutate = (mutant) => mutateIn(WEB, mutant);
 const childIdx = args.indexOf('--child');
-
-function loadSpec(specPath) {
-  const spec = JSON.parse(fs.readFileSync(specPath, 'utf8'));
-  if (!Array.isArray(spec.tests) || spec.tests.length === 0) throw new Error('spec.tests must list test files');
-  if (!spec.mutants || typeof spec.mutants !== 'object') throw new Error('spec.mutants is required');
-  return spec;
-}
-
-/** Apply a mutant's edits in memory. Returns Map<absPath, mutatedSource>. */
-function mutate(mutant) {
-  const byFile = new Map();
-  for (const [rel, from, to, times = 1] of mutant.edits) {
-    const abs = path.join(WEB, rel);
-    const src = byFile.get(abs) ?? fs.readFileSync(abs, 'utf8');
-    const found = src.split(from).length - 1;
-    if (found !== times) {
-      throw new Error(`pattern found ${found}× (expected ${times}) in ${rel}: ${JSON.stringify(from.slice(0, 80))}`);
-    }
-    byFile.set(abs, src.split(from).join(to));
-  }
-  return byFile;
-}
 
 // ---------------------------------------------------------------- child
 if (childIdx !== -1) {
@@ -84,13 +64,7 @@ if (childIdx !== -1) {
   const spec = loadSpec(specPath);
   const byFile = name === '(control)' ? new Map() : mutate(spec.mutants[name]);
   const { startVitest } = await import(pathToFileURL(path.join(REPO, 'node_modules/vitest/dist/node.js')).href);
-  const plugin = {
-    name: 'mutation-check-loader',
-    enforce: 'pre',
-    load(id) {
-      return byFile.get(id.split('?')[0]) ?? null;
-    },
-  };
+  const plugin = mutantPlugin(byFile);
   const vitest = await startVitest(
     'test',
     spec.tests,

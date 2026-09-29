@@ -40,6 +40,15 @@
  *       the panel from the highlighted toggle)
  *   Hr2 keyboard focus lands on a button that draws no focus ring
  *       (outline-style none while :focus-visible matches)
+ *   Hb  after Fit, the out-of-bounds banner reaches down over the sheet
+ *   Hw  opening the guidelines panel scrolls its clipped wrapper (a wipe,
+ *       not a slide)
+ *   Hk2 a held Enter on the panel's Show toggle flips the panel more than once
+ *   Hr3 a rail tab's, or any data-focus-inset button's (guidelines header and
+ *       Save as, author ▲ ▼ ×, Post comment), focus ring is drawn outside it
+ *       (where its container clips it)
+ *   Ht6 the tour's step 6 does not show the Issues tab on a poster with issues
+ *   Hts after a window resize the tour's dimming stops short of the window
  *   Hf  closing the guidelines panel from the keyboard, with focus inside
  *       it, or opening it from its focused toggle, leaves focus on <body>
  *       or on something invisible. The sidebar's case is INFORMATION
@@ -54,7 +63,7 @@
  *
  * RUN (from apps/web)
  *   node scripts/fit-check.mjs [--only id,id]
- *   env PORT (default 5261), OUT_DIR, POSTR_REPO
+ *   env PORT (default 5261), OUT_DIR, POSTR_REPO, POSTR_MUTANT (lib/editorHarness.mjs)
  *
  * EXIT 0 no claim observed and no scenario errored · 1 a claim observed ·
  *      2 a scenario errored, or the harness did not start (the instrument
@@ -385,6 +394,36 @@ SCENARIOS.push({
   },
 });
 SCENARIOS.push({
+  // As tour-reopened-sidebar-step2, but measuring the sidebar itself: the
+  // tour scrolls its target into view while the sidebar is still sliding
+  // open. scrollIntoView also scrolled the sidebar's clipping wrappers
+  // sideways, so the panel stays shifted left after the slide; the
+  // highlight follows the target, so its offset alone cannot show it.
+  id: 'tour-reopened-sidebar-sideways', claim: 'Hp',
+  async run(h) {
+    const { context, page } = await openEditor(h, { viewport: { width: 1440, height: 900 }, poster: { w: 48, h: 36 }, tour: true });
+    try {
+      await page.getByRole('button', { name: 'Next →' }).waitFor({ timeout: 5000 });
+      await page.keyboard.press('Meta+/');
+      await page.waitForTimeout(600);
+      if (!(await page.$('[title="Show sidebar (⌘/)"]'))) throw new Error('precondition: the sidebar collapsed');
+      await tourNext(page);
+      await page.waitForTimeout(800);
+      const got = await page.evaluate(() => {
+        const sb = document.querySelector('[data-postr-sidebar]');
+        if (!sb) return null;
+        let scrolledSideways = 0;
+        for (let el = sb; el; el = el.parentElement) scrolledSideways = Math.max(scrolledSideways, el.scrollLeft);
+        return { scrolledSideways, sidebarLeft: Math.round(sb.getBoundingClientRect().left * 10) / 10 };
+      });
+      if (!got) throw new Error('precondition: the sidebar is open again');
+      return { observed: got.scrolledSideways > 0 || got.sidebarLeft < -0.5, ...got };
+    } finally {
+      await context.close();
+    }
+  },
+});
+SCENARIOS.push({
   // The last step below 1600 px highlights the closed panel's toggle; the
   // user clicks it, as the step invites.
   id: 'tour-step8-open-panel', claim: 'Hp',
@@ -566,6 +605,192 @@ SCENARIOS.push({
         return { on: a?.getAttribute('title') ?? a?.tagName, focusVisible: !!a && a.matches(':focus-visible') };
       });
       return { ok: !got.focusVisible, ...got };
+    } finally {
+      await context.close();
+    }
+  },
+});
+// Review of fix 03 (record section 9): one scenario per follow-up that
+// jsdom cannot see.
+const offSheet = (n) => (doc) => ({
+  ...doc,
+  blocks: doc.blocks.map((b, i) => (b.type !== 'title' && i <= n + 1 && i > 1 ? { ...b, x: doc.widthIn * 10 + 20 } : b)),
+});
+for (const [vw, vh] of [[1280, 800], [1440, 900]]) {
+  SCENARIOS.push({
+    id: `oob-banner-${vw}x${vh}`, claim: 'Hb',
+    async run(h) {
+      const { context, page } = await openEditor(h, { viewport: { width: vw, height: vh }, poster: { w: 36, h: 48 }, editDoc: offSheet(3) });
+      try {
+        await clickFit(page);
+        const got = await page.evaluate(() => {
+          const b = document.querySelector('[data-postr-oob-banner]') ?? [...document.querySelectorAll('strong')].find((x) => /outside poster bounds/.test(x.textContent))?.parentElement;
+          const sheet = document.getElementById('poster-canvas').getBoundingClientRect();
+          return b ? { bannerBottom: Math.round(b.getBoundingClientRect().bottom * 10) / 10, sheetTop: Math.round(sheet.top * 10) / 10 } : null;
+        });
+        if (!got) throw new Error('precondition: the banner shows');
+        return { observed: got.bannerBottom > got.sheetTop, ...got };
+      } finally {
+        await context.close();
+      }
+    },
+  });
+}
+SCENARIOS.push({
+  id: 'guidelines-open-slide', claim: 'Hw',
+  async run(h) {
+    const { context, page } = await openEditor(h, { viewport: { width: 1440, height: 900 }, poster: { w: 48, h: 36 } });
+    try {
+      await setGuidelines(page, false);
+      await page.focus('[title="Show poster guidelines"]');
+      const sample = page.evaluate(() => new Promise((resolve) => {
+        const panel = document.querySelector('[data-postr-guidelines]');
+        let wrap = panel.parentElement;
+        while (wrap && getComputedStyle(wrap).overflow !== 'hidden') wrap = wrap.parentElement;
+        let max = 0;
+        const t0 = performance.now();
+        const tick = () => {
+          max = Math.max(max, wrap.scrollLeft);
+          if (performance.now() - t0 < 500) requestAnimationFrame(tick); else resolve(max);
+        };
+        requestAnimationFrame(tick);
+      }));
+      await page.keyboard.press('Enter');
+      const maxScrollLeft = await sample;
+      return { observed: maxScrollLeft > 0, maxScrollLeft };
+    } finally {
+      await context.close();
+    }
+  },
+});
+SCENARIOS.push({
+  id: 'guidelines-held-enter', claim: 'Hk2',
+  async run(h) {
+    const { context, page } = await openEditor(h, { viewport: { width: 1440, height: 900 }, poster: { w: 48, h: 36 } });
+    try {
+      await setGuidelines(page, false);
+      await page.focus('[title="Show poster guidelines"]');
+      const isOpen = () => page.evaluate(() => !document.querySelector('[title="Show poster guidelines"]'));
+      let flips = 0;
+      let last = await isOpen();
+      for (let i = 0; i < 6; i += 1) {
+        await page.keyboard.down('Enter'); // after the first, Playwright sends repeat: true
+        await page.waitForTimeout(60);
+        const now = await isOpen();
+        if (now !== last) flips += 1;
+        last = now;
+      }
+      await page.keyboard.up('Enter');
+      if (flips === 0) throw new Error('precondition: the first Enter opens the panel');
+      return { observed: flips > 1, flips };
+    } finally {
+      await context.close();
+    }
+  },
+});
+SCENARIOS.push({
+  // Every button the fix marks data-focus-inset, in each of its five places,
+  // plus a rail tab (its own inset rule). A missing site is an instrument
+  // failure, not a pass.
+  id: 'focus-ring-inset', claim: 'Hr3',
+  async run(h) {
+    const { context, page } = await openEditor(h, { viewport: { width: 1920, height: 1080 }, poster: { w: 48, h: 36 } });
+    try {
+      // Keyboard modality first, so a programmatic focus matches :focus-visible.
+      // `where` is a selector; { text } a sidebar button's whole text; or
+      // { author } the first author row's ▲, ▼ or × (found from the row's ▲,
+      // not by the attribute under test: the affiliation list has its own ×).
+      // Every element is found by something other than data-focus-inset, so
+      // removing the attribute cannot move the check onto a sibling that
+      // still has it (the code review found the headers did exactly that).
+      const read = async (where) => {
+        await page.keyboard.press('Shift');
+        return page.evaluate((w) => {
+          const sidebarButton = (t) => [...document.querySelectorAll('[data-postr-sidebar] button')].find((b) => b.textContent.trim() === t);
+          const authorRow = () => sidebarButton('▲')?.parentElement?.parentElement;
+          const el = typeof w === 'string' ? document.querySelector(w)
+            : w.header !== undefined ? document.querySelectorAll('[data-postr-section-header]')[w.header]
+            : w.text ? sidebarButton(w.text)
+            : w.author === 'remove' ? [...(authorRow()?.children ?? [])].find((c) => c.tagName === 'BUTTON')
+            : sidebarButton(w.author);
+          if (!el) return 'missing';
+          el.focus();
+          return el.matches(':focus-visible') ? getComputedStyle(el).outlineOffset : 'no :focus-visible';
+        }, where);
+      };
+      const openTab = (name) => page.evaluate((n) => {
+        [...document.querySelectorAll('button[data-postr-tab]')].find((b) => b.firstChild?.textContent === n)?.click();
+      }, name);
+      const byText = (t) => page.waitForFunction(
+        (x) => [...document.querySelectorAll('[data-postr-sidebar] button')].some((b) => b.textContent.trim() === x), t, { timeout: 5000 },
+      ).catch(() => {});
+      const got = {};
+      got.railTab = await read('button[data-postr-tab]');
+      // All five section headers: the worst offset counts.
+      const headers = await page.$$eval('[data-postr-section-header]', (els) => els.length);
+      if (headers < 5) throw new Error(`precondition: 5 guidelines section headers, found ${headers}`);
+      const offsets = [];
+      for (let i = 0; i < headers; i += 1) offsets.push(await read({ header: i }));
+      const unreadable = offsets.find((v) => v === 'missing' || v === 'no :focus-visible');
+      if (unreadable) throw new Error(`precondition: could not focus every guidelines header (${unreadable})`);
+      got.guidelinesHeaders = [...new Set(offsets)].join(' ');
+      // "Save as..." sits in a section that may start closed (inert): open it.
+      await page.evaluate(() => {
+        const b = document.querySelector('[title="Save current checklist as a reusable template"]');
+        let p = b?.closest('[inert]')?.parentElement;
+        while (p && !p.firstElementChild?.matches('button[data-postr-section-header]')) p = p.parentElement;
+        p?.firstElementChild.click();
+      });
+      await page.waitForFunction(() => !document.querySelector('[title="Save current checklist as a reusable template"]')?.closest('[inert]'), null, { timeout: 3000 }).catch(() => {});
+      got.guidelinesSaveAs = await read('[title="Save current checklist as a reusable template"]');
+      await openTab('authors');
+      await byText('×');
+      for (const [key, author] of [['authorUp', '▲'], ['authorDown', '▼'], ['authorRemove', 'remove']]) got[key] = await read({ author });
+      await openTab('comments');
+      await byText('Post comment');
+      got.postComment = await read({ text: 'Post comment' });
+      const missing = Object.entries(got).filter(([, v]) => v === 'missing' || v === 'no :focus-visible');
+      if (missing.length) throw new Error(`precondition: could not focus ${missing.map(([k, v]) => `${k} (${v})`).join(', ')}`);
+      const outside = Object.entries(got).filter(([, v]) => v !== '-2px').map(([k]) => k);
+      // (guidelinesHeaders lists the distinct offsets of all five; anything
+      // but exactly "-2px" is outside.)
+      return { observed: outside.length > 0, outside: outside.join(' ') || 'none', ...got };
+    } finally {
+      await context.close();
+    }
+  },
+});
+SCENARIOS.push({
+  id: 'tour-step6-issues', claim: 'Ht6',
+  async run(h) {
+    const { context, page } = await openEditor(h, { viewport: { width: 1440, height: 900 }, poster: { w: 48, h: 36 }, editDoc: offSheet(1), tour: true });
+    try {
+      await page.getByRole('button', { name: 'Next →' }).waitFor({ timeout: 5000 });
+      for (let i = 0; i < 5; i += 1) await tourNext(page);
+      const step = await page.evaluate(() => [...document.querySelectorAll('span')].map((x) => x.textContent).find((t) => /^\d\/8$/.test(t)));
+      if (step !== '6/8') throw new Error(`precondition: at step 6, got ${step}`);
+      const shown = await page.evaluate(() => /out of bounds/i.test(document.querySelector('[data-postr-sidebar]')?.textContent ?? ''));
+      return { observed: !shown, issuesTabShown: shown };
+    } finally {
+      await context.close();
+    }
+  },
+});
+SCENARIOS.push({
+  id: 'tour-resize-strips', claim: 'Hts',
+  async run(h) {
+    const { context, page } = await openEditor(h, { viewport: { width: 1280, height: 700 }, poster: { w: 48, h: 36 }, tour: true });
+    try {
+      await page.getByRole('button', { name: 'Next →' }).waitFor({ timeout: 5000 });
+      await tourNext(page); // step 2
+      await page.setViewportSize({ width: 1280, height: 1000 });
+      await page.waitForTimeout(500);
+      const got = await page.evaluate(() => {
+        const strips = [...document.querySelectorAll('div')].filter((d) => d.style.zIndex === '10000' && d.style.position === 'fixed');
+        const bottom = Math.max(...strips.map((d) => d.getBoundingClientRect().bottom));
+        return { stripsBottom: Math.round(bottom), windowHeight: innerHeight };
+      });
+      return { observed: got.stripsBottom < got.windowHeight - 1, ...got };
     } finally {
       await context.close();
     }
@@ -813,7 +1038,7 @@ if (rulerRuns.length) {
   byClaim.Hr = { observed: rulerRuns.filter((r) => r.rulerRegressed).length, of: rulerRuns.length };
 }
 const summary = {
-  git: h.git, claims: byClaim,
+  git: h.git, mutant: h.mutant, claims: byClaim,
   mechanism132: `${mech.filter((r) => r.mechanism).length} of ${mech.length}`,
   scrollsAfterFit: `${mech.filter((r) => r.scrolls).length} of ${mech.length}`,
   rulerError: (() => {
