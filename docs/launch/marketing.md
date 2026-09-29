@@ -2,7 +2,7 @@
 
 > The academic poster tool for people who hate making academic posters.
 
-[postr.sh](https://www.postr.sh) — free for students, no signup to start, no watermarks, no AI-generated stock-photo aesthetic.
+[postr.sh](https://www.postr.sh) — no signup to start, no AI-generated stock-photo aesthetic.
 
 ---
 
@@ -15,7 +15,7 @@ Every researcher uses one of four tools to make a conference poster, and every o
 - **Figma** — overqualified, underspecialized. Steep learning curve for non-designers, slow on a 48 × 36″ canvas, web-only on conference-hotel WiFi. Has none of the academic conventions baked in.
 - **LaTeX (Beamerposter / tikzposter)** — print-correct but visually punishing. Iterating on layout means recompiling. The output looks like 1998 and your advisor asks why.
 
-Postr is the missing fifth option: **opinionated, web-based, free, and built for academic posters specifically.** Nothing in the editor exists unless it is useful for that one job.
+Postr is the missing fifth option: **opinionated, web-based, and built for academic posters specifically.** Nothing in the editor exists unless it is useful for that one job.
 
 ---
 
@@ -108,7 +108,6 @@ Each row is a small thing. Stacked across the few days a researcher spends on a 
 | Inline comments for advisor review | ❌ | Limited | Yes | ❌ | ✅ |
 | Real-time autosave | ❌ | ✅ | ✅ | ❌ | ✅ |
 | Print-safe export at 300 DPI | Brittle | Brittle | Brittle | ✅ | ✅ |
-| Zero-cost for students | ❌ | Free tier limited | Free tier limited | ✅ | ✅ |
 
 ---
 
@@ -120,7 +119,7 @@ Pick one per channel; don't try to communicate all of them at once.
 - **"It's 2026. Stop typing superscripts by hand."** Lead with the author/institution cascade. Instantly recognizable to anyone who has ever made a poster.
 - **"Type `/alpha`. Get α."** Lead with slash commands. Works as a sub-30-second short.
 - **"Your axis labels are too small. Postr told us before you printed."** Lead with the plot-code readability check. Saves people money, which is more memorable than saving them time.
-- **"No signup. No watermark. No 'Pro' tier between you and a working poster."** Lead with the free / anonymous-first principle. Aimed at the student-budget audience.
+- **"No signup to start."** Lead with the anonymous-first principle.
 
 ---
 
