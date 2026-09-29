@@ -107,7 +107,7 @@
     "no-whole-pixel-floor": {
       "undoes": "A — the fit uses whole pixels, so a fractional canvas cannot round into overflow",
       "expect": "survive",
-      "why": "UNVERIFIED as necessary: no configuration tried produces a fractional canvas. jsdom boxes are whole pixels, and in Chromium 0 of 18 states at device pixel ratios 1.25 and 1.5 had one (the mutant applied, fit-check exit 0). Kept as a cheap guard; browser page zoom is the reviewers' to try.",
+      "why": "the floor changes the fit's input when the canvas is fractional, but no visible outcome was measured to change; see unguarded",
       "edits": [
         [
           "src/poster/workspaceGeometry.ts",
@@ -115,7 +115,7 @@
           "  const w = box.width;\n  const h = box.height;"
         ]
       ],
-      "unguarded": "MEASURED by review R2: fractional canvases are common, but removing the floor changed no fit in 0 of 720 states, so no environment measured here reaches it. The floor is kept as a cheap guarantee that the sheet never lands on a sub-pixel edge (INSPECTED); no check can show it."
+      "unguarded": "Reached, but with no visible effect: fractional canvases occur (in 664 of 720 of review R2's sweep steps, MEASURED by R2; in about a third of the frames of a panel slide, 19 to 20 of 60 to 61 in 3 runs, MEASURED by the step 11 claims audit's scratch probe audit/claims/fractional-canvas-probe.mjs). Yet without the floor, a visible defect (overflow, a scrollbar, a hidden sheet) appeared in 0 of 720 steps (MEASURED by R2). No check can show it; it is kept as a cheap guarantee against a sub-pixel edge (INSPECTED)."
     },
     "ruler-origin-96": {
       "undoes": "A — the rulers count from the gutter the workarea draws, not a copy of 96",

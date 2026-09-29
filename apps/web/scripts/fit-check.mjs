@@ -394,6 +394,35 @@ SCENARIOS.push({
   },
 });
 SCENARIOS.push({
+  // Step 1's target is the canvas. Zoomed in, the canvas is taller than its
+  // own scroll box, and scrolling it into view moved the user's canvas (the
+  // step 11 claims audit of fix 03 found this path: 0,0 -> 64,64 px with
+  // scrollIntoView). The tour must leave the user's scroll alone.
+  id: 'tour-back-zoomed-keeps-scroll', claim: 'Hp',
+  async run(h) {
+    const { context, page } = await openEditor(h, { viewport: { width: 1440, height: 900 }, poster: { w: 48, h: 36 }, tour: true });
+    try {
+      await page.getByRole('button', { name: 'Next →' }).waitFor({ timeout: 5000 });
+      await tourNext(page); // step 2
+      for (let i = 0; i < 8; i += 1) await page.click('[aria-label="Zoom in"]');
+      await page.waitForTimeout(300);
+      const scroll = () => page.evaluate(() => {
+        const el = document.querySelector('[data-postr-canvas-outer]');
+        return el ? { x: el.scrollLeft, y: el.scrollTop, tall: el.scrollHeight > el.clientHeight } : null;
+      });
+      const before = await scroll();
+      if (!before?.tall) throw new Error('precondition: the zoomed canvas scrolls');
+      await page.getByRole('button', { name: 'Back' }).click(); // step 1, the canvas
+      await page.waitForTimeout(800);
+      const after = await scroll();
+      const moved = Math.max(Math.abs(after.x - before.x), Math.abs(after.y - before.y));
+      return { observed: moved > 0.5, moved, before, after };
+    } finally {
+      await context.close();
+    }
+  },
+});
+SCENARIOS.push({
   // As tour-reopened-sidebar-step2, but measuring the sidebar itself: the
   // tour scrolls its target into view while the sidebar is still sliding
   // open. scrollIntoView also scrolled the sidebar's clipping wrappers

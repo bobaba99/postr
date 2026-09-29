@@ -192,15 +192,20 @@
     "tour-scroll-into-view-everything": {
       "undoes": "C (review 3) — the tour scrolls a target only vertically, inside its own panel (scrollIntoView also scrolled the opening sidebar sideways)",
       "expect": "survive",
-      "why": "jsdom has no layout or scrolling, and in the browser the difference no longer shows (see unguarded)",
+      "why": "jsdom has no layout or scrolling; fit-check.mjs measures it: going Back to step 1 with a zoomed canvas moves the canvas 0,0 -> 64,64 px with scrollIntoView and 0 with scrollIntoPanel (found by the step 11 claims audit, which disproved an earlier 'unguarded' acceptance)",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "tour-back-zoomed-keeps-scroll"
+        ]
+      },
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
           "      if (hit) scrollIntoPanel(hit.el);",
           "      hit?.el.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });"
         ]
-      ],
-      "unguarded": "MEASURED (blind-spot-check.mjs): serving this mutant at 1440 × 900, the reopened sidebar scrolls 0 px sideways and step 2's highlight is 0 px off (tour-reopened-sidebar-sideways, tour-reopened-sidebar-step2). The 144 px in record section 8 was measured before the tour followed its target every frame; since then nothing measured shows the difference. Kept for the reasons in section 7 (INSPECTED): vertical-only, inside its own panel, not for targets taller than the panel."
+      ]
     },
     "tour-no-scroll": {
       "undoes": "C (reproducer T) — the tour brings a target below its panel's fold into view",
