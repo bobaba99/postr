@@ -3388,22 +3388,18 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
               zIndex: 15,
               boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
               lineHeight: 1.4,
+              whiteSpace: 'nowrap',
               pointerEvents: 'none',
             }}
+            data-postr-oob-banner
           >
+            {/* One line, so it stays in the sheet's 64 px top gutter
+                (fix 03): each extra line pushed it 33 px down over the
+                fitted sheet's title. The Issues tab lists every block. */}
             <strong style={{ color: '#f87171' }}>
               {oobWarnings.length} block{oobWarnings.length > 1 ? 's' : ''} outside poster bounds
             </strong>
-            {oobWarnings.slice(0, 3).map((w) => (
-              <div key={w.blockId} style={{ marginTop: 2 }}>
-                {w.severity === 'full' ? '⛔' : '⚠️'} {w.message}
-              </div>
-            ))}
-            {oobWarnings.length > 3 && (
-              <div style={{ marginTop: 2, color: '#f8717188' }}>
-                +{oobWarnings.length - 3} more…
-              </div>
-            )}
+            {' '}— details in Issues
           </div>
         )}
 
