@@ -77,20 +77,36 @@ Found while fixing one item, belonging to another (details in the record named):
   - The Templates copy promised the content was kept. It now asks first and
     says it replaces (cause C).
 - **Item 4**, from fix 02's review of cause A (MEASURED, and confirmed by a
-  skeptic with its own instruments). The rulers assume the sheet starts at
-  the 96 px workspace padding. They ignore the flex centring and the 24 px
-  ruler bar, so the 0" mark is off by (container − frame) / 2 − 96 px on any
-  centred axis:
-  - 2 in horizontally and 9.5 in vertically on a 48 × 36 poster at
-    1440 × 900;
-  - up to 52 in on extreme shapes.
-
-  Code: PosterEditor.tsx, the ruler's `pad = 96` against the flex-centred
-  workarea.
+  skeptic with its own instruments), updated by fix 03. The rulers ignore
+  the flex centring and the 24 px ruler bar, so the 0" mark is off on any
+  centred axis: 2 in horizontally and 9.5 in vertically on a 48 × 36 poster
+  at 1440 × 900 before fix 03, up to 52 in on extreme shapes. Fix 03 made
+  the ruler count from the gutter the workarea draws (`gutterX`/`gutterY`
+  in PosterEditor.tsx, no longer a copy of 96), but not from the centring:
+  on the centred axis the error grew in 10 of 12 cases, for example −124 →
+  −181.5 px at 1280 × 800 on 48 × 36 in; on the filled axis it is the bar's
+  24 px, before and after (record 03, section 8). `fit-check.mjs` claim Hr
+  guards the filled axis at 24 px; item 4 must update that guard.
 - **Item 3**, same review: zoom-to-fit leaves 36 px of the limiting side out
-  of view (workarea padding 96 px per side against a fit gutter of 60 px in
-  total). Separately, the Zoom-out button zooms IN when the fit is below its
-  0.3 floor.
+  of view, and Zoom out zooms IN below its 0.3 floor. **Fixed by fix 03.**
+- **From fix 03** (record 03, section 10, which lists every item with its
+  numbers):
+  - owner questions: the 64 px gutter against block controls at large fitted
+    zooms (the ZoomBar over a rotate control, a move control off the canvas,
+    a rotated block hidden by 21–62 px); the ring a mouse user sees after
+    clicking a chrome button and pressing an arrow key; the readout on a
+    0 px canvas; whether to install Firefox and WebKit for measuring;
+  - MEDIUM, there before: the guidelines template `<select>` gives its
+    arrow keys to the canvas, and Backspace in it deletes the selected
+    block;
+  - LOW, there before: zoom (pinch during the panel's slide, pinch over the
+    ZoomBar, a Zoom out landing on the fit, a burst of 53+ wheel events,
+    line-mode wheels), classic scrollbars, the rubber band's stored
+    geometry, tour tooltips and resumes, the panel's missing
+    `aria-expanded`, the collapsed sidebar's keyboard focus, a table cell
+    that keeps Tab;
+  - the critic's untested gaps: a production build, the tour during other
+    modals, D's ring in dialogs, the 640 px share threshold crossed live.
 - **Unplanned, from fix 02's reviews** (MEASURED unless marked):
   - The area-comment label divides inches by 10 again ("Area 2×1 in" for a
     19.2 × 14.4 in area).
@@ -165,3 +181,4 @@ Found while fixing one item, belonging to another (details in the record named):
 |---|---|---|
 | 1 | `editor/undo-sidebar-history` | done — `docs/fixes/01-sidebar-undo-history.md` |
 | 2 | `editor/custom-sheet-size` (causes A, E), `editor/size-change-keeps-blocks` (B–D) | done — `docs/fixes/02-poster-size.md` |
+| 3 | `editor/fit-whole-sheet` (A, B), `editor/guidelines-closed-small-screens` (C, D) | done — `docs/fixes/03-fit-whole-sheet.md`; four owner questions open (section 10) |

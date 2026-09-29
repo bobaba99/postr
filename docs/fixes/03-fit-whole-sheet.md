@@ -32,6 +32,29 @@ screens** (viewport narrower than 1600 px).
 
 ## 3. Method
 
+**Scope from the code graph** (process step 0, done retroactively on
+2026-09-29: the step postdates this fix's start):
+
+Graph: `list_graph_stats_tool` — 661 files, 8,080 nodes, 78,957 edges, built
+at 142173a with HEAD 142173a (a full rebuild; an incremental update on this
+fresh worktree had indexed only 64 files). `get_impact_radius_tool` from
+292f10f, depth 2: 21 changed files, 23 more affected.
+
+| surface | file:line | touched | check |
+|---|---|---|---|
+| the editor's fit, zoom controls, guidelines panel, banner, rulers | `PosterEditor.tsx`, `workspaceGeometry.ts` | yes (A, B, C) | `fit-check.mjs`, jsdom suites, mutants |
+| the guidelines panel and its focus | `GuidelinesPanel.tsx` | yes (C, D) | `guidelinesDefault.test.tsx`, Hf, Hk2, Hw, Hr3 |
+| the onboarding tour | `OnboardingTour.tsx` | yes (C) | `guidelinesDefault.test.tsx`, Ht, Hp, Ht6, Hts |
+| the small-screen hook and its other consumer | `hooks/useIsSmallScreen.ts`, `components/MobileNotice.tsx` | yes (C) / no | `useIsSmallScreen.test.tsx`, `MobileNotice.test.tsx` |
+| the sidebar's tabs and author buttons; the comments composer | `Sidebar.tsx`, `CommentsPanel.tsx` | yes (D) | Hr3 |
+| the house focus ring | `index.css` | yes (D) | Hr2, Hr3 |
+| the desktop share page and the phone share view | `pages/Share.tsx` | no (reads the fit) | review R1, R5 (section 9) |
+| the editor page and routes | `pages/Editor.tsx`, `routes.tsx`, `App.tsx` | no | the full suite; `EditorSheetSize.test.tsx`, `EditorLeaveGuard.test.tsx` |
+| replaying the tour | `pages/Profile.tsx` | no (clears a flag for the next load) | code review (section 9) |
+| a preset dialog's input | `components/PresetEditModal.tsx` | no: an input's inline `outline: none`; D targets buttons | INSPECTED |
+| the Preview overlay, thumbnails, print and PDF | `PosterPreviewOverlay.tsx`, `data/thumbnails.ts` | no (own gutter, poster units) | review R5 (section 9) |
+| the index docs | `docs/feature-graph.md`; `docs/manual-test-flows.md` | updated (zoom, toggle, banner, tour, focus ring); not touched: no manual flow covers the editor's fit | process step 12 |
+
 **Author's instruments** (the confirmers did not use them):
 
 - `apps/web/scripts/fit-check.mjs` — real Chromium on the app's own Vite
@@ -97,6 +120,20 @@ screens** (viewport narrower than 1600 px).
   focuses the rail's own reopen toggle and presses Shift+Tab, with a
   control that an open rail's controls still take focus.
 
+**Re-running everything** (from `apps/web`; each exits 0 on the final code):
+
+```bash
+node scripts/fit-check.mjs
+node scripts/mutation-check.mjs ../../docs/fixes/03-fit-whole-sheet.fit.mutants.json
+node scripts/mutation-check.mjs ../../docs/fixes/03-fit-whole-sheet.floors.mutants.json
+node scripts/mutation-check.mjs ../../docs/fixes/03-fit-whole-sheet.panel.mutants.json
+node scripts/blind-spot-check.mjs ../../docs/fixes/03-fit-whole-sheet.fit.mutants.json
+node scripts/blind-spot-check.mjs ../../docs/fixes/03-fit-whole-sheet.panel.mutants.json
+node scripts/blind-spot-check.mjs ../../docs/fixes/03-fit-whole-sheet.ring.mutants.json
+npx vitest run
+git checkout -- public/version.json
+```
+
 ## 4. Results before the fix
 
 On main (292f10f), MEASURED:
@@ -124,7 +161,8 @@ On main (292f10f), MEASURED:
   - H5: after scrolling, FIT leaves 36 px of the near (left) edge hidden;
     with a block parked off the sheet, 299 px.
   - H6: at 96 px of canvas the fit is 0.075 and 36 px are hidden; at 56 px
-    the fit falls back to 100% and 520 px of the 48 in poster are hidden.
+    the fit falls back to 100%, and the whole poster (480 px) is off the
+    canvas. (Corrected after review R8: this line said "520 px hidden".)
 - jsdom, the final test files run against main (TESTED):
   - `fitWholeSheet.test.tsx`: 16 of 18 fail, each for its predicted reason
     (for example: the fitted sheet plus its padding is 652 px tall in a
@@ -138,8 +176,10 @@ On main (292f10f), MEASURED:
     (section 8).
   - `zoomFloors.test.tsx`: 5 of 6 fail (Zoom out and a pinch go 0.14 →
     0.3 and 0.2); the control passes.
-  - `guidelinesDefault.test.tsx`: 4 of 6 fail (open at 1280, 1440 and
-    1599 px); the two wide-window cases pass.
+  - `guidelinesDefault.test.tsx`, cause C's first version of the file: 4 of
+    6 fail (open at 1280, 1440 and 1599 px); the two wide-window cases
+    pass. (Review R8 ran the final file, 19 tests then, against main: 13
+    fail and 6 pass. The final file now has 25 tests; section 8.)
 
 ## 5. Independent confirmation (before any change)
 
@@ -148,12 +188,16 @@ A workflow ran two confirmers on a frozen copy of main (292f10f), with
 different things, not repeat each other), and a critic listing what neither
 tested. Neither saw the author's tests or harness.
 
-- **Confirmer A — the Fit claim and its cause.** Two instruments sharing no
-  code: GEOM (the sheet's box against the canvas's client box) and PIX (the
-  sheet painted a unique colour and found in a real screenshot).
-- **Confirmer B — siblings and other entry points.** Zoom limits, re-fit
-  triggers, the guidelines panel's default, the share page, and whether the
-  rulers share the cause.
+- **Confirmer A** — scope: the Fit claim at the reported entry point, and
+  its cause. Two instruments sharing no code: GEOM (the sheet's box against
+  the canvas's client box) and PIX (the sheet painted a unique colour and
+  found in a real screenshot).
+- **Confirmer B** — scope: siblings and other entry points: zoom limits,
+  re-fit triggers, the guidelines panel's default, the share page, and
+  whether the rulers share the cause.
+
+(The numbers below are the confirmers', MEASURED by their own scripts in the
+fix's scratch folder, not committed; process §1.1.)
 
 | claim | confirmer | verdict | numbers (MEASURED unless marked) |
 |---|---|---|---|
@@ -186,7 +230,7 @@ tested. Neither saw the author's tests or harness.
   border box never grows; undoing a size change keeps a manual zoom; the fit
   is capped at 5× while manual zoom goes to 10×.
 
-**The critic's gaps**, each assigned below to a reviewer of the fix: the
+Critic — the gaps, each assigned to a reviewer of the fix (section 9): the
 64 px rationale (handles clear of the rulers) was never measured; a flush
 fit at fractional DPR or page zoom could round to 1 px of overflow;
 classic scrollbars were only simulated; blocks past the left or top edge
@@ -221,6 +265,17 @@ that no longer agree.**
   `all: 'unset'`, but that is an inline style: an inline declaration beats
   a stylesheet rule that is not `!important`, so the ring never drew on
   them. Cause C moves keyboard focus to two such buttons.
+
+**Siblings checked** (process step 5):
+- the ruler's own copy of the padding (`pad = 96`): shares the constant, not
+  the fit's error; handed to item 4 (confirmer B, MEASURED by B);
+- the Preview overlay's own gutter, the share pages, thumbnails and
+  print: separate fits, whole in every case measured (review R5, MEASURED
+  by R5);
+- fix 02's stored-versus-rendered geometry: not the same cause; the fit
+  reads the canvas's rendered box (INSPECTED, `useZoom`);
+- the zoom floors (B) and the panel's default (C) came out of the same
+  confirmation, as separate causes.
 
 **What these do not explain:** the fit's 100% fallback for a canvas smaller
 than the gutter (a separate guard, `ratio > 0 ? ratio : 1`, made easier to
@@ -342,8 +397,10 @@ fix. Each had its own scope and its own instruments:
 - **S:** a sweep for anything `inert` breaks.
 
 I measured the same two hypotheses with `fit-check.mjs`. Every claim below
-is MEASURED on both trees, by the reproducer and by `fit-check.mjs`, unless
-marked otherwise.
+is MEASURED on both trees by the reproducer (its own script in the fix's
+scratch folder, not committed), and by `fit-check.mjs` where a claim names
+it. (Corrected after review R8: `fit-check.mjs` has no Backspace or
+block-count scenario, so "14 → 13 blocks" is the reproducer's alone.)
 - **The tour's last step pointed at nothing (regression from cause C).**
   Below 1600 px the step measured the closed panel, which sits off the
   window's right edge, and dimmed the whole editor. It now takes selectors
@@ -409,18 +466,37 @@ what users experience; each MEDIUM finding reproduced in Chromium first):
 `button:focus-visible` in `index.css` now sets the outline and its offset
 `!important`, so the ring draws on buttons styled with an inline
 `all: 'unset'`, as the rule's own comment always said it should. Only the
-outline is `!important`; the radius stays each button's own. Nothing else
-sets a button's focus outline; the three inline `outline: 'none'` in the
-app are on inputs, which the rule does not touch.
+outline is `!important`; the radius stays each button's own. Of the 20
+inline `outline: 'none'` in the app, one is on buttons: the sidebar tabs'
+`tabStyle`, which the rule overrides on purpose (its comment now says so);
+the others are on inputs, selects, textareas and three divs, which the rule
+does not touch. (Corrected after review R8: this said "three, all on
+inputs".)
 
 ## 8. Results after the fix
 
-**All three causes together** (`fit-check.mjs`, the complete run on the final
-code, MEASURED): exit 0, no scenario errored, every control passed. H1 0 of
-88; H2 0 of 1; H3 0 of 1; H4 0 of 7; H4k 0 of 4; H5 0 of 2; H6 0 of 2; the
-ruler guard Hr 0 of 88 (the filled-axis error is 24 px in 88 of 88, as on
-main). Handles under the ruler (information only): 4 of 12, as measured
-after cause A.
+**The final code, all four causes** (MEASURED on 60391af, the branch head
+after the review follow-ups; re-run with the commands in section 3):
+- `fit-check.mjs`, the complete run: exit 0, 142 scenarios, no errors,
+  every control passed. H1 0 of 88; H2 0 of 1; H3 0 of 1; H4 0 of 7; H4k 0
+  of 2 (the guidelines panel); H5 0 of 2; H6 0 of 2; Ht 0 of 9; Hp 0 of 3;
+  Hf 0 of 2; Hr2 0 of 3; the review follow-ups' Hb 0 of 2, Hw, Hk2, Hr3,
+  Ht6 and Hts 0 of 1 each; the ruler guard Hr 0 of 88 (the filled-axis
+  error is 24 px in 88 of 88, as on main). No fit scrolls (0 of 88), and
+  the 132 px overflow is gone (0 of 88). Information only, handed on
+  (section 10): the collapsed sidebar keeps 29 controls in the Tab order
+  (H4k-sidebar 2 of 2) and keeps focus on a hidden field after ⌘/
+  (Hf-sidebar 1 of 1); handles start under the ruler in 4 of 12 cases (Hh;
+  the worst −19.75 px at 2560 × 1440 on 24 × 36 in).
+- Mutation checks: fit 14 of 14 killed, floors 8 of 8, panel 22 of 22.
+- Browser-only blind spots (`blind-spot-check.mjs`): ring 7 of 7 guarded;
+  fit 1 guarded and 1 accepted; panel 1 guarded and 2 accepted (reasons in
+  the specs and in section 9).
+- The full suite: 2973 of 2973 in 180 files.
+
+(Corrected after review R8: this headline said "H4k 0 of 4, exit 0" for a
+run that could not have produced it on the final code. The numbers under
+each cause below are from the rounds they name.)
 
 ### Cause A
 
@@ -556,7 +632,137 @@ Two documented blind spots:
 
 ## 9. Review of the fix
 
-(Written after the independent review.)
+Eight reviewers worked on a frozen copy of the fix (142173a) and one of main
+(292f10f). Each had its own scope and its own instruments, and none used the
+author's. The numbers below are the reviewers' and skeptics', MEASURED by
+their own scripts in the fix's scratch folder (process §1.1), unless marked.
+
+- Reviewer R1 — scope: what the user can see and reach at each edge of the fitted sheet, and the new focus rings.
+- Reviewer R2 — scope: rounding, classic scrollbars, page zoom, device pixel ratios, and whether the fit oscillates.
+- Reviewer R3 — scope: working at the sheet's edges: drags, handles, block controls, rubber band and pinch.
+- Reviewer R4 — scope: the zoom controls end to end (cause B), swept from a fit of 0.05 to 4.
+- Reviewer R5 — scope: sibling fits and other consumers of the geometry: Preview, share pages, thumbnails, print, selection, comments.
+- Reviewer R6 — scope: the guidelines panel's default and keyboard focus (cause C, not the tour).
+- Reviewer R7 — scope: the onboarding tour end to end, with interruptions (modals, resizes, reloads).
+- Reviewer R8 — scope: an audit of the record's and the commit messages' claims against their instruments.
+
+**Findings: 46** (10 MEDIUM, 36 LOW; none HIGH). By the reporters' own
+comparison with main: 23 caused by the fix, 3 made worse, 20 there before.
+Every MEDIUM got a skeptic with its own instrument: 10 of 10 REPRODUCED;
+the skeptics rated 6 of them LOW.
+
+| finding | by | severity (skeptic) | caused | what was done |
+|---|---|---|---|---|
+| After FIT the out-of-bounds banner hides the poster's title (77–93% of its glyphs in 1280–1440 px windows): the sheet moved 32 px up, the banner did not | R1, R5 | MEDIUM (MEDIUM) | worse | fixed (A): the banner is one line, "N blocks outside poster bounds — details in Issues". Hb: its bottom 143.7 → 45.4 px, above the sheet's 64 px top (MEASURED, `fit-check.mjs`) |
+| The ZoomBar covers the rotate control of a block flush with the sheet's bottom edge near its centre | R3 | MEDIUM (LOW) | yes | owner decision (the gutter; section 10) |
+| At large fitted zooms, the move control of a narrow image at the left edge sits left of the canvas | R3 | MEDIUM (MEDIUM) | worse | owner decision (the gutter; section 10) |
+| The template `<select>` loses its arrow keys to the canvas, and Backspace in it deletes the selected block | R6 | MEDIUM (MEDIUM) | no | handed on (section 10) |
+| A resize that leaves the tour's target in place leaves the dimming strips at the old window size | R7 | MEDIUM (LOW) | yes | fixed (C): the tour tracks the window size. Hts: strips' bottom 700 → 1000 px after a resize to 1000 px (MEASURED) |
+| Closing the feedback modal mid-tour reopens a sidebar the user collapsed; section 7 said it never does | R7 | MEDIUM (LOW) | yes | fixed (C): a step is prepared once. TESTED, mutant `tour-prepares-on-resume` killed |
+| Step 6 never opens the Issues tab when the poster has issues (the tab's text includes its count badge) | R7 | MEDIUM (MEDIUM) | no | fixed anyway (a one-line match in code this fix rewrote). Ht6: false → true (MEASURED) |
+| Section 8's headline ("H4k 0 of 4, exit 0") cannot come from the final code | R8 | MEDIUM (LOW) | yes | corrected: section 8 now gives a complete run on the final code |
+| The blind spot `tour-scroll-into-view-everything` is not guarded by `fit-check.mjs`, as section 8 claimed | R8 | MEDIUM (LOW) | yes | MEASURED with the new `blind-spot-check.mjs`: with the mutant served, 0 px sideways and 0 px off. Recorded as accepted-unguarded with that reason (below) |
+| Commit 142173a's "main → fix" table puts values that are not main's in its left column (Ht 0%, Hp 144 px) | R8 | MEDIUM (LOW) | yes | corrected here (below); the commit is not rewritten |
+
+**LOW findings caused or worsened by the fix** (18):
+- **Fixed** (each red first, then green):
+  - the focus ring clipped on full-width buttons, and the author ▲ ▼ ×
+    rings drawn over the name field: `data-focus-inset` on all five groups
+    of such buttons, and the rail tabs inset too. Hr3 now samples every
+    site (7 of 7 at −2 px; with the attribute removed from two sites, those
+    two read 2 px: MEASURED);
+  - opening the panel uncovered it in place (a wipe) instead of sliding:
+    focus now moves with `preventScroll`. Hw: the wrapper's scrollLeft
+    during the slide 286 → 0 px (MEASURED);
+  - a held Enter on a guidelines toggle flickered the panel: key repeats
+    are ignored. Hk2: 6 flips → 1 (MEASURED);
+  - floating-point residue after k steps in and out below 0.2 left the
+    zoom 1e-17 above the fit: a zoom within 1e-9 of the fit is the fit
+    (TESTED, on a 143 px canvas: 0.06083333333333335 against the fit
+    0.060833333333333336);
+  - the banner over a height-limited sheet (the MEDIUM above);
+  - the guidelines tour tests' flake: they waited for the highlight's
+    corner, which a not-yet-measured 0 × 0 target also has. MEASURED: in 3
+    of 3 runs the tour draws two 12 × 12 frames at (−6, −6) before the
+    sidebar's 496 × 912 box, and reading the strips on one gives the flaked
+    894 px. The tests now wait for the whole box; the strip mutants are
+    still killed;
+  - the zoom-in ceiling, listed as a blind spot, is now a test (80 clicks
+    stop at 10×; mutant `zoom-in-unclamped` killed, 8 of 8 in its spec).
+- **Owner decisions** (section 10): a mouse user sees a ring on the chrome
+  button they clicked once they press an arrow or Shift (Chromium's
+  `:focus-visible` rule, drawn now that D forces the ring: 6 of 7 cases, 0
+  on main); a block rotated past the sheet's left edge is hidden by 21, 42
+  and 62 px at the fit in 1280, 1440 and 1920 px windows (main: 0, 0 and
+  39 px); at 800 × 600 with both panels open the canvas is 0 px wide and
+  the readout shows 0–1% (main: 100%).
+- **Claims corrected** (R8, R2; each reproduced by a skeptic or
+  INSPECTED):
+  - H6 read "520 px of the 48 in poster hidden"; the instrument measured a
+    480 px sheet (section 4, section 8, commit 74ef5c3);
+  - section 4 called the guidelines test result "the final test files run
+    against main"; it was an earlier version of the file;
+  - section 7 D said "three inline `outline: none` in the app, all on
+    inputs"; there are 20;
+  - Hr2 was claimed for "every button with an inline `all: unset` that
+    keyboard focus can reach"; it measured two panel buttons. Hr3 now
+    covers the five marked groups; other such buttons are not measured;
+  - the whole-pixel floor's reason: R2 found fractional canvases common,
+    yet removing the floor changed no fit in 0 of 720 states. The floor
+    stays as a guard nothing measured needs (UNVERIFIED as necessary);
+  - section 8's fix-side numbers were measured before later review rounds,
+    and some MEASURED labels named no committed instrument: section 8 is
+    re-measured on the final code, and the rest relabelled;
+  - commit 142173a's table, left column: Ht "0%" and Hp "144 px" are values
+    from the third review round of the fix, not main's. Main's are in
+    section 4.
+
+**LOW findings that were there before** (18): handed on in section 10.
+
+Critic — 17 gaps (1 HIGH, 7 MEDIUM, 9 LOW). The HIGH one: every claim was
+measured in Chromium only; Firefox and WebKit need a download, which is the
+owner's call (asked). The MEDIUM ones are listed in section 10.
+
+Jev — shadow mode (the review-finding format has not passed its gate): 46
+findings sent, 0 routed (`jev-route-findings.mjs`, route log in the fix's
+scratch folder). Jev judged 42 as evidence on both trees (35 with a
+control) and 4 as weaker (3 one tree, 1 code only), all 4 below confidence
+1.00, so none could have been routed. Nothing to audit (this is not a pass).
+
+**Blind spots, falsified in the browser** (`blind-spot-check.mjs`,
+MEASURED): `ruler-origin-96` and `tour-no-scroll` are guarded (their
+scenarios go red with the mutant served). Accepted unguarded, with reasons
+in the specs: the whole-pixel floor, the guarded media read, and
+`tour-scroll-into-view-everything` (0 px sideways, 0 px off with the
+mutant served; the 144 px of section 8 was measured before the tour
+followed its target every frame).
+
+**Code reviews of the follow-ups** (process step 9):
+- The first, of the fixes above except the flake and the blind spots, found
+  one MEDIUM: `data-focus-inset` had no check for three of its five sites
+  (reproduced: 0 tests referenced it; Hr3 sampled two). Hr3 now samples all
+  five. It also saw the tour test flake once in the full suite (above), and
+  noted that the rail tabs' inset is written in `Sidebar.tsx`'s own style
+  block rather than through `data-focus-inset` (kept: that block already
+  styles the tabs).
+- The second, of everything above, found one HIGH: Hr3 located the
+  guidelines header by the very attribute under test, so with the headers'
+  `data-focus-inset` removed it read "Save as…" instead and stayed green
+  (reproduced: exit 0 with the mutant served). The headers now carry their
+  own hook, `data-postr-section-header`, and Hr3 reads all five. MEASURED
+  with `03-fit-whole-sheet.ring.mutants.json` (seven browser-only mutants,
+  one per site): each turns Hr3 red, naming its site; `blind-spot-check.mjs`
+  7 of 7 guarded. Two LOWs: the one-line banner keeps `maxWidth: 400` with
+  `nowrap` (MEASURED by the reviewer: 13 blocks off the sheet make it 313
+  px wide, so it fits; not changed), and `fit-check.mjs` is over 1,000
+  lines (handed on: split it by concern). The reviewer also re-ran the
+  other mutants in the browser (6 of 6 red) and the three jsdom specs
+  (8 of 8, 14 of 14, 22 of 22 killed).
+- The same reviewer then re-checked the Hr3 fix as a skeptic, with its own
+  mutants that remove the attribute from ONE header (Writing Guide, then
+  Scratch Pad, the first in the page): both red, control green (MEASURED by
+  the reviewer). Its one LOW, the helper that opens a section also finding
+  it by `data-focus-inset`, is fixed (it now uses the header hook).
 
 ## 10. Limits and follow-ups
 
@@ -578,14 +784,33 @@ Two documented blind spots:
   should start. A sidebar step does open a sidebar the user collapsed: a
   tab in a closed sidebar shows nothing.
 
+**Owner decisions asked after the review** (section 9; 2026-09-29):
+- **The 64 px gutter and the block controls.** The ZoomBar covers the rotate
+  control of a block flush with the sheet's bottom edge near its centre; at
+  large fitted zooms the move control of a narrow image at the left edge
+  sits left of the canvas; a block rotated past the left edge is hidden by
+  21–62 px at the fit (main 0–39). Same root as the handles under the
+  ruler (below): the controls scale with zoom, the gutter does not.
+- **A ring after a mouse click.** Once D draws the house ring, a mouse user
+  who clicked a chrome button (Zoom in, FIT, a rail tab) and then presses an
+  arrow key or Shift sees a ring on that button: Chromium's `:focus-visible`
+  rule (6 of 7 cases; 0 on main, where no ring drew at all).
+- **A 0 px canvas.** At 800 × 600 with both panels open the canvas has no
+  width; the readout shows 0–1% (a fit left from the panel's slide) where
+  main showed 100%. Nothing is visible either way.
+- **Firefox and WebKit** (the critic's one HIGH gap): measuring them needs
+  `npx playwright install firefox webkit`, a download.
+
 **Accepted limits of this fix:**
-- **The whole-pixel floor in the fit is UNVERIFIED as necessary.** Nothing
-  measured produces a fractional canvas (section 8). It costs under a pixel.
+- **The whole-pixel floor in the fit is UNVERIFIED as necessary.** Review
+  R2 found fractional canvases common, but removing the floor changed no fit
+  in 0 of 720 states (MEASURED by R2). It costs under a pixel and stays as
+  a guard (an accepted blind spot, section 9).
 - **A new poster size is drawn at the old fit for one render** before the
   fit catches up (the code review's suggestion, not taken). It was already
   so on main.
-- **Zoom in has no test of its 10× ceiling**: that takes more than 60 clicks
-  (documented blind spot). The fit is still capped at 5×.
+- **The fit is still capped at 5×** while manual zoom goes to 10× (as on
+  main).
 
 **Handed on** (existed before this fix, or outside its causes; to go into
 `docs/stress-test/PLAN.md`):
@@ -602,7 +827,8 @@ Two documented blind spots:
   they are visible. The options (handles at a fixed screen size, or a
   larger gutter) are the owner's.
 - **The collapsed sidebar and the keyboard** (MEASURED by reproducers F and
-  S, and by `fit-check.mjs`; the same on main and the fix). The collapsed
+  S, whose scripts are in the fix's scratch folder; `fit-check.mjs` measures
+  only where focus lands after ⌘/; the same on main and the fix). The collapsed
   sidebar is clipped, not removed:
   - 29 of its controls stay in the Tab order, invisible;
   - ⌘/ from a sidebar field leaves focus in that field, and typing edits it
@@ -637,6 +863,35 @@ Two documented blind spots:
     behaviour that does not happen;
   - undoing a size change keeps a manual zoom;
   - the fit is capped at 5× while manual zoom goes to 10×.
+- **From the independent review, there before this fix** (section 9; the
+  reviewers' numbers):
+  - the guidelines template `<select>` gives its arrow keys to the canvas,
+    and Backspace in it deletes the selected block (MEDIUM, R6);
+  - the panel's toggle has no `aria-expanded` or `aria-controls` (R6);
+  - zoom: a pinch during the panel's 280 ms slide can go the wrong way; a
+    pinch over the ZoomBar is not handled; a Zoom out that lands exactly on
+    the fit leaves manual mode; more than 52 Ctrl+wheel events in one task
+    throw "Maximum update depth exceeded"; line-mode wheel events (Firefox)
+    zoom about 30× less per notch (R4);
+  - classic scrollbars: a block parked off one axis makes the other axis
+    scroll by the bar's width; on the phone share view 3 px of the sheet sit
+    under it; the fit lags the sidebar's slide by one frame (R2);
+  - a rubber band from the gutter selects by stored geometry (R3);
+  - the undo toast straddles the sheet's bottom edge for 1.2 s; on a tall
+    poster the phone share bar covers 57 px; table handle rings are drawn at
+    20% opacity, and three Figure-tab buttons' rings are clipped (R1);
+  - the tour: step 1's tooltip leaves the window when the sidebar is
+    collapsed or the canvas panned; collapsing the sidebar during a sidebar
+    step leaves the highlight on the canvas; leaving the editor mid-tour
+    restarts it at 1/8; step 2's tooltip runs off a 600 px window; closing
+    the feedback modal mid-step switches the sidebar back to the step's
+    tab (R7).
+- **The critic's MEDIUM gaps, not tested:** "a new poster size scrolls back
+  to 0,0" in a browser (only jsdom); a production build (every run used the
+  dev server, with StrictMode); the tour during the other modals (it is
+  suspended only for publishing and feedback); D's ring in dialogs and
+  toasts; the quarter-cap zone below 1280 px; crossing the 640 px share
+  threshold live; the tour's keyboard path.
 - **Browsers:** only Chromium was measured. Firefox and WebKit are not
   installed here.
 
@@ -667,9 +922,10 @@ mutants (scrolling everything, not scrolling). jsdom cannot scroll, so
 
 ### Cause D
 
-**Chromium, `fit-check.mjs`** (claim Hr2, MEASURED): every button in the
-editor with an inline `all: 'unset'` that keyboard focus can reach, focused
-after a key press so `:focus-visible` applies:
+**Chromium, `fit-check.mjs`** (claim Hr2, MEASURED): the 11 buttons with an
+inline `all: 'unset'` that keyboard focus can reach in the editor's default
+view, focused after a key press so `:focus-visible` applies. Buttons in
+other tabs and in dialogs were not swept (review R8):
 
 | | main | fix |
 |---|---|---|

@@ -1335,13 +1335,14 @@ flowchart LR
 - [ ] `Make your own` — link (mobile share bar) — `PosterEditor.tsx:2479-2498` — navigates to `/`
 - [ ] `Show sidebar` / title `Show sidebar (⌘/)` — reveal-tab button (sidebar closed, desktop) — `PosterEditor.tsx:2504-2538` — opens sidebar
 - [ ] canvas rubber-band — pointer drag on workspace — `PosterEditor.tsx:2559-2626` — marquee multi-select (click = deselect)
-- [ ] pinch / `Ctrl`+wheel — gesture — `PosterEditor.tsx:1148-1203` — cursor-anchored zoom (0.2–10×)
+- [ ] pinch / `Ctrl`+wheel — gesture — listener `PosterEditor.tsx:1348` — cursor-anchored zoom, 10× ceiling; the floor is min(0.2, the fit, the current zoom), so it never zooms the wrong way (`clampZoom`, `workspaceGeometry.ts`; fix 03)
+- [ ] keyboard focus ring — `button:focus-visible` in `index.css` sets the outline `!important`, so it draws on buttons styled with an inline `all: 'unset'`; buttons marked `data-focus-inset` (guidelines section headers and Save as…, the author ▲ ▼ ×, Post comment) and the sidebar tabs draw it inset (−2 px) so it is not clipped or drawn over a neighbour (fix 03, cause D)
 - [ ] two-finger scroll — native pan via overflow:auto — `PosterEditor.tsx:1119-1121` (comment), container `:2720-2721`
-- [ ] `Zoom out` (`−`) — ZoomBar button — `PosterEditor.tsx:3360-3366` — `setZoom(zoom - 0.15)`
-- [ ] `Reset zoom to fit` (`{percent}%` readout) — ZoomBar button — `PosterEditor.tsx:3367-3376` — `setZoom(null)` (auto-fit)
-- [ ] `Zoom in` (`+`) — ZoomBar button — `PosterEditor.tsx:3377-3383` — `setZoom(zoom + 0.15)`
-- [ ] `Fit poster to screen` (`FIT`) — ZoomBar button — `PosterEditor.tsx:3385-3391` — `setZoom(null)`
-- [ ] `Show poster guidelines` — toggle button (guidelines closed) — `PosterEditor.tsx:3234-3273` — opens GuidelinesPanel
+- [ ] `Zoom out` (`−`) — ZoomBar button — `PosterEditor.tsx:3609` — `stepTo(zoom - 0.15)`: clamped by `clampZoom` (floor min(0.3, the fit, the current zoom); a zoom within 1e-9 of the fit is the fit; a step that cannot move keeps the poster fitted)
+- [ ] `Reset zoom to fit` (`{percent}%` readout) — ZoomBar button — `PosterEditor.tsx:3616` — `fitToScreen()`
+- [ ] `Zoom in` (`+`) — ZoomBar button — `PosterEditor.tsx:3626` — `stepTo(zoom + 0.15)`, 10× ceiling
+- [ ] `Fit poster to screen` (`FIT`) — ZoomBar button — `PosterEditor.tsx:3634` — `fitToScreen()`: the fit keeps a 64 px gutter per side (8 px on the phone share view; a quarter of the canvas when it is narrower than two gutters) and scrolls back to 0,0 (`fitSheet`, `workspaceGeometry.ts`; fix 03)
+- [ ] `Show poster guidelines` — toggle button (guidelines closed) — `PosterEditor.tsx:3468` — opens GuidelinesPanel. The panel starts closed in windows 1599 px wide or narrower (`GUIDELINES_CLOSED_QUERY`, `:639`), read once on load; a held Enter acts once (`ignoreRepeatedEnter.ts`); focus follows into the panel only if it was on the toggle (`useGuidelinesFocus`, `:554`; fix 03)
 - [ ] `FigureSizeOverlay` body — draggable gray rect (Check tab active, no image selected) — `PosterEditor.tsx:3034-3044,3535-3605` — drag moves `checkFigureRect`
 - [ ] `FigureSizeOverlay` corner — resize handle — `PosterEditor.tsx:3534-3548` — drag resizes rect
 - [ ] `PendingAreaAnchor` body — draggable comment-area rect — `PosterEditor.tsx:3663-3694` — move pending/focused area anchor
@@ -1385,9 +1386,7 @@ flowchart LR
 - [ ] "Stay here" — ConfirmModal cancel — `PosterEditor.tsx:2385`
 - [ ] "Popup blocked. Please allow popups for this site to use "Save PDF", or press Ctrl/⌘+P directly from the editor as a fallback." — alert() — `PosterEditor.tsx:2146-2148`
 - [ ] "Untitled Poster" — publish-flow fallback title — `PosterEditor.tsx:1216`
-- [ ] `{N} block{s} outside poster bounds` — OOB banner heading — `PosterEditor.tsx:3176`
-- [ ] `⛔ {message}` / `⚠️ {message}` — OOB banner lines (messages from boundsCheck.ts) — `PosterEditor.tsx:3180`
-- [ ] `+{N} more…` — OOB banner overflow line — `PosterEditor.tsx:3185`
+- [ ] `{N} block{s} outside poster bounds — details in Issues` — OOB banner, one line so it stays in the 64 px gutter above a fitted sheet — `PosterEditor.tsx:3404` (fix 03: the per-block lines moved to the Issues tab only)
 - [ ] `{inch}"` — ruler tick labels (top + left rulers) — `PosterEditor.tsx:3098,3205`
 - [ ] "FIGURE PREVIEW" — overlay label — `PosterEditor.tsx:3525`
 - [ ] `{widthIn}" × {heightIn}"` — overlay dimensions — `PosterEditor.tsx:3527`
@@ -4242,9 +4241,10 @@ flowchart LR
 #### `components/OnboardingTour.tsx` — 8-step click-through editor tour (spotlight + tooltip)
 
 **Elements**
-- [ ] `Skip tour` — button — `OnboardingTour.tsx:303` — `finish()` → sets `localStorage['postr.onboarding-done']`
-- [ ] `Back` — button — `OnboardingTour.tsx:308` — previous step (hidden on step 1)
-- [ ] `Next →` / `Done` — button — `OnboardingTour.tsx:310` — advance / finish
+- [ ] `Skip tour` — button — `OnboardingTour.tsx:393` — `finish()` → sets `localStorage['postr.onboarding-done']`
+- [ ] `Back` — button — `OnboardingTour.tsx:397` — previous step (hidden on step 1)
+- [ ] `Next →` / `Done` — button — `OnboardingTour.tsx:400` — advance / finish
+- [ ] Behaviour (fix 03): each step names its targets in order of preference and highlights the first on screen; the highlight follows its target and the window every frame while a step is shown; a step is prepared once (opens a collapsed sidebar, picks the tab by its label, scrolls the target vertically inside its own panel), not again when a modal closes; the dimming strips are clamped to the window on all four sides
 
 **Copy** (all in `STEPS` constant `:38-95`; rendered `:292-300`)
 - [ ] "Your poster canvas" — step 1 title — `:41`
@@ -4263,7 +4263,8 @@ flowchart LR
 - [ ] "Save as PDF, email to any Staples kiosk, publish to the gallery — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser." — step 7 body (flag-ON variant) — `:85`
 - [ ] "Save as PDF, email to any Staples kiosk — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser." — step 7 body (**active**, `GALLERY_PUBLIC_ENABLED=false`) — `:86`
 - [ ] "Conference guidelines" — step 8 title — `:91`
-- [ ] "Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Close it to give the canvas more room." — step 8 body — `:92`
+- [ ] "Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Open it with this button when you need it." — step 8 body on the closed panel's toggle — `:104`
+- [ ] "Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Close it to give the canvas more room." — step 8 body on the open panel — `:105`
 - [ ] "{step + 1}/8" — step counter — `OnboardingTour.tsx:296`
 
 **Graphics**
