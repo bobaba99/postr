@@ -16,7 +16,11 @@ import { useEffect, useState } from 'react';
 /** Tailwind `sm` is min-width 640px, so "small" is everything under it. */
 export const SMALL_SCREEN_QUERY = '(max-width: 639px)';
 
-const matches = (query: string): boolean => {
+/**
+ * A media query's answer right now, read once. False where there is no
+ * window (a prerender) or no `matchMedia` (some test environments).
+ */
+export const mediaQueryMatches = (query: string): boolean => {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
     return false;
   }
@@ -24,7 +28,7 @@ const matches = (query: string): boolean => {
 };
 
 export function useIsSmallScreen(query: string = SMALL_SCREEN_QUERY): boolean {
-  const [small, setSmall] = useState(() => matches(query));
+  const [small, setSmall] = useState(() => mediaQueryMatches(query));
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {

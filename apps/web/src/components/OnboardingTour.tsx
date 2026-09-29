@@ -18,10 +18,16 @@ import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 
 interface TourStep {
-  selector: string;
+  /**
+   * What to highlight: a selector, or several in order of preference (the
+   * first that matches wins), for a feature shown two ways, such as a
+   * closed panel's toggle before the panel itself.
+   */
+  selector: string | readonly string[];
   tabName?: string;
   title: string;
-  body: string;
+  /** The text; or one per selector, for the one that matched. */
+  body: string | readonly string[];
   position: 'bottom' | 'right' | 'left' | 'top';
 }
 
@@ -90,18 +96,68 @@ const STEPS: TourStep[] = [
     position: 'right',
   },
   {
-    selector: '[data-postr-guidelines]',
+    // Below 1600 px the panel starts closed (fix 03): point at its toggle
+    // then, not at the panel clipped off the edge of the window.
+    selector: ['[data-postr-guidelines-toggle]', '[data-postr-guidelines]'],
     title: 'Conference guidelines',
-    body: 'Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Close it to give the canvas more room.',
+    body: [
+      'Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Open it with this button when you need it.',
+      'Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Close it to give the canvas more room.',
+    ],
     position: 'left',
   },
 ];
 
 const STORAGE_KEY = 'postr.onboarding-done';
 
+/**
+ * The first element matching one of `selector`, in order of preference,
+ * and which selector it was.
+ */
+function firstMatch(selector: TourStep['selector']): { el: HTMLElement; index: number } | null {
+  const list = typeof selector === 'string' ? [selector] : selector;
+  for (let index = 0; index < list.length; index += 1) {
+    const el = document.querySelector<HTMLElement>(list[index]!);
+    if (el) return { el, index };
+  }
+  return null;
+}
+
+/**
+ * Bring `el` into view inside the nearest panel that scrolls vertically,
+ * and only vertically. scrollIntoView would also scroll clipped boxes, such
+ * as the sidebar while it slides open, and move the target away from where
+ * it was measured (fix 03). A target taller than its panel (the canvas
+ * when zoomed in) is left alone.
+ */
+function scrollIntoPanel(el: HTMLElement) {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const overflowY = getComputedStyle(p).overflowY;
+    if (overflowY !== 'auto' && overflowY !== 'scroll') continue;
+    const box = p.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (r.height > box.height) return;
+    if (r.top < box.top) p.scrollTop -= box.top - r.top;
+    else if (r.bottom > box.bottom) p.scrollTop += r.bottom - box.bottom;
+    return;
+  }
+}
+
+/** A rect's position and size, rounded, for telling whether it moved. */
+const rectKey = (r: DOMRect | null) =>
+  r ? `${Math.round(r.left)} ${Math.round(r.top)} ${Math.round(r.width)} ${Math.round(r.height)}` : '';
+
 export function OnboardingTour() {
   const [step, setStep] = useState(-1);
   const [rect, setRect] = useState<DOMRect | null>(null);
+  /** Which of the step's selectors matched (for its text). */
+  const [matched, setMatched] = useState(0);
+  /**
+   * The window's size when the target was last measured. The strips and the
+   * tooltip are drawn from it, not from `window` at render time, so a resize
+   * always redraws them (review of fix 03).
+   */
+  const [win, setWin] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
   const pulseRef = useRef<HTMLStyleElement | null>(null);
 
   // Suspend the tour while a modal that needs full attention is open.
@@ -145,27 +201,30 @@ export function OnboardingTour() {
     return () => { style.remove(); };
   }, []);
 
-  const measureStep = useCallback((idx: number) => {
-    if (idx < 0 || idx >= STEPS.length) return;
-    const s = STEPS[idx]!;
-
-    // Click sidebar tab if specified
+  // Get a step's target ready to be seen: open the sidebar if the user
+  // collapsed it (a tab in a closed sidebar shows nothing), click the
+  // step's sidebar tab, and, a frame later once the tab has rendered,
+  // scroll the target into its panel (the export button sits below the
+  // fold in a short window). Only when the step changes: a resize or a
+  // modal closing never reopens a sidebar the user collapsed.
+  const prepareStep = useCallback((idx: number) => {
+    const s = STEPS[idx];
+    if (!s) return;
     if (s.tabName) {
+      document.querySelector<HTMLElement>('[data-postr-sidebar-reveal]')?.click();
       const allBtns = document.querySelectorAll<HTMLElement>('nav[aria-label="Sidebar sections"] button');
       for (const btn of allBtns) {
-        if (btn.textContent?.trim().toLowerCase() === s.tabName) {
+        // The label is the button's first text: the Issues tab also holds
+        // a count badge, so its whole text reads "issues2" (review of fix 03).
+        if (btn.firstChild?.textContent?.trim().toLowerCase() === s.tabName) {
           btn.click();
           break;
         }
       }
     }
-
-    // Defer one frame so the tab click + DOM re-layout settle
-    // before measuring. Without this, getBoundingClientRect can
-    // return the previous tab's geometry.
     requestAnimationFrame(() => {
-      const el = document.querySelector<HTMLElement>(s.selector);
-      setRect(el ? el.getBoundingClientRect() : null);
+      const hit = firstMatch(s.selector);
+      if (hit) scrollIntoPanel(hit.el);
     });
   }, []);
 
@@ -178,23 +237,45 @@ export function OnboardingTour() {
   // canvas during the sidebar steps) and made the pulse border
   // appear to share a stacking layer with the highlighted element.
   // Removing the boost fixes both visual artifacts.
+  // Once per step: not again when a modal closes and the tour resumes,
+  // which would reopen a sidebar the user collapsed (review of fix 03).
+  const preparedStepRef = useRef(-1);
   useEffect(() => {
-    if (step >= 0 && !suspended) measureStep(step);
-  }, [step, measureStep, suspended]);
+    if (step < 0) preparedStepRef.current = -1;
+    if (step < 0 || suspended || preparedStepRef.current === step) return;
+    preparedStepRef.current = step;
+    prepareStep(step);
+  }, [step, prepareStep, suspended]);
 
+  // Follow the target every frame while a step is shown: it moves when a
+  // panel opens or closes under it (the last step's toggle gives way to
+  // the panel it opens), when the sidebar slides, and when the window
+  // resizes. Measuring only on step changes left the highlight behind.
   useEffect(() => {
-    if (suspended) setRect(null);
-    // No else branch — when suspended flips false, the effect above
-    // will re-fire because `suspended` is in its deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [suspended]);
-
-  useEffect(() => {
-    if (step < 0) return;
-    const handler = () => measureStep(step);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, [step, measureStep]);
+    const s = step >= 0 && !suspended ? STEPS[step] : undefined;
+    if (!s) {
+      setRect(null);
+      return;
+    }
+    let frame = 0;
+    let last: string | null = null;
+    const track = () => {
+      const hit = firstMatch(s.selector);
+      const r = hit ? hit.el.getBoundingClientRect() : null;
+      // The window's size too: the dimming strips span the window, so a
+      // resize that leaves the target in place must still redraw them.
+      const key = `${rectKey(r)} ${window.innerWidth} ${window.innerHeight}`;
+      if (key !== last) {
+        last = key;
+        setRect(r);
+        setMatched(hit ? hit.index : 0);
+        setWin({ w: window.innerWidth, h: window.innerHeight });
+      }
+      frame = requestAnimationFrame(track);
+    };
+    frame = requestAnimationFrame(track);
+    return () => cancelAnimationFrame(frame);
+  }, [step, suspended]);
 
   const finish = useCallback(() => {
     localStorage.setItem(STORAGE_KEY, 'true');
@@ -232,28 +313,33 @@ export function OnboardingTour() {
 
     const gap = 16;
     if (current.position === 'right') {
-      return { ...base, top: Math.min(rect.top + 60, window.innerHeight - 200), left: rect.right + gap };
+      return { ...base, top: Math.min(rect.top + 60, win.h - 200), left: rect.right + gap };
     }
     if (current.position === 'left') {
-      return { ...base, top: Math.min(rect.top + 60, window.innerHeight - 200), right: window.innerWidth - rect.left + gap };
+      return { ...base, top: Math.min(rect.top + 60, win.h - 200), right: win.w - rect.left + gap };
     }
     if (current.position === 'bottom') {
       return { ...base, top: rect.bottom + gap, left: rect.left + rect.width / 2, transform: 'translateX(-50%)' };
     }
-    return { ...base, bottom: window.innerHeight - rect.top + gap, left: rect.left + rect.width / 2, transform: 'translateX(-50%)' };
+    return { ...base, bottom: win.h - rect.top + gap, left: rect.left + rect.width / 2, transform: 'translateX(-50%)' };
   })();
 
   // Build 4 overlay rects that darken everything EXCEPT the target
   const pad = 6;
-  const sr = rect ? {
-    top: rect.top - pad,
-    left: rect.left - pad,
-    width: rect.width + pad * 2,
-    height: rect.height + pad * 2,
-  } : null;
+  // Clamped to the window on every side, so no strip gets a negative
+  // size: the browser drops a negative width or height and keeps the
+  // previous step's strip, over the highlight.
+  const sr = rect ? (() => {
+    const clamp = (v: number, max: number) => Math.min(max, Math.max(0, v));
+    const top = clamp(rect.top - pad, win.h);
+    const left = clamp(rect.left - pad, win.w);
+    const bottom = Math.max(top, clamp(rect.bottom + pad, win.h));
+    const right = Math.max(left, clamp(rect.right + pad, win.w));
+    return { top, left, width: right - left, height: bottom - top };
+  })() : null;
   const overlayColor = 'rgba(0, 0, 0, 0.5)';
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const vw = win.w;
+  const vh = win.h;
 
   return (
     <>
@@ -300,7 +386,7 @@ export function OnboardingTour() {
           </span>
         </div>
         <div style={{ fontSize: 13, color: '#9ca3af', lineHeight: 1.5, marginBottom: 16 }}>
-          {current.body}
+          {typeof current.body === 'string' ? current.body : current.body[matched] ?? current.body[0]}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button onClick={finish} style={skipBtnStyle}>

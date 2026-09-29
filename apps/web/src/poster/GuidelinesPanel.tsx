@@ -6,6 +6,7 @@
  * Data sourced from official conference websites (links provided inline).
  * The panel is collapsible via a bookmark-style toggle on the right edge.
  */
+import { ignoreRepeatedEnter } from './ignoreRepeatedEnter';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { InputModal } from '@/components/InputModal';
 
@@ -569,7 +570,9 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
           </div>
         </div>
         <button
+          data-postr-guidelines-hide
           onClick={onToggle}
+          onKeyDown={ignoreRepeatedEnter}
           title="Hide guidelines"
           style={{
             all: 'unset',
@@ -634,6 +637,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                     )}
                   </select>
                   <button
+                    data-focus-inset
                     onClick={() => setShowSaveModal(true)}
                     title="Save current checklist as a reusable template"
                     style={{ all: 'unset', cursor: 'pointer', fontSize: 14, color: '#7c6aed', fontWeight: 600, whiteSpace: 'nowrap', padding: '6px 0' }}
@@ -1179,6 +1183,8 @@ function SectionDropdown({ title, open, onToggle, children }: {
   return (
     <div style={{ borderBottom: '1px solid #1a1a26' }}>
       <button
+        data-focus-inset
+        data-postr-section-header
         onClick={onToggle}
         style={{ ...cardHeaderStyle, padding: '16px 20px' }}
         onMouseEnter={(e) => { e.currentTarget.style.background = '#1a1a26'; }}

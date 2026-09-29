@@ -112,6 +112,33 @@ describe('H2, H3 — the zoom controls never zoom the wrong way', () => {
     expect(zoomNow()).toBeGreaterThanOrEqual(fit - 1e-9);
   });
 
+  it('five steps in and five out land exactly on the fit, so the next Zoom out is not a dead click', async () => {
+    // Found by the independent review (R4, record section 9): 0.15 steps are
+    // not exact in binary, so the round trip ended 1e-17 above the fit
+    // (0.0566666666666667 against 0.056666666666666664). The drift happens
+    // for some fits only: a 143 px canvas (fit 0.060833333333333336) drifts
+    // to 0.06083333333333335 under the old clamp, found by simulating it.
+    stubScreen({ width: 143, height: 700 });
+    load({ ...makeDoc(120, 72) } as PosterDoc);
+    renderEditor();
+    const fit = zoomNow();
+    expect(fit, 'precondition: a fit below 0.2').toBeLessThan(0.2);
+    for (let i = 0; i < 5; i += 1) await click(screen.getByRole('button', { name: 'Zoom in' }), 'Zoom in');
+    for (let i = 0; i < 5; i += 1) await click(screen.getByRole('button', { name: 'Zoom out' }), 'Zoom out');
+    expect(Object.is(zoomNow(), fit), `${zoomNow()} against the fit ${fit}`).toBe(true);
+  });
+
+  it('Zoom in stops at the 10× ceiling', async () => {
+    // Found by the independent review (R8, record section 9): this was listed
+    // as a blind spot because reaching 10× takes many clicks, but clicks are
+    // cheap in jsdom: 80 clicks of 0.15 pass 10× from this fit.
+    stubScreen({ width: 1060, height: 520 });
+    load(makeDoc(48, 36));
+    renderEditor();
+    for (let i = 0; i < 80; i += 1) await click(screen.getByRole('button', { name: 'Zoom in' }), 'Zoom in');
+    expect(zoomNow()).toBe(10);
+  });
+
   it('control: above the floors, Zoom out and a pinch out both zoom out', async () => {
     stubScreen({ width: 1060, height: 520 });
     load(makeDoc(48, 36));

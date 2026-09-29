@@ -8,6 +8,11 @@
  * Plain ESM on purpose: harnesses run in bare Node. The repo is POSTR_REPO or
  * the repo containing this file.
  *
+ * POSTR_MUTANT=<spec.mutants.json>#<name> serves that mutant's edited
+ * sources instead of the files (the repo is never written), so a browser
+ * scenario can show it goes red when a part of a fix is taken away:
+ * scripts/blind-spot-check.mjs runs it for a spec's blind spots.
+ *
  * Side effect: loading vite.config.ts rewrites apps/web/public/version.json
  * (the build-stamp plugin). Restore it afterwards:
  *   git -C "$POSTR_REPO" checkout -- apps/web/public/version.json
@@ -17,6 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { loadSpec, mutate, mutantPlugin } from './mutants.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO = path.resolve(process.env.POSTR_REPO ?? path.resolve(HERE, '../../../..'));
@@ -39,9 +45,11 @@ export async function startHarness({ name, port }) {
   fs.mkdirSync(out, { recursive: true });
   const { chromium } = await import(pathToFileURL(path.join(REPO, 'node_modules/playwright/index.mjs')).href);
   const { createServer } = await import(pathToFileURL(path.join(REPO, 'node_modules/vite/dist/node/index.js')).href);
+  const mutant = mutantFromEnv();
   const server = await createServer({
     root: WEB, configFile: path.join(WEB, 'vite.config.ts'), cacheDir: path.join(out, '.vite-cache'),
     server: { port, strictPort: true, host: '127.0.0.1', hmr: false }, logLevel: 'warn',
+    plugins: mutant ? [mutantPlugin(mutant.byFile)] : [],
   });
   await server.listen();
   let browser;
@@ -55,14 +63,26 @@ export async function startHarness({ name, port }) {
   try {
     git = (await import('node:child_process')).execSync('git rev-parse --short HEAD', { cwd: REPO }).toString().trim();
   } catch { /* not a git checkout */ }
-  log(`[harness] vite on ${base} (repo ${REPO}, ${git})`);
+  log(`[harness] vite on ${base} (repo ${REPO}, ${git})${mutant ? ` MUTANT ${mutant.name} (${mutant.byFile.size} file(s))` : ''}`);
   return {
-    base, out, git, browser,
+    base, out, git, browser, mutant: mutant?.name ?? null,
     async stop() {
       await browser.close().catch(() => {});
       await server.close().catch(() => {});
     },
   };
+}
+
+/** POSTR_MUTANT=<spec>#<name>, validated the way mutation-check validates it. */
+function mutantFromEnv() {
+  const env = process.env.POSTR_MUTANT;
+  if (!env) return null;
+  const at = env.lastIndexOf('#');
+  if (at < 0) throw new Error('POSTR_MUTANT is <spec.mutants.json>#<mutant name>');
+  const [specPath, name] = [path.resolve(env.slice(0, at)), env.slice(at + 1)];
+  const m = loadSpec(specPath).mutants[name];
+  if (!m) throw new Error(`no mutant "${name}" in ${specPath}`);
+  return { name, byFile: mutate(WEB, m) };
 }
 
 // ---------------------------------------------------------------- fake backend
@@ -78,9 +98,10 @@ function makeJwt(sub) {
 /**
  * A fake backend holding one poster row (`state.row`) and recording every
  * write (`state.saves`). Anything that is not the dev server, a data/blob URL
- * or a faked host is aborted and recorded (`state.aborted`).
+ * or a faked host is aborted and recorded (`state.aborted`). The onboarding
+ * tour is marked done unless `tour` is true.
  */
-export async function installMocks(context, state, base) {
+export async function installMocks(context, state, base, { tour = false } = {}) {
   const t = new Date().toISOString();
   const user = {
     id: state.userId, aud: 'authenticated', role: 'authenticated', email: 'jane.doe@example.test', phone: '',
@@ -140,12 +161,12 @@ export async function installMocks(context, state, base) {
     return json(route, {});
   });
   await context.route('http://localhost:3000/**', (route) => json(route, { success: false, error: 'mock' }, 404));
-  await context.addInitScript(() => {
+  await context.addInitScript((showTour) => {
     try {
-      localStorage.setItem('postr.onboarding-done', 'true');
+      if (!showTour) localStorage.setItem('postr.onboarding-done', 'true');
       localStorage.setItem('postr.mobile-notice-dismissed', 'true');
     } catch { /* ignore */ }
-  });
+  }, tour);
 }
 
 /**
@@ -182,11 +203,12 @@ export async function buildDoc(page, base, { w, h }) {
  * the poster someone else's: an owner opening their own share link is sent
  * to the editor, so a share-page check needs a poster the user does not own.
  * `editDoc(doc)` returns a changed copy of the doc before it is stored.
+ * `tour` leaves the onboarding tour to start, as for a first-time user.
  */
-export async function openEditor(h, { viewport, poster, deviceScaleFactor = 1, route, ownedByOther = false, editDoc }) {
+export async function openEditor(h, { viewport, poster, deviceScaleFactor = 1, route, ownedByOther = false, editDoc, tour = false }) {
   const context = await h.browser.newContext({ viewport, deviceScaleFactor });
   const state = { userId: randomUUID(), row: null, saves: [], aborted: [], errors: [] };
-  await installMocks(context, state, h.base);
+  await installMocks(context, state, h.base, { tour });
   const page = await context.newPage();
   page.on('pageerror', (e) => state.errors.push(String(e).slice(0, 300)));
   const built = await buildDoc(page, h.base, poster);

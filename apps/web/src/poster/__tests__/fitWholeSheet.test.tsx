@@ -231,3 +231,20 @@ describe('the phone share view keeps its own, smaller gutter', () => {
     expect(workareaPadding()).toEqual({ left: GUTTER, right: GUTTER, top: GUTTER, bottom: GUTTER });
   });
 });
+
+describe('the out-of-bounds banner stays in the gutter above a fitted sheet', () => {
+  // Found by the independent review (R1, confirmed by a skeptic; record
+  // section 9): the banner grew 33 px per warning line and, with the gutter
+  // cut from 96 to 64 px, covered up to 93% of a fitted poster's title. Every
+  // block is listed in the Issues tab, so the banner keeps to one line.
+  it('three blocks past the edge: one line, no per-block lines', () => {
+    stubScreen({ width: 1060, height: 520 });
+    const d = makeDoc(48, 36);
+    load({ ...d, blocks: d.blocks.map((b, i) => (i < 3 ? { ...b, x: 490 } : b)) });
+    renderEditor();
+    const heading = screen.getByText(/3 blocks outside poster bounds/);
+    const banner = heading.parentElement!;
+    expect(banner.querySelectorAll('div').length, 'lines under the heading').toBe(0);
+    expect(banner.textContent).toMatch(/details in Issues/);
+  });
+});

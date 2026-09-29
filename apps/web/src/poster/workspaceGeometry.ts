@@ -36,7 +36,11 @@ export const ZOOM_STEP = 0.15;
  */
 export function clampZoom(next: number, current: number, fit: number): number {
   const floor = Math.min(ZOOM_MIN, fit, current);
-  return Math.min(ZOOM_MAX, Math.max(floor, next));
+  const z = Math.min(ZOOM_MAX, Math.max(floor, next));
+  // Steps of 0.15 are not exact in binary: k steps in and k out from the fit
+  // can end 1e-17 above it, and the next Zoom out then moves nothing you can
+  // see (review of fix 03). A zoom that close to the fit is the fit.
+  return Math.abs(z - fit) < 1e-9 ? fit : z;
 }
 
 /**

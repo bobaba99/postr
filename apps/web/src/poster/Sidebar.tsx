@@ -380,9 +380,10 @@ export function Sidebar(props: SidebarProps) {
   //      the tab you just left reads as a distinct third color
   //      (neither bright white nor dim #6b7280) — that's the
   //      "third state" users kept seeing. We need instant snaps.
-  //   3. outline: none is REQUIRED even with `all: unset` because
-  //      some browsers re-apply focus outline via :focus-visible
-  //      at the user-agent level.
+  //   3. outline: none keeps the user agent's own focus ring off after
+  //      a click. The house keyboard ring (index.css,
+  //      button:focus-visible, !important) overrides it on purpose, and
+  //      the style block below draws it inset (fix 03, cause D).
   const tabStyle = (active: boolean): CSSProperties => ({
     all: 'unset',
     boxSizing: 'border-box',
@@ -452,7 +453,7 @@ export function Sidebar(props: SidebarProps) {
       */}
       <style>{`
         button[data-postr-tab]:focus-visible {
-          box-shadow: inset 0 0 0 1px #7c6aed;
+          outline-offset: -2px !important;
         }
       `}</style>
 
@@ -1700,12 +1701,14 @@ function AuthorManager(props: {
           <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
             <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
               <button
+                data-focus-inset
                 onClick={() => swap(i - 1, i)}
                 style={{ all: 'unset', cursor: 'pointer', color: i > 0 ? '#666' : '#2a2a3a', fontSize: 13 }}
               >
                 ▲
               </button>
               <button
+                data-focus-inset
                 onClick={() => swap(i, i + 1)}
                 style={{
                   all: 'unset',
@@ -1724,6 +1727,7 @@ function AuthorManager(props: {
               style={{ ...inputBase, flex: 1, fontSize: 17 }}
             />
             <button
+              data-focus-inset
               onClick={() => remove(a.id)}
               style={{ all: 'unset', cursor: 'pointer', color: '#c55', fontSize: 18, fontWeight: 700 }}
             >
