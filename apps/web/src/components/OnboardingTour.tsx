@@ -152,6 +152,12 @@ export function OnboardingTour() {
   const [rect, setRect] = useState<DOMRect | null>(null);
   /** Which of the step's selectors matched (for its text). */
   const [matched, setMatched] = useState(0);
+  /**
+   * The window's size when the target was last measured. The strips and the
+   * tooltip are drawn from it, not from `window` at render time, so a resize
+   * always redraws them (review of fix 03).
+   */
+  const [win, setWin] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
   const pulseRef = useRef<HTMLStyleElement | null>(null);
 
   // Suspend the tour while a modal that needs full attention is open.
@@ -208,7 +214,9 @@ export function OnboardingTour() {
       document.querySelector<HTMLElement>('[data-postr-sidebar-reveal]')?.click();
       const allBtns = document.querySelectorAll<HTMLElement>('nav[aria-label="Sidebar sections"] button');
       for (const btn of allBtns) {
-        if (btn.textContent?.trim().toLowerCase() === s.tabName) {
+        // The label is the button's first text: the Issues tab also holds
+        // a count badge, so its whole text reads "issues2" (review of fix 03).
+        if (btn.firstChild?.textContent?.trim().toLowerCase() === s.tabName) {
           btn.click();
           break;
         }
@@ -229,8 +237,14 @@ export function OnboardingTour() {
   // canvas during the sidebar steps) and made the pulse border
   // appear to share a stacking layer with the highlighted element.
   // Removing the boost fixes both visual artifacts.
+  // Once per step: not again when a modal closes and the tour resumes,
+  // which would reopen a sidebar the user collapsed (review of fix 03).
+  const preparedStepRef = useRef(-1);
   useEffect(() => {
-    if (step >= 0 && !suspended) prepareStep(step);
+    if (step < 0) preparedStepRef.current = -1;
+    if (step < 0 || suspended || preparedStepRef.current === step) return;
+    preparedStepRef.current = step;
+    prepareStep(step);
   }, [step, prepareStep, suspended]);
 
   // Follow the target every frame while a step is shown: it moves when a
@@ -248,11 +262,14 @@ export function OnboardingTour() {
     const track = () => {
       const hit = firstMatch(s.selector);
       const r = hit ? hit.el.getBoundingClientRect() : null;
-      const key = rectKey(r);
+      // The window's size too: the dimming strips span the window, so a
+      // resize that leaves the target in place must still redraw them.
+      const key = `${rectKey(r)} ${window.innerWidth} ${window.innerHeight}`;
       if (key !== last) {
         last = key;
         setRect(r);
         setMatched(hit ? hit.index : 0);
+        setWin({ w: window.innerWidth, h: window.innerHeight });
       }
       frame = requestAnimationFrame(track);
     };
@@ -296,15 +313,15 @@ export function OnboardingTour() {
 
     const gap = 16;
     if (current.position === 'right') {
-      return { ...base, top: Math.min(rect.top + 60, window.innerHeight - 200), left: rect.right + gap };
+      return { ...base, top: Math.min(rect.top + 60, win.h - 200), left: rect.right + gap };
     }
     if (current.position === 'left') {
-      return { ...base, top: Math.min(rect.top + 60, window.innerHeight - 200), right: window.innerWidth - rect.left + gap };
+      return { ...base, top: Math.min(rect.top + 60, win.h - 200), right: win.w - rect.left + gap };
     }
     if (current.position === 'bottom') {
       return { ...base, top: rect.bottom + gap, left: rect.left + rect.width / 2, transform: 'translateX(-50%)' };
     }
-    return { ...base, bottom: window.innerHeight - rect.top + gap, left: rect.left + rect.width / 2, transform: 'translateX(-50%)' };
+    return { ...base, bottom: win.h - rect.top + gap, left: rect.left + rect.width / 2, transform: 'translateX(-50%)' };
   })();
 
   // Build 4 overlay rects that darken everything EXCEPT the target
@@ -314,15 +331,15 @@ export function OnboardingTour() {
   // previous step's strip, over the highlight.
   const sr = rect ? (() => {
     const clamp = (v: number, max: number) => Math.min(max, Math.max(0, v));
-    const top = clamp(rect.top - pad, window.innerHeight);
-    const left = clamp(rect.left - pad, window.innerWidth);
-    const bottom = Math.max(top, clamp(rect.bottom + pad, window.innerHeight));
-    const right = Math.max(left, clamp(rect.right + pad, window.innerWidth));
+    const top = clamp(rect.top - pad, win.h);
+    const left = clamp(rect.left - pad, win.w);
+    const bottom = Math.max(top, clamp(rect.bottom + pad, win.h));
+    const right = Math.max(left, clamp(rect.right + pad, win.w));
     return { top, left, width: right - left, height: bottom - top };
   })() : null;
   const overlayColor = 'rgba(0, 0, 0, 0.5)';
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const vw = win.w;
+  const vh = win.h;
 
   return (
     <>

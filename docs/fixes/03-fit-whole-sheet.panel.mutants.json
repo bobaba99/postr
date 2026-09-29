@@ -7,7 +7,7 @@
   ],
   "mutants": {
     "panel-always-open": {
-      "undoes": "C (H4) \u2014 below 1600 px the panel starts closed",
+      "undoes": "C (H4) — below 1600 px the panel starts closed",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -17,7 +17,7 @@
       ]
     },
     "panel-always-closed": {
-      "undoes": "C \u2014 from 1600 px up the panel still starts open",
+      "undoes": "C — from 1600 px up the panel still starts open",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -27,7 +27,7 @@
       ]
     },
     "threshold-off-by-one": {
-      "undoes": "C \u2014 exactly 1600 px is a wide screen (panel open)",
+      "undoes": "C — exactly 1600 px is a wide screen (panel open)",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -37,7 +37,7 @@
       ]
     },
     "toggle-on-phone-share": {
-      "undoes": "C (code review) \u2014 the phone share view, which never draws the panel, shows no toggle for it",
+      "undoes": "C (code review) — the phone share view, which never draws the panel, shows no toggle for it",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -47,7 +47,7 @@
       ]
     },
     "unguarded-media-read": {
-      "undoes": "C (code review) \u2014 the first state is read through the guarded mediaQueryMatches (no window during a prerender, no matchMedia in some tests)",
+      "undoes": "C (code review) — the first state is read through the guarded mediaQueryMatches (no window during a prerender, no matchMedia in some tests)",
       "expect": "survive",
       "why": "every test environment here has a window and matchMedia; the guard itself is useIsSmallScreen's, covered by its own tests; no code path prerenders React today (scripts/prerender.mjs only injects strings)",
       "edits": [
@@ -56,10 +56,11 @@
           "  const [guidelinesOpen, setGuidelinesOpen] = useState(() => !mediaQueryMatches(GUIDELINES_CLOSED_QUERY));",
           "  const [guidelinesOpen, setGuidelinesOpen] = useState(() => !window.matchMedia(GUIDELINES_CLOSED_QUERY).matches);"
         ]
-      ]
+      ],
+      "unguarded": "INSPECTED: every test environment has a window and matchMedia, and no code path prerenders React; the guard is useIsSmallScreen's, covered by its own tests."
     },
     "guidelines-not-inert": {
-      "undoes": "C (sibling) \u2014 the closed guidelines panel is out of the keyboard's reach",
+      "undoes": "C (sibling) — the closed guidelines panel is out of the keyboard's reach",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -69,7 +70,7 @@
       ]
     },
     "tour-last-step-panel-only": {
-      "undoes": "C (review 2) \u2014 the tour's last step points at the toggle while the panel is closed",
+      "undoes": "C (review 2) — the tour's last step points at the toggle while the panel is closed",
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
@@ -79,27 +80,27 @@
       ]
     },
     "close-focus-not-moved": {
-      "undoes": "C (review 2) \u2014 closing the panel with focus inside moves focus to its Show toggle",
+      "undoes": "C (review 2) — closing the panel with focus inside moves focus to its Show toggle",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "    else openerRef.current?.focus();\n",
+          "    else openerRef.current?.focus({ preventScroll: true });\n",
           ""
         ]
       ]
     },
     "open-focus-not-moved": {
-      "undoes": "C (review 2) \u2014 opening the panel from its focused toggle moves focus to its Hide button",
+      "undoes": "C (review 2) — opening the panel from its focused toggle moves focus to its Hide button",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "    if (open) panelRef.current?.querySelector<HTMLElement>('[data-postr-guidelines-hide]')?.focus();",
+          "    if (open) panelRef.current?.querySelector<HTMLElement>('[data-postr-guidelines-hide]')?.focus({ preventScroll: true });",
           "    if (open) void 0;"
         ]
       ]
     },
     "open-focus-always": {
-      "undoes": "C (review 2) \u2014 opening moves focus only when the toggle itself had focus",
+      "undoes": "C (review 2) — opening moves focus only when the toggle itself had focus",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -109,7 +110,7 @@
       ]
     },
     "close-focus-always": {
-      "undoes": "C (review 3) \u2014 closing moves focus only when it was in the panel",
+      "undoes": "C (review 3) — closing moves focus only when it was in the panel",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
@@ -119,7 +120,7 @@
       ]
     },
     "tour-no-sidebar-reveal": {
-      "undoes": "C (review 2, sibling) \u2014 a sidebar step opens a sidebar the user collapsed",
+      "undoes": "C (review 2, sibling) — a sidebar step opens a sidebar the user collapsed",
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
@@ -129,7 +130,7 @@
       ]
     },
     "tour-no-tracking": {
-      "undoes": "C (review 3) \u2014 the highlight follows its target while a step is shown (the panel opened from the last step)",
+      "undoes": "C (review 3) — the highlight follows its target while a step is shown (the panel opened from the last step)",
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
@@ -139,7 +140,7 @@
       ]
     },
     "tour-one-text": {
-      "undoes": "C (review 3) \u2014 the last step's text matches what it points at",
+      "undoes": "C (review 3) — the last step's text matches what it points at",
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
@@ -149,65 +150,123 @@
       ]
     },
     "tour-strip-top-unclamped": {
-      "undoes": "C (reproducer T, review 3) \u2014 the top edge of the highlight is clamped to the window",
+      "undoes": "C (reproducer T, review 3) — the top edge of the highlight is clamped to the window",
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
-          "    const top = clamp(rect.top - pad, window.innerHeight);",
+          "    const top = clamp(rect.top - pad, win.h);",
           "    const top = rect.top - pad;"
         ]
       ]
     },
     "tour-strip-left-unclamped": {
-      "undoes": "C (reproducer T, review 3) \u2014 the left edge of the highlight is clamped to the window",
+      "undoes": "C (reproducer T, review 3) — the left edge of the highlight is clamped to the window",
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
-          "    const left = clamp(rect.left - pad, window.innerWidth);",
+          "    const left = clamp(rect.left - pad, win.w);",
           "    const left = rect.left - pad;"
         ]
       ]
     },
     "tour-strip-bottom-unclamped": {
-      "undoes": "C (reproducer T, review 3) \u2014 the bottom edge of the highlight is clamped to the window",
+      "undoes": "C (reproducer T, review 3) — the bottom edge of the highlight is clamped to the window",
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
-          "    const bottom = Math.max(top, clamp(rect.bottom + pad, window.innerHeight));",
+          "    const bottom = Math.max(top, clamp(rect.bottom + pad, win.h));",
           "    const bottom = rect.bottom + pad;"
         ]
       ]
     },
     "tour-strip-right-unclamped": {
-      "undoes": "C (reproducer T, review 3) \u2014 the right edge of the highlight is clamped to the window",
+      "undoes": "C (reproducer T, review 3) — the right edge of the highlight is clamped to the window",
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
-          "    const right = Math.max(left, clamp(rect.right + pad, window.innerWidth));",
+          "    const right = Math.max(left, clamp(rect.right + pad, win.w));",
           "    const right = rect.right + pad;"
         ]
       ]
     },
     "tour-scroll-into-view-everything": {
-      "undoes": "C (review 3) \u2014 the tour scrolls a target only vertically, inside its own panel (scrollIntoView also scrolled the opening sidebar sideways)",
+      "undoes": "C (review 3) — the tour scrolls a target only vertically, inside its own panel (scrollIntoView also scrolled the opening sidebar sideways)",
       "expect": "survive",
-      "why": "jsdom has no layout or scrolling; fit-check.mjs measures it (claim Hp, tour-reopened-sidebar-step2: 144 px off with scrollIntoView, 0 with scrollIntoPanel)",
+      "why": "jsdom has no layout or scrolling, and in the browser the difference no longer shows (see unguarded)",
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
           "      if (hit) scrollIntoPanel(hit.el);",
           "      hit?.el.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });"
         ]
-      ]
+      ],
+      "unguarded": "MEASURED (blind-spot-check.mjs): serving this mutant at 1440 × 900, the reopened sidebar scrolls 0 px sideways and step 2's highlight is 0 px off (tour-reopened-sidebar-sideways, tour-reopened-sidebar-step2). The 144 px in record section 8 was measured before the tour followed its target every frame; since then nothing measured shows the difference. Kept for the reasons in section 7 (INSPECTED): vertical-only, inside its own panel, not for targets taller than the panel."
     },
     "tour-no-scroll": {
-      "undoes": "C (reproducer T) \u2014 the tour brings a target below its panel's fold into view",
+      "undoes": "C (reproducer T) — the tour brings a target below its panel's fold into view",
       "expect": "survive",
       "why": "jsdom has no scrolling; fit-check.mjs measures it (tour-export-step: 0 visible on main, 100% on the fix)",
       "edits": [
         [
           "src/components/OnboardingTour.tsx",
           "      if (hit) scrollIntoPanel(hit.el);\n",
+          ""
+        ]
+      ],
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "tour-export-step-1280",
+          "tour-export-step-1440"
+        ]
+      }
+    },
+    "held-enter-repeats": {
+      "undoes": "C (review R6) — a held Enter on a panel toggle acts once",
+      "edits": [
+        [
+          "src/poster/ignoreRepeatedEnter.ts",
+          "  if (e.key === 'Enter' && e.repeat) e.preventDefault();",
+          "  void e;"
+        ]
+      ]
+    },
+    "focus-scrolls-panel": {
+      "undoes": "C (review R6) — focus moves into the opening panel without scrolling it",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "?.focus({ preventScroll: true });\n    else",
+          "?.focus();\n    else"
+        ]
+      ]
+    },
+    "tour-tab-whole-text": {
+      "undoes": "C (review R7) — the tour finds a sidebar tab by its label, not its whole text",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "if (btn.firstChild?.textContent?.trim().toLowerCase() === s.tabName) {",
+          "if (btn.textContent?.trim().toLowerCase() === s.tabName) {"
+        ]
+      ]
+    },
+    "tour-prepares-on-resume": {
+      "undoes": "C (review R7) — a step is prepared once, not again when a modal closes",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "    if (step < 0 || suspended || preparedStepRef.current === step) return;",
+          "    if (step < 0 || suspended) return;"
+        ]
+      ]
+    },
+    "tour-window-not-tracked": {
+      "undoes": "C (review R7) — a resize redraws the tour's strips",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "        setWin({ w: window.innerWidth, h: window.innerHeight });\n",
           ""
         ]
       ]

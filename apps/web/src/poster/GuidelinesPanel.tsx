@@ -6,6 +6,7 @@
  * Data sourced from official conference websites (links provided inline).
  * The panel is collapsible via a bookmark-style toggle on the right edge.
  */
+import { ignoreRepeatedEnter } from './ignoreRepeatedEnter';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { InputModal } from '@/components/InputModal';
 
@@ -571,6 +572,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
         <button
           data-postr-guidelines-hide
           onClick={onToggle}
+          onKeyDown={ignoreRepeatedEnter}
           title="Hide guidelines"
           style={{
             all: 'unset',

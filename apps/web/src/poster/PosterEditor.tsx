@@ -75,6 +75,7 @@ import { autoLayout } from './autoLayout';
 import { filterDeletable } from '@/export/blockLock';
 import { LAYOUT_TEMPLATES, makeBlocks, type LayoutKey } from './templates';
 import { formatSheetSize, moveOntoSheet } from './resizeSheet';
+import { ignoreRepeatedEnter } from './ignoreRepeatedEnter';
 import {
   PHONE_GUTTER, WORKSPACE_GUTTER, ZOOM_STEP, clampZoom, fitSheet, type SheetFit,
 } from './workspaceGeometry';
@@ -559,8 +560,11 @@ function useGuidelinesFocus(
   useLayoutEffect(() => {
     if (!focusFollowsRef.current) return;
     focusFollowsRef.current = false;
-    if (open) panelRef.current?.querySelector<HTMLElement>('[data-postr-guidelines-hide]')?.focus();
-    else openerRef.current?.focus();
+    // preventScroll: the panel is still clipped to its opening width, and
+    // focusing without it scrolls the clip to the button, so the panel
+    // wipes in place instead of sliding (review of fix 03).
+    if (open) panelRef.current?.querySelector<HTMLElement>('[data-postr-guidelines-hide]')?.focus({ preventScroll: true });
+    else openerRef.current?.focus({ preventScroll: true });
   }, [open, panelRef, openerRef, focusFollowsRef]);
 }
 
@@ -3466,6 +3470,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
             guidelinesFocusFollowsRef.current = document.activeElement === e.currentTarget;
             setGuidelinesOpen(true);
           }}
+          onKeyDown={ignoreRepeatedEnter}
           style={{
             all: 'unset',
             position: 'fixed',

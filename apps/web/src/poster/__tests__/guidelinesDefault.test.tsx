@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { PosterEditor } from '../PosterEditor';
+import { useFeedbackStore } from '@/stores/feedbackStore';
 
 const authSpies = vi.hoisted(() => ({
   getUser: vi.fn(async () => ({ data: { user: { id: 'u1' } } })),
@@ -148,6 +149,14 @@ const highlight = () => {
   const pulse = [...document.querySelectorAll('div')].find((d) => d.style.animation.includes('postr-tour-pulse'));
   return pulse ? { left: parseFloat(pulse.style.left), top: parseFloat(pulse.style.top) } : null;
 };
+/** The highlight's whole box. Its corner alone cannot tell the target from a
+ *  not-yet-measured one (0 × 0 at the origin draws at -6, -6 too). */
+const highlightBox = () => {
+  const pulse = [...document.querySelectorAll('div')].find((d) => d.style.animation.includes('postr-tour-pulse'));
+  return pulse
+    ? { left: parseFloat(pulse.style.left), top: parseFloat(pulse.style.top), width: parseFloat(pulse.style.width), height: parseFloat(pulse.style.height) }
+    : null;
+};
 /** The four dimming strips, by the side of the highlight they cover. */
 const strips = () => {
   const all = [...document.querySelectorAll<HTMLElement>('div')].filter((d) => d.style.zIndex === '10000');
@@ -220,7 +229,9 @@ describe('the onboarding tour points at what the user can see', () => {
     load(makeDoc(48, 36));
     renderEditor();
     await tourToLastStep();
-    await waitFor(() => expect(highlight()).not.toBeNull());
+    // Wait for the panel's own box before reading the strips once (review of
+    // fix 03: waiting for any highlight read a stale frame under load).
+    await waitFor(() => expect(highlightBox()).toEqual({ left: 1594, top: -6, width: 332, height: 912 }));
     const st = strips();
     expect([st.top?.height, st.bottom?.height, st.right?.width], 'top, bottom, right').toEqual(['0px', '0px', '0px']);
   });
@@ -234,7 +245,8 @@ describe('the onboarding tour points at what the user can see', () => {
       fireEvent.click(nextButton()!); // to step 3, Authors: the whole sidebar
       await waitFor(() => expect(screen.getByText(`${i + 2}/8`)).toBeTruthy());
     }
-    await waitFor(() => expect(highlight()).toEqual({ left: -6, top: -6 }));
+    // The sidebar's whole box: a 0 × 0 box at the origin has the same corner.
+    await waitFor(() => expect(highlightBox()).toEqual({ left: -6, top: -6, width: 496, height: 912 }));
     const st = strips();
     expect([st.left?.width, st.top?.height, st.bottom?.height], 'left, top, bottom').toEqual(['0px', '0px', '0px']);
   });
@@ -309,5 +321,97 @@ describe('opening and closing the guidelines panel keeps keyboard focus visible'
     expect(document.activeElement, 'after closing').toBe(zoomIn);
     await click(q('[title="Show poster guidelines"]'), 'Show poster guidelines');
     expect(document.activeElement, 'after opening').toBe(zoomIn);
+  });
+});
+
+describe('review of fix 03: the panel toggles and the tour', () => {
+  // Findings of the independent review (record section 9), each confirmed
+  // in Chromium before it was fixed.
+
+  it('a held Enter on either toggle acts once (key repeats are ignored)', () => {
+    // R6: focus moves between the two toggles, so each repeat of a held
+    // Enter flipped the panel open and shut.
+    stubScreen({ width: 900, height: 700 }, 1920);
+    load(makeDoc(48, 36));
+    renderEditor();
+    const repeatAllowed = (el: Element) => fireEvent.keyDown(el, { key: 'Enter', repeat: true });
+    expect(repeatAllowed(q('[title="Hide guidelines"]')), 'Hide: repeat prevented').toBe(false);
+    expect(fireEvent.keyDown(q('[title="Hide guidelines"]'), { key: 'Enter' }), 'Hide: first press allowed').toBe(true);
+  });
+
+  it('a held Enter on the Show toggle acts once too', () => {
+    stubScreen({ width: 900, height: 700 }, 1280);
+    load(makeDoc(48, 36));
+    renderEditor();
+    expect(fireEvent.keyDown(q('[title="Show poster guidelines"]'), { key: 'Enter', repeat: true })).toBe(false);
+  });
+
+  it('focus moves into the opening panel without scrolling it (so it slides, not wipes)', async () => {
+    // R6: focusing Hide scrolled the still-clipped panel to the button.
+    stubScreen({ width: 900, height: 700 }, 1280);
+    load(makeDoc(48, 36));
+    renderEditor();
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    const show = q<HTMLButtonElement>('[title="Show poster guidelines"]');
+    show.focus();
+    focus.mockClear();
+    await click(show, 'Show poster guidelines');
+    const hideCalls = focus.mock.contexts
+      .map((el, i) => ({ el, arg: focus.mock.calls[i]?.[0] }))
+      .filter((c) => (c.el as Element).matches?.('[title="Hide guidelines"]'));
+    expect(hideCalls.length, 'focus moved to Hide').toBe(1);
+    expect(hideCalls[0]!.arg).toEqual({ preventScroll: true });
+  });
+});
+
+describe('review of fix 03: the tour', () => {
+  beforeEach(() => localStorage.removeItem('postr.onboarding-done'));
+  afterEach(() => localStorage.setItem('postr.onboarding-done', 'true'));
+  const stepTo = async (n: number) => {
+    await tourStarted();
+    for (let i = 1; i < n; i += 1) {
+      fireEvent.click(nextButton()!);
+      await waitFor(() => expect(screen.getByText(`${i + 1}/8`)).toBeTruthy());
+    }
+  };
+
+  it('step 6 opens the Issues tab when the poster has issues', async () => {
+    // R7: the tab was matched by its whole text, and the count badge made
+    // it "issues2", so the step showed the previous tab.
+    stubTourScreen(1920, []);
+    const d = makeDoc(48, 36);
+    load({ ...d, blocks: d.blocks.map((b, i) => (i === 3 ? { ...b, x: 490 } : b)) });
+    renderEditor();
+    await stepTo(6);
+    await waitFor(() => expect(screen.getByText(/text out of bounds/i)).toBeTruthy());
+  });
+
+  it('closing a modal mid-tour does not reopen a sidebar the user collapsed', async () => {
+    // R7: the tour prepared its step again when it resumed.
+    stubTourScreen(1920, []);
+    load(makeDoc(48, 36));
+    renderEditor();
+    await stepTo(3);
+    fireEvent.keyDown(window, { key: '/', metaKey: true });
+    await nextTask();
+    expect(q('[title="Show sidebar (⌘/)"]'), 'precondition: collapsed').not.toBeNull();
+    useFeedbackStore.getState().open();
+    await wait(60);
+    useFeedbackStore.setState({ isOpen: false });
+    await wait(200);
+    expect(q('[title="Show sidebar (⌘/)"]'), 'still collapsed').not.toBeNull();
+  });
+
+  it('a window resize that leaves the target in place still redraws the dimming', async () => {
+    // R7: the tour redrew only when its target moved, so after a resize a
+    // band of the editor stayed undimmed.
+    stubTourScreen(1920, [['[data-postr-sidebar]', rectOf(0, 0, 484, 900)]]);
+    load(makeDoc(48, 36));
+    renderEditor();
+    await stepTo(3);
+    await waitFor(() => expect(strips().right?.width).toBe(`${1920 - 490}px`));
+    vi.stubGlobal('innerWidth', 1500);
+    fireEvent(window, new Event('resize'));
+    await waitFor(() => expect(strips().right?.width).toBe(`${1500 - 490}px`));
   });
 });
