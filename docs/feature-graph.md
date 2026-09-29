@@ -1048,9 +1048,9 @@ Scope note: `Sidebar.tsx`, `CommentsPanel.tsx`, `VersionPanel.tsx`, `Readability
 flowchart LR
   E["Editor /p/:posterId"] -->|"renders :305"| PE["PosterEditor"]
   S["Share /s/:slug"] -->|"renders readOnly :108"| PE
-  PE -->|"renders :2332-2420"| SB["Sidebar (§6.8)"]
+  PE -->|"renders :2458-2540"| SB["Sidebar (§6.8)"]
   PE -->|"renders :3305"| GP["GuidelinesPanel"]
-  PE -->|"renders :3358"| OT["OnboardingTour (§6.13)"]
+  PE -->|"renders :3515"| OT["OnboardingTour (§6.13)"]
   PE -->|"renders :3271-3275"| ASP["AutosaveStatusPill (§6.13)"]
   PE -->|"renders :3224-3228"| UT["UndoToast"]
   PE -->|"blocks"| B["blocks.tsx renderers"]
@@ -1181,7 +1181,7 @@ flowchart LR
 #### `poster/boundsCheck.ts` — OOB detection (logic; produces user-visible message strings)
 
 **Copy**
-- [ ] `{block.type} block is completely outside the poster — it won't appear in print.` — warning message (severity full) — `boundsCheck.ts:58` — rendered in OOB banner `PosterEditor.tsx:3180` and Issues tab
+- [ ] `{block.type} block is completely outside the poster — it won't appear in print.` — warning message (severity full) — `boundsCheck.ts:58` — rendered in the Issues tab (since fix 03 the banner shows only the count, `PosterEditor.tsx:3404`)
 - [ ] `{block.type} block extends past the {edges.join(' and ')} edge{s} — content may be cut off in print.` — warning message (partial) — `boundsCheck.ts:59` — same render sites
 
 #### `poster/CropOverlay.tsx` — Inline 4-edge crop UI for image/logo blocks
@@ -1254,19 +1254,19 @@ flowchart LR
 #### `poster/GuidelinesPanel.tsx` — Right-side reference rail: scratch-pad checklist, conference specs, writing guide, shortcuts cheatsheet, resources
 
 **Elements**
-- [ ] `Hide guidelines` — X button — `GuidelinesPanel.tsx:571-590` — `onToggle()` → closes panel
+- [ ] `Hide guidelines` — X button — `GuidelinesPanel.tsx:576` — `onToggle()` → closes panel; a held Enter acts once (`ignoreRepeatedEnter`); focus returns to the Show toggle only if it was inside the panel (fix 03)
 - [ ] `Scratch Pad ({done}/{total})` — section toggle — `GuidelinesPanel.tsx:595-599` — collapse/expand
 - [ ] template `<select>` — select — `GuidelinesPanel.tsx:603-635` — `applyTemplate(name)` loads checklist into scratch pad
-- [ ] `Save as...` — button — `GuidelinesPanel.tsx:636-642` — opens InputModal
+- [ ] `Save as...` — button — `GuidelinesPanel.tsx:645` — opens InputModal
 - [ ] item checkbox — `<input type="checkbox">` ×N — `GuidelinesPanel.tsx:647-652` — `toggleItem(id)`
 - [ ] item text input `New item...` — `<input>` ×N — `GuidelinesPanel.tsx:653-665` — `updateItemText`
-- [ ] `×` `Remove` — button ×N — `GuidelinesPanel.tsx:666-672` — `removeItem(id)`
-- [ ] `+ Add item` — button — `GuidelinesPanel.tsx:676-681` — `addItem()`
+- [ ] `×` `Remove` — button ×N — `GuidelinesPanel.tsx:675` — `removeItem(id)`
+- [ ] `+ Add item` — button — `GuidelinesPanel.tsx:686` — `addItem()`
 - [ ] notes textarea `Reminders, talking points, reviewer feedback...` — textarea — `GuidelinesPanel.tsx:688-707` — `updateNote` → localStorage `postr.scratch-note`
-- [ ] `Conference Guidelines ({GUIDELINES.length})` — section toggle — `GuidelinesPanel.tsx:713-717`
-- [ ] `Writing Guide ({WRITING_TIPS.length})` — section toggle — `GuidelinesPanel.tsx:729-733`
-- [ ] `Shortcuts & Manipulations` — section toggle — `GuidelinesPanel.tsx:748-752`
-- [ ] `General Resources ({GENERAL_RESOURCES.length})` — section toggle — `GuidelinesPanel.tsx:757-761`
+- [ ] `Conference Guidelines ({GUIDELINES.length})` — section toggle — `GuidelinesPanel.tsx:720`
+- [ ] `Writing Guide ({WRITING_TIPS.length})` — section toggle — `GuidelinesPanel.tsx:736`
+- [ ] `Shortcuts & Manipulations` — section toggle — `GuidelinesPanel.tsx:755`
+- [ ] `General Resources ({GENERAL_RESOURCES.length})` — section toggle — `GuidelinesPanel.tsx:764`
 - [ ] conference card header (×7: APA, SfN, APS, ACNP, SOBP, ECNP, SPSP) — expand toggle button — `GuidelinesPanel.tsx:801-814`
 - [ ] `{g.urlLabel} ↗` — external link ×7 — `GuidelinesPanel.tsx:851-858` — opens conference URL (new tab)
 - [ ] writing-tip card header (×6) — expand toggle — `GuidelinesPanel.tsx:1225-1238`
@@ -1275,16 +1275,16 @@ flowchart LR
 - [ ] `Save as template` InputModal — modal (external component) — `GuidelinesPanel.tsx:779-787` — confirm → `saveCurrentAsTemplate`
 
 **Copy**
-- [ ] "Poster Guidelines" — panel heading — `GuidelinesPanel.tsx:565`
-- [ ] "Official requirements from major conferences. Click to expand." — subheading — `GuidelinesPanel.tsx:568`
-- [ ] "Load template..." — disabled select option — `GuidelinesPanel.tsx:622`
-- [ ] "Built-in" — optgroup label — `GuidelinesPanel.tsx:623`
-- [ ] "Custom" — optgroup label — `GuidelinesPanel.tsx:629`
+- [ ] "Poster Guidelines" — panel heading — `GuidelinesPanel.tsx:566`
+- [ ] "Official requirements from major conferences. Click to expand." — subheading — `GuidelinesPanel.tsx:569`
+- [ ] "Load template..." — disabled select option — `GuidelinesPanel.tsx:625`
+- [ ] "Built-in" — optgroup label — `GuidelinesPanel.tsx:626`
+- [ ] "Custom" — optgroup label — `GuidelinesPanel.tsx:632`
 - [ ] `{t.name} ({t.items.length})` — option label template — `GuidelinesPanel.tsx:625,631`
-- [ ] "Notes" — label — `GuidelinesPanel.tsx:686`
-- [ ] "Save as template" — modal title — `GuidelinesPanel.tsx:781`
+- [ ] "Notes" — label — `GuidelinesPanel.tsx:689`
+- [ ] "Save as template" — modal title — `GuidelinesPanel.tsx:787`
 - [ ] "Give your checklist template a name so you can reuse it on future posters." — modal message — `GuidelinesPanel.tsx:782`
-- [ ] "e.g. My Meta-Analysis Checklist" — modal placeholder — `GuidelinesPanel.tsx:783`
+- [ ] "e.g. My Meta-Analysis Checklist" — modal placeholder — `GuidelinesPanel.tsx:789`
 - [ ] "Save template" — modal confirm label — `GuidelinesPanel.tsx:784`
 - [ ] `Note: {g.sizeNote}` — size note template — `GuidelinesPanel.tsx:819-821`
 - [ ] "Element" / "Min" / "Ideal" — font-table headers — `GuidelinesPanel.tsx:827-829`
@@ -1335,13 +1335,13 @@ flowchart LR
 - [ ] `Make your own` — link (mobile share bar) — `PosterEditor.tsx:2479-2498` — navigates to `/`
 - [ ] `Show sidebar` / title `Show sidebar (⌘/)` — reveal-tab button (sidebar closed, desktop) — `PosterEditor.tsx:2504-2538` — opens sidebar
 - [ ] canvas rubber-band — pointer drag on workspace — `PosterEditor.tsx:2559-2626` — marquee multi-select (click = deselect)
-- [ ] pinch / `Ctrl`+wheel — gesture — listener `PosterEditor.tsx:1348` — cursor-anchored zoom, 10× ceiling; the floor is min(0.2, the fit, the current zoom), so it never zooms the wrong way (`clampZoom`, `workspaceGeometry.ts`; fix 03)
+- [ ] pinch / `Ctrl`+wheel — gesture — listener `PosterEditor.tsx:1348` — cursor-anchored zoom, 10× ceiling; the floor is min(0.2, the fit, the current zoom), so a pinch does not zoom the wrong way (one exception handed on: a pinch during the guidelines panel's 280 ms slide, record 03 section 10) (`clampZoom`, `workspaceGeometry.ts`; fix 03)
 - [ ] keyboard focus ring — `button:focus-visible` in `index.css` sets the outline `!important`, so it draws on buttons styled with an inline `all: 'unset'`; buttons marked `data-focus-inset` (guidelines section headers and Save as…, the author ▲ ▼ ×, Post comment) and the sidebar tabs draw it inset (−2 px) so it is not clipped or drawn over a neighbour (fix 03, cause D)
 - [ ] two-finger scroll — native pan via overflow:auto — `PosterEditor.tsx:1119-1121` (comment), container `:2720-2721`
-- [ ] `Zoom out` (`−`) — ZoomBar button — `PosterEditor.tsx:3609` — `stepTo(zoom - 0.15)`: clamped by `clampZoom` (floor min(0.3, the fit, the current zoom); a zoom within 1e-9 of the fit is the fit; a step that cannot move keeps the poster fitted)
+- [ ] `Zoom out` (`−`) — ZoomBar button — `PosterEditor.tsx:3609` — `stepTo(zoom - 0.15)`: clamped by `clampZoom` (floor min(0.2, the fit, the current zoom), the same as the pinch; a zoom within 1e-9 of the fit is the fit; a step that cannot move keeps the poster fitted)
 - [ ] `Reset zoom to fit` (`{percent}%` readout) — ZoomBar button — `PosterEditor.tsx:3616` — `fitToScreen()`
 - [ ] `Zoom in` (`+`) — ZoomBar button — `PosterEditor.tsx:3626` — `stepTo(zoom + 0.15)`, 10× ceiling
-- [ ] `Fit poster to screen` (`FIT`) — ZoomBar button — `PosterEditor.tsx:3634` — `fitToScreen()`: the fit keeps a 64 px gutter per side (8 px on the phone share view; a quarter of the canvas when it is narrower than two gutters) and scrolls back to 0,0 (`fitSheet`, `workspaceGeometry.ts`; fix 03)
+- [ ] `Fit poster to screen` (`FIT`) — ZoomBar button — `PosterEditor.tsx:3634` — `fitToScreen()`: the fit keeps a 64 px gutter per side (8 px on the phone share view; a quarter of the canvas when that is less than 64 px, i.e. a canvas under 256 px) and scrolls back to 0,0 (`fitSheet`, `workspaceGeometry.ts`; fix 03)
 - [ ] `Show poster guidelines` — toggle button (guidelines closed) — `PosterEditor.tsx:3468` — opens GuidelinesPanel. The panel starts closed in windows 1599 px wide or narrower (`GUIDELINES_CLOSED_QUERY`, `:639`), read once on load; a held Enter acts once (`ignoreRepeatedEnter.ts`); focus follows into the panel only if it was on the toggle (`useGuidelinesFocus`, `:554`; fix 03)
 - [ ] `FigureSizeOverlay` body — draggable gray rect (Check tab active, no image selected) — `PosterEditor.tsx:3034-3044,3535-3605` — drag moves `checkFigureRect`
 - [ ] `FigureSizeOverlay` corner — resize handle — `PosterEditor.tsx:3534-3548` — drag resizes rect
@@ -1363,10 +1363,10 @@ flowchart LR
 - [ ] `Sidebar` mount — panel — `PosterEditor.tsx:2253-2341` — §6.8
 - [ ] `PaletteDesigner` mount — modal — `PosterEditor.tsx:2345-2364` — §6.13
 - [ ] `StaplesPrintModal` mount — modal — `PosterEditor.tsx:2367-2375` — `onSavePdf` → `printPoster()`
-- [ ] `GuidelinesPanel` mount — right rail — `PosterEditor.tsx:3226`
+- [ ] `GuidelinesPanel` mount — right rail — `PosterEditor.tsx:3450`
 - [ ] `AutosaveStatusPill` mount — status pill — `PosterEditor.tsx:3192-3196` — §6.13
 - [ ] `UndoToast` mount — toast — `PosterEditor.tsx:3145-3149`
-- [ ] `OnboardingTour` mount (edit mode only) — tour — `PosterEditor.tsx:3279`
+- [ ] `OnboardingTour` mount (edit mode only) — tour — `PosterEditor.tsx:3515`
 - [ ] `?publish=1` auto-open publish flow — feature-flagged (`GALLERY_PUBLIC_ENABLED`) — `PosterEditor.tsx:1219-1234` — opens `usePublishFlowStore` flow once on load
 
 **Copy**
@@ -1405,9 +1405,8 @@ flowchart LR
 - [ ] workspace grid (CSS repeating background, minor+major) — css — `PosterEditor.tsx:2646-2662`
 - [ ] poster grid overlay — inline-svg lines ×(rows+cols) — `PosterEditor.tsx:2742-2772` — `data-postr-overlay="grid"`
 - [ ] drag guides (block edges, centerlines, canvas-center match ticks, dashed accent) — inline-svg — `PosterEditor.tsx:2787-2846` — visible while dragging
-- [ ] rulers (top + left bars, corner square, tick marks) — css/divs — `PosterEditor.tsx:3054-3243`
+- [ ] rulers (top + left bars, corner square, tick marks) — css/divs — `PosterEditor.tsx:3272-3366`
 - [ ] comment hover/focus highlight rects (area: filled; block/text: dashed outline; sticky glow) — css overlays — `PosterEditor.tsx:2870-2958`
-- [ ] ⛔ / ⚠️ — emoji — `PosterEditor.tsx:3180` — OOB banner severity icons
 - [ ] area-comment live drag rect (dashed purple) — css overlay — `PosterEditor.tsx:3783-3796`
 - [ ] pending/focused area anchor rect (purple outline + fill) — css overlay — `PosterEditor.tsx:3663-3694`
 - [ ] mobile share bar backdrop (blur bar) — css — `PosterEditor.tsx:2438-2456`
@@ -1515,7 +1514,7 @@ Slice-wide notes:
 
 ```mermaid
 flowchart LR
-  PE["PosterEditor"] -->|"renders :2332-2420"| SB["Sidebar (11 tabs)"]
+  PE["PosterEditor"] -->|"renders :2458-2540"| SB["Sidebar (11 tabs)"]
   SB --> L1["layout"] --> SB
   SB --> S1["style"] --> SB
   SB --> A1["authors"] --> SB
@@ -3938,7 +3937,7 @@ Everything reusable under `components/` + the `motion/` animation module. Cross-
 - No `dialog primitives` file exists. Every modal hand-rolls the same pattern: `data-postr-modal-backdrop` + `data-postr-modal-content` divs driven by `useModalTransition` (§6.14). `LogoPicker` additionally portals to `document.body`.
 - **`GALLERY_PUBLIC_ENABLED = false`** (`config/features.ts:21`) makes the entire publish flow dead UI: `PublishFlow` is mounted in `App.tsx:15`, but every trigger is flag-gated (Sidebar "Share to gallery" `Sidebar.tsx:1183`, Profile "Upload external PDF or image" `Profile.tsx:589`, `?publish=1` auto-open `PosterEditor.tsx:1220`). `PublishConsentModal`'s `mode="share"` has **no caller anywhere** — also dead.
 - `AuthBootstrap` is **defined but never mounted** anywhere in `src/` (only referenced in a comment in `pages/Share.tsx:4`) — dead component (§10).
-- Mount sites: `FeedbackModal`, `PublishFlow`, `SessionExpiredModal`, `ConsentNotice` in `App.tsx:14-24`; `OnboardingTour` in `PosterEditor.tsx:3279`; `UpdateAvailableBanner`/`JustRefreshedBanner` in `Sidebar.tsx:581-582`; `PasswordStrength` in `Auth.tsx:483` + `Profile.tsx:1252`; `RotatingWord` in `Landing.tsx:147`; `AuthGuard` wraps routes in `routes.tsx:152-167`.
+- Mount sites: `FeedbackModal`, `PublishFlow`, `SessionExpiredModal`, `ConsentNotice` in `App.tsx:14-24`; `OnboardingTour` in `PosterEditor.tsx:3515`; `UpdateAvailableBanner`/`JustRefreshedBanner` in `Sidebar.tsx:581-582`; `PasswordStrength` in `Auth.tsx:483` + `Profile.tsx:1252`; `RotatingWord` in `Landing.tsx:147`; `AuthGuard` wraps routes in `routes.tsx:152-167`.
 
 ```mermaid
 flowchart LR
@@ -4244,32 +4243,32 @@ flowchart LR
 - [ ] `Skip tour` — button — `OnboardingTour.tsx:393` — `finish()` → sets `localStorage['postr.onboarding-done']`
 - [ ] `Back` — button — `OnboardingTour.tsx:397` — previous step (hidden on step 1)
 - [ ] `Next →` / `Done` — button — `OnboardingTour.tsx:400` — advance / finish
-- [ ] Behaviour (fix 03): each step names its targets in order of preference and highlights the first on screen; the highlight follows its target and the window every frame while a step is shown; a step is prepared once (opens a collapsed sidebar, picks the tab by its label, scrolls the target vertically inside its own panel), not again when a modal closes; the dimming strips are clamped to the window on all four sides
+- [ ] Behaviour (fix 03): each step names its targets in order of preference and highlights the first present in the page; the highlight follows its target and the window every frame while a step is shown; a step is prepared once (opens a collapsed sidebar, picks the tab by its label, scrolls the target vertically inside its own panel), not again when a modal closes; the dimming strips are clamped to the window on all four sides
 
-**Copy** (all in `STEPS` constant `:38-95`; rendered `:292-300`)
-- [ ] "Your poster canvas" — step 1 title — `:41`
-- [ ] "Click any block to select it, drag to move, and resize from the corner handle." — step 1 body — `:42`
-- [ ] "Already have a poster? Import it" — step 2 title — `:48`
-- [ ] "Drop a PDF, image, or .postr bundle. Text-layer PDFs land every paragraph AND embedded figure as editable blocks. Image-based files (flattened PDFs, JPG/PNG scans) bring in the text only — figures and tables need to be re-added with the Insert tab…" (full string 380 chars, trimmed) — step 2 body — `:49`
-- [ ] "Author list & institutions" — step 3 title — `:55`
-- [ ] "Define institutions once, then assign each author to one or more — the byline auto-formats with superscript footnotes (¹University A · ²University B). No other poster tool gets this right." — step 3 body — `:56`
-- [ ] "References with citation styles" — step 4 title — `:62`
-- [ ] "Import .bib / .ris / .enw, add citations manually, or paste pre-formatted references straight from your manuscript. APA, Vancouver, IEEE, and Harvard styles render automatically." — step 4 body — `:63`
-- [ ] "Plot code readability check" — step 5 title — `:69`
-- [ ] "Paste your R or Python plotting code to verify figure text will be legible at print size. Drag the gray rectangle on the canvas, or select an image block to lock to its exact dimensions." — step 5 body — `:70`
-- [ ] "Pre-flight issues" — step 6 title — `:76`
-- [ ] "Automated lint scans for blocks off-canvas, empty figures, missing authors, leftover placeholder text, and more. The red badge counts pending problems — click any issue to jump to the offending block." — step 6 body — `:77`
-- [ ] "Export, print, or save .postr" — step 7 title — `:83`
-- [ ] "Save as PDF, email to any Staples kiosk, publish to the gallery — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser." — step 7 body (flag-ON variant) — `:85`
-- [ ] "Save as PDF, email to any Staples kiosk — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser." — step 7 body (**active**, `GALLERY_PUBLIC_ENABLED=false`) — `:86`
-- [ ] "Conference guidelines" — step 8 title — `:91`
+**Copy** (all in `STEPS` constant `:44-109`; rendered `:379-390`)
+- [ ] "Your poster canvas" — step 1 title — `:47`
+- [ ] "Click any block to select it, drag to move, and resize from the corner handle." — step 1 body — `:48`
+- [ ] "Already have a poster? Import it" — step 2 title — `:54`
+- [ ] "Drop a PDF, image, or .postr bundle. Text-layer PDFs land every paragraph AND embedded figure as editable blocks. Image-based files (flattened PDFs, JPG/PNG scans) bring in the text only — figures and tables need to be re-added with the Insert tab…" (full string 380 chars, trimmed) — step 2 body — `:55`
+- [ ] "Author list & institutions" — step 3 title — `:61`
+- [ ] "Define institutions once, then assign each author to one or more — the byline auto-formats with superscript footnotes (¹University A · ²University B). No other poster tool gets this right." — step 3 body — `:62`
+- [ ] "References with citation styles" — step 4 title — `:68`
+- [ ] "Import .bib / .ris / .enw, add citations manually, or paste pre-formatted references straight from your manuscript. APA, Vancouver, IEEE, and Harvard styles render automatically." — step 4 body — `:69`
+- [ ] "Plot code readability check" — step 5 title — `:78`
+- [ ] "Paste your R or Python plotting code to verify figure text will be legible at print size. Drag the gray rectangle on the canvas, or select an image block to lock to its exact dimensions." — step 5 body — `:79`
+- [ ] "Pre-flight issues" — step 6 title — `:85`
+- [ ] "Automated lint scans for blocks off-canvas, empty figures, missing authors, leftover placeholder text, and more. The red badge counts pending problems — click any issue to jump to the offending block." — step 6 body — `:86`
+- [ ] "Export, print, or save .postr" — step 7 title — `:92`
+- [ ] "Save as PDF, email to any Staples kiosk, publish to the gallery — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser." — step 7 body (flag-ON variant) — `:94`
+- [ ] "Save as PDF, email to any Staples kiosk — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser." — step 7 body (**active**, `GALLERY_PUBLIC_ENABLED=false`) — `:95`
+- [ ] "Conference guidelines" — step 8 title — `:102`
 - [ ] "Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Open it with this button when you need it." — step 8 body on the closed panel's toggle — `:104`
 - [ ] "Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Close it to give the canvas more room." — step 8 body on the open panel — `:105`
-- [ ] "{step + 1}/8" — step counter — `OnboardingTour.tsx:296`
+- [ ] "{step + 1}/8" — step counter — `OnboardingTour.tsx:385`
 
 **Graphics**
-- [ ] pulsing purple highlight border — css-animation (`postr-tour-pulse`, injected `:134-139`) — `:272-287` — around target element
-- [ ] 4 dark overlay rects — css — `:258-269` — spotlight cutout
+- [ ] pulsing purple highlight border — css-animation (`postr-tour-pulse`, injected `:193-198`) — `:360-376` — around target element
+- [ ] 4 dark overlay rects — css — `:346-358` — spotlight cutout, clamped to the window on all four sides (fix 03)
 
 #### `components/PaletteDesigner.tsx` — custom-palette builder modal (Manual / Random / From text / From image)
 
@@ -4658,7 +4657,7 @@ flowchart LR
 - [ ] State fields: `isOpen: boolean` (`:32`), `initialKind: FeedbackKind` (`:33`, default `'feature'` `:41`), `context: FeedbackContext | null` (`:34`; `title?`/`body?`/`attachment?`/`log?` `:17-29`).
 - [ ] `open(kind = 'feature', context?)` — opens modal with kind + optional prefill context (`:43`). Callers: `components/PublicFooter.tsx:52` ('other'); `pages/About.tsx:181,187,193` ('bug'/'feature'/'other'); `components/PublicHeader.tsx:146,152` ('feature'); `pages/ChartChooser.tsx:185` ('bug'); `components/ImportPosterModal.tsx:145` ('bug' + captured log); `pages/Profile.tsx:639,642,645`; `pages/Home.tsx:179` ('feature'); `charts/ChartBlock.tsx:93` ('bug', title "Chart failed to render"); `components/CopyDesignModal.tsx:142` ('bug' + log)
 - [ ] `close()` — closes modal, clears context (`:45`). Caller: `components/FeedbackModal.tsx:22`
-- [ ] Readers: `components/FeedbackModal.tsx:19-21` (isOpen/initialKind/context); `isOpen` also read by `components/OnboardingTour.tsx:111` and `pages/Profile.tsx:63` (to suppress other UI)
+- [ ] Readers: `components/FeedbackModal.tsx:19-21` (isOpen/initialKind/context); `isOpen` also read by `components/OnboardingTour.tsx:170` and `pages/Profile.tsx:63` (to suppress other UI)
 
 **Elements** — none (store; modal UI in `components/FeedbackModal.tsx`). **Copy** — none. **Graphics** — none.
 
@@ -4690,7 +4689,7 @@ flowchart LR
 - [ ] `openForUpload()` — opens at consent step for external PDF/image (`:37`). Caller: `pages/Profile.tsx:65` (flag-gated)
 - [ ] `advanceToMetadata()` — consent accepted → metadata step (`:39`). Caller: `components/PublishFlow.tsx:24`
 - [ ] `close()` — resets to closed + clears ids (`:40`). Caller: `components/PublishFlow.tsx:25`
-- [ ] Readers: `step` — `PublishFlow.tsx:21`, `pages/Profile.tsx:66`, `components/OnboardingTour.tsx:110`; `posterId`/`posterTitle` — `PublishFlow.tsx:22-23`
+- [ ] Readers: `step` — `PublishFlow.tsx:21`, `pages/Profile.tsx:66`, `components/OnboardingTour.tsx:169`; `posterId`/`posterTitle` — `PublishFlow.tsx:22-23`
 
 **Elements** — none. **Copy** — none. **Graphics** — none.
 
@@ -4715,7 +4714,7 @@ Consumers: `poster/CommentsPanel.tsx`, `poster/PosterEditor.tsx`. Storage: local
 
 #### `hooks/useIsSmallScreen.ts` — `matchMedia('(max-width: 639px)')` breakpoint hook
 
-No UI — logic only. Exported constant `SMALL_SCREEN_QUERY` (`:17`). Consumer: `poster/PosterEditor.tsx` (phone-only layout branches). Returns `false` under SSR/jsdom.
+No UI — logic only. Exported constant `SMALL_SCREEN_QUERY` (`:17`) and the guarded one-off reader `mediaQueryMatches(query)` (fix 03: PosterEditor reads `(max-width: 1599px)` with it for the guidelines panel's first state). Consumers: `poster/PosterEditor.tsx` (phone-only layout branches, and the panel default), `components/MobileNotice.tsx`. Returns `false` under SSR/jsdom.
 **Elements** — none. **Copy** — none. **Graphics** — none.
 
 #### `hooks/useModalTransition.ts` — keeps modals mounted 140 ms for exit animation (`data-state='closing'`)
@@ -4888,12 +4887,12 @@ No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) 
 | `CopyDesignModal` | Sidebar Style tab (:2393-2396) |
 | `StaplesPrintModal` | PosterEditor (:2446-2454) |
 | `PaletteDesigner` | PosterEditor (:2424-2443) |
-| `OnboardingTour` | PosterEditor (:3358, edit mode) |
+| `OnboardingTour` | PosterEditor (:3515, edit mode) |
 | `AutosaveStatusPill` | PosterEditor (:3271-3275) |
 | `InputModal` | GuidelinesPanel (:779-787, save template) |
 | `UpdateAvailableBanner` / `JustRefreshedBanner` | Sidebar (:581-582) |
 | `StyleMiniPreview` | CopyDesignModal (:257,:263) |
-| `Sidebar` | PosterEditor (:2332-2420) |
+| `Sidebar` | PosterEditor (:2458-2540) |
 | `GuidelinesPanel` | PosterEditor (:3305) |
 | `FloatingFormatToolbar` | blocks.tsx (:2537); docked variant in Sidebar Edit tab (:3865,:3890) |
 | `RichTextEditor` | Sidebar Edit tab TextBlockEditor (:3881-3888); block text editors in blocks.tsx |
@@ -4928,7 +4927,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 - [ ] `postr.scratch-note` — inline `poster/GuidelinesPanel.tsx:502` (read), `:526` (write); removed `pages/Profile.tsx:292`
 - [ ] `postr.style-presets` — inline `poster/PosterEditor.tsx:662` (read), `:669` (write); const `components/PresetEditModal.tsx:40` (read `:44`, write `:53`); read `pages/Profile.tsx:73`; removed `pages/Profile.tsx:162,290`
 - [ ] `postr.profile` — const `pages/Profile.tsx:1266`; read `:1278`, write `:1299`; removed `:294`
-- [ ] `postr.onboarding-done` — const `components/OnboardingTour.tsx:97`; read `:115`, write `:125,197`, remove `:321`; removed `pages/Profile.tsx:295`
+- [ ] `postr.onboarding-done` — const `components/OnboardingTour.tsx:111`; read `:174`, write `:184,281`, remove `:410` (`resetOnboarding()`, called from `pages/Profile.tsx:414`)
 - [ ] `postr.cb-random-pref` — const `components/PaletteDesigner.tsx:34`; read `:38`, write `:46`
 - [ ] `postr.welcome-seeded:{userId}` — prefix const `data/seedWelcomePoster.ts:36`; read `:40`, write `:50`
 - [ ] `postr.comment-name` — const `hooks/useComments.ts:153`; read `:157`, write `:165`
@@ -5069,7 +5068,7 @@ Switched off to keep the product to its core — the poster editor. After the se
 - [ ] **Unused DB tables** — `public.presets` (`20260408000200_presets.sql`), `public.authors_lib` / `public.institutions_lib` / `public.references_lib` (`20260408000300_library.sql`, PRD §21) — nothing in `apps/web/src` reads or writes them (style presets live in localStorage `postr.style-presets`).
 - [ ] **Missing GC edge function** — `supabase/functions/` is empty (`delete-account` deleted 2026-09-11); no storage garbage-collection function exists (account deletion cleans the user's own objects via `apps/api/src/storageCleanup.ts`, but orphaned per-poster assets from `deletePoster` still are not swept) (AdminGallery copy even says image files "stay in storage until the owner hard-deletes", `AdminGallery.tsx:168-172`); the only GC is `POST /cron/cleanup-anonymous-users` for guest accounts.
 - [ ] **Unpublish promised but missing** — `pages/Share.tsx:93-95` tells visitors "the owner may have unpublished it", and `PublishConsentModal` share clause 3 (`PublishConsentModal.tsx:98-101`) promises "I can revoke the share link at any time from my dashboard" — no unpublish/revoke UI exists anywhere (no dashboard share-link manager).
-- [ ] **`.enw` accept-listed but no parser** — Refs tab file input accepts `.bib,.bibtex,.ris,.enw` (`Sidebar.tsx:2038`, button label `Sidebar.tsx:2017-2037`) and OnboardingTour step 4 advertises ".enw" (`OnboardingTour.tsx:63`), but only `parseBibtex`/`parseRis` exist — dropping an `.enw` file parses as garbage.
+- [ ] **`.enw` accept-listed but no parser** — Refs tab file input accepts `.bib,.bibtex,.ris,.enw` (`Sidebar.tsx:2038`, button label `Sidebar.tsx:2017-2037`) and OnboardingTour step 4 advertises ".enw" (`OnboardingTour.tsx:69`), but only `parseBibtex`/`parseRis` exist — dropping an `.enw` file parses as garbage.
 - [ ] **Dead export/UI remnants** — `HIGHLIGHT_PRESETS` imported but unused (`Sidebar.tsx:29`; block highlight UI removed, comment `Sidebar.tsx:4036-4044`); `getCapturedCount()` dead export (`lib/consoleCapture.ts:89`); posterStore actions `addBlock`/`updateBlock`/`removeBlock`/`setPalette`/`setFont` have zero production callers (tests only); `ATTRIBUTION_TEXT` + 7 back-compat aliases (`attribution.ts:49,345-351`); PricingSection "Coming soon" badge + clock-icon variant unreachable (`PricingSection.tsx:182,223-227`); `SampleDataset.label` ×10 dead copy (`charts/sampleData.ts`); `UndoToast` misnamed (renders ALL editor toasts).
 
 ### Stale comments / docs

@@ -39,7 +39,7 @@ One branch per cause.
 
 ## Assumptions accepted with the plan
 
-- Poster gutter 64 px (smallest measured value with no handles under rulers).
+- Poster gutter 64 px (owner decision; fix 03 measured handles still under the rulers at large fitted zooms, 4 of 12 cases, record 03 section 10).
 - "Small screen" = viewport narrower than 1600 px.
 - Pasted script saved per poster in this browser (localStorage), not in the poster.
 - Undo history 50 -> 100 steps.
@@ -82,18 +82,24 @@ Found while fixing one item, belonging to another (details in the record named):
   centred axis: 2 in horizontally and 9.5 in vertically on a 48 × 36 poster
   at 1440 × 900 before fix 03, up to 52 in on extreme shapes. Fix 03 made
   the ruler count from the gutter the workarea draws (`gutterX`/`gutterY`
-  in PosterEditor.tsx, no longer a copy of 96), but not from the centring:
-  on the centred axis the error grew in 10 of 12 cases, for example −124 →
-  −181.5 px at 1280 × 800 on 48 × 36 in; on the filled axis it is the bar's
-  24 px, before and after (record 03, section 8). `fit-check.mjs` claim Hr
+  in PosterEditor.tsx, no longer a copy of 96), but not from the centring.
+  On the centred axis, with the guidelines panel in the same state on both
+  trees, the error grew: at 1280 × 800 on 48 × 36 in with the panel closed,
+  −4 → −61.5 px; at 1920 × 1080 (panel open), −24 → −81.5 px (MEASURED
+  with `fit-check.mjs`'s fit scenarios, `rulerError`, on both trees, by
+  fix 03's step 11 audits). As the editor opens by default at 1280 × 800 it
+  shrank instead (−124 px with main's open panel → −61.5 px), because the
+  panel now starts closed. On the filled axis it is the bar's 24 px, before
+  and after. Item 4 must re-measure at the shipped defaults. `fit-check.mjs` claim Hr
   guards the filled axis at 24 px; item 4 must update that guard.
 - **Item 3**, same review: zoom-to-fit leaves 36 px of the limiting side out
   of view, and Zoom out zooms IN below its 0.3 floor. **Fixed by fix 03.**
-- **From fix 03** (record 03, section 10, which lists every item with its
-  numbers):
+- **From fix 03** (a summary; record 03 section 10 is the complete list,
+  with numbers and labels):
   - owner questions: the 64 px gutter against block controls at large fitted
     zooms (the ZoomBar over a rotate control, a move control off the canvas,
-    a rotated block hidden by 21–62 px); the ring a mouse user sees after
+    a rotated block hidden by 21–62 px, handles under the rulers in 2 → 4 of
+    12 measured cases); the ring a mouse user sees after
     clicking a chrome button and pressing an arrow key; the readout on a
     0 px canvas; whether to install Firefox and WebKit for measuring;
   - MEDIUM, there before: the guidelines template `<select>` gives its
@@ -104,9 +110,20 @@ Found while fixing one item, belonging to another (details in the record named):
     line-mode wheels), classic scrollbars, the rubber band's stored
     geometry, tour tooltips and resumes, the panel's missing
     `aria-expanded`, the collapsed sidebar's keyboard focus, a table cell
-    that keeps Tab;
+    that keeps Tab, "Comment on selection" with the sidebar collapsed, sidebar
+    dialogs without `aria-modal` drawn inside the rail, PosterEditor's
+    hooks after an early return, the phone share bars over the poster,
+    read-only visitors seeing the guidelines rail, the `canvasOverflow`
+    mechanism that never fires, a size change keeping a manual zoom, the
+    fit's 5× cap against manual zoom's 10×, the undo toast straddling the
+    sheet's bottom edge for 1.2 s, table handle rings at 20% opacity and
+    three Figure-tab buttons' rings clipped, the fit lagging the sidebar's
+    slide by one frame, and splitting `fit-check.mjs` (over 1,000 lines);
   - the critic's untested gaps: a production build, the tour during other
-    modals, D's ring in dialogs, the 640 px share threshold crossed live.
+    modals, D's ring in dialogs and toasts, the 640 px share threshold
+    crossed live, "a new poster size scrolls back to 0,0" in a browser (only
+    jsdom), the quarter-cap zone below 1280 px, and the tour's keyboard
+    path.
 - **Unplanned, from fix 02's reviews** (MEASURED unless marked):
   - The area-comment label divides inches by 10 again ("Area 2×1 in" for a
     19.2 × 14.4 in area).
@@ -181,4 +198,4 @@ Found while fixing one item, belonging to another (details in the record named):
 |---|---|---|
 | 1 | `editor/undo-sidebar-history` | done — `docs/fixes/01-sidebar-undo-history.md` |
 | 2 | `editor/custom-sheet-size` (causes A, E), `editor/size-change-keeps-blocks` (B–D) | done — `docs/fixes/02-poster-size.md` |
-| 3 | `editor/fit-whole-sheet` (A, B), `editor/guidelines-closed-small-screens` (C, D) | done — `docs/fixes/03-fit-whole-sheet.md`; four owner questions open (section 10) |
+| 3 | `editor/fit-whole-sheet` (A, B), `editor/guidelines-closed-small-screens` (C, D, and A and B's review follow-ups) | done — `docs/fixes/03-fit-whole-sheet.md`; four owner questions open (section 10) |
