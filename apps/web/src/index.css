@@ -820,6 +820,13 @@ button:focus-visible,
   border-radius: 4px;
 }
 
+/* Buttons that fill a clipped container (a rail tab, a section header) or
+ * sit tight against their neighbours: an outset ring is cut off or drawn
+ * over the next control, so theirs is drawn inside (review of fix 03). */
+[data-focus-inset]:focus-visible {
+  outline-offset: -2px !important;
+}
+
 /* The readability code editor (poster/ReadabilityPanel.tsx) sits
  * inside its own bordered frame next to a line-number gutter, so the
  * ring is drawn INSIDE the textarea's edge — an outset ring would be

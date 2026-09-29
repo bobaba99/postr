@@ -439,6 +439,7 @@ function DraftField({
       {error && <div style={errorStyle}>{error}</div>}
       <button
         type="button"
+        data-focus-inset
         onClick={onSubmit}
         disabled={submitting}
         style={primaryBtnStyle(submitting)}

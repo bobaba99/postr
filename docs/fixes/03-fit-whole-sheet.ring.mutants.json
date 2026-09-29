@@ -1,0 +1,133 @@
+{
+  "tests": [
+    "src/poster/__tests__/guidelinesDefault.test.tsx"
+  ],
+  "mutants": {
+    "headers-not-inset": {
+      "undoes": "D — the guidelines section headers draw the ring inset (so its ring is not clipped or drawn over a neighbour)",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs Hr3 reads the computed outline-offset in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-ring-inset"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/GuidelinesPanel.tsx",
+          "        data-focus-inset\n        data-postr-section-header\n",
+          "        data-postr-section-header\n"
+        ]
+      ]
+    },
+    "save-as-not-inset": {
+      "undoes": "D — Save as… draws the ring inset (so its ring is not clipped or drawn over a neighbour)",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs Hr3 reads the computed outline-offset in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-ring-inset"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/GuidelinesPanel.tsx",
+          "                    data-focus-inset\n                    onClick={() => setShowSaveModal(true)}",
+          "                    onClick={() => setShowSaveModal(true)}"
+        ]
+      ]
+    },
+    "author-up-not-inset": {
+      "undoes": "D — the author ▲ draws the ring inset (so its ring is not clipped or drawn over a neighbour)",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs Hr3 reads the computed outline-offset in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-ring-inset"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "                data-focus-inset\n                onClick={() => swap(i - 1, i)}",
+          "                onClick={() => swap(i - 1, i)}"
+        ]
+      ]
+    },
+    "author-down-not-inset": {
+      "undoes": "D — the author ▼ draws the ring inset (so its ring is not clipped or drawn over a neighbour)",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs Hr3 reads the computed outline-offset in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-ring-inset"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "                data-focus-inset\n                onClick={() => swap(i, i + 1)}",
+          "                onClick={() => swap(i, i + 1)}"
+        ]
+      ]
+    },
+    "author-remove-not-inset": {
+      "undoes": "D — the author × draws the ring inset (so its ring is not clipped or drawn over a neighbour)",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs Hr3 reads the computed outline-offset in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-ring-inset"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "              data-focus-inset\n              onClick={() => remove(a.id)}",
+          "              onClick={() => remove(a.id)}"
+        ]
+      ]
+    },
+    "post-comment-not-inset": {
+      "undoes": "D — Post comment draws the ring inset (so its ring is not clipped or drawn over a neighbour)",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs Hr3 reads the computed outline-offset in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-ring-inset"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/CommentsPanel.tsx",
+          "        data-focus-inset\n        onClick={onSubmit}",
+          "        onClick={onSubmit}"
+        ]
+      ]
+    },
+    "rail-tab-not-inset": {
+      "undoes": "D — the rail tabs draw the ring inset (so its ring is not clipped or drawn over a neighbour)",
+      "expect": "survive",
+      "why": "jsdom draws no focus ring; fit-check.mjs Hr3 reads the computed outline-offset in Chromium",
+      "browser": {
+        "harness": "scripts/fit-check.mjs",
+        "scenarios": [
+          "focus-ring-inset"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "          outline-offset: -2px !important;",
+          "          outline-offset: 2px;"
+        ]
+      ]
+    }
+  }
+}

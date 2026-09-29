@@ -637,6 +637,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
                     )}
                   </select>
                   <button
+                    data-focus-inset
                     onClick={() => setShowSaveModal(true)}
                     title="Save current checklist as a reusable template"
                     style={{ all: 'unset', cursor: 'pointer', fontSize: 14, color: '#7c6aed', fontWeight: 600, whiteSpace: 'nowrap', padding: '6px 0' }}
@@ -1182,6 +1183,8 @@ function SectionDropdown({ title, open, onToggle, children }: {
   return (
     <div style={{ borderBottom: '1px solid #1a1a26' }}>
       <button
+        data-focus-inset
+        data-postr-section-header
         onClick={onToggle}
         style={{ ...cardHeaderStyle, padding: '16px 20px' }}
         onMouseEnter={(e) => { e.currentTarget.style.background = '#1a1a26'; }}
