@@ -12,8 +12,12 @@ order:
    cover.
 4. **Results before the fix** — the numbers each prediction produced.
 5. **Independent confirmation** — two reviewers who did not use the author's
-   scripts, each with its own method, confirming or refuting the defect before
-   anything was changed.
+   scripts, each with its own method AND its own scope, confirming or refuting
+   the defect before anything was changed. Their scopes are split so they test
+   different things (for example: the claim as stated and its cause; its
+   siblings, other entry points and alternative causes), never the same checks
+   with a different tool. The record states the split. The same applies to the
+   reviews of the fix (section 9).
 6. **Root cause** — the mechanism, with file references, and what it does not
    explain.
 7. **Fix** — what changed and why that shape.

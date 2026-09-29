@@ -75,6 +75,9 @@ import { autoLayout } from './autoLayout';
 import { filterDeletable } from '@/export/blockLock';
 import { LAYOUT_TEMPLATES, makeBlocks, type LayoutKey } from './templates';
 import { formatSheetSize, moveOntoSheet } from './resizeSheet';
+import {
+  PHONE_GUTTER, WORKSPACE_GUTTER, ZOOM_STEP, clampZoom, fitSheet, type SheetFit,
+} from './workspaceGeometry';
 import { snap } from './snap';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
 import { buildPrintDocument } from '@/export/printDocument';
@@ -541,32 +544,25 @@ function useZoom(
   widthIn: number,
   heightIn: number,
   /**
-   * Gutter reserved around the poster when auto-fitting. The desktop
-   * workspace keeps a generous 60px so blocks dragged just past the
-   * canvas edge stay grabbable; a phone has no drag affordances to
-   * protect and needs the pixels, so the mobile share path passes a
-   * much smaller gutter.
+   * The largest gutter on each side of the sheet (workspaceGeometry.ts).
+   * The fit reserves it, capped for a small canvas, and returns the
+   * gutter it used as `gutterX`/`gutterY`; the workarea pads the sheet by
+   * exactly those, so the fitted sheet and its padding always fit.
    */
-  fitPadding = 60,
+  gutter: number,
 ) {
   const [manual, setManual] = useState<number | null>(null);
-  const [fit, setFit] = useState(1);
+  const [fit, setFit] = useState<SheetFit>({ zoom: 1, gutterX: gutter, gutterY: gutter });
 
   useEffect(() => {
     const compute = () => {
       if (!canvasRef.current) return;
-      const r = canvasRef.current.getBoundingClientRect();
-      // Fit-to-viewport picks the tighter of width vs height ratio
-      // minus the canvas gutter. The 5× upper bound is a
-      // safety net for pathological cases (canvas not yet measured,
-      // offscreen, etc.) — it's not a "sensible max zoom", auto-fit
-      // on a large monitor should happily go to 3–4×.
-      const wRatio = (r.width - fitPadding) / (widthIn * PX);
-      const hRatio = (r.height - fitPadding) / (heightIn * PX);
-      const ratio = Math.min(wRatio, hRatio, 5);
-      // Guard against NaN / negative when the container hasn't laid
-      // out yet (width < 60).
-      setFit(ratio > 0 && Number.isFinite(ratio) ? ratio : 1);
+      const next = fitSheet(canvasRef.current.getBoundingClientRect(), widthIn * PX, heightIn * PX, gutter);
+      // Null: the canvas has no size yet (not laid out). Keep the fit we have.
+      if (!next) return;
+      setFit((prev) =>
+        prev.zoom === next.zoom && prev.gutterX === next.gutterX && prev.gutterY === next.gutterY ? prev : next,
+      );
     };
     compute();
 
@@ -580,9 +576,29 @@ function useZoom(
       window.removeEventListener('resize', compute);
       ro.disconnect();
     };
-  }, [widthIn, heightIn, canvasRef, fitPadding]);
+  }, [widthIn, heightIn, canvasRef, gutter]);
 
-  return { zoom: manual ?? fit, setZoom: setManual };
+  // Back to the fitted zoom, and to the start of the scroll range, where
+  // the fitted sheet sits one gutter in. A scroll kept from a zoomed-in
+  // view would cut the sheet's near edge whenever the canvas can still
+  // scroll (a block parked off the sheet).
+  const fitToScreen = useCallback(() => {
+    setManual(null);
+    const el = canvasRef.current;
+    if (el) {
+      el.scrollLeft = 0;
+      el.scrollTop = 0;
+    }
+  }, [canvasRef]);
+
+  return {
+    zoom: manual ?? fit.zoom,
+    fitZoom: fit.zoom,
+    gutterX: fit.gutterX,
+    gutterY: fit.gutterY,
+    setZoom: setManual,
+    fitToScreen,
+  };
 }
 
 // =========================================================================
@@ -684,7 +700,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   }, [savedPresets]);
   // Phone-sized read-only viewing (a shared /s/:slug link opened on a
   // phone) is the one context where the desktop chrome actively gets
-  // in the way: a fixed 484px rail plus 96px of workspace padding
+  // in the way: a fixed 484px rail plus the desktop workspace gutter
   // leaves ~180px of a 375px viewport for the poster itself, and the
   // poster IS the content. Everything gated on `mobileShare` collapses
   // that chrome so the poster fits the viewport on open. The editing
@@ -1190,10 +1206,12 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   const ffc = FONTS[doc.fontFamily]?.css ?? doc.fontFamily;
   const palName = paletteNameFor(doc.palette, customPalettes);
 
-  // 16px of gutter on a phone versus 60 on desktop: at 375px wide the
-  // desktop gutter alone eats a sixth of the viewport, and the whole
+  // A phone's gutter is much smaller than the desktop's: at 375 px wide
+  // the desktop gutter alone eats a third of the viewport, and the whole
   // point of the mobile share view is that the poster arrives fitted.
-  const { zoom, setZoom } = useZoom(canvasRef, pw, ph, mobileShare ? 16 : 60);
+  const { zoom, fitZoom, gutterX, gutterY, setZoom, fitToScreen } = useZoom(
+    canvasRef, pw, ph, mobileShare ? PHONE_GUTTER : WORKSPACE_GUTTER,
+  );
 
   // ── Touchpad pinch-to-zoom + pan ───────────────────────────────────
   //
@@ -1227,15 +1245,14 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   //   on the very next line — otherwise the adjustment lags by one
   //   frame and the cursor visibly drifts.
   const zoomRef = useRef(zoom);
+  const fitZoomRef = useRef(fitZoom);
   useEffect(() => {
     zoomRef.current = zoom;
-  }, [zoom]);
+    fitZoomRef.current = fitZoom;
+  }, [zoom, fitZoom]);
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return;
-
-    const ZOOM_MIN = 0.2;
-    const ZOOM_MAX = 10;
 
     const onWheel = (e: WheelEvent) => {
       if (!e.ctrlKey) return; // not a pinch / Cmd+wheel — let it scroll
@@ -1261,10 +1278,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       // without feeling sluggish or runaway. Figma uses roughly
       // the same range.
       const factor = Math.exp(-e.deltaY / 240);
-      const newZoom = Math.min(
-        ZOOM_MAX,
-        Math.max(ZOOM_MIN, oldZoom * factor),
-      );
+      const newZoom = clampZoom(oldZoom * factor, oldZoom, fitZoomRef.current);
       if (newZoom === oldZoom) return;
 
       // Synchronously commit the zoom so the following scroll math
@@ -1911,7 +1925,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       // No coalesce key: a size change is its own step.
       updateDoc(moveOntoSheet(latest, pendingSize.widthIn, pendingSize.heightIn));
       clearSelection();
-      setZoom(null);
+      fitToScreen();
     }
     setPendingSize(null);
   };
@@ -2850,10 +2864,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
             minWidth: '100%',
             minHeight: '100%',
             boxSizing: 'border-box',
-            // Matches the auto-fit gutter above, so the fitted poster
-            // sits flush in the viewport instead of being pushed
-            // into a scroll by padding the fit calculation ignored.
-            padding: mobileShare ? 8 : 96,
+            // The gutter the fit reserved (useZoom), so the fitted sheet
+            // and its padding fill the canvas on the sheet's limiting axis:
+            // only blocks parked off the sheet can make it scroll.
+            padding: `${gutterY}px ${gutterX}px`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -3220,10 +3234,12 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           // Continuous rulers — compute which inch marks are visible
           // based on scroll position, then render only those ticks.
           const inchPx = PX * zoom; // pixels per inch at current zoom
-          const pad = 96; // workarea padding in CSS px
-          // Canvas origin in scroll-container space
-          const canvasOriginX = pad - scrollPos.x;
-          const canvasOriginY = pad - scrollPos.y;
+          // Canvas origin in scroll-container space: the workarea's
+          // padding, less the scroll. Right only on an axis the sheet
+          // fills; on the axis where it is centred, and for the 24 px
+          // ruler bar, the marks are off (plan item 4).
+          const canvasOriginX = gutterX - scrollPos.x;
+          const canvasOriginY = gutterY - scrollPos.y;
           // Visible range in inches (extend past viewport edges)
           const viewW = canvasRef.current?.clientWidth ?? 2000;
           const viewH = canvasRef.current?.clientHeight ?? 1200;
@@ -3353,7 +3369,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           </div>
         )}
 
-        <ZoomBar zoom={zoom} setZoom={setZoom} touch={mobileShare} />
+        <ZoomBar zoom={zoom} fit={fitZoom} setZoom={setZoom} onFit={fitToScreen} touch={mobileShare} />
         <AutosaveStatusPill
           status={autosave.status}
           lastSavedAt={autosave.lastSavedAt}
@@ -3475,11 +3491,17 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
 
 function ZoomBar({
   zoom,
+  fit,
   setZoom,
+  onFit,
   touch = false,
 }: {
   zoom: number;
+  /** The fitted zoom: Zoom out may always go down to it. */
+  fit: number;
   setZoom: (z: number | null) => void;
+  /** Back to the fitted zoom and the start of the scroll range. */
+  onFit: () => void;
   /**
    * Touch sizing for the mobile share view. The desktop bar is a
    * deliberately unobtrusive 8–14px cluster driven by a precise
@@ -3489,6 +3511,13 @@ function ZoomBar({
    */
   touch?: boolean;
 }) {
+  // A step that cannot move (at the floor or the ceiling) changes nothing:
+  // setting the same zoom would leave fit mode, and the poster would stop
+  // refitting when the window changes.
+  const stepTo = (next: number) => {
+    const z = clampZoom(next, zoom, fit);
+    if (z !== zoom) setZoom(z);
+  };
   // Square 44px touch targets vs the desktop's tight padding.
   const stepStyle = touch
     ? { fontSize: 20, padding: 0, minWidth: 44, minHeight: 44 }
@@ -3523,14 +3552,14 @@ function ZoomBar({
     >
       <button
         aria-label="Zoom out"
-        onClick={() => setZoom(Math.max(0.3, zoom - 0.15))}
+        onClick={() => stepTo(zoom - ZOOM_STEP)}
         style={{ all: 'unset', ...center, cursor: 'pointer', color: '#aaa', fontWeight: 700, ...stepStyle }}
       >
         −
       </button>
       <button
         aria-label="Reset zoom to fit"
-        onClick={() => setZoom(null)}
+        onClick={onFit}
         // tabular-nums keeps the % from shifting width as the digits
         // change while dragging zoom (e.g. 90% → 100%), so the readout
         // and the +/− buttons flanking it stay put.
@@ -3540,7 +3569,7 @@ function ZoomBar({
       </button>
       <button
         aria-label="Zoom in"
-        onClick={() => setZoom(Math.min(10, zoom + 0.15))}
+        onClick={() => stepTo(zoom + ZOOM_STEP)}
         style={{ all: 'unset', ...center, cursor: 'pointer', color: '#aaa', fontWeight: 700, ...stepStyle }}
       >
         +
@@ -3548,7 +3577,7 @@ function ZoomBar({
       <div style={{ width: 1, height: touch ? 24 : 14, background: '#333', margin: '0 4px' }} />
       <button
         aria-label="Fit poster to screen"
-        onClick={() => setZoom(null)}
+        onClick={onFit}
         style={{ all: 'unset', ...center, cursor: 'pointer', color: '#666', fontWeight: 600, ...fitStyle }}
       >
         FIT
