@@ -1065,21 +1065,22 @@ flowchart LR
 #### `pages/Editor.tsx` — /p/:posterId loader shell around PosterEditor
 
 **Elements**
-- [ ] `Back to Dashboard` — anchor — `Editor.tsx:275-280` — href `/dashboard` (not-found state only)
-- [ ] `Sign in` / `My posters` — anchors — `Editor.tsx:296-307` — href `/auth` / `/dashboard` (account-changed state only, fix 23)
-- [ ] `×` (aria-label `Dismiss warning`) — button — `Editor.tsx:287-302` — dismisses two-tab collision alert
+- [ ] `Back to Dashboard` — anchor — `Editor.tsx:313-318` — href `/dashboard` (not-found state only)
+- [ ] `Download a copy` — button — `PosterClosedPage.tsx:85-87` — saves the closed poster as a `.postr` made as the page opened (account-changed state only, fix 23)
+- [ ] `Sign in` / `My posters` — anchors — `PosterClosedPage.tsx:88-96` — href `/auth` / `/dashboard`; Sign in only for an account's poster while a guest or no one is signed in (account-changed state only, fix 23)
+- [ ] `×` (aria-label `Dismiss warning`) — button — `Editor.tsx:396-411` — dismisses two-tab collision alert
 
 **Copy**
-- [ ] "Loading poster…" — loading state — `Editor.tsx:211`
-- [ ] "Poster not found" — not-found heading — `Editor.tsx:220`
-- [ ] "The poster you're looking for doesn't exist or you don't have access to it." — not-found body — `Editor.tsx:271-274`. Also shown for another user's poster, shared or not (fix 23)
-- [ ] "This poster is in another account" — account-changed heading — `Editor.tsx:290`; "The account signed in here changed. Sign in to the account that owns this poster to keep editing it." — `Editor.tsx:291-294`. Shown when the signed-in user changes while a poster is open (fix 23); the tab title then drops the poster's name
-- [ ] "Couldn't load this poster" — error heading — `Editor.tsx:239`; "{status.message}" — `Editor.tsx:240`
-- [ ] "This poster is already open in another tab." — collision alert bold — `Editor.tsx:279-281`
-- [ ] "Postr autosave is last-write-wins, so edits in one tab can silently overwrite the other. Close the duplicate tab to avoid losing work." — collision alert body — `Editor.tsx:283-285`
+- [ ] "Loading poster…" — loading state — `Editor.tsx:298`
+- [ ] "Poster not found" — not-found heading — `Editor.tsx:308`
+- [ ] "The poster you're looking for doesn't exist or you don't have access to it." — not-found body — `Editor.tsx:309-312`. Also shown for another user's poster, shared or not (fix 23)
+- [ ] "This poster is in another account" / "This guest poster was closed" — account-changed heading — `PosterClosedPage.tsx:74-76` (takes the focus); body `PosterClosedPage.tsx:77-83`: for a guest's poster "The guest session that made it has ended in this browser. Download a copy to keep it; you can import it into any account."; for an account's, "The account signed in here changed. Sign in to the account that owns this poster to keep editing it." when Sign in is offered, else "…Download a copy to keep this version; you can import it into any account." Download status (live region): "Preparing the file…", "Downloaded.", "Downloaded. N image(s) could not be included.", "Something went wrong. Try again." Shown when the signed-in user changes while a poster is open (fix 23); the tab title then drops the poster's name
+- [ ] "Couldn’t load this poster" — error heading — `Editor.tsx:467`; "{message}" — `Editor.tsx:468`
+- [ ] "This poster is already open in another tab." — collision alert bold — `Editor.tsx:389-391`
+- [ ] "Postr autosave is last-write-wins, so edits in one tab can silently overwrite the other. Close the duplicate tab to avoid losing work." — collision alert body — `Editor.tsx:393-395`
 
 **Graphics**
-- [ ] ⚠️ — emoji, aria-hidden — `Editor.tsx:277` — collision alert
+- [ ] ⚠️ — emoji, aria-hidden — `Editor.tsx:386` — collision alert
 - [ ] Render site: `<PosterEditor />` — `Editor.tsx:305`. `hydrateIfEmpty`/`normalizeStaleStyles`/`migrateBase64ToStorage` are logic only.
 
 #### `pages/Share.tsx` — /s/:slug public read-only viewer
