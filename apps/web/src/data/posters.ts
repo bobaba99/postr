@@ -122,13 +122,30 @@ export async function loadPosterBySlug(slug: string): Promise<PosterRow | null> 
 
 /**
  * Returns the most recently updated poster for the current user.
- * Used by the Editor route when the URL contains `/p/new` or any
- * other id we couldn't resolve.
+ * Used by the Editor route for `/p/new`.
+ *
+ * The explicit `user_id` filter matters, as in listPosters: the read policy
+ * also returns every shared (`is_public`) poster, so without it a visitor
+ * was opened into a stranger's shared poster (docs/fixes/23-new-poster-owner-only.md).
  */
 export async function loadMostRecentPoster(): Promise<PosterRow | null> {
+  // The session the client holds, not a round trip to the auth server: the
+  // editor has already opened on this session, and a lookup that failed for
+  // a moment left a returning user at a dead end (fix 23, CRa-4).
+  const {
+    data: { session },
+    error: authError,
+  } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (authError || !user) {
+    throw new Error(
+      `Cannot load the most recent poster — no active user: ${authError?.message ?? 'unknown'}`,
+    );
+  }
   const { data, error } = await supabase
     .from('posters')
     .select('*')
+    .eq('user_id', user.id)
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle();

@@ -37,6 +37,8 @@ let traces: QueryTrace[] = [];
 let nextResponses: Array<{ data: unknown; error: unknown }> = [];
 let fakeUser: { id: string } | null = { id: 'user-1' };
 let getUserError: { message: string } | null = null;
+/** The auth server cannot be reached: the network user lookup fails, the local session is intact. */
+let userEndpointDown = false;
 
 function makeQuery(table: string) {
   const trace: QueryTrace = { table, ops: [], resolved: null };
@@ -87,9 +89,12 @@ vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: (table: string) => makeQuery(table),
     auth: {
-      getUser: vi.fn(async () => ({
-        data: { user: fakeUser },
-        error: getUserError,
+      getUser: vi.fn(async () => (userEndpointDown
+        ? { data: { user: null }, error: { message: 'Failed to fetch' } }
+        : { data: { user: fakeUser }, error: getUserError })),
+      getSession: vi.fn(async () => ({
+        data: { session: fakeUser ? { user: fakeUser } : null },
+        error: null,
       })),
       signInAnonymously: signInAnonymouslyMock,
       signOut: signOutMock,
@@ -171,6 +176,7 @@ beforeEach(() => {
   nextResponses = [];
   fakeUser = { id: 'user-1' };
   getUserError = null;
+  userEndpointDown = false;
   storageCopyMock.mockClear();
   storageCopyMock.mockResolvedValue({ data: null, error: null });
 });
@@ -207,19 +213,40 @@ describe('loadPoster', () => {
 // loadMostRecentPoster
 // ---------------------------------------------------------------------------
 describe('loadMostRecentPoster', () => {
-  it('orders by updated_at desc and limits to 1', async () => {
+  // Fix 23 (docs/fixes/23-new-poster-owner-only.md): the posters read policy
+  // also returns every shared (public) poster, so "the most recent poster"
+  // must say "mine". The test this replaces pinned the unfiltered query.
+  it('asks for the current user\'s newest poster only', async () => {
     const row = makeRow({ id: 'recent' });
     setResponses({ data: row, error: null });
 
     const result = await loadMostRecentPoster();
 
     expect(result?.id).toBe('recent');
-    const trace = traces[0]!;
-    const methods = trace.ops.map((o) => o.method);
-    expect(methods).toEqual(['select', 'order', 'limit', 'maybeSingle']);
-    expect(trace.ops[1]!.args[0]).toBe('updated_at');
-    expect(trace.ops[1]!.args[1]).toMatchObject({ ascending: false });
-    expect(trace.ops[2]!.args).toEqual([1]);
+    const trace = traces.find((t) => t.table === 'posters')!;
+    expect(trace.ops.find((o) => o.method === 'eq')?.args).toEqual(['user_id', 'user-1']);
+    const order = trace.ops.find((o) => o.method === 'order')!;
+    expect(order.args[0]).toBe('updated_at');
+    expect(order.args[1]).toMatchObject({ ascending: false });
+    expect(trace.ops.find((o) => o.method === 'limit')!.args).toEqual([1]);
+  });
+
+  it('sends no query when there is no active user', async () => {
+    fakeUser = null;
+    await expect(loadMostRecentPoster()).rejects.toThrow(/no active user/i);
+    expect(traces.filter((t) => t.table === 'posters')).toEqual([]);
+  });
+
+  // Fix 23's step 9 review (CRa-4, MEASURED in the browser): the owner filter
+  // first asked the auth server who the user is, and a returning user whose
+  // lookup failed for a moment got a dead end instead of their poster.
+  it('finds the user\'s own poster while the auth server cannot be reached', async () => {
+    userEndpointDown = true;
+    setResponses({ data: makeRow({ id: 'recent' }), error: null });
+    const result = await loadMostRecentPoster();
+    expect(result?.id).toBe('recent');
+    const trace = traces.find((t) => t.table === 'posters')!;
+    expect(trace.ops.find((o) => o.method === 'eq')?.args).toEqual(['user_id', 'user-1']);
   });
 });
 
