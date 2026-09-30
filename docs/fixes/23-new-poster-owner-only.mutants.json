@@ -1,0 +1,208 @@
+{
+  "tests": [
+    "src/pages/__tests__/EditorOwnership.test.tsx",
+    "src/data/__tests__/posters.test.ts",
+    "src/hooks/__tests__/useAutosaveOwner.test.ts",
+    "src/__tests__/routes.test.tsx",
+    "src/seo/__tests__/vercelRouting.test.ts",
+    "src/poster/__tests__/sharingHidden.test.tsx"
+  ],
+  "mutants": {
+    "no-owner-filter": {
+      "undoes": "A — /p/new asks for the signed-in user's own posters only",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "    .select('*')\n    .eq('user_id', user.id)\n    .order('updated_at', { ascending: false })",
+          "    .select('*')\n    .order('updated_at', { ascending: false })"
+        ]
+      ]
+    },
+    "no-user-no-guard": {
+      "undoes": "A — with no signed-in user, /p/new sends no query",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  if (authError || !user) {\n    throw new Error(\n      `Cannot load the most recent poster — no active user: ${authError?.message ?? 'unknown'}`,\n    );\n  }\n",
+          ""
+        ]
+      ]
+    },
+    "recent-by-network-lookup": {
+      "undoes": "A — /p/new takes the user from the session the client holds, not a network lookup (step 9 review, CRa-4)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  } = await supabase.auth.getSession();\n  const user = session?.user;",
+          "  } = await supabase.auth.getUser().then(({ data, error }) => ({ data: { session: data.user ? { user: data.user } : null }, error }));\n  const user = session?.user;"
+        ]
+      ]
+    },
+    "no-owner-gate": {
+      "undoes": "B — the editor shows another user's poster as not found",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "        if (!userId || row.user_id !== userId) {",
+          "        if (!userId) {"
+        ]
+      ]
+    },
+    "user-change-not-followed": {
+      "undoes": "B — the editor loads again when the signed-in user changes",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "  }, [posterId, userId, setPoster, navigate]);",
+          "  }, [posterId, userId === undefined, setPoster, navigate]);"
+        ]
+      ]
+    },
+    "account-change-said-not-found": {
+      "undoes": "B — a poster closed by a change of account says it is in another account, without asking the database again",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "      if (opened.posterId === posterId) {\n        setStatus({ kind: 'account-changed' });\n        return undefined;\n      }",
+          "      if (false) {\n        setStatus({ kind: 'account-changed' });\n        return undefined;\n      }"
+        ]
+      ]
+    },
+    "tab-keeps-closed-poster-name": {
+      "undoes": "B — the browser tab is named after the poster only while it is open",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "  useDocumentMeta(editorMeta(status.kind === 'ready' ? posterTitle : null, posterId));",
+          "  useDocumentMeta(editorMeta(posterTitle, posterId));"
+        ]
+      ]
+    },
+    "reload-closes-open-editor": {
+      "undoes": "B — an open editor stays open while the user's next poster loads (step 9 review, CRa-2)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "      setStatus((s) => (s.kind === 'ready' ? s : { kind: 'loading' }));",
+          "      setStatus({ kind: 'loading' });"
+        ]
+      ]
+    },
+    "switch-keeps-old-poster": {
+      "undoes": "B — a change of account while the next poster loads closes the open one",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "      // The open poster is closed at once; it stays remembered, so going\n      // Back to it still says it is in another account.\n      setStatus({ kind: 'loading' });\n    } else {",
+          "    }\n    {"
+        ]
+      ]
+    },
+    "switch-forgets-closed-poster": {
+      "undoes": "B — after a change of account during a switch, the closed poster stays remembered, so Back to it says it is in another account (step 9 round 2, NEW-1)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "      // The open poster is closed at once; it stays remembered, so going\n      // Back to it still says it is in another account.\n      setStatus({ kind: 'loading' });",
+          "      openedRef.current = null;\n      setStatus({ kind: 'loading' });"
+        ]
+      ]
+    },
+    "duplicate-any-poster": {
+      "undoes": "B — duplicate copies only the user's own posters (owner decision)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  if (source.user_id !== user.id) {\n    throw new Error('Cannot duplicate poster — not found');\n  }",
+          ""
+        ]
+      ]
+    },
+    "thumbnail-as-current-user": {
+      "undoes": "B — the thumbnail uploads only as the user the editor was opened for",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (!uid || uid !== owner) return;",
+          "      if (!uid) return;"
+        ]
+      ]
+    },
+    "owner-by-network-lookup": {
+      "undoes": "B — the thumbnail's owner is read from the session the client holds (step 9 review, CRa-5)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "openedForRef.current = supabase.auth.getSession().then(({ data }) => data?.session?.user?.id ?? null);",
+          "openedForRef.current = supabase.auth.getUser().then(({ data }) => data?.user?.id ?? null);"
+        ]
+      ]
+    },
+    "sharing-on": {
+      "undoes": "C — sharing and comments are hidden (owner decision)",
+      "edits": [
+        [
+          "src/config/features.ts",
+          "export const SHARING_ENABLED = false;",
+          "export const SHARING_ENABLED = true;"
+        ]
+      ]
+    },
+    "toolbar-offers-comment": {
+      "undoes": "C — the text toolbar offers no \"Comment on selection\"",
+      "edits": [
+        [
+          "src/poster/FloatingFormatToolbar.tsx",
+          "        {SHARING_ENABLED && (\n          <>\n            <div style={divider} />",
+          "        {true && (\n          <>\n            <div style={divider} />"
+        ]
+      ]
+    },
+    "comment-text-followed": {
+      "undoes": "C — a request to comment on a selection is ignored",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    if (!SHARING_ENABLED) return undefined;\n    function handle(e: Event) {",
+          "    function handle(e: Event) {"
+        ]
+      ]
+    },
+    "comment-area-followed": {
+      "undoes": "C — a request to comment on an area is ignored",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    if (!SHARING_ENABLED) return undefined;\n    function startArea() {",
+          "    function startArea() {"
+        ]
+      ]
+    },
+    "panel-ungated": {
+      "undoes": "C — the sidebar renders the comments panel only with sharing on",
+      "expect": "survive",
+      "why": "defence in depth: with the rail tab and both comment requests switched off, nothing sets the comments tab, so no test can reach the panel gate on its own",
+      "unguarded": "a second gate behind three that are each guarded (sharing-on, comment-text-followed, comment-area-followed); INSPECTED",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        {SHARING_ENABLED && tab === 'comments' && (",
+          "        {tab === 'comments' && ("
+        ]
+      ]
+    },
+    "share-rewrite-to-shell": {
+      "undoes": "C — the server sends /s/:slug to the app shell, not the share edge shell",
+      "expect": "survive",
+      "why": "vercel.json is read with fs by src/seo/__tests__/vercelRouting.test.ts, which this tool's load-hook mutants do not reach, and no browser harness runs Vercel's rewrites",
+      "unguarded": "TESTED by hand on 2026-09-30: with the old rewrite put back, vercelRouting.test.ts fails 1 of 50 ('serves the app shell at /s/:slug'); restored, 50 of 50",
+      "edits": [
+        [
+          "vercel.json",
+          "    { \"source\": \"/s/:slug\", \"destination\": \"/\" },",
+          "    { \"source\": \"/s/:slug\", \"destination\": \"/api/shell/share\" },"
+        ]
+      ]
+    }
+  }
+}

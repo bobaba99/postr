@@ -95,7 +95,7 @@ All of `apps/web/src/` is covered (test files excluded by rule) — the earlier 
 
 All routes from `routes.tsx`. Auth gating via `AuthGuard` (`components/AuthGuard.tsx`) on `/dashboard`, `/profile`, `/admin/gallery` — these require a real account and bounce a session-less visitor to `/auth`. The editor route `/p/:posterId` instead uses `EnsureSession` (`components/EnsureSession.tsx`): it silently creates an ANONYMOUS session (`ensureSession`) so a logged-out visitor edits immediately with no signup (the no-auth editor, 2026-07-29). On `SIGNED_OUT` it re-bootstraps a fresh anonymous session (`resetEnsureSession` + `ensureSession`) rather than dead-ending. Global mounts in `App.tsx`: `AppRoutes`, `FeedbackModal`, `PublishFlow`, `SessionExpiredModal`, `ConsentNotice`, `Analytics` beacon.
 
-**No-auth editor (2026-07-29):** logged-out "Editor" nav link, the Landing "Try as guest" hero, and the Pricing free-tier CTA all point at `/p/new` → `EnsureSession` mints an anonymous session behind it → `Editor.tsx` load-or-creates a poster → edits autosave. An anonymous editor is prompted to secure their work to a permanent account only on EXPORT (`EditableExportButtons` gates `run()` on `plan.isGuest` → `SecureWorkModal reason="export"`) or on LEAVE (`useLeaveGuard` arms a `beforeunload` dialog when `isGuest && canUndo` — the live path, covering tab-close/refresh and the editor's `<a href>` exits; it also exposes a `requestLeave()` gate for a styled in-app-nav `SecureWorkModal reason="leave"`, but that has no caller yet — wiring it needs prop-drilling through the frozen `PosterEditor`, deferred). Conversion is in place via `lib/convertGuest.ts` (`convertGuestWithGoogle` → `linkIdentity`; `convertGuestWithEmail` → `updateUser`) — NEVER `signUp`, so the poster carries over. The same `PosterEditor` serves logged-in and anonymous users unchanged; a permanent user never sees either prompt.
+**No-auth editor (2026-07-29):** logged-out "Editor" nav link, the Landing "Try as guest" hero, and the Pricing free-tier CTA all point at `/p/new` → `EnsureSession` mints an anonymous session behind it → `Editor.tsx` load-or-creates the user's OWN most recent poster (`loadMostRecentPoster` filters by `user_id`: the read policy also returns shared posters, fix 23) → edits autosave. An anonymous editor is prompted to secure their work to a permanent account only on EXPORT (`EditableExportButtons` gates `run()` on `plan.isGuest` → `SecureWorkModal reason="export"`) or on LEAVE (`useLeaveGuard` arms a `beforeunload` dialog when `isGuest && canUndo` — the live path, covering tab-close/refresh and the editor's `<a href>` exits; it also exposes a `requestLeave()` gate for a styled in-app-nav `SecureWorkModal reason="leave"`, but that has no caller yet — wiring it needs prop-drilling through the frozen `PosterEditor`, deferred). Conversion is in place via `lib/convertGuest.ts` (`convertGuestWithGoogle` → `linkIdentity`; `convertGuestWithEmail` → `updateUser`) — NEVER `signUp`, so the poster carries over. The same `PosterEditor` serves logged-in and anonymous users unchanged; a permanent user never sees either prompt.
 
 ```mermaid
 flowchart LR
@@ -124,7 +124,7 @@ flowchart LR
     R_auth["/auth"]
     R_billok["/billing/success"]
     R_billcx["/billing/cancel"]
-    R_share["/s/:slug"]
+    R_share["/s/:slug (redirect → / since fix 23)"]
     R_dash["/dashboard"]
     R_edit["/p/:posterId"]
     R_prof["/profile"]
@@ -255,9 +255,9 @@ flowchart LR
 | `/auth` | `pages/Auth.tsx` | no | — |
 | `/billing/success` | `pages/BillingResult.tsx` (`outcome="success"`) | no | — |
 | `/billing/cancel` | `pages/BillingResult.tsx` (`outcome="cancel"`) | no | — |
-| `/s/:slug` | `pages/Share.tsx` | yes | public read-only |
+| `/s/:slug` | `<Navigate to="/" replace>` while `SHARING_ENABLED` is false (`routes.tsx:294`) | — | **deactivated 2026-09-30** with comments (owner decision, fix 23); `pages/Share.tsx` kept; `vercel.json` serves the app shell here, not `api/shell/share.ts`. Re-enabling needs the database hardening listed in `config/features.ts` |
 | `/dashboard` | `pages/Home.tsx` | no | `AuthGuard` |
-| `/p/:posterId` | `pages/Editor.tsx` | yes | `EnsureSession` + `EditorErrorBoundary` (anonymous-first — creates a guest session instead of bouncing) |
+| `/p/:posterId` | `pages/Editor.tsx` | yes | `EnsureSession` + `EditorErrorBoundary` (anonymous-first — creates a guest session instead of bouncing). Opens only the signed-in user's own posters, and closes one when the signed-in user changes (fix 23) |
 | `/profile` | `pages/Profile.tsx` | no | `AuthGuard` |
 | `/admin/gallery` | `pages/AdminGallery.tsx` | yes | `AuthGuard` + in-page admin check |
 | `*` | `pages/NotFound.tsx` | no | — |
@@ -415,7 +415,7 @@ flowchart LR
   - [ ] "Start from the poster you already have" / "Already have a poster in PowerPoint, as a PDF, or as an image? Open it here and keep editing it, blocks and all — title, headings, body text and figures land where they were, each one still yours to move and rewrite." — `start-from-work` milestone — `About.tsx:63-66`. **Rewritten 2026-09-10** (paper-to-poster deactivated — see routes.tsx header): the manuscript sentence was dropped. Old copy, kept as the reactivation reference: ~~"Start from the work you already have" / "Paste a manuscript or drop a .docx and answer a few short questions about what to emphasise — you get a structured poster draft rather than a blank canvas. Already have a poster in PowerPoint? Open the .pptx here and keep editing it, blocks and all…"~~
   - [ ] "The right figure, drawn for print" / "Paste a table or answer three questions in the Figure tab and Postr ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once and insert them straight onto the poster." — `About.tsx` (rewritten 2026-09-10: names the editor's Figure tab instead of "the plot picker" and no longer promises SVG/PNG downloads — those lived on the deactivated standalone page)
   - [ ] "Borrow a look you like" / "Upload a poster you admire and Postr lifts its colours and type onto yours — the look, never the content. Print-safe clamping keeps the result legible on paper rather than only on screen." — `About.tsx:72-74`
-  - [ ] "Share, iterate, print" / "Read-only share links for advisors and co-authors, readable on a phone. Undo and redo through the entire session. Export to PDF, to PowerPoint with every block still editable, or to LaTeX with a compilable poster.tex and references.bib for Overleaf." — `About.tsx:78-80`
+  - [ ] "Iterate, export, print" / "Undo and redo through the entire session. Export to PDF, to PowerPoint with every block still editable, or to LaTeX with a compilable poster.tex and references.bib for Overleaf." — `About.tsx:84-90` (the share-link sentence removed with sharing, fix 23)
 - [ ] "Shape what ships next" — eyebrow — `About.tsx:169`
 - [ ] "Tell us what's missing." — h2 — `About.tsx:172`
 - [ ] "Every bug report and feature request lands in the developer's queue. The loudest feedback wins the most attention — so if something's broken, missing, or could be better, say so." — para — `About.tsx:174-178`
@@ -1065,13 +1065,15 @@ flowchart LR
 #### `pages/Editor.tsx` — /p/:posterId loader shell around PosterEditor
 
 **Elements**
-- [ ] `Back to Dashboard` — anchor — `Editor.tsx:224-229` — href `/dashboard` (not-found state only)
+- [ ] `Back to Dashboard` — anchor — `Editor.tsx:275-280` — href `/dashboard` (not-found state only)
+- [ ] `Sign in` / `My posters` — anchors — `Editor.tsx:296-307` — href `/auth` / `/dashboard` (account-changed state only, fix 23)
 - [ ] `×` (aria-label `Dismiss warning`) — button — `Editor.tsx:287-302` — dismisses two-tab collision alert
 
 **Copy**
 - [ ] "Loading poster…" — loading state — `Editor.tsx:211`
 - [ ] "Poster not found" — not-found heading — `Editor.tsx:220`
-- [ ] "The poster you're looking for doesn't exist or you don't have access to it." — not-found body — `Editor.tsx:221-223`
+- [ ] "The poster you're looking for doesn't exist or you don't have access to it." — not-found body — `Editor.tsx:271-274`. Also shown for another user's poster, shared or not (fix 23)
+- [ ] "This poster is in another account" — account-changed heading — `Editor.tsx:290`; "The account signed in here changed. Sign in to the account that owns this poster to keep editing it." — `Editor.tsx:291-294`. Shown when the signed-in user changes while a poster is open (fix 23); the tab title then drops the poster's name
 - [ ] "Couldn't load this poster" — error heading — `Editor.tsx:239`; "{status.message}" — `Editor.tsx:240`
 - [ ] "This poster is already open in another tab." — collision alert bold — `Editor.tsx:279-281`
 - [ ] "Postr autosave is last-write-wins, so edits in one tab can silently overwrite the other. Close the duplicate tab to avoid losing work." — collision alert body — `Editor.tsx:283-285`
@@ -1081,6 +1083,8 @@ flowchart LR
 - [ ] Render site: `<PosterEditor />` — `Editor.tsx:305`. `hydrateIfEmpty`/`normalizeStaleStyles`/`migrateBase64ToStorage` are logic only.
 
 #### `pages/Share.tsx` — /s/:slug public read-only viewer
+
+**Deactivated 2026-09-30** (`SHARING_ENABLED = false`, fix 23): not routed; kept for when sharing returns.
 
 **Elements** — none of its own; ready state renders `<PosterEditor readOnly />` (`Share.tsx:108`).
 
@@ -1231,14 +1235,14 @@ flowchart LR
 - [ ] `Text · Purple` — swatch button — constant `FloatingFormatToolbar.tsx:127` — `'#7c3aed'`
 - [ ] `∅` `Default color` — swatch button — `FloatingFormatToolbar.tsx:351` — `foreColor 'inherit'`
 - [ ] `Clear` `Clear formatting` — button — `FloatingFormatToolbar.tsx:356-373` — `execCommand('removeFormat')`
-- [ ] `💬` `Comment on selection` — button — `FloatingFormatToolbar.tsx:377-393` — dispatches `postr:comment-text` (blockId + offsets + quote)
+- [ ] `💬` `Comment on selection` — button — `FloatingFormatToolbar.tsx:377-399` — dispatches `postr:comment-text` (blockId + offsets + quote). **Only with `SHARING_ENABLED`** (off since 2026-09-30, fix 23); `PosterEditor` also ignores the event while it is off
 
 **Copy** — none beyond labels/titles above (dividers are pure css).
 
 **Graphics**
-- [ ] 💬 — emoji — `FloatingFormatToolbar.tsx:392` — comment button
+- [ ] 💬 — emoji — `FloatingFormatToolbar.tsx:396` — comment button (only with `SHARING_ENABLED`)
 - [ ] `∅` — text glyph — `FloatingFormatToolbar.tsx:223` — "none" swatches
-- [ ] 6 vertical divider bars — css — `FloatingFormatToolbar.tsx:260,275,291,336,344,354,375`
+- [ ] vertical divider bars — css — `FloatingFormatToolbar.tsx:261,276,292,337,345,355` (and `:379`, before the comment button, only with `SHARING_ENABLED`)
 
 #### `poster/GroupFrame.tsx` — Multi-select bounding box (union rect + group move/resize)
 
@@ -1523,7 +1527,7 @@ flowchart LR
   SB --> R1["references"] --> SB
   SB --> F1["figure (check)"] --> SB
   SB --> I2["issues (count badge)"] --> SB
-  SB --> C1["comments"] --> CP["CommentsPanel :769"]
+  SB -.->|"hidden: SHARING_ENABLED false"| C1["comments"] --> CP["CommentsPanel :769"]
   SB --> V1["versions"] --> VP["VersionPanel :795"]
   SB --> X1["export"] --> EEB["EditableExportButtons :1162"]
   F1 --> CC["ChartChooser (§6.10)"]
@@ -1535,7 +1539,9 @@ flowchart LR
 
 #### `poster/CommentsPanel.tsx` — review-thread UI: doc/block/text/area-anchored comment threads with replies, resolve, delete, share-link copy (owner), guest display name
 
-Mounted from: imported `Sidebar.tsx:56`, rendered `Sidebar.tsx:768-782` under `tab === 'comments'` (`isOwner` hardcoded `true` at `Sidebar.tsx:780`). Guests reach it via `pages/Share.tsx` → `PosterEditor`. Talks to canvas via window events (`postr:comment-area`, `postr:cancel-area-comment`, `postr:comment-edit-anchor`, `postr:comment-hover/focus/blur`).
+**Deactivated 2026-09-30 with sharing** (fix 23): while `SHARING_ENABLED` is false nothing opens this panel. The sidebar leaves out the comments tab (`Sidebar.tsx:643`) and renders the panel only with the flag on; the text toolbar has no "Comment on selection"; and `PosterEditor` ignores `postr:comment-text` and `postr:comment-area`. So no control in the app makes a poster public (its "Copy share link" was the only one). Kept, not removed; `isOwner` must become real ownership before it returns (fix 23's F1).
+
+Mounted from: imported `Sidebar.tsx:63`, rendered `Sidebar.tsx:806-819` under `SHARING_ENABLED && tab === 'comments'` (`isOwner` hardcoded `true` at `Sidebar.tsx:818`). Guests reach it via `pages/Share.tsx` → `PosterEditor`. Talks to canvas via window events (`postr:comment-area`, `postr:cancel-area-comment`, `postr:comment-edit-anchor`, `postr:comment-hover/focus/blur`).
 
 **Elements**
 - [ ] `▭ Comment on area` / active: `▣ Drag a rectangle on the canvas` — toggle button (`aria-pressed`) — `CommentsPanel.tsx:170-196` — dispatches `postr:start-area-comment` / `postr:cancel-area-comment` window events (canvas area-drag mode); hidden while `pendingAnchor` set
