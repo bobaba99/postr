@@ -17,7 +17,7 @@
  * actions in.
  */
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
+import { GALLERY_PUBLIC_ENABLED, SHARING_ENABLED } from '@/config/features';
 import type {
   Author,
   Block,
@@ -639,7 +639,8 @@ export function Sidebar(props: SidebarProps) {
                   ['check', 'figure'],
                   ['issues', 'issues'],
                   // ['review', 'review'] — deactivated, see routes.tsx header
-                  ['comments', 'comments'],
+                  // Comments are deactivated with sharing (config/features.ts).
+                  ...(SHARING_ENABLED ? ([['comments', 'comments']] as Array<[SidebarTab, string]>) : []),
                   ['versions', 'versions'],
                   ['export', 'export'],
                 ] as Array<[SidebarTab, string]>))
@@ -800,7 +801,9 @@ export function Sidebar(props: SidebarProps) {
             )}
         */}
 
-        {tab === 'comments' && (
+        {/* Only with sharing on: the text toolbar and the area drag also
+            set this tab (config/features.ts). */}
+        {SHARING_ENABLED && tab === 'comments' && (
           <CommentsPanel
             posterId={props.posterId}
             pendingAnchor={props.pendingCommentAnchor}

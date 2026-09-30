@@ -81,10 +81,12 @@ const MILESTONES: Milestone[] = [
       'Upload a poster you admire and Postr lifts its colours and type onto yours — the look, never the content. Print-safe clamping keeps the result legible on paper rather than only on screen.',
   },
   {
+    // Share links are deactivated with comments (config/features.ts), so the
+    // card no longer offers them (fix 23).
     id: 'ship',
-    title: 'Share, iterate, print',
+    title: 'Iterate, export, print',
     body:
-      "Read-only share links for advisors and co-authors, readable on a phone. Undo and redo through the entire session. Export to PDF, to PowerPoint with every block still editable, or to LaTeX with a compilable poster.tex and references.bib for Overleaf.",
+      'Undo and redo through the entire session. Export to PDF, to PowerPoint with every block still editable, or to LaTeX with a compilable poster.tex and references.bib for Overleaf.',
   },
 ];
 

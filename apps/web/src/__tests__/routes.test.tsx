@@ -130,3 +130,17 @@ describe('deactivated standalone plot picker routes', () => {
     },
   );
 });
+
+/**
+ * Sharing and comments are deactivated (owner decision 2026-09-30, fix 23:
+ * docs/fixes/23-new-poster-owner-only.md). A share link lands on the
+ * landing page instead of the share viewer.
+ */
+describe('deactivated share links', () => {
+  it('redirects /s/:slug to the landing page', async () => {
+    renderAt('/s/some-slug');
+
+    expect(await screen.findByTestId('location-probe')).toHaveTextContent(/^\/$/);
+    expect(screen.getByText(/academic posters/i)).toBeInTheDocument();
+  });
+});

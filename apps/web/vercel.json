@@ -17,7 +17,7 @@
     { "source": "/paper-to-presentation", "destination": "/", "permanent": true }
   ],
   "rewrites": [
-    { "source": "/s/:slug", "destination": "/api/shell/share" },
+    { "source": "/s/:slug", "destination": "/" },
     { "source": "/gallery", "destination": "/" },
     { "source": "/gallery/:entryId", "destination": "/" },
     { "source": "/chart-chooser", "destination": "/" },

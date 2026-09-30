@@ -28,7 +28,7 @@ import { nanoid } from 'nanoid';
 import { breakUndoCoalescing } from '@/stores/posterStore';
 import { usePosterStore } from '@/stores/posterStore';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
-import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
+import { GALLERY_PUBLIC_ENABLED, SHARING_ENABLED } from '@/config/features';
 import { useAutosave } from '@/hooks/useAutosave';
 import { mediaQueryMatches, useIsSmallScreen } from '@/hooks/useIsSmallScreen';
 import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
@@ -781,6 +781,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // canvas into "drag a rectangle" mode. The drag overlay (rendered
   // inside #poster-canvas) emits `postr:comment-area` on mouseup.
   useEffect(() => {
+    // Comments are deactivated with sharing (config/features.ts).
+    if (!SHARING_ENABLED) return undefined;
     function startArea() {
       setAreaCommentMode(true);
     }
@@ -811,6 +813,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // it into a CommentAnchor and flip the sidebar to the comments tab so
   // the user sees the draft form.
   useEffect(() => {
+    // Comments are deactivated with sharing (config/features.ts).
+    if (!SHARING_ENABLED) return undefined;
     function handle(e: Event) {
       const detail = (e as CustomEvent).detail as {
         blockId: string;

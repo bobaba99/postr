@@ -27,7 +27,7 @@
         "Postr is a free academic poster editor for students and researchers. It exists because the usual tools were built for something else. Research structure, print constraints, and editable output stay in one focused workflow.",
         "Enter institutions once, then click to assign them to authors. Superscript numbering stays in sync when you add or remove an affiliation.",
         "Export a .bib from your reference manager and drop it in. Postr reads BibTeX, RIS and EndNote files and formats the reference list for you. The result remains editable without rebuilding citations by hand.",
-        "Every poster starts at a real print size, so what you see on screen is what the print shop actually produces at full scale. Read-only share links let advisors and co-authors comment from a phone."
+        "Every poster starts at a real print size, so what you see on screen is what the print shop actually produces at full scale."
       ]
     },
     "/why-posters": {

@@ -21,6 +21,7 @@
 import { useMemo, type CSSProperties, type JSX } from 'react';
 import { createPortal } from 'react-dom';
 import type { SelectionInfo } from './RichTextEditor';
+import { SHARING_ENABLED } from '@/config/features';
 
 /**
  * Wrap the current selection in a `<span style="font-size: 1.06em">`
@@ -372,25 +373,30 @@ export function FormatToolbarButtons({
           Clear
         </button>
 
-        <div style={divider} />
+        {/* Comments are deactivated with sharing (config/features.ts). */}
+        {SHARING_ENABLED && (
+          <>
+            <div style={divider} />
 
-        <button
-          type="button"
-          title="Comment on selection"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            startCommentOnSelection();
-          }}
-          style={{
-            ...btnBase,
-            width: 40,
-            fontSize: 11,
-            fontWeight: 700,
-            color: '#b8a9ff',
-          }}
-        >
-          💬
-        </button>
+            <button
+              type="button"
+              title="Comment on selection"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                startCommentOnSelection();
+              }}
+              style={{
+                ...btnBase,
+                width: 40,
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#b8a9ff',
+              }}
+            >
+              💬
+            </button>
+          </>
+        )}
     </>
   );
 }
