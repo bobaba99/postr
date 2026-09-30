@@ -899,7 +899,16 @@ which owns `lib/mutants.mjs`:
   should start. A sidebar step does open a sidebar the user collapsed: a
   tab in a closed sidebar shows nothing.
 
-**Owner decisions asked after the review** (section 9; 2026-09-29):
+**Owner decisions asked after the review** (section 9; 2026-09-29). The
+owner answered on 2026-09-30, with the goal of an editor that adapts to every
+screen size and feels smooth: the controls are to stay one size on screen at
+every zoom (plan item 19, the gutter stays 64 px); toolbar buttons show a
+ring only after Tab (item 20); the guidelines panel closes when the poster
+area is too narrow (item 21); the template dropdown's keys (below) are item 22;
+and Playwright's Firefox and WebKit engines are installed. Later the same day
+the owner parked items 21 and 22 on the Later list, kept 19 and 20, and had
+the remaining items re-ranked by their effect on a first visitor
+(`docs/stress-test/PLAN.md`). The questions as asked:
 - **The 64 px gutter and the block controls.** The ZoomBar covers the rotate
   control of a block flush with the sheet's bottom edge near its centre; at
   large fitted zooms the move control of a narrow image at the left edge
