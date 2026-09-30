@@ -552,6 +552,13 @@ Results:
 | `02-poster-size.resize.mutants.json` (causes B–D) | 309/309 | 89/89 killed; 2 documented equivalents (`focus-before-mount`; `half-turn-as-turned`, which differs by at most 0.01 units over 168 flush 180° moves) |
 | `01-sidebar-undo-history.mutants.json` (fix 01, re-run on the new code) | 112/112 | 33/33 killed; no blind spots left |
 
+*2026-09-29:* fix 03 rewrote the fit computation (74ef5c3) and left three
+of the sheet spec's mutants (`zoom-fit-from-preset`, `zoom-args-swapped`,
+`zoom-deps-dropped`) on removed code, so the whole spec stopped at "bad
+spec" until they were ported. Re-run after the port: control 102/102, 36/36
+killed, the same 2 blind spots (MEASURED). `scripts/__tests__/mutantSpecs.test.mjs`
+now fails the suite when a committed spec no longer applies.
+
 The three equivalents in the sheet and row specs are second guards behind
 the store repair: the editor's own size check, the preview label's, and
 autosave's. Once the store repairs every document and the fields accept only
