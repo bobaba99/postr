@@ -32,10 +32,21 @@ export interface SetPosterOptions {
    * the poster's current size when a version is restored.
    */
   sizeFallback?: { widthIn?: unknown; heightIn?: unknown };
+  /**
+   * The user who owns the poster, as the editor checked when it opened it.
+   * Images put into the poster go into this user's storage folder, not the
+   * folder of whoever the session names at that moment (another account's
+   * sign-in in another tab replaces the session before this tab hears of
+   * it; docs/fixes/23-new-poster-owner-only.md). A version of the same
+   * poster restored keeps it; another poster loaded without one clears it.
+   */
+  ownerId?: string;
 }
 
 export interface PosterStoreState {
   posterId: string | null;
+  /** The poster's owner, when the editor opened it (SetPosterOptions.ownerId). */
+  posterOwnerId: string | null;
   posterTitle: string;
   doc: PosterDoc | null;
 
@@ -285,6 +296,7 @@ function isKeystrokePatch(patch: Partial<Block>): boolean {
 
 export const usePosterStore = create<PosterStoreState>((set) => ({
   posterId: null,
+  posterOwnerId: null,
   posterTitle: '',
   doc: null,
   canUndo: false,
@@ -318,13 +330,14 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
     const sized = withUsableSheetSize(doc, options.sizeFallback);
     const seeded = options.seedAcknowledgement ? ensureAckBlock(sized) : sized;
     lockedBaseline = seeded.blocks.filter((b) => b.locked === true);
-    set({
+    set((state) => ({
       posterId,
+      posterOwnerId: options.ownerId ?? (state.posterId === posterId ? state.posterOwnerId : null),
       doc: seeded,
       posterTitle: title ?? '',
       canUndo: false,
       canRedo: false,
-    });
+    }));
   },
 
   setPosterTitle: (posterTitle) => set({ posterTitle }),

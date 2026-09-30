@@ -50,11 +50,28 @@ export async function exportPostr(
   doc: PosterDoc,
   options: ExportPostrOptions = {},
 ): Promise<Blob> {
+  return (await exportPostrWithReport(doc, options)).blob;
+}
+
+/** A `.postr` file, and how many of the poster's images it could not include. */
+export interface PostrExport {
+  blob: Blob;
+  missingImages: number;
+}
+
+/**
+ * `exportPostr`, also counting the images it left out because their bytes
+ * could not be fetched (packBlock drops those rather than keep a path
+ * with nothing behind it).
+ */
+export async function exportPostrWithReport(
+  doc: PosterDoc,
+  options: ExportPostrOptions = {},
+): Promise<PostrExport> {
   const files: Record<string, Uint8Array> = {};
-  const exportedDoc: PosterDoc = {
-    ...doc,
-    blocks: await Promise.all(doc.blocks.map((b) => packBlock(b, files))),
-  };
+  const packed = await Promise.all(doc.blocks.map((b) => packBlock(b, files)));
+  const missingImages = packed.filter((b, i) => !b.imageSrc && !!doc.blocks[i]!.imageSrc).length;
+  const exportedDoc: PosterDoc = { ...doc, blocks: packed };
 
   const docJson = canonicalJson(exportedDoc);
   const hash = await sha256Hex(docJson);
@@ -80,7 +97,19 @@ export async function exportPostr(
   // Slice into a fresh ArrayBuffer so the Blob constructor accepts it
   // regardless of whether the zip output sits on a SharedArrayBuffer.
   const buf = zipped.buffer.slice(zipped.byteOffset, zipped.byteOffset + zipped.byteLength);
-  return new Blob([buf as ArrayBuffer], { type: 'application/zip' });
+  return { blob: new Blob([buf as ArrayBuffer], { type: 'application/zip' }), missingImages };
+}
+
+/** Save a `.postr` file, named after the poster's title, to the user's computer. */
+export function savePostr(blob: Blob, title: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(title || 'poster').replace(/[^a-z0-9-_]/gi, '_')}.postr`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /**

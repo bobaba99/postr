@@ -95,8 +95,11 @@ describe('audited public-page outline and contrast', () => {
 
   it('gives every poster-editor state a level-one heading', () => {
     const editor = sourceOf('pages/Editor.tsx');
+    // loading, not found, error, and the editor; a poster closed by a change
+    // of account (fix 23) shows its own page, with its own heading
     expect(editor.match(/<h1\b/g)).toHaveLength(4);
-    expect(editor).toContain('editorMeta(posterTitle, posterId)');
+    expect(sourceOf('components/PosterClosedPage.tsx').match(/<h1\b/g)).toHaveLength(1);
+    expect(editor).toContain("editorMeta(status.kind === 'ready' ? posterTitle : null, posterId)");
   });
 
   it.each([

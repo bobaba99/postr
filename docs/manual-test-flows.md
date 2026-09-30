@@ -9,7 +9,8 @@ Walk-through checklist for the **admin surfaces** (payment, sign-up, delete acco
 > - `/paper-to-poster`, `/paper-to-slides`, `/presentation-checker`, `/manuscript-to-poster`, `/paper-to-present`, `/paper-to-presentation`, `/chart-chooser`, `/plot-picker` → all land on the landing page (`/`); no header/footer/landing/dashboard link to any of them; `X-Robots-Tag: noindex` on the four canonical paths; none in `/sitemap-static.xml`.
 > - **No standalone tools anywhere in the nav.** Header (flat row and the phone menu) = Editor / My posters · Pricing · Why posters · About; footer Product column = Home · Pricing; the landing page has no "Tools you can use on their own" section. The chart ladder is still live **inside the editor** (Figure tab → Make mode → "Insert selected figures") — test it there, not at a URL.
 > - `/auth?plan=review_pack` and `/auth?plan=review_addon` → the plain auth page (no paid-intent banner). The **review-SKU checkout scenarios are dormant**: `POST /billing/create-checkout {sku:'review_pack'|'review_addon'}` returns `400 invalid_sku` while `FEATURE_REVIEW` is unset, regardless of the Stripe price env.
-> - Editor sidebar rail: layout · style · authors · insert · edit block · references · figure · issues · comments · versions · export — **no "review" tab**. Dashboard: no "Import manuscript" link under "+ New poster". `/pricing`: no "Paper-to-talk is next" / "Join the waitlist" card.
+> - Editor sidebar rail: layout · style · authors · insert · edit block · references · figure · issues · versions · export — **no "review" tab, and no "comments" tab since 2026-09-30** (below). Dashboard: no "Import manuscript" link under "+ New poster". `/pricing`: no "Paper-to-talk is next" / "Join the waitlist" card.
+> - **Sharing and comments, deactivated 2026-09-30** (fix 23; `SHARING_ENABLED` in `apps/web/src/config/features.ts`): `/s/<slug>` lands on `/`; the editor offers no way into comments — no comments tab, and no "Comment on selection" (💬) in the text toolbar when you select text — so no "Copy share link" and no comment mode. The editor opens only your own posters: `/p/<another user's poster id>` shows "Poster not found", and signing out or in to another account (here or in another tab) while a poster is open closes it: a guest's poster says the guest session has ended, an account's says "This poster is in another account"; both offer "Download a copy" and My posters, and Sign in only for an account's poster while a guest or no one is signed in.
 > - **⚠ Pre-deploy DB check (needs the Supabase + Stripe dashboards):** before this ships, query prod for `users` rows with `review_credits > 0` or `review_addon = true` (they lose the UI to spend what they bought — refund manually via Stripe per `billing.ts` D8 and tell them) and for rows in `talk_waitlist` (they are expecting a launch email). Archive the review products/prices in Stripe; leave `STRIPE_PRICE_REVIEW_PACK` / `STRIPE_PRICE_REVIEW_ADDON` / `FEATURE_MANUSCRIPT` / `FEATURE_REVIEW` unset in Render. Existing add-on subscriptions keep reconciling through the webhook (fulfilment is not gated).
 
 ---
@@ -288,20 +289,24 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 ## 9. AuthGuard gate + session lifecycle
 
 - **Set up:** Signed-out browser.
-- [ ] Hit `/dashboard`, `/p/:id`, `/profile`, `/admin/gallery` → pulsing **"Loading…"** → redirect to `/auth`.
+- [ ] Hit `/dashboard`, `/profile`, `/admin/gallery` → pulsing **"Loading…"** → redirect to `/auth`.
+- [ ] Hit `/p/:id` → **no** redirect to `/auth`. The editor route is guarded by `EnsureSession`, not AuthGuard (`apps/web/src/routes.tsx`): pulsing **"Preparing your editor…"**, then a new guest session and the editor. This predates fix 23 (commit e6a932a, 2026-07-29). Since fix 23 the editor opens only your own posters, so another user's poster id shows "Poster not found".
 - [ ] Signed-in → page renders after brief "Loading…".
-- [ ] Sign out on a guarded page → bounced to `/auth`.
+- [ ] Sign out on a guarded page → bounced to `/auth`. (Not on `/p/:id`: there the poster closes, see §10.)
 - **⚠ Findings to note:**
   - [ ] AuthGuard uses **plain `getSession()`, no self-heal** — a stale/invalid cached JWT **passes** and renders children (the stale token only surfaces on the first real API call). Contradicts feature-graph §7's claim that `ensureSession` heals the guard. **Code wins — flag the doc.**
   - [ ] `getSession()` has **no `.catch`/timeout** — a network failure can strand the user on "Loading…" forever.
 
-## 10. Session-expired modal (global self-heal is warn-only)
+## 10. Session lost in the editor (the poster closes; the session-expired modal never appears)
 
 - **Set up:** Signed-in, editor open; revoke the refresh token (or let it expire).
-- [ ] On `SIGNED_OUT` with a prior session → full-screen 🔒 **"Your session has expired"** modal, body warns unsaved edits since expiry were **not** saved.
-- [ ] "Reload and sign in again" → full page load to `/auth`. "Dismiss (save text first)" → keeps editor open but **session stays dead** (autosaves keep 401ing silently).
+- [ ] **Expected since fix 23:** on `SIGNED_OUT`, `EnsureSession` gives the tab a new guest session at once, and the editor closes the poster to the account-changed page. The editor does **not** stay open on a dead session.
+  - An account's poster: **"This poster is in another account"**, with "Download a copy", "Sign in" (offered because a guest is now signed in) and "My posters".
+  - A guest's poster: **"This guest poster was closed"**, with "Download a copy" and "My posters", no "Sign in".
+  - Evidence: TESTED by `EditorOwnership.test.tsx`, 'a lost session replaced by a new guest closes it' (it passed in the fix 23 docs audit, S9D-7). Record 23 §9, "G3's rerun on the fix", row a2 ('refresh fails in the editor's tab'): closed, the same page, 3 of 3 (MEASURED by the lead with G3's script; not re-run for this doc).
+- [ ] The 🔒 **"Your session has expired"** modal currently **never appears**. Its callback reads a stale `hadSession` (`SessionExpiredModal.tsx:52`, INSPECTED); record 23 §5, G3: 0 of 5 sign-out runs showed it, on main before the fix (fix 23 did not change `SessionExpiredModal.tsx`). This is pre-existing and on the Later list (record 23 §10). Its buttons, "Reload and sign in again" and "Dismiss (save text first)", cannot be reached until it is fixed. If the modal does appear, note it.
 - **Edge:** fresh unauthenticated load does NOT show the modal (no false positive).
-- **Note:** this modal does NOT re-auth or preserve edits — warn-only.
+- **Note:** the modal, once it works, does NOT re-auth or preserve edits — warn-only. "Download a copy" on the closed page saves the version that was in memory.
 
 ---
 

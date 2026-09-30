@@ -24,13 +24,16 @@ vi.mock('@/hooks/useLeaveGuard', () => ({
 const row = vi.hoisted(() => ({ data: {} as Record<string, unknown>, width_in: 48 as unknown, height_in: 36 as unknown }));
 vi.mock('@/data/posters', async (orig) => ({
   ...(await orig<typeof import('@/data/posters')>()),
-  loadPoster: vi.fn(async (id: string) => ({ id, title: 'Lab meeting draft v3', width_in: row.width_in, height_in: row.height_in, data: row.data })),
+  // The poster is the signed-in user's own (the editor opens nothing else,
+  // fix 23; the session is mocked in beforeEach).
+  loadPoster: vi.fn(async (id: string) => ({ id, user_id: 'owner', title: 'Lab meeting draft v3', width_in: row.width_in, height_in: row.height_in, data: row.data })),
   loadPosterBySlug: vi.fn(async () => ({ id: 'p1', title: 'Lab meeting draft v3', width_in: row.width_in, height_in: row.height_in, data: row.data })),
 }));
 
 import Editor from '../Editor';
 import Share from '../Share';
 import { usePosterStore } from '@/stores/posterStore';
+import { supabase } from '@/lib/supabase';
 
 function storedDoc(size: Record<string, unknown>) {
   return {
@@ -69,6 +72,11 @@ async function open(size: Record<string, unknown>, columns: [unknown, unknown] =
 
 beforeEach(() => {
   usePosterStore.setState({ posterId: null, doc: null });
+  // Signed in as the poster's owner.
+  const session = { user: { id: 'owner' } } as never;
+  vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({ data: { session }, error: null } as never);
+  vi.spyOn(supabase.auth, 'getUser').mockResolvedValue({ data: { user: { id: 'owner' } }, error: null } as never);
+  vi.spyOn(supabase.auth, 'onAuthStateChange').mockReturnValue({ data: { subscription: { unsubscribe: () => {} } } } as never);
 });
 
 describe('opening a poster repairs an unusable saved size', () => {

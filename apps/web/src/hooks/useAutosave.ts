@@ -144,13 +144,28 @@ export function useAutosave(
   // path can force one and the dashboard still gets a fresh thumbnail.
   const lastCaptureRef = useRef(0);
   const captureDirtyRef = useRef(false);
+  // The user this editor was opened for. The editor opens only the signed-in
+  // user's own poster, so that is its owner. A capture uploads into the
+  // signed-in user's storage folder, so one that runs after the user changed
+  // (a sign-in to another account in another tab, then the save's idle-time
+  // capture, or the final capture as the editor closes) would put this
+  // poster's image in the other account's folder (fix 23, gap G3).
+  // Read from the session the client holds, not over the network: one
+  // failed lookup would otherwise turn thumbnails off for the session
+  // (fix 23, CRa-5).
+  const openedForRef = useRef<Promise<string | null> | null>(null);
+  useEffect(() => {
+    openedForRef.current = supabase.auth.getSession().then(({ data }) => data?.session?.user?.id ?? null);
+  }, []);
 
   const runThumbnailCapture = (id: string) => {
     lastCaptureRef.current = Date.now();
     captureDirtyRef.current = false;
-    void supabase.auth.getUser().then(({ data: userData }) => {
+    const openedFor = openedForRef.current;
+    if (!openedFor) return;
+    void Promise.all([openedFor, supabase.auth.getUser()]).then(([owner, { data: userData }]) => {
       const uid = userData?.user?.id;
-      if (!uid) return;
+      if (!uid || uid !== owner) return;
       return captureThumbnail(uid, id).then((path) => {
         if (path) void upsertPoster(id, { thumbnailPath: path });
       });

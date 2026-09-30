@@ -28,7 +28,7 @@
  *                         creates a guest session instead of bouncing to /auth)
  *   /profile            → Profile (auth-gated)
  *   /admin/gallery      → Admin gallery moderation (admin-gated, code-split)
- *   /s/:slug            → Share (public read-only)
+ *   /s/:slug            → redirect to / (sharing deactivated, config/features.ts)
  *   /debug              → Diagnostics (development builds only)
  *   *                   → 404
  *
@@ -194,6 +194,7 @@
  */
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router';
+import { SHARING_ENABLED } from '@/config/features';
 import { AuthGuard } from '@/components/AuthGuard';
 import { EnsureSession } from '@/components/EnsureSession';
 import { EditorErrorBoundary } from '@/components/EditorErrorBoundary';
@@ -288,7 +289,9 @@ export function AppRoutes() {
         {/* Stripe checkout redirect landings (apps/api billingUrl()). */}
         <Route path="/billing/success" element={<BillingResult outcome="success" />} />
         <Route path="/billing/cancel" element={<BillingResult outcome="cancel" />} />
-        <Route path="/s/:slug" element={<Share />} />
+        {/* Share links are deactivated with comments — see
+            SHARING_ENABLED in config/features.ts. */}
+        <Route path="/s/:slug" element={SHARING_ENABLED ? <Share /> : <Navigate to="/" replace />} />
 
         {/* Protected routes */}
         <Route path="/dashboard" element={<AuthGuard><Home /></AuthGuard>} />

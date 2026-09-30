@@ -8,7 +8,6 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { flushSync } from 'react-dom';
-import { supabase } from '@/lib/supabase';
 import type { CommentAnchor } from '@/data/comments';
 import { useNavigate, useSearchParams } from 'react-router';
 import { duplicatePoster, type PosterRow } from '@/data/posters';
@@ -28,7 +27,7 @@ import { nanoid } from 'nanoid';
 import { breakUndoCoalescing } from '@/stores/posterStore';
 import { usePosterStore } from '@/stores/posterStore';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
-import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
+import { GALLERY_PUBLIC_ENABLED, SHARING_ENABLED } from '@/config/features';
 import { useAutosave } from '@/hooks/useAutosave';
 import { mediaQueryMatches, useIsSmallScreen } from '@/hooks/useIsSmallScreen';
 import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
@@ -643,13 +642,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   const setPoster = usePosterStore((s) => s.setPoster);
   const posterId = usePosterStore((s) => s.posterId);
 
-  // Current user ID — needed for Storage uploads (image blocks).
-  const [userId, setUserId] = useState<string | null>(null);
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user?.id) setUserId(data.user.id);
-    });
-  }, []);
+  // Whose storage folder image blocks upload into: the poster's owner, as
+  // the editor checked it when it opened the poster. The session's user can
+  // already be another account signed in from another tab (fix 23, step 9
+  // round 2). With no owner recorded, an image is kept in the poster itself.
+  const userId = usePosterStore((s) => s.posterOwnerId);
 
   // Local UI state — selection, grid, sort, citation style, presets.
   // (Style/font/palette/etc live in the doc itself, persisted via store.)
@@ -781,6 +778,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // canvas into "drag a rectangle" mode. The drag overlay (rendered
   // inside #poster-canvas) emits `postr:comment-area` on mouseup.
   useEffect(() => {
+    // Comments are deactivated with sharing (config/features.ts).
+    if (!SHARING_ENABLED) return undefined;
     function startArea() {
       setAreaCommentMode(true);
     }
@@ -811,6 +810,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // it into a CommentAnchor and flip the sidebar to the comments tab so
   // the user sees the draft form.
   useEffect(() => {
+    // Comments are deactivated with sharing (config/features.ts).
+    if (!SHARING_ENABLED) return undefined;
     function handle(e: Event) {
       const detail = (e as CustomEvent).detail as {
         blockId: string;

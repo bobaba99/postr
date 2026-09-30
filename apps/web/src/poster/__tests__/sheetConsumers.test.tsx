@@ -2,8 +2,8 @@
  * Fix 02, cause A — every part of the editor that draws or measures the
  * sheet uses the poster's own size. sheetSize.test.tsx covers the canvas,
  * menu, templates, Auto-Arrange, placement, ISSUES and zoom; this file covers
- * the rest: the preview's sheet, the grid, the frame, the drag guides' centre
- * and area comments. Each test uses a 30×40 poster, so a 48×36 sheet at any
+ * the rest: the preview's sheet, the grid, the frame and the drag guides'
+ * centre (area comments: areaCommentSheet.test.tsx). Each test uses a 30×40 poster, so a 48×36 sheet at any
  * one of these sites shows up as a wrong number.
  *
  * jsdom has no PointerEvent and no setPointerCapture; both are polyfilled
@@ -112,35 +112,6 @@ describe('A — the rest of the editor uses the poster\'s own sheet (30×40 = 30
       .map((l) => [l.getAttribute('x1'), l.getAttribute('y1'), l.getAttribute('x2'), l.getAttribute('y2')].join(','));
     fireEvent.pointerUp(window, { clientX: 180, clientY: 300, pointerId: 1 });
     expect(accents, 'bright guide lines while dragging').toContain('150,0,150,400');
-  });
-
-  it('an area comment dragged over the sheet is stored in the poster\'s inches', async () => {
-    load(makeDoc(30, 40));
-    renderEditor();
-    openTab(/comment/i);
-    await nextTask();
-    await click(q('button[aria-pressed]'), 'area comment mode');
-    const overlay = q<HTMLElement>('[data-postr-overlay="area-comment"]');
-    expect(overlay, 'the area-comment overlay').not.toBeNull();
-    // What a browser reports for the overlay: the whole 300×400 sheet at zoom 1.
-    const real = Element.prototype.getBoundingClientRect;
-    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
-      if (this.getAttribute('data-postr-overlay') === 'area-comment') {
-        return { width: 300, height: 400, top: 0, left: 0, right: 300, bottom: 400, x: 0, y: 0, toJSON() {} } as DOMRect;
-      }
-      return real.call(this);
-    });
-    const rects: number[][] = [];
-    const onArea = (e: Event) => rects.push((e as CustomEvent<{ rect: number[] }>).detail.rect);
-    window.addEventListener('postr:comment-area', onArea);
-    fireEvent.pointerDown(overlay, { clientX: 30, clientY: 40, button: 0, pointerId: 1 });
-    fireEvent.pointerMove(overlay, { clientX: 150, clientY: 200, pointerId: 1 });
-    await nextTask();
-    fireEvent.pointerUp(overlay, { clientX: 150, clientY: 200, pointerId: 1 });
-    await nextTask();
-    window.removeEventListener('postr:comment-area', onArea);
-    // Dragged from (30,40) to (150,200) units on a 300×400 sheet: 3 in, 4 in, 12 in wide, 16 in tall.
-    expect(rects.map((r) => r.map((v) => +v.toFixed(3)))).toEqual([[3, 4, 12, 16]]);
   });
 });
 

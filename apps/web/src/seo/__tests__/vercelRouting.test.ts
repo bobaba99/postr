@@ -241,9 +241,11 @@ describe('vercel.json rewrites', () => {
     expect(rewriteMatching('/auth')).toBeUndefined();
   });
 
-  it('sends /s/:slug to the share edge shell', () => {
+  it('serves the app shell at /s/:slug, whose route sends it home (sharing is hidden, fix 23)', () => {
+    // Sharing is deactivated (owner decision 2026-09-30, features.ts). The
+    // share edge shell stays in the repo but no request reaches it.
     const match = rewriteMatching('/s/some-slug');
-    expect(match?.destination).toBe('/api/shell/share');
+    expect(match?.destination).toBe('/');
   });
 
   it('does not rewrite alias slugs (they must redirect, not render)', () => {

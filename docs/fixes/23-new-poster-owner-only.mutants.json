@@ -1,0 +1,560 @@
+{
+  "tests": [
+    "src/pages/__tests__/EditorOwnership.test.tsx",
+    "src/data/__tests__/posters.test.ts",
+    "src/hooks/__tests__/useAutosaveOwner.test.ts",
+    "src/__tests__/routes.test.tsx",
+    "src/seo/__tests__/vercelRouting.test.ts",
+    "src/poster/__tests__/sharingHidden.test.tsx",
+    "src/poster/__tests__/uploadOwner.test.tsx",
+    "src/import/__tests__/postrFile.test.ts"
+  ],
+  "mutants": {
+    "no-owner-filter": {
+      "undoes": "A — /p/new asks for the signed-in user's own posters only",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "    .select('*')\n    .eq('user_id', user.id)\n    .order('updated_at', { ascending: false })",
+          "    .select('*')\n    .order('updated_at', { ascending: false })"
+        ]
+      ]
+    },
+    "no-user-no-guard": {
+      "undoes": "A — with no signed-in user, /p/new sends no query",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  if (authError || !user) {\n    throw new Error(\n      `Cannot load the most recent poster — no active user: ${authError?.message ?? 'unknown'}`,\n    );\n  }\n",
+          ""
+        ]
+      ]
+    },
+    "recent-by-network-lookup": {
+      "undoes": "A — /p/new takes the user from the session the client holds, not a network lookup (step 9 review, CRa-4)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  } = await supabase.auth.getSession();\n  const user = session?.user;",
+          "  } = await supabase.auth.getUser().then(({ data, error }) => ({ data: { session: data.user ? { user: data.user } : null }, error }));\n  const user = session?.user;"
+        ]
+      ]
+    },
+    "no-owner-gate": {
+      "undoes": "B — the editor shows another user's poster as not found",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "        if (!userId || row.user_id !== userId) {",
+          "        if (!userId) {"
+        ]
+      ]
+    },
+    "user-change-not-followed": {
+      "undoes": "B — the editor loads again when the signed-in user changes",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "  }, [posterId, userId, setPoster, navigate]);",
+          "  }, [posterId, userId === undefined, setPoster, navigate]);"
+        ]
+      ]
+    },
+    "account-change-said-not-found": {
+      "undoes": "B — a poster closed by a change of account says it is in another account, without asking the database again",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "      if (opened.posterId === posterId || ownAddress) {\n        addressSetRef.current = null;\n        setStatus({ kind: 'account-changed', ownerWasGuest: guestsRef.current.get(opened.userId) === true });",
+          "      if (false) {\n        addressSetRef.current = null;\n        setStatus({ kind: 'account-changed', ownerWasGuest: guestsRef.current.get(opened.userId) === true });"
+        ]
+      ]
+    },
+    "tab-keeps-closed-poster-name": {
+      "undoes": "B — the browser tab is named after the poster only while it is open",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "  useDocumentMeta(editorMeta(status.kind === 'ready' ? posterTitle : null, posterId));",
+          "  useDocumentMeta(editorMeta(posterTitle, posterId));"
+        ]
+      ]
+    },
+    "reload-closes-open-editor": {
+      "undoes": "B — an open editor stays open while the user's next poster loads (step 9 review, CRa-2)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "      setStatus((s) => (s.kind === 'ready' ? s : { kind: 'loading' }));",
+          "      setStatus({ kind: 'loading' });"
+        ]
+      ]
+    },
+    "switch-keeps-old-poster": {
+      "undoes": "B — a change of account while the next poster loads closes the open one",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "      // The open poster is closed at once; it stays remembered, so going\n      // Back to it still says it is in another account.\n      setStatus({ kind: 'loading' });\n    } else {",
+          "    }\n    {"
+        ]
+      ]
+    },
+    "switch-forgets-closed-poster": {
+      "undoes": "B — after a change of account during a switch, the closed poster stays remembered, so Back to it says it is in another account (step 9 round 2, NEW-1)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "      // The open poster is closed at once; it stays remembered, so going\n      // Back to it still says it is in another account.\n      setStatus({ kind: 'loading' });",
+          "      openedRef.current = null;\n      setStatus({ kind: 'loading' });"
+        ]
+      ]
+    },
+    "address-change-reloads": {
+      "undoes": "B — the page's own change of address from /p/new to /p/<id> does not load the poster on screen again (step 9 round 2, NEW-2)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "    if (ownAddress && opened.userId === userId) {",
+          "    if (false) {"
+        ]
+      ]
+    },
+    "pending-address-opens-other-account": {
+      "undoes": "B — a sign-in to another account that lands while the address still says /p/new closes the poster instead of opening that account's (step 10, R3-1)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "      if (opened.posterId === posterId || ownAddress) {",
+          "      if (opened.posterId === posterId) {"
+        ]
+      ]
+    },
+    "migration-as-current-user": {
+      "undoes": "B — the image migration uploads only as the user the poster was opened for (step 10, G1)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "  if (sessionData?.session?.user?.id !== ownerId) return;\n",
+          ""
+        ]
+      ]
+    },
+    "guest-owner-said-other-account": {
+      "undoes": "B — a guest's poster closed by a change of account says the guest session ended (step 10, R1-2)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "ownerWasGuest: guestsRef.current.get(opened.userId) === true",
+          "ownerWasGuest: false"
+        ]
+      ]
+    },
+    "guest-flag-of-new-user": {
+      "undoes": "B — whether the owner was a guest is read from the owner, not from the user signed in now (step 10, R1-2)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "ownerWasGuest: guestsRef.current.get(opened.userId) === true",
+          "ownerWasGuest: guestsRef.current.get(userId ?? '') === true"
+        ]
+      ]
+    },
+    "sign-in-always-offered": {
+      "undoes": "B — \"Sign in\" is offered only when /auth shows its form (step 10, R1-1)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "canSignIn={!user || user.isGuest}",
+          "canSignIn={true}"
+        ]
+      ]
+    },
+    "sign-in-never-offered": {
+      "undoes": "B — \"Sign in\" is offered when a guest or no one is signed in now (step 10, R1-1)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "canSignIn={!user || user.isGuest}",
+          "canSignIn={false}"
+        ]
+      ]
+    },
+    "guest-offered-sign-in": {
+      "undoes": "B — a guest's closed poster offers no sign-in: a guest session cannot be signed in to again (step 10, R1-2)",
+      "edits": [
+        [
+          "src/components/PosterClosedPage.tsx",
+          "{canSignIn && !ownerWasGuest && (",
+          "{canSignIn && ("
+        ]
+      ]
+    },
+    "download-does-nothing": {
+      "undoes": "B — \"Download a copy\" saves the closed poster as a .postr file (step 10, R1-2)",
+      "edits": [
+        [
+          "src/components/PosterClosedPage.tsx",
+          "onClick={downloadCopy}",
+          "onClick={() => {}}"
+        ]
+      ]
+    },
+    "address-flag-kept-on-close": {
+      "undoes": "B — closing on a change of account forgets the page's own pending change of address, so a sign-back in that window opens the poster again (step 9 round 2, S9R2-6)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "        addressSetRef.current = null;\n        setStatus({ kind: 'account-changed'",
+          "        setStatus({ kind: 'account-changed'"
+        ]
+      ]
+    },
+    "owner-not-recorded": {
+      "undoes": "B — the editor records the poster's owner with the poster it opens (step 9 round 2, S9R2-2)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "{ seedAcknowledgement: true, ownerId: row.user_id }",
+          "{ seedAcknowledgement: true }"
+        ]
+      ]
+    },
+    "image-block-uploads-as-session": {
+      "undoes": "B — an image picked for an image block goes into the poster owner's folder (step 9 round 2, S9R2-2)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const userId = usePosterStore((s) => s.posterOwnerId);",
+          "  const userId = usePosterStore((s) => (s.posterOwnerId ? 'session-user' : null));"
+        ]
+      ]
+    },
+    "import-replace-as-session": {
+      "undoes": "B — a .postr imported over the open poster puts its images in the owner's folder (step 9 round 2, S9R2-2)",
+      "edits": [
+        [
+          "src/components/ImportPosterModal.tsx",
+          "      const userId = mode === 'replace' && targetPosterId === store.posterId && store.posterOwnerId",
+          "      const userId = false && targetPosterId === store.posterId && store.posterOwnerId"
+        ]
+      ]
+    },
+    "import-new-as-owner": {
+      "undoes": "B — a new poster imported goes into the signed-in user's folder (control for S9R2-2)",
+      "edits": [
+        [
+          "src/components/ImportPosterModal.tsx",
+          "      const userId = mode === 'replace' && targetPosterId === store.posterId && store.posterOwnerId",
+          "      const userId = store.posterOwnerId"
+        ]
+      ]
+    },
+    "owner-dropped-on-restore": {
+      "undoes": "B — a version of the same poster restored keeps its owner (step 9 round 2, S9R2-2)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      posterOwnerId: options.ownerId ?? (state.posterId === posterId ? state.posterOwnerId : null),",
+          "      posterOwnerId: options.ownerId ?? null,"
+        ]
+      ]
+    },
+    "owner-kept-for-other-poster": {
+      "undoes": "B — another poster loaded without an owner does not inherit the last one's",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      posterOwnerId: options.ownerId ?? (state.posterId === posterId ? state.posterOwnerId : null),",
+          "      posterOwnerId: options.ownerId ?? state.posterOwnerId,"
+        ]
+      ]
+    },
+    "copy-made-on-press": {
+      "undoes": "B — the closed poster's copy is made as the page opens, while its stored images can still be fetched (step 9 round 2, S9R2-1)",
+      "edits": [
+        [
+          "src/components/PosterClosedPage.tsx",
+          "    copy.current = made;\n",
+          "    void made;\n"
+        ]
+      ]
+    },
+    "missing-images-unreported": {
+      "undoes": "B — the copy says how many images it could not include (step 9 round 2, S9R2-1)",
+      "edits": [
+        [
+          "src/components/PosterClosedPage.tsx",
+          "      setDownload({ kind: 'done', missingImages: made.missingImages });",
+          "      setDownload({ kind: 'done', missingImages: 0 });"
+        ]
+      ]
+    },
+    "failed-copy-not-retried": {
+      "undoes": "B — a copy that could not be made is made again on the next press",
+      "edits": [
+        [
+          "src/components/PosterClosedPage.tsx",
+          "      const made = await (copy.current ?? makeCopy()).catch(() => makeCopy());",
+          "      const made = await (copy.current ?? makeCopy());"
+        ]
+      ]
+    },
+    "signed-urls-not-renewed": {
+      "undoes": "B — an open poster's stored images are signed again every 40 minutes, so the closed page's copy can fetch them (step 9 round 3, S9R3-1)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "      if (doc) void renewStorageUrls(doc.blocks.map((b) => b.imageSrc));\n",
+          ""
+        ]
+      ]
+    },
+    "focus-not-taken": {
+      "undoes": "B — the closed page's heading takes the focus (step 9 round 2, S9R2-8)",
+      "edits": [
+        [
+          "src/components/PosterClosedPage.tsx",
+          "    heading.current?.focus();\n",
+          ""
+        ]
+      ]
+    },
+    "blocks-without-images-counted": {
+      "undoes": "B — only an image the copy could not include is counted as missing (step 9 round 3, S9R3-3)",
+      "edits": [
+        [
+          "src/import/postrFile.ts",
+          "  const missingImages = packed.filter((b, i) => !b.imageSrc && !!doc.blocks[i]!.imageSrc).length;",
+          "  const missingImages = packed.filter((b) => !b.imageSrc).length;"
+        ]
+      ]
+    },
+    "duplicate-any-poster": {
+      "undoes": "B — duplicate copies only the user's own posters (owner decision)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  if (source.user_id !== user.id) {\n    throw new Error('Cannot duplicate poster — not found');\n  }",
+          ""
+        ]
+      ]
+    },
+    "thumbnail-as-current-user": {
+      "undoes": "B — the thumbnail uploads only as the user the editor was opened for",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (!uid || uid !== owner) return;",
+          "      if (!uid) return;"
+        ]
+      ]
+    },
+    "owner-by-network-lookup": {
+      "undoes": "B — the thumbnail's owner is read from the session the client holds (step 9 review, CRa-5)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "openedForRef.current = supabase.auth.getSession().then(({ data }) => data?.session?.user?.id ?? null);",
+          "openedForRef.current = supabase.auth.getUser().then(({ data }) => data?.user?.id ?? null);"
+        ]
+      ]
+    },
+    "sharing-on": {
+      "undoes": "C — sharing and comments are hidden (owner decision)",
+      "edits": [
+        [
+          "src/config/features.ts",
+          "export const SHARING_ENABLED = false;",
+          "export const SHARING_ENABLED = true;"
+        ]
+      ]
+    },
+    "toolbar-offers-comment": {
+      "undoes": "C — the text toolbar offers no \"Comment on selection\"",
+      "edits": [
+        [
+          "src/poster/FloatingFormatToolbar.tsx",
+          "        {SHARING_ENABLED && (\n          <>\n            <div style={divider} />",
+          "        {true && (\n          <>\n            <div style={divider} />"
+        ]
+      ]
+    },
+    "comment-text-followed": {
+      "undoes": "C — a request to comment on a selection is ignored",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    if (!SHARING_ENABLED) return undefined;\n    function handle(e: Event) {",
+          "    function handle(e: Event) {"
+        ]
+      ]
+    },
+    "comment-area-followed": {
+      "undoes": "C — a request to comment on an area is ignored",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    if (!SHARING_ENABLED) return undefined;\n    function startArea() {",
+          "    function startArea() {"
+        ]
+      ]
+    },
+    "panel-ungated": {
+      "undoes": "C — the sidebar renders the comments panel only with sharing on",
+      "expect": "survive",
+      "why": "defence in depth: with the rail tab, the /s/:slug route and both comment requests switched off, nothing sets the comments tab, so no test can reach the panel gate on its own",
+      "unguarded": "a second gate with no path of its own. Four paths reach the comments tab, and each is killed by one test: the rail tab (Sidebar.tsx:643; 'the sidebar offers no comments tab'), the /s/:slug route, which renders the read-only editor on the comments tab (routes.tsx:294; 'redirects /s/:slug to the landing page'), and comment-text-followed and comment-area-followed (in this spec; 1 of 156 each in fix23-r7-runs/mutants.log). The rail-tab and route mutants are not in this spec: MEASURED by the fix 23 claims audit, CA23-6, 1 of 156 each (scratch folder, fix23-audit/claims/runs/audit-panel-gates.log). No other code sets the tab to 'comments' (INSPECTED, grep)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        {SHARING_ENABLED && tab === 'comments' && (",
+          "        {tab === 'comments' && ("
+        ]
+      ]
+    },
+    "share-rewrite-to-shell": {
+      "undoes": "C — the server sends /s/:slug to the app shell, not the share edge shell",
+      "expect": "survive",
+      "why": "a blind spot of this tool, not of the tests: src/seo/__tests__/vercelRouting.test.ts reads vercel.json with fs, and this tool serves mutants through a Vite load hook, so that test never sees the mutant. No browser harness runs Vercel's rewrites (G7, record 23 section 10)",
+      "unguarded": "not unguarded code: production runs this rewrite on every /s/:slug request. It is guarded by vercelRouting.test.ts, which the load-hook tool cannot serve the mutant to. Falsified by hand (TESTED, 2026-09-30): with the old rewrite put back, vercelRouting.test.ts fails 1 of 50 ('serves the app shell at /s/:slug'); restored, 50 of 50. The fix 23 claims audit reproduced it with main's vercel.json: 1 of 50 red, 49 green (MEASURED, CA23-7). It is filed under 'unguarded' only because blind-spot-check.mjs accepts a blind spot with a browser check or an 'unguarded' reason and nothing else; Vercel's own routing is still never run (G7, record 23 section 10)",
+      "edits": [
+        [
+          "vercel.json",
+          "    { \"source\": \"/s/:slug\", \"destination\": \"/\" },",
+          "    { \"source\": \"/s/:slug\", \"destination\": \"/api/shell/share\" },"
+        ]
+      ]
+    },
+    "renewal-at-52-minutes": {
+      "undoes": "step 9 round 4, S9R4-3: the renewal comes before the 50-minute cache expires (at 52 minutes an account change between 50 and 52 leaves the image out)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "const RENEW_SIGNED_IMAGES_MS = 40 * 60 * 1000;",
+          "const RENEW_SIGNED_IMAGES_MS = 52 * 60 * 1000;"
+        ]
+      ]
+    },
+    "renewal-at-54-minutes": {
+      "undoes": "step 9 round 4, S9R4-3: the same, at 54 minutes",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "const RENEW_SIGNED_IMAGES_MS = 40 * 60 * 1000;",
+          "const RENEW_SIGNED_IMAGES_MS = 54 * 60 * 1000;"
+        ]
+      ]
+    },
+    "refused-renewal-drops-url": {
+      "undoes": "step 9 round 4, S9R4-3: a renewal the session cannot sign (another tab already signed in) keeps the URL signed for the owner",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "    if (!error && data) urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + CACHE_TTL_MS });",
+          "    if (!error && data) urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + CACHE_TTL_MS }); else urlCache.delete(path);"
+        ]
+      ]
+    },
+    "renewal-never-stops": {
+      "undoes": "step 9 round 4, S9R4-3: the renewal stops when the poster closes",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "    return () => clearInterval(id);",
+          "    return () => {};"
+        ]
+      ]
+    },
+    "renewal-reads-poster-as-opened": {
+      "undoes": "step 9 round 4, S9R4-3: each renewal reads the poster as it is then, so an image added later is renewed",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "    const id = setInterval(() => {\n      const doc = usePosterStore.getState().doc;",
+          "    const opened = usePosterStore.getState().doc;\n    const id = setInterval(() => {\n      const doc = opened;"
+        ]
+      ]
+    },
+    "renewal-expiry-in-seconds": {
+      "undoes": "step 9 round 5, SK5-1: a renewal caches its URL for the 50 minutes the cache allows (a seconds-for-milliseconds slip leaves 3.6 s)",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "if (!error && data) urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + CACHE_TTL_MS });",
+          "if (!error && data) urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + SIGNED_URL_TTL });"
+        ]
+      ]
+    },
+    "renewal-expiry-5-minutes": {
+      "undoes": "step 9 round 5, SK5-1: the same, with a 5-minute entry",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "if (!error && data) urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + CACHE_TTL_MS });",
+          "if (!error && data) urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + 5 * 60 * 1000 });"
+        ]
+      ]
+    },
+    "renewal-once": {
+      "undoes": "step 9 round 5, SK5-2: the renewal keeps running while the poster stays open",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "    const id = setInterval(() => {\n",
+          "    const id = setInterval(() => {\n      clearInterval(id);\n"
+        ]
+      ]
+    },
+    "renewal-only-if-images-at-open": {
+      "undoes": "step 9 round 5, SK5-3: the renewal runs even when the poster opened with no stored image",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "    if (status.kind !== 'ready') return undefined;",
+          "    if (status.kind !== 'ready' || !usePosterStore.getState().doc?.blocks.some((b) => !!b.imageSrc?.startsWith('storage://'))) return undefined;"
+        ]
+      ]
+    },
+    "renewal-stops-at-first-refusal": {
+      "undoes": "step 9 round 5, SK5-5: an image the session cannot sign does not stop the renewal of the others",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "  await Promise.all([...paths].map(async (path) => {\n    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_TTL);\n    if (!error && data) urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + CACHE_TTL_MS });\n  }));",
+          "  for (const path of paths) {\n    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_TTL);\n    if (error || !data) return;\n    urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + CACHE_TTL_MS });\n  }"
+        ]
+      ]
+    },
+    "renewal-at-51-minutes": {
+      "undoes": "step 9 round 5, SK5-4: the renewal comes before the 50-minute cache expires (at 51 minutes an account change between 50 and 51 leaves the image out)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "const RENEW_SIGNED_IMAGES_MS = 40 * 60 * 1000;",
+          "const RENEW_SIGNED_IMAGES_MS = 51 * 60 * 1000;"
+        ]
+      ]
+    },
+    "renewal-every-minute": {
+      "undoes": "step 9 round 5, SK5-6: the renewal signs every 40 minutes, not every minute (60 signing requests per image per hour)",
+      "edits": [
+        [
+          "src/pages/Editor.tsx",
+          "const RENEW_SIGNED_IMAGES_MS = 40 * 60 * 1000;",
+          "const RENEW_SIGNED_IMAGES_MS = 60 * 1000;"
+        ]
+      ]
+    },
+    "renewal-expiry-39-minutes": {
+      "undoes": "step 9 round 6, SK6-1: a renewal caches its URL for longer than the 40-minute period (39 minutes leaves the image out just before the second renewal)",
+      "edits": [
+        [
+          "src/data/posterImages.ts",
+          "if (!error && data) urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + CACHE_TTL_MS });",
+          "if (!error && data) urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + 39 * 60 * 1000 });"
+        ]
+      ]
+    }
+  }
+}

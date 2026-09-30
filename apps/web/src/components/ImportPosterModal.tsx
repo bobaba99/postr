@@ -168,7 +168,12 @@ export function ImportPosterModal({ open, mode, targetPosterId, onClose }: Props
 
     try {
       const { data: userData } = await supabase.auth.getUser();
-      const userId = userData.user?.id;
+      // Over the open poster, its images go into its owner's folder, not the
+      // folder of whoever the session names now (fix 23, step 9 round 2).
+      const store = usePosterStore.getState();
+      const userId = mode === 'replace' && targetPosterId === store.posterId && store.posterOwnerId
+        ? store.posterOwnerId
+        : userData.user?.id;
       if (!userId) {
         setError('Sign-in expired. Please refresh and try again.');
         setPhase('pick');

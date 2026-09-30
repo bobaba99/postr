@@ -122,13 +122,30 @@ export async function loadPosterBySlug(slug: string): Promise<PosterRow | null> 
 
 /**
  * Returns the most recently updated poster for the current user.
- * Used by the Editor route when the URL contains `/p/new` or any
- * other id we couldn't resolve.
+ * Used by the Editor route for `/p/new`.
+ *
+ * The explicit `user_id` filter matters, as in listPosters: the read policy
+ * also returns every shared (`is_public`) poster, so without it a visitor
+ * was opened into a stranger's shared poster (docs/fixes/23-new-poster-owner-only.md).
  */
 export async function loadMostRecentPoster(): Promise<PosterRow | null> {
+  // The session the client holds, not a round trip to the auth server: the
+  // editor has already opened on this session, and a lookup that failed for
+  // a moment left a returning user at a dead end (fix 23, CRa-4).
+  const {
+    data: { session },
+    error: authError,
+  } = await supabase.auth.getSession();
+  const user = session?.user;
+  if (authError || !user) {
+    throw new Error(
+      `Cannot load the most recent poster — no active user: ${authError?.message ?? 'unknown'}`,
+    );
+  }
   const { data, error } = await supabase
     .from('posters')
     .select('*')
+    .eq('user_id', user.id)
     .order('updated_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -304,12 +321,11 @@ export async function upsertPoster(id: string, update: PosterUpdate): Promise<Po
  * `share_slug = null` / `is_public = false` so duplicates are never
  * accidentally public.
  *
- * Always uses `auth.uid()` for the new row's `user_id` rather than
- * `source.user_id`. The `posters_insert_own` RLS policy enforces
- * `auth.uid() = user_id` WITH CHECK, so copying a public poster
- * owned by another user would otherwise fail with "new row violates
- * row-level security policy". With this rule the duplicate is always
- * the current user's, regardless of the source's owner.
+ * Only the user's own posters are copied (owner decision 2026-09-30,
+ * fix 23): the read policy also returns other users' shared posters, so a
+ * readable source is refused unless it is the user's. The new row's
+ * `user_id` is the current user's (`posters_insert_own` enforces
+ * `auth.uid() = user_id` WITH CHECK).
  */
 export async function duplicatePoster(id: string): Promise<PosterRow> {
   const source = await loadPoster(id);
@@ -325,6 +341,12 @@ export async function duplicatePoster(id: string): Promise<PosterRow> {
     throw new Error(
       `Cannot duplicate poster — no active user: ${authError?.message ?? 'unknown'}`,
     );
+  }
+  // Only the user's own posters are copied (owner decision 2026-09-30, fix
+  // 23). The read policy lets anyone read a shared poster, so a readable
+  // source is not necessarily the user's.
+  if (source.user_id !== user.id) {
+    throw new Error('Cannot duplicate poster — not found');
   }
 
   // The poster's own size: the source row's columns can be stale (they were
@@ -362,8 +384,8 @@ export async function duplicatePoster(id: string): Promise<PosterRow> {
   // edits the doc. Opening + closing a fresh duplicate would leave a
   // permanently blank card.
   //
-  // Failures here (cross-user RLS denial when forking a public
-  // poster, storage hiccup, etc.) are intentionally swallowed — the
+  // Failures here (a storage hiccup, a missing source file) are
+  // intentionally swallowed — the
   // duplicate is still usable and the thumbnail will be regenerated
   // on the next autosave.
   if (source.thumbnail_path) {

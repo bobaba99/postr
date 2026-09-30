@@ -2,13 +2,13 @@
  * Editor page — loads the poster row from Supabase, sets it in the
  * Zustand store, then mounts <PosterEditor />.
  *
- * Friction principle: if the URL contains "/p/new" or any id we
- * can't resolve, we silently fall back to the user's most recently
- * updated poster (handle_new_user already created an Untitled one
- * for every anonymous session). The user always lands on a real
- * editable canvas — never an error page.
+ * Friction principle: "/p/new" opens the user's most recently updated
+ * poster, or a new one, so a visitor always lands on an editable canvas.
+ * An explicit id opens only the signed-in user's own poster; any other
+ * id, including another user's shared poster, shows "Poster not found"
+ * (fix 23).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { loadOrCreateMostRecentPoster, loadPoster } from '@/data/posters';
 import { usePosterStore } from '@/stores/posterStore';
@@ -18,8 +18,10 @@ import { makeBlocks } from '@/poster/templates';
 import { DEFAULT_STYLES, PALETTES, withUsableSheetSize } from '@/poster/constants';
 import { useTwoTabGuard } from '@/hooks/useTwoTabGuard';
 import { useLeaveGuard } from '@/hooks/useLeaveGuard';
+import { useSignedInUser } from '@/hooks/useSignedInUser';
+import { PosterClosedPage } from '@/components/PosterClosedPage';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
-import { uploadBase64Image } from '@/data/posterImages';
+import { renewStorageUrls, uploadBase64Image } from '@/data/posterImages';
 import { supabase } from '@/lib/supabase';
 import { reportUiSignal } from '@/lib/diagnostics';
 import { editorMeta } from '@/seo/siteMeta';
@@ -103,15 +105,20 @@ function normalizeSheetSize(doc: PosterDoc, row: { width_in: unknown; height_in:
  * after poster load, fire-and-forget. Triggers a store update on
  * success so autosave persists the migrated paths.
  */
-async function migrateBase64ToStorage(posterId: string, doc: PosterDoc) {
+async function migrateBase64ToStorage(posterId: string, doc: PosterDoc, ownerId: string) {
   const base64Blocks = doc.blocks.filter(
     (b) => b.imageSrc && b.imageSrc.startsWith('data:'),
   );
   if (base64Blocks.length === 0) return;
 
-  const { data: userData } = await supabase.auth.getUser();
-  const userId = userData?.user?.id;
-  if (!userId) return;
+  // Into the folder of the user the poster was opened for, and only while
+  // that user is still signed in: asked when this ran, a sign-in to another
+  // account in the meantime put the owner's images in that account's folder
+  // (fix 23, step 10 critic G1). A write with another user's token into the
+  // owner's folder is refused by the storage policy anyway.
+  const { data: sessionData } = await supabase.auth.getSession();
+  if (sessionData?.session?.user?.id !== ownerId) return;
+  const userId = ownerId;
 
   let mutated = false;
   const nextBlocks = await Promise.all(
@@ -141,10 +148,17 @@ async function migrateBase64ToStorage(posterId: string, doc: PosterDoc) {
   }
 }
 
+/** How often an open poster's stored images are signed again (their URLs are cached for 50 minutes). */
+const RENEW_SIGNED_IMAGES_MS = 40 * 60 * 1000;
+
 type Status =
   | { kind: 'loading' }
   | { kind: 'ready' }
   | { kind: 'not-found' }
+  // The poster was open for the user signed in before, and the signed-in
+  // user changed (a sign-out, or a sign-in to another account, here or in
+  // another tab).
+  | { kind: 'account-changed'; ownerWasGuest: boolean }
   | { kind: 'error'; message: string };
 
 export default function Editor() {
@@ -153,13 +167,77 @@ export default function Editor() {
   const setPoster = usePosterStore((s) => s.setPoster);
   const posterTitle = usePosterStore((s) => s.posterTitle);
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
+  // Who is signed in. The page opens only that user's own posters, and loads
+  // again when the user changes (fix 23): the database also lets anyone read
+  // a shared poster, and a sign-in elsewhere must not leave another user's
+  // poster open under the new session.
+  const user = useSignedInUser();
+  const userId = user === undefined ? undefined : (user?.id ?? null);
+  // Whether each user signed in here was a guest, when last seen: a guest
+  // who signs up in place keeps the same id. The load below reads the
+  // owner's entry once the account has changed, renders after it was set.
+  const guestsRef = useRef<ReadonlyMap<string, boolean>>(new Map());
+  useEffect(() => {
+    if (user) guestsRef.current = new Map(guestsRef.current).set(user.id, user.isGuest);
+  }, [user]);
+  // The poster that is open, and the user it was opened for.
+  const openedRef = useRef<{ posterId: string; userId: string } | null>(null);
+  // The address the page moved itself to after /p/new opened a poster; it
+  // names the poster already on screen, so it is not loaded again.
+  const addressSetRef = useRef<string | null>(null);
+
+  // While the poster is open its stored images are signed again every 40
+  // minutes: signed URLs are cached for 50, and once the account changes the
+  // closed page's copy can fetch them only with a URL signed for the owner
+  // (step 9 round 3, S9R3-1: open over 50 minutes, the copy left them out).
+  useEffect(() => {
+    if (status.kind !== 'ready') return undefined;
+    const id = setInterval(() => {
+      const doc = usePosterStore.getState().doc;
+      if (doc) void renewStorageUrls(doc.blocks.map((b) => b.imageSrc));
+    }, RENEW_SIGNED_IMAGES_MS);
+    return () => clearInterval(id);
+  }, [status.kind]);
 
   // Noindex, and named after the poster so a user with several editor
-  // tabs open can tell them apart.
-  useDocumentMeta(editorMeta(posterTitle, posterId));
+  // tabs open can tell them apart; only while it is open, so a poster closed
+  // by a change of account, or a poster that is not the user's, leaves no
+  // name behind.
+  useDocumentMeta(editorMeta(status.kind === 'ready' ? posterTitle : null, posterId));
 
   useEffect(() => {
     let cancelled = false;
+    // Wait until the client has said who is signed in.
+    if (userId === undefined) return undefined;
+    // A change of user closes the poster that was open. It is not asked for
+    // again: the new user cannot read a private poster, so the database would
+    // only say it does not exist.
+    const opened = openedRef.current;
+    // The page's own change of address: the poster on screen, under its
+    // new address, or still under /p/new (the router applies the change
+    // after other updates, so a sign-in can land first).
+    const ownAddress =
+      !!opened && addressSetRef.current === opened.posterId &&
+      (posterId === opened.posterId || posterId === 'new');
+    if (posterId !== 'new') addressSetRef.current = null;
+    if (ownAddress && opened.userId === userId) {
+      // Loading it again would replace what was typed since it opened.
+      return undefined;
+    }
+    if (opened && opened.userId !== userId) {
+      if (opened.posterId === posterId || ownAddress) {
+        addressSetRef.current = null;
+        setStatus({ kind: 'account-changed', ownerWasGuest: guestsRef.current.get(opened.userId) === true });
+        return undefined;
+      }
+      // The open poster is closed at once; it stays remembered, so going
+      // Back to it still says it is in another account.
+      setStatus({ kind: 'loading' });
+    } else {
+      // An open editor stays open while the next poster loads (a copy
+      // opened from the editor), rather than flashing the loading screen.
+      setStatus((s) => (s.kind === 'ready' ? s : { kind: 'loading' }));
+    }
 
     (async () => {
       try {
@@ -181,6 +259,13 @@ export default function Editor() {
         }
 
         if (cancelled) return;
+        // Someone else's poster (a shared one is readable by anyone) is not
+        // found here: nothing of it is loaded, shown or migrated.
+        if (!userId || row.user_id !== userId) {
+          setStatus({ kind: 'not-found' });
+          return;
+        }
+        openedRef.current = { posterId: row.id, userId };
         // normalizeStaleStyles runs first so that docs saved before
         // the typography calibration fix (title:60, heading:28, etc.)
         // self-heal on load without needing a db reset.
@@ -196,9 +281,10 @@ export default function Editor() {
         // Share.tsx renders a poster exactly as stored, version restore
         // already keeps the mark via the lock guard, and importPostr
         // calls ensureAckBlock itself.
-        setPoster(row.id, hydrated, row.title, { seedAcknowledgement: true });
+        setPoster(row.id, hydrated, row.title, { seedAcknowledgement: true, ownerId: row.user_id });
         // Normalize the URL so refreshes land on the real id, not "/p/new"
         if (posterId !== row.id) {
+          addressSetRef.current = row.id;
           navigate(`/p/${row.id}`, { replace: true });
         }
         setStatus({ kind: 'ready' });
@@ -206,7 +292,7 @@ export default function Editor() {
         // Background migration: upload any base64 images to Storage.
         // Fire-and-forget — the poster renders immediately with base64,
         // then autosave picks up the storage:// paths on next change.
-        migrateBase64ToStorage(row.id, hydrated);
+        migrateBase64ToStorage(row.id, hydrated, userId);
       } catch (err: unknown) {
         if (cancelled) return;
         const message =
@@ -218,7 +304,7 @@ export default function Editor() {
     return () => {
       cancelled = true;
     };
-  }, [posterId, setPoster, navigate]);
+  }, [posterId, userId, setPoster, navigate]);
 
   if (status.kind === 'loading') {
     return (
@@ -233,7 +319,7 @@ export default function Editor() {
 
   if (status.kind === 'not-found') {
     return (
-      <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
+      <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] px-4 text-[#c8cad0]">
         <div className="max-w-md space-y-3 text-center">
           <h1 className="text-base font-medium">Poster not found</h1>
           <p className="text-xs text-[#888]">
@@ -248,6 +334,15 @@ export default function Editor() {
           </a>
         </div>
       </main>
+    );
+  }
+
+  if (status.kind === 'account-changed') {
+    return (
+      <PosterClosedPage
+        ownerWasGuest={status.ownerWasGuest}
+        canSignIn={!user || user.isGuest}
+      />
     );
   }
 
