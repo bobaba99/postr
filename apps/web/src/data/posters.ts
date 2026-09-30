@@ -321,12 +321,11 @@ export async function upsertPoster(id: string, update: PosterUpdate): Promise<Po
  * `share_slug = null` / `is_public = false` so duplicates are never
  * accidentally public.
  *
- * Always uses `auth.uid()` for the new row's `user_id` rather than
- * `source.user_id`. The `posters_insert_own` RLS policy enforces
- * `auth.uid() = user_id` WITH CHECK, so copying a public poster
- * owned by another user would otherwise fail with "new row violates
- * row-level security policy". With this rule the duplicate is always
- * the current user's, regardless of the source's owner.
+ * Only the user's own posters are copied (owner decision 2026-09-30,
+ * fix 23): the read policy also returns other users' shared posters, so a
+ * readable source is refused unless it is the user's. The new row's
+ * `user_id` is the current user's (`posters_insert_own` enforces
+ * `auth.uid() = user_id` WITH CHECK).
  */
 export async function duplicatePoster(id: string): Promise<PosterRow> {
   const source = await loadPoster(id);
@@ -342,6 +341,12 @@ export async function duplicatePoster(id: string): Promise<PosterRow> {
     throw new Error(
       `Cannot duplicate poster — no active user: ${authError?.message ?? 'unknown'}`,
     );
+  }
+  // Only the user's own posters are copied (owner decision 2026-09-30, fix
+  // 23). The read policy lets anyone read a shared poster, so a readable
+  // source is not necessarily the user's.
+  if (source.user_id !== user.id) {
+    throw new Error('Cannot duplicate poster — not found');
   }
 
   // The poster's own size: the source row's columns can be stale (they were
@@ -379,8 +384,8 @@ export async function duplicatePoster(id: string): Promise<PosterRow> {
   // edits the doc. Opening + closing a fresh duplicate would leave a
   // permanently blank card.
   //
-  // Failures here (cross-user RLS denial when forking a public
-  // poster, storage hiccup, etc.) are intentionally swallowed — the
+  // Failures here (a storage hiccup, a missing source file) are
+  // intentionally swallowed — the
   // duplicate is still usable and the thumbnail will be regenerated
   // on the next autosave.
   if (source.thumbnail_path) {

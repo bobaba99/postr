@@ -95,8 +95,9 @@ describe('audited public-page outline and contrast', () => {
 
   it('gives every poster-editor state a level-one heading', () => {
     const editor = sourceOf('pages/Editor.tsx');
-    expect(editor.match(/<h1\b/g)).toHaveLength(4);
-    expect(editor).toContain('editorMeta(posterTitle, posterId)');
+    // loading, not found, in another account (fix 23), error, and the editor
+    expect(editor.match(/<h1\b/g)).toHaveLength(5);
+    expect(editor).toContain("editorMeta(status.kind === 'ready' ? posterTitle : null, posterId)");
   });
 
   it.each([

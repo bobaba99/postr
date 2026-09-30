@@ -415,11 +415,20 @@ describe('listPosters', () => {
 // duplicatePoster
 // ---------------------------------------------------------------------------
 describe('duplicatePoster', () => {
-  it('loads the source row and inserts a copy owned by the CURRENT user', async () => {
-    // Source belongs to a different user (e.g. a public gallery
-    // poster) — duplicate must still succeed and own the new row.
+  it('refuses another user\'s poster, even one the database lets anyone read', async () => {
+    // Owner decision 2026-09-30 (fix 23): duplicate copies the user's OWN
+    // posters only. It used to copy any readable poster, and every shared
+    // poster is readable.
+    setResponses({ data: makeRow({ id: 'src', user_id: 'someone-else' }), error: null });
+
+    await expect(duplicatePoster('src')).rejects.toThrow();
+    expect(traces.flatMap((t) => t.ops).some((o) => o.method === 'insert')).toBe(false);
+    expect(storageCopyMock).not.toHaveBeenCalled();
+  });
+
+  it('loads the source row and inserts a copy owned by the current user', async () => {
     // No thumbnail on the source so the storage copy step is skipped.
-    const source = makeRow({ id: 'src', title: 'My Poster', user_id: 'someone-else' });
+    const source = makeRow({ id: 'src', title: 'My Poster', user_id: 'user-1' });
     const copy = makeRow({ id: 'dst', title: 'My Poster (copy)' });
     setResponses(
       { data: source, error: null }, // loadPoster

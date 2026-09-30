@@ -2,13 +2,13 @@
  * Editor page — loads the poster row from Supabase, sets it in the
  * Zustand store, then mounts <PosterEditor />.
  *
- * Friction principle: if the URL contains "/p/new" or any id we
- * can't resolve, we silently fall back to the user's most recently
- * updated poster (handle_new_user already created an Untitled one
- * for every anonymous session). The user always lands on a real
- * editable canvas — never an error page.
+ * Friction principle: "/p/new" opens the user's most recently updated
+ * poster, or a new one, so a visitor always lands on an editable canvas.
+ * An explicit id opens only the signed-in user's own poster; any other
+ * id, including another user's shared poster, shows "Poster not found"
+ * (fix 23).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { loadOrCreateMostRecentPoster, loadPoster } from '@/data/posters';
 import { usePosterStore } from '@/stores/posterStore';
@@ -18,6 +18,7 @@ import { makeBlocks } from '@/poster/templates';
 import { DEFAULT_STYLES, PALETTES, withUsableSheetSize } from '@/poster/constants';
 import { useTwoTabGuard } from '@/hooks/useTwoTabGuard';
 import { useLeaveGuard } from '@/hooks/useLeaveGuard';
+import { useSignedInUserId } from '@/hooks/useSignedInUserId';
 import type { PosterDoc, Styles, TypeStyle } from '@postr/shared';
 import { uploadBase64Image } from '@/data/posterImages';
 import { supabase } from '@/lib/supabase';
@@ -145,6 +146,10 @@ type Status =
   | { kind: 'loading' }
   | { kind: 'ready' }
   | { kind: 'not-found' }
+  // The poster was open for the user signed in before, and the signed-in
+  // user changed (a sign-out, or a sign-in to another account, here or in
+  // another tab).
+  | { kind: 'account-changed' }
   | { kind: 'error'; message: string };
 
 export default function Editor() {
@@ -153,13 +158,44 @@ export default function Editor() {
   const setPoster = usePosterStore((s) => s.setPoster);
   const posterTitle = usePosterStore((s) => s.posterTitle);
   const [status, setStatus] = useState<Status>({ kind: 'loading' });
+  // Who is signed in. The page opens only that user's own posters, and loads
+  // again when the user changes (fix 23): the database also lets anyone read
+  // a shared poster, and a sign-in elsewhere must not leave another user's
+  // poster open under the new session.
+  const userId = useSignedInUserId();
+  // The poster that is open, and the user it was opened for.
+  const openedRef = useRef<{ posterId: string; userId: string } | null>(null);
 
   // Noindex, and named after the poster so a user with several editor
-  // tabs open can tell them apart.
-  useDocumentMeta(editorMeta(posterTitle, posterId));
+  // tabs open can tell them apart; only while it is open, so a poster closed
+  // by a change of account, or a poster that is not the user's, leaves no
+  // name behind.
+  useDocumentMeta(editorMeta(status.kind === 'ready' ? posterTitle : null, posterId));
 
   useEffect(() => {
     let cancelled = false;
+    // Wait until the client has said who is signed in.
+    if (userId === undefined) return undefined;
+    // A change of user closes the poster that was open. It is not asked for
+    // again: the new user cannot read a private poster, so the database would
+    // only say it does not exist.
+    const opened = openedRef.current;
+    if (opened && opened.userId !== userId) {
+      if (opened.posterId === posterId) {
+        setStatus({ kind: 'account-changed' });
+        return undefined;
+      }
+      // The open poster is closed at once; it stays remembered, so going
+      // Back to it still says it is in another account.
+      setStatus({ kind: 'loading' });
+    } else {
+      // An open editor stays open while the next poster loads (/p/new's
+      // address becoming /p/<id>, or a copy opened from the editor), rather
+      // than flashing the loading screen. The load still replaces the
+      // poster when it lands (docs/fixes/23-new-poster-owner-only.md,
+      // section 10).
+      setStatus((s) => (s.kind === 'ready' ? s : { kind: 'loading' }));
+    }
 
     (async () => {
       try {
@@ -181,6 +217,13 @@ export default function Editor() {
         }
 
         if (cancelled) return;
+        // Someone else's poster (a shared one is readable by anyone) is not
+        // found here: nothing of it is loaded, shown or migrated.
+        if (!userId || row.user_id !== userId) {
+          setStatus({ kind: 'not-found' });
+          return;
+        }
+        openedRef.current = { posterId: row.id, userId };
         // normalizeStaleStyles runs first so that docs saved before
         // the typography calibration fix (title:60, heading:28, etc.)
         // self-heal on load without needing a db reset.
@@ -218,7 +261,7 @@ export default function Editor() {
     return () => {
       cancelled = true;
     };
-  }, [posterId, setPoster, navigate]);
+  }, [posterId, userId, setPoster, navigate]);
 
   if (status.kind === 'loading') {
     return (
@@ -246,6 +289,34 @@ export default function Editor() {
           >
             Back to Dashboard
           </a>
+        </div>
+      </main>
+    );
+  }
+
+  if (status.kind === 'account-changed') {
+    return (
+      <main className="flex h-screen w-screen items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
+        <div className="max-w-md space-y-3 text-center">
+          <h1 className="text-base font-medium">This poster is in another account</h1>
+          <p className="text-xs text-[#888]">
+            The account signed in here changed. Sign in to the account that owns
+            this poster to keep editing it.
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            <a
+              href="/auth"
+              className="inline-block rounded-md bg-[#2a2a3a] px-4 py-2 text-xs font-medium text-[#c8cad0] hover:bg-[#3a3a4a]"
+            >
+              Sign in
+            </a>
+            <a
+              href="/dashboard"
+              className="inline-block rounded-md bg-[#2a2a3a] px-4 py-2 text-xs font-medium text-[#c8cad0] hover:bg-[#3a3a4a]"
+            >
+              My posters
+            </a>
+          </div>
         </div>
       </main>
     );
