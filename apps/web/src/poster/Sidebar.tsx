@@ -2,8 +2,8 @@
  * Sidebar — the editor's tabbed control panel.
  *
  * Rail order (display labels): layout · style · authors · insert ·
- * edit block · references · figure · issues · comments · versions ·
- * export. The read-only share viewer shows comments only.
+ * edit block · references · figure · issues · versions · export. The
+ * comments panel needs SHARING_ENABLED (off, fix 23); readOnly shows only it.
  *
  * The `review` tab (poster/sidebar/ReviewTab.tsx — the Presentation
  * Checker's in-editor surface) is deactivated: its rail tuple and its

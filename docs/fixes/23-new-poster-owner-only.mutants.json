@@ -403,8 +403,8 @@
     "panel-ungated": {
       "undoes": "C — the sidebar renders the comments panel only with sharing on",
       "expect": "survive",
-      "why": "defence in depth: with the rail tab and both comment requests switched off, nothing sets the comments tab, so no test can reach the panel gate on its own",
-      "unguarded": "a second gate behind three that are each guarded (sharing-on, comment-text-followed, comment-area-followed); INSPECTED",
+      "why": "defence in depth: with the rail tab, the /s/:slug route and both comment requests switched off, nothing sets the comments tab, so no test can reach the panel gate on its own",
+      "unguarded": "a second gate with no path of its own. Four paths reach the comments tab, and each is killed by one test: the rail tab (Sidebar.tsx:643; 'the sidebar offers no comments tab'), the /s/:slug route, which renders the read-only editor on the comments tab (routes.tsx:294; 'redirects /s/:slug to the landing page'), and comment-text-followed and comment-area-followed (in this spec; 1 of 156 each in fix23-r7-runs/mutants.log). The rail-tab and route mutants are not in this spec: MEASURED by the fix 23 claims audit, CA23-6, 1 of 156 each (scratch folder, fix23-audit/claims/runs/audit-panel-gates.log). No other code sets the tab to 'comments' (INSPECTED, grep)",
       "edits": [
         [
           "src/poster/Sidebar.tsx",
@@ -416,8 +416,8 @@
     "share-rewrite-to-shell": {
       "undoes": "C — the server sends /s/:slug to the app shell, not the share edge shell",
       "expect": "survive",
-      "why": "vercel.json is read with fs by src/seo/__tests__/vercelRouting.test.ts, which this tool's load-hook mutants do not reach, and no browser harness runs Vercel's rewrites",
-      "unguarded": "TESTED by hand on 2026-09-30: with the old rewrite put back, vercelRouting.test.ts fails 1 of 50 ('serves the app shell at /s/:slug'); restored, 50 of 50",
+      "why": "a blind spot of this tool, not of the tests: src/seo/__tests__/vercelRouting.test.ts reads vercel.json with fs, and this tool serves mutants through a Vite load hook, so that test never sees the mutant. No browser harness runs Vercel's rewrites (G7, record 23 section 10)",
+      "unguarded": "not unguarded code: production runs this rewrite on every /s/:slug request. It is guarded by vercelRouting.test.ts, which the load-hook tool cannot serve the mutant to. Falsified by hand (TESTED, 2026-09-30): with the old rewrite put back, vercelRouting.test.ts fails 1 of 50 ('serves the app shell at /s/:slug'); restored, 50 of 50. The fix 23 claims audit reproduced it with main's vercel.json: 1 of 50 red, 49 green (MEASURED, CA23-7). It is filed under 'unguarded' only because blind-spot-check.mjs accepts a blind spot with a browser check or an 'unguarded' reason and nothing else; Vercel's own routing is still never run (G7, record 23 section 10)",
       "edits": [
         [
           "vercel.json",

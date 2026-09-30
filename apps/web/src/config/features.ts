@@ -46,5 +46,8 @@ export const GALLERY_PUBLIC_ENABLED = false;
  * move a comment to another poster, pgTAP tests for all of it; the
  * comments panel must take real ownership instead of `isOwner={true}`
  * (Sidebar.tsx); and sharing needs a way to stop sharing and a consent step.
+ * This list is a summary. The full list, with items left out here, is
+ * docs/fixes/23-new-poster-owner-only.md, section 10 ("Before sharing is
+ * turned back on").
  */
 export const SHARING_ENABLED = false;

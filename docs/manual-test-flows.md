@@ -289,20 +289,24 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 ## 9. AuthGuard gate + session lifecycle
 
 - **Set up:** Signed-out browser.
-- [ ] Hit `/dashboard`, `/p/:id`, `/profile`, `/admin/gallery` → pulsing **"Loading…"** → redirect to `/auth`.
+- [ ] Hit `/dashboard`, `/profile`, `/admin/gallery` → pulsing **"Loading…"** → redirect to `/auth`.
+- [ ] Hit `/p/:id` → **no** redirect to `/auth`. The editor route is guarded by `EnsureSession`, not AuthGuard (`apps/web/src/routes.tsx`): pulsing **"Preparing your editor…"**, then a new guest session and the editor. This predates fix 23 (commit e6a932a, 2026-07-29). Since fix 23 the editor opens only your own posters, so another user's poster id shows "Poster not found".
 - [ ] Signed-in → page renders after brief "Loading…".
-- [ ] Sign out on a guarded page → bounced to `/auth`.
+- [ ] Sign out on a guarded page → bounced to `/auth`. (Not on `/p/:id`: there the poster closes, see §10.)
 - **⚠ Findings to note:**
   - [ ] AuthGuard uses **plain `getSession()`, no self-heal** — a stale/invalid cached JWT **passes** and renders children (the stale token only surfaces on the first real API call). Contradicts feature-graph §7's claim that `ensureSession` heals the guard. **Code wins — flag the doc.**
   - [ ] `getSession()` has **no `.catch`/timeout** — a network failure can strand the user on "Loading…" forever.
 
-## 10. Session-expired modal (global self-heal is warn-only)
+## 10. Session lost in the editor (the poster closes; the session-expired modal never appears)
 
 - **Set up:** Signed-in, editor open; revoke the refresh token (or let it expire).
-- [ ] On `SIGNED_OUT` with a prior session → full-screen 🔒 **"Your session has expired"** modal, body warns unsaved edits since expiry were **not** saved.
-- [ ] "Reload and sign in again" → full page load to `/auth`. "Dismiss (save text first)" → keeps editor open but **session stays dead** (autosaves keep 401ing silently).
+- [ ] **Expected since fix 23:** on `SIGNED_OUT`, `EnsureSession` gives the tab a new guest session at once, and the editor closes the poster to the account-changed page. The editor does **not** stay open on a dead session.
+  - An account's poster: **"This poster is in another account"**, with "Download a copy", "Sign in" (offered because a guest is now signed in) and "My posters".
+  - A guest's poster: **"This guest poster was closed"**, with "Download a copy" and "My posters", no "Sign in".
+  - Evidence: TESTED by `EditorOwnership.test.tsx`, 'a lost session replaced by a new guest closes it' (it passed in the fix 23 docs audit, S9D-7). Record 23 §9, "G3's rerun on the fix", row a2 ('refresh fails in the editor's tab'): closed, the same page, 3 of 3 (MEASURED by the lead with G3's script; not re-run for this doc).
+- [ ] The 🔒 **"Your session has expired"** modal currently **never appears**. Its callback reads a stale `hadSession` (`SessionExpiredModal.tsx:52`, INSPECTED); record 23 §5, G3: 0 of 5 sign-out runs showed it, on main before the fix (fix 23 did not change `SessionExpiredModal.tsx`). This is pre-existing and on the Later list (record 23 §10). Its buttons, "Reload and sign in again" and "Dismiss (save text first)", cannot be reached until it is fixed. If the modal does appear, note it.
 - **Edge:** fresh unauthenticated load does NOT show the modal (no false positive).
-- **Note:** this modal does NOT re-auth or preserve edits — warn-only.
+- **Note:** the modal, once it works, does NOT re-auth or preserve edits — warn-only. "Download a copy" on the closed page saves the version that was in memory.
 
 ---
 
