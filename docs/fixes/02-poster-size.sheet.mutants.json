@@ -64,8 +64,8 @@
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "      const wRatio = (r.width - fitPadding) / (widthIn * PX);\n      const hRatio = (r.height - fitPadding) / (heightIn * PX);",
-          "      const wRatio = (r.width - fitPadding) / (48 * PX);\n      const hRatio = (r.height - fitPadding) / (36 * PX);"
+          "canvasRef.current.getBoundingClientRect(), widthIn * PX, heightIn * PX, gutter);",
+          "canvasRef.current.getBoundingClientRect(), 48 * PX, 36 * PX, gutter);"
         ]
       ]
     },
@@ -74,8 +74,8 @@
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "      const wRatio = (r.width - fitPadding) / (widthIn * PX);\n      const hRatio = (r.height - fitPadding) / (heightIn * PX);",
-          "      const wRatio = (r.width - fitPadding) / (heightIn * PX);\n      const hRatio = (r.height - fitPadding) / (widthIn * PX);"
+          "canvasRef.current.getBoundingClientRect(), widthIn * PX, heightIn * PX, gutter);",
+          "canvasRef.current.getBoundingClientRect(), heightIn * PX, widthIn * PX, gutter);"
         ]
       ]
     },
@@ -84,8 +84,8 @@
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "  }, [widthIn, heightIn, canvasRef, fitPadding]);",
-          "  }, [canvasRef, fitPadding]);"
+          "  }, [widthIn, heightIn, canvasRef, gutter]);",
+          "  }, [canvasRef, gutter]);"
         ]
       ]
     },

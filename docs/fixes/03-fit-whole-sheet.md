@@ -850,6 +850,37 @@ or matchMedia).
 
 ## 10. Limits and follow-ups
 
+**Found after the merge (2026-09-29).** This fix re-ran its own four specs
+but not fixes 01 and 02's. Its rewrite of the fit code (cause A) left three
+of fix 02's sheet mutants on removed code, so that whole spec stopped at
+"bad spec" and its 36 gated mutants guarded nothing. They were ported
+(record 02 §8: control 102/102, 36/36 killed, MEASURED). Every committed
+spec was then re-run on the ported tree: 206 of 206 gated mutants killed,
+17 documented blind spots, 223 mutants, no survivor (MEASURED by the port's
+second review, one spec at a time). And
+`scripts/__tests__/mutantSpecs.test.mjs` now fails the suite when a
+committed spec no longer applies.
+
+The test checks that each spec still applies, not that it can guard
+anything. Its second review found shapes it still passes (all LOW or INFO,
+MEASURED by the reviewer on crafted specs), handed on to the process branch,
+which owns `lib/mutants.mjs`:
+- a mutant with `"edits": []`, an edit with count 0, or edits that cancel
+  each other: one check on the net effect (does `mutate()` change the file?)
+  would cover all three and the no-op edit (all 223 committed mutants pass
+  it); a blind spot shaped so reports "BLIND SPOT", exit 0;
+- a mutant id written twice (JSON keeps the last);
+- `"expect"` misspelled, which `blind-spot-check.mjs` then silently drops;
+- `"edits"` given as an object stops the test at a bare TypeError that
+  names no mutant;
+- a blind spot whose edit lands in a file none of the spec's tests load
+  (mutation-check reports it as a blind spot, exit 0);
+- a failing test-file load that the control does not catch (the port's first
+  review, CR-3; the process branch's uncommitted `mutation-check.mjs` has
+  the check);
+- once the process branch merges, its `loadSpec` throws on the first
+  problem, so this test would again name only one.
+
 **Owner calls made here** (each can be reversed on request):
 - **The phone share view keeps its own 8 px gutter.** The owner's 64 px is
   for the desktop workspace; on a 375 px phone it would take a third of the
