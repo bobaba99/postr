@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   canonicalJson,
   exportPostr,
+  exportPostrWithReport,
   importPostr,
   sanitizeImportedBlock,
 } from '../postrFile';
@@ -147,5 +148,24 @@ describe('sanitizeImportedBlock (stored-XSS guard)', () => {
     expect(clean.note).toBeUndefined();
     expect(clean.caption).toBeUndefined();
     expect(clean.imageSrc).toBe('storage://u/p/x.png');
+  });
+});
+
+// Fix 23, step 9 round 3 (S9R3-3): the closed poster's page names the
+// images its copy could not include; a block with no image is not one.
+describe('exportPostrWithReport', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('counts as missing only the images it could not include', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, arrayBuffer: async () => new ArrayBuffer(0) })));
+    const doc: PosterDoc = {
+      ...minimalDoc,
+      blocks: [
+        makeBlock({ id: 'words', type: 'text', content: 'Methods' }),
+        makeBlock({ id: 'kept', type: 'image', imageSrc: 'data:image/png;base64,iVBORw0KGgo=' }),
+        makeBlock({ id: 'lost', type: 'image', imageSrc: 'https://images.test/figure.png' }),
+      ],
+    };
+    expect((await exportPostrWithReport(doc)).missingImages).toBe(1);
   });
 });

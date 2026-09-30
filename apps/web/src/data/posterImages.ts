@@ -181,6 +181,22 @@ export async function resolveStorageUrl(storageSrc: string): Promise<string | nu
 }
 
 /**
+ * Sign these stored images again now, whatever the cache holds. The editor
+ * keeps its poster's images signed while it is open, so a URL signed for the
+ * owner is at hand when the poster closes on a change of account, when the
+ * account signed in can no longer sign them (fix 23, step 9 round 3).
+ * A path the session cannot sign keeps its cached URL.
+ */
+export async function renewStorageUrls(srcs: Iterable<string | null>): Promise<void> {
+  const paths = new Set<string>();
+  for (const src of srcs) if (src && isStoragePath(src)) paths.add(extractStoragePath(src));
+  await Promise.all([...paths].map(async (path) => {
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_TTL);
+    if (!error && data) urlCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + CACHE_TTL_MS });
+  }));
+}
+
+/**
  * Batch-resolve all storage:// URLs in a set of blocks.
  * Returns a Map from storage path → signed URL.
  */
