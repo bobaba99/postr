@@ -30,10 +30,46 @@
 import { Router, type RequestHandler } from 'express';
 import { z } from 'zod';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { DIAGNOSTIC_BATCH_MAX, diagnosticSignatureDetail } from '@postr/shared';
+import type { DiagnosticSignal } from '@postr/shared';
 import { requireAuth, type AuthLocals } from './auth.js';
 import { createRateLimiter } from './rateLimit.js';
 import { logger as defaultLogger, type Logger } from './logger.js';
+
+/**
+ * Runtime copies of the shared DIAGNOSTIC_BATCH_MAX and
+ * diagnosticSignatureDetail. @postr/shared ships TS source only (its `main`
+ * points at src/index.ts), which plain `node dist/index.js` cannot load in
+ * production, so the API must not import runtime VALUES from it (the value
+ * import that stood here crashed the server on start). The client emitter
+ * uses the originals; diagnosticsSharedCopy.test.ts pins these copies to
+ * them for every signal kind, and sharedTypeOnly.test.ts fails on any value
+ * import of @postr/shared in the API.
+ */
+export const DIAGNOSTIC_BATCH_MAX = 20;
+
+export function diagnosticSignatureDetail(signal: DiagnosticSignal): string {
+  switch (signal.kind) {
+    case 'layout_defect':
+      return signal.defect;
+    case 'undo_noop':
+      return signal.action;
+    case 'redo_unavailable':
+      return signal.afterAction;
+    case 'autosave_failed':
+    case 'session_invalid':
+      return signal.reason;
+    case 'duplicate_tab':
+      return signal.state;
+    case 'paste_normalized':
+      return signal.flavor;
+    case 'client_error':
+      return `${signal.where}|${signal.name}`;
+    // fit_overflow and undo_exhausted carry no sub-type: one per poster is
+    // the right granularity for both.
+    default:
+      return '';
+  }
+}
 
 const surface = z.enum([
   'poster-editor',
