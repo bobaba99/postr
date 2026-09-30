@@ -45,6 +45,16 @@ import { stubScreen, zoomNow } from './workspaceKit';
 beforeEach(() => {
   vi.stubGlobal('ResizeObserver', NoopResizeObserver);
 });
+
+/**
+ * A button found once before many clicks is still the one on the page. If
+ * it were re-created, the clicks went to a detached copy: say so, before
+ * the zoom value would blame the zoom (step 9 review, CR2-CIT-01).
+ */
+function expectSameButton(button: HTMLElement, name: string) {
+  expect(button.isConnected, `the ${name} button found before the clicks is still on the page`).toBe(true);
+  expect(screen.getByRole('button', { name }), `${name} is the same button throughout`).toBe(button);
+}
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -123,8 +133,15 @@ describe('H2, H3 — the zoom controls never zoom the wrong way', () => {
     renderEditor();
     const fit = zoomNow();
     expect(fit, 'precondition: a fit below 0.2').toBeLessThan(0.2);
-    for (let i = 0; i < 5; i += 1) await click(screen.getByRole('button', { name: 'Zoom in' }), 'Zoom in');
-    for (let i = 0; i < 5; i += 1) await click(screen.getByRole('button', { name: 'Zoom out' }), 'Zoom out');
+    // Each button is found once (see the ceiling test below for why and
+    // for what that gives up: here, that exactly one accessible Zoom out
+    // exists at every zoom on the way, now checked once at the end).
+    const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
+    const zoomOut = screen.getByRole('button', { name: 'Zoom out' });
+    for (let i = 0; i < 5; i += 1) await click(zoomIn, 'Zoom in');
+    for (let i = 0; i < 5; i += 1) await click(zoomOut, 'Zoom out');
+    expectSameButton(zoomIn, 'Zoom in');
+    expectSameButton(zoomOut, 'Zoom out');
     expect(Object.is(zoomNow(), fit), `${zoomNow()} against the fit ${fit}`).toBe(true);
   });
 
@@ -135,7 +152,17 @@ describe('H2, H3 — the zoom controls never zoom the wrong way', () => {
     stubScreen({ width: 1060, height: 520 });
     load(makeDoc(48, 36));
     renderEditor();
-    for (let i = 0; i < 80; i += 1) await click(screen.getByRole('button', { name: 'Zoom in' }), 'Zoom in');
+    // The button is found once. A role query walks the whole editor (about
+    // 28 ms), and 80 of them made this test time out on CI's slower runners
+    // (5170 ms); the timed-out loop kept running, and its next fresh query
+    // found and clicked the following test's button. Clicking one element
+    // means a timed-out loop clicks a button no longer on the page. What
+    // this gives up: a check, at every zoom on the way, that exactly one
+    // accessible button has this name; it is now checked once, at the end
+    // (step 9 reviews CR2-CIT-02 and R2-CIT-01).
+    const zoomIn = screen.getByRole('button', { name: 'Zoom in' });
+    for (let i = 0; i < 80; i += 1) await click(zoomIn, 'Zoom in');
+    expectSameButton(zoomIn, 'Zoom in');
     expect(zoomNow()).toBe(10);
   });
 
