@@ -51,3 +51,17 @@ export const GALLERY_PUBLIC_ENABLED = false;
  * turned back on").
  */
 export const SHARING_ENABLED = false;
+
+/**
+ * RULERS_ENABLED — the workspace rulers were hidden on 2026-09-30 (owner
+ * decision: "hide this entirely and we can work on it later"). On main
+ * their marks were off the sheet by up to 30 in (docs/stress-test/PLAN.md,
+ * item 4). The fix in progress is parked on the local branch
+ * editor/rulers-match-sheet: its record (docs/fixes/04-rulers-match-sheet.md
+ * there), its instruments (ruler-check.mjs, ruler-sync-check.mjs,
+ * ruler-paint-check.mjs) and the open review findings. What is switched off:
+ *   - poster/PosterEditor.tsx: the rulers are not drawn
+ *   - poster/Sidebar.tsx: no "Show ruler" toggle in the layout tab
+ * The ruler code and its toggle's state remain.
+ */
+export const RULERS_ENABLED = false;
