@@ -23,7 +23,9 @@
  *       panels open) shows the poster at 100%, or hides part of it
  *   Hr  regression guard: on the axis the sheet fills, the rulers' 0-inch
  *       mark is not the 24 px off it was on main (the ruler bar's inset,
- *       plan item 4). Update this guard when item 4 fixes the rulers.
+ *       plan item 4). Update this guard when item 4 fixes the rulers. While
+ *       the rulers are hidden (RULERS_ENABLED) it measures nothing, and the
+ *       run prints that instead of the claim.
  *   H4k with the guidelines panel closed (clipped to zero width, not
  *       removed), the keyboard still reaches controls inside it: focus
  *       lands on something nobody can see. The same for the sidebar is
@@ -1065,6 +1067,11 @@ const mech = results.filter((r) => r.claim === 'H1');
 const rulerRuns = mech.filter((r) => typeof r.rulerFilled === 'number');
 if (rulerRuns.length) {
   byClaim.Hr = { observed: rulerRuns.filter((r) => r.rulerRegressed).length, of: rulerRuns.length };
+} else if (mech.length) {
+  // No ruler drew a 0" mark: the rulers are hidden (RULERS_ENABLED,
+  // config/features.ts, 2026-09-30), so the guard measures nothing. Say so
+  // rather than let it pass in silence.
+  log('[INFO] Hr not measured: no ruler drew a 0" mark (the rulers are hidden)');
 }
 const summary = {
   git: h.git, mutant: h.mutant, claims: byClaim,
