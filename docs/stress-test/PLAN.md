@@ -91,7 +91,7 @@ Found while fixing one item, belonging to another (details in the record named):
   shrank instead (−124 px with main's open panel → −61.5 px), because the
   panel now starts closed. On the filled axis it is the bar's 24 px, before
   and after. Item 4 must re-measure at the shipped defaults. `fit-check.mjs` claim Hr
-  guards the filled axis at 24 px; item 4 must update that guard.
+  guards the filled axis at 24 px; item 4 must update that guard. (Since 2026-09-30 the rulers are hidden, `RULERS_ENABLED`; Hr measures nothing and the run says so.)
 - **Item 3**, same review: zoom-to-fit leaves 36 px of the limiting side out
   of view, and Zoom out zooms IN below its 0.3 floor. **Fixed by fix 03.**
 - **From fix 03** (a summary; record 03 section 10 is the complete list,
@@ -199,3 +199,5 @@ Found while fixing one item, belonging to another (details in the record named):
 | 1 | `editor/undo-sidebar-history` | done — `docs/fixes/01-sidebar-undo-history.md` |
 | 2 | `editor/custom-sheet-size` (causes A, E), `editor/size-change-keeps-blocks` (B–D) | done — `docs/fixes/02-poster-size.md` |
 | 3 | `editor/fit-whole-sheet` (A, B), `editor/guidelines-closed-small-screens` (C, D, and A and B's review follow-ups) | done — `docs/fixes/03-fit-whole-sheet.md`; four owner questions open (section 10) |
+| 23 | `fix/new-poster-owner-only` | done — `docs/fixes/23-new-poster-owner-only.md`; sharing and comments hidden (`SHARING_ENABLED`) |
+| 4 | `editor/rulers-match-sheet` (local, parked) | hidden — the owner hid the rulers on 2026-09-30 (`RULERS_ENABLED`, `config/features.ts`); the fix is parked unmerged with its record, instruments and open review findings |

@@ -17,7 +17,7 @@
  * actions in.
  */
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { GALLERY_PUBLIC_ENABLED, SHARING_ENABLED } from '@/config/features';
+import { GALLERY_PUBLIC_ENABLED, RULERS_ENABLED, SHARING_ENABLED } from '@/config/features';
 import type {
   Author,
   Block,
@@ -1066,17 +1066,20 @@ export function LayoutTab(props: {
         />
         Show grid
       </label>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer', marginTop: 4 }}>
-        <input
-          type="checkbox"
-          checked={props.showRuler}
-          onChange={(e) => props.onToggleRuler(e.target.checked)}
-          style={{ accentColor: '#7c6aed' }}
-        />
-        Show ruler
-      </label>
+      {/* The rulers are hidden for now (RULERS_ENABLED, config/features.ts). */}
+      {RULERS_ENABLED && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer', marginTop: 4 }}>
+          <input
+            type="checkbox"
+            checked={props.showRuler}
+            onChange={(e) => props.onToggleRuler(e.target.checked)}
+            style={{ accentColor: '#7c6aed' }}
+          />
+          Show ruler
+        </label>
+      )}
       <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-        Visual aids only — they never print or export.
+        {RULERS_ENABLED ? 'Visual aids only — they never print or export.' : 'A visual aid only — it never prints or exports.'}
       </div>
 
       <div

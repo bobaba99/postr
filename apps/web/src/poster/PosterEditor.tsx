@@ -27,7 +27,7 @@ import { nanoid } from 'nanoid';
 import { breakUndoCoalescing } from '@/stores/posterStore';
 import { usePosterStore } from '@/stores/posterStore';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
-import { GALLERY_PUBLIC_ENABLED, SHARING_ENABLED } from '@/config/features';
+import { GALLERY_PUBLIC_ENABLED, RULERS_ENABLED, SHARING_ENABLED } from '@/config/features';
 import { useAutosave } from '@/hooks/useAutosave';
 import { mediaQueryMatches, useIsSmallScreen } from '@/hooks/useIsSmallScreen';
 import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
@@ -743,7 +743,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // cost real estate and add visual noise over the one thing the
   // visitor came for. The underlying toggles keep their state; only
   // the rendering is suppressed, so widening the window restores them.
-  const showRulerEffective = showRuler && !mobileShare;
+  const showRulerEffective = RULERS_ENABLED && showRuler && !mobileShare;
   const showGridEffective = showGrid && !mobileShare;
 
   const [sidebarOpen, setSidebarOpen] = useState(!mobileShare);

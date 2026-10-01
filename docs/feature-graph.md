@@ -1399,7 +1399,7 @@ flowchart LR
 - [ ] "Popup blocked. Please allow popups for this site to use "Save PDF", or press Ctrl/⌘+P directly from the editor as a fallback." — alert() — `PosterEditor.tsx:2147-2149`
 - [ ] "Untitled Poster" — publish-flow fallback title — `PosterEditor.tsx:1217`
 - [ ] `{N} block{s} outside poster bounds — details in Issues` — OOB banner, one line so it stays in the 64 px gutter above a fitted sheet — `PosterEditor.tsx:3405` (fix 03: the per-block lines moved to the Issues tab only)
-- [ ] `{inch}"` — ruler tick labels (top + left rulers) — `PosterEditor.tsx:3099,3206`
+- [ ] `{inch}"` — ruler tick labels (top + left rulers) — `PosterEditor.tsx:3322,3350` — not drawn while `RULERS_ENABLED` is off (hidden by the owner 2026-09-30; fix 04 parked)
 - [ ] "FIGURE PREVIEW" — overlay label — `PosterEditor.tsx:3526`
 - [ ] `{widthIn}" × {heightIn}"` — overlay dimensions — `PosterEditor.tsx:3528`
 - [ ] "drag to move · corner to resize" — overlay hint — `PosterEditor.tsx:3531`
@@ -1417,7 +1417,7 @@ flowchart LR
 - [ ] workspace grid (CSS repeating background, minor+major) — css — `PosterEditor.tsx:2647-2663`
 - [ ] poster grid overlay — inline-svg lines ×(rows+cols) — `PosterEditor.tsx:2743-2773` — `data-postr-overlay="grid"`
 - [ ] drag guides (block edges, centerlines, canvas-center match ticks, dashed accent) — inline-svg — `PosterEditor.tsx:2788-2847` — visible while dragging
-- [ ] rulers (top + left bars, corner square, tick marks) — css/divs — `PosterEditor.tsx:3273-3367`
+- [ ] rulers (top + left bars, corner square, tick marks) — css/divs — `PosterEditor.tsx:3273-3367` — not drawn while `RULERS_ENABLED` is off (`PosterEditor.tsx:746`, `config/features.ts`)
 - [ ] comment hover/focus highlight rects (area: filled; block/text: dashed outline; sticky glow) — css overlays — `PosterEditor.tsx:2871-2959`
 - [ ] area-comment live drag rect (dashed purple) — css overlay — `PosterEditor.tsx:3784-3797`
 - [ ] pending/focused area anchor rect (purple outline + fill) — css overlay — `PosterEditor.tsx:3664-3695`
@@ -1697,7 +1697,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] template button `Sidebar + Focus` — button — `Sidebar.tsx:1034-1053` (data `templates.ts:132-133`) — calls `onApplyTemplate`
 - [ ] template button `Blank` — button — `Sidebar.tsx:1034-1053` (data `templates.ts:161-162`) — calls `onApplyTemplate`
 - [ ] `Show grid` — checkbox — `Sidebar.tsx:1059-1067` — calls `onToggleGrid`
-- [ ] `Show ruler` — checkbox — `Sidebar.tsx:1068-1076` — calls `onToggleRuler`
+- [ ] `Show ruler` — checkbox — `Sidebar.tsx:1071-1079` — calls `onToggleRuler`; not shown while `RULERS_ENABLED` is off
 - [ ] `ImportSection` (tile + 2 modals) — panel render site — `Sidebar.tsx:916` — see `sidebar/ImportSection.tsx` / `ImportTile.tsx`
 
 *Export tab (`ExportTab`, :1146-1247)*
@@ -1827,7 +1827,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] "Pick a starting column layout. Apply anytime — blocks rearrange without losing their content." — helper — `Sidebar.tsx:1027-1028`
 - [ ] template descriptions: "Traditional conference layout." / "Full-width figure zone." / "Award-winning assertion-evidence." / "Narrow text, wide visuals." / "Title + authors only." — template-button subtext (`templates.ts:44,88,111,133,162`, rendered `Sidebar.tsx:1052`)
 - [ ] "📐 Canvas overlays" — section label — `Sidebar.tsx:1059`
-- [ ] "Visual aids only — they never print or export." — helper — `Sidebar.tsx:1078`
+- [ ] "Visual aids only — they never print or export." / "A visual aid only — it never prints or exports." — helper, the second while `RULERS_ENABLED` is off — `Sidebar.tsx:1082`
 - [ ] "💡 Done building? Head to the Export tab to preview, save PDF, or print at Staples." — footer tip (active branch; gallery branch adds "publish to the gallery", dead while flag=false) — `Sidebar.tsx:1093-1097`
 - [ ] "Preview" — section label — `Sidebar.tsx:1116`
 - [ ] "See the poster at full size without the editor chrome. Great for a final sanity check before exporting." — helper — `Sidebar.tsx:1120-1123`
@@ -4667,6 +4667,7 @@ flowchart LR
   SBX["lib/supabase.ts (singleton client)"] --> ALL["28 importer files"]
   CFG["config/features.ts GALLERY_PUBLIC_ENABLED=false"] --> G1["Home / Profile / HistoryRows / PosterEditor / Sidebar / OnboardingTour"]
   CFG2["config/features.ts SHARING_ENABLED=false (fix 23)"] --> G2["routes / Sidebar / FloatingFormatToolbar / PosterEditor"]
+  CFG3["config/features.ts RULERS_ENABLED=false (rulers hidden)"] --> G3["PosterEditor / Sidebar"]
 ```
 
 #### `stores/feedbackStore.ts` — global Feedback-modal state (open from anywhere, optional diagnostic context)
@@ -4788,11 +4789,12 @@ Imported by 28 files (all `data/*`, auth components, import modules, pages, `hoo
 - [ ] "Missing Supabase env vars: VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY must be set in apps/web/.env" — module-load throw — `supabase.ts:15-17`
 **Graphics** — none.
 
-#### `config/features.ts` — product feature switches (two flags, both off)
+#### `config/features.ts` — product feature switches (three flags, all off)
 
 No UI — logic only. 8 non-test files import it (grep, 2026-09-30).
 - `GALLERY_PUBLIC_ENABLED = false` (`features.ts:21`) — **the public gallery is OFF**; flag hides all publish/browse entry points. Importers: `pages/Profile.tsx`, `pages/Home.tsx`, `profile/HistoryRows.tsx`, `poster/PosterEditor.tsx`, `poster/Sidebar.tsx`, `components/OnboardingTour.tsx`. `components/PosterCard.tsx` no longer imports it; only its comment at `PosterCard.tsx:281` names the file (this list was stale before fix 23). Reactivation checklist (routes.tsx redirects, vercel.json noindex, sitemap, deleted api/shell files, PosterCard "Publish" action deleted-not-gated) documented in the header comment `features.ts:4-19`.
 - `SHARING_ENABLED = false` (`features.ts:53`, added 2026-09-30, fix 23) — **share links and comments are OFF**. Importers: `routes.tsx` (`/s/:slug` redirects to `/`, `:294`), `poster/Sidebar.tsx` (no comments tab `:643`; panel not rendered `:806`), `poster/FloatingFormatToolbar.tsx` (no "Comment on selection", `:377`), `poster/PosterEditor.tsx` (ignores `postr:comment-text` and `postr:comment-area`, `:782`, `:814`). The header comment `features.ts:23-52` lists what is switched off and summarises the database hardening needed before it returns; the full list is `docs/fixes/23-new-poster-owner-only.md` §10 ("Before sharing is turned back on").
+- `RULERS_ENABLED = false` (`features.ts:67`, added 2026-09-30) — **the workspace rulers are hidden** (owner decision; they were off the sheet by up to 30 in, PLAN.md item 4). Importers: `poster/PosterEditor.tsx` (the rulers are not drawn, `showRulerEffective` `:746`), `poster/Sidebar.tsx` (no "Show ruler" toggle, `:1070`). The fix in progress is parked on the local branch `editor/rulers-match-sheet` (its record `docs/fixes/04-rulers-match-sheet.md` and instruments are there).
 **Elements** — none. **Copy** — none. **Graphics** — none.
 
 #### `globals.d.ts` — declares `__BUILD_ID__` (git SHA baked by vite `define`)
@@ -4937,6 +4939,7 @@ No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) 
 | `lib/consoleCapture` | main.tsx (install); `getCapturedLog` from ImportPosterModal, CopyDesignModal |
 | `config/features` (`GALLERY_PUBLIC_ENABLED`) | Profile, Home, HistoryRows, PosterEditor, Sidebar, OnboardingTour |
 | `config/features` (`SHARING_ENABLED`, fix 23) | routes, Sidebar, FloatingFormatToolbar, PosterEditor |
+| `config/features` (`RULERS_ENABLED`) | PosterEditor, Sidebar |
 | `stores/feedbackStore` | 10 open-callers (see §6.14) + FeedbackModal + OnboardingTour/Profile readers |
 | `stores/posterStore` | Editor, Share, ImportPosterModal, PosterEditor (all field readers listed §6.14), CopyDesignModal, sidebar/{ImportSection, PostrExportButton, EditableExportButtons} |
 | `stores/publishFlowStore` | PosterEditor (:1307, flag-gated), Profile (:65-66, flag-gated), PublishFlow, OnboardingTour — all dead while flag off |
@@ -5091,6 +5094,7 @@ Switched off to keep the product to its core — the poster editor. After the se
 
 - [ ] **Public gallery (`GALLERY_PUBLIC_ENABLED = false`, `config/features.ts:21`)** — full surface: routes `/gallery`, `/gallery/:entryId` redirect to `/` (`routes.tsx:116-117`); `pages/Gallery.tsx` + `pages/GalleryEntry.tsx` unreachable but kept for reactivation; flag gates Home Gallery link (`Home.tsx:148`), Profile upload button + entry links (`Profile.tsx:571-595,814`), Sidebar "Share to gallery" (`Sidebar.tsx:1186-1205`), `?publish=1` auto-open (`PosterEditor.tsx:1220-1235`), OnboardingTour step-7 flag-ON body (`OnboardingTour.tsx:85`); dead flow: `PublishFlow` (mounted `App.tsx:15`), `PublishConsentModal`, `PublishGalleryModal`, `stores/publishFlowStore.ts`, `data/gallery.ts` publish path; `PublishConsentModal` `mode="share"` has NO caller anywhere; PosterCard "Publish" hover action was DELETED not gated (comment `PosterCard.tsx:262-271`); gallery siteMeta templates (`siteMeta.ts:213-219`) unused; reactivation checklist in `features.ts:4-19` header comment. `/admin/gallery` + `data/gallery.ts` read paths remain live.
 - [ ] **Sharing and comments (`SHARING_ENABLED = false`, `config/features.ts:53`) — switched off 2026-09-30, fix 23** (owner decision: editor only). Same pattern as the gallery: files kept, route redirects, flag off. Switched off: `/s/:slug` redirects to `/` (`routes.tsx:294`); `vercel.json:20` rewrites `/s/:slug` to `/` (the app shell), not `api/shell/share.ts`; the Sidebar has no comments tab (`Sidebar.tsx:643`) and renders `CommentsPanel` only with the flag on (`Sidebar.tsx:806`); `FloatingFormatToolbar` has no "Comment on selection" (`FloatingFormatToolbar.tsx:377`); `PosterEditor` ignores `postr:comment-text` (`:782`) and `postr:comment-area` (`:814`); the About `ship` card no longer offers share links (`About.tsx:84-85`). Share-only surfaces, kept but unreachable: `pages/Share.tsx` (and the Sidebar's `readOnly` rail, `Sidebar.tsx:630-631`), `poster/CommentsPanel.tsx` (its "Copy share link" was the only control that made a poster public), `hooks/useComments.ts`, `data/comments.ts`, `data/posters.ts` `ensureShareLink`, `api/shell/share.ts`. The database is unchanged: `public.posters` share read path and `public.poster_comments` are frozen — UI flag-gated (§9); an owner can still set `is_public` through the API (`features.ts:39-40`). Before turning it back on: the database hardening summarised in `features.ts:42-51`, full list in `docs/fixes/23-new-poster-owner-only.md` §10. Tests that lock it: `poster/__tests__/sharingHidden.test.tsx`, `src/__tests__/routes.test.tsx`, `seo/__tests__/vercelRouting.test.ts`. Flip these when restoring.
+- [ ] **Workspace rulers (`RULERS_ENABLED = false`, `config/features.ts:67`) — hidden 2026-09-30** (owner decision: hide them and come back later). The ruler bars and corner (`PosterEditor.tsx:3273-3367`) are not drawn, and the Layout tab has no "Show ruler" toggle (`Sidebar.tsx:1070-1080`); the toggle's state and the ruler code remain. Main's rulers were off the sheet by up to 30 in (PLAN.md item 4); the fix is parked on the local branch `editor/rulers-match-sheet`. `fit-check.mjs` claim Hr measures nothing while they are hidden (it says so). Test that locks it: `poster/__tests__/rulersHidden.test.tsx`. Flip it when restoring.
 - [ ] **Dead `AuthBootstrap`** — `components/AuthBootstrap.tsx` defined but never mounted in `src/`; referenced only by a comment in `pages/Share.tsx:4` and the consumer list in `lib/auth.ts`.
 - [ ] **Unused `SORT_MODE_LABELS`** — `poster/citations.ts:111-115` ("Manual order" / "Alphabetical (first author)" / "Year (newest first)" / "Year (oldest first)"); `sortMode` is hardcoded `'alpha'` with "no user-facing toggle" (`PosterEditor.tsx:651-653`) — labels have no live render site.
 - [ ] **Unused DB tables** — `public.presets` (`20260408000200_presets.sql`), `public.authors_lib` / `public.institutions_lib` / `public.references_lib` (`20260408000300_library.sql`, PRD §21) — nothing in `apps/web/src` reads or writes them (style presets live in localStorage `postr.style-presets`).
