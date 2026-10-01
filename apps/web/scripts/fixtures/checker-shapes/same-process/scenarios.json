@@ -1,0 +1,61 @@
+{
+  "about": "Chains of scripts run in ONE Python by checker-shape-check.mts (lib/checker-shape/sameProcess.mts). A step is fixed at its print size (size), fixed with a need given outright (need), or left unfixed (fixed: false).",
+  "scenarios": [
+    {
+      "name": "rc_context_after_fig_then_later",
+      "origin": "round 6, the page reviewer and skeptic-page-2 (s10 then s16)",
+      "why": "a context opened after a figure lowers title and label sizes; the next script's need omits titles",
+      "steps": [{ "file": "A_rc_context_after_fig.py", "size": "6x4.5" }, { "file": "B_later_script_big_print.py", "size": "10x7.5" }]
+    },
+    {
+      "name": "style_context_paper_after_fig_then_later",
+      "origin": "round 6, the page reviewer and skeptic-page-2 (s11 then s16)",
+      "why": "style.context('seaborn-v0_8-paper') after a figure lowers every listed size; the next script's need omits titles, ticks and legends",
+      "steps": [{ "file": "A_style_context_paper_after_fig.py", "size": "6x4.5" }, { "file": "B_later_script_big_print.py", "size": "10x7.5" }]
+    },
+    {
+      "name": "rc_context_decorator_after_fig_then_later",
+      "origin": "round 6, skeptic-page-2 (v4 then s16)",
+      "why": "an rc_context decorator lowers title and label sizes for a function called after a figure",
+      "steps": [{ "file": "A_rc_context_decorator_after_fig.py", "size": "6x4.5" }, { "file": "B_later_script_big_print.py", "size": "10x7.5" }]
+    },
+    {
+      "name": "rc_context_then_plain_then_later",
+      "origin": "round 6, skeptic-page-2 (s10, l1 unfixed, s16)",
+      "why": "a triple: an unfixed plain script after a fixed one, then a fixed one",
+      "steps": [{ "file": "A_rc_context_after_fig.py", "size": "6x4.5" }, { "file": "L_later_cell_all_classes.py", "fixed": false }, { "file": "B_later_script_big_print.py", "size": "10x7.5" }]
+    },
+    {
+      "name": "style_context_then_plain_then_later",
+      "origin": "round 6, skeptic-page-2 (s11, l1 unfixed, s16)",
+      "why": "the same triple with a style context",
+      "steps": [{ "file": "A_style_context_paper_after_fig.py", "size": "6x4.5" }, { "file": "L_later_cell_all_classes.py", "fixed": false }, { "file": "B_later_script_big_print.py", "size": "10x7.5" }]
+    },
+    {
+      "name": "global_small_after_fig_then_later",
+      "origin": "round 6, skeptic-page-2 (v5 then s16)",
+      "why": "a script that sets listed rc keys globally, small, after a figure: it must keep its own values after its end",
+      "keepsOwn": true,
+      "steps": [{ "file": "A_global_small_after_fig.py", "size": "6x4.5" }, { "file": "B_later_script_big_print.py", "size": "10x7.5" }]
+    },
+    {
+      "name": "rc_equal_need_then_later",
+      "origin": "round 6, the code reviewer (a07, need 17 given outright, then s16)",
+      "why": "a script that sets a listed key to exactly the need after a figure: its own value must stay after its end",
+      "keepsOwn": true,
+      "steps": [{ "file": "A_rc_equal_need.py", "need": { "axisTitle": 17 } }, { "file": "B_later_script_big_print.py", "size": "10x7.5" }]
+    },
+    {
+      "name": "falling_need",
+      "origin": "harness v6 (round 5, R5-06: a smaller need after a bigger one)",
+      "why": "need 25, then 17, labels left to rcParams: the second script prints at its own 17",
+      "steps": [{ "file": "N_labels_rc.py", "need": { "axisTitle": 25 } }, { "file": "N_labels_rc.py", "need": { "axisTitle": 17 } }]
+    },
+    {
+      "name": "rc_context_before_any_fig_then_later",
+      "origin": "round 6, skeptic-page-2 (v3 then s16): a negative control",
+      "why": "the context opens before any figure, so nothing of it outlives the script",
+      "steps": [{ "file": "A_rc_context_before_any_fig.py", "size": "6x4.5" }, { "file": "B_later_script_big_print.py", "size": "10x7.5" }]
+    }
+  ]
+}

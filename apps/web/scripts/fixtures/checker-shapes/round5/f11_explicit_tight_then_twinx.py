@@ -1,0 +1,22 @@
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+fig, axs = plt.subplots(1, 2, figsize=(6.4, 3.2))
+axs[0].plot([1, 2, 3, 4], [1, 4, 9, 16], label='L1_a')
+axs[0].plot([1, 2, 3, 4], [2, 3, 5, 8], label='L1_b')
+axs[0].set_title('T1_title', fontsize=8)
+axs[0].set_xlabel('X1_label', fontsize=8)
+axs[0].set_ylabel('Y1_label', fontsize=8)
+axs[0].tick_params(labelsize=8)
+axs[1].plot([1, 2, 3, 4], [1, 4, 9, 16], label='L2_a')
+axs[1].plot([1, 2, 3, 4], [2, 3, 5, 8], label='L2_b')
+axs[1].set_title('T2_title', fontsize=8)
+axs[1].set_xlabel('X2_label', fontsize=8)
+axs[1].set_ylabel('Y2_label', fontsize=8)
+axs[1].tick_params(labelsize=8)
+fig.tight_layout()
+tw = axs[0].twinx()
+tw.plot([1, 2, 3, 4], [9, 7, 5, 3], color='r')
+tw.set_ylabel('Y3_twin', fontsize=8)
+tw.tick_params(labelsize=7)
+fig.savefig('f11.pdf')

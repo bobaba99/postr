@@ -1,0 +1,18 @@
+import matplotlib.pyplot as plt
+
+fig = plt.figure(figsize=(6.4, 4.8))
+left, right = fig.subfigures(1, 2)
+axl = left.subplots()
+axl.plot([1, 2, 3], [1, 4, 9], label="squares")
+axl.set_xlabel("x")
+axl.set_ylabel("y")
+axl.set_title("Left")
+left.legend(loc="lower center")
+left.suptitle("Panel A")
+left.text(0.02, 0.02, "note A")
+axr = right.subplots()
+axr.plot([1, 2, 3], [3, 2, 1], label="down")
+axr.set_xlabel("x")
+axr.set_title("Right")
+axr.legend()
+fig.savefig("sub.png")
