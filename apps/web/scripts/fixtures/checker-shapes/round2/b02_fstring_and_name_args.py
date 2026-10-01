@@ -1,0 +1,15 @@
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(6.4, 4.8))
+ax.plot([1, 2, 3], [1, 2, 1], label="g")
+ax.set_xlabel("x")
+ax.set_ylabel("y")
+ax.set_title("T")
+ax.legend()
+out = "res"
+import os
+os.makedirs(out, exist_ok=True)
+fig.savefig(f"{out}/a.png")
+fig.savefig(os.path.join(out, "b.png"))
+path = "c.png"
+fig.savefig(path)

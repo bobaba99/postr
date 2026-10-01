@@ -1,0 +1,550 @@
+{
+  "_about": "Corpus for scripts/checker-truth-check.mjs (plan item 13). Made-up data and generic labels only. For each script, `elements` names the claim that owns the comparison of each text element the REAL figure draws (from scripts/truth/mpl_truth.py): C = control (the size comes from plt.rcParams['font.size'] or its update() dict form, or from ax.set_xlabel/set_ylabel/set_title(fontsize=) and ax.tick_params(labelsize=), all of which the checker is meant to read; must agree or the run exits 2), T = tick labels inheriting font.size (the 0.83x multiplier), W2 = a per-element rcParams key, SA = the rcParams alias (mpl.rcParams, from matplotlib import rcParams), SR = plt.rc(), SK = a fontsize= keyword the parser does not read, SK2 = a further keyword idiom (size=, fontdict=, a named size in fontsize=/labelsize=, legend(prop=), Text.set_fontsize), READTIME = an rcParams key set after the figure exists, G = Postr's own generated code (charts/codegen/toPython.ts) sets it through a variable. '-' = drawn but not scored (a mismatch there would be confounded by another claim, or belongs to another plan item). `what` says what the script exercises; it is documentation, not an input to the scoring. A script with `generated` is not a file here: the harness generates it at run time through the app's own module (`generated.module`, export `generated.export`) from `generated.spec`, so it always matches the shipped generator. `scaleClaim` names the claim that owns the scale comparison: C (the default, a control), G (G-scale: the canvas is set through variables), CANVAS (the canvas is not a literal figsize), '-' (not scored). `expect` makes the script a known answer (control K-known) for the claims it names: {claim: {observed, ofAtLeast}} - the claim's own comparison must observe exactly `observed` of at least `ofAtLeast`, and the script is kept out of that claim's k of n. Legend titles and Axes texts (claim AXTEXT), bbox_inches='tight' (TIGHT) and show() (SHOWSAVE) need no entry: the harness reads them from the real render.",
+  "scripts": {
+    "ctl-fontsize": {
+      "what": "plt.rcParams['font.size'] = 12, nothing per element",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "ctl-default": {
+      "what": "no size set at all (matplotlib defaults, font.size 10); also K-known for CANVAS: the literal-figsize twin of cv-default-canvas",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      },
+      "expect": {
+        "CANVAS": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      }
+    },
+    "ctl-explicit": {
+      "what": "ax.set_xlabel/set_ylabel(fontsize=16), set_title(fontsize=20), tick_params(labelsize=14); legend inherits 10",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "axisText": "C",
+        "legendText": "C"
+      }
+    },
+    "w2-rc-ticks": {
+      "what": "rcParams.update({'font.size': 22, 'xtick.labelsize': 12, 'ytick.labelsize': 12})",
+      "elements": {
+        "axisTitle": "C",
+        "axisText": "W2"
+      }
+    },
+    "w2-rc-all": {
+      "what": "font.size 16 with axes.labelsize 11, axes.titlesize 12, legend.fontsize 9, x/ytick.labelsize 9 (item form)",
+      "elements": {
+        "axisTitle": "W2",
+        "plotTitle": "W2",
+        "legendText": "W2",
+        "axisText": "W2"
+      }
+    },
+    "w2-rc-fixblock": {
+      "what": "only per-element keys, the shape of the checker's own fix block: axes.titlesize 28, axes.labelsize 26, x/ytick.labelsize 20, legend.fontsize 20",
+      "elements": {
+        "axisTitle": "W2",
+        "plotTitle": "W2",
+        "legendText": "W2",
+        "axisText": "W2"
+      }
+    },
+    "w2-rc-named": {
+      "what": "font.size 20 with x/ytick.labelsize 'x-small' and legend.fontsize 'small' (named sizes)",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "axisText": "W2",
+        "legendText": "W2"
+      }
+    },
+    "w2-rc-yonly": {
+      "what": "font.size 20 with only ytick.labelsize 9 (x ticks stay 20)",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "axisText": "W2"
+      }
+    },
+    "s-alias-mpl": {
+      "what": "import matplotlib as mpl; mpl.rcParams['font.size'] = 20",
+      "elements": {
+        "axisTitle": "SA",
+        "plotTitle": "SA",
+        "legendText": "SA",
+        "axisText": "-"
+      }
+    },
+    "s-alias-from": {
+      "what": "from matplotlib import rcParams; rcParams['font.size'] = 18",
+      "elements": {
+        "axisTitle": "SA",
+        "plotTitle": "SA",
+        "legendText": "SA",
+        "axisText": "-"
+      }
+    },
+    "s-rc-font": {
+      "what": "plt.rc('font', size=18)",
+      "elements": {
+        "axisTitle": "SR",
+        "plotTitle": "SR",
+        "legendText": "SR",
+        "axisText": "-"
+      }
+    },
+    "s-rc-elements": {
+      "what": "plt.rc('font', size=20); plt.rc('axes', labelsize=20, titlesize=22); plt.rc('xtick'/'ytick', labelsize=16)",
+      "elements": {
+        "axisTitle": "SR",
+        "plotTitle": "SR",
+        "axisText": "SR"
+      }
+    },
+    "s-kw-pyplot": {
+      "what": "pyplot keywords: plt.xlabel/ylabel(fontsize=9), plt.xticks/yticks(fontsize=7), plt.title(fontsize=11), plt.legend(fontsize=7)",
+      "elements": {
+        "axisTitle": "SK",
+        "plotTitle": "SK",
+        "axisText": "SK",
+        "legendText": "SK"
+      }
+    },
+    "s-kw-axlegend": {
+      "what": "ax.set_xlabel/set_ylabel(fontsize=12) and ax.tick_params(labelsize=10), which are read, and ax.legend(fontsize=7), which is not",
+      "elements": {
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "SK"
+      }
+    },
+    "s-kw-ticklabels": {
+      "what": "font.size 20 with ax.set_xticklabels(..., fontsize=8) and plt.setp(ax.get_yticklabels(), fontsize=8)",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "axisText": "SK"
+      }
+    },
+    "g-codegen-grouped": {
+      "what": "Postr's own Make-a-figure Python for a grouped bar chart, generated live: title/axis/tick sizes via variables (title_size, axis_title_size, axis_text_size) passed as fontsize=/labelsize=, canvas figsize=(fig_w, fig_h), legend inherits font.size",
+      "generated": {
+        "module": "/src/charts/codegen/toPython.ts",
+        "export": "chartSpecToPython",
+        "mode": "sample",
+        "spec": {
+          "version": 1,
+          "form": "bar-grouped",
+          "data": {
+            "columns": [
+              {
+                "name": "Condition",
+                "kind": "category"
+              },
+              {
+                "name": "Response",
+                "kind": "number"
+              },
+              {
+                "name": "Phase",
+                "kind": "category"
+              }
+            ],
+            "rows": [
+              [
+                "Control",
+                42,
+                "Pre"
+              ],
+              [
+                "Drug A",
+                51,
+                "Pre"
+              ],
+              [
+                "Drug B",
+                63,
+                "Post"
+              ],
+              [
+                "Control",
+                45,
+                "Post"
+              ]
+            ]
+          },
+          "encoding": {
+            "x": "Condition",
+            "y": "Response",
+            "series": "Phase"
+          },
+          "options": {
+            "legend": true,
+            "sort": "none",
+            "horizontal": false,
+            "directLabel": "auto"
+          },
+          "paletteSlots": [
+            "accent",
+            "accent2"
+          ],
+          "title": "Response by condition",
+          "xLabel": "Condition",
+          "yLabel": "Response"
+        }
+      },
+      "scaleClaim": "G",
+      "elements": {
+        "plotTitle": "G",
+        "axisTitle": "G",
+        "axisText": "G",
+        "legendText": "C"
+      }
+    },
+    "cv-default-canvas": {
+      "what": "ctl-default without its figsize: a bare plt.subplots(), so matplotlib's default 6.4 x 4.8 in canvas",
+      "scaleClaim": "CANVAS",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "cv-rc-figsize": {
+      "what": "plt.rcParams['figure.figsize'] = (4, 3) and font.size 12; plt.subplots() without figsize",
+      "scaleClaim": "CANVAS",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "cv-set-size-inches": {
+      "what": "plt.subplots() without figsize, then fig.set_size_inches(7, 5) before saving",
+      "scaleClaim": "CANVAS",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "w2-rc-dictvar": {
+      "what": "per-element keys in a dict held in a variable: params = {...}; plt.rcParams.update(params) (labels 8, title 9, ticks and legend 7)",
+      "elements": {
+        "axisTitle": "W2",
+        "plotTitle": "W2",
+        "legendText": "W2",
+        "axisText": "W2"
+      }
+    },
+    "w2-rc-context": {
+      "what": "with plt.rc_context({...}): per-element keys (labels 9, title 10, ticks and legend 8) around the whole figure, saved inside the block",
+      "elements": {
+        "axisTitle": "W2",
+        "plotTitle": "W2",
+        "legendText": "W2",
+        "axisText": "W2"
+      }
+    },
+    "rt-rc-after-fig": {
+      "what": "plt.rcParams.update of per-element keys (22/22/20/20) AFTER plt.subplots(): matplotlib draws the title (set_title) and legend at the new sizes, the axis labels and ticks at the old (10). The ticks are not scored: they inherit font.size, so on main their mismatch is the 0.83x tick model (T) and cannot show READTIME; rt-fontsize-after-fig carries the tick case (checker 16.6 pt against a real 10 pt, which neither 0.83 x 10 nor 1.0 x 20 explains)",
+      "elements": {
+        "axisTitle": "READTIME",
+        "plotTitle": "READTIME",
+        "legendText": "READTIME",
+        "axisText": "-"
+      }
+    },
+    "rt-fontsize-after-fig": {
+      "what": "plt.rcParams['font.size'] = 20 AFTER plt.subplots(): the title (24) and legend (20) follow it, the axis labels and ticks stay 10",
+      "elements": {
+        "axisTitle": "READTIME",
+        "plotTitle": "READTIME",
+        "legendText": "READTIME",
+        "axisText": "READTIME"
+      }
+    },
+    "ax-legend-title": {
+      "what": "ax.legend(title='Treatment arm'): a legend title (no row in the table; AXTEXT), default sizes otherwise",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "sk2-size-alias": {
+      "what": "set_xlabel/set_ylabel(..., size=9) and set_title(..., size=10): the size= alias of fontsize=",
+      "elements": {
+        "axisTitle": "SK2",
+        "plotTitle": "SK2",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "sk2-legend-prop": {
+      "what": "font.size 16 with ax.legend(prop={'size': 7})",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "SK2",
+        "axisText": "T"
+      }
+    },
+    "sk2-named-kw": {
+      "what": "font.size 16 with ax.tick_params(labelsize='x-small') and ax.legend(fontsize='x-small'): named sizes in keywords",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "SK2",
+        "axisText": "SK2"
+      }
+    },
+    "sk2-fontdict": {
+      "what": "set_xlabel/set_ylabel(..., fontdict={'fontsize': 9}) and set_title(..., fontdict={'fontsize': 10})",
+      "elements": {
+        "axisTitle": "SK2",
+        "plotTitle": "SK2",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "sk2-setfontsize-loop": {
+      "what": "font.size 16, then lab.set_fontsize(7) for every x and y tick label",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "SK2"
+      }
+    },
+    "ax-annotations": {
+      "what": "ax.bar_label, ax.text('**') and a fig.text caption at the default size: Axes texts have no row (AXTEXT); the caption row's 0.83x model is T's cause, so it is not scored",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T",
+        "caption": "-"
+      }
+    },
+    "run-oo-figure": {
+      "what": "object-oriented matplotlib with no pyplot import: fig = Figure(figsize=(8, 6)); ax = fig.subplots() (RUN: a fix written as plt.rcParams has no plt)",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "run-seaborn-only": {
+      "what": "seaborn only, no pyplot import: sns.set_theme(style='whitegrid') (the notebook context: sizes 12/11) and an axes-level barplot on the default canvas; seaborn's sizes are plan item 14, so they are not scored here (RUN, CANVAS)",
+      "scaleClaim": "CANVAS",
+      "elements": {
+        "axisTitle": "-",
+        "plotTitle": "-",
+        "axisText": "-"
+      }
+    },
+    "tight-legend-outside": {
+      "what": "font.size 16, a legend outside the Axes and fig.savefig(..., bbox_inches='tight'): the saved image is wider than the canvas (TIGHT)",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "show-only": {
+      "what": "pyplot with plt.show() and no savefig: the corrected code gets its savefig appended after plt.show() (SHOWSAVE)",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "ctl-oo-figure-import": {
+      "what": "K-known for RUN: run-oo-figure plus import matplotlib.pyplot as plt, so a plt.rcParams fix has its name",
+      "expect": {
+        "RUN": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "ctl-raise-only": {
+      "what": "K-known for L: font.size 6 on an 8 x 6 in canvas, so every text is below its minimum at every print size used (at most 7.2 pt x 1.67 = 12 pt) and a fix can only raise it",
+      "expect": {
+        "L": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "ctl-sk2-agree": {
+      "what": "K-known for SK2: size=10, fontdict={'fontsize': 10}, set_title(size=12), legend(prop={'size': 10}), each equal to the default the element has anyway; ticks via tick_params(labelsize=10)",
+      "expect": {
+        "SK2": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "SK2",
+        "plotTitle": "SK2",
+        "legendText": "SK2",
+        "axisText": "C"
+      }
+    },
+    "ctl-rt-agree": {
+      "what": "K-known for READTIME: rcParams set after plt.subplots() to the values they have anyway (title 12, labels 10, legend 10), so when they are read cannot matter",
+      "expect": {
+        "READTIME": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "READTIME",
+        "plotTitle": "READTIME",
+        "legendText": "READTIME",
+        "axisText": "T"
+      }
+    },
+    "ctl-axtext-large": {
+      "what": "K-known for AXTEXT: a legend title and an ax.text at 36 pt (27 pt at the smallest scale used), default sizes otherwise so a fix is offered",
+      "expect": {
+        "AXTEXT": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "ctl-tight-full": {
+      "what": "K-known for TIGHT and TIGHT-fix: an invisible frame over the whole 8 x 6 in canvas and everything else inside it, saved with bbox_inches='tight', pad_inches=0, so the image written is the canvas",
+      "expect": {
+        "TIGHT": {
+          "observed": 0,
+          "ofAtLeast": 1
+        },
+        "TIGHT-fix": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "ctl-save-then-show": {
+      "what": "K-known for SHOWSAVE: plt.savefig() before plt.show(), so the inline backend saves the figure before show() closes it",
+      "expect": {
+        "SHOWSAVE": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "ctl-w2-agree": {
+      "what": "K-known for W2: font.size 20 with axes.titlesize 24, axes.labelsize 20 and legend.fontsize 20 (rcParams.update), each the size the element has anyway; ticks via ax.tick_params(labelsize=20)",
+      "expect": {
+        "W2": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "W2",
+        "plotTitle": "W2",
+        "legendText": "W2",
+        "axisText": "C"
+      }
+    },
+    "ctl-sa-agree": {
+      "what": "K-known for SA: plt.rcParams['font.size'] = 20 and then mpl.rcParams['font.size'] = 20, the alias setting the value font.size already has; ticks via ax.tick_params(labelsize=20)",
+      "expect": {
+        "SA": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "SA",
+        "plotTitle": "SA",
+        "legendText": "SA",
+        "axisText": "C"
+      }
+    },
+    "ctl-sr-agree": {
+      "what": "K-known for SR: font.size 20 with plt.rc('font', size=20), plt.rc('axes', titlesize=24, labelsize=20), plt.rc('legend', fontsize=20), each the size the element has anyway; ticks via ax.tick_params(labelsize=20)",
+      "expect": {
+        "SR": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "SR",
+        "plotTitle": "SR",
+        "legendText": "SR",
+        "axisText": "C"
+      }
+    },
+    "ctl-sk-agree": {
+      "what": "K-known for SK: font.size 20 with plt.xlabel/ylabel(fontsize=20), plt.title(fontsize=24), plt.legend(fontsize=20), each the size the element has anyway; ticks via plt.tick_params(labelsize=20)",
+      "expect": {
+        "SK": {
+          "observed": 0,
+          "ofAtLeast": 1
+        }
+      },
+      "elements": {
+        "axisTitle": "SK",
+        "plotTitle": "SK",
+        "legendText": "SK",
+        "axisText": "C"
+      }
+    }
+  }
+}

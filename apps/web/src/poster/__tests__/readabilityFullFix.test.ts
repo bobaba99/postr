@@ -6,7 +6,7 @@
  * size unrelated to the base_size it recommends.
  */
 import { describe, expect, it } from 'vitest';
-import { generateFullFix } from '../readabilityFullFix';
+import { generateFullFix, generateTargetedFullFix } from '../readabilityFullFix';
 import { parsePythonCode, parseRCode } from '../readability';
 
 const R = (c: string) => generateFullFix(c, parseRCode(c), 32);
@@ -41,10 +41,12 @@ describe('generateFullFix (R)', () => {
 
 describe('generateFullFix (Python)', () => {
   it('sets the figure size to the canvas the check used when the code has no figsize', () => {
+    // The check uses matplotlib's own default canvas for such a script, not
+    // the print size (fix 13, claim CANVAS), and the fix pins that canvas.
     const params = parsePythonCode(PY_NO_SAVE, { defaultWidthIn: 24, defaultHeightIn: 18 });
     const fixed = generateFullFix(PY_NO_SAVE, params, 18);
     expect(fixed).toContain("plt.rcParams['font.size'] = 18");
-    expect(fixed).toContain("plt.rcParams['figure.figsize'] = (24, 18)");
+    expect(fixed).toContain("plt.rcParams['figure.figsize'] = (6.4, 4.8)");
     expect(fixed).toContain('plt.savefig("poster_figure.png", dpi=300, bbox_inches="tight")');
   });
 
@@ -166,5 +168,25 @@ describe('the generated script must run, and do what was asked', () => {
     const c = 'library(ggplot2)\np <- ggplot(d, aes(x,y)) + geom_point()\nggsave("f.png", p, width = 9, height = 6)';
     const out = R(c);
     expect(out.split('\n').some((l) => /ggsave.*\+\s*$/.test(l)), out).toBe(false);
+  });
+});
+
+describe('generateTargetedFullFix (Python)', () => {
+  // Step 9 review of fix 13, round 2 (R2-04): the save was looked for after
+  // the fix went in, as the word "savefig", which the fix's own helper text
+  // contains, so a script that never saved got no save at all.
+  it('a script that never saves gets a save, and the text it saves is raised', () => {
+    const fixed = generateTargetedFullFix(PY_NO_SAVE, parsePythonCode(PY_NO_SAVE), "{'axisTitle': 17}");
+    // Added as written; the block's wrap raises it when it runs.
+    expect(fixed).toContain('\nplt.savefig("poster_figure.png", dpi=300, bbox_inches="tight")\n');
+    expect(fixed).toMatch(/^_postr_install\(\)$/m);
+  });
+
+  it('a save only mentioned in a comment or a string is not a save', () => {
+    const code = `${PY_NO_SAVE}
+# fig.savefig("later.png")
+note = "call savefig when done"`;
+    const fixed = generateTargetedFullFix(code, parsePythonCode(code), "{'axisTitle': 17}");
+    expect(fixed).toContain('.savefig("poster_figure.png"');
   });
 });
