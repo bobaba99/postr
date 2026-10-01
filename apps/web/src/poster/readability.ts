@@ -48,6 +48,12 @@ export interface FigureParams {
    * explicitly, which is always correct if more verbose.
    */
   overrideViaBareSelector?: Partial<Record<ElementKey, boolean>>;
+  /**
+   * Classes whose size is what the checker's own fix raised them to, not
+   * one the user set (Python). The fix list does not call these "(you set
+   * this)".
+   */
+  raisedByFix?: Partial<Record<ElementKey, boolean>>;
   facetRows: number;
   facetCols: number;
   warnings: string[];
@@ -101,6 +107,8 @@ export interface OverrideFix {
  */
 export interface FontFix {
   name: string;
+  /** The element's class, which the Python fix raises by name. */
+  key: ElementKey;
   /** ggplot theme selector, or matplotlib rcParams key. */
   selector: string | null;
   /** What it renders at today, in pt (source, before scaling). */
@@ -166,10 +174,9 @@ const PY_ELEMENTS: ElementSpec[] = [
   { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0,  minPt: 18, selector: 'axes.labelsize' },
   { name: 'Tick labels',  key: 'axisText',    relMultiplier: 0.83, minPt: 14, selector: 'xtick.labelsize' },
   { name: 'Legend text',  key: 'legendText',  relMultiplier: 1.0,  minPt: 14, selector: 'legend.fontsize' },
-  // No selector: matplotlib has no rcParams key that moves a caption.
-  // `figure.titlesize` moves fig.suptitle, so emitting it would be a
-  // line that silently does nothing. It is still listed in the
-  // per-element advice — just not in the copyable block.
+  // No selector: matplotlib has no rcParams key that moves a caption
+  // (`figure.titlesize` moves fig.suptitle). The fix raises it all the same:
+  // its helper raises the figure's own texts at save (fix 13).
   { name: 'Caption',      key: 'caption',     relMultiplier: 0.83, minPt: 12, selector: null },
 ];
 
@@ -846,6 +853,115 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
 
 // ── Python Parser ────────────────────────────────────────────────────
 
+/** A number as Python writes one (`8`, `5.6`, `.5`). */
+// One reading per number: `\d*\.?\d+` backtracked over long digit runs
+// (quadratic; step 9 review round 2, R2-09).
+const PY_NUM = '(?:\\d+(?:\\.\\d*)?|\\.\\d+)';
+/** A Python name. */
+const PY_NAME = '[A-Za-z_]\\w*';
+/** One side of a size: a number or a name; nothing that could backtrack. */
+const PY_SIDE = `(${PY_NUM}|${PY_NAME})`;
+/** A width, height pair in brackets: `(w, h)` or `[w, h]`. */
+const PY_PAIR = `[(\\[]\\s*${PY_SIDE}\\s*,\\s*${PY_SIDE}\\s*[)\\]]`;
+
+type PyValue = number | [number, number];
+
+/**
+ * The top-level numeric assignments of a script, by name, in source order:
+ * `w = 8`, `w, h, dpi = 8, 5.6, 300` (Postr's own generated code) and
+ * `size = (8, 6)`. Read from code with strings and comments masked.
+ */
+function pyAssignments(masked: string): Map<string, Array<{ at: number; value: PyValue }>> {
+  const byName = new Map<string, Array<{ at: number; value: PyValue }>>();
+  const add = (name: string, at: number, value: PyValue) =>
+    byName.set(name, [...(byName.get(name) ?? []), { at, value }]);
+  const line = new RegExp(
+    `^(${PY_NAME}(?:[ \\t]*,[ \\t]*${PY_NAME})*)[ \\t]*=[ \\t]*[(\\[]?[ \\t]*(${PY_NUM}(?:[ \\t]*,[ \\t]*${PY_NUM})*)[ \\t]*[)\\]]?[ \\t]*$`,
+    'gm',
+  );
+  for (const m of masked.matchAll(line)) {
+    const names = m[1]!.split(',').map((n) => n.trim());
+    const values = m[2]!.split(',').map((v) => Number(v.trim()));
+    if (!values.every(Number.isFinite)) continue;
+    if (names.length === values.length) names.forEach((n, k) => add(n, m.index, values[k]!));
+    else if (names.length === 1 && values.length === 2) add(names[0]!, m.index, [values[0]!, values[1]!]);
+  }
+  return byName;
+}
+
+/** The value `name` holds at offset `at`: its last assignment before it. */
+function pyValueAt(
+  names: Map<string, Array<{ at: number; value: PyValue }>>,
+  name: string,
+  at: number,
+): PyValue | null {
+  const before = (names.get(name) ?? []).filter((a) => a.at < at);
+  return before.length ? before[before.length - 1]!.value : null;
+}
+
+/** A width and height from two sides (numbers or names), or one name holding a pair. */
+function pySize(
+  names: Map<string, Array<{ at: number; value: PyValue }>>,
+  at: number,
+  sides: Array<string | undefined>,
+): { width: number; height: number } | null {
+  const [a, b] = sides;
+  if (a !== undefined && b === undefined) {
+    const pair = pyValueAt(names, a, at);
+    return Array.isArray(pair) ? { width: pair[0], height: pair[1] } : null;
+  }
+  const side = (t: string | undefined): number | null => {
+    if (t === undefined) return null;
+    if (new RegExp(`^${PY_NUM}$`).test(t)) return Number(t);
+    const v = pyValueAt(names, t, at);
+    return typeof v === 'number' ? v : null;
+  };
+  const width = side(a);
+  const height = side(b);
+  return width !== null && height !== null && width > 0 && height > 0 ? { width, height } : null;
+}
+
+/**
+ * The canvas matplotlib draws the figure on, or null when the script does
+ * not set one (matplotlib's default then applies). set_size_inches wins
+ * (its last call); then the figsize the figure is made with (the first:
+ * the checker reads one figure); then rcParams['figure.figsize'] or
+ * plt.rc('figure', figsize=...) (the last setting). Calls and keywords are
+ * found in code with strings masked; the rcParams key, a string, is read
+ * with only comments masked.
+ */
+function pythonCanvas(code: string): { width: number; height: number } | null {
+  const masked = maskCodeForRewrite(code);
+  const text = maskComments(code);
+  const names = pyAssignments(masked);
+  const found = (source: string, re: RegExp) =>
+    [...source.matchAll(re)].flatMap((m) => {
+      const size = pySize(names, m.index, m.slice(1).filter((g) => g !== undefined));
+      return size ? [{ at: m.index, size }] : [];
+    });
+
+  // set_size_inches(w, h), ((w, h)), (w=..., h=...), (size), with more
+  // arguments after or not.
+  const resized = found(masked, new RegExp(
+    `\\.set_size_inches\\s*\\(\\s*(?:(?:w\\s*=\\s*)?[(\\[]?\\s*${PY_SIDE}\\s*,\\s*(?:h\\s*=\\s*)?${PY_SIDE}\\s*[)\\]]?|(${PY_NAME})\\s*)[,)]`, 'g',
+  ));
+  if (resized.length) return resized[resized.length - 1]!.size;
+
+  // rc('figure', figsize=...) sets the default, like rcParams: its figsize
+  // is not the figure's own.
+  const rcCalls = [...text.matchAll(/\brc\s*\(\s*['"]figure['"]\s*,[^()]*/g)].map((m) => [m.index, m.index + m[0].length] as const);
+  const inRcCall = (at: number) => rcCalls.some(([from, to]) => at >= from && at < to);
+  const made = found(masked, new RegExp(`\\bfigsize\\s*=\\s*(?:${PY_PAIR}|(${PY_NAME})\\b)`, 'g'))
+    .filter((f) => !inRcCall(f.at));
+  if (made.length) return made[0]!.size;
+
+  const rc = [
+    ...found(text, new RegExp(`['"]figure\\.figsize['"]\\s*(?:\\]\\s*=|:)\\s*(?:${PY_PAIR}|${PY_SIDE}\\s*,\\s*${PY_SIDE}|(${PY_NAME})\\b)`, 'g')),
+    ...found(masked, new RegExp(`\\bfigsize\\s*=\\s*(?:${PY_PAIR}|(${PY_NAME})\\b)`, 'g')).filter((f) => inRcCall(f.at)),
+  ].sort((x, y) => x.at - y.at);
+  return rc.length ? rc[rc.length - 1]!.size : null;
+}
+
 export function parsePythonCode(code: string, options: ParseOptions = {}): FigureParams {
   const warnings: string[] = [];
   // See parseRCode: Python is the mirror image of FR6 — its `figsize`
@@ -983,24 +1099,39 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
     overrideCoversAll.plotTitle = true;
   }
 
-  // figsize — same overlay-default override pattern as parseRCode.
-  // If the user's Python src doesn't set figsize=(w,h) we prefer
-  // the figure-preview overlay's dimensions over matplotlib's
-  // 6.4×4.8 built-in so the analyzer and the UI agree on scale.
-  let width = options.defaultWidthIn ?? PY_DEFAULTS.width;
-  let height = options.defaultHeightIn ?? PY_DEFAULTS.height;
-  const figsize = src.match(/figsize\s*=\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
-  const pltFig = src.match(/plt\.figure\s*\(\s*figsize\s*=\s*\(\s*([\d.]+)\s*,\s*([\d.]+)\s*\)/);
-  const fs = figsize ?? pltFig;
-  if (fs) {
-    width = parseFloat(fs[1]!);
-    height = parseFloat(fs[2]!);
-  } else if (options.defaultWidthIn !== undefined) {
-    warnings.push(
-      `No figsize=(w,h) found — using ${options.defaultSizeLabel ?? DEFAULT_SIZE_LABEL} ${width.toFixed(1)}"×${height.toFixed(1)}" as the source canvas.`,
-    );
-  } else {
+  // The canvas, as matplotlib sizes it. Unlike R, where ggsave() with no
+  // size uses whatever device is open, matplotlib's rule is fixed: the
+  // figure is drawn at rcParams['figure.figsize'] (6.4 × 4.8 in unless the
+  // script sets it) or the figsize it was made with, and set_size_inches
+  // overrides both. Taking the print size as the canvas when the script
+  // had no literal figsize put the scale at 1 against a real 0.86–3.33
+  // (fix 13, claim CANVAS, 16 of 16 runs).
+  const canvas = pythonCanvas(code);
+  const width = canvas?.width ?? PY_DEFAULTS.width;
+  const height = canvas?.height ?? PY_DEFAULTS.height;
+  if (!canvas) {
     warnings.push('No canvas size found — assuming matplotlib default 6.4"×4.8".');
+  }
+
+  // The checker's own fix: `_POSTR_NEED = {'axisTitle': 17}` and each save
+  // rewritten to `_postr_raise_text(fig, _POSTR_NEED).savefig(...)` raise
+  // every drawn text of each named class to at least that size at the save, so nothing earlier overrides it and it never lowers
+  // one. Without reading it the re-check showed the same failures as the
+  // first check (fix 13, W1: 42 of 42 runs identical).
+  // The smallest text of the class before the raise: a size the user set
+  // on one axis only leaves the other axis at the inherited size (step 9
+  // review, S9-06: reading the set axis for the class passed 2 rows falsely).
+  const raisedByFix: Partial<Record<ElementKey, boolean>> = {};
+  for (const [key, pt] of Object.entries(raisedByOwnFix(code))) {
+    const spec = PY_ELEMENTS.find((e) => e.key === key);
+    if (!spec) continue;
+    const k = key as ElementKey;
+    const inherited = baseSize * spec.relMultiplier;
+    const own = overrides[k];
+    const before = own === undefined ? inherited : overrideCoversAll[k] ? own : Math.min(own, inherited);
+    if (pt > before) raisedByFix[k] = true;
+    overrides[k] = Math.max(before, pt);
+    overrideCoversAll[k] = true;
   }
 
   // Subplots grid
@@ -1023,6 +1154,7 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
     effectiveCanvasHeight: height,
     overrides,
     overrideCoversAll,
+    raisedByFix,
     facetRows,
     facetCols,
     warnings,
@@ -1141,10 +1273,11 @@ export function computeReadability(
       const el = elements.find((e) => e.name === spec.name)!;
       return {
         name: spec.name,
+        key: spec.key,
         selector: spec.selector,
         currentPt: el.sourcePt,
         neededPt: Math.ceil(spec.minPt / scale),
-        wasOverridden: overrides[spec.key] !== undefined,
+        wasOverridden: overrides[spec.key] !== undefined && !params.raisedByFix?.[spec.key],
         // Reachability, NOT coverage. A parent element never clears a
         // child that was explicitly set, so a bare selector reaches only
         // when nothing is pinned or the user pinned the bare selector
@@ -1181,14 +1314,20 @@ export function computeReadability(
  * is legal and overrides only the properties named — the user does not
  * have to merge it by hand.
  *
- * Python emits `rcParams.update({...})` rather than per-Axes calls
- * (`ax.set_xlabel(fontsize=)`, `ax.tick_params(labelsize=)`) because
- * those reach only the Axes they are called on, which is wrong advice
- * for a figure with subplots — and legend text has no per-Axes setter at
- * all. rcParams sets every Axes uniformly, which is what the advice
- * means. It must be set BEFORE the figure is created.
+ * Python emits the sizes each listed element needs, by class, as a dict
+ * literal (`{'axisTitle': 16, ...}`); applyFontFixes hands it to a helper
+ * that raises the drawn text just before the figure is saved. An
+ * rcParams block, the earlier form, is overridden by any `fontsize=` in a
+ * plotting call, by settings read when the figure or Axes is made, and by
+ * seaborn's theme resets, and it could lower text the user had set larger
+ * (fix 13: 44 of 129 corrected scripts left a listed element too small,
+ * against 4 at save, all of those a separate canvas cause).
  */
 function buildFontSnippet(language: 'r' | 'python', fixes: FontFix[]): string | null {
+  if (language === 'python') {
+    const need = fixes.filter((f) => PY_RAISED.has(f.key)).map((f) => `'${f.key}': ${f.neededPt}`);
+    return need.length ? `{${need.join(', ')}}` : null;
+  }
   const usable = fixes.filter((f) => f.selector !== null);
   if (!usable.length) return null;
 
@@ -1210,15 +1349,7 @@ function buildFontSnippet(language: 'r' | 'python', fixes: FontFix[]): string | 
     });
     return `theme(\n${args.join(',\n')}\n)`;
   }
-
-  // matplotlib splits tick label size across two keys; setting only
-  // `xtick.labelsize` would silently leave the y axis at its old size.
-  const entries = usable.flatMap((f) =>
-    f.selector === 'xtick.labelsize'
-      ? [`    'xtick.labelsize': ${f.neededPt}`, `    'ytick.labelsize': ${f.neededPt}`]
-      : [`    '${f.selector}': ${f.neededPt}`],
-  );
-  return `plt.rcParams.update({\n${entries.join(',\n')}\n})`;
+  return null;
 }
 
 /**
@@ -1237,9 +1368,13 @@ function buildFontSnippet(language: 'r' | 'python', fixes: FontFix[]): string | 
  * the plot expression, which is the last non-blank line before
  * `ggsave()`.
  *
- * Python: `rcParams.update({...})` is inserted BEFORE the figure is
- * created, because rcParams is read at figure-creation time — placing it
- * after `plt.subplots()` would silently do nothing.
+ * Python: a helper, `_postr_raise_text`, goes at the top of the script
+ * (after a cell magic, a module docstring and `from __future__` imports),
+ * and each save and pyplot show is rewritten to go through it
+ * (`fig.savefig(` becomes `_postr_raise_text(fig, _POSTR_NEED).savefig(`;
+ * with neither, it is called at the end): it raises each drawn text of a
+ * listed class to at least its needed size and never lowers one
+ * (applyPythonRaise).
  *
  * Returns the code unchanged when there is nothing to apply.
  */
@@ -1283,29 +1418,650 @@ export function applyFontFixes(
     return lines.join('\n');
   }
 
-  const lines = code.split('\n');
-  // rcParams is read when the figure is created, so this must land above
-  // it or it is a no-op the user cannot see.
-  let at = maskedLines.findIndex((l) => /plt\.(subplots|figure)\s*\(/.test(l));
-  if (at === -1) {
-    const lastImport = maskedLines.reduce(
-      (best, l, i) => (/^\s*(import|from)\s+\w/.test(l) ? i : best),
-      -1,
-    );
-    at = lastImport + 1;
+  return applyPythonRaise(code, fontSnippet);
+}
+
+/** The element classes the Python fix can raise (Strip text is ggplot's). */
+const PY_RAISED = new Set<ElementKey>(['plotTitle', 'axisTitle', 'axisText', 'legendText', 'caption']);
+
+/**
+ * A figure reaching a file or a notebook without `Figure.savefig`, which the
+ * fix wraps. Any `display(` counts: a figure reaches it under any name
+ * (`display(f)`, `display(ax.get_figure())`, `display(df, fig)`), so
+ * `display(df)` withholds the credit too, a false red kept rather than a
+ * false green (round 6, R6C-01; round 5's R5-09 narrowed it and was reversed).
+ */
+const PY_BYPASSES_SAVEFIG = /\.print_(?:figure|png|pdf|svgz?|e?ps|pgf|jpe?g|tiff?|webp|raw|rgba|to_buffer)\b|\b(?:buffer_rgba|tostring_rgb|tostring_argb)\s*\(|\bdisplay\s*\(/;
+
+const PY_HELPER_BEGIN = '# Postr: raise text that prints too small (begin)';
+const PY_HELPER_END = '# Postr: raise text that prints too small (end)';
+
+/**
+ * The block the Python fix puts at the top of the script: the sizes each
+ * listed class needs, a helper that raises the drawn text of a figure to
+ * them, never lowering one, and `_postr_install()`, which wraps matplotlib's
+ * `Figure` once so that:
+ * - as each figure is made, the sizes rcParams set (titles, axis labels,
+ *   tick labels, legends and their titles) are raised, so the text is born at
+ *   its size and the script's own layout, and a library's (seaborn's legend
+ *   placed outside), is computed with it (round 4, R4-04). What Postr set is
+ *   put back to the script's own value before each figure and at the end of
+ *   the script, so a size the script sets later (a bigger font.size, a
+ *   relative "large") is resolved again, never capped (round 5, R5-01);
+ * - as each figure is saved, however the save is written (`fig.savefig`,
+ *   `plt.savefig`, `PdfPages.savefig`, a saved reference to the method),
+ *   every listed text is raised: sizes the script set itself included. A
+ *   figure that reaches a file another way (its canvas's `print_*`) is not;
+ *   the re-check withholds its credit there (R4-05).
+ *
+ * The figure's own layout (its last `tight_layout(...)`, with the script's
+ * arguments, and a `subplots_adjust(...)` made after it) is run again when a
+ * save grew a text, or when the layout is out of date: the figure resized, or
+ * titles, labels or legends added since (R3-02, R5-03). Not when the script
+ * moved an Axes off its place in the grid (by hand, or a colorbar shared by
+ * several Axes) or changed the layout engine: the replay pushed a hand-placed
+ * panel back and crashed after a switch to constrained layout (R4-01, R4-02).
+ * A colorbar, a twin Axes, an Axes deleted and added again, or an unpickled
+ * figure no longer stop it (R5-02). The record holds step names, not
+ * functions, so a figure still pickles (R4-03). The wrap's state lives on the
+ * Figure class: running the block again gives it that script's sizes without
+ * unwrapping a library that wrapped after it (R4-08, R5-10). A failure is a
+ * warning, never a failed save.
+ *
+ * It imports matplotlib when the block runs, but nothing from pyplot until a
+ * figure is saved or shown, so it chooses no backend. Legend titles follow
+ * legend text; fig.supxlabel/supylabel count as axis titles; captions
+ * (figure texts) are raised; subfigures, inset Axes, minor tick labels and 3D
+ * axes count. Six matplotlib names it reads are private (`_pylab_helpers`,
+ * `_supxlabel`, `_supylabel`, `_suptitle`, `_left_title`, `_right_title`);
+ * the last five through getattr, so a version without them only loses those
+ * texts.
+ */
+function pyHelperBlock(need: string): string {
+  return [
+    PY_HELPER_BEGIN,
+    `_POSTR_NEED = ${need}`,
+    '',
+    '',
+    'def _postr_raise_text(target, need, every=False, end=False):',
+    '    """Raise each listed text of a figure about to be saved or shown to at',
+    '    least its size in points, never lowering one. The figure\'s own layout is',
+    '    run again when a text grew or the layout is out of date, unless the',
+    '    script moved an Axes off its place in the grid or changed the layout',
+    '    engine. Returns `target` (pyplot for None), or None at `end`: the script',
+    '    is over, and rcParams get the script\'s own values back. It never stops a',
+    '    save: a failure is a warning, and the figure is saved as the script drew',
+    '    it, even under warnings-as-errors."""',
+    '    try:',
+    '        from matplotlib import _pylab_helpers',
+    '        from matplotlib.figure import Figure',
+    '        if every:',
+    '            figs = [m.canvas.figure for m in _pylab_helpers.Gcf.get_all_fig_managers()]',
+    '        elif isinstance(target, Figure):',
+    '            figs = [target]',
+    '        else:',
+    '            import matplotlib.pyplot as plt',
+    '            figs = [plt.gcf()] if plt.get_fignums() else []',
+    '        grew = []',
+    '',
+    '        def up(texts, key):',
+    '            for t in texts:',
+    '                if key in need and t is not None and t.get_text().strip() and t.get_fontsize() < need[key]:',
+    '                    t.set_fontsize(need[key])',
+    '                    grew.append(t)',
+    '',
+    '        def parts(fig):',
+    '            yield fig',
+    '            for sub in getattr(fig, "subfigs", []):',
+    '                yield from parts(sub)',
+    '',
+    '        def in_place(fig):',
+    '            for ax in fig.axes:',
+    '                spec = ax.get_subplotspec() if hasattr(ax, "get_subplotspec") else None',
+    '                if spec is not None and any(abs(a - b) > 1e-6 for a, b in zip(spec.get_position(ax.figure).bounds, ax.get_position(original=True).bounds)):',
+    '                    return False',
+    '            return True',
+    '',
+    '        for fig in figs:',
+    '            before = len(grew)',
+    '            axes, legends = [], []',
+    '            for part in parts(fig):',
+    '                axes += [ax for ax in part.axes if ax not in axes]',
+    '                legends += list(part.legends)',
+    '                sup_labels = [getattr(part, "_supxlabel", None), getattr(part, "_supylabel", None)]',
+    '                up(sup_labels, "axisTitle")',
+    '                own = sup_labels + [getattr(part, "_suptitle", None)]',
+    '                up([t for t in part.texts if not any(t is o for o in own)], "caption")',
+    '            for ax in axes:',
+    '                axes += [child for child in getattr(ax, "child_axes", []) if child not in axes]',
+    '            for ax in axes:',
+    '                up([ax.title, getattr(ax, "_left_title", None), getattr(ax, "_right_title", None)], "plotTitle")',
+    '                named = [(n, a) for n, a in (("x", ax.xaxis), ("y", ax.yaxis), ("z", getattr(ax, "zaxis", None))) if a is not None]',
+    '                up([a.label for n, a in named], "axisTitle")',
+    '                for name, axis in named:',
+    '                    ticks = [t for t in axis.get_ticklabels(which="both") if t.get_text().strip()]',
+    '                    if "axisText" in need and ticks and max(t.get_fontsize() for t in ticks) < need["axisText"]:',
+    '                        ax.tick_params(axis=name, which="both", labelsize=need["axisText"])',
+    '                        grew.append(axis)',
+    '                    elif ticks:',
+    '                        up(ticks, "axisText")',
+    '                    elif "axisText" in need and axis.majorTicks and axis.majorTicks[0].label1.get_fontsize() < need["axisText"]:',
+    '                        # Labels hidden (a shared axis): its size still spaces the',
+    '                        # shared ticks, so small ones crowded the raised labels (R6M-04).',
+    '                        ax.tick_params(axis=name, which="both", labelsize=need["axisText"])',
+    '                    if axis.majorTicks:',
+    '                        # The size a label was born at from rcParams stays the',
+    '                        # axis\'s own once rcParams are given back, or the locator',
+    '                        # spaces its ticks for the smaller one (R6M-03).',
+    '                        size = axis.majorTicks[0].label1.get_fontsize()',
+    '                        for kw in (getattr(axis, "_major_tick_kw", None), getattr(axis, "_minor_tick_kw", None)):',
+    '                            if kw is not None and "labelsize" not in kw:',
+    '                                kw["labelsize"] = size',
+    '                if ax.get_legend() is not None:',
+    '                    legends.append(ax.get_legend())',
+    '            for legend in legends:',
+    '                up(legend.get_texts(), "legendText")',
+    '                up([legend.get_title()], "legendText")',
+    '            record = getattr(fig, "_postr_layout", None)',
+    '            steps = getattr(Figure, "_postr_state", {}).get("steps")',
+    '            if record and steps:',
+    '                now = _postr_layout_state(fig)',
+    '                stale = now["size"] != record["size"] or now["texts"] != record["texts"]',
+    '                if (len(grew) > before or stale) and now["engine"] == record["engine"] and in_place(fig):',
+    '                    import warnings',
+    '                    fig._postr_replaying = True',
+    '                    try:',
+    '                        with warnings.catch_warnings():',
+    '                            # The script\'s own layout skips an inset Axes or one added',
+    '                            # after it, or cannot fit the grown text and leaves the',
+    '                            # layout as it was; saying so is not the script\'s warning',
+    '                            # (round 6: R6M-05, a 3D Axes).',
+    '                            warnings.filterwarnings("ignore", message="This figure includes Axes that are not compatible")',
+    '                            warnings.filterwarnings("ignore", message="Tight layout not applied")',
+    '                            for name, args, kwargs in record["steps"]:',
+    '                                steps[name](fig, *args, **kwargs)',
+    '                    finally:',
+    '                        fig._postr_replaying = False',
+    '                    record.update(_postr_layout_state(fig))',
+    '    except Exception as error:',
+    '        import warnings',
+    '        try:',
+    '            warnings.warn(f"Postr could not raise the text ({type(error).__name__}: {error}); it keeps its sizes.")',
+    '        except Warning:',
+    '            pass',
+    '    if end:',
+    '        # Even when raising the text failed (round 6, R6C-12).',
+    '        try:',
+    '            from matplotlib.figure import Figure',
+    '            _postr_born_at_size({})',
+    '            Figure._postr_state["rc"].clear()',
+    '        except Exception:',
+    '            pass',
+    '        return None',
+    '    if target is None:',
+    '        import matplotlib.pyplot as plt',
+    '        return plt',
+    '    return target',
+    '',
+    '',
+    'def _postr_born_at_size(need):',
+    '    """Raise the sizes rcParams gives listed text to `need`, so a figure made',
+    '    now lays its text out at its size, never lowering one. What Postr set is',
+    '    put back to the script\'s own value first, so a size the script sets later',
+    '    (a relative one, like "large", or a bigger font.size) is resolved again.',
+    '    Postr knows its own value by identity, not by equal numbers: a context',
+    '    (rc_context, style.context) puts back the very object it saved, and a',
+    '    script setting the same number itself makes a new one (round 6, R6C-02)."""',
+    '    from matplotlib import rcParams',
+    '    from matplotlib.figure import Figure',
+    '    from matplotlib.font_manager import FontProperties',
+    '    keys = {"plotTitle": ["axes.titlesize"], "axisTitle": ["axes.labelsize"],',
+    '            "axisText": ["xtick.labelsize", "ytick.labelsize"],',
+    '            "legendText": ["legend.fontsize", "legend.title_fontsize"]}',
+    '    mine = Figure._postr_state.setdefault("rc", {})',
+    '    for key, names in keys.items():',
+    '        for name in names:',
+    '            now = dict.__getitem__(rcParams, name)',
+    '            for value, theirs in mine.get(name, []):',
+    '                if now is value:',
+    '                    rcParams[name] = theirs',
+    '                    break',
+    '            if key in need and FontProperties(size=rcParams[name]).get_size_in_points() < need[key]:',
+    '                value = float(need[key])',
+    '                mine.setdefault(name, []).append((value, rcParams[name]))',
+    '                rcParams[name] = value',
+    '',
+    '',
+    'def _postr_layout_state(fig):',
+    '    """The figure\'s layout engine, its size, and how many titles, labels,',
+    '    legend texts and figure texts it has."""',
+    '    engine = getattr(fig, "get_layout_engine", lambda: None)()',
+    '    texts = [t for t in fig.texts]',
+    '    for ax in fig.axes:',
+    '        texts += [ax.title, ax.xaxis.label, ax.yaxis.label]',
+    '        if ax.get_legend() is not None:',
+    '            texts += ax.get_legend().get_texts()',
+    '    for legend in fig.legends:',
+    '        texts += legend.get_texts()',
+    '    return {"engine": type(engine).__name__, "size": [round(v, 4) for v in fig.get_size_inches()],',
+    '            "texts": sum(1 for t in texts if t.get_text().strip())}',
+    '',
+    '',
+    'def _postr_install():',
+    '    """Make every figure raise its listed text: the sizes rcParams set, as',
+    '    the figure is made, so the script lays it out with them; every text, as',
+    '    it is saved. Record each figure\'s own layout (its last tight_layout and a',
+    '    subplots_adjust after it), to run again if a text still grew or the',
+    '    layout is out of date. The wrap is made once; running this again (a',
+    '    second fixed script in the same Python) gives it this script\'s sizes."""',
+    '    from matplotlib.figure import Figure',
+    '    state = getattr(Figure, "_postr_state", None)',
+    '    if state is None:',
+    '        init, save, tight, adjust = Figure.__init__, Figure.savefig, Figure.tight_layout, Figure.subplots_adjust',
+    '        state = {"steps": {"tight_layout": tight, "subplots_adjust": adjust}, "rc": {}}',
+    '',
+    '        def __init__(self, *args, **kwargs):',
+    '            try:',
+    '                Figure._postr_state["born"](Figure._postr_state["need"])',
+    '            except Exception as error:',
+    '                import warnings',
+    '                try:',
+    '                    warnings.warn(f"Postr could not raise the text sizes ({type(error).__name__}: {error}).")',
+    '                except Warning:',
+    '                    pass',
+    '            init(self, *args, **kwargs)',
+    '',
+    '        def tight_layout(self, *args, **kwargs):',
+    '            result = tight(self, *args, **kwargs)',
+    '            if not getattr(self, "_postr_replaying", False):',
+    '                self._postr_layout = {"steps": [("tight_layout", args, kwargs)], **Figure._postr_state["state"](self)}',
+    '            return result',
+    '',
+    '        def subplots_adjust(self, *args, **kwargs):',
+    '            result = adjust(self, *args, **kwargs)',
+    '            record = getattr(self, "_postr_layout", None)',
+    '            if record and not getattr(self, "_postr_replaying", False):',
+    '                # It lays out no text: a text added or changed since the',
+    '                # tight_layout still makes the layout out of date (round 7, k11).',
+    '                record["steps"].append(("subplots_adjust", args, kwargs))',
+    '            return result',
+    '',
+    '        def savefig(self, *args, **kwargs):',
+    '            Figure._postr_state["raise"](self, Figure._postr_state["need"])',
+    '            return save(self, *args, **kwargs)',
+    '',
+    '        Figure._postr_state = state',
+    '        Figure.__init__, Figure.savefig, Figure.tight_layout, Figure.subplots_adjust = __init__, savefig, tight_layout, subplots_adjust',
+    '    state.update(need=_POSTR_NEED, born=_postr_born_at_size, state=_postr_layout_state)',
+    '    state["raise"] = _postr_raise_text',
+    '',
+    '',
+    '_postr_install()',
+    PY_HELPER_END,
+  ].join('\n');
+}
+
+/** Index of the bracket that closes the one opening at `open`, in masked code; -1 if none. */
+function closingBracket(masked: string, open: number): number {
+  let depth = 0;
+  for (let k = open; k < masked.length; k += 1) {
+    const ch = masked[k]!;
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') {
+      depth -= 1;
+      if (depth === 0) return k;
+    }
   }
-  // Match the indentation of the line we are inserting above. A figure
-  // built inside a function, loop or `with` block is ordinary code, and a
-  // column-0 statement spliced under `def make_figure(x, y):` is an
-  // IndentationError — the tool handing back a script that cannot run,
-  // which is worse than handing back nothing.
-  const indent = (lines[at] ?? '').match(/^[ \t]*/)![0];
-  const indented = fontSnippet
-    .split('\n')
-    .map((l) => (l === '' ? l : indent + l))
-    .join('\n');
-  lines.splice(at, 0, indented, '');
+  return -1;
+}
+
+/** Index of the bracket that opens the one closing at `close`, in masked code; -1 if none. */
+function openingBracket(masked: string, close: number): number {
+  let depth = 0;
+  for (let k = close; k >= 0; k -= 1) {
+    const ch = masked[k]!;
+    if (ch === ')' || ch === ']' || ch === '}') depth += 1;
+    else if (ch === '(' || ch === '[' || ch === '{') {
+      depth -= 1;
+      if (depth === 0) return k;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Every bracket's partner in masked code, found in one pass: `close[k]` for
+ * an opening bracket at `k`, `open[k]` for a closing one; -1 for none. A
+ * script of many unclosed calls made a scan per call quadratic (R2-09).
+ */
+function bracketIndex(masked: string): { close: Int32Array; open: Int32Array } {
+  const close = new Int32Array(masked.length).fill(-1);
+  const open = new Int32Array(masked.length).fill(-1);
+  const stack: number[] = [];
+  for (let k = 0; k < masked.length; k += 1) {
+    const ch = masked[k]!;
+    if (ch === '(' || ch === '[' || ch === '{') stack.push(k);
+    else if ((ch === ')' || ch === ']' || ch === '}') && stack.length) {
+      const o = stack.pop()!;
+      close[o] = k;
+      open[k] = o;
+    }
+  }
+  return { close, open };
+}
+
+/** Bracket depth before each index of masked code (0 outside every bracket). */
+function bracketDepths(masked: string): Int32Array {
+  const depth = new Int32Array(masked.length + 1);
+  let d = 0;
+  for (let k = 0; k < masked.length; k += 1) {
+    depth[k] = d;
+    const ch = masked[k]!;
+    if (ch === '(' || ch === '[' || ch === '{') d += 1;
+    else if ((ch === ')' || ch === ']' || ch === '}') && d > 0) d -= 1;
+  }
+  depth[masked.length] = d;
+  return depth;
+}
+
+/**
+ * The last index at or before `k` that is not space in Python's sense:
+ * spaces and tabs, a backslash line continuation, and a line break inside
+ * brackets are skipped (`fig \` + newline + `.savefig(`). -1 at the start.
+ */
+function skipSpaceBack(masked: string, k: number, depth: Int32Array): number {
+  let at = k;
+  for (;;) {
+    while (at >= 0 && /[ \t\r]/.test(masked[at]!)) at -= 1;
+    if (at < 0 || masked[at] !== '\n') return at;
+    let prev = at - 1;
+    if (masked[prev] === '\r') prev -= 1;
+    if (masked[prev] === '\\') at = prev - 1;
+    else if (depth[at]! > 0) at -= 1;
+    else return at;
+  }
+}
+
+/** Index of the first comma at the top level of the brackets opening at `open` and closing at `close`; -1 if none. */
+function firstTopLevelComma(masked: string, open: number, close: number): number {
+  let depth = 0;
+  for (let k = open + 1; k < close; k += 1) {
+    const ch = masked[k]!;
+    if (ch === '(' || ch === '[' || ch === '{') depth += 1;
+    else if (ch === ')' || ch === ']' || ch === '}') depth -= 1;
+    else if (ch === ',' && depth === 0) return k;
+  }
+  return -1;
+}
+
+/**
+ * Where a pyplot receiver of `.show` starts, given the index of its dot: one
+ * name or two dotted names (`plt`, `matplotlib.pyplot`), which may run over a
+ * line continuation or a line break in brackets. -1 for anything longer, a
+ * call or a subscript, none of which is a pyplot alias: walking a whole chain
+ * back from every `.show` of `x.show.show…` was quadratic (round 3, R3-07).
+ */
+function pyplotReceiverStart(masked: string, dot: number, depth: Int32Array): number {
+  let k = skipSpaceBack(masked, dot - 1, depth);
+  for (let names = 0; names < 2; names += 1) {
+    const end = k;
+    while (k >= 0 && /\w/.test(masked[k]!)) k -= 1;
+    if (k === end || /\d/.test(masked[k + 1]!)) return -1;
+    const before = skipSpaceBack(masked, k, depth);
+    if (before < 0 || masked[before] !== '.') return k + 1;
+    k = skipSpaceBack(masked, before - 1, depth);
+  }
+  return -1;
+}
+
+/**
+ * A pyplot show in the script: `plt.show(` on a name bound to
+ * matplotlib.pyplot, a bare `show(` imported from it by name, or `plt.show`
+ * handed on uncalled (`display = plt.show`; round 3, n20). `from`..`to` is
+ * the receiver and its dot (empty for a bare call); `nameEnd` the end of
+ * `show`.
+ */
+interface PyShowSite {
+  from: number;
+  to: number;
+  nameEnd: number;
+  receiver: string | null;
+  called: boolean;
+}
+
+function pyShowSites(source: string, masked: string): PyShowSite[] {
+  const depth = bracketDepths(masked);
+  const aliases = pyplotAliases(masked);
+  // `from matplotlib.pyplot import show`, or `import *` (round 4, R4-07),
+  // pylab's too (round 6, R6P-03), unless the script defines or assigns a
+  // show of its own anywhere, a method aside (round 5, R5-08; round 6,
+  // R6C-04: one inside a function or an `if` was replaced).
+  const ownShow = /^[ \t]*(?:def[ \t]+show[ \t]*\((?![ \t]*(?:self|cls)\b)|show[ \t]*=(?!=))/m.test(masked);
+  const bareShow = !ownShow
+    && /^[ \t]*from[ \t]+(?:matplotlib\.pyplot|matplotlib\.pylab|pylab)[ \t]+import[ \t]+(?:\*|[^\n]*\bshow\b)/m.test(masked);
+  const sites: PyShowSite[] = [];
+  for (const m of masked.matchAll(/(?<!\bdef[ \t]+)(?<![\w])show\b/g)) {
+    const nameEnd = m.index + 4;
+    let n = nameEnd;
+    while (n < masked.length && /[ \t]/.test(masked[n]!)) n += 1;
+    // `plt.show = ...` replaces it: not a show.
+    if (masked[n] === '=' && masked[n + 1] !== '=') continue;
+    const called = masked[n] === '(';
+    const dot = skipSpaceBack(masked, m.index - 1, depth);
+    if (dot >= 0 && masked[dot] === '.') {
+      const start = pyplotReceiverStart(masked, dot, depth);
+      if (start < 0) continue;
+      const receiver = source.slice(start, skipSpaceBack(masked, dot - 1, depth) + 1);
+      if (!aliases.has(receiver.replace(/\s+/g, ''))) continue;
+      // `del plt.show` names the attribute itself.
+      if (!called && /\bdel[ \t]+$/.test(masked.slice(Math.max(0, start - 8), start))) continue;
+      sites.push({ from: start, to: dot + 1, nameEnd, receiver, called });
+    } else if (called && bareShow) {
+      sites.push({ from: m.index, to: m.index, nameEnd, receiver: null, called });
+    }
+  }
+  return sites;
+}
+
+/**
+ * Where an earlier fix's block is, as [first line, last line]: found by its
+ * marker comments, and by its `_POSTR_NEED` line and helper def when a
+ * marker was edited or deleted (a second fix otherwise read the def as a
+ * call and cut it to `def `; step 9 review round 2, R2-03). Null if none.
+ */
+function earlierBlock(lines: string[], masked: string[]): [number, number] | null {
+  const begin = lines.findIndex((l) => l.trim() === PY_HELPER_BEGIN);
+  const end = lines.findIndex((l) => l.trim() === PY_HELPER_END);
+  const needAt = masked.findIndex((l) => /^_POSTR_NEED\s*=/.test(l));
+  const defs = [/^def[ \t]+_postr_raise_text\b/, /^def[ \t]+_postr_install\b/].map((re) => masked.findIndex((l) => re.test(l)));
+  const callAt = masked.findIndex((l) => /^_postr_install\s*\(\s*\)/.test(l));
+  const starts = [begin, needAt, ...defs, callAt].filter((k) => k >= 0);
+  if (!starts.length) return null;
+  const from = Math.min(...starts);
+  if (end > from) return [from, end];
+  let to = Math.max(...starts);
+  for (const defAt of defs) {
+    if (defAt < 0) continue;
+    for (let k = defAt + 1; k < lines.length; k += 1) {
+      if (lines[k]!.trim() === '') continue;
+      if (!/^[ \t]/.test(lines[k]!)) break;
+      to = Math.max(to, k);
+    }
+  }
+  return [from, to];
+}
+
+/**
+ * Undo an earlier fix: its block, each `_postr_raise_text(x, ...).` back to
+ * `x.`, and its call at the end of the script. A show handed on uncalled is
+ * left as `(lambda *a, **k: x.show(*a, **k))`, a called show the new fix
+ * routes again, back to the same text.
+ */
+function withoutEarlierFix(code: string): string {
+  const lines = code.split('\n');
+  const block = earlierBlock(lines, maskCodeForRewrite(code).split('\n'));
+  let out = code;
+  if (block) {
+    let after = block[1] + 1;
+    while (after < lines.length && lines[after]!.trim() === '') after += 1;
+    out = [...lines.slice(0, block[0]), ...lines.slice(after)].join('\n');
+  }
+  // The receiver is the first argument: up to the first comma at its own
+  // level (`sns.catplot(data=df, x="a")` keeps its commas; R2-02).
+  const receiverOf = (masked: string, open: number, close: number) => {
+    const comma = firstTopLevelComma(masked, open, close);
+    return out.slice(open + 1, comma < 0 ? close : comma).trim();
+  };
+  // Edits are collected and applied in one pass: one copy of the script per
+  // edit was quadratic on a script of many calls (R2-09).
+  const apply = (text: string, edits: Array<{ from: number; to: number; text: string }>) => {
+    const parts: string[] = [];
+    let at = 0;
+    for (const e of edits.sort((a, b) => a.from - b.from)) {
+      if (e.from < at) continue;
+      parts.push(text.slice(at, e.from), e.text);
+      at = e.to;
+    }
+    parts.push(text.slice(at));
+    return parts.join('');
+  };
+  const masked = maskCodeForRewrite(out);
+  const brackets = bracketIndex(masked);
+  const calls: Array<{ from: number; to: number; text: string }> = [];
+  for (const m of masked.matchAll(/(?<![\w.])(?<!\bdef[ \t]+)_postr_raise_text\s*\(/g)) {
+    const open = m.index + m[0].length - 1;
+    const close = brackets.close[open]!;
+    // Never closed: not a call of the fix's; left as it is.
+    if (close < 0) continue;
+    const next = masked.slice(close + 1).search(/\S/);
+    const dot = next < 0 ? -1 : close + 1 + next;
+    if (dot < 0 || masked[dot] !== '.') {
+      // A statement of its own (the call at the end of the script): the call
+      // and a `;` after it go, never code or a comment after them on the line.
+      const semicolon = masked.slice(close + 1).match(/^[ \t]*;[ \t]*/);
+      calls.push({ from: m.index, to: close + 1 + (semicolon?.[0].length ?? 0), text: '' });
+      continue;
+    }
+    const receiver = receiverOf(masked, open, close);
+    calls.push({ from: m.index, to: dot + 1, text: receiver === 'None' ? '' : `${receiver}.` });
+  }
+  return calls.length ? apply(out, calls) : out;
+}
+
+/** The line to put the block on: after leading comments, a module docstring and `from __future__` imports. */
+function helperLine(code: string): number {
+  const lines = code.split('\n');
+  const masked = maskCodeForRewrite(code).split('\n');
+  const skipBlank = (k: number) => {
+    let at = k;
+    while (at < lines.length && masked[at]!.trim() === '') at += 1;
+    return at;
+  };
+  let at = skipBlank(0);
+  // A notebook cell's `%%` magic must stay its first line (R2-07).
+  if (/^%%/.test(lines[at] ?? '')) at = skipBlank(at + 1);
+  const doc = lines[at]?.match(/^[rRuUbB]*("""|'''|"|')/);
+  if (doc) {
+    const rest = lines.slice(at).join('\n');
+    const close = rest.indexOf(doc[1]!, doc[0].length);
+    if (close >= 0) at = skipBlank(at + rest.slice(0, close).split('\n').length);
+  }
+  while (at < lines.length && /^from\s+__future__\s+import\b/.test(masked[at]!)) {
+    let depth = 0;
+    let k = at;
+    for (; k < lines.length; k += 1) {
+      for (const ch of masked[k]!) depth += ch === '(' ? 1 : ch === ')' ? -1 : 0;
+      if (depth <= 0 && !/\\\s*$/.test(masked[k]!)) break;
+    }
+    at = skipBlank(k + 1);
+  }
+  return at;
+}
+
+/** Names the script binds to matplotlib.pyplot. */
+function pyplotAliases(masked: string): Set<string> {
+  const aliases = new Set(['matplotlib.pyplot']);
+  // `import a, matplotlib.pyplot as plt` (R2-06), and after a `;`.
+  for (const m of masked.matchAll(/(?:^|;)[ \t]*import[ \t]+([^\n;]+)/gm)) {
+    for (const part of m[1]!.split(',')) {
+      const a = part.trim().match(/^matplotlib\.pyplot(?:[ \t]+as[ \t]+(\w+))?$/);
+      if (a) aliases.add(a[1] ?? 'matplotlib.pyplot');
+    }
+  }
+  // `from matplotlib import pyplot as plt, cm`, also in brackets over several lines (round 3, R3-08).
+  for (const m of masked.matchAll(/(?:^|;)[ \t]*from[ \t]+matplotlib[ \t]+import[ \t]+(?:\(([^)]*)\)|([^\n;]+))/gm)) {
+    for (const part of (m[1] ?? m[2]!).split(',')) {
+      const a = part.trim().match(/^pyplot(?:[ \t]+as[ \t]+(\w+))?$/);
+      if (a) aliases.add(a[1] ?? 'pyplot');
+    }
+  }
+  return aliases;
+}
+
+/**
+ * The Python fix: the helper block at the top of the script, each pyplot
+ * `show(` routed through the helper in place (`plt.show(` becomes
+ * `_postr_raise_text(plt, _POSTR_NEED, every=True).show(`; a show handed on
+ * uncalled becomes a lambda), and a call at the end that raises every open
+ * figure. Saves are not edited: the block wraps `Figure.savefig` (rewriting
+ * each save in the text broke scripts with attributes of their own named
+ * `savefig`; round 3, R3-01). Routing the call in place, rather than adding
+ * a statement before it, keeps one-line `for`/`with`/`else:` bodies intact
+ * (S9-01). An earlier fix is taken out before this one goes in. `need` is
+ * the dict literal buildFontSnippet emits.
+ */
+function applyPythonRaise(code: string, need: string): string {
+  const source = withoutEarlierFix(code);
+  const masked = maskCodeForRewrite(source);
+  const edits = pyShowSites(source, masked).map((site) => (site.called
+    ? { from: site.from, to: site.to, text: `_postr_raise_text(${site.receiver ?? 'None'}, _POSTR_NEED, every=True).` }
+    : {
+        from: site.from, to: site.nameEnd,
+        text: `(lambda *a, **k: _postr_raise_text(${site.receiver}, _POSTR_NEED, every=True).show(*a, **k))`,
+      }));
+  let out = source;
+  for (const e of edits.sort((a, b) => b.from - a.from)) out = out.slice(0, e.from) + e.text + out.slice(e.to);
+  // Every open figure at the end (a notebook draws them then), however many
+  // saves came before (round 3, R3-03).
+  out = `${out.trimEnd()}\n\n_postr_raise_text(None, _POSTR_NEED, every=True, end=True)\n`;
+
+  const lines = out.split('\n');
+  const at = helperLine(out);
+  lines.splice(at, 0, ...(at > 0 ? [''] : []), pyHelperBlock(need), '', '');
   return lines.join('\n');
+}
+
+/**
+ * The sizes the checker's own fix raises each class to: its last live
+ * `_POSTR_NEED` assignment, read only with the helper and install defs
+ * and a live `_postr_install()` call (a copy in a string or a comment is not
+ * read; S9-10), no figure reaching a file or a notebook around
+ * `Figure.savefig`, and every pyplot show routed.
+ */
+function raisedByOwnFix(code: string): Record<string, number> {
+  const masked = maskCodeForRewrite(code);
+  // The assignment Python runs last, and only with the helper defined: two
+  // blocks were read by the first, and a deleted def still read (R2-14).
+  const assignments = [...masked.matchAll(/^_POSTR_NEED\s*=\s*\{/gm)];
+  const at = assignments.length ? assignments[assignments.length - 1]!.index : -1;
+  if (at < 0 || !/^def[ \t]+_postr_raise_text\s*\(/m.test(masked)) return {};
+  // The saves go through the helper once `_postr_install()` has run. A
+  // figure that reaches a file or a notebook another way does not: printed
+  // by its canvas, called or handed on (R3-05, R4-05), its pixels read from
+  // the canvas, or `display(fig)`. Every pyplot show must be routed.
+  if (!/^def[ \t]+_postr_install\s*\(/m.test(masked) || !/^_postr_install\s*\(\s*\)/m.test(masked)) return {};
+  if (PY_BYPASSES_SAVEFIG.test(masked)) return {};
+  const routed = (site: PyShowSite) => !!site.receiver && /^_postr_raise_text\s*\(/.test(site.receiver.trim());
+  if (!pyShowSites(code, masked).every(routed)) return {};
+  const open = masked.indexOf('{', at);
+  const close = closingBracket(masked, open);
+  if (close < 0) return {};
+  const raised: Record<string, number> = {};
+  for (const entry of code.slice(open + 1, close).matchAll(new RegExp(`['"](\\w+)['"]\\s*:\\s*(${PY_NUM})`, 'g'))) {
+    const pt = Number(entry[2]);
+    if (Number.isFinite(pt)) raised[entry[1]!] = pt;
+  }
+  return raised;
 }
 
 /**

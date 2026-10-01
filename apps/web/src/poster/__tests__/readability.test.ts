@@ -9,6 +9,7 @@ import {
   type FigureParams,
   type ReadabilityResult,
 } from '../readability';
+import { generateTargetedFullFix } from '../readabilityFullFix';
 
 describe('parseRCode', () => {
   it('extracts base_size from theme_minimal(base_size = 24)', () => {
@@ -491,15 +492,96 @@ describe('ParseOptions.defaultSizeLabel', () => {
     );
   });
 
-  it('uses the caller-supplied label in the Python warning', () => {
-    const p = parsePythonCode('plt.plot(x, y)', {
+});
+
+// Fix 13, claim CANVAS (docs/fixes/13-checker-reads-its-own-fix.md): with
+// no literal figsize the checker took the print size as the canvas (scale
+// 1), while matplotlib draws at rcParams['figure.figsize'], 6.4 × 4.8 in
+// unless the script sets it, or at what set_size_inches says. Measured
+// against real matplotlib: the scale wrong in 16 of 16 page runs. The
+// expected canvases below are what matplotlib 3.10.8 reports for each
+// script (checker-truth-check.mjs's truth runner).
+describe('the Python canvas follows matplotlib', () => {
+  it('with no figsize, the canvas is matplotlib\'s default, whatever the print size', () => {
+    const p = parsePythonCode('import matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nax.plot(x, y)', {
       defaultWidthIn: 24,
       defaultHeightIn: 18,
       defaultSizeLabel: 'the print size you entered,',
     });
-    expect(p.warnings).toContain(
-      'No figsize=(w,h) found — using the print size you entered, 24.0"×18.0" as the source canvas.',
-    );
+    expect([p.canvasWidth, p.canvasHeight]).toEqual([6.4, 4.8]);
+  });
+
+  it('rcParams figure.figsize sets the canvas of a figure made without figsize', () => {
+    for (const line of [
+      "plt.rcParams['figure.figsize'] = (4, 3)",
+      "mpl.rcParams['figure.figsize'] = [4, 3]",
+      "plt.rcParams.update({'font.size': 12, 'figure.figsize': (4, 3)})",
+    ]) {
+      const p = parsePythonCode(`import matplotlib.pyplot as plt\n${line}\nfig, ax = plt.subplots()`, { defaultWidthIn: 10, defaultHeightIn: 7 });
+      expect([p.canvasWidth, p.canvasHeight], line).toEqual([4, 3]);
+    }
+  });
+
+  it('set_size_inches sets the canvas, over the figsize the figure was made with', () => {
+    for (const call of ['fig.set_size_inches(10, 7)', 'fig.set_size_inches((10, 7))', 'fig.set_size_inches(10, 7, forward=True)']) {
+      const p = parsePythonCode(`import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(6, 4))\n${call}`);
+      expect([p.canvasWidth, p.canvasHeight], call).toEqual([10, 7]);
+    }
+  });
+
+  it('a figsize given as names assigned numbers is read (Postr\'s own generated code)', () => {
+    const p = parsePythonCode('fig_w = 10\nfig_h = 7.5\nfig, ax = plt.subplots(figsize=(fig_w, fig_h))');
+    expect([p.canvasWidth, p.canvasHeight]).toEqual([10, 7.5]);
+    expect(p.warnings.some((w) => /figsize|canvas size/i.test(w))).toBe(false);
+  });
+
+  it('the idioms the step 9 review found misread, each as matplotlib 3.10.8 sizes it', () => {
+    const cases: Array<[string, [number, number]]> = [
+      ['fig, ax = plt.subplots()\nfig.set_size_inches(w=10, h=7.5)', [10, 7.5]],
+      ['fig, ax = plt.subplots()\nfig.set_size_inches(10, h=7.5)', [10, 7.5]],
+      ['FIGSIZE = (8, 6)\nfig, ax = plt.subplots(figsize=FIGSIZE)', [8, 6]],
+      ["plt.rcParams['figure.figsize'] = 4, 3\nfig, ax = plt.subplots()", [4, 3]],
+      ["plt.rc('figure', figsize=(10, 7.5))\nfig, ax = plt.subplots(figsize=(4, 3))", [4, 3]],
+      ["plt.rc('figure', figsize=(10, 7.5))\nfig, ax = plt.subplots()", [10, 7.5]],
+      ['w = 8\nfig, ax = plt.subplots(figsize=(w, 3))\nw = 4', [8, 3]],
+      ['note = "figsize=(2, 2)"\nfig, ax = plt.subplots(figsize=(9, 6))', [9, 6]],
+    ];
+    for (const [code, canvas] of cases) {
+      const p = parsePythonCode(`import matplotlib.pyplot as plt\n${code}`);
+      expect([p.canvasWidth, p.canvasHeight], code).toEqual(canvas);
+    }
+  });
+
+  it('a placeholder that is not a number leaves the default canvas, never NaN', () => {
+    const p = parsePythonCode('import matplotlib.pyplot as plt\nFIG_W = ...\nfig, ax = plt.subplots(figsize=(FIG_W, 4))');
+    expect([p.canvasWidth, p.canvasHeight]).toEqual([6.4, 4.8]);
+  });
+
+  it('a long script parses in linear time (the step 9 review timed 21 s on 200 KB)', () => {
+    for (const code of [`figsize=(a${' '.repeat(200_000)}`, `fig.set_size_inches(a${' '.repeat(200_000)}`,
+      `plt.rcParams['figure.figsize'] = (a${' '.repeat(200_000)}`, 'fig, ax = plt.subplots(figsize=(w, h))\n'.repeat(3_200),
+      // Round 2 (R2-09): long runs of digits.
+      `w = ${'9'.repeat(20_000)}`, `figsize=(${'9'.repeat(50_000)}`, `fig.set_size_inches(${'9'.repeat(50_000)}`]) {
+      const t0 = performance.now();
+      parsePythonCode(code);
+      expect(performance.now() - t0, code.slice(0, 30)).toBeLessThan(1_000);
+    }
+  });
+
+  it('a size written with a trailing dot is read (round 3, R3-06)', () => {
+    const p = parsePythonCode('fig, ax = plt.subplots(figsize=(12., 9.))\nfig.savefig("f.png")');
+    expect([p.canvasWidth, p.canvasHeight]).toEqual([12, 9]);
+  });
+
+  it('the last set_size_inches is the canvas, as in matplotlib', () => {
+    const p = parsePythonCode('fig, ax = plt.subplots()\nfig.set_size_inches(4, 3)\nax.plot(x, y)\nfig.set_size_inches(8, 6)');
+    expect([p.canvasWidth, p.canvasHeight]).toEqual([8, 6]);
+  });
+
+  it('a figsize given as names assigned together is read (the line Postr generates)', () => {
+    // charts/codegen/toPython.ts writes exactly this pair of lines.
+    const p = parsePythonCode('fig_w, fig_h, dpi = 8, 5.6, 300\nfig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=dpi)');
+    expect([p.canvasWidth, p.canvasHeight]).toEqual([8, 5.6]);
   });
 });
 
@@ -696,14 +778,14 @@ describe('computeReadability', () => {
     expect(snip.split('(').length).toBe(snip.split(')').length);
   });
 
-  it('font-first: emits a copy-ready matplotlib rcParams block', () => {
+  it('font-first: the Python fix names each failing element\'s needed size by class', () => {
+    // Fix 13: the sizes go to a helper that raises the drawn text at save
+    // time (applyFontFixes), so they are listed by class, not as rcParams.
     const code = `plt.rcParams['font.size'] = 8\nplt.figure(figsize=(9, 6))`;
-    const snip = computeReadability(parsePythonCode(code), 7, 10).fontSnippet!;
-    expect(snip).toContain('rcParams.update');
-    // Tick labels live on two keys in matplotlib; both must be set or
-    // the y axis silently keeps the old size.
-    if (snip.includes('xtick.labelsize')) expect(snip).toContain('ytick.labelsize');
-    expect(snip.split('(').length).toBe(snip.split(')').length);
+    const r = computeReadability(parsePythonCode(code), 7, 10);
+    const snip = r.fontSnippet!;
+    expect(snip).not.toContain('rcParams');
+    for (const f of r.fontFixes) expect(snip).toContain(`'${f.key}': ${f.neededPt}`);
   });
 
   it('font-first: keeps the base_size one-liner available as the fallback', () => {
@@ -885,16 +967,38 @@ describe('font snippet — advice that actually reaches the element', () => {
     expect(snip).not.toContain('axis.text.x');
   });
 
-  it('never offers a matplotlib key that does not move a caption', () => {
-    // `figure.titlesize` moves fig.suptitle, not a caption. Emitting it
-    // is a line that silently does nothing.
+  it('the caption is raised too: the helper reaches the figure\'s texts', () => {
+    // No rcParams key moves a caption (`figure.titlesize` moves
+    // fig.suptitle), so the block form left it out; the helper raises
+    // fig.text() captions directly.
     const code = `plt.rcParams['font.size'] = 6\nplt.figure(figsize=(9, 6))`;
     const r = computeReadability(parsePythonCode(code), 7, 10);
+    expect(r.fontFixes.some((f) => f.key === 'caption')).toBe(true);
+    expect(r.fontSnippet).toContain("'caption':");
     expect(r.fontSnippet).not.toContain('figure.titlesize');
-    // Still reported in the per-element advice, just not in the snippet.
-    expect(r.fontFixes.some((f) => f.name === 'Caption')).toBe(true);
   });
 });
+
+/** A Python fix as buildFontSnippet emits it. */
+const PY_NEED = "{'axisTitle': 17, 'axisText': 14}";
+
+/** The user's script back from a Python fix: the block out, each rewritten call back to its receiver. */
+function stripPyFix(fixed: string): string {
+  const lines = fixed.split('\n');
+  const begin = lines.findIndex((l) => l.startsWith('# Postr: raise text that prints too small (begin)'));
+  const end = lines.findIndex((l) => l.startsWith('# Postr: raise text that prints too small (end)'));
+  let after = end + 1;
+  while (after < lines.length && lines[after] === '') after += 1;
+  let before = begin;
+  while (before > 0 && lines[before - 1] === '') before -= 1;
+  const kept = [...lines.slice(0, before), ...(before > 0 ? [''] : []), ...lines.slice(after)];
+  const joined = (before > 0 ? [...lines.slice(0, before), ...lines.slice(after)] : kept).join('\n');
+  return joined
+    .replace(/\(lambda \*a, \*\*k: _postr_raise_text\(([^,]+), _POSTR_NEED, every=True\)\.show\(\*a, \*\*k\)\)/g, '$1.show')
+    .replace(/_postr_raise_text\(None, _POSTR_NEED(?:, [^()]*)?\)\./g, '')
+    .replace(/_postr_raise_text\(([^,]+), _POSTR_NEED(?:, [^()]*)?\)\./g, '$1.')
+    .replace(/\n+_postr_raise_text\(None, _POSTR_NEED, every=True, end=True\)\n*$/, '');
+}
 
 describe('applyFontFixes — the copy button hands back runnable code', () => {
   const rFix = 'theme(\n  axis.title = element_text(size = 17)\n)';
@@ -927,15 +1031,126 @@ ggsave("f.png", width = 9, height = 6)`;
     expect(out.indexOf('theme(')).toBeLessThan(out.indexOf('ggsave'));
   });
 
-  it('puts rcParams above the figure, where matplotlib reads it', () => {
-    const py = "plt.rcParams.update({\n    'axes.labelsize': 17\n})";
+  it('python: the saves are left as written; the block makes every save raise, and a call at the end raises what is open', () => {
     const code = `import matplotlib.pyplot as plt
 fig, ax = plt.subplots(figsize=(9, 6))
-ax.plot(x, y)`;
-    const out = applyFontFixes(code, 'python', py);
-    // After the figure is created, rcParams is a silent no-op.
-    expect(out.indexOf('axes.labelsize')).toBeLessThan(out.indexOf('plt.subplots'));
-    expect(out.indexOf('import matplotlib')).toBeLessThan(out.indexOf('axes.labelsize'));
+ax.set_xlabel("Time (s)", fontsize=9)
+fig.savefig("figure.png", dpi=300)`;
+    const out = applyFontFixes(code, 'python', PY_NEED);
+    expect(out).toContain('\nfig.savefig("figure.png", dpi=300)\n');
+    expect(out).toContain(`_POSTR_NEED = ${PY_NEED}`);
+    expect(out.match(/def _postr_raise_text/g)).toHaveLength(1);
+    expect(out).toMatch(/^_postr_install\(\)$/m);
+    expect(out.trimEnd().split('\n').pop()).toBe('_postr_raise_text(None, _POSTR_NEED, every=True, end=True)');
+    // Take the block and the end call out: the user's script, exactly.
+    expect(stripPyFix(out)).toBe(code);
+  });
+
+  it('python: the block goes after a module docstring and from __future__ imports', () => {
+    const code = ['"""Figure for the poster."""', 'from __future__ import annotations', 'import matplotlib.pyplot as plt',
+      'fig, ax = plt.subplots()', 'fig.savefig("f.png")'].join('\n');
+    const lines = applyFontFixes(code, 'python', PY_NEED).split('\n');
+    const block = lines.findIndex((l) => l.startsWith('# Postr: raise text'));
+    expect(block).toBeGreaterThan(lines.indexOf('from __future__ import annotations'));
+    expect(block).toBeLessThan(lines.indexOf('import matplotlib.pyplot as plt'));
+  });
+
+  it('python: a multi-line or continued import keeps the block out of it', () => {
+    for (const imports of [['from matplotlib.ticker import (', '    MaxNLocator,', ')'], ['from matplotlib.ticker import \\', '    MaxNLocator']]) {
+      const code = ['import matplotlib.pyplot as plt', ...imports, 'fig, ax = plt.subplots()', 'fig.savefig("f.png")'].join('\n');
+      const out = applyFontFixes(code, 'python', PY_NEED);
+      expect(out.indexOf('# Postr: raise text')).toBeLessThan(out.indexOf('import matplotlib.pyplot'));
+      expect(stripPyFix(out)).toBe(code);
+    }
+  });
+
+  it('python: saves inside one-line bodies, comprehensions and defs are left as written', () => {
+    const code = ['import matplotlib.pyplot as plt', 'from matplotlib.backends.backend_pdf import PdfPages',
+      'figs = [plt.figure() for _ in range(2)]', 'for k, f in enumerate(figs): f.savefig(f"f{k}.png")',
+      'if figs: figs[0].savefig("a.png")', 'else: plt.savefig("b.png")', '[f.savefig(n) for f, n in zip(figs, "ab")]',
+      'def save(f, n): f.savefig(n)', 'with PdfPages("w.pdf") as pdf: pdf.savefig(figs[0])'].join('\n');
+    const out = applyFontFixes(code, 'python', PY_NEED);
+    for (const line of code.split('\n')) expect(out).toContain(`\n${line}\n`);
+    expect(stripPyFix(out)).toBe(code);
+  });
+
+  it('python: a show() is rewritten to raise every open figure; with neither save nor show, a call at the end', () => {
+    const shown = applyFontFixes('import matplotlib.pyplot as plt\nplt.plot([1], [1])\nplt.show()', 'python', PY_NEED);
+    expect(shown).toContain('_postr_raise_text(plt, _POSTR_NEED, every=True).show()');
+    const bare = applyFontFixes('import matplotlib.pyplot as plt\nplt.plot([1], [1])', 'python', PY_NEED).trimEnd().split('\n');
+    expect(bare[bare.length - 1]).toBe('_postr_raise_text(None, _POSTR_NEED, every=True, end=True)');
+    // fig.show() does not close the figure; it is left alone.
+    expect(applyFontFixes('import matplotlib.pyplot as plt\nfig.show()\nfig.savefig("f.png")', 'python', PY_NEED)).toContain('\nfig.show()');
+  });
+
+  it('python: a show() in a comment, a string or a def of its own is not rewritten, nor fig.show()', () => {
+    const code = ['import matplotlib.pyplot as plt', '# plt.show()', 'note = "call plt.show later"',
+      'def show(): pass', 'fig, ax = plt.subplots()', 'fig.show()', 'plt.show()'].join('\n');
+    const out = applyFontFixes(code, 'python', PY_NEED);
+    expect(out.match(/_postr_raise_text\(plt, _POSTR_NEED, every=True\)\.show\(\)/g)).toHaveLength(1);
+    expect(out).toContain('\n# plt.show()\n');
+    expect(out).toContain('\ndef show(): pass\n');
+    expect(out).toContain('\nfig.show()\n');
+  });
+
+  it('python: fixing an already fixed script replaces the block, and routes each show and adds the end call once', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nfig.savefig("f.png")\nplt.show()';
+    const once = applyFontFixes(code, 'python', PY_NEED);
+    const twice = applyFontFixes(once, 'python', "{'plotTitle': 20}");
+    expect(twice.match(/def _postr_raise_text/g)).toHaveLength(1);
+    expect(twice.match(/^_postr_install\(\)$/gm)).toHaveLength(1);
+    expect(twice).toContain("_POSTR_NEED = {'plotTitle': 20}");
+    expect(twice.match(/_postr_raise_text\(plt, _POSTR_NEED, every=True\)\.show/g)).toHaveLength(1);
+    expect(twice.match(/^_postr_raise_text\(None, _POSTR_NEED, every=True, end=True\)$/gm)).toHaveLength(1);
+    expect(stripPyFix(twice)).toBe(code);
+  });
+
+  it('R: a trailing comment does not swallow the joining +', () => {
+    // Measured in ggplot2: with the + inside the comment the script still
+    // evaluates cleanly and the theme simply never attaches — a silent
+    // no-op, which is the failure this whole feature exists to avoid.
+    const code = ['library(ggplot2)', 'p <- ggplot(df, aes(x, y)) + geom_point()  # main plot',
+      'ggsave("f.png", width = 9, height = 6)'].join('\n');
+    const out = applyFontFixes(code, 'r', 'theme(\n  axis.title = element_text(size = 17)\n)');
+    expect(out.split('\n').some((l) => /#.*\+\s*$/.test(l))).toBe(false);
+    expect(out).toMatch(/geom_point\(\) \+\s+# main plot/);
+  });
+
+  it('R: a commented-out theme_*() does not attract the insert', () => {
+    // The commented copy must come AFTER the live one, because the
+    // insertion point is the LAST theme_*() call — put it first and the
+    // old raw-text scan picks the right one by luck.
+    const code = [
+      'p <- ggplot(df, aes(x, y)) + geom_point() + theme_minimal(base_size = 11)',
+      '# p <- p + theme_minimal(base_size = 20)   # an older version',
+      'ggsave("f.png", width = 9, height = 6)',
+    ].join('\n');
+    const out = applyFontFixes(code, 'r', 'theme(axis.title = element_text(size = 17))');
+    // The comment survives byte-for-byte...
+    expect(out).toContain('# p <- p + theme_minimal(base_size = 20)   # an older version');
+    // ...and the snippet hangs off the LIVE theme_minimal, not the dead one.
+    expect(out).toContain('theme_minimal(base_size = 11) +');
+  });
+
+  it('R: offsets survive comments around the real theme call', () => {
+    // Pins that the comment mask is length-preserving: the index is found
+    // in the masked copy and applied to the original, so any drift lands
+    // the insert mid-token. The banner sits BEFORE (so it shifts offsets)
+    // and a dead theme_*() sits AFTER (so a raw-text scan picks it).
+    const code = [
+      '# --------------------------------------------------------------',
+      '# Banner with parens ( ) and a fake theme_minimal( inside it',
+      '# --------------------------------------------------------------',
+      'p <- ggplot(df, aes(x, y)) + geom_point() + theme_minimal(base_size = 11)',
+      '# p + theme_bw(base_size = 9)',
+      'ggsave("f.png", width = 9, height = 6)',
+    ].join('\n');
+    const out = applyFontFixes(code, 'r', 'theme(axis.title = element_text(size = 17))');
+    expect(out).toContain('theme_minimal(base_size = 11) +');
+    expect(out).toContain('# Banner with parens ( ) and a fake theme_minimal( inside it');
+    expect(out).toContain('# p + theme_bw(base_size = 9)');
+    const commented = out.split('\n').filter((l) => l.trimStart().startsWith('#'));
+    expect(commented.join('\n')).not.toContain('axis.title');
   });
 
   it('returns the code untouched when there is nothing to apply', () => {
@@ -950,6 +1165,17 @@ ggsave("fig.png", width = 9, height = 6)`;
     const out = applyFontFixes(code, 'r', rFix);
     expect(out.split('(').length).toBe(out.split(')').length);
   });
+
+  it('python: a save inside a function or a loop is left where it is, as written', () => {
+    const code = ['import matplotlib.pyplot as plt', '', 'def make_figure(x, y):',
+      '    fig, ax = plt.subplots(figsize=(9, 6))', '    ax.plot(x, y)', '    fig.savefig("a.png")', '',
+      'for i in range(3):', '    fig, ax = plt.subplots()', '    plt.savefig(f"b{i}.png")'].join('\n');
+    const out = applyFontFixes(code, 'python', PY_NEED);
+    expect(out).toContain('\n    fig.savefig("a.png")\n');
+    expect(out).toContain('\n    plt.savefig(f"b{i}.png")\n');
+    expect(stripPyFix(out)).toBe(code);
+  });
+
 });
 
 describe('override coverage is not override reachability', () => {
@@ -1075,95 +1301,6 @@ describe('override coverage is not override reachability', () => {
       + 'ggsave("f.png", width = 10, height = 7)';
     const snip = computeReadability(parseRCode(code), 7, 10).fontSnippet ?? '';
     expect(snip).toContain('axis.title.y');
-  });
-});
-
-describe('the fix is inserted where it will actually run', () => {
-  // Insertion points used to be chosen from raw text, so comments and
-  // indentation were invisible. Ground truth below: Python verified with
-  // ast.parse, R with Rscript 4.6.0 + ggplot2 (both the broken and fixed
-  // forms EVALUATE — only one attaches the theme, so "does it parse" is
-  // the wrong question).
-
-  it('python: a figure built inside a function stays indented', () => {
-    const code = ['import matplotlib.pyplot as plt', '', 'def make_figure(x, y):',
-      '    fig, ax = plt.subplots(figsize=(9, 6))', '    ax.plot(x, y)', '    return fig'].join('\n');
-    const out = applyFontFixes(code, 'python', "plt.rcParams.update({\n    'axes.labelsize': 17\n})");
-    // A column-0 statement under `def ...:` is an IndentationError.
-    expect(out).toContain('    plt.rcParams.update');
-    expect(out).not.toMatch(/^plt\.rcParams\.update/m);
-  });
-
-  it('python: a figure built in a loop stays indented', () => {
-    const code = ['import matplotlib.pyplot as plt', '', 'for i in range(3):',
-      '    fig, ax = plt.subplots(figsize=(9, 6))'].join('\n');
-    const out = applyFontFixes(code, 'python', "plt.rcParams.update({\n    'axes.labelsize': 17\n})");
-    expect(out).toContain('    plt.rcParams.update');
-  });
-
-  it('python: a module-level figure still gets a column-0 insert', () => {
-    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(9,6))';
-    const out = applyFontFixes(code, 'python', "plt.rcParams['font.size'] = 17");
-    expect(out).toMatch(/^plt\.rcParams/m);
-  });
-
-  it('python: a commented-out plt.subplots does not attract the insert', () => {
-    const code = ['import matplotlib.pyplot as plt', '# fig, ax = plt.subplots(figsize=(3,2))',
-      'fig, ax = plt.subplots(figsize=(9,6))'].join('\n');
-    const out = applyFontFixes(code, 'python', "plt.rcParams['font.size'] = 17");
-    const lines = out.split('\n');
-    const insertAt = lines.findIndex((l) => l.includes('rcParams'));
-    const realAt = lines.findIndex((l) => !l.trimStart().startsWith('#') && l.includes('plt.subplots'));
-    expect(insertAt).toBeLessThan(realAt);
-    expect(insertAt).toBeGreaterThan(lines.findIndex((l) => l.trimStart().startsWith('#')));
-  });
-
-  it('R: a trailing comment does not swallow the joining +', () => {
-    // Measured in ggplot2: with the + inside the comment the script still
-    // evaluates cleanly and the theme simply never attaches — a silent
-    // no-op, which is the failure this whole feature exists to avoid.
-    const code = ['library(ggplot2)', 'p <- ggplot(df, aes(x, y)) + geom_point()  # main plot',
-      'ggsave("f.png", width = 9, height = 6)'].join('\n');
-    const out = applyFontFixes(code, 'r', 'theme(\n  axis.title = element_text(size = 17)\n)');
-    expect(out.split('\n').some((l) => /#.*\+\s*$/.test(l))).toBe(false);
-    expect(out).toMatch(/geom_point\(\) \+\s+# main plot/);
-  });
-
-  it('R: a commented-out theme_*() does not attract the insert', () => {
-    // The commented copy must come AFTER the live one, because the
-    // insertion point is the LAST theme_*() call — put it first and the
-    // old raw-text scan picks the right one by luck.
-    const code = [
-      'p <- ggplot(df, aes(x, y)) + geom_point() + theme_minimal(base_size = 11)',
-      '# p <- p + theme_minimal(base_size = 20)   # an older version',
-      'ggsave("f.png", width = 9, height = 6)',
-    ].join('\n');
-    const out = applyFontFixes(code, 'r', 'theme(axis.title = element_text(size = 17))');
-    // The comment survives byte-for-byte...
-    expect(out).toContain('# p <- p + theme_minimal(base_size = 20)   # an older version');
-    // ...and the snippet hangs off the LIVE theme_minimal, not the dead one.
-    expect(out).toContain('theme_minimal(base_size = 11) +');
-  });
-
-  it('R: offsets survive comments around the real theme call', () => {
-    // Pins that the comment mask is length-preserving: the index is found
-    // in the masked copy and applied to the original, so any drift lands
-    // the insert mid-token. The banner sits BEFORE (so it shifts offsets)
-    // and a dead theme_*() sits AFTER (so a raw-text scan picks it).
-    const code = [
-      '# --------------------------------------------------------------',
-      '# Banner with parens ( ) and a fake theme_minimal( inside it',
-      '# --------------------------------------------------------------',
-      'p <- ggplot(df, aes(x, y)) + geom_point() + theme_minimal(base_size = 11)',
-      '# p + theme_bw(base_size = 9)',
-      'ggsave("f.png", width = 9, height = 6)',
-    ].join('\n');
-    const out = applyFontFixes(code, 'r', 'theme(axis.title = element_text(size = 17))');
-    expect(out).toContain('theme_minimal(base_size = 11) +');
-    expect(out).toContain('# Banner with parens ( ) and a fake theme_minimal( inside it');
-    expect(out).toContain('# p + theme_bw(base_size = 9)');
-    const commented = out.split('\n').filter((l) => l.trimStart().startsWith('#'));
-    expect(commented.join('\n')).not.toContain('axis.title');
   });
 });
 
@@ -1320,3 +1457,288 @@ describe('sizes are reported at one decimal, everywhere', () => {
     expect(r.elements.find((e) => e.name === 'Axis titles')!.sourcePt).toBe(9);
   });
 });
+
+// Fix 13, claim W1: the re-check could not read the checker's own fix, so
+// pasting the corrected code back showed the same failures (42 of 42 runs
+// identical, while real matplotlib passed 31 of them). The re-check now
+// reads the helper's calls: each listed class is at least the size named.
+describe('the Python fix, applied again and to harder scripts (step 9 review, rounds 2 and 3)', () => {
+  const NEED2 = "{'axisTitle': 20, 'axisText': 16, 'legendText': 14}";
+  const twice = (code: string) => applyFontFixes(applyFontFixes(code, 'python', PY_NEED), 'python', NEED2);
+  const block = '# Postr: raise text that prints too small';
+
+  it('R2-02: a second fix leaves every save as written, commas and all', () => {
+    for (const code of [
+      'import seaborn as sns\nsns.catplot(data=df, x="a", y="b").savefig("f.png")',
+      'import matplotlib.pyplot as plt\nfig, axs = plt.subplots(2, 2)\naxs[0, 1].figure.savefig("f.png")',
+      'import matplotlib.pyplot as plt\nplt.figure(1, figsize=(6, 4)).savefig("f.png")',
+    ]) {
+      const out = twice(code);
+      expect(out).toContain(`\n${code.split('\n').pop()}\n`);
+      expect(out.match(/def _postr_raise_text/g)).toHaveLength(1);
+      expect(out).toContain(`_POSTR_NEED = ${NEED2}`);
+      expect(stripPyFix(out)).toBe(code);
+    }
+  });
+
+  it('R2-03: a second fix finds the earlier block when its marker comments were edited', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nfig.savefig("f.png")';
+    const once = applyFontFixes(code, 'python', PY_NEED);
+    const begin = `${block} (begin)`;
+    const end = `${block} (end)`;
+    for (const edited of [
+      once.replace(`${begin}\n`, ''),
+      once.replace(`${end}\n`, ''),
+      once.replace(begin, `${begin} `).replace(end, `${end} `),
+      once.replace(/\n/g, '\r\n'),
+    ]) {
+      const out = applyFontFixes(edited, 'python', NEED2).replace(/\r/g, '');
+      expect(out.match(/def _postr_raise_text/g)).toHaveLength(1);
+      expect(out.match(/def _postr_install/g)).toHaveLength(1);
+      expect(out.match(/^_postr_install\(\)$/gm)).toHaveLength(1);
+      expect(out).not.toMatch(/^def[ \t]*$/m);
+      expect(out.match(/_POSTR_NEED = /g)).toHaveLength(1);
+      // No marker of the earlier block is left behind.
+      expect(out.match(/raise text that prints too small \(begin\)/g)).toHaveLength(1);
+      expect(out.match(/raise text that prints too small \(end\)/g)).toHaveLength(1);
+      expect(stripPyFix(out)).toBe(code);
+    }
+  });
+
+  it('R2-07: a first-line cell magic stays on the first line', () => {
+    const code = '%%time\nimport matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nfig.savefig("f.png")';
+    expect(applyFontFixes(code, 'python', PY_NEED).split('\n')[0]).toBe('%%time');
+  });
+
+  it('R2-09: a script full of unclosed calls is fixed in linear time, and not doubled', () => {
+    const code = `import matplotlib.pyplot as plt\n${'_postr_raise_text(\n'.repeat(20_000)}`;
+    const t0 = performance.now();
+    const out = applyFontFixes(code, 'python', PY_NEED);
+    expect(performance.now() - t0).toBeLessThan(2_000);
+    expect(out.length).toBeLessThan(code.length * 1.5);
+  });
+
+  it('R3-01: an attribute named savefig or show that is not matplotlib\'s is left alone', () => {
+    const code = ['import matplotlib.pyplot as plt', 'import functools', 'fig, ax = plt.subplots()',
+      'if args.savefig: fig.savefig(args.savefig)', 'self.savefig = True', 'save = fig.savefig',
+      'fig.savefig = functools.partial(fig.savefig, dpi=120)', 'cfg.plot.show()', 'save("f.png")'].join('\n');
+    const out = applyFontFixes(code, 'python', PY_NEED);
+    for (const line of code.split('\n')) expect(out).toContain(`\n${line}\n`);
+    expect(stripPyFix(out)).toBe(code);
+  });
+
+  it('R3-04: a save added to a script that never binds plt imports it', () => {
+    const code = 'import matplotlib.pyplot as pyplot\nfig, ax = pyplot.subplots()\nax.set_xlabel("t")';
+    const fixed = generateTargetedFullFix(code, parsePythonCode(code), "{'axisTitle': 17}");
+    expect(fixed).toMatch(/\nimport matplotlib\.pyplot as plt\nplt\.savefig\("poster_figure\.png"/);
+  });
+
+  it('R2-06: shows across a line continuation, continued in brackets, and under an import of several modules are routed', () => {
+    for (const code of [
+      'import matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nplt \\\n    .show()',
+      'import matplotlib.pyplot as plt\nfig, ax = plt.subplots()\n(plt\n    .show())',
+      'import numpy as np, matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nplt.show()',
+    ]) expect(applyFontFixes(code, 'python', PY_NEED), code).toContain('_postr_raise_text(plt, _POSTR_NEED, every=True).show()');
+  });
+
+  it('R3-08 and n20: shows through a bracketed import and a show handed on uncalled are routed', () => {
+    const bracketed = 'from matplotlib import (\n    pyplot as plt,\n    cm,\n)\nfig, ax = plt.subplots()\nplt.show()';
+    expect(applyFontFixes(bracketed, 'python', PY_NEED)).toContain('_postr_raise_text(plt, _POSTR_NEED, every=True).show()');
+    const handed = 'import matplotlib.pyplot as plt\ndisplay_plot = plt.show\nfig, ax = plt.subplots()\ndisplay_plot()';
+    const out = applyFontFixes(handed, 'python', PY_NEED);
+    expect(out).toContain('display_plot = (lambda *a, **k: _postr_raise_text(plt, _POSTR_NEED, every=True).show(*a, **k))');
+    expect(stripPyFix(out)).toBe(handed);
+    // Replaced or deleted, it is the attribute itself: left alone.
+    const replaced = 'import matplotlib.pyplot as plt\nplt.show = print\ndel plt.show';
+    expect(stripPyFix(applyFontFixes(replaced, 'python', PY_NEED))).toBe(replaced);
+    expect(applyFontFixes(replaced, 'python', PY_NEED)).toContain('\nplt.show = print\ndel plt.show\n');
+  });
+
+  it('the re-check gives the fix no credit while a pyplot show is not routed, a figure is printed by its canvas, or the wrap is not installed', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(10, 7))\nax.set_xlabel("t")\nfig.savefig("f.png")';
+    const fixed = applyFontFixes(code, 'python', "{'axisTitle': 17}");
+    expect(parsePythonCode(fixed).overrides.axisTitle, 'precondition: credited as fixed').toBe(17);
+    expect(parsePythonCode(`${fixed}\nplt.show()`).overrides.axisTitle).toBeUndefined();
+    expect(parsePythonCode(`${fixed}\nfig.canvas.print_figure("g.png")`).overrides.axisTitle).toBeUndefined();
+    expect(parsePythonCode(fixed.replace(/^_postr_install\(\)$/m, '')).overrides.axisTitle).toBeUndefined();
+  });
+
+  it('R2-14: of two blocks, the one Python runs last is read; a helper deleted is not read at all', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(10, 7))\nax.set_xlabel("t")\nfig.savefig("f.png")';
+    const fixed = applyFontFixes(code, 'python', "{'axisTitle': 40}");
+    const two = fixed.replace("_POSTR_NEED = {'axisTitle': 40}", "_POSTR_NEED = {'axisTitle': 40}\n_POSTR_NEED = {'axisTitle': 12}");
+    expect(parsePythonCode(two).overrides.axisTitle ?? 0).toBeLessThanOrEqual(12);
+    const noDef = fixed.replace(/^def _postr_raise_text[\s\S]*?\n(?=\S)/m, '');
+    expect(noDef, 'precondition: the def is gone').not.toContain('def _postr_raise_text');
+    expect(parsePythonCode(noDef).overrides.axisTitle).toBeUndefined();
+  });
+
+  it('R3-06: shows are routed after a continuation before a Windows line break, an import after a `;`, and a receiver over several lines', () => {
+    for (const [code, receiver] of <Array<[string, string]>>[
+      ['import matplotlib.pyplot as plt\r\nfig, ax = plt.subplots()\r\nplt \\\r\n    .show()', 'plt'],
+      ['import numpy as np; import matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nplt.show()', 'plt'],
+      ['import matplotlib.pyplot\nfig, ax = matplotlib.pyplot.subplots()\n(matplotlib\n    .pyplot\n    .show())', 'matplotlib\n    .pyplot'],
+    ]) expect(applyFontFixes(code, 'python', PY_NEED), code).toContain(`_postr_raise_text(${receiver}, _POSTR_NEED, every=True)`);
+  });
+
+  it('R3-07: a long chain of `.show` attributes is fixed and read back in linear time', () => {
+    const code = `import matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nax.set_xlabel("x")\nfig${'.show'.repeat(8_000)}\n`;
+    const t0 = performance.now();
+    parsePythonCode(applyFontFixes(code, 'python', PY_NEED));
+    expect(performance.now() - t0).toBeLessThan(1_000);
+  });
+
+  it('R4-07: a bare show() under `from matplotlib.pyplot import *` is routed', () => {
+    const code = 'from matplotlib.pyplot import *\nfig, ax = subplots()\nax.set_title("t")\nshow()';
+    expect(applyFontFixes(code, 'python', PY_NEED)).toContain('\n_postr_raise_text(None, _POSTR_NEED, every=True).show()\n');
+  });
+
+  it('R5-08: a script that defines its own show() keeps calling it under `from matplotlib.pyplot import *`', () => {
+    const code = 'from matplotlib.pyplot import *\ndef show():\n    savefig("report.pdf")\nfig, ax = subplots()\nax.set_title("t")\nshow()';
+    const out = applyFontFixes(code, 'python', PY_NEED);
+    expect(out).toContain('\nshow()\n');
+    expect(out).not.toContain(').show()');
+  });
+
+  it('R6: any display( withholds the credit, since a figure can reach it under any name (round 6, R6C-01, R6P-01)', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(10, 7))\nax.set_xlabel("t")\nfig.savefig("f.png")';
+    const fixed = applyFontFixes(code, 'python', "{'axisTitle': 17}");
+    expect(parsePythonCode(fixed).overrides.axisTitle, 'precondition: credited as fixed').toBe(17);
+    for (const shown of [
+      'display(fig)', 'display(g.figure)', 'IPython.display.display(plt.gcf())',
+      'display(f)', 'display(ax.get_figure())', 'display(g.fig)', 'display(df, fig)', 'display(*figs)',
+      'display(plt.figure(1))', 'ipd.display(p)', 'display(\n    fig,\n)',
+      // Not a figure, but the checker cannot tell (round 5's R5-09, reversed:
+      // a false red is kept rather than a false green).
+      'display(df.describe())',
+    ]) expect(parsePythonCode(`${fixed}\n${shown}`).overrides.axisTitle, shown).toBeUndefined();
+  });
+
+  it('R6: a show() the script defines or assigns anywhere, not only at the top, is its own (round 6, R6C-04, R6P-04)', () => {
+    for (const own of [
+      'def main():\n    def show():\n        savefig("report.pdf")\n    fig, ax = subplots()\n    show()\nmain()',
+      'if True:\n    def show():\n        savefig("r.pdf")\nfig, ax = subplots()\nshow()',
+      'try:\n    show = save_pdf\nexcept NameError:\n    pass\nfig, ax = subplots()\nshow()',
+    ]) {
+      const out = applyFontFixes(`from matplotlib.pyplot import *\n${own}`, 'python', PY_NEED);
+      expect(out, own).not.toContain(').show()');
+    }
+  });
+
+  it('R6: a method named show is not the script\'s own show (round 6)', () => {
+    const code = 'from matplotlib.pyplot import *\nclass Report:\n    def show(self):\n        print("x")\nfig, ax = subplots()\nax.set_title("t")\nshow()';
+    expect(applyFontFixes(code, 'python', PY_NEED)).toContain('\n_postr_raise_text(None, _POSTR_NEED, every=True).show()\n');
+  });
+
+  it('R6: a bare show() under `from pylab import *` is routed (round 6, R6P-03)', () => {
+    for (const imp of ['from pylab import *', 'from matplotlib.pylab import *', 'from pylab import show, subplots']) {
+      const code = `${imp}\nfig, ax = subplots()\nax.set_title("t")\nshow()`;
+      expect(applyFontFixes(code, 'python', PY_NEED), imp).toContain('\n_postr_raise_text(None, _POSTR_NEED, every=True).show()\n');
+    }
+  });
+
+  it('R4-05: the re-check gives no credit when a figure reaches a file or a notebook without Figure.savefig', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(10, 7))\nax.set_xlabel("t")\nfig.savefig("f.png")';
+    const fixed = applyFontFixes(code, 'python', "{'axisTitle': 17}");
+    expect(parsePythonCode(fixed).overrides.axisTitle, 'precondition: credited as fixed').toBe(17);
+    for (const bypass of [
+      'fig.canvas.print_png("g.png")',
+      'write = fig.canvas.print_figure',
+      'FigureCanvasPdf(fig).print_pdf("g.pdf")',
+      'fig.canvas.draw()\nimage = fig.canvas.buffer_rgba()',
+      'display(fig)',
+    ]) expect(parsePythonCode(`${fixed}\n${bypass}`).overrides.axisTitle, bypass).toBeUndefined();
+  });
+
+  it('R4-11: a save added to a script that imports pyplot only inside a function imports it at the top level', () => {
+    const code = 'def main():\n    import matplotlib.pyplot as plt\n    fig, ax = plt.subplots()\n    ax.set_xlabel("t")\n    plt.show()\n\nmain()';
+    const fixed = generateTargetedFullFix(code, parsePythonCode(code), "{'axisTitle': 17}");
+    expect(fixed).toMatch(/\nimport matplotlib\.pyplot as plt\nplt\.savefig\("poster_figure\.png"/);
+  });
+
+  it('R4-13: a second fix takes out an earlier install def whose marker comments and call were deleted', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nfig.savefig("f.png")';
+    const once = applyFontFixes(code, 'python', PY_NEED)
+      .replace('# Postr: raise text that prints too small (begin)\n', '')
+      .replace('# Postr: raise text that prints too small (end)\n', '')
+      .replace(/^_postr_install\(\)\n/m, '');
+    expect(once, 'precondition: the earlier install def is the block\'s last line').not.toMatch(/^_postr_install\(\)$/m);
+    const out = applyFontFixes(once, 'python', NEED2);
+    expect(out.match(/^def _postr_install/gm)).toHaveLength(1);
+    expect(out.match(/^_postr_install\(\)$/gm)).toHaveLength(1);
+  });
+
+  it('R3-06: a second fix takes a show handed on uncalled back to one lambda', () => {
+    const handed = 'import matplotlib.pyplot as plt\ndisplay_plot = plt.show\nfig, ax = plt.subplots()\ndisplay_plot()';
+    const out = twice(handed);
+    expect(out.match(/\(lambda \*a, \*\*k:/g)).toHaveLength(1);
+    expect(stripPyFix(out)).toBe(handed);
+  });
+
+  it('a second fix keeps code written after the end call on its line, and a call nested in another', () => {
+    const code = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nax.set_xlabel("t")\nfig.savefig("f.png")';
+    const once = applyFontFixes(code, 'python', PY_NEED);
+    const edited = once.replace(/^(_postr_raise_text\(None, _POSTR_NEED, every=True, end=True\))$/m, '$1; print("done")  # finished');
+    expect(edited, 'precondition: the end call has code after it').toContain('end=True); print("done")');
+    const out = applyFontFixes(edited, 'python', NEED2);
+    expect(out).toMatch(/^print\("done"\) {2}# finished$/m);
+    expect(out.match(/^_postr_raise_text\(None, _POSTR_NEED, every=True, end=True\)$/gm)).toHaveLength(1);
+    // Wrapped twice by hand: one call is taken out, the other left whole.
+    const nested = `${once}\n_postr_raise_text(_postr_raise_text(plt, _POSTR_NEED, every=True), _POSTR_NEED, every=True).show()`;
+    const again = applyFontFixes(nested, 'python', NEED2);
+    expect(again).toContain('\n_postr_raise_text(plt, _POSTR_NEED, every=True).show()');
+    expect(again).not.toMatch(/_postr_raise_text\([^\n]*\)\.\s*$/m);
+  });
+});
+
+describe('the re-check reads its own Python fix', () => {
+  const script = 'import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(10, 7))\nax.set_title("Result")\nfig.savefig("f.png")';
+
+  it('each class the fix names is read at the size it names', () => {
+    const fixed = applyFontFixes(script, 'python', "{'plotTitle': 19, 'axisTitle': 17}");
+    const p = parsePythonCode(fixed);
+    expect(p.overrides.plotTitle).toBe(19);
+    expect(p.overrides.axisTitle).toBe(17);
+  });
+
+  it('the re-check never reads a class lower than the script already sets it', () => {
+    const big = script.replace('import matplotlib.pyplot as plt', "import matplotlib.pyplot as plt\nplt.rcParams['font.size'] = 20");
+    const p = parsePythonCode(applyFontFixes(big, 'python', "{'axisTitle': 17}"));
+    expect(p.overrides.axisTitle ?? p.baseSize).toBeGreaterThanOrEqual(20);
+  });
+
+  it('a copy of the block in a comment or a string is not read', () => {
+    const block = "_POSTR_NEED = {'axisTitle': 30}\n_postr_raise_text(fig, _POSTR_NEED).savefig('f.png')";
+    expect(parsePythonCode(`${script}\n# ${block.replace('\n', '\n# ')}`).overrides.axisTitle).toBeUndefined();
+    expect(parsePythonCode(`${script}\nnote = """${block}"""`).overrides.axisTitle).toBeUndefined();
+    // Each line of the copy at column 0 inside a multi-line string (round 2, R2-12).
+    expect(parsePythonCode(`${script}\nnote = """\n${block}\n"""`).overrides.axisTitle).toBeUndefined();
+  });
+
+  it('a size the user set on one axis does not stand for the whole class', () => {
+    // Step 9 review, S9-06: the x label at 30 pt, the y label inheriting 10;
+    // the fix raises the class to 17, so the smallest drawn is 17, not 30.
+    const oneAxis = "import matplotlib.pyplot as plt\nfig, ax = plt.subplots(figsize=(10, 7))\nax.set_xlabel('t', fontsize=30)\nax.set_ylabel('y')\nfig.savefig('f.png')";
+    const p = parsePythonCode(applyFontFixes(oneAxis, 'python', "{'axisTitle': 17}"));
+    expect(p.overrides.axisTitle).toBe(17);
+  });
+
+  it('a row the fix raised is not marked "(you set this)"', () => {
+    const code = "import matplotlib.pyplot as plt\nplt.rcParams['font.size'] = 6\nfig, ax = plt.subplots(figsize=(10, 7))\nfig.savefig('f.png')";
+    const first = computeReadability(parsePythonCode(code), 10, 7);
+    const again = computeReadability(parsePythonCode(applyFontFixes(code, 'python', first.fontSnippet)), 5, 3.5);
+    expect(again.fontFixes.length, 'precondition: at a smaller size something fails again').toBeGreaterThan(0);
+    expect(again.fontFixes.filter((f) => f.wasOverridden)).toEqual([]);
+  });
+
+  it('the corrected code re-checks with every fixed element passing', () => {
+    const code = "import matplotlib.pyplot as plt\nplt.rcParams['font.size'] = 6\nfig, ax = plt.subplots(figsize=(10, 7))\nfig.savefig('f.png')";
+    const first = computeReadability(parsePythonCode(code), 10, 7);
+    expect(first.fontFixes.length, 'precondition: something fails').toBeGreaterThan(0);
+    const fixed = applyFontFixes(code, 'python', first.fontSnippet);
+    const again = computeReadability(parsePythonCode(fixed), 10, 7);
+    const fixedNames = new Set(first.fontFixes.map((f) => f.name));
+    expect(again.elements.filter((e) => fixedNames.has(e.name) && e.status !== 'pass')).toEqual([]);
+  });
+});
+

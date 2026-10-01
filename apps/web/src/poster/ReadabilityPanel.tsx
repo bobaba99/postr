@@ -675,7 +675,7 @@ export function ReadabilityPanel({
                     Your script with the sizes above applied — copy it whole and run it.{' '}
                     {checkedParams?.language === 'r'
                       ? 'The new theme() sits after your existing one; ggplot applies theme calls in order and the last wins, so it overrides only the sizes named.'
-                      : 'The rcParams block sits above the figure, because matplotlib reads it when the figure is created.'}
+                      : 'A small function raises these sizes just before the figure is saved, so nothing earlier in your script overrides them. It never makes text smaller.'}
                   </div>
                 </div>
               )}

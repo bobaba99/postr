@@ -200,14 +200,24 @@ function fixPython(code: string, params: FigureParams, suggested: number): strin
 
 /** Python counterpart of `ensureRSave`. */
 function ensurePySave(code: string): string {
-  if (/savefig/.test(code)) return code;
-  return `${code.trimEnd()}\n\nplt.savefig("poster_figure.png", dpi=300, bbox_inches="tight")`;
+  // A save in the code itself: not the word in a comment or a string (the
+  // fix's own helper text names savefig; step 9 review of fix 13, R2-04).
+  const masked = maskCodeForRewrite(code);
+  if (/(?<![\w])savefig\b/.test(masked)) return code;
+  // `plt` bound to pyplot at the top level, or bound here (round 3, R3-04:
+  // `import matplotlib.pyplot as pyplot` left the save a NameError; round 4,
+  // R4-11: so did an import inside a function).
+  const bound = /^import[ \t]+matplotlib\.pyplot[ \t]+as[ \t]+plt\b/m.test(masked) ||
+    /^from[ \t]+matplotlib[ \t]+import[ \t]+[^\n]*\bpyplot[ \t]+as[ \t]+plt\b/m.test(masked);
+  const save = 'plt.savefig("poster_figure.png", dpi=300, bbox_inches="tight")';
+  return `${code.trimEnd()}\n\n${bound ? '' : 'import matplotlib.pyplot as plt\n'}${save}`;
 }
 
 /**
  * "Full edited code" for the TARGETED advice: the user's script with the
  * per-element sizes applied, plus the same save call the base_size path
- * appends when the script has none.
+ * appends when the script has none (for Python, added before the sizes, so
+ * the fix raises the text it saves).
  *
  * This is what the copy button hands over. A theme() fragment would
  * leave the user to work out where it goes, and pasting it below
@@ -218,10 +228,9 @@ export function generateTargetedFullFix(
   params: FigureParams,
   fontSnippet: string | null,
 ): string {
-  const withFixes = applyFontFixes(code, params.language, fontSnippet);
-  return params.language === 'r'
-    ? ensureRSave(withFixes, params)
-    : ensurePySave(withFixes);
+  if (params.language === 'r') return ensureRSave(applyFontFixes(code, 'r', fontSnippet), params);
+  // The save goes in before the fix, so the fix raises the text it saves.
+  return applyFontFixes(ensurePySave(code), 'python', fontSnippet);
 }
 
 export function generateFullFix(
