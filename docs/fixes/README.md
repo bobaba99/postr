@@ -29,3 +29,74 @@ order:
 Evidence tiers used throughout: **MEASURED** (a number from a re-runnable
 command), **TESTED** (a test that fails without the fix), **INSPECTED** (read the
 code; nothing ran), **UNVERIFIED** (not reproduced).
+
+## Review budget
+
+Set by the owner on 2026-09-30: **three review rounds for important feature
+logic** (data, money, privacy, a result the user relies on), **one for a
+simple feature** (a display aid, a layout nicety). Count rounds per batch of
+code, not per fix: a new cause's first review is that code's round 1.
+
+**Why, from the records of fixes 01, 02, 03, 04, 13 and 23** (a tally of
+every review round, 2026-10-05; the HIGH and MEDIUM counts recounted from the
+records' grade labels, the rest an agent's reading of them, not re-derived:
+UNVERIFIED. Record 04 is on the parked branch `editor/rulers-match-sheet`). Later
+rounds were not marginal by count: they found about the same number of HIGH
+or MEDIUM product defects per round at every ordinal (1.8 at round 1, 1.8 at
+round 2, 2.2 at round 3, about 1.7 from round 4 on). What changed was where
+the defects came from. Of the about 47 found at round 4 and later, about 25
+were made by the previous round's own change, about 11 were older defects on
+main found in passing, and about 11 were missed in the fix's earlier code.
+Rounds in which a reviewer re-ran its own instruments found no HIGH or MEDIUM
+product defect (5 of 5); rounds that added an angle found most of what was
+missed (the four step 10 reviews, 3.5 each). And the cost of a missed defect,
+or of a round, is not in the records.
+
+**So the rounds go in this order:**
+
+1. Code review on a frozen copy.
+2. An independent review from a new angle: other browsers, the production
+   build, the real backend, the user's own entry points.
+3. A re-check of the responses to 1 and 2.
+
+A simple feature gets one round, and it is the second kind: the browser,
+through the user's entry points.
+
+**Stopping rule.** One more round only when the last response changed what
+the product does beyond a local fix with a test that went red first (a new
+mechanism, keyboard or focus handling, a redesign), or an angle not yet used
+applies, or the last round found a HIGH or MEDIUM data-loss or privacy
+defect (then a sweep for its siblings). Findings only about the record, an
+instrument or a test never justify a round: they go to the step 11 claims
+audit. Defects on main found in passing go to the plan.
+
+## Harnesses to reuse
+
+Review agents start from these committed instruments and extend them (a new
+scenario, a new fixture, a new claim) instead of writing their own. A tool
+built during a review that finds a real defect is folded into the matching
+harness before the fix merges: anything left in a scratch folder is lost
+when it is cleared. All run from `apps/web` unless their row says otherwise;
+the fix harnesses' headers give their claims, controls, blind spots and exit
+codes (0 clean, 1 the defect observed, 2 an instrument error).
+
+| harness | measures | first written for |
+|---|---|---|
+| `scripts/lib/editorHarness.mjs` | the base of the editor browser checks from fix 03 on: the app's own Vite server and Playwright, the backend faked at the network; `POSTR_BROWSER` (chromium, firefox, webkit), `POSTR_SCROLLBARS=classic` (scrollbars that take space), `POSTR_MUTANT` (serve a mutant, the repo never written); `RouteRedirected` and `sourceFlag` let a scenario skip a page a feature switch hides | fix 03; browsers, scrollbars and skips from fix 04 |
+| `scripts/lib/guestBackend.mjs` | a fake Supabase with anonymous sessions and the posters table's row-level security | fix 23 |
+| `scripts/lib/png.mjs` | decodes a browser screenshot, for judging what is painted (layout boxes do not show paint) | fix 04 |
+| `scripts/mutation-check.mjs` | each part of a fix against the unit tests, one mutant at a time; a mutant no test notices is a blind spot | the fix process |
+| `scripts/blind-spot-check.mjs` | serves each blind-spot mutant to the browser scenarios its spec names; guarded only if they go red | fix 03 |
+| `scripts/sidebar-history-check.mjs` | undo history and the poster name across sidebar changes | fix 01 |
+| `scripts/poster-size-check.mjs` | poster size and template changes keep every block | fix 02 |
+| `scripts/fit-check.mjs` | Fit and zoom: gutters, hidden sheet, focus rings, the guidelines panel, the tour | fix 03 |
+| `scripts/new-poster-owner-check.mjs` | `/p/new` never opens someone else's poster | fix 23 |
+| `scripts/account-change-check.mjs` | the editor across an account change, against a real local Supabase | fix 23 |
+| `scripts/checker-truth-check.mjs` | the plot checker's gate: the page and the editor on 45 scripts at 4 sizes, every original and corrected script run in matplotlib | fix 13 |
+| `scripts/checker-shape-check.mts` | the plot checker's Python fix on the reviewers' break sets, judged by layout against controls that run no Postr code | fix 13 |
+| `scripts/geometry-desync.mjs` | stored against rendered block geometry, in real layout, on a page that copies the block renderer (not the app); run from the repo root; exits 0 when the desync reproduces | — |
+| `scripts/mobile-audit.mjs` | overflow, tap targets and text sizes of the public pages at phone widths; needs a dev server already on port 5173; no exit code | — |
+
+Parked with fix 04 on the local branch `editor/rulers-match-sheet`:
+`ruler-check.mjs` (every ruler mark against the sheet's inches, at rest and
+frame by frame), `ruler-sync-check.mjs` and a first `ruler-paint-check.mjs`.
