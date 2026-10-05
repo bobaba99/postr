@@ -8,10 +8,28 @@
  * Plain ESM on purpose: harnesses run in bare Node. The repo is POSTR_REPO or
  * the repo containing this file.
  *
+ * POSTR_BROWSER=chromium (the default), firefox or webkit picks the engine
+ * (Playwright's own builds: `npx playwright install firefox webkit`); the
+ * harness reports it as `h.engine`.
+ *
+ * POSTR_SCROLLBARS=classic (Chromium and WebKit) draws scrollbars that take
+ * space, 10 px, as on Windows and Linux, and in Safari set to always show
+ * them; by default Playwright hides them, and macOS overlays them. A scrollbar that appears or goes when the sheet
+ * resizes changes the canvas's size, which the default cannot show (the
+ * step 9 review of fix 04's cause C, S9C-04).
+ *
  * POSTR_MUTANT=<spec.mutants.json>#<name> serves that mutant's edited
  * sources instead of the files (the repo is never written), so a browser
  * scenario can show it goes red when a part of a fix is taken away:
  * scripts/blind-spot-check.mjs runs it for a spec's blind spots.
+ *
+ * A page opened at a `route` the app redirects to another path throws
+ * RouteRedirected at once, instead of waiting 90 s for a sheet that never
+ * comes: a tree that hides a feature (fix 23 sends the share link /s/:slug
+ * to /) has nothing for that scenario to measure. `sourceFlag` reads the
+ * tree's own feature switch, so a scenario can tell that apart from a page
+ * that redirects by mistake. It reads the file on disk, not a POSTR_MUTANT's
+ * edited copy: a mutant that flips a switch in features.ts is not seen.
  *
  * Side effect: loading vite.config.ts rewrites apps/web/public/version.json
  * (the build-stamp plugin). Restore it afterwards:
@@ -43,7 +61,9 @@ export async function startHarness({ name, port }) {
   const base = `http://127.0.0.1:${port}`;
   const out = path.resolve(process.env.OUT_DIR ?? path.join(os.tmpdir(), `postr-${name}-${port}`));
   fs.mkdirSync(out, { recursive: true });
-  const { chromium } = await import(pathToFileURL(path.join(REPO, 'node_modules/playwright/index.mjs')).href);
+  const engines = await import(pathToFileURL(path.join(REPO, 'node_modules/playwright/index.mjs')).href);
+  const engine = process.env.POSTR_BROWSER ?? 'chromium';
+  if (!['chromium', 'firefox', 'webkit'].includes(engine)) throw new Error(`POSTR_BROWSER must be chromium, firefox or webkit, not "${engine}"`);
   const { createServer } = await import(pathToFileURL(path.join(REPO, 'node_modules/vite/dist/node/index.js')).href);
   const mutant = mutantFromEnv();
   const server = await createServer({
@@ -52,9 +72,14 @@ export async function startHarness({ name, port }) {
     plugins: mutant ? [mutantPlugin(mutant.byFile)] : [],
   });
   await server.listen();
+  const scrollbars = process.env.POSTR_SCROLLBARS || 'default';
+  if (!['default', 'classic'].includes(scrollbars)) throw new Error(`POSTR_SCROLLBARS must be classic or unset, not "${scrollbars}"`);
+  // Chromium and WebKit draw styled ::-webkit-scrollbar ones in the layout;
+  // Playwright's Firefox keeps overlay scrollbars whatever it is told.
+  if (scrollbars === 'classic' && engine === 'firefox') throw new Error('POSTR_SCROLLBARS=classic needs POSTR_BROWSER=chromium or webkit');
   let browser;
   try {
-    browser = await chromium.launch();
+    browser = await engines[engine].launch(scrollbars === 'classic' && engine === 'chromium' ? { ignoreDefaultArgs: ['--hide-scrollbars'] } : {});
   } catch (e) {
     await server.close().catch(() => {});
     throw e;
@@ -63,9 +88,9 @@ export async function startHarness({ name, port }) {
   try {
     git = (await import('node:child_process')).execSync('git rev-parse --short HEAD', { cwd: REPO }).toString().trim();
   } catch { /* not a git checkout */ }
-  log(`[harness] vite on ${base} (repo ${REPO}, ${git})${mutant ? ` MUTANT ${mutant.name} (${mutant.byFile.size} file(s))` : ''}`);
+  log(`[harness] vite on ${base} (repo ${REPO}, ${git})${mutant ? ` MUTANT ${mutant.name} (${mutant.byFile.size} file(s))` : ''}${scrollbars === 'classic' ? ' SCROLLBARS classic' : ''}`);
   return {
-    base, out, git, browser, mutant: mutant?.name ?? null,
+    base, out, git, browser, engine, scrollbars, mutant: mutant?.name ?? null,
     async stop() {
       await browser.close().catch(() => {});
       await server.close().catch(() => {});
@@ -197,6 +222,27 @@ export async function buildDoc(page, base, { w, h }) {
   }, { w, h });
 }
 
+/** The app sent a page opened at a route to another path (see the file's header). */
+export class RouteRedirected extends Error {
+  constructor(wanted, landed) {
+    super(`${wanted} was redirected to ${landed}`);
+    this.wanted = wanted;
+    this.landed = landed;
+  }
+}
+
+/**
+ * A feature switch of the tree under test (apps/web/src/config/features.ts,
+ * `export const NAME = true|false;`): true or false, or null when the tree
+ * has no such switch.
+ */
+export function sourceFlag(name) {
+  let src = '';
+  try { src = fs.readFileSync(path.join(WEB, 'src/config/features.ts'), 'utf8'); } catch { return null; }
+  const m = src.match(new RegExp(`export const ${name}\\s*=\\s*(true|false)\\s*;`));
+  return m ? m[1] === 'true' : null;
+}
+
 /**
  * A fresh browser context and editor page on a `w` × `h` inch poster.
  * `route` picks the page (default the editor, /p/:id). `ownedByOther` makes
@@ -204,9 +250,28 @@ export async function buildDoc(page, base, { w, h }) {
  * to the editor, so a share-page check needs a poster the user does not own.
  * `editDoc(doc)` returns a changed copy of the doc before it is stored.
  * `tour` leaves the onboarding tour to start, as for a first-time user.
+ * `browser` and `scrollbars` override the harness's (a browser launched
+ * with a device scale factor of its own); `viewport: null` takes that
+ * browser's window as it is, with its own ratio.
  */
-export async function openEditor(h, { viewport, poster, deviceScaleFactor = 1, route, ownedByOther = false, editDoc, tour = false }) {
-  const context = await h.browser.newContext({ viewport, deviceScaleFactor });
+export async function openEditor(h, {
+  viewport, poster, deviceScaleFactor = 1, route, ownedByOther = false, editDoc, tour = false,
+  browser = h.browser, scrollbars = h.scrollbars,
+}) {
+  const context = await browser.newContext(viewport === null ? { viewport: null } : { viewport, deviceScaleFactor });
+  if (scrollbars === 'classic') {
+    await context.addInitScript(() => {
+      // The standard scrollbar-width and scrollbar-color (the app sets both)
+      // make Chromium draw its platform's scrollbars, overlaid on macOS, and
+      // ignore these; unset, it draws these 10 px ones in the layout.
+      const css = '*{scrollbar-width:auto!important;scrollbar-color:auto!important}::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#555}::-webkit-scrollbar-track{background:#222}';
+      document.addEventListener('DOMContentLoaded', () => {
+        const st = document.createElement('style');
+        st.textContent = css;
+        document.head.append(st);
+      });
+    });
+  }
   const state = { userId: randomUUID(), row: null, saves: [], aborted: [], errors: [] };
   await installMocks(context, state, h.base, { tour });
   const page = await context.newPage();
@@ -219,7 +284,17 @@ export async function openEditor(h, { viewport, poster, deviceScaleFactor = 1, r
     data: doc, thumbnail_path: null, share_slug: 'zq-share', is_public: false, created_at: t, updated_at: t,
   };
   try {
-    await page.goto(`${h.base}${route ? route(state.row) : `/p/${state.row.id}`}`);
+    const wanted = route ? route(state.row) : `/p/${state.row.id}`;
+    await page.goto(`${h.base}${wanted}`);
+    if (route) {
+      // The sheet, or the app sending the page somewhere else.
+      const at = await page.waitForFunction(
+        (w) => (document.querySelector('#poster-canvas [data-block-id]') ? 'sheet' : location.pathname !== w ? location.pathname : null),
+        new URL(wanted, h.base).pathname, { timeout: 90000 },
+      );
+      const landed = await at.jsonValue();
+      if (landed !== 'sheet') throw new RouteRedirected(wanted, landed);
+    }
     await page.waitForSelector('#poster-canvas [data-block-id]', { timeout: 90000 });
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(800);

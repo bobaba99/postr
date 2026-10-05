@@ -46,7 +46,7 @@ fresh worktree had indexed only 64 files). `get_impact_radius_tool` from
 | the guidelines panel and its focus | `GuidelinesPanel.tsx` | yes (C, D) | `guidelinesDefault.test.tsx`, Hf, Hk2, Hw, Hr3 |
 | the onboarding tour | `OnboardingTour.tsx` | yes (C) | `guidelinesDefault.test.tsx`, Ht, Hp, Ht6, Hts |
 | the small-screen hook and its other consumer | `hooks/useIsSmallScreen.ts`, `components/MobileNotice.tsx` | yes (C) / no | `useIsSmallScreen.test.tsx`, `MobileNotice.test.tsx` |
-| the sidebar's tabs and author buttons; the comments composer | `Sidebar.tsx`, `CommentsPanel.tsx` | yes (D) | Hr3 |
+| the sidebar's tabs and author buttons; the comments composer | `Sidebar.tsx`, `CommentsPanel.tsx` | yes (D) | Hr3 (the composer's ring unguarded while fix 23 hides comments: the `post-comment-not-inset` blind spot is accepted until sharing returns) |
 | the house focus ring | `index.css` | yes (D) | Hr2, Hr3 |
 | the desktop share page and the phone share view | `pages/Share.tsx` | no (reads the fit) | review R1, R5 (section 9) |
 | the editor page and routes | `pages/Editor.tsx`, `routes.tsx`, `App.tsx` | no | the full suite; `EditorSheetSize.test.tsx`, `EditorLeaveGuard.test.tsx` |

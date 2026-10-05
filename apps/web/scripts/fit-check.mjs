@@ -61,7 +61,11 @@
  *       sheet, so it sits 24 × zoom px above its block; it happens on main
  *       too, and is handed on (record section 10), not fixed here.
  *   Control: the phone share view (its gutter matches its padding) hides
- *   nothing.
+ *   nothing. Skipped (printed as [skipped], not counted, never an error)
+ *   on a tree that hides sharing, read at run time: the share link
+ *   /s/<slug> is sent elsewhere (fix 23 sends it to /) and the tree's
+ *   src/config/features.ts sets SHARING_ENABLED = false. A redirect that
+ *   the switch does not explain is an error (exit 2).
  *
  * RUN (from apps/web)
  *   node scripts/fit-check.mjs [--only id,id]
@@ -76,7 +80,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { log, openEditor, startHarness } from './lib/editorHarness.mjs';
+import { RouteRedirected, log, openEditor, sourceFlag, startHarness } from './lib/editorHarness.mjs';
 
 const PORT = Number(process.env.PORT ?? 5261);
 const onlyArg = process.argv.find((a) => a.startsWith('--only'));
@@ -777,15 +781,21 @@ SCENARIOS.push({
       await openTab('authors');
       await byText('×');
       for (const [key, author] of [['authorUp', '▲'], ['authorDown', '▼'], ['authorRemove', 'remove']]) got[key] = await read({ author });
-      await openTab('comments');
-      await byText('Post comment');
-      got.postComment = await read({ text: 'Post comment' });
+      // The comments tab exists only where sharing does (fix 23 switched it
+      // off): read the tree's own switch, so a missing button is still an
+      // error where the tab should be there.
+      if (sourceFlag('SHARING_ENABLED') !== false) {
+        await openTab('comments');
+        await byText('Post comment');
+        got.postComment = await read({ text: 'Post comment' });
+      }
       const missing = Object.entries(got).filter(([, v]) => v === 'missing' || v === 'no :focus-visible');
       if (missing.length) throw new Error(`precondition: could not focus ${missing.map(([k, v]) => `${k} (${v})`).join(', ')}`);
       const outside = Object.entries(got).filter(([, v]) => v !== '-2px').map(([k]) => k);
       // (guidelinesHeaders lists the distinct offsets of all five; anything
       // but exactly "-2px" is outside.)
-      return { observed: outside.length > 0, outside: outside.join(' ') || 'none', ...got };
+      const left = sourceFlag('SHARING_ENABLED') === false ? { leftOut: 'Post comment (the comments tab is hidden: SHARING_ENABLED is false)' } : {};
+      return { observed: outside.length > 0, outside: outside.join(' ') || 'none', ...got, ...left };
     } finally {
       await context.close();
     }
@@ -1020,10 +1030,19 @@ for (const [vw, vh] of [[1440, 900], [1920, 1080], [2560, 1440]]) {
 SCENARIOS.push({
   id: 'ctl-phone-share', control: true,
   async run(h) {
-    const { context, page } = await openEditor(h, {
-      viewport: { width: 375, height: 812 }, poster: { w: 48, h: 36 }, route: (row) => `/s/${row.share_slug}`,
-      ownedByOther: true,
-    });
+    let opened;
+    try {
+      opened = await openEditor(h, {
+        viewport: { width: 375, height: 812 }, poster: { w: 48, h: 36 }, route: (row) => `/s/${row.share_slug}`,
+        ownedByOther: true,
+      });
+    } catch (e) {
+      if (e instanceof RouteRedirected && sourceFlag('SHARING_ENABLED') === false) {
+        return { skipped: `the app hides this page: ${e.wanted} was sent to ${e.landed}, and src/config/features.ts sets SHARING_ENABLED = false` };
+      }
+      throw e;
+    }
+    const { context, page } = opened;
     try {
       const m = await measure(page);
       const onShare = await page.evaluate(() => location.pathname.startsWith('/s/'));
@@ -1043,6 +1062,11 @@ try {
   for (const sc of list) {
     try {
       const r = await sc.run(h);
+      if (r.skipped) {
+        results.push({ id: sc.id, skipped: r.skipped });
+        log(`[skipped] ${sc.id} ${r.skipped}`);
+        continue;
+      }
       results.push({ id: sc.id, claim: sc.claim ?? null, control: !!sc.control, ...r });
       const verdict = sc.control ? (r.ok ? 'CONTROL-OK' : 'CONTROL-FAIL') : r.observed ? 'OBSERVED' : 'not observed';
       if (sc.control && !r.ok) errors += 1;
@@ -1075,6 +1099,7 @@ if (rulerRuns.length) {
 }
 const summary = {
   git: h.git, mutant: h.mutant, claims: byClaim,
+  skipped: results.filter((r) => r.skipped).map((r) => r.id),
   mechanism132: `${mech.filter((r) => r.mechanism).length} of ${mech.length}`,
   scrollsAfterFit: `${mech.filter((r) => r.scrolls).length} of ${mech.length}`,
   rulerError: (() => {
