@@ -97,12 +97,13 @@
       "undoes": "D — Post comment draws the ring inset (so its ring is not clipped or drawn over a neighbour)",
       "expect": "survive",
       "why": "jsdom draws no focus ring; fit-check.mjs Hr3 reads the computed outline-offset in Chromium",
-      "browser": {
+      "browserWhenSharingReturns": {
         "harness": "scripts/fit-check.mjs",
         "scenarios": [
           "focus-ring-inset"
         ]
       },
+      "unguarded": "INSPECTED: the comments panel is not rendered while SHARING_ENABLED is false (fix 23, 2026-09-30), so fit-check's focus-ring-inset cannot read Post comment and leaves it out; rename browserWhenSharingReturns back to browser when sharing returns",
       "edits": [
         [
           "src/poster/CommentsPanel.tsx",
