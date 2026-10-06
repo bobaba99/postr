@@ -209,7 +209,7 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "  }, [kept?.code, kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
+          "  }, [kept?.code, kept?.lang, kept?.picked, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
           "  }, [kept, t.defaultSizeLabel]);"
         ]
       ]
@@ -219,8 +219,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "  }, [kept?.code, kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
-          "  }, [kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);"
+          "  }, [kept?.code, kept?.lang, kept?.picked, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
+          "  }, [kept?.lang, kept?.picked, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);"
         ]
       ]
     },
@@ -229,8 +229,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "  }, [kept?.code, kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
-          "  }, [kept?.code, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);"
+          "  }, [kept?.code, kept?.lang, kept?.picked, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
+          "  }, [kept?.code, kept?.picked, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);"
         ]
       ]
     },
@@ -239,8 +239,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "  }, [kept?.code, kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
-          "  }, [kept?.code, kept?.lang, t.defaultSizeLabel]);"
+          "  }, [kept?.code, kept?.lang, kept?.picked, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
+          "  }, [kept?.code, kept?.lang, kept?.picked, t.defaultSizeLabel]);"
         ]
       ]
     },
@@ -249,18 +249,28 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "checked: { code, lang: detectedLang, widthIn: blockWidthIn, heightIn: blockHeightIn, imageId },",
-          "checked: { code, lang: 'python', widthIn: blockWidthIn, heightIn: blockHeightIn, imageId },"
+          "      lang: plot.language,\n      picked: lang !== 'auto',",
+          "      lang: 'python',\n      picked: lang !== 'auto',"
         ]
       ]
     },
-    "undetected-check-keeps-old-table": {
-      "undoes": "A — a Check on text that is neither R nor Python clears the old table, as before (review R1-05)",
+    "undetected-check-drops-kept-check": {
+      "undoes": "A, merged with fix 15 — a Check on text that is neither R nor Python leaves the kept check in the draft, so the old table stays, marked out of date, after a tab change and a reload too (until the merge this was `undetected-check-keeps-old-table`, which pinned the opposite: the table cleared)",
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "      updateDraft({ checked: null });\n      return;",
-          "      return;"
+          "      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });\n",
+          "      updateDraft({ checked: null });\n      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });\n"
+        ]
+      ]
+    },
+    "unsupported-check-drops-kept-check": {
+      "undoes": "A, merged with fix 15 — a Check on a plotting system the check does not read leaves the kept check in the draft, so the old table stays, marked out of date, after a reload too",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });\n",
+          "      updateDraft({ checked: null });\n      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });\n"
         ]
       ]
     },
@@ -789,8 +799,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "checked: { code, lang: detectedLang, widthIn: blockWidthIn, heightIn: blockHeightIn, imageId },",
-          "checked: { code, lang: detectedLang, widthIn: blockWidthIn, heightIn: blockHeightIn, imageId: null },"
+          "      imageId,\n    };\n    updateDraft({ checked: inputs });",
+          "      imageId: null,\n    };\n    updateDraft({ checked: inputs });"
         ]
       ]
     },
@@ -819,8 +829,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "    otherFigure ||\n    (layout === 'page' &&",
-          "    (layout === 'page' &&"
+          "  const stale = otherFigure || resized;",
+          "  const stale = resized;"
         ]
       ]
     },
@@ -871,6 +881,106 @@
           "src/poster/ReadabilityPanel.tsx",
           "        <div role=\"status\" style={{ fontSize: 13, color: '#f9e2af', lineHeight: 1.5 }}>",
           "        <div style={{ fontSize: 13, color: '#f9e2af', lineHeight: 1.5 }}>"
+        ]
+      ]
+    },
+    "merge-kept-check-not-gated": {
+      "undoes": "merge 7+15 — a kept check is read again as its Check read it, and shows no table when that check would now be refused",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    if (reading.language !== kept.lang || !reading.system || !SUPPORTED_SYSTEMS.includes(reading.system)) {\n      return null;\n    }\n",
+          ""
+        ]
+      ]
+    },
+    "merge-kept-check-system-not-gated": {
+      "undoes": "merge 7+15 — a kept check that now reads as a system the check does not read shows no table",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          " || !SUPPORTED_SYSTEMS.includes(reading.system)) {\n      return null;",
+          ") {\n      return null;"
+        ]
+      ]
+    },
+    "merge-kept-check-language-not-gated": {
+      "undoes": "merge 7+15 — a kept check that Auto now reads as the other language shows no table",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    if (reading.language !== kept.lang || !reading.system",
+          "    if (!reading.system"
+        ]
+      ]
+    },
+    "merge-kept-check-read-as-picked": {
+      "undoes": "merge 7+15 — a check Auto made is read again by Auto, not as a pick of the language it read",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "describePlotCode(kept.code, kept.picked ? kept.lang : undefined)",
+          "describePlotCode(kept.code, kept.lang)"
+        ]
+      ]
+    },
+    "merge-kept-check-read-as-auto": {
+      "undoes": "merge 7+15 — a check made with the language picked by hand is read again with that pick",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "describePlotCode(kept.code, kept.picked ? kept.lang : undefined)",
+          "describePlotCode(kept.code, undefined)"
+        ]
+      ]
+    },
+    "merge-picked-not-recorded": {
+      "undoes": "merge 7+15 — a Check records whether the language was picked by hand",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "      picked: lang !== 'auto',",
+          "      picked: false,"
+        ]
+      ]
+    },
+    "merge-picked-not-stored": {
+      "undoes": "merge 7+15 — the stored check keeps whether the language was picked by hand",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      picked: checked.picked,\n",
+          ""
+        ]
+      ]
+    },
+    "merge-picked-not-read": {
+      "undoes": "merge 7+15 — a stored check's pick is read back",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "          picked: c.picked === true,",
+          "          picked: false,"
+        ]
+      ]
+    },
+    "merge-picked-not-validated": {
+      "undoes": "merge 7+15 — a stored check whose pick is not a boolean is not a check",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    (c.picked === undefined || typeof c.picked === 'boolean') &&\n",
+          ""
+        ]
+      ]
+    },
+    "merge-memo-ignores-picked": {
+      "undoes": "merge 7+15 review finding 1 — the table is computed again when only `picked` changes (a kept Auto check, then R picked and Check pressed)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  }, [kept?.code, kept?.lang, kept?.picked, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
+          "  }, [kept?.code, kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);"
         ]
       ]
     }

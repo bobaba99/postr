@@ -1,0 +1,5 @@
+plt.plot(time, score, linewidth=2)
+plt.xlabel("Time (min)")
+plt.ylabel("Score")
+plt.title("Score over time")
+plt.show()

@@ -40,6 +40,14 @@ export type ScriptLanguage = 'auto' | 'r' | 'python';
 export interface CheckedInputs {
   readonly code: string;
   readonly lang: 'r' | 'python';
+  /**
+   * True when the language was picked by hand, false when Auto read it.
+   * The table is shown only while the code, read the same way, still reads
+   * as that language and as a system the check reads (fix 15's gate,
+   * applied to a kept check at the merge of fixes 7 and 15). A stored check
+   * without it is read as Auto's.
+   */
+  readonly picked: boolean;
   readonly widthIn: number;
   readonly heightIn: number;
   /**
@@ -118,6 +126,7 @@ function serialize(draft: FigureScriptDraft): string {
     lang: draft.lang,
     checked: checked && {
       lang: checked.lang,
+      picked: checked.picked,
       widthIn: checked.widthIn,
       heightIn: checked.heightIn,
       imageId: checked.imageId,
@@ -140,6 +149,7 @@ function parse(raw: string): FigureScriptDraft | null {
   const checked: CheckedInputs | null =
     c &&
     (c.lang === 'r' || c.lang === 'python') &&
+    (c.picked === undefined || typeof c.picked === 'boolean') &&
     isInches(c.widthIn) &&
     isInches(c.heightIn) &&
     (c.imageId === null || typeof c.imageId === 'string') &&
@@ -147,6 +157,7 @@ function parse(raw: string): FigureScriptDraft | null {
       ? {
           code: typeof c.code === 'string' ? c.code : entry.code,
           lang: c.lang,
+          picked: c.picked === true,
           widthIn: c.widthIn,
           heightIn: c.heightIn,
           imageId: c.imageId,

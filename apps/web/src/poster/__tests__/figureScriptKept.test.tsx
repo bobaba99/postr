@@ -76,6 +76,14 @@ const SCRIPT = [
   "fig.savefig('figure1.png', dpi=300)",
 ].join('\n');
 
+/** Base R graphics: R, a system the check does not read (fix 15). */
+const BASE_R = ['x <- c(3, 5, 2)', 'plot(x, main = "Counts")', 'abline(h = 2)'].join('\n');
+/** R ggplot2 whose only plotnine hint is a string in aes(): Auto cannot place it, a pick of R checks it (fix 15). */
+const UNPLACEABLE_GGPLOT =
+  'ggplot(votes, aes(x = "", y = share, fill = party)) + geom_col(width = 1) + coord_polar("y")';
+const CANNOT_TELL = 'Couldn’t tell R from Python — pick R (ggplot2) or Python (matplotlib).';
+const OUT_OF_DATE = 'Out of date: this result is from your last check';
+
 let k: Kit;
 let rtl: Rtl;
 let view: { unmount: () => void } | null = null;
@@ -268,15 +276,114 @@ describe('item 7 — leaving the Figure tab keeps the script', () => {
     expect(resultTable()?.textContent).not.toBe(table);
   });
 
-  it('guard: Check on text that is neither R nor Python clears the old table, as before', async () => {
+  // Merged with fix 15: Check on code it cannot place, or on a plotting
+  // system it does not read, answers so and leaves the result on screen,
+  // marked out of date (the owner's answer to item 15). The draft keeps
+  // that result, so a tab change and a reload bring it back too. Until the
+  // merge this guard pinned main's old behaviour, the table cleared.
+  it('Check on text that is neither R nor Python keeps the old table, marked out of date, after a tab round trip and a reload too', async () => {
     await openChecker();
     await typeScript();
     await k.click(k.findButton('Check'), 'Check');
     expect(pressed('Auto')).toBe(true);
+    const table = resultTable()?.textContent;
     expect(resultRows()).toBeGreaterThan(0);
-    await typeScript(`${MARK} some notes, not code`);
+    const notes = `${MARK} some notes, not code`;
+    await typeScript(notes);
     await k.click(k.findButton('Check'), 'Check');
+    expect(document.body.textContent).toContain(CANNOT_TELL);
+    expect(resultTable()?.textContent).toBe(table);
+    expect(document.body.textContent).toContain(OUT_OF_DATE);
+    k.openTab(/^layout$/i);
+    await k.nextTask();
+    await openChecker();
+    expect(codeBox()?.value).toBe(notes);
+    expect(resultTable()?.textContent).toBe(table);
+    expect(document.body.textContent).toContain(OUT_OF_DATE);
+    // The answer was for the press; the line beside Check says what it reads.
+    expect(document.body.textContent).not.toContain(CANNOT_TELL);
+    expect(document.body.textContent).toContain('Can’t tell R from Python. Pick one above.');
+    await pageLoad('fixture-1');
+    await openChecker();
+    expect(codeBox()?.value).toBe(notes);
+    expect(resultTable()?.textContent).toBe(table);
+    expect(document.body.textContent).toContain(OUT_OF_DATE);
+  });
+
+  it('Check on a plotting system the check does not read, R picked by hand, names it and keeps the old table marked out of date; a reload brings that table back, not one for the new code', async () => {
+    await checkScript();
+    const table = resultTable()?.textContent;
+    await k.click(k.findButton('R'), 'R');
+    await typeScript(BASE_R);
+    await k.click(k.findButton('Check'), 'Check');
+    expect(document.body.textContent).toContain('Not supported yet: base R graphics.');
+    expect(resultTable()?.textContent).toBe(table);
+    expect(document.body.textContent).toContain(OUT_OF_DATE);
+    await pageLoad('fixture-1');
+    await openChecker();
+    expect(codeBox()?.value).toBe(BASE_R);
+    expect(pressed('R')).toBe(true);
+    expect(resultTable()?.textContent).toBe(table);
+    expect(document.body.textContent).toContain(OUT_OF_DATE);
+  });
+
+  it('a check made with R picked on ggplot code Auto cannot place comes back after a reload', async () => {
+    await openChecker();
+    await typeScript(UNPLACEABLE_GGPLOT);
+    expect(document.body.textContent).toContain('Can’t tell R from Python. Pick one above.');
+    await k.click(k.findButton('R'), 'R');
+    await k.click(k.findButton('Check'), 'Check');
+    const table = resultTable()?.textContent;
+    expect(resultRows()).toBeGreaterThan(0);
+    await pageLoad('fixture-1');
+    await openChecker();
+    expect(pressed('R')).toBe(true);
+    expect(resultTable()?.textContent).toBe(table);
+    expect(document.body.textContent).not.toContain(OUT_OF_DATE);
+  });
+
+  it('a kept check that now reads as a system the check does not read, or that Auto no longer places, opens without a table', async () => {
+    // What an earlier version of the reading could have kept: a check it
+    // took, which this one would refuse (fix 15's gate, read again on load).
+    const check = (code: string, box: 'auto' | 'r' | 'python', lang: 'r' | 'python', extra: Record<string, unknown>) =>
+      JSON.stringify({ v: 1, code, lang: box, checked: { lang, widthIn: 10, heightIn: 7, imageId: null, ...extra } });
+    const entries: Array<[string, string, string, number]> = [
+      // [poster, entry, code, rows: 0 none, 1 some]
+      ['poster-g', check(BASE_R, 'r', 'r', { picked: true }), BASE_R, 0],
+      ['poster-i', check(UNPLACEABLE_GGPLOT, 'auto', 'r', { picked: false }), UNPLACEABLE_GGPLOT, 0],
+      // No `picked`: a check kept before the merge is read as Auto's.
+      ['poster-j', check(UNPLACEABLE_GGPLOT, 'auto', 'r', {}), UNPLACEABLE_GGPLOT, 0],
+      // Auto's R reading of code Auto now reads as Python: an R table for it would be wrong.
+      ['poster-n', check(SCRIPT, 'auto', 'r', { picked: false }), SCRIPT, 0],
+      // Not a boolean: not a check.
+      ['poster-k', check(SCRIPT, 'auto', 'python', { picked: 'yes' }), SCRIPT, 0],
+      // Controls: the entries a Check of this version keeps.
+      ['poster-l', check(UNPLACEABLE_GGPLOT, 'r', 'r', { picked: true }), UNPLACEABLE_GGPLOT, 1],
+      ['poster-m', check(SCRIPT, 'auto', 'python', { picked: false }), SCRIPT, 1],
+    ];
+    for (const [id, raw, code, rows] of entries) {
+      localStorage.setItem(`postr.figure-script.${id}`, raw);
+      await pageLoad(id);
+      await openChecker();
+      expect(codeBox()?.value, id).toBe(code);
+      if (rows === 0) expect(resultRows(), id).toBe(0);
+      else expect(resultRows(), id).toBeGreaterThan(0);
+    }
+  });
+
+  it('a kept check Auto could not place opens without a table; picking R and pressing Check shows the R table', async () => {
+    // Merge review finding 1: the table must follow `picked` alone. The entry
+    // is one kept before the merge (no `picked`), so it reads as Auto's.
+    localStorage.setItem(
+      'postr.figure-script.poster-p',
+      JSON.stringify({ v: 1, code: UNPLACEABLE_GGPLOT, lang: 'auto', checked: { lang: 'r', widthIn: 10, heightIn: 7, imageId: null } }),
+    );
+    await pageLoad('poster-p');
+    await openChecker();
     expect(resultRows()).toBe(0);
+    await k.click(k.findButton('R'), 'R');
+    await k.click(k.findButton('Check'), 'Check');
+    expect(resultRows()).toBeGreaterThan(0);
   });
 
   it('a blank line typed into the empty box stays in it, and is not stored (it is not a script)', async () => {
@@ -635,7 +742,8 @@ describe('item 7 — a kept result says which figure and size it is for (review 
     expect(pill()).toBe('10.0" × 7.0"');
     expect(resultRows()).toBe(0);
     expect(scaleLine()).toBeNull();
-    expect(k.q('[role="status"]')?.textContent).toBe(
+    // A status line (fix 15's answer region, always mounted, is another).
+    expect(Array.from(document.querySelectorAll('[role="status"]'), (el) => el.textContent)).toContain(
       'The last result is for an image block at 12.0" × 8.0". Click Check to check the size above.',
     );
     await clickBlock('img1');

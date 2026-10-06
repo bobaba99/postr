@@ -1,0 +1,645 @@
+{
+ "_about": "Corpus for scripts/language-detect-check.mjs (plan item 15). Everyday R and Python plotting snippets, made-up data and generic labels only, each labelled with its TRUE language (lang: r | python | null for text that is not R or Python code: prose, a lone comment, another language), its plotting system, and whether the checker supports it. 'supported' follows the public page's own promise: 'R (ggplot2) or Python (matplotlib, seaborn)'; pandas .plot draws with matplotlib, so it counts as supported; base graphics, lattice, plotly, plotnine and altair do not. 'noParse' names why a snippet is not valid source on its own (the harness checks every other R file parses in R and every other Python file parses in Python, so a label cannot be wrong by a typo). A script with 'generated' is not a file here: the harness generates it at run time through the app's own module.",
+ "scripts": {
+  "none-comment-only.txt": {
+   "lang": null,
+   "system": "none",
+   "supported": false,
+   "what": "a lone comment line, no code"
+  },
+  "none-prose.txt": {
+   "lang": null,
+   "system": "none",
+   "supported": false,
+   "what": "a sentence of prose pasted by mistake"
+  },
+  "other-julia.jl": {
+   "lang": null,
+   "system": "julia",
+   "supported": false,
+   "what": "Julia Plots.jl with savefig() (neither R nor Python; the confirmer: read as Python)"
+  },
+  "other-matlab.m": {
+   "lang": null,
+   "system": "matlab",
+   "supported": false,
+   "what": "MATLAB plot and xlabel (neither R nor Python)"
+  },
+  "py-altair.py": {
+   "lang": "python",
+   "system": "altair",
+   "supported": false,
+   "what": "altair Chart with configure_axis"
+  },
+  "py-mpl-arrowstyle.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "ax.annotate with arrowstyle=\"<-\" (the confirmer: <- inside a string)"
+  },
+  "py-mpl-ax-only.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "Axes calls only"
+  },
+  "py-mpl-commented-r-draft.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "D9 mirror: a Python script carrying a commented-out ggplot draft"
+  },
+  "py-mpl-comparison.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "the comparison y<-0.5 (the confirmer: read as R assignment)"
+  },
+  "py-mpl-control.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "CONTROL: import, rcParams, subplots(figsize=), savefig; must detect Python and render a table"
+  },
+  "py-mpl-fig-only.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "plt.figure + add_subplot, no import"
+  },
+  "py-mpl-function-docstring.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "a plotting function with a docstring, no import"
+  },
+  "py-mpl-oo-figure.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "matplotlib.figure.Figure object API"
+  },
+  "py-mpl-pylab-commented.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "a %pylab cell whose only Python signal is the word matplotlib in a comment (reconstructed from 4e9c175's message)",
+   "noParse": "IPython magic"
+  },
+  "py-mpl-pylab-magic.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "%pylab inline notebook cell (an IPython magic, not plain Python)",
+   "noParse": "IPython magic"
+  },
+  "py-mpl-pylab-star.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "from pylab import * then bare plot()"
+  },
+  "py-mpl-pyplot-no-import.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "pyplot calls without the import line"
+  },
+  "py-mpl-scale-factor.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "a scale_factor variable and axes.autoscale_view() (the confirmer: scale_ matched them)"
+  },
+  "py-mpl-subplot-mosaic.py": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "subplot_mosaic, layout=\"constrained\""
+  },
+  "py-pandas-ax.py": {
+   "lang": "python",
+   "system": "pandas",
+   "supported": true,
+   "what": "ax = df.plot(); ax.set_ylabel()"
+  },
+  "py-pandas-groupby.py": {
+   "lang": "python",
+   "system": "pandas",
+   "supported": true,
+   "what": "groupby().mean().plot.bar()"
+  },
+  "py-pandas-hist.py": {
+   "lang": "python",
+   "system": "pandas",
+   "supported": true,
+   "what": "Series.hist() only"
+  },
+  "py-pandas-plot-bare.py": {
+   "lang": "python",
+   "system": "pandas",
+   "supported": true,
+   "what": "df.plot(kind=\"bar\") only, no import"
+  },
+  "py-pandas-plot-figsize.py": {
+   "lang": "python",
+   "system": "pandas",
+   "supported": true,
+   "what": "df.plot(figsize=, fontsize=) only"
+  },
+  "py-pandas-plot-import.py": {
+   "lang": "python",
+   "system": "pandas",
+   "supported": true,
+   "what": "import pandas + df.plot.scatter"
+  },
+  "py-plotly-express.py": {
+   "lang": "python",
+   "system": "plotly",
+   "supported": false,
+   "what": "plotly express with import and write_image"
+  },
+  "py-plotly-go.py": {
+   "lang": "python",
+   "system": "plotly",
+   "supported": false,
+   "what": "plotly.graph_objects"
+  },
+  "py-plotly-no-import.py": {
+   "lang": "python",
+   "system": "plotly",
+   "supported": false,
+   "what": "px.line() without the import"
+  },
+  "py-plotnine-import.py": {
+   "lang": "python",
+   "system": "plotnine",
+   "supported": false,
+   "what": "plotnine with named imports and an underscore override"
+  },
+  "py-plotnine-no-import.py": {
+   "lang": "python",
+   "system": "plotnine",
+   "supported": false,
+   "what": "a bare plotnine expression with string aesthetics"
+  },
+  "py-plotnine-star.py": {
+   "lang": "python",
+   "system": "plotnine",
+   "supported": false,
+   "what": "from plotnine import * and ggsave(p, ...)"
+  },
+  "py-plotnine-theme-underscore.py": {
+   "lang": "python",
+   "system": "plotnine",
+   "supported": false,
+   "what": "plotnine theme(axis_title=...) and p.save()"
+  },
+  "py-sns-catplot-facetgrid.py": {
+   "lang": "python",
+   "system": "seaborn",
+   "supported": true,
+   "what": "catplot FacetGrid without the sns. prefix after the call"
+  },
+  "py-sns-context.py": {
+   "lang": "python",
+   "system": "seaborn",
+   "supported": true,
+   "what": "sns.set_context(\"talk\")"
+  },
+  "py-sns-from-import.py": {
+   "lang": "python",
+   "system": "seaborn",
+   "supported": true,
+   "what": "from seaborn import histplot"
+  },
+  "py-sns-import.py": {
+   "lang": "python",
+   "system": "seaborn",
+   "supported": true,
+   "what": "import seaborn + set_theme(font_scale=) + savefig"
+  },
+  "py-sns-no-import.py": {
+   "lang": "python",
+   "system": "seaborn",
+   "supported": true,
+   "what": "sns.lineplot() only"
+  },
+  "r-base-assign.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "<- assignment then plot()"
+  },
+  "r-base-barplot-c.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "barplot() with c() vectors"
+  },
+  "r-base-barplot.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "barplot() without <- or c()"
+  },
+  "r-base-boxplot-formula.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "boxplot(value ~ group)"
+  },
+  "r-base-class-title.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "hist() whose title says class label (the confirmer: class words inside titles were scored)"
+  },
+  "r-base-comment-import.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "a comment saying \"import the data\" over base R"
+  },
+  "r-base-commented-gg-draft.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "a commented ggplot draft over a base-graphics plot (one of the classes 4e9c175's revert names; reconstructed from its message, its corpus is not in the repo)"
+  },
+  "r-base-curve.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "curve(dnorm(x))"
+  },
+  "r-base-dollar.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "df$col access, plot() and lines()"
+  },
+  "r-base-matplot-legend.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "matplot() + legend() with c()"
+  },
+  "r-base-maxdot.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "plot() of a dotted column, weather$max.temp (the confirmer: ax. matched inside max.temp)"
+  },
+  "r-base-par-cex.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "par(cex.lab=...) then plot() and hist()"
+  },
+  "r-base-pdf-hist.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "pdf() device, hist(), dev.off()"
+  },
+  "r-base-plot.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "base plot() written without <-"
+  },
+  "r-base-png-device.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "png() device, plot(), dev.off()"
+  },
+  "r-base-roxygen-examples.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "a roxygen block whose @examples line carries the only <- over a base-graphics function (reconstructed from 4e9c175's message)"
+  },
+  "r-base-title-import.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "barplot() whose title holds the word import (the confirmer of item 15: words inside titles were scored)"
+  },
+  "r-gg-commented-py-draft.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "D9: an R script carrying a commented-out matplotlib draft"
+  },
+  "r-gg-control.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "CONTROL: library(), <-, ggplot, ggsave; must detect R and render a table"
+  },
+  "r-gg-cowplot.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "cowplot plot_grid + save_plot"
+  },
+  "r-gg-equals-assign.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "= assignment instead of <-"
+  },
+  "r-gg-facet.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "facet_wrap + scale_colour_manual, no library()"
+  },
+  "r-gg-ggsave-separate.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "last_plot() + theme, ggsave in cm"
+  },
+  "r-gg-maxdot.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "ggplot of a dotted column name, max.temp"
+  },
+  "r-gg-native-pipe.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "native pipe |> into ggplot, no library()"
+  },
+  "r-gg-no-library.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "ggplot2 pasted without library() or <-"
+  },
+  "r-gg-patchwork.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "patchwork panels over two ggplots"
+  },
+  "r-gg-qplot.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "qplot() only: ggplot2 quick plot, no ggplot( token"
+  },
+  "r-gg-rmd-chunk.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "an R Markdown chunk with its fences (not parseable R on its own)",
+   "noParse": "R Markdown fences"
+  },
+  "r-gg-roxygen-function.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "roxygen #' header over a plotting function"
+  },
+  "r-gg-theme-only.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "a theme() tweak alone, element_text sizes"
+  },
+  "r-gg-tidyverse.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "library(tidyverse) and %>% (not library(ggplot2))"
+  },
+  "r-gg-title-words.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "ggplot whose title holds import and class"
+  },
+  "r-lattice-assign.R": {
+   "lang": "r",
+   "system": "lattice",
+   "supported": false,
+   "what": "p <- histogram(); print(p)"
+  },
+  "r-lattice-library.R": {
+   "lang": "r",
+   "system": "lattice",
+   "supported": false,
+   "what": "library(lattice) + bwplot()"
+  },
+  "r-lattice-par-settings.R": {
+   "lang": "r",
+   "system": "lattice",
+   "supported": false,
+   "what": "xyplot() with par.settings fontsize"
+  },
+  "r-lattice-xyplot.R": {
+   "lang": "r",
+   "system": "lattice",
+   "supported": false,
+   "what": "xyplot() formula, no library()"
+  },
+  "r-plotly.R": {
+   "lang": "r",
+   "system": "plotly",
+   "supported": false,
+   "what": "plotly for R, plot_ly() with formula columns"
+  },
+  "r-gg-pie-aes-empty.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): a pie chart, aes(x = \"\") (R's aes() given a string was read as plotnine)"
+  },
+  "r-gg-single-boxplot.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): one boxplot, aes(x = \"\", y = score)"
+  },
+  "r-gg-single-stacked-bar.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): one stacked bar, aes(x = \"All samples\", ...), no library()"
+  },
+  "r-gg-legend-colour-first.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): legend labels as constants, aes(colour = \"Observed\", y = obs)"
+  },
+  "r-gg-legend-point-colour.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): geom_point(aes(colour = \"Observed\")) with no library() and no <- (only the trailing + is R-only)"
+  },
+  "r-gg-hline-linetype.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): geom_hline(aes(linetype = \"Threshold\", yintercept = 0.5))"
+  },
+  "r-base-tidyverse-hist.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): library(tidyverse) then base hist() (a package name alone was read as ggplot2)"
+  },
+  "r-base-ggplot2-loaded-barplot.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): library(ggplot2) then base barplot()"
+  },
+  "r-base-tidyverse-png.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): library(tidyverse), a png() device, base plot() and dev.off()"
+  },
+  "r-lattice-tidyverse.R": {
+   "lang": "r",
+   "system": "lattice",
+   "supported": false,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): library(tidyverse) and library(lattice), xyplot()"
+  },
+  "r-lattice-gridextra.R": {
+   "lang": "r",
+   "system": "lattice",
+   "supported": false,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): lattice panels arranged with gridExtra"
+  },
+  "r-plotly-tidyverse.R": {
+   "lang": "r",
+   "system": "plotly",
+   "supported": false,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): library(tidyverse), a pipe into plot_ly()"
+  },
+  "py-plotly-make-subplots.py": {
+   "lang": "python",
+   "system": "plotly",
+   "supported": false,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): plotly make_subplots() (subplots( inside the name was read as matplotlib)"
+  },
+  "py-plotly-make-subplots-no-import.py": {
+   "lang": "python",
+   "system": "plotly",
+   "supported": false,
+   "what": "fix 15 round 1 reviewer (out of sample for the first version): plotly make_subplots() with no import"
+  },
+  "py-sns-stripplot-bare.py": {
+   "lang": "python",
+   "system": "seaborn",
+   "supported": true,
+   "what": "fix 15 round 1: seaborn stripplot() with no import (lattice has a stripplot() too)"
+  },
+  "py-sns-heatmap-bare.py": {
+   "lang": "python",
+   "system": "seaborn",
+   "supported": true,
+   "what": "fix 15 round 1: seaborn heatmap() with no import (base R has a heatmap() too)"
+  },
+  "py-sns-barplot-bare.py": {
+   "lang": "python",
+   "system": "seaborn",
+   "supported": true,
+   "what": "fix 15 correction: seaborn barplot() with no import (base R has a barplot() too; seaborn 0.13.2 has barplot, heatmap and stripplot)"
+  },
+  "r-lattice-stripplot.R": {
+   "lang": "r",
+   "system": "lattice",
+   "supported": false,
+   "what": "fix 15 correction: lattice stripplot(), a name seaborn shares, read as lattice once the code is R"
+  },
+  "r-base-heatmap.R": {
+   "lang": "r",
+   "system": "base",
+   "supported": false,
+   "what": "fix 15 correction: base heatmap() with no other R-only token: the cost of sharing the name with seaborn (cannot be placed; a hand pick of R names base graphics)"
+  },
+  "py-pandas-geopandas-geom-type.py": {
+   "lang": "python",
+   "system": "pandas",
+   "supported": true,
+   "what": "fix 15 correction: geopandas .plot() filtered on geom_type (geom_ inside an attribute is not a ggplot2 geom)"
+  },
+  "py-pandas-filter-eqeq.py": {
+   "lang": "python",
+   "system": "pandas",
+   "supported": true,
+   "what": "fix 15 correction: pandas filtered on df.year == 2020 (a dotted name compared with == is not an R argument)"
+  },
+  "g-py-codegen": {
+   "lang": "python",
+   "system": "matplotlib",
+   "supported": true,
+   "what": "Postr's own generated Python (charts/codegen/toPython.ts) for the same spec",
+   "generated": {
+    "module": "/src/charts/codegen/toPython.ts",
+    "export": "chartSpecToPython",
+    "mode": "sample",
+    "specFrom": "checker-corpus/manifest.json#g-codegen-grouped"
+   }
+  },
+  "g-r-codegen": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "Postr's own generated R (charts/codegen/toR.ts) for the checker corpus's grouped-bar spec",
+   "generated": {
+    "module": "/src/charts/codegen/toR.ts",
+    "export": "chartSpecToR",
+    "mode": "sample",
+    "specFrom": "checker-corpus/manifest.json#g-codegen-grouped"
+   }
+  },
+  "r-gg-print-wrapped-pie.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 2 reviewer: a pie, aes(x = \"\"), its chain inside print() (no line ends in + outside brackets: read as plotnine and refused)"
+  },
+  "r-gg-for-loop-print.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 2 reviewer: a pie per site printed in a for loop (the chain inside print() and braces: read as plotnine and refused)"
+  },
+  "r-gg-ggsave-inline.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 2 reviewer: ggsave() with the plot inline, aes(x = \"\") (read as plotnine and refused)"
+  },
+  "r-gg-print-legend-colour.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 2 reviewer: legend labels, aes(colour = \"Observed\"), the chain inside print() (read as plotnine and refused)"
+  },
+  "r-gg-oneliner-pie-string.R": {
+   "lang": "r",
+   "system": "ggplot2",
+   "supported": true,
+   "what": "fix 15 round 2 reviewer: a pie on one line, aes(x = \"\"), nothing only R has (read as plotnine and refused; parses in Python too)"
+  },
+  "other-d3-import-star.js": {
+   "lang": null,
+   "system": "javascript",
+   "supported": false,
+   "noParse": "JavaScript",
+   "what": "fix 15 round 2 reviewer: D3 with import * as d3 (read as Python and given a matplotlib table)"
+  }
+ }
+}
