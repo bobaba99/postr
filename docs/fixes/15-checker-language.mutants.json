@@ -1,0 +1,937 @@
+{
+  "_about": "Mutants for fix 15 (docs/fixes/15-checker-language.md): each undoes one part of the fix. Run from apps/web: node scripts/mutation-check.mjs ../../docs/fixes/15-checker-language.mutants.json",
+  "tests": [
+    "src/pages/__tests__/FigureReadability.test.tsx",
+    "src/poster/__tests__/FigureTab.test.tsx",
+    "src/poster/__tests__/readability.test.ts"
+  ],
+  "mutants": {
+    "detect-raw-text": {
+      "undoes": "detection — comments and string contents are not scored (D9, the held-back 9ea9f38; words in titles, the confirmer)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "scoreMasked(maskCodeForRewrite(code))",
+          "scoreMasked(code)",
+          2
+        ],
+        [
+          "src/poster/readability.ts",
+          "  const masked = maskCodeForRewrite(code);\n  const scored = scoreMasked(masked);",
+          "  const masked = code;\n  const scored = scoreMasked(masked);"
+        ]
+      ]
+    },
+    "detect-comments-only": {
+      "undoes": "detection — string contents are blanked too, not only comments (9ea9f38 alone left \"import\" in a title scored)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "scoreMasked(maskCodeForRewrite(code))",
+          "scoreMasked(maskComments(code))",
+          2
+        ],
+        [
+          "src/poster/readability.ts",
+          "  const masked = maskCodeForRewrite(code);\n  const scored = scoreMasked(masked);",
+          "  const masked = maskComments(code);\n  const scored = scoreMasked(masked);"
+        ]
+      ]
+    },
+    "axes-inside-names": {
+      "undoes": "detection — ax. counts only as its own name, not inside max.temp (the confirmer)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "{ name: 'an Axes method', re: /(?<![\\w.$])ax(?:es|s)?(?:\\[[^\\]\\n]*\\])*\\.\\w+/, w: 3 },",
+          "{ name: 'an Axes method', re: /ax(?:es|s)?(?:\\[[^\\]\\n]*\\])*\\.\\w+/, w: 3 },"
+        ]
+      ]
+    },
+    "axes-ax-only": {
+      "undoes": "detection — axes. and axs[0]. are Axes too, not only ax.",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "{ name: 'an Axes method', re: /(?<![\\w.$])ax(?:es|s)?(?:\\[[^\\]\\n]*\\])*\\.\\w+/, w: 3 },",
+          "{ name: 'an Axes method', re: /(?<![\\w.$])ax\\.\\w+/, w: 3 },"
+        ]
+      ]
+    },
+    "scale-any-name": {
+      "undoes": "detection — a ggplot scale is scale_<aesthetic>_<kind>(), not any scale_ (scale_factor, the confirmer)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "re: /(?<![\\w.])scale_[a-z]+_\\w+\\s*\\(/, w: 2 }",
+          "re: /scale_\\w+/, w: 2 }"
+        ]
+      ]
+    },
+    "assign-anywhere": {
+      "undoes": "detection — <- counts only at the start of a statement, not in y<-0.5 (the confirmer)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "re: /(?:^|[;{])[ \\t]*[A-Za-z.][\\w.$@]*(?:\\[[^\\]\\n]*\\])*[ \\t]*<<?-/m, w: 3 }",
+          "re: /<-/, w: 3 }"
+        ]
+      ]
+    },
+    "savefig-bare": {
+      "undoes": "detection — only a .savefig() method counts, not Julia's bare savefig() (the confirmer)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "{ name: '.savefig()', re: /\\.savefig\\s*\\(/, w: 4 },",
+          "{ name: '.savefig()', re: /savefig\\s*\\(/, w: 4 },"
+        ]
+      ]
+    },
+    "import-star-unread": {
+      "undoes": "detection — from pylab import * is an import",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "{ name: 'import', re: /import\\s+[\\w.]|from\\s+[\\w.]+\\s+import\\s+\\*/, w: 3 },",
+          "{ name: 'import', re: /import\\s+[\\w.]/, w: 3 },"
+        ]
+      ]
+    },
+    "r-assign-gone": {
+      "undoes": "R signal — an assignment at the start of a statement",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: '<- assignment', re: /(?:^|[;{])[ \\t]*[A-Za-z.][\\w.$@]*(?:\\[[^\\]\\n]*\\])*[ \\t]*<<?-/m, w: 3 },",
+          "  { name: '<- assignment', re: /(?:^|[;{])[ \\t]*[A-Za-z.][\\w.$@]*(?:\\[[^\\]\\n]*\\])*[ \\t]*<<?-/m, w: 0 },"
+        ]
+      ]
+    },
+    "r-function-unread": {
+      "undoes": "R signal — function()",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'function()', re: /(?<![\\w.$])function\\s*\\(/, w: 3 },",
+          "  { name: 'function()', re: /(?<![\\w.$])function\\s*\\(/, w: 0 },"
+        ]
+      ]
+    },
+    "r-logical-unread": {
+      "undoes": "R signal — TRUE, FALSE or NULL",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'TRUE, FALSE or NULL', re: /\\b(?:TRUE|FALSE|NULL)\\b/, w: 2 },",
+          "  { name: 'TRUE, FALSE or NULL', re: /\\b(?:TRUE|FALSE|NULL)\\b/, w: 0 },"
+        ]
+      ]
+    },
+    "r-dollar-unread": {
+      "undoes": "R signal — df$col",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'df$col', re: /[\\w)\\]]\\$[A-Za-z.]/, w: 3 },",
+          "  { name: 'df$col', re: /[\\w)\\]]\\$[A-Za-z.]/, w: 0 },"
+        ]
+      ]
+    },
+    "r-dotted-arg-unread": {
+      "undoes": "R signal — a dotted argument name (cex.lab =)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'a dotted argument name', re: /[(,]\\s*[A-Za-z]\\w*\\.[\\w.]+\\s*=(?!=)/, w: 4 },",
+          "  { name: 'a dotted argument name', re: /[(,]\\s*[A-Za-z]\\w*\\.[\\w.]+\\s*=(?!=)/, w: 0 },"
+        ]
+      ]
+    },
+    "r-main-unread": {
+      "undoes": "R signal — main=, xlab= or ylab=",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'main=, xlab= or ylab=', re: /[(,]\\s*(?:main|xlab|ylab)\\s*=(?!=)/, w: 2 },",
+          "  { name: 'main=, xlab= or ylab=', re: /[(,]\\s*(?:main|xlab|ylab)\\s*=(?!=)/, w: 0 },"
+        ]
+      ]
+    },
+    "r-formula-unread": {
+      "undoes": "R signal — a formula",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'a formula', re: /[\\w)]\\s*~\\s*[\\w.(]/, w: 2 },",
+          "  { name: 'a formula', re: /[\\w)]\\s*~\\s*[\\w.(]/, w: 0 },"
+        ]
+      ]
+    },
+    "r-device-unread": {
+      "undoes": "R signal — a graphics device",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'a graphics device', re: /(?<![\\w.$])(?:png|pdf|jpeg|tiff|bmp|svg|cairo_pdf)\\s*\\(/, w: 3 },",
+          "  { name: 'a graphics device', re: /(?<![\\w.$])(?:png|pdf|jpeg|tiff|bmp|svg|cairo_pdf)\\s*\\(/, w: 0 },"
+        ]
+      ]
+    },
+    "r-base-fn-unread": {
+      "undoes": "R signal — a base graphics function only R has",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'a base graphics function', re: BASE_R_ONLY, w: 4 },",
+          "  { name: 'a base graphics function', re: BASE_R_ONLY, w: 0 },"
+        ]
+      ]
+    },
+    "r-lattice-unread": {
+      "undoes": "R signal — a lattice function",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'a lattice function', re: LATTICE_ONLY, w: 5 },",
+          "  { name: 'a lattice function', re: LATTICE_ONLY, w: 0 },"
+        ]
+      ]
+    },
+    "r-plotly-unread": {
+      "undoes": "R signal — plotly for R",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'plotly for R', re: PLOTLY_R, w: 5 },",
+          "  { name: 'plotly for R', re: PLOTLY_R, w: 0 },"
+        ]
+      ]
+    },
+    "py-magic-unread": {
+      "undoes": "Python signal — a %pylab or %matplotlib magic",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'a notebook magic', re: /^[ \\t]*%(?:matplotlib|pylab)\\b/m, w: 5 },",
+          "  { name: 'a notebook magic', re: /^[ \\t]*%(?:matplotlib|pylab)\\b/m, w: 0 },"
+        ]
+      ]
+    },
+    "py-literal-unread": {
+      "undoes": "Python signal — True, False or None",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'True, False or None', re: /\\b(?:True|False|None)\\b/, w: 2 },",
+          "  { name: 'True, False or None', re: /\\b(?:True|False|None)\\b/, w: 0 },"
+        ]
+      ]
+    },
+    "py-colon-unread": {
+      "undoes": "Python signal — a block opened with a colon",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'a block opened with a colon', re: /^[ \\t]*(?:for|while|if|elif|else|with|try|except|finally)\\b[^\\n]*:[ \\t]*$/m, w: 3 },",
+          "  { name: 'a block opened with a colon', re: /^[ \\t]*(?:for|while|if|elif|else|with|try|except|finally)\\b[^\\n]*:[ \\t]*$/m, w: 0 },"
+        ]
+      ]
+    },
+    "py-plotly-unread": {
+      "undoes": "Python signal — plotly",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'plotly', re: PLOTLY_PY, w: 6 },",
+          "  { name: 'plotly', re: PLOTLY_PY, w: 0 },"
+        ]
+      ]
+    },
+    "py-altair-unread": {
+      "undoes": "Python signal — Altair",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'Altair', re: ALTAIR, w: 6 },",
+          "  { name: 'Altair', re: ALTAIR, w: 0 },"
+        ]
+      ]
+    },
+    "gg-qplot-unread": {
+      "undoes": "ggplot2 signal — qplot()",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'qplot()', re: /(?<![\\w.])qplot\\s*\\(/, w: 5 },",
+          "  { name: 'qplot()', re: /(?<![\\w.])qplot\\s*\\(/, w: 0 },"
+        ]
+      ]
+    },
+    "gg-packages-old": {
+      "undoes": "R signal — ggplot2 and tidyverse are among the package names (main had neither; require(ggplot2) alone is R)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "re: /\\b(?:ggplot2|tidyverse|cowplot|patchwork|ggpubr|gridExtra)\\b/, w: 4 }",
+          "re: /\\b(cowplot|patchwork|ggpubr|gridExtra|lattice)\\b/, w: 4 }"
+        ]
+      ]
+    },
+    "plotnine-import-unread": {
+      "undoes": "plotnine — imported",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "const PLOTNINE_IMPORT = /^[ \\t]*(?:from[ \\t]+plotnine\\b|import[ \\t]+plotnine\\b)/m;",
+          "const PLOTNINE_IMPORT = /(?!)/m;"
+        ]
+      ]
+    },
+    "plotnine-string-aes-unread": {
+      "undoes": "plotnine — aes() given strings (a hint)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  /(?<!\\w)aes\\s*\\(\\s*(?:\\w+\\s*=\\s*)?[\"']/,",
+          "  /(?!)/,"
+        ]
+      ]
+    },
+    "plotnine-theme-unread": {
+      "undoes": "plotnine — theme() with underscore names (a hint)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  /(?<!\\w)theme\\s*\\([^)]*\\b(?:axis|plot|legend|strip|panel)_\\w+\\s*=/,",
+          "  /(?!)/,"
+        ]
+      ]
+    },
+    "plotnine-save-unread": {
+      "undoes": "plotnine — a .save() method (a hint)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  /\\.save\\s*\\(/,\n];",
+          "  /(?!)/,\n];"
+        ]
+      ]
+    },
+    "plotnine-scored-as-r": {
+      "undoes": "plotnine — the grammar with plotnine imported is Python, whatever it scores for R",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  const verdict: 'r' | 'python' | null = plotnineImport\n    ? 'python'\n    : forR === 0",
+          "  const verdict: 'r' | 'python' | null = false\n    ? 'python'\n    : forR === 0"
+        ]
+      ]
+    },
+    "plotnine-without-ggplot-call": {
+      "undoes": "plotnine — needs a ggplot() call, not just a grammar word (a seaborn FacetGrid called facet_grid; PIL's .save())",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "!plotnineImport && ggCall && rOnly === 0 && !endsLineWithPlus(masked)",
+          "!plotnineImport && grammar > 0 && rOnly === 0 && !endsLineWithPlus(masked)"
+        ],
+        [
+          "src/poster/readability.ts",
+          "  if (scored.ggCall && (language === 'python' || scored.plotnineImport)) return named('plotnine');",
+          "  if (scored.grammar && (language === 'python' || scored.plotnineImport)) return named('plotnine');"
+        ]
+      ]
+    },
+    "ggcall-not-after-dot": {
+      "undoes": "plotnine — p9.ggplot( is a ggplot() call (import plotnine as p9)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "const GGPLOT_CALL = /(?<!\\w)(?:ggplot|qplot)\\s*\\(/;",
+          "const GGPLOT_CALL = /(?<![\\w.])(?:ggplot|qplot)\\s*\\(/;"
+        ]
+      ]
+    },
+    "python-grammar-not-plotnine": {
+      "undoes": "system — ggplot's grammar in code picked as Python is plotnine",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "if (scored.ggCall && (language === 'python' || scored.plotnineImport)) return named('plotnine');",
+          "if (scored.ggCall && scored.plotnineImport) return named('plotnine');"
+        ]
+      ]
+    },
+    "system-mpl-unnamed": {
+      "undoes": "system — pyplot, Axes or seaborn name matplotlib",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  if (language === 'python' && MATPLOTLIB.test(masked)) return named('matplotlib');\n",
+          ""
+        ]
+      ]
+    },
+    "system-lattice-unnamed": {
+      "undoes": "system — lattice",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  if (LATTICE_ONLY.test(masked) || (language === 'r' && LATTICE_SHARED.test(masked))) return named('lattice');\n",
+          ""
+        ]
+      ]
+    },
+    "system-plotly-unnamed": {
+      "undoes": "system — plotly",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  if (PLOTLY_R.test(masked) || PLOTLY_PY.test(masked)) return named('plotly');\n",
+          ""
+        ]
+      ]
+    },
+    "system-altair-unnamed": {
+      "undoes": "system — Altair",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  if (ALTAIR.test(masked)) return named('altair');\n",
+          ""
+        ]
+      ]
+    },
+    "system-base-unnamed": {
+      "undoes": "system — base graphics",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  if (BASE_R_ONLY.test(masked) || (language === 'r' && BASE_R_SHARED.test(masked))) return named('base');\n",
+          ""
+        ]
+      ]
+    },
+    "system-base-shared-unread": {
+      "undoes": "system — plot(), hist() and the like are base graphics once the code is R (plot(x, y) with R picked)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "if (BASE_R_ONLY.test(masked) || (language === 'r' && BASE_R_SHARED.test(masked))) return named('base');",
+          "if (BASE_R_ONLY.test(masked)) return named('base');"
+        ]
+      ]
+    },
+    "system-base-shared-in-python": {
+      "undoes": "system — plot() in Python is pylab, not base graphics",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "if (BASE_R_ONLY.test(masked) || (language === 'r' && BASE_R_SHARED.test(masked))) return named('base');",
+          "if (BASE_R_ONLY.test(masked) || BASE_R_SHARED.test(masked)) return named('base');"
+        ]
+      ]
+    },
+    "system-mpl-shared-unread": {
+      "undoes": "system — pandas' plot methods and pylab's bare calls are matplotlib",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  if (language === 'python' && MATPLOTLIB_SHARED.test(masked)) return named('matplotlib');\n",
+          ""
+        ]
+      ]
+    },
+    "system-mpl-shared-first": {
+      "undoes": "system — plotly and Altair are read before the calls they share with matplotlib (px.scatter)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  if (language === 'python' && MATPLOTLIB.test(masked)) return named('matplotlib');\n",
+          "  if (language === 'python' && (MATPLOTLIB.test(masked) || MATPLOTLIB_SHARED.test(masked))) return named('matplotlib');\n"
+        ]
+      ]
+    },
+    "system-never-assumed": {
+      "undoes": "system — \"checked as\" when no call named the system",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  return { language, system: language === 'r' ? 'ggplot2' : 'matplotlib', assumed: true };",
+          "  return { language, system: language === 'r' ? 'ggplot2' : 'matplotlib', assumed: false };"
+        ]
+      ]
+    },
+    "cannot-tell-silent": {
+      "undoes": "panel — Check answers that it could not tell R from Python (main: it did nothing)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });\n",
+          ""
+        ]
+      ]
+    },
+    "cannot-tell-wipes": {
+      "undoes": "panel — a result on screen stays when the new code cannot be placed (main wiped it)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });\n",
+          "      setChecked(null);\n      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });\n"
+        ]
+      ]
+    },
+    "unsupported-scored": {
+      "undoes": "panel — an unsupported system gets no table and no edited code, even after a hand pick",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    if (!SUPPORTED_SYSTEMS.includes(plot.system)) {\n      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });\n      return;\n    }\n",
+          ""
+        ]
+      ]
+    },
+    "unsupported-wipes": {
+      "undoes": "panel — a result on screen stays when the new code is unsupported",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });\n",
+          "      setChecked(null);\n      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });\n"
+        ]
+      ]
+    },
+    "success-unannounced": {
+      "undoes": "panel — a successful check is announced too",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    setAnswer({\n      ...at,\n      kind: 'checked',",
+          "    if (false) setAnswer({\n      ...at,\n      kind: 'checked',"
+        ]
+      ]
+    },
+    "answer-not-live": {
+      "undoes": "panel — the answer is in a live region (role=status)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "          <div role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">",
+          "          <div>"
+        ]
+      ]
+    },
+    "answer-not-rekeyed": {
+      "undoes": "panel — each press puts the answer back, so the same words are heard again",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "key: `press-${answer.press}`",
+          "key: 'answer'"
+        ]
+      ]
+    },
+    "answer-sticks": {
+      "undoes": "panel — an answer is for the press that gave it: editing the code or picking another language drops it (round 2: dropped in the handlers, not hidden by comparison)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    setCode(next);\n    setAnswer(null);",
+          "    setCode(next);"
+        ],
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    if (next !== lang) setAnswer(null);\n",
+          ""
+        ]
+      ]
+    },
+    "stale-announcement-kept": {
+      "undoes": "panel — a table's announcement goes when the page hides the table at a new size (round 2: for good, so it is not made again back at the old size)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  if (stale && answer?.kind === 'checked') setAnswer(null);\n",
+          ""
+        ]
+      ]
+    },
+    "success-answer-visible": {
+      "undoes": "panel — the success answer is for screen readers; the table is what a sighted user reads",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "className={shownAnswer.kind === 'checked' ? 'sr-only' : 'postr-rise-in'}",
+          "className=\"postr-rise-in\""
+        ]
+      ]
+    },
+    "out-of-date-unmarked": {
+      "undoes": "panel — a kept result is marked out of date",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "          {outOfDate && (",
+          "          {false && ("
+        ]
+      ]
+    },
+    "out-of-date-code-only": {
+      "undoes": "panel — a result is out of date when the code reads as another language, not only when the code changes",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  const outOfDate = checked !== null && (checked.code !== code || checked.language !== plot.language);",
+          "  const outOfDate = checked !== null && checked.code !== code;"
+        ]
+      ]
+    },
+    "label-language-only": {
+      "undoes": "panel — the label names the system the code is checked as (main: R / ggplot2 or Python / matplotlib whatever the code drew with)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "                ? `Detected: ${plotLabel(plot)}`",
+          "                ? `Detected: ${plot.language === 'r' ? 'R / ggplot2' : 'Python / matplotlib'}`"
+        ]
+      ]
+    },
+    "check-button-wraps": {
+      "undoes": "panel — ▶ Check keeps one line beside a long answer",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "            whiteSpace: 'nowrap',\n            minHeight: t.buttonMinHeight,",
+          "            minHeight: t.buttonMinHeight,"
+        ]
+      ]
+    },
+    "check-disabled-when-unknown": {
+      "undoes": "panel — Check stays enabled on code it cannot place (the owner)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "          disabled={!code.trim()}",
+          "          disabled={!code.trim() || !plot.language}"
+        ]
+      ]
+    },
+    "r1-hint-despite-r-signal": {
+      "undoes": "round 1 — a plotnine hint does not count when an R signal fired (library(), <-: a pie chart on one line)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "!plotnineImport && ggCall && rOnly === 0 && !endsLineWithPlus(masked) && PLOTNINE_HINTS",
+          "!plotnineImport && ggCall && !endsLineWithPlus(masked) && PLOTNINE_HINTS"
+        ]
+      ]
+    },
+    "r1-hint-despite-trailing-plus": {
+      "undoes": "round 1 — a plotnine hint does not count when a line ends in + outside brackets (geom_point(aes(colour = \"Observed\")) with no other R-only token)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "!plotnineImport && ggCall && rOnly === 0 && !endsLineWithPlus(masked) && PLOTNINE_HINTS",
+          "!plotnineImport && ggCall && rOnly === 0 && PLOTNINE_HINTS"
+        ]
+      ]
+    },
+    "r1-trailing-plus-in-brackets": {
+      "undoes": "round 1 — only a + outside every bracket is R's (plotnine wraps its chains in parentheses)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "    if (depth[m.index] === 0) return true;",
+          "    return true;"
+        ]
+      ]
+    },
+    "r1-r-pick-takes-hint": {
+      "undoes": "round 1 — a pick of R wins over a plotnine hint; only an import keeps it plotnine",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "if (scored.ggCall && (language === 'python' || scored.plotnineImport)) return named('plotnine');",
+          "if (scored.ggCall && (language === 'python' || scored.plotnineImport || PLOTNINE_HINTS.some((re) => re.test(masked)))) return named('plotnine');"
+        ]
+      ]
+    },
+    "r1-package-names-ggplot2": {
+      "undoes": "round 1 — a package name is an R signal, not the grammar: library(tidyverse) then hist() is base graphics",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  // A package name is R, but names no plotting system on its own:\n  // library(tidyverse) then base hist() is base graphics (round 1).\n  { name: 'a ggplot2 package', re: /\\b(?:ggplot2|tidyverse|cowplot|patchwork|ggpubr|gridExtra)\\b/, w: 4 },\n",
+          ""
+        ],
+        [
+          "src/poster/readability.ts",
+          "  { name: 'qplot()', re: /(?<![\\w.])qplot\\s*\\(/, w: 5 },\n];",
+          "  { name: 'qplot()', re: /(?<![\\w.])qplot\\s*\\(/, w: 5 },\n  { name: 'a ggplot2 package', re: /\\b(?:ggplot2|tidyverse|cowplot|patchwork|ggpubr|gridExtra)\\b/, w: 4 },\n];"
+        ]
+      ]
+    },
+    "r1-mpl-subplots-inside-names": {
+      "undoes": "round 1 — subplots( names matplotlib only as its own name (plotly's make_subplots)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "figsize\\s*=|(?<!\\w)subplots\\s*\\(|rcParams",
+          "figsize\\s*=|subplots\\s*\\(|rcParams"
+        ]
+      ]
+    },
+    "r1-base-shared-names-r-only": {
+      "undoes": "round 1 — barplot() and heatmap() are seaborn's too: base graphics only in R",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "(?:matplot|abline|mtext|dotchart|stripchart|mosaicplot|persp|curve|pairs|dev\\.off|par)\\s*\\(/;",
+          "(?:barplot|heatmap|matplot|abline|mtext|dotchart|stripchart|mosaicplot|persp|curve|pairs|dev\\.off|par)\\s*\\(/;"
+        ]
+      ]
+    },
+    "r1-base-shared-without-barplot": {
+      "undoes": "round 1 — barplot() and heatmap() are base graphics once the code is R",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "(?:plot|hist|boxplot|barplot|heatmap|lines|",
+          "(?:plot|hist|boxplot|lines|"
+        ]
+      ]
+    },
+    "r1-lattice-shared-names-r-only": {
+      "undoes": "round 1 — stripplot() and histogram() are seaborn's and pylab's too: lattice only in R",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "(?:xyplot|bwplot|densityplot|dotplot|barchart|levelplot|",
+          "(?:histogram|stripplot|xyplot|bwplot|densityplot|dotplot|barchart|levelplot|"
+        ]
+      ]
+    },
+    "r1-lattice-shared-unread": {
+      "undoes": "round 1 — stripplot() and histogram() are lattice once the code is R",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  if (LATTICE_ONLY.test(masked) || (language === 'r' && LATTICE_SHARED.test(masked))) return named('lattice');",
+          "  if (LATTICE_ONLY.test(masked)) return named('lattice');"
+        ]
+      ]
+    },
+    "r1-gg-ggplot-inside-names": {
+      "undoes": "round 1 — ggplot( scores as the grammar only as its own name (myggplot())",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'ggplot()', re: /(?<!\\w)ggplot\\s*\\(/, w: 5 },",
+          "  { name: 'ggplot()', re: /ggplot\\s*\\(/, w: 5 },"
+        ]
+      ]
+    },
+    "r1-gg-geom-not-called": {
+      "undoes": "round 1 — geom_ scores only as a call (a loop variable called geom_type)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "re: /(?<![\\w.$])geom_\\w+\\s*\\(/, w: 5 },",
+          "re: /(?<![\\w.$])geom_\\w+/, w: 5 },"
+        ]
+      ]
+    },
+    "r1-gg-geom-after-dot": {
+      "undoes": "round 1 — geom_ scores only as its own name, not a method (geopandas' .geom_equals())",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "re: /(?<![\\w.$])geom_\\w+\\s*\\(/, w: 5 },",
+          "re: /geom_\\w+\\s*\\(/, w: 5 },"
+        ]
+      ]
+    },
+    "r1-gg-theme-not-called": {
+      "undoes": "round 1 — theme_ scores only as a call (a variable called theme_colors)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  { name: 'theme_*()', re: /theme_\\w+\\s*\\(/, w: 4 },",
+          "  { name: 'theme_*()', re: /theme_\\w+/, w: 4 },"
+        ]
+      ]
+    },
+    "r1-ggcall-any-suffix": {
+      "undoes": "ggplot( is a ggplot() call only as its own name (round 1 reviewer: myggplot() had no test)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "const GGPLOT_CALL = /(?<!\\w)(?:ggplot|qplot)\\s*\\(/;",
+          "const GGPLOT_CALL = /(?:ggplot|qplot)\\s*\\(/;"
+        ]
+      ]
+    },
+    "r1-dotted-arg-eqeq": {
+      "undoes": "a dotted name compared with == is not an R argument (round 1 reviewer: no test)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "re: /[(,]\\s*[A-Za-z]\\w*\\.[\\w.]+\\s*=(?!=)/, w: 4",
+          "re: /[(,]\\s*[A-Za-z]\\w*\\.[\\w.]+\\s*=/, w: 4"
+        ]
+      ]
+    },
+    "r1-main-eqeq": {
+      "undoes": "main == is not the main= argument (round 1 reviewer: no test)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "re: /[(,]\\s*(?:main|xlab|ylab)\\s*=(?!=)/, w: 2",
+          "re: /[(,]\\s*(?:main|xlab|ylab)\\s*=/, w: 2"
+        ]
+      ]
+    },
+    "r1-naive-hash-strip": {
+      "undoes": "a # inside a string does not start a comment (round 1 reviewer: the test was vacuous)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  return scoreMasked(maskCodeForRewrite(code)).verdict;",
+          "  return scoreMasked(maskCodeForRewrite(code.replace(/#.*$/gm, ''))).verdict;"
+        ],
+        [
+          "src/poster/readability.ts",
+          "  const masked = maskCodeForRewrite(code);\n  const scored = scoreMasked(masked);",
+          "  const masked = maskCodeForRewrite(code.replace(/#.*$/gm, ''));\n  const scored = scoreMasked(masked);"
+        ]
+      ]
+    },
+    "r1-answer-ignores-lang": {
+      "undoes": "panel — picking another language drops the answer (round 1 reviewer: no test; round 2: in the handler)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    if (next !== lang) setAnswer(null);\n",
+          ""
+        ]
+      ]
+    },
+    "r1-atomic-dropped": {
+      "undoes": "panel — the answer region is read whole (aria-atomic) (round 1 reviewer: no test)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "<div role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">",
+          "<div role=\"status\" aria-live=\"polite\">"
+        ]
+      ]
+    },
+    "r1-region-mounted-on-answer": {
+      "undoes": "panel — the live region is there before the first answer, always mounted (round 1 reviewer: no test, and the harness counted it announced)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "<div role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">\n            {shownAnswer && (",
+          "<div>\n            {shownAnswer && <div role=\"status\" aria-live=\"polite\" aria-atomic=\"true\">{("
+        ],
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "              </span>\n            )}\n          </div>\n          {!answerOnScreen",
+          "              </span>\n            )}</div>}\n          </div>\n          {!answerOnScreen"
+        ]
+      ]
+    },
+    "r2-hint-names-plotnine": {
+      "undoes": "round 2 — a plotnine hint names nothing on its own (round 1 named plotnine on it: R ggplot2 inside print(), ggsave() or a for loop was refused)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  const verdict: 'r' | 'python' | null = plotnineImport\n    ? 'python'\n    : forR === 0",
+          "  const verdict: 'r' | 'python' | null = plotnineImport || hinted\n    ? 'python'\n    : forR === 0"
+        ]
+      ]
+    },
+    "r2-hint-leaves-grammar": {
+      "undoes": "round 2 — a plotnine hint takes the grammar's words out of R's score (else plotnine with no import is R, main's WRONG)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  const forR = hinted ? 0 : r;",
+          "  const forR = r;"
+        ]
+      ]
+    },
+    "r2-hint-ignores-python": {
+      "undoes": "round 2 — with a hint, Python's own signals decide (se=False: plotnine with no import is Python, not could-not-tell)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "  const verdict: 'r' | 'python' | null = plotnineImport\n    ? 'python'\n    : forR === 0",
+          "  const verdict: 'r' | 'python' | null = plotnineImport\n    ? 'python'\n    : hinted ? null : forR === 0"
+        ]
+      ]
+    },
+    "r2-import-star-any-form": {
+      "undoes": "round 2 — import * is Python only as from x import * (JavaScript's import * as d3 read as Python)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "{ name: 'import', re: /import\\s+[\\w.]|from\\s+[\\w.]+\\s+import\\s+\\*/, w: 3 },",
+          "{ name: 'import', re: /import\\s+[\\w.*]/, w: 3 },"
+        ]
+      ]
+    },
+    "r2-answer-kept-on-edit": {
+      "undoes": "round 2 — editing the code drops the answer for good (an edit undone put it back in the live region)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    setCode(next);\n    setAnswer(null);",
+          "    setCode(next);"
+        ]
+      ]
+    },
+    "r2-answer-dropped-on-same-lang": {
+      "undoes": "round 2 — pressing the language button already pressed keeps the answer",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    if (next !== lang) setAnswer(null);",
+          "    setAnswer(null);"
+        ]
+      ]
+    },
+    "r2-resized-silent": {
+      "undoes": "round 2 — a result hidden by a new print size is said to be hidden (it went without a word)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "      ? { kind: 'resized', text: RESIZED, key: 'resized' }\n      : null;",
+          "      ? null\n      : null;"
+        ]
+      ]
+    },
+    "r2-resized-over-answer": {
+      "undoes": "round 2 — an answer about the code stays when the print size changes (the sentence is said only when none is on screen)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "= answer\n    ? { kind: answer.kind, text: answer.text, key: `press-${answer.press}` }\n    : stale\n      ? { kind: 'resized', text: RESIZED, key: 'resized' }\n      : null;",
+          "= stale && answer?.kind !== 'checked'\n    ? { kind: 'resized', text: RESIZED, key: 'resized' }\n    : answer\n      ? { kind: answer.kind, text: answer.text, key: `press-${answer.press}` }\n      : null;"
+        ]
+      ]
+    },
+    "r2-resized-not-stale-only": {
+      "undoes": "round 2 — the sentence is said only while the result is hidden (back at the old size, the line goes back to what it detects)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    : stale\n      ? { kind: 'resized', text: RESIZED, key: 'resized' }",
+          "    : checked !== null\n      ? { kind: 'resized', text: RESIZED, key: 'resized' }"
+        ]
+      ]
+    }
+  }
+}

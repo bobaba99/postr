@@ -132,6 +132,11 @@ scope becomes a plan item or a question for the owner.
   the product rule that user-facing errors stay generic. Before any workshop or
   class session, check production's anonymous sign-in rate limit (30 per hour
   per IP in the local config): a room on one network would hit this screen.
+- The editor's plot checker code box keeps Tab and Shift+Tab (it indents),
+  so a keyboard-only user who types code cannot reach ▶ Check or the
+  language buttons (WCAG 2.1.2); the public page does not indent. On main
+  too (MEASURED by fix 15's round 2 reviewer, 8 of 8 runs in each of three
+  engines; INSPECTED in fix 15, record 15 section 10).
 - **Item 10, outside the MVP scope (2026-09-30):** the crash screen claims the
   work is safe when it may not be (MEASURED with a synthetic crash only); its
   "Try again discards unsaved work" part moved into item 8.
@@ -140,7 +145,9 @@ scope becomes a plan item or a question for the owner.
   its parts moved into items 8 and 9.
 - **Item 17, outside the MVP scope (2026-09-30):** "Copied" when copying
   failed, Scan image silent on an empty placeholder, a stale language label
-  (MEASURED); the label may be absorbed by item 15.
+  (MEASURED). Fix 15 marks a result out of date when the code or its
+  reading changes; the label's "Detected:" for a hand-picked language is
+  not changed (record 15, section 10).
 - **Item 18 as its own item (2026-09-30):** its real-R/Python harness is the
   instrument of items 13–16 instead.
 - **Item 21, parked by the owner (2026-09-30):** close the guidelines panel when
@@ -313,3 +320,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 23 | `fix/new-poster-owner-only` | done — `docs/fixes/23-new-poster-owner-only.md`; sharing and comments hidden (`SHARING_ENABLED`) |
 | 4 | `editor/rulers-match-sheet` (local, parked) | hidden — the owner hid the rulers on 2026-09-30 (`RULERS_ENABLED`, `config/features.ts`); the fix is parked unmerged with its record, instruments and open review findings |
 | 13 | `checker/python-reads-own-fix` | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md` (the fix raises the text it saves, and its re-check reads it); part 2, the parser's own misreads, not started |
+| 15 | `fix/15-checker-language` | done (three review rounds) — `docs/fixes/15-checker-language.md` (Check answers when it cannot tell R from Python; unsupported plotting systems are named, not scored; a result on screen stays, marked out of date, and one a new print size hides is said to be hidden; detection reads live code only, re-landing 9ea9f38; a string in `aes()` or seaborn's `barplot()` places nothing on its own: code with only such a token gets the could-not-tell answer (an R package name such as `library(tidyverse)` is an R signal and is checked as ggplot2)) |
