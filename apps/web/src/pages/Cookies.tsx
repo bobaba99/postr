@@ -31,7 +31,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = 'October 5, 2026';
+const LAST_UPDATED = 'October 6, 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Cookies() {
@@ -139,10 +139,22 @@ export default function Cookies() {
               'Until you clear browser data',
             ],
             [
+              'postr.figure-script.<poster id>',
+              'localStorage',
+              'The plotting script you put into a poster’s figure check, its language, and the script, size and image block of your last check, so they are still there when you come back to that poster. The key name contains the poster id. They are kept only in this browser and are not sent to our servers.',
+              'Until you empty the code box, delete the poster or your account in this browser, or clear browser data. Only the 10 most recently changed posters keep a script. A very long script is not stored: it is lost when you reload the page or close the tab.',
+            ],
+            [
               'postr.tab-id',
               'sessionStorage',
               'A random id for this tab, used by the two-tab warning.',
               'Until you close the tab',
+            ],
+            [
+              'postr.figure-script-page, postr.figure-size-page',
+              'sessionStorage',
+              'On the plot checker page, the script you put in, its language, your last check and the printed size you typed, so reloading the page keeps them.',
+              'Until you close the tab. A very long script is not stored: it is lost when you reload the page.',
             ],
             [
               'postr.signupConsent, postr.checkoutIntent',
@@ -226,12 +238,12 @@ export default function Cookies() {
         <SectionHeading n="5" title="How to control cookies" />
         <Body>
           Deleting these entries signs you out. It also removes the presets,
-          palettes, templates, Scratch Pad notes and profile details that are
-          kept only in your browser. The posters, feedback and settings saved
-          with your account stay on our servers, and your posters and settings
-          come back when you sign in again. If you use Postr as a guest, without
-          an account, the sign-in session is the only key to your posters: once
-          it is deleted, you can no longer open them.
+          palettes, templates, Scratch Pad notes, plotting scripts and profile
+          details that are kept only in your browser. The posters, feedback and
+          settings saved with your account stay on our servers, and your posters
+          and settings come back when you sign in again. If you use Postr as a
+          guest, without an account, the sign-in session is the only key to your
+          posters: once it is deleted, you can no longer open them.
         </Body>
         <Body>
           You can clear Postr’s storage in the usual ways for your browser:

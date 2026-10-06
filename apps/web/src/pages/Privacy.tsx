@@ -20,7 +20,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = 'October 5, 2026';
+const LAST_UPDATED = 'October 6, 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Privacy() {
@@ -355,8 +355,9 @@ export default function Privacy() {
           Postr sets no cookies. It keeps a few items in your browser’s storage: your
           sign-in session, a marker that notices when the same poster is open in two
           tabs, short-lived values that last only for the current tab, and settings and
-          notes you create, such as saved styles, palettes, scratch-pad notes and your
-          profile details. We use them only to run features you use, so we do not ask
+          notes you create, such as saved styles, palettes, scratch-pad notes, the
+          plotting scripts you put into the figure check and your profile details. We
+          use them only to run features you use, so we do not ask
           for consent before storing them. The{' '}
           <Link to="/cookies" className="text-[#7c6aed] underline">
             Cookies Policy

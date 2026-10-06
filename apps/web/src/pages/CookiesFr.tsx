@@ -12,7 +12,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = '5 octobre 2026';
+const LAST_UPDATED = '6 octobre 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function CookiesFr() {
@@ -129,10 +129,22 @@ export default function CookiesFr() {
               'Jusqu’à ce que vous effaciez les données du navigateur',
             ],
             [
+              'postr.figure-script.<ID de l’affiche>',
+              'localStorage',
+              'Le script de graphique que vous placez dans la vérification de figure d’une affiche, son langage, ainsi que le script, la taille et le bloc image de votre dernière vérification, pour les retrouver quand vous revenez à cette affiche. Le nom de la clé contient l’identifiant de l’affiche. Ils sont conservés uniquement dans ce navigateur et ne sont pas envoyés à nos serveurs.',
+              'Jusqu’à ce que vous vidiez la zone de code, supprimiez l’affiche ou votre compte dans ce navigateur, ou effaciez les données du navigateur. Seules les 10 affiches modifiées le plus récemment gardent un script. Un script très long n’est pas enregistré : il est perdu quand vous rechargez la page ou fermez l’onglet.',
+            ],
+            [
               'postr.tab-id',
               'sessionStorage',
               'Un identifiant aléatoire pour cet onglet, utilisé par l’alerte des deux onglets.',
               'Jusqu’à ce que vous fermiez l’onglet',
+            ],
+            [
+              'postr.figure-script-page, postr.figure-size-page',
+              'sessionStorage',
+              'Sur la page de vérification de graphiques, le script que vous y placez, son langage, votre dernière vérification et la taille d’impression que vous avez saisie, pour que le rechargement de la page les conserve.',
+              'Jusqu’à ce que vous fermiez l’onglet. Un script très long n’est pas enregistré : il est perdu quand vous rechargez la page.',
             ],
             [
               'postr.signupConsent, postr.checkoutIntent',
@@ -224,13 +236,14 @@ export default function CookiesFr() {
         <SectionHeading n="5" title="Comment contrôler les témoins" />
         <Body>
           La suppression de ces entrées vous déconnecte. Elle efface aussi les
-          préréglages, palettes, modèles, notes du bloc-notes et données de
-          profil qui ne sont conservés que dans votre navigateur. Les affiches,
-          la rétroaction et les paramètres enregistrés avec votre compte restent
-          sur nos serveurs, et vos affiches et paramètres reviennent quand vous
-          vous reconnectez. Si vous utilisez Postr en tant qu'invité, sans
-          compte, la session de connexion est la seule clé de vos affiches : une
-          fois qu'elle est supprimée, vous ne pouvez plus les ouvrir.
+          préréglages, palettes, modèles, notes du bloc-notes, scripts de
+          graphique et données de profil qui ne sont conservés que dans votre
+          navigateur. Les affiches, la rétroaction et les paramètres enregistrés
+          avec votre compte restent sur nos serveurs, et vos affiches et
+          paramètres reviennent quand vous vous reconnectez. Si vous utilisez
+          Postr en tant qu'invité, sans compte, la session de connexion est la
+          seule clé de vos affiches : une fois qu'elle est supprimée, vous ne
+          pouvez plus les ouvrir.
         </Body>
         <Body>
           Vous pouvez effacer le stockage de Postr des façons habituelles pour

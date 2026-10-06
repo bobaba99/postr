@@ -15,7 +15,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = '5 octobre 2026';
+const LAST_UPDATED = '6 octobre 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function PrivacyFr() {
@@ -371,7 +371,8 @@ export default function PrivacyFr() {
           la même affiche est ouverte dans deux onglets, des valeurs temporaires qui ne
           durent que le temps de l’onglet en cours, ainsi que les réglages et les notes
           que vous créez, comme les styles enregistrés, les palettes, les notes du
-          bloc-notes et les détails de votre profil. Nous ne les utilisons que pour faire
+          bloc-notes, les scripts de graphique que vous placez dans la vérification de
+          figure et les détails de votre profil. Nous ne les utilisons que pour faire
           fonctionner les fonctions que vous utilisez. C’est pourquoi nous ne demandons
           pas de consentement avant de les enregistrer. La{' '}
           <Link to="/cookies/fr" className="text-[#7c6aed] underline">
