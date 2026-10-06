@@ -1,5 +1,7 @@
 # Postr — Feature Graph & Refactoring Checklist (v2)
 
+**Revised 2026-10-06 — legal pages and privacy (record 24, `docs/fixes/24-legal-canada-law25.md`).** §6.4 rewritten (Privacy, Cookies and Terms, EN and FR, for Quebec's Law 25 and PIPEDA first; the person in charge as a role of Resila; recipients read from the code; the line-by-line copy listing replaced by section summaries and the test that pins the required elements). §6.1 and §6.15: Vercel Web Analytics is not mounted under Global Privacy Control, `/gallery/:id` is redacted, every page is served with `Referrer-Policy: strict-origin`; the `ConsentNotice` this file listed does not exist in the code. §6.5: the sign-up Terms line links the French pages. §6.13: the feedback form's console log starts unticked. §8: account deletion clears every Postr entry in the browser that deletes, in localStorage and sessionStorage, except another account's welcome marker. Review round 1 (same record): `redactUrl` matches the path as the router reads it (case, percent-escapes, doubled slashes), the sign-up line and Terms §1 present the Privacy Policy as information rather than something agreed to, the Terms and Privacy name Stripe's merchant-of-record service without naming the seller, the pack refund is the amount paid with tax, and Privacy §9 says a feedback report with an attached file keeps the account id in the file's storage path. Review round 2 (same record): the `/auth` Terms line is shown in both modes, right under `Continue with Google` ("By continuing, you agree to…"; `data-testid="auth-terms-line"`); Privacy §8 no longer lists page counting among the private defaults (it is on by default); Privacy §6/§7 and Cookies §4 say what Vercel's documentation says it may record from a page view (an approximate location, device type, operating system, browser), and "no technology that locates" carries that exception; Privacy §15 names Canada's adequacy and how to learn a provider's safeguard, and GDPR portability to another organization; portability (§10) is to a person or body the law authorizes; the Terms precede §5.5, §10, §11 and §13's "continued use" sentence with the Consumer Protection Act s. 19.1 statement (EN and FR); the French pages are labelled « Juridique » and use Quebec usage (« 18,99 $ CA », « lot », « Finalité », Quebec civil-law terms, curly apostrophes). Internal: `docs/legal/quebec-law-25.md`.
+
 **Revised 2026-09-10 — hide pass.** The manuscript pipelines (§6.12 `/paper-to-poster`, §6.16 `/paper-to-slides`), the Presentation Checker (§6.17: `/presentation-checker`, the editor `review` tab, the `review_pack` / `review_addon` SKUs), the paper-to-talk waitlist callout (§6.3) **and — same day, second pass — the standalone plot picker page (§6.10 `pages/ChartChooser.tsx`, `/chart-chooser` + alias `/plot-picker`)** are **DEACTIVATED, not deleted** — routes redirect to `/`, nav/footer/landing/dashboard/pricing entries are removed, SEO records are gone, the API routers mount only behind `FEATURE_MANUSCRIPT` / `FEATURE_REVIEW`. The product's nav carries **one standalone tool** — the figure-readability check at `/tools/figure-readability` (alias `/plot-checker`), added 2026-09-11 and inventoried in §6.10 `pages/FigureReadability.tsx`; `charts/*` itself stays LIVE inside the editor's Figure tab (§6.8). Every file named in those sections still exists and stays unit-tested. Canonical restore recipe: the `apps/web/src/routes.tsx` header; summary in §10 "Deactivated features". The per-element inventories in §6.10 / §6.12 / §6.16 / §6.17 are kept verbatim as the reactivation reference and are NOT re-extracted.
 
 **Revised 2026-07-29** (v2 second pass was 2026-07-28, superseding v1 from earlier that day; 2026-07-29 updates added §6.16 Manuscript → Slides and — documented from the `feat/presentation-checker` branch ahead of its launch gate — §6.17 Presentation Checker). Source of truth: `apps/web/src/` (React 19 + react-router 8 + Vite SPA) plus `apps/api/src/` for the external-services map. Every file:line reference and verbatim UI string below was extracted from the code as of **2026-07-28 ~16:00 local** (§6.16 and §6.17 extracted 2026-07-29; §6.17 from the feature branch). If the doc and the code disagree, **the code wins** — regenerate this doc.
@@ -13,7 +15,7 @@ What changed in the repo since v1 was generated:
 - **Stripe billing shipped** — `apps/api/src/billing.ts` (checkout, webhook, consume-credit, mark-export, refund, portal), `pages/BillingResult.tsx` serving the new `/billing/success` + `/billing/cancel` routes, `talk_waitlist` table + `TalkWaitlistCallout` (inside `components/PricingSection.tsx`) on `/pricing`.
 - **`/pricing` page shipped** — `pages/Pricing.tsx` + `components/PricingSection.tsx` with three tiers: Free, Term **CA$18.99 / 4 months**, Export pack **CA$9.99 / 3 credits**.
 - **French legal page variants shipped** — `/privacy/fr`, `/cookies/fr`, `/terms/fr` (`pages/PrivacyFr.tsx`, `CookiesFr.tsx`, `TermsFr.tsx`), cross-linked from the EN pages.
-- **Always-visible `ConsentNotice`** mounted in `App.tsx:24` — bottom-left, non-dismissible, on every route.
+- **Always-visible `ConsentNotice`** mounted in `App.tsx:24` — bottom-left, non-dismissible, on every route. *(2026-10-06: no such component exists in the code or its git history; see §6.1.)*
 - **Persona-testing docs deleted** from `docs/`; **MCP / public-API plans ditched**; **business-model experiments archived** to `docs/archive/`.
 
 What changed in the doc:
@@ -93,7 +95,7 @@ All of `apps/web/src/` is covered (test files excluded by rule) — the earlier 
 
 ## 5. Master graph
 
-All routes from `routes.tsx`. Auth gating via `AuthGuard` (`components/AuthGuard.tsx`) on `/dashboard`, `/profile`, `/admin/gallery` — these require a real account and bounce a session-less visitor to `/auth`. The editor route `/p/:posterId` instead uses `EnsureSession` (`components/EnsureSession.tsx`): it silently creates an ANONYMOUS session (`ensureSession`) so a logged-out visitor edits immediately with no signup (the no-auth editor, 2026-07-29). On `SIGNED_OUT` it re-bootstraps a fresh anonymous session (`resetEnsureSession` + `ensureSession`) rather than dead-ending. Global mounts in `App.tsx`: `AppRoutes`, `FeedbackModal`, `PublishFlow`, `SessionExpiredModal`, `ConsentNotice`, `Analytics` beacon.
+All routes from `routes.tsx`. Auth gating via `AuthGuard` (`components/AuthGuard.tsx`) on `/dashboard`, `/profile`, `/admin/gallery` — these require a real account and bounce a session-less visitor to `/auth`. The editor route `/p/:posterId` instead uses `EnsureSession` (`components/EnsureSession.tsx`): it silently creates an ANONYMOUS session (`ensureSession`) so a logged-out visitor edits immediately with no signup (the no-auth editor, 2026-07-29). On `SIGNED_OUT` it re-bootstraps a fresh anonymous session (`resetEnsureSession` + `ensureSession`) rather than dead-ending. Global mounts in `App.tsx`: `RouteScrollManager`, `MobileNotice`, `AppRoutes`, `FeedbackModal`, `PublishFlow`, `SessionExpiredModal`, and the `Analytics` beacon unless the browser sends Global Privacy Control (record 24). There is no `ConsentNotice` component in the code (checked 2026-10-06: no file, no history).
 
 **No-auth editor (2026-07-29):** logged-out "Editor" nav link, the Landing "Try as guest" hero, and the Pricing free-tier CTA all point at `/p/new` → `EnsureSession` mints an anonymous session behind it → `Editor.tsx` load-or-creates the user's OWN most recent poster (`loadMostRecentPoster` filters by `user_id`: the read policy also returns shared posters, fix 23) → edits autosave. An anonymous editor is prompted to secure their work to a permanent account only on EXPORT (`EditableExportButtons` gates `run()` on `plan.isGuest` → `SecureWorkModal reason="export"`) or on LEAVE (`useLeaveGuard` arms a `beforeunload` dialog when `isGuest && canUndo` — the live path, covering tab-close/refresh and the editor's `<a href>` exits; it also exposes a `requestLeave()` gate for a styled in-app-nav `SecureWorkModal reason="leave"`, but that has no caller yet — wiring it needs prop-drilling through the frozen `PosterEditor`, deferred). Conversion is in place via `lib/convertGuest.ts` (`convertGuestWithGoogle` → `linkIdentity`; `convertGuestWithEmail` → `updateUser`) — NEVER `signUp`, so the poster carries over. The same `PosterEditor` serves logged-in and anonymous users unchanged; a permanent user never sees either prompt.
 
@@ -159,11 +161,10 @@ flowchart LR
   end
 
   subgraph Global["Global mounts (App.tsx)"]
-    G_fb["FeedbackModal :14"]
-    G_pub["PublishFlow :15 (dead — gallery flag off)"]
-    G_sess["SessionExpiredModal :16"]
-    G_consent["ConsentNotice :24"]
-    G_an["Analytics beacon :38"]
+    G_fb["FeedbackModal :19"]
+    G_pub["PublishFlow :20 (dead — gallery flag off)"]
+    G_sess["SessionExpiredModal :21"]
+    G_an["Analytics beacon :39-41 (not under GPC)"]
   end
 
   AG[["AuthGuard"]]
@@ -275,41 +276,27 @@ One sub-section per feature area. Every file gets a sub-heading; under it the ex
 
 ### 6.1 App Shell & Routing & Consent
 
-Root bootstrap, the route table, the always-on privacy notice, the dev-only debug page, and the 404 catch-all.
+Root bootstrap, the route table, the dev-only debug page, and the 404 catch-all. (An always-on `ConsentNotice` was listed here; no such component exists in the code or its history, checked 2026-10-06 for record 24. The privacy notice is the Privacy and Cookies pages, §6.4.)
 
 ```mermaid
 flowchart LR
   main["main.tsx"] -->|"installConsoleCapture + render"| App["App.tsx"]
-  App -->|"mounts :13"| Routes["AppRoutes (routes.tsx)"]
-  App -->|"mounts :14"| FB["FeedbackModal"]
-  App -->|"mounts :15"| PF["PublishFlow (dead — flag off)"]
-  App -->|"mounts :16"| SE["SessionExpiredModal"]
-  App -->|"mounts :24"| CN["ConsentNotice"]
-  App -->|"mounts :38"| AN["Analytics (beforeSend=redactUrl)"]
-  CN -->|"Details link"| C["/cookies"]
+  App -->|"mounts :18"| Routes["AppRoutes (routes.tsx)"]
+  App -->|"mounts :19"| FB["FeedbackModal"]
+  App -->|"mounts :20"| PF["PublishFlow (dead — flag off)"]
+  App -->|"mounts :21"| SE["SessionExpiredModal"]
+  App -->|"mounts :39-41 unless GPC"| AN["Analytics (beforeSend=redactUrl)"]
 ```
 
-#### `App.tsx` — root shell: router + global modals + consent notice + analytics
+#### `App.tsx` — root shell: router + global modals + analytics
 
 No elements, copy, or graphics of its own. Mount sites only:
-- [ ] `<AppRoutes />` — `App.tsx:13`
-- [ ] `<FeedbackModal />` global modal — `App.tsx:14` (see §6.13)
-- [ ] `<PublishFlow />` global modal — `App.tsx:15` (dead — `GALLERY_PUBLIC_ENABLED=false`, see §6.13, §10)
-- [ ] `<SessionExpiredModal />` global modal — `App.tsx:16` (see §6.5)
-- [ ] `<ConsentNotice />` — `App.tsx:24` (this section, below)
-- [ ] `<Analytics beforeSend={…redactUrl}>` Vercel Web Analytics — `App.tsx:38` (see §6.15)
-
-#### `components/ConsentNotice.tsx` — always-visible, non-dismissible privacy notice (bottom-left fixed, every route)
-
-**Elements**
-- [ ] `Details` — router link — `ConsentNotice.tsx:44` — navigates to `/cookies`
-
-**Copy**
-- [ ] "Privacy notice" — aria-label on `role="note"` container — `ConsentNotice.tsx:24`
-- [ ] "Postr counts page visits and bounce rates — no cookies, no cross-site tracking." — body text — `ConsentNotice.tsx:42`
-- [ ] Note: deliberately NO close button (header comment `ConsentNotice.tsx:1-17`); z-index 40 sits under modals/tour.
-
-**Graphics** — none.
+- [ ] `<RouteScrollManager />` — `App.tsx:15` · `<MobileNotice />` — `App.tsx:17`
+- [ ] `<AppRoutes />` — `App.tsx:18`
+- [ ] `<FeedbackModal />` global modal — `App.tsx:19` (see §6.13)
+- [ ] `<PublishFlow />` global modal — `App.tsx:20` (dead — `GALLERY_PUBLIC_ENABLED=false`, see §6.13, §10)
+- [ ] `<SessionExpiredModal />` global modal — `App.tsx:21` (see §6.5)
+- [ ] `<Analytics beforeSend={…redactUrl}>` Vercel Web Analytics — `App.tsx:39-41`, rendered only when `globalPrivacyControlOn()` is false (`analytics/globalPrivacyControl.ts`; record 24) (see §6.15)
 
 #### `main.tsx` — React root bootstrap
 
@@ -594,163 +581,54 @@ Writes to Supabase table `talk_waitlist` (§9). Its only caller, `TalkWaitlistCa
 
 ### 6.4 Legal Pages EN/FR
 
-Six legal pages: Privacy, Cookies, Terms, each in EN + FR variants. EN pages link to their FR variant (`Français`); FR pages link back (`English`). Note: FR cross-links to other legal pages target the EN URLs (e.g. `CookiesFr` → `/privacy`, not `/privacy/fr`). Shared presentational components `SectionHeading/Body/List/Table/CalloutBox` are duplicated per legal page (defined e.g. `Cookies.tsx:274-338`).
+Six legal pages: Privacy, Cookies, Terms, each in EN + FR (Quebec French), kept sentence for sentence. EN pages link to their FR variant (`Français`), FR pages back (`English`); FR cross-links target the FR pages (`/privacy/fr`, `/cookies/fr`, `/terms/fr#refunds`). Rewritten for record 24 (`docs/fixes/24-legal-canada-law25.md`, owner decisions 2026-10-06): Canada first (Quebec's Law 25 and PIPEDA), then the EU/UK GDPR and US state law; Resila Technologies Inc. "incorporated in Quebec"; the person in charge published as a ROLE ("Person in charge of the protection of personal information (Privacy Officer), Resila Technologies Inc." / « Responsable de la protection des renseignements personnels, Resila Technologies Inc. »), never a name or "President"; every data flow read from the code (file references in `docs/legal/quebec-law-25.md`). Shared presentational components `SectionHeading/SubHeading/Body/List/Table/CalloutBox` are duplicated per page.
+
+**Contracts (tests):** `pages/__tests__/legalPagesContent.test.tsx` renders all six pages and checks every element the decisions require (Law 25 list, rights table with "how to use it", Vercel/Render/Supabase first among recipients, GPC, Google Fonts, Terms: before tax, cancellation at period end, unused-term refund, PowerPoint only, the Quebec consumer's own court, no arbitration/class-action waiver), that nothing dropped is stated (LaTeX, SCCs, a region, a DPO, a CCPA-applies claim), that no page names a President, and that EN and FR have the same shape (h2, h3, li, tr, callouts, ids). Since review round 2 it also checks page counting is not listed as a private default, what Vercel may record from a page view, Canada's adequacy and the safeguard request (no safeguard claimed), portability as the law gives it, the s. 19.1 statement right before each Quebec-inapplicable Terms clause (in bold), and Quebec French usage on the three FR pages. `pages/__tests__/cookiesStorageInventory.test.ts` pins the Cookies table to the code's storage writers and the GPC claim to the code that reads GPC.
 
 ```mermaid
 flowchart LR
   P["/privacy Privacy"] <-->|"Français / English"| PF["/privacy/fr PrivacyFr"]
   C["/cookies Cookies"] <-->|"Français / English"| CF["/cookies/fr CookiesFr"]
   T["/terms Terms"] <-->|"Français / English"| TF["/terms/fr TermsFr"]
-  C -->|"Privacy Policy link"| P
-  CF -->|"Politique de confidentialité (targets EN)"| P
-  T -->|"Privacy Policy link"| P
-  TF -->|"Politique de confidentialité (targets EN)"| P
-  CN["ConsentNotice (global)"] -->|"Details"| C
+  C -->|"Privacy Policy"| P
+  CF -->|"Politique de confidentialité"| PF
+  T -->|"Privacy Policy"| P
+  TF -->|"Politique de confidentialité"| PF
+  P -->|"Cookies Policy · Terms of Service (#refunds) · Profile page"| C
+  PF -->|"Politique relative aux témoins · Conditions (#refunds)"| CF
+  AU["Auth Terms line (both modes)"] -->|"Terms · Privacy · Conditions · Politique"| T
   EEB["EditableExportButtons paywall"] -->|"Refund terms"| TR["/terms#refunds"]
 ```
 
-#### `pages/Privacy.tsx` — /privacy policy (EN)
+#### `pages/Privacy.tsx` — /privacy (EN) · `pages/PrivacyFr.tsx` — /privacy/fr (FR)
 
-**Elements**
-- [ ] `Français` — router link — `Privacy.tsx:31` — `/privacy/fr`
-- [ ] `{support@resila.ai}` — mailto ×5 — `Privacy.tsx:46,272,279,331,348`
-- [ ] `Terms of Service` — router link — `Privacy.tsx:190` — `/terms`
-- [ ] `Profile page` — router link — `Privacy.tsx:284` — `/profile`
+`LAST_UPDATED` `Privacy.tsx:32` ('October 6, 2026') · `PrivacyFr.tsx:21` ('6 octobre 2026'). The FR page's label is « Juridique » (`PrivacyFr.tsx:34`). An intro paragraph (`:54-64`; Law 25 + PIPEDA first; sections 15–16 for EU/UK and US), then 18 sections (EN line · FR line):
+- [ ] §1 Who is responsible — Resila, incorporated in Quebec; callout with the Privacy Officer role + mailto — `:66` · `:58`
+- [ ] §2 What we collect, and how — table When / What / How, and is it needed? (10 rows: every visit, page counting, guest account, sign-up, profile details (browser only), posters, the four language-model features, buying a plan, feedback (console log only if ticked), technical records) + sensitive-data paragraph — `:88` · `:80`
+- [ ] §3 Why we use it — table Purpose / Information used (FR « Finalité »; 9 rows) + no sale, no ads, no training — `:155` · `:149`
+- [ ] §4 Who receives your information — table Provider / What it does / What it receives, and when: **Vercel, Render, Supabase first**, then Anthropic, Stripe, Google (sign-in, Fonts, logo-picker icons), Wikimedia Foundation (FR « Fondation Wikimedia »); Staples mail draft; legal requests; Sharing callout (gallery retract → `/profile`) — `:178` · `:174`
+- [ ] §5 Information communicated outside Quebec — "United States or other countries", no region, no contract claim — `:249` · `:246`
+- [ ] §6 Page counting, cookies and browser storage — Vercel Web Analytics only (what a beacon carries, MEASURED on production; what Vercel's documentation says it may record from it: an approximate location (country, region, city), device type, operating system, browser; review round 2); how to object (GPC → not loaded; or email); Google Fonts (IP + user agent, editor only); browser storage → `/cookies` — `:260` · `:258`
+- [ ] §7 Language-model features, profiling and automated decisions — the 4 Anthropic features; the plot checker sends code nowhere; apart from the approximate location Vercel derives from each page view, no technology that identifies, locates or profiles (GPC turns page counting off); the refund button as the one automated decision, with human review by email (→ `/terms#refunds`) — `:305` · `:309`
+- [ ] §8 Privacy by default — 5 defaults (emails off, console log unticked, profile in browser, nothing published, nothing to the model until used), then the two things that do not start at the most private choice: page counting, on by default (off under GPC), and the attachment box — `:344` · `:353`
+- [ ] §9 How long we keep it, and how it is destroyed — 11-row retention table (no period the code does not enforce) + destruction — `:363` · `:374`
+- [ ] §10 Your rights in Canada and Quebec — how to write (guest: the id from "Download my data"), 30-day written reply, free; table Right / What it means / How to use it in Postr today (Access, Rectification, Withdrawal of consent, Deletion, De-indexation, Portability (to a person or body the law authorizes, s. 27), Explanation of an automated decision, Complaint → CAI / OPC) + account-deletion consequences — `:409` · `:421`
+- [ ] §11 How we govern personal information — roles and responsibilities, life cycle, complaints process — `:472` · `:486`
+- [ ] §12 Confidentiality incidents — register; notice to the CAI and the people affected on a risk of serious injury; OPC under PIPEDA — `:503` · `:521`
+- [ ] §13 Security · §14 Children (16) — `:513`, `:524` · `:533`, `:545`
+- [ ] §15 If you are in the EU or the UK — legal bases table (8 rows; FR citations « art. 6, par. 1, point b) »), restriction, portability to another organization (art. 20(2)), supervisory authority; transfers: Canada's adequacy for organizations subject to PIPEDA, the US only for Data Privacy Framework companies, write to learn whether a decision or safeguard covers a provider (none claimed); Art. 21 objection callout — `:532` · `:554`
+- [ ] §16 If you are in the United States — no sale/sharing for cross-context ads, GPC, state rights — `:580` · `:609`
+- [ ] §17 Changes · §18 Contact — `:590`, `:598` · `:620`, `:630`
 
-**Copy** (`LAST_UPDATED = 'April 10, 2026'` `Privacy.tsx:16`)
-- [ ] "Legal" eyebrow — `Privacy.tsx:29` · [ ] "Privacy Policy" h1 — `Privacy.tsx:35` · [ ] "Last updated: {LAST_UPDATED}" — `Privacy.tsx:36`
-- [ ] §1 "Who we are" + bodies: "Postr ("we", "us") is an academic poster editor operated by Resila Technologies Inc., a corporation registered in the Province of Quebec, Canada. If you have any question about how we handle your personal data — or want to exercise any of the rights described in Section 7 — contact us at {email}." (`:40-50`) · "We act as the data controller (the "enterprise" under Quebec law). Under Quebec's Act respecting the protection of personal information in the private sector (the "Law 25" reform), the person responsible for the protection of personal information within Resila Technologies Inc. is reachable at the same address above. We will name a dedicated Data Protection Officer if and when legal thresholds require it." (`:51-58`)
-- [ ] §2 "What data we collect" + intro body (`:61-64`) + Table "When / What / Required?" 7 rows (`:65-104`): rows for "Anonymous first visit", "When you sign up", "Profile details (optional)", "When you edit a poster", "When you use the figure-readability feature", "When you send feedback", "Technical logs" — each with What + Required cells verbatim at those lines
-- [ ] body "We do not intentionally collect any special-category data (health, biometric, political, religious, sexual orientation, ethnic origin, trade-union membership, genetic data). If you type such information into a poster block yourself, it is stored as the poster content you wrote — we do not process it further." — `:105-111`
-- [ ] §3 "Why we process your data (and our legal basis)" + Table "Purpose / Legal basis / Data categories" 6 rows (`:114-148`) + body "We do not sell personal data, we do not run profiling or automated decision-making that produces legal or similarly significant effects, and we do not use your poster content to train any AI model. We only email you about product research if you have explicitly opted in, and you can withdraw that consent at any time in your account settings — it never affects your access to Postr." — `:149-156`
-- [ ] §4 "Who receives your data" + body (`:159-163`) + Table "Provider / What it does / Location" 5 rows (`:164-173`): Supabase / Vercel / Render / Anthropic / Google rows verbatim + body "We do not share your personal data with advertisers, data brokers, or social networks. If a legal authority issues a valid request compelling disclosure, we will comply, and will tell you unless we are legally prohibited from doing so." (`:174-179`)
-- [ ] Callout "Public gallery." + "If you choose to publish a poster to the public gallery, or create a read-only share link, the poster content and any name you put on it becomes visible to anyone on the internet — including visitors who don't have a Postr account. It may be indexed by search engines and cached by third parties. Retracting the poster removes it from Postr but cannot recall copies that others may have already made. Think before publishing. See Section 5.3 of the Terms of Service for the full rules." — `:180-194`
-- [ ] §5 "International transfers" + body "Some of the processors above are based in the United States. When your data is transferred outside the European Economic Area, we rely on appropriate safeguards: Standard Contractual Clauses approved by the European Commission, and, where applicable, the EU–US Data Privacy Framework certification of the recipient. You can request a copy of the specific safeguards we rely on by emailing us." — `:196-204`
-- [ ] §6 "How long we keep your data" + Table "Data / Retention" 5 rows (`:207-231`): "Poster drafts and assets", "Anonymous guest accounts", "Feedback submissions", "Server/error logs", "Legal/tax records" rows verbatim
-- [ ] §7 "Your rights" + body "Several privacy laws may apply to you depending on where you live. Postr is operated from Quebec, Canada, so the federal Personal Information Protection and Electronic Documents Act (PIPEDA) and Quebec's Act respecting the protection of personal information in the private sector ("Law 25") apply. If you are in the European Economic Area or the United Kingdom, the EU/UK GDPR applies. If you are in California, the California Consumer Privacy Act (CCPA) applies. Across these regimes you have the following rights over your personal data:" (`:234-243`)
-- [ ] List 9 items (`:244-256`): "Access — ask for a copy of the personal information we hold about you and the categories of people it has been shared with." · "Rectification — ask us to correct inaccurate or incomplete information." · "Erasure / de-indexing — ask us to delete your data or stop disseminating it, subject to legal exceptions." · "Restriction — ask us to pause processing while a dispute is resolved." · "Portability — ask for your data in a structured, commonly used, machine-readable format (GDPR and, since September 2024, Quebec Law 25)." · "Objection — object to processing based on our legitimate interest." · "Withdraw consent — where processing is based on consent, withdraw it at any time without affecting processing already carried out." · "Non-discrimination (CCPA) — we will not treat you differently for exercising your CCPA rights." · "Lodge a complaint — with the appropriate regulator (see below)."
-- [ ] body "You can file a complaint with the Commission d'accès à l'information du Québec (CAI) if you are a Quebec resident, the Office of the Privacy Commissioner of Canada (OPC) for matters under PIPEDA, your local EU data-protection authority under GDPR, the UK Information Commissioner's Office (ICO) under UK GDPR, or the California Privacy Protection Agency (CPPA) under CCPA." — `:257-265`
-- [ ] Callout "Right to object (Art. 21 GDPR)." + "You have the right to object at any time — on grounds relating to your particular situation — to processing of your personal data based on our legitimate interest, including any profiling. Send an email to {email}." — `:266-276`
-- [ ] body "To exercise any of these rights, email us at {email}. We will respond within one month, as required by the GDPR. For most actions you can also use the buttons in your Profile page — deleting your account there erases everything associated with it." — `:277-288`
-- [ ] §8 "Cookies and similar technologies" + bodies "We only set cookies and local-storage items that are strictly necessary to run the app — authenticating your session, remembering the poster you last opened, and preventing cross-site request forgery. These do not require consent under the ePrivacy Directive." (`:291-296`) · "We currently do not run third-party analytics or advertising trackers. If we add optional analytics in the future, we will update this notice and ask for your explicit consent before any non-essential cookies are set." (`:297-301`) — note: second para is stale vs. Cookies §4/§8 (Vercel Analytics exists) — drift to flag (§10)
-- [ ] §9 "AI features and automated processing" + bodies (`:303-314`)
-- [ ] §10 "Security" + body "We use encryption in transit (HTTPS everywhere), encryption at rest for database and storage, scoped service-role credentials, row-level security policies on every table, and least-privilege access for everyone who operates the service. No system is perfectly secure, but we take reasonable steps appropriate to the size of the service and the sensitivity of the data." — `:316-324`
-- [ ] §11 "Children's data" + body — `:326-335`
-- [ ] §12 "Changes to this notice" + body — `:337-343`
-- [ ] §13 "Contact" + body — `:345-352`
+**Elements:** `Français`/`English` (`Privacy.tsx:47` · `PrivacyFr.tsx:36`); mailto `support@resila.ai` ×5 (EN `:80,413,494,574,602` · FR `:72,425,511,602,635`); `Profile page` → `/profile` (`:242` · `:239`); `Cookies Policy` → `/cookies` (`:299`) · `/cookies/fr` (`:303`); `Terms of Service` → `/terms#refunds` (`:336`) · `/terms/fr#refunds` (`:345`). **Graphics** — none.
 
-**Graphics** — none.
+#### `pages/Cookies.tsx` — /cookies (EN) · `pages/CookiesFr.tsx` — /cookies/fr (FR)
 
-#### `pages/PrivacyFr.tsx` — /privacy/fr policy (FR)
+`LAST_UPDATED` `Cookies.tsx:42` · `CookiesFr.tsx:16`. Nine sections: §1 Scope (→ `/privacy` · `/privacy/fr`), §2 What cookies are, §3 What Postr uses today (callout: Vercel Web Analytics only, not loaded under GPC; the storage table, one row per key family, lifetimes as the code sets them, account deletion clearing every Postr entry in the browser that deletes, the welcome marker only for that account; the lswt test entry; the strictly-necessary position; Google Fonts with IP + user agent, the logo picker, Google sign-in, Stripe), §4 Page counting (what a beacon carries; what Vercel's documentation says it may record from it, an approximate location, device type, operating system and browser; `/p/[redacted]`, no query; the referring address only from another site on the first page; Referrer-Policy keeps the path out), §5 How to control cookies, §6 Global Privacy Control and Do Not Track (GPC honoured: analytics not loaded; DNT not read; objection by email), §7 Retention, §8 Changes, §9 Contact. The FR page is labelled « Juridique » (`CookiesFr.tsx:29`), uses « mesure d’audience » for analytics and curly apostrophes throughout. **Elements:** `Français`/`English` (`:57` · `:31`), `postr.sh` external link (§1), mailto ×2 (§6 `:293` · `:293`, §9 `:321` · `:323`). **Graphics** — none.
 
-**Elements**
-- [ ] `English` — router link — `PrivacyFr.tsx:29` — `/privacy`
-- [ ] `{support@resila.ai}` — mailto ×5 — `PrivacyFr.tsx:46,284,291,349,368`
-- [ ] `Conditions d'utilisation` — router link — `PrivacyFr.tsx:196` — `/terms` (targets EN)
-- [ ] `page de profil` — router link — `PrivacyFr.tsx:296` — `/profile`
+#### `pages/Terms.tsx` — /terms (EN) · `pages/TermsFr.tsx` — /terms/fr (FR)
 
-**Copy** (`LAST_UPDATED = '10 avril 2026'` `PrivacyFr.tsx:14`) — full FR mirror of Privacy: "Légal" (:27), "Politique de confidentialité" h1 (:34), "Dernière mise à jour : {…}" (:36); §1 "Qui nous sommes" + 2 bodies (:38-59); §2 "Quelles données nous recueillons" + intro + Table "Quand / Quoi / Obligatoire ?" 7 rows (:61-106) + special-category body (:107-114); §3 "Pourquoi nous traitons vos données (et notre base juridique)" + Table "Finalité / Base juridique / Catégories de données" 6 rows (:116-151) + no-sale body (:152-161); §4 "Qui reçoit vos données" + body + Table "Fournisseur / Rôle / Emplacement" 5 rows (:163-179) + no-sharing body (:180-185) + "Galerie publique." callout (:186-200); §5 "Transferts internationaux" + body (:202-211); §6 "Combien de temps nous conservons vos données" + Table "Données / Conservation" 5 rows (:213-238); §7 "Vos droits" + intro body (:240-252) + List 9 items (:253-265) + complaint body naming CAI/CPVP/ICO/CPPA (:266-276) + "Droit d'opposition (art. 21 RGPD)." callout (:277-288) + exercise-rights body (:289-300); §8 "Témoins et technologies semblables" + 2 bodies (:302-316, same stale "aucun outil d'analyse" drift); §9 "Fonctions d'IA et traitement automatisé" + 2 bodies (:318-330); §10 "Sécurité" + body (:332-341); §11 "Données des enfants" + body (:343-353); §12 "Modifications du présent avis" + body (:355-362); §13 "Nous joindre" + body (:364-372). All strings verbatim at the cited line ranges; every FR string enumerated structurally identical to EN list above (counted individually in totals).
-
-**Graphics** — none.
-
-#### `pages/Cookies.tsx` — /cookies policy (EN)
-
-**Elements**
-- [ ] `Français` — router link — `Cookies.tsx:47` — `/cookies/fr`
-- [ ] `postr.sh` — external link — `Cookies.tsx:59` — https://postr.sh
-- [ ] `Privacy Policy` — router link — `Cookies.tsx:61` — `/privacy`
-- [ ] `{support@resila.ai}` — mailto link — `Cookies.tsx:260` — mail client
-
-**Copy** (constants: `LAST_UPDATED = 'July 28, 2026'` `Cookies.tsx:32`)
-- [ ] "Legal" — eyebrow — `Cookies.tsx:45` · [ ] "Cookies Policy" — h1 — `Cookies.tsx:51` · [ ] "Last updated: {LAST_UPDATED}" — `Cookies.tsx:52`
-- [ ] §1 "Scope" — heading — `Cookies.tsx:55`; body "This Cookies Policy explains how Resila Technologies Inc. (the company behind Postr) uses cookies and similar client-side storage technologies on postr.sh. It supplements our Privacy Policy." — `Cookies.tsx:56-65`
-- [ ] §2 "What cookies (and similar technologies) are" — `Cookies.tsx:67`; body "A cookie is a small text file a website asks your browser to store so that it can recognise you on a later page load. Modern web apps also use related browser features — localStorage and sessionStorage — which serve the same purpose (remembering state between visits) but live in a different part of the browser. Wherever this policy says "cookies", we mean cookies, localStorage, and sessionStorage collectively." — `Cookies.tsx:68-76`
-- [ ] body "Regulators (CAI, CNIL, ICO, OPC) treat these technologies the same way: strictly necessary storage can be used without asking, but anything optional — analytics, advertising, third-party embeds — requires your prior, informed, freely-given consent." — `Cookies.tsx:77-82`
-- [ ] §3 "What Postr uses today" — `Cookies.tsx:84`; callout "Postr uses only strictly-necessary storage." + "We do not run Google Analytics, Facebook Pixel, advertising trackers, social-media share buttons with tracking, or any other technology that stores something on your device. We do count page views, using Vercel Web Analytics — it sets no cookie, writes nothing to your browser, and cannot recognise you on a second visit or on any other site. No consent banner is shown because none of the entries below require consent under GDPR, the ePrivacy Directive, PIPEDA, or Quebec Law 25 — that duty attaches to storing or reading data on your device, and page counting does neither. The small notice at the bottom-left of every page repeats this and links here; it is not a consent banner — there is nothing to accept or refuse." — `Cookies.tsx:85-99`
-- [ ] Table headers "Entry / Stored where / What it does / Lifetime" + 5 rows — `Cookies.tsx:101-135`: ("sb-<project-ref>-auth-token", "localStorage", "Holds your Supabase authentication session (JWT + refresh token). Without it, the app cannot tell who you are and your drafts cannot be loaded.", "Until you sign out or the session expires") · ("postr-onboarding-*", "localStorage", "Remembers whether you have seen the onboarding tour so we do not show it again on every visit.", "Until you clear browser data") · ("postr-templates", "localStorage", "Holds custom poster templates you save from the editor's Scratch Pad so they are available on your next visit.", "Until you delete the template or clear browser data") · ("Supabase refresh/session timers", "sessionStorage", "Short-lived technical flags used by the Supabase client to coordinate token refresh between tabs.", "Until you close the browser tab") · ("Aggregate usage measurement", "No device storage", "Counts page visits and bounce rates with Vercel Web Analytics, so we can tell which pages people find useful. Sets no cookie and writes nothing to your browser; visits are never linked to your account or to activity on other sites.", "The per-visit identifier is discarded within 24 hours; only aggregates are kept")
-- [ ] body "The storage entries above fall under the "strictly necessary to provide the service the user explicitly requested" exemption in Article 5(3) of the ePrivacy Directive and the equivalent provisions of PIPEDA and Quebec Law 25. The measurement row needs no exemption: it stores nothing on your device, and the consent duty attaches only to storing or reading data on the device. None of these track you across other sites." — `Cookies.tsx:136-144`
-- [ ] §4 "Page counting, and what Postr still does not use" — `Cookies.tsx:146`; body "Postr counts page views with Vercel Web Analytics, so we can see which pages people find useful. It is worth being precise about what that does and does not involve. It sets no cookie and writes nothing to your browser. There is no identifier that persists: a visit is counted using a value derived from the request itself and discarded within 24 hours, so a second visit tomorrow is a stranger. Every figure is an aggregate — a count of views on a page, never a record of what you did." — `Cookies.tsx:147-157`
-- [ ] body "We also strip the address before it is counted. Poster URLs, share links and admin pages are recorded only as their shape — `/s/[redacted]` rather than the slug you were sent. A share link is a link to unpublished work, and the slug is what opens it, so it never leaves the app. Query strings are discarded entirely." — `Cookies.tsx:158-165`
-- [ ] List, 6 items — `Cookies.tsx:166-175`: "Advertising cookies — there are no ads on Postr." · "Google Analytics, Matomo, PostHog, Plausible — none of these." · "Cross-site tracking or fingerprinting — we do not profile you between visits or across other websites." · "Social-media widgets — no Facebook, Twitter, or LinkedIn buttons that phone home." · "Persistent identifiers beyond what your authentication session requires." · "Recording of your poster contents, share-link slugs, or query strings in analytics."
-- [ ] body "If we ever add something that does store or read data on your device for optional purposes, we will update this policy, display a consent banner with equally-visible "Accept" and "Reject" choices, and refrain from setting any non-essential storage until you click "Accept"." — `Cookies.tsx:176-182`
-- [ ] §5 "How to control cookies" — `Cookies.tsx:184`; body "Because Postr currently only stores what is strictly necessary for sign-in and editing, deleting these entries will sign you out and discard your locally-saved templates and onboarding state. Your server-side data (posters, profile, feedback) is unaffected." — `Cookies.tsx:185-190`; body "You can clear Postr's storage in the usual ways for your browser:" — `Cookies.tsx:191-193`
-- [ ] List, 4 items — `Cookies.tsx:194-201`: 'Chrome / Edge: Settings → Privacy and security → Cookies and other site data → See all site data and permissions → search "postr.sh" → Delete.' · 'Firefox: Settings → Privacy & Security → Cookies and Site Data → Manage Data → search "postr.sh" → Remove.' · 'Safari: Settings → Privacy → Manage Website Data → search "postr.sh" → Remove.' · "Mobile: follow your browser's instructions for clearing site data."
-- [ ] body "Most browsers also let you block all cookies, block third-party cookies, or receive a prompt before each cookie is set. Blocking strictly-necessary cookies will prevent Postr from working." — `Cookies.tsx:202-206`
-- [ ] §6 "Do Not Track and Global Privacy Control" — `Cookies.tsx:208`; body "We respect "Do Not Track" (DNT) headers and the newer Global Privacy Control (GPC) signal. To be precise about what runs today: Postr counts page visits and bounce rates with Vercel Web Analytics. That measurement is cookieless — nothing is stored on your device, there is no cross-site tracking, and there is no separate telemetry layer — so today these signals have nothing to opt out of. Targeted advertising: none. If we ever introduce optional tracking, receiving DNT or GPC from your browser will be treated as an automatic opt-out." — `Cookies.tsx:209-219`
-- [ ] §7 "Retention" — `Cookies.tsx:221`; body "Each entry in the table above lives until the lifetime listed there. None of them outlive 13 months, which is the maximum retention period allowed for consent records under French CNIL guidance and a common reference across EU regulators. When we add a consent cookie in the future, we will default it to 6 months in line with CNIL's recommendation." — `Cookies.tsx:222-229`
-- [ ] §8 "Changes to this policy" — `Cookies.tsx:231`; body "We may update this Cookies Policy as the product evolves. The "Last updated" date at the top reflects the current version. If a change is material — for example, the first time we introduce an analytics or advertising cookie — we will show a clear notice in the app before the change takes effect." — `Cookies.tsx:232-238`
-- [ ] changelog "Changed on July 27, 2026: we added aggregate page counting with Vercel Web Analytics (disclosed in §3 and §4 above), and narrowed the consent-banner commitment in §4: it previously promised a banner for "any non-essential technology", and now attaches to technologies that store or read data on your device or could identify you across visits or other sites. We are noting the narrowing here rather than making it quietly, because it is a narrowing." — `Cookies.tsx:239-248`
-- [ ] changelog "Changed on July 28, 2026: we corrected §6, which previously stated that we do not run analytics — we do count page visits and bounce rates, as described in §4 — and added a small always-visible notice at the bottom of every page that says so and links here." — `Cookies.tsx:249-255`
-- [ ] §9 "Contact" — `Cookies.tsx:257`; body "Questions about cookies or this policy: {email}." — `Cookies.tsx:258-264`
-
-**Graphics** — none. Shared presentational components `SectionHeading/Body/List/Table/CalloutBox` defined `Cookies.tsx:274-338` (duplicated per legal page).
-
-#### `pages/CookiesFr.tsx` — /cookies/fr policy (FR, Québécois)
-
-**Elements**
-- [ ] `English` — router link — `CookiesFr.tsx:30` — `/cookies`
-- [ ] `postr.sh` — external link — `CookiesFr.tsx:45` — https://postr.sh
-- [ ] `Politique de confidentialité` — router link — `CookiesFr.tsx:47` — `/privacy` (note: targets EN page, not /privacy/fr)
-- [ ] `{support@resila.ai}` — mailto — `CookiesFr.tsx:234`
-
-**Copy** (`LAST_UPDATED = '27 juillet 2026'` `CookiesFr.tsx:15`; note EN page is 'July 28' — FR lags one revision)
-- [ ] "Légal" — `CookiesFr.tsx:28` · [ ] "Politique relative aux témoins" — h1 — `CookiesFr.tsx:35` · [ ] "Dernière mise à jour : {LAST_UPDATED}" — `CookiesFr.tsx:37`
-- [ ] §1 "Portée" + body "La présente Politique relative aux témoins explique comment Resila Technologies Inc. (la société derrière Postr) utilise les témoins et les technologies de stockage côté client similaires sur postr.sh. Elle complète notre Politique de confidentialité." — `CookiesFr.tsx:39-51`
-- [ ] §2 "Ce que sont les témoins (et les technologies similaires)" + body "Un témoin est un petit fichier texte qu'un site Web demande à votre navigateur de conserver afin de pouvoir vous reconnaître lors d'un chargement de page ultérieur. Les applications Web modernes utilisent aussi des fonctions de navigateur connexes — localStorage et sessionStorage — qui remplissent le même rôle (mémoriser un état d'une visite à l'autre) mais résident dans une partie différente du navigateur. Partout où la présente politique dit « témoins », nous entendons collectivement les témoins, le localStorage et le sessionStorage." — `CookiesFr.tsx:53-64`
-- [ ] body "Les autorités de réglementation (CAI, CNIL, ICO, CPVP) traitent ces technologies de la même manière : le stockage strictement nécessaire peut être utilisé sans demander la permission, mais tout ce qui est facultatif — analytique, publicité, contenus intégrés de tiers — exige votre consentement préalable, éclairé et donné librement." — `CookiesFr.tsx:65-72`
-- [ ] §3 "Ce que Postr utilise aujourd'hui" + callout "Postr n'utilise que du stockage strictement nécessaire." + "Nous n'exécutons pas Google Analytics, le pixel Facebook, de traceurs publicitaires, de boutons de partage de médias sociaux avec suivi, ni aucune autre technologie qui stocke quoi que ce soit sur votre appareil. Nous comptons bien les pages vues, au moyen de Vercel Web Analytics — cet outil ne dépose aucun témoin, n'écrit rien dans votre navigateur et ne peut pas vous reconnaître lors d'une deuxième visite ni sur aucun autre site. Aucune bannière de consentement n'est affichée parce qu'aucune des entrées ci-dessous n'exige de consentement en vertu du RGPD, de la directive vie privée et communications électroniques, de la LPRPDE ou de la Loi 25 du Québec — cette obligation s'applique au stockage ou à la lecture de données sur votre appareil, et le comptage des pages ne fait ni l'un ni l'autre." — `CookiesFr.tsx:74-90`
-- [ ] Table headers "Entrée / Stockée où / Ce qu'elle fait / Durée de vie" + 4 rows (FR table omits the 5th "Aggregate usage measurement" row present in EN — content drift to flag, §10) — `CookiesFr.tsx:92-120`: ("sb-<project-ref>-auth-token", "localStorage", "Conserve votre session d'authentification Supabase (JWT + jeton de rafraîchissement). Sans elle, l'application ne peut pas savoir qui vous êtes et vos brouillons ne peuvent pas être chargés.", "Jusqu'à votre déconnexion ou l'expiration de la session") · ("postr-onboarding-*", "localStorage", "Retient si vous avez vu la visite guidée d'accueil afin que nous ne l'affichions pas à chaque visite.", "Jusqu'à ce que vous effaciez les données du navigateur") · ("postr-templates", "localStorage", "Conserve les modèles d'affiche personnalisés que vous enregistrez depuis le bloc-notes de l'éditeur afin qu'ils soient disponibles lors de votre prochaine visite.", "Jusqu'à ce que vous supprimiez le modèle ou effaciez les données du navigateur") · ("Minuteries de rafraîchissement/session Supabase", "sessionStorage", "Indicateurs techniques de courte durée utilisés par le client Supabase pour coordonner le rafraîchissement des jetons entre les onglets.", "Jusqu'à ce que vous fermiez l'onglet du navigateur")
-- [ ] body "Toutes ces entrées relèvent de l'exemption « strictement nécessaire à la fourniture du service expressément demandé par l'utilisateur » prévue à l'article 5(3) de la directive vie privée et communications électroniques et aux dispositions équivalentes de la LPRPDE et de la Loi 25 du Québec. Aucune d'elles ne vous suit à travers d'autres sites." — `CookiesFr.tsx:121-127`
-- [ ] §4 "Le comptage des pages, et ce que Postr n'utilise toujours pas" + body "Postr compte les pages vues avec Vercel Web Analytics, afin que nous puissions voir quelles pages les gens trouvent utiles. Il vaut la peine d'être précis sur ce que cela implique et n'implique pas. Cet outil ne dépose aucun témoin et n'écrit rien dans votre navigateur. Il n'existe aucun identifiant qui persiste : une visite est comptée à l'aide d'une valeur dérivée de la requête elle-même et supprimée en moins de 24 heures, de sorte qu'une deuxième visite demain est celle d'un inconnu. Chaque chiffre est un agrégat — un décompte des consultations d'une page, jamais un enregistrement de ce que vous avez fait." — `CookiesFr.tsx:129-142`
-- [ ] body "Nous retirons également l'adresse avant qu'elle ne soit comptée. Les URL d'affiches, les liens de partage et les pages d'administration ne sont enregistrés que sous leur forme — /s/[caviardé] plutôt que l'identifiant qui vous a été envoyé. Un lien de partage est un lien vers un travail non publié, et l'identifiant est ce qui l'ouvre, si bien qu'il ne quitte jamais l'application. Les chaînes de requête sont entièrement écartées." — `CookiesFr.tsx:143-152`
-- [ ] List, 6 items — `CookiesFr.tsx:153-162`: "Témoins publicitaires — il n'y a aucune publicité sur Postr." · "Google Analytics, Matomo, PostHog, Plausible — aucun de ceux-là." · "Suivi intersite ou empreinte numérique — nous ne vous profilons pas d'une visite à l'autre ni à travers d'autres sites Web." · "Widgets de médias sociaux — aucun bouton Facebook, Twitter ou LinkedIn qui transmet des données." · "Identifiants persistants au-delà de ce qu'exige votre session d'authentification." · "Enregistrement du contenu de vos affiches, des identifiants de liens de partage ou des chaînes de requête dans l'analytique."
-- [ ] body "Si nous ajoutons un jour quelque chose qui stocke ou lit effectivement des données sur votre appareil à des fins facultatives, nous mettrons à jour la présente politique, afficherons une bannière de consentement offrant des choix « Accepter » et « Refuser » d'égale visibilité, et nous abstiendrons de déposer tout stockage non essentiel jusqu'à ce que vous cliquiez sur « Accepter »." — `CookiesFr.tsx:163-170`
-- [ ] §5 "Comment contrôler les témoins" + bodies "Comme Postr ne stocke actuellement que ce qui est strictement nécessaire à la connexion et à l'édition, la suppression de ces entrées vous déconnectera et effacera vos modèles enregistrés localement ainsi que votre état d'accueil. Vos données côté serveur (affiches, profil, rétroaction) ne sont pas touchées." / "Vous pouvez effacer le stockage de Postr des façons habituelles pour votre navigateur :" — `CookiesFr.tsx:172-183`
-- [ ] List, 4 items — `CookiesFr.tsx:184-191`: "Chrome / Edge : Paramètres → Confidentialité et sécurité → Cookies et autres données de site → Afficher toutes les données et autorisations des sites → rechercher « postr.sh » → Supprimer." · "Firefox : Paramètres → Vie privée et sécurité → Cookies et données de sites → Gérer les données → rechercher « postr.sh » → Supprimer." · "Safari : Réglages → Confidentialité → Gérer les données de site Web → rechercher « postr.sh » → Supprimer." · "Mobile : suivez les instructions de votre navigateur pour effacer les données de site."
-- [ ] body "La plupart des navigateurs vous permettent aussi de bloquer tous les témoins, de bloquer les témoins de tiers ou de recevoir une invite avant le dépôt de chaque témoin. Bloquer les témoins strictement nécessaires empêchera Postr de fonctionner." — `CookiesFr.tsx:192-197`
-- [ ] §6 "Do Not Track et Global Privacy Control" + body "Nous respectons les en-têtes « Do Not Track » (DNT) et le signal plus récent Global Privacy Control (GPC). À ce jour, ces signaux n'ont rien à désactiver, puisque nous n'exécutons ni analytique ni publicité ciblée. Si nous introduisons un jour un suivi facultatif, la réception d'un signal DNT ou GPC de votre navigateur sera traitée comme un retrait automatique du consentement." — `CookiesFr.tsx:199-208` (note: FR §6 retains the outdated "ni analytique" claim the EN July-28 changelog corrected — content drift, §10)
-- [ ] §7 "Conservation" + body "Chaque entrée du tableau ci-dessus subsiste jusqu'à la durée de vie qui y est indiquée. Aucune d'elles ne dépasse 13 mois, qui est la période de conservation maximale autorisée pour les registres de consentement selon les lignes directrices de la CNIL française et une référence courante parmi les autorités de réglementation de l'UE. Lorsque nous ajouterons un témoin de consentement à l'avenir, nous le fixerons par défaut à 6 mois, conformément à la recommandation de la CNIL." — `CookiesFr.tsx:210-219`
-- [ ] §8 "Modifications de la présente politique" + body "Nous pouvons mettre à jour la présente Politique relative aux témoins à mesure que le produit évolue. La date de « Dernière mise à jour » en haut reflète la version courante. Si une modification est importante — par exemple, la première fois que nous introduirons un témoin d'analytique ou de publicité — nous afficherons un avis clair dans l'application avant que la modification prenne effet." — `CookiesFr.tsx:221-229` (no July-27/28 changelog entries — drift vs EN)
-- [ ] §9 "Contact" + body "Questions sur les témoins ou sur la présente politique : {email}." — `CookiesFr.tsx:231-238`
-
-**Graphics** — none.
-
-#### `pages/Terms.tsx` — /terms (EN)
-
-**Elements**
-- [ ] `Français` — router link — `Terms.tsx:35` — `/terms/fr`
-- [ ] `Privacy Policy` — router link — `Terms.tsx:50` — `/privacy`
-- [ ] `{support@resila.ai}` — mailto ×3 — `Terms.tsx:176,253,338`
-
-**Copy** (`LAST_UPDATED = 'September 11, 2026'` `Terms.tsx:20`)
-- [ ] "Legal" (:33) · "Terms of Service" h1 (:39) · "Last updated: {…}" (:40)
-- [ ] §1 "Agreement" + body "These Terms of Service ("Terms") form a legal agreement between you and Postr ("we", "us"), operated by Resila Technologies Inc., a corporation registered in the Province of Quebec, Canada. By creating an account, signing in, or otherwise using Postr — including browsing the public gallery without an account — you agree to these Terms and to our Privacy Policy. If you do not agree, do not use the service." — `:42-54`
-- [ ] §2 "What Postr is" + body "Postr is an academic poster editor and sharing platform. It lets you create conference-quality posters, store drafts, share read-only links, submit feedback, and — if you choose — publish posters to a public gallery so that other users and visitors can see them." (`:56-62`) + callout "Postr is a sharing platform, not a publisher." + "We host and display the content you upload. We do not review it for accuracy, originality, or lawful use before it goes live. You are solely responsible for what you publish — see Section 5 below." (`:63-71`)
-- [ ] §3 "Accounts" + List 5 items — `:73-82`
-- [ ] §4 "Acceptable use" + lead "You agree not to use Postr to:" + List 7 items (`:86-96`: copyright-infringing / defamatory / unlawful-or-malware / impersonation / probing / feedback-abuse-scraping / ML-training) + body "We may suspend or terminate accounts — and remove content — that violate these rules, with or without notice, at our sole discretion." — `:84-100`
-- [ ] §5 "Your content" + ownership body (`:102-107`); §5.1 "Your warranties" + lead + List 4 items (`:109-121`); §5.2 "Licence you grant to us" + 2 bodies (`:123-140`); §5.3 "The public gallery — read carefully" + callout "Anything you publish to the gallery is public.…" (`:142-154`) + confirm lead (`:155-158`) + List 4 items (`:159-166`) + retract body (`:167-171`); §5.4 "Copyright and DMCA-style takedowns" + body (`:173-184`); §5.5 "Indemnification" + body (`:186-194`)
-- [ ] §6 "Postr's content and trademarks" + body — `:196-203`
-- [ ] §7 "Fees, subscriptions, and refunds" + body "Building and editing posters, and exporting a print-ready PDF, are free. Some features are paid, in Canadian dollars (CAD):" (`:206-209`) + List 2 items: "Term — CA$18.99 billed every 4 months. A recurring subscription that unlocks unlimited PowerPoint and LaTeX export with no watermark. It renews automatically every 4 months until you cancel." · "Export pack — CA$9.99, one time, for 3 export credits. Each PowerPoint or LaTeX export uses one credit. Credits never expire." (`:210-215`) + body "Prices are shown at checkout before you pay…" (`:216-221`); §7.1 "Cancelling your subscription" + body (`:223-229`); §7.2 "Refunds" (id="refunds") + callout "Term — 14-day money-back guarantee.…" (`:232-241`) + callout "Export pack — refundable in full until you export.… we will refund the CA$9.99 charge in full, as long as you have not completed a PowerPoint or LaTeX export with it… once any credit has been used the pack is no longer refundable — not even in part…" (`:242-250`) + body "You can request a refund from the Subscription section of your Profile page, or by emailing {email}. Refunds are returned to your original payment method and may take a few business days to appear." (`:250-258`) + EU/EEA/UK withdrawal-rights body (`:259-269`)
-- [ ] §8 "Feedback" + body — `:271-277`
-- [ ] §9 "Availability, changes, and termination" + List 4 items — `:279-287`
-- [ ] §10 "Disclaimers" + callout ""As is" and "as available". Postr is provided without warranties of any kind… The figure-readability feature is a helpful guide, not a guarantee that your poster will print correctly." — `:289-298`
-- [ ] §11 "Limitation of liability" + 2 bodies — `:300-313`
-- [ ] §12 "Governing law and disputes" + body (Quebec law, Montréal courts) — `:315-324`
-- [ ] §13 "Changes to these Terms" + body — `:326-333`
-- [ ] §14 "Contact" + body "Questions, notices, or legal requests: {email}." — `:335-342`
-
-**Graphics** — none.
-
-#### `pages/TermsFr.tsx` — /terms/fr (FR)
-
-**Elements**
-- [ ] `English` — router link — `TermsFr.tsx:34` — `/terms`
-- [ ] `Politique de confidentialité` — router link — `TermsFr.tsx:50` — `/privacy` (targets EN)
-- [ ] `{support@resila.ai}` — mailto ×3 — `TermsFr.tsx:185,272,365`
-
-**Copy** (`LAST_UPDATED = '11 septembre 2026'` `TermsFr.tsx:19`) — full FR mirror of Terms: "Légal" (:32), "Conditions d'utilisation" h1 (:38), "Dernière mise à jour : {…}" (:39); §1 "Entente" (:41-54); §2 "Ce qu'est Postr" + body + callout "Postr est une plateforme de partage, et non un éditeur au sens juridique." (:56-74); §3 "Comptes" + List 5 (:76-85); §4 "Utilisation acceptable" + lead + List 7 + suspension body (:87-103); §5 "Votre contenu" + §5.1 "Vos garanties" + List 4, §5.2 "Licence que vous nous accordez" + 2 bodies, §5.3 "La galerie publique — à lire attentivement" + callout + List 4 + body, §5.4 "Droit d'auteur et retraits de type DMCA", §5.5 "Indemnisation" (:105-206); §6 "Contenu et marques de commerce de Postr" (:208-216); §7 "Frais, abonnements et remboursements" + List 2 ("Forfait à terme — CA$18.99 facturés tous les 4 mois…" · "Pack d'exportation — CA$9.99, une seule fois, pour 3 crédits d'exportation…") + §7.1 "Annulation de votre abonnement" + §7.2 "Remboursements" (id="refunds") + 2 callouts ("Forfait à terme — garantie de remboursement de 14 jours." · "Pack d'exportation — remboursable intégralement jusqu'à votre première exportation.") + refund-request body + EU/EEE/R-U body (:218-290); §8 "Commentaires" (:292-299); §9 "Disponibilité, modifications et résiliation" + List 4 (:301-309); §10 "Exclusions de garantie" + callout "« Tel quel » et « selon disponibilité »." (:311-321); §11 "Limitation de responsabilité" + 2 bodies (:323-338); §12 "Droit applicable et différends" (:340-349); §13 "Modifications des présentes Conditions" (:351-360); §14 "Nous joindre" (:362-369). All verbatim at cited ranges.
-
-**Graphics** — none.
+`LAST_UPDATED` `Terms.tsx:29` · `TermsFr.tsx:21`. Fourteen sections, unchanged in order: §1 Agreement (Resila "incorporated in Quebec"; the user agrees to the Terms, and the Privacy Policy, → `/privacy` · `/privacy/fr`, "explains how we handle your personal information"), §2 What Postr is (PDF or PowerPoint), §3 Accounts, §4 Acceptable use, §5 Your content (5.1–5.5), §6 Postr's content, §7 Fees, subscriptions, and refunds (prices in CAD and before tax, tax added at checkout; term CA$18.99 + taxes / 4 months, PowerPoint only; pack CA$9.99 + taxes, 3 credits (FR « 18,99 $ CA », « lot d’exportation »); payments through Stripe's merchant-of-record service, which bills, issues receipts and collects the tax; no entity named as the seller) with 7.1 Cancelling (end of the paid period; the unused-term exception) and 7.2 Refunds `id="refunds"` (`Terms.tsx:234` · `TermsFr.tsx:241`: term within 14 days if no paid export since the charge, ends at once; pack: the full amount paid, CA$9.99 plus the tax charged, only while no credit used, pooled; EU/UK withdrawal paragraph), §8 Feedback, §9 Availability, §10 Disclaimers, §11 Limitation of liability (+ consumer rights that cannot be waived), §12 Governing law and disputes (Quebec law; Montréal courts subject to: a Quebec consumer's own court under the Consumer Protection Act, no arbitration required, class actions kept; other consumers' local courts), §13 Changes, §14 Contact. Since review round 2, `QuebecNotice` ("The following clause does not apply to consumers in Quebec to the extent that Quebec’s Consumer Protection Act prohibits it." / « La clause qui suit ne s’applique pas aux consommateurs du Québec dans la mesure où la Loi sur la protection du consommateur l’interdit. », bold) immediately precedes §5.5, §10, §11 and §13's "continued use" sentence (Consumer Protection Act s. 19.1; `Terms.tsx:182,299,311,353` · `TermsFr.tsx:182,314,327,375`); the FR page is labelled « Juridique » and uses Quebec civil-law terms (« responsabilité extracontractuelle », « honoraires extrajudiciaires », « dommages-intérêts punitifs », « marchand officiel »). **Elements:** `Français`/`English` (`:44` · `:36`), mailto ×3 (`:171,259,362` · `:170,270,384`). **Graphics** — none.
 
 ---
 
@@ -777,17 +655,19 @@ flowchart LR
 #### `pages/Auth.tsx` — /auth sign-in/sign-up/guest + account-first checkout
 
 **Elements**
-- [ ] Postr logo + wordmark — router link — `Auth.tsx:363` — navigates to `/`
-- [ ] `Start creating — no account needed` (busy: `Loading…`) — button — `Auth.tsx:389-395` — `handleGuest()` → `supabase.auth.signInAnonymously()` then `/dashboard` (hidden when checkout plan intent present)
-- [ ] `Continue with Google` — button — `Auth.tsx:443-455` — `handleGoogle()` → `signInWithOAuth`/`linkIdentity` (google), redirects to `/dashboard` or back to `/auth?plan=…`
-- [ ] email field — input type=email, required — `Auth.tsx:465-472` — form state
-- [ ] password field — input type=password, required, minLength 8 — `Auth.tsx:474-482` — form state; signup mode renders `<PasswordStrength>` (§6.13) at `Auth.tsx:483`
-- [ ] `Forgot password?` — button — `Auth.tsx:491-497` — `supabase.auth.resetPasswordForEmail` (signin mode only)
-- [ ] `consent-research` — checkbox, unchecked by default — `Auth.tsx:513-519` — sets researchOptIn (signup mode only)
-- [ ] `consent-marketing` — checkbox, unchecked by default — `Auth.tsx:529-535` — sets marketingOptIn (signup mode only)
-- [ ] submit: `Sign in` / `Create account` / `Create account & continue` / busy `Loading…` / `Continuing to checkout…` — button type=submit — `Auth.tsx:545-559` — `handleEmailAuth` → `signUp`/`updateUser`/`signInWithPassword`; on checkout intent → `startCheckoutForPlan` (Stripe redirect)
-- [ ] `Sign up` — mode-toggle button — `Auth.tsx:566-568` — switches to signup mode
-- [ ] `Sign in` — mode-toggle button — `Auth.tsx:573-575` — switches to signin mode
+- [ ] Postr logo + wordmark — router link — `Auth.tsx:416` — navigates to `/`
+- [ ] `Start creating — no account needed` (busy: `Loading…`) — button — `Auth.tsx:480-486` — `handleGuest()` → `supabase.auth.signInAnonymously()` then `/dashboard` (hidden when checkout plan intent present)
+- [ ] `Continue with Google` — button — `Auth.tsx:539-551` — `handleGoogle()` → `signInWithOAuth`/`linkIdentity` (google), redirects to `/dashboard` or back to `/auth?plan=…`; in either mode, creates an account for a Google user Postr has not seen (Supabase, while sign-ups are enabled)
+- [ ] Terms line (both modes, right under `Continue with Google`, before the email form; `data-testid="auth-terms-line"`, record 24, placed by review round 2) — `Auth.tsx:564-582` — links `Terms of Service` → `/terms`, `Privacy Policy` → `/privacy`, `Conditions d’utilisation` → `/terms/fr`, `Politique de confidentialité` → `/privacy/fr`; copy "By continuing, you agree to the Terms of Service. The Privacy Policy explains how we handle your information. En français : Conditions d’utilisation et Politique de confidentialité." (the Privacy Policy is not presented as agreed to, review round 1). Tested by `pages/__tests__/Auth.termsFrench.test.tsx` (the default sign-in view, the switch to sign-up, `/auth?plan=term`; the line is the Google button's next element) and in the browser by `scripts/analytics-privacy-check.mjs` T1 (12 px under the button, in the first view, 3 engines × 3 window sizes × 2 modes)
+- [ ] email field — input type=email, required — `Auth.tsx:592-600` — form state
+- [ ] password field — input type=password, required, minLength 8 — `Auth.tsx:602-611` — form state; signup mode renders `<PasswordStrength>` (§6.13) at `Auth.tsx:612`
+- [ ] `Forgot password?` — button — `Auth.tsx:624-630` — `supabase.auth.resetPasswordForEmail` (signin mode only)
+- [ ] `consent-research` — checkbox, unchecked by default — `Auth.tsx:647-653` — sets researchOptIn (signup mode only)
+- [ ] `consent-marketing` — checkbox, unchecked by default — `Auth.tsx:659-665` — sets marketingOptIn (signup mode only)
+- [ ] submit: `Sign in` / `Create account` / `Create account & continue` / busy `Loading…` / `Continuing to checkout…` — button type=submit — `Auth.tsx:674-688` — `handleEmailAuth` → `signUp`/`updateUser`/`signInWithPassword`; on checkout intent → `startCheckoutForPlan` (Stripe redirect)
+- [ ] `Sign up` — mode-toggle button — `Auth.tsx:695-697` — switches to signup mode
+- [ ] `Sign in` — mode-toggle button — `Auth.tsx:702-704` — switches to signin mode
+- [ ] Legal footer `nav[aria-label="Legal"]` — `Privacy` / `Terms` / `Cookies` — `AuthLegalFooter`, `Auth.tsx:717-741`
 
 **Copy**
 - [ ] "Postr" — wordmark next to logo — `Auth.tsx:370`
@@ -942,7 +822,7 @@ flowchart LR
 - [ ] `Get a subscription` — router link — `Profile.tsx:1199-1204` — `/pricing`
 - [ ] `↓ Download my data (JSON)` (busy `Preparing…`) — button — `Profile.tsx:682-689` — RPC `export_my_data` → JSON file download `postr-export-{ts}.json`
 - [ ] `Delete all posters` — DangerAction button — `Profile.tsx:704-710` — ConfirmModal → deletes all posters (disabled at 0; `deletePoster` removes each one's kept plot script, plan item 7)
-- [ ] `Delete account` — DangerAction button (`profile/DangerZone.tsx`) — ConfirmModal with typed confirmation `I confirm the deletion of my account` → `profile/accountDeletion.ts runAccountDeletion()` → `POST /account/delete` (`data/account.ts`; server cancels Stripe subs, deletes the customer, removes Storage, writes `account_deletions`, deletes the auth user — nothing is deleted client-side first) → clear 6 localStorage keys and every `postr.figure-script.*` entry (`clearStoredFigureScripts`, plan item 7) + global signOut → `/auth`. Failure: generic "Something went wrong deleting your account. Nothing was removed — please try again or send feedback." (true: the API leaves the account intact on every pre-final-step failure). With `hasActiveTerm` the description/modal add that deleting also cancels the CA$18.99 term. **Changed 2026-09-11 (P0-3)** — was: delete posters client-side + RPC `delete_own_account`.
+- [ ] `Delete account` — DangerAction button (`profile/DangerZone.tsx`) — ConfirmModal with typed confirmation `I confirm the deletion of my account` → `profile/accountDeletion.ts runAccountDeletion()` → `POST /account/delete` (`data/account.ts`; server cancels Stripe subs, deletes the customer, removes Storage, writes `account_deletions`, deletes the auth user — nothing is deleted client-side first) → clear every Postr entry this browser keeps, in localStorage and sessionStorage: every key named `postr.…` or `postr-…` (the Cookies Policy's naming), except another account's `postr.welcome-seeded:<id>` (this account's id is read from the session before the delete), then `clearStoredFigureScripts` (plan item 7: it also drops scripts too long to store, held in memory) (record 24: first the palettes, the preference, the welcome marker and the two-tab markers; review round 1, the tab's sessionStorage entries and the guest commenter name; `pages/__tests__/Profile.dangerZone.test.tsx` seeds every key in `pages/__tests__/storageWriters.ts`) + global signOut → `/auth`. Failure: generic "Something went wrong deleting your account. Nothing was removed — please try again or send feedback." (true: the API leaves the account intact on every pre-final-step failure). With `hasActiveTerm` the description/modal add that deleting also cancels the CA$18.99 term. **Changed 2026-09-11 (P0-3)** — was: delete posters client-side + RPC `delete_own_account`.
 - [ ] `<PresetEditModal>` — `Profile.tsx:723-727`; `<ConfirmModal>` — `Profile.tsx:729-738` (§6.13)
 
 **Copy**
@@ -4096,8 +3976,8 @@ flowchart LR
 - [ ] `Other` — kind-select button — same — `setKind('other')`
 - [ ] title input — text input — `FeedbackModal.tsx:206` — maxLength 120
 - [ ] details textarea — textarea — `FeedbackModal.tsx:245` — maxLength 4000, 6 rows
-- [ ] `Attach {filename}` — checkbox — `FeedbackModal.tsx:312` — toggles attachment inclusion
-- [ ] `Include console log` — checkbox — `FeedbackModal.tsx:346` — toggles log inclusion
+- [ ] `Attach {filename}` — checkbox, ticked on every open — `FeedbackModal.tsx:316` — toggles attachment inclusion
+- [ ] `Include console log` — checkbox, **unticked on every open** (privacy by default, Law 25 s. 9.1; record 24) — `FeedbackModal.tsx:350` — the log is sent only when ticked (`:76`); `components/__tests__/FeedbackModal.privacyDefault.test.tsx` enters at Copy a design's failed read → "Send feedback"
 - [ ] `Cancel` — button — `FeedbackModal.tsx:382` — `close()`
 - [ ] `Send` / `Sending…` — submit button — `FeedbackModal.tsx:398` — `submitFeedback(...)` (`@/data/feedback`); disabled while submitting or title/body blank
 - [ ] `Close` — button (success view) — `FeedbackModal.tsx:459` — `close()`
@@ -4773,7 +4653,7 @@ No UI — logic only. `useSessionDraft(key, initial)` returns `[value, set]` lik
 
 #### `poster/figureScriptDraft.ts` — the plot checker's draft, kept per poster (localStorage) or per tab (sessionStorage) (plan item 7)
 
-No UI — logic only. `useScriptDraft(slot)` (`:281`), `readScriptDraft` / `writeScriptDraft` (`:225`, `:245`), `useHasPosterScript(posterId)` (`:305`, PosterEditor's Figure-mode default; a box of blank lines is not a script), `forgetPosterScript(posterId)` (`:313`, called by `data/posters.ts deletePoster` `:466` once the delete has succeeded), `clearStoredFigureScripts()` (`:325`, called by `profile/accountDeletion.ts` `:47`), `readPageSize` / `writePageSize` (`:343`, `:356`; a stored size outside 1–96 in is ignored). A stored entry is validated field by field (another version, an unknown language, text that is not JSON read as no entry; a bad check, including one whose figure is neither null nor a block id or whose `picked` is not a boolean, is dropped and the script kept; a check stored without `picked`, before the merge with fix 15, is read as Auto's). Storage is the record whenever it works; a draft it cannot take, and a box of blank lines (never stored), is kept in memory while the page is open (a reload loses it). Bounds: 50,000 characters per copy of a script as stored (`tooLongToStore`, `:178`; the script and the version last checked are capped separately, so an edit after a Check never unstores a script that fits, review round 2), 10 posters (`:81-82`): about a million characters in all.
+No UI — logic only. `useScriptDraft(slot)` (`:281`), `readScriptDraft` / `writeScriptDraft` (`:225`, `:245`), `useHasPosterScript(posterId)` (`:305`, PosterEditor's Figure-mode default; a box of blank lines is not a script), `forgetPosterScript(posterId)` (`:313`, called by `data/posters.ts deletePoster` `:466` once the delete has succeeded), `clearStoredFigureScripts()` (`:325`, called by `profile/accountDeletion.ts` `:73`), `readPageSize` / `writePageSize` (`:343`, `:356`; a stored size outside 1–96 in is ignored). A stored entry is validated field by field (another version, an unknown language, text that is not JSON read as no entry; a bad check, including one whose figure is neither null nor a block id or whose `picked` is not a boolean, is dropped and the script kept; a check stored without `picked`, before the merge with fix 15, is read as Auto's). Storage is the record whenever it works; a draft it cannot take, and a box of blank lines (never stored), is kept in memory while the page is open (a reload loses it). Bounds: 50,000 characters per copy of a script as stored (`tooLongToStore`, `:178`; the script and the version last checked are capped separately, so an edit after a Check never unstores a script that fits, review round 2), 10 posters (`:81-82`): about a million characters in all.
 **Elements** — none. **Copy** — none. **Graphics** — none.
 
 #### `hooks/useStorageUrl.ts` — resolves `storage://` image srcs to Supabase signed URLs (50 min TTL cache)
@@ -4841,7 +4721,9 @@ Per-route metadata (`seo/routes.json` → `seo/siteMeta.ts` → `seo/useDocument
 ```mermaid
 flowchart LR
   RJ["seo/routes.json"] --> SM["seo/siteMeta.ts (builders + canonical rules)"] --> UDM["seo/useDocumentMeta.ts"] --> HEAD["document.head (title/og/canonical/JSON-LD)"]
-  APP["App.tsx:38"] -->|"beforeSend redactUrl"| RU["analytics/redactUrl.ts"] --> VA["Vercel Web Analytics"]
+  GPC["analytics/globalPrivacyControl.ts"] -->|"GPC on: not mounted"| APP
+  APP["App.tsx:39-41"] -->|"beforeSend redactUrl"| RU["analytics/redactUrl.ts"] --> VA["Vercel Web Analytics"]
+  VJ["vercel.json Referrer-Policy: strict-origin"] -->|"beacon Referer = origin"| VA
 ```
 
 #### `seo/routes.json` — per-route metadata data source (consumed by siteMeta.ts + prerender script)
@@ -4879,14 +4761,19 @@ No UI — logic only (upserts title, description, robots, canonical, og:*, twitt
 
 #### `analytics/redactUrl.ts` — redacts identifier-bearing routes before Vercel Web Analytics beacons
 
-No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) => ({ ...event, url: redactUrl(event.url) })} />`); behavior described in policy text at `pages/Cookies.tsx` (§6.4).
+No UI — logic only. Consumed by `App.tsx:40` (`<Analytics beforeSend={(event) => ({ ...event, url: redactUrl(event.url) })} />`); behavior described in policy text at `pages/Cookies.tsx` §4 and `pages/Privacy.tsx` §6 (§6.4). The vendor script (production v0.1.3, MEASURED on www.postr.sh for record 24) calls `beforeSend` with `{ type, url: location.href }` and sends `o` (the returned url), `sv`, `sdkn`, `sdkv`, `ts`, and `r` (the referrer) only on the first page view and only when the referrer's host is not the page's. `analytics/__tests__/redactUrl.test.ts` reads every `:param` route from `routes.tsx` and fails until a new one is redacted here. The match is made on the path as the router reads it (`routeKey`, `:71`: percent-escapes decoded, lower case), because the router serves `/P/<id>` and `/%70/<id>` as the editor, with repeated slashes also collapsed, so a not-found `//p/<id>` is redacted too (record 24, review round 1); the test spells each route four ways and checks the router's own matcher serves the first three.
 **Elements** — none.
 **Copy** (analytics payloads, not user-visible, listed for refactor sweep):
-- [ ] `/s/[redacted]` — redaction shape for share-link slugs — `redactUrl.ts:40`
-- [ ] `/p/[redacted]` — redaction shape for poster ids — `redactUrl.ts:41`
-- [ ] `/admin/[redacted]` — redaction shape for the whole `/admin` subtree — `redactUrl.ts:45,91`
-- [ ] `https://www.postr.sh/[unparseable]` — fallback for unparseable URLs — `redactUrl.ts:48,78`
+- [ ] `/s/[redacted]` — redaction shape for share-link slugs — `redactUrl.ts:54`
+- [ ] `/p/[redacted]` — redaction shape for poster ids — `redactUrl.ts:55`
+- [ ] `/gallery/[redacted]` — redaction shape for gallery entries (route redirects to `/`; record 24) — `redactUrl.ts:56`
+- [ ] `/admin/[redacted]` — redaction shape for the whole `/admin` subtree — `redactUrl.ts:60,123`
+- [ ] `https://www.postr.sh/[unparseable]` — fallback for unparseable URLs — `redactUrl.ts:63,109`
 **Graphics** — none.
+
+#### `analytics/globalPrivacyControl.ts` — reads Global Privacy Control (record 24)
+
+No UI — logic only. `globalPrivacyControlOn()` is true only when `navigator.globalPrivacyControl === true` (Firefox, Brave, DuckDuckGo send it; Chromium has no setting). `App.tsx:39` renders `<Analytics>` only when it is false, so under GPC no script, no queue, no beacon (`src/__tests__/analyticsPrivacy.test.tsx`; `scripts/analytics-privacy-check.mjs` claim G1 with Firefox's own GPC setting). `apps/web/vercel.json` serves every page with `Referrer-Policy: strict-origin` so the beacon's Referer header carries only the origin, never `/p/<id>` (claim B1).
 
 ---
 
@@ -4978,20 +4865,20 @@ No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) 
 
 ## 8. Storage-key sweep list
 
-Every localStorage / sessionStorage key the app reads or writes, with file:line (from the stores/hooks slice sweep, 2026-07-28). The "delete my data" sweep point is `profile/accountDeletion.ts` (`LOCAL_KEYS` and `clearLocalData`; it moved there from `pages/Profile.tsx` on 2026-09-11) — any NEW key added anywhere must be added there too, and to the Cookies Policy table (EN and FR), which `pages/__tests__/cookiesStorageInventory.test.ts` pins to the code.
+Every localStorage / sessionStorage key the app reads or writes, with file:line (from the stores/hooks slice sweep, 2026-07-28). The "delete my data" sweep point is `profile/accountDeletion.ts` (`clearLocalData`; it moved there from `pages/Profile.tsx` on 2026-09-11): since record 24's review round 1 it removes every key named `postr.…` or `postr-…` from both storage areas (another account's welcome marker aside), so a NEW key must keep that naming; it must also be added to the Cookies Policy table (EN and FR) and to `pages/__tests__/storageWriters.ts`, which `cookiesStorageInventory.test.ts` pins to the code and `Profile.dangerZone.test.tsx` seeds to check deletion clears it. Keys below with no "removed by account deletion" note are removed by it too.
 
 **localStorage**
-- [ ] `postr.custom-palettes` — const `poster/customPalettes.ts:9`; read `:13`, write `:30`
+- [ ] `postr.custom-palettes` — const `poster/customPalettes.ts:9`; read `:13`, write `:30`; removed by account deletion (`profile/accountDeletion.ts`, every `postr.…` key, record 24)
 - [ ] `postr.checklist-templates` — const `poster/GuidelinesPanel.tsx:390`; read `:457`, write `:465`
 - [ ] `postr.scratch-pad` — const `poster/GuidelinesPanel.tsx:389`; read `:478`, write `:486`; removed `pages/Profile.tsx:291`
 - [ ] `postr.scratch-note` — inline `poster/GuidelinesPanel.tsx:502` (read), `:526` (write); removed `pages/Profile.tsx:292`
 - [ ] `postr.style-presets` — inline `poster/PosterEditor.tsx:718` (read), `:726` (write); const `components/PresetEditModal.tsx:40` (read `:44`, write `:53`); read `pages/Profile.tsx:73`; removed `pages/Profile.tsx:162,290`
 - [ ] `postr.profile` — const `pages/Profile.tsx:1266`; read `:1278`, write `:1299`; removed `:294`
 - [ ] `postr.onboarding-done` — const `components/OnboardingTour.tsx:111`; read `:174`, write `:184,281`, remove `:410` (`resetOnboarding()`, called from `pages/Profile.tsx:414`)
-- [ ] `postr.cb-random-pref` — const `components/PaletteDesigner.tsx:34`; read `:38`, write `:46`
-- [ ] `postr.welcome-seeded:{userId}` — prefix const `data/seedWelcomePoster.ts:36`; read `:40`, write `:50`
+- [ ] `postr.cb-random-pref` — const `components/PaletteDesigner.tsx:34`; read `:38`, write `:46`; removed by account deletion (every `postr.…` key, record 24)
+- [ ] `postr.welcome-seeded:{userId}` — prefix const `data/seedWelcomePoster.ts:36`; read `:40`, write `:50`; the deleted account's own key removed by account deletion, another account's kept (`profile/accountDeletion.ts:48-50`, record 24)
 - [ ] `postr.comment-name` — const `hooks/useComments.ts:153`; read `:157`, write `:165`
-- [ ] `postr.active-editor.{posterId}` — prefix const `hooks/useTwoTabGuard.ts:37`; read `:97`, write `:113,122` (30 s heartbeat)
+- [ ] `postr.active-editor.{posterId}` — prefix const `hooks/useTwoTabGuard.ts:37`; read `:97`, write `:113,122` (30 s heartbeat); all removed by account deletion (every `postr.…` key, `profile/accountDeletion.ts`, record 24)
 - [ ] `postr.figure-script.{posterId}` — prefix const `poster/figureScriptDraft.ts:76`; read `readScriptDraft` `:225`, write `writeScriptDraft` `:245` (every change), removed when the code box is emptied, by `deletePoster` once the delete has succeeded (`forgetPosterScript` `:313`), by account deletion (`clearStoredFigureScripts` `:325`) and by the 10-poster cap (`pruneStoredScripts` `:195`) (plan item 7)
 - [ ] `sb-*` (Supabase auth token keys, owned by supabase-js) — enabled by `lib/supabase.ts:22` (`persistSession: true`); wiped via `signOut({scope:'local'})` `lib/auth.ts:54`; enumerated `pages/Debug.tsx:61`; bulk-cleared `pages/Debug.tsx:136`
 
@@ -5084,9 +4971,10 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 
 ### Vercel Web Analytics
 
-- [ ] Beacon mounted `App.tsx:38` — `<Analytics beforeSend={…redactUrl}>`; cookieless page-view + bounce counting
-- [ ] URL redaction `analytics/redactUrl.ts` (`/s/[redacted]`, `/p/[redacted]`, `/admin/[redacted]`, unparseable fallback)
-- [ ] Disclosed in Cookies §3/§4/§6 and the ConsentNotice body (§6.4, §6.1)
+- [ ] Beacon mounted `App.tsx:39-41` — `<Analytics beforeSend={…redactUrl}>`; cookieless page-view counting; **not mounted when the browser sends Global Privacy Control** (`analytics/globalPrivacyControl.ts`, record 24)
+- [ ] URL redaction `analytics/redactUrl.ts` (`/s/[redacted]`, `/p/[redacted]`, `/gallery/[redacted]`, `/admin/[redacted]`, matched however the router would read the path — `/P/<id>`, `/%70/<id>`, `//p/<id>` too; query dropped, unparseable fallback); every page served with `Referrer-Policy: strict-origin` (`apps/web/vercel.json`), so the beacon's Referer carries only the origin
+- [ ] Production script v0.1.3 (MEASURED on www.postr.sh, 2026-10-06): beacon fields `o`, `sv`, `sdkn`, `sdkv`, `ts`, plus `r` only on the first page view when the referrer is another host; 0 localStorage / 0 sessionStorage keys and no cookie after three page views
+- [ ] Disclosed in Privacy §2/§4/§6/§8 and Cookies §3/§4/§6 (§6.4); internal file `docs/legal/quebec-law-25.md`
 
 ### Anthropic (Claude)
 
