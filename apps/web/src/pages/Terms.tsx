@@ -17,7 +17,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = 'September 11, 2026';
+const LAST_UPDATED = 'October 5, 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Terms() {
@@ -45,8 +45,8 @@ export default function Terms() {
           Postr (“we”, “us”), operated by{' '}
           <strong className="text-[#e2e2e8]">Resila Technologies Inc.</strong>, a
           corporation registered in the Province of Quebec, Canada. By creating an
-          account, signing in, or otherwise using Postr — including browsing the
-          public gallery without an account — you agree to these Terms and to our{' '}
+          account, signing in, or otherwise using Postr, including using the
+          editor without signing up, you agree to these Terms and to our{' '}
           <Link to="/privacy" className="text-[#7c6aed] underline">
             Privacy Policy
           </Link>
@@ -55,29 +55,28 @@ export default function Terms() {
 
         <SectionHeading n="2" title="What Postr is" />
         <Body>
-          Postr is an academic poster editor and sharing platform. It lets you
-          create conference-quality posters, store drafts, share read-only links,
-          submit feedback, and — if you choose — publish posters to a public gallery
-          so that other users and visitors can see them.
+          Postr is an academic poster editor. It lets you create posters at
+          standard conference sizes, store drafts, export your posters to PDF,
+          PowerPoint or LaTeX, and submit feedback.
         </Body>
         <CalloutBox>
           <strong className="text-[#e2e2e8]">
-            Postr is a sharing platform, not a publisher.
+            Postr hosts your content. It is not a publisher.
           </strong>
           <br />
           We host and display the content you upload. We do not review it for accuracy,
-          originality, or lawful use before it goes live. You are solely responsible
-          for what you publish — see Section 5 below.
+          originality, or lawful use. You are solely responsible for what you
+          upload; see Section 5 below.
         </CalloutBox>
 
         <SectionHeading n="3" title="Accounts" />
         <List
           items={[
-            'You may start using Postr with an anonymous session and convert it to a permanent account later. All progress migrates across.',
+            'You may start using Postr with an anonymous session and convert it to a new permanent account later. All progress migrates across. Signing in to an account you already have does not bring the anonymous session’s work with it.',
             'You must provide accurate sign-up information and keep your login credentials confidential.',
             'You must be at least 16 years old (or the minimum age of digital consent in your country) to create a permanent account.',
             'You are responsible for everything that happens under your account.',
-            'You can delete your account at any time from your Profile page. Deletion is permanent and immediate.',
+            'You can delete your account at any time from your Profile page. Deletion is permanent and immediate. It also ends a paid term straight away, without a refund for the rest of the period, and removes any unused export credits.',
           ]}
         />
 
@@ -108,7 +107,7 @@ export default function Terms() {
 
         <SubHeading>5.1 Your warranties</SubHeading>
         <Body>
-          By uploading, publishing, or sharing anything on Postr, you{' '}
+          By uploading or creating anything on Postr, you{' '}
           <strong>represent and warrant</strong> that:
         </Body>
         <List
@@ -127,47 +126,28 @@ export default function Terms() {
             worldwide, royalty-free, non-exclusive, limited licence to host, store,
             reproduce, display, and transmit Your Content
           </strong>{' '}
-          as necessary to provide the features you use — for example, saving your
-          drafts, generating previews, delivering share links to people you invite,
-          and displaying your posters in the public gallery when you choose to publish
-          them.
+          as necessary to provide the features you use, for example saving your
+          drafts, generating previews, reading the PDFs and images you import, and
+          producing the files you export.
         </Body>
         <Body>
-          This licence ends when you delete the relevant content or your account,
-          except (a) for copies that normal technical caches and backups retain for a
-          short period, and (b) for shared content that third parties may have already
-          viewed or downloaded while it was public.
+          This licence ends when you delete your account, and for a poster when you
+          delete that poster, except (a) for the images you uploaded to a poster and
+          its preview image, which stay stored after you delete the poster and are
+          deleted when you delete your account, but stay stored, along with the
+          guest’s other uploaded files, when our weekly clean-up deletes a guest
+          account; (b) for copies that normal technical
+          caches and backups retain after deletion; and (c) for content that third
+          parties may have already viewed or downloaded while it was public.
         </Body>
 
-        <SubHeading>5.3 The public gallery — read carefully</SubHeading>
-        <CalloutBox>
-          <strong className="text-[#e2e2e8]">
-            Anything you publish to the gallery is public.
-          </strong>
-          <br />
-          It can be viewed by anyone on the internet, including people who do not
-          have a Postr account. It may be indexed by search engines. It may be
-          cached or linked to by third parties you do not control. Think before
-          publishing — especially if the poster contains unpublished results,
-          embargoed data, or anything your collaborators or institution would not
-          want made public.
-        </CalloutBox>
+        <SubHeading>5.3 Sharing and the public gallery</SubHeading>
         <Body>
-          By choosing to publish a poster (either one created in Postr or a PDF/image
-          you uploaded), you confirm each of the following:
-        </Body>
-        <List
-          items={[
-            'You are the rightful owner of every element of the poster — text, figures, photos, logos, data — or you have written permission from every rights-holder to display them publicly.',
-            'All co-authors named on the poster have agreed to its public display.',
-            'You are not publishing confidential, embargoed, or export-controlled material.',
-            'You will retract the poster promptly if any of the above ceases to be true.',
-          ]}
-        />
-        <Body>
-          You can retract (unpublish or delete) any poster at any time from your
-          dashboard. Once retracted, it will no longer be served from Postr, but we
-          cannot recall copies that third parties may already have made.
+          Share links and the public gallery are switched off. The app has no
+          control that publishes a poster or creates a link for someone else to
+          open it. If you published a poster to the gallery before it closed, you
+          can retract it from the “Gallery submissions” section of your Profile
+          page. We cannot recall copies that third parties may already have made.
         </Body>
 
         <SubHeading>5.4 Copyright and DMCA-style takedowns</SubHeading>
@@ -195,9 +175,10 @@ export default function Terms() {
 
         <SectionHeading n="6" title="Postr’s content and trademarks" />
         <Body>
-          The Postr software, branding, logo, palette, fonts we shipped, and the
-          built-in templates are owned by us (or used under licence). You may use
-          them only as necessary to operate and share posters you create on Postr.
+          The Postr software, branding, logo, palette, and the built-in templates
+          are owned by us (or used under licence). The fonts in the font menu are
+          third-party typefaces under their own licences. You may use our assets
+          only as necessary to create, export, and share posters you make on Postr.
           You may not reuse our brand assets for other products or services without
           written permission.
         </Body>
@@ -222,8 +203,9 @@ export default function Terms() {
 
         <SubHeading>7.1 Cancelling your subscription</SubHeading>
         <Body>
-          You can cancel the term at any time — through the “Manage subscription” link
-          on your Profile page. Cancelling stops the next renewal; your term stays
+          You can cancel the term at any time through Stripe, which handles billing
+          for Postr. The “Manage subscription” button on your Profile page takes you
+          there. Cancelling stops the next renewal; your term stays
           active until the end of the period you already paid for. There is no fee to
           cancel, and cancelling is not a refund.
         </Body>
@@ -234,19 +216,21 @@ export default function Terms() {
           <br />
           If you change your mind, we will refund your most recent term charge in
           full within 14 days of that charge, as long as you have not completed a
-          PowerPoint or LaTeX export in that period. Taking a paid export uses the
-          product you paid for, so the guarantee ends there. After 14 days, or once
-          you have exported, that charge is not refundable — you can still cancel at
-          any time to stop future renewals.
+          PowerPoint or LaTeX export in that period. A refund also cancels the term
+          straight away, which ends its PowerPoint and LaTeX exports. Taking a paid
+          export uses the product you paid for, so the guarantee ends there. After
+          14 days, or once you have exported, the guarantee no longer covers that
+          charge. You can still cancel at any time to stop future renewals.
         </CalloutBox>
         <CalloutBox>
-          <strong className="text-[#e2e2e8]">Export pack — refundable in full until you export.</strong>
+          <strong className="text-[#e2e2e8]">Export pack — refundable in full until you use a credit.</strong>
           <br />
-          If you change your mind before using the pack, we will refund the CA$9.99
-          charge in full, as long as you have not completed a PowerPoint or LaTeX
-          export with it. Taking a paid export uses the product you paid for, so once
-          any credit has been used the pack is no longer refundable — not even in
-          part. Refunding a pack removes its 3 credits from your account.
+          If you change your mind, we will refund the CA$9.99 charge for your most
+          recent pack in full, as long as none of your export credits has been used,
+          from that pack or an earlier one. Each credit is a PowerPoint or LaTeX
+          export you paid for, so once any credit has been used the pack is no
+          longer refundable, not even in part. Refunding a pack removes its 3
+          credits from your account.
         </CalloutBox>
         <Body>
           You can request a refund from the Subscription section of your Profile page,
@@ -254,16 +238,19 @@ export default function Terms() {
           <a className="text-[#7c6aed] underline" href={`mailto:${CONTACT_EMAIL}`}>
             {CONTACT_EMAIL}
           </a>
-          . Refunds are returned to your original payment method and may take a few
+          . While a term is active, that section offers the term refund only.
+          Refunds are returned to your original payment method and may take a few
           business days to appear.
         </Body>
         <Body>
           <strong className="text-[#c8cad0]">If you are in the EU, the EEA, or the UK:</strong>{' '}
           you have a statutory 14-day right to withdraw from a distance purchase. When
-          you buy a paid feature you are asked to confirm that you want access
-          immediately and that you understand you lose this 14-day withdrawal right
-          once you take a paid export (for the term) or use a credit (for the pack).
-          Where that confirmation was not obtained, your statutory 14-day right
+          you buy from the export prompt in the editor, you are asked to confirm that
+          you want access immediately and that you understand you lose this 14-day
+          withdrawal right once you take a paid export (for the term) or use a credit
+          (for the pack). A purchase started from the Pricing page does not ask for
+          this confirmation. Where that confirmation was not obtained, your statutory
+          14-day right
           applies regardless of use. Nothing in this section limits any refund or
           cancellation right you have under the mandatory consumer-protection law of
           your country of residence.
@@ -282,7 +269,7 @@ export default function Terms() {
           items={[
             'We may change, suspend, or discontinue any part of Postr at any time, with or without notice.',
             'We do not guarantee uninterrupted availability. Planned maintenance, emergency fixes, and third-party outages will happen.',
-            'You can stop using Postr at any time. We can terminate your account for material breach of these Terms or prolonged inactivity of an anonymous guest session.',
+            'You can stop using Postr at any time. We can terminate your account for material breach of these Terms. A guest account that is never converted to a permanent account may be deleted once 14 days have passed since its last sign-in, as the Privacy Policy explains.',
             'Sections that by their nature should survive termination (for example, Your warranties, indemnification, disclaimers, and limitation of liability) will survive.',
           ]}
         />
