@@ -92,6 +92,7 @@ codes (0 clean, 1 the defect observed, 2 an instrument error).
 | `scripts/fit-check.mjs` | Fit and zoom: gutters, hidden sheet, focus rings, the guidelines panel, the tour | fix 03 |
 | `scripts/new-poster-owner-check.mjs` | `/p/new` never opens someone else's poster | fix 23 |
 | `scripts/account-change-check.mjs` | the editor across an account change, against a real local Supabase | fix 23 |
+| `scripts/figure-script-check.mjs` | the plot checker's script and the sidebar's drafts across tab changes, block clicks, a reload, another poster, a copy opened in place, the dashboard round trip, and the public page's reload and new tab; a kept result against the figure and size it is for, a long script edited after its Check, and the engine's storage capacity | fix 07 |
 | `scripts/checker-truth-check.mjs` | the plot checker's gate: the page and the editor on 45 scripts at 4 sizes, every original and corrected script run in matplotlib | fix 13 |
 | `scripts/checker-shape-check.mts` | the plot checker's Python fix on the reviewers' break sets, judged by layout against controls that run no Postr code | fix 13 |
 | `scripts/geometry-desync.mjs` | stored against rendered block geometry, in real layout, on a page that copies the block renderer (not the app); run from the repo root; exits 0 when the desync reproduces | — |

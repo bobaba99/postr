@@ -898,7 +898,7 @@ flowchart LR
 - [ ] profile icon (aria-label `Profile and settings`, title `Profile & Settings`) — router link — `Home.tsx:188-198` — `/profile`
 - [ ] `<NewPosterButton />` ×2 — `Home.tsx:212,258` — creates poster + navigates to editor (§6.13)
 - [ ] `<PosterCard onDuplicate onDelete>` per row — `Home.tsx:266-271` (§6.13); handlers here: duplicate → `duplicatePoster`, delete → opens ConfirmModal
-- [ ] `<ConfirmModal>` "Delete poster" — `Home.tsx:277-285` — confirm → `deletePoster` (optimistic + rollback)
+- [ ] `<ConfirmModal>` "Delete poster" — `Home.tsx:277-285` — confirm → `deletePoster` (optimistic + rollback; also removes the poster's kept plot script from this browser, plan item 7)
 - [ ] `<ConfirmModal>` "Duplicated" — `Home.tsx:287-299` — confirm → `navigate('/p/{newId}')`
 
 **Copy**
@@ -941,8 +941,8 @@ flowchart LR
 - [ ] `Refund export pack` — button — `profile/SubscriptionPanel.tsx` — `requestRefund('pack')` (2026-09-11: whole pack, never a per-credit amount)
 - [ ] `Get a subscription` — router link — `Profile.tsx:1199-1204` — `/pricing`
 - [ ] `↓ Download my data (JSON)` (busy `Preparing…`) — button — `Profile.tsx:682-689` — RPC `export_my_data` → JSON file download `postr-export-{ts}.json`
-- [ ] `Delete all posters` — DangerAction button — `Profile.tsx:704-710` — ConfirmModal → deletes all posters (disabled at 0)
-- [ ] `Delete account` — DangerAction button (`profile/DangerZone.tsx`) — ConfirmModal with typed confirmation `I confirm the deletion of my account` → `profile/accountDeletion.ts runAccountDeletion()` → `POST /account/delete` (`data/account.ts`; server cancels Stripe subs, deletes the customer, removes Storage, writes `account_deletions`, deletes the auth user — nothing is deleted client-side first) → clear 6 localStorage keys + global signOut → `/auth`. Failure: generic "Something went wrong deleting your account. Nothing was removed — please try again or send feedback." (true: the API leaves the account intact on every pre-final-step failure). With `hasActiveTerm` the description/modal add that deleting also cancels the CA$18.99 term. **Changed 2026-09-11 (P0-3)** — was: delete posters client-side + RPC `delete_own_account`.
+- [ ] `Delete all posters` — DangerAction button — `Profile.tsx:704-710` — ConfirmModal → deletes all posters (disabled at 0; `deletePoster` removes each one's kept plot script, plan item 7)
+- [ ] `Delete account` — DangerAction button (`profile/DangerZone.tsx`) — ConfirmModal with typed confirmation `I confirm the deletion of my account` → `profile/accountDeletion.ts runAccountDeletion()` → `POST /account/delete` (`data/account.ts`; server cancels Stripe subs, deletes the customer, removes Storage, writes `account_deletions`, deletes the auth user — nothing is deleted client-side first) → clear 6 localStorage keys and every `postr.figure-script.*` entry (`clearStoredFigureScripts`, plan item 7) + global signOut → `/auth`. Failure: generic "Something went wrong deleting your account. Nothing was removed — please try again or send feedback." (true: the API leaves the account intact on every pre-final-step failure). With `hasActiveTerm` the description/modal add that deleting also cancels the CA$18.99 term. **Changed 2026-09-11 (P0-3)** — was: delete posters client-side + RPC `delete_own_account`.
 - [ ] `<PresetEditModal>` — `Profile.tsx:723-727`; `<ConfirmModal>` — `Profile.tsx:729-738` (§6.13)
 
 **Copy**
@@ -1045,7 +1045,7 @@ flowchart LR
 
 The editor route hosts (`pages/Editor.tsx`, `pages/Share.tsx`) and everything under `poster/` EXCEPT the sidebar (§6.8): block renderers + selection chrome, crop UI, floating format toolbar, group frame, guidelines rail, the top-level `PosterEditor.tsx` (zoom, rulers, grid, drag guides, overlays, shortcuts), resize handles, rich-text editor + symbol library, selection marquee, layout templates, poster constants, and the toast pill.
 
-Scope note: `Sidebar.tsx`, `CommentsPanel.tsx`, `VersionPanel.tsx`, `ReadabilityPanel.tsx`, and `poster/sidebar/*` are in §6.8 — `Sidebar.tsx` imports all three panels (`Sidebar.tsx:56,64`; `sidebar/FigureTab.tsx:20` imports ReadabilityPanel). `GuidelinesPanel.tsx` IS here (imported and rendered directly by `PosterEditor.tsx:42,3451`). External components mounted from this slice but inventoried elsewhere: `Sidebar` (§6.8), `PaletteDesigner`, `StaplesPrintModal`, `ConfirmModal`, `AutosaveStatusPill`, `OnboardingTour`, `InputModal`, `LogoPicker` (§6.13), `ChartBlock` (§6.10).
+Scope note: `Sidebar.tsx`, `CommentsPanel.tsx`, `VersionPanel.tsx`, `ReadabilityPanel.tsx`, and `poster/sidebar/*` are in §6.8 — `Sidebar.tsx` imports all three panels (`Sidebar.tsx:56,64`; `sidebar/FigureTab.tsx:25` imports ReadabilityPanel). `GuidelinesPanel.tsx` IS here (imported and rendered directly by `PosterEditor.tsx:42,3451`). External components mounted from this slice but inventoried elsewhere: `Sidebar` (§6.8), `PaletteDesigner`, `StaplesPrintModal`, `ConfirmModal`, `AutosaveStatusPill`, `OnboardingTour`, `InputModal`, `LogoPicker` (§6.13), `ChartBlock` (§6.10).
 
 ```mermaid
 flowchart LR
@@ -1522,6 +1522,7 @@ Slice-wide notes:
 - `GALLERY_PUBLIC_ENABLED = false` (`config/features.ts:21`) → the Export tab's "Share to gallery" section (`Sidebar.tsx:1186-1205`) is **currently dead UI**, and the Layout tab footer tip uses the non-gallery copy branch.
 - `HIGHLIGHT_PRESETS` imported at `Sidebar.tsx:29` but **never used** in the file — dead import (block-level highlight UI intentionally removed, see comment `Sidebar.tsx:4039-4047`).
 - Header comment `Sidebar.tsx:1-18` gives the rail order: 10 tabs, plus comments behind `SHARING_ENABLED` (updated 2026-09-30, fix 23). Until 2026-09-10 it said "5-tab control panel" (§10).
+- **Drafts outlive the tab (plan item 7, 2026-10-06, record `docs/fixes/07-figure-script-kept.md`):** only the active tab's panel is mounted, and selecting a block changes the tab (the selection effect, `Sidebar.tsx:345-367`), so a panel's own state died on every click on the poster. The panel area is keyed `${posterId}:${tab}` (`:701`, so another poster opened in the mounted editor starts its panels afresh) and text still being written lives outside the panels: the figure checker's script per poster in localStorage (`poster/figureScriptDraft.ts`, below), and for the session only, in memory (`hooks/useSessionDraft.ts`, §6.14), under the poster id: the Authors paste box with its parse in flight and feedback (`:1656-1662`), the References paste box, manual-entry fields, parse in flight and feedback (`:1972-2005`), the Layout poster-name draft (`:896-916`, tied to the name it was typed over, cleared on Save), the version name (`VersionPanel.tsx:53`) and the Make ladder (§6.10). Each tab gets the scope as `draftScope={props.posterId}` (`:704, 722, 736, 849`), the Figure tab as `posterId` (`:782`). Tests: `poster/__tests__/figureScriptKept.test.tsx`, `sidebarDraftsKept.test.tsx`; browser: `scripts/figure-script-check.mjs`.
 - Out-of-slice components rendered from this slice (internals covered elsewhere): `CopyDesignModal` (`:2393`), `UpdateAvailableBanner`/`JustRefreshedBanner` (`:581-582`), `ChartChooser` (via `FigureTab`, §6.10), `RichTextEditor`/`DockedFormatToolbar`/`FloatingFormatToolbar` (`:3865,3881,3890`), `AuthorLine` (`:1245`), `ImportPosterModal`/`ImportConfirmReplaceModal` (via `ImportSection`), `BusyIndicator` (via `EditableExportButtons`). In-slice panels: `CommentsPanel`, `VersionPanel`, `ReadabilityPanel` — inventoried below.
 
 ```mermaid
@@ -1608,16 +1609,18 @@ Mounted from: imported `Sidebar.tsx:63`, rendered `Sidebar.tsx:806-819` under `S
 
 **Python fix (fix 13, part 1):** the corrected code carries a helper (`readability.ts` `pyHelperBlock`, `:1480`) that raises the listed text classes as the figure is made and at every save, replays the script's own layout when needed, and gives rcParams back at the end; `readabilityFullFix.ts` `ensurePySave` (`:202`) puts the save before it. Record `docs/fixes/13-checker-reads-its-own-fix.md`; instruments `scripts/checker-truth-check.mjs` (the gate) and `scripts/checker-shape-check.mts` (the matplotlib shape harness).
 
-Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-126` when `mode === 'check'`; `FigureTab` rendered at `Sidebar.tsx:744-759` under `tab === 'check'`. **Also mounted (2026-09-11) by the public page `pages/FigureReadability.tsx` (§6.10) with `layout="page"`.**
+Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:181-186` (both modes stay mounted, the inactive one `display:none`); `FigureTab` rendered at `Sidebar.tsx:780` under `tab === 'check'`. **Also mounted (2026-09-11) by the public page `pages/FigureReadability.tsx` (§6.10) with `layout="page"`.**
+
+**Kept per poster (plan item 7, 2026-10-06, record `docs/fixes/07-figure-script-kept.md`):** the script, the language and the inputs of the last Check (`{ code, lang, widthIn, heightIn, imageId }`) are no longer the panel's state but a draft (`poster/figureScriptDraft.ts`, `useScriptDraft(draftSlot)` at `ReadabilityPanel.tsx:277`), so they survive the sidebar unmounting the panel and a reload. New prop `draftSlot` (`:58`): the editor passes `posterScriptSlot(posterId)` (localStorage `postr.figure-script.<poster id>`, `FigureTab.tsx:185`), the page `PAGE_SCRIPT_SLOT` (sessionStorage `postr.figure-script-page`); omitted, it is component state. The table is computed from the kept inputs (`runReadabilityCheck`, `:233`; memo `:287`, which catches a parser error so a kept script cannot take the panel down), so a restored check shows the same table it showed, at the size it was checked at; `▶ Check` stores the inputs, with the figure it sized against (`imageId`: the selected image block, or null for the gray figure preview; `runCheck`, `:333`). In the editor a result checked against another figure than the one the sizing note names (an image block after a deselect or a reload, another image, or the preview while an image is selected) is not shown (`otherFigure`, `:353`) and a status line says what it is for and when it shows (`keptResultNote`, `ReadabilitySizingNote.tsx:72`, rendered at `:525`); a result kept at another size of the same figure (the preview dragged, or back at 10 × 7 after a reload; an image resized) stays, as the editor always kept it through a drag, and the line says the size it is for, compared as the pill shows sizes (review round 2, R2-01 and R1-08). Storage is written on every change, synchronously; a box with no code in it stores nothing (blank lines typed first, or a language picked before the code, stay in memory while the page is open); a script over 50,000 characters as stored (each copy counted on its own: the script, and the checked version when it differs; review round 2, R2-02), or one storage refuses, is kept in memory while the page is open (a reload loses it) and the older stored copy is removed; only the 10 most recently changed posters keep a script (`figureScriptDraft.ts:73-74, 167, 184`). A Check after an edit, in the other language or at another size computes the table again (the memo's inputs, `ReadabilityPanel.tsx:287`); an explicit Make/Check pick wins over a kept script. The Figure tab opens on Check when the poster has a script (`PosterEditor.tsx:906, 1569`). Not kept: the image scan result (`scanState`, still the panel's state; record 07 §10).
 
 **`layout` prop (added 2026-09-11):** `layout?: 'panel' | 'page'`, default `'panel'` so `FigureTab` is untouched. Tokens live in `poster/readabilityLayout.ts` (`layoutTokens(layout)`): `'page'` = 16px/24px monospace editor + gutter, 44px min-height on the language toggles / Check / Copy / "Open full edited code" / modal close, table 15px, muted `#8b8f99` (not `#6b7280`), Tab NOT intercepted in the code editor, scale suffix " (source canvas → printed size)", copied-banner tail "paste it into your script, re-run, and print at this size.", parser `defaultSizeLabel` "the print size you entered," (`readability.ts` `ParseOptions.defaultSizeLabel`, default "figure preview size"). The image-OCR scan section is hard-gated to `layout === 'panel'` (`isImage`). The sizing sentence under the intro moved to `poster/ReadabilitySizingNote.tsx` (image block / canvas overlay / page variants; re-keys the `postr-dimension-pill` on the dimensions). Results now render inside a `postr-rise-in` wrapper; language toggles carry `aria-pressed`. Pinned by `poster/__tests__/FigureTab.test.tsx` ("drag or resize it" still present in the editor) and `pages/__tests__/FigureReadability.test.tsx`.
 
 **Split + a11y pass (2026-09-11, same day, review follow-ups):** `ReadabilityPanel.tsx` is now ~790 lines; four satellites carry what moved out — `poster/readabilityStyles.ts` (`panelStyle`/`labelStyle`/`btnStyle`/`primaryBtnStyle`), `poster/readabilityFullFix.ts` (`generateFullFix`: the appended `ggsave(...)` / `plt.rcParams['figure.figsize']` + `savefig` now carry the canvas the check was SCORED against — `params.canvasWidth/Height`, i.e. the typed print size on the page or the overlay in the editor — never a hardcoded 10 × 7; `__tests__/readabilityFullFix.test.ts`), `poster/ReadabilityCodeView.tsx` (`CopyButton` — `white-space: nowrap`, motion via `--dur-base`/`--ease-standard` — and `CodeView`, which takes `layout` so the snippet/modal code renders at the page's 16px), `poster/FullCodeModal.tsx` (a real dialog: `role="dialog" aria-modal="true" aria-labelledby` → "Full edited code", `×` is `aria-label="Close"`, focus lands on × on open and returns to the opener on close, Tab wraps inside, `document.body.style.overflow` locked while open; `__tests__/FullCodeModal.test.tsx`). The code textarea carries `aria-label="Your R or Python plotting code"` + `className="postr-code-editor"` and no longer resets `outline` — `textarea.postr-code-editor:focus-visible` in `index.css` draws the accent ring inset. `checked` is stamped with `{ widthIn, heightIn }`; in `layout="page"` a result computed at a different size than the live one is treated as stale and the table is dropped until Check runs again (the editor keeps results through an overlay drag). In page layout the fix-box label uses `tableFontSize`, "Copy snippet" / "Open full edited code" use `buttonFontSize` (15px).
 
 **Elements**
-- [ ] `Auto` / `R` / `Python` — language segment buttons (3) — `ReadabilityPanel.tsx` — sets `lang` state, `aria-pressed`
+- [ ] `Auto` / `R` / `Python` — language segment buttons (3) — `ReadabilityPanel.tsx` — sets the draft's `lang` (kept with the script, plan item 7), `aria-pressed`
 - [ ] Code textarea (line-numbered CodeEditor, `aria-label="Your R or Python plotting code"`, `.postr-code-editor` focus ring) — `ReadabilityPanel.tsx` — keyboard: **Tab** inserts two spaces (panel layout only); scroll syncs number gutter
-- [ ] `▶ Check` — primary button, disabled when code empty — `ReadabilityPanel.tsx:670-681` — `runCheck` → local `parseRCode`/`parsePythonCode`/`computeReadability`
+- [ ] `▶ Check` — primary button, disabled when code empty — `ReadabilityPanel.tsx` — `runCheck` stores the check's inputs in the draft; the table is `runReadabilityCheck` (local `parseRCode`/`parsePythonCode`/`computeReadability`) over them (plan item 7)
 - [ ] `Copy snippet` / `✓ Copied` — CopyButton — `ReadabilityPanel.tsx` (component def `ReadabilityCodeView.tsx`) — clipboard write, 2400ms feedback, opens copied banner
 - [ ] `Open full edited code →` — button — `ReadabilityPanel.tsx` — opens FullCodeModal
 - [ ] FullCodeModal — `role="dialog" aria-modal` — `FullCodeModal.tsx` — backdrop click closes, **Escape** closes, Tab trapped, focus restored to opener, body scroll locked
@@ -1639,6 +1642,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:20`, rendered `FigureTab.tsx:122-1
 - [ ] "✓ Copied to clipboard — paste it into your editor, re-run, and re-upload the image." — banner text — `ReadabilityPanel.tsx:698-699`
 - [ ] "{warning}" rows prefixed with ⚠ — dynamic warnings from `computeReadability` — `ReadabilityPanel.tsx:705-717`
 - [ ] "Scale factor: {x.xx}x" + " (default block size)" suffix when no image — `ReadabilityPanel.tsx:720-721`
+- [ ] "The last result is for an image block at {W}" × {H}". Click Check to check the size above." / "The last result is for the figure preview at {W}" × {H}". Click Check to check the size above." (table hidden) / "This result is for {W}" × {H}", not the size above. Click Check to update it." (table kept) — `role="status"` line, editor only, above the results — `ReadabilitySizingNote.tsx:72` (`keptResultNote`), rendered `ReadabilityPanel.tsx:525` (plan item 7, review round 2)
 - [ ] "Element" / "Source" / "Print" / "Min" — results table headers — `ReadabilityPanel.tsx:727-731`
 - [ ] "{n}pt" ×3 per row — source/effective/min point cells — `ReadabilityPanel.tsx:745, 760, 769`
 - [ ] "Recommended fix (base_size = {n}):" — fix section label — `ReadabilityPanel.tsx:799`
@@ -2036,15 +2040,16 @@ Mounted from: imported `Sidebar.tsx:64`, rendered `Sidebar.tsx:795-801` under `t
 #### `poster/sidebar/FigureTab.tsx` — Figure tab's two-mode segmented workbench ("Make a figure" chart chooser / "Check a figure" readability) + per-chart palette picker
 
 **Elements**
-- [ ] `ChartPalettePicker` — panel render site (above the mode toggle), shown only when the selected block is a **multi-series** chart (`distinctSeries(spec).length >= 2`) — `FigureTab.tsx` — `onChange` writes/clears `seriesPaletteId` via `onUpdateChartSpec(id, spec)` → `updateBlock` (§6.10)
-- [ ] `Make a figure` — segmented-control button (aria-pressed) — `FigureTab.tsx:76-83` — `onChangeMode('make')`
-- [ ] `Check a figure` — segmented-control button (aria-pressed) — `FigureTab.tsx:84-91` — `onChangeMode('check')`
-- [ ] `ChartChooser` (action button label `Insert selected figures`, busy label `Inserting {n} figures…` / `Inserting…`) — panel render site — `FigureTab.tsx:96-117` — insert loops `onInsertChart(spec, caption)` per selected figure (§6.10)
-- [ ] `ReadabilityPanel` — panel render site (check mode) — `FigureTab.tsx:121-127` — this slice, above
+- [ ] `ChartPalettePicker` — panel render site (above the mode toggle), shown only when the selected block is a **multi-series** chart (`distinctSeries(spec).length >= 2`) — `FigureTab.tsx:102` — `onChange` writes/clears `seriesPaletteId` via `onUpdateChartSpec(id, spec)` → `updateBlock` (§6.10)
+- [ ] `Make a figure` — segmented-control button (aria-pressed) — `FigureTab.tsx:131-138` — `onChangeMode('make')`
+- [ ] `Check a figure` — segmented-control button (aria-pressed) — `FigureTab.tsx:139-146` — `onChangeMode('check')`
+- [ ] `ChartChooser` (action button label `Insert selected figures`, busy label `Inserting {n} figures…` / `Inserting…`) — panel render site — `FigureTab.tsx:151-176` — insert loops `onInsertChart(spec, caption)` per selected figure (§6.10); `draftScope={posterId}` (`:153`) keeps the ladder's progress for the session (plan item 7)
+- [ ] `ReadabilityPanel` — panel render site (check mode) — `FigureTab.tsx:181-186` — this slice, above; `draftSlot={posterScriptSlot(posterId)}` (`:185`) keeps the checker's script per poster (plan item 7)
+- [ ] `posterId` prop (`FigureTab.tsx:50`, passed by `Sidebar.tsx:782`) — the open poster: the checker's slot and the ladder's draft scope; omitted, both last only while the tab is mounted
 
 **Copy**
-- [ ] "Inserted — legible at print size" — ChartChooser confirmation string (prop) — `FigureTab.tsx:116`
-- [ ] "Figure tools" — aria-label on segment group — `FigureTab.tsx:64`
+- [ ] "Inserted on your poster" — ChartChooser confirmation string (prop) — `FigureTab.tsx:175`
+- [ ] "Figure tools" — aria-label on segment group — `FigureTab.tsx:120`
 
 **Graphics** — none.
 
@@ -2403,6 +2408,8 @@ flowchart LR
 
 #### `charts/ladder/ChartChooser.tsx` — the auto-scrolling questionnaire ladder (panel + page layouts)
 
+**Kept for the session in the editor (plan item 7, 2026-10-06):** new prop `draftScope` (FigureTab passes the poster id, `FigureTab.tsx:153`). With it the ladder's source, answers, step-1 summary, picked-but-unused grouping columns and the variables-form switch (`ChartChooser.tsx:88-100`), DataStep's typed table and an uploaded workbook's sheet choice (`DataStep.tsx:105, 114`) and VariablesStep's rows (`VariablesStep.tsx:176`) are session drafts (`hooks/useSessionDraft.ts`), so a click on a block (which unmounts the Figure tab) no longer resets the ladder. They outlive a tab change, not the step: a used table or sheet clears step 1's drafts (`DataStep.tsx:122`) and leaving the variables form resets its rows (`VariablesStep.tsx:183`), as before. Not kept: the figures chosen in the last step (PreviewStep picks the top-ranked one again when it mounts). Without `draftScope` (the deactivated `/chart-chooser` page, the manuscript panel) nothing changed.
+
 **Elements**
 - [ ] `▸ change` (via StepSection) — button — rendered for every answered step — `ChartChooser.tsx:217,265` — `onReopen` (`resetData` for step 1, `reopen(rung)` for the rest); invalidates all rungs below
 - [ ] chips from `SHAPE_OPTIONS` (7 labels, enumerated at `steps.ts:270-278`) — chip buttons — `ChartChooser.tsx:274-279` — synthetic branch measure rung; `answer('measure', { shape })`
@@ -2658,6 +2665,8 @@ flowchart LR
 #### `charts/chartColors.ts` — palette-slot resolution/color math (incl. `resolveSeriesColors` override) — no UI, logic only
 
 #### `pages/FigureReadability.tsx` — /tools/figure-readability standalone figure-readability check (public, no session) — **LIVE 2026-09-11** (alias `/plot-checker` → 308)
+
+**Kept for the tab (plan item 7, 2026-10-06):** the script, its language, the last check (`ReadabilityPanel` `draftSlot={PAGE_SCRIPT_SLOT}`, `FigureReadability.tsx:97`) and the typed size (`readPageSize` / `writePageSize`, `:56-58`) are kept in sessionStorage (`postr.figure-script-page`, `postr.figure-size-page`): a reload keeps them, closing the tab forgets them. A very long script (over 50,000 characters as stored) is not stored: a reload loses it; a long one that fits stays stored when it is edited after a Check (review round 2, R2-02). Not localStorage, by the owner's decision: library guides send students here from shared computers. A new tab starts empty (`scripts/figure-script-check.mjs` P1).
 
 The editor's Figure › Check tab (`poster/ReadabilityPanel.tsx`, §6.8) as a public page: the printed figure size is TYPED (`poster/PrintSizeFields.tsx` + `poster/printSize.ts`) instead of dragged on a canvas; the image-OCR scan path is never mounted (`selectedBlock={null}` + the panel's `layout === 'page'` gate); nothing leaves the browser and no Supabase session is created (`PublicHeader` only reads one). Code-split (`lazy`). SEO: static `routes.json` record (title "Figure Font Size Checker for Posters — R & Python | Postr", description "Paste ggplot2 or matplotlib code. Get the printed point size of every label at your poster size, and the exact base_size to fix it. Free, no signup.", h1 + 4 copy lines; prerendered to `dist/tools/figure-readability/index.html`, in `sitemap-static.xml`) + `WebApplication` JSON-LD "Postr Figure Readability Check". Surfaces: `PublicHeader` `TOOL_LINKS` ({ to, label "Figure readability", blurb "Check figure text at poster print size" }), `PublicFooter` Product column, `Landing` tools section + feature-card link (§6.2). Tests: `pages/__tests__/FigureReadability.test.tsx`, `poster/__tests__/printSize.test.ts`, `src/__tests__/routes.test.tsx`, `toolDiscoverability.test.tsx` (`TOOL_PATHS`), `siteMeta.test.ts`, `vercelRouting.test.ts` (`CLIENT_ROUTES` / `ALIAS_REDIRECTS` / `UNKNOWN_PATHS` `/tools`), `PublicPageOutline.test.tsx` (`auditedFiles`), `redactUrl.test.ts`. Scripts: `verify-prerender.sh` (prerendered loop, distinct-title loop, `/tools` 404, `check_alias /plot-checker /tools/figure-readability`), `mobile-audit.mjs` ROUTES, `scripts/text-audit/scrape.mts` ROUTES.
 
@@ -4748,6 +4757,16 @@ No UI itself; drives `[data-postr-modal-backdrop]/[data-postr-modal-content]` CS
 No UI — logic only. Returns `SignedInUser { id, isGuest } | null | undefined` (`:15-19`, `:23`): `undefined` until the client answers, `null` with no session. Follows `supabase.auth.getSession()` (`:36`) and `onAuthStateChange` (`:37`); returns the same object while the id and guest flag are unchanged, so a token refresh re-renders nothing (`:33`). Consumer: `pages/Editor.tsx:174` — the editor opens only this user's own posters and closes one when the user changes (§6.7).
 **Elements** — none. **Copy** — none. **Graphics** — none.
 
+#### `hooks/useSessionDraft.ts` — useState kept in memory for the session under a scoped key (plan item 7)
+
+No UI — logic only. `useSessionDraft(key, initial)` returns `[value, set]` like `useState`, but with a key the value lives in a module map (`:24`) for as long as the page is open, so a panel that unmounts (every sidebar tab change) finds its draft again; writes are synchronous and notify every mounted reader (`useSyncExternalStore`), so a write made after the panel unmounted (a parse finishing) reaches the panel mounted since. `draftKey(scope, name)` (`:40`) builds `scope:name`, or null — with a null key it is plain `useState`. Nothing is written to browser storage. Consumers: `poster/Sidebar.tsx` (Authors, References, Layout name), `poster/VersionPanel.tsx`, `charts/ladder/{ChartChooser,DataStep,VariablesStep}.tsx`. Record `docs/fixes/07-figure-script-kept.md`.
+**Elements** — none. **Copy** — none. **Graphics** — none.
+
+#### `poster/figureScriptDraft.ts` — the plot checker's draft, kept per poster (localStorage) or per tab (sessionStorage) (plan item 7)
+
+No UI — logic only. `useScriptDraft(slot)` (`:270`), `readScriptDraft` / `writeScriptDraft` (`:214`, `:234`), `useHasPosterScript(posterId)` (`:294`, PosterEditor's Figure-mode default; a box of blank lines is not a script), `forgetPosterScript(posterId)` (`:302`, called by `data/posters.ts deletePoster` `:466` once the delete has succeeded), `clearStoredFigureScripts()` (`:314`, called by `profile/accountDeletion.ts` `:47`), `readPageSize` / `writePageSize` (`:332`, `:345`; a stored size outside 1–96 in is ignored). A stored entry is validated field by field (another version, an unknown language, text that is not JSON read as no entry; a bad check, including one whose figure is neither null nor a block id, is dropped and the script kept). Storage is the record whenever it works; a draft it cannot take, and a box of blank lines (never stored), is kept in memory while the page is open (a reload loses it). Bounds: 50,000 characters per copy of a script as stored (`tooLongToStore`, `:167`; the script and the version last checked are capped separately, so an edit after a Check never unstores a script that fits, review round 2), 10 posters (`:73-74`): about a million characters in all.
+**Elements** — none. **Copy** — none. **Graphics** — none.
+
 #### `hooks/useStorageUrl.ts` — resolves `storage://` image srcs to Supabase signed URLs (50 min TTL cache)
 
 No UI — logic only. Consumer: `poster/blocks.tsx` (image block rendering). The cache lives in `data/posterImages.ts` (URLs signed for 1 hour, `SIGNED_URL_TTL` `:11`; cached 50 minutes, `CACHE_TTL_MS` `:149`). Renewal (fix 23): `renewStorageUrls` (`posterImages.ts:190`) signs an open poster's images again every 40 minutes, called from `pages/Editor.tsx` (§6.7), so the closed page's copy still has URLs signed for the owner after an account change.
@@ -4901,7 +4920,7 @@ No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) 
 | `PasswordStrength` | Auth (:483, signup), Profile (:1252, guest email signup) |
 | `PresetEditModal` | Profile (:723-727) |
 | `BusyIndicator` | EditableExportButtons, PaperToPoster (:410-414), ChartPreview (:81), DataStep (:149,:168) |
-| `ChartChooser` (`charts/ladder`) | pages/ChartChooser, sidebar/FigureTab (:96-117), manuscript/ChartPanel (:140-146) |
+| `ChartChooser` (`charts/ladder`) | pages/ChartChooser, sidebar/FigureTab (:151-176), manuscript/ChartPanel (:140-146) |
 | `ChatPane` | PaperToPoster (:293-301) |
 | `ChartPanel` | PaperToPoster (:309-314) |
 | `OutlineCard` | PaperToPoster (:334-338) |
@@ -4950,7 +4969,7 @@ No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) 
 
 ## 8. Storage-key sweep list
 
-Every localStorage / sessionStorage key the app reads or writes, with file:line (from the stores/hooks slice sweep, 2026-07-28). The "delete my data" sweep point is `pages/Profile.tsx:290-295` — any NEW key added anywhere must be added there too.
+Every localStorage / sessionStorage key the app reads or writes, with file:line (from the stores/hooks slice sweep, 2026-07-28). The "delete my data" sweep point is `profile/accountDeletion.ts` (`LOCAL_KEYS` and `clearLocalData`; it moved there from `pages/Profile.tsx` on 2026-09-11) — any NEW key added anywhere must be added there too, and to the Cookies Policy table (EN and FR), which `pages/__tests__/cookiesStorageInventory.test.ts` pins to the code.
 
 **localStorage**
 - [ ] `postr.custom-palettes` — const `poster/customPalettes.ts:9`; read `:13`, write `:30`
@@ -4964,6 +4983,7 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 - [ ] `postr.welcome-seeded:{userId}` — prefix const `data/seedWelcomePoster.ts:36`; read `:40`, write `:50`
 - [ ] `postr.comment-name` — const `hooks/useComments.ts:153`; read `:157`, write `:165`
 - [ ] `postr.active-editor.{posterId}` — prefix const `hooks/useTwoTabGuard.ts:37`; read `:97`, write `:113,122` (30 s heartbeat)
+- [ ] `postr.figure-script.{posterId}` — prefix const `poster/figureScriptDraft.ts:68`; read `readScriptDraft` `:214`, write `writeScriptDraft` `:234` (every change), removed when the code box is emptied, by `deletePoster` once the delete has succeeded (`forgetPosterScript` `:302`), by account deletion (`clearStoredFigureScripts` `:314`) and by the 10-poster cap (`pruneStoredScripts` `:184`) (plan item 7)
 - [ ] `sb-*` (Supabase auth token keys, owned by supabase-js) — enabled by `lib/supabase.ts:22` (`persistSession: true`); wiped via `signOut({scope:'local'})` `lib/auth.ts:54`; enumerated `pages/Debug.tsx:61`; bulk-cleared `pages/Debug.tsx:136`
 
 **sessionStorage**
@@ -4973,6 +4993,8 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 - [ ] `postr-acknowledged-build` — const `components/UpdateAvailableToast.tsx:27`; read `:91`, write `:126,208`
 - [ ] `postr.checkoutIntent` — const `data/checkoutIntent.ts:23`; write `:40`, read `:49`, remove `:58`
 - [ ] `postr.signupConsent` — const `data/consent.ts:34`; write `:44`, read `:54`, remove `:69`
+- [ ] `postr.figure-script-page` — `poster/figureScriptDraft.ts:69` (`PAGE_SCRIPT_SLOT`); the public checker's script, language and last check (plan item 7)
+- [ ] `postr.figure-size-page` — `poster/figureScriptDraft.ts` `readPageSize` `:332` (a stored size outside 1–96 in is ignored), `writePageSize` `:345`; the public checker's typed size (plan item 7)
 
 **BroadcastChannel** (not storage, same sweep family)
 - [ ] `postr-editors` — `hooks/useTwoTabGuard.ts:36,73`

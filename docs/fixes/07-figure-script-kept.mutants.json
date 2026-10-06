@@ -1,0 +1,878 @@
+{
+  "tests": [
+    "src/poster/__tests__/figureScriptKept.test.tsx",
+    "src/poster/__tests__/sidebarDraftsKept.test.tsx",
+    "src/pages/__tests__/figureReadabilityKept.test.tsx",
+    "src/pages/__tests__/FigureReadability.test.tsx",
+    "src/poster/__tests__/FigureTab.test.tsx",
+    "src/poster/__tests__/VersionPanel.test.tsx",
+    "src/charts/__tests__/ChartChooser.test.tsx",
+    "src/charts/__tests__/DataStep.loading.test.tsx",
+    "src/charts/ladder/__tests__/VariablesStep.test.tsx",
+    "src/pages/__tests__/cookiesStorageInventory.test.ts",
+    "src/pages/__tests__/figureScriptDeletion.test.tsx",
+    "src/pages/__tests__/Profile.dangerZone.test.tsx"
+  ],
+  "mutants": {
+    "no-persistence": {
+      "undoes": "A — the script is written to storage (memory only would lose it on a reload)",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      setStored(slot.area, slot.key, raw);\n      unstored.delete(id);",
+          "      throw new Error('mutant: storage never written');"
+        ]
+      ]
+    },
+    "stored-copy-not-read": {
+      "undoes": "A — the stored script is read back when the checker mounts",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    const raw = getStored(slot.area, slot.key);\n    if (raw !== null) {",
+          "    const raw = null as string | null;\n    if (raw !== null) {"
+        ]
+      ]
+    },
+    "debounced-write": {
+      "undoes": "A — every change is written at once (a pending write is fix 02 L-2)",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      setStored(slot.area, slot.key, raw);",
+          "      setTimeout(() => setStored(slot.area, slot.key, raw), 300);"
+        ]
+      ]
+    },
+    "empty-box-keeps-old-copy": {
+      "undoes": "A — emptying the code box removes the stored script",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      removeStored(slot.area, slot.key);\n      if (draft.code === ''",
+          "      if (draft.code === ''"
+        ]
+      ]
+    },
+    "language-dropped-before-code": {
+      "undoes": "A — a language picked before the code goes in is kept",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      else unstored.set(id, draft);",
+          "      else unstored.delete(id);"
+        ]
+      ]
+    },
+    "no-size-cap": {
+      "undoes": "A — a script over MAX_SCRIPT_CHARS is not stored",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      if (tooLongToStore(draft)) throw new RangeError('too large to store');\n",
+          ""
+        ]
+      ]
+    },
+    "older-copy-kept-when-unstorable": {
+      "undoes": "A — a draft storage cannot take removes the older stored copy",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    unstored.set(id, draft);\n    try {\n      removeStored(slot.area, slot.key);\n    } catch {",
+          "    unstored.set(id, draft);\n    try {\n      void 0;\n    } catch {"
+        ]
+      ]
+    },
+    "no-memory-fallback": {
+      "undoes": "A — a draft storage cannot take is kept in memory for the tab",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    // drop the stored copy so a reload cannot bring back an older script.\n    unstored.set(id, draft);\n",
+          "    // drop the stored copy so a reload cannot bring back an older script.\n"
+        ]
+      ]
+    },
+    "no-prune": {
+      "undoes": "A — only MAX_STORED_SCRIPTS posters keep a script",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      if (isNew && slot.area === 'localStorage') pruneStoredScripts();\n",
+          ""
+        ]
+      ]
+    },
+    "prune-drops-newest": {
+      "undoes": "A — the most recently changed scripts are the ones kept",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          ".sort((a, b) => b.at - a.at)",
+          ".sort((a, b) => a.at - b.at)"
+        ]
+      ]
+    },
+    "check-not-restored": {
+      "undoes": "A — the last check comes back, so its table does",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "  return { code: entry.code, lang, checked };",
+          "  return { code: entry.code, lang, checked: checked && null };"
+        ]
+      ]
+    },
+    "stored-version-not-checked": {
+      "undoes": "A — a stored entry from another version is not read as a draft",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "  if (entry?.v !== 1 || typeof entry.code !== 'string') return null;",
+          "  if (typeof entry?.code !== 'string') return null;"
+        ]
+      ]
+    },
+    "stored-language-not-checked": {
+      "undoes": "A — a stored entry with an unknown language is not read as a draft",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "  const lang = LANGUAGES.find((l) => l === entry.lang);\n  if (!lang) return null;",
+          "  const lang = (entry.lang as ScriptLanguage) ?? 'auto';"
+        ]
+      ]
+    },
+    "stored-read-error-uncaught": {
+      "undoes": "A — unreadable storage, or stored text that is not JSON, reads as no entry",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "  } catch {\n    // Storage unreadable, or its text is not JSON: only the memory copy is left.\n  }\n  return unstored",
+          "  } finally {\n    // mutant: no catch\n  }\n  return unstored"
+        ]
+      ]
+    },
+    "stored-check-not-validated": {
+      "undoes": "A — a stored check with sizes that are not sizes is dropped, the script kept",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    isInches(c.widthIn) &&\n    isInches(c.heightIn) &&\n",
+          "    true &&\n"
+        ]
+      ]
+    },
+    "checked-code-not-stored": {
+      "undoes": "A — a check of code edited since is stored with the code it ran on",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      ...(checked.code === draft.code ? {} : { code: checked.code }),\n",
+          ""
+        ]
+      ]
+    },
+    "snapshot-not-cached": {
+      "undoes": "A — the same stored text reads back as the same draft (useSyncExternalStore)",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      if (last?.raw === raw) return last.draft;\n",
+          ""
+        ]
+      ]
+    },
+    "panel-state-local": {
+      "undoes": "A — the checker keeps its script in the draft, not its own state",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  const [draft, updateDraft] = useScriptDraft(draftSlot);",
+          "  const [draft, updateDraft] = useScriptDraft(null);"
+        ]
+      ]
+    },
+    "kept-script-parser-error-uncaught": {
+      "undoes": "A — a kept script the parser cannot read does not take the checker down",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "      return null;\n    }\n    // Keyed on the inputs' values",
+          "      throw err;\n    }\n    // Keyed on the inputs' values"
+        ]
+      ]
+    },
+    "check-rerun-on-every-keystroke": {
+      "undoes": "A — typing after a check does not run it again (the table is keyed on the inputs' values)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  }, [kept?.code, kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
+          "  }, [kept, t.defaultSizeLabel]);"
+        ]
+      ]
+    },
+    "check-not-rerun-on-new-code": {
+      "undoes": "A — a Check after an edit computes the table again (review R1-03)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  }, [kept?.code, kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
+          "  }, [kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);"
+        ]
+      ]
+    },
+    "check-not-rerun-in-other-language": {
+      "undoes": "A — a Check in the other language computes the table again (review R1-03)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  }, [kept?.code, kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
+          "  }, [kept?.code, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);"
+        ]
+      ]
+    },
+    "check-not-rerun-at-other-size": {
+      "undoes": "A — a Check at another size computes the table again (review R1-03)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  }, [kept?.code, kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);",
+          "  }, [kept?.code, kept?.lang, t.defaultSizeLabel]);"
+        ]
+      ]
+    },
+    "check-language-not-stored": {
+      "undoes": "A — the check keeps the language it ran in",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "checked: { code, lang: detectedLang, widthIn: blockWidthIn, heightIn: blockHeightIn, imageId },",
+          "checked: { code, lang: 'python', widthIn: blockWidthIn, heightIn: blockHeightIn, imageId },"
+        ]
+      ]
+    },
+    "undetected-check-keeps-old-table": {
+      "undoes": "A — a Check on text that is neither R nor Python clears the old table, as before (review R1-05)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "      updateDraft({ checked: null });\n      return;",
+          "      return;"
+        ]
+      ]
+    },
+    "memory-copy-kept-after-store": {
+      "undoes": "A — a draft storage takes again replaces its memory copy (review R1-05)",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      setStored(slot.area, slot.key, raw);\n      unstored.delete(id);",
+          "      setStored(slot.area, slot.key, raw);"
+        ]
+      ]
+    },
+    "blank-lines-dropped": {
+      "undoes": "A — blank lines typed into the empty box stay in it (review round 1, the blank-line regression)",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      if (draft.code === '' && draft.lang === 'auto' && draft.checked === null) unstored.delete(id);",
+          "      if (draft.lang === 'auto' && draft.checked === null) unstored.delete(id);"
+        ]
+      ]
+    },
+    "checker-not-given-poster-slot": {
+      "undoes": "A — the editor keeps the checker's script under the poster",
+      "edits": [
+        [
+          "src/poster/sidebar/FigureTab.tsx",
+          "          draftSlot={posterId ? posterScriptSlot(posterId) : null}",
+          "          draftSlot={null}"
+        ]
+      ]
+    },
+    "figure-tab-no-poster": {
+      "undoes": "A — the sidebar passes the poster to the Figure tab",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "            posterId={props.posterId}\n            mode={props.figureMode}",
+          "            posterId={null}\n            mode={props.figureMode}"
+        ]
+      ]
+    },
+    "panels-not-keyed-by-poster": {
+      "undoes": "B — the sidebar's panels start again for another poster",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        <div key={`${props.posterId ?? ''}:${tab}`} className=\"postr-tab-enter\">",
+          "        <div key={tab} className=\"postr-tab-enter\">"
+        ]
+      ]
+    },
+    "page-script-in-localStorage": {
+      "undoes": "C — the public page keeps its script for the tab only (sessionStorage)",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "export const PAGE_SCRIPT_SLOT: ScriptDraftSlot = { area: 'sessionStorage', key: 'postr.figure-script-page' };",
+          "export const PAGE_SCRIPT_SLOT: ScriptDraftSlot = { area: 'localStorage', key: 'postr.figure-script-page' };"
+        ]
+      ]
+    },
+    "page-script-not-kept": {
+      "undoes": "C — the public page gives its checker the tab's slot",
+      "edits": [
+        [
+          "src/pages/FigureReadability.tsx",
+          "            draftSlot={PAGE_SCRIPT_SLOT}\n",
+          ""
+        ]
+      ]
+    },
+    "page-size-not-read": {
+      "undoes": "C — the public page starts from the typed size kept for the tab",
+      "edits": [
+        [
+          "src/pages/FigureReadability.tsx",
+          "useState<PrintSize>(() => readPageSize() ?? DEFAULT_PRINT_SIZE)",
+          "useState<PrintSize>(DEFAULT_PRINT_SIZE)"
+        ]
+      ]
+    },
+    "page-size-not-written": {
+      "undoes": "C — a typed size is kept for the tab",
+      "edits": [
+        [
+          "src/pages/FigureReadability.tsx",
+          "    writePageSize(next);\n",
+          ""
+        ]
+      ]
+    },
+    "page-size-in-localStorage": {
+      "undoes": "C — the typed size is kept for the tab only (sessionStorage)",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    const raw = sessionStorage.getItem(PAGE_SIZE_KEY);",
+          "    const raw = localStorage.getItem(PAGE_SIZE_KEY);"
+        ],
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    sessionStorage.setItem(PAGE_SIZE_KEY,",
+          "    localStorage.setItem(PAGE_SIZE_KEY,"
+        ]
+      ]
+    },
+    "page-size-not-validated": {
+      "undoes": "C — a kept page size outside the fields' range is ignored (review R1-05)",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "typeof n === 'number' && n >= PRINT_SIZE_MIN_IN && n <= PRINT_SIZE_MAX_IN;",
+          "typeof n === 'number';"
+        ]
+      ]
+    },
+    "figure-mode-ignores-script": {
+      "undoes": "D — the Figure tab stays on Check once the poster has a script",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "figureModeChoice ?? (selectedBlock?.type === 'image' || posterHasScript ? 'check' : 'make');",
+          "figureModeChoice ?? (selectedBlock?.type === 'image' ? 'check' : 'make');"
+        ]
+      ]
+    },
+    "explicit-pick-loses-to-script": {
+      "undoes": "D — an explicit pick of Make wins over a kept script (review R1-01)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "figureModeChoice ?? (selectedBlock?.type === 'image' || posterHasScript ? 'check' : 'make');",
+          "(posterHasScript ? 'check' : null) ?? figureModeChoice ?? (selectedBlock?.type === 'image' ? 'check' : 'make');"
+        ]
+      ]
+    },
+    "blank-box-counts-as-script": {
+      "undoes": "D — a box holding only blank lines does not keep Check up (review R1-05)",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "readScriptDraft(posterScriptSlot(posterId)).code.trim() !== ''",
+          "readScriptDraft(posterScriptSlot(posterId)).code !== ''"
+        ]
+      ]
+    },
+    "poster-deletion-keeps-script": {
+      "undoes": "E — deleting a poster removes its stored script",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "  forgetPosterScript(id);\n",
+          ""
+        ]
+      ]
+    },
+    "script-forgotten-before-delete-succeeds": {
+      "undoes": "E — a delete that fails keeps the poster's script (review R1-05)",
+      "edits": [
+        [
+          "src/data/posters.ts",
+          "export async function deletePoster(id: string): Promise<void> {\n",
+          "export async function deletePoster(id: string): Promise<void> {\n  forgetPosterScript(id);\n"
+        ],
+        [
+          "src/data/posters.ts",
+          "  }\n  forgetPosterScript(id);\n}",
+          "  }\n}"
+        ]
+      ]
+    },
+    "forget-leaves-storage": {
+      "undoes": "E — forgetting a poster's script removes it from storage",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    localStorage.removeItem(slot.key);",
+          ""
+        ]
+      ]
+    },
+    "account-deletion-keeps-scripts": {
+      "undoes": "E — account deletion removes every stored script",
+      "edits": [
+        [
+          "src/profile/accountDeletion.ts",
+          "  clearStoredFigureScripts();\n",
+          ""
+        ]
+      ]
+    },
+    "clear-leaves-storage": {
+      "undoes": "E — clearing the scripts removes them from storage",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    keys.forEach((key) => localStorage.removeItem(key));\n",
+          ""
+        ]
+      ]
+    },
+    "session-drafts-not-notified": {
+      "undoes": "F — a write after the panel unmounted reaches the panel mounted since",
+      "edits": [
+        [
+          "src/hooks/useSessionDraft.ts",
+          "      listeners.get(key)?.forEach((listener) => listener());\n",
+          ""
+        ]
+      ]
+    },
+    "session-draft-key-ignored": {
+      "undoes": "F — a scope gives a session draft its key",
+      "edits": [
+        [
+          "src/hooks/useSessionDraft.ts",
+          "  return scope ? `${scope}:${name}` : null;",
+          "  return null;"
+        ]
+      ]
+    },
+    "session-update-from-initial": {
+      "undoes": "F — an update built on the last value reads the session draft, not the initial value (review R1-02)",
+      "edits": [
+        [
+          "src/hooks/useSessionDraft.ts",
+          "const prev = drafts.has(key) ? (drafts.get(key) as T) : local;",
+          "const prev = local;"
+        ]
+      ]
+    },
+    "authors-not-given-scope": {
+      "undoes": "F — the Authors tab keeps its drafts under the poster",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "          <AuthorsTab\n            draftScope={props.posterId}",
+          "          <AuthorsTab\n            draftScope={null}"
+        ]
+      ]
+    },
+    "authors-paste-local": {
+      "undoes": "F — the Authors paste box is a session draft",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "  const [pasteText, setPasteText] = useSessionDraft(draftKey(props.draftScope, 'authors-paste'), '');",
+          "  const [pasteText, setPasteText] = useState('');"
+        ]
+      ]
+    },
+    "authors-feedback-local": {
+      "undoes": "F — the Authors paste feedback is a session draft",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "  const [pasteFeedback, setPasteFeedback] = useSessionDraft<string | null>(\n    draftKey(props.draftScope, 'authors-paste-feedback'),\n    null,\n  );",
+          "  const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);"
+        ]
+      ]
+    },
+    "authors-parsing-local": {
+      "undoes": "F — an author parse in flight is a session draft (no double send)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "  const [parsing, setParsing] = useSessionDraft(draftKey(props.draftScope, 'authors-parsing'), false);",
+          "  const [parsing, setParsing] = useState(false);"
+        ]
+      ]
+    },
+    "refs-not-given-scope": {
+      "undoes": "F — the References tab keeps its drafts under the poster",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "          <RefsTab\n            draftScope={props.posterId}",
+          "          <RefsTab\n            draftScope={null}"
+        ]
+      ]
+    },
+    "refs-manual-local": {
+      "undoes": "F — the manual-entry fields are a session draft",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "  const [manual, setManual] = useSessionDraft(draftKey(props.draftScope, 'refs-manual'), {",
+          "  const [manual, setManual] = useState({"
+        ]
+      ]
+    },
+    "refs-paste-local": {
+      "undoes": "F — the References paste box is a session draft",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "  const [pasteText, setPasteText] = useSessionDraft(draftKey(props.draftScope, 'refs-paste'), '');",
+          "  const [pasteText, setPasteText] = useState('');"
+        ]
+      ]
+    },
+    "refs-feedback-local": {
+      "undoes": "F — the References paste feedback is a session draft",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "  const [pasteFeedback, setPasteFeedback] = useSessionDraft<string | null>(\n    draftKey(props.draftScope, 'refs-paste-feedback'),\n    null,\n  );",
+          "  const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);"
+        ]
+      ]
+    },
+    "refs-parsing-local": {
+      "undoes": "F — a reference parse in flight is a session draft (no double send)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "  const [parsing, setParsing] = useSessionDraft(draftKey(props.draftScope, 'refs-parsing'), false);",
+          "  const [parsing, setParsing] = useState(false);"
+        ]
+      ]
+    },
+    "poster-name-not-given-scope": {
+      "undoes": "F — the poster-name draft is a session draft",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "          <LayoutTab\n            draftScope={props.posterId}",
+          "          <LayoutTab\n            draftScope={null}"
+        ]
+      ]
+    },
+    "poster-name-ignores-new-name": {
+      "undoes": "F — a name typed over the poster's name gives way when that name changes some other way",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "    titleDraft && titleDraft.over === props.posterTitle ? titleDraft.text : props.posterTitle;",
+          "    titleDraft ? titleDraft.text : props.posterTitle;"
+        ]
+      ]
+    },
+    "poster-name-draft-not-cleared-on-save": {
+      "undoes": "F — saving the name ends the draft",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "    setTitleDraft(null);\n    props.onChangePosterTitle(localTitle);",
+          "    props.onChangePosterTitle(localTitle);"
+        ]
+      ]
+    },
+    "version-name-not-given-scope": {
+      "undoes": "F — the version name is a session draft",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "            posterId={props.posterId}\n            draftScope={props.posterId}",
+          "            posterId={props.posterId}\n            draftScope={null}"
+        ]
+      ]
+    },
+    "ladder-not-given-scope": {
+      "undoes": "F — the Make ladder keeps its progress under the poster",
+      "edits": [
+        [
+          "src/poster/sidebar/FigureTab.tsx",
+          "            draftScope={posterId}",
+          "            draftScope={null}"
+        ]
+      ]
+    },
+    "make-source-local": {
+      "undoes": "F — the ladder's source is a session draft",
+      "edits": [
+        [
+          "src/charts/ladder/ChartChooser.tsx",
+          "draftKey(draftScope, 'make-source')",
+          "null"
+        ]
+      ]
+    },
+    "make-answers-local": {
+      "undoes": "F — the ladder's answers is a session draft",
+      "edits": [
+        [
+          "src/charts/ladder/ChartChooser.tsx",
+          "draftKey(draftScope, 'make-answers')",
+          "null"
+        ]
+      ]
+    },
+    "make-summary-local": {
+      "undoes": "F — the ladder's summary is a session draft",
+      "edits": [
+        [
+          "src/charts/ladder/ChartChooser.tsx",
+          "draftKey(draftScope, 'make-summary')",
+          "null"
+        ]
+      ]
+    },
+    "make-groups-local": {
+      "undoes": "F — the ladder's groups is a session draft",
+      "edits": [
+        [
+          "src/charts/ladder/ChartChooser.tsx",
+          "draftKey(draftScope, 'make-groups')",
+          "null"
+        ]
+      ]
+    },
+    "make-listing-variables-local": {
+      "undoes": "F — the ladder's listing-variables is a session draft",
+      "edits": [
+        [
+          "src/charts/ladder/ChartChooser.tsx",
+          "draftKey(draftScope, 'make-listing-variables')",
+          "null"
+        ]
+      ]
+    },
+    "make-table-local": {
+      "undoes": "F — the table being typed is a session draft",
+      "edits": [
+        [
+          "src/charts/ladder/DataStep.tsx",
+          "draftKey(draftScope, 'make-table')",
+          "null"
+        ]
+      ]
+    },
+    "make-sheets-local": {
+      "undoes": "F — the sheet choice of an uploaded workbook is a session draft",
+      "edits": [
+        [
+          "src/charts/ladder/DataStep.tsx",
+          "draftKey(draftScope, 'make-sheets')",
+          "null"
+        ]
+      ]
+    },
+    "table-draft-not-cleared-on-use": {
+      "undoes": "F — a used table leaves step 1 empty for a reopen, as before",
+      "edits": [
+        [
+          "src/charts/ladder/DataStep.tsx",
+          "      setDraft('');\n      setSheets(null);\n",
+          "      setSheets(null);\n"
+        ]
+      ]
+    },
+    "sheets-not-cleared-on-use": {
+      "undoes": "F — a used sheet does not ask again on a reopen, as before",
+      "edits": [
+        [
+          "src/charts/ladder/DataStep.tsx",
+          "      setDraft('');\n      setSheets(null);\n",
+          "      setDraft('');\n"
+        ]
+      ]
+    },
+    "make-variables-local": {
+      "undoes": "F — the variables being listed are a session draft",
+      "edits": [
+        [
+          "src/charts/ladder/VariablesStep.tsx",
+          "draftKey(draftScope, 'make-variables')",
+          "null"
+        ]
+      ]
+    },
+    "variables-not-reset-on-leave": {
+      "undoes": "F — leaving the variables form starts the next visit blank, as before",
+      "edits": [
+        [
+          "src/charts/ladder/VariablesStep.tsx",
+          "    setVariables(blankRows());\n",
+          ""
+        ]
+      ]
+    },
+    "variables-not-reset-on-declare": {
+      "undoes": "F — declaring the variables starts the next visit to the form blank, as before (review R1-05)",
+      "edits": [
+        [
+          "src/charts/ladder/VariablesStep.tsx",
+          "onClick={() => leave(() => onDeclare(variables, describeVariables(variables)))}",
+          "onClick={() => onDeclare(variables, describeVariables(variables))}"
+        ]
+      ]
+    },
+    "version-name-local": {
+      "undoes": "F — the version name is a session draft",
+      "edits": [
+        [
+          "src/poster/VersionPanel.tsx",
+          "  const [name, setName] = useSessionDraft(draftKey(draftScope, 'version-name'), '');",
+          "  const [name, setName] = useState('');"
+        ]
+      ]
+    },
+    "cap-counts-whole-entry": {
+      "undoes": "A (R2-02) — each copy of the script is capped on its own; capping the whole entry unstored a stored script at the first keystroke after its Check",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      if (tooLongToStore(draft)) throw new RangeError('too large to store');\n      const raw = serialize(draft);\n",
+          "      const raw = serialize(draft);\n      if (raw.length > MAX_SCRIPT_CHARS) throw new RangeError('too large to store');\n"
+        ]
+      ]
+    },
+    "checked-copy-uncapped": {
+      "undoes": "A (R2-02) — the version last checked is capped too, so no entry holds a copy over the cap",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    (checked !== null && checked.code !== code && storedLength(checked.code) > MAX_SCRIPT_CHARS)",
+          "    false"
+        ]
+      ]
+    },
+    "check-figure-not-recorded": {
+      "undoes": "A (R2-01) — a Check records the figure it was made against (the image block, or the preview)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "checked: { code, lang: detectedLang, widthIn: blockWidthIn, heightIn: blockHeightIn, imageId },",
+          "checked: { code, lang: detectedLang, widthIn: blockWidthIn, heightIn: blockHeightIn, imageId: null },"
+        ]
+      ]
+    },
+    "check-figure-not-stored": {
+      "undoes": "A (R2-01) — the stored entry keeps the figure of the check",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "      imageId: checked.imageId,\n",
+          ""
+        ]
+      ]
+    },
+    "stored-figure-not-validated": {
+      "undoes": "A (R2-01) — a stored check whose figure is neither null nor a block id is not one",
+      "edits": [
+        [
+          "src/poster/figureScriptDraft.ts",
+          "    (c.imageId === null || typeof c.imageId === 'string') &&\n",
+          ""
+        ]
+      ]
+    },
+    "other-figure-result-shown": {
+      "undoes": "A (R2-01) — the editor does not show a result checked against another figure",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "    otherFigure ||\n    (layout === 'page' &&",
+          "    (layout === 'page' &&"
+        ]
+      ]
+    },
+    "figure-ignores-which-image": {
+      "undoes": "A (R2-01) — another image block is another figure",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "const otherFigure = layout === 'panel' && kept !== null && kept.imageId !== imageId;",
+          "const otherFigure = layout === 'panel' && kept !== null && (kept.imageId === null) !== (imageId === null);"
+        ]
+      ]
+    },
+    "no-note-for-other-figure": {
+      "undoes": "A (R2-01) — a result hidden for another figure says where it is",
+      "edits": [
+        [
+          "src/poster/ReadabilitySizingNote.tsx",
+          "  if (otherFigure) {\n    return kept.imageId !== null",
+          "  if (otherFigure) {\n    return null;\n    return kept.imageId !== null"
+        ]
+      ]
+    },
+    "no-note-for-other-size": {
+      "undoes": "A (R2-01, R1-08) — a result kept at another size of the same figure says the size it is for",
+      "edits": [
+        [
+          "src/poster/ReadabilitySizingNote.tsx",
+          "  return checkedAt === inchesLabel(widthIn, heightIn)\n    ? null\n    : `This result is for ${checkedAt}, not the size above. Click Check to update it.`;",
+          "  return null;"
+        ]
+      ]
+    },
+    "note-compares-exact-sizes": {
+      "undoes": "A (R2-01) — sizes are compared as the pill shows them, so a hair's difference raises no note",
+      "edits": [
+        [
+          "src/poster/ReadabilitySizingNote.tsx",
+          "  return checkedAt === inchesLabel(widthIn, heightIn)\n    ? null",
+          "  return kept.widthIn === widthIn && kept.heightIn === heightIn\n    ? null"
+        ]
+      ]
+    },
+    "note-not-announced": {
+      "undoes": "A (R2-01) — the note is a status line",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "        <div role=\"status\" style={{ fontSize: 13, color: '#f9e2af', lineHeight: 1.5 }}>",
+          "        <div style={{ fontSize: 13, color: '#f9e2af', lineHeight: 1.5 }}>"
+        ]
+      ]
+    }
+  }
+}

@@ -153,6 +153,32 @@ scope becomes a plan item or a question for the owner.
   the likeliest path, and ⌘Z restores the block (6 of 6) (MEASURED by the
   ranking evidence on main, 2026-09-30). The cause is one key guard, copied at
   three places in `PosterEditor.tsx`, that covers text fields but not SELECT.
+- From fix 07's confirmer (2026-10-06), for items 6 and 12 to settle, not
+  re-measured: in Playwright's Chromium and WebKit, ⌘Z with focus outside the
+  figure checker's code box undid the pasted script (325 → 0 characters;
+  Control+Z and Firefox: no change; real Chrome and Safari UNVERIFIED); and
+  after one arrow nudge of an image on the Figure tab a keyboard undo did not
+  move it back (x 778 → 785 → 785, 4 of 4, the "Undo" toast showing).
+- Fix 07's image scan results (Figure › Check with an image block) are still
+  the panel's state: lost on a tab change (2 rows → 0, MEASURED on the fix),
+  and a second image shows the first one's rows (the FR8 family, items 15/17).
+  A rerun costs an API call. Record 07 section 10.
+- On main, from fix 07's round 2 reviewer (2026-10-06, MEASURED by it in
+  Chromium, Firefox and WebKit, and on main 735636e in Chromium; the
+  corrector read the code, INSPECTED): the editor's plot-checker code box
+  traps the keyboard. With focus in it, Tab and Shift+Tab each insert two
+  spaces and Escape does nothing, so "▶ Check", which follows the box, cannot
+  be reached by keyboard after a paste (WCAG 2.1.2). The panel layout sets
+  `tabIndents: true` (`poster/readabilityLayout.ts:52`) and the box's keydown
+  handler cancels every Tab, Shift+Tab included (`ReadabilityPanel.tsx:126`).
+  The public page does not intercept Tab. For an accessibility item: for
+  example Escape leaves the box, or Tab indents only once the user turns it
+  on.
+- On main, found by fix 07's corrector (2026-10-06, INSPECTED, not run): a
+  failed delete on the dashboard shows the raw error text ("Failed to delete
+  poster: " and the database's message, `pages/Home.tsx:126-127` showing
+  `data/posters.ts:464`), against the rule that user-facing errors stay
+  generic.
 - The "five steps in and five out" zoom test passes on its own when Zoom in
   does nothing; the 10× ceiling test in the same file catches that
   (MEASURED by the step 9 reviewer of 60ca7b3, mutant F6; it predates that
@@ -313,3 +339,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 23 | `fix/new-poster-owner-only` | done — `docs/fixes/23-new-poster-owner-only.md`; sharing and comments hidden (`SHARING_ENABLED`) |
 | 4 | `editor/rulers-match-sheet` (local, parked) | hidden — the owner hid the rulers on 2026-09-30 (`RULERS_ENABLED`, `config/features.ts`); the fix is parked unmerged with its record, instruments and open review findings |
 | 13 | `checker/python-reads-own-fix` | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md` (the fix raises the text it saves, and its re-check reads it); part 2, the parser's own misreads, not started |
+| 7 | `fix/07-figure-script-kept` | done (three review rounds); review round 1 answered (a blank-line regression fixed, tests added, legal copy corrected); round 2 answered (a result checked against an image block is no longer shown under the preview's size, and a kept result says the size it is for; a long script edited after its Check stays stored); round 3 answered (a note no longer promises an image check comes back) — `docs/fixes/07-figure-script-kept.md`; the owner's decisions of 2026-10-06: the script kept per poster in this browser and re-checked on return, sessionStorage on the public page, Check stays up once a script is in, and the same cause fixed in the Authors, References, Make-a-figure, poster-name and version-name drafts (memory only) |

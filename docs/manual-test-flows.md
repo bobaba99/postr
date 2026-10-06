@@ -427,7 +427,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
   The RPC still exists but `EXECUTE` is revoked from `anon`/`authenticated` (migration `20260911000000_account_delete_hardening.sql`), so the client cannot bypass the wind-down. The old `supabase/functions/delete-account` edge function is deleted (it was unreferenced).
 - [ ] `/profile` → red **"Danger Zone"** → "Delete account" DangerAction → ConfirmModal with typed confirmation **"I confirm the deletion of my account"** (button disabled until exact, case-insensitive, trimmed match).
 - [ ] With an **active term** (Account F) the modal must state that deleting **also cancels the CA$18.99 term** (client-side line keyed on `usePlan().hasActiveTerm`).
-- [ ] Confirm → toast **"Deleting account…"** → `POST /account/delete` → 200 `{ ok, cancelledSubscriptions, deletedCustomer }` → localStorage cleared → global sign-out → `/auth`. **No client-side poster deletion first** (`profile/accountDeletion.ts`, 2026-09-11 review fix): the server removes storage and the auth cascade removes the posters, so on ANY API failure the copy "Nothing was removed" is literally true — verify by making the API fail (invalid Stripe key) and confirming every poster is still on the dashboard afterwards.
+- [ ] Confirm → toast **"Deleting account…"** → `POST /account/delete` → 200 `{ ok, cancelledSubscriptions, deletedCustomer }` → localStorage cleared (the 6 `LOCAL_KEYS` and, since plan item 7, every `postr.figure-script.<poster id>` plot script; devtools › Application › Local Storage shows none left) → global sign-out → `/auth`. **No client-side poster deletion first** (`profile/accountDeletion.ts`, 2026-09-11 review fix): the server removes storage and the auth cascade removes the posters, so on ANY API failure the copy "Nothing was removed" is literally true — verify by making the API fail (invalid Stripe key) and confirming every poster is still on the dashboard afterwards.
 - **Edges (every failure leaves the account intact — retry is safe, 3/hour rate limit):**
   - [ ] Wrong/partial phrase → button stays greyed, no error string.
   - [ ] Stripe refuses a cancel → **502 `cancel_failed`**; customer NOT deleted, storage untouched, user still signed in, generic error shown ("Something went wrong…"), no raw Stripe text.
@@ -465,7 +465,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 - **Set up:** Any signed-in user with ≥1 poster (button disabled at 0).
 - [ ] Danger Zone → "Delete all posters". Description **"Permanently delete all {n} poster(s). This cannot be undone."** ConfirmModal **has NO typed-confirmation** — one click on "Delete all" after opening.
 - [ ] Confirm → toast "Deleting posters…" → "Deleted {n} poster(s)." **Stays on /profile, still signed in.**
-- **✓ verify:** poster rows GONE; `auth.users` UNTOUCHED; still signed in; posterCount → 0; button greys out. Do NOT conflate with account deletion — this keeps account/session/billing/localStorage.
+- **✓ verify:** poster rows GONE; `auth.users` UNTOUCHED; still signed in; posterCount → 0; button greys out. Do NOT conflate with account deletion — this keeps account/session/billing/localStorage, except each deleted poster's kept plot script (`postr.figure-script.<poster id>`, removed by `deletePoster` since plan item 7; the dashboard's single-poster Delete does the same).
 
 ---
 
@@ -524,6 +524,27 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 - [ ] "🏪 Email to Staples kiosk" → opens StaplesPrintModal (8-digit release-code flow; reuses the free PDF print window → inherits the popup-blocked alert).
 - **✓ verify:** `.postr` round-trips (re-import via "+ New poster ▾" restores poster + images); **neither shows any paywall** (free regardless of plan); guest can back up + re-import.
 - **Note:** StaplesPrintModal internal copy (email address, exact wording) was **not read line-by-line** in the trace — treat as UNVERIFIED beyond the sidebar helper; the Staples PDF is the same always-watermarked editor PDF.
+
+---
+
+# PART 6 — DRAFTS THAT OUTLIVE THE SIDEBAR TAB (plan item 7)
+
+## 26. The plot checker keeps the script; the paste boxes keep their text
+
+Record `docs/fixes/07-figure-script-kept.md`; browser instrument `apps/web/scripts/figure-script-check.mjs` (its claims are the checks below).
+
+- **Set up:** a guest at `/p/new`. FIGURE → "Check a figure" → drag the gray preview's corner → "Python" → paste a matplotlib script → ▶ Check (the table and "Copy edited code" show).
+- [ ] Every other rail tab and back to FIGURE: the script, Python and the same table (L1).
+- [ ] Click a title, heading, text, table, authors or references block (the sidebar moves to that block's tab), then FIGURE: the same (L2). An image block keeps the Figure tab up, as before.
+- [ ] Reload: the script, Python and the table (re-run at the size it was checked at; the gray preview itself is back at 10 × 7, by design, see record 07 §10, and a yellow line above the table says "This result is for 6.5" × 4.5", not the size above. Click Check to update it.") (L3, K5). Drag the preview after a Check: the table stays and the same line names the size it is for (K5). "Back to My Posters" → the poster's card (L7), and another poster by URL then back (L4): the same. FIGURE opens on Check when the poster has a script.
+- [ ] Duplicate → "Open copy": the copy's checker is empty; Back to the original shows its script (L6).
+- [ ] Select an image (Check comes up without a click), paste a script, click empty canvas: it stays on Check with the script on screen (K3). Do the same but press ▶ Check on the image first: after the click on empty canvas the table is hidden and the line reads "The last result is for an image block at 14.9" × 14.8". Click Check to check the size above."; reload: the same; select the image: its table is back once the poster has been saved (K4; on a poster never edited, the blocks get new ids on reload, so the table does not come back). A check made on the preview is hidden the same way while an image is selected, and on a second image a check made on the first is hidden. With no script (or only blank lines), the same click goes back to Make, as before. With a kept script, a click on "Make a figure", or Insert › Chart, shows Make: an explicit pick wins.
+- [ ] Edit the script and ▶ Check again: the table and "Copy edited code" follow the edit. Pick the other language and ▶ Check: that language's table.
+- [ ] Empty the code box and reload: empty (nothing stored). devtools › Local Storage: one `postr.figure-script.<poster id>` per poster with a script; at most 10. A very long script (over 50,000 characters as stored) is not stored: it survives tab changes but not a reload. A long one that fits (about 500 lines), checked, then edited by one character: still stored, and a reload brings back the edit and the table (L8).
+- [ ] Dashboard › a poster's Delete › Delete: its `postr.figure-script.<poster id>` is gone, the others stay; a delete that fails (offline) brings the card back and keeps the script.
+- [ ] Authors "Paste author list", References paste box and Manual Entry, Make a figure's "Paste your table" and its answered steps, Layout's poster name (unsaved), Versions' name: type, click a text block, come back — the text is still there (S1–S7). Reload: they start empty (memory only, nothing in browser storage). Click "Parse with AI" and click a block before it answers: on return it still says "Parsing…" and cannot be clicked again; the authors are added once.
+- [ ] `/tools/figure-readability`: type 6 × 4.5, R, a script, Check → reload: all of it and the table (L5). Open the page in a NEW tab: empty, 10 × 7 (P1, the shared-computer rule). Close the tab: sessionStorage `postr.figure-script-page` / `postr.figure-size-page` gone. Not measured: a browser's "reopen closed tab" (⌘⇧T) or session restore may bring that sessionStorage back (record 07 §10).
+- **Not kept (by design or Later):** the image "Scan image" results (lost on a tab change, and a second image still shows the first one's rows: the FR8 family); the figures chosen in Make's last step; the editor's gray preview size across a reload.
 
 ---
 
