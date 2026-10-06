@@ -1,0 +1,5 @@
+library(lattice)
+library(gridExtra)
+p1 <- xyplot(mpg ~ wt, data = mtcars)
+p2 <- bwplot(mpg ~ factor(cyl), data = mtcars)
+grid.arrange(p1, p2, ncol = 2)
