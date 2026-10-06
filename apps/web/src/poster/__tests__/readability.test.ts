@@ -6,6 +6,8 @@ import {
   parsePythonCode,
   computeReadability,
   detectLanguage,
+  describePlotCode,
+  languageSignals,
   type FigureParams,
   type ReadabilityResult,
 } from '../readability';
@@ -598,15 +600,14 @@ describe('language detection patterns', () => {
     expect(detectLanguage(code)).toBe('r');
   });
 
-  it('detects base R plot with library call as R', () => {
+  it('detects base R plot with main= and axis labels as R', () => {
+    // main=, xlab= and ylab= are base graphics arguments that matplotlib
+    // never takes (fix 15). This test used to pin null: before fix 15 a
+    // null left Check doing nothing, now the base R plot is named as
+    // unsupported instead of scored as ggplot2.
     const code = `plot(x, y, main="Title", xlab="X", ylab="Y")`;
-    // base R plot alone has no strong R-specific tokens beyond plot()
-    // but parseRCode should still handle it — detection may return null
-    // since "plot" is ambiguous. Let's verify what the scorer returns.
-    const result = detectLanguage(code);
-    // "plot" alone doesn't trigger any R or Python patterns strongly
-    // No ggplot, no plt., no import — should be null
-    expect(result).toBeNull();
+    expect(detectLanguage(code)).toBe('r');
+    expect(describePlotCode(code).system).toBe('base');
   });
 
   it('detects cowplot multi-panel as R', () => {
@@ -1397,12 +1398,145 @@ describe('in-panel text: found when it is there, not invented when it is not', (
   });
 });
 
+describe('language detection reads the live code, not the comments', () => {
+  // Held back from 9ea9f38 by its revert (4e9c175) until the panel could
+  // say it could not tell R from Python; re-landed with that state by fix
+  // 15. Detection now reads maskCodeForRewrite's output: comments AND
+  // string contents blanked.
+  it('an R script carrying a commented-out matplotlib draft is still R', () => {
+    // Leaving the abandoned port in comments is normal while moving a
+    // figure between languages. Scored on raw text the Python signals win,
+    // the whole script goes to parsePythonCode, and a ggplot figure gets
+    // measured against matplotlib defaults and offered a plt.rcParams fix.
+    const code = [
+      'library(ggplot2)',
+      '# python draft I abandoned:',
+      '# import matplotlib.pyplot as plt',
+      '# fig, ax = plt.subplots(1, 2, figsize=(12, 8))',
+      '# ax.set_xlabel("x"); plt.savefig("f.png")',
+      'p <- ggplot(mtcars, aes(wt, mpg)) + geom_point() + theme_minimal(base_size = 11)',
+      'ggsave("fig.png", p, width = 7, height = 5)',
+    ].join('\n');
+    expect(detectLanguage(code)).toBe('r');
+  });
+
+  it('a python script carrying a commented-out ggplot draft is still python', () => {
+    const code = [
+      'import matplotlib.pyplot as plt',
+      '# the R version this replaced:',
+      '# library(ggplot2)',
+      '# p <- ggplot(d, aes(x, y)) + geom_point() + theme_minimal()',
+      '# ggsave("f.png", p, width = 7, height = 5)',
+      "plt.rcParams['font.size'] = 10",
+      'fig, ax = plt.subplots(figsize=(7, 5))',
+    ].join('\n');
+    expect(detectLanguage(code)).toBe('python');
+  });
+
+  it('a # inside a string does not start a comment', () => {
+    // 9ea9f38 had "signals inside string literals still count" here; fix 15
+    // blanks string contents too, so what this pins now is that the
+    // masking keeps the code after a '#' inside a string. A hex colour is
+    // the everyday case, and the deciding signal sits after it: a stripper
+    // that cut the line at the '#' would find nothing (round 1: the first
+    // version of this test put every signal before the '#', and passed
+    // against a naive /#.*$/ stripper).
+    expect(detectLanguage('plot(dose, response, col = "#1b9e77", main = "Dose response")')).toBe('r');
+    expect(detectLanguage('line, = plot(t, v, color="#d62728"); fig.savefig("f.png")')).toBe('python');
+  });
+
+  it('a script that is nothing but comments detects nothing', () => {
+    expect(detectLanguage('# import matplotlib.pyplot as plt\n# plt.plot()')).toBeNull();
+  });
+
+  it('words inside strings do not count', () => {
+    // The confirmer of item 15: "import" in a title read a base R plot as
+    // Python. The masked text keeps the quotes and drops the words.
+    expect(detectLanguage('plot(dose, response, main = "Effect of import duties")')).toBe('r');
+    expect(detectLanguage('ax.annotate("onset", xy=(2, 0.4), arrowprops=dict(arrowstyle="<-"))')).toBe('python');
+  });
+});
+
+describe('describePlotCode: the language and the plotting system (fix 15)', () => {
+  // Supporting tests: the falsifiers enter at the page
+  // (FigureReadability.test.tsx). These pin the function's contract.
+  it.each([
+    ['ggplot2', 'ggplot(df, aes(x, y)) + geom_point()', 'r', 'ggplot2', false],
+    ['matplotlib', 'fig, ax = plt.subplots()\nax.plot(x, y)', 'python', 'matplotlib', false],
+    ['seaborn is matplotlib', 'sns.lineplot(data=df, x="t", y="v")', 'python', 'matplotlib', false],
+    ['base graphics', 'barplot(counts, names.arg = groups)', 'r', 'base', false],
+    ['lattice', 'xyplot(y ~ x | g, data = df)', 'r', 'lattice', false],
+    ['plotly in R', 'plot_ly(df, x = ~a, y = ~b)', 'r', 'plotly', false],
+    ['plotly in Python', 'fig = go.Figure(go.Bar(x=g, y=m))\nfig.update_layout(title="T")', 'python', 'plotly', false],
+    ['Altair', 'alt.Chart(df).mark_line().encode(x="a", y="b")', 'python', 'altair', false],
+    ['plotnine', 'from plotnine import ggplot, aes, geom_point\np = ggplot(df, aes("a", "b")) + geom_point()', 'python', 'plotnine', false],
+    ['R with no plotting call', 'x <- 1', 'r', 'ggplot2', true],
+    ['Python with no plotting call', 'import numpy as np', 'python', 'matplotlib', true],
+    ['nothing to go on', 'plot(x, y)', null, null, false],
+  ])('%s', (_name, code, language, system, assumed) => {
+    expect(describePlotCode(code)).toEqual({ language, system, assumed });
+  });
+
+  it('a hand pick decides the language, and the code the system', () => {
+    expect(describePlotCode('plot(x, y)', 'r')).toEqual({ language: 'r', system: 'base', assumed: false });
+    expect(describePlotCode('plot(x, y)', 'python')).toEqual({ language: 'python', system: 'matplotlib', assumed: false });
+    // A system named by its own calls stays named whatever is picked.
+    expect(describePlotCode('library(lattice)\nbwplot(v ~ g)', 'python').system).toBe('lattice');
+    expect(describePlotCode('from plotnine import *\nggplot(df, aes("a", "b"))', 'r').system).toBe('plotnine');
+    // ggplot's grammar in Python is plotnine.
+    expect(describePlotCode('ggplot(df, aes(x, y)) + geom_point()', 'python').system).toBe('plotnine');
+    // A pick of R wins over a plotnine hint; only an import of plotnine
+    // outweighs it (round 1: R's aes() takes strings too).
+    expect(describePlotCode('(ggplot(df, aes("a", "b")) + geom_col())', 'r')).toEqual({ language: 'r', system: 'ggplot2', assumed: false });
+    // A name seaborn shares is lattice or base graphics only in R.
+    expect(describePlotCode('stripplot(x="day", y="tip", data=tips)', 'python').system).toBe('matplotlib');
+    expect(describePlotCode('stripplot(x="day", y="tip", data=tips)', 'r').system).toBe('lattice');
+    expect(describePlotCode('heatmap(corr, annot=True)', 'python').system).toBe('matplotlib');
+    expect(describePlotCode('heatmap(corr, annot=True)', 'r').system).toBe('base');
+  });
+
+  it('a plotnine hint with nothing only one language has places nothing (round 2)', () => {
+    // The hint takes the grammar's words out of R's score: Python's own
+    // signals then decide, and with none the code cannot be placed. A pick
+    // decides the language, the grammar the system.
+    const wrapped = 'print(ggplot(df, aes(x = "", y = n, fill = g)) +\n  geom_col(width = 1))';
+    expect(describePlotCode(wrapped)).toEqual({ language: null, system: null, assumed: false });
+    expect(describePlotCode(wrapped, 'r')).toEqual({ language: 'r', system: 'ggplot2', assumed: false });
+    expect(describePlotCode(wrapped, 'python')).toEqual({ language: 'python', system: 'plotnine', assumed: false });
+    expect(describePlotCode('p = (ggplot(df, aes("a", "b")) + geom_smooth(se=False))').system).toBe('plotnine');
+    // With R's own line ending, the hint does not count and the code is R.
+    expect(describePlotCode('ggplot(df, aes(x = "", y = n)) +\n  geom_col()').system).toBe('ggplot2');
+  });
+
+  it('an import of everything is Python only in Python\'s form (round 2)', () => {
+    expect(detectLanguage('from pylab import *\nplot(t, v)')).toBe('python');
+    expect(detectLanguage('import * as d3 from "d3";\nd3.select("#chart");')).toBeNull();
+  });
+
+  it('a package name is R, but names no plotting system on its own', () => {
+    expect(describePlotCode('library(tidyverse)\nhist(df$v)')).toEqual({ language: 'r', system: 'base', assumed: false });
+    expect(describePlotCode('library(ggplot2)')).toEqual({ language: 'r', system: 'ggplot2', assumed: true });
+    expect(describePlotCode('library(ggplot2)\np <- ggplot(df, aes(x, y))')).toEqual({ language: 'r', system: 'ggplot2', assumed: false });
+  });
+
+  it('detectLanguage is describePlotCode\'s language', () => {
+    for (const code of ['plot(x, y)', 'barplot(c(1, 2))', '(ggplot(df, aes("a", "b")) + geom_col())', 'import altair as alt']) {
+      expect(detectLanguage(code)).toBe(describePlotCode(code).language);
+    }
+  });
+
+  it('languageSignals names what fired and agrees with detectLanguage', () => {
+    const s = languageSignals('library(ggplot2)\np <- ggplot(df, aes(x, y))');
+    expect(s.verdict).toBe('r');
+    expect(s.r).toBeGreaterThan(s.py);
+    expect(s.fired.length).toBeGreaterThan(0);
+  });
+});
+
 describe('comment stripping respects string literals', () => {
-  // Kept from the reverted detection change: these pin stripComments
-  // itself, which is still in use. The detection-from-stripped-code tests
-  // went with the revert — scoring stripped code doubled the cases where
-  // Check does nothing (5 -> 10 of 20) because the panel has no
-  // 'could not tell R from Python' state yet. They return with that state.
+  // Kept from the reverted detection change of 9ea9f38: these pin
+  // stripComments itself, which the parsers use. The detection tests that
+  // left with the revert are back above (fix 15).
   it('a # inside a string does not truncate the line', () => {
     // The previous version of this test put every scoring token OUTSIDE
     // the quotes, so it passed even against a naive /#.*$/gm stripper —
