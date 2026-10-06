@@ -6,6 +6,13 @@
  * reviewed by qualified data-protection counsel — several placeholders
  * below (legal entity, governing law, DPO contact) need to be filled
  * with real values from the business side, not invented here.
+ *
+ * The data flows in Sections 2, 3, 4, 6, 8 and 9 were checked against
+ * the code on 2026-10-05: every third party the browser or the API
+ * sends data to, what Storage keeps after a poster or account is
+ * deleted, and every use of the language model (apps/api/src/import.ts).
+ * Adding a third party, a stored field or a new model call means
+ * updating those sections here and in PrivacyFr.tsx in the same change.
  */
 import { Link } from 'react-router';
 import { PublicFooter } from '@/components/PublicFooter';
@@ -13,7 +20,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = 'April 10, 2026';
+const LAST_UPDATED = 'October 5, 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Privacy() {
@@ -59,46 +66,55 @@ export default function Privacy() {
 
         <SectionHeading n="2" title="What data we collect" />
         <Body>
-          We try to collect as little as possible. Here is the full list, grouped by
-          what happens when you interact with Postr:
+          Here is what we collect, grouped by what happens when you use Postr:
         </Body>
         <Table
           headers={['When', 'What', 'Required?']}
           rows={[
             [
-              'Anonymous first visit',
-              'An anonymous account identifier, IP address (for abuse prevention), and browser user-agent.',
-              'Yes — required for the app to work.',
+              'Every visit',
+              'Your IP address and browser user-agent reach our hosting providers with each request, as with any website, and can appear in their logs. Vercel Web Analytics also counts the page view, as Section 8 explains.',
+              'Yes. This is how the site is delivered and counted.',
+            ],
+            [
+              'When you open the editor, start as a guest, or send feedback',
+              'An anonymous account identifier, created automatically so your work can be saved.',
+              'Yes. The editor needs an account to save your work.',
             ],
             [
               'When you sign up',
-              'Your email address and, if you sign in with Google, the basic profile returned by Google (name, email, avatar URL).',
-              'Yes, if you choose to create a permanent account.',
+              'Your email address; the password you choose, if you sign up with an email address, which our authentication provider stores only as a hash; and, if you sign in with Google, the basic profile returned by Google (name, email, avatar URL). We also record whether you agreed to product-research emails and product-update emails; both are off unless you tick them.',
+              'Yes, if you choose to create a permanent account. The email choices are optional.',
             ],
             [
               'Profile details (optional)',
-              'Display name, institution, department, ORCID ID, personal website.',
-              'No — all optional, for pre-filling poster author info.',
+              'Display name, institution, department, ORCID ID, personal website. These are kept only in your browser, on that device. Our servers never receive them.',
+              'No. All optional.',
             ],
             [
               'When you edit a poster',
-              'The poster document itself: blocks, styles, authors, institutions, references, and any images you upload.',
-              'Yes — this is the product.',
+              'The poster document itself (blocks, styles, authors, institutions, references), any images you upload, a preview image of the poster, logos you save to your logo library, and the versions of the poster you save.',
+              'Yes. This is the product.',
             ],
             [
-              'When you use the figure-readability feature',
-              'The R or Python plotting code you paste, sent to a language-model provider for analysis.',
-              'Only if you choose to use the feature.',
+              'When you import a poster, copy a design, scan a figure, or paste authors or references',
+              'The page images, figure images or pasted text you send, passed to a language-model provider (Anthropic) to read them. Section 9 explains each feature.',
+              'Only if you use these features.',
+            ],
+            [
+              'When you buy a plan',
+              'Your plan, export credits, subscription status, the date of your first paid export, and the Stripe customer and subscription identifiers linked to your account. We send Stripe your email address and account identifier, and Stripe collects your payment details on its own pages. We never see your card number.',
+              'Only if you buy a plan.',
             ],
             [
               'When you send feedback',
-              'The title and body of your message, the page you were on, and your browser user-agent.',
+              'The title and body of your message, the full address of the page you were on, and your browser user-agent. If an import or a design copy fails and you report it, the file you were using and your browser’s console log are attached unless you untick them.',
               'Only if you submit feedback.',
             ],
             [
               'Technical logs',
-              'Server and client error reports, approximate request timing, and request paths.',
-              'Yes — for debugging and abuse prevention.',
+              'Server logs of each request (the path, the result, how long it took, and your account identifier); error reports from the app (the error, where it happened, the poster identifier and the app version); and, when you import an image or a PDF without selectable text, up to 200 characters of the text read from it.',
+              'Yes. For debugging and abuse prevention.',
             ],
           ]}
         />
@@ -106,8 +122,9 @@ export default function Privacy() {
           We do <strong>not</strong> intentionally collect any special-category data
           (health, biometric, political, religious, sexual orientation, ethnic origin,
           trade-union membership, genetic data). If you type such information into a
-          poster block yourself, it is stored as the poster content you wrote — we do
-          not process it further.
+          poster block yourself, it is stored as the poster content you wrote. It goes
+          to a language-model provider only if you send that content through one of
+          the features in Section 9.
         </Body>
 
         <SectionHeading n="3" title="Why we process your data (and our legal basis)" />
@@ -122,22 +139,37 @@ export default function Privacy() {
             [
               'Debugging errors and preventing abuse',
               'Legitimate interest (Art. 6(1)(f) GDPR)',
-              'Technical logs, IP, user-agent',
+              'Technical logs, error reports, and the IP address and user-agent in our hosting providers’ logs',
             ],
             [
-              'Figure-readability analysis via third-party LLM',
-              'Contract — the feature you invoked (Art. 6(1)(b))',
-              'Plotting code you paste',
+              'Counting page views, to see which pages people use',
+              'Legitimate interest (Art. 6(1)(f))',
+              'Page addresses with poster identifiers removed, and the address of the page you came from',
+            ],
+            [
+              'Reading imported posters, copied designs, scanned figures, and pasted author or reference lists with a third-party language model',
+              'Contract, as part of the feature you invoked (Art. 6(1)(b))',
+              'The page images, figure images and text you send',
+            ],
+            [
+              'Processing payments and managing your plan',
+              'Contract (Art. 6(1)(b))',
+              'Email address, account identifier, plan and billing records',
             ],
             [
               'Responding to support and feedback messages',
               'Legitimate interest (Art. 6(1)(f))',
-              'Feedback content, contact info if you are signed in',
+              'Feedback content and anything you attach, contact info if you are signed in',
             ],
             [
-              'Inviting you to product research (interviews, surveys) — only if you opt in',
-              'Consent (Art. 6(1)(a)) — withdrawable at any time',
+              'Inviting you to product research (interviews, surveys), only if you opt in',
+              'Consent (Art. 6(1)(a)), withdrawable at any time',
               'Email address, and any research responses you choose to give',
+            ],
+            [
+              'Emailing you about new features and updates, only if you opt in',
+              'Consent (Art. 6(1)(a)), withdrawable at any time',
+              'Email address',
             ],
             [
               'Complying with legal obligations',
@@ -149,28 +181,34 @@ export default function Privacy() {
         <Body>
           We do not sell personal data, we do not run profiling or automated
           decision-making that produces legal or similarly significant effects, and we
-          do not use your poster content to train any AI model. We only email you about
-          product research if you have explicitly opted in, and you can withdraw that
-          consent at any time in your account settings — it never affects your access to
-          Postr.
+          do not use your poster content to train any AI model. We email you about
+          product research or product updates only if you opted in. You can turn
+          either off at any time on your Profile page, and doing so never affects your
+          access to Postr.
         </Body>
 
         <SectionHeading n="4" title="Who receives your data" />
         <Body>
-          We use a small set of carefully chosen service providers (“processors”) to
-          run Postr. They only process your data under our instructions and for the
-          purposes listed.
+          The services below receive personal data when you use Postr. The table says
+          what each one does and when it receives your data.
         </Body>
         <Table
           headers={['Provider', 'What it does', 'Location']}
           rows={[
-            ['Supabase', 'Database, authentication, file storage', 'European Union (project region to be confirmed)'],
-            ['Vercel', 'Web app hosting and edge delivery', 'Global (primarily United States)'],
-            ['Render', 'Backend API hosting', 'United States'],
-            ['Anthropic', 'LLM used for the figure-readability feature', 'United States'],
-            ['Google (if you use Google sign-in)', 'Sign-in identity provider', 'Global'],
+            ['Supabase', 'Database, authentication, file storage', 'United States (Oregon)'],
+            ['Vercel', 'Web app hosting and edge delivery, and page-view counting (Vercel Web Analytics)', 'Global (primarily United States)'],
+            ['Render', 'Backend API hosting', 'United States or other countries (see Section 5)'],
+            ['Anthropic', 'Language model that reads the images and text you send through the features in Section 9', 'United States'],
+            ['Stripe (if you buy a plan)', 'Payments and subscriptions, as merchant of record', 'Global (primarily United States)'],
+            ['Google', 'Sign-in, if you choose Google sign-in; the editor’s fonts (Google Fonts), loaded when you open the editor; the preset university logos (favicon service), when you open the logo picker, which shows the presets first', 'Global'],
+            ['Wikimedia Foundation (if you pick a logo preset)', 'University logos from Wikidata, Wikipedia and Wikimedia Commons', 'Global (primarily United States)'],
           ]}
         />
+        <Body>
+          If you use the Staples print helper, your email provider (Gmail, Outlook.com
+          or Yahoo Mail) opens a draft addressed to Staples with your poster’s title as
+          the subject. Nothing is sent until you send it yourself.
+        </Body>
         <Body>
           We do not share your personal data with advertisers, data brokers, or social
           networks. If a legal authority issues a valid request compelling disclosure,
@@ -178,24 +216,25 @@ export default function Privacy() {
           so.
         </Body>
         <CalloutBox>
-          <strong className="text-[#e2e2e8]">Public gallery.</strong>
+          <strong className="text-[#e2e2e8]">Sharing.</strong>
           <br />
-          If you choose to publish a poster to the public gallery, or create a
-          read-only share link, the poster content and any name you put on it
-          becomes visible to anyone on the internet — including visitors who don’t
-          have a Postr account. It may be indexed by search engines and cached by
-          third parties. Retracting the poster removes it from Postr but cannot
-          recall copies that others may have already made. Think before publishing.
-          See Section 5.3 of the{' '}
-          <Link to="/terms" className="text-[#7c6aed] underline">
-            Terms of Service
-          </Link>{' '}
-          for the full rules.
+          Postr has no public gallery and no share links at the moment. No control in
+          the app publishes a poster or gives another Postr user access to it. If you
+          published a poster to the gallery while it was open, you can retract it on
+          your{' '}
+          <Link to="/profile" className="text-[#7c6aed] underline">
+            Profile page
+          </Link>
+          . Retracting deletes the entry and its files, but it cannot recall copies
+          that others made while the poster was public.
         </CalloutBox>
 
         <SectionHeading n="5" title="International transfers" />
         <Body>
-          Some of the processors above are based in the United States. When your data
+          Our database and file storage (Supabase) are in Oregon, in the United States,
+          so your account, posters and files are stored in the United States, outside
+          Quebec and Canada. The other services above, including our API host
+          (Render), can process your data in the United States or in other countries. When your data
           is transferred outside the European Economic Area, we rely on appropriate
           safeguards: Standard Contractual Clauses approved by the European Commission,
           and, where applicable, the EU–US Data Privacy Framework certification of the
@@ -208,20 +247,40 @@ export default function Privacy() {
           headers={['Data', 'Retention']}
           rows={[
             [
-              'Poster drafts and assets',
-              'For as long as your account exists. Deleted immediately when you delete the poster or your account.',
+              'Posters and the versions you save',
+              'Until you delete the poster or your account.',
+            ],
+            [
+              'Images you upload to a poster, and poster preview images',
+              'Until you delete your account. Deleting a poster does not delete these files.',
+            ],
+            [
+              'Logos in your logo library',
+              'Until you delete the logo or your account.',
+            ],
+            [
+              'Images sent for import or design copying',
+              'Uploaded to temporary storage for the language model to read, and deleted by the app when that step ends. Any that fail to delete stay until you delete your account.',
             ],
             [
               'Anonymous guest accounts',
-              'Deleted automatically 14 days after the last sign-in if never converted to a permanent account.',
+              'A weekly job deletes guest accounts that were never converted to a permanent account, once 14 days have passed since their last sign-in. The job does not delete the files a guest uploaded.',
             ],
             [
               'Feedback submissions',
-              'Kept while the product is operated, so we can track history of reports and decisions.',
+              'Kept while the product is operated, so we can track history of reports and decisions. They are kept after you delete your account; a file you attached is deleted with your account.',
+            ],
+            [
+              'Record of an account deletion',
+              'When you delete your account, we keep your account identifier, your Stripe customer identifier, the identifiers of any subscriptions we cancelled, and the number of files we removed. There is no set deletion date.',
+            ],
+            [
+              'Copies in caches and backups',
+              'Deleted data can remain in our providers’ caches and backups until those copies expire. Our providers set how long that takes; we have not set a shorter period.',
             ],
             [
               'Server/error logs',
-              'Up to 30 days, then purged.',
+              'Kept for as long as our hosting providers keep logs. We have not set a shorter period.',
             ],
             [
               'Legal/tax records',
@@ -237,8 +296,8 @@ export default function Privacy() {
           Protection and Electronic Documents Act (PIPEDA) and Quebec’s Act
           respecting the protection of personal information in the private sector
           (“Law 25”) apply. If you are in the European Economic Area or the United
-          Kingdom, the EU/UK GDPR applies. If you are in California, the California
-          Consumer Privacy Act (CCPA) applies. Across these regimes you have the
+          Kingdom, the EU/UK GDPR applies. If you are in California, you may also have
+          rights under the California Consumer Privacy Act (CCPA). Across these regimes you have the
           following rights over your personal data:
         </Body>
         <List
@@ -279,46 +338,71 @@ export default function Privacy() {
           <a className="text-[#7c6aed] underline" href={`mailto:${CONTACT_EMAIL}`}>
             {CONTACT_EMAIL}
           </a>
-          . We will respond within one month, as required by the GDPR. For most actions
-          you can also use the buttons in your{' '}
+          . We will respond within one month, as required by the GDPR. Your{' '}
           <Link to="/profile" className="text-[#7c6aed] underline">
             Profile page
           </Link>{' '}
-          — deleting your account there erases everything associated with it.
+          also lets you download your account details, posters and feedback as a JSON
+          file, change your email choices, and delete your account. Deleting your
+          account cancels any subscription and deletes your account, your posters and
+          your uploaded files. It ends a paid term straight away, without a refund for
+          the rest of the period, and removes any unused export credits. Section 6
+          lists what we keep afterwards.
         </Body>
 
         <SectionHeading n="8" title="Cookies and similar technologies" />
         <Body>
-          We only set cookies and local-storage items that are strictly necessary to
-          run the app — authenticating your session, remembering the poster you last
-          opened, and preventing cross-site request forgery. These do not require
-          consent under the ePrivacy Directive.
+          Postr sets no cookies. It keeps a few items in your browser’s storage: your
+          sign-in session, a marker that notices when the same poster is open in two
+          tabs, short-lived values that last only for the current tab, and settings and
+          notes you create, such as saved styles, palettes, scratch-pad notes and your
+          profile details. We use them only to run features you use, so we do not ask
+          for consent before storing them. The{' '}
+          <Link to="/cookies" className="text-[#7c6aed] underline">
+            Cookies Policy
+          </Link>{' '}
+          describes them.
         </Body>
         <Body>
-          We currently do not run third-party analytics or advertising trackers. If we
-          add optional analytics in the future, we will update this notice and ask for
-          your explicit consent before any non-essential cookies are set.
+          We count page views with Vercel Web Analytics. It sets no cookie and writes
+          nothing to your browser. Before a page address is sent, any poster identifier
+          in it is replaced with a placeholder and the query string is removed. The
+          address of the page you came from can also be sent, and Postr does not
+          remove it. We run no advertising trackers. If we ever store or read anything on your device for
+          an optional purpose, we will ask for your consent first.
         </Body>
 
         <SectionHeading n="9" title="AI features and automated processing" />
         <Body>
-          Postr offers an optional figure-readability feature that sends the R or
-          Python plotting code you paste to a third-party large-language model
-          (Anthropic Claude) for analysis. The response is used only to tell you
-          whether your figure text will be legible at print size.
+          Some Postr features send content to a third-party large language model,
+          Anthropic’s Claude, which reads it and returns structured results:
+        </Body>
+        <List
+          items={[
+            'Importing a poster from a PDF or an image: an image of the page, or parts of it, so the model can find the figures, logos and text.',
+            'Copy a design: an image of the poster you choose, so the model can identify its fonts and how its colors are used.',
+            '“Scan image” in the editor’s Figure tab: the selected image, so the model can find its text and measure how large it will print.',
+            'Pasting a list of authors or references: the pasted text, so the model can split it into names, affiliations and references.',
+          ]}
+        />
+        <Body>
+          Nothing is sent until you use one of these features. We use the results to
+          fill in your poster in the editor, where you can change or remove them. The
+          figure-readability check for pasted R or Python code runs in your browser and
+          sends that code nowhere.
         </Body>
         <Body>
           No automated decisions with legal or similarly significant effects are made
-          about you. Your poster content and profile data are never used to train any
-          AI model.
+          about you. We do not use your poster content to train any AI model, and your
+          profile details never leave your browser.
         </Body>
 
         <SectionHeading n="10" title="Security" />
         <Body>
           We use encryption in transit (HTTPS everywhere), encryption at rest for
-          database and storage, scoped service-role credentials, row-level security
-          policies on every table, and least-privilege access for everyone who
-          operates the service. No system is perfectly secure, but we take reasonable
+          database and storage, and row-level security policies on every table. The
+          database’s full-access key is kept on our server and never sent to your
+          browser. No system is perfectly secure, but we take reasonable
           steps appropriate to the size of the service and the sensitivity of the
           data.
         </Body>

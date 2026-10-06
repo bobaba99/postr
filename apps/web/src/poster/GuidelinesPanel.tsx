@@ -3,7 +3,8 @@
  * guidelines. Sits opposite the editing sidebar so both can be open
  * simultaneously without overlap.
  *
- * Data sourced from official conference websites (links provided inline).
+ * Board sizes come from each conference's page (linked inline). The type
+ * sizes are suggestions, and the tips mix organiser rules with advice.
  * The panel is collapsible via a bookmark-style toggle on the right edge.
  */
 import { ignoreRepeatedEnter } from './ignoreRepeatedEnter';
@@ -111,7 +112,6 @@ export const GUIDELINES: Guideline[] = [
       'Readable from 4–6 feet away',
       'Sans-serif strongly preferred',
       'Figures should dominate — minimize text',
-      'Number your poster with your assigned board number',
     ],
     // The dimensions live on this CHILD page. The parent
     // /presentation-formats page does not state them, and
@@ -144,8 +144,6 @@ export const GUIDELINES: Guideline[] = [
     ],
     tips: [
       'Content readable from 3 feet',
-      'Assertion-evidence format encouraged',
-      'No A/V equipment allowed at standard poster sessions',
       'Include QR code linking to your OSF/preprint',
     ],
     url: 'https://www.psychologicalscience.org/conventions/2026-aps-annual-convention/call-for-submissions/poster-rules-guidelines',
@@ -168,7 +166,6 @@ export const GUIDELINES: Guideline[] = [
       { element: 'Body', min: '24pt' },
     ],
     tips: [
-      'Mount at eye level',
       'Include institutional logo and funding acknowledgments',
       'Download the yearly poster guidelines PDF from ACNP',
     ],
@@ -198,7 +195,6 @@ export const GUIDELINES: Guideline[] = [
       { element: 'Body', min: '24pt' },
     ],
     tips: [
-      'Square format increasingly common',
       'Data-forward: figures > text',
     ],
     url: 'https://sobp.org/meetings/',
@@ -229,7 +225,6 @@ export const GUIDELINES: Guideline[] = [
       'A0 portrait — narrower than a typical US landscape poster, so plan a vertical column flow',
       'Casual observer should grasp the message within seconds',
       'Disclose conflicts of interest at the bottom',
-      'Posters hung after 09:00 may not qualify for the ECNP Poster Award',
     ],
     url: 'https://www.ecnp.eu/congress2025/abstracts-and-posters/guidelines-for-poster-presentation/',
     urlLabel: 'ECNP 2025 — Poster Guidelines',
@@ -254,7 +249,6 @@ export const GUIDELINES: Guideline[] = [
       'Do NOT use foam-core or thick heavy materials',
       'Cannot set materials on the floor or lean against the board',
       'Keep methods brief — focus on results + implications',
-      'Fabric printing recommended (Spoonflower) — reusable, wrinkle-free',
     ],
     url: 'https://spsp.org/sites/default/files/2024-12/2025-SPSP-Poster-Presenter-Guidelines.pdf',
     urlLabel: 'SPSP 2025 — Poster Presenter Guidelines (PDF)',
@@ -278,7 +272,7 @@ const WRITING_TIPS: TipSection[] = [
       'Methods (~200 words): Equipment + procedure. Use flowcharts instead of paragraphs. Mention stats.',
       'Results (~200 words + legends): State if procedures worked, then data. Figures > tables.',
       'Conclusions (~200 words): Restate key result → why it matters → future directions.',
-      'Total target: under 800–1000 words. More than 1000 is "problematic".',
+      'Total target: about 1000 words or fewer.',
     ],
     source: 'Colin Purrington',
     sourceUrl: 'https://colinpurrington.com/tips/poster-design/',
@@ -286,14 +280,12 @@ const WRITING_TIPS: TipSection[] = [
   {
     title: 'Saving Space',
     tips: [
-      'Aim for 20% text, 40% figures, 40% whitespace.',
+      'Leave generous white space around text and figures.',
       'Use bullet points, not paragraphs. Lists of sentences, not blocks of prose.',
       'Only cite key references integral to your study — refs are wordy. Use smaller font for refs.',
       'Say the rest verbally — the poster is a conversation starter, not a paper.',
       'Cut every sentence that doesn\'t answer "so what?"',
     ],
-    source: 'UCLA / Ohio State poster guides',
-    sourceUrl: 'https://ohiostate.pressbooks.pub/scientificposterguide/chapter/figures-tables/',
   },
   {
     title: 'Tables vs. Text',
@@ -304,7 +296,7 @@ const WRITING_TIPS: TipSection[] = [
       'Figures > tables > text for communicating results. Use tables only when exact numbers matter.',
       'Min 20pt font in tables. If you can\'t fit it at 20pt, the table has too many columns.',
     ],
-    source: 'Ohio State Poster Guide',
+    source: 'Ohio State Poster Guide (the 20 pt table rule)',
     sourceUrl: 'https://ohiostate.pressbooks.pub/scientificposterguide/chapter/figures-tables/',
   },
   {
@@ -332,7 +324,7 @@ const WRITING_TIPS: TipSection[] = [
   {
     title: 'Common Beginner Mistakes',
     tips: [
-      'Too much text — the #1 mistake. If your poster reads like a paper, cut 60%.',
+      'Too much text — the #1 mistake. If your poster reads like a paper, cut it down to the key points.',
       'Unreadable figure legends — they must stand alone without the presenter explaining.',
       'No clear "take-home message" — add one sentence in the title or conclusion that a passerby can grasp.',
       'Using the poster as a teleprompter — don\'t read from it. Talk naturally, point at figures.',
@@ -347,7 +339,7 @@ const GENERAL_RESOURCES: { name: string; url: string; description: string }[] = 
   {
     name: 'Colin Purrington — Designing Conference Posters',
     url: 'https://colinpurrington.com/tips/poster-design/',
-    description: 'Title 85pt, body 32pt, captions 24pt. Target <1000 words. 45-65 chars per line.',
+    description: 'Target <1000 words. 45-65 chars per line.',
   },
   {
     name: 'Better Posters (Zen Faulkes)',
@@ -357,17 +349,17 @@ const GENERAL_RESOURCES: { name: string; url: string; description: string }[] = 
   {
     name: 'Better Posters — Font Size Article',
     url: 'https://betterposters.substack.com/p/your-poster-text-is-too-damn-small-20-08-20',
-    description: '"Your poster text is too damn small" — why 24pt body is half the ADA standard.',
+    description: '"Your poster text is too damn small": why 24pt body is less than half the ADA standard.',
   },
   {
     name: 'NYU Poster Design Tips',
     url: 'https://guides.nyu.edu/posters',
-    description: 'Min 18pt any text. 300-800 words. 120+ ppi images. 1-inch margins.',
+    description: '300-800 words. 120+ ppi images.',
   },
   {
-    name: 'UAB Poster Design — Font Size Chart',
+    name: 'UAB Poster Design — Font Sizes',
     url: 'https://www.uab.edu/medicine/poster/create-poster/poster-design',
-    description: 'Font size reference chart by poster dimension. Purrington-style specs.',
+    description: 'Example type sizes for a 36" × 48" poster, and sizes by viewing distance.',
   },
 ];
 
@@ -566,7 +558,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
             Poster Guidelines
           </div>
           <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
-            Official requirements from major conferences. Click to expand.
+            Board sizes from each conference's page, plus tips. Click to expand.
           </div>
         </div>
         <button
@@ -785,7 +777,7 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
       <InputModal
         open={showSaveModal}
         title="Save as template"
-        message="Give your checklist template a name so you can reuse it on future posters."
+        message="Give your checklist template a name so you can reuse it on future posters in this browser."
         placeholder="e.g. My Meta-Analysis Checklist"
         confirmLabel="Save template"
         onConfirm={saveCurrentAsTemplate}
@@ -827,6 +819,9 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
             </div>
           )}
 
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 4, lineHeight: 1.4 }}>
+            Suggested type sizes. The conference page may set its own.
+          </div>
           <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse', marginBottom: 8 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #2a2a3a' }}>
@@ -898,7 +893,7 @@ function ShortcutsPanel() {
 
       <ShortcutGroup title="External handles (appear when selected)">
         <ShortcutRow label={<KeyBadge icon="move" />} inline>
-          <strong style={{ color: '#c8b6ff' }}>Move</strong> — top-left, purple.
+          <strong style={{ color: '#c8b6ff' }}>Move</strong> — first button in the row above the block.
           Drag to reposition. Required for image and logo blocks (the
           browser's native image-drag otherwise hijacks the pointer).
         </ShortcutRow>
@@ -907,7 +902,8 @@ function ShortcutsPanel() {
           Drag in a circle around the block.
         </ShortcutRow>
         <ShortcutRow label={<KeyBadge icon="delete" danger />} inline>
-          <strong style={{ color: '#f87171' }}>Delete</strong> — top-right, red. One click removes the block.
+          <strong style={{ color: '#f87171' }}>Delete</strong> — red, last button in that row. One click removes
+          the block. The credit block stays.
         </ShortcutRow>
         <ShortcutRow label={<KeyBadge icon="resize" />} inline>
           <strong>Resize</strong> — bottom-right corner of the frame. Drag to resize.
@@ -948,11 +944,11 @@ function ShortcutsPanel() {
         <ShortcutRow label={<KeyCombo keys={['Tab']} />} inline>
           Move to the next cell. <KeyCombo keys={['Shift', 'Tab']} /> goes backward.
         </ShortcutRow>
-        <ShortcutRow label="Paste TSV / CSV from Excel or Word" inline>
-          Tabs become columns, newlines become rows. The existing table auto-grows.
+        <ShortcutRow label="Paste rows from Excel or Word" inline>
+          Tabs become columns, newlines become rows. The pasted grid replaces the whole table.
         </ShortcutRow>
         <ShortcutRow label="Right-click a cell" inline>
-          Custom context menu for insert / delete row + column, table border preset, clear range.
+          Custom context menu to insert or delete a row or column, or clear the cell.
         </ShortcutRow>
       </ShortcutGroup>
 

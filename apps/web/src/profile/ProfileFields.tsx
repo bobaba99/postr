@@ -1,6 +1,8 @@
 /**
  * ProfileFields — optional author metadata (name, institution, ORCID…)
- * kept in localStorage and used for author auto-fill.
+ * kept in localStorage under 'postr.profile'. Nothing else reads that
+ * key today (no author auto-fill, no ORCID link), so the field hints make
+ * no such claim; the account-deletion flow only clears it.
  */
 import { useState } from 'react';
 import type { User } from '@supabase/supabase-js';
@@ -61,10 +63,10 @@ export function ProfileFields({ user, onStatusMessage }: { user: User | null; on
 
   return (
     <div>
-      {fieldRow('Display name', 'displayName', 'e.g. Dr. Jane Smith', 'Used for author auto-fill')}
+      {fieldRow('Display name', 'displayName', 'e.g. Dr. Jane Smith')}
       {fieldRow('Institution', 'institution', 'e.g. Acme State University')}
       {fieldRow('Department', 'department', 'e.g. Department of Psychology')}
-      {fieldRow('ORCID', 'orcid', 'e.g. 0000-0002-1234-5678', 'Optional — links to your ORCID profile')}
+      {fieldRow('ORCID', 'orcid', 'e.g. 0000-0002-1234-5678')}
       {fieldRow('Website / Lab page', 'website', 'e.g. https://lab.example.com')}
       <button
         onClick={save}

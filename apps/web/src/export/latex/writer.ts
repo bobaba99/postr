@@ -431,9 +431,22 @@ function paletteDefs(doc: PosterDoc): string {
     .join('\n');
 }
 
+/** The family name poster.tex writes: anything outside [A-Za-z0-9 ] becomes Source Sans 3. */
+function texFontFamily(family: string): string {
+  return /^[A-Za-z0-9 ]+$/.test(family) ? family : 'Source Sans 3';
+}
+
+/**
+ * True when poster.tex carries the commented pdfLaTeX fallback block for
+ * this family. README.txt reads it so it only points at a block that
+ * exists (a family outside the curated ten gets none).
+ */
+export function hasPdflatexFallback(family: string): boolean {
+  return Boolean(PDFLATEX_FALLBACKS[texFontFamily(family)]);
+}
+
 function fontSetup(doc: PosterDoc): string {
-  const family = doc.fontFamily;
-  const safeFamily = /^[A-Za-z0-9 ]+$/.test(family) ? family : 'Source Sans 3';
+  const safeFamily = texFontFamily(doc.fontFamily);
   const fallback = PDFLATEX_FALLBACKS[safeFamily];
   const fallbackLines = fallback
     ? [

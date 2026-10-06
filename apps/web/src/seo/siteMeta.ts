@@ -250,6 +250,10 @@ export interface GalleryEntryMetaInput {
  * Gallery entries are indexable, so they get a real canonical and a
  * poster-image card. Used by the React page and by the edge shell
  * function that serves crawlers, which must agree.
+ *
+ * The public gallery is off (config/features.ts GALLERY_PUBLIC_ENABLED):
+ * /gallery/:entryId redirects home and the gallery edge shell was
+ * deleted, so nothing renders this today.
  */
 export function galleryEntryMeta(entry: GalleryEntryMetaInput): PageMeta {
   const venue = [entry.conference, entry.year ? String(entry.year) : null]
@@ -286,6 +290,14 @@ export function galleryEntryMeta(entry: GalleryEntryMetaInput): PageMeta {
  * than a stored image, so real cards await the Phase 1 edge shell.
  * This builder accepts an image so that shell can supply one without
  * renegotiating the noindex contract.
+ *
+ * Sharing is switched off (config/features.ts SHARING_ENABLED), so
+ * /s/:slug redirects home and nothing renders this today. The copy
+ * says only what a share link would do if it came back: show the
+ * poster read-only. It does not promise privacy (any shared poster is
+ * readable through the API until fix 23's database work lands) or
+ * comments (the 2026-09-29 copy audit found a first-time visitor could
+ * not post one).
  */
 export function shareMeta(input: {
   slug: string;
@@ -294,14 +306,14 @@ export function shareMeta(input: {
 }): PageMeta {
   const posterTitle = input.title?.trim();
   const title = posterTitle
-    ? `${clampDescription(posterTitle, 28)} — Shared Poster Review | ${SITE_NAME}`
-    : `Shared Research Poster Review | ${SITE_NAME}`;
+    ? `${clampDescription(posterTitle, 28)} — Shared Poster | ${SITE_NAME}`
+    : `Shared Research Poster | ${SITE_NAME}`;
   const image =
     input.imageUrl ??
     (DEFAULT_OG_IMAGE ? `${SITE_ORIGIN}${DEFAULT_OG_IMAGE}` : null);
   return {
     title,
-    description: `Review a private research poster shared through ${SITE_NAME}. Add comments, return to the owner's read-only poster, or create your own conference poster for free.`,
+    description: `A research poster shared through ${SITE_NAME} and shown read-only. Make your own conference poster in ${SITE_NAME} for free, then save it as a print-ready PDF.`,
     robots: NOINDEX,
     canonical: canonicalFor(`/s/${input.slug}`),
     language: SITE_LANGUAGE,

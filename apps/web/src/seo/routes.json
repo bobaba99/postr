@@ -8,26 +8,26 @@
   "static": {
     "/": {
       "title": "Academic Poster Maker for Researchers | Postr",
-      "description": "A poster editor built for researchers. Print-ready conference sizes, figure readability checks, authors and affiliations, BibTeX citations.",
+      "description": "A poster editor built for researchers. Print-ready poster sizes, figure readability checks, authors and affiliations, BibTeX citations.",
       "robots": "index,follow",
       "h1": "Academic posters, without the hassle.",
       "copy": [
-        "A poster editor that handles the fiddly parts — micro-edits, text that reflows when you resize, conference size specs, figures too small to read in print, authors and affiliations, BibTeX citations — so you can work on the science. Start with a conference-ready layout, then keep every design decision under your control.",
-        "Smart templates: conference-ready layouts with discipline-specific palettes, and APA, SfN and ECNP size presets built in. Every poster starts at a real print size.",
+        "A poster editor that handles the fiddly parts: block nudging, text that reflows on you, BibTeX citation styles, conference size lookups, authors and affiliations, and the figure font-size math, so you can work on the science. Start from a layout template, then keep every design decision under your control.",
+        "Poster templates: four layouts and a blank start, with disciplinary palettes and standard academic size presets. Every poster starts at a real print size.",
         "Figure readability: paste your R or Python plotting code and see whether the axis labels will still be readable at print size, with a copy-ready fix.",
-        "Writing guide: section-by-section tips, word count targets, and a checklist to follow from intro to conclusion."
+        "Writing guide: short prompts in each template section, word targets for the introduction, methods and conclusions, and a checklist from the title to the final proofread."
       ]
     },
     "/about": {
       "title": "How Postr Works: Features for Academic Posters",
-      "description": "See how Postr handles authors and affiliations, BibTeX citations, Greek symbols, print sizing, and figure readability: the parts other poster tools get wrong.",
+      "description": "See how Postr handles authors and affiliations, BibTeX citations, Greek symbols, print sizing, and figure text checks for academic conference posters.",
       "robots": "index,follow",
       "h1": "About Postr",
       "copy": [
         "Postr is a free academic poster editor for students and researchers. It exists because the usual tools were built for something else. Research structure, print constraints, and editable output stay in one focused workflow.",
         "Enter institutions once, then click to assign them to authors. Superscript numbering stays in sync when you add or remove an affiliation.",
-        "Export a .bib from your reference manager and drop it in. Postr reads BibTeX, RIS and EndNote files and formats the reference list for you. The result remains editable without rebuilding citations by hand.",
-        "Every poster starts at a real print size, so what you see on screen is what the print shop actually produces at full scale."
+        "Export a .bib from your reference manager and drop it in. Postr reads BibTeX and RIS files and formats the reference list in APA 7, Vancouver, IEEE or Harvard style. Switch styles at any time and the imported entries are reformatted for you.",
+        "Every poster starts at a real print size, and Save PDF sets the page to that size."
       ]
     },
     "/why-posters": {
@@ -37,87 +37,88 @@
       "h1": "Why poster sessions matter",
       "copy": [
         "Poster sessions have a reputation as the consolation prize of conference formats. That reading misses what the format is unusually good at.",
-        "A poster visit lasts anywhere from twenty seconds to twenty minutes, so you build a one-line version, a two-minute version, and the full walkthrough.",
+        "A poster visit can be a glance or a long conversation, so you build a one-line version, a two-minute version, and the full walkthrough.",
         "A poster has no room for the paragraph that rescues a confusing figure, so the layout has to carry the logic. That is editorial work, not decoration.",
         "Committee meetings, peer review, and interviews all run on answering questions in real time. A poster session is a low-stakes place to learn it.",
         "You cannot fit the project on the board, so you decide the one claim the poster defends. Framing early, on a deadline, is unusually good practice."
       ]
     },
     "/pricing": {
-      "title": "Postr Pricing: Free Poster Maker, Paid Export",
-      "description": "Editing and PDF export are always free. Export to PowerPoint & LaTeX with the CA$18.99 term (every 4 months, cancel anytime) or a one-time CA$9.99 export pack.",
+      "title": "Postr Pricing: Free PDF Export, Paid PowerPoint & LaTeX",
+      "description": "Editing and PDF export are free. PowerPoint and LaTeX exports need the CA$18.99 term, renewing every 4 months, or a one-time CA$9.99 pack of 3 exports.",
       "robots": "index,follow",
       "h1": "Free to build. Pay only to take it further.",
       "copy": [
-        "A finished, print-ready poster costs nothing on Postr. Editing and PDF export are always free, with a small \"made with postr.sh\" mark. No card or account is required to finish and print your work.",
-        "The CA$18.99 term unlocks unlimited PowerPoint and LaTeX export with no watermark. It renews every four months and you can cancel anytime.",
-        "The CA$9.99 pack exports three posters to PowerPoint or LaTeX — a one-time purchase whose credits never expire, for anyone who doesn't need a full term.",
-        "Refunds are plain: a term is refundable in full within 14 days of a charge if you haven't taken a paid export, and an export pack is refundable in full until its first export — never after.",
-        "You only pay to export to PowerPoint or LaTeX. The free poster workflow — editor, tools, and watermarked PDF — has no limits. All prices are in Canadian dollars, charged through Stripe."
+        "A finished, print-ready poster costs nothing on Postr. Editing and PDF export are free, and every PDF carries a \"made with postr.sh\" credit. No card or account is required to finish and print your work.",
+        "The CA$18.99 term gives unlimited PowerPoint and LaTeX exports with no watermark while it is active. It renews every four months and you can cancel anytime.",
+        "The CA$9.99 pack gives three PowerPoint or LaTeX exports. Each export uses one credit, even a second export of the same poster. It is a one-time purchase, and the credits never expire.",
+        "Refunds: a term is refundable in full within 14 days of a charge if you haven't taken a paid export. A pack is refundable in full until you use an export credit, and not after.",
+        "You only pay to export to PowerPoint or LaTeX. The editor, its tools and the PDF export have no paywall. A guest can keep up to 25 posters and an account up to 200, and some tools, such as import and Copy a design, have daily limits. Prices are shown in Canadian dollars, and payments go through Stripe."
       ]
     },
     "/tools/figure-readability": {
-      "title": "Figure Font Size Checker for Posters — R & Python | Postr",
-      "description": "Paste ggplot2 or matplotlib code. Get the printed point size of every label at your poster size, and the exact base_size to fix it. Free, no signup.",
+      "title": "Poster Figure Font Size Checker: ggplot2, matplotlib | Postr",
+      "description": "Paste ggplot2 or matplotlib code and a print size. See which titles, axis labels, tick labels and legends fall below poster minimums. Free, no signup.",
       "robots": "index,follow",
       "h1": "Will your figure labels be readable at poster size?",
       "copy": [
-        "Paste your R (ggplot2) or Python (matplotlib, seaborn) plotting code, type the size the figure will print at, and see the point size of every label on paper — axis titles need 18 pt, tick labels 14 pt, captions 12 pt. If anything falls short, copy the base_size fix. No account, and your code never leaves the browser.",
-        "How the check works: it scales your figure from its source canvas (the ggsave() or figsize your code sets, or the typed size when it sets none) to the printed size, then scores every element against poster thresholds — 18 pt for titles and axis titles, 14 pt for tick labels, legends and strips, 12 pt for captions.",
-        "If anything falls short, the check back-calculates the smallest base_size that makes every element pass and hands it to you as a one-line snippet or as your full script with the edit already made.",
-        "Postr is a free academic poster editor with this same check built into its Figure tab, sized against the figure box on your canvas or the exact print dimensions of an image block."
+        "Paste your R (ggplot2) or Python (matplotlib) plotting code and type the size the figure will print at. The check scores its titles, axis labels, tick labels, legend and caption at that size against minimums of 18 pt for axis titles, 14 pt for tick labels and 12 pt for captions. If anything falls short, it adds the size each element needs to a copy of your script. No account, and your code never leaves the browser.",
+        "How the check works: it scales your figure from its source canvas to the printed size. In R the canvas is the ggsave() width and height, or the size you typed when there is no ggsave(). In Python it is the figsize or set_size_inches() your code sets, or matplotlib’s default of 6.4 × 4.8 in. It then scores each text element against a minimum: 18 pt for titles and axis titles, 14 pt for tick labels, legends and strips, 12 pt for captions.",
+        "In R it reads base_size and the sizes theme() sets for the elements it scores. It does not read a size set on text or title. In Python it reads font.size in plt.rcParams, seaborn’s context and font_scale, and the sizes given to set_xlabel(), set_ylabel(), set_title() and tick_params(). Check sizes set any other way yourself.",
+        "If anything falls short, it lists the size each element needs and adds those sizes to a copy of your script. When some sizes still follow base_size (font.size in Python), it also gives the smallest base_size at which they meet their minimums, as a one-line snippet.",
+        "Postr is a free academic poster editor with this same check in its Figure tab: drag a figure box on the canvas and the check sizes against it, or select an image block to use its exact print dimensions."
       ]
     },
     "/privacy": {
       "title": "Privacy Policy for Postr Researchers",
-      "description": "How Postr collects, stores, and protects your data, including anonymous sessions, poster documents, and cookies. Plain language, no dark patterns.",
+      "description": "What Postr collects and why, who receives it, where it is stored, how long it is kept, and how to access, download or delete it. Postr sets no cookies.",
       "robots": "index,follow",
       "h1": "Privacy Policy",
       "copy": [
-        "Postr collects account details and poster documents only when needed to provide, secure, and support the service. You control your research content, and private posters are not used to train models.",
-        "Anonymous editor sessions use essential authentication storage. Page counting is cookieless, creates no advertising profile, and does not assign a persistent visitor identifier.",
-        "Hosting, authentication, payment, email, and operations providers receive only the data required for their role, subject to contractual and technical safeguards. Uploaded figures are stored privately and served only through signed links.",
+        "Postr collects your account details, the posters you make and the images you upload, technical logs, your plan and billing records if you buy a plan, and the feedback you send. We do not use your poster content to train any AI model.",
+        "Postr sets no cookies. Your browser's storage keeps your sign-in session and the settings and notes you save. Page views are counted with Vercel Web Analytics, which sets no cookie and writes nothing to your browser.",
+        "The services that receive personal data are Supabase (database, sign-in and file storage, in Oregon, United States), Vercel, Render, Anthropic, Stripe, Google and the Wikimedia Foundation. Anthropic's language model reads the images and text you send when you import a poster, copy a design, scan a figure, or paste authors or references. Uploaded figures are stored privately and served only through signed links.",
         "You may request access, correction, export, or deletion of personal data. The full privacy policy explains retention, international processing, security, legal bases, children's privacy, policy changes, complaints, and how to contact Postr with a question or request."
       ]
     },
     "/privacy/fr": {
       "title": "Politique de confidentialité de Postr",
-      "description": "Découvrez comment Postr collecte, utilise, protège et supprime vos renseignements personnels, y compris les comptes, affiches, témoins et fournisseurs.",
+      "description": "Ce que Postr recueille et pourquoi, qui le reçoit, où et combien de temps il est conservé, et comment l’obtenir ou le supprimer. Postr ne dépose aucun témoin.",
       "robots": "index,follow",
       "language": "fr-CA",
       "locale": "fr_CA",
       "h1": "Politique de confidentialité",
       "copy": [
-        "Postr recueille les renseignements de compte et les documents d’affiche nécessaires pour fournir, sécuriser et soutenir le service. Vous gardez le contrôle de votre contenu de recherche, et les affiches privées ne servent jamais à entraîner des modèles.",
-        "Les sessions anonymes utilisent un stockage d’authentification essentiel. Le comptage des pages fonctionne sans témoins, sans profil publicitaire et sans identifiant persistant attribué aux visiteurs.",
-        "Les fournisseurs d’hébergement, d’authentification, de paiement, de courriel et d’exploitation reçoivent uniquement les données requises pour leur rôle, avec des garanties contractuelles et techniques.",
-        "Vous pouvez demander l’accès, la rectification, l’exportation ou la suppression de vos renseignements. La politique complète explique la conservation, les transferts internationaux, la sécurité, les plaintes et les coordonnées."
+        "Postr recueille les renseignements de votre compte, les affiches que vous créez et les images que vous téléversez, des journaux techniques, votre forfait et vos dossiers de facturation si vous achetez un forfait, ainsi que la rétroaction que vous envoyez. Nous n’utilisons pas le contenu de vos affiches pour entraîner un quelconque modèle d’IA.",
+        "Postr ne dépose aucun témoin. Le stockage de votre navigateur conserve votre session de connexion ainsi que les réglages et les notes que vous enregistrez. Les pages vues sont comptées au moyen de Vercel Web Analytics, qui ne dépose aucun témoin et n’écrit rien dans votre navigateur.",
+        "Les services qui reçoivent des renseignements personnels sont Supabase (base de données, connexion et stockage de fichiers, en Oregon, aux États-Unis), Vercel, Render, Anthropic, Stripe, Google et la Wikimedia Foundation. Le modèle de langage d’Anthropic lit les images et le texte que vous transmettez lorsque vous importez une affiche, copiez un design, lancez « Scan image » sur une figure ou collez des auteurs ou des références. Les figures téléversées sont stockées en privé et servies uniquement au moyen de liens signés.",
+        "Vous pouvez demander l’accès, la rectification, l’exportation ou la suppression de vos renseignements. La politique complète explique la conservation, les transferts internationaux, la sécurité, les fondements juridiques, la protection des renseignements des enfants, les modifications de la politique, les plaintes et la façon de joindre Postr pour une question ou une demande."
       ]
     },
     "/cookies": {
       "title": "Cookie Policy and Analytics | Postr",
-      "description": "What Postr stores on your device and what it does not. Essential authentication only — page counting is cookieless, with no persistent identifier.",
+      "description": "Postr sets no cookies. See each item it keeps in your browser's storage and why, how page views are counted, and how to clear that storage.",
       "robots": "index,follow",
       "h1": "Cookies Policy",
       "copy": [
-        "Postr uses essential browser storage to maintain signed-in and anonymous editor sessions, protect accounts, remember the poster currently being edited, and keep requested features working between page loads.",
-        "Page views are counted without cookies, advertising profiles, fingerprinting, cross-site tracking, or an identifier that persists between visits. Postr does not use optional analytics or advertising cookies.",
-        "Payment providers may set storage required to complete checkout, prevent fraud, verify a transaction, and manage billing. Their own policies govern that limited provider-controlled storage.",
-        "Blocking essential storage can prevent sign-in, saving, checkout, export access, or other requested features. The full policy lists each storage category, purpose, duration, responsible provider, and available browser control in plain language. Signing out removes the session from the browser."
+        "Postr sets no cookies. It keeps items in your browser's storage, such as your sign-in session, the presets, palettes, notes and profile details you save, a marker that warns you when the same poster is open in two tabs, and short-lived values for the current tab.",
+        "Page views are counted with Vercel Web Analytics, which as Postr uses it sets no cookie and writes nothing to your browser. Poster ids and query strings are removed from the page address Postr reports. The address of the page you came from is not changed. Postr runs no advertising and no cross-site tracking.",
+        "Some features load files from other services that have their own cookie policies: poster fonts from Google Fonts, and preset university logos from Google and Wikimedia sites. Payments and billing open on Stripe's own pages.",
+        "Deleting this storage signs you out, and a guest without an account can then no longer open their posters. If you block storage for postr.sh, Postr cannot keep you signed in from one page load to the next, and the editor may not work. The full policy lists each entry, where it is stored, what it does and how long it lasts, and how to clear it in your browser."
       ]
     },
     "/cookies/fr": {
       "title": "Politique relative aux témoins | Postr",
-      "description": "Découvrez le stockage essentiel utilisé par Postr pour les sessions et paiements, ainsi que l’analyse sans témoins, profil publicitaire ni suivi persistant.",
+      "description": "Postr ne dépose aucun témoin. Voyez chaque élément conservé dans le stockage de votre navigateur et pourquoi, le comptage des pages vues et comment l’effacer.",
       "robots": "index,follow",
       "language": "fr-CA",
       "locale": "fr_CA",
       "h1": "Politique relative aux témoins",
       "copy": [
-        "Postr utilise le stockage essentiel du navigateur pour maintenir les sessions connectées et anonymes, protéger les comptes, mémoriser l’affiche ouverte et conserver les fonctions demandées.",
-        "Les pages sont comptées sans témoins, profil publicitaire, empreinte numérique, suivi intersite ou identifiant persistant. Postr n’utilise aucun témoin facultatif d’analyse ou de publicité.",
-        "Les fournisseurs de paiement peuvent définir le stockage requis pour effectuer une transaction, prévenir la fraude et gérer la facturation. Leurs politiques encadrent ce stockage limité.",
-        "Bloquer le stockage essentiel peut empêcher la connexion, l’enregistrement, le paiement ou l’accès aux exportations. La politique complète précise, en langage clair, chaque catégorie de stockage, sa finalité, sa durée, le fournisseur responsable et le contrôle offert par votre navigateur."
+        "Postr ne dépose aucun témoin. Il conserve des éléments dans le stockage de votre navigateur, comme votre session de connexion, les préréglages, palettes, notes et données de profil que vous enregistrez, un marqueur qui vous avertit lorsque la même affiche est ouverte dans deux onglets, ainsi que des valeurs temporaires qui ne durent que le temps de l’onglet en cours.",
+        "Les pages vues sont comptées au moyen de Vercel Web Analytics, qui, tel que Postr l’utilise, ne dépose aucun témoin et n’écrit rien dans votre navigateur. Les identifiants d’affiches et les chaînes de requête sont retirés de l’adresse de page que Postr transmet. L’adresse de la page d’où vous venez n’est pas modifiée. Postr n’affiche aucune publicité et ne fait aucun suivi intersite.",
+        "Certaines fonctions chargent des fichiers depuis d’autres services, qui ont leurs propres politiques relatives aux témoins : les polices des affiches depuis Google Fonts, et les logos d’universités prédéfinis depuis Google et des sites Wikimedia. Les paiements et la facturation s’ouvrent sur les pages de Stripe.",
+        "La suppression de ce stockage vous déconnecte, et un invité sans compte ne peut alors plus ouvrir ses affiches. Si vous bloquez le stockage pour postr.sh, Postr ne peut pas garder votre session ouverte d’un chargement de page à l’autre, et l’éditeur pourrait ne pas fonctionner. La politique complète indique, pour chaque entrée, où elle est stockée, ce qu’elle fait et combien de temps elle dure, ainsi que la façon de l’effacer dans votre navigateur."
       ]
     },
     "/terms": {
@@ -126,10 +127,10 @@
       "robots": "index,follow",
       "h1": "Terms of Service",
       "copy": [
-        "You keep ownership of the posters, manuscripts, figures, and other content you create or upload. Postr receives only the permissions needed to provide the service.",
+        "You keep ownership of the posters, figures, images, text, and other content you create or upload. Postr receives only the permissions needed to provide the service.",
         "Use Postr lawfully and only with content you have permission to use. Respect intellectual property, personal privacy, platform security, and other users.",
-        "Free and paid features may change, and uninterrupted availability is not guaranteed. Payment, renewal, cancellation, refunds, and export access follow the terms shown at checkout. The current prices are listed on the pricing page.",
-        "Postr may suspend harmful or unlawful use. The full terms explain account termination, service disclaimers, liability limits, indemnity, governing law, dispute handling, policy changes, and how to contact us about a legal, billing, account, accessibility, privacy, or service question."
+        "Free and paid features may change, and uninterrupted availability is not guaranteed. The full terms set out how the term renews, how to cancel it through Stripe, and the refund rules for the term and the export pack. Prices are shown at checkout before you pay, and the current prices are listed on the pricing page.",
+        "Postr may suspend harmful or unlawful use. The full terms explain account termination, service disclaimers, liability limits, indemnity, governing law, dispute handling, changes to the terms, and the email address for questions, notices and legal requests."
       ]
     },
     "/terms/fr": {
@@ -140,10 +141,10 @@
       "locale": "fr_CA",
       "h1": "Conditions d’utilisation",
       "copy": [
-        "Vous conservez la propriété des affiches, manuscrits, figures et autres contenus créés ou téléversés. Postr reçoit uniquement les autorisations nécessaires pour fournir le service demandé.",
+        "Vous conservez la propriété des affiches, figures, images, textes et autres contenus que vous créez ou téléversez. Postr reçoit uniquement les autorisations nécessaires pour fournir le service.",
         "Utilisez Postr légalement et seulement avec du contenu que vous êtes autorisé à employer. Respectez la propriété intellectuelle, la vie privée, la sécurité et les autres utilisateurs.",
-        "Les fonctions gratuites et payantes peuvent changer, et une disponibilité ininterrompue n’est pas garantie. Les paiements, renouvellements, annulations, remboursements et exportations suivent les conditions affichées au moment du paiement. Les prix en vigueur figurent sur la page de tarification.",
-        "Postr peut suspendre un usage nuisible ou illégal. Les conditions complètes expliquent la résiliation, les exclusions, la responsabilité, le droit applicable, les différends, les changements de politique et les coordonnées pour toute question."
+        "Les fonctions gratuites et payantes peuvent changer, et une disponibilité ininterrompue n’est pas garantie. Les conditions complètes précisent le renouvellement du forfait à terme, la façon de l’annuler par l’intermédiaire de Stripe et les règles de remboursement du forfait à terme et du pack d’exportation. Les prix sont affichés au moment du paiement, avant que vous ne payiez, et les prix en vigueur figurent sur la page de tarification.",
+        "Postr peut suspendre un usage nuisible ou illégal. Les conditions complètes expliquent la résiliation, les exclusions de garantie, la limitation de responsabilité, l’indemnisation, le droit applicable, le règlement des différends, les modifications des conditions et l’adresse courriel pour les questions, les avis et les demandes juridiques."
       ]
     }
   },
@@ -167,17 +168,17 @@
     },
     "/profile": {
       "title": "Profile, Billing, and Settings | Postr",
-      "description": "Manage your Postr account details, security, billing status, export access, and saved preferences from one private settings page.",
+      "description": "Manage your Postr profile details, saved style presets, email choices, plan and export credits, data download, and account deletion from one private page.",
       "robots": "noindex,nofollow"
     },
     "/debug": {
       "title": "Postr Application Diagnostics | Postr",
-      "description": "Review private Postr application diagnostics, browser capabilities, authentication state, and service connectivity while troubleshooting.",
+      "description": "Developer-only page that shows the Supabase session, live sign-in events, the current route, viewport and browser, and the sign-in keys in local storage.",
       "robots": "noindex,nofollow"
     },
     "/admin/gallery": {
       "title": "Conference Poster Gallery Moderation | Postr",
-      "description": "Review submitted conference posters, verify gallery details, and approve or reject public listings from the private moderation queue.",
+      "description": "Admin-only list of all gallery entries, retracted ones included. Retract an entry with a reason or restore one retracted by mistake. The public gallery is off.",
       "robots": "noindex,nofollow"
     },
     "/p": {
@@ -186,13 +187,13 @@
       "robots": "noindex,nofollow"
     },
     "/billing/success": {
-      "title": "Payment Confirmed and Access Updated | Postr",
-      "description": "Your Postr payment was received. Review the confirmed purchase, wait for export access to update, then return to your conference poster.",
+      "title": "Checkout Complete: Checking Your Purchase | Postr",
+      "description": "Checkout is complete. Postr checks your account for the purchase, which appears once Stripe confirms the payment. Then go back to your conference posters.",
       "robots": "noindex,nofollow"
     },
     "/billing/cancel": {
       "title": "Checkout Cancelled — Return to Postr",
-      "description": "No charge was made. Return to your conference poster, continue with free PDF export, or review editable PowerPoint and LaTeX options.",
+      "description": "No charge was made. Go back and keep editing your conference poster for free, including PDF export, or see the editable PowerPoint and LaTeX plans.",
       "robots": "noindex,nofollow"
     },
     "/404": {

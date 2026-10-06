@@ -241,7 +241,10 @@ export default function Home() {
               </svg>
               <div>
                 <h3 className="text-lg font-bold text-[#e2e2e8]">Welcome to Postr</h3>
-                <p className="text-[14pt] text-[#8b8f99]">Create conference-quality research posters in minutes, not hours.</p>
+                {/* "+ New poster" opens on the three-column template
+                    (pages/Editor.tsx hydrateIfEmpty); "Import…" takes a
+                    PowerPoint, PDF, image or .postr file. */}
+                <p className="text-[14pt] text-[#8b8f99]">Start a new poster on the three-column template, or import one you already have.</p>
               </div>
             </div>
             <div className="mt-6">

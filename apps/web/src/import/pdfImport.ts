@@ -91,8 +91,8 @@ function rateLimitToImportError(err: ApiError): PdfImportError {
     err.body !== null &&
     (err.body as { error?: string }).error === 'daily_limit_exceeded';
   const lead = isDaily
-    ? 'Daily AI import limit reached.'
-    : 'Too many AI requests in the last minute.';
+    ? 'Daily import limit reached.'
+    : 'Too many import requests in the last minute.';
   return new PdfImportError(`${lead}${wait}`, 'rate-limited');
 }
 
@@ -172,7 +172,7 @@ export async function extractFromPdf(
     const fctx = fallbackCanvas.getContext('2d');
     if (!fctx) {
       throw new PdfImportError(
-        'Could not rasterize page for vision fallback.',
+        'Could not render this PDF page.',
         'parse-failed',
       );
     }
@@ -265,7 +265,7 @@ export async function extractFromPdf(
         ? `Source fonts (${sourceFonts.slice(0, 3).join(', ')}${sourceFonts.length > 3 ? '…' : ''}) replaced with the editor default.`
         : '',
       figureResult.uploadFailures > 0
-        ? `${figureResult.uploadFailures} figure${figureResult.uploadFailures === 1 ? '' : 's'} couldn't be uploaded (storage timeout). Drop the PDF again to retry the missing figures — your text has already been imported.`
+        ? `${figureResult.uploadFailures} figure${figureResult.uploadFailures === 1 ? '' : 's'} couldn't be uploaded. Import the PDF again to retry the missing figures.`
         : '',
     ].filter(Boolean),
   });

@@ -293,6 +293,14 @@ describe('ensureAckBlock — .postr re-injection', () => {
     expect(ack.imageSrc).toMatch(/^data:image\/svg\+xml;base64,/);
   });
 
+  it('labels the seeded mark with the current credit copy, not the retired one', () => {
+    const ack = ensureAckBlock(makeFixtureDoc()).blocks.find((b) => b.id === ACK_BLOCK_ID)!;
+    const svg = atob(ack.imageSrc!.slice('data:image/svg+xml;base64,'.length));
+    expect(svg).toContain(`aria-label="${ACKNOWLEDGEMENT_TEXT}"`);
+    // Retired 2026-09-13 (see attribution.ts); it must not come back.
+    expect(svg).not.toContain('Poster made with');
+  });
+
   it('is IDEMPOTENT — repeated round-trips never duplicate the mark', () => {
     let doc = makeFixtureDoc();
     for (let i = 0; i < 5; i++) doc = ensureAckBlock(doc);

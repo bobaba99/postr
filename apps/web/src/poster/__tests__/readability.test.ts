@@ -50,7 +50,7 @@ describe('parseRCode', () => {
     const code = `ggplot(df, aes(x, y)) + geom_point()`;
     const p = parseRCode(code);
     expect(p.baseSize).toBe(11);
-    expect(p.warnings).toContain('No font size found — assuming ggplot2 default base_size = 11pt.');
+    expect(p.warnings).toContain('No base_size found — assuming ggplot2 default base_size = 11pt.');
   });
 
   it('FR3: reads ggsave() whose filename is a nested call', () => {

@@ -2,17 +2,18 @@
  * StaplesPrintModal — step-by-step helper for printing at Staples.
  *
  * Staples' "Print & Go" mobile service lets customers email a PDF to
- * `staplesmobile@printme.com`, receive an 8-digit code, and release
- * the print at any kiosk without transferring files on a USB drive
- * or creating an account. This modal walks students through the flow
- * directly from the editor so they don't have to hunt for the email
- * address or miss a step.
+ * `staplesmobile@printme.com`, receive a release code, and release the
+ * print at a store without a USB drive. This modal walks students
+ * through the flow directly from the editor so they don't have to hunt
+ * for the email address or miss a step. Every Staples detail is a
+ * third-party fact nothing here checks; the user-facing copy avoids
+ * timing, coverage and kiosk-capability promises for that reason.
  *
  *   1. Save the poster as PDF (triggers the browser Save dialog)
  *   2. Open email client pre-addressed to staplesmobile@printme.com
  *   3. Attach the PDF and send
- *   4. Wait for the 8-digit release code email back from Staples
- *   5. At any Staples kiosk → "Mobile Device" → enter the code → print
+ *   4. Wait for the release code email back from Staples
+ *   5. At a Staples kiosk → "Mobile Device" → enter the code → print
  */
 import { useEffect, useState } from 'react';
 import { useModalTransition } from '@/hooks/useModalTransition';
@@ -125,10 +126,14 @@ export function StaplesPrintModal({
         >
           🏪 Print at Staples
         </h3>
+        {/* Everything about Staples here is a third-party fact the code
+            cannot check (address, reply, kiosk menus, store practice), so
+            the copy keeps the steps and drops timing, coverage and
+            "prints right away" promises. Owner question: confirm against
+            Staples' current Print & Go documentation. */}
         <p style={{ margin: '0 0 20px', fontSize: 13, color: '#9ca3af', lineHeight: 1.55 }}>
-          Staples' Print &amp; Go flow — email your PDF, get a release code,
-          print at any kiosk. No USB drive, no Staples account, no upload
-          portal.
+          Staples' Print &amp; Go service: email your PDF, get a release code
+          back by email, and print at a Staples store. No USB drive needed.
         </p>
 
         <ol
@@ -146,8 +151,8 @@ export function StaplesPrintModal({
             title="Save your poster as PDF"
             body={
               <>
-                Use your browser's Save as PDF dialog. Set layout to{' '}
-                <strong style={{ color: '#c8cad0' }}>Landscape</strong>, margins
+                Use your browser's Save as PDF dialog. If it shows a layout
+                option, pick the one that matches your poster. Set margins
                 to <strong style={{ color: '#c8cad0' }}>None</strong>, and
                 enable <strong style={{ color: '#c8cad0' }}>Background graphics</strong>{' '}
                 so fills don't print white.
@@ -180,8 +185,8 @@ export function StaplesPrintModal({
                 >
                   {STAPLES_EMAIL}
                 </code>
-                . Pick whichever mail client you actually use — subject and
-                body are optional. Staples only needs the attachment.
+                . Use whichever mail client you like. You can leave the body
+                blank.
               </>
             }
           >
@@ -254,8 +259,9 @@ export function StaplesPrintModal({
                 lineHeight: 1.55,
               }}
             >
-              <strong>⚠️ Don't forget to attach the PDF.</strong> The email
-              body can be left blank — Staples only reads the attachment.
+              <strong>⚠️ Don't forget to attach the PDF.</strong> The Gmail,
+              Outlook and Yahoo buttons fill in the address and subject, not
+              the file.
             </div>
             <div
               style={{
@@ -273,26 +279,25 @@ export function StaplesPrintModal({
 
           <Step
             index={3}
-            title="Wait for the 8-digit release code"
+            title="Wait for your release code"
             body={
               <>
-                Staples will reply within a few minutes with an email
-                containing an 8-digit code. This code unlocks your print job
-                at any Staples location.
+                Staples replies by email with a release code. The code unlocks
+                your print job at a Staples store.
               </>
             }
           />
 
           <Step
             index={4}
-            title="Print at any Staples kiosk"
+            title="Print at a Staples store"
             body={
               <>
-                Walk up to a self-serve print kiosk → select{' '}
+                At a self-serve print kiosk, look for an option such as{' '}
                 <strong style={{ color: '#c8cad0' }}>"Mobile Device"</strong>{' '}
-                (sometimes "Print from Mobile" or "Email") → enter the 8-digit
-                code → pick paper size and pay. Your poster prints right
-                away.
+                ("Print from Mobile" or "Email" on some kiosks), enter the
+                code, then pick the paper size and pay. For a large-format
+                poster, ask at the print counter.
               </>
             }
           />
@@ -310,10 +315,10 @@ export function StaplesPrintModal({
             lineHeight: 1.55,
           }}
         >
-          💡 <strong style={{ color: '#c8b6ff' }}>Tip:</strong> Some campus Staples
-          stores require 24–48h lead time for large-format poster printing.
-          Ask the associate about in-stock paper sizes (A0, A1, 36×48") before
-          committing the print job.
+          💡 <strong style={{ color: '#c8b6ff' }}>Tip:</strong> Large-format
+          printing can take longer than a kiosk print. Before you count on a
+          deadline, ask the store how long it takes and which paper sizes
+          (A0, A1, 36×48") it has in stock.
         </div>
 
         <div

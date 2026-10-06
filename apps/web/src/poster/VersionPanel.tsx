@@ -194,8 +194,8 @@ export function VersionPanel({ posterId, onSaveVersion, onRestoreVersion }: Prop
 
       {atLimit ? (
         <div style={warnStyle}>
-          You've hit the {MAX_VERSIONS_PER_POSTER}-version limit. Delete an old
-          version to save a new one.
+          Save version stops at the {MAX_VERSIONS_PER_POSTER}-version limit. Delete an
+          old version to save a new one with it.
         </div>
       ) : nearLimit ? (
         <div style={warnStyle}>

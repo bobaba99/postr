@@ -132,7 +132,7 @@ describe('refund rule before purchase (2026-09-11)', () => {
 
   it('gives both paid tiers a plan-specific refund line, and the free tier none', () => {
     expect(term?.refund).toMatch(/14 days/);
-    expect(pack?.refund).toMatch(/first export/i);
+    expect(pack?.refund).toMatch(/until you use an export credit/i);
     expect(free?.refund).toBeUndefined();
   });
 
@@ -173,7 +173,7 @@ describe('refund rule before purchase (2026-09-11)', () => {
     expect(link).toHaveAttribute('href', '/terms#refunds');
     const finePrint = link.closest('p')?.textContent ?? '';
     expect(finePrint).toMatch(/14 days/);
-    expect(finePrint).toMatch(/first export/i);
+    expect(finePrint).toMatch(/until you use an export credit/i);
     expect(finePrint).not.toMatch(/\bAI\b/i);
   });
 });

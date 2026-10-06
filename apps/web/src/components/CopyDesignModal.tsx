@@ -216,7 +216,7 @@ export function CopyDesignModal({ open, onClose }: Props) {
                 user watches. */}
             <BusyIndicator
               label={`${STAGE_LABELS[stage]}…`}
-              hint="Reading a PDF or a large image can take a few seconds."
+              hint="Reading the file and matching its style can take a few seconds."
             />
           </div>
         )}
@@ -342,9 +342,9 @@ function Header({ onClose }: { onClose: () => void }) {
           Copy a design
         </h3>
         <p style={{ margin: '4px 0 0', fontSize: 12, color: '#9ca3af' }}>
-          Upload a poster you admire — we lift its colours and type and
-          apply them to <em>your</em> poster. Copies the look, not the
-          content.
+          Upload a poster you admire. We take its colours and the closest
+          match from our fonts and apply them to <em>your</em> poster.
+          Copies the look, not the content.
         </p>
       </div>
       <button

@@ -90,17 +90,20 @@ export function MobileNotice() {
     setDismissed(true);
   };
 
+  // The strip shows on every route but the two exempt ones, including
+  // pages that do work on a phone (/pricing, the legal pages). So it
+  // names the EDITOR, the one surface that needs a computer, rather
+  // than calling the page in front of the visitor unfit for phones.
   return (
     <aside
       role="region"
-      aria-label="Not optimised for phones"
+      aria-label="The editor is not optimised for phones"
       className="postr-rise-in fixed inset-x-0 bottom-0 z-[60] flex items-start gap-3 border-t border-[#2a2a3a] bg-[#111118]/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-[#c8cad0] shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur"
     >
       <span aria-hidden className="mt-0.5 text-lg leading-none">💻</span>
       <p className="m-0 flex-1 text-[13px] leading-snug">
-        <span className="font-semibold text-[#e2e2e8]">Not optimised for phones.</span>{' '}
-        Postr is built for a laptop or desktop screen — open this page on a
-        computer for the full editor.
+        <span className="font-semibold text-[#e2e2e8]">The editor is not optimised for phones.</span>{' '}
+        Open Postr on a laptop or desktop computer to make and edit posters.
       </p>
       <button
         type="button"

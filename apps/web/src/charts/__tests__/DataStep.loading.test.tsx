@@ -70,7 +70,7 @@ describe('DataStep loading feedback', () => {
 
     dropFile(file);
     await waitFor(() => {
-      expect((screen.getByText('Upload CSV or Excel') as HTMLButtonElement).disabled).toBe(
+      expect((screen.getByText('Upload CSV or Excel (.xlsx)') as HTMLButtonElement).disabled).toBe(
         true,
       );
     });
@@ -80,7 +80,7 @@ describe('DataStep loading feedback', () => {
 
     release();
     await waitFor(() => {
-      expect((screen.getByText('Upload CSV or Excel') as HTMLButtonElement).disabled).toBe(
+      expect((screen.getByText('Upload CSV or Excel (.xlsx)') as HTMLButtonElement).disabled).toBe(
         false,
       );
     });

@@ -130,9 +130,10 @@ export class EditorErrorBoundary extends Component<Props, State> {
               margin: '0 0 24px',
             }}
           >
-            Your work is safe — Postr auto-saves every few seconds, so nothing
-            you typed before the error has been lost. The error details below
-            help us track down what went wrong.
+            Postr saves your changes a moment after you stop editing, and
+            sends any change still waiting when the editor closes, so your
+            work from before the error is saved unless a save failed. The
+            error details below help us track down what went wrong.
           </p>
           <pre
             style={{

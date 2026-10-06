@@ -108,7 +108,7 @@ const twoCol: LayoutTemplate = {
 const billboard: LayoutTemplate = {
   key: 'billboard',
   name: 'Billboard',
-  description: 'Award-winning assertion-evidence.',
+  description: 'Key finding up top, figure below.',
   build: (pw, ph) => {
     const { W, bodyTop, bodyHeight } = bodyMetrics(pw, ph);
     const c = (W - M * 2 - GAP * 2) / 3;

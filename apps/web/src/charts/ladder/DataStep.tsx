@@ -67,7 +67,7 @@ function failureMessage(outcome: ParseOutcome): string {
     case 'empty':
       return 'We couldn’t find any rows in that. Try pasting the cells, including the header row.';
     case 'no-delimiter':
-      return 'That looks like prose, not a table — paste cells from a spreadsheet, or upload a CSV or Excel file.';
+      return 'That looks like prose, not a table — paste cells from a spreadsheet, or upload a CSV or .xlsx file.';
     case 'too-large':
       return `That’s ${outcome.rowCount.toLocaleString()} rows — charts cap at ${CHART_MAX_ROWS.toLocaleString()} so the poster stays fast.`;
     case 'legacy-xls':
@@ -251,7 +251,8 @@ export function DataStep({
           disabled={reading !== null}
           onClick={() => fileRef.current?.click()}
         >
-          Upload CSV or Excel
+          {/* .xlsx only: read-excel-file rejects legacy .xls (parseExcel.ts). */}
+          Upload CSV or Excel (.xlsx)
         </button>
         {/* The phone-friendly entry: naming variables beats pasting a
             table on a 375px screen, which is the whole reason it

@@ -16,7 +16,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = '11 septembre 2026';
+const LAST_UPDATED = '5 octobre 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function TermsFr() {
@@ -43,11 +43,11 @@ export default function TermsFr() {
           Les présentes conditions d’utilisation (« Conditions ») constituent une entente
           juridique entre vous et Postr (« nous »), exploité par{' '}
           <strong className="text-[#e2e2e8]">Resila Technologies Inc.</strong>, une
-          société constituée dans la province de Québec, au Canada. En créant un
-          compte, en vous connectant ou en utilisant autrement Postr — y compris en
-          consultant la galerie publique sans compte —, vous acceptez les présentes
+          société immatriculée dans la province de Québec, au Canada. En créant un
+          compte, en vous connectant ou en utilisant autrement Postr, y compris en
+          utilisant l’éditeur sans vous inscrire, vous acceptez les présentes
           Conditions ainsi que notre{' '}
-          <Link to="/privacy" className="text-[#7c6aed] underline">
+          <Link to="/privacy/fr" className="text-[#7c6aed] underline">
             Politique de confidentialité
           </Link>
           . Si vous n’êtes pas d’accord, n’utilisez pas le service.
@@ -55,32 +55,30 @@ export default function TermsFr() {
 
         <SectionHeading n="2" title="Ce qu’est Postr" />
         <Body>
-          Postr est un éditeur d’affiches scientifiques et une plateforme de partage.
-          Il vous permet de créer des affiches de qualité pour conférences, de
-          conserver des brouillons, de partager des liens en lecture seule, de
-          soumettre des commentaires et — si vous le souhaitez — de publier des
-          affiches dans une galerie publique afin que d’autres utilisateurs et
-          visiteurs puissent les voir.
+          Postr est un éditeur d’affiches scientifiques. Il vous permet de créer
+          des affiches aux formats standard des conférences, de conserver des
+          brouillons, d’exporter vos affiches en PDF, PowerPoint ou LaTeX et de
+          soumettre de la rétroaction.
         </Body>
         <CalloutBox>
           <strong className="text-[#e2e2e8]">
-            Postr est une plateforme de partage, et non un éditeur au sens juridique.
+            Postr héberge votre contenu. Il n’en est pas l’éditeur au sens juridique.
           </strong>
           <br />
           Nous hébergeons et affichons le contenu que vous téléversez. Nous ne le
-          vérifions pas quant à son exactitude, son originalité ou sa licéité avant sa
-          mise en ligne. Vous êtes seul responsable de ce que vous publiez — voir la
-          section 5 ci-dessous.
+          vérifions pas quant à son exactitude, son originalité ou sa licéité. Vous
+          êtes seul responsable de ce que vous téléversez; voir la section 5
+          ci-dessous.
         </CalloutBox>
 
         <SectionHeading n="3" title="Comptes" />
         <List
           items={[
-            'Vous pouvez commencer à utiliser Postr avec une session anonyme et la convertir ultérieurement en compte permanent. Toute votre progression est alors transférée.',
+            'Vous pouvez commencer à utiliser Postr avec une session anonyme et la convertir ultérieurement en un nouveau compte permanent. Toute votre progression est alors transférée. Si vous vous connectez plutôt à un compte que vous possédez déjà, le travail de la session anonyme n’y est pas transféré.',
             'Vous devez fournir des renseignements d’inscription exacts et garder vos identifiants de connexion confidentiels.',
             'Vous devez être âgé d’au moins 16 ans (ou avoir l’âge minimal du consentement numérique dans votre pays) pour créer un compte permanent.',
             'Vous êtes responsable de tout ce qui se produit sous votre compte.',
-            'Vous pouvez supprimer votre compte à tout moment depuis votre page Profil. La suppression est permanente et immédiate.',
+            'Vous pouvez supprimer votre compte à tout moment depuis votre page Profil. La suppression est permanente et immédiate. Elle met aussi fin sur-le-champ à un forfait à terme payé, sans remboursement pour le reste de la période, et retire les crédits d’exportation inutilisés.',
           ]}
         />
 
@@ -93,7 +91,7 @@ export default function TermsFr() {
             'Téléverser, publier ou partager du contenu qui contient du matériel illicite, des maliciels ou des liens vers des maliciels.',
             'Usurper l’identité d’une personne ou d’une entité, ou déclarer faussement votre affiliation avec l’une d’elles.',
             'Tenter de sonder, d’analyser ou de tester la vulnérabilité du service, de contourner l’authentification ou de perturber d’autres utilisateurs.',
-            'Abuser du système de commentaires, contourner les limites de fréquence ou effectuer une extraction automatisée au-delà de ce que ferait un utilisateur normal.',
+            'Abuser du système de rétroaction, contourner les limites de fréquence ou effectuer une extraction automatisée au-delà de ce que ferait un utilisateur normal.',
             'Utiliser Postr pour entraîner des modèles d’apprentissage automatique sur le contenu d’autres utilisateurs.',
           ]}
         />
@@ -112,7 +110,7 @@ export default function TermsFr() {
 
         <SubHeading>5.1 Vos garanties</SubHeading>
         <Body>
-          En téléversant, en publiant ou en partageant quoi que ce soit sur Postr, vous{' '}
+          En téléversant ou en créant quoi que ce soit sur Postr, vous{' '}
           <strong>déclarez et garantissez</strong> que :
         </Body>
         <List
@@ -132,50 +130,30 @@ export default function TermsFr() {
             héberger, stocker, reproduire, afficher et transmettre Votre contenu
           </strong>{' '}
           dans la mesure nécessaire à la fourniture des fonctionnalités que vous
-          utilisez — par exemple, l’enregistrement de vos brouillons, la génération
-          d’aperçus, la remise de liens de partage aux personnes que vous invitez et
-          l’affichage de vos affiches dans la galerie publique lorsque vous choisissez
-          de les publier.
+          utilisez, par exemple l’enregistrement de vos brouillons, la génération
+          d’aperçus, la lecture des PDF et des images que vous importez et la
+          production des fichiers que vous exportez.
         </Body>
         <Body>
-          Cette licence prend fin lorsque vous supprimez le contenu concerné ou votre
-          compte, sauf (a) pour les copies que les caches techniques normaux et les
-          sauvegardes conservent pendant une courte période, et (b) pour le contenu
-          partagé que des tiers ont pu déjà consulter ou télécharger pendant qu’il était
-          public.
+          Cette licence prend fin lorsque vous supprimez votre compte et, pour une
+          affiche, lorsque vous supprimez cette affiche, sauf (a) pour les images que
+          vous avez téléversées dans une affiche et son image d’aperçu, qui restent
+          stockées après la suppression de l’affiche et sont supprimées lorsque vous
+          supprimez votre compte, mais qui restent stockées, avec les autres fichiers téléversés par l’invité,
+          lorsque notre nettoyage hebdomadaire supprime un compte invité; (b) pour les copies que les caches techniques
+          normaux et les sauvegardes conservent après la suppression; et (c) pour le
+          contenu que des tiers ont pu déjà consulter ou télécharger pendant qu’il
+          était public.
         </Body>
 
-        <SubHeading>5.3 La galerie publique — à lire attentivement</SubHeading>
-        <CalloutBox>
-          <strong className="text-[#e2e2e8]">
-            Tout ce que vous publiez dans la galerie est public.
-          </strong>
-          <br />
-          Cela peut être vu par quiconque sur Internet, y compris par des personnes qui
-          n’ont pas de compte Postr. Cela peut être indexé par les moteurs de
-          recherche. Cela peut être mis en cache ou lié par des tiers que vous ne
-          contrôlez pas. Réfléchissez avant de publier — surtout si l’affiche contient
-          des résultats non publiés, des données sous embargo ou tout élément que vos
-          collaborateurs ou votre établissement ne voudraient pas rendre public.
-        </CalloutBox>
+        <SubHeading>5.3 Partage et galerie publique</SubHeading>
         <Body>
-          En choisissant de publier une affiche (qu’elle ait été créée dans Postr ou
-          qu’il s’agisse d’un PDF ou d’une image que vous avez téléversé), vous
-          confirmez chacun des points suivants :
-        </Body>
-        <List
-          items={[
-            'Vous êtes le titulaire légitime des droits sur chaque élément de l’affiche — texte, figures, photos, logos, données — ou vous détenez l’autorisation écrite de chaque titulaire de droits pour les afficher publiquement.',
-            'Tous les coauteurs nommés sur l’affiche ont consenti à son affichage public.',
-            'Vous ne publiez pas de matériel confidentiel, sous embargo ou soumis à un contrôle des exportations.',
-            'Vous retirerez l’affiche sans délai si l’un des points ci-dessus cesse d’être vrai.',
-          ]}
-        />
-        <Body>
-          Vous pouvez retirer (dépublier ou supprimer) toute affiche à tout moment
-          depuis votre tableau de bord. Une fois retirée, elle ne sera plus diffusée par
-          Postr, mais nous ne pouvons pas rappeler les copies que des tiers ont pu déjà
-          faire.
+          Les liens de partage et la galerie publique sont désactivés. L’application
+          n’offre aucune commande qui publie une affiche ou qui crée un lien
+          permettant à une autre personne de l’ouvrir. Si vous avez publié une
+          affiche dans la galerie avant sa fermeture, vous pouvez la retirer depuis
+          la section « Gallery submissions » de votre page Profil. Nous ne pouvons
+          pas rappeler les copies que des tiers ont pu déjà faire.
         </Body>
 
         <SubHeading>5.4 Droit d’auteur et retraits de type DMCA</SubHeading>
@@ -207,12 +185,13 @@ export default function TermsFr() {
 
         <SectionHeading n="6" title="Contenu et marques de commerce de Postr" />
         <Body>
-          Le logiciel Postr, l’image de marque, le logo, la palette, les polices que
-          nous fournissons et les modèles intégrés nous appartiennent (ou sont utilisés
-          sous licence). Vous ne pouvez les utiliser que dans la mesure nécessaire pour
-          exploiter et partager les affiches que vous créez sur Postr. Vous ne pouvez
-          pas réutiliser nos éléments de marque pour d’autres produits ou services sans
-          autorisation écrite.
+          Le logiciel Postr, l’image de marque, le logo, la palette et les modèles
+          intégrés nous appartiennent (ou sont utilisés sous licence). Les polices
+          offertes dans le menu des polices appartiennent à des tiers et sont
+          soumises à leurs propres licences. Vous ne pouvez utiliser nos éléments que dans la mesure
+          nécessaire pour créer, exporter et partager les affiches que vous réalisez
+          sur Postr. Vous ne pouvez pas réutiliser nos éléments de marque pour
+          d’autres produits ou services sans autorisation écrite.
         </Body>
 
         <SectionHeading n="7" title="Frais, abonnements et remboursements" />
@@ -237,8 +216,9 @@ export default function TermsFr() {
 
         <SubHeading>7.1 Annulation de votre abonnement</SubHeading>
         <Body>
-          Vous pouvez annuler le forfait à terme à tout moment — au moyen du lien « Gérer
-          l’abonnement » sur votre page Profil. L’annulation met fin au prochain
+          Vous pouvez annuler le forfait à terme à tout moment par l’intermédiaire de
+          Stripe, qui gère la facturation de Postr. Le bouton « Manage subscription »
+          de votre page Profil vous y mène. L’annulation met fin au prochain
           renouvellement; votre forfait demeure actif jusqu’à la fin de la période que
           vous avez déjà payée. L’annulation est sans frais et ne constitue pas un
           remboursement.
@@ -251,46 +231,53 @@ export default function TermsFr() {
           Si vous changez d’avis, nous rembourserons intégralement votre plus récente
           facturation de forfait dans les 14 jours suivant cette facturation, à
           condition que vous n’ayez pas effectué d’exportation PowerPoint ou LaTeX
-          pendant cette période. Effectuer une exportation payante revient à utiliser le
-          produit que vous avez payé, de sorte que la garantie prend fin à ce
-          moment-là. Après 14 jours, ou une fois que vous avez exporté, cette
-          facturation n’est pas remboursable — vous pouvez toujours annuler à tout
-          moment pour interrompre les renouvellements futurs.
+          pendant cette période. Un remboursement annule aussi le forfait
+          immédiatement, ce qui met fin à ses exportations PowerPoint et LaTeX.
+          Effectuer une exportation payante revient à utiliser le produit que vous
+          avez payé, de sorte que la garantie prend fin à ce moment-là. Après 14
+          jours, ou une fois que vous avez exporté, la garantie ne couvre plus cette
+          facturation. Vous pouvez toujours annuler à tout moment pour interrompre
+          les renouvellements futurs.
         </CalloutBox>
         <CalloutBox>
-          <strong className="text-[#e2e2e8]">Pack d’exportation — remboursable intégralement jusqu’à votre première exportation.</strong>
+          <strong className="text-[#e2e2e8]">Pack d’exportation — remboursable intégralement jusqu’à ce que vous utilisiez un crédit.</strong>
           <br />
-          Si vous changez d’avis avant d’utiliser le pack, nous rembourserons
-          intégralement la facturation de CA$9.99, à condition que vous n’ayez effectué
-          aucune exportation PowerPoint ou LaTeX avec celui-ci. Effectuer une
-          exportation payante revient à utiliser le produit que vous avez payé : dès
-          qu’un crédit a été utilisé, le pack n’est plus remboursable, même en partie.
-          Le remboursement d’un pack retire ses 3 crédits de votre compte.
+          Si vous changez d’avis, nous rembourserons intégralement la facturation de
+          CA$9.99 de votre plus récent pack, à condition qu’aucun de vos crédits
+          d’exportation n’ait été utilisé, que ce soit de ce pack ou d’un pack
+          antérieur. Chaque crédit correspond à une exportation PowerPoint ou LaTeX
+          payée : dès qu’un crédit a été utilisé, le pack n’est plus remboursable,
+          même en partie. Le remboursement d’un pack retire ses 3 crédits de votre
+          compte.
         </CalloutBox>
         <Body>
-          Vous pouvez demander un remboursement depuis la section Abonnement de votre
-          page Profil, ou en écrivant à{' '}
+          Vous pouvez demander un remboursement depuis la section « Subscription » de
+          votre page Profil, ou en écrivant à{' '}
           <a className="text-[#7c6aed] underline" href={`mailto:${CONTACT_EMAIL}`}>
             {CONTACT_EMAIL}
           </a>
-          . Les remboursements sont retournés sur votre mode de paiement d’origine et
-          peuvent prendre quelques jours ouvrables avant d’apparaître.
+          . Tant qu’un forfait à terme est actif, cette section n’offre que le
+          remboursement du forfait. Les remboursements sont retournés sur votre mode
+          de paiement d’origine et peuvent prendre quelques jours ouvrables avant
+          d’apparaître.
         </Body>
         <Body>
           <strong className="text-[#c8cad0]">Si vous êtes dans l’UE, l’EEE ou au Royaume-Uni :</strong>{' '}
           vous disposez d’un droit légal de rétractation de 14 jours pour un achat à
-          distance. Lorsque vous achetez une fonctionnalité payante, il vous est demandé
-          de confirmer que vous voulez y accéder immédiatement et que vous comprenez que
-          vous perdez ce droit de rétractation de 14 jours dès que vous effectuez une
-          exportation payante (pour le forfait à terme) ou utilisez un crédit (pour le
-          pack). Lorsque cette confirmation n’a pas été obtenue, votre droit légal de 14
+          distance. Lorsque vous achetez depuis l’invite d’exportation de l’éditeur,
+          il vous est demandé de confirmer que vous voulez un accès immédiat et que
+          vous comprenez que vous perdez ce droit de rétractation de 14 jours dès que
+          vous effectuez une exportation payante (pour le forfait à terme) ou utilisez
+          un crédit (pour le pack). Un achat commencé depuis la page « Pricing » ne
+          demande pas cette confirmation. Lorsque cette confirmation n’a pas été
+          obtenue, votre droit légal de 14
           jours s’applique indépendamment de l’utilisation. Rien dans la présente
           section ne limite les droits de remboursement ou d’annulation dont vous
           disposez en vertu des lois impératives de protection des consommateurs de
           votre pays de résidence.
         </Body>
 
-        <SectionHeading n="8" title="Commentaires" />
+        <SectionHeading n="8" title="Rétroaction" />
         <Body>
           Si vous soumettez des commentaires, des rapports de bogue ou des demandes de
           fonctionnalités au moyen de l’outil de rétroaction intégré à l’application,
@@ -304,7 +291,7 @@ export default function TermsFr() {
           items={[
             'Nous pouvons modifier, suspendre ou interrompre toute partie de Postr à tout moment, avec ou sans préavis.',
             'Nous ne garantissons pas une disponibilité ininterrompue. Des entretiens planifiés, des correctifs d’urgence et des pannes de tiers surviendront.',
-            'Vous pouvez cesser d’utiliser Postr à tout moment. Nous pouvons résilier votre compte en cas de manquement substantiel aux présentes Conditions ou d’inactivité prolongée d’une session d’invité anonyme.',
+            'Vous pouvez cesser d’utiliser Postr à tout moment. Nous pouvons résilier votre compte en cas de manquement substantiel aux présentes Conditions. Un compte invité qui n’est jamais converti en compte permanent peut être supprimé une fois 14 jours écoulés depuis sa dernière connexion, comme l’explique la Politique de confidentialité.',
             'Les sections qui, de par leur nature, doivent survivre à la résiliation (par exemple, Vos garanties, l’indemnisation, les exclusions de garantie et la limitation de responsabilité) survivront.',
           ]}
         />

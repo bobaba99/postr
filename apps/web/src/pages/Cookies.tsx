@@ -6,22 +6,24 @@
  * PIPEDA, and Quebec's Law 25 all cover "cookies and similar
  * technologies", so this policy uses that broader framing.
  *
- * Postr uses only strictly-necessary DEVICE STORAGE — no advertising,
- * no social trackers, and nothing optional written to the browser.
+ * Postr sets no cookie. The §3 table lists every localStorage and
+ * sessionStorage key the app writes; pages/__tests__/
+ * cookiesStorageInventory.test.ts fails when a file starts writing a
+ * key the table (English or French) does not list, or the table names
+ * a key the code never writes. The page states the owner's position
+ * that every listed entry is strictly necessary; that position, not
+ * the code, is what decides that no consent banner is shown.
  *
  * Page views ARE counted, via Vercel Web Analytics (added 2026-07-27).
- * That is compatible with the above and with the consent promise in
- * §4 because it stores nothing on the device: no cookie, no
- * localStorage, no persistent identifier — a visitor is a hash of the
- * request, discarded after 24h. The ePrivacy Art. 5(3) consent duty
- * attaches to storing or reading data on the device, so a genuinely
- * storage-free counter does not trigger it.
+ * As configured (no enableCookie, no identify) it writes nothing to
+ * the device. The visitor hash and its 24-hour discard are Vercel's
+ * documented behaviour, so the page attributes them to Vercel.
  *
  * If that ever changes — a real identifier, a cookie, anything
  * optional written to the browser — the banner promised in §4 is owed,
  * and this comment is the reminder. `analytics/redactUrl.ts` is the
- * other half: it strips share-link slugs and poster ids before any
- * URL is sent.
+ * other half: it strips share-link slugs and poster ids from the URL
+ * the page-view event reports.
  */
 import { Link } from 'react-router';
 import { PublicFooter } from '@/components/PublicFooter';
@@ -29,7 +31,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = 'July 27, 2026';
+const LAST_UPDATED = 'October 5, 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Cookies() {
@@ -68,32 +70,33 @@ export default function Cookies() {
         <Body>
           A <em>cookie</em> is a small text file a website asks your browser to
           store so that it can recognise you on a later page load. Modern web apps
-          also use related browser features — <em>localStorage</em> and{' '}
-          <em>sessionStorage</em> — which serve the same purpose (remembering state
-          between visits) but live in a different part of the browser. Wherever this
-          policy says “cookies”, we mean cookies, localStorage, and sessionStorage
-          collectively.
+          also use two related browser features, <em>localStorage</em> and{' '}
+          <em>sessionStorage</em>, which do a similar job (remembering state from
+          one page load to the next) but live in a different part of the browser.
+          Wherever this policy says “cookies”, we mean cookies, localStorage, and
+          sessionStorage collectively.
         </Body>
         <Body>
-          Regulators (CAI, CNIL, ICO, OPC) treat these technologies the same way:
-          <strong> strictly necessary</strong> storage can be used without asking,
-          but anything optional — analytics, advertising, third-party embeds —
-          requires your <strong>prior, informed, freely-given consent</strong>.
+          Privacy regulators (CAI, CNIL, ICO, OPC) treat these technologies the
+          same way as cookies. <strong>Strictly necessary</strong> storage can be
+          used without asking. Optional storage, such as for advertising or
+          third-party embeds, generally needs your{' '}
+          <strong>prior, informed, freely-given consent</strong>, and the rules
+          for analytics differ from one regulator to another.
         </Body>
 
         <SectionHeading n="3" title="What Postr uses today" />
         <CalloutBox>
-          <strong className="text-[#e2e2e8]">Postr uses only strictly-necessary storage.</strong>
+          <strong className="text-[#e2e2e8]">
+            Everything Postr stores on your device is listed in the table below.
+          </strong>
           <br />
-          We do not run Google Analytics, Facebook Pixel, advertising trackers,
-          social-media share buttons with tracking, or any other technology that
-          stores something on your device. We do count page views, using Vercel
-          Web Analytics — it sets no cookie, writes nothing to your browser, and
-          cannot recognise you on a second visit or on any other site. No consent
-          banner is shown because none of the entries below require consent under
-          GDPR, the ePrivacy Directive, PIPEDA, or Quebec Law 25 — that duty
-          attaches to storing or reading data on your device, and page counting
-          does neither.
+          Each entry makes a Postr feature work or keeps something you saved,
+          and none is used for advertising or to follow you across sites. We do
+          not run Google Analytics, Facebook Pixel, advertising trackers or
+          social-media share buttons. We do count page views with Vercel Web
+          Analytics, which, as Postr uses it, sets no cookie and writes nothing
+          to your browser. Section 4 explains how it works.
         </CalloutBox>
 
         <Table
@@ -102,34 +105,84 @@ export default function Cookies() {
             [
               'sb-<project-ref>-auth-token',
               'localStorage',
-              'Holds your Supabase authentication session (JWT + refresh token). Without it, the app cannot tell who you are and your drafts cannot be loaded.',
-              'Until you sign out or the session expires',
+              'Holds your sign-in session: the tokens that prove who you are and a copy of your account record. Without it, Postr cannot tell who you are or load your posters.',
+              'Until you delete your account, the session ends, or you clear browser data',
             ],
             [
-              'postr-onboarding-*',
+              'postr.style-presets, postr.custom-palettes, postr.checklist-templates, postr.scratch-pad, postr.scratch-note',
               'localStorage',
-              'Remembers whether you have seen the onboarding tour so we do not show it again on every visit.',
+              'The style presets, colour palettes, checklist templates and Scratch Pad notes you save in the editor, so they are there on your next visit. The style-presets entry is created empty the first time you open the editor.',
+              'Until you delete them or clear browser data. Deleting your account also clears all but the palettes.',
+            ],
+            [
+              'postr.profile',
+              'localStorage',
+              'The profile details you enter on your Profile page: name, institution, department, ORCID and website. They are kept only in this browser and are not sent to our servers.',
+              'Until you delete your account or clear browser data',
+            ],
+            [
+              'postr.onboarding-done, postr.cb-random-pref',
+              'localStorage',
+              'Remember that you finished or skipped the editor tour, and whether random palettes should be colour-blind friendly.',
+              'Until you clear browser data. Deleting your account or choosing Replay tour on your Profile page also clears the tour entry.',
+            ],
+            [
+              'postr.welcome-seeded:<account id>',
+              'localStorage',
+              'Records that your welcome poster was created, so it is not created again. The key name contains your account id.',
               'Until you clear browser data',
             ],
             [
-              'postr-templates',
+              'postr.active-editor.<poster id>',
               'localStorage',
-              'Holds custom poster templates you save from the editor’s Scratch Pad so they are available on your next visit.',
-              'Until you delete the template or clear browser data',
+              'Lets Postr warn you when the same poster is open in two tabs. The key name contains the poster id, or “new” when the editor opens at /p/new. The entry holds a random tab id and the time the poster was last open.',
+              'Until you clear browser data',
             ],
             [
-              'Supabase refresh/session timers',
+              'postr.tab-id',
               'sessionStorage',
-              'Short-lived technical flags used by the Supabase client to coordinate token refresh between tabs.',
-              'Until you close the browser tab',
+              'A random id for this tab, used by the two-tab warning.',
+              'Until you close the tab',
+            ],
+            [
+              'postr.signupConsent, postr.checkoutIntent',
+              'sessionStorage',
+              'Carry your research and marketing email choices, and the plan you picked, through sign-up, including a sign-in with Google.',
+              'Until they are used or you close the tab',
+            ],
+            [
+              'postr.autoArrangeOnLoad',
+              'sessionStorage',
+              'Tells the editor to tidy the layout of a poster you just imported. Holds that poster’s id.',
+              'Until the editor reads it or you close the tab',
+            ],
+            [
+              'postr-just-refreshed, postr-acknowledged-build, postr.mobile-notice-dismissed',
+              'sessionStorage',
+              'Remember your answer to the notice about a new version of Postr, and that you closed the notice shown on phone-size screens, so neither comes back in this tab.',
+              'Until you close the tab at the latest',
             ],
           ]}
         />
         <Body>
-          All of these fall under the “strictly necessary to provide the service
-          the user explicitly requested” exemption in Article 5(3) of the
-          ePrivacy Directive and the equivalent provisions of PIPEDA and Quebec
-          Law 25. None of them track you across other sites.
+          The sign-in library also writes a test entry named lswt-… and deletes it
+          straight away, to check that your browser allows storage. It is not kept.
+        </Body>
+        <Body>
+          We treat all of these as falling under the “strictly necessary to
+          provide the service the user explicitly requested” exemption in Article
+          5(3) of the ePrivacy Directive and the equivalent provisions of PIPEDA
+          and Quebec Law 25, so Postr shows no consent banner. None of them track
+          you across other sites, and Postr itself sets no cookies at all.
+        </Body>
+        <Body>
+          Some features load files straight from other services, which have their
+          own cookie policies. The editor loads poster fonts from Google Fonts.
+          The logo picker opens on its Presets tab, which loads university icons
+          from Google, and a logo you pick there is loaded from Wikimedia sites
+          or, failing that, from Google. Signing in with Google opens Google’s
+          sign-in pages, which have their own cookie policy. Payments and billing
+          open on Stripe’s own pages.
         </Body>
 
         <SectionHeading n="4" title="Page counting, and what Postr still does not use" />
@@ -137,29 +190,29 @@ export default function Cookies() {
           Postr counts page views with{' '}
           <strong className="text-[#e2e2e8]">Vercel Web Analytics</strong>, so we
           can see which pages people find useful. It is worth being precise about
-          what that does and does not involve. It sets{' '}
-          <strong>no cookie</strong> and writes nothing to your browser. There is
-          no identifier that persists: a visit is counted using a value derived
-          from the request itself and discarded within 24 hours, so a second
-          visit tomorrow is a stranger. Every figure is an aggregate — a count of
-          views on a page, never a record of what you did.
+          what that does and does not involve. As Postr uses it, it sets{' '}
+          <strong>no cookie</strong> and writes nothing to your browser. Each page
+          view sends Vercel the page address, and it can include the address of
+          the page you came from, along with what every web request carries, such
+          as your IP address and browser type. Vercel says it tells visits apart
+          with a value derived from the request and discards that value within
+          24 hours.
         </Body>
         <Body>
-          We also strip the address before it is counted. Poster URLs, share
-          links and admin pages are recorded only as their shape —{' '}
-          <code className="text-[#c8b6ff]">/s/[redacted]</code> rather than the
-          slug you were sent. A share link is a link to unpublished work, and the
-          slug is what opens it, so it never leaves the app. Query strings are
-          discarded entirely.
+          In the page address it reports, Postr replaces poster and admin pages
+          with their shape, for example{' '}
+          <code className="text-[#c8b6ff]">/p/[redacted]</code> in place of your
+          poster’s id, and drops query strings entirely. Postr does not remove the
+          address of the page you came from, which can be another Postr page.
         </Body>
         <List
           items={[
-            'Advertising cookies — there are no ads on Postr.',
-            'Google Analytics, Matomo, PostHog, Plausible — none of these.',
-            'Cross-site tracking or fingerprinting — we do not profile you between visits or across other websites.',
-            'Social-media widgets — no Facebook, Twitter, or LinkedIn buttons that phone home.',
-            'Persistent identifiers beyond what your authentication session requires.',
-            'Recording of your poster contents, share-link slugs, or query strings in analytics.',
+            'Advertising cookies: there are no ads on Postr.',
+            'Google Analytics, Matomo, PostHog or Plausible: none of these.',
+            'Cross-site tracking or fingerprinting: we do not profile you between visits or across other websites.',
+            'Social-media widgets: no Facebook, Twitter or LinkedIn buttons that phone home.',
+            'Advertising or tracking identifiers: the only ids Postr stores on your device are the ones in the table above, each used by the feature described next to it.',
+            'Recording your poster contents in analytics, or poster ids and query strings in the page address Postr reports.',
           ]}
         />
         <Body>
@@ -172,53 +225,57 @@ export default function Cookies() {
 
         <SectionHeading n="5" title="How to control cookies" />
         <Body>
-          Because Postr currently only stores what is strictly necessary for
-          sign-in and editing, deleting these entries will sign you out and
-          discard your locally-saved templates and onboarding state. Your
-          server-side data (posters, profile, feedback) is unaffected.
+          Deleting these entries signs you out. It also removes the presets,
+          palettes, templates, Scratch Pad notes and profile details that are
+          kept only in your browser. The posters, feedback and settings saved
+          with your account stay on our servers, and your posters and settings
+          come back when you sign in again. If you use Postr as a guest, without
+          an account, the sign-in session is the only key to your posters: once
+          it is deleted, you can no longer open them.
         </Body>
         <Body>
           You can clear Postr’s storage in the usual ways for your browser:
         </Body>
         <List
           items={[
-            'Chrome / Edge: Settings → Privacy and security → Cookies and other site data → See all site data and permissions → search "postr.sh" → Delete.',
-            'Firefox: Settings → Privacy & Security → Cookies and Site Data → Manage Data → search "postr.sh" → Remove.',
+            'Chrome: Settings → Privacy and security → Third-party cookies → See all site data and permissions → search "postr.sh" → Delete.',
+            'Edge: open Settings, search for "cookies", open the list of all cookies and site data, then search "postr.sh" and delete it.',
+            'Firefox: Settings → Privacy and security → Clear data for specific sites → search "postr.sh" → Remove Selected → Save Changes.',
             'Safari: Settings → Privacy → Manage Website Data → search "postr.sh" → Remove.',
             'Mobile: follow your browser’s instructions for clearing site data.',
           ]}
         />
         <Body>
-          Most browsers also let you block all cookies, block third-party cookies,
-          or receive a prompt before each cookie is set. Blocking strictly-necessary
-          cookies will prevent Postr from working.
+          Most browsers also let you block cookies and other site data, either
+          for every site or only for third parties. If you block storage for
+          postr.sh, Postr cannot keep you signed in from one page load to the
+          next, and the editor may not work.
         </Body>
 
         <SectionHeading n="6" title="Do Not Track and Global Privacy Control" />
         <Body>
-          We respect “Do Not Track” (DNT) headers and the newer{' '}
-          <em>Global Privacy Control</em> (GPC) signal. Today these signals have
-          nothing to opt out of, since we do not run analytics or targeted
-          advertising. If we ever introduce optional tracking, receiving DNT or
-          GPC from your browser will be treated as an automatic opt-out.
+          Postr’s code does not read “Do Not Track” (DNT) headers or the newer{' '}
+          <em>Global Privacy Control</em> (GPC) signal, and it does not switch off
+          page counting when your browser sends them. Postr runs no advertising
+          and no cross-site tracking that these signals would switch off.
         </Body>
 
         <SectionHeading n="7" title="Retention" />
         <Body>
-          Each entry in the table above lives until the lifetime listed there.
-          None of them outlive 13 months, which is the maximum retention period
-          allowed for consent records under French CNIL guidance and a common
-          reference across EU regulators. When we add a consent cookie in the
-          future, we will default it to <strong>6 months</strong> in line with
-          CNIL’s recommendation.
+          Each entry in the table above lasts for the lifetime listed there.
+          Postr sets no expiry date on its localStorage entries, so each one
+          stays until the event in the table happens, however long that takes.
+          The sessionStorage entries end when you close the tab, if not before.
+          If we ever add a consent cookie, it will expire after{' '}
+          <strong>6 months</strong>, in line with CNIL’s recommendation.
         </Body>
 
         <SectionHeading n="8" title="Changes to this policy" />
         <Body>
           We may update this Cookies Policy as the product evolves. The “Last
           updated” date at the top reflects the current version. If a change is
-          material — for example, the first time we introduce an analytics or
-          advertising cookie — we will show a clear notice in the app before the
+          material, such as the first time we introduce an analytics or
+          advertising cookie, we will show a clear notice in the app before the
           change takes effect.
         </Body>
 

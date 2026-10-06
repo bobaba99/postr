@@ -289,7 +289,7 @@ export function scoreRuns({ recs, missing, selftest: st, truthOrig, truthFixed, 
         if (Math.abs(x.sourcePt - realSrc) > 0.05 + 1e-6) controlFails.push(`${r.key} ${x.name}: checker ${x.sourcePt} pt, real ${r2(realSrc)} pt`);
       }
     }
-    if (r.first.hasCopy && r.unchanged) bump('W1e', true, `${r.key}: "Copy corrected code" returned the script unchanged`);
+    if (r.first.hasCopy && r.unchanged) bump('W1e', true, `${r.key}: "Copy edited code" returned the script unchanged`);
     if (r.first.hasCopy && !r.unchanged) {
       // As on the page: the script raising is the checker's; any other failure is the instrument's.
       const tf = truthFixed[r.key];
@@ -396,7 +396,7 @@ export function scoreRuns({ recs, missing, selftest: st, truthOrig, truthFixed, 
     bump('P', phantom.length > 0, phantom.length ? `${r.key}: ${phantom.map((e) => `${e.name} ${e.checkerPrint} pt ${e.checker}`).join(', ')}` : null);
 
     if (r.first.hasCopy && r.unchanged) {
-      bump('F', true, `${r.key}: "Copy corrected code" returned the script unchanged`);
+      bump('F', true, `${r.key}: "Copy edited code" returned the script unchanged`);
     } else if (r.first.hasCopy) {
       const tf = truthFixed[r.key];
       const ffig = lastFig(tf);
@@ -476,7 +476,7 @@ export function scoreRuns({ recs, missing, selftest: st, truthOrig, truthFixed, 
         if ([...drawn, ...hidden].every((e) => e.real === 'pass')) w1.realAllPass += 1;
         if (dis.length || hidden.length) w1.disagree += 1;
         // W1p, the user's view: the corrected code passes in real matplotlib,
-        // so the page should now say "All elements pass". Rows for elements
+        // so the page should now say "Every element in the table meets its minimum". Rows for elements
         // the figure does not draw count here, since the user sees them.
         if ([...drawn, ...hidden].every((e) => e.real === 'pass')) {
           const red = fixedEls.filter((e) => !e.noRow && e.checker !== 'pass');

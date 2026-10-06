@@ -249,9 +249,12 @@ export function PreviewStep({
           }}
         >
           <strong style={{ fontSize: 13, color: '#d9a441' }}>{SAMPLE_DATA_LABEL}</strong>
+          {/* Shown for the worked-example branch too, where no columns were
+              detected; and an inserted chart's numbers cannot be edited
+              later, so the way to real numbers is building it again. */}
           <span style={{ fontSize: 12.5, lineHeight: 1.45, color: '#c8cad0' }}>
-            These values were generated from the columns we detected, so you can see the shape of
-            the figure. Replace them with your own numbers before using it.
+            These values are made up so you can see the shape of the figure. Build it again from
+            your own data before you use it.
           </span>
         </div>
       )}

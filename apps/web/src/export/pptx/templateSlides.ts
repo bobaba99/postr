@@ -61,12 +61,22 @@ export const TEMPLATE_SLIDE_LAYOUTS: readonly string[] = [
 /**
  * House-voice explainer copy. Plain, short, and about what the user
  * does next — no marketing, and nothing about how the deck was made.
+ *
+ * It says "this deck", not "your poster": the only caller today is the
+ * styled talk-deck export (`exportStyledDeckWithUtilitySlides`), which
+ * has no poster. There the slides take the deck theme's colours and the
+ * same Arial face as the content slides; on a poster deck they would
+ * take the poster's font and palette (`resolveTemplateStyle`). Either
+ * way the fonts and colours are the file's own. The talk-deck path
+ * defines none of the named layouts, so its empty slides hold only the
+ * layout label and their placeholders are not ours to promise; the copy
+ * no longer says "type over it".
  */
 export const EXPLAINER_HEADING = 'The slides after this one are empty templates.';
 export const EXPLAINER_BODY =
-  'They already use your poster’s fonts and colours. ' +
-  'Right-click the one you want and choose Duplicate Slide to add a section, ' +
-  'then type over it. Delete any you don’t use — including this slide.';
+  'They already use this deck’s fonts and colours. ' +
+  'To use one, right-click it and choose Duplicate Slide. ' +
+  'Delete any you don’t use, including this slide.';
 
 /**
  * pptxgenjs exposes no public setter for the slide's `<p:cSld name>`,

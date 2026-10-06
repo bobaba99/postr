@@ -112,7 +112,7 @@ export function NewPosterButton() {
             onClick={handlePrimary}
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[#e2e2e8] hover:bg-[#1a1a26]"
           >
-            <span aria-hidden>＋</span> New blank poster
+            <span aria-hidden>＋</span> New poster (3-column template)
           </button>
           <button
             type="button"

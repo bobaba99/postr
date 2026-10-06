@@ -126,7 +126,9 @@ export const SERIES_PALETTES_3: readonly SeriesPalette[] = [
     name: 'Blue · Orange · Gray',
     kind: 'qualitative',
     colors: ['#1a80bb', '#ea801c', '#b8b8b8'],
-    note: 'The most robust pair under red-green CVD, plus a neutral.',
+    // Simulated protanopia and deuteranopia (Machado 2009, CIE76): the
+    // blue-orange pair stays at least 98 dE apart (content/true-claims).
+    note: 'Blue and orange stay far apart under red-green CVD, plus a neutral.',
   },
   {
     id: 'teal-red-gray',
@@ -297,7 +299,7 @@ export const SERIES_PALETTES_NAMED: readonly SeriesPalette[] = [
     name: 'Okabe–Ito',
     kind: 'qualitative',
     colors: ['#000000', '#e69f00', '#56b4e9', '#009e73', '#f0e442', '#0072b2', '#d55e00', '#cc79a7'],
-    note: 'The standard eight-colour CVD-safe set for scientific figures.',
+    note: 'Okabe and Ito’s eight colours, designed for colour-vision deficiency.',
   },
   {
     id: 'tol-bright',
@@ -318,7 +320,7 @@ export const SERIES_PALETTES_NAMED: readonly SeriesPalette[] = [
     name: 'Tol high-contrast',
     kind: 'qualitative',
     colors: ['#004488', '#ddaa33', '#bb5566'],
-    note: 'Three maximally distinct colours, also mono-safe.',
+    note: 'Three well-separated colours, also mono-safe.',
   },
 ];
 

@@ -1,7 +1,7 @@
 {
   "name": "Postr",
   "short_name": "Postr",
-  "description": "Free conference poster maker for researchers.",
+  "description": "Conference poster maker for researchers.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#7c6aed",

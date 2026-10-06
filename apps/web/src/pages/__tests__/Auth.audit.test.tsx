@@ -175,14 +175,14 @@ describe('refund rule on the checkout-resume banner (2026-09-11)', () => {
       label.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(line.textContent).not.toMatch(/\bAI\b/i);
-    expect(screen.queryByText(/first export/i)).toBeNull();
+    expect(screen.queryByText(/export credit/i)).toBeNull();
   });
 
   it('states the pack refund line under the pack label', () => {
     renderPaidSignupFor('pack');
 
     const label = screen.getByText('Export pack · CA$9.99');
-    const line = screen.getByText(/first export/i);
+    const line = screen.getByText(/until you use an export credit/i);
     expect(label.parentElement).toBe(line.parentElement);
     expect(line.textContent).toMatch(/no refund after/i);
     expect(screen.queryByText(/14 days/)).toBeNull();

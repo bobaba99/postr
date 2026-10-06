@@ -94,3 +94,83 @@ describe('exportPosterLatex', () => {
     expect(tex).toContain('{[}1{]} J. Smith');
   });
 });
+
+/**
+ * Every sentence in README.txt is checked against the files it ships
+ * beside, through the same `exportPosterLatex` call the export button
+ * makes. `paidPlan: true` because that is the only LaTeX export a user
+ * can reach (EditableExportButtons passes `paidPlan: canExport`, and the
+ * button is disabled or gated without it).
+ */
+describe('README.txt claims match the files it ships with', () => {
+  const exportFiles = async (doc: ReturnType<typeof makeFixtureDoc>) => {
+    const { bytes } = await exportPosterLatex(doc, {
+      fetcher: async () => TINY_PNG_BYTES,
+      attribution: { paidPlan: true },
+    });
+    const entries = unzipSync(bytes);
+    return {
+      entries,
+      readme: decode(entries['README.txt']!),
+      tex: decode(entries['poster.tex']!),
+    };
+  };
+
+  it('does not send a Charter poster to Google Fonts, which has no Charter page', async () => {
+    const { readme } = await exportFiles(makeFixtureDoc({ fontFamily: 'Charter' }));
+    expect(readme).toContain('"Charter"');
+    expect(readme).not.toContain('fonts.google.com');
+    expect(readme).not.toContain('Google Fonts');
+  });
+
+  it('links a curated family that Google Fonts carries to its specimen page', async () => {
+    const { readme } = await exportFiles(makeFixtureDoc({ fontFamily: 'IBM Plex Sans' }));
+    expect(readme).toContain('https://fonts.google.com/specimen/IBM%2BPlex%2BSans');
+  });
+
+  it.each(['Source Sans 3', 'Charter', 'Lora', 'Inter'])(
+    'mentions a pdfLaTeX fallback block only when poster.tex has one (%s)',
+    async (fontFamily) => {
+      const { readme, tex } = await exportFiles(makeFixtureDoc({ fontFamily }));
+      expect(/fallback/i.test(readme)).toBe(tex.includes('pdfLaTeX fallback'));
+    },
+  );
+
+  it('says the file needs XeLaTeX or LuaLaTeX because it loads fontspec', async () => {
+    const { readme, tex } = await exportFiles(makeFixtureDoc());
+    expect(tex).toContain('\\usepackage{fontspec}');
+    expect(readme).toContain('loads fontspec');
+    // No compile was run to back "LuaLaTeX also works", so it is not claimed.
+    expect(readme).not.toMatch(/also works/i);
+  });
+
+  it('says figures/ holds the image files unchanged, and they are the fetched bytes', async () => {
+    const { readme, entries } = await exportFiles(makeFixtureDoc());
+    expect(readme).toContain('copied unchanged');
+    expect(entries['figures/figure-1.png']).toEqual(TINY_PNG_BYTES);
+  });
+
+  it('says poster.tex does not read references.bib, and it does not', async () => {
+    const { readme, tex } = await exportFiles(makeFixtureDoc());
+    expect(readme).toContain('poster.tex does not read it');
+    // Comment lines may name \bibliography; only TeX that runs counts.
+    const code = tex
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('%'))
+      .join('\n');
+    expect(code).not.toMatch(/\\bibliography|\\nocite|\\cite\{/);
+    expect(readme).not.toMatch(/matches the original/i);
+  });
+
+  it('claims a plain-text reference list only when poster.tex prints one', async () => {
+    const withBlock = makeFixtureDoc();
+    const withoutBlock = {
+      ...withBlock,
+      blocks: withBlock.blocks.filter((b) => b.type !== 'references'),
+    };
+    for (const doc of [withBlock, withoutBlock]) {
+      const { readme, tex } = await exportFiles(doc);
+      expect(readme.includes('reference list as literal text')).toBe(tex.includes('{References}'));
+    }
+  });
+});

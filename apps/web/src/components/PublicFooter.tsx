@@ -31,8 +31,11 @@ export function PublicFooter() {
               </svg>
               <span className="text-[18pt] font-medium text-[#c8cad0]">Postr</span>
             </Link>
+            {/* "Built by researchers" was dropped: nothing in the code or
+                the docs says who builds Postr, so only the audience half
+                of the line can be checked. */}
             <p className="mt-3 max-w-xs text-[14pt] leading-relaxed">
-              Built by researchers. Built for researchers.
+              A poster editor built for researchers.
             </p>
           </div>
 

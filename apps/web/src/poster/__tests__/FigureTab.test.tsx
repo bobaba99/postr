@@ -141,7 +141,7 @@ describe('FigureTab', () => {
     expect(spec.version).toBe(1);
     expect(caption.length).toBeGreaterThan(10);
     expect(
-      await screen.findByText(/Inserted — legible at print size/),
+      await screen.findByText(/Inserted on your poster/),
     ).toBeInTheDocument();
   });
 

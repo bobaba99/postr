@@ -144,6 +144,22 @@ describe('exportStyledDeckWithUtilitySlides', () => {
     }
   });
 
+  it('explainer copy is true of this file: it is a deck, so it does not talk about a poster', async () => {
+    const rasterizeSvg = vi.fn(async () => TINY_PNG_BYTES);
+    const bytes = await exportStyledDeckWithUtilitySlides(fixtureDeck(), PALETTES, {
+      rasterizeSvg,
+    });
+    const files = unzipSync(bytes);
+    const xmls = slideXmls(files);
+    const names = slideNames(xmls, files);
+    const xml = strFromU8(files[xmls[names.indexOf(EXPLAINER_SLIDE_NAME)]!]!);
+    const text = [...xml.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]).join(' ');
+    expect(text).toContain('Duplicate Slide');
+    // This export has no poster: the slides take the deck theme's colours
+    // (asserted above) and the same Arial face as the content slides.
+    expect(text).not.toMatch(/poster/i);
+  });
+
   it('awaits icon rasterization before writing — the icon slide carries real images, not raw SVG', async () => {
     const rasterizeSvg = vi.fn(async () => TINY_PNG_BYTES);
     const bytes = await exportStyledDeckWithUtilitySlides(fixtureDeck(), PALETTES, {

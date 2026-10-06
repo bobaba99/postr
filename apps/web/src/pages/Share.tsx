@@ -98,7 +98,7 @@ export default function Share() {
       <main className="flex h-screen w-screen flex-col items-center justify-center bg-[#0a0a12] text-[#c8cad0]">
         <h1 className="text-xl font-semibold">Poster not found</h1>
         <p className="mt-2 text-sm text-[#888]">
-          The link may be wrong, or the owner may have unpublished it.
+          The link may be wrong, or the owner may have deleted the poster.
         </p>
       </main>
     );

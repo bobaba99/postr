@@ -1010,8 +1010,9 @@ export function LayoutTab(props: {
         Auto-Arrange
       </button>
       <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-        Tidy existing blocks into an even grid — measures each text block's
-        actual content height so short sections don't leave empty space.
+        Tidy existing blocks into columns. It measures each text block's
+        content height so short sections don't leave empty space, and if
+        the blocks still don't fit, it makes body and heading text smaller.
         Great after dragging things around or after editing a lot of text.
       </div>
 
@@ -1122,8 +1123,8 @@ function ExportTab(props: {
         👁 Preview poster
       </button>
       <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-        See the poster at full size without the editor chrome. Great for a
-        final sanity check before exporting.
+        See the whole poster fitted to your window, without the editor
+        chrome. Great for a final sanity check before exporting.
       </div>
 
       <div style={labelStyle}>Save as PDF</div>
@@ -1144,7 +1145,7 @@ function ExportTab(props: {
       >
         <strong style={{ color: '#9ca3af' }}>🖨️ Browser Print dialog steps:</strong>
         <ol style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-          <li>Click "Save PDF" or press Ctrl+P / Cmd+P</li>
+          <li>Click "Save PDF" to open the print dialog</li>
           <li>
             Destination ={' '}
             <strong style={{ color: '#c8cad0' }}>"Save as PDF"</strong>
@@ -1168,7 +1169,7 @@ function ExportTab(props: {
       <div style={labelStyle}>✎ Editable formats</div>
       <EditableExportButtons citationStyle={props.citationStyle} />
 
-      <div style={labelStyle}>📦 Lossless backup</div>
+      <div style={labelStyle}>📦 Backup file</div>
       <PostrExportButton />
 
       <div style={labelStyle}>🏪 Print at Staples</div>
@@ -1180,11 +1181,11 @@ function ExportTab(props: {
           color: '#ff6b6b',
         }}
       >
-        🏪 Email to Staples kiosk
+        🏪 Email the PDF to Staples
       </button>
       <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-        Staples' Print &amp; Go flow — email the PDF, get an 8-digit release
-        code, print at any Staples kiosk without a USB drive.
+        Staples mobile printing: you email the PDF, get a release code back,
+        and print at a Staples self-serve kiosk without a USB drive.
       </div>
 
       {GALLERY_PUBLIC_ENABLED && (
@@ -1902,13 +1903,14 @@ function AuthorManager(props: {
           </button>
         </div>
         <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.45 }}>
-          AI-assisted parsing handles messy bylines — Unicode super-
-          scripts, mixed scripts, footnote markers, range affiliations
-          (<code>1-3</code>), parenthesised nicknames. Detects a
+          AI parsing is built for messy bylines: Unicode superscripts,
+          mixed scripts, footnote markers, range affiliations
+          (<code>1-3</code>) and parenthesised nicknames. It detects a
           trailing <code>(1) X, (2) Y</code> institution list, creates
           the institutions, and links each author's <code>1,2</code>{' '}
-          markers automatically. Falls back to the offline regex
-          parser if the API is unreachable.
+          markers automatically. If the AI call fails or finds no
+          authors, a simpler offline parser runs instead; it does not
+          expand ranges like <code>1-3</code>.
         </div>
       </div>
     </div>
@@ -2058,7 +2060,7 @@ function RefsTab(props: {
           textAlign: 'center',
         }}
       >
-        Import .bib / .ris / .enw
+        Import .bib / .ris
       </button>
       <input ref={fileRef} type="file" accept=".bib,.bibtex,.ris,.enw" onChange={handleImport} style={{ display: 'none' }} />
 
@@ -2117,9 +2119,11 @@ function RefsTab(props: {
       <div style={{ ...labelStyle, marginTop: 28 }}>Paste from Manuscript</div>
       <p style={{ fontSize: 13, color: '#6b7280', margin: 0, lineHeight: 1.5 }}>
         Already have your references formatted in a paper? Paste the whole
-        block here — one per line, or separated by blank lines. Each
-        entry is stored verbatim and rendered exactly as pasted, so your
-        existing APA / Vancouver / in-house formatting is preserved.
+        block here, one per line or separated by blank lines. Each entry
+        keeps the text you pasted, so your existing APA / Vancouver /
+        in-house formatting is preserved. A leading number such as "1."
+        may be dropped, and the Vancouver and IEEE styles put their own
+        number in front of each entry.
       </p>
       <textarea
         value={pasteText}
@@ -2178,7 +2182,7 @@ function RefsTab(props: {
         <input
           value={manual.authors}
           onChange={(e) => setManual({ ...manual, authors: e.target.value })}
-          placeholder="Authors (Last, F., comma-separated)"
+          placeholder="Authors, comma-separated (e.g. Smith J, Doe A)"
           style={inputBase}
         />
         <div style={{ display: 'flex', gap: 10 }}>
@@ -2412,8 +2416,8 @@ function StyleTab(props: {
           paddingLeft: 2,
         }}
       >
-        Upload a poster you admire and apply its colours and font to
-        yours. Copies the look, not the content.
+        Upload a poster you admire and apply its colours and the closest
+        matching font to yours. Copies the look, not the content.
       </div>
       <CopyDesignModal
         open={copyDesignOpen}
@@ -2858,7 +2862,7 @@ function TableTipsDropdown() {
       <ul style={{ margin: '8px 0 4px', paddingLeft: 18 }}>
         <li>✏️ Click any cell on the canvas to type directly.</li>
         <li>🖱️ Click a row/column header strip to select the whole row or column.</li>
-        <li>📋 Paste TSV from Word, Excel, or Google Sheets into any cell — the grid auto-grows.</li>
+        <li>📋 Pasting into a cell replaces the whole table with what you paste, so rows copied from Word, Excel, or Google Sheets come in as a new grid.</li>
         <li>↔️ Drag column borders to resize.</li>
         <li>🗑️ Select a row/column and press Delete to remove it.</li>
         <li>⌨️ Tab / Shift+Tab to jump between cells.</li>
@@ -3032,9 +3036,9 @@ function CaptionEditor(props: {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={labelStyle}>{label} Caption</div>
       <p style={{ fontSize: 13, color: '#8a8a95', margin: 0, lineHeight: 1.5 }}>
-        The <b>{label} N.</b> number is assigned automatically from
-        reading order — drag this block on the canvas to renumber.
-        Just type the descriptive text below.
+        The <b>{label} N.</b> number is assigned automatically, top to
+        bottom and then left to right on the canvas. Drag this block to
+        renumber. Just type the descriptive text below.
       </p>
       <input
         type="text"
@@ -3118,12 +3122,16 @@ function CaptionEditor(props: {
       <div style={{ ...labelStyle, marginTop: 8 }}>{label} Note</div>
       <p style={{ fontSize: 13, color: '#8a8a95', margin: 0, lineHeight: 1.5 }}>
         Longer footnote shown directly below the {label.toLowerCase()}.
-        Just paste or type normally — clicking{' '}
-        <b>✨ Format {label === 'Table' ? 'table' : 'note'}</b> auto-italicizes
-        APA stat symbols (<code>p</code>, <code>t</code>, <code>F</code>,{' '}
+        Just paste or type normally. Clicking{' '}
+        <b>✨ Format {label === 'Table' ? 'table' : 'note'}</b> marks APA stat
+        symbols (<code>p</code>, <code>t</code>, <code>F</code>,{' '}
         <code>M</code>, <code>SD</code>, <code>N</code>, <code>r</code>,{' '}
-        <code>df</code>, <code>β</code>, <code>χ²</code>, …) in the caption,
-        note, and every cell.
+        <code>df</code>, <code>β</code>, <code>χ²</code>, …) as italic in the
+        caption{label === 'Table' ? ', note, and every cell' : ' and note'} and
+        clears other formatting there.{' '}
+        {label === 'Table'
+          ? 'The caption and note are already set in italics, so the change shows in the cells.'
+          : 'The caption and note are already set in italics, so the symbols look the same.'}
       </p>
       {/* Button is above the textarea so it's always in view when
           the Edit tab opens — used to live at the bottom below the
@@ -3196,8 +3204,8 @@ function CaptionEditor(props: {
         <code>**bold**</code> or <code>*p*</code>
         {label === 'Table' ? ' in the note or in any cell' : ''}, click{' '}
         <b>✨ Format {label === 'Table' ? 'table' : 'note'}</b> to convert
-        them into bold / italic / superscript on the poster. Re-click
-        anytime — it's safe to run more than once.
+        them into bold / italic / superscript on the poster. Click it once:
+        a second click removes the formatting your markers made.
       </p>
     </div>
   );
@@ -4110,7 +4118,7 @@ function AddBlockPanel(props: {
     ['image', 'Image', 'Figure or photo upload'],
     [null, 'Chart', 'Build a figure from your data'],
     ['table', 'Table', 'Data table with border presets'],
-    ['references', 'References', 'Auto-formatted from Refs tab'],
+    ['references', 'References', 'Auto-formatted from the References tab'],
     ['logo', 'Logo', 'Institution or sponsor mark'],
   ];
 
@@ -4202,8 +4210,7 @@ function IssuesTab(props: {
             lineHeight: 1.5,
           }}
         >
-          ✓ No issues detected. Your poster passes all automated checks
-          — ready to export.
+          ✓ No issues detected. Your poster passes all automated checks.
         </div>
         <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.55 }}>
           This tab scans for common pre-flight problems: blocks outside

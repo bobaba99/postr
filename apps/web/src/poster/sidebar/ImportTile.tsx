@@ -72,9 +72,9 @@ export function ImportTile({ blocksCount, onClick }: Props) {
             lineHeight: 1.5,
           }}
         >
-          Drop a PDF, image, or .postr bundle. Text + headings land at
-          their original positions — figures get re-added with the
-          Insert tab.
+          Drop a PDF, image, or .postr bundle. Its content becomes
+          editable blocks, arranged into columns. Figures from a scan or
+          photo need to be re-added with the Insert tab.
         </div>
       </button>
     );

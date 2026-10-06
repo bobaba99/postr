@@ -38,7 +38,7 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
       const amount = `CA$${(amountCents / 100).toFixed(2)}`;
       setRefundMsg(
         subscriptionCancelled
-          ? `Refunded ${amount} — it may take a few days to appear. Your term has been cancelled and PowerPoint/LaTeX export is locked again.`
+          ? `Refunded ${amount}. It may take a few days to appear. Your term has been cancelled, so its unlimited PowerPoint and LaTeX exports have ended.`
           : `Refunded ${amount}. It may take a few days to appear.`,
       );
       // The server just changed the billing row (term → free, or fewer
@@ -53,7 +53,7 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
         already_used:
           kind === 'term'
             ? 'This term isn’t refundable once you’ve taken a paid export.'
-            : 'This pack isn’t refundable once you’ve taken a paid export — not even in part.',
+            : 'This pack isn’t refundable once an export credit has been used, not even in part.',
         no_pack_purchase: 'No refundable pack purchase found.',
       };
       setRefundMsg(reason && map[reason] ? map[reason] : 'We couldn’t process that refund. Please try again or contact support.');
@@ -79,9 +79,13 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
             </span>
           )}
         </p>
+        {/* Manage opens a Stripe billing-portal session, or link.com when
+            the portal is unavailable under Managed Payments (data/billing.ts
+            openBillingPortal), so the copy names Stripe and does not list
+            portal features the fallback may not show. */}
         <p className="text-[14pt] text-[#8b8f99]">
-          The term renews every 4 months. Manage it — update your card, see
-          receipts, or cancel — through Stripe, which handles billing for Postr.
+          The term renews every 4 months until you cancel. Manage subscription
+          takes you to Stripe, which handles billing for Postr.
         </p>
         <div className="flex flex-wrap gap-2">
           <button
@@ -118,7 +122,7 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
     <div className="space-y-3">
       <p className="text-[14pt] text-[#c8cad0]">
         You’re on the free plan — unlimited editing and print-ready PDF export,
-        with a small “made with postr.sh” mark.
+        with a “made with postr.sh” credit on the poster.
       </p>
 
       {/* Export-credit balance — shown even at 0 so the user always knows
@@ -133,7 +137,7 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
         <p className="mt-1 text-[13pt] text-[#8b8f99]">
           {hasCredits
             ? `${plan.credits} PowerPoint or LaTeX export${plan.credits === 1 ? '' : 's'} left — credits never expire.`
-            : 'From a $9.99 export pack. Credits never expire once purchased.'}
+            : 'From a CA$9.99 export pack. Credits never expire once purchased.'}
         </p>
         {refundMsg && !hasCredits && (
           <p className="mt-2 text-[13pt] text-[#a3a7b3]">{refundMsg}</p>
@@ -149,8 +153,9 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
               {refunding ? 'Processing…' : 'Refund export pack'}
             </button>
             <p className="mt-1 text-[12pt] text-[#8b8f99]">
-              A pack is refundable in full (CA$9.99) only if you haven’t taken a
-              paid export. Refunding removes its 3 credits from your account.
+              A pack is refundable in full only while none of your export
+              credits has been used. Refunding removes its 3 credits from your
+              account.
             </p>
             {refundMsg && <p className="mt-1 text-[13pt] text-[#a3a7b3]">{refundMsg}</p>}
           </div>

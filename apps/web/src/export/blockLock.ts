@@ -19,18 +19,23 @@
  * ── Refusal, not silence ─────────────────────────────────────────
  * A delete that quietly does nothing reads as a bug. Every refusal
  * returns `refusalMessage` so the caller can surface it in the same
- * toast the rest of the editor uses. The copy is plain and states the
- * bargain — it does not lecture, and it does not advertise a tier
- * that does not exist.
+ * toast the rest of the editor uses. The copy is plain and says what
+ * happened. It does not lecture, and it does not advertise a tier.
  */
 import type { Block } from '@postr/shared';
 
 /**
- * Refusal copy, in the house voice. States the exchange in one line
- * and stops. Deliberately NOT "you can't do that" (scolding) and NOT
- * "upgrade to remove" (there is no paid tier to upgrade to).
+ * Refusal copy, in the house voice. One line, then stop. Deliberately
+ * NOT "you can't do that" (scolding) and NOT "upgrade to remove".
+ *
+ * It says "canvas", not "poster", and makes no claim about price:
+ * paying users see this toast too, and paid PowerPoint and LaTeX
+ * exports leave the credit out (`stripAckBlock`), so "Postr is free —
+ * this credit stays on the poster" was false for them. The only block
+ * that is ever locked is the credit (`ackBlock.ts`), so "this credit"
+ * always names the right thing.
  */
-export const LOCKED_BLOCK_REFUSAL = 'Postr is free — this credit stays on the poster.';
+export const LOCKED_BLOCK_REFUSAL = 'This credit stays on the canvas.';
 
 /** True when a block refuses deletion. */
 export function isLocked(block: Pick<Block, 'locked'>): boolean {

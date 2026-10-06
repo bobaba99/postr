@@ -2,7 +2,8 @@
  * PasswordStrength — inline password strength checker + requirements.
  *
  * Enforces: uppercase, lowercase, number, symbol, min 8 chars.
- * Shows a color-coded strength bar + individual requirement checks.
+ * Shows a color-coded progress bar labelled "N of 5 met" + individual
+ * requirement checks. It measures rule compliance, not entropy.
  */
 
 interface Rule {
@@ -35,11 +36,11 @@ export function PasswordStrength({ password }: { password: string }) {
     passed <= 3 ? '#f9e2af' :
     passed <= 4 ? '#89b4fa' : '#a6e3a1';
 
-  const strengthLabel =
-    passed <= 1 ? 'Weak' :
-    passed <= 2 ? 'Fair' :
-    passed <= 3 ? 'Good' :
-    passed <= 4 ? 'Strong' : 'Excellent';
+  // A count of rules met, not a strength rating: the meter checks the five
+  // rules only (nothing past the 8-character minimum, no common-password
+  // list), so a word like "Password1!" meets all five. Naming it "Strong"
+  // or "Excellent" claimed a strength the check does not measure.
+  const strengthLabel = `${passed} of ${total} met`;
 
   return (
     <div style={{ marginTop: 6 }}>

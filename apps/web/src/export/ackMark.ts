@@ -21,6 +21,9 @@
  */
 
 import { markInnerSvg, MARK_COLORS } from '@/brand/markGeometry';
+// The label is the credit copy itself, so it cannot drift from it again
+// (it read the retired "Poster made with postr.sh" until 2026-10).
+import { ACKNOWLEDGEMENT_TEXT } from './attribution';
 
 /** Stroke/fill colour — matches the print colophon's muted grey. */
 const MARK_COLOR = MARK_COLORS.muted;
@@ -59,7 +62,7 @@ export function ackMarkSvgInner(): string {
  */
 export function ackMarkSvg(size: number): string {
   return [
-    `<svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Poster made with postr.sh">`,
+    `<svg width="${size}" height="${size}" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${ACKNOWLEDGEMENT_TEXT}">`,
     ackMarkSvgInner(),
     '</svg>',
   ].join('');

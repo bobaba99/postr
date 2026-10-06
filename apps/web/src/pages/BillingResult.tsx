@@ -72,18 +72,22 @@ function Success() {
           </svg>
         </div>
 
+        {/* Copy states only what this page knows: Stripe sends the buyer
+            here once checkout completes, and the grant comes from the
+            webhook, which may land after the one re-read below. So no
+            "payment received" or "ready" claim until the plan shows it. */}
         <h1 className="mt-6 text-2xl font-semibold text-[#e2e2e8]">
-          You&apos;re all set
+          Checkout complete
         </h1>
 
         <p className="mt-3 text-sm leading-relaxed text-[#9ca3af]">
           {plan.hasActiveTerm
             ? 'Your term is active. Editable PowerPoint and LaTeX exports are unlocked — no watermark.'
             : plan.credits > 0
-              ? `Your export pack is ready — ${plan.credits} export${plan.credits === 1 ? '' : 's'} to use whenever. Credits never expire.`
+              ? `You have ${plan.credits} export credit${plan.credits === 1 ? '' : 's'} to use whenever. Credits never expire.`
               : stillProcessing
-                ? 'Payment received — finalizing your account. This takes just a moment.'
-                : 'Payment received. Your access will appear shortly — head back in and it’ll be ready.'}
+                ? 'Checking your account for the purchase.'
+                : 'Your purchase hasn’t reached your account yet. It appears once Stripe confirms the payment. Check your profile page to see it.'}
         </p>
 
         <button
@@ -114,12 +118,16 @@ function Cancelled() {
           No charge was made. Your poster is exactly as you left it — you can
           keep editing for free, or pick up checkout again anytime.
         </p>
+        {/* history.back() returns to the previous history entry. After a
+            Stripe cancel that entry can be the Stripe Checkout page, and a
+            buyer who came from /pricing has no editor behind it, so the
+            label promises only "Go back" (not run against real Stripe). */}
         <button
           type="button"
           onClick={() => window.history.back()}
           className="mt-7 w-full rounded-lg bg-[#5641b8] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#4c39a6]"
         >
-          Back to editing
+          Go back
         </button>
         <Link
           to="/pricing"

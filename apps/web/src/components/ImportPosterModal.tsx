@@ -447,7 +447,7 @@ function Header({
         </h3>
         <p style={{ margin: '4px 0 0', fontSize: 12, color: '#9ca3af' }}>
           {mode === 'new'
-            ? 'Drop a PDF, PowerPoint, image, or .postr file. We extract the content into editable blocks at their original positions.'
+            ? 'Drop a PDF, PowerPoint, image, or .postr file. We turn its content into editable blocks and arrange them into columns.'
             : 'Replace the current poster with content from a PDF, PowerPoint, image, or .postr file.'}
         </p>
       </div>
@@ -540,11 +540,12 @@ function DropZone({
         }}
       >
         <strong style={{ color: '#fde68a' }}>What comes across.</strong>{' '}
-        PowerPoint files bring their text, images, and tables. PDF and
-        image imports are text-only — we capture titles, headings, authors,
-        body text, captions, and references at their original positions, but
-        figures, charts, and logos must be re-added from the Insert tab.
-        Image-based imports take ~30–90s.
+        PowerPoint and .postr files bring their text, images, and tables.
+        PDFs with a text layer bring their text and embedded images, but not
+        charts drawn as vector graphics. PDFs without a text layer and images
+        bring text only, so re-add figures, charts, and logos from the Insert tab.
+        Imports are arranged into columns. Image-based imports can take a
+        minute or more.
       </div>
     </div>
   );
@@ -552,7 +553,7 @@ function DropZone({
 
 const STAGE_LABELS: Record<ImportProgress['stage'], string> = {
   reading: 'Reading file',
-  clustering: 'Detecting text blocks',
+  clustering: 'Finding text',
   // Generic label that fits both pipelines: PDF text-layer extracts
   // embedded raster figures; image OCR does not (text-only mode)
   // but llm-call sub-stages still parent into here so the bar
@@ -588,16 +589,11 @@ const STAGE_PARENT: Partial<Record<ImportProgress['stage'], ImportProgress['stag
 // counts in tool-use mode), so the typewriter line carries the
 // motion. Inspired by Claude Code's idle-spinner.
 const LLM_WORKING_PHRASES = [
-  'Reading the page layout…',
-  'Locating the title and authors…',
-  'Detecting section headings…',
-  'Mapping the reading order…',
-  'Capturing body text…',
-  'Cross-checking column boundaries…',
-  'Inspecting captions and footnotes…',
-  'Aligning text to its original position…',
-  'Tidying up the block structure…',
-  'Almost there — finalising blocks…',
+  'Reading your file…',
+  'Finding the text…',
+  'Building editable blocks…',
+  'Placing blocks on the poster…',
+  'Still working…',
 ];
 
 function ProgressView({ progress }: { progress: ImportProgress }) {
@@ -773,8 +769,8 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
         </div>
         {showLongHint && (
           <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280' }}>
-            This is taking a little longer than usual ({elapsedSec}s) —
-            hang tight, your work won&apos;t be lost.
+            Still working ({elapsedSec}s). Image-based imports can take a
+            minute or more.
           </div>
         )}
       </div>
@@ -782,7 +778,7 @@ function ProgressView({ progress }: { progress: ImportProgress }) {
           announced once when it changes, not once per typed glyph. */}
       <span role="status" aria-live="polite" className="sr-only">
         {STAGE_LABELS[effectiveStage] ?? 'Working'}
-        {showLongHint ? ' — still working, this is taking longer than usual' : ''}
+        {showLongHint ? ', still working' : ''}
       </span>
       <style>{`
         @keyframes postrPulse {
@@ -885,7 +881,7 @@ function Committing() {
   return (
     <div style={{ padding: '40px 20px', textAlign: 'center', color: '#9ca3af' }}>
       <div style={{ fontSize: 14, marginBottom: 8 }}>Saving poster…</div>
-      <div style={{ fontSize: 12 }}>This usually takes a second or two.</div>
+      <div style={{ fontSize: 12 }}>Saving the imported poster to your account.</div>
     </div>
   );
 }

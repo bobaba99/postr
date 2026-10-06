@@ -13,9 +13,17 @@ export const TERM_CANCEL_LINE =
 /** The confirmation phrase the user must type before deleting the account. */
 export const DELETE_ACCOUNT_PHRASE = 'I confirm the deletion of my account';
 
+/**
+ * Not "all associated data": feedback rows survive with user_id set to
+ * null (feedback.sql `on delete set null`), and POST /account/delete
+ * writes an account_deletions audit row (no FK) before deleting the user
+ * (apps/api/src/account.ts). Posters, Storage files, billing rows and the
+ * users row are removed. How long the kept rows are retained is not set
+ * in code (owner question).
+ */
 export function deleteAccountDescription(hasActiveTerm: boolean): string {
   const base =
-    'Permanently delete your account and all associated data. You will be signed out.';
+    'Permanently delete your account, posters, uploaded files and preferences. Feedback you sent and a record of the deletion are kept. You will be signed out.';
   return hasActiveTerm ? `${base} ${TERM_CANCEL_LINE}` : base;
 }
 
@@ -41,7 +49,7 @@ export function DangerZone({
       <div className="space-y-4">
         <DangerAction
           title="Delete all posters"
-          description={`Permanently delete all ${posterCount} poster(s). This cannot be undone.`}
+          description={`Permanently delete all ${posterCount} poster(s). This removes the posters but not their stored images. This cannot be undone.`}
           buttonText="Delete all posters"
           onClick={onDeletePosters}
           disabled={posterCount === 0}

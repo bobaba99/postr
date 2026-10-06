@@ -59,7 +59,7 @@ beforeEach(() => {
 });
 
 describe('SubscriptionPanel — term refund', () => {
-  it('says the term is cancelled and export is locked, then refreshes the plan', async () => {
+  it('says the term is cancelled and its unlimited exports ended, then refreshes the plan', async () => {
     billing.requestRefund.mockResolvedValue({ amountCents: 1899, subscriptionCancelled: true });
     const p = plan();
     renderPanel(p);
@@ -68,7 +68,10 @@ describe('SubscriptionPanel — term refund', () => {
 
     expect(await screen.findByText(/Refunded CA\$18\.99/)).toBeInTheDocument();
     expect(screen.getByText(/term has been cancelled/i)).toBeInTheDocument();
-    expect(screen.getByText(/PowerPoint\/LaTeX export is locked again/i)).toBeInTheDocument();
+    // Not "export is locked again": a holder of pack credits can still
+    // export, so the copy says only that the term's exports ended.
+    expect(screen.getByText(/unlimited PowerPoint and LaTeX exports have ended/i)).toBeInTheDocument();
+    expect(screen.queryByText(/locked again/i)).toBeNull();
     expect(billing.requestRefund).toHaveBeenCalledWith('term');
     await waitFor(() => expect(p.refresh).toHaveBeenCalledTimes(1));
   });
@@ -106,7 +109,7 @@ describe('SubscriptionPanel — pack refund', () => {
     renderPanel(plan({ hasActiveTerm: false, credits: 2, canExport: true, subscriptionStatus: null }));
 
     expect(screen.getByRole('button', { name: /refund export pack/i })).toBeInTheDocument();
-    expect(screen.getByText(/refundable in full \(CA\$9\.99\) only if you haven’t taken a paid export/i)).toBeInTheDocument();
+    expect(screen.getByText(/refundable in full only while none of your export credits has been used/i)).toBeInTheDocument();
     expect(screen.queryByText(/unused credit/i)).toBeNull();
     expect(screen.queryByText(/3\.33/)).toBeNull();
   });
@@ -120,7 +123,7 @@ describe('SubscriptionPanel — pack refund', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /refund export pack/i }));
 
-    expect(await screen.findByText(/This pack isn’t refundable once you’ve taken a paid export — not even in part/i)).toBeInTheDocument();
+    expect(await screen.findByText(/This pack isn’t refundable once an export credit has been used, not even in part/i)).toBeInTheDocument();
     expect(screen.queryByText(/This term isn’t refundable/i)).toBeNull();
     expect(screen.queryByText(/already_used/)).toBeNull();
     expect(p.refresh).not.toHaveBeenCalled();

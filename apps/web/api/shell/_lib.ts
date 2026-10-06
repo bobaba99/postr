@@ -83,7 +83,12 @@ export function injectOrPassThrough(
   return new Response(html, { status: 200, headers });
 }
 
-/** Mirrors shareMeta() in src/seo/siteMeta.ts. Never indexable. */
+/**
+ * Mirrors shareMeta() in src/seo/siteMeta.ts, copy included. Never
+ * indexable. Sharing is switched off (config/features.ts
+ * SHARING_ENABLED): vercel.json sends /s/:slug to the app shell, so no
+ * request reaches this today.
+ */
 export function buildShareMeta(input: {
   slug: string;
   title: string | null;
@@ -91,14 +96,14 @@ export function buildShareMeta(input: {
 }): ShellMeta {
   const posterTitle = input.title?.trim();
   const title = posterTitle
-    ? `${clampText(posterTitle, 28)} — Shared Poster Review | Postr`
-    : 'Shared Research Poster Review | Postr';
+    ? `${clampText(posterTitle, 28)} — Shared Poster | Postr`
+    : 'Shared Research Poster | Postr';
   const image =
     input.imageUrl ?? `${SITE.siteOrigin}${SITE.defaultOgImage}`;
   return {
     title,
     description:
-      "Review a private research poster shared through Postr. Add comments, return to the owner's read-only poster, or create your own conference poster for free.",
+      'A research poster shared through Postr and shown read-only. Make your own conference poster in Postr for free, then save it as a print-ready PDF.',
     robots: 'noindex,nofollow',
     canonical: `${SITE.siteOrigin}/s/${input.slug.toLowerCase()}`,
     language: SITE.language,
