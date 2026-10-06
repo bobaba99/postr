@@ -190,8 +190,8 @@ export function UpdateAvailableBanner() {
         ✨ New version available
       </div>
       <div style={{ color: '#b3b5be' }}>
-        Refresh to load the latest fixes. Your work is already saved —
-        autosave has written it to your account.
+        Refresh to load the latest fixes. Before you do, check that the
+        save status on the canvas says Saved.
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button
@@ -318,8 +318,8 @@ export function JustRefreshedBanner() {
         ✓ You're on the latest version
       </div>
       <div style={{ color: '#b3b5be' }}>
-        Thanks for refreshing — enjoy the fresh fixes. Your work picked
-        up right where you left off.
+        Thanks for refreshing. Your poster reopened as it was last
+        saved.
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button

@@ -1607,7 +1607,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           severity: 'warning',
           category: 'Empty figure',
           message:
-            'Image block has no file attached — it will export as a dashed placeholder.',
+            'Image block has no file attached. Add an image or delete the block before you export.',
           blockId: b.id,
         });
       }
@@ -1673,7 +1673,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         severity: 'warning',
         category: 'Empty references',
         message:
-          'References block is on the canvas but the Refs tab is empty.',
+          'References block is on the canvas but the References tab is empty.',
       });
     }
     for (const r of doc.references) {
@@ -2350,7 +2350,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     const printWin = window.open('', '_blank', 'width=900,height=700');
     if (!printWin) {
       alert(
-        'Popup blocked. Please allow popups for this site to use "Save PDF", or press Ctrl/⌘+P directly from the editor as a fallback.',
+        'Popup blocked. Please allow popups for this site to use "Save PDF".',
       );
       return;
     }

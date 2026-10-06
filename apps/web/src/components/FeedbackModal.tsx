@@ -131,8 +131,8 @@ export function FeedbackModal() {
                 color: '#9ca3af',
               }}
             >
-              Bug reports and feature requests go straight to the developer. We read
-              everything — thank you for taking the time.
+              Bug reports and feature requests are saved for the developer to read.
+              Thank you for taking the time.
             </p>
 
             <div style={{ marginBottom: 16 }}>
@@ -452,7 +452,7 @@ function SuccessView({ onClose }: { onClose: () => void }) {
         Thanks — got it.
       </h3>
       <p style={{ margin: '0 0 20px', fontSize: 13, color: '#9ca3af', lineHeight: 1.5 }}>
-        Your feedback is in the queue. If you left contact info in your profile, we may reach
+        Your feedback is in the queue. If your account has an email address, we may reach
         out with follow-up questions.
       </p>
       <button

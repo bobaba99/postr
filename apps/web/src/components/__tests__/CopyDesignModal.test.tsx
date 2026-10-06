@@ -224,7 +224,7 @@ describe('CopyDesignModal', () => {
     mockExtract.mockRejectedValue(
       new StyleImportError(
         'rasterize_failed',
-        "That doesn't look like a poster — try a photo or PDF of the whole thing.",
+        "We couldn't read that file. Try a PNG or JPG image, or a one-page PDF.",
       ),
     );
     render(<CopyDesignModal open onClose={() => {}} />);
@@ -236,7 +236,7 @@ describe('CopyDesignModal', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/doesn't look like a poster/i),
+        screen.getByText(/couldn't read that file/i),
       ).toBeInTheDocument(),
     );
     // Back on the pick phase, not an error dialog.

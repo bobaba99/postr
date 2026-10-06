@@ -63,7 +63,7 @@ export interface StyleImportResult {
 }
 
 const UNREADABLE_MESSAGE =
-  "That doesn't look like a poster — try a photo or PDF of the whole thing.";
+  "We couldn't read that file. Try a PNG or JPG image, or a one-page PDF.";
 
 /**
  * Extract a poster's style from a dropped file. Throws
@@ -98,7 +98,8 @@ export async function extractStyleFromFile(
       ? await rasterizePdfFirstPage(file)
       : await rasterizeImage(file);
   } catch (err) {
-    // Undecodable input is "not a poster", not a bug (plan §5 row 1).
+    // Undecodable input (or a multi-page PDF) is the user's to fix, not a
+    // bug (plan §5 row 1). Nothing here checks that it is a poster.
     throw new StyleImportError(
       err instanceof Error ? err.message : 'rasterize_failed',
       UNREADABLE_MESSAGE,

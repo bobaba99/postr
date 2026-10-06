@@ -254,7 +254,7 @@ async function runImageOcr(
     model: 'claude',
   };
 
-  onProgress({ stage: 'llm-call', detail: 'Calling Claude Vision…' });
+  onProgress({ stage: 'llm-call', detail: 'Reading the page…' });
   let response: ExtractFullResponse;
   try {
     response = await postJson<ExtractFullResponse>(
@@ -273,8 +273,8 @@ async function runImageOcr(
         err.body !== null &&
         (err.body as { error?: string }).error === 'daily_limit_exceeded';
       const lead = isDaily
-        ? 'Daily AI import limit reached.'
-        : 'Too many AI requests in the last minute.';
+        ? 'Daily import limit reached.'
+        : 'Too many import requests in the last minute.';
       throw new Error(`${lead}${wait}`);
     }
     throw err instanceof Error ? err : new Error('Vision call failed.');
@@ -374,7 +374,7 @@ async function runImageOcr(
     warnings: [
       ...textOnlyWarnings,
       ...(response.warnings ?? []),
-      'Imported via vision model — verify the extracted text against the source.',
+      'Check the imported text against your original file.',
     ],
   });
 

@@ -52,21 +52,21 @@ const STEPS: TourStep[] = [
     selector: '[data-postr-import-tile]',
     tabName: 'layout',
     title: 'Already have a poster? Import it',
-    body: 'Drop a PDF, image, or .postr bundle. Text-layer PDFs land every paragraph AND embedded figure as editable blocks. Image-based files (flattened PDFs, JPG/PNG scans) bring in the text only — figures and tables need to be re-added with the Insert tab. The "+ New poster ▾" menu on the dashboard does the same for fresh imports.',
+    body: 'Drop a PDF, image, or .postr bundle. PDFs with a text layer bring in their text and embedded images as editable blocks; charts drawn as vector graphics stay behind. Image-based files (flattened PDFs, JPG/PNG scans) bring in the text only, so re-add figures and tables with the Insert tab. Imports are arranged into columns. The "Import…" button on the dashboard does the same for a new poster.',
     position: 'right',
   },
   {
     selector: '[data-postr-sidebar]',
     tabName: 'authors',
     title: 'Author list & institutions',
-    body: 'Define institutions once, then assign each author to one or more — the byline auto-formats with superscript footnotes (¹University A · ²University B). No other poster tool gets this right.',
+    body: 'Define institutions once, then assign each author to one or more. The byline auto-formats with superscript footnotes (¹University A · ²University B).',
     position: 'right',
   },
   {
     selector: '[data-postr-sidebar]',
     tabName: 'references',
     title: 'References with citation styles',
-    body: 'Import .bib / .ris / .enw, add citations manually, or paste pre-formatted references straight from your manuscript. APA, Vancouver, IEEE, and Harvard styles render automatically.',
+    body: 'Import .bib or .ris files, add citations manually, or paste pre-formatted references straight from your manuscript. Pick APA, Vancouver, IEEE, or Harvard and imported or typed references are reformatted in that style.',
     position: 'right',
   },
   {
@@ -76,14 +76,14 @@ const STEPS: TourStep[] = [
     // renamed, so the tour silently skipped opening the tab.
     tabName: 'figure',
     title: 'Plot code readability check',
-    body: 'Paste your R or Python plotting code to verify figure text will be legible at print size. Drag the gray rectangle on the canvas, or select an image block to lock to its exact dimensions.',
+    body: 'Paste ggplot2 or matplotlib/seaborn plotting code to check that figure text will be legible at print size. Drag the gray rectangle on the canvas, or select an image block to lock to its exact dimensions.',
     position: 'right',
   },
   {
     selector: '[data-postr-sidebar]',
     tabName: 'issues',
     title: 'Pre-flight issues',
-    body: 'Automated lint scans for blocks off-canvas, empty figures, missing authors, leftover placeholder text, and more. The red badge counts pending problems — click any issue to jump to the offending block.',
+    body: 'Automated checks flag blocks off the canvas, empty figures, missing authors, the default title, and more. The badge on the tab counts the issues. Click an issue tied to a block to jump to it.',
     position: 'right',
   },
   {
@@ -91,8 +91,8 @@ const STEPS: TourStep[] = [
     tabName: 'export',
     title: 'Export, print, or save .postr',
     body: GALLERY_PUBLIC_ENABLED
-      ? 'Save as PDF, email to any Staples kiosk, publish to the gallery — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser.'
-      : 'Save as PDF, email to any Staples kiosk — or download a lossless .postr bundle (poster JSON + every figure) you can re-import later from any browser.',
+      ? 'Save as PDF, email the PDF to Staples for kiosk printing, publish to the gallery, or download a .postr backup file to import again later.'
+      : 'Save as PDF, email the PDF to Staples for kiosk printing, or download a .postr backup file to import again later.',
     position: 'right',
   },
   {
@@ -101,8 +101,8 @@ const STEPS: TourStep[] = [
     selector: ['[data-postr-guidelines-toggle]', '[data-postr-guidelines]'],
     title: 'Conference guidelines',
     body: [
-      'Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Open it with this button when you need it.',
-      'Quick reference for poster sizes and font minimums from APA, SfN, APS, ECNP, and more. Close it to give the canvas more room.',
+      'Quick reference for board sizes from APA, SfN, APS, ECNP, and more, with suggested type sizes. Open it with this button when you need it.',
+      'Quick reference for board sizes from APA, SfN, APS, ECNP, and more, with suggested type sizes. Close it to give the canvas more room.',
     ],
     position: 'left',
   },
