@@ -16,8 +16,18 @@
  *
  * Page views ARE counted, via Vercel Web Analytics (added 2026-07-27).
  * As configured (no enableCookie, no identify) it writes nothing to
- * the device. The visitor hash and its 24-hour discard are Vercel's
- * documented behaviour, so the page attributes them to Vercel.
+ * the device: MEASURED on www.postr.sh on 2026-10-06 (record 24: 0
+ * localStorage and 0 sessionStorage keys, no cookie, after three page
+ * views). The visitor hash and its 24-hour discard, and the approximate
+ * location, device and browser Vercel may store with a page view, are
+ * Vercel's documented behaviour (docs/analytics/privacy-policy), so the page
+ * attributes them to Vercel (record 24 review round 2). It is not
+ * mounted at all when the browser sends Global Privacy Control
+ * (analytics/globalPrivacyControl.ts, App.tsx; owner decision 2026-10-06).
+ * The production script sends the referring address only on the first
+ * page view and only from another site (MEASURED, record 24), and
+ * vercel.json's Referrer-Policy keeps the page path out of the beacon's
+ * Referer header.
  *
  * If that ever changes — a real identifier, a cookie, anything
  * optional written to the browser — the banner promised in §4 is owed,
@@ -95,8 +105,10 @@ export default function Cookies() {
           and none is used for advertising or to follow you across sites. We do
           not run Google Analytics, Facebook Pixel, advertising trackers or
           social-media share buttons. We do count page views with Vercel Web
-          Analytics, which, as Postr uses it, sets no cookie and writes nothing
-          to your browser. Section 4 explains how it works.
+          Analytics, and with nothing else. As Postr uses it, it sets no cookie
+          and writes nothing to your browser, and Postr does not load it when
+          your browser sends Global Privacy Control. Section 4 explains how it
+          works.
         </CalloutBox>
 
         <Table
@@ -112,7 +124,7 @@ export default function Cookies() {
               'postr.style-presets, postr.custom-palettes, postr.checklist-templates, postr.scratch-pad, postr.scratch-note',
               'localStorage',
               'The style presets, colour palettes, checklist templates and Scratch Pad notes you save in the editor, so they are there on your next visit. The style-presets entry is created empty the first time you open the editor.',
-              'Until you delete them or clear browser data. Deleting your account also clears all but the palettes.',
+              'Until you delete them, delete your account in this browser, or clear browser data.',
             ],
             [
               'postr.profile',
@@ -124,19 +136,19 @@ export default function Cookies() {
               'postr.onboarding-done, postr.cb-random-pref',
               'localStorage',
               'Remember that you finished or skipped the editor tour, and whether random palettes should be colour-blind friendly.',
-              'Until you clear browser data. Deleting your account or choosing Replay tour on your Profile page also clears the tour entry.',
+              'Until you delete your account in this browser or clear browser data. Choosing Replay tour on your Profile page also clears the tour entry.',
             ],
             [
               'postr.welcome-seeded:<account id>',
               'localStorage',
               'Records that your welcome poster was created, so it is not created again. The key name contains your account id.',
-              'Until you clear browser data',
+              'Until you delete that account in this browser or clear browser data',
             ],
             [
               'postr.active-editor.<poster id>',
               'localStorage',
               'Lets Postr warn you when the same poster is open in two tabs. The key name contains the poster id, or “new” when the editor opens at /p/new. The entry holds a random tab id and the time the poster was last open.',
-              'Until you clear browser data',
+              'Until you delete your account in this browser or clear browser data',
             ],
             [
               'postr.figure-script.<poster id>',
@@ -189,7 +201,9 @@ export default function Cookies() {
         </Body>
         <Body>
           Some features load files straight from other services, which have their
-          own cookie policies. The editor loads poster fonts from Google Fonts.
+          own cookie policies. The editor loads poster fonts from Google Fonts:
+          each time it does, your browser sends Google your IP address and user
+          agent, as with any request. The public pages do not load Google Fonts.
           The logo picker opens on its Presets tab, which loads university icons
           from Google, and a logo you pick there is loaded from Wikimedia sites
           or, failing that, from Google. Signing in with Google opens Google’s
@@ -204,18 +218,23 @@ export default function Cookies() {
           can see which pages people find useful. It is worth being precise about
           what that does and does not involve. As Postr uses it, it sets{' '}
           <strong>no cookie</strong> and writes nothing to your browser. Each page
-          view sends Vercel the page address, and it can include the address of
-          the page you came from, along with what every web request carries, such
-          as your IP address and browser type. Vercel says it tells visits apart
-          with a value derived from the request and discards that value within
-          24 hours.
+          view sends Vercel the page address, along with what every web request
+          carries, such as your IP address and browser type. On the first page
+          you open, it also sends the address of the website that sent you to
+          Postr, if any; it never sends a Postr page as that address. Vercel’s
+          documentation says it may record with each page view an approximate
+          location (country, region and city), the device type, the operating
+          system and the browser. It also says it tells
+          visits apart with a value derived from the request and discards that
+          value within 24 hours.
         </Body>
         <Body>
           In the page address it reports, Postr replaces poster and admin pages
           with their shape, for example{' '}
           <code className="text-[#c8b6ff]">/p/[redacted]</code> in place of your
-          poster’s id, and drops query strings entirely. Postr does not remove the
-          address of the page you came from, which can be another Postr page.
+          poster’s id, and drops query strings entirely. Postr’s pages also tell
+          your browser to send only the site’s address (https://www.postr.sh/),
+          not the page’s path, with the counting request.
         </Body>
         <List
           items={[
@@ -264,12 +283,19 @@ export default function Cookies() {
           next, and the editor may not work.
         </Body>
 
-        <SectionHeading n="6" title="Do Not Track and Global Privacy Control" />
+        <SectionHeading n="6" title="Global Privacy Control and Do Not Track" />
         <Body>
-          Postr’s code does not read “Do Not Track” (DNT) headers or the newer{' '}
-          <em>Global Privacy Control</em> (GPC) signal, and it does not switch off
-          page counting when your browser sends them. Postr runs no advertising
-          and no cross-site tracking that these signals would switch off.
+          Postr honours <em>Global Privacy Control</em> (GPC), a privacy setting
+          offered by some browsers, such as Firefox, Brave and DuckDuckGo. When
+          your browser sends it, Postr does not load Vercel Web Analytics, so your
+          page views are not counted. Page counting is the only optional thing
+          GPC could switch off: Postr runs no advertising and no cross-site
+          tracking. Postr does not read the older “Do Not Track” (DNT) header; turn
+          on GPC instead. You can also object to page counting by writing to{' '}
+          <a className="text-[#7c6aed] underline" href={`mailto:${CONTACT_EMAIL}`}>
+            {CONTACT_EMAIL}
+          </a>
+          .
         </Body>
 
         <SectionHeading n="7" title="Retention" />

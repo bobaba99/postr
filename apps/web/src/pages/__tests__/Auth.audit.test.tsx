@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -119,15 +119,18 @@ describe('paid signup audit regressions', () => {
     renderPaidSignup();
 
     expect(screen.queryByRole('heading', { name: 'Product' })).toBeNull();
-    expect(screen.getByRole('link', { name: /privacy/i })).toHaveAttribute(
+    // The footer's own links (the sign-up line links the Terms and the
+    // Privacy Policy too, in both languages: record 24).
+    const footer = within(screen.getByRole('navigation', { name: 'Legal' }));
+    expect(footer.getByRole('link', { name: /privacy/i })).toHaveAttribute(
       'href',
       '/privacy',
     );
-    expect(screen.getByRole('link', { name: /terms/i })).toHaveAttribute(
+    expect(footer.getByRole('link', { name: /terms/i })).toHaveAttribute(
       'href',
       '/terms',
     );
-    expect(screen.getByRole('link', { name: /cookies/i })).toHaveAttribute(
+    expect(footer.getByRole('link', { name: /cookies/i })).toHaveAttribute(
       'href',
       '/cookies',
     );

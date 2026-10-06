@@ -2,7 +2,13 @@
  * Conditions d'utilisation — publiques, en langage clair.
  *
  * Version française de la page Terms, fournie aux résidents du Québec
- * conformément à la Charte de la langue française.
+ * conformément à la Charte de la langue française. It follows Terms.tsx
+ * sentence for sentence, including the owner's decisions of 2026-10-06
+ * (record 24; see that file's header), and the statements that precede
+ * the clauses that may not apply to a Quebec consumer (Consumer Protection
+ * Act s. 19.1; record 24, review round 2). Quebec French: prices as
+ * « 18,99 $ CA » with no-break spaces, « lot » for the export pack,
+ * Quebec civil-law vocabulary.
  *
  * La section « Votre contenu » est délibérément stricte afin de couvrir
  * la fonction de galerie publique : les utilisateurs déclarent être les
@@ -16,7 +22,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = '5 octobre 2026';
+const LAST_UPDATED = '6 octobre 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function TermsFr() {
@@ -29,7 +35,7 @@ export default function TermsFr() {
       <article className="mx-auto max-w-3xl px-8 py-16">
         <div className="mb-4 flex items-center justify-between">
           <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#7c6aed]">
-            Légal
+            Juridique
           </div>
           <Link to="/terms" className="text-[13px] text-[#7c6aed] underline">
             English
@@ -43,21 +49,22 @@ export default function TermsFr() {
           Les présentes conditions d’utilisation (« Conditions ») constituent une entente
           juridique entre vous et Postr (« nous »), exploité par{' '}
           <strong className="text-[#e2e2e8]">Resila Technologies Inc.</strong>, une
-          société immatriculée dans la province de Québec, au Canada. En créant un
+          société constituée au Québec, au Canada. En créant un
           compte, en vous connectant ou en utilisant autrement Postr, y compris en
           utilisant l’éditeur sans vous inscrire, vous acceptez les présentes
-          Conditions ainsi que notre{' '}
+          Conditions. Notre{' '}
           <Link to="/privacy/fr" className="text-[#7c6aed] underline">
             Politique de confidentialité
-          </Link>
-          . Si vous n’êtes pas d’accord, n’utilisez pas le service.
+          </Link>{' '}
+          explique comment nous traitons vos renseignements personnels. Si vous
+          n’acceptez pas les présentes Conditions, n’utilisez pas le service.
         </Body>
 
         <SectionHeading n="2" title="Ce qu’est Postr" />
         <Body>
           Postr est un éditeur d’affiches scientifiques. Il vous permet de créer
           des affiches aux formats standard des conférences, de conserver des
-          brouillons, d’exporter vos affiches en PDF, PowerPoint ou LaTeX et de
+          brouillons, d’exporter vos affiches en PDF ou PowerPoint et de
           soumettre de la rétroaction.
         </Body>
         <CalloutBox>
@@ -172,10 +179,11 @@ export default function TermsFr() {
         </Body>
 
         <SubHeading>5.5 Indemnisation</SubHeading>
+        <QuebecNotice />
         <Body>
           Vous acceptez de défendre, d’indemniser et de tenir Postr et son exploitant
           indemnes de toute réclamation, demande, perte, dommage, coût ou dépense (y
-          compris les honoraires juridiques raisonnables) découlant de Votre contenu ou
+          compris les honoraires extrajudiciaires raisonnables) découlant de Votre contenu ou
           s’y rapportant — en particulier les réclamations selon lesquelles Votre
           contenu porte atteinte aux droits de propriété intellectuelle, au droit à la
           vie privée ou au droit à l’image d’un tiers. Dans la mesure où la loi
@@ -197,31 +205,37 @@ export default function TermsFr() {
         <SectionHeading n="7" title="Frais, abonnements et remboursements" />
         <Body>
           La création et la modification d’affiches, ainsi que l’exportation d’un PDF
-          prêt à imprimer, sont gratuites. Certaines fonctionnalités sont payantes, en
-          dollars canadiens (CAD) :
+          prêt à imprimer, sont gratuites. Certaines fonctionnalités sont payantes. Les
+          prix sont en dollars canadiens (CAD) et avant taxes : les taxes applicables
+          sont ajoutées au moment du paiement.
         </Body>
         <List
           items={[
-            'Forfait à terme — CA$18.99 facturés tous les 4 mois. Un abonnement récurrent qui débloque l’exportation illimitée vers PowerPoint et LaTeX, sans filigrane. Il se renouvelle automatiquement tous les 4 mois jusqu’à ce que vous l’annuliez.',
-            'Pack d’exportation — CA$9.99, une seule fois, pour 3 crédits d’exportation. Chaque exportation PowerPoint ou LaTeX utilise un crédit. Les crédits n’expirent jamais.',
+            'Forfait à terme — 18,99\u00a0$\u00a0CA plus les taxes applicables, facturés tous les 4 mois. Un abonnement récurrent qui débloque l’exportation illimitée vers PowerPoint, sans filigrane visible. Il se renouvelle automatiquement tous les 4 mois jusqu’à ce que vous l’annuliez.',
+            'Lot d’exportation — 9,99\u00a0$\u00a0CA plus les taxes applicables, une seule fois, pour 3 crédits d’exportation. Chaque exportation PowerPoint utilise un crédit. Les crédits n’expirent jamais.',
           ]}
         />
         <Body>
-          Les prix sont affichés au moment du paiement avant que vous ne payiez et
-          peuvent changer de temps à autre; un changement de prix n’a jamais d’incidence
-          sur un achat que vous avez déjà effectué. Les paiements sont traités par notre
-          fournisseur de paiement, qui agit à titre de marchand attitré (merchant of
-          record) et gère la facturation, les reçus et les taxes applicables.
+          Le total, taxes comprises, est affiché au moment du paiement, avant que vous
+          ne payiez. Les prix peuvent changer de temps à autre; un changement de prix n’a
+          jamais d’incidence sur un achat que vous avez déjà effectué. Les paiements sont
+          traités par notre fournisseur de paiement, Stripe, au moyen de son service de
+          marchand officiel (merchant of record), qui vous facture, émet vos reçus, et
+          calcule et perçoit les taxes.
         </Body>
 
         <SubHeading>7.1 Annulation de votre abonnement</SubHeading>
         <Body>
           Vous pouvez annuler le forfait à terme à tout moment par l’intermédiaire de
           Stripe, qui gère la facturation de Postr. Le bouton « Manage subscription »
-          de votre page Profil vous y mène. L’annulation met fin au prochain
-          renouvellement; votre forfait demeure actif jusqu’à la fin de la période que
-          vous avez déjà payée. L’annulation est sans frais et ne constitue pas un
-          remboursement.
+          de votre page Profil vous y mène. L’annulation prend effet à la fin de la
+          période que vous avez déjà payée : elle met fin au prochain renouvellement,
+          et votre forfait demeure actif jusqu’à la fin de la période payée.
+          L’annulation est sans frais et ne constitue pas un remboursement. La seule
+          exception est un forfait inutilisé : si vous n’avez pas effectué
+          d’exportation PowerPoint payante depuis la facturation, vous pouvez demander
+          un remboursement intégral dans les 14 jours suivant cette facturation, et le
+          forfait prend fin immédiatement (section 7.2).
         </Body>
 
         <SubHeading id="refunds">7.2 Remboursements</SubHeading>
@@ -230,9 +244,9 @@ export default function TermsFr() {
           <br />
           Si vous changez d’avis, nous rembourserons intégralement votre plus récente
           facturation de forfait dans les 14 jours suivant cette facturation, à
-          condition que vous n’ayez pas effectué d’exportation PowerPoint ou LaTeX
-          pendant cette période. Un remboursement annule aussi le forfait
-          immédiatement, ce qui met fin à ses exportations PowerPoint et LaTeX.
+          condition que vous n’ayez pas effectué d’exportation PowerPoint payante
+          depuis cette facturation. Le remboursement met fin au forfait
+          immédiatement, et avec lui à ses exportations PowerPoint.
           Effectuer une exportation payante revient à utiliser le produit que vous
           avez payé, de sorte que la garantie prend fin à ce moment-là. Après 14
           jours, ou une fois que vous avez exporté, la garantie ne couvre plus cette
@@ -240,14 +254,14 @@ export default function TermsFr() {
           les renouvellements futurs.
         </CalloutBox>
         <CalloutBox>
-          <strong className="text-[#e2e2e8]">Pack d’exportation — remboursable intégralement jusqu’à ce que vous utilisiez un crédit.</strong>
+          <strong className="text-[#e2e2e8]">Lot d’exportation — remboursable intégralement jusqu’à ce que vous utilisiez un crédit.</strong>
           <br />
-          Si vous changez d’avis, nous rembourserons intégralement la facturation de
-          CA$9.99 de votre plus récent pack, à condition qu’aucun de vos crédits
-          d’exportation n’ait été utilisé, que ce soit de ce pack ou d’un pack
-          antérieur. Chaque crédit correspond à une exportation PowerPoint ou LaTeX
-          payée : dès qu’un crédit a été utilisé, le pack n’est plus remboursable,
-          même en partie. Le remboursement d’un pack retire ses 3 crédits de votre
+          Si vous changez d’avis, nous rembourserons intégralement le montant payé pour
+          votre plus récent lot (9,99&nbsp;$&nbsp;CA plus les taxes facturées), à condition
+          qu’aucun de vos crédits d’exportation n’ait été utilisé, que ce soit de ce
+          lot ou d’un lot antérieur. Chaque crédit correspond à une exportation PowerPoint payée :
+          dès qu’un crédit a été utilisé, le lot n’est plus remboursable,
+          même en partie. Le remboursement d’un lot retire ses 3 crédits de votre
           compte.
         </CalloutBox>
         <Body>
@@ -268,7 +282,7 @@ export default function TermsFr() {
           il vous est demandé de confirmer que vous voulez un accès immédiat et que
           vous comprenez que vous perdez ce droit de rétractation de 14 jours dès que
           vous effectuez une exportation payante (pour le forfait à terme) ou utilisez
-          un crédit (pour le pack). Un achat commencé depuis la page « Pricing » ne
+          un crédit (pour le lot). Un achat commencé depuis la page « Pricing » ne
           demande pas cette confirmation. Lorsque cette confirmation n’a pas été
           obtenue, votre droit légal de 14
           jours s’applique indépendamment de l’utilisation. Rien dans la présente
@@ -297,6 +311,7 @@ export default function TermsFr() {
         />
 
         <SectionHeading n="10" title="Exclusions de garantie" />
+        <QuebecNotice />
         <CalloutBox>
           <strong className="text-[#e2e2e8]">« Tel quel » et « selon disponibilité ».</strong>
           <br />
@@ -309,20 +324,26 @@ export default function TermsFr() {
         </CalloutBox>
 
         <SectionHeading n="11" title="Limitation de responsabilité" />
+        <QuebecNotice />
         <Body>
           Dans la mesure maximale permise par la loi applicable, Postr et son exploitant
-          ne seront pas responsables des dommages indirects, accessoires, spéciaux,
-          consécutifs ou punitifs, ni d’aucune perte de profits, de revenus, de données
-          ou d’achalandage, découlant de votre utilisation du service ou s’y rapportant
-          — que ce soit sur le fondement d’un contrat, d’un délit (y compris la
-          négligence), d’une loi ou de toute autre théorie juridique, et que nous ayons
-          été avisés ou non de la possibilité de tels dommages.
+          ne seront pas responsables des dommages indirects, accessoires, spéciaux ou
+          consécutifs, des dommages-intérêts punitifs, ni d’aucune perte de profits, de
+          revenus, de données ou d’achalandage, découlant de votre utilisation du
+          service ou s’y rapportant — que ce soit en matière de responsabilité
+          contractuelle ou extracontractuelle (y compris la négligence), en vertu d’une
+          loi ou de toute autre théorie juridique, et que nous ayons été avisés ou non
+          de la possibilité de tels dommages.
         </Body>
         <Body>
           Rien dans les présentes Conditions ne limite la responsabilité en cas de décès
           ou de préjudice corporel causé par notre négligence, de fraude ou de fausse
           déclaration frauduleuse, ni aucune autre responsabilité qui ne peut être
-          limitée ou exclue en vertu de la loi applicable.
+          limitée ou exclue en vertu de la loi applicable. Si vous êtes un
+          consommateur, rien dans les présentes Conditions ne vous retire un droit que
+          vous confère la Loi sur la protection du consommateur du Québec, ou la loi
+          de protection des consommateurs du lieu où vous vivez, et auquel il ne peut
+          être renoncé.
         </Body>
 
         <SectionHeading n="12" title="Droit applicable et différends" />
@@ -330,10 +351,17 @@ export default function TermsFr() {
           Les présentes Conditions sont régies par les lois de la province de Québec et
           les lois fédérales du Canada qui y sont applicables, sans égard aux règles de
           conflit de lois. Tout différend découlant des présentes Conditions ou de votre
-          utilisation de Postr sera porté exclusivement devant les tribunaux siégeant
-          dans le district judiciaire de Montréal, au Québec, sauf lorsque les lois
-          impératives de protection des consommateurs de votre pays de résidence vous
-          confèrent le droit d’intenter des procédures localement.
+          utilisation de Postr sera porté devant les tribunaux siégeant dans le district
+          judiciaire de Montréal, au Québec, sous réserve des exceptions ci-dessous.
+        </Body>
+        <Body>
+          Si vous êtes un consommateur au Québec, vous conservez le droit que vous
+          confère la Loi sur la protection du consommateur d’intenter une poursuite
+          devant le tribunal de votre domicile. Les présentes Conditions n’imposent pas
+          l’arbitrage et ne vous empêchent pas d’intenter une action collective ou d’y
+          participer. Si vous êtes un consommateur ailleurs, vous conservez aussi tout
+          droit que la loi impérative de protection des consommateurs du lieu où vous
+          vivez vous confère d’y intenter une poursuite.
         </Body>
 
         <SectionHeading n="13" title="Modifications des présentes Conditions" />
@@ -342,9 +370,12 @@ export default function TermsFr() {
           évolue ou que la loi change. La date de « Dernière mise à jour » en haut de la
           page reflète toujours la version en vigueur. Si une modification touche
           substantiellement vos droits, nous en informerons les utilisateurs connectés
-          dans l’application ou par courriel avant qu’elle ne prenne effet. La poursuite
-          de l’utilisation de Postr après la date d’entrée en vigueur signifie que vous
-          acceptez les Conditions mises à jour.
+          dans l’application ou par courriel avant qu’elle ne prenne effet.
+        </Body>
+        <QuebecNotice />
+        <Body>
+          La poursuite de l’utilisation de Postr après la date d’entrée en vigueur
+          signifie que vous acceptez les Conditions mises à jour.
         </Body>
 
         <SectionHeading n="14" title="Nous joindre" />
@@ -378,6 +409,23 @@ function SubHeading({ children, id }: { children: React.ReactNode; id?: string }
     <h3 id={id} className="mt-6 mb-3 scroll-mt-24 text-[15px] font-semibold text-[#c8cad0]">
       {children}
     </h3>
+  );
+}
+
+/**
+ * Loi sur la protection du consommateur, art. 19.1 : une stipulation
+ * inapplicable au Québec doit être immédiatement précédée d'une mention
+ * explicite et présentée de façon évidente à cet effet. Twin of Terms.tsx's
+ * QuebecNotice.
+ */
+function QuebecNotice() {
+  return (
+    <p className="mb-3 text-[14pt] leading-relaxed text-[#e2e2e8]">
+      <strong>
+        La clause qui suit ne s’applique pas aux consommateurs du Québec dans la
+        mesure où la Loi sur la protection du consommateur l’interdit.
+      </strong>
+    </p>
   );
 }
 

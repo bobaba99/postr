@@ -550,6 +550,37 @@ export default function Auth() {
             Continue with Google
           </button>
 
+          {/* Continuing here is accepting the Terms (Terms §1: creating an
+              account or signing in), so this line sits right under the
+              Google button, in both modes: "Continue with Google" creates an
+              account for a Google user Postr has never seen, whatever the
+              mode, and the page opens in sign-in mode (record 24, review
+              round 2). It comes before the email form, so it is read before
+              either way of continuing. Both languages are linked (owner
+              decision 2026-10-06, Bill 96). The Privacy Policy is
+              information, not something the user agrees to (Law 25 s. 14
+              asks for consent separately from other information; record 24,
+              review round 1). */}
+          <p data-testid="auth-terms-line" className="mt-3 text-[13px] leading-relaxed text-[#8b8f99]">
+            By continuing, you agree to the{' '}
+            <Link className="text-[#9ca3af] underline underline-offset-4" to="/terms">
+              Terms of Service
+            </Link>
+            . The{' '}
+            <Link className="text-[#9ca3af] underline underline-offset-4" to="/privacy">
+              Privacy Policy
+            </Link>{' '}
+            explains how we handle your information. <span lang="fr">En français :{' '}
+            <Link className="text-[#9ca3af] underline underline-offset-4" to="/terms/fr">
+              Conditions d’utilisation
+            </Link>{' '}
+            et{' '}
+            <Link className="text-[#9ca3af] underline underline-offset-4" to="/privacy/fr">
+              Politique de confidentialité
+            </Link>
+            .</span>
+          </p>
+
           <div className="my-4 flex items-center gap-3">
             <div className="h-px flex-1 bg-[#2a2a3a]" />
             <span className="text-[13px] text-[#8b8f99]">or use email</span>
