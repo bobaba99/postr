@@ -41,6 +41,11 @@
  * EXIT  0 every mutant killed (blind spots aside) · 1 at least one survived ·
  *       2 control failed or bad spec
  *
+ * A test that reads a source file from disk rather than importing it sees
+ * the mutant too, if it reads through src/test/copyScan.ts `readSource`:
+ * the child writes the mutated sources to a file named in
+ * POSTR_MUTANT_SOURCES (fix 25).
+ *
  * Side effect: loading the Vite config rewrites apps/web/public/version.json.
  */
 import fs from 'node:fs';
@@ -63,6 +68,12 @@ if (childIdx !== -1) {
   const [, name, specPath, outFile] = args.slice(childIdx);
   const spec = loadSpec(specPath);
   const byFile = name === '(control)' ? new Map() : mutate(spec.mutants[name]);
+  // A test that reads a source file from disk instead of importing it (the
+  // copy inventory, src/test/copyScan.ts readSource) finds the mutated text
+  // here; the test workers inherit this environment.
+  const overlayFile = `${outFile}.sources.json`;
+  fs.writeFileSync(overlayFile, JSON.stringify(Object.fromEntries(byFile)));
+  process.env.POSTR_MUTANT_SOURCES = overlayFile;
   const { startVitest } = await import(pathToFileURL(path.join(REPO, 'node_modules/vitest/dist/node.js')).href);
   const plugin = mutantPlugin(byFile);
   const vitest = await startVitest(
