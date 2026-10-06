@@ -3,6 +3,9 @@
  * regression here means an unpublished-research share slug leaves the
  * application, so each case names the thing it protects.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { matchRoutes } from 'react-router';
 import { describe, expect, it } from 'vitest';
 import { redactUrl } from '../redactUrl';
 
@@ -123,4 +126,56 @@ describe('output is always an absolute URL', () => {
     expect(out).toBe('https://postr.sh/s/[redacted]');
     expect(out).not.toContain('secret-slug');
   });
+});
+
+/**
+ * Every route with an identifier in its path is redacted, read from the
+ * router itself, so a new `:param` route fails here until redactUrl knows
+ * it (record 24: /gallery/:entryId was not covered). A redirecting route
+ * counts too: the page address can be reported before the redirect lands.
+ */
+describe('every id-bearing route in the router', () => {
+  const routes = readFileSync(join(process.cwd(), 'src/routes.tsx'), 'utf8');
+  const paramPaths = [...routes.matchAll(/path="([^"]*:[^"]*)"/g)].map((match) => match[1] ?? '');
+
+  it('finds the id-bearing routes', () => {
+    expect(paramPaths.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it.each(paramPaths)('%s never reports its id', (path) => {
+    const secret = 'zq-secret-4f1c9a';
+    const url = `${ORIGIN}${path.replace(/:[A-Za-z]+/g, secret)}`;
+    const out = redactUrl(url);
+    expect(out).not.toContain(secret);
+    expect(out).toMatch(/^https:\/\/www\.postr\.sh\//);
+  });
+
+  /**
+   * The router matches paths without regard to case and after decoding
+   * percent-escapes, so /P/<id> and /%70/<id> open the editor like /p/<id>
+   * (record 24, review round 1: they were reported with the id). Each
+   * spelling below is one the router serves as that route — checked here
+   * with the router's own matcher — or, for a doubled slash, a not-found
+   * page whose address still carries the id.
+   */
+  const spellings: ReadonlyArray<[string, (path: string) => string, boolean]> = [
+    ['upper case', (path) => path.toUpperCase(), true],
+    ['capitalised', (path) => path.replace(/^\/(\w)/, (_m, c: string) => `/${c.toUpperCase()}`), true],
+    ['percent-encoded first letter', (path) => path.replace(/^\/(\w)/, (_m, c: string) => `/%${c.charCodeAt(0).toString(16)}`), true],
+    ['doubled leading slash', (path) => `/${path}`, false],
+  ];
+  it.each(paramPaths.flatMap((path) => spellings.map(([name, spell, served]) => [path, name, spell, served] as const)))(
+    '%s spelled %s never reports its id',
+    (path, _name, spell, served) => {
+      const secret = 'zq-secret-4f1c9a';
+      const spelled = spell(path.replace(/:[A-Za-z]+/g, ':id')).replace(/:id/gi, secret);
+      if (served) {
+        const match = matchRoutes([{ path }, { path: '*' }], spelled);
+        expect(match?.[0]?.route.path, spelled).toBe(path);
+      }
+      const out = redactUrl(`${ORIGIN}${spelled}`);
+      expect(out).not.toContain(secret);
+      expect(out).toMatch(/^https:\/\/www\.postr\.sh\//);
+    },
+  );
 });

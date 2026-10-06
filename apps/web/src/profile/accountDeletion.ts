@@ -19,35 +19,72 @@
  * Only on success: clear local data and sign out everywhere. On any
  * failure the user stays signed in with everything intact — the caller
  * shows a generic message and they can retry.
+ *
+ * Local data is every Postr entry this browser keeps, in localStorage and
+ * in sessionStorage: every key named postr.… or postr-…, which is how each
+ * entry in the Cookies Policy's table is named. One exception: another
+ * account's welcome-poster marker (`postr.welcome-seeded:<account id>`)
+ * stays, because it is not this account's data and removing it would seed
+ * that account's welcome poster again. Record 24 first added the four
+ * localStorage kinds the claims audit found left behind; its review round
+ * 1 found the tab's sessionStorage entries left too, which the Privacy
+ * Policy says deletion clears. Clearing by name rather than by a list
+ * means a key added later goes with the account without being listed
+ * here; pages/__tests__/Profile.dangerZone.test.tsx seeds every key in the
+ * policy's inventory (pages/__tests__/storageWriters.ts) and checks.
  */
 import { supabase } from '@/lib/supabase';
 import { deleteAccount } from '@/data/account';
 import { clearStoredFigureScripts } from '@/poster/figureScriptDraft';
 
-const LOCAL_KEYS = [
-  'postr.style-presets',
-  'postr.scratch-pad',
-  'postr.scratch-note',
-  'postr.checklist-templates',
-  'postr.profile',
-  'postr.onboarding-done',
-] as const;
+/** Every Postr entry's key starts with this (postr.… or postr-…). */
+const POSTR_KEY = /^postr[.-]/;
+/** data/seedWelcomePoster.ts: `postr.welcome-seeded:<account id>`. */
+const WELCOME_SEEDED_PREFIX = 'postr.welcome-seeded:';
 
 export type DeletionOutcome = { ok: true } | { ok: false };
 
-function clearLocalData(): void {
-  for (const key of LOCAL_KEYS) {
-    try {
-      localStorage.removeItem(key);
-    } catch {
-      // Storage unavailable — nothing to clear.
+/** Another account's welcome-poster marker: not this account's data. */
+function isOtherAccountsMarker(key: string, userId: string | null): boolean {
+  return key.startsWith(WELCOME_SEEDED_PREFIX) && key !== `${WELCOME_SEEDED_PREFIX}${userId}`;
+}
+
+/** Removes every Postr entry from one storage area, but another account's marker. */
+function clearArea(area: () => Storage, userId: string | null): void {
+  try {
+    const storage = area();
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i += 1) {
+      const key = storage.key(i);
+      if (key && POSTR_KEY.test(key) && !isOtherAccountsMarker(key, userId)) keys.push(key);
     }
+    keys.forEach((key) => storage.removeItem(key));
+  } catch {
+    // Storage unavailable — nothing stored to clear.
   }
-  // The plot scripts kept per poster (postr.figure-script.<poster id>).
+}
+
+function clearLocalData(userId: string | null): void {
+  clearArea(() => localStorage, userId);
+  clearArea(() => sessionStorage, userId);
+  // The plot scripts kept per poster (postr.figure-script.<poster id>):
+  // their keys went above; this also drops the copies too long to store,
+  // which the figure check holds in memory, and tells it they are gone.
   clearStoredFigureScripts();
 }
 
+/** The account being deleted, read before the server deletes it. */
+async function currentUserId(): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function runAccountDeletion(): Promise<DeletionOutcome> {
+  const userId = await currentUserId();
   try {
     await deleteAccount();
   } catch (err) {
@@ -56,7 +93,7 @@ export async function runAccountDeletion(): Promise<DeletionOutcome> {
     console.error('[account] delete failed:', err);
     return { ok: false };
   }
-  clearLocalData();
+  clearLocalData(userId);
   await supabase.auth.signOut({ scope: 'global' });
   return { ok: true };
 }
