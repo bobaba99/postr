@@ -111,14 +111,14 @@ const MILESTONES: Milestone[] = [
     // card no longer offers them (fix 23).
     //
     // Undo keeps MAX_HISTORY (50) steps (stores/posterStore.ts). PowerPoint
-    // and LaTeX need a term or a pack credit (usePlan canExport). The PPTX
-    // and LaTeX writers have no case for chart blocks, so the card names
-    // what they do carry. references.bib ships only when the poster has
-    // references (export/latex/bib.ts); the .tex targets XeLaTeX/LuaLaTeX.
+    // needs a term or a pack credit (usePlan canExport). The PPTX writer
+    // has no case for chart blocks, so the card names what it does carry.
+    // The LaTeX export is hidden (config/features.ts LATEX_EXPORT_ENABLED,
+    // fix 25), so the card does not name it.
     id: 'ship',
     title: 'Iterate, export, print',
     body:
-      'Undo and redo up to 50 steps. Save a PDF for free. PowerPoint and LaTeX exports are paid: PowerPoint keeps text, images and tables editable, and LaTeX gives you a poster.tex for XeLaTeX with your images, plus a references.bib when the poster has references. Charts made in Postr are not included.',
+      'Undo and redo up to 50 steps. Save a PDF for free. PowerPoint exports are paid, and keep text, images and tables editable. Charts made in Postr are not included.',
   },
 ];
 

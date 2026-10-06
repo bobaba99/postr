@@ -50,7 +50,7 @@ import { usePlan } from '@/hooks/usePlan';
 /** Shown instead of starting checkout when the user already holds an
  *  active term (P0-2). Generic on purpose — never the raw API text. */
 const ALREADY_SUBSCRIBED_MESSAGE =
-  'You already have an active term — PowerPoint and LaTeX export are unlocked.';
+  'You already have an active term — PowerPoint export is unlocked.';
 
 type Mode = 'signin' | 'signup';
 
@@ -438,8 +438,8 @@ export default function Auth() {
                   {
                     (
                       {
-                        term: 'Term · CA$18.99 / 4 months',
-                        pack: 'Export pack · CA$9.99',
+                        term: 'Term · CA$18.99 every 4 months + applicable taxes',
+                        pack: 'Export pack · CA$9.99 + applicable taxes',
                         review_pack: 'Review pack · credits never expire',
                         review_addon: 'Review add-on · weekly reviews',
                       } as Record<CheckoutPlan, string>

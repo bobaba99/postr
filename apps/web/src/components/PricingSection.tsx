@@ -23,7 +23,12 @@
  * Copy names the workflow, never a capability, and makes no AI claim
  * (feedback_marketing_no_ai_framing). Every line is checked against what
  * the product actually does: editing + watermarked PDF are free today;
- * PPTX/LaTeX export is the paid line.
+ * the PowerPoint export is the paid line (the LaTeX export is hidden,
+ * config/features.ts LATEX_EXPORT_ENABLED, fix 25).
+ *
+ * Stripe prices are before tax (owner, 2026-10-06): each paid card says
+ * "+ applicable taxes" right under its price (`taxNote`), and
+ * src/components/__tests__/pricesTax.test.tsx reads it there.
  *
  * The paid tier CTAs route to /auth?plan=<sku> — the account-first
  * checkout flow: a signed-out user creates a REAL account (never guest,
@@ -65,6 +70,8 @@ export interface PricingTier {
   readonly featured?: boolean;
   readonly cta: string;
   readonly ctaTo: string;
+  /** Said right under the price: the price is before tax. Paid tiers only. */
+  readonly taxNote?: string;
   /** Plain-language "who is this for". */
   readonly forWho: string;
   /** Essential purchase condition that must remain visible. */
@@ -74,6 +81,9 @@ export interface PricingTier {
   /** The plan's refund rule, shown right under the CTA (paid tiers only). */
   readonly refund?: string;
 }
+
+/** The tax line under a paid price: Stripe adds the tax at checkout. */
+const TAX_NOTE = '+ applicable taxes';
 
 export const PRICING_TIERS = [
   {
@@ -95,13 +105,14 @@ export const PRICING_TIERS = [
     name: 'Term',
     price: 'CA$18.99',
     cadence: 'every 4 months',
+    taxNote: TAX_NOTE,
     featured: true,
     cta: 'Get the term',
     ctaTo: '/auth?plan=term',
     forWho: 'For unlimited editable exports while your term runs.',
     condition: 'Renews every four months. Cancel anytime.',
     features: [
-      'PowerPoint and LaTeX exports with no watermark.',
+      'PowerPoint exports with no watermark.',
       'No export limit while your term is active.',
     ],
     refund: REFUND_LINE.term,
@@ -111,12 +122,13 @@ export const PRICING_TIERS = [
     name: 'Export pack',
     price: 'CA$9.99',
     cadence: 'one-time · 3 exports',
+    taxNote: TAX_NOTE,
     cta: 'Get the pack',
     ctaTo: '/auth?plan=pack',
     forWho: 'For a few editable exports without a subscription.',
     condition: 'One-time purchase. Credits never expire.',
     features: [
-      'Three PowerPoint or LaTeX exports.',
+      'Three PowerPoint exports.',
       'Purchased exports have no watermark.',
     ],
     refund: REFUND_LINE.pack,
@@ -197,6 +209,9 @@ function PricingCard({
         <span className="text-3xl font-bold tracking-tight text-white">{tier.price}</span>
         <span className="text-sm text-[#8b8f99]">{tier.cadence}</span>
       </div>
+      {tier.taxNote && (
+        <p className="mt-1 text-xs text-[#8b8f99]">{tier.taxNote}</p>
+      )}
       <p className="mt-3 text-sm leading-relaxed text-[#a3a7b3]">{tier.forWho}</p>
       <p className="mt-3 text-sm font-medium leading-relaxed text-[#c8cad0]">
         {tier.condition}

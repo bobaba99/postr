@@ -44,16 +44,16 @@
       ]
     },
     "/pricing": {
-      "title": "Postr Pricing: Free PDF Export, Paid PowerPoint & LaTeX",
-      "description": "Editing and PDF export are free. PowerPoint and LaTeX exports need the CA$18.99 term, renewing every 4 months, or a one-time CA$9.99 pack of 3 exports.",
+      "title": "Postr Pricing: Free PDF Export, Paid PowerPoint Export",
+      "description": "Editing and PDF export are free. PowerPoint exports need the 4-month term, CA$18.99 + applicable taxes, or a pack of 3, CA$9.99 + applicable taxes.",
       "robots": "index,follow",
       "h1": "Free to build. Pay only to take it further.",
       "copy": [
         "A finished, print-ready poster costs nothing on Postr. Editing and PDF export are free, and every PDF carries a \"made with postr.sh\" credit. No card or account is required to finish and print your work.",
-        "The CA$18.99 term gives unlimited PowerPoint and LaTeX exports with no watermark while it is active. It renews every four months and you can cancel anytime.",
-        "The CA$9.99 pack gives three PowerPoint or LaTeX exports. Each export uses one credit, even a second export of the same poster. It is a one-time purchase, and the credits never expire.",
+        "The CA$18.99 term, plus applicable taxes, gives unlimited PowerPoint exports with no watermark while it is active. It renews every four months and you can cancel anytime.",
+        "The CA$9.99 pack, plus applicable taxes, gives three PowerPoint exports. Each export uses one credit, even a second export of the same poster. It is a one-time purchase, and the credits never expire.",
         "Refunds: a term is refundable in full within 14 days of a charge if you haven't taken a paid export. A pack is refundable in full until you use an export credit, and not after.",
-        "You only pay to export to PowerPoint or LaTeX. The editor, its tools and the PDF export have no paywall. A guest can keep up to 25 posters and an account up to 200, and some tools, such as import and Copy a design, have daily limits. Prices are shown in Canadian dollars, and payments go through Stripe."
+        "You only pay to export to PowerPoint. The editor, its tools and the PDF export have no paywall. A guest can keep up to 25 posters and an account up to 200, and some tools, such as import and Copy a design, have daily limits. Prices are shown in Canadian dollars, before applicable taxes, and payments go through Stripe."
       ]
     },
     "/tools/figure-readability": {
@@ -158,12 +158,12 @@
       "h1": "Sign in or create your account",
       "copy": [
         "Sign in, create an account, or continue as a guest to start building a conference poster.",
-        "Poster editing and print-ready PDF export are free. Paid plans only unlock editable PowerPoint and LaTeX exports."
+        "Poster editing and print-ready PDF export are free. Paid plans only unlock editable PowerPoint exports."
       ]
     },
     "/dashboard": {
       "title": "Conference Poster Dashboard | Postr",
-      "description": "Create, manage, and reopen conference posters in Postr, then export print-ready PDFs or unlock editable PowerPoint and LaTeX files.",
+      "description": "Create, manage, and reopen conference posters in Postr, then export print-ready PDFs for free or unlock editable PowerPoint files.",
       "robots": "noindex,nofollow"
     },
     "/profile": {
@@ -193,7 +193,7 @@
     },
     "/billing/cancel": {
       "title": "Checkout Cancelled — Return to Postr",
-      "description": "No charge was made. Go back and keep editing your conference poster for free, including PDF export, or see the editable PowerPoint and LaTeX plans.",
+      "description": "No charge was made. Go back and keep editing your conference poster for free, including PDF export, or see the plans for editable PowerPoint export.",
       "robots": "noindex,nofollow"
     },
     "/404": {

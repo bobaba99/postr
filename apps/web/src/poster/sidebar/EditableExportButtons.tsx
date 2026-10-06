@@ -1,15 +1,18 @@
 /**
- * EditableExportButtons — the "keep editing elsewhere" exports:
- * PowerPoint (.pptx) and LaTeX (.zip).
+ * EditableExportButtons — the "keep editing elsewhere" export:
+ * PowerPoint (.pptx). The LaTeX (.zip) export is hidden while
+ * LATEX_EXPORT_ENABLED is false (config/features.ts, 2026-10-06): its
+ * button, its hint and its handler stay here behind the switch, and no
+ * other copy in this panel names it (fix 25).
  *
- * Both writers are pure `PosterDoc → bytes` modules loaded via
+ * The writers are pure `PosterDoc → bytes` modules loaded via
  * dynamic import, so fflate/pptxgenjs and the writer code stay out
  * of the editor bundle for users who never export.
  *
  * PowerPoint's 56-inch ceiling is surfaced HERE, before export —
  * silent scaling is how someone prints a 36-inch poster for a
  * 72-inch board. Beyond 112 in the PPTX button is disabled and the
- * copy steers to LaTeX/PDF, which have no size limit.
+ * copy steers to the PDF (Save PDF, above this panel).
  *
  * Reads from `usePosterStore` directly (same pattern as
  * PostrExportButton) so the host tab needs no new plumbing beyond
@@ -32,6 +35,7 @@ import {
 } from '@/data/billing';
 import { stashCheckoutIntent, type CheckoutPlan } from '@/data/checkoutIntent';
 import { REFUND_LINE_BOTH } from '@/data/refundCopy';
+import { LATEX_EXPORT_ENABLED } from '@/config/features';
 
 type ExportKind = 'latex' | 'pptx';
 
@@ -49,7 +53,7 @@ const IDLE: ExportState = { busy: null, done: null, notes: [], failed: false };
  *  active (409 already_subscribed, P0-2). Generic on purpose — never the
  *  raw error text. */
 const ALREADY_SUBSCRIBED_NOTICE =
-  'You already have an active term — PowerPoint and LaTeX export are unlocked. Manage it from your profile.';
+  'You already have an active term — PowerPoint export is unlocked. Manage it from your profile.';
 
 function downloadBytes(bytes: Uint8Array, fileName: string, mime: string): void {
   const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
@@ -121,7 +125,7 @@ export function EditableExportButtons({
 
   // The paywall (docs/plans/2026-07-28-payment-and-paywall.md): editable
   // exports are paid. Unlock on an active term (unlimited) or an export
-  // credit from the $9.99 pack. A credit-based export spends one credit
+  // credit from the pack. A credit-based export spends one credit
   // (server-side, after the bytes are produced); a term export does not.
   const canExport = plan.canExport;
   const usesCredit = !plan.hasActiveTerm && plan.credits > 0;
@@ -264,19 +268,24 @@ export function EditableExportButtons({
       return note ? [note, ...warnings] : warnings;
     });
 
-  const handleLatex = () =>
-    run('latex', async () => {
-      const [{ exportPosterLatex }, { safeFileBaseName }] = await Promise.all([
-        import('@/export/latex/exportLatex'),
-        import('@/export/posterContent'),
-      ]);
-      const { bytes, warnings } = await exportPosterLatex(doc!, {
-        citationStyle,
-        attribution: { paidPlan: canExport },
+  // Hidden export (LATEX_EXPORT_ENABLED): the writer is imported only
+  // inside the switch, so with it off nothing can run it or fetch it.
+  const handleLatex = () => {
+    if (LATEX_EXPORT_ENABLED) {
+      void run('latex', async () => {
+        const [{ exportPosterLatex }, { safeFileBaseName }] = await Promise.all([
+          import('@/export/latex/exportLatex'),
+          import('@/export/posterContent'),
+        ]);
+        const { bytes, warnings } = await exportPosterLatex(doc!, {
+          citationStyle,
+          attribution: { paidPlan: canExport },
+        });
+        downloadBytes(bytes, `${safeFileBaseName(posterTitle)}-latex.zip`, 'application/zip');
+        return warnings;
       });
-      downloadBytes(bytes, `${safeFileBaseName(posterTitle)}-latex.zip`, 'application/zip');
-      return warnings;
-    });
+    }
+  };
 
   // A guest's export buttons stay CLICKABLE — the click is what trips the
   // secure-work modal (the guest's gate is account creation, not the
@@ -300,8 +309,9 @@ export function EditableExportButtons({
         Paywall (docs/plans/2026-07-28-payment-and-paywall.md): editable
         exports are the paid line. Shown only once the plan has loaded and
         the user can't export — never flashes during the initial read.
-        Copy names what they GET ("keep editing in PowerPoint or
-        Overleaf"), not what they're blocked from (marketing rule).
+        Copy names what they GET ("keep editing in PowerPoint"), not what
+        they're blocked from (marketing rule). Stripe prices are before
+        tax (owner, 2026-10-06), so each price says taxes are extra.
         Suppressed for guests: their next step is creating an account (the
         secure-work modal on export click), not paying — the paywall would
         only apply after they convert.
@@ -317,12 +327,13 @@ export function EditableExportButtons({
           }}
         >
           <div style={{ fontSize: 14, fontWeight: 600, color: '#e2e2e8', marginBottom: 4 }}>
-            Keep editing in PowerPoint or Overleaf
+            Keep editing in PowerPoint
           </div>
           <div style={{ fontSize: 12.5, color: '#9ca3af', lineHeight: 1.5, marginBottom: 12 }}>
-            Your PDF export is free. Unlock clean PowerPoint &amp; LaTeX with the
-            CA$18.99 term (renews every 4 months, cancel anytime), or a CA$9.99
-            3-export pack whose credits never expire.
+            Your PDF export is free. Unlock clean PowerPoint export with the
+            term at CA$18.99 + applicable taxes (renews every 4 months, cancel
+            anytime), or a 3-export pack at CA$9.99 + applicable taxes (its
+            credits never expire).
           </div>
           {/* EU right-of-withdrawal waiver (required to enforce the refund
               policy). Gates the buy buttons. */}
@@ -402,7 +413,7 @@ export function EditableExportButtons({
       {!plan.loading && canExport && usesCredit && (
         <div style={{ ...hintStyle, color: '#a3a7b3', marginTop: 0, marginBottom: 10 }}>
           {plan.credits} export{plan.credits === 1 ? '' : 's'} left in your pack —
-          each PowerPoint or LaTeX export uses one. Credits never expire.
+          each PowerPoint export uses one. Credits never expire.
         </div>
       )}
       <button
@@ -431,7 +442,7 @@ export function EditableExportButtons({
         <div style={{ ...hintStyle, color: '#fca5a5' }}>
           This poster is {doc.widthIn}×{doc.heightIn} in — too large for
           PowerPoint even at half size (its limit is {PPTX_MAX_DIMENSION_IN} in
-          per side). Export LaTeX or PDF instead; neither has a size limit.
+          per side). Save a PDF instead.
         </div>
       )}
       {doc && overCeiling && !beyondHalf && (
@@ -440,14 +451,14 @@ export function EditableExportButtons({
           limit is {PPTX_MAX_DIMENSION_IN} in per side, so this file will be
           exactly half size ({doc.widthIn / 2}×{doc.heightIn / 2} in) —{' '}
           <strong style={{ color: '#e3c520' }}>print at 200%</strong>. The note
-          is also written inside the file. For a full-size editable export, use
-          LaTeX below.
+          is also written inside the file.
+          {LATEX_EXPORT_ENABLED && ' For a full-size editable export, use LaTeX below.'}
         </div>
       )}
-      {/* Neither writer handles `chart` blocks (pptx/writer.ts block
-          switch, latex/writer.ts EMITTERS), so charts are named as left
-          out. Third-party app compatibility is not claimed: nothing here
-          checks it. */}
+      {/* The PowerPoint writer does not handle `chart` blocks
+          (pptx/writer.ts block switch), so charts are named as left out.
+          Third-party app compatibility is not claimed: nothing here checks
+          it. */}
       {!beyondHalf && (
         <div style={hintStyle}>
           One editable slide. Text, images and tables become PowerPoint text
@@ -455,36 +466,43 @@ export function EditableExportButtons({
         </div>
       )}
 
-      <div style={{ height: 10 }} />
+      {/* The hidden LaTeX export (LATEX_EXPORT_ENABLED, fix 25): kept,
+          not rendered. Before it comes back: docs/stress-test/PLAN.md,
+          "LaTeX export: before it is switched back on". */}
+      {LATEX_EXPORT_ENABLED && (
+        <>
+          <div style={{ height: 10 }} />
 
-      <button
-        onClick={handleLatex}
-        disabled={latexDisabled}
-        data-postr-export-latex
-        style={exportButtonStyle(
-          latexDisabled,
-          state.done === 'latex',
-          '#8ec5ff',
-          '#3178c6',
-        )}
-      >
-        {state.done === 'latex' ? (
-          '✓ Saved'
-        ) : state.busy === 'latex' ? (
-          <BusyIndicator inline tone="#8ec5ff" label="Writing LaTeX…" />
-        ) : (
-          '⌨ LaTeX source (.zip)'
-        )}
-      </button>
-      {/* poster.tex loads fontspec, so it needs XeLaTeX or LuaLaTeX
-          (exportLatex.ts README); references.bib ships only when the
-          poster has references (hasBib); charts are not emitted. */}
-      <div style={hintStyle}>
-        A <code>poster.tex</code> for XeLaTeX or LuaLaTeX, with your images and,
-        when the poster has references, a <code>references.bib</code>. Each
-        block keeps its position. Charts made in Postr are not included. Full
-        size at any poster dimension.
-      </div>
+          <button
+            onClick={handleLatex}
+            disabled={latexDisabled}
+            data-postr-export-latex
+            style={exportButtonStyle(
+              latexDisabled,
+              state.done === 'latex',
+              '#8ec5ff',
+              '#3178c6',
+            )}
+          >
+            {state.done === 'latex' ? (
+              '✓ Saved'
+            ) : state.busy === 'latex' ? (
+              <BusyIndicator inline tone="#8ec5ff" label="Writing LaTeX…" />
+            ) : (
+              '⌨ LaTeX source (.zip)'
+            )}
+          </button>
+          {/* poster.tex loads fontspec, so it needs XeLaTeX or LuaLaTeX
+              (exportLatex.ts README); references.bib ships only when the
+              poster has references (hasBib); charts are not emitted. */}
+          <div style={hintStyle}>
+            A <code>poster.tex</code> for XeLaTeX or LuaLaTeX, with your images and,
+            when the poster has references, a <code>references.bib</code>. Each
+            block keeps its position. Charts made in Postr are not included. Full
+            size at any poster dimension.
+          </div>
+        </>
+      )}
 
       {state.notes.length > 0 && (
         <ul
@@ -509,7 +527,9 @@ export function EditableExportButtons({
       )}
       {state.done && (
         <span role="status" aria-live="polite" className="sr-only">
-          {state.done === 'pptx' ? 'PowerPoint file saved' : 'LaTeX source saved'}
+          {state.done === 'pptx'
+            ? 'PowerPoint file saved'
+            : LATEX_EXPORT_ENABLED && 'LaTeX source saved'}
         </span>
       )}
     </div>

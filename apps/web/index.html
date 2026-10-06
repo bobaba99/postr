@@ -17,13 +17,15 @@
       here is what an un-prerendered route (and the app shell) falls back to.
 
       No bare "free" and no "no paywall": editing and the PDF export are
-      free, but PowerPoint and LaTeX exports need a term or a pack
-      (hooks/usePlan.ts canExport). Say both or neither.
+      free, but PowerPoint exports need a term or a pack
+      (hooks/usePlan.ts canExport). Say both or neither, and name no export
+      that config/features.ts switches off: this comment ships in every
+      page's source.
     -->
     <title>Academic Poster Maker for Researchers | Postr</title>
     <meta
       name="description"
-      content="Conference poster maker for researchers. Print-ready sizes, discipline-appropriate palettes, BibTeX citations. Editing and PDF export are free; PowerPoint and LaTeX exports are paid."
+      content="Conference poster maker for researchers. Print-ready sizes, discipline-appropriate palettes, BibTeX citations. Editing and PDF export are free; PowerPoint exports are paid."
     />
     <meta property="og:site_name" content="Postr" />
     <meta property="og:locale" content="en_US" />

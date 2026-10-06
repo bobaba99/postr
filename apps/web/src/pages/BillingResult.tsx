@@ -82,7 +82,7 @@ function Success() {
 
         <p className="mt-3 text-sm leading-relaxed text-[#9ca3af]">
           {plan.hasActiveTerm
-            ? 'Your term is active. Editable PowerPoint and LaTeX exports are unlocked — no watermark.'
+            ? 'Your term is active. Editable PowerPoint exports are unlocked — no watermark.'
             : plan.credits > 0
               ? `You have ${plan.credits} export credit${plan.credits === 1 ? '' : 's'} to use whenever. Credits never expire.`
               : stillProcessing

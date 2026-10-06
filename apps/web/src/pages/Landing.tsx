@@ -240,6 +240,10 @@ export default function Landing() {
               Follow section prompts, word targets, and a poster-ready checklist.
             </p>
           </div>
+          {/* The import reads .pptx (ImportPosterModal); the export needs a
+              term or a pack credit (usePlan canExport), so the card says it
+              is paid (owner, 2026-10-06). The LaTeX export is hidden
+              (config/features.ts), so the card does not name it (fix 25). */}
           <div
             data-postr-reveal
             className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
@@ -247,7 +251,8 @@ export default function Landing() {
             <div className="text-2xl mb-3">🎞️</div>
             <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Editable exports</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Import, edit, and export PowerPoint, or continue in LaTeX.
+              Import and edit a PowerPoint, then export an editable one.
+              PowerPoint exports are paid.
             </p>
           </div>
         </div>

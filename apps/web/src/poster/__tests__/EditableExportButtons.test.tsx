@@ -1,7 +1,7 @@
 /**
  * Loading feedback for the editable exports.
  *
- * Both writers are dynamic imports — the first PPTX click pays a
+ * The writers are dynamic imports — the first PPTX click pays a
  * ~368 kB pptxgenjs chunk fetch before a single slide is written, so
  * "no feedback until the file lands" reads as a dead button.
  */
@@ -117,15 +117,15 @@ describe('EditableExportButtons loading feedback', () => {
     });
   });
 
-  it('disables both exports while one is in flight', async () => {
+  it('disables the export while it is in flight', async () => {
     renderInRouter(<EditableExportButtons citationStyle="APA 7" />);
-    fireEvent.click(screen.getByText('▤ PowerPoint (.pptx)'));
+    const pptx = document.querySelector('[data-postr-export-pptx]') as HTMLButtonElement;
+    expect(pptx.disabled).toBe(false);
+    fireEvent.click(pptx);
 
-    await waitFor(() => {
-      expect(
-        (screen.getByText('⌨ LaTeX source (.zip)').closest('button') as HTMLButtonElement)
-          .disabled,
-      ).toBe(true);
-    });
+    await waitFor(() => expect(pptx.disabled).toBe(true));
+    await waitFor(() => expect(gate.release).toBeDefined());
+    gate.release!();
+    await waitFor(() => expect(pptx.disabled).toBe(false));
   });
 });
