@@ -154,11 +154,14 @@ export function PrintSizeFields({ value, onChange }: Props) {
         })}
       </div>
 
+      {/* parsePythonCode no longer takes the typed size as its canvas
+          (fix 13): with no figsize it uses matplotlib's 6.4 × 4.8 in. */}
       <p className="mt-3 max-w-[62ch] text-sm leading-relaxed text-[#8b8f99]">
         Measure the space the figure will fill on the printed poster, not the
-        image file. If your code sets ggsave() or figsize, the check scales
-        from that canvas to this size; otherwise it assumes the figure renders
-        at this size.
+        image file. If your code sets its canvas (ggsave() in R, figsize in
+        Python), the check scales from that canvas to this size. Without one,
+        it assumes R code renders at this size and Python code at
+        matplotlib&rsquo;s default of 6.4 × 4.8 in.
       </p>
     </div>
   );

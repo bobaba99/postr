@@ -9,7 +9,7 @@
  * figure size" (Enter commits), paste the script into the code box, press
  * "▶ Check", read the table the page renders (source pt, print pt, min,
  * verdict per element), the scale line and the "Raise these text elements"
- * list. If the page offers "Copy corrected code", press it and read what
+ * list. If the page offers "Copy edited code", press it and read what
  * it wrote to the clipboard, paste that back and press Check again, then
  * copy again if a second fix is offered. Nothing in the app is called
  * directly; the backend is faked at the network layer (lib/editorHarness.mjs).
@@ -165,7 +165,7 @@ function readReport(page) {
   return page.evaluate(() => {
     const leaf = (re) => [...document.querySelectorAll('div')].find((d) => d.children.length === 0 && re.test(d.textContent.trim()));
     const table = [...document.querySelectorAll('table')].find((t) => !t.dataset.zqOld && /Element/.test(t.querySelector('thead')?.textContent ?? ''));
-    const detected = leaf(/^(Detected: .*|Auto-detect waiting for code…)$/)?.textContent.trim() ?? null;
+    const detected = leaf(/^(Detected: .*|Auto-detect waiting for code…|Can’t tell R from Python\. Pick one above\.)$/)?.textContent.trim() ?? null;
     if (!table) return { detected, table: false, rows: [] };
     const panel = table.parentElement;
     const rows = [...table.querySelectorAll('tbody tr')].map((tr) => {
@@ -175,7 +175,7 @@ function readReport(page) {
     const scaleEl = [...panel.querySelectorAll('div')].find((d) => /^Scale factor:/.test(d.textContent.trim()));
     const scale = scaleEl ? parseFloat(scaleEl.textContent.trim().replace(/^Scale factor:\s*/, '')) : null;
     const warnings = [...panel.children].filter((c) => c.textContent.trim().startsWith('⚠')).map((c) => c.textContent.trim().slice(1).trim());
-    const copyBtn = [...panel.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Copy corrected code');
+    const copyBtn = [...panel.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Copy edited code');
     let fixShown = null;
     let fixList = [];
     if (copyBtn) {
@@ -188,7 +188,7 @@ function readReport(page) {
           : { raw: li.textContent };
       });
     }
-    const allPassBanner = [...panel.querySelectorAll('div')].some((d) => d.textContent.trim() === 'All elements pass readability thresholds at this poster size.');
+    const allPassBanner = [...panel.querySelectorAll('div')].some((d) => d.textContent.trim() === 'Every element in the table meets its minimum at this poster size.');
     return { detected, table: true, rows, scale, warnings, hasCopy: !!copyBtn, fixShown, fixList, allPassBanner };
   });
 }
@@ -206,11 +206,11 @@ async function check(page, code) {
   return readReport(page);
 }
 
-/** Press "Copy corrected code" and return what the page put on the clipboard. */
+/** Press "Copy edited code" and return what the page put on the clipboard. */
 async function copyCorrected(page) {
   const SENTINEL = '__ZQ_CLIPBOARD_EMPTY__';
   await page.evaluate((s) => navigator.clipboard.writeText(s), SENTINEL);
-  await page.getByRole('button', { name: 'Copy corrected code' }).click();
+  await page.getByRole('button', { name: 'Copy edited code' }).click();
   const got = await page.waitForFunction(
     async (s) => { const t = await navigator.clipboard.readText(); return t !== s ? t : null; },
     SENTINEL, { timeout: 3000, polling: 50 },
@@ -225,7 +225,7 @@ async function checkAndRecheck(page, code, rec) {
   if (rec.first.detected !== 'Detected: Python / matplotlib') rec.errors.push(`detected: ${rec.first.detected}`);
   if (!rec.first.hasCopy) return;
   rec.copied = await copyCorrected(page);
-  if (rec.copied === null) rec.errors.push('Copy corrected code wrote nothing to the clipboard');
+  if (rec.copied === null) rec.errors.push('Copy edited code wrote nothing to the clipboard');
   else if (rec.copied !== rec.first.fixShown) rec.errors.push('copied code differs from the code shown');
   if (rec.copied !== null && rec.copied === code) rec.unchanged = true;
   if (rec.copied !== null && !rec.unchanged) {

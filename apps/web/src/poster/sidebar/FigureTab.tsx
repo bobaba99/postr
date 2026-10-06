@@ -157,7 +157,10 @@ export function FigureTab({
                 busyLabel: (n) => (n > 1 ? `Inserting ${n} figures…` : 'Inserting…'),
               },
             ]}
-            confirmation="Inserted — legible at print size"
+            // No size promise: with a legend, renderChart grows the svg and
+            // the viewBox shrinks all its text, so 18 pt tick and legend text
+            // prints at 14.9-16.8 pt (measured on the seeded samples).
+            confirmation="Inserted on your poster"
           />
         </div>
       </div>

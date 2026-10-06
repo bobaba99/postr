@@ -129,7 +129,9 @@ export function ChartChooser({
     setAnswers({});
     setPendingGroups([]);
     setListingVariables(false);
-    setDataSummary('Worked example — swap in your numbers after inserting');
+    // No promise of editing later: an inserted chart's data cannot be
+    // edited on the poster (no chart-data editor exists).
+    setDataSummary('Worked example with sample numbers, not your results');
   };
 
   const onDeclare = (variables: readonly DeclaredVariable[], summary: string) => {

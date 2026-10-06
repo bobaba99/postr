@@ -133,7 +133,7 @@ describe('FigureReadabilityPage', () => {
     renderPage();
     pasteCode(R_CODE);
     clickCheck();
-    expect(screen.queryByText(/all elements pass/i)).toBeNull();
+    expect(screen.queryByText(/every element in the table meets its minimum/i)).toBeNull();
 
     const preset = screen.getByRole('button', { name: /quarter of a 48 × 36 poster/i });
     fireEvent.click(preset);
@@ -142,7 +142,7 @@ describe('FigureReadabilityPage', () => {
     expect((screen.getByLabelText('Height') as HTMLInputElement).value).toBe('18');
 
     clickCheck();
-    expect(screen.getByText(/all elements pass/i)).toBeInTheDocument();
+    expect(screen.getByText(/every element in the table meets its minimum/i)).toBeInTheDocument();
     expect(apiSpies.postJson).not.toHaveBeenCalled();
   });
 

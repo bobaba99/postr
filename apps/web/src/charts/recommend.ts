@@ -497,7 +497,9 @@ export function needsEmphasisQuestion(table: InferredTable, choice: RoleChoice =
 }
 
 // ────────────────────────────────────────────────────────────────────
-// Methods-voice "why" lines. Perceptual justifications, not marketing.
+// Methods-voice "why" lines. Each says what the chart's encoding does;
+// no speed or accuracy ranking the code cannot show. The series count is
+// left out because buildSpec folds more than 8 series into "Other".
 // ────────────────────────────────────────────────────────────────────
 
 function whyText(
@@ -513,13 +515,17 @@ function whyText(
     case 'bar-grouped':
       return 'One measure across two categorical factors — grouping keeps the primary comparison adjacent within each cluster.';
     case 'bar-stacked':
-      return 'Parts of a whole — stacked segments preserve the part-to-whole reading while keeping every share on a common scale.';
+      // Also offered for two categorical factors, where buildSpec stacks
+      // group means: those segments are not shares of a whole.
+      return roles.shape === 'shares' || roles.shape === 'likert'
+        ? 'Parts of a whole — stacked segments preserve the part-to-whole reading while keeping every share on a common scale.'
+        : 'One measure across two categorical factors — each bar stacks one segment per level of the second factor.';
     case 'bar-diverging':
       return 'An ordered agreement scale — a diverging stack anchors the neutral point so agreement and disagreement read in opposite directions.';
     case 'line':
       return roles.cat1
-        ? `An ordered axis with one measure per group — lines encode change as slope, and hue separates the ${k} series.`
-        : 'An ordered axis with one continuous measure — a line encodes change between adjacent points as slope, the fastest-read cue for trend.';
+        ? 'An ordered axis with one measure per group — lines encode change as slope, and hue separates the series.'
+        : 'An ordered axis with one continuous measure — a line encodes change between adjacent points as slope.';
     case 'area':
       return 'A single ordered series — filling under the line adds visual weight to cumulative magnitude without adding a second encoding.';
     case 'scatter':
@@ -531,8 +537,12 @@ function whyText(
         ? 'Repeated observations per group — boxes show median and spread, which a bar of means would hide.'
         : 'A compact distribution summary — median, quartiles, and outliers in one mark.';
     case 'heatmap':
-      return 'A magnitude across two factors — a matrix of shaded cells stays legible where dozens of bars or lines would not.';
+      // Two numeric measures get a binned density map, not a value grid
+      // (buildSpec.ts 'heatmap'), so the sentence has to say so.
+      return !roles.cat1 && roles.measure2
+        ? `Two continuous measures (n = ${table.rowCount}) — shaded bins show how many observations fall in each region.`
+        : 'A magnitude across two factors — one shaded cell per combination shows every pair of levels in one grid.';
     case 'dumbbell':
-      return 'Paired before/after values per item — a dumbbell shows each item’s change as a distance along a common scale, more accurate than paired bars.';
+      return 'Paired before/after values per item — a dumbbell shows each item’s change as a distance along a common scale.';
   }
 }

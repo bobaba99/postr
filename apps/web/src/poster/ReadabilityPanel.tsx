@@ -373,7 +373,8 @@ export function ReadabilityPanel({
         }}
       >
         🔎 Paste your R or Python plotting code, then click <b>Check</b> to
-        see if figure text will be readable at poster print size.{' '}
+        see how large its titles, labels and legend will print on the
+        poster.{' '}
         <ReadabilitySizingNote
           layout={layout}
           isImage={isImage}
@@ -423,8 +424,12 @@ export function ReadabilityPanel({
             Detected: {detectedLang === 'r' ? 'R / ggplot2' : 'Python / matplotlib'}
           </div>
         ) : (
+          // detectLanguage returns null for empty code AND for a tie; on a
+          // tie Check does nothing, so the line has to say why.
           <div style={{ fontSize: 13, color: t.mutedColor }}>
-            Auto-detect waiting for code…
+            {code.trim()
+              ? 'Can’t tell R from Python. Pick one above.'
+              : 'Auto-detect waiting for code…'}
           </div>
         )}
         <button
@@ -487,9 +492,9 @@ export function ReadabilityPanel({
             <thead>
               <tr style={{ borderBottom: '1px solid #45475a', color: '#9ca3af' }}>
                 <th style={{ textAlign: 'left', padding: '4px 0' }}>Element</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="The size set in your code">Source</th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="The size the check read from your code">Source</th>
                 <th style={{ textAlign: 'right', padding: '4px 4px' }} title="What it measures once the figure is scaled onto the poster">Print</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="The smallest size that stays readable at poster viewing distance">Min</th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="Postr’s minimum for this element on a poster">Min</th>
                 <th style={{ textAlign: 'center', padding: '4px 0', width: 20 }} aria-label="Verdict"></th>
               </tr>
             </thead>
@@ -573,8 +578,8 @@ export function ReadabilityPanel({
             <div>
               <span style={{ color: '#a6e3a1', fontWeight: 700 }}>✓</span>{' '}
               <span style={{ color: '#bac2de' }}>
-                <strong style={{ color: '#cdd6f4' }}>At or above the minimum.</strong> Readable from
-                the distance people stand at.
+                <strong style={{ color: '#cdd6f4' }}>At or above the minimum.</strong> Nothing to
+                change.
               </span>
             </div>
             <div>
@@ -588,15 +593,23 @@ export function ReadabilityPanel({
             <div>
               <span style={{ color: '#f38ba8', fontWeight: 700 }}>✗</span>{' '}
               <span style={{ color: '#bac2de' }}>
-                <strong style={{ color: '#cdd6f4' }}>More than 15% below.</strong> Will not be read
-                at the poster.
+                <strong style={{ color: '#cdd6f4' }}>More than 15% below.</strong> Raise it before
+                you print.
               </span>
             </div>
             <div style={{ color: '#7f849c', marginTop: 2 }}>
-              <strong style={{ color: '#9ca3af' }}>Source</strong> is the size in your code.{' '}
-              <strong style={{ color: '#9ca3af' }}>Print</strong> is what it measures on the poster
-              after the figure is scaled to fit the block — that is the number that matters, and the
-              one compared against <strong style={{ color: '#9ca3af' }}>Min</strong>.
+              <strong style={{ color: '#9ca3af' }}>Source</strong> is the size the check read from
+              your code. <strong style={{ color: '#9ca3af' }}>Print</strong> is what it measures on
+              the poster after the figure is scaled to fit the block, and it is the number compared
+              against <strong style={{ color: '#9ca3af' }}>Min</strong>.{' '}
+              {/* What the parsers read (readability.ts parseRCode /
+                  parsePythonCode). A size set any other way is scored at
+                  the inherited size, which can show a 6 pt label as a pass:
+                  R `theme(text = element_text(size = 6))`, Python
+                  `plt.xlabel(..., fontsize=6)`. */}
+              {checkedParams?.language === 'python'
+                ? 'It reads font.size in plt.rcParams, seaborn’s context and font_scale, and the sizes given to set_xlabel(), set_ylabel(), set_title() and tick_params(). Check sizes set any other way yourself.'
+                : 'It reads base_size and the sizes theme() sets for the elements in this table. Check sizes set any other way, such as on text or title, yourself.'}
             </div>
           </div>
 
@@ -634,9 +647,13 @@ export function ReadabilityPanel({
                         fragment — splicing a fragment into the right place
                         is work the tool can do, and getting it wrong gives
                         code that runs and silently changes nothing. */}
+                    {/* "edited", not "corrected": in R a theme() of the
+                        user's own placed after theme_*() still wins over the
+                        inserted one (measured: axis.text 7 -> 7 pt), so the
+                        copy cannot promise the result is corrected. */}
                     <CopyButton
                       text={fullFixedCode}
-                      label="Copy corrected code"
+                      label="Copy edited code"
                       onCopied={handleCopied}
                       style={{ minHeight: t.buttonMinHeight, fontSize: t.buttonFontSize }}
                     />
@@ -672,10 +689,16 @@ export function ReadabilityPanel({
                     Open full edited code →
                   </button>
                   <div style={{ fontSize: 12, color: '#7f849c', lineHeight: 1.5 }}>
-                    Your script with the sizes above applied — copy it whole and run it.{' '}
+                    Your script with the sizes above added. Copy it whole and run it.{' '}
+                    {/* R: applyFontFixes inserts after the LAST theme_*()
+                        call, so a later theme() of the user's own still wins
+                        for the sizes it sets. Python: the helper raises each
+                        listed class at the save (fix 13); "never makes text
+                        smaller" was dropped because f03 in fix 13's record
+                        prints text below what the script alone draws. */}
                     {checkedParams?.language === 'r'
-                      ? 'The new theme() sits after your existing one; ggplot applies theme calls in order and the last wins, so it overrides only the sizes named.'
-                      : 'A small function raises these sizes just before the figure is saved, so nothing earlier in your script overrides them. It never makes text smaller.'}
+                      ? 'The new theme() goes right after your theme_*() call, or at the end of the plot when there is none, and sets only the sizes listed. ggplot applies theme calls in order and the last one wins, so if a theme() of your own comes later and sets one of these sizes, change the number there.'
+                      : 'A small function raises these elements to at least the sizes listed when the figure is saved, so settings earlier in your script cannot undo it.'}
                   </div>
                 </div>
               )}
@@ -686,14 +709,23 @@ export function ReadabilityPanel({
                   overridden, since base_size governs nothing then (FR7). */}
               {result.suggestedBaseSize !== null && result.copySnippet !== null && (
                 <details style={{ borderTop: '1px solid #45475a', paddingTop: 10 }}>
+                  {/* Python's snippet sets rcParams['font.size'], so the
+                      summary names that, not ggplot's base_size. The
+                      number is computed from the elements that follow it
+                      only, so it can be LOWER than the script's own value
+                      (base_size 20 with axis.text set to 7 suggests 18):
+                      the note says what it moves, not that it grows. */}
                   <summary style={{ cursor: 'pointer', fontSize: t.tableFontSize, color: '#9ca3af' }}>
-                    Or change one number: base_size = {result.suggestedBaseSize}
+                    Or change one number:{' '}
+                    {checkedParams?.language === 'python' ? 'font.size' : 'base_size'} ={' '}
+                    {result.suggestedBaseSize}
                   </summary>
                   <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ fontSize: 12, color: '#7f849c', lineHeight: 1.5 }}>
-                      Simpler to paste, but it scales every text element — including the
-                      ones already large enough — so it takes more room from the plot
-                      than the targeted fix above.
+                      Simpler to paste. It moves every text size that follows{' '}
+                      {checkedParams?.language === 'python' ? 'font.size' : 'base_size'}, including
+                      the ones already large enough, and leaves the sizes your code sets
+                      directly as they are.
                     </div>
                     <CodeView text={result.copySnippet} layout={layout} />
                     <CopyButton
@@ -718,7 +750,7 @@ export function ReadabilityPanel({
                 color: '#a6e3a1',
               }}
             >
-              All elements pass readability thresholds at this poster size.
+              Every element in the table meets its minimum at this poster size.
             </div>
           )}
         </div>
@@ -817,10 +849,10 @@ function ImageScanSection(props: {
     >
       <div style={{ ...labelStyle, marginBottom: 6 }}>📷 Scan Image Text</div>
       <p style={{ fontSize: 13, color: '#c8cad0', lineHeight: 1.5, margin: '0 0 10px' }}>
-        Use Claude Vision to measure every text region in this image and
-        compute its effective print size at the block's current
-        dimensions. Useful for plots and tables you imported from a PDF
-        or JPG and don't have the source code for.
+        Sends this image to Claude Vision to find the text in it, then
+        estimates each text's printed size from its height at the block's
+        current dimensions. Useful for plots and tables you imported from
+        a PDF or JPG and don't have the source code for.
       </p>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <button

@@ -42,7 +42,7 @@ const CHECKER_JSON_LD = {
   applicationCategory: 'DesignApplication',
   operatingSystem: 'Any (web browser)',
   description:
-    'Paste ggplot2 or matplotlib code and the size the figure will print at. See the printed point size of every label and copy the base_size fix.',
+    'Paste ggplot2 or matplotlib code and the size the figure will print at. The check scores its titles, axis labels, tick labels and legend against poster minimums and adds the sizes they need to a copy of your script.',
 } as const;
 
 export default function FigureReadabilityPage() {
@@ -61,11 +61,13 @@ export default function FigureReadabilityPage() {
           Will your figure labels be readable at poster size?
         </h1>
         <p className="mt-4 max-w-[62ch] text-base leading-relaxed text-[#a3a7b3] sm:mt-5 sm:text-lg">
-          Paste your R (ggplot2) or Python (matplotlib, seaborn) plotting code,
-          type the size the figure will print at, and see the point size of
-          every label on paper — axis titles need 18 pt, tick labels 14 pt,
-          captions 12 pt. If anything falls short, copy the base_size fix. No
-          account, and your code never leaves the browser.
+          Paste your R (ggplot2) or Python (matplotlib) plotting code and type
+          the size the figure will print at. The check scores its titles, axis
+          labels, tick labels, legend and caption at that size against minimums
+          of 18 pt for axis titles, 14 pt for tick labels and 12 pt for
+          captions. If anything falls short, it adds the size each element
+          needs to a copy of your script. No account, and your code never
+          leaves the browser.
         </p>
 
         {/* The printed size stands in for the editor's canvas overlay:
@@ -89,17 +91,35 @@ export default function FigureReadabilityPage() {
           <h2 id="how-it-works" className="text-lg font-semibold text-white">
             How the check works
           </h2>
+          {/* Canvas: parseRCode falls back to the typed size; parsePythonCode
+              does not (fix 13): it reads figsize / set_size_inches /
+              rcParams['figure.figsize'], else matplotlib's 6.4 × 4.8 in. */}
           <p className="mt-2 max-w-[62ch] text-[15px] leading-relaxed text-[#a3a7b3]">
-            The check scales your figure from its source canvas — the ggsave()
-            or figsize your code sets, or the typed size when it sets none — to
-            the printed size, then scores every element against poster
-            thresholds: 18 pt for titles and axis titles, 14 pt for tick labels,
-            legends and strips, 12 pt for captions.
+            The check scales your figure from its source canvas to the printed
+            size. In R the canvas is the ggsave() width and height, or the size
+            you typed when there is no ggsave(). In Python it is the figsize or
+            set_size_inches() your code sets, or matplotlib&rsquo;s default of
+            6.4 × 4.8 in. It then scores each text element against a minimum:
+            18 pt for titles and axis titles, 14 pt for tick labels, legends and
+            strips, 12 pt for captions.
+          </p>
+          {/* What the parsers read. A size set any other way is scored at
+              the inherited size, which can pass a 6 pt label (measured:
+              R theme(text = element_text(size = 6)), Python
+              plt.xlabel(fontsize=6)). */}
+          <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-[#a3a7b3]">
+            In R it reads base_size and the sizes theme() sets for the elements
+            it scores. It does not read a size set on text or title. In Python
+            it reads font.size in plt.rcParams, seaborn&rsquo;s context and
+            font_scale, and the sizes given to set_xlabel(), set_ylabel(),
+            set_title() and tick_params(). Check sizes set any other way
+            yourself.
           </p>
           <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-[#a3a7b3]">
-            If anything falls short, it back-calculates the smallest base_size
-            that makes every element pass and hands it to you as a one-line
-            snippet or as your full script with the edit already made.
+            If anything falls short, it lists the size each element needs and
+            adds those sizes to a copy of your script. When some sizes still
+            follow base_size (font.size in Python), it also gives the smallest
+            base_size at which they meet their minimums, as a one-line snippet.
           </p>
         </section>
 
@@ -113,7 +133,7 @@ export default function FigureReadabilityPage() {
           </h2>
           <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed text-[#a3a7b3]">
             Postr is a free academic poster editor with this same check in its
-            Figure tab — drag a figure box on the canvas and the check sizes
+            Figure tab: drag a figure box on the canvas and the check sizes
             against it, or select an image block to use its exact print
             dimensions.
           </p>

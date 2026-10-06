@@ -583,7 +583,8 @@ export function parseRCode(code: string, options: ParseOptions = {}): FigurePara
     baseSizeParsed = true;
   }
   if (!src.match(/base_size\s*=/)) {
-    warnings.push('No font size found — assuming ggplot2 default base_size = 11pt.');
+    // "base_size", not "font size": a theme() size can be present here.
+    warnings.push('No base_size found — assuming ggplot2 default base_size = 11pt.');
   } else if (!baseSizeParsed && /base_size\s*=\s*[A-Za-z_.]/.test(src)) {
     // `theme_minimal(base_size = s)` — the value is a name, not a number,
     // so there is nothing to read and the figure was silently scored at
@@ -1011,7 +1012,8 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
   baseSize = baseSize * fontScale;
 
   if (!rc && !sns_scale && !sns_ctx) {
-    warnings.push('No font size found — assuming matplotlib default font.size = 10pt.');
+    // "font.size", not "font size": a fontsize= argument can be present.
+    warnings.push('No font.size found — assuming matplotlib default font.size = 10pt.');
   }
 
   // Per-element overrides
