@@ -9,6 +9,7 @@
  */
 import { useRef, useState, type ChangeEvent, type CSSProperties, type DragEvent } from 'react';
 import type { TableData } from '@postr/shared';
+import { draftKey, useSessionDraft } from '@/hooks/useSessionDraft';
 import {
   parseDelimited,
   parseTableBlock,
@@ -31,6 +32,11 @@ interface DataStepProps {
   onSynthetic: () => void;
   /** Switch to declaring variables by name (the mobile path). */
   onListVariables: () => void;
+  /**
+   * Keeps the table being typed and the sheet choice of an uploaded
+   * workbook for the session (ChartChooser's draftScope).
+   */
+  draftScope?: string | null;
 }
 
 type Pending =
@@ -92,10 +98,11 @@ export function DataStep({
   onTable,
   onSynthetic,
   onListVariables,
+  draftScope = null,
 }: DataStepProps) {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
-  const [sheets, setSheets] = useState<ExcelSheet[] | null>(null);
+  const [sheets, setSheets] = useSessionDraft<ExcelSheet[] | null>(draftKey(draftScope, 'make-sheets'), null);
   /**
    * What we are doing to the user's file, in their words. `null` when
    * idle. Excel is the slow one — `read-excel-file` is dynamically
@@ -104,12 +111,16 @@ export function DataStep({
    * to "I just gave you my thesis data".
    */
   const [reading, setReading] = useState<string | null>(null);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useSessionDraft(draftKey(draftScope, 'make-table'), '');
 
   const finish = (outcome: ParseOutcome, pending: Pending) => {
     if (outcome.ok) {
       const { header, rows } = outcome.table;
       const truncatedNote = outcome.truncated ? ' (first 2,000 rows)' : '';
+      // The drafts outlive a tab change, not the step: reopening step 1
+      // starts empty, as when they were local state.
+      setDraft('');
+      setSheets(null);
       onTable(outcome.table, `${rows.length.toLocaleString()} rows × ${header.length} columns${truncatedNote}`);
       setFailure(null);
       return;

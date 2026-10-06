@@ -54,6 +54,7 @@ import { CITATION_STYLES, type CitationStyleKey } from './citations';
 import { LAYOUT_TEMPLATES, type LayoutKey } from './templates';
 import { parseBibtex, parseRis } from './parsers';
 import { postJson } from '@/lib/apiClient';
+import { draftKey, useSessionDraft } from '@/hooks/useSessionDraft';
 import { AuthorLine } from './blocks';
 import {
   autoFormatAPA,
@@ -686,11 +687,21 @@ export function Sidebar(props: SidebarProps) {
           * the fade-slide enter animation defined in index.css. The
           * nested wrapper decouples the animation from the scroll
           * container's own layout so scroll position survives switches
-          * without re-animating. */}
+          * without re-animating.
+          *
+          * Only the active tab's panel is mounted, so a panel's own state
+          * dies on every switch, and selecting a block is a switch (the
+          * effect above). Text still being written (the paste boxes, the
+          * poster-name and version-name drafts, the figure checker and
+          * the Make ladder) is kept under the poster id instead (plan
+          * item 7). Keyed on the poster too: the editor stays mounted when
+          * it opens another poster (a copy), and that poster's panels
+          * must start from its own drafts. */}
         <div style={{ flex: 1, overflow: 'auto', padding: '4px 20px 24px', minWidth: 0 }}>
-        <div key={tab} className="postr-tab-enter">
+        <div key={`${props.posterId ?? ''}:${tab}`} className="postr-tab-enter">
         {tab === 'layout' && (
           <LayoutTab
+            draftScope={props.posterId}
             posterTitle={props.posterTitle}
             onChangePosterTitle={props.onChangePosterTitle}
             posterSizeKey={props.posterSizeKey}
@@ -708,6 +719,7 @@ export function Sidebar(props: SidebarProps) {
 
         {tab === 'authors' && (
           <AuthorsTab
+            draftScope={props.posterId}
             authors={props.authors}
             onChangeAuthors={props.onChangeAuthors}
             institutions={props.institutions}
@@ -721,6 +733,7 @@ export function Sidebar(props: SidebarProps) {
 
         {tab === 'refs' && (
           <RefsTab
+            draftScope={props.posterId}
             references={props.references}
             onChangeReferences={props.onChangeReferences}
             citationStyle={props.citationStyle}
@@ -766,6 +779,7 @@ export function Sidebar(props: SidebarProps) {
 
         {tab === 'check' && (
           <FigureTab
+            posterId={props.posterId}
             mode={props.figureMode}
             onChangeMode={props.onChangeFigureMode}
             selectedImageBlock={
@@ -832,6 +846,7 @@ export function Sidebar(props: SidebarProps) {
         {tab === 'versions' && (
           <VersionPanel
             posterId={props.posterId}
+            draftScope={props.posterId}
             onSaveVersion={props.onSaveVersion}
             onRestoreVersion={props.onRestoreVersion}
           />
@@ -861,6 +876,8 @@ export function Sidebar(props: SidebarProps) {
 // isolation (props + the store-backed ImportSection), and exporting
 // avoids having to mount the whole 4k-line Sidebar to reach it.
 export function LayoutTab(props: {
+  /** Keeps a poster-name draft for the session (plan item 7); omitted, it is local state. */
+  draftScope?: string | null;
   posterTitle: string;
   onChangePosterTitle: (title: string) => void;
   /** The preset this poster's size matches, or 'custom'. */
@@ -876,17 +893,27 @@ export function LayoutTab(props: {
   onApplyTemplate: (k: LayoutKey) => void;
   onAutoLayout: () => void;
 }) {
-  const [localTitle, setLocalTitle] = useState(props.posterTitle);
+  // The name being typed outlives the tab (it is saved only on Enter or
+  // Save), kept per poster with the name it was typed over: when the
+  // poster's name changes some other way (a poster imported over this
+  // one), that name shows, as the sync from the parent always did.
+  const [titleDraft, setTitleDraft] = useSessionDraft<{ text: string; over: string } | null>(
+    draftKey(props.draftScope, 'poster-name'),
+    null,
+  );
+  const localTitle =
+    titleDraft && titleDraft.over === props.posterTitle ? titleDraft.text : props.posterTitle;
+  const setLocalTitle = (text: string) => setTitleDraft({ text, over: props.posterTitle });
   const [titleSaved, setTitleSaved] = useState(!!props.posterTitle.trim());
   const titleDirty = localTitle !== props.posterTitle;
 
   // Sync from parent when the poster changes (e.g. navigating to a different poster)
   useEffect(() => {
-    setLocalTitle(props.posterTitle);
     setTitleSaved(!!props.posterTitle.trim());
   }, [props.posterTitle]);
 
   const saveTitle = () => {
+    setTitleDraft(null);
     props.onChangePosterTitle(localTitle);
     setTitleSaved(true);
     setTimeout(() => setTitleSaved(true), 0); // ensure re-render
@@ -1217,6 +1244,8 @@ function ExportTab(props: {
 // =========================================================================
 
 function AuthorsTab(props: {
+  /** Keeps the paste box's text for the session (plan item 7). */
+  draftScope?: string | null;
   authors: Author[];
   onChangeAuthors: (a: Author[], coalesceKey?: string) => void;
   institutions: Institution[];
@@ -1233,6 +1262,7 @@ function AuthorsTab(props: {
 
       <div style={{ ...labelStyle, marginTop: 28 }}>② Authors</div>
       <AuthorManager
+        draftScope={props.draftScope}
         authors={props.authors}
         onChange={props.onChangeAuthors}
         institutions={props.institutions}
@@ -1567,6 +1597,7 @@ function parseAuthorBlock(text: string): ParsedAuthorBlock {
 }
 
 function AuthorManager(props: {
+  draftScope?: string | null;
   authors: Author[];
   onChange: (a: Author[], coalesceKey?: string) => void;
   institutions: Institution[];
@@ -1617,10 +1648,18 @@ function AuthorManager(props: {
   //      Institution.id.
   // When the input has no institution list, behaviour falls back
   // to "create bare authors" — same as the previous version.
-  const [pasteText, setPasteText] = useState('');
-  const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
+  //
+  // The box, the parse in flight and its feedback outlive the tab (plan
+  // item 7): a parse that finishes after the user left lands in the box
+  // they come back to, and Parse stays disabled until it does, so the
+  // list cannot be sent twice.
+  const [pasteText, setPasteText] = useSessionDraft(draftKey(props.draftScope, 'authors-paste'), '');
+  const [pasteFeedback, setPasteFeedback] = useSessionDraft<string | null>(
+    draftKey(props.draftScope, 'authors-paste-feedback'),
+    null,
+  );
 
-  const [parsing, setParsing] = useState(false);
+  const [parsing, setParsing] = useSessionDraft(draftKey(props.draftScope, 'authors-parsing'), false);
   const addPasted = async () => {
     if (!pasteText.trim()) {
       setPasteFeedback('Paste an author list first.');
@@ -1922,15 +1961,25 @@ function AuthorManager(props: {
 // =========================================================================
 
 function RefsTab(props: {
+  /** Keeps the paste box, the manual-entry fields and a parse in flight for the session (plan item 7). */
+  draftScope?: string | null;
   references: Reference[];
   onChangeReferences: (r: Reference[]) => void;
   citationStyle: CitationStyleKey;
   onChangeCitationStyle: (s: CitationStyleKey) => void;
 }) {
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const [manual, setManual] = useState({ authors: '', year: '', title: '', journal: '' });
-  const [pasteText, setPasteText] = useState('');
-  const [pasteFeedback, setPasteFeedback] = useState<string | null>(null);
+  const [manual, setManual] = useSessionDraft(draftKey(props.draftScope, 'refs-manual'), {
+    authors: '',
+    year: '',
+    title: '',
+    journal: '',
+  });
+  const [pasteText, setPasteText] = useSessionDraft(draftKey(props.draftScope, 'refs-paste'), '');
+  const [pasteFeedback, setPasteFeedback] = useSessionDraft<string | null>(
+    draftKey(props.draftScope, 'refs-paste-feedback'),
+    null,
+  );
 
   /**
    * Split a pasted references block into individual citation strings.
@@ -1953,7 +2002,7 @@ function RefsTab(props: {
       .filter((s) => s.length > 0);
   };
 
-  const [parsing, setParsing] = useState(false);
+  const [parsing, setParsing] = useSessionDraft(draftKey(props.draftScope, 'refs-parsing'), false);
   const addPasted = async () => {
     if (!pasteText.trim()) {
       setPasteFeedback('Paste some references first.');

@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { isStaleJwtError } from '@/lib/auth';
 import type { Database, Json, PosterDoc } from '@postr/shared';
 import { usableSheetSize } from '@/poster/constants';
+import { forgetPosterScript } from '@/poster/figureScriptDraft';
 
 type PosterUpdateRow = Database['public']['Tables']['posters']['Update'];
 
@@ -454,6 +455,7 @@ export async function ensureShareLink(posterId: string): Promise<string> {
  * to drop the entire poster + its related rows.
  *
  * Orphaned storage objects are swept by the nightly cron (Task 10.2).
+ * The plot script this browser kept for the poster goes with it.
  */
 export async function deletePoster(id: string): Promise<void> {
   const { error } = await supabase.from('posters').delete().eq('id', id);
@@ -461,4 +463,5 @@ export async function deletePoster(id: string): Promise<void> {
   if (error) {
     throw new Error(`Failed to delete poster: ${error.message}`);
   }
+  forgetPosterScript(id);
 }

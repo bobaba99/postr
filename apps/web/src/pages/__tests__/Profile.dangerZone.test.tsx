@@ -9,12 +9,15 @@
  * cascades the posters, so a failed API call really does leave
  * everything in place (the copy promises "Nothing was removed"). The
  * typed confirmation stays. On an ApiError the user stays signed in with
- * a generic message; no sign-out, no storage wipe.
+ * a generic message; no sign-out, no storage wipe. The plot scripts the
+ * figure check keeps per poster in this browser go with the account
+ * (plan item 7, docs/fixes/07-figure-script-kept.md).
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { ApiError } from '@/lib/apiClient';
+import { posterScriptSlot, writeScriptDraft } from '@/poster/figureScriptDraft';
 
 const auth = vi.hoisted(() => ({
   getUser: vi.fn(),
@@ -112,7 +115,14 @@ beforeEach(() => {
     data: { session: { user: { id: 'user-1', is_anonymous: false } } },
   });
   localStorage.setItem('postr.profile', JSON.stringify({ displayName: 'Jane' }));
+  // A script left in each poster's figure check, as the editor writes it.
+  for (const id of ['p1', 'p2']) {
+    writeScriptDraft(posterScriptSlot(id), { code: `# ${id}\nlibrary(ggplot2)`, lang: 'r', checked: null });
+  }
 });
+
+const storedScripts = () =>
+  Object.keys(localStorage).filter((key) => key.startsWith('postr.figure-script.')).sort();
 
 describe('Profile — Danger Zone (P0-3)', () => {
   it('names the term cancellation only when a term is active', async () => {
@@ -144,6 +154,7 @@ describe('Profile — Danger Zone (P0-3)', () => {
     await waitFor(() => expect(auth.signOut).toHaveBeenCalledWith({ scope: 'global' }));
     expect(await screen.findByText('auth page')).toBeInTheDocument();
     expect(localStorage.getItem('postr.profile')).toBeNull();
+    expect(storedScripts()).toEqual([]);
   });
 
   it('on an ApiError shows a generic message and keeps the user signed in', async () => {
@@ -167,6 +178,7 @@ describe('Profile — Danger Zone (P0-3)', () => {
     expect(auth.signOut).not.toHaveBeenCalled();
     expect(screen.queryByText('auth page')).toBeNull();
     expect(localStorage.getItem('postr.profile')).not.toBeNull();
+    expect(storedScripts()).toEqual(['postr.figure-script.p1', 'postr.figure-script.p2']);
     consoleError.mockRestore();
   });
 });

@@ -12,9 +12,16 @@
  * (stacked previews, insert action) and the standalone /chart-chooser
  * page (3-up previews, download actions) — only layout and the
  * action list differ.
+ *
+ * In the sidebar the ladder unmounts on every tab change (a click on a
+ * block is one), so with a `draftScope` its progress and step 1's
+ * drafts are kept for the session instead (plan item 7,
+ * hooks/useSessionDraft.ts). The chosen figures in the last step are
+ * not: PreviewStep picks the top-ranked one again when it mounts.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import type { Palette } from '@postr/shared';
+import { draftKey, useSessionDraft } from '@/hooks/useSessionDraft';
 import type { DeclaredVariable } from '../declaredVariables';
 import { inferTable } from '../inferColumns';
 import type { RawTable } from '../parseData';
@@ -46,6 +53,12 @@ export interface ChartChooserProps {
   actions: PreviewAction[];
   /** Confirmation line after the primary action runs. */
   confirmation?: string;
+  /**
+   * Keeps the ladder's answers and step 1's drafts for the session
+   * under this scope (the sidebar passes the poster id). Omitted, they
+   * last only while the ladder is mounted.
+   */
+  draftScope?: string | null;
 }
 
 const VARS_OPTIONS = [
@@ -70,17 +83,23 @@ export function ChartChooser({
   posterTables = [],
   actions,
   confirmation,
+  draftScope = null,
 }: ChartChooserProps) {
-  const [source, setSource] = useState<DataSource | null>(null);
-  const [answers, setAnswers] = useState<LadderAnswers>({});
-  const [dataSummary, setDataSummary] = useState('');
-  const [pendingGroups, setPendingGroups] = useState<string[]>([]);
+  const [source, setSource] = useSessionDraft<DataSource | null>(draftKey(draftScope, 'make-source'), null);
+  const [answers, setAnswers] = useSessionDraft<LadderAnswers>(draftKey(draftScope, 'make-answers'), {});
+  const [dataSummary, setDataSummary] = useSessionDraft(draftKey(draftScope, 'make-summary'), '');
+  const [pendingGroups, setPendingGroups] = useSessionDraft<string[]>(draftKey(draftScope, 'make-groups'), []);
   /**
    * True while step 1 shows the declare-your-variables form instead of
    * the paste/upload affordances. Local to step 1 — once variables are
    * declared the source carries them and this returns to false.
    */
-  const [listingVariables, setListingVariables] = useState(false);
+  const [listingVariables, setListingVariables] = useSessionDraft(
+    draftKey(draftScope, 'make-listing-variables'),
+    false,
+  );
+  // Not kept: a ladder mounted again (back on the tab) must not scroll
+  // to and focus its active step, only one the user's answer created.
   const hasInteracted = useRef(false);
 
   const plan = useMemo(() => planLadder(source, answers), [source, answers]);
@@ -242,11 +261,13 @@ export function ChartChooser({
             <StepSection key={step} {...common}>
               {listingVariables ? (
                 <VariablesStep
+                  draftScope={draftScope}
                   onDeclare={onDeclare}
                   onCancel={() => setListingVariables(false)}
                 />
               ) : (
                 <DataStep
+                  draftScope={draftScope}
                   posterTables={posterTables}
                   onTable={onTable}
                   onSynthetic={onSynthetic}

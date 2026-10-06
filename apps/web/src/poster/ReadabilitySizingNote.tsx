@@ -11,7 +11,12 @@
  * the browser restarts its pulse whenever the size changes (a drag on
  * the canvas, a different image, a new number in the page's inputs),
  * drawing the eye to the fresh value.
+ *
+ * `keptResultNote` is its companion in the editor: the line that says
+ * which size a kept result is for when that is not the size named here
+ * (plan item 7, review round 2).
  */
+import type { CheckedInputs } from './figureScriptDraft';
 import type { ReadabilityLayout } from './readabilityLayout';
 
 interface Props {
@@ -49,4 +54,36 @@ export function ReadabilitySizingNote({ layout, isImage, widthIn, heightIn }: Pr
       to use its exact dimensions.
     </>
   );
+}
+
+/** A size as the pill shows it: 10.0" × 7.0". */
+function inchesLabel(widthIn: number, heightIn: number): string {
+  return `${widthIn.toFixed(1)}" × ${heightIn.toFixed(1)}"`;
+}
+
+/**
+ * The editor's line about a kept result that is not for the size the
+ * sizing note names: hidden because it is for another figure, or shown
+ * at the size it was checked at. Compared as the pill shows sizes, so a
+ * hair's difference the pill cannot show does not raise it. Null when the
+ * result is for what the note names, or there is none (or on the page,
+ * which hides a result at another size).
+ */
+export function keptResultNote(
+  layout: ReadabilityLayout,
+  kept: CheckedInputs | null,
+  otherFigure: boolean,
+  widthIn: number,
+  heightIn: number,
+): string | null {
+  if (layout !== 'panel' || kept === null) return null;
+  const checkedAt = inchesLabel(kept.widthIn, kept.heightIn);
+  if (otherFigure) {
+    return kept.imageId !== null
+      ? `The last result is for an image block at ${checkedAt}. Click Check to check the size above.`
+      : `The last result is for the figure preview at ${checkedAt}. Click Check to check the size above.`;
+  }
+  return checkedAt === inchesLabel(widthIn, heightIn)
+    ? null
+    : `This result is for ${checkedAt}, not the size above. Click Check to update it.`;
 }

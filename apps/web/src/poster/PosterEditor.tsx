@@ -81,6 +81,7 @@ import {
 import { snap } from './snap';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
 import { buildPrintDocument } from '@/export/printDocument';
+import { useHasPosterScript } from './figureScriptDraft';
 
 // =========================================================================
 // Helpers
@@ -894,11 +895,15 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // Figure tab mode ("Make a figure" / "Check a figure"). Null until
   // the user picks explicitly; the effective default follows the
   // selection — Check when an image block is selected (its dimensions
-  // feed the checker), Make otherwise. An explicit pick sticks for
-  // the rest of the session ("remembers last used").
+  // feed the checker), Make otherwise — and stays on Check once the
+  // poster's checker holds a script, so deselecting an image does not
+  // hide it and a kept script opens on Check after a reload (plan
+  // item 7). An explicit pick sticks for the rest of the session
+  // ("remembers last used").
   const [figureModeChoice, setFigureModeChoice] = useState<
     'make' | 'check' | null
   >(null);
+  const posterHasScript = useHasPosterScript(posterId ?? null);
 
   // Custom palettes persist via localStorage (postr.custom-palettes).
   // They appear in the Style tab beneath the curated catalog and can
@@ -1558,9 +1563,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   );
 
   // Effective Figure-tab mode: the user's explicit pick wins; before
-  // any pick, follow the selection (image selected → Check, else Make).
+  // any pick, Check when an image is selected or the checker holds a
+  // script, else Make.
   const effectiveFigureMode =
-    figureModeChoice ?? (selectedBlock?.type === 'image' ? 'check' : 'make');
+    figureModeChoice ?? (selectedBlock?.type === 'image' || posterHasScript ? 'check' : 'make');
   const oobBlockIds = useMemo(
     () => new Set(oobWarnings.map((w) => w.blockId)),
     [oobWarnings],

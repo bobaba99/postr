@@ -21,11 +21,12 @@ import {
 import { resolveStorageUrl } from '@/data/posterImages';
 import { postJson } from '@/lib/apiClient';
 import { layoutTokens, type ReadabilityLayout } from './readabilityLayout';
-import { ReadabilitySizingNote } from './ReadabilitySizingNote';
+import { ReadabilitySizingNote, keptResultNote } from './ReadabilitySizingNote';
 import { generateFullFix, generateTargetedFullFix } from './readabilityFullFix';
 import { CodeView, CopyButton } from './ReadabilityCodeView';
 import { FullCodeModal } from './FullCodeModal';
 import { btnStyle, labelStyle, panelStyle, primaryBtnStyle } from './readabilityStyles';
+import { useScriptDraft, type CheckedInputs, type ScriptDraftSlot } from './figureScriptDraft';
 
 interface Props {
   selectedBlock: Block | null;
@@ -45,6 +46,16 @@ interface Props {
    * never mounted (see readabilityLayout.ts).
    */
   layout?: ReadabilityLayout;
+  /**
+   * Where the script, its language and the last Check are kept, so they
+   * outlive this panel (the sidebar unmounts it on every tab change) and a
+   * reload: the editor passes the poster's slot, the public page its tab's
+   * (figureScriptDraft.ts). Omitted, they last only while it is mounted.
+   * Mount the panel keyed by the slot, so the rest of its state (an image
+   * scan, the copied banner) starts again with it: the sidebar keys its
+   * panels by the poster id.
+   */
+  draftSlot?: ScriptDraftSlot | null;
 }
 
 interface ScanRegion {
@@ -205,28 +216,88 @@ function CodeEditor({ value, onChange, placeholder, layout }: CodeEditorProps) {
 // Main panel
 // ──────────────────────────────────────────────────────────────────────
 
+interface CheckResult {
+  code: string;
+  result: ReadabilityResult;
+  params: FigureParams;
+  fullFix: string;
+  widthIn: number;
+  heightIn: number;
+}
+
+/**
+ * One Check: the script parsed at the size it was checked at, scored, and
+ * the user's own script with the sizes it needs. Pure, so the table comes
+ * back the same when the panel mounts again or the page reloads.
+ */
+function runReadabilityCheck(inputs: CheckedInputs, defaultSizeLabel: string | undefined): CheckResult {
+  // The figure-preview overlay (or selected image block) dimensions go to
+  // the parser as the canvas default — that way a user whose code doesn't
+  // contain ggsave() / plt.savefig() still gets their analysis scored
+  // against the exact dimensions they see highlighted in the description
+  // pill.
+  const parseOpts = {
+    defaultWidthIn: inputs.widthIn,
+    defaultHeightIn: inputs.heightIn,
+    defaultSizeLabel,
+  };
+  const params =
+    inputs.lang === 'r'
+      ? parseRCode(inputs.code, parseOpts)
+      : parsePythonCode(inputs.code, parseOpts);
+  const result = computeReadability(params, inputs.heightIn, inputs.widthIn);
+  // The user gets their OWN script back with the targeted sizes applied.
+  // Handing over a theme() fragment asks them to work out where it goes,
+  // and on a script that already has a theme() with ggsave() at the
+  // bottom, that is a real chance to paste it somewhere it does nothing.
+  const fullFix = result.fontSnippet
+    ? generateTargetedFullFix(inputs.code, params, result.fontSnippet)
+    : generateFullFix(inputs.code, params, result.suggestedBaseSize);
+  return {
+    code: inputs.code,
+    result,
+    params,
+    fullFix,
+    widthIn: inputs.widthIn,
+    heightIn: inputs.heightIn,
+  };
+}
+
 export function ReadabilityPanel({
   selectedBlock,
   defaultFigureWidthIn = 10,
   defaultFigureHeightIn = 7,
   layout = 'panel',
+  draftSlot = null,
 }: Props) {
   const t = layoutTokens(layout);
-  const [code, setCode] = useState('');
-  const [lang, setLang] = useState<'auto' | 'r' | 'python'>('auto');
+  // The script, its language and the last Check live in the draft, not
+  // in this panel's state: the sidebar unmounts the panel on every tab
+  // change, and the editor's poster can be reloaded (plan item 7).
+  const [draft, updateDraft] = useScriptDraft(draftSlot);
+  const { code, lang } = draft;
+  const setCode = (next: string) => updateDraft({ code: next });
+  const setLang = (next: 'auto' | 'r' | 'python') => updateDraft({ lang: next });
   const [fullCodeOpen, setFullCodeOpen] = useState(false);
-  // `checked` holds the result captured when the user clicks the
-  // Check button. Typing after a check does NOT rerun analysis —
+  // `checked` is the result of the last click on Check, computed from the
+  // inputs the draft keeps. Typing after a check does NOT rerun analysis —
   // results stay pinned to the last explicit check so the panel
   // reads like a run-button, not a live typing-pad.
-  const [checked, setChecked] = useState<{
-    code: string;
-    result: ReadabilityResult;
-    params: FigureParams;
-    fullFix: string;
-    widthIn: number;
-    heightIn: number;
-  } | null>(null);
+  const kept = draft.checked;
+  const checked = useMemo<CheckResult | null>(() => {
+    if (!kept) return null;
+    try {
+      return runReadabilityCheck(kept, t.defaultSizeLabel);
+    } catch (err) {
+      // A kept script the parser cannot take must not take the panel
+      // down on every visit; it shows without a table.
+      console.error('[readability] check of a kept script failed:', err);
+      return null;
+    }
+    // Keyed on the inputs' values, not the draft object: every keystroke
+    // writes a new draft, and typing must not run the check again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kept?.code, kept?.lang, kept?.widthIn, kept?.heightIn, t.defaultSizeLabel]);
   // Global "just copied" banner shared across the panel + modal.
   // Stays for 3s so users can't miss it.
   const [copiedBannerOpen, setCopiedBannerOpen] = useState(false);
@@ -241,6 +312,8 @@ export function ReadabilityPanel({
   const isImage = layout === 'panel' && selectedBlock?.type === 'image';
   const blockWidthIn = isImage ? selectedBlock.w / PX : defaultFigureWidthIn;
   const blockHeightIn = isImage ? selectedBlock.h / PX : defaultFigureHeightIn;
+  // The figure that sizes the check: the selected image, else the preview.
+  const imageId = isImage ? selectedBlock.id : null;
 
   // Image-OCR readability state — separate from the code-based path
   // because the inputs and analysis differ. The same `result` shape
@@ -259,49 +332,31 @@ export function ReadabilityPanel({
 
   const runCheck = () => {
     if (!code.trim() || !detectedLang) {
-      setChecked(null);
+      updateDraft({ checked: null });
       return;
     }
-    // Pass the current figure-preview overlay (or selected image
-    // block) dimensions to the parser as the canvas default —
-    // that way a user whose code doesn't contain ggsave() /
-    // plt.savefig() still gets their analysis scored against the
-    // exact dimensions they see highlighted in the description pill.
-    const parseOpts = {
-      defaultWidthIn: blockWidthIn,
-      defaultHeightIn: blockHeightIn,
-      defaultSizeLabel: t.defaultSizeLabel,
-    };
-    const params =
-      detectedLang === 'r'
-        ? parseRCode(code, parseOpts)
-        : parsePythonCode(code, parseOpts);
-    const result = computeReadability(params, blockHeightIn, blockWidthIn);
-    // The user gets their OWN script back with the targeted sizes applied.
-    // Handing over a theme() fragment asks them to work out where it goes,
-    // and on a script that already has a theme() with ggsave() at the
-    // bottom, that is a real chance to paste it somewhere it does nothing.
-    const fullFix = result.fontSnippet
-      ? generateTargetedFullFix(code, params, result.fontSnippet)
-      : generateFullFix(code, params, result.suggestedBaseSize);
-    setChecked({
-      code,
-      result,
-      params,
-      fullFix,
-      widthIn: blockWidthIn,
-      heightIn: blockHeightIn,
+    updateDraft({
+      checked: { code, lang: detectedLang, widthIn: blockWidthIn, heightIn: blockHeightIn, imageId },
     });
   };
 
-  // On the page a preset click or a new number changes the size the
-  // pill asserts; a table computed at the old size must not stay next
-  // to it. (The editor keeps results through an overlay drag — a
-  // continuous gesture the user is watching.)
+  // A kept table was scored at the size it was checked at, while the
+  // sizing note above names the size the panel sizes against now. On the
+  // page a preset click or a new number changes the size the pill
+  // asserts; a table computed at the old size must not stay next to it.
+  // The editor keeps a result through a drag of the preview or a resize of
+  // the image (a continuous gesture the user is watching) and says which
+  // size it is for; a result checked against another figure (an image
+  // block while the preview or another image now sizes the check, as after
+  // a deselect or a reload, or the preview while an image is selected) is
+  // not shown, and the note says where it is (review round 2, R2-01).
+  const otherFigure = layout === 'panel' && kept !== null && kept.imageId !== imageId;
   const stale =
-    layout === 'page' &&
-    checked !== null &&
-    (checked.widthIn !== blockWidthIn || checked.heightIn !== blockHeightIn);
+    otherFigure ||
+    (layout === 'page' &&
+      checked !== null &&
+      (checked.widthIn !== blockWidthIn || checked.heightIn !== blockHeightIn));
+  const resultNote = keptResultNote(layout, checked === null ? null : kept, otherFigure, blockWidthIn, blockHeightIn);
   const result = stale ? null : checked?.result ?? null;
   const checkedParams = stale ? null : checked?.params ?? null;
   const fullFixedCode = stale ? '' : checked?.fullFix ?? '';
@@ -464,6 +519,12 @@ export function ReadabilityPanel({
           }}
         >
           ✓ Copied to clipboard — {t.copiedBannerTail}
+        </div>
+      )}
+
+      {resultNote && (
+        <div role="status" style={{ fontSize: 13, color: '#f9e2af', lineHeight: 1.5 }}>
+          {resultNote}
         </div>
       )}
 

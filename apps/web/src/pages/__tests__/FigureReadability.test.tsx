@@ -75,6 +75,9 @@ function clickCheck() {
 describe('FigureReadabilityPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Each test is a new tab: the page keeps the script and the typed
+    // size in sessionStorage for the tab (figureReadabilityKept.test.tsx).
+    sessionStorage.clear();
   });
 
   it('has a routes.json record to prerender from', () => {

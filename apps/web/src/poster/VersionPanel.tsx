@@ -22,9 +22,15 @@ import {
   type PosterVersionSummary,
 } from '@/data/posterVersions';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { draftKey, useSessionDraft } from '@/hooks/useSessionDraft';
 
 interface Props {
   posterId: string | null;
+  /**
+   * Keeps the name being typed for the session, though the tab unmounts
+   * this panel on every switch (plan item 7). Omitted, it is local state.
+   */
+  draftScope?: string | null;
   onSaveVersion: (name: string) => Promise<void>;
   onRestoreVersion: (versionId: string) => Promise<void>;
 }
@@ -41,10 +47,10 @@ function formatTimestamp(iso: string): string {
   });
 }
 
-export function VersionPanel({ posterId, onSaveVersion, onRestoreVersion }: Props) {
+export function VersionPanel({ posterId, draftScope = null, onSaveVersion, onRestoreVersion }: Props) {
   const [versions, setVersions] = useState<PosterVersionSummary[]>([]);
   const [loading, setLoading] = useState(false);
-  const [name, setName] = useState('');
+  const [name, setName] = useSessionDraft(draftKey(draftScope, 'version-name'), '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [restoreTarget, setRestoreTarget] = useState<PosterVersionSummary | null>(null);

@@ -22,6 +22,7 @@
  */
 import { supabase } from '@/lib/supabase';
 import { deleteAccount } from '@/data/account';
+import { clearStoredFigureScripts } from '@/poster/figureScriptDraft';
 
 const LOCAL_KEYS = [
   'postr.style-presets',
@@ -42,6 +43,8 @@ function clearLocalData(): void {
       // Storage unavailable — nothing to clear.
     }
   }
+  // The plot scripts kept per poster (postr.figure-script.<poster id>).
+  clearStoredFigureScripts();
 }
 
 export async function runAccountDeletion(): Promise<DeletionOutcome> {

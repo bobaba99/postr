@@ -11,7 +11,10 @@
  *
  * Mode state lives in PosterEditor, not here — the sidebar remounts
  * its panel on every tab switch (keyed content), and the canvas
- * figure-size overlay needs to know the mode too.
+ * figure-size overlay needs to know the mode too. For the same reason
+ * the checker's script is kept per poster in this browser, and the
+ * Make ladder's progress for the session, under `posterId` (plan
+ * item 7, docs/fixes/07-figure-script-kept.md).
  */
 import type { CSSProperties } from 'react';
 import type { Block, ChartSpec, Palette } from '@postr/shared';
@@ -20,6 +23,7 @@ import type { PosterTableRef } from '@/charts/ladder/DataStep';
 import { ChartPalettePicker } from '@/charts/ChartPalettePicker';
 import { distinctSeries } from '@/charts/plotOptions';
 import { ReadabilityPanel } from '../ReadabilityPanel';
+import { posterScriptSlot } from '../figureScriptDraft';
 
 export type FigureMode = 'make' | 'check';
 
@@ -38,6 +42,12 @@ interface FigureTabProps {
   /** Selected chart block, if any — enables the per-chart palette picker. */
   selectedChartBlock: Block | null;
   onUpdateChartSpec: (blockId: string, spec: ChartSpec) => void;
+  /**
+   * The open poster: the checker's script is kept under it (and a
+   * different poster gets its own checker), and so is the ladder's
+   * progress. Omitted, both last only while this tab is mounted.
+   */
+  posterId?: string | null;
 }
 
 const segmentStyle = (active: boolean): CSSProperties => ({
@@ -64,6 +74,7 @@ export function FigureTab({
   onInsertChart,
   selectedChartBlock,
   onUpdateChartSpec,
+  posterId = null,
 }: FigureTabProps) {
   const selectedChartSpec = selectedChartBlock?.chartSpec ?? null;
   // Only multi-series charts colour from the categorical palette; a
@@ -139,6 +150,7 @@ export function FigureTab({
         <div style={{ paddingTop: 14 }}>
           <ChartChooser
             layout="panel"
+            draftScope={posterId}
             palette={palette}
             fontFamily={fontFamily}
             posterTables={posterTables}
@@ -170,6 +182,7 @@ export function FigureTab({
           selectedBlock={selectedImageBlock}
           defaultFigureWidthIn={defaultFigureWidthIn}
           defaultFigureHeightIn={defaultFigureHeightIn}
+          draftSlot={posterId ? posterScriptSlot(posterId) : null}
         />
       </div>
     </div>

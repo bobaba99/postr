@@ -19,7 +19,8 @@
  * floor, and the one text field sits at 16px — below that iOS Safari
  * zooms the viewport on focus and throws the user out of the ladder.
  */
-import { useState, type CSSProperties } from 'react';
+import { type CSSProperties } from 'react';
+import { draftKey, useSessionDraft } from '@/hooks/useSessionDraft';
 import {
   MAX_DECLARED_VARIABLES,
   hasUsableOutcome,
@@ -33,6 +34,8 @@ interface VariablesStepProps {
   onDeclare: (variables: readonly DeclaredVariable[], summary: string) => void;
   /** Back to the paste/upload affordances. */
   onCancel: () => void;
+  /** Keeps the rows being typed for the session (ChartChooser's draftScope). */
+  draftScope?: string | null;
 }
 
 const ROLE_OPTIONS: Array<{ value: VariableRoleChoice; label: string; hint: string }> = [
@@ -167,11 +170,19 @@ export function describeVariables(variables: readonly DeclaredVariable[]): strin
   return `${noun(outcomes, 'outcome')} × ${noun(factors, 'factor')}`;
 }
 
-export function VariablesStep({ onDeclare, onCancel }: VariablesStepProps) {
-  const [variables, setVariables] = useState<readonly DeclaredVariable[]>(() => [
-    blankVariable('outcome'),
-    blankVariable('factor'),
-  ]);
+const blankRows = (): readonly DeclaredVariable[] => [blankVariable('outcome'), blankVariable('factor')];
+
+export function VariablesStep({ onDeclare, onCancel, draftScope = null }: VariablesStepProps) {
+  const [variables, setVariables] = useSessionDraft<readonly DeclaredVariable[]>(
+    draftKey(draftScope, 'make-variables'),
+    blankRows,
+  );
+  // The rows outlive a tab change, not the form: leaving it either way
+  // starts the next visit with blank rows, as when they were local state.
+  const leave = (then: () => void) => {
+    setVariables(blankRows());
+    then();
+  };
 
   // Immutable updates throughout — house rule, and it keeps the row
   // list safe to render from state directly.
@@ -298,7 +309,7 @@ export function VariablesStep({ onDeclare, onCancel }: VariablesStepProps) {
         <button
           type="button"
           disabled={!ready}
-          onClick={() => onDeclare(variables, describeVariables(variables))}
+          onClick={() => leave(() => onDeclare(variables, describeVariables(variables)))}
           style={{
             ...buttonStyle,
             border: 'none',
@@ -310,7 +321,7 @@ export function VariablesStep({ onDeclare, onCancel }: VariablesStepProps) {
         >
           Show me the figure
         </button>
-        <button type="button" style={buttonStyle} onClick={onCancel}>
+        <button type="button" style={buttonStyle} onClick={() => leave(onCancel)}>
           Back
         </button>
       </div>

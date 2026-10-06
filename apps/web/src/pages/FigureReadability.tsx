@@ -20,6 +20,11 @@
  *    is never mounted here: `selectedBlock={null}` plus the panel's own
  *    `layout === 'page'` gate. Nothing the visitor pastes leaves the
  *    browser.
+ * 4. The script, its language, the last check and the typed size are
+ *    kept in sessionStorage (poster/figureScriptDraft.ts): a reload keeps
+ *    them, closing the tab forgets them. Not localStorage: library guides
+ *    send students here from shared computers (owner decision, 2026-10-06;
+ *    plan item 7).
  *
  * Sibling of the deactivated pages/ChartChooser.tsx — same page shell,
  * same phone-first ergonomics (px-5 gutter, 44px targets, 16px inputs).
@@ -33,6 +38,7 @@ import { useDocumentMeta } from '@/seo/useDocumentMeta';
 import { PrintSizeFields } from '@/poster/PrintSizeFields';
 import { DEFAULT_PRINT_SIZE, type PrintSize } from '@/poster/printSize';
 import { ReadabilityPanel } from '@/poster/ReadabilityPanel';
+import { PAGE_SCRIPT_SLOT, readPageSize, writePageSize } from '@/poster/figureScriptDraft';
 
 const CHECKER_JSON_LD = {
   '@context': 'https://schema.org',
@@ -47,7 +53,11 @@ const CHECKER_JSON_LD = {
 
 export default function FigureReadabilityPage() {
   useDocumentMeta(STATIC_ROUTE_META['/tools/figure-readability'] ?? null, CHECKER_JSON_LD);
-  const [size, setSize] = useState<PrintSize>(DEFAULT_PRINT_SIZE);
+  const [size, setSize] = useState<PrintSize>(() => readPageSize() ?? DEFAULT_PRINT_SIZE);
+  const changeSize = (next: PrintSize) => {
+    writePageSize(next);
+    setSize(next);
+  };
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
@@ -74,7 +84,7 @@ export default function FigureReadabilityPage() {
             the check scores the pasted code against whatever is typed
             here, and the panel's sizing note re-keys its pill on it. */}
         <div className="mt-8">
-          <PrintSizeFields value={size} onChange={setSize} />
+          <PrintSizeFields value={size} onChange={changeSize} />
         </div>
 
         <div className="mt-8">
@@ -84,6 +94,7 @@ export default function FigureReadabilityPage() {
             selectedBlock={null}
             defaultFigureWidthIn={size.w}
             defaultFigureHeightIn={size.h}
+            draftSlot={PAGE_SCRIPT_SLOT}
           />
         </div>
 
