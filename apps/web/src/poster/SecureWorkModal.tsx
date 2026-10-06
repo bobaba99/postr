@@ -13,20 +13,25 @@ interface Props {
   onConverted?: () => void;
 }
 
+// A free account does not unlock PowerPoint/LaTeX on its own (the paywall
+// still applies after conversion), and guest posters are deleted by the
+// weekly cron 14 days after the guest's last sign-in (apps/api/src/cron.ts
+// STALE_GUEST_DAYS), so the copy says both instead of "finish" and "after
+// a while". The editor has no Send Feedback control; the profile page does.
 const COPY = {
   export: {
     title: 'Create an account to export',
-    body: 'Your poster is saved to a guest session — create a free account to finish and keep it for good.',
+    body: 'Your poster is saved to a guest session. Create a free account to keep it. PowerPoint and LaTeX files then need a paid term or pack.',
     dismiss: 'Cancel',
   },
   leave: {
     title: 'Keep this poster',
-    body: 'Create a free account so this poster is here next time you visit. Guest posters are removed after a while.',
+    body: 'Create a free account so this poster is here next time you visit. Guest posters may be deleted after 14 days.',
     dismiss: 'Not now',
   },
 } as const;
 
-const GENERIC_ERROR = 'Something went wrong. Try again, or send feedback.';
+const GENERIC_ERROR = 'Something went wrong. Try again, or send feedback from your profile page.';
 
 export function SecureWorkModal({ reason, onClose, onConverted }: Props) {
   const copy = COPY[reason];
@@ -117,8 +122,9 @@ export function SecureWorkModal({ reason, onClose, onConverted }: Props) {
 
         {confirmSent ? (
           <p style={bodyStyle}>
-            Check your email to finish creating your account. Your poster is
-            safe in the meantime.
+            Check your email to finish creating your account. Until you click
+            the link, this is still a guest poster, which may be deleted after
+            14 days.
           </p>
         ) : (
           <>

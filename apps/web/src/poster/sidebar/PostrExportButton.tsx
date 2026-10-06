@@ -62,9 +62,12 @@ export function PostrExportButton() {
       >
         {done ? '✓ Saved' : busy ? 'Packing…' : '📦 Save as .postr'}
       </button>
+      {/* exportPostr drops an image whose bytes cannot be fetched
+          (import/postrFile.ts packBlock), so no "lossless / every image"
+          claim; this button does not surface that count. */}
       <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-        Lossless backup that bundles the poster JSON + every image. Re-import
-        from the dashboard "+ New poster ▾" menu to restore.
+        One backup file with the poster and its images. An image that can’t
+        be downloaded is left out. Restore it with “Import…” on your dashboard.
       </div>
       {error && (
         <div style={{ fontSize: 12, color: '#fca5a5', marginTop: 6 }}>{error}</div>

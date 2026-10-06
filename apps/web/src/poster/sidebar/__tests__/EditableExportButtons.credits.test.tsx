@@ -215,7 +215,7 @@ describe('EditableExportButtons — refund rule before purchase (2026-09-11)', (
     renderInRouter(<EditableExportButtons citationStyle="APA 7" />);
 
     const line = screen.getByText(/14 days/);
-    expect(line.textContent).toMatch(/first export/i);
+    expect(line.textContent).toMatch(/until you use an export credit/i);
     expect(line.textContent).not.toMatch(/\bAI\b/i);
     // Reading order: the rule, then the buttons it governs.
     const termButton = screen.getByText('Get the term');

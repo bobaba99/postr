@@ -291,8 +291,12 @@ export default function Profile() {
       // sees a generic message (the detail is logged for the operator).
       const outcome = await runAccountDeletion();
       if (!outcome.ok) {
+        // Not "nothing was removed": the API cancels billing and removes
+        // Storage files BEFORE deleting the auth user (apps/api/src/
+        // account.ts deleteAccountForUser), so a late failure leaves some
+        // steps done. Every step is safe to retry.
         setActionError(
-          'Something went wrong deleting your account. Nothing was removed — please try again or send feedback.',
+          'Something went wrong deleting your account. Some steps may have finished, such as cancelling your term or removing uploaded images. Please try again or send feedback.',
         );
         setActionStatus(null);
         return;
@@ -360,8 +364,11 @@ export default function Profile() {
 
         {/* Profile Details */}
         <Section title="Profile Details">
+          {/* ProfileFields keeps these in localStorage ('postr.profile')
+              and nothing else reads that key, so no auto-fill claim. */}
           <p className="mb-3 text-[14pt] text-[#8b8f99] leading-relaxed">
-            Optional — helps identify your posters and auto-fill author info.
+            Optional. These details are saved in this browser only and are not
+            added to your posters.
           </p>
           <ProfileFields user={user} onStatusMessage={(msg) => {
             setActionStatus(msg);
@@ -433,9 +440,9 @@ export default function Profile() {
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-[#c8cad0]">Product-research emails</div>
                   <div className="text-[13px] text-[#8b8f99]">
-                    Let us occasionally email you to invite you to a short
-                    interview or survey about Postr. Turn it on or off anytime.
-                    It never affects your access.
+                    Let us email you to invite you to an interview or survey
+                    about Postr. Turn it on or off anytime. It never affects
+                    your access.
                   </div>
                 </div>
                 <button
@@ -463,9 +470,8 @@ export default function Profile() {
                 <div className="min-w-0 flex-1">
                   <div className="text-sm text-[#c8cad0]">Product-update emails</div>
                   <div className="text-[13px] text-[#8b8f99]">
-                    Occasional emails about new Postr features and updates.
-                    Turn it on or off anytime; unsubscribe links are in every
-                    email too.
+                    Emails about new Postr features and updates. Turn it on or
+                    off anytime.
                   </div>
                 </div>
                 <button
@@ -603,8 +609,8 @@ export default function Profile() {
         {/* Feedback */}
         <Section title="Feedback">
           <p className="mb-4 text-[14pt] text-[#8b8f99] leading-relaxed">
-            Found a bug? Have an idea? Send it in — everything lands in the developer's
-            queue and shapes what ships next.
+            Found a bug? Have an idea? Send it in. Every submission goes to the
+            developer’s feedback queue.
           </p>
           <div className="mb-4 flex gap-2">
             <button onClick={() => openFeedback('bug')} className={btnSecondary}>
@@ -640,15 +646,19 @@ export default function Profile() {
           <SubscriptionPanel plan={plan} />
         </Section>
 
-        {/* Data export — GDPR Art. 15 / 20 */}
+        {/* Data export. Lists exactly what export_my_data returns
+            (supabase/migrations/20260610000000_fix_gdpr_export_feedback_columns.sql):
+            the auth record, posters rows, gallery_entries and feedback.
+            Not "everything": uploaded files, billing rows, saved
+            libraries and poster versions are not in it, so it makes no
+            GDPR-compliance claim (an owner/legal question). */}
         <Section title="Your data">
           <div className="space-y-3">
             <p className="text-[14pt] text-[#8b8f99]">
-              Download everything Postr has stored for your account as a
-              single JSON file — your posters (with full contents),
-              gallery submissions, feedback you've sent, and your
-              profile. Useful for backups, or to comply with GDPR Art.
-              15 / 20 right-of-access requests.
+              Download a JSON file with your account record (email, sign-up
+              date and last sign-in), your posters with their full contents, your
+              gallery submissions, and the feedback you've sent. Uploaded
+              image files are not included. Useful for backups.
             </p>
             <button
               type="button"
@@ -721,7 +731,9 @@ function confirmModalMessage(
     return `Remove "${action.entry.title}" from the public gallery? The entry row and stored image will be deleted. Third parties may still have cached copies.`;
   }
   if (action === 'deleteAccount') return deleteAccountConfirmMessage(hasActiveTerm);
-  return `Permanently delete all ${posterCount} poster(s)? This cannot be undone.`;
+  // deletePoster removes the posters rows only (data/posters.ts); their
+  // Storage images stay until the account is deleted.
+  return `Permanently delete all ${posterCount} poster(s)? This removes the posters but not their stored images. This cannot be undone.`;
 }
 
 function confirmModalLabel(action: ConfirmAction): string {

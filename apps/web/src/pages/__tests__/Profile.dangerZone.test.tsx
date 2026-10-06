@@ -157,9 +157,12 @@ describe('Profile — Danger Zone (P0-3)', () => {
 
     expect(await screen.findByText(/Something went wrong/i)).toBeInTheDocument();
     expect(screen.queryByText(/cancel_failed/)).toBeNull();
-    // "Nothing was removed" must be TRUE: no poster was deleted before the
-    // API refused, so the retry the copy invites still has everything.
-    expect(screen.getByText(/Nothing was removed/i)).toBeInTheDocument();
+    // The copy no longer says "Nothing was removed": the API cancels billing
+    // and removes Storage files before deleting the user, so a late failure
+    // leaves some steps done. It says so, and invites the retry, which still
+    // works because the client deletes no poster on its own.
+    expect(screen.getByText(/Some steps may have finished/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing was removed/i)).toBeNull();
     expect(posters.deletePoster).not.toHaveBeenCalled();
     expect(auth.signOut).not.toHaveBeenCalled();
     expect(screen.queryByText('auth page')).toBeNull();

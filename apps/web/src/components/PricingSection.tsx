@@ -83,11 +83,11 @@ export const PRICING_TIERS = [
     cadence: 'always',
     cta: 'Start free',
     ctaTo: '/p/new',
-    forWho: 'For one poster you can print or present.',
-    condition: 'Includes a small Postr mark.',
+    forWho: 'For posters you print or present.',
+    condition: 'Includes a “made with postr.sh” credit.',
     features: [
       'Unlimited editing and every design tool.',
-      'Print-ready PDF export.',
+      'Print-ready PDF, saved from your browser.',
     ],
   },
   {
@@ -98,11 +98,11 @@ export const PRICING_TIERS = [
     featured: true,
     cta: 'Get the term',
     ctaTo: '/auth?plan=term',
-    forWho: 'For repeated posters and editable exports all term.',
+    forWho: 'For unlimited editable exports while your term runs.',
     condition: 'Renews every four months. Cancel anytime.',
     features: [
       'PowerPoint and LaTeX exports with no watermark.',
-      'Keep editing your posters anywhere.',
+      'No export limit while your term is active.',
     ],
     refund: REFUND_LINE.term,
   },
@@ -153,9 +153,9 @@ export function PricingSection() {
       {/* The refund rule, in one place for the whole section, linking to
           the full Terms wording — every buyer passes this before a CTA. */}
       <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-relaxed text-[#a3a7b3]">
-        A term is refundable in full within 14 days of a charge, a pack until
-        its first export; taking a paid export ends either refund. Full details
-        in the{' '}
+        A term is refundable in full within 14 days of a charge if you haven’t
+        taken a paid export. A pack is refundable in full until you use an
+        export credit. Full details in the{' '}
         <Link
           to={REFUND_TERMS_PATH}
           className="font-medium text-[#b4a9f5] underline-offset-4 hover:underline"

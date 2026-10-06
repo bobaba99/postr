@@ -444,11 +444,14 @@ export function EditableExportButtons({
           LaTeX below.
         </div>
       )}
+      {/* Neither writer handles `chart` blocks (pptx/writer.ts block
+          switch, latex/writer.ts EMITTERS), so charts are named as left
+          out. Third-party app compatibility is not claimed: nothing here
+          checks it. */}
       {!beyondHalf && (
         <div style={hintStyle}>
-          One editable slide — every block stays a real PowerPoint text box,
-          image, or table. Also opens in Keynote, Google Slides, and
-          LibreOffice.
+          One editable slide. Text, images and tables become PowerPoint text
+          boxes, pictures and tables. Charts made in Postr are not included.
         </div>
       )}
 
@@ -473,11 +476,14 @@ export function EditableExportButtons({
           '⌨ LaTeX source (.zip)'
         )}
       </button>
+      {/* poster.tex loads fontspec, so it needs XeLaTeX or LuaLaTeX
+          (exportLatex.ts README); references.bib ships only when the
+          poster has references (hasBib); charts are not emitted. */}
       <div style={hintStyle}>
-        A compilable <code>poster.tex</code> with your figures and a{' '}
-        <code>references.bib</code> — every block keeps its exact position,
-        ready to keep editing in Overleaf or any TeX setup. Full size at any
-        poster dimension.
+        A <code>poster.tex</code> for XeLaTeX or LuaLaTeX, with your images and,
+        when the poster has references, a <code>references.bib</code>. Each
+        block keeps its position. Charts made in Postr are not included. Full
+        size at any poster dimension.
       </div>
 
       {state.notes.length > 0 && (
@@ -497,8 +503,8 @@ export function EditableExportButtons({
       )}
       {state.failed && (
         <div role="alert" style={{ fontSize: 12, color: '#fca5a5', marginTop: 6 }}>
-          Something went wrong. Try again, or use Send Feedback so we can look
-          into it.
+          Something went wrong. Try again, or send feedback from your profile
+          page so we can look into it.
         </div>
       )}
       {state.done && (

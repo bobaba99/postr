@@ -484,9 +484,14 @@ export default function Auth() {
           >
             {loading ? 'Loading…' : 'Start creating — no account needed'}
           </button>
+          {/* handleGuest lands on /dashboard, guest posters are stored on
+              Postr's servers under the anonymous session, and the weekly
+              cron deletes guests 14 days after their last sign-in
+              (apps/api/src/cron.ts STALE_GUEST_DAYS). "May" because the
+              deletion runs weekly, so it can come later than day 14. */}
           <p className="mt-3 text-center text-[14pt] leading-relaxed text-[#8b8f99]">
-            Jump straight into the editor as a guest. Your work saves in this browser.
-            Link an account anytime to sync across devices.
+            Go straight to your dashboard as a guest. Guest posters may be
+            deleted after 14 days. Create an account to keep them on any device.
           </p>
         </div>
         )}
@@ -519,7 +524,7 @@ export default function Auth() {
                   : ' Then come back to sign in.'}
               </p>
               <p className="mt-2 text-[12px] text-[#6ee7b7]/70">
-                Don’t see it? Check spam, or wait a minute and look again.
+                Don’t see it? Check your spam folder.
               </p>
             </div>
           )}
@@ -576,9 +581,13 @@ export default function Auth() {
               {mode === 'signup' && <PasswordStrength password={password} />}
               {mode === 'signin' && (
                 <div className="mt-1.5 text-right">
+                  {/* The recovery link signs the user in; the app has no
+                      screen to set a new password (no PASSWORD_RECOVERY
+                      handler), so this must not promise a reset. Supabase
+                      sends nothing to an address with no account. */}
                   {resetSent ? (
                     <span className="text-[13px] text-[#34d399]">
-                      Password reset email sent to {email}.
+                      If {email} has an account, we emailed it a sign-in link.
                     </span>
                   ) : (
                     <button
@@ -612,7 +621,7 @@ export default function Auth() {
                       className="mt-0.5 h-4 w-4 shrink-0 accent-[#7c6aed]"
                     />
                     <span className="text-[13px] leading-snug text-[#c8cad0]">
-                      Invite me to occasional research interviews or surveys.
+                      Invite me to research interviews or surveys.
                     </span>
                   </label>
                   <label htmlFor="consent-marketing" className="flex cursor-pointer items-start gap-2.5 py-1">
