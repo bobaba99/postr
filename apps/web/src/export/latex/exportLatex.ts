@@ -16,8 +16,9 @@ import {
   extractPosterTitle,
   type ExportContentOptions,
 } from '../posterContent';
+import { FONTS } from '@/poster/constants';
 import { referencesToBib } from './bib';
-import { buildLatexDocument } from './writer';
+import { buildLatexDocument, hasPdflatexFallback } from './writer';
 import type { AttributionOptions } from '../attribution';
 import { stripAckBlock } from '../stripAckBlock';
 
@@ -45,35 +46,65 @@ function textToBytes(s: string): Uint8Array {
   return new Uint8Array(new TextEncoder().encode(s));
 }
 
+/**
+ * Curated families that Google Fonts does not carry. Charter's specimen
+ * page and its CSS2 request both answer "Font family not found" (content
+ * audit, 2026-09-30), so a Charter poster gets no Google Fonts link.
+ */
+const NOT_ON_GOOGLE_FONTS: ReadonlySet<string> = new Set(['Charter']);
+
+/**
+ * True when the README can send the user to a Google Fonts specimen
+ * page: a curated family other than the ones Google Fonts lacks. A
+ * family outside the curated ten is unknown, so it gets no link.
+ */
+function hasGoogleFontsPage(family: string): boolean {
+  return Object.prototype.hasOwnProperty.call(FONTS, family) && !NOT_ON_GOOGLE_FONTS.has(family);
+}
+
+function fontLines(family: string): string[] {
+  if (!hasGoogleFontsPage(family)) {
+    return [`Fonts: the poster uses "${family}". Install it if`, 'your system lacks it.'];
+  }
+  return [
+    `Fonts: the poster uses "${family}". Install it from`,
+    'Google Fonts if your system lacks it:',
+    `  https://fonts.google.com/specimen/${encodeURIComponent(family.replace(/ /g, '+'))}`,
+  ];
+}
+
 function buildReadme(doc: PosterDoc, hasBib: boolean, hasFigures: boolean): string {
   const title = extractPosterTitle(doc) || 'Poster';
+  const printsReferenceList = doc.blocks.some((b) => b.type === 'references');
   return [
     `${title} — LaTeX export from Postr (https://postr.sh)`,
     '',
     'Compile:',
     '  xelatex poster.tex',
     '',
-    '(LuaLaTeX also works: lualatex poster.tex. The document uses',
-    'fontspec, so plain pdflatex needs the commented fallback block',
-    'near the top of poster.tex.)',
+    'poster.tex loads fontspec, so it needs XeLaTeX or LuaLaTeX',
+    ...(hasPdflatexFallback(doc.fontFamily)
+      ? [
+          '(lualatex poster.tex). For pdflatex, follow the commented',
+          'pdfLaTeX fallback block near the top of poster.tex.',
+        ]
+      : ['(lualatex poster.tex).']),
     '',
-    `Fonts: the poster uses "${doc.fontFamily}". Install it from`,
-    'Google Fonts if your system lacks it:',
-    `  https://fonts.google.com/specimen/${encodeURIComponent(doc.fontFamily.replace(/ /g, '+'))}`,
+    ...fontLines(doc.fontFamily),
     '',
     ...(hasFigures
-      ? ['figures/ holds every image at the resolution stored in Postr.', '']
+      ? ["figures/ holds the poster's image files, copied unchanged", 'from Postr.', '']
       : []),
     ...(hasBib
       ? [
-          'references.bib mirrors the poster reference list for',
-          '\\bibliography workflows; the .tex renders the same list as',
-          'literal text so the compiled poster matches the original.',
+          "references.bib holds the poster's references as BibTeX",
+          'entries for \\bibliography workflows. poster.tex does not read it.',
+          ...(printsReferenceList ? ['It prints the reference list as literal text.'] : []),
           '',
         ]
       : []),
     'Every \\begin{textblock}{W}(X,Y) uses poster coordinates where',
-    'one module = 0.1 inch — edit the numbers to nudge a block.',
+    'one module = 0.1 inch. Edit the numbers to nudge a block.',
     '',
   ].join('\n');
 }

@@ -299,9 +299,12 @@ describe('setPoster seeding — opt-in, never automatic', () => {
 });
 
 describe('refusal copy', () => {
-  it('states the exchange without scolding or advertising a tier', () => {
-    expect(LOCKED_BLOCK_REFUSAL).toBe('Postr is free — this credit stays on the poster.');
-    // No paid tier exists, so no upgrade language may appear.
+  it('says what happened without scolding or advertising a tier', () => {
+    expect(LOCKED_BLOCK_REFUSAL).toBe('This credit stays on the canvas.');
+    // Paying users see this toast too (PosterEditor shows it with no plan
+    // check), and paid PowerPoint and LaTeX exports drop the credit, so
+    // the copy may not claim Postr is free or that the credit is in every file.
+    expect(LOCKED_BLOCK_REFUSAL).not.toMatch(/postr is free/i);
     expect(LOCKED_BLOCK_REFUSAL).not.toMatch(/upgrade|pro\b|premium|pay|subscri/i);
     // Not a lecture.
     expect(LOCKED_BLOCK_REFUSAL).not.toMatch(/cannot|not allowed|forbidden|denied/i);
