@@ -12,6 +12,8 @@ Walk-through checklist for the **admin surfaces** (payment, sign-up, delete acco
 > - Editor sidebar rail: layout · style · authors · insert · edit block · references · figure · issues · versions · export — **no "review" tab, and no "comments" tab since 2026-09-30** (below). Dashboard: no "Import manuscript" link under "+ New poster". `/pricing`: no "Paper-to-talk is next" / "Join the waitlist" card.
 > - **Sharing and comments, deactivated 2026-09-30** (fix 23; `SHARING_ENABLED` in `apps/web/src/config/features.ts`): `/s/<slug>` lands on `/`; the editor offers no way into comments — no comments tab, and no "Comment on selection" (💬) in the text toolbar when you select text — so no "Copy share link" and no comment mode. The editor opens only your own posters: `/p/<another user's poster id>` shows "Poster not found", and signing out or in to another account (here or in another tab) while a poster is open closes it: a guest's poster says the guest session has ended, an account's says "This poster is in another account"; both offer "Download a copy" and My posters, and Sign in only for an account's poster while a guest or no one is signed in.
 > - **The workspace rulers, hidden 2026-09-30** (`RULERS_ENABLED` in `apps/web/src/config/features.ts`): no ruler bars along the canvas's top and left edges, and no "Show ruler" checkbox in the Layout tab ("Show grid" stays).
+> - **The LaTeX export, hidden 2026-10-06** (fix 25; `LATEX_EXPORT_ENABLED` in `apps/web/src/config/features.ts`): the Export tab's "✎ Editable formats" has the PowerPoint button only, for every plan (guest, free, pack, term); no page outside the legal pages names LaTeX or Overleaf (landing, About, /pricing, the paywall, /auth, /billing/success, the profile, the crawler copy). Scenarios below that click "⌨ LaTeX source (.zip)" are dormant. The writer is kept; before it returns: `docs/stress-test/PLAN.md`, "LaTeX export: before it is switched back on".
+> - **Every price shown says tax is extra (2026-10-06, fix 25):** Stripe prices are before tax. /pricing prints "+ applicable taxes" under CA$18.99 and CA$9.99; the paywall reads "the term at CA$18.99 + applicable taxes … a 3-export pack at CA$9.99 + applicable taxes"; `/auth?plan=` labels read "Term · CA$18.99 every 4 months + applicable taxes" (the period before the tax note: "+ applicable taxes / 4 months" read as taxes per 4 months; review round 1, B-R1-03) and "Export pack · CA$9.99 + applicable taxes"; the profile's free plan reads "From an export pack, CA$9.99 + applicable taxes."; the account-deletion line names no price. Stripe Checkout itself shows the tax it adds (not in our code).
 > - **⚠ Pre-deploy DB check (needs the Supabase + Stripe dashboards):** before this ships, query prod for `users` rows with `review_credits > 0` or `review_addon = true` (they lose the UI to spend what they bought — refund manually via Stripe per `billing.ts` D8 and tell them) and for rows in `talk_waitlist` (they are expecting a launch email). Archive the review products/prices in Stripe; leave `STRIPE_PRICE_REVIEW_PACK` / `STRIPE_PRICE_REVIEW_ADDON` / `FEATURE_MANUSCRIPT` / `FEATURE_REVIEW` unset in Render. Existing add-on subscriptions keep reconciling through the webhook (fulfilment is not gated).
 
 ---
@@ -181,7 +183,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 - **Set up:** Account **A** (guest), a poster open.
 - [ ] In editor Export tab, guest sees note: **"You're working as a guest — you'll create a free account (or sign in with Google) first, so your purchase and posters stay yours across devices."**
 - [ ] Click "Get the term". It does **NOT** call the API (a guest would 403). It stashes intent and navigates to `/auth?plan=term`.
-- [ ] On `/auth?plan=term`: **guest card is GONE**, replaced by banner **"Term · CA$18.99 / 4 months"** + **"Create your account below to continue to secure checkout."** Mode defaults to **signup**.
+- [ ] On `/auth?plan=term`: **guest card is GONE**, replaced by banner **"Term · CA$18.99 every 4 months + applicable taxes"** + **"Create your account below to continue to secure checkout."** Mode defaults to **signup**.
 - [ ] `?guest=1` auto-guest is suppressed while a plan is present (verify by loading `/auth?guest=1&plan=term` — no guest is minted, form shows).
 - [ ] Enter email + password (must pass all 5 rules). Submit label reads **"Create account & continue"**.
 - [ ] With email confirmation ON: signup returns no session → banner **"Check your email to confirm your account, then come back to continue to checkout."** No checkout starts yet.
@@ -318,25 +320,25 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 ## 11. Buy the TERM (recurring 4-mo sub) — signed-in permanent
 
 - **Set up:** Account **E** (permanent free, 0 credits), poster open. API env must have `STRIPE_SECRET_KEY`, `STRIPE_PRICE_TERM`, `STRIPE_WEBHOOK_SECRET`, `APP_ORIGIN`, service_role; `VITE_API_BASE_URL` non-empty.
-- [ ] Editor → Sidebar **Export** tab → "✎ Editable formats". Paywall heading **"Keep editing in PowerPoint or Overleaf"**, body **"Your PDF export is free. Unlock clean PowerPoint & LaTeX with the CA$18.99 term (renews every 4 months, cancel anytime), or a CA$9.99 3-export pack whose credits never expire."** Both export buttons disabled.
-- [ ] **Refund rule visible BEFORE purchase (owner rule, 2026-09-11 — wording `data/refundCopy.ts`, must match Terms §7.2 + Profile):** (1) the paywall shows, directly above the buy buttons, **"Term: full refund within 14 days of a charge if you haven’t taken a paid export. Pack: full refund until your first export, none after — even in part."**; (2) `/pricing` term card shows **"Full refund within 14 days of a charge if you haven’t taken a paid export."** right under "Get the term" (kept even when the CTA is swapped for the active-term notice), and the fine print under the grid — **"A term is refundable in full within 14 days of a charge, a pack until its first export; taking a paid export ends either refund. Full details in the refund terms."** — links **refund terms** → `/terms#refunds`; (3) `/auth?plan=term` banner shows the same term line under **"Term · CA$18.99 / 4 months"**. ⚠ The Stripe-hosted page shows NO refund text: `custom_text` is rejected together with Managed Payments (sandbox 2026-09-11, `StripeInvalidRequestError`: "You cannot use custom_text with Managed Payments.") — do not look for it there.
+- [ ] Editor → Sidebar **Export** tab → "✎ Editable formats". Paywall heading **"Keep editing in PowerPoint"**, body **"Your PDF export is free. Unlock clean PowerPoint export with the term at CA$18.99 + applicable taxes (renews every 4 months, cancel anytime), or a 3-export pack at CA$9.99 + applicable taxes (its credits never expire)."** The PowerPoint button disabled; no LaTeX button (fix 25).
+- [ ] **Refund rule visible BEFORE purchase (owner rule, 2026-09-11 — wording `data/refundCopy.ts`, must match Terms §7.2 + Profile):** (1) the paywall shows, directly above the buy buttons, **"Term: full refund within 14 days of a charge if you haven’t taken a paid export. Pack: full refund until your first export, none after — even in part."**; (2) `/pricing` term card shows **"Full refund within 14 days of a charge if you haven’t taken a paid export."** right under "Get the term" (kept even when the CTA is swapped for the active-term notice), and the fine print under the grid — **"A term is refundable in full within 14 days of a charge, a pack until its first export; taking a paid export ends either refund. Full details in the refund terms."** — links **refund terms** → `/terms#refunds`; (3) `/auth?plan=term` banner shows the same term line under **"Term · CA$18.99 every 4 months + applicable taxes"**. ⚠ The Stripe-hosted page shows NO refund text: `custom_text` is rejected together with Managed Payments (sandbox 2026-09-11, `StripeInvalidRequestError`: "You cannot use custom_text with Managed Payments.") — do not look for it there.
 - [ ] Click "Get the term" → full-page redirect to Stripe hosted checkout. Pay with a **test card**.
 - [ ] Return to `/billing/success` → check icon + **"You're all set"**. Page polls (`refreshSession` at 2.5s, "waited" at 6s).
-- [ ] Once the webhook lands + refresh fires → copy switches to **"Your term is active. Editable PowerPoint and LaTeX exports are unlocked — no watermark."**
-- [ ] "Back to your posters" → `/dashboard`; return to Export tab: paywall gone, PPTX/LaTeX enabled.
+- [ ] Once the webhook lands + refresh fires → copy switches to **"Your term is active. Editable PowerPoint exports are unlocked — no watermark."**
+- [ ] "Back to your posters" → `/dashboard`; return to Export tab: paywall gone, PowerPoint enabled.
 - **Edges:**
   - [ ] Webhook lands after page load → **"Payment received — finalizing your account. This takes just a moment."** then after 6s **"Payment received. Your access will appear shortly — head back in and it'll be ready."** (expected latency).
   - [ ] Misconfigured API → generic **"Something went wrong. Try again, or use Send Feedback…"** alert.
   - [ ] `VITE_API_BASE_URL` empty → same generic alert (throws before network).
   - [ ] Rate limit (>10/window, >40/day) → 429 → generic alert (no dedicated copy).
   - [ ] **⚠ webhook secret wrong** → 400 invalid_signature → **no grant ever**, success page stalls forever on "access will appear shortly".
-  - [ ] **Already a term holder (P0-2, 2026-09-11):** `/pricing` and the paywall hide "Get the term" and `/auth?plan=term` skips checkout when `usePlan().hasActiveTerm`. Force it anyway (stale tab) → `POST /billing/create-checkout` → **409 `already_subscribed`** (`billing/subscriptionGuard.ts hasActiveTerm`) → the client re-reads the plan and shows **"You already have an active term — PowerPoint and LaTeX export are unlocked…"** ONLY if the fresh row agrees; if the row disagrees (stuck `subscription_status` past a lapsed expiry) the guard does not fire at all — such a row is sold a new term and logged `[billing] subscription_status … stuck`.
+  - [ ] **Already a term holder (P0-2, 2026-09-11):** `/pricing` and the paywall hide "Get the term" and `/auth?plan=term` skips checkout when `usePlan().hasActiveTerm`. Force it anyway (stale tab) → `POST /billing/create-checkout` → **409 `already_subscribed`** (`billing/subscriptionGuard.ts hasActiveTerm`) → the client re-reads the plan and shows **"You already have an active term — PowerPoint export is unlocked…"** ONLY if the fresh row agrees; if the row disagrees (stuck `subscription_status` past a lapsed expiry) the guard does not fire at all — such a row is sold a new term and logged `[billing] subscription_status … stuck`.
   - [ ] **Customer reuse:** a repeat buyer's session is created with `customer: <stored stripe_customer_id>` (no `customer_email`) — one Stripe customer per account (`users_stripe_customer_id_unique_idx`).
 - **✓ verify (query Supabase):**
   - [ ] `plan='term'`, `plan_expires_at` ~4 months out, `subscription_status='active'`, `stripe_subscription_id` + `stripe_customer_id` set.
   - [ ] Landed on `/billing/success` (not `/cancel`).
   - [ ] `[data-postr-export-pptx].disabled === false`, upgrade panel absent.
-  - [ ] A PPTX/LaTeX export now has **no watermark**.
+  - [ ] A PowerPoint export now has **no watermark**.
   - [ ] `billing_fulfilled_sessions` NOT written for term (pack-only).
 - **⚠ Basil breaking change:** period end reads `items.data[0].current_period_end`; if absent it **throws → 500 → retry**. Verify the pinned `2026-02-25.preview` API version returns item-level period end in sandbox.
 
@@ -344,9 +346,9 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 
 - **Set up:** Account **E**, `STRIPE_PRICE_PACK` set.
 - [ ] Same paywall → "Get the pack" → Stripe (mode `payment`, no subscription) → pay.
-- [ ] **Refund rule visible BEFORE purchase (2026-09-11):** paywall line as §11; `/pricing` pack card shows **"Full refund until your first export. No refund after, even in part."** right under "Get the pack"; `/auth?plan=pack` banner shows the same pack line under **"Export pack · CA$9.99"**; `/pricing` crawler copy (`seo/routes.json`) carries the rule too. Stripe page: none (see §11).
+- [ ] **Refund rule visible BEFORE purchase (2026-09-11):** paywall line as §11; `/pricing` pack card shows **"Full refund until your first export. No refund after, even in part."** right under "Get the pack"; `/auth?plan=pack` banner shows the same pack line under **"Export pack · CA$9.99 + applicable taxes"**; `/pricing` crawler copy (`seo/routes.json`) carries the rule too. Stripe page: none (see §11).
 - [ ] `/billing/success` → once credits show: **"Your export pack is ready — 3 exports to use whenever. Credits never expire."**
-- [ ] Editor hint: **"3 exports left in your pack — each PowerPoint or LaTeX export uses one. Credits never expire."**
+- [ ] Editor hint: **"3 exports left in your pack — each PowerPoint export uses one. Credits never expire."**
 - **Edges (Stripe sandbox):**
   - [ ] **Replay the event** → idempotent, credits NOT double-granted (`billing_fulfilled_sessions` unique key).
   - [ ] Unpaid async completion → no grant until `async_payment_succeeded`.
@@ -387,7 +389,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 ## 16. Cancel subscription — ⚠ done at link.com, not in Postr
 
 - **Set up:** Account **F** on `/profile`.
-- [ ] "Subscription" section shows (because `hasActiveTerm`). Copy: **"Your term is active — PowerPoint and LaTeX export are unlocked, no watermark."** + **"The term renews every 4 months. Manage it — update your card, see receipts, or cancel — at Link, which handles billing for Postr."**
+- [ ] "Subscription" section shows (because `hasActiveTerm`). Copy: **"Your term is active — PowerPoint export is unlocked, no watermark."** + **"The term renews every 4 months. Manage it — update your card, see receipts, or cancel — at Link, which handles billing for Postr."**
 - [ ] "Manage subscription at Link ↗" → opens `https://link.com` in a new tab. **No in-app cancel.**
 - **⚠ UNVERIFIED:** the link goes to link.com **root**, not a customer-specific portal deep link. Confirm a real customer can actually find + cancel THIS sub from link.com's root.
 - **After cancel-at-period-end (Stripe sandbox):**
@@ -395,7 +397,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
   - [ ] At period end `customer.subscription.deleted` → `plan='free'`, `plan_expires_at=now()`, `subscription_status='canceled'`; paywall returns; Subscription section disappears.
 - **past_due variant:** inline warning **"There's a payment issue on your latest renewal — update your card at Link to keep your term."**
 - **Self-serve term refund (P0-1 + H-10, 2026-09-11):** "Request refund" within 14 days and before any paid export → `POST /billing/refund {kind:'term'}` → Stripe refund of the latest invoice's PaymentIntent (resolved Basil-style via `latest_invoice.payments` / `invoicePayments.list`) → **the subscription is cancelled immediately** (`subscriptions.cancel`, `prorate:false`) → row `plan='free', plan_expires_at=now(), subscription_status='canceled'` (sub id kept) → response `{ ok, amount_cents, subscription_cancelled: true }`.
-  - [ ] Panel copy: **"Refunded CA$18.99 — it may take a few days to appear. Your term has been cancelled and PowerPoint/LaTeX export is locked again."**, then the panel re-reads the plan and drops to the FREE state (no second "Request refund" button).
+  - [ ] Panel copy: **"Refunded CA$18.99 — it may take a few days to appear. Your term has been cancelled, so its unlimited PowerPoint exports have ended."**, then the panel re-reads the plan and drops to the FREE state (no second "Request refund" button).
   - [ ] Double click → idempotent (same refund id, cancel once). A later `customer.subscription.updated` "active" for that sub id does **not** re-grant (`termAdvanceDecision` → `skip_terminal`, logged).
   - [ ] Eligibility 409s map to copy: `window_expired`, `already_used` (term AND pack — kind-specific wording), `no_pack_purchase`; anything else → generic. (`no_unused_credits` is no longer emitted — a consumed credit is `already_used`.)
 
@@ -426,7 +428,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
   5. `auth.admin.deleteUser(uid)` → FK cascade.
   The RPC still exists but `EXECUTE` is revoked from `anon`/`authenticated` (migration `20260911000000_account_delete_hardening.sql`), so the client cannot bypass the wind-down. The old `supabase/functions/delete-account` edge function is deleted (it was unreferenced).
 - [ ] `/profile` → red **"Danger Zone"** → "Delete account" DangerAction → ConfirmModal with typed confirmation **"I confirm the deletion of my account"** (button disabled until exact, case-insensitive, trimmed match).
-- [ ] With an **active term** (Account F) the modal must state that deleting **also cancels the CA$18.99 term** (client-side line keyed on `usePlan().hasActiveTerm`).
+- [ ] With an **active term** (Account F) the modal must state that deleting **also cancels the term** ("This also cancels your term and any add-on immediately."; no price since fix 25) (client-side line keyed on `usePlan().hasActiveTerm`).
 - [ ] Confirm → toast **"Deleting account…"** → `POST /account/delete` → 200 `{ ok, cancelledSubscriptions, deletedCustomer }` → localStorage cleared (the 6 `LOCAL_KEYS` and, since plan item 7, every `postr.figure-script.<poster id>` plot script; devtools › Application › Local Storage shows none left) → global sign-out → `/auth`. **No client-side poster deletion first** (`profile/accountDeletion.ts`, 2026-09-11 review fix): the server removes storage and the auth cascade removes the posters, so on ANY API failure the copy "Nothing was removed" is literally true — verify by making the API fail (invalid Stripe key) and confirming every poster is still on the dashboard afterwards.
 - **Edges (every failure leaves the account intact — retry is safe, 3/hour rate limit):**
   - [ ] Wrong/partial phrase → button stays greyed, no error string.
@@ -496,14 +498,15 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 - **⚠ format inconsistency, OPEN:** only the PDF/print colophon was resized and moved. The **PPTX** box (11 pt, bottom-left) and **LaTeX** footer (9 pt, bottom-left) are unchanged, so the credit now differs across formats. Owner decision pending — see `docs/stress-test/TRIAGE.md`.
 - **⚠ SEAM / intent disagreement:** the editor PDF hardcodes `attribution: {}`, so `shouldAttribute()` is always true → **the PDF ALWAYS carries the watermark, even for a paid term/credit user.** Unlike PPTX/LaTeX, the PDF path is NOT wired to `usePlan`. **Buying the term does NOT drop the PDF watermark.** Confirm whether that's intended.
 
-## 23. Paid editable export — PPTX / LaTeX (entitled)
+## 23. Paid editable export — PPTX (entitled; the LaTeX export is hidden, fix 25)
 
 - **Set up:** Account **F** (term) or **G** (credits). PPTX ≤112 in/side.
-- [ ] Export tab: paywall card **hidden** (canExport true), both buttons enabled. Pack holders see the credit hint.
-- [ ] "▤ PowerPoint (.pptx)" → busy **"Building slides…"** → downloads `{title}.pptx` → **"✓ Saved"**. "⌨ LaTeX source (.zip)" → **"Writing LaTeX…"** → `{title}-latex.zip`.
+- [ ] Export tab: paywall card **hidden** (canExport true), the PowerPoint button enabled, **no LaTeX button**. Pack holders see the credit hint.
+- [ ] "▤ PowerPoint (.pptx)" → busy **"Building slides…"** → downloads `{title}.pptx` → **"✓ Saved"**. (Dormant while `LATEX_EXPORT_ENABLED` is off: "⌨ LaTeX source (.zip)" → **"Writing LaTeX…"** → `{title}-latex.zip`.)
 - **Edges:**
   - [ ] PPTX 56–112 in → yellow half-size note, export runs at half scale ("print at 200%").
-  - [ ] PPTX >112 in → **button disabled**, red note, use LaTeX/PDF instead.
+  - [ ] PPTX >112 in → **button disabled**, red note ending **"Save a PDF instead."** (no LaTeX, fix 25).
+  - [ ] PPTX 56–112 in → the yellow note ends at "The note is also written inside the file." (its "use LaTeX below" sentence is behind the switch).
   - [ ] Export throws → **"Something went wrong. Try again, or use Send Feedback…"**
 - **✓ verify:** files download + open in PowerPoint/Overleaf; **no Postr mark of any kind** — (a) no bottom-edge colophon text box / muted logo (PPTX) and no margin-band `textblock` colophon (LaTeX); (b) **the seeded logo mark (`ACK_BLOCK_ID`, the locked `logo` block on the canvas) is NOT in the file**: PPTX has no picture shape for it (count `<p:pic>` in `ppt/slides/slide1.xml` = the poster's own images only), LaTeX zip has no `figures/logo-N.*` for it and no `\includegraphics` of it (the user's OWN logo blocks still export); (c) the credit does not appear in the references list / `references.bib`. Only the `%%` header comment (LaTeX) and the `Company` doc property (PPTX) remain — metadata, not a visible mark. Enforced by `export/stripAckBlock.ts`, applied at the top of `exportPosterPptx`, `exportPosterLatex` and `buildLatexDocument` when `!shouldAttribute(attribution)` (pinned by `export/__tests__/ackExports.test.ts` "PAID:" cases). Credit user's `export_credits` −1 (term user: no consume call).
 - **History:** before 2026-09-11 (audit H-3) only the colophon honoured `paidPlan`; the seeded logo block was still written as an ordinary picture / `figures/logo-1` in paid files, so this line's "no watermark" was false. The canvas itself still shows the locked mark to everyone — that is by design (same editor for all plans); the strip happens at export time only. PDF (§22) is unchanged: it never had the seam wired.
@@ -512,7 +515,7 @@ The account-first checkout is the highest-risk surface. Each scenario below is a
 ## 24. Paywall-blocked export → forced signup → resume (nested — cross-ref §1b/1c)
 
 - **Set up:** Account **A** (guest) or **E** (free), poster open, `canExport=false`.
-- [ ] Export tab shows the upgrade card; PPTX/LaTeX **disabled** (clicking no-ops). Guest sees the "working as a guest" note.
+- [ ] Export tab shows the upgrade card; PowerPoint **disabled** (clicking no-ops), no LaTeX button. Guest sees the "working as a guest" note.
 - [ ] "Get the term"/"Get the pack" → guest branch stashes intent + `navigate('/auth?plan=…')`; free-permanent branch calls `createCheckout` directly → Stripe.
 - **This is the same journey as §1b (email) / §1c (Google)** — run those branches there.
 - **✓ verify:** guest routes to `/auth?plan=…` (not Stripe directly), stash set; free PDF and `.postr` remain available to the locked user; after webhook grant the Export tab unlocks on `usePlan` re-read. If webhook delayed/failed, **user pays but export stays locked, no in-app retry.**

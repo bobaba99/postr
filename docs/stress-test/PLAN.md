@@ -210,6 +210,53 @@ scope becomes a plan item or a question for the owner.
   titles, axis labels, legend and figure texts only; panel letters or tick
   labels changed after the layout are not replayed (a03, a06; record 13,
   section 10).
+- **Fix 25, Stripe's own text (an owner check):** the product names and
+  descriptions Stripe shows on Checkout and on receipts come from the Stripe
+  Dashboard, not the repo, so no test can read them. Whether they still name
+  LaTeX is UNVERIFIED (fix 25's implementer and its round 1 reviewer, B-R1-04;
+  `apps/api/src` has 0 strings naming LaTeX and sends no `custom_text`,
+  MEASURED). The owner reads them in the Dashboard.
+
+## LaTeX export: before it is switched back on
+
+The owner hid the LaTeX export on 2026-10-06 ("unnecessary for now"):
+`LATEX_EXPORT_ENABLED = false` in `apps/web/src/config/features.ts`, fix 25
+(`docs/fixes/25-latex-hidden-prices.md`). The writer (`src/export/latex/`)
+and its tests are kept; the button, its hint and its handler are behind the
+switch in `poster/sidebar/EditableExportButtons.tsx`. Turning it back on is
+this list, not a flip:
+
+- **It compiles.** The claims audit (2026-10-06) could not show that the
+  `.zip` compiles: compile `poster.tex` with XeLaTeX and LuaLaTeX on a set of
+  real posters (every block kind, images, references, a 120 × 60 in sheet)
+  and record the numbers before the button returns.
+- **Charts.** The writer has no case for chart blocks (`latex/writer.ts`
+  EMITTERS), and the button's hint says so; the PowerPoint export has the
+  same gap (queued, HIGH). Decide the warning for both.
+- **The copy fix 25 took out** comes back, each sentence checked against the
+  code again: record 25 section 7 lists every string and where it was (main
+  `e09c0ea` holds the old wording): the landing "Editable exports" card, the
+  About "Iterate, export, print" card, the /pricing hero, the pricing cards,
+  the paywall heading and body, the pack holder's credit line, the size
+  notes (the too-big note's way out; the half-size note's LaTeX sentence is
+  already behind the switch), the already-subscribed notices (`Auth.tsx`,
+  `EditableExportButtons.tsx`), `/billing/success`, the guest's export
+  modal, the profile's subscription panel (four strings),
+  `PptxSizeLimitError`, the crawler copy (`seo/routes.json`: `/pricing`
+  title, description and copy, `/auth`, `/dashboard`, `/billing/cancel`)
+  and `index.html`'s description. The legal pages (Terms §7 and the privacy
+  pages, EN and FR) name the paid exports too: stream A of 2026-10-06 owns
+  their wording.
+- **The tests that lock it hidden flip:** `poster/__tests__/latexHidden.test.tsx`
+  (no button for any plan) becomes a test that the button is there for a
+  paid user; `src/__tests__/copyInventory.test.ts` stops checking LaTeX by
+  itself (`describe.runIf(!LATEX_EXPORT_ENABLED)`); the mutant spec
+  `docs/fixes/25-latex-hidden-prices.mutants.json` part A is retired.
+- **Prices still say tax is extra** on every new string, after the billing
+  period ("CA$18.99 every 4 months + applicable taxes"; the inventory checks
+  both whatever the switch).
+- **Stripe's own text** (product names and descriptions in the Dashboard,
+  shown on Checkout and receipts) is not in the repo; check it says the same.
 
 ## Handed on by finished fixes
 
@@ -348,3 +395,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 13 | `checker/python-reads-own-fix` | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md` (the fix raises the text it saves, and its re-check reads it); part 2, the parser's own misreads, not started |
 | 7 | `fix/07-figure-script-kept` | done (three review rounds); review round 1 answered (a blank-line regression fixed, tests added, legal copy corrected); round 2 answered (a result checked against an image block is no longer shown under the preview's size, and a kept result says the size it is for; a long script edited after its Check stays stored); round 3 answered (a note no longer promises an image check comes back) — `docs/fixes/07-figure-script-kept.md`; the owner's decisions of 2026-10-06: the script kept per poster in this browser and re-checked on return, sessionStorage on the public page, Check stays up once a script is in, and the same cause fixed in the Authors, References, Make-a-figure, poster-name and version-name drafts (memory only) |
 | 15 | `fix/15-checker-language` | done (three review rounds) — `docs/fixes/15-checker-language.md` (Check answers when it cannot tell R from Python; unsupported plotting systems are named, not scored; a result on screen stays, marked out of date, and one a new print size hides is said to be hidden; detection reads live code only, re-landing 9ea9f38; a string in `aes()` or seaborn's `barplot()` places nothing on its own: code with only such a token gets the could-not-tell answer (an R package name such as `library(tidyverse)` is an R signal and is checked as ggplot2)) |
+| 25 | `fix/latex-hidden-prices` | one review round (browser and entry points), answered: the `/auth?plan=term` label puts the period before the tax note, a stale code comment reworded — `docs/fixes/25-latex-hidden-prices.md`; the owner's decisions of 2026-10-06: the LaTeX export hidden (`LATEX_EXPORT_ENABLED`, `config/features.ts`; before it returns: the section above), every price shown says tax is extra, the landing "Editable exports" card says the export is paid; a copy inventory test keeps both true |
