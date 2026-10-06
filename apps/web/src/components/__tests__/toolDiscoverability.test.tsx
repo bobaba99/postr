@@ -407,7 +407,9 @@ describe('Landing page', () => {
     renderIn(<Landing />);
     const heading = screen.getByRole('heading', {
       level: 2,
-      name: /tools you can use on their own/i,
+      // Singular while one tool is live (Landing.tsx comment above the
+      // section); plural again when a second card returns.
+      name: /a tool you can use on its own/i,
     });
     const section = heading.closest('section') as HTMLElement;
     // "Two parts of the poster workflow…" went stale the moment one

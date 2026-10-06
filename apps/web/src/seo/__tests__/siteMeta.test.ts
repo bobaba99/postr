@@ -176,9 +176,13 @@ describe('staticCopyFor', () => {
   });
 
   it('states the refund rule in the /pricing crawler copy (owner rule, 2026-09-11)', () => {
+    // The pack line names the credit, as data/refundCopy.ts does: credits
+    // are pooled, so the server refuses a pack refund once any credit is
+    // used. "Until its first export" was wrong in both directions.
     const copy = staticCopyFor('/pricing')?.copy.join(' ') ?? '';
     expect(copy).toMatch(/14 days/);
-    expect(copy).toMatch(/first export/i);
+    expect(copy).toMatch(/until you use an export credit/i);
+    expect(copy).not.toMatch(/first export/i);
   });
 
   it('returns null for a route with no static copy', () => {
@@ -340,6 +344,24 @@ describe('shareMeta', () => {
       expect(result.description.length).toBeLessThanOrEqual(160);
     },
   );
+
+  it('describes a share link without promising privacy or comments (sharing is off, fix 23)', () => {
+    // A shared poster is readable through the API, and a first-time
+    // visitor could not post a comment (copy audit, 2026-09-29), so the
+    // card says only what the page does: show the poster read-only.
+    const result = shareMeta({ slug: 'review-abc', title: null, imageUrl: null });
+    expect(result.description).toMatch(/read-only/);
+    expect(`${result.title} ${result.description}`).not.toMatch(/private|comment|review/i);
+  });
+
+  it('keeps the edge shell share card word for word the same as shareMeta', () => {
+    // api/shell/_lib.ts cannot import this module (it runs on the edge
+    // without the app's path aliases), so it carries a copy of the text.
+    const source = readFileSync(`${process.cwd()}/api/shell/_lib.ts`, 'utf8');
+    const result = shareMeta({ slug: 'review-abc', title: null, imageUrl: null });
+    expect(source).toContain(result.description);
+    expect(source).toContain(result.title);
+  });
 
   it('is applied while the share record loads instead of inheriting an indexable page', () => {
     const source = readFileSync(`${process.cwd()}/src/pages/Share.tsx`, 'utf8');

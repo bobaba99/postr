@@ -1,5 +1,5 @@
 # https://www.postr.sh/robots.txt
-# Postr — free conference poster maker.
+# Postr: conference poster maker for researchers.
 
 # ── Default: crawl allowed; indexation controlled by header ─────────
 # Nothing is disallowed for general crawlers, on purpose.
@@ -11,21 +11,26 @@
 # is noindex, and a URL discovered from an external link can still be
 # indexed as a bare listing. Allow the crawl, forbid the index.
 #
-# For /s/ (share links) there is a second reason. Slackbot, Twitterbot
-# and LinkedInBot honour robots.txt, so disallowing /s/ would kill the
-# link previews that are the core sharing loop.
+# For /s/ (share links) there is a second reason. Sharing is switched
+# off for now (config/features.ts SHARING_ENABLED; /s/ serves the home
+# page).
+# If it comes back: Slackbot, Twitterbot and LinkedInBot honour
+# robots.txt, so disallowing /s/ would stop share-link previews.
 #
-# These routes are all cheap to crawl — they return the same small app
-# shell — so the crawl-budget cost of allowing them is negligible.
+# These routes are all cheap to crawl: each returns one small static
+# HTML page (the prerendered home page, the prerendered sign-in page, or
+# the 404 page), so the crawl-budget cost of allowing them is negligible.
 # Do not "tidy this up" by adding Disallow lines.
 User-agent: *
 Allow: /
 
 # ── AI crawlers: allowed on purpose, EXCEPT on user posters ─────────
-# Postr is free and there is no monetisable content to protect — the
-# site is the pitch. Blocking these guarantees Postr is never the
+# The public pages hold no paid content to protect: the site is the
+# pitch. Blocking these crawlers would make Postr less likely to be the
 # answer when someone asks an assistant what to use instead of
-# PowerPoint. Share links are in-progress research and are off limits.
+# PowerPoint. Share links can hold unpublished research, so this group
+# is asked to stay off them (robots rules bind only crawlers that follow
+# them).
 User-agent: GPTBot
 User-agent: OAI-SearchBot
 User-agent: ChatGPT-User

@@ -31,9 +31,9 @@ const SKILLS: Skill[] = [
     id: 'compression',
     title: 'Explaining your work at three lengths',
     atTheSession:
-      'A poster visit lasts anywhere from twenty seconds to twenty minutes, and you do not get to choose which. You end up with a one-line version, a two-minute version, and the full walkthrough — and you learn to read which one the person in front of you actually wants.',
+      'A poster visit can be a glance or a long conversation, and you do not get to choose which. You end up with a one-line version, a two-minute version, and the full walkthrough, and you learn to read which one the person in front of you actually wants.',
     laterOn:
-      'This is the same skill as a job talk, a grant summary, a thesis defence opening, and answering "so what do you do?" at a family dinner. Most researchers build it by accident at poster sessions before they ever need it under pressure.',
+      'This is the same skill as a job talk, a grant summary, a thesis defence opening, and answering "so what do you do?" at a family dinner. A poster session lets you build it before you need it under pressure.',
   },
   {
     id: 'visual-argument',
@@ -65,7 +65,7 @@ const SKILLS: Skill[] = [
     atTheSession:
       'You cannot fit the project on the board. Choosing the one claim the poster defends — and demoting everything else to "happy to talk about it" — forces a decision most people postpone until they write the paper.',
     laterOn:
-      'Framing is the hardest part of a paper, a proposal, and a research programme. Doing it early, on a deadline, with a physical size limit, is unusually good practice.',
+      'A paper, a proposal, and a research programme all need the same framing decision. Making it early, on a deadline, with a physical size limit, is unusually good practice.',
   },
   {
     id: 'networking',
@@ -73,7 +73,7 @@ const SKILLS: Skill[] = [
     atTheSession:
       'A poster gives you a legitimate reason to talk to people whose work you have only read, and gives them a reason to approach you. That is a rare structural advantage, and it disappears the moment the session ends.',
     laterOn:
-      'Collaborations, postdoc positions, and reviewers who already know your name tend to originate in exactly these conversations rather than in cold email.',
+      'Collaborations, postdoc positions, and reviewers who already know your name can all start in exactly these conversations.',
   },
 ];
 
@@ -98,8 +98,8 @@ export default function WhyPosters() {
           Poster sessions have a reputation as the consolation prize of
           conference formats — what you get when your abstract does not make the
           talk list. That reading misses what the format is unusually good at.
-          Standing next to your own work for two hours, explaining it over and
-          over to people who did not choose it, builds a set of skills that
+          Standing next to your own work for a whole session, explaining it over
+          and over to people who did not choose it, builds a set of skills that
           outlast the conference.
         </p>
       </section>
@@ -198,9 +198,9 @@ export default function WhyPosters() {
           </h2>
           <p className="mb-6 text-[13pt] leading-relaxed text-[#9ca3af]">
             The skills above come from presenting, not from formatting. Postr
-            exists so the formatting is not the hard part — real print sizes,
-            authors and affiliations that stay in sync, and figures checked for
-            legibility before you get to the print shop.
+            exists so the formatting is not the hard part: real print sizes,
+            authors and affiliations that stay in sync, and a figure text check
+            you can run before you get to the print shop.
           </p>
           <div className="flex flex-wrap gap-3">
             <Link

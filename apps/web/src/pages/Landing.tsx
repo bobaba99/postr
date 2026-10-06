@@ -58,14 +58,23 @@ const LANDING_JSON_LD = {
  *
  * Keep them short enough to read in one glance, but do not count
  * characters. That constraint is gone.
+ *
+ * Each phrase must be something the editor really does. "the
+ * conference size lookups": the conference guidelines panel lists the
+ * board sizes (poster/GuidelinesPanel.tsx GUIDELINES), but nothing
+ * applies one to the sheet, so the phrase does not say "specs". "the
+ * figure font-size math": the figure check works out each label's
+ * printed point size (poster/readability.ts) and charts drawn in the
+ * Figure tab start at print-legible sizes (charts/plotOptions.ts), but
+ * nothing catches small text on its own.
  */
 const HERO_FRICTIONS = [
   'the fiddly block nudging',
   'the text reflowing on you',
   'the BibTeX citation styles',
-  'the conference size specs',
+  'the conference size lookups',
   'the authors and affiliations',
-  'the unreadable tiny figures',
+  'the figure font-size math',
 ] as const;
 
 export default function Landing() {
@@ -193,9 +202,12 @@ export default function Landing() {
             className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
           >
             <div className="text-2xl mb-3">📐</div>
-            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Smart templates</h3>
+            {/* poster/templates.ts LAYOUT_TEMPLATES: four layouts plus
+                "Blank" (title and authors only). Not "smart": the
+                templates are fixed layouts scaled to the sheet. */}
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Poster templates</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Five conference-ready layouts with disciplinary palettes and
+              Four layouts and a blank start, with disciplinary palettes and
               standard academic size presets.
             </p>
           </div>
@@ -248,18 +260,20 @@ export default function Landing() {
         manuscript flows are deactivated (routes.tsx header): the
         Plot checker (the standalone figure-readability check). The intro is count-free on purpose —
         "Two parts of the poster workflow…" went stale the moment a
-        card left. When the picker returns, its card goes in FRONT of
-        this one and the grid goes back to `sm:grid-cols-2`.
+        card left. The heading and intro are singular while one tool is
+        live; when the picker returns, its card goes in FRONT of this
+        one, the heading and intro go back to the plural, and the grid
+        goes back to `sm:grid-cols-2`.
 
         Mirrors PublicHeader TOOL_LINKS and the PublicFooter Product
         column; toolDiscoverability.test.tsx pins all three.
       */}
       <section className="mx-auto w-full max-w-4xl px-8 pb-24">
         <h2 className="text-center text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8]">
-          Tools you can use on their own
+          A tool you can use on its own
         </h2>
         <p className="mx-auto mt-3 max-w-[52ch] text-center text-sm leading-relaxed text-[#8b8f99]">
-          The parts of the poster workflow that work without an account,
+          The part of the poster workflow that works without an account,
           and without opening the editor.
         </p>
 
@@ -268,7 +282,7 @@ export default function Landing() {
             to="/tools/figure-readability"
             icon="🔍"
             title="Plot checker"
-            body="Paste your R or Python plotting code and the size it will print at. See which labels fall below poster thresholds and copy the base_size fix."
+            body="Paste your R or Python plotting code and the size it will print at. See which labels fall below poster minimums and copy your script with the sizes they need added."
             cta="Check your figure"
           />
         </div>

@@ -38,31 +38,52 @@ const MILESTONES: Milestone[] = [
       "Anonymous session on first click — no sign-up wall. Every keystroke autosaves from before you've even named the poster. When you sign up later, your drafts follow you across devices without a single \"export and re-import\".",
   },
   {
+    // Layouts: poster/templates.ts LAYOUT_TEMPLATES (the fifth is Blank).
+    // Palettes: poster/constants.ts PALETTES (8, six named by discipline)
+    // plus the custom palette designer (components/PaletteDesigner.tsx).
+    // Board sizes: poster/GuidelinesPanel.tsx GUIDELINES lists seven
+    // meetings but does not set the sheet; the size menu has no conference
+    // presets, and custom sizes run SHEET_MIN_IN..SHEET_MAX_IN
+    // (poster/resizeSheet.ts).
     id: 'templates',
-    title: 'Templates tuned for conferences',
+    title: 'Templates built for conference posters',
     body:
-      'Five layouts — three-column classic, billboard, sidebar + focus, and more. Discipline-appropriate palettes instead of freeform color pickers. APA, SfN, and ECNP size presets ship built-in so your dimensions are never a guess.',
+      'Five layouts: three-column classic, two-column wide figure, billboard, sidebar + focus, and a blank start. Eight palettes, six of them named for a discipline, or build your own. The poster guidelines panel lists board sizes for APA, SfN, ECNP and four more meetings, and the sheet takes any size from 10 to 100 inches.',
   },
   {
+    // Prompts: the placeholder text in poster/templates.ts. Word targets:
+    // the built-in "Standard Poster" checklist in poster/GuidelinesPanel.tsx
+    // (BUILT_IN_TEMPLATES[0], loaded by default).
     id: 'writing',
     title: 'Writing guidance, not a blank page',
     body:
-      'Each section comes with concrete prompts, word-count targets, and a built-in checklist from intro to conclusion. Rich text for emphasis, Greek-symbol shortcuts for STEM, and a reference manager with citation-style support.',
+      'Template sections open with short prompts, and a built-in checklist runs from the title to the final proofread, with word targets for the introduction, methods and conclusions. Rich text for emphasis, Greek-symbol shortcuts for STEM, and a reference manager with citation-style support.',
   },
   {
+    // The check compares each label's printed point size with the
+    // minimums in poster/readability.ts. It runs when the user runs it.
     id: 'readability',
-    title: 'Figures readable from three feet',
+    title: 'Figure text checked at print size',
     body:
-      'Paste your R or Python plotting code and Postr checks whether axis labels will actually be legible at print size. Out-of-bounds warnings catch layout slips. No more discovering typography problems at the FedEx counter.',
+      'Paste your R or Python plotting code and Postr checks whether axis labels will actually be legible at print size. Out-of-bounds warnings catch layout slips. Run the check before you print, while small labels are still easy to fix.',
   },
   {
     // The manuscript sentence this card used to open with was removed:
     // paper-to-poster is deactivated — see routes.tsx header. The id is
     // kept so the timeline outline and its tests stay stable.
+    //
+    // Every import is auto-arranged into columns after it lands
+    // (ImportPosterModal.tsx sets postr.autoArrangeOnLoad; PosterEditor
+    // runs onAutoLayout), so blocks do not keep their original places.
+    // Image imports, and PDFs with no text layer (pdfImport.ts
+    // rasterizes those), are text-only (import/imageImport.ts). A text-layer
+    // PDF brings only embedded raster images (paintImageXObject), and a
+    // PowerPoint import skips native charts (import/pptx/shapes.ts
+    // unsupportedLabel), so the card says charts stay behind.
     id: 'start-from-work',
     title: 'Start from the poster you already have',
     body:
-      'Already have a poster in PowerPoint, as a PDF, or as an image? Open it here and keep editing it, blocks and all — title, headings, body text and figures land where they were, each one still yours to move and rewrite.',
+      'Already have a poster in PowerPoint, as a PDF, or as an image? Import it and keep editing. The title, headings and body text come in as blocks you can move and rewrite, and Postr arranges them into columns. Imports from PowerPoint and text-based PDFs also bring in images. Charts built in PowerPoint, and charts a PDF draws as vector graphics, stay behind. From an image or a scanned PDF, you add figures yourself.',
   },
   {
     // Describes the editor's Figure tab. The same ladder used to have a
@@ -75,18 +96,29 @@ const MILESTONES: Milestone[] = [
       'Paste a table or answer three questions in the Figure tab and Postr ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once and insert them straight onto the poster.',
   },
   {
+    // Only a palette and one of the curated fonts come back
+    // (apps/api/src/extractStyle.ts schema); clampPrintSafe
+    // (poster/styleExtraction.ts) lifts very dark backgrounds and caps
+    // saturation. It does not check contrast, so the card does not
+    // promise legibility.
     id: 'design',
     title: 'Borrow a look you like',
     body:
-      'Upload a poster you admire and Postr lifts its colours and type onto yours — the look, never the content. Print-safe clamping keeps the result legible on paper rather than only on screen.',
+      'Upload a poster you admire and Postr applies its colours and the closest built-in font to yours. It copies no text or images. Very dark backgrounds are lifted slightly and neon colours are toned down for print.',
   },
   {
     // Share links are deactivated with comments (config/features.ts), so the
     // card no longer offers them (fix 23).
+    //
+    // Undo keeps MAX_HISTORY (50) steps (stores/posterStore.ts). PowerPoint
+    // and LaTeX need a term or a pack credit (usePlan canExport). The PPTX
+    // and LaTeX writers have no case for chart blocks, so the card names
+    // what they do carry. references.bib ships only when the poster has
+    // references (export/latex/bib.ts); the .tex targets XeLaTeX/LuaLaTeX.
     id: 'ship',
     title: 'Iterate, export, print',
     body:
-      'Undo and redo through the entire session. Export to PDF, to PowerPoint with every block still editable, or to LaTeX with a compilable poster.tex and references.bib for Overleaf.',
+      'Undo and redo up to 50 steps. Save a PDF for free. PowerPoint and LaTeX exports are paid: PowerPoint keeps text, images and tables editable, and LaTeX gives you a poster.tex for XeLaTeX with your images, plus a references.bib when the poster has references. Charts made in Postr are not included.',
   },
 ];
 
@@ -129,8 +161,8 @@ export default function About() {
         </h1>
         <p className="mt-6 text-[14pt] text-[#9ca3af] leading-relaxed max-w-xl mx-auto">
           Postr is an opinionated poster editor built around one idea: constraint is
-          a feature. Every default is tuned to produce something print-ready — you
-          just fill in the science.
+          a feature. The defaults are set for print. A new poster starts on a 48 ×
+          36 inch sheet with 36 pt body text, and you fill in the science.
         </p>
         <p className="mt-4 text-[12pt] text-[#8b8f99] leading-relaxed max-w-xl mx-auto">
           Built and maintained by{' '}
@@ -184,8 +216,7 @@ export default function About() {
             </h2>
             <p className="mb-8 max-w-xl text-[14pt] leading-relaxed text-[#9ca3af]">
               Every bug report and feature request lands in the developer's queue.
-              The loudest feedback wins the most attention — so if something's
-              broken, missing, or could be better, say so.
+              If something's broken, missing, or could be better, say so.
             </p>
             <div className="flex flex-wrap gap-3">
               <button
