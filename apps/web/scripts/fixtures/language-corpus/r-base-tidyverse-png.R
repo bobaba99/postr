@@ -1,0 +1,5 @@
+library(tidyverse)
+df <- read_csv("data.csv") %>% filter(!is.na(y))
+png("fig.png", width = 6, height = 4, units = "in", res = 300)
+plot(df$x, df$y, pch = 19, main = "Response", xlab = "Dose", ylab = "Response")
+dev.off()

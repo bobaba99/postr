@@ -192,6 +192,85 @@ describe('FigureTab', () => {
     expect(spec.seriesPaletteId).toBe('blue-orange-gray');
   });
 
+  // Fix 15, at the editor's entry point: Figure › Check a figure.
+  describe('Check a figure, on code the check cannot place or read', () => {
+    const codeBox = () => screen.getByLabelText('Your R or Python plotting code');
+    const check = () => fireEvent.click(screen.getByRole('button', { name: /check$/i }));
+    /** The line beside ▶ Check as a sighted user reads it. */
+    const checkLabel = () => {
+      const slot = screen.getByRole('button', { name: /check$/i }).previousElementSibling as HTMLElement;
+      const copy = slot.cloneNode(true) as HTMLElement;
+      copy.querySelectorAll('.sr-only').forEach((e) => e.remove());
+      return copy.textContent?.trim() ?? '';
+    };
+    const announced = () => screen.queryAllByRole('status').map((e) => e.textContent ?? '').join(' | ');
+    const openChecker = () => {
+      render(<Harness />);
+      fireEvent.click(screen.getByRole('button', { name: 'Check a figure' }));
+    };
+
+    it('answers that it could not tell R from Python, and a screen reader hears it', () => {
+      openChecker();
+      fireEvent.change(codeBox(), { target: { value: 'df.plot(kind="bar", title="Counts by group", rot=0)' } });
+      check();
+      const answer = 'Couldn’t tell R from Python — pick R (ggplot2) or Python (matplotlib).';
+      expect(checkLabel()).toBe(answer);
+      expect(announced()).toContain(answer);
+      expect(screen.queryByRole('table')).toBeNull();
+    });
+
+    it('names an unsupported plotting system, with no table', () => {
+      openChecker();
+      fireEvent.change(codeBox(), { target: { value: 'library(lattice)\nbwplot(value ~ group, data = df)' } });
+      check();
+      expect(checkLabel()).toBe('Not supported yet: lattice. The check reads R (ggplot2) and Python (matplotlib).');
+      expect(screen.queryByRole('table')).toBeNull();
+    });
+
+    it('checks ggplot2 with a string in aes() as ggplot2, not plotnine (round 1)', () => {
+      openChecker();
+      fireEvent.change(codeBox(), {
+        target: {
+          value: [
+            'library(ggplot2)',
+            'ggplot(scores, aes(x = "", y = score)) +',
+            '  geom_boxplot() +',
+            '  theme_classic(base_size = 12)',
+            'ggsave("box.png", width = 3, height = 5)',
+          ].join('\n'),
+        },
+      });
+      expect(checkLabel()).toBe('Detected: R / ggplot2');
+      check();
+      expect(screen.getByText('Tick labels')).toBeInTheDocument();
+    });
+
+    it('does not say an answer again when the language is changed and changed back (round 2)', () => {
+      openChecker();
+      fireEvent.change(codeBox(), { target: { value: 'df.plot(kind="bar", title="Counts by group", rot=0)' } });
+      check();
+      const answer = 'Couldn’t tell R from Python — pick R (ggplot2) or Python (matplotlib).';
+      expect(announced()).toContain(answer);
+      fireEvent.click(screen.getByRole('button', { name: /^python$/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^auto$/i }));
+      expect(announced()).not.toContain(answer);
+      expect(checkLabel()).toBe('Can’t tell R from Python. Pick one above.');
+    });
+
+    it('keeps the last result, marked out of date, when the new code cannot be checked', () => {
+      openChecker();
+      fireEvent.change(codeBox(), {
+        target: { value: 'library(ggplot2)\nggplot(mtcars, aes(mpg, wt)) + geom_point() + theme_minimal(base_size = 11)' },
+      });
+      check();
+      expect(screen.getByText('Tick labels')).toBeInTheDocument();
+      fireEvent.change(codeBox(), { target: { value: 'plot(x, y)' } });
+      check();
+      expect(screen.getByText('Tick labels')).toBeInTheDocument();
+      expect(screen.getByText(/^Out of date: /)).toBeInTheDocument();
+    });
+  });
+
   it('clearing a chart palette drops seriesPaletteId from the spec', () => {
     const onUpdateChartSpec = vi.fn();
     render(

@@ -14,7 +14,10 @@ import {
   parseRCode,
   parsePythonCode,
   computeReadability,
-  detectLanguage,
+  describePlotCode,
+  SUPPORTED_SYSTEMS,
+  type PlotCode,
+  type PlotSystem,
   type ReadabilityResult,
   type FigureParams,
 } from './readability';
@@ -202,6 +205,56 @@ function CodeEditor({ value, onChange, placeholder, layout }: CodeEditorProps) {
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// What the line beside Check says
+// ──────────────────────────────────────────────────────────────────────
+//
+// The line beside ▶ Check is where the user is looking when they press it:
+// at 1280 × 720 the editor's results start about 26 px from the bottom of
+// the window (the confirmer of item 15), so an answer placed below would
+// go unseen. Before fix 15, code the check could not place left Check
+// doing nothing at all, and wiped any result on screen.
+
+const SYSTEM_NAME: Record<PlotSystem, string> = {
+  ggplot2: 'ggplot2',
+  matplotlib: 'matplotlib',
+  base: 'base graphics',
+  lattice: 'lattice',
+  plotly: 'plotly',
+  plotnine: 'plotnine',
+  altair: 'Altair',
+};
+
+/** "R / ggplot2", or "R (checked as ggplot2)" when no call named the system. */
+function plotLabel(plot: PlotCode): string {
+  const language = plot.language === 'r' ? 'R' : 'Python';
+  const system = SYSTEM_NAME[plot.system!];
+  return plot.assumed ? `${language} (checked as ${system})` : `${language} / ${system}`;
+}
+
+const CANNOT_TELL = 'Couldn’t tell R from Python — pick R (ggplot2) or Python (matplotlib).';
+
+/** The answer to an unsupported system names it and what the check reads. */
+function unsupportedAnswer(system: PlotSystem): string {
+  const name = system === 'base' ? 'base R graphics' : SYSTEM_NAME[system];
+  return `Not supported yet: ${name}. The check reads R (ggplot2) and Python (matplotlib).`;
+}
+
+/**
+ * Said when the page hides a result because the print size changed: a
+ * table no longer on screen must not go without a word (round 2 of fix
+ * 15's review; the page hides it by design, fix 13).
+ */
+const RESIZED = 'The print size changed: click Check again for a result at this size.';
+
+interface CheckAnswer {
+  /** 'checked' is announced only; the table below is what a sighted user reads. */
+  kind: 'cannot-tell' | 'unsupported' | 'checked';
+  text: string;
+  /** One per press, so the same words said twice are put back, and heard again. */
+  press: number;
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Main panel
 // ──────────────────────────────────────────────────────────────────────
 
@@ -221,12 +274,19 @@ export function ReadabilityPanel({
   // reads like a run-button, not a live typing-pad.
   const [checked, setChecked] = useState<{
     code: string;
+    /**
+     * The language the code was checked as: a different reading now makes
+     * it out of date. The system follows from the code and the language.
+     */
+    language: 'r' | 'python';
     result: ReadabilityResult;
     params: FigureParams;
     fullFix: string;
     widthIn: number;
     heightIn: number;
   } | null>(null);
+  const [answer, setAnswer] = useState<CheckAnswer | null>(null);
+  const presses = useRef(0);
   // Global "just copied" banner shared across the panel + modal.
   // Stays for 3s so users can't miss it.
   const [copiedBannerOpen, setCopiedBannerOpen] = useState(false);
@@ -252,14 +312,40 @@ export function ReadabilityPanel({
     result?: ScanResult;
   }>({ phase: 'idle' });
 
-  const detectedLang = useMemo(() => {
-    if (lang !== 'auto') return lang;
-    return detectLanguage(code);
-  }, [code, lang]);
+  const plot = useMemo(
+    () => describePlotCode(code, lang === 'auto' ? undefined : lang),
+    [code, lang],
+  );
+
+  // An answer is for the press that gave it: editing the code or picking
+  // another language drops it for good. Hidden by comparison instead, it
+  // came back, put into the live region and read out again, when the edit
+  // was undone (round 2 of fix 15's review).
+  const changeCode = (next: string) => {
+    setCode(next);
+    setAnswer(null);
+  };
+  const changeLang = (next: 'auto' | 'r' | 'python') => {
+    if (next !== lang) setAnswer(null);
+    setLang(next);
+  };
 
   const runCheck = () => {
-    if (!code.trim() || !detectedLang) {
-      setChecked(null);
+    if (!code.trim()) return;
+    presses.current += 1;
+    const at = { press: presses.current };
+    // Neither branch touches `checked`: a result already on screen stays,
+    // marked out of date (the owner's answer, 2026-10-06), instead of
+    // vanishing without a word as it did.
+    if (!plot.language || !plot.system) {
+      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });
+      return;
+    }
+    // Including after a hand pick: a ggplot2 table and edited code for a
+    // base R plot would be wrong (the reproducer: the edit ran and saved a
+    // blank figure), so the system is named instead.
+    if (!SUPPORTED_SYSTEMS.includes(plot.system)) {
+      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });
       return;
     }
     // Pass the current figure-preview overlay (or selected image
@@ -273,7 +359,7 @@ export function ReadabilityPanel({
       defaultSizeLabel: t.defaultSizeLabel,
     };
     const params =
-      detectedLang === 'r'
+      plot.language === 'r'
         ? parseRCode(code, parseOpts)
         : parsePythonCode(code, parseOpts);
     const result = computeReadability(params, blockHeightIn, blockWidthIn);
@@ -286,11 +372,22 @@ export function ReadabilityPanel({
       : generateFullFix(code, params, result.suggestedBaseSize);
     setChecked({
       code,
+      language: plot.language,
       result,
       params,
       fullFix,
       widthIn: blockWidthIn,
       heightIn: blockHeightIn,
+    });
+    const below = result.elements.filter((e) => e.status !== 'pass').length;
+    setAnswer({
+      ...at,
+      kind: 'checked',
+      text: `Checked as ${plotLabel({ ...plot, assumed: false })}: ${
+        below === 0
+          ? 'every text element meets its minimum'
+          : `${below} of ${result.elements.length} text elements are below the minimum`
+      }.`,
     });
   };
 
@@ -303,6 +400,22 @@ export function ReadabilityPanel({
     checked !== null &&
     (checked.widthIn !== blockWidthIn || checked.heightIn !== blockHeightIn);
   const result = stale ? null : checked?.result ?? null;
+  // The result was computed for other code, or the code now reads as
+  // another language (and so, maybe, another system): still shown, marked.
+  const outOfDate = checked !== null && (checked.code !== code || checked.language !== plot.language);
+  // A table's announcement goes with the table when the page hides it at a
+  // new size, for good: back at the old size the table returns, but its
+  // announcement is not made again without a press (round 2). React's
+  // pattern for state that follows a prop: set during render, guarded.
+  if (stale && answer?.kind === 'checked') setAnswer(null);
+  // With no answer about the code on screen, a hidden result is said to be
+  // hidden, beside Check and to a screen reader.
+  const shownAnswer: { kind: CheckAnswer['kind'] | 'resized'; text: string; key: string } | null = answer
+    ? { kind: answer.kind, text: answer.text, key: `press-${answer.press}` }
+    : stale
+      ? { kind: 'resized', text: RESIZED, key: 'resized' }
+      : null;
+  const answerOnScreen = shownAnswer !== null && shownAnswer.kind !== 'checked';
   const checkedParams = stale ? null : checked?.params ?? null;
   const fullFixedCode = stale ? '' : checked?.fullFix ?? '';
   const needsFix =
@@ -388,7 +501,7 @@ export function ReadabilityPanel({
           <button
             key={l}
             type="button"
-            onClick={() => setLang(l)}
+            onClick={() => changeLang(l)}
             aria-pressed={lang === l}
             style={{
               ...btnStyle,
@@ -406,7 +519,7 @@ export function ReadabilityPanel({
 
       <CodeEditor
         value={code}
-        onChange={setCode}
+        onChange={changeCode}
         placeholder="# Paste your ggplot / matplotlib code here..."
         layout={layout}
       />
@@ -419,19 +532,39 @@ export function ReadabilityPanel({
           gap: 8,
         }}
       >
-        {detectedLang ? (
-          <div style={{ fontSize: 13, color: '#89b4fa' }}>
-            Detected: {detectedLang === 'r' ? 'R / ggplot2' : 'Python / matplotlib'}
+        <div style={{ flex: '1 1 auto', minWidth: 0, fontSize: 13 }}>
+          {/* The answer to the last press of Check, or that a new print
+              size hid its result. The region is always mounted so a screen
+              reader hears what is added to it; each press adds a new node
+              (keyed by the press), so pressing again on code that still
+              cannot be checked is heard again, and the screen changes. A
+              table's answer is for screen readers only: a sighted user
+              reads the table. */}
+          <div role="status" aria-live="polite" aria-atomic="true">
+            {shownAnswer && (
+              <span
+                key={shownAnswer.key}
+                className={shownAnswer.kind === 'checked' ? 'sr-only' : 'postr-rise-in'}
+                style={
+                  shownAnswer.kind === 'checked'
+                    ? undefined
+                    : { display: 'block', color: '#f9e2af', lineHeight: 1.4 }
+                }
+              >
+                {shownAnswer.text}
+              </span>
+            )}
           </div>
-        ) : (
-          // detectLanguage returns null for empty code AND for a tie; on a
-          // tie Check does nothing, so the line has to say why.
-          <div style={{ fontSize: 13, color: t.mutedColor }}>
-            {code.trim()
-              ? 'Can’t tell R from Python. Pick one above.'
-              : 'Auto-detect waiting for code…'}
-          </div>
-        )}
+          {!answerOnScreen && (
+            <div style={{ color: plot.language ? '#89b4fa' : t.mutedColor }}>
+              {plot.language
+                ? `Detected: ${plotLabel(plot)}`
+                : code.trim()
+                  ? 'Can’t tell R from Python. Pick one above.'
+                  : 'Auto-detect waiting for code…'}
+            </div>
+          )}
+        </div>
         <button
           type="button"
           onClick={runCheck}
@@ -440,6 +573,9 @@ export function ReadabilityPanel({
             ...primaryBtnStyle,
             opacity: code.trim() ? 1 : 0.4,
             cursor: code.trim() ? 'pointer' : 'not-allowed',
+            // The answer beside it can run to three lines on a phone; the
+            // button keeps its one line instead of being squeezed into two.
+            whiteSpace: 'nowrap',
             minHeight: t.buttonMinHeight,
             fontSize: t.buttonFontSize,
           }}
@@ -469,6 +605,21 @@ export function ReadabilityPanel({
 
       {result && (
         <div key={checked?.code} className="postr-rise-in" style={panelStyle}>
+          {outOfDate && (
+            <div
+              style={{
+                fontSize: 13,
+                lineHeight: 1.4,
+                color: '#f9e2af',
+                background: '#2a2516',
+                border: '1px solid #6b5a1e',
+                borderRadius: 6,
+                padding: '6px 10px',
+              }}
+            >
+              Out of date: this result is from your last check, before the code or the language changed.
+            </div>
+          )}
           {result.warnings.map((w, i) => (
             <div
               key={i}

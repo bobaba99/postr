@@ -1,0 +1,5 @@
+library(patchwork)
+p1 <- ggplot(df, aes(time, score)) + geom_line()
+p2 <- ggplot(df, aes(group, score)) + geom_boxplot()
+(p1 | p2) + plot_annotation(tag_levels = "A")
+ggsave("panels.png", width = 10, height = 4)
