@@ -44,16 +44,16 @@
       ]
     },
     "/pricing": {
-      "title": "Postr Pricing: Free PDF Export, Paid PowerPoint & LaTeX",
-      "description": "Editing and PDF export are free. PowerPoint and LaTeX exports need the CA$18.99 term, renewing every 4 months, or a one-time CA$9.99 pack of 3 exports.",
+      "title": "Postr Pricing: Free PDF Export, Paid PowerPoint Export",
+      "description": "Editing and PDF export are free. PowerPoint exports need the 4-month term, CA$18.99 + applicable taxes, or a pack of 3, CA$9.99 + applicable taxes.",
       "robots": "index,follow",
       "h1": "Free to build. Pay only to take it further.",
       "copy": [
         "A finished, print-ready poster costs nothing on Postr. Editing and PDF export are free, and every PDF carries a \"made with postr.sh\" credit. No card or account is required to finish and print your work.",
-        "The CA$18.99 term gives unlimited PowerPoint and LaTeX exports with no watermark while it is active. It renews every four months and you can cancel anytime.",
-        "The CA$9.99 pack gives three PowerPoint or LaTeX exports. Each export uses one credit, even a second export of the same poster. It is a one-time purchase, and the credits never expire.",
+        "The CA$18.99 term, plus applicable taxes, gives unlimited PowerPoint exports with no watermark while it is active. It renews every four months and you can cancel anytime.",
+        "The CA$9.99 pack, plus applicable taxes, gives three PowerPoint exports. Each export uses one credit, even a second export of the same poster. It is a one-time purchase, and the credits never expire.",
         "Refunds: a term is refundable in full within 14 days of a charge if you haven't taken a paid export. A pack is refundable in full until you use an export credit, and not after.",
-        "You only pay to export to PowerPoint or LaTeX. The editor, its tools and the PDF export have no paywall. A guest can keep up to 25 posters and an account up to 200, and some tools, such as import and Copy a design, have daily limits. Prices are shown in Canadian dollars, and payments go through Stripe."
+        "You only pay to export to PowerPoint. The editor, its tools and the PDF export have no paywall. A guest can keep up to 25 posters and an account up to 200, and some tools, such as import and Copy a design, have daily limits. Prices are shown in Canadian dollars, before applicable taxes, and payments go through Stripe."
       ]
     },
     "/tools/figure-readability": {
@@ -71,28 +71,28 @@
     },
     "/privacy": {
       "title": "Privacy Policy for Postr Researchers",
-      "description": "What Postr collects and why, who receives it, where it is stored, how long it is kept, and how to access, download or delete it. Postr sets no cookies.",
+      "description": "Who is responsible at Postr, what is collected and why, who receives it, how long it is kept, and your rights under Quebec's Law 25, PIPEDA and the GDPR.",
       "robots": "index,follow",
       "h1": "Privacy Policy",
       "copy": [
-        "Postr collects your account details, the posters you make and the images you upload, technical logs, your plan and billing records if you buy a plan, and the feedback you send. We do not use your poster content to train any AI model.",
-        "Postr sets no cookies. Your browser's storage keeps your sign-in session and the settings and notes you save. Page views are counted with Vercel Web Analytics, which sets no cookie and writes nothing to your browser.",
-        "The services that receive personal data are Supabase (database, sign-in and file storage, in Oregon, United States), Vercel, Render, Anthropic, Stripe, Google and the Wikimedia Foundation. Anthropic's language model reads the images and text you send when you import a poster, copy a design, scan a figure, or paste authors or references. Uploaded figures are stored privately and served only through signed links.",
-        "You may request access, correction, export, or deletion of personal data. The full privacy policy explains retention, international processing, security, legal bases, children's privacy, policy changes, complaints, and how to contact Postr with a question or request."
+        "Postr is run by Resila Technologies Inc., a corporation incorporated in Quebec, Canada, which is responsible for the personal information Postr collects. Questions, requests and complaints go to its Privacy Officer, the person in charge of the protection of personal information.",
+        "Postr collects your account details, the posters you make and the images you upload, technical records, your plan and billing records if you buy a plan, and the feedback you send. We do not use your poster content to train any AI model.",
+        "The services that receive personal information are Vercel (it hosts the website and counts page views), Render (it runs the API) and Supabase (database, sign-in and file storage), then Anthropic, Stripe, Google and the Wikimedia Foundation. Your information is processed outside Quebec and outside Canada, in the United States or other countries.",
+        "Page views are counted with Vercel Web Analytics only, which sets no cookie and is not loaded when your browser sends Global Privacy Control. You can ask to access, correct, delete or de-index your information, receive a copy of it, withdraw your consent, and complain to the Commission d’accès à l’information du Québec or the Office of the Privacy Commissioner of Canada; we reply in writing within 30 days. The full policy also covers retention, governance, confidentiality incidents, and users in the European Union, the United Kingdom and the United States."
       ]
     },
     "/privacy/fr": {
       "title": "Politique de confidentialité de Postr",
-      "description": "Ce que Postr recueille et pourquoi, qui le reçoit, où et combien de temps il est conservé, et comment l’obtenir ou le supprimer. Postr ne dépose aucun témoin.",
+      "description": "Qui est responsable chez Postr, ce qui est recueilli et pourquoi, qui le reçoit, sa conservation, et vos droits selon la Loi 25, la LPRPDE et le RGPD.",
       "robots": "index,follow",
       "language": "fr-CA",
       "locale": "fr_CA",
       "h1": "Politique de confidentialité",
       "copy": [
-        "Postr recueille les renseignements de votre compte, les affiches que vous créez et les images que vous téléversez, des journaux techniques, votre forfait et vos dossiers de facturation si vous achetez un forfait, ainsi que la rétroaction que vous envoyez. Nous n’utilisons pas le contenu de vos affiches pour entraîner un quelconque modèle d’IA.",
-        "Postr ne dépose aucun témoin. Le stockage de votre navigateur conserve votre session de connexion ainsi que les réglages et les notes que vous enregistrez. Les pages vues sont comptées au moyen de Vercel Web Analytics, qui ne dépose aucun témoin et n’écrit rien dans votre navigateur.",
-        "Les services qui reçoivent des renseignements personnels sont Supabase (base de données, connexion et stockage de fichiers, en Oregon, aux États-Unis), Vercel, Render, Anthropic, Stripe, Google et la Wikimedia Foundation. Le modèle de langage d’Anthropic lit les images et le texte que vous transmettez lorsque vous importez une affiche, copiez un design, lancez « Scan image » sur une figure ou collez des auteurs ou des références. Les figures téléversées sont stockées en privé et servies uniquement au moyen de liens signés.",
-        "Vous pouvez demander l’accès, la rectification, l’exportation ou la suppression de vos renseignements. La politique complète explique la conservation, les transferts internationaux, la sécurité, les fondements juridiques, la protection des renseignements des enfants, les modifications de la politique, les plaintes et la façon de joindre Postr pour une question ou une demande."
+        "Postr est exploité par Resila Technologies Inc., une société constituée au Québec, au Canada, qui est responsable des renseignements personnels que Postr recueille. Les questions, demandes et plaintes s’adressent à la personne responsable de la protection des renseignements personnels.",
+        "Postr recueille les renseignements de votre compte, les affiches que vous créez et les images que vous téléversez, des registres techniques, votre forfait et vos dossiers de facturation si vous achetez un forfait, ainsi que la rétroaction que vous envoyez. Nous n’utilisons pas le contenu de vos affiches pour entraîner un quelconque modèle d’IA.",
+        "Les services qui reçoivent des renseignements personnels sont Vercel (qui héberge le site et compte les pages vues), Render (qui exploite l’API) et Supabase (base de données, connexion et stockage de fichiers), puis Anthropic, Stripe, Google et la Fondation Wikimedia. Vos renseignements sont traités à l’extérieur du Québec et du Canada, aux États-Unis ou dans d’autres pays.",
+        "Les pages vues sont comptées uniquement au moyen de Vercel Web Analytics, qui ne dépose aucun témoin et n’est pas chargé lorsque votre navigateur envoie le signal Global Privacy Control. Vous pouvez demander l’accès à vos renseignements, leur rectification, leur suppression ou leur désindexation, en recevoir une copie, retirer votre consentement et porter plainte à la Commission d’accès à l’information du Québec ou au Commissariat à la protection de la vie privée du Canada; nous répondons par écrit dans les 30 jours. La politique complète traite aussi de la conservation, de la gouvernance, des incidents de confidentialité et des utilisateurs de l’Union européenne, du Royaume-Uni et des États-Unis."
       ]
     },
     "/cookies": {
@@ -102,8 +102,8 @@
       "h1": "Cookies Policy",
       "copy": [
         "Postr sets no cookies. It keeps items in your browser's storage, such as your sign-in session, the presets, palettes, notes and profile details you save, a marker that warns you when the same poster is open in two tabs, and short-lived values for the current tab.",
-        "Page views are counted with Vercel Web Analytics, which as Postr uses it sets no cookie and writes nothing to your browser. Poster ids and query strings are removed from the page address Postr reports. The address of the page you came from is not changed. Postr runs no advertising and no cross-site tracking.",
-        "Some features load files from other services that have their own cookie policies: poster fonts from Google Fonts, and preset university logos from Google and Wikimedia sites. Payments and billing open on Stripe's own pages.",
+        "Page views are counted with Vercel Web Analytics only, which as Postr uses it sets no cookie and writes nothing to your browser, and which Postr does not load when your browser sends Global Privacy Control. Poster ids and query strings are removed from the page address Postr reports. Postr runs no advertising and no cross-site tracking.",
+        "Some features load files from other services: the editor's fonts from Google Fonts, which receives your IP address and user agent each time, and preset university logos from Google and Wikimedia sites. Payments and billing open on Stripe's own pages.",
         "Deleting this storage signs you out, and a guest without an account can then no longer open their posters. If you block storage for postr.sh, Postr cannot keep you signed in from one page load to the next, and the editor may not work. The full policy lists each entry, where it is stored, what it does and how long it lasts, and how to clear it in your browser."
       ]
     },
@@ -116,8 +116,8 @@
       "h1": "Politique relative aux témoins",
       "copy": [
         "Postr ne dépose aucun témoin. Il conserve des éléments dans le stockage de votre navigateur, comme votre session de connexion, les préréglages, palettes, notes et données de profil que vous enregistrez, un marqueur qui vous avertit lorsque la même affiche est ouverte dans deux onglets, ainsi que des valeurs temporaires qui ne durent que le temps de l’onglet en cours.",
-        "Les pages vues sont comptées au moyen de Vercel Web Analytics, qui, tel que Postr l’utilise, ne dépose aucun témoin et n’écrit rien dans votre navigateur. Les identifiants d’affiches et les chaînes de requête sont retirés de l’adresse de page que Postr transmet. L’adresse de la page d’où vous venez n’est pas modifiée. Postr n’affiche aucune publicité et ne fait aucun suivi intersite.",
-        "Certaines fonctions chargent des fichiers depuis d’autres services, qui ont leurs propres politiques relatives aux témoins : les polices des affiches depuis Google Fonts, et les logos d’universités prédéfinis depuis Google et des sites Wikimedia. Les paiements et la facturation s’ouvrent sur les pages de Stripe.",
+        "Les pages vues sont comptées uniquement au moyen de Vercel Web Analytics, qui, tel que Postr l’utilise, ne dépose aucun témoin et n’écrit rien dans votre navigateur, et que Postr ne charge pas lorsque votre navigateur envoie le signal Global Privacy Control. Les identifiants d’affiches et les chaînes de requête sont retirés de l’adresse de page que Postr transmet. Postr n’affiche aucune publicité et ne fait aucun suivi intersite.",
+        "Certaines fonctions chargent des fichiers depuis d’autres services : les polices de l’éditeur depuis Google Fonts, qui reçoit chaque fois votre adresse IP et votre agent utilisateur, et les logos d’universités prédéfinis depuis Google et des sites Wikimedia. Les paiements et la facturation s’ouvrent sur les pages de Stripe.",
         "La suppression de ce stockage vous déconnecte, et un invité sans compte ne peut alors plus ouvrir ses affiches. Si vous bloquez le stockage pour postr.sh, Postr ne peut pas garder votre session ouverte d’un chargement de page à l’autre, et l’éditeur pourrait ne pas fonctionner. La politique complète indique, pour chaque entrée, où elle est stockée, ce qu’elle fait et combien de temps elle dure, ainsi que la façon de l’effacer dans votre navigateur."
       ]
     },
@@ -129,8 +129,8 @@
       "copy": [
         "You keep ownership of the posters, figures, images, text, and other content you create or upload. Postr receives only the permissions needed to provide the service.",
         "Use Postr lawfully and only with content you have permission to use. Respect intellectual property, personal privacy, platform security, and other users.",
-        "Free and paid features may change, and uninterrupted availability is not guaranteed. The full terms set out how the term renews, how to cancel it through Stripe, and the refund rules for the term and the export pack. Prices are shown at checkout before you pay, and the current prices are listed on the pricing page.",
-        "Postr may suspend harmful or unlawful use. The full terms explain account termination, service disclaimers, liability limits, indemnity, governing law, dispute handling, changes to the terms, and the email address for questions, notices and legal requests."
+        "Free and paid features may change, and uninterrupted availability is not guaranteed. Prices are before tax: applicable taxes are added at checkout, where the total is shown before you pay. Cancelling a term takes effect at the end of the period you paid for; an unused term can be refunded in full within 14 days of its charge. The full terms set out the renewal, how to cancel and the refund rules for the term and the export pack.",
+        "Postr may suspend harmful or unlawful use. The full terms explain account termination, service disclaimers, liability limits, indemnity, governing law (Quebec and Canada), dispute handling, what consumers in Quebec keep under the Consumer Protection Act, changes to the terms, and the email address for questions, notices and legal requests."
       ]
     },
     "/terms/fr": {
@@ -143,8 +143,8 @@
       "copy": [
         "Vous conservez la propriété des affiches, figures, images, textes et autres contenus que vous créez ou téléversez. Postr reçoit uniquement les autorisations nécessaires pour fournir le service.",
         "Utilisez Postr légalement et seulement avec du contenu que vous êtes autorisé à employer. Respectez la propriété intellectuelle, la vie privée, la sécurité et les autres utilisateurs.",
-        "Les fonctions gratuites et payantes peuvent changer, et une disponibilité ininterrompue n’est pas garantie. Les conditions complètes précisent le renouvellement du forfait à terme, la façon de l’annuler par l’intermédiaire de Stripe et les règles de remboursement du forfait à terme et du pack d’exportation. Les prix sont affichés au moment du paiement, avant que vous ne payiez, et les prix en vigueur figurent sur la page de tarification.",
-        "Postr peut suspendre un usage nuisible ou illégal. Les conditions complètes expliquent la résiliation, les exclusions de garantie, la limitation de responsabilité, l’indemnisation, le droit applicable, le règlement des différends, les modifications des conditions et l’adresse courriel pour les questions, les avis et les demandes juridiques."
+        "Les fonctions gratuites et payantes peuvent changer, et une disponibilité ininterrompue n’est pas garantie. Les prix sont avant taxes : les taxes applicables s’ajoutent au paiement, où le total est affiché avant que vous ne payiez. L’annulation d’un forfait à terme prend effet à la fin de la période payée; un forfait à terme inutilisé peut être remboursé en entier dans les 14 jours suivant son prélèvement. Les conditions complètes précisent le renouvellement, la façon d’annuler et les règles de remboursement du forfait à terme et du lot d’exportation.",
+        "Postr peut suspendre un usage nuisible ou illégal. Les conditions complètes expliquent la résiliation, les exclusions de garantie, la limitation de responsabilité, l’indemnisation, le droit applicable (Québec et Canada), le règlement des différends, ce que conservent les consommateurs du Québec en vertu de la Loi sur la protection du consommateur, les modifications des conditions et l’adresse courriel pour les questions, les avis et les demandes juridiques."
       ]
     }
   },
@@ -158,12 +158,12 @@
       "h1": "Sign in or create your account",
       "copy": [
         "Sign in, create an account, or continue as a guest to start building a conference poster.",
-        "Poster editing and print-ready PDF export are free. Paid plans only unlock editable PowerPoint and LaTeX exports."
+        "Poster editing and print-ready PDF export are free. Paid plans only unlock editable PowerPoint exports."
       ]
     },
     "/dashboard": {
       "title": "Conference Poster Dashboard | Postr",
-      "description": "Create, manage, and reopen conference posters in Postr, then export print-ready PDFs or unlock editable PowerPoint and LaTeX files.",
+      "description": "Create, manage, and reopen conference posters in Postr, then export print-ready PDFs for free or unlock editable PowerPoint files.",
       "robots": "noindex,nofollow"
     },
     "/profile": {
@@ -193,7 +193,7 @@
     },
     "/billing/cancel": {
       "title": "Checkout Cancelled — Return to Postr",
-      "description": "No charge was made. Go back and keep editing your conference poster for free, including PDF export, or see the editable PowerPoint and LaTeX plans.",
+      "description": "No charge was made. Go back and keep editing your conference poster for free, including PDF export, or see the plans for editable PowerPoint export.",
       "robots": "noindex,nofollow"
     },
     "/404": {

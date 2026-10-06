@@ -154,7 +154,11 @@ describe('paid signup audit regressions', () => {
 });
 
 // Owner rule (2026-09-11): the checkout-resume banner states the refund
-// rule for the plan it is about to sell, under the plan label.
+// rule for the plan it is about to sell, under the plan label. And the
+// label's price says tax is extra (owner, 2026-10-06: Stripe prices are
+// before tax; fix 25), so the labels below are matched whole. The term's
+// period comes before the tax note: "+ applicable taxes / 4 months" read
+// as taxes per 4 months (fix 25, review round 1, B-R1-03).
 function renderPaidSignupFor(plan: 'term' | 'pack') {
   return render(
     <MemoryRouter initialEntries={[`/auth?plan=${plan}`]}>
@@ -171,7 +175,7 @@ describe('refund rule on the checkout-resume banner (2026-09-11)', () => {
   it('states the term refund line under the term label', () => {
     renderPaidSignupFor('term');
 
-    const label = screen.getByText('Term · CA$18.99 / 4 months');
+    const label = screen.getByText('Term · CA$18.99 every 4 months + applicable taxes');
     const line = screen.getByText(/14 days/);
     expect(label.parentElement).toBe(line.parentElement);
     expect(
@@ -184,7 +188,7 @@ describe('refund rule on the checkout-resume banner (2026-09-11)', () => {
   it('states the pack refund line under the pack label', () => {
     renderPaidSignupFor('pack');
 
-    const label = screen.getByText('Export pack · CA$9.99');
+    const label = screen.getByText('Export pack · CA$9.99 + applicable taxes');
     const line = screen.getByText(/until you use an export credit/i);
     expect(label.parentElement).toBe(line.parentElement);
     expect(line.textContent).toMatch(/no refund after/i);

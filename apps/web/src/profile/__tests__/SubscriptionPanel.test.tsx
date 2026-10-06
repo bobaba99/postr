@@ -70,7 +70,7 @@ describe('SubscriptionPanel — term refund', () => {
     expect(screen.getByText(/term has been cancelled/i)).toBeInTheDocument();
     // Not "export is locked again": a holder of pack credits can still
     // export, so the copy says only that the term's exports ended.
-    expect(screen.getByText(/unlimited PowerPoint and LaTeX exports have ended/i)).toBeInTheDocument();
+    expect(screen.getByText(/unlimited PowerPoint exports have ended/i)).toBeInTheDocument();
     expect(screen.queryByText(/locked again/i)).toBeNull();
     expect(billing.requestRefund).toHaveBeenCalledWith('term');
     await waitFor(() => expect(p.refresh).toHaveBeenCalledTimes(1));

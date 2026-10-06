@@ -104,7 +104,7 @@ const permanentUser = {
   created_at: '2026-09-01T00:00:00Z',
 };
 
-const TERM_LINE = /This also cancels your CA\$18\.99 term and any add-on immediately/i;
+const TERM_LINE = /This also cancels your term and any add-on immediately/i;
 
 function renderProfile() {
   return render(

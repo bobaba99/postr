@@ -117,7 +117,7 @@ describe('EditableExportButtons — credit balance (H-8)', () => {
 
     await waitFor(() => expect(applyCreditsSpy).toHaveBeenCalledWith(1));
     expect(await screen.findByText(/1 export left in your pack/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Keep editing in PowerPoint or Overleaf/i)).toBeNull();
+    expect(screen.queryByText(/Keep editing in PowerPoint/i)).toBeNull();
   });
 
   it('spending the last credit raises the paywall and disables the buttons', async () => {
@@ -128,7 +128,7 @@ describe('EditableExportButtons — credit balance (H-8)', () => {
     fireEvent.click(screen.getByText('▤ PowerPoint (.pptx)'));
 
     expect(
-      await screen.findByText(/Keep editing in PowerPoint or Overleaf/i),
+      await screen.findByText(/Keep editing in PowerPoint/i),
     ).toBeInTheDocument();
     expect(screen.queryByText(/export left in your pack/i)).toBeNull();
     const pptx = document.querySelector('[data-postr-export-pptx]') as HTMLButtonElement;
@@ -144,7 +144,7 @@ describe('EditableExportButtons — credit balance (H-8)', () => {
 
     await waitFor(() => expect(applyCreditsSpy).toHaveBeenCalledWith(0));
     expect(
-      await screen.findByText(/Keep editing in PowerPoint or Overleaf/i),
+      await screen.findByText(/Keep editing in PowerPoint/i),
     ).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
   });

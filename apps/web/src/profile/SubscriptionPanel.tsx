@@ -38,7 +38,7 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
       const amount = `CA$${(amountCents / 100).toFixed(2)}`;
       setRefundMsg(
         subscriptionCancelled
-          ? `Refunded ${amount}. It may take a few days to appear. Your term has been cancelled, so its unlimited PowerPoint and LaTeX exports have ended.`
+          ? `Refunded ${amount}. It may take a few days to appear. Your term has been cancelled, so its unlimited PowerPoint exports have ended.`
           : `Refunded ${amount}. It may take a few days to appear.`,
       );
       // The server just changed the billing row (term → free, or fewer
@@ -70,8 +70,7 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
     return (
       <div className="space-y-3">
         <p className="text-[14pt] text-[#c8cad0]">
-          Your term is active — PowerPoint and LaTeX export are unlocked, no
-          watermark.
+          Your term is active — PowerPoint export is unlocked, no watermark.
           {plan.subscriptionStatus === 'past_due' && (
             <span className="text-[#fbbf24]">
               {' '}There’s a payment issue on your latest renewal — update your
@@ -136,8 +135,8 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
         </div>
         <p className="mt-1 text-[13pt] text-[#8b8f99]">
           {hasCredits
-            ? `${plan.credits} PowerPoint or LaTeX export${plan.credits === 1 ? '' : 's'} left — credits never expire.`
-            : 'From a CA$9.99 export pack. Credits never expire once purchased.'}
+            ? `${plan.credits} PowerPoint export${plan.credits === 1 ? '' : 's'} left — credits never expire.`
+            : 'From an export pack, CA$9.99 + applicable taxes. Credits never expire once purchased.'}
         </p>
         {refundMsg && !hasCredits && (
           <p className="mt-2 text-[13pt] text-[#a3a7b3]">{refundMsg}</p>
@@ -163,8 +162,8 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
       </div>
 
       <p className="text-[14pt] text-[#8b8f99]">
-        Unlock clean PowerPoint &amp; LaTeX export with the term, or a one-time
-        export pack whose credits never expire.
+        Unlock clean PowerPoint export with the term, or a one-time export
+        pack whose credits never expire.
       </p>
       <Link
         to="/pricing"

@@ -35,7 +35,7 @@ export default function Pricing() {
           <span className="text-[#7c6aed]">Pay only to take it further.</span>
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-[14pt] leading-relaxed text-[#9ca3af]">
-          Build and print free. Pay only for editable PowerPoint or LaTeX exports.
+          Build and print free. Pay only for editable PowerPoint exports.
         </p>
       </section>
 
