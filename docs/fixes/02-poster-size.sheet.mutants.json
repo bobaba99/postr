@@ -376,8 +376,8 @@
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "      setPoster(currentId, restored, currentTitle, { sizeFallback: currentDoc ?? undefined });",
-          "      setPoster(currentId, restored, currentTitle);"
+          "      usePosterStore.getState().restoreVersion(restored, { sizeFallback: currentDoc ?? undefined });",
+          "      usePosterStore.getState().restoreVersion(restored);"
         ]
       ]
     },
@@ -386,8 +386,8 @@
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "      setPoster(currentId, restored, currentTitle, { sizeFallback: currentDoc ?? undefined });",
-          "      setPoster(currentId, restored, currentTitle, { sizeFallback: currentDoc ? { widthIn: currentDoc.widthIn } : undefined });"
+          "      usePosterStore.getState().restoreVersion(restored, { sizeFallback: currentDoc ?? undefined });",
+          "      usePosterStore.getState().restoreVersion(restored, { sizeFallback: currentDoc ? { widthIn: currentDoc.widthIn } : undefined });"
         ]
       ]
     }

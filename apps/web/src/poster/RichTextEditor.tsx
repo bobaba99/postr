@@ -36,16 +36,23 @@
  *                 inside this editor. The argument is a SelectionInfo
  *                 object or null when the selection leaves. Parents
  *                 use it to position / dismiss the floating toolbar.
+ *   historyKey    the field's key in the editor's one undo history
+ *                 (`content:<block id>`), with `surface` (canvas or
+ *                 sidebar): an undo or redo of this field writes the
+ *                 restored text in even while it has focus, and puts the
+ *                 caret back where the change was (useEditableHistory.ts,
+ *                 docs/fixes/12-one-undo-history.md).
  */
 import {
   useEffect,
-  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
 import { breakUndoCoalescing } from '@/stores/posterStore';
+import type { EditorSurface } from './editorHistory';
+import { useEditableHistory } from './useEditableHistory';
 import { SYMBOLS, filterSymbols } from './symbols';
 import { matchSlashAtCaret } from './slashCommand';
 import { htmlToPlainText, sanitizeHtml } from './sanitizeHtml';
@@ -77,6 +84,10 @@ export interface RichTextEditorProps {
    * is clicking inside its text to position the caret.
    */
   stopPointerDown?: boolean;
+  /** The field's key in the editor's undo history (`content:<block id>`). */
+  historyKey?: string;
+  /** Which copy of the field this is; the focused copy keeps the caret after an undo. */
+  surface?: EditorSurface;
   /** data-* test hook */
   'data-testid'?: string;
 }
@@ -143,34 +154,37 @@ export function RichTextEditor({
   style,
   onSelectionChange,
   stopPointerDown,
+  historyKey,
+  surface = 'canvas',
   'data-testid': testId,
 }: RichTextEditorProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [slash, setSlash] = useState<SlashMenuState>(INITIAL_SLASH);
   const [focused, setFocused] = useState(false);
 
-  // Mount + external-value sync. Only replace innerHTML when the
-  // editor is NOT focused, so we don't clobber the user's caret
-  // while they're actively typing. When focused, we trust the
-  // DOM as the source of truth and call onChange on every input.
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (document.activeElement === el) return;
-    const sanitized = sanitizeHtml(value ?? '');
-    if (el.innerHTML !== sanitized) {
-      el.innerHTML = sanitized;
-    }
-  }, [value]);
+  // Mount + value sync. The editor's own typing is committed and left
+  // alone (the DOM is the source while the user types); any other change
+  // to `value` — an undo or redo, the same block edited in its other copy
+  // — is written in, focused or not, keeping the caret. Before fix 12 a
+  // focused editor skipped every write, so an undo with the caret inside
+  // left the old text on screen and the next keystroke wrote it back.
+  const history = useEditableHistory({
+    ref,
+    value: value ?? '',
+    toHtml: sanitizeHtml,
+    historyKey,
+    surface,
+  });
 
+  // Sanitize on every commit so execCommand output doesn't leak
+  // disallowed tags into the store. The sanitizer is idempotent and fast
+  // (< 1 ms on typical block content).
+  const read = () => sanitizeHtml(ref.current?.innerHTML ?? '');
+
+  /** Commit after a change the editor made itself (a symbol, a paste). */
   const commit = () => {
-    const el = ref.current;
-    if (!el) return;
-    // Sanitize on every commit so execCommand output doesn't leak
-    // disallowed tags into the store. The sanitizer is idempotent
-    // and fast (< 1 ms on typical block content).
-    const clean = sanitizeHtml(el.innerHTML);
-    onChange(clean);
+    if (!ref.current) return;
+    history.commitValue(read(), onChange);
   };
 
   // Recompute the slash-command menu based on the caret position.
@@ -198,8 +212,8 @@ export function RichTextEditor({
     insertSymbolViaExec(symbolKey, ref, commit, setSlash);
   };
 
-  const handleInput = () => {
-    commit();
+  const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
+    history.commitInput(e.nativeEvent, read, onChange);
     recomputeSlash();
   };
 
@@ -224,6 +238,9 @@ export function RichTextEditor({
   };
 
   const handleKeyUp = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    // A caret moved by key ends the typing step (the next word typed
+    // elsewhere is undone on its own).
+    history.onCaretKey(e);
     if (
       e.key === 'ArrowLeft' ||
       e.key === 'ArrowRight' ||
@@ -253,6 +270,10 @@ export function RichTextEditor({
       html || text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
       { blockSeparator: multiline ? '<br>' : ' ' },
     );
+    // A paste is an undo step of its own: this paste event says so (the
+    // editor's document listener notes it, useEditorHistory.ts). The
+    // input event execCommand fires does not: its type is '' in Chromium
+    // and Firefox and 'insertText' in WebKit (fix 12 review, round 1).
     document.execCommand('insertHTML', false, clean);
     commit();
   };
@@ -319,6 +340,8 @@ export function RichTextEditor({
       <div
         ref={ref}
         data-testid={testId}
+        data-history-key={historyKey}
+        data-history-surface={historyKey ? surface : undefined}
         contentEditable
         suppressContentEditableWarning
         data-placeholder={placeholder}
@@ -329,7 +352,11 @@ export function RichTextEditor({
         onFocus={handleFocus}
         onBlur={handleBlur}
         onPointerDown={stopDrag}
-        onClick={recomputeSlash}
+        onClick={() => {
+          // A click that moves the caret ends the typing step.
+          history.onCaretClick();
+          recomputeSlash();
+        }}
         style={{
           outline: 'none',
           minHeight: '1em',

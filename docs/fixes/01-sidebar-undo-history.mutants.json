@@ -41,7 +41,7 @@
       "edits": [
         [
           "src/stores/posterStore.ts",
-          "const next = withUndo(state, (doc) => ({ ...doc, ...patch }), keyForThisRun(coalesceKey));",
+          "const next = withUndo(state, (doc) => ({ ...doc, ...patch }), keyForThisRun(coalesceKey), text);",
           "const next = { doc: { ...state.doc, ...patch } } as Partial<PosterStoreState>;"
         ]
       ]
@@ -321,7 +321,7 @@
       "undoes": "the no-op check compares arrays in order (an author reorder is a change)",
       "edits": [
         [
-          "src/stores/posterStore.ts",
+          "src/stores/historySteps.ts",
           "      Array.isArray(a) &&\n      Array.isArray(b) &&\n      a.length === b.length &&\n      a.every((v, i) => sameValue(v, b[i]))",
           "      Array.isArray(a) &&\n      Array.isArray(b) &&\n      a.length === b.length &&\n      a.every((v) => b.some((w) => sameValue(v, w)))"
         ]
@@ -331,7 +331,7 @@
       "undoes": "the no-op check compares array elements at all",
       "edits": [
         [
-          "src/stores/posterStore.ts",
+          "src/stores/historySteps.ts",
           "      Array.isArray(a) &&\n      Array.isArray(b) &&\n      a.length === b.length &&\n      a.every((v, i) => sameValue(v, b[i]))",
           "      Array.isArray(a) &&\n      Array.isArray(b) &&\n      a.length === b.length"
         ]
@@ -341,7 +341,7 @@
       "undoes": "the no-op check is deep (Reset to palette on an unset colour adds no step)",
       "edits": [
         [
-          "src/stores/posterStore.ts",
+          "src/stores/historySteps.ts",
           "ka.every((k) => sameValue(ra[k], rb[k]))",
           "ka.every((k) => Object.is(ra[k], rb[k]))"
         ]

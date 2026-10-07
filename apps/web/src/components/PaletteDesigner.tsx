@@ -282,7 +282,12 @@ export function PaletteDesigner({
         padding: 16,
       }}
     >
+      {/* A modal: the editor's shortcuts (undo, delete, nudge) wait while
+          it is open, and its fields keep the browser's own undo (fix 12). */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={initialName ? `Edit palette ${initialName}` : 'Create custom palette'}
         style={{
           width: '100%',
           maxWidth: 720,

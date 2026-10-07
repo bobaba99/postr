@@ -295,9 +295,23 @@ function settleScenario(name, subject) {
         await page.getByRole('button', { name: 'Fit poster to screen' }).click();
         await page.waitForTimeout(350);
         await subject.select(page);
-        // Park the pointer on the workspace, 20 px inside the canvas's top-left corner.
+        // Park the pointer on the workspace, 20 px inside the canvas's
+        // top-left corner, as record 19 measured it. (After the merge of main
+        // into fix 12 it sat at the left edge's half height for a while:
+        // fix 12's Undo / Redo buttons were drawn over that corner and took
+        // the pinch, K-settle; they are in the editor's top bar since.)
         const o = await page.locator('[data-postr-canvas-outer]').boundingBox();
         const park = { x: o.x + 20, y: o.y + 20 };
+        // Precondition: the park is the workspace itself, so a Ctrl + wheel
+        // there reaches the canvas's pinch handler (chrome drawn over the
+        // canvas would take it).
+        const parkedOn = await page.evaluate(({ x, y }) => {
+          const el = document.elementFromPoint(x, y);
+          if (el && el.closest('[data-postr-canvas-outer]') && !el.closest('#poster-canvas')) return 'workspace';
+          const named = el && el.closest('[aria-label], [title]');
+          return named ? (named.getAttribute('aria-label') || named.getAttribute('title')) : el ? el.tagName.toLowerCase() : 'nothing';
+        }, park);
+        if (parkedOn !== 'workspace') throw new Error(`precondition: the parked pointer (${Math.round(park.x)}, ${Math.round(park.y)}) is on "${parkedOn}", not the workspace`);
         const zb = async (label) => {
           const b = await page.getByRole('button', { name: label }).boundingBox();
           await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
