@@ -29,6 +29,8 @@ import { ACK_REFERENCE_ID, withAcknowledgementReference } from '@/export/attribu
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { CropOverlay } from './CropOverlay';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
+import { TableCellEditor } from './TableCellEditor';
+import { onHistoryButtons } from './editorHistory';
 import {
   DEFAULT_TABLE_DATA,
   deleteColAt,
@@ -676,9 +678,11 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
     if (selectedRow === null && selectedCol === null) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-      // Don't hijack keystrokes aimed at an editable element
+      // Don't hijack keystrokes aimed at an editable element, or pressed
+      // on the Undo / Redo button (fix 12 review R3-F1).
       const target = e.target as HTMLElement | null;
       if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+      if (onHistoryButtons(target)) return;
       e.preventDefault();
       if (selectedRow !== null && data.rows > 1) {
         commit(deleteRowAt(data, selectedRow));
@@ -704,6 +708,8 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
       if (e.key !== 'Delete' && e.key !== 'Backspace') return;
       const target = e.target as HTMLElement | null;
       if (target?.isContentEditable || target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
+      // Not from the Undo / Redo button either (fix 12 review R3-F1).
+      if (onHistoryButtons(target)) return;
       e.preventDefault();
       const r0 = Math.min(rangeStart.r, rangeEnd.r);
       const r1 = Math.max(rangeStart.r, rangeEnd.r);
@@ -1021,11 +1027,10 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
                     userSelect: isMultiCellRange ? 'none' : 'auto',
                   }}
                 >
-                  <div
-                    contentEditable
-                    suppressContentEditableWarning
-                    dangerouslySetInnerHTML={{ __html: data.cells[r * data.cols + c] ?? '' }}
-                    onInput={(e) => updateCellValue(r, c, e.currentTarget.innerHTML)}
+                  <TableCellEditor
+                    html={data.cells[r * data.cols + c] ?? ''}
+                    historyKey={`cell:${block.id}:${r * data.cols + c}`}
+                    onCommit={(html) => updateCellValue(r, c, html)}
                     onFocus={() => {
                       setActiveCell({ r, c });
                       // Focusing a cell clears any whole-row/col
@@ -1043,7 +1048,6 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
                     }}
                     onBlur={() => setActiveCell((prev) => prev?.r === r && prev?.c === c ? null : prev)}
                     onKeyDown={(e) => onCellKeyDown(e, r, c)}
-                    onPointerDown={(e) => e.stopPropagation()}
                     style={{
                       outline: 'none',
                       width: '100%',
@@ -2121,6 +2125,7 @@ export function BlockFrame(props: BlockFrameProps) {
           <RichTextEditor
             value={b.content}
             onChange={(v) => update({ content: v })}
+            historyKey={`content:${b.id}`}
             placeholder="Poster Title"
             multiline={false}
             stopPointerDown
@@ -2163,6 +2168,7 @@ export function BlockFrame(props: BlockFrameProps) {
             <RichTextEditor
               value={b.content}
               onChange={(v) => update({ content: v })}
+              historyKey={`content:${b.id}`}
               placeholder="Section Heading"
               multiline={false}
               stopPointerDown
@@ -2183,6 +2189,7 @@ export function BlockFrame(props: BlockFrameProps) {
           <RichTextEditor
             value={b.content}
             onChange={(v) => update({ content: v })}
+            historyKey={`content:${b.id}`}
             multiline
             stopPointerDown
             onSelectionChange={setSelectionInfo}

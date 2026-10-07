@@ -3,12 +3,23 @@
  *
  * Single source of truth for the in-memory PosterDoc currently being
  * edited. All mutations are immutable. Undo/redo snapshots the `doc`
- * field on every change, maintaining two stacks capped at 50 entries.
+ * field on every change, maintaining two stacks capped at
+ * UNDO_HISTORY_LIMIT (100) entries. What one step is lives in
+ * historySteps.ts (text by word, docs/fixes/12-one-undo-history.md).
  */
 import { create } from 'zustand';
 import { filterDeletable, preserveLocked } from '@/export/blockLock';
 import { ACK_BLOCK_ID, ensureAckBlock, replaceAckBlock } from '@/export/ackBlock';
 import { withUsableSheetSize } from '@/poster/constants';
+import {
+  classifyTextEdit,
+  continuesTextStep,
+  sameValue,
+  singleStringChange,
+  textFieldOfBlockPatch,
+  type TextEdit,
+} from './historySteps';
+import { browserHistoryNow, compositionEditNow, ownStepNow, typedNow, typedOverSelection, typedWordStart } from './inputHint';
 import type {
   Block,
   Palette,
@@ -17,7 +28,12 @@ import type {
   TypeStyle,
 } from '@postr/shared';
 
-const MAX_HISTORY = 50;
+/**
+ * How many steps undo and redo each keep. The plan's accepted value (fix
+ * plan, 2026-09-27); the About page states it.
+ */
+export const UNDO_HISTORY_LIMIT = 100;
+const MAX_HISTORY = UNDO_HISTORY_LIMIT;
 
 export interface SetPosterOptions {
   /**
@@ -37,8 +53,8 @@ export interface SetPosterOptions {
    * Images put into the poster go into this user's storage folder, not the
    * folder of whoever the session names at that moment (another account's
    * sign-in in another tab replaces the session before this tab hears of
-   * it; docs/fixes/23-new-poster-owner-only.md). A version of the same
-   * poster restored keeps it; another poster loaded without one clears it.
+   * it; docs/fixes/23-new-poster-owner-only.md). The same poster loaded again
+   * without one (Import over it) keeps it; another poster clears it.
    */
   ownerId?: string;
 }
@@ -74,6 +90,14 @@ export interface PosterStoreState {
    * no step.
    */
   patchDoc: (patch: Partial<PosterDoc>, coalesceKey?: string | null) => void;
+  /**
+   * Put a saved version's document in place as ONE undoable step (owner
+   * decision 6, fix 12): ⌘Z returns to the poster as it was, and the
+   * history before it is kept. The poster's id, owner and display name
+   * stay; a version with no usable size takes `sizeFallback`'s; the
+   * locked blocks follow the same rule as undo (`restoreFromHistory`).
+   */
+  restoreVersion: (doc: PosterDoc, options?: { sizeFallback?: SetPosterOptions['sizeFallback'] }) => void;
   addBlock: (block: Block) => void;
   updateBlock: (id: string, patch: Partial<Block>) => void;
   removeBlock: (id: string) => void;
@@ -92,8 +116,10 @@ export interface PosterStoreState {
   setBlocks: (blocks: Block[]) => void;
   /** Set blocks without pushing to undo — for drag intermediates. */
   setBlocksSilent: (blocks: Block[]) => void;
-  undo: () => void;
-  redo: () => void;
+  /** Undo one step; false when there was nothing to undo. */
+  undo: () => boolean;
+  /** Redo one step; false when there was nothing to redo. */
+  redo: () => boolean;
 }
 
 // Internal stacks — kept outside Zustand to avoid triggering
@@ -134,9 +160,11 @@ const COALESCE_MAX_MS = 5_000;
 /**
  * The burst currently being coalesced, if any. `key` identifies WHAT is
  * being edited, so typing in one block cannot merge with typing in
- * another.
+ * another. `text` is the kind of the last text edit in it, for a text
+ * field (historySteps.ts); null for every other edit, which is grouped by
+ * the time windows above.
  */
-let lastPush: { key: string; at: number; startedAt: number } | null = null;
+let lastPush: { key: string; at: number; startedAt: number; text: TextEdit['kind'] | null } | null = null;
 
 /** End the current burst, so the next edit starts a fresh undo entry. */
 export function breakUndoCoalescing() {
@@ -178,20 +206,26 @@ function keyForThisRun(requested: string | null): string {
  * Raising the cap alone does not fix it: 78 keystrokes would still burn
  * 78 entries. The cap is the amplifier; the push rate is the defect.
  */
-function pushUndo(doc: PosterDoc, coalesceKey?: string) {
+function pushUndo(doc: PosterDoc, coalesceKey?: string, text?: TextEdit) {
   const now = Date.now();
-  const inBurst =
+  const sameThing =
     coalesceKey !== undefined &&
     lastPush !== null &&
     lastPush.key === coalesceKey &&
-    now - lastPush.at < COALESCE_IDLE_MS &&
-    now - lastPush.startedAt < COALESCE_MAX_MS &&
     // Nothing to coalesce ONTO if the stack is empty — the first push
     // must always land, or the burst would have no undo point at all.
     undoStack.length > 0;
+  const inBurst =
+    sameThing &&
+    (text
+      ? // Text: by word, whatever the pauses (historySteps.ts).
+        continuesTextStep(lastPush!.text, text)
+      : lastPush!.text === null &&
+        now - lastPush!.at < COALESCE_IDLE_MS &&
+        now - lastPush!.startedAt < COALESCE_MAX_MS);
 
   if (inBurst) {
-    lastPush = { ...lastPush!, at: now };
+    lastPush = { ...lastPush!, at: now, text: text?.kind ?? null };
     // Still a new branch: redo cannot survive a fresh edit.
     redoStack = [];
     return;
@@ -200,7 +234,9 @@ function pushUndo(doc: PosterDoc, coalesceKey?: string) {
   undoStack = [...undoStack, doc].slice(-MAX_HISTORY);
   redoStack = [];
   lastPush =
-    coalesceKey === undefined ? null : { key: coalesceKey, at: now, startedAt: now };
+    coalesceKey === undefined
+      ? null
+      : { key: coalesceKey, at: now, startedAt: now, text: text?.kind ?? null };
 }
 
 /**
@@ -223,9 +259,14 @@ function withUndo(
   state: PosterStoreState,
   fn: (doc: PosterDoc) => PosterDoc,
   coalesceKey?: string,
+  text?: TextEdit,
 ): Partial<PosterStoreState> {
-  if (!state.doc) return {};
-  pushUndo(state.doc, coalesceKey);
+  // Not an edit: the browser's own undo or redo changed a field with no
+  // beforeinput to cancel first (Chromium's and Firefox's execCommand). It
+  // never reaches the poster (owner decision 1, fix 12 review R1-F3); a
+  // controlled field is put back by React when its change is refused.
+  if (!state.doc || browserHistoryNow()) return {};
+  pushUndo(state.doc, coalesceKey, text);
   return {
     doc: fn(state.doc),
     canUndo: true,
@@ -252,31 +293,6 @@ function restoreFromHistory(current: PosterDoc, target: PosterDoc): PosterDoc {
 }
 
 /**
- * Deep equality by value, ignoring key order and treating an `undefined`
- * field as absent (as JSON does). Key order matters here because Postgres
- * jsonb does not keep it: a palette loaded from the database can list the
- * same colours in a different order from the catalog entry a click builds,
- * and a `JSON.stringify` comparison called that a change.
- */
-function sameValue(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
-  if (Array.isArray(a) || Array.isArray(b)) {
-    return (
-      Array.isArray(a) &&
-      Array.isArray(b) &&
-      a.length === b.length &&
-      a.every((v, i) => sameValue(v, b[i]))
-    );
-  }
-  const ra = a as Record<string, unknown>;
-  const rb = b as Record<string, unknown>;
-  const keys = (r: Record<string, unknown>) => Object.keys(r).filter((k) => r[k] !== undefined);
-  const ka = keys(ra);
-  return ka.length === keys(rb).length && ka.every((k) => sameValue(ra[k], rb[k]));
-}
-
-/**
  * True when every field in `patch` already holds that value — clicking the
  * option that is already selected. Compared by value because the sidebar
  * rebuilds objects (`{ ...headingStyle, border }`) on every click.
@@ -286,12 +302,41 @@ function changesNothing(doc: PosterDoc, patch: Partial<PosterDoc>): boolean {
 }
 
 /**
- * True for the patch a text editor emits on every `input`: content and
- * nothing else. Anything wider is a deliberate edit, not a keystroke.
+ * A keyed sidebar edit that is typing in one string (an author's name), so
+ * it is grouped by word like the canvas, or a paste into one (a step of its
+ * own). Undefined for anything else — a number, a list, a colour picked —
+ * which keeps the time windows. Only the browser can tell typing from a
+ * colour picked one hex digit later ('#112233' → '#112234' reads as a typed
+ * letter): it fires `beforeinput` for typing and a paste, and none for a
+ * colour input (fix 12 review R1-F1; stores/inputHint.ts).
  */
-function isKeystrokePatch(patch: Partial<Block>): boolean {
-  const keys = Object.keys(patch);
-  return keys.length === 1 && keys[0] === 'content';
+function textEditOfDocPatch(doc: PosterDoc, patch: Partial<PosterDoc>): TextEdit | undefined {
+  if (!typedNow() && !ownStepNow()) return undefined;
+  const keys = (Object.keys(patch) as Array<keyof PosterDoc>).filter((k) => !sameValue(patch[k], doc[k]));
+  if (keys.length !== 1) return undefined;
+  const change = singleStringChange(doc[keys[0]!], patch[keys[0]!]);
+  return change ? textEdit(change.before, change.after) : undefined;
+}
+
+/**
+ * Classify a text change, with what the browser said about it first
+ * (stores/inputHint.ts): a composition's edits (an input method, a dead
+ * key) are typing that continues the step its first edit began, whatever
+ * each update replaced (fix 12 review R2-F1); a paste, a drop, a cut or a
+ * deleted selection is a step of its own; a letter typed over a selection
+ * starts a new step, even where the text alone reads as a deletion ("Jane
+ * Doe" → "J"); and a typed letter starts a word when the character before
+ * the caret is a space, even where the text alone cannot say where it went
+ * ("the dog" → "the ddog").
+ */
+function textEdit(before: string, after: string): TextEdit {
+  const composed = compositionEditNow();
+  if (composed) return { kind: 'type', startsWord: composed.startsWord };
+  if (ownStepNow()) return { kind: 'other', startsWord: false };
+  if (typedOverSelection()) return { kind: 'type', startsWord: true };
+  const edit = classifyTextEdit(before, after);
+  const word = typedWordStart();
+  return edit.kind === 'type' && word !== null ? { kind: 'type', startsWord: word } : edit;
 }
 
 export const usePosterStore = create<PosterStoreState>((set) => ({
@@ -348,7 +393,10 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
       // Not an edit: no undo step, and a guest who changed nothing is not
       // asked to confirm leaving (useLeaveGuard arms on canUndo).
       if (changesNothing(state.doc, patch)) return {};
-      const next = withUndo(state, (doc) => ({ ...doc, ...patch }), keyForThisRun(coalesceKey));
+      // Only an edit that fires on every keystroke passes a key; a text one
+      // is grouped by word (historySteps.ts).
+      const text = coalesceKey !== null ? textEditOfDocPatch(state.doc, patch) : undefined;
+      const next = withUndo(state, (doc) => ({ ...doc, ...patch }), keyForThisRun(coalesceKey), text);
       // Keep the locked-block baseline in step with the edited doc, as
       // setPoster did on this path before. It matters when a size change
       // DROPS the credit mark for lack of room: the guard restores a locked
@@ -362,6 +410,16 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
       return next;
     }),
 
+  restoreVersion: (doc, options = {}) =>
+    set((state) => {
+      if (!state.doc) return {};
+      const restored = restoreFromHistory(state.doc, withUsableSheetSize(doc, options.sizeFallback));
+      // Restoring the version already on screen is not an edit.
+      if (sameValue(restored, state.doc)) return {};
+      // Like undo and redo, it leaves the locked baseline alone.
+      return withUndo(state, () => restored);
+    }),
+
   addBlock: (block) =>
     set((state) =>
       withUndo(state, (doc) => ({
@@ -371,19 +429,30 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
     ),
 
   updateBlock: (id, patch) =>
-    set((state) =>
-      withUndo(
+    set((state) => {
+      const block = state.doc?.blocks.find((b) => b.id === id);
+      if (!state.doc || !block) return {};
+      // Not an edit: an input that changes nothing (a browser's own undo
+      // firing over text the editor already restored) must not add a step,
+      // or it wipes the redo (fix 12, U10).
+      const keys = Object.keys(patch) as Array<keyof Block>;
+      if (keys.every((k) => sameValue(patch[k], block[k]))) return {};
+      // A patch to ONE text field (the content, one table cell, the
+      // caption, the note) is typing, grouped by word under that field's
+      // key. Any other patch — one that also moves or resizes, a slider,
+      // a table's rows — is a discrete act with its own entry, so a drag
+      // landing mid-burst is never swallowed by it.
+      const field = textFieldOfBlockPatch(block, patch);
+      return withUndo(
         state,
         (doc) => ({
           ...doc,
           blocks: doc.blocks.map((b) => (b.id === id ? { ...b, ...patch } : b)),
         }),
-        // Only a content-only patch is a keystroke. A patch that also
-        // moves or resizes is a discrete act and keeps its own entry —
-        // otherwise a drag landing mid-burst would be swallowed by it.
-        isKeystrokePatch(patch) ? `content:${id}` : undefined,
-      ),
-    ),
+        field?.key,
+        field ? textEdit(field.before, field.after) : undefined,
+      );
+    }),
 
   // Locked blocks refuse deletion here too, not only at the UI call
   // sites. `removeBlock` is a public store action — anything holding
@@ -474,9 +543,11 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
   // Both directions also end any edit in progress: without that, the
   // next keystroke into the same field joined the undone burst, and the
   // following undo went one step too far.
-  undo: () =>
+  undo: () => {
+    let applied = false;
     set((state) => {
       if (undoStack.length === 0 || !state.doc) return {};
+      applied = true;
       redoStack = [...redoStack, state.doc].slice(-MAX_HISTORY);
       const prev = undoStack[undoStack.length - 1]!;
       undoStack = undoStack.slice(0, -1);
@@ -491,11 +562,15 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
         canUndo: undoStack.length > 0,
         canRedo: true,
       };
-    }),
+    });
+    return applied;
+  },
 
-  redo: () =>
+  redo: () => {
+    let applied = false;
     set((state) => {
       if (redoStack.length === 0 || !state.doc) return {};
+      applied = true;
       undoStack = [...undoStack, state.doc].slice(-MAX_HISTORY);
       const next = redoStack[redoStack.length - 1]!;
       redoStack = redoStack.slice(0, -1);
@@ -505,5 +580,7 @@ export const usePosterStore = create<PosterStoreState>((set) => ({
         canUndo: true,
         canRedo: redoStack.length > 0,
       };
-    }),
+    });
+    return applied;
+  },
 }));

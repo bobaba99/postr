@@ -83,7 +83,10 @@ export function FigureTab({
   const chartHasSeries =
     selectedChartSpec !== null && distinctSeries(selectedChartSpec).length >= 2;
   return (
-    <div>
+    // The checker's code box, its preview size and Make's table are not
+    // the poster: their text fields keep the browser's own undo, and the
+    // editor's history never reaches them (fix 12).
+    <div data-own-undo>
       {/* Per-chart palette control — contextual to the current
           selection, so it sits above the make/check modes and shows
           only when a multi-series chart block is selected. Recolours

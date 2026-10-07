@@ -24,13 +24,6 @@ import type { SelectionInfo } from './RichTextEditor';
 import { SHARING_ENABLED } from '@/config/features';
 
 /**
- * Wrap the current selection in a `<span style="font-size: 1.06em">`
- * (or 0.94em for shrink) so repeated presses compound smoothly at
- * ~6% per press. Falls back to `execCommand('fontSize')` for
- * selections that cross element boundaries — `surroundContents`
- * throws in that case and we catch it.
- */
-/**
  * Compute the plain-text character offset of `node` + `offset` within
  * `root.textContent`. Used to translate a DOM Range into stable
  * offsets for comment text anchors. Returns -1 if `node` is outside
@@ -86,22 +79,6 @@ function startCommentOnSelection() {
       detail: { blockId, start, end, quote },
     }),
   );
-}
-
-function bumpFontSize(direction: 1 | -1) {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return;
-  const range = selection.getRangeAt(0);
-  if (range.collapsed) return;
-  const span = document.createElement('span');
-  span.style.fontSize = direction > 0 ? '1.06em' : '0.94em';
-  try {
-    range.surroundContents(span);
-  } catch {
-    // Range crosses element boundaries — fall back to the legacy
-    // command. Coarser, but better than nothing.
-    document.execCommand('fontSize', false, direction > 0 ? '4' : '3');
-  }
 }
 
 export interface FloatingFormatToolbarProps {
@@ -231,7 +208,16 @@ function colorSwatch(
  *    - `FloatingFormatToolbar` (portal-positioned above the selection)
  *    - The Edit-tab sidebar panel (always visible above the
  *      RichTextEditor so users don't have to make a selection
- *      first to see lists / alignment / colors)
+ *      first to see lists / colors)
+ *
+ *  No text size (A+ / A−) and no alignment (owner decision of
+ *  2026-10-06, fix 12): neither ever reached the poster. A+ wrapped the
+ *  selection without an input event, so nothing was stored or undoable,
+ *  and the sanitizer keeps only `color` and `background-color`, so a
+ *  size or an alignment was dropped by the next keystroke's save
+ *  (MEASURED by the item 12 reproducer, 3 of 3 engines; record
+ *  docs/fixes/12-one-undo-history.md). Text size is the Edit tab's Font
+ *  size field (per text level); headings' alignment is Style › Headings.
  *
  *  Active-format highlighting requires a `formats` object — when it's
  *  null (no selection), buttons render unpressed but stay clickable;
@@ -261,21 +247,6 @@ export function FormatToolbarButtons({
         <div style={divider} />
 
         {/*
-          Text alignment triad — left / center / right. `justifyLeft`
-          etc. are deprecated execCommand IDs, but along with
-          `bold` / `italic` they're the cross-browser baseline we
-          already depend on. Alignment applies to the block the
-          caret is inside, not the selected span — that's fine for
-          one-line titles, headings, and simple paragraphs (which is
-          what academic posters use these for).
-        */}
-        {cmdButton('⟸', 'justifyLeft', false, onChange, { fontSize: 12 })}
-        {cmdButton('≡', 'justifyCenter', false, onChange, { fontSize: 16 })}
-        {cmdButton('⟹', 'justifyRight', false, onChange, { fontSize: 12 })}
-
-        <div style={divider} />
-
-        {/*
           List + indent controls. `insertUnorderedList` /
           `insertOrderedList` toggle list formatting on the block
           containing the caret; `indent` / `outdent` nest or unnest
@@ -288,51 +259,6 @@ export function FormatToolbarButtons({
         {cmdButton('1.', 'insertOrderedList', false, onChange, { fontSize: 11, fontWeight: 600 })}
         {cmdButton('⇥', 'indent', false, onChange, { fontSize: 14 })}
         {cmdButton('⇤', 'outdent', false, onChange, { fontSize: 14 })}
-
-        <div style={divider} />
-
-        {/*
-          Inline font-size bump — small increments (~6 %/press).
-
-          `execCommand('fontSize', …)` takes a 1–7 legacy scale,
-          which jumps ~25 % per step and looks like a different
-          typeface entirely after one click. Instead we grab the
-          current selection range directly, wrap it in a span
-          with `font-size: 1.06em` (or `0.94em` for shrink), and
-          let the browser compose sizes multiplicatively as the
-          user taps. Repeated presses compound smoothly, which
-          matches Figma / Canva's "A+ / A−" feel.
-
-          `surroundContents` throws when the range crosses
-          element boundaries (e.g. the selection starts inside a
-          `<b>` and ends outside it). The catch falls back to
-          `execCommand('fontSize')` for those edge cases so the
-          user still gets SOME effect instead of nothing.
-        */}
-        <button
-          type="button"
-          title="Smaller"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            bumpFontSize(-1);
-            onChange?.();
-          }}
-          style={{ ...btnBase, width: 28, fontSize: 11 }}
-        >
-          A−
-        </button>
-        <button
-          type="button"
-          title="Larger"
-          onMouseDown={(e) => {
-            e.preventDefault();
-            bumpFontSize(1);
-            onChange?.();
-          }}
-          style={{ ...btnBase, width: 28, fontSize: 14 }}
-        >
-          A+
-        </button>
 
         <div style={divider} />
 

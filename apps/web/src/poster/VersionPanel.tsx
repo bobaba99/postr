@@ -141,7 +141,8 @@ export function VersionPanel({ posterId, draftScope = null, onSaveVersion, onRes
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    // The version name is not the poster: it keeps the browser's own undo (fix 12).
+    <div data-own-undo style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#e2e2e8' }}>
           Versions ({versions.length})

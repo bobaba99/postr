@@ -934,6 +934,8 @@ export function LayoutTab(props: {
       <div style={labelStyle}>Poster Name</div>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
         <input
+          // Not the poster until saved: keeps the browser's own undo (fix 12).
+          data-own-undo
           value={localTitle}
           aria-label="Poster name"
           onChange={(e) => {
@@ -1884,6 +1886,8 @@ function AuthorManager(props: {
           Paste author list
         </div>
         <textarea
+          // A draft until parsed: keeps the browser's own undo (fix 12).
+          data-own-undo
           value={pasteText}
           onChange={(e) => setPasteText(e.target.value)}
           placeholder={
@@ -2175,6 +2179,8 @@ function RefsTab(props: {
         number in front of each entry.
       </p>
       <textarea
+        // A draft until parsed: keeps the browser's own undo (fix 12).
+        data-own-undo
         value={pasteText}
         onChange={(e) => setPasteText(e.target.value)}
         placeholder={
@@ -2227,7 +2233,8 @@ function RefsTab(props: {
       </div>
 
       <div style={{ ...labelStyle, marginTop: 28 }}>Manual Entry</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* A draft until added: keeps the browser's own undo (fix 12). */}
+      <div data-own-undo style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <input
           value={manual.authors}
           onChange={(e) => setManual({ ...manual, authors: e.target.value })}
@@ -2561,6 +2568,8 @@ function StyleTab(props: {
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <input
+          // A preset's name, not the poster: keeps the browser's own undo (fix 12).
+          data-own-undo
           value={props.presetName}
           onChange={(e) => props.setPresetName(e.target.value)}
           placeholder="e.g. Smith Lab Green"
@@ -3952,8 +3961,8 @@ function TextBlockEditor(props: {
           same bold/italic/underline/strike/highlight/color/slash
           commands as the canvas inline editor.
           A docked format toolbar sits ABOVE the editor so users see
-          the formatting affordances (bold, italic, lists, alignment,
-          colors) without first making a selection. The floating
+          the formatting affordances (bold, italic, lists, colors)
+          without first making a selection. The floating
           toolbar still appears for selection-relative actions on the
           canvas. */}
       <div>
@@ -3978,6 +3987,8 @@ function TextBlockEditor(props: {
           <RichTextEditor
             value={block.content}
             onChange={(v) => onUpdateBlock(block.id, { content: v })}
+            historyKey={`content:${block.id}`}
+            surface="sidebar"
             placeholder="Type here… (type / for symbols)"
             // Was hardcoded true for EVERY block type. The canvas
             // editors already pass `multiline={false}` for titles and

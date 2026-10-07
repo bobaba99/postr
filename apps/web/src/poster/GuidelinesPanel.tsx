@@ -551,7 +551,9 @@ export function GuidelinesPanel({ open, onToggle }: { open: boolean; onToggle: (
   void open;
 
   return (
-    <div data-postr-guidelines style={panelStyle}>
+    // The checklist and the note are not the poster: their fields keep the
+    // browser's own undo (fix 12).
+    <div data-postr-guidelines data-own-undo style={panelStyle}>
       <div style={{ padding: '20px 20px 12px', borderBottom: '1px solid #1f1f2e', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.2, color: '#9ca3af' }}>

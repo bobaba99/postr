@@ -110,7 +110,8 @@ const MILESTONES: Milestone[] = [
     // Share links are deactivated with comments (config/features.ts), so the
     // card no longer offers them (fix 23).
     //
-    // Undo keeps MAX_HISTORY (50) steps (stores/posterStore.ts). PowerPoint
+    // Undo keeps UNDO_HISTORY_LIMIT (100) steps (stores/posterStore.ts;
+    // fix 12, docs/fixes/12-one-undo-history.md). PowerPoint
     // and LaTeX need a term or a pack credit (usePlan canExport). The PPTX
     // and LaTeX writers have no case for chart blocks, so the card names
     // what they do carry. references.bib ships only when the poster has
@@ -118,7 +119,7 @@ const MILESTONES: Milestone[] = [
     id: 'ship',
     title: 'Iterate, export, print',
     body:
-      'Undo and redo up to 50 steps. Save a PDF for free. PowerPoint and LaTeX exports are paid: PowerPoint keeps text, images and tables editable, and LaTeX gives you a poster.tex for XeLaTeX with your images, plus a references.bib when the poster has references. Charts made in Postr are not included.',
+      'Undo and redo up to 100 steps. Save a PDF for free. PowerPoint and LaTeX exports are paid: PowerPoint keeps text, images and tables editable, and LaTeX gives you a poster.tex for XeLaTeX with your images, plus a references.bib when the poster has references. Charts made in Postr are not included.',
   },
 ];
 
