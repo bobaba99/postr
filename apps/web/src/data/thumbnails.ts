@@ -10,6 +10,7 @@
  * Both generate a JPEG of #poster-canvas via html-to-image and upload
  * it to the poster-assets Storage bucket.
  */
+import { stripEditorChrome } from '@/export/stripEditorChrome';
 import { toCanvas } from 'html-to-image';
 import { supabase } from '@/lib/supabase';
 
@@ -78,33 +79,11 @@ export async function capturePosterJpeg(opts: {
     clone.style.left = '0';
     clone.style.top = '0';
 
-    // Strip editor-only chrome from the clone so the captured
-    // image looks like the printed poster, not the live edit
-    // surface. Without this, a selected block would appear in the
-    // capture with its resize handles, move/delete pills,
-    // and accent border baked in.
-    //
-    // Selectors mirror the data attributes set by:
-    //   - resizeHandles.tsx → [data-postr-resize-handle]
-    //   - blocks.tsx top handle row, GroupFrame, SelectionRect,
-    //     FigureSizeOverlay → [data-postr-selection-ui]
-    //   - the grid / ruler overlays → [data-postr-overlay]
-    clone
-      .querySelectorAll(
-        '[data-postr-resize-handle], [data-postr-selection-ui], [data-postr-overlay]',
-      )
-      .forEach((el) => el.remove());
-
-    // Reset the selected-block border back to its unselected state
-    // (1px transparent matches the inline style on non-selected
-    // blocks). The block frame is tagged when selected via
-    // data-postr-selected so we can find it without re-deriving the
-    // selection from React state.
-    clone
-      .querySelectorAll<HTMLElement>('[data-postr-selected="true"]')
-      .forEach((el) => {
-        el.style.border = '1px solid transparent';
-      });
+    // Strip editor-only chrome from the clone so the captured image
+    // looks like the printed poster, not the live edit surface: a selected
+    // block's resize handles, handle row and accent border, the grid and
+    // the rulers (shared with "⎙ Save PDF").
+    stripEditorChrome(clone);
 
     const wrapper = document.createElement('div');
     wrapper.style.cssText =

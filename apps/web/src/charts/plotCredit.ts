@@ -9,7 +9,9 @@
  * Design (approved via visual companion, 2026-08-06):
  *   - 11px, flush RIGHT, purple ink (#7c6aed), zero padding — the least
  *     attention-grabbing treatment. Smaller and lighter than any real
- *     chart text (ticks ≥18pt, titles ≥24pt), so it can never read as data.
+ *     chart text (ticks ≥14pt, titles ≥18pt, the canonical minimums the
+ *     chart never draws below; charts/chartLayout.ts), so it can never
+ *     read as data.
  *   - the small square mark (shared brand geometry) sits after the text.
  *   - it lives in ADDED canvas below the plot; the plot area (width, bars,
  *     ticks, labels) is untouched, so data readability cannot regress.

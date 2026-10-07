@@ -81,6 +81,7 @@ import {
 import { snap } from './snap';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
 import { buildPrintDocument } from '@/export/printDocument';
+import { stripEditorChrome } from '@/export/stripEditorChrome';
 import { useHasPosterScript } from './figureScriptDraft';
 
 // =========================================================================
@@ -2340,13 +2341,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     const canvas = document.getElementById('poster-canvas');
     if (!canvas) return;
 
-    // Deep-clone and strip editor overlays. Grid and ruler are marked
-    // with `data-postr-overlay` so we can pull them out cleanly
-    // without touching user-added SVG content inside blocks.
+    // Deep-clone and strip the editor's chrome: the grid and ruler
+    // overlays, and a selected block's handles, handle row and accent
+    // border (a block just inserted is selected, and clicking the Export
+    // tab does not deselect it; fix 13c review Q-R5). Marked with data
+    // attributes, so user-added SVG content inside blocks is untouched.
     const clone = canvas.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll('[data-postr-overlay]').forEach((el) => {
-      el.parentNode?.removeChild(el);
-    });
+    stripEditorChrome(clone);
     // Reset the editor's zoom-slider transform on the clone itself —
     // we scale via `zoom` in the print window instead.
     clone.style.transform = '';

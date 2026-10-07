@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { Block } from '@postr/shared';
 import { PX } from './constants';
+import { FIGURE_TEXT_MIN_PT, figureTextStatus } from './figureTextMinimums';
 import {
   parseRCode,
   parsePythonCode,
@@ -1016,13 +1017,17 @@ export function ReadabilityPanel({
 // user doesn't have the original plotting code to paste.
 // ──────────────────────────────────────────────────────────────────────
 
+// The canonical minimums for figure text, the code check's too
+// (figureTextMinimums.ts). The scan cannot tell legend titles or strips
+// apart, so in-panel data labels and other text take the tick-label minimum,
+// as they did when this table had its own numbers (24/24/18, warning at 75%).
 const MIN_PT_BY_ROLE: Record<ScanRegion['role'], number> = {
-  title: 24,
-  'axis-title': 24,
-  'axis-tick': 18,
-  legend: 18,
-  data: 18,
-  other: 18,
+  title: FIGURE_TEXT_MIN_PT.plotTitle,
+  'axis-title': FIGURE_TEXT_MIN_PT.axisTitle,
+  'axis-tick': FIGURE_TEXT_MIN_PT.axisText,
+  legend: FIGURE_TEXT_MIN_PT.legendText,
+  data: FIGURE_TEXT_MIN_PT.axisText,
+  other: FIGURE_TEXT_MIN_PT.axisText,
 };
 
 function computeImageReadability(
@@ -1049,12 +1054,8 @@ function computeImageReadability(
   const regions: ScanRegion[] = raw.regions.map((r) => {
     const heightIn = r.bbox.h * printScale;
     const effectivePt = heightIn * 72;
-    const minPt = MIN_PT_BY_ROLE[r.role] ?? 18;
-    let status: ScanRegion['status'];
-    if (effectivePt >= minPt) status = 'pass';
-    else if (effectivePt >= minPt * 0.75) status = 'warn';
-    else status = 'fail';
-    return { ...r, effectivePt, status, minPt };
+    const minPt = MIN_PT_BY_ROLE[r.role] ?? MIN_PT_BY_ROLE.other;
+    return { ...r, effectivePt, status: figureTextStatus(effectivePt, minPt), minPt };
   });
 
   return {
