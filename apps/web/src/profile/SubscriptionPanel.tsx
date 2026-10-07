@@ -9,6 +9,10 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import type { PlanState } from '@/hooks/usePlan';
 import { openBillingPortal, requestRefund } from '@/data/billing';
+import { ApiError } from '@/lib/apiClient';
+
+const AUTOMATED_DECISION_NOTE =
+  'This answer was given automatically. To have a person review it, email support@resila.ai.';
 
 // ── SubscriptionPanel — plan state + manage/upgrade, always shown ──
 
@@ -48,6 +52,9 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
     } catch (err) {
       // Map known eligibility reasons; fall back to generic.
       const reason = (err as { body?: { error?: string } })?.body?.error;
+      // Every 409 from /billing/refund is the automated check saying no
+      // (apps/api/src/billing.ts); anything else is a failure to retry.
+      const refused = err instanceof ApiError && err.status === 409 && Boolean(reason);
       const map: Record<string, string> = {
         window_expired: 'The 14-day refund window has passed. You can cancel anytime to stop renewals.',
         already_used:
@@ -56,7 +63,14 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
             : 'This pack isn’t refundable once an export credit has been used, not even in part.',
         no_pack_purchase: 'No refundable pack purchase found.',
       };
-      setRefundMsg(reason && map[reason] ? map[reason] : 'We couldn’t process that refund. Please try again or contact support.');
+      // A refusal is a decision made only by automated processing (Privacy
+      // §7): Quebec's Law 25 s. 12.1 asks that the person be told so, and how
+      // to have a person review it, when they are told the decision.
+      setRefundMsg(
+        refused
+          ? `${(reason && map[reason]) || 'This purchase can’t be refunded here.'} ${AUTOMATED_DECISION_NOTE}`
+          : 'We couldn’t process that refund. Please try again or contact support.',
+      );
     } finally {
       setRefunding(false);
     }

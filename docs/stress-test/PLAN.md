@@ -210,8 +210,17 @@ scope becomes a plan item or a question for the owner.
   titles, axis labels, legend and figure texts only; panel letters or tick
   labels changed after the layout are not replayed (a03, a06; record 13,
   section 10).
-- **Record 24 review round 1, the refund button as an automated decision**
-  (LOW, INSPECTED; the legal reading UNVERIFIED). Privacy §7 and §10 name
+- ~~**Record 24 review round 1, the refund button as an automated decision**~~
+  FIXED 2026-10-06 (`fix/refund-review-note`): every refusal the endpoint
+  sends (a 409: `window_expired`, `already_used` for a term or a pack,
+  `no_pack_purchase`, and `no_subscription`, `no_invoice`, `no_payment`, which
+  showed the generic "try again" before and now read "This purchase can’t be
+  refunded here.") ends "This answer was given automatically. To have a person
+  review it, email support@resila.ai."; a failure that is not a 409 keeps the
+  generic message without it (`profile/__tests__/SubscriptionPanel.test.tsx`:
+  7 of 13 red on main's component, 13 of 13 after; its one review found the
+  three unmapped codes).
+  Was (LOW, INSPECTED; the legal reading UNVERIFIED). Privacy §7 and §10 name
   the self-serve refund button as the one decision made only by automated
   processing, with review by a person on request by email. Law 25 s. 12.1
   asks that the person be told so no later than when they are told the
@@ -424,12 +433,10 @@ the evidence label of each.
   shrink side by side and each label takes two lines (main's layout, kept:
   R1-01); stacking them is a design choice for the owner.
 - **From review round 1 (record 26 section 9), not changed here:**
-  (1) the French Terms §7.2 call the pricing page « Pricing », and the
-  French page is now titled « Tarifs » (legal text; owner or legal decision,
-  R1-07); (2) fix 24's `routes.json` crawler copy for `/terms/fr` and
-  `/cookies/fr` says « prélèvement » and « fonctions » where the French
-  Terms say « facturation » and « fonctionnalités » (the public pages were
-  aligned, R1-03); (3) on main already: when Supabase answers an e-mail
+  (1) and (2) FIXED in the merge of 26 (2026-10-06): the French Terms §7.2
+  now name the pricing page « Tarifs », as the French page is titled (R1-07),
+  and the `/terms/fr` and `/cookies/fr` crawler copy says « facturation » and
+  « fonctionnalités », as the French Terms do (R1-03); (3) on main already: when Supabase answers an e-mail
   sign-up with the user and `is_anonymous: false` but no session (a pending
   confirmation, if GoTrue sends that field), `Auth.tsx` skips « Check your
   inbox » and sends one create-checkout request with no session (R1-09,

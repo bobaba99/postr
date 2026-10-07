@@ -282,7 +282,7 @@ export default function TermsFr() {
           il vous est demandé de confirmer que vous voulez un accès immédiat et que
           vous comprenez que vous perdez ce droit de rétractation de 14 jours dès que
           vous effectuez une exportation payante (pour le forfait à terme) ou utilisez
-          un crédit (pour le lot). Un achat commencé depuis la page « Pricing » ne
+          un crédit (pour le lot). Un achat commencé depuis la page « Tarifs » ne
           demande pas cette confirmation. Lorsque cette confirmation n’a pas été
           obtenue, votre droit légal de 14
           jours s’applique indépendamment de l’utilisation. Rien dans la présente

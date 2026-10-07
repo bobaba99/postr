@@ -129,3 +129,40 @@ describe('SubscriptionPanel — pack refund', () => {
     expect(p.refresh).not.toHaveBeenCalled();
   });
 });
+
+describe('SubscriptionPanel — a refused refund says it was automatic (Law 25 s. 12.1)', () => {
+  // Privacy §7 names the refund button as a decision made only by automated
+  // processing; the person must be told so, and how to have a person review
+  // it, when they are told the decision (record 24's review, round 1). Every
+  // 409 the refund endpoint sends is such a refusal (apps/api/src/billing.ts
+  // /billing/refund: `409 {error: result.reason}`).
+  const PACK = { hasActiveTerm: false, credits: 2, canExport: true, subscriptionStatus: null };
+  it.each([
+    ['term', 'window_expired', /request refund/i, {}, /The 14-day refund window has passed/],
+    ['term', 'already_used', /request refund/i, {}, /This term isn’t refundable once you’ve taken a paid export/],
+    ['pack', 'already_used', /refund export pack/i, PACK, /This pack isn’t refundable once an export credit has been used/],
+    ['pack', 'no_pack_purchase', /refund export pack/i, PACK, /No refundable pack purchase found/],
+    ['term', 'no_subscription', /request refund/i, {}, /This purchase can’t be refunded here\./],
+    ['term', 'no_invoice', /request refund/i, {}, /This purchase can’t be refunded here\./],
+    ['pack', 'no_payment', /refund export pack/i, PACK, /This purchase can’t be refunded here\./],
+  ] as const)('%s refund refused for %s', async (_kind, reason, button, over, reasonText) => {
+    billing.requestRefund.mockRejectedValue(new ApiError(reason, 409, { error: reason }));
+    renderPanel(plan(over));
+
+    fireEvent.click(screen.getByRole('button', { name: button }));
+
+    const msg = await screen.findByText(/This answer was given automatically\. To have a person review it, email support@resila\.ai\./);
+    expect(msg.textContent).toMatch(reasonText);
+    expect(msg.textContent).not.toContain(reason);
+  });
+
+  it('a failure that is not a refusal (no 409) keeps the generic message, without the note', async () => {
+    billing.requestRefund.mockRejectedValue(new ApiError('server_error', 500, { error: 'server_error' }));
+    renderPanel(plan());
+
+    fireEvent.click(screen.getByRole('button', { name: /request refund/i }));
+
+    expect(await screen.findByText(/couldn’t process that refund/i)).toBeInTheDocument();
+    expect(screen.queryByText(/given automatically/i)).toBeNull();
+  });
+});
