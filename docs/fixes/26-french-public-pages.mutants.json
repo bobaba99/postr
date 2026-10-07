@@ -408,12 +408,12 @@
       ]
     },
     "warnings-python-canvas-untranslated": {
-      "undoes": "C — every engine warning has a French sentence (readabilityWarnings.ts)",
+      "undoes": "C — every engine warning has a French sentence (readabilityWarnings.ts); fix 13b retargeted it to the Python canvas warning's new shape",
       "edits": [
         [
           "src/i18n/readabilityWarnings.ts",
-          "    /^No canvas size found — assuming matplotlib default ([\\d.]+)\"×([\\d.]+)\"\\.$/,",
-          "    /^No canvas size found — assuming matplotlib default ([\\d.]+)\"×([\\d.]+)\"\\. never$/,"
+          "    /^No canvas size found — assuming matplotlib default ([\\d.]+)\"×([\\d.]+)\"; the edited script sets it\\.$/,",
+          "    /^No canvas size found — assuming matplotlib default ([\\d.]+)\"×([\\d.]+)\"; the edited script sets it\\. never$/,"
         ]
       ]
     },

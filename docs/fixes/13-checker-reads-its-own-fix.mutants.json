@@ -1,688 +1,110 @@
 {
+  "_ported": "Fix 13b (docs/fixes/13b-checker-sizes.md) replaced the code these mutants guarded: part 1's regex reader and its save-time helper (_postr_raise_text) became the rule table (readabilityPyRules.ts, readabilityPyText.ts, readabilityPyModel.ts) and plain edits (readabilityPyFix.ts). The four canvas mutants are ported to the new canvas code with the same intent; the other 59 guarded the helper, its placement and its read-back, which no longer exist, and are listed in _retired. docs/fixes/13b-checker-sizes.mutants.json guards the new code.",
+  "_retired": [
+    "cell-magic-moved",
+    "markers-exact",
+    "backslash-continuation-unread",
+    "bracket-continuation-unread",
+    "uncalled-save-skipped",
+    "multi-import-alias-missed",
+    "credit-without-helper",
+    "credit-first-block",
+    "save-added-after-fix",
+    "numbers-backtrack",
+    "no-read-back",
+    "read-back-lowers",
+    "raised-shown-as-yours",
+    "helper-minor-ticks",
+    "wrap-not-installed",
+    "shows-not-routed",
+    "show-handed-on-not-routed",
+    "no-end-call",
+    "block-found-by-markers-only",
+    "credit-with-unrouted-show",
+    "credit-without-install",
+    "save-found-in-strings",
+    "plt-not-imported-for-save",
+    "bracketed-import-unread",
+    "layout-not-replayed",
+    "crlf-continuation-unread",
+    "import-after-semicolon-unread",
+    "overlapping-undo-applied",
+    "receiver-whitespace-kept",
+    "end-call-takes-its-line",
+    "receiver-walk-unbounded",
+    "born-small",
+    "record-holds-functions",
+    "no-z-axis",
+    "bare-show-under-star-missed",
+    "bypass-credited",
+    "plt-bound-inside-function",
+    "install-def-not-undone",
+    "second-install-ignored",
+    "helper-failure-breaks-save",
+    "moved-axes-ignored",
+    "engine-change-ignored",
+    "rc-not-given-back",
+    "stale-layout-kept",
+    "legend-title-not-born",
+    "inset-axes-skipped",
+    "end-keeps-rc",
+    "own-show-routed",
+    "replay-warns",
+    "display-narrowed",
+    "own-show-top-level-only",
+    "method-show-counts-as-own",
+    "pylab-not-routed",
+    "rc-known-by-equality",
+    "hidden-tick-labels-skipped",
+    "tick-size-not-pinned",
+    "end-returns-pyplot",
+    "warning-as-error-breaks-save",
+    "adjust-refreshes-record"
+  ],
   "tests": [
     "src/poster/__tests__/readability.test.ts",
     "src/poster/__tests__/readabilityFullFix.test.ts"
   ],
   "mutants": {
     "canvas-resize-ignored": {
-      "undoes": "canvas — a set_size_inches call sets the canvas",
+      "undoes": "canvas — a set_size_inches call sets the canvas (ported by fix 13b to readabilityPyModel.ts canvasOf)",
       "edits": [
         [
-          "src/poster/readability.ts",
-          "  if (resized.length) return resized[resized.length - 1]!.size;",
-          "  if (false) return resized[resized.length - 1]!.size;"
+          "src/poster/readabilityPyModel.ts",
+          "  const resized = scan.sizes[scan.sizes.length - 1];",
+          "  const resized = scan.sizes[-1];"
         ]
       ]
     },
     "canvas-first-resize-wins": {
-      "undoes": "canvas — the last set_size_inches wins, as it does in matplotlib",
+      "undoes": "canvas — the last set_size_inches wins, as it does in matplotlib (ported by fix 13b)",
       "edits": [
         [
-          "src/poster/readability.ts",
-          "  if (resized.length) return resized[resized.length - 1]!.size;",
-          "  if (resized.length) return resized[0]!.size;"
+          "src/poster/readabilityPyModel.ts",
+          "  const resized = scan.sizes[scan.sizes.length - 1];",
+          "  const resized = scan.sizes[0];"
         ]
       ]
     },
     "canvas-rc-figure-as-own": {
-      "undoes": "canvas — rc('figure', figsize=...) is a default, not the figure's own figsize",
+      "undoes": "canvas — rc('figure', figsize=...) is a default, not the figure's own figsize (ported by fix 13b: the figure's own figsize= wins over figure.figsize)",
       "edits": [
         [
-          "src/poster/readability.ts",
-          "    .filter((f) => !inRcCall(f.at));\n",
-          "    ;\n"
+          "src/poster/readabilityPyModel.ts",
+          "  if (first?.figsize) {",
+          "  if (first?.figsize && rcState(scan, first.at).values['figure.figsize'].origin === 'default') {"
         ]
       ]
     },
     "canvas-rcparams-ignored": {
-      "undoes": "canvas — rcParams['figure.figsize'] sets the canvas when nothing else does",
+      "undoes": "canvas — rcParams['figure.figsize'] sets the canvas when nothing else does (ported by fix 13b)",
       "edits": [
         [
-          "src/poster/readability.ts",
-          "  return rc.length ? rc[rc.length - 1]!.size : null;",
-          "  return null;"
+          "src/poster/readabilityPyModel.ts",
+          "  const rc = rcState(scan, first?.at ?? END).values['figure.figsize'];",
+          "  const rc = RC_DEFAULTS['figure.figsize'];"
         ]
       ]
-    },
-    "cell-magic-moved": {
-      "undoes": "shape — a first-line cell magic stays first (round 2, R2-07)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  if (/^%%/.test(lines[at] ?? '')) at = skipBlank(at + 1);\n",
-          ""
-        ]
-      ]
-    },
-    "markers-exact": {
-      "undoes": "undo — a marker with a trailing space or a CR still marks the block (round 2, R2-03)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  const begin = lines.findIndex((l) => l.trim() === PY_HELPER_BEGIN);\n  const end = lines.findIndex((l) => l.trim() === PY_HELPER_END);",
-          "  const begin = lines.indexOf(PY_HELPER_BEGIN);\n  const end = lines.indexOf(PY_HELPER_END);"
-        ]
-      ]
-    },
-    "backslash-continuation-unread": {
-      "undoes": "finder — a show after a backslash line continuation is found (round 2, R2-06)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    if (masked[prev] === '\\\\') at = prev - 1;",
-          "    if (false) at = prev - 1;"
-        ]
-      ]
-    },
-    "bracket-continuation-unread": {
-      "undoes": "finder — a show continued on the next line inside brackets is found (round 2, R2-06)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    else if (depth[at]! > 0) at -= 1;",
-          "    else if (false) at -= 1;"
-        ]
-      ]
-    },
-    "uncalled-save-skipped": {
-      "undoes": "finder — a save handed on uncalled (save = fig.savefig) is raised (round 2, R2-06)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    if (masked[n] === '=' && masked[n + 1] !== '=') continue;",
-          "    if (masked[n] !== '(') continue;"
-        ]
-      ]
-    },
-    "multi-import-alias-missed": {
-      "undoes": "finder — pyplot imported among other modules is found (round 2, R2-06)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    for (const part of m[1]!.split(',')) {\n      const a = part.trim().match(/^matplotlib",
-          "    for (const part of m[1]!.split(',').slice(0, 1)) {\n      const a = part.trim().match(/^matplotlib"
-        ]
-      ]
-    },
-    "credit-without-helper": {
-      "undoes": "re-check — no credit when the helper's def is gone (round 2, R2-14)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  if (at < 0 || !/^def[ \\t]+_postr_raise_text\\s*\\(/m.test(masked)) return {};",
-          "  if (at < 0) return {};"
-        ]
-      ]
-    },
-    "credit-first-block": {
-      "undoes": "re-check — of two blocks, the one Python runs last is read (round 2, R2-14)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  const at = assignments.length ? assignments[assignments.length - 1]!.index : -1;",
-          "  const at = assignments.length ? assignments[0]!.index : -1;"
-        ]
-      ]
-    },
-    "save-added-after-fix": {
-      "undoes": "full fix — a save is added before the fix, so the fix raises it (round 2, R2-04)",
-      "edits": [
-        [
-          "src/poster/readabilityFullFix.ts",
-          "  return applyFontFixes(ensurePySave(code), 'python', fontSnippet);",
-          "  return ensurePySave(applyFontFixes(code, 'python', fontSnippet));"
-        ]
-      ]
-    },
-    "numbers-backtrack": {
-      "undoes": "parser — numbers are read in linear time (round 2, R2-09)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "const PY_NUM = '(?:\\\\d+(?:\\\\.\\\\d*)?|\\\\.\\\\d+)';",
-          "const PY_NUM = '\\\\d*\\\\.?\\\\d+';"
-        ]
-      ]
-    },
-    "no-read-back": {
-      "undoes": "read-back — the re-check reads the fix's own sizes (W1)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  for (const [key, pt] of Object.entries(raisedByOwnFix(code))) {",
-          "  for (const [key, pt] of Object.entries({} as Record<string, number>)) {"
-        ]
-      ]
-    },
-    "read-back-lowers": {
-      "undoes": "read-back — the re-check never reads a class lower than the script sets it",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    overrides[k] = Math.max(before, pt);",
-          "    overrides[k] = pt;"
-        ]
-      ]
-    },
-    "raised-shown-as-yours": {
-      "undoes": "read-back — a row the fix raised is not marked \"(you set this)\" (S9-13)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    if (pt > before) raisedByFix[k] = true;\n",
-          ""
-        ]
-      ]
-    },
-    "helper-minor-ticks": {
-      "undoes": "helper — minor tick labels are raised with the major ones (S9-04)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "which=\"both\"",
-          "which=\"major\"",
-          3
-        ]
-      ],
-      "expect": "survive",
-      "why": "the helper is Python: jsdom never runs it",
-      "unguarded": "TESTED in matplotlib 3.10.8 on 2026-09-30, not by a committed harness: a script with 18 labelled minor x ticks, fixed to {'axisText': 14}, saves them at 14 pt; with this mutant's text, at 10 pt. The gate's corpus has no minor tick labels (record, section 10). The shape harness does not judge minor tick labels (it lists them apart, as axisTextMinor)"
-    },
-    "wrap-not-installed": {
-      "undoes": "shape — the block installs the wrap that raises every save (round 3, R3-01)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    '_postr_install()',\n    PY_HELPER_END,",
-          "    '# _postr_install()',\n    PY_HELPER_END,"
-        ]
-      ]
-    },
-    "shows-not-routed": {
-      "undoes": "shape — each pyplot show goes through the helper",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "      if (!aliases.has(receiver.replace(/\\s+/g, ''))) continue;\n      // `del plt.show`",
-          "      continue;\n      // `del plt.show`"
-        ]
-      ]
-    },
-    "show-handed-on-not-routed": {
-      "undoes": "shape — a pyplot show handed on uncalled is routed (round 3, n20)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    const called = masked[n] === '(';\n    const dot = skipSpaceBack(masked, m.index - 1, depth);",
-          "    const called = masked[n] === '(';\n    if (!called) continue;\n    const dot = skipSpaceBack(masked, m.index - 1, depth);"
-        ]
-      ]
-    },
-    "no-end-call": {
-      "undoes": "shape — a call at the end raises every figure still open (round 3, R3-03)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  out = `${out.trimEnd()}\\n\\n_postr_raise_text(None, _POSTR_NEED, every=True, end=True)\\n`;\n",
-          ""
-        ]
-      ]
-    },
-    "block-found-by-markers-only": {
-      "undoes": "undo — an earlier block is found when its markers were edited (round 2, R2-03)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  const needAt = masked.findIndex((l) => /^_POSTR_NEED\\s*=/.test(l));\n  const defs = [/^def[ \\t]+_postr_raise_text\\b/, /^def[ \\t]+_postr_install\\b/].map((re) => masked.findIndex((l) => re.test(l)));\n  const callAt = masked.findIndex((l) => /^_postr_install\\s*\\(\\s*\\)/.test(l));",
-          "  const needAt = -1;\n  const defs = [-1, -1];\n  const callAt = -1;"
-        ]
-      ]
-    },
-    "credit-with-unrouted-show": {
-      "undoes": "re-check — no credit while a pyplot show is not routed",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  if (!pyShowSites(code, masked).every(routed)) return {};\n",
-          ""
-        ]
-      ]
-    },
-    "credit-without-install": {
-      "undoes": "re-check — no credit when the wrap is not installed",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  if (!/^def[ \\t]+_postr_install\\s*\\(/m.test(masked) || !/^_postr_install\\s*\\(\\s*\\)/m.test(masked)) return {};\n",
-          ""
-        ]
-      ]
-    },
-    "save-found-in-strings": {
-      "undoes": "full fix — only a save in live code counts as the script's save (round 2, R2-04)",
-      "edits": [
-        [
-          "src/poster/readabilityFullFix.ts",
-          "  if (/(?<![\\w])savefig\\b/.test(masked)) return code;",
-          "  if (/savefig/.test(code)) return code;"
-        ]
-      ]
-    },
-    "plt-not-imported-for-save": {
-      "undoes": "full fix — a save added to a script that never binds plt imports it (round 3, R3-04)",
-      "edits": [
-        [
-          "src/poster/readabilityFullFix.ts",
-          "${bound ? '' : 'import matplotlib.pyplot as plt\\n'}",
-          "${bound ? '' : ''}"
-        ]
-      ]
-    },
-    "bracketed-import-unread": {
-      "undoes": "finder — pyplot imported in brackets over several lines is found (round 3, R3-08)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "import[ \\t]+(?:\\(([^)]*)\\)|([^\\n;]+))/gm)) {",
-          "import[ \\t]+(?:\\((?!)([^)]*)\\)|([^\\n;]+))/gm)) {"
-        ]
-      ]
-    },
-    "layout-not-replayed": {
-      "undoes": "helper — a figure's own layout is run again when a save still had to grow a text (round 3, R3-02)",
-      "expect": "survive",
-      "why": "the helper is Python: jsdom never runs it",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#layout-not-replayed; matplotlib 3.10.8, 2026-09-30): k47's grid of text the script sized itself collides 2.07 in² and clips 0.643 in², against 0 and 0 with the fix",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "for name, args, kwargs in record[\"steps\"]:",
-          "for name, args, kwargs in ():"
-        ]
-      ]
-    },
-    "crlf-continuation-unread": {
-      "undoes": "shape — a backslash continuation before a Windows line break is crossed (round 3, R3-06)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    if (masked[prev] === '\\r') prev -= 1;\n",
-          ""
-        ]
-      ]
-    },
-    "import-after-semicolon-unread": {
-      "undoes": "shape — an import after a `;` is read (round 3, R3-06)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "masked.matchAll(/(?:^|;)[ \\t]*import[ \\t]+([^\\n;]+)/gm)",
-          "masked.matchAll(/^[ \\t]*import[ \\t]+([^\\n;]+)/gm)"
-        ]
-      ]
-    },
-    "overlapping-undo-applied": {
-      "undoes": "undo — a call nested in another is taken out once (round 3, R3-06)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "      if (e.from < at) continue;\n",
-          ""
-        ]
-      ]
-    },
-    "receiver-whitespace-kept": {
-      "undoes": "shape — a pyplot receiver written over several lines is still pyplot (round 3, R3-06)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "aliases.has(receiver.replace(/\\s+/g, ''))",
-          "aliases.has(receiver)"
-        ]
-      ]
-    },
-    "end-call-takes-its-line": {
-      "undoes": "undo — the end call goes, never code after it on its line",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "to: close + 1 + (semicolon?.[0].length ?? 0), text: ''",
-          "to: (masked.indexOf('\\n', close) + 1 || out.length + 1) - 1, text: ''"
-        ]
-      ]
-    },
-    "receiver-walk-unbounded": {
-      "undoes": "shape — the walk back from `.show` reads at most two names (round 3, R3-07)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "for (let names = 0; names < 2; names += 1) {",
-          "for (let names = 0; ; names += 1) {"
-        ]
-      ]
-    },
-    "born-small": {
-      "undoes": "helper — the sizes rcParams set are raised as each figure is made, so the script and seaborn lay the text out at its size (round 4, R4-04)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "                rcParams[name] = value",
-          "                pass"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#born-small; matplotlib 3.10.8, 2026-09-30): k10's seaborn legend over the panel 0.419 in² (0.027 with the fix), k22 and k38 colliding 0.167 and 0.177 in², k39 clipping 0.592 in²"
-    },
-    "record-holds-functions": {
-      "undoes": "helper — the layout record holds names, not functions, so the figure pickles (round 4, R4-03)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "self._postr_layout = {\"steps\": [(\"tight_layout\", args, kwargs)]",
-          "self._postr_layout = {\"steps\": [(tight, args, kwargs)]"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#record-holds-functions; matplotlib 3.10.8, 2026-09-30): k41 no longer pickles (PicklingError)"
-    },
-    "no-z-axis": {
-      "undoes": "helper — a 3D Axes' z axis is raised with the other two (round 4, R4-06)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          ", (\"z\", getattr(ax, \"zaxis\", None))",
-          ""
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#no-z-axis; matplotlib 3.10.8, 2026-09-30): k50's and f28's z labels stay at 8 pt against a need of 20, shown passing on the re-check"
-    },
-    "bare-show-under-star-missed": {
-      "undoes": "shape — a bare show() under `from matplotlib.pyplot import *` is routed (round 4, R4-07)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "import[ \\t]+(?:\\*|[^\\n]*\\bshow\\b)/m",
-          "import[ \\t]+[^\\n]*\\bshow\\b/m"
-        ]
-      ]
-    },
-    "bypass-credited": {
-      "undoes": "re-check — no credit when a figure reaches a file or a notebook without Figure.savefig (round 3, R3-05; round 4, R4-05)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  if (PY_BYPASSES_SAVEFIG.test(masked)) return {};\n",
-          ""
-        ]
-      ]
-    },
-    "plt-bound-inside-function": {
-      "undoes": "save — a pyplot import inside a function does not bind plt where the added save runs (round 4, R4-11)",
-      "edits": [
-        [
-          "src/poster/readabilityFullFix.ts",
-          "const bound = /^import[ \\t]+matplotlib",
-          "const bound = /^[ \\t]*import[ \\t]+matplotlib"
-        ]
-      ]
-    },
-    "install-def-not-undone": {
-      "undoes": "undo — an earlier fix's install def is taken out on a second fix (round 4, R4-13)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "const defs = [/^def[ \\t]+_postr_raise_text\\b/, /^def[ \\t]+_postr_install\\b/]",
-          "const defs = [/^def[ \\t]+_postr_raise_text\\b/]"
-        ]
-      ]
-    },
-    "second-install-ignored": {
-      "undoes": "helper — installing again gives the wrap this script's sizes (round 4, R4-08)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "state.update(need=_POSTR_NEED,",
-          "state.update(need=state.get(\"need\", _POSTR_NEED),"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#second-install-ignored; matplotlib 3.10.8, 2026-09-30): the same-process check saves the second script at the first one's size, [[17], [17]] against [[17], [25]] with the fix"
-    },
-    "helper-failure-breaks-save": {
-      "undoes": "helper — a failure inside it is a warning and the save still happens (round 4)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    '    except Exception as error:',\n    '        import warnings',\n    '        try:',\n    '            warnings.warn(f\"Postr could not raise the text",
-          "    '    except ZeroDivisionError as error:',\n    '        import warnings',\n    '        try:',\n    '            warnings.warn(f\"Postr could not raise the text"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#helper-failure-breaks-save; matplotlib 3.10.8, 2026-09-30): equivalent alone: the layout guard leaves nothing to fail on the sets. With the guard also off, k49 crashes (RuntimeError) where the fix, and this mutant alone, warn and save"
-    },
-    "moved-axes-ignored": {
-      "undoes": "helper — the layout is not run again after the script moved an Axes off its place in the grid (round 4, R4-01)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          " and in_place(fig):",
-          ":"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#moved-axes-ignored; matplotlib 3.10.8, 2026-09-30): k48's hand-placed panel moved 1.86 in and colliding 0.265 in² (with the fix it stays, and only clips: a known cost)"
-    },
-    "engine-change-ignored": {
-      "undoes": "helper — the layout is not run again after the script changed the layout engine (round 4, R4-02)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          " and now[\"engine\"] == record[\"engine\"]",
-          ""
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#engine-change-ignored; matplotlib 3.10.8, 2026-09-30): k51, a figure switched to constrained layout after its tight_layout: the replay switches it back, and matplotlib warns \"The figure layout has changed to tight\" (a LAYOUT WARNING); with the fix it keeps ConstrainedLayoutEngine and warns nothing"
-    },
-    "rc-not-given-back": {
-      "undoes": "helper — what Postr set in rcParams is put back to the script's own value before it is resolved again (round 5, R5-01)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "                    rcParams[name] = theirs",
-          "                    pass"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#rc-not-given-back; matplotlib 3.10.8, 2026-09-30): f01 and f02 lower titles, labels, ticks and legends that a bigger font.size set after the first figure would have made larger (LOWERED on all four classes)"
-    },
-    "stale-layout-kept": {
-      "undoes": "helper — an out-of-date layout (the figure resized, titles or labels added since) is run again (round 5, R5-03)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "stale = now[\"size\"] != record[\"size\"] or now[\"texts\"] != record[\"texts\"]",
-          "stale = False"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts, its sixth version (POSTR_MUTANT=<this spec>#stale-layout-kept; matplotlib 3.10.8, 2026-09-30, on the seventh shape): its stale rule (a save whose original layout is out of date may clip or cross no more than the original or a fresh layout of the script's own calls, plus 0.05 in²) flags k08, k11, k20 and k24 at both sizes and k32 at 4 x 3 in (k20 clips 0.44 and crosses 0.98 in², k24 clips 0.63, against 0 and 0 with the fix). The fifth version could not see it: its raise-first control fails the same way (round 6, R6C-05)"
-    },
-    "legend-title-not-born": {
-      "undoes": "helper — legend titles are born at the legend text's size too (round 5, R5-05)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "\"legendText\": [\"legend.fontsize\", \"legend.title_fontsize\"]}",
-          "\"legendText\": [\"legend.fontsize\"]}"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#legend-title-not-born; matplotlib 3.10.8, 2026-09-30): f17's seaborn legend with a long title lies 1.333 in² over the panel (0.017 with the fix; the control 0.028)"
-    },
-    "inset-axes-skipped": {
-      "undoes": "helper — inset Axes (an Axes' children) are raised (round 5, R5-11)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "                axes += [child for child in getattr(ax, \"child_axes\", []) if child not in axes]",
-          "                pass"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#inset-axes-skipped; matplotlib 3.10.8, 2026-09-30): f13's inset Axes' tick labels stay at 6 pt against a need of 15, and the re-check shows them passing (a false green)"
-    },
-    "end-keeps-rc": {
-      "undoes": "helper — at the end of the script, rcParams get the script's own values back (round 5, R5-01, R5-07)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    '            _postr_born_at_size({})',",
-          "    '            pass',"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#end-keeps-rc; matplotlib 3.10.8, 2026-09-30): the same-process check finds rcParams left at the second script's size after both scripts end (axes.labelsize 25); with the fix they are matplotlib's own again"
-    },
-    "own-show-routed": {
-      "undoes": "shape — a script's own show() is not routed to pyplot's (round 5, R5-08)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "  const bareShow = !ownShow\n    && ",
-          "  const bareShow = "
-        ]
-      ]
-    },
-    "replay-warns": {
-      "undoes": "helper — the replay does not print matplotlib's \"not compatible with tight_layout\" or \"Tight layout not applied\" warnings, which the script never gave (rounds 6 and 7)",
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts (POSTR_MUTANT=<this spec>#replay-warns; matplotlib 3.10.8, 2026-09-30): k39, f12 and f24 print matplotlib's \"This figure includes Axes that are not compatible with tight_layout\", which the original scripts never print (a LAYOUT WARNING, at both sizes)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    '                            warnings.filterwarnings(\"ignore\", message=\"This figure includes Axes that are not compatible\")',\n    '                            warnings.filterwarnings(\"ignore\", message=\"Tight layout not applied\")',",
-          ""
-        ]
-      ]
-    },
-    "display-narrowed": {
-      "undoes": "re-check — any display( withholds the credit, since a figure reaches it under any name (round 6, R6C-01, R6P-01; reverses round 5's R5-09)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "|\\bdisplay\\s*\\(/;",
-          "|\\bdisplay\\s*\\(\\s*(?:fig\\w*|[\\w.]*\\.figure|[\\w.]*gcf\\(\\s*\\))\\s*[,)]/;"
-        ]
-      ]
-    },
-    "own-show-top-level-only": {
-      "undoes": "shape — a show() the script defines or assigns inside a function, an if or a try is its own (round 6, R6C-04, R6P-04)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "const ownShow = /^[ \\t]*(?:def[ \\t]+show[ \\t]*\\((?![ \\t]*(?:self|cls)\\b)|show[ \\t]*=(?!=))/m",
-          "const ownShow = /^(?:def[ \\t]+show[ \\t]*\\((?![ \\t]*(?:self|cls)\\b)|show[ \\t]*=(?!=))/m"
-        ]
-      ]
-    },
-    "method-show-counts-as-own": {
-      "undoes": "shape — a method named show is not the script's own show (round 6)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "def[ \\t]+show[ \\t]*\\((?![ \\t]*(?:self|cls)\\b)|",
-          "def[ \\t]+show[ \\t]*\\(|"
-        ]
-      ]
-    },
-    "pylab-not-routed": {
-      "undoes": "shape — a bare show() under `from pylab import *` is routed (round 6, R6P-03)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "(?:matplotlib\\.pyplot|matplotlib\\.pylab|pylab)",
-          "matplotlib\\.pyplot"
-        ]
-      ]
-    },
-    "rc-known-by-equality": {
-      "undoes": "helper — Postr knows its rcParams value by identity, so a context that puts it back, or a script that sets the same number, is told apart (round 6, R6C-02, R6P-02, R6M-01, R6M-02)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    '                if now is value:',",
-          "    '                if now == value:',"
-        ]
-      ],
-      "expect": "survive",
-      "why": "the helper is Python: the unit tests never run it",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts, its sixth version (POSTR_MUTANT=<this spec>#rc-known-by-equality; matplotlib 3.10.8, 2026-09-30, on the seventh shape): its same-process check flags 3 chains (a context or a style after a figure, then a second fixed script). Also in matplotlib with round 6's skeptic-code-2 pairs, re-run by the lead: the fix matches the unfixed pair in 14 of 14 cells, this mutant differs in 6 (A3 and A7 lose the script's own 36 or 8/6, A6 leaks 8/6 into B)"
-    },
-    "hidden-tick-labels-skipped": {
-      "undoes": "helper — an axis whose tick labels are hidden (a shared axis) gets the needed size too, since it spaces the shared ticks (round 6, R6M-04)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    '                    elif \"axisText\" in need and axis.majorTicks and axis.majorTicks[0].label1.get_fontsize() < need[\"axisText\"]:',",
-          "    '                    elif False:',"
-        ]
-      ],
-      "expect": "survive",
-      "why": "the helper is Python: the unit tests never run it",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts, its sixth version (POSTR_MUTANT=<this spec>#hidden-tick-labels-skipped; matplotlib 3.10.8, 2026-09-30, on the seventh shape): its tick-overlap judgement flags g48 (0.026 in² at 6 x 4.5 in, 0.368 at 4 x 3) and v06 (0.110 and 0.076), tick labels of shared axes overlapping each other; with the fix, neither. Round 6's skeptic-mpl-4 cases, re-run by the lead, agree (ink overlap: the fix 0 on all 10 cases at 6 x 4.5 in)"
-    },
-    "tick-size-not-pinned": {
-      "undoes": "helper — a tick label size born from rcParams stays the axis's own once rcParams are given back (round 6, R6M-03)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    '                            if kw is not None and \"labelsize\" not in kw:',",
-          "    '                            if False:',"
-        ]
-      ],
-      "expect": "survive",
-      "why": "the helper is Python: the unit tests never run it",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts, its sixth version (POSTR_MUTANT=<this spec>#tick-size-not-pinned; matplotlib 3.10.8, 2026-09-30, on the seventh shape): its tick-overlap judgement on figures left open after the script (a notebook's preview, a later save) flags 19 places; with the fix, none. Round 6's skeptic-mpl-3 notebook cases, re-run by the lead, agree: 18 labels overlapping 0.101 to 0.954 in² with this mutant, 8 labels and no overlap with the fix"
-    },
-    "end-returns-pyplot": {
-      "undoes": "helper — the end call returns None, so a notebook cell shows no output for it (round 6, R6C-09)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    '            pass',\n    '        return None',",
-          "    '            pass',"
-        ]
-      ],
-      "expect": "survive",
-      "why": "the helper is Python: the unit tests never run it",
-      "unguarded": "Python the unit tests never run. Falsified by hand (2026-09-30): a fixed script run as one IPython cell has the result None with the fix, and the pyplot module (shown as the cell's output) with this mutant"
-    },
-    "warning-as-error-breaks-save": {
-      "undoes": "helper — under warnings-as-errors its own warning never stops the save (round 6, R6C-08)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    '        except Warning:',\n    '            pass',\n    '    if end:',",
-          "    '        except ZeroDivisionError:',\n    '            pass',\n    '    if end:',"
-        ]
-      ],
-      "expect": "survive",
-      "why": "the helper is Python: the unit tests never run it",
-      "unguarded": "Python the unit tests never run. Falsified by hand (2026-09-30): a fixed script whose need makes the helper fail, run with python -W error, saves its file and exits 0 with the fix; with this mutant it stops at the helper's warning (exit 1, no file)"
-    },
-    "adjust-refreshes-record": {
-      "undoes": "helper — a subplots_adjust after the script's tight_layout keeps the record of what that layout was made for, so a text added in between still makes it out of date (round 7, k11)",
-      "edits": [
-        [
-          "src/poster/readability.ts",
-          "    '                # tight_layout still makes the layout out of date (round 7, k11).',",
-          "    '                record.update(Figure._postr_state[\"state\"](self))',"
-        ]
-      ],
-      "expect": "survive",
-      "unguarded": "Python the unit tests never run. Falsified by scripts/checker-shape-check.mts, its sixth version (POSTR_MUTANT=<this spec>#adjust-refreshes-record; matplotlib 3.10.8, 2026-09-30, on the seventh shape): its stale rule flags k11 (a seaborn jointplot whose labels are set after its tight_layout, then subplots_adjust(top=0.92)) at both sizes, clipping 0.433 and 0.67 in² where a fresh layout of the script's own calls clips 0 (the fix: 0 and 0), and its grid flags f17 at 4 x 3 in (a figure legend 0.304 in² over a panel; the fix 0.104). The fifth version's grid could not: the ideal clips k11 the same"
     }
   }
 }

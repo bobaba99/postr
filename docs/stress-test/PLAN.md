@@ -269,18 +269,98 @@ scope becomes a plan item or a question for the owner.
   a transform (the step 9-G critic's CG-1), a committed paint check (CG-3),
   and skipping its share scenarios while sharing is hidden. The ruler items
   above wait for it.
-- **Fix 13, legend titles** are raised with legend text. Not a class the
+- **Fix 13, legend titles** are raised with legend text (fix 13b keeps it:
+  `legend.title_fontsize` is set with `legend.fontsize`). Not a class the
   checker lists, so a policy for the owner: f32 at 4 × 3 in crosses 1.394 in²
-  with the title raised against 0.208 left at 10 pt (record 13, section 10).
-- **Fix 13, one layout pass:** at 4 × 3 in, f10 and f26 cross 1.131 and
-  0.329 in² where a layout made at the needed sizes gives 0.918 and 0.274.
-  Raise explicit sizes before the script's own `tight_layout`, or replay
-  until the layout settles (record 13, section 10; neither measured on the
-  whole set).
-- **Fix 13, what counts as out of date:** the layout record counts centre
-  titles, axis labels, legend and figure texts only; panel letters or tick
-  labels changed after the layout are not replayed (a03, a06; record 13,
-  section 10).
+  with the title raised against 0.208 left at 10 pt (record 13, section 10;
+  the same on 13b).
+- ~~**Fix 13, one layout pass** and **what counts as out of date**~~ gone
+  with part 1's helper (fix 13b): the plain edits set each size where the
+  code sets it, and the fixed script measures the same as the layout grid's
+  ideal control in each of its 26 stale-layout tags outside the seaborn grids
+  the fix sets to the print size (record 13b, section 10).
+- **Fix 13b, a seaborn grid smaller than the print size** (an owner
+  question): the script sets the grid to the print size, so two texts that
+  printed at 15.67 and 17.95 pt at the grid's own size print at 14 (pass to
+  pass; c-displot and p2-facetgrid at 14 × 10 in, MEASURED, the gate's L 4).
+  Setting the size only when the grid is larger than the print size would
+  keep them; not built (a runtime branch, and the re-check could then only
+  give a lower bound).
+- **Fix 13b, a legend wider than the print size leaves room for** (an owner
+  question): f17 at 4 × 3 in, two facets and a legend 2.942 in wide at 14 pt:
+  `tight_layout` gives up and the legend covers the plots (2.484 in²,
+  MEASURED by the shape harness). Moving such a legend below the plots is
+  not built.
+- **Fix 13b, rows for text the code does not draw:** a plot title or legend
+  the script never makes (Python), or a legend, strip or caption (R), still
+  has a row at the default size, unmarked, as on main, and the script sets
+  it (harmless; INSPECTED). Since review round 2 a Python row of that kind no
+  longer drives the one-number advice.
+- **Fix 13b, `ReadabilityPanel.tsx` is 1245 lines** (1208 on main, over the
+  800-line rule before 13b); a split is its own change.
+- **Fix 13b review round 2, the fit block at a small print size** (R2-12):
+  when what a script draws outside its plots is wider than the canvas at the
+  sizes needed, the fit stops at a tenth of the canvas and the box cuts the
+  rest, and the page cannot know before the script runs, so its ✓ stands
+  (py08 at 4 × 3 in: a legend entry cut, MEASURED). The copy now says the
+  crop's text is kept when it fits. Re-running the script's own layout
+  inside the fit loop, or warning when the fit stops at its floor, is not
+  built. Review round 3 (P13B-R3-05) asked again for the ✓ or the all-pass
+  line to be withheld for a tight save at a small print size: accepted as is
+  (record 13b section 9): the page has no text extents to say "small"; on the
+  review's partition 1 of its 5 tight-save scripts cuts a text, at 4 × 3 in
+  only (MEASURED with the review's driver), and the shape harness measures 3
+  of the 4 corpus tight-save scripts cut at 4 × 3 in, 0 at 6 × 4.5 in.
+- **Fix 13b review round 3, an unread `font.size` floored at the largest
+  need:** `max(N, float(EXPR))` raises every class that follows it to the
+  need of the largest, so a script with no layout call of its own cuts more
+  at the canvas edge than the ideal control (0.607 against 0.316 in² at
+  6 × 4.5 in, MEASURED, record 13b section 10). Per-key floors after the
+  `font.size` line, as for a seaborn context the check cannot read, would
+  match the ideal; not built.
+- **Fix 13b review round 3, an R theme from outside the script under a name
+  that is not `theme_*`** (`+ my_theme()` from a `source()`d file): no complete
+  theme is seen, so base 11 is assumed and set at the root
+  (`text = element_text(size = 11)`), which lowers the text if that theme
+  draws larger (INSPECTED; how common is UNVERIFIED; no corpus script). A theme
+  held in a name or a function the script itself defines is read (R15). A
+  floor on the root size, or reading the sourced file, is not built.
+- **Fix 13b review round 3, a Python `fontdict=` the check cannot see into**
+  (a call's result): raised only where it falls short, with a plain
+  `fontsize=N` (review round 1's choice), which would lower a larger size the
+  dict sets (INSPECTED); where it passes it is left as written and the panel
+  says to check it.
+- **Fix 13b review round 3, devices the check does not read:** svglite
+  (UNVERIFIED: not installed), and a plot drawn with `plot(p)` or
+  `grid.draw()`: the page says it found the device but not its plot, and the
+  script saves `poster_figure.png` at the size checked.
+- **Fix 13b review round 2, several figures in one Python script** (out of
+  scope by the owner's design): the first figure's canvas is read for the
+  second (py09: 2 false passes and 6 false greens in 9 runs, MEASURED with the
+  review's driver), and the page says nothing about it. A warning when a
+  script makes more than one figure is not built.
+- **Fix 13b review round 2, an R canvas the check cannot read**
+  (`ggsave(width = cfg$width)`) is set to the size checked, so text a smaller
+  canvas printed larger prints at 1.0 × (the R gate's L 15, every verdict
+  kept, no size lowered). `min(cfg$width, W)` would keep the larger print
+  but mixes units; not built.
+- **Fix 13b review round 1, outside text wider than the canvas:** where what
+  a script draws outside its plots (a long legend or suptitle) is wider than
+  the canvas at the sizes needed, the fit block cannot fit it: at 4 × 3 in
+  three of the four tight-save scripts cut 0.33–0.96 in² of text (MEASURED,
+  shape harness); 0 at 6 × 4.5 in. Moving the legend inside or below the
+  plots is not built (record 13b, section 10).
+- **Fix 13b review round 1, a reset inside an `if`** is read as made: a false
+  fail when the branch does not run, and the script writes the reset's size
+  (one of the gate's L 5, pass to pass). Reading both branches is not built.
+- **Fix 13b review round 1, text grown past a canvas the script fixes** with
+  no layout call of its own (an axis title cut at the edge, 13 gate runs, 9
+  on main): the size's own cost, equal to the ideal control's in 23 of 23
+  runs measured; adding a layout call to the user's script is not built.
+- **Fix 13b review rounds 1 and 2, patchwork** (UNVERIFIED, patchwork not
+  installed): since round 2 a patchwork of plot names (`p1 | p2`) is read as
+  a combined figure and themed in each plot, as cowplot and gridExtra are
+  (measured for those two); measure with patchwork installed.
 - ~~**Record 24 review round 1, the refund button as an automated decision**~~
   FIXED 2026-10-06 (`fix/refund-review-note`): every refusal the endpoint
   sends (a 409: `window_expired`, `already_used` for a term or a pack,
@@ -440,8 +520,9 @@ it gave them; not re-measured for this list, so UNVERIFIED here).
   `docProps/app.xml` Company and `core.xml` Subject say "made with postr.sh
   (https://postr.sh)" (`export/pptx/writer.ts`), while the visible mark is
   gone for paid exports (MEASURED by the audit; claims g2-…-21, -145).
-- **Item 13 part 2, the plot checker's misses** (already queued; these are
-  its sub-items from the audit, UNVERIFIED here): R sizes set with
+- **Item 13 part 2, the plot checker's misses** (fix 13b reads the sizes
+  below and places the R fix after every theme; the two sets of minimums and
+  the inserted charts are stream Q's; these are the audit's sub-items): R sizes set with
   `theme(text = element_text(size = …))` and Python sizes set with
   `plt.xlabel(…, fontsize=…)`, `plt.xticks(fontsize=…)` or
   `plt.legend(fontsize=…)` are not read, so a too-small label passes (claims
@@ -693,7 +774,7 @@ Found while fixing one item, belonging to another (details in the record named):
 | 3 | `editor/fit-whole-sheet` (A, B), `editor/guidelines-closed-small-screens` (C, D, and A and B's review follow-ups) | done — `docs/fixes/03-fit-whole-sheet.md`; the owner answered its questions on 2026-09-30 (items 19–22; Firefox and WebKit engines installed) |
 | 23 | `fix/new-poster-owner-only` | done — `docs/fixes/23-new-poster-owner-only.md`; sharing and comments hidden (`SHARING_ENABLED`) |
 | 4 | `editor/rulers-match-sheet` (local, parked) | hidden — the owner hid the rulers on 2026-09-30 (`RULERS_ENABLED`, `config/features.ts`); the fix is parked unmerged with its record, instruments and open review findings |
-| 13 | `checker/python-reads-own-fix` | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md` (the fix raises the text it saves, and its re-check reads it); part 2, the parser's own misreads, not started |
+| 13 | `checker/python-reads-own-fix` (part 1), `fix/13p2-checker-sizes` (part 2) | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md`; part 2 implemented, review rounds 1 (17 findings: a tight save cut what it drew outside the plots, a `fontdict=`/`prop=` overwritten so the script raised, R theme order, `theme_void()`, a theme that is not ggplot2's, `ggsave(filename = …)`, `**kwargs`, and more) and 2 (13 findings: an R figure combining plots themed as a whole, a blank image for gridExtra; a panel letter replacing the centre title; a size the check cannot read pinned at the default and lowered; R names with a comment; PdfPages; colorbars seaborn and pandas make; sup-labels; legend guides; png() devices; advice from rows not drawn; `%+replace%`; loops over Axes) and 3 (5 findings: a theme held in a name or a function dropped from a combined figure's plots and base 11 written over it; the floor on a string font.size, an import above `from __future__`, `FontProperties as FP`; a passing unread size left unfloored; a plot drawn on its own line in a device, `grid.arrange()`, ragg; a cut legend at 4 × 3 in, accepted) done and answered — `docs/fixes/13b-checker-sizes.md` (the owner's design of 2026-10-07: a bounded rule table read by position, the last setting winning; a size or canvas the code leaves out marked `*` and set in the script the page asks you to use in place of yours; plain edits instead of part 1's helper. On the corpora with every review scenario, 116 Python and 61 R scripts × 4 sizes in real matplotlib, seaborn and ggplot2: first-check false passes 201 → 0 unmarked (Python; 10 on rows marked `*`) and 126 → 0 unmarked (R; 6 marked), re-check false greens 151 → 0 and 141 → 0, scripts whose fix leaves a text short or does not run 31 → 0 and 51 → 0, texts cut from the image 0 → 0, false fails 151 → 16 and 86 → 22 (rows marked `*`); R sizes written below what ggplot2 draws 68 → 0 (R texts printed smaller 78 → 15, all from a canvas the check cannot read, set to the size checked); Python 0 → 5, pass to pass: two seaborn grids at 14 × 10 in, an owner question, and a reset inside an `if`) |
 | 7 | `fix/07-figure-script-kept` | done (three review rounds); review round 1 answered (a blank-line regression fixed, tests added, legal copy corrected); round 2 answered (a result checked against an image block is no longer shown under the preview's size, and a kept result says the size it is for; a long script edited after its Check stays stored); round 3 answered (a note no longer promises an image check comes back) — `docs/fixes/07-figure-script-kept.md`; the owner's decisions of 2026-10-06: the script kept per poster in this browser and re-checked on return, sessionStorage on the public page, Check stays up once a script is in, and the same cause fixed in the Authors, References, Make-a-figure, poster-name and version-name drafts (memory only) |
 | 15 | `fix/15-checker-language` | done (three review rounds) — `docs/fixes/15-checker-language.md` (Check answers when it cannot tell R from Python; unsupported plotting systems are named, not scored; a result on screen stays, marked out of date, and one a new print size hides is said to be hidden; detection reads live code only, re-landing 9ea9f38; a string in `aes()` or seaborn's `barplot()` places nothing on its own: code with only such a token gets the could-not-tell answer (an R package name such as `library(tidyverse)` is an R signal and is checked as ggplot2)) |
 | 19 | `fix/19-controls-one-size` | fixed; its one review round (the browser, through the user's entry points) answered: on a turned block the handle row now turns about its own centre (near 180° it lay on the block's own handles, and a click on one deleted the block), and crop mode's edge handles no longer animate their size after a zoom change; after the round, by the lead's decision, zoomed out under 35% a handle row wider than its block draws only its move button (there a click meant for another block could delete the selected image: F3; the threshold measured); three cosmetic or older items and F3's remainder went to the Later list — `docs/fixes/19-controls-one-size.md` (a selected block's handles, row, rotate control, a selected table's strips and grips, crop mode's edges and bar and a group's handles and outline are the same size on screen at every zoom, 24 px to grab with 8 px squares and 20 px circles; a block small on screen draws fewer controls; the rotate control moves into the handle row where below it would meet the ZoomBar or leave the canvas; the owner's Q5–Q9 are on the Later list) |
