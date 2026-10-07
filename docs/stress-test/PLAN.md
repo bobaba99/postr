@@ -241,13 +241,18 @@ scope becomes a plan item or a question for the owner.
     edge overruns the sheet by 9 to 12 px and its bottom corner handles
     meet the zoom bar at the fits, as on main. Q3's zoom bar test could
     cover the bottom corner handles.
-- On main, found by fix 19 (2026-10-06, MEASURED in Chromium by a scratch
+- ~~On main, found by fix 19 (2026-10-06, MEASURED in Chromium by a scratch
   probe on main `e09c0ea` and on the fix): Save PDF with a block selected
   copies its selection controls into the print document (8 handles, the
   row and the rotate control on main; `printPoster` strips only
   `[data-postr-overlay]`, `PosterEditor.tsx`, where the thumbnail strips
   the selection markers too). Whether they show in the PDF was not
-  measured; with fix 19 they are drawn at the editor's zoom of the moment.
+  measured; with fix 19 they are drawn at the editor's zoom of the moment.~~
+  FIXED by fix 13c's review round 1 (2026-10-07; finding Q-R5): the print
+  copy is stripped as the thumbnail's is (`export/stripEditorChrome.ts`),
+  and a selected or out-of-bounds frame prints with a 1 px border
+  (MEASURED, `chart-print-size-check.mjs` CHROME 0 of 91 print documents,
+  7 on the frozen copy).
 - Still in the sheet's units after fix 19, growing with the zoom: a
   selected block's own border (1.5 units: 15 px at 10×; it is the block's
   box, so a thinner one would change where its text wraps) and the crop
@@ -446,9 +451,12 @@ it gave them; not re-measured for this list, so UNVERIFIED here).
   `plt.xlabel(…, fontsize=…)`, `plt.xticks(fontsize=…)` or
   `plt.legend(fontsize=…)` are not read, so a too-small label passes (claims
   g3-…-04, -05); the R fix does nothing when the script's `theme()` comes
-  after `theme_*()`; two sets of minimums exist (the code check's 18/14/12 pt
+  after `theme_*()`; ~~two sets of minimums exist (the code check's 18/14/12 pt
   and the image scan's and inserted charts' 24/18 pt; claims g3-…-07, -30,
-  -45); inserted charts with a legend print their text at 14.9–16.8 pt.
+  -45); inserted charts with a legend print their text at 14.9–16.8 pt~~
+  (these two FIXED by fix 13c, 2026-10-07: one module of minimums, and
+  inserted charts at 18/24 pt or, in a box too small for the legend, never
+  below 14/18; record `docs/fixes/13c-chart-text-minimums.md`).
 - **LaTeX re-enable checklist** (the export is hidden by the owner,
   2026-10-06; stream B's flag). Before switching it back on: it may not
   compile (9 of 12 coloured text arguments contain a paragraph break, which
@@ -517,6 +525,43 @@ the evidence label of each.
 - **`poster/ReadabilityPanel.tsx` is 1,208 lines** (1,202 on main): splitting
   it (the result table and the fix box) is left for a change that can
   re-run fixes 07 and 15's mutant specs in full.
+
+### Queued by fix 13c (Postr's own charts, 2026-10-07)
+
+Record `docs/fixes/13c-chart-text-minimums.md` section 10 has the detail and
+the evidence label of each.
+
+- ~~**Category labels that do not fit their band meet**~~ and ~~**charts
+  smaller than 6 × 4.5 in can still print under the minimum**~~: FIXED by the
+  review round 1 corrections (labels never wider than their room, each band
+  holding its label's lines; a chart too small for its text at the
+  minimums grows its block): tick labels whose glyphs meet 0 of 1706
+  chart-sizes, now a gate; below the range (4 × 3, 5 × 7) 0 of 138 under
+  the minimum (MEASURED, Chromium).
+- **Insert places a chart by its stored size**: its frame, with the caption
+  now shown, is 12.8 to 18.2 units taller, so on the 3-column template the
+  caption covers another block in 7 of 7 inserts (MEASURED, INFO
+  INSERT-COVER; ISSUES counts it). Images with captions do the same on main.
+  An older poster's captioned chart grows the same way when opened. Since
+  review round 1 a chart whose text at the minimums does not fit its
+  block's height also grows (a long legend or long category labels at 6 ×
+  4.5 to 8 × 6: 96 of 757 pasted chart-sizes, by up to 5.35 in, median
+  0.9 in; 3 of the chooser's 949, by 0.07 in), and may cover the block under
+  it the same way. Placing by the drawn size, or telling the user the
+  chart needs more room (an owner's choice: the lead's decision 6 asked
+  for the legend inside the block's height).
+- **A caption made from an upper-case column name lower-cases its first
+  letter** ("Mean sCORE … by cONDITION"; `captionFor`'s `lower()` in
+  `charts/buildSpec.ts`; review Q-R9, INSPECTED, on main too).
+- **For stream P:** the code check's row status still uses a literal 0.85
+  (`readability.ts:1216`) where the image scan reads
+  `FIGURE_TEXT_WARN_RATIO` (review Q-R8, INSPECTED; equal today).
+- **Found in passing, on main:** an out-of-bounds text block's white editor
+  text (`blocks.tsx` `txtStyle`, `color: isOutOfBounds ? '#ffffff'`) is
+  copied into the print document; the part on the sheet prints white
+  (INSPECTED; the print copy now resets only the frame's border).
+- **Charts are not in the PPTX export** (no chart case in
+  `export/pptx/writer.ts`; INSPECTED, on main too).
 
 ## LaTeX export: before it is switched back on
 
@@ -694,6 +739,7 @@ Found while fixing one item, belonging to another (details in the record named):
 | 23 | `fix/new-poster-owner-only` | done — `docs/fixes/23-new-poster-owner-only.md`; sharing and comments hidden (`SHARING_ENABLED`) |
 | 4 | `editor/rulers-match-sheet` (local, parked) | hidden — the owner hid the rulers on 2026-09-30 (`RULERS_ENABLED`, `config/features.ts`); the fix is parked unmerged with its record, instruments and open review findings |
 | 13 | `checker/python-reads-own-fix` | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md` (the fix raises the text it saves, and its re-check reads it); part 2, the parser's own misreads, not started |
+| 13 part 2, stream Q (13c) | `fix/13p2-chart-text` | fixed; its one review round (the browser, the user's entry points, the print path) answered: Q-R1 to Q-R5 held and are corrected (text measured in the chart's font, Plot's tick labels read back for the margins and spacing, legend and long labels wrapped inside the chart, each band holding its label's lines, a chart too small for its text at the minimums growing its block, "⎙ Save PDF" stripping the editor's chrome), Q-R7's cause found (a 1.5 px border the editor draws 1 px wide and the print 1.458 units), the rest on the Later list; re-measured in Chromium, Firefox and WebKit on the review's partition folded into the harness, 48 of 48 mutants killed, 10 blind spots guarded in the browser and 1 accepted; one more round is the lead's call (the corrections add mechanisms) — `docs/fixes/13c-chart-text-minimums.md` (one module of minimums for figure text, read by the code check's tables, the image scan and the charts; an inserted chart is drawn at the box it is laid out in, text at 18/24 pt never rounded and never below 14/18 (its floor 0.5 % above them, for print's rounding); chart blocks have an image's caption chrome, so the caption and its "Sample data, not real results." prefix show whole; in each of Chromium, Firefox and WebKit 0 of 1706 chart-sizes below the minimum, clipped, colliding or printed differently, from 408, 1705, 1077 and 18 on main in Chromium; 99 of 1706 grow their block, all at 6 × 4.5 to 8 × 6); the queued items above |
 | 7 | `fix/07-figure-script-kept` | done (three review rounds); review round 1 answered (a blank-line regression fixed, tests added, legal copy corrected); round 2 answered (a result checked against an image block is no longer shown under the preview's size, and a kept result says the size it is for; a long script edited after its Check stays stored); round 3 answered (a note no longer promises an image check comes back) — `docs/fixes/07-figure-script-kept.md`; the owner's decisions of 2026-10-06: the script kept per poster in this browser and re-checked on return, sessionStorage on the public page, Check stays up once a script is in, and the same cause fixed in the Authors, References, Make-a-figure, poster-name and version-name drafts (memory only) |
 | 15 | `fix/15-checker-language` | done (three review rounds) — `docs/fixes/15-checker-language.md` (Check answers when it cannot tell R from Python; unsupported plotting systems are named, not scored; a result on screen stays, marked out of date, and one a new print size hides is said to be hidden; detection reads live code only, re-landing 9ea9f38; a string in `aes()` or seaborn's `barplot()` places nothing on its own: code with only such a token gets the could-not-tell answer (an R package name such as `library(tidyverse)` is an R signal and is checked as ggplot2)) |
 | 19 | `fix/19-controls-one-size` | fixed; its one review round (the browser, through the user's entry points) answered: on a turned block the handle row now turns about its own centre (near 180° it lay on the block's own handles, and a click on one deleted the block), and crop mode's edge handles no longer animate their size after a zoom change; after the round, by the lead's decision, zoomed out under 35% a handle row wider than its block draws only its move button (there a click meant for another block could delete the selected image: F3; the threshold measured); three cosmetic or older items and F3's remainder went to the Later list — `docs/fixes/19-controls-one-size.md` (a selected block's handles, row, rotate control, a selected table's strips and grips, crop mode's edges and bar and a group's handles and outline are the same size on screen at every zoom, 24 px to grab with 8 px squares and 20 px circles; a block small on screen draws fewer controls; the rotate control moves into the handle row where below it would meet the ZoomBar or leave the canvas; the owner's Q5–Q9 are on the Later list) |

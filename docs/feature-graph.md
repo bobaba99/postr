@@ -1601,7 +1601,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:181-1
 - [ ] "{p} pass · {w} warn · {f} fail · {t} total" — scan summary — `ReadabilityPanel.tsx:958-959`
 - [ ] "{error message}" (e.g. "Could not resolve image URL.", "Scan failed.") — scan error line — `ReadabilityPanel.tsx:567, 541, 963-967`
 - [ ] "Status" / "Role" / "Text" / "Effective pt" / "Min" — scan table headers — `ReadabilityPanel.tsx:981-985`
-- [ ] "{role}", "{region text}", "{effectivePt}", "{minPt}" — scan table row cells — `ReadabilityPanel.tsx:994-1003`
+- [ ] "{role}", "{region text}", "{effectivePt}", "{minPt}" — scan table row cells — `ReadabilityPanel.tsx:994-1003`; since fix 13c (2026-10-07) `{minPt}` and the status are the canonical minimums for figure text with the code check's 15% warning band (`MIN_PT_BY_ROLE` and `figureTextStatus` from `poster/figureTextMinimums.ts`: titles and axis titles 18, tick labels, legend, data labels and other text 14), not the scan's own 24/24/18 with a 25% band
 
 **Graphics**
 - [ ] 🔎 emoji — `ReadabilityPanel.tsx:596` — intro paragraph
@@ -2256,6 +2256,8 @@ Storage: localStorage `postr.welcome-seeded:{userId}` (prefix const `:36`; read 
 
 #### `data/thumbnails.ts` — poster thumbnail capture/upload — no UI, logic only (failures return null)
 
+Strips the editor's chrome from its copy of the sheet with `export/stripEditorChrome.ts`, shared with "⎙ Save PDF" since fix 13c's review round 1.
+
 #### `data/userLogos.ts` — user logo library client — no DOM UI; throws user-visible errors
 
 **Copy**
@@ -2274,6 +2276,8 @@ Storage: localStorage `postr.welcome-seeded:{userId}` (prefix const `:36`; read 
 **Standalone page DEACTIVATED 2026-09-10 — `charts/*` stays LIVE.** `pages/ChartChooser.tsx` (`/chart-chooser`, alias `/plot-picker`) is no longer mounted: both routes `<Navigate to="/" replace>`, the lazy import is gone, `vercel.json` rewrites `/chart-chooser` → `/` with `X-Robots-Tag: noindex` and 308s `/plot-picker` → `/`, the `routes.json` static record is deleted (out of prerender + sitemap; the page reads `metaFor()` → `null`). The file, its test (`pages/__tests__/ChartChooser.test.tsx`, renders the component directly) and the JSON-LD stay on disk. The picker is being revamped in another worktree. **The standalone figure-readability check is LIVE (2026-09-11)** — `pages/FigureReadability.tsx` at `/tools/figure-readability`, inventoried at the end of this section. Restore recipe for the picker: `apps/web/src/routes.tsx` header; summary in §10. The `pages/ChartChooser.tsx` inventory below is kept verbatim as the reactivation reference.
 
 The plot-picker engine: ~~standalone `/chart-chooser` page~~ (deactivated), the embedded ladder questionnaire (`charts/ladder/*`), recommender + design-shape copy, SVG rendering (`renderChart`/`plotOptions`), the on-canvas `ChartBlock`, sample-data labels, the CVD-tested series palettes, and the per-chart `ChartPalettePicker`. `ChartChooser` is embedded in three places: the standalone page (**deactivated**), the sidebar Figure tab Make mode (§6.8 — the only LIVE render site), and the manuscript ChartPanel (§6.12 — deactivated with the manuscript pipeline).
+
+**Print size of chart text and the caption (fix 13c, 2026-10-07; `docs/fixes/13c-chart-text-minimums.md`):** an inserted chart never prints its text below the canonical minimums for figure text (tick labels, legend text and line-end labels 14 pt, axis titles 18 pt; `poster/figureTextMinimums.ts`, the one module the code check's tables in `poster/readability.ts`, the image scan in `ReadabilityPanel.tsx` and the charts read), and its caption is never clipped. `ChartBlock` draws at the box its host is laid out in (a `ResizeObserver`: the block less its frame's border and a side caption's share; it waits for that box, and a box of zero, the editor hidden behind Export › Preview poster, keeps the last one). `charts/chartLayout.ts` lays the legend's rows, the tick labels and the axis titles out inside that box and gives the plot what is left: text at 18 pt (axis titles 24), never rounded; only in a box too small for the legend at that size does the text scale, in quarter-point steps, and never below the minimums. Category labels, line-end labels, legend labels and a long title wrap so none runs past the svg (a word wider than its room breaks after its hyphens, then between characters); `renderChart` places the axis titles on the lines the margins hold. A chart block has the caption chrome an image block has: its body is pinned to the block's height and the frame grows with a caption (side captions too) or a note (`blocks.tsx` `CaptionWrapper`, `chartHasGrowingChrome`). Since its review round 1 (2026-10-07): text widths are measured in the chart's own font on a canvas at the size drawn, padded 2 % and 0.16 em (`charts/textMeasure.ts`, after waiting up to 3 s for the font; `ChartBlock` draws again when a face of its font finishes loading), not counted at 0.6 em; where a band under the plot cannot hold one character of its labels, every k-th band is labelled; the chart's own floor sits 0.5 % above the minimums (print's rounding); the tick labels Plot drew on a continuous axis are read back (`charts/tickFit.ts`) and the chart laid out again with the margins and the tick spacing they need (a "1,000,000" y label no longer runs past the left edge); each band of a category axis on the left holds its label's lines; the y title stops short of the line-end labels; and a chart whose text at the minimums does not fit its block's height reports the least height it takes (`ChartBlock` `onMinHeight`) and the block grows to it, the frame without a caption and the pinned body under one, instead of the svg being scaled below the minimums. "⎙ Save PDF" strips the editor's chrome as the thumbnail does (`export/stripEditorChrome.ts`): no resize handles, handle row or accent border, and a selected or out-of-bounds frame prints with the 1 px border the editor drew (a 1.5 px border, drawn 1 px wide on a 1x screen, printed 1.458 units wide under the print's zoom and shrank the chart). Measured in the editor and in the "⎙ Save PDF" document laid out in print media by `scripts/chart-print-size-check.mjs`, on the chooser's and confirmer's sets and on the review's pasted tables.
 
 **Series-palette override (wired 2026-07-29):** a chart's categorical series fills normally resolve from the poster theme's `paletteSlots` at render time ("restyle poster → restyle charts"). An optional `ChartSpec.seriesPaletteId` overrides that for one chart, pinning its series fills to a fixed CVD-tested palette from `seriesPalettes.ts` (Simplified Science + Okabe-Ito + Paul Tol). `chartColors.ts::resolveSeriesColors` resolves it (categorical fills only — heatmap/Likert ramps stay slot-based); a stale/removed id falls back to slots, visibly. The `ChartPalettePicker` (Figure tab, shown only for a selected **multi-series** chart) writes the choice into `posters.data` via `updateBlock`; "Poster theme (default)" clears it.
 
@@ -2316,15 +2320,15 @@ flowchart LR
 #### `charts/ChartBlock.tsx` — renders a chart block's `ChartSpec` to live SVG on the poster canvas
 
 **Elements**
-- [ ] `Send Feedback` — button — `ChartBlock.tsx:91` — calls `useFeedbackStore.open('bug', { title: 'Chart failed to render' })` (opens feedback modal, prefilled); only rendered in the error state
+- [ ] `Send Feedback` — button — `ChartBlock.tsx:178-191` — calls `useFeedbackStore.open('bug', { title: 'Chart failed to render' })` (opens feedback modal, prefilled); only rendered in the error state
 
 **Copy**
-- [ ] "Rendering chart…" — loading state text — `ChartBlock.tsx:87`
-- [ ] "Something went wrong rendering this chart." — error state text — `ChartBlock.tsx:90`
-- [ ] "Chart failed to render" — feedback-modal prefill title passed to the store — `ChartBlock.tsx:93`
+- [ ] "Rendering chart…" — loading state text (first draw only: a chart on screen stays while it redraws for a new box) — `ChartBlock.tsx:173`
+- [ ] "Something went wrong rendering this chart." — error state text — `ChartBlock.tsx:176`
+- [ ] "Chart failed to render" — feedback-modal prefill title passed to the store — `ChartBlock.tsx:179`
 
 **Graphics**
-- [ ] none in-file — the chart `<svg>` is injected by `renderChart()` into `hostRef` (`ChartBlock.tsx:53`); error/loading frame is a CSS dashed border, no glyph
+- [ ] none in-file — the chart `<svg>` is injected by `renderChartLaidOut()` into `hostRef` (`ChartBlock.tsx:139`), drawn at the host's laid-out box (fix 13c), which `BlockFrame` grows to the chart's least height when its text at the minimums does not fit (`onMinHeight`, review round 1); error/loading frame is a CSS dashed border, no glyph
 
 #### `charts/declaredVariables.ts` — declared-variable (mobile) data synthesis; no DOM UI
 
@@ -2529,9 +2533,10 @@ flowchart LR
 #### `charts/plotOptions.ts` — Observable Plot option builder — no DOM UI; emits in-SVG strings
 
 **Copy** (rendered inside the chart SVG)
-- [ ] "Count" — histogram y-axis label — `plotOptions.ts:243`
-- [ ] "All responses" — fallback y category for single-statement Likert — `plotOptions.ts:293`
-- [ ] "Before" / "After" — fallback dumbbell legend labels when encoding names absent — `plotOptions.ts:358-359`
+- [ ] "Count" — histogram y-axis label — `plotOptions.ts:413`
+- [ ] "All responses" — fallback y category for single-statement Likert — `plotOptions.ts:270,463`
+- [ ] "Before" / "After" — fallback dumbbell legend labels when encoding names absent — `plotOptions.ts:525-526`
+- (fix 13c) no copy of its own about sizes: the text sizes, the legend's rows, wrapping, the margins and the chart's least height come from `charts/chartLayout.ts` (no UI, logic only), whose floor is `poster/figureTextMinimums.ts` (no UI); text widths from `charts/textMeasure.ts` (no UI: a canvas in the chart's font, an estimate in jsdom); a drawn chart's continuous-axis tick labels are read back by `charts/tickFit.ts` (no UI) for the margins and tick spacing they need
 
 #### `charts/recommend.ts` — hardcoded chart recommender; `FORM_NAMES` + `whyText` shown verbatim in PreviewStep
 
@@ -2564,8 +2569,8 @@ flowchart LR
 #### `charts/renderChart.ts` — ChartSpec → SVG renderer — no UI, logic only
 
 **Copy**
-- [ ] "legend" — aria-label set on the generated legend `<g>` — `renderChart.ts:92`
-- [ ] (thrown errors `'chart spec has no rows'` :121, `'chart render produced no svg'` :130 are internal, caught by ChartBlock/ChartPreview error states)
+- [ ] "legend" — aria-label set on the generated legend `<g>` — `renderChart.ts:113`
+- [ ] (thrown errors `'chart spec has no rows'` :175, `'chart render produced no svg'` :158 are internal, caught by ChartBlock/ChartPreview error states)
 
 #### `charts/sampleData.ts` — seeded sample-data generators + the mandatory sample-data labels — no DOM UI
 
@@ -2646,7 +2651,7 @@ The editor's Figure › Check tab (`poster/ReadabilityPanel.tsx`, §6.8) as a pu
 flowchart LR
   EEB["EditableExportButtons (§6.8)"] -->|"exportPosterPptx"| PW["export/pptx/writer.ts → {title}.pptx"]
   EEB -.->|"exportLatex (only with LATEX_EXPORT_ENABLED, off since fix 25)"| LW["export/latex/exportLatex.ts → {title}-latex.zip"]
-  PE["PosterEditor printPoster()"] --> PD["export/printDocument.ts (popup + window.print)"]
+  PE["PosterEditor printPoster()"] -->|"stripEditorChrome (clone)"| PD["export/printDocument.ts (popup + window.print)"]
   SB["Sidebar ⎙ Save PDF"] --> PD
   SPM["StaplesPrintModal (§6.13)"] --> PD
   PEB["PostrExportButton (§6.8)"] --> PF["import/postrFile.ts exportPostr → {title}.postr"]
@@ -2809,6 +2814,10 @@ No UI — logic only. Silent-degradation note: failure keeps Office swatches (co
 - [ ] `⚠ {plan.note}` — red off-slide warning text box (half-scale note; note text from units.ts) — `writer.ts:702`
 - [ ] `Poster made with postr.sh` — colophon text box near bottom edge (from attribution.ts) — `writer.ts:686`
 - [ ] `Poster made with postr.sh (https://postr.sh)` — `company`/`subject` doc properties — `writer.ts:606,613`
+
+#### `export/stripEditorChrome.ts` — no UI, logic only
+
+Takes the editor's own marks out of a copy of `#poster-canvas` before it leaves the editor: resize handles (`[data-postr-resize-handle]`), the selection's controls (`[data-postr-selection-ui]`), the grid and ruler overlays (`[data-postr-overlay]`), and a selected or out-of-bounds frame's 1.5 px border, set back to the unselected 1 px transparent one. Used by `PosterEditor` `printPoster` ("⎙ Save PDF", Preview's Print) and by `data/thumbnails.ts`. Fix 13c review round 1 (Q-R5, Q-R7): the print path stripped only the overlays, so a selected block (a block just inserted is) printed its handles, and a chart in a selected frame printed 0.94 % smaller than drawn.
 
 #### `export/printDocument.ts` — print-window HTML shell (editor print/PDF flow)
 
