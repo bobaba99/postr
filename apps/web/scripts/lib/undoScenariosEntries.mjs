@@ -10,7 +10,7 @@
  */
 import {
   KEY, MOD, activeIs, blockOf, canonical, caretIn, clickAway, contentBoxText, focusBlockEnd, focusContentBox, openTab,
-  press, probeInstall, probeTake, read, selectFrame, selectLastWord, typeWord,
+  press, probeInstall, probeTake, read, selectFrame, selectLastWord, tabToward, typeWord,
 } from './undoKit.mjs';
 
 const has = (s, id, word) => (s.blocks[id].dom ?? '').includes(word);
@@ -224,11 +224,12 @@ export const ENTRIES = [
     // press used to move the focus into the text, so the next Enter typed a
     // line break into the poster (wiping the redo) or replaced the redone
     // word. The poster has no table, as the reviewer's: the table's last
-    // cell keeps forward Tab (R2-F3, B1t, Later list), and Shift+Tab from
-    // the workspace leaves Playwright's Firefox at the page's first control.
+    // cell keeps forward Tab (R2-F3, B1t, Later list). Since the merge with
+    // main the buttons are in the top bar, before the workspace: Shift+Tab
+    // reaches them (tabToward picks the direction).
     id: 'B2-buttons-from-the-keyboard', claims: ['B2'],
     editDoc: (doc) => { const d = canonical(doc); return { ...d, blocks: d.blocks.filter((b) => b.type !== 'table') }; },
-    how: 'a poster without a table: type " ZQAA ZQBB" in block 1, click away; Tab to Undo, Enter, Space; Tab to Redo, Enter, Space; then click Undo with the mouse',
+    how: 'a poster without a table: type " ZQAA ZQBB" in block 1, click away; Tab (Shift+Tab since the top bar) to Undo, Enter, Space; Tab to Redo, Enter, Space; then click Undo with the mouse',
     async run(page, ids) {
       const [a] = ids;
       const fwd = engine(page) === 'webkit' ? 'Alt+Tab' : 'Tab';
@@ -238,9 +239,10 @@ export const ENTRIES = [
       await typeWord(page, ' ZQAA ZQBB');
       await clickAway(page);
       const base = (await text()).store.replace(/ ZQAA ZQBB$/, '');
-      let presses = 0;
-      while ((await label()) !== 'Undo' && presses < 60) { await page.keyboard.press(fwd); presses += 1; }
-      if ((await label()) !== 'Undo') throw new Error(`${fwd} did not reach Undo in 60 presses`);
+      // Tab or Shift+Tab, as Undo comes after or before the click (undoKit tabToward).
+      const reach = await tabToward(page, 'Undo');
+      if (!reach) throw new Error('neither Tab nor Shift+Tab reached Undo in 150 presses');
+      const presses = `${reach.presses} × ${reach.key}`;
       const tail = (s) => (s.startsWith(base) ? `…${s.slice(base.length)}` : s);
       const steps = [];
       const after = async (what) => { await page.waitForTimeout(300); const t = await text(); steps.push({ what, text: tail(t.store), screen: tail(t.dom), lineBreak: /<br|<div/i.test(t.storeHtml), focus: await label() }); };

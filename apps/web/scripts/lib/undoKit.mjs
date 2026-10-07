@@ -289,4 +289,30 @@ export const activeIs = (page) => page.evaluate(() => {
   return `${a.tagName}${a.getAttribute('aria-label') ? `[${a.getAttribute('aria-label')}]` : ''}`;
 });
 
+/**
+ * Reach the button named `name` with the keyboard, as a user does from where
+ * the focus (or the last click) is: Tab when the button comes after that
+ * point in the page, Shift+Tab when it comes before (since the merge with
+ * main the Undo and Redo buttons are in the editor's top bar, first in the
+ * page: Shift+Tab from the workspace or the text; Playwright's Firefox does
+ * not wrap a forward Tab past the page's end). WebKit adds Alt (Option),
+ * as Safari's "Press Tab to highlight each item" does. Returns the presses
+ * and the direction, or null when `max` presses did not reach it.
+ */
+export async function tabToward(page, name, max = 150) {
+  const before = await page.evaluate((name) => {
+    const target = [...document.querySelectorAll('button[aria-label]')].find((b) => b.getAttribute('aria-label') === name);
+    const a = document.activeElement;
+    const from = a && a !== document.body ? a : document.querySelector('[data-postr-canvas-outer]');
+    return !!target && !!from && !!(target.compareDocumentPosition(from) & Node.DOCUMENT_POSITION_FOLLOWING);
+  }, name);
+  const webkit = (page.context().browser()?.browserType().name() ?? '') === 'webkit';
+  const key = `${webkit ? 'Alt+' : ''}${before ? 'Shift+' : ''}Tab`;
+  for (let i = 1; i <= max; i += 1) {
+    await page.keyboard.press(key);
+    if ((await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) === name) return { presses: i, key };
+  }
+  return null;
+}
+
 export { sleep };

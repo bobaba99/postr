@@ -20,8 +20,9 @@
  * URL the app uses), never written. Scenarios: lib/undoScenariosCore.mjs
  * (the reproducer's), lib/undoScenariosEntries.mjs, and the review's:
  * lib/undoScenariosSignals.mjs (round 1), lib/undoScenariosCompose.mjs
- * (round 2), lib/undoScenariosButtonKeys.mjs (round 3); helpers:
- * lib/undoKit.mjs.
+ * (round 2), lib/undoScenariosButtonKeys.mjs (round 3), and the merge with
+ * main's: lib/undoScenariosDrags.mjs, lib/undoScenariosPlacement.mjs;
+ * helpers: lib/undoKit.mjs.
  *
  * CLAIMS (a claim is OBSERVED when the defect is present)
  *   U1   ⌘Z with the caret in a text block runs the browser's undo, not the
@@ -72,7 +73,8 @@
  *        Undo does not undo, or Tab from Undo does not reach Redo, or Enter
  *        on Redo does not redo
  *   B2   (review round 2; a poster without a table) " ZQAA ZQBB", click
- *        away, Tab to Undo:
+ *        away, Tab to Undo (Shift+Tab since the merge: the buttons are in
+ *        the top bar, before the workspace; lib/undoKit.mjs tabToward):
  *        Enter then Space do not undo twice with the focus kept on Undo,
  *        or a line break or a space reaches the poster; Tab to Redo, Enter
  *        then Space do not redo both with the focus on Redo; or a mouse
@@ -133,7 +135,7 @@
  *   From the fix's review, round 3 (lib/undoScenariosButtonKeys.mjs; a
  *   poster without a table, " ZQAA ZQBB" typed in block 1, each case on a
  *   new page):
- *   B3   click away, Tab to Undo, Enter, then ArrowDown, ArrowRight,
+ *   B3   click away, Tab (or Shift+Tab) to Undo, Enter, then ArrowDown, ArrowRight,
  *        Backspace, Delete or ⌘D on Undo: a block moves, is removed or is
  *        duplicated, the redo is lost, or the focus leaves Undo
  *   B3k  the same with no click away (a keyboard-only user: Tab from the
@@ -146,6 +148,31 @@
  *        handle, or a range of cells dragged, then Backspace and Delete on
  *        Undo (focused by .focus(), a stand-in for Shift+Tab): the column or
  *        the cells' text is removed
+ *   From the merge of main into fix 12 (record section 11; the merge
+ *   review's F1 and F2, folded in from its undo-controls.mjs and overlap.mjs
+ *   and the integrator's history-vs-controls.mjs):
+ *   G1   the image's right crop edge dragged 12 moves, Apply: the Undo button
+ *        does not undo the drag in one press, or ⌘⇧Z redo it in one
+ *   G2   the image nudged, then one crop gesture of 330 moves (back and
+ *        forth, each a new crop), Apply: the first ⌘Z leaves a crop, or the
+ *        second does not undo the nudge (the gesture pushed it out of the
+ *        100 steps)
+ *   G3   a table column's width grip dragged 12 moves: not one press
+ *   G4   Edit block › Caption spacing dragged through its values: not one
+ *        press (review R2-I1)
+ *   G5   Edit block › Line spacing dragged, held still 0.8 s midway: not one
+ *        press
+ *   B4   the History group shares any area with the workspace, or a control
+ *        of a selected top-left corner logo (one turned 180°) has the group
+ *        on top at its centre: at the fit for the shapes and windows where the
+ *        merge review found one (48×48, 44×48, 46×48 at 1280 × 800 with the
+ *        sidebar shown; 48×28, 48×30, 48×32 hidden; 48×30 hidden at
+ *        2560 × 1440), at the ceiling scrolled to the corner, and the default
+ *   B4o  the top bar at 1280 × 800 (sidebar shown and hidden), 900 × 800 with
+ *        both panels open, 375 × 812 (the phone notice showing): clipped or
+ *        scrolled sideways, the group outside the window or under the notice,
+ *        a button not the top element at its centre, or the sidebar's Show
+ *        button (hidden sidebar) over the workspace
  *   INFORMATION, not counted:
  *   U10p U10 on text stored with <p> wrappers (the first commit unwraps them)
  *   P1   whether highlight (an allowed style) reaches the store after a
@@ -177,6 +204,8 @@
  *   C2  type in a block, click away: ⌘Z removes the word, ⌘⇧Z restores it
  *   C3  a bare contenteditable page (no app code): one ⌘Z removes the typed
  *       word and one ⌘⇧Z restores it
+ *   G0  the image's move button dragged 12 moves (one step before the merge
+ *       too): one press of Undo returns it
  *
  * BLIND SPOTS
  *   - Keys are Playwright's. Native editing shortcuts are the host's: on a
@@ -224,6 +253,8 @@ import { ENTRIES } from './lib/undoScenariosEntries.mjs';
 import { SIGNALS } from './lib/undoScenariosSignals.mjs';
 import { COMPOSE } from './lib/undoScenariosCompose.mjs';
 import { BUTTON_KEYS } from './lib/undoScenariosButtonKeys.mjs';
+import { DRAGS } from './lib/undoScenariosDrags.mjs';
+import { PLACEMENT } from './lib/undoScenariosPlacement.mjs';
 
 const PORT = Number(process.env.PORT ?? 5880);
 const argVal = (name) => {
@@ -239,7 +270,7 @@ const fail = (e) => {
 };
 const VIEWPORT = { width: 1440, height: 900 };
 const POSTER = { w: 48, h: 36 };
-const SCENARIOS = [...CORE, ...ENTRIES, ...SIGNALS, ...COMPOSE, ...BUTTON_KEYS];
+const SCENARIOS = [...CORE, ...ENTRIES, ...SIGNALS, ...COMPOSE, ...BUTTON_KEYS, ...DRAGS, ...PLACEMENT];
 
 /** C3: the engine's own undo on a bare page, no app code. */
 async function bareControl(h) {
@@ -315,8 +346,10 @@ try {
       if (ids.length < 2) throw new Error(`need two text blocks, found ${ids.length}`);
       const extra = [];
       const reopen = async () => { const o = await openEditor(h, openOpts); extra.push(o); return o; };
+      // Another window, poster size or document (the placement scenarios).
+      const openWith = async (over) => { const o = await openEditor(h, { ...openOpts, ...over }); extra.push(o); return o; };
       let r;
-      try { r = await sc.run(opened.page, ids, reopen); } finally { for (const o of extra) await o.context.close().catch(() => {}); }
+      try { r = await sc.run(opened.page, ids, reopen, openWith); } finally { for (const o of extra) await o.context.close().catch(() => {}); }
       results.push({ id: sc.id, how: sc.how, ms: Date.now() - t0, pageErrors: opened.state.errors, ...r, ...(sc.info ? { info: true } : {}) });
     } catch (e) {
       results.push({ id: sc.id, how: sc.how, error: String(e?.message ?? e).slice(0, 300) });

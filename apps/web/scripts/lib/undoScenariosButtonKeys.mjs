@@ -14,7 +14,7 @@
  * returns { claims: {id: observed}, numbers }; a claim is OBSERVED when the
  * defect is present. The claims are listed in the harness header.
  */
-import { MOD, activeIs, blockOf, canonical, clickAway, focusBlockEnd, press, read, selectFrame, typeWord } from './undoKit.mjs';
+import { MOD, activeIs, blockOf, canonical, clickAway, focusBlockEnd, press, read, selectFrame, tabToward, typeWord } from './undoKit.mjs';
 
 /** The engine a page runs in. */
 const engine = (page) => page.context().browser()?.browserType().name() ?? 'chromium';
@@ -50,13 +50,10 @@ const holdBackspaceNavigation = (page) => page.evaluate(() => {
   return location.href;
 });
 
-/** Press the forward Tab until the focus is on the button named `name`; the presses, or null. */
-async function tabTo(page, name, max = 80) {
-  for (let i = 1; i <= max; i += 1) {
-    await page.keyboard.press(fwdTab(page));
-    if ((await page.evaluate(() => document.activeElement?.getAttribute('aria-label'))) === name) return i;
-  }
-  return null;
+/** Tab (or Shift+Tab, undoKit tabToward) until the focus is on the button named `name`; the presses and key, or null. */
+async function tabTo(page, name) {
+  const r = await tabToward(page, name);
+  return r ? `${r.presses} × ${r.key}` : null;
 }
 
 /**
@@ -74,7 +71,7 @@ async function keyCase(open, { start, key }) {
   await typeWord(page, ' ZQAA ZQBB');
   if (start !== 'kbd') await clickAway(page);
   const tabs = await tabTo(page, 'Undo');
-  if (tabs === null) throw new Error(`${fwdTab(page)} did not reach Undo (${start})`);
+  if (tabs === null) throw new Error(`neither Tab nor Shift+Tab reached Undo (${start})`);
   const atUndo = await snapshot(page);
   await press(page, 'Enter', 300);
   let button = 'Undo';
