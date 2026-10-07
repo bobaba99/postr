@@ -1,0 +1,1223 @@
+{
+  "tests": [
+    "src/poster/__tests__/oneUndoHistory.test.tsx",
+    "src/poster/__tests__/undoTextSteps.test.tsx",
+    "src/poster/__tests__/undoInputKinds.test.tsx",
+    "src/poster/__tests__/undoComposition.test.tsx",
+    "src/poster/__tests__/undoButtonKeys.test.tsx",
+    "src/poster/__tests__/sidebarHistory.test.tsx",
+    "src/stores/__tests__/posterStore.test.ts",
+    "src/poster/__tests__/previewMode.test.tsx",
+    "src/poster/__tests__/restoreSheetSize.test.tsx"
+  ],
+  "mutants": {
+    "A-key-case-sensitive": {
+      "undoes": "A — the shortcut letter is matched without case (Shift makes \"z\" into \"Z\")",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "const k = typeof e.key === 'string' ? e.key.toLowerCase() : '';",
+          "const k = typeof e.key === 'string' ? e.key : '';"
+        ]
+      ]
+    },
+    "A-no-ctrl": {
+      "undoes": "A — Ctrl+Z / Ctrl+Y as well as ⌘",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "if (!(e.metaKey || e.ctrlKey) || e.altKey) return null;",
+          "if (!e.metaKey || e.altKey) return null;"
+        ]
+      ]
+    },
+    "A-altgr-is-undo": {
+      "undoes": "A — Ctrl+Alt (AltGr on Windows) is not the shortcut",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "if (!(e.metaKey || e.ctrlKey) || e.altKey) return null;",
+          "if (!(e.metaKey || e.ctrlKey)) return null;"
+        ]
+      ]
+    },
+    "A-no-physical-key": {
+      "undoes": "A — a layout with no Latin letter on the key still undoes (code KeyZ)",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          ": e.code === 'KeyZ' ? 'z' : e.code === 'KeyY' ? 'y' : '';",
+          ": '';"
+        ]
+      ]
+    },
+    "A-no-y-redo": {
+      "undoes": "A — ⌘Y / Ctrl+Y redo",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "return letter === 'y' ? 'redo' : null;",
+          "return null;"
+        ]
+      ]
+    },
+    "A-shift-ignored": {
+      "undoes": "A — Shift turns ⌘Z into redo",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "if (letter === 'z') return e.shiftKey ? 'redo' : 'undo';",
+          "if (letter === 'z') return 'undo';"
+        ]
+      ]
+    },
+    "A-text-fields-keep-browser-undo": {
+      "undoes": "A — MAIN'S DEFECT: every text field of the poster uses the one history (main stepped aside for INPUT, TEXTAREA and contenteditable)",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "  if (keepsOwnUndo(target)) return 'own';",
+          "  if (isTextEntry(target)) return 'own';"
+        ]
+      ]
+    },
+    "A-own-fields-take-history": {
+      "undoes": "A — a field that keeps its own undo is left to the browser",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "  if (keepsOwnUndo(target)) return 'own';\n",
+          ""
+        ]
+      ]
+    },
+    "A-input-not-text": {
+      "undoes": "A — a text <input> is a text field (only a textarea or an editing host would be)",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "  if (el.tagName === 'INPUT') return TEXT_INPUT_TYPES.has((el as HTMLInputElement).type);\n",
+          ""
+        ]
+      ]
+    },
+    "A-dialog-not-blocked": {
+      "undoes": "A — with a dialog or the preview open, ⌘Z does not edit the poster",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "return overlayOpen ? 'block' : 'history';",
+          "return 'history';"
+        ]
+      ]
+    },
+    "A-key-not-cancelled": {
+      "undoes": "A — the key is cancelled, so the browser's own undo never runs",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "      if (route === 'own') return;\n      e.preventDefault();",
+          "      if (route === 'own') return;"
+        ]
+      ]
+    },
+    "A-blocked-key-runs-history": {
+      "undoes": "A — a blocked key (a dialog, the preview) does nothing",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "      if (route === 'history') runRef.current(dir);",
+          "      runRef.current(dir);"
+        ]
+      ]
+    },
+    "A-dialog-needs-aria-modal": {
+      "undoes": "A — a modal without aria-modal (the shared modal markup) counts as a dialog",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "const DIALOG = '[role=\"dialog\"][aria-modal=\"true\"], [data-postr-modal-content]';",
+          "const DIALOG = '[role=\"dialog\"][aria-modal=\"true\"]';"
+        ]
+      ]
+    },
+    "A-closing-dialog-blocks": {
+      "undoes": "A — a dialog fading out (answered) no longer holds ⌘Z",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          ".some((d) => d.getAttribute('data-state') !== 'closing')",
+          ".length > 0"
+        ]
+      ]
+    },
+    "A-dialog-field-no-own-undo": {
+      "undoes": "A — a text field in a dialog keeps its own undo",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "(el.closest(`[${OWN_UNDO_ATTR}]`) !== null || inDialog(el))",
+          "el.closest(`[${OWN_UNDO_ATTR}]`) !== null"
+        ]
+      ]
+    },
+    "B-not-cancelled": {
+      "undoes": "B — the browser's history input is cancelled wherever it would change the poster",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "      if (verdict === 'allow') return;\n      e.preventDefault();",
+          "      if (verdict === 'allow') return;"
+        ]
+      ]
+    },
+    "B-spill-allowed": {
+      "undoes": "B — only the field the key was pressed in gets the browser's undo (a spill to a canvas block is cancelled)",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "if (press) return press.route === 'own' && target === press.field ? 'allow' : 'cancel';",
+          "if (press) return press.route === 'own' ? 'allow' : 'cancel';"
+        ]
+      ]
+    },
+    "B-press-input-routed": {
+      "undoes": "B — the history input of a key already handled is cancelled, not run again (one ⌘Z, one step)",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "if (press) return press.route === 'own' && target === press.field ? 'allow' : 'cancel';",
+          "if (press && press.route !== 'history') return press.route === 'own' && target === press.field ? 'allow' : 'cancel';"
+        ]
+      ]
+    },
+    "B-press-not-cleared": {
+      "undoes": "B — a key press counts for its own task only",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "  setTimeout(() => {\n    pressNow = null;\n  }, 0);",
+          "  void 0;"
+        ]
+      ]
+    },
+    "B-menu-not-routed": {
+      "undoes": "B — the Edit menu's Undo / Redo with the focus in the poster runs the editor's history",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "      if (verdict === 'route') runRef.current(",
+          "      if (verdict === 'route' && false) runRef.current("
+        ]
+      ]
+    },
+    "B-own-field-menu-cancelled": {
+      "undoes": "B — the Edit menu's Undo in a field that keeps its own undo is that field's",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "  if (keepsOwnUndo(target) && target === active) return 'allow';\n",
+          ""
+        ]
+      ]
+    },
+    "B-menu-spill-routed": {
+      "undoes": "B — the Edit menu's Undo spilling from an own-undo field is cancelled, not run by the editor",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "  if (overlayOpen || keepsOwnUndo(active)) return 'cancel';",
+          "  if (overlayOpen) return 'cancel';"
+        ]
+      ]
+    },
+    "B-menu-behind-dialog": {
+      "undoes": "B — the Edit menu's Undo with a dialog open does not edit the poster",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "  if (overlayOpen || keepsOwnUndo(active)) return 'cancel';",
+          "  if (keepsOwnUndo(active)) return 'cancel';"
+        ]
+      ]
+    },
+    "C-history-50": {
+      "undoes": "C — 100 steps (decision 10; main held 50)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "export const UNDO_HISTORY_LIMIT = 100;",
+          "export const UNDO_HISTORY_LIMIT = 50;"
+        ]
+      ]
+    },
+    "C-toast-always": {
+      "undoes": "C — nothing is shown when there was nothing to undo or redo (decision 7)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      if (!applied) return;\n      showToast(",
+          "      showToast("
+        ]
+      ]
+    },
+    "C-undo-always-applied": {
+      "undoes": "C — undo reports when there was nothing to undo",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "    });\n    return applied;\n  },\n\n  redo: () => {",
+          "    });\n    return true;\n  },\n\n  redo: () => {"
+        ]
+      ]
+    },
+    "C-redo-always-applied": {
+      "undoes": "C — redo reports when there was nothing to redo",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "    });\n    return applied;\n  },\n}));",
+          "    });\n    return true;\n  },\n}));"
+        ]
+      ]
+    },
+    "C-noop-update-is-a-step": {
+      "undoes": "C — an update that changes nothing adds no step (the browser's undo over text the editor restored, U10)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      if (keys.every((k) => sameValue(patch[k], block[k]))) return {};\n",
+          ""
+        ]
+      ]
+    },
+    "C-words-not-split": {
+      "undoes": "C — a non-space character typed after a space starts a new step (decision 3)",
+      "edits": [
+        [
+          "src/stores/historySteps.ts",
+          "  return !(edit.kind === 'type' && edit.startsWord);",
+          "  return true;"
+        ]
+      ]
+    },
+    "C-pause-splits-word": {
+      "undoes": "C — a pause does not split a word",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "        continuesTextStep(lastPush!.text, text)",
+          "        continuesTextStep(lastPush!.text, text) && now - lastPush!.at < COALESCE_IDLE_MS"
+        ]
+      ]
+    },
+    "C-kinds-merge": {
+      "undoes": "C — typing and deleting are separate steps",
+      "edits": [
+        [
+          "src/stores/historySteps.ts",
+          "  if (previous === null || edit.kind === 'other' || edit.kind !== previous) return false;",
+          "  if (previous === null || edit.kind === 'other') return false;"
+        ]
+      ]
+    },
+    "C-other-continues": {
+      "undoes": "C — a paste, a cut or Enter is a step of its own even after another",
+      "edits": [
+        [
+          "src/stores/historySteps.ts",
+          "  if (previous === null || edit.kind === 'other' || edit.kind !== previous) return false;",
+          "  if (previous === null || edit.kind !== previous) return false;"
+        ]
+      ]
+    },
+    "C-replace-continues": {
+      "undoes": "C — a character typed over a selection starts a new step",
+      "edits": [
+        [
+          "src/stores/historySteps.ts",
+          "    if (removed > 0) return { kind: 'type', startsWord: true };",
+          "    if (removed > 0) return { kind: 'type', startsWord: false };"
+        ]
+      ]
+    },
+    "C-newline-is-typing": {
+      "undoes": "C — a newline (Enter in a note) is not typing",
+      "edits": [
+        [
+          "src/stores/historySteps.ts",
+          "  if (inserted.length === 1 && inserted !== '\\n') {",
+          "  if (inserted.length === 1) {"
+        ]
+      ]
+    },
+    "C-backspace-not-grouped": {
+      "undoes": "C — single-character deletions run together as one step",
+      "edits": [
+        [
+          "src/stores/historySteps.ts",
+          "  if (inserted.length === 0 && removed === 1) return { kind: 'delete', startsWord: false };\n",
+          ""
+        ]
+      ]
+    },
+    "C-hint-ignored": {
+      "undoes": "C — the browser's word that a letter was typed over a selection is used (\"Jane Doe\" → \"J\")",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "  if (typedOverSelection()) return { kind: 'type', startsWord: true };\n",
+          ""
+        ]
+      ]
+    },
+    "C-hint-not-noted": {
+      "undoes": "C — the editor notes the browser's beforeinput (typing, deleting, a paste or a drop) for the store's step rules",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "        noteBeforeInput(e.inputType, e.data, caretOf(e.target));\n",
+          ""
+        ]
+      ]
+    },
+    "C-hint-selection-not-read": {
+      "undoes": "C — the selection of a text <input> is read for that",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "return { collapsed: start === target.selectionEnd,",
+          "return { collapsed: true,"
+        ]
+      ]
+    },
+    "C-colour-as-text": {
+      "undoes": "C — a colour picked (a string, not typed: no beforeinput) keeps the time windows, even one hex digit at a time (review R1-F1)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "  if (!typedNow() && !ownStepNow()) return undefined;\n",
+          ""
+        ]
+      ]
+    },
+    "C-sidebar-text-by-time": {
+      "undoes": "C — typing in a sidebar text field is grouped by word too",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      const text = coalesceKey !== null ? textEditOfDocPatch(state.doc, patch) : undefined;",
+          "      const text = undefined;"
+        ]
+      ]
+    },
+    "C-cell-not-keyed": {
+      "undoes": "C — typing in a table cell is grouped by word under the cell (main: one step per keystroke)",
+      "edits": [
+        [
+          "src/stores/historySteps.ts",
+          "  if (k === 'tableData') {",
+          "  if (k === ('tableDataX' as string)) {"
+        ]
+      ]
+    },
+    "C-caption-not-keyed": {
+      "undoes": "C — the caption and the note are text fields too (main: one step per keystroke)",
+      "edits": [
+        [
+          "src/stores/historySteps.ts",
+          "  if (k === 'content' || k === 'caption' || k === 'note') {",
+          "  if (k === 'content') {"
+        ]
+      ]
+    },
+    "C-restore-wipes-history": {
+      "undoes": "C — restoring a version is one undoable step (decision 6; main called setPoster, which wiped the history)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      usePosterStore.getState().restoreVersion(restored, { sizeFallback: currentDoc ?? undefined });",
+          "      usePosterStore.getState().setPoster(currentId, restored, state.posterTitle, { sizeFallback: currentDoc ?? undefined });"
+        ]
+      ]
+    },
+    "C-restore-drops-lock": {
+      "undoes": "C — a restored version keeps the locked credit mark, as undo does",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      const restored = restoreFromHistory(state.doc, withUsableSheetSize(doc, options.sizeFallback));",
+          "      const restored = withUsableSheetSize(doc, options.sizeFallback);"
+        ]
+      ]
+    },
+    "C-restore-same-is-a-step": {
+      "undoes": "C — restoring the version already on screen adds no step",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "      if (sameValue(restored, state.doc)) return {};\n",
+          ""
+        ]
+      ]
+    },
+    "D-focused-not-repainted": {
+      "undoes": "D — an undo with the caret in the field shows the result there (the H4 trap: the next keystroke wrote the old text back)",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "    if (!el || shown.current === value) return;",
+          "    if (!el || shown.current === value || document.activeElement === el) return;"
+        ]
+      ]
+    },
+    "D-history-input-committed": {
+      "undoes": "D — the browser's own undo input is never stored",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "      if (type === 'historyUndo' || type === 'historyRedo') {",
+          "      if (false) {"
+        ]
+      ]
+    },
+    "D-history-input-not-put-back": {
+      "undoes": "D — after the browser's own undo input, the field shows the poster again",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "        el.innerHTML = latest.current.toHtml(latest.current.value);\n",
+          ""
+        ]
+      ]
+    },
+    "D-history-input-caret-lost": {
+      "undoes": "D — putting the field back keeps the caret",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "        if (caret) selectOffsets(el, caret.start, caret.end);\n        return;",
+          "        return;"
+        ]
+      ]
+    },
+    "D-no-focus-after-undo": {
+      "undoes": "D — after an undo or redo of text the field takes the focus (decision 4)",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "    if (takeHistoryFocus(historyKey, surface)) {",
+          "    if (takeHistoryFocus(historyKey, surface) && false) {"
+        ]
+      ]
+    },
+    "D-no-selection-after-undo": {
+      "undoes": "D — and the restored text is selected (the caret where text went)",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "      selectOffsets(el, changed.start, changed.end);\n",
+          ""
+        ]
+      ]
+    },
+    "D-format-range-text-only": {
+      "undoes": "D — after a format undo, the text it was on is selected",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "  const differs = (i: number) => a.marks[i] !== b.marks[i];",
+          "  const differs = (_i: number) => false;"
+        ]
+      ]
+    },
+    "D-external-write-loses-caret": {
+      "undoes": "D — a focused field rewritten by a wider undo keeps its caret",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "    } else if (caret) {",
+          "    } else if (caret && false) {"
+        ]
+      ]
+    },
+    "D-caret-key-continues": {
+      "undoes": "D — moving the caret by key ends the step",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "    if (CARET_KEYS.has(e.key) && e.nativeEvent?.isComposing !== true) breakUndoCoalescing();",
+          "    void e;"
+        ]
+      ]
+    },
+    "D-caret-click-continues": {
+      "undoes": "D — a click in a text block ends the step",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "          history.onCaretClick();\n",
+          ""
+        ]
+      ]
+    },
+    "D-cell-caret-key-continues": {
+      "undoes": "D — moving the caret by key in a cell ends the step",
+      "edits": [
+        [
+          "src/poster/TableCellEditor.tsx",
+          "      onKeyUp={history.onCaretKey}\n",
+          ""
+        ]
+      ]
+    },
+    "D-cell-caret-click-continues": {
+      "undoes": "D — a click in a cell ends the step",
+      "edits": [
+        [
+          "src/poster/TableCellEditor.tsx",
+          "      onClick={history.onCaretClick}\n",
+          ""
+        ]
+      ]
+    },
+    "D-cell-history-input-committed": {
+      "undoes": "D — a cell refuses the browser's own undo input too",
+      "edits": [
+        [
+          "src/poster/TableCellEditor.tsx",
+          "      onInput={(e) => history.commitInput(e.nativeEvent, () => ref.current?.innerHTML ?? '', onCommit)}",
+          "      onInput={(e) => onCommit(e.currentTarget.innerHTML)}"
+        ]
+      ]
+    },
+    "D-cell-rewritten-each-render": {
+      "undoes": "D (decision 9) — a cell is not rewritten as it is typed in (main: \"abc\" became \"cba\")",
+      "edits": [
+        [
+          "src/poster/TableCellEditor.tsx",
+          "      contentEditable\n      suppressContentEditableWarning\n",
+          "      contentEditable\n      suppressContentEditableWarning\n      dangerouslySetInnerHTML={{ __html: html }}\n"
+        ]
+      ]
+    },
+    "D-focus-join-step": {
+      "undoes": "D — going into a field ends the step",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "    document.addEventListener('focusin', endStep, true);\n",
+          ""
+        ]
+      ]
+    },
+    "D-title-not-keyed": {
+      "undoes": "D — the title's editor has its history key",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "            historyKey={`content:${b.id}`}\n            placeholder=\"Poster Title\"",
+          "            placeholder=\"Poster Title\""
+        ]
+      ]
+    },
+    "D-heading-not-keyed": {
+      "undoes": "D — a heading's editor has its history key",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "              historyKey={`content:${b.id}`}\n              placeholder=\"Section Heading\"",
+          "              placeholder=\"Section Heading\""
+        ]
+      ]
+    },
+    "D-text-not-keyed": {
+      "undoes": "D — a text block's editor has its history key",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "            historyKey={`content:${b.id}`}\n            multiline\n",
+          "            multiline\n"
+        ]
+      ]
+    },
+    "D-content-box-not-keyed": {
+      "undoes": "D — the Content box has its history key, so an undo there stays there",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "            historyKey={`content:${block.id}`}\n            surface=\"sidebar\"\n",
+          "            surface=\"sidebar\"\n"
+        ]
+      ]
+    },
+    "D-content-box-is-canvas": {
+      "undoes": "D — the Content box is the sidebar's copy",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "            historyKey={`content:${block.id}`}\n            surface=\"sidebar\"\n",
+          "            historyKey={`content:${block.id}`}\n"
+        ]
+      ]
+    },
+    "E-block-not-selected": {
+      "undoes": "E — the block whose text was undone is selected",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        setSelectedIds((prev) => (prev.size === 1 && prev.has(target.blockId) ? prev : new Set([target.blockId])));\n",
+          ""
+        ]
+      ]
+    },
+    "E-buttons-under-reveal": {
+      "undoes": "E — with the sidebar hidden the buttons move clear of its Show button",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "<HistoryButtons left={sidebarOpen ? 12 : 64} onRun={runEditorHistory} />",
+          "<HistoryButtons left={12} onRun={runEditorHistory} />"
+        ]
+      ]
+    },
+    "E-buttons-read-only": {
+      "undoes": "E — a read-only viewer gets no buttons",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        {!readOnly && (\n          // Not for viewers",
+          "        {(\n          // Not for viewers"
+        ]
+      ]
+    },
+    "E-undo-button-never-disabled": {
+      "undoes": "E — Undo is disabled with nothing to undo (decision 5)",
+      "edits": [
+        [
+          "src/poster/HistoryButtons.tsx",
+          "        disabled={!canUndo}\n",
+          ""
+        ]
+      ]
+    },
+    "E-redo-button-never-disabled": {
+      "undoes": "E — Redo is disabled with nothing to redo",
+      "edits": [
+        [
+          "src/poster/HistoryButtons.tsx",
+          "        disabled={!canRedo}\n",
+          ""
+        ]
+      ]
+    },
+    "E-redo-button-undoes": {
+      "undoes": "E — the Redo button redoes",
+      "edits": [
+        [
+          "src/poster/HistoryButtons.tsx",
+          "        onClick={run('redo')}",
+          "        onClick={run('undo')}"
+        ]
+      ]
+    },
+    "E-about-50": {
+      "undoes": "E — the About page states the limit the editor keeps",
+      "edits": [
+        [
+          "src/pages/About.tsx",
+          "'Undo and redo up to 100 steps.",
+          "'Undo and redo up to 50 steps."
+        ]
+      ]
+    },
+    "F-alignment-back": {
+      "undoes": "F — no alignment buttons on the selection toolbar (they never reached the poster)",
+      "edits": [
+        [
+          "src/poster/FloatingFormatToolbar.tsx",
+          "      {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}\n",
+          "      {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}\n      {cmdButton('≡', 'justifyCenter', false, onChange, { fontSize: 16 })}\n"
+        ]
+      ]
+    },
+    "F-size-back": {
+      "undoes": "F — no A+ / A− on the selection toolbar (they never reached the poster)",
+      "edits": [
+        [
+          "src/poster/FloatingFormatToolbar.tsx",
+          "      {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}\n",
+          "      {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}\n      <button type=\"button\" title=\"Larger\">A+</button>\n"
+        ]
+      ]
+    },
+    "Z-figure-tab": {
+      "undoes": "Z — the Figure tab (the code box, its preview size, Make's table) keeps its own undo",
+      "edits": [
+        [
+          "src/poster/sidebar/FigureTab.tsx",
+          "    <div data-own-undo>\n",
+          "    <div>\n"
+        ]
+      ]
+    },
+    "Z-poster-name": {
+      "undoes": "Z — the poster name keeps its own undo",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "          // Not the poster until saved: keeps the browser's own undo (fix 12).\n          data-own-undo\n",
+          ""
+        ]
+      ]
+    },
+    "Z-authors-paste": {
+      "undoes": "Z — the Authors paste box keeps its own undo",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "          // A draft until parsed: keeps the browser's own undo (fix 12).\n          data-own-undo\n          value={pasteText}",
+          "          value={pasteText}"
+        ]
+      ]
+    },
+    "Z-references-paste": {
+      "undoes": "Z — the References paste box keeps its own undo",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        // A draft until parsed: keeps the browser's own undo (fix 12).\n        data-own-undo\n        value={pasteText}",
+          "        value={pasteText}"
+        ]
+      ]
+    },
+    "Z-references-manual": {
+      "undoes": "Z — the References manual entry keeps its own undo",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      <div data-own-undo style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>",
+          "      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>"
+        ]
+      ]
+    },
+    "Z-preset-name": {
+      "undoes": "Z — the style preset's name keeps its own undo",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "          // A preset's name, not the poster: keeps the browser's own undo (fix 12).\n          data-own-undo\n",
+          ""
+        ]
+      ]
+    },
+    "Z-version-name": {
+      "undoes": "Z — the version name keeps its own undo",
+      "edits": [
+        [
+          "src/poster/VersionPanel.tsx",
+          "    <div data-own-undo style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>",
+          "    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>"
+        ]
+      ]
+    },
+    "Z-guidelines": {
+      "undoes": "Z — the guidelines' checklist and notes keep their own undo",
+      "edits": [
+        [
+          "src/poster/GuidelinesPanel.tsx",
+          "    <div data-postr-guidelines data-own-undo style={panelStyle}>",
+          "    <div data-postr-guidelines style={panelStyle}>"
+        ]
+      ]
+    },
+    "Z-palette-designer-not-dialog": {
+      "undoes": "Z — the palette designer is a modal dialog",
+      "edits": [
+        [
+          "src/components/PaletteDesigner.tsx",
+          "        role=\"dialog\"\n        aria-modal=\"true\"\n",
+          ""
+        ]
+      ]
+    },
+    "A-physical-key-for-punctuation": {
+      "undoes": "A — the physical key counts only for a letter that is not Latin (Dvorak's ⌘; is not undo, review R1-F5)",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "  const otherLetter = /^\\p{L}$/u.test(k);",
+          "  const otherLetter = true;"
+        ]
+      ]
+    },
+    "A-no-physical-y": {
+      "undoes": "A — ⌘Y on a layout with no Latin Y there (code KeyY) redoes (review R1-F4)",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          ": e.code === 'KeyZ' ? 'z' : e.code === 'KeyY' ? 'y' : '';",
+          ": e.code === 'KeyZ' ? 'z' : '';"
+        ]
+      ]
+    },
+    "C-typing-not-noted": {
+      "undoes": "C — a beforeinput of typing says a sidebar string is text (one step per word there)",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "    h.typed = true;\n    if (!caret.collapsed) h.typedOverSelection = true;",
+          "    if (!caret.collapsed) h.typedOverSelection = true;"
+        ]
+      ]
+    },
+    "C-delete-not-typed": {
+      "undoes": "C — a beforeinput of deleting says a sidebar string is text (backspaces run together, whatever the pauses)",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "  } else if (inputType.startsWith('delete')) {\n    h.typed = true;",
+          "  } else if (inputType.startsWith('delete')) {"
+        ]
+      ]
+    },
+    "C-deleted-selection-not-own-step": {
+      "undoes": "C — a deleted selection (or a cut) is a step of its own, even of one character",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "    if (!caret.collapsed) h.ownStep = true;",
+          "    if (false) h.ownStep = true;"
+        ]
+      ]
+    },
+    "C-drop-not-own-step": {
+      "undoes": "C — a drop of one character is a step of its own (beforeinput insertFromDrop)",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "    h.ownStep = true; // a paste, a drop",
+          "    // a paste, a drop"
+        ]
+      ]
+    },
+    "C-paste-not-noted": {
+      "undoes": "C — a paste of one character is a step of its own: the paste event says so, the editor's execCommand does not (review R1-F2)",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "    document.addEventListener('paste', notePaste, true);\n",
+          ""
+        ]
+      ]
+    },
+    "C-own-step-ignored": {
+      "undoes": "C — the store reads a paste, drop, cut or deleted selection as a step of its own",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "  if (ownStepNow()) return { kind: 'other', startsWord: false };\n",
+          ""
+        ]
+      ]
+    },
+    "C-word-start-ignored": {
+      "undoes": "C — a word starts where the caret is, whatever follows it (review R1-F6)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "  return edit.kind === 'type' && word !== null ? { kind: 'type', startsWord: word } : edit;",
+          "  return edit;"
+        ]
+      ]
+    },
+    "C-word-start-not-noted": {
+      "undoes": "C — the editor notes whether the typed character starts a word",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "      h.wordStart = !isSpace(data) && (caret.before === null || isSpace(caret.before));",
+          "      h.wordStart = null;"
+        ]
+      ]
+    },
+    "C-caret-before-field-not-read": {
+      "undoes": "C — in a sidebar field, the character before the caret is read",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "before: start > 0 ? target.value[start - 1]! : null };",
+          "before: undefined };"
+        ]
+      ]
+    },
+    "C-caret-before-host-not-read": {
+      "undoes": "C — in a text block or a cell, the character before the caret is read",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "  return { collapsed: r.collapsed, before: text.length > 0 ? text[text.length - 1]! : null };",
+          "  return { collapsed: r.collapsed, before: undefined };"
+        ]
+      ]
+    },
+    "C-host-selection-not-read": {
+      "undoes": "C — in a text block or a cell, whether the selection was a caret is read (typing over a word, a deleted selection)",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "  return { collapsed: r.collapsed, before: text.length > 0",
+          "  return { collapsed: true, before: text.length > 0"
+        ]
+      ]
+    },
+    "C-word-capped-at-5s": {
+      "undoes": "C — a pause never splits a word, even past the 5 s cap other edits keep (review R1-F4)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "        continuesTextStep(lastPush!.text, text)",
+          "        continuesTextStep(lastPush!.text, text) && now - lastPush!.startedAt < COALESCE_MAX_MS"
+        ]
+      ]
+    },
+    "B-field-history-input-not-noted": {
+      "undoes": "B — the browser's own undo applied to a sidebar field with no beforeinput is noted (review R1-F3)",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "    document.addEventListener('input', onInput, true);\n",
+          ""
+        ]
+      ]
+    },
+    "B-field-history-input-stored": {
+      "undoes": "B — nothing is stored in the task of the browser's own undo or redo (review R1-F3)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "  if (!state.doc || browserHistoryNow()) return {};",
+          "  if (!state.doc) return {};"
+        ]
+      ]
+    },
+    "B-hint-not-reset-by-key": {
+      "undoes": "B — a key starts a new record: one run before the end-of-task timer is not refused",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "      resetInputHint();\n",
+          ""
+        ]
+      ]
+    },
+    "D-history-redo-input-committed": {
+      "undoes": "D — the browser's own redo input is not stored either, and the field is put back (review R1-F4)",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "      if (type === 'historyUndo' || type === 'historyRedo') {",
+          "      if (type === 'historyUndo') {"
+        ]
+      ]
+    },
+    "C-composition-read-as-typing": {
+      "undoes": "C — a composition's updates are one unit, not letters typed over the selection the browser puts on the text composed so far (review R2-F1)",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "  if (COMPOSITION_INPUT.has(inputType)) {\n    // The selection over the text composed so far is the composition's,\n    // not one the user made.\n    h.typed = true;\n    h.composing = true;\n    return;\n  }\n  if (inputType === 'insertText') {",
+          "  if (inputType === 'insertText' || inputType === 'insertCompositionText') {"
+        ]
+      ]
+    },
+    "C-composition-level2-commit-own-step": {
+      "undoes": "C — WebKit's commit (deleteCompositionText, insertFromComposition) belongs to its composition, not a paste-like step of its own (review R2-F1)",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "const COMPOSITION_INPUT = new Set(['insertCompositionText', 'deleteCompositionText', 'insertFromComposition']);",
+          "const COMPOSITION_INPUT = new Set(['insertCompositionText']);"
+        ]
+      ]
+    },
+    "C-composition-not-consulted": {
+      "undoes": "C — the store reads the composition before its other rules (review R2-F1)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "  const composed = compositionEditNow();\n",
+          "  const composed = null as { startsWord: boolean } | null;\n"
+        ]
+      ]
+    },
+    "C-composition-updates-split": {
+      "undoes": "C — only a composition's first edit can start a step; its updates and commit continue it (review R2-F1)",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "  return { startsWord: first && composition.wordStart };",
+          "  return { startsWord: composition.wordStart };"
+        ]
+      ]
+    },
+    "C-composition-never-starts-word": {
+      "undoes": "C — a composition after a space starts a new step (review R2-F1)",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "  return { startsWord: first && composition.wordStart };",
+          "  return { startsWord: false };"
+        ]
+      ]
+    },
+    "C-composition-cjk-joins": {
+      "undoes": "C — after a Han, Hiragana or Katakana character a composition starts a new step: there each composed phrase is a word (review R2-F1)",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          " || isSpace(before) || NO_SPACE_SCRIPT.test(before);",
+          " || isSpace(before);"
+        ]
+      ]
+    },
+    "C-composition-over-selection-continues": {
+      "undoes": "C — a composition that replaces a selection starts a new step, like a letter typed over one (review R2-F1)",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "  const wordStart = !caret.collapsed || before == null",
+          "  const wordStart = before == null"
+        ]
+      ]
+    },
+    "C-composition-read-for-typing": {
+      "undoes": "C — the composition is read only for an edit the browser said was a composition's: a word typed after it is its own step (review R2-F1)",
+      "edits": [
+        [
+          "src/stores/inputHint.ts",
+          "  if (!composition || hint?.composing !== true) return null;",
+          "  if (!composition) return null;"
+        ]
+      ]
+    },
+    "B-compositionstart-not-noted": {
+      "undoes": "B — the page notes where each composition begins (review R2-F1)",
+      "edits": [
+        [
+          "src/poster/useEditorHistory.ts",
+          "    document.addEventListener('compositionstart', onCompositionStart, true);\n",
+          ""
+        ]
+      ]
+    },
+    "D-caret-key-in-composition-ends-step": {
+      "undoes": "D — an arrow key released inside a composition (an input method's candidate list) does not end the step (review R2-F1)",
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "    if (CARET_KEYS.has(e.key) && e.nativeEvent?.isComposing !== true) breakUndoCoalescing();",
+          "    if (CARET_KEYS.has(e.key)) breakUndoCoalescing();"
+        ]
+      ]
+    },
+    "E-button-key-press-moves-focus": {
+      "undoes": "E — Undo or Redo pressed from the keyboard leaves the focus on the button (review R2-F2)",
+      "edits": [
+        [
+          "src/poster/HistoryButtons.tsx",
+          "onRun(dir, { keepFocus: e.detail === 0 })",
+          "onRun(dir, { keepFocus: false && e.detail === 0 })"
+        ]
+      ]
+    },
+    "E-keep-focus-ignored": {
+      "undoes": "E — the history leaves the focus where it is when asked to (review R2-F2)",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "  if (target && !opts.keepFocus) {",
+          "  if (target) {"
+        ]
+      ]
+    },
+    "E-button-click-keeps-focus": {
+      "undoes": "E — a mouse or touch press still puts the caret back where the change was (decision 4)",
+      "edits": [
+        [
+          "src/poster/HistoryButtons.tsx",
+          "onRun(dir, { keepFocus: e.detail === 0 })",
+          "onRun(dir, { keepFocus: e.detail >= 0 })"
+        ]
+      ]
+    },
+    "E-keyboard-press-selects-block": {
+      "undoes": "E — a button pressed from the keyboard keeps the selection as it was: it selects no block (review R3-F1)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      if (target && !opts?.keepFocus) {",
+          "      if (target) {"
+        ]
+      ]
+    },
+    "E-keys-on-buttons-reach-poster": {
+      "undoes": "E — a key pressed on the Undo or Redo button never reaches the selected block: no nudge, delete or duplicate from there (review R3-F1)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      if (onHistoryButtons(e.target)) return;\n",
+          ""
+        ]
+      ]
+    },
+    "E-table-line-delete-from-buttons": {
+      "undoes": "E — Backspace or Delete on the Undo or Redo button leaves a table row or column the user selected (review R3-F1, a sibling)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      if (onHistoryButtons(target)) return;\n      e.preventDefault();\n      if (selectedRow !== null",
+          "      e.preventDefault();\n      if (selectedRow !== null"
+        ]
+      ]
+    },
+    "E-table-range-clear-from-buttons": {
+      "undoes": "E — Backspace or Delete on the Undo or Redo button leaves the text of a range of table cells the user selected (review R3-F1, a sibling)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      if (onHistoryButtons(target)) return;\n      e.preventDefault();\n      const r0",
+          "      e.preventDefault();\n      const r0"
+        ]
+      ]
+    },
+    "E-button-guard-everywhere": {
+      "undoes": "E — the buttons' guard is narrow: with the focus off the buttons the editor's nudge and delete keys still act on the selection (review R3-F1)",
+      "edits": [
+        [
+          "src/poster/editorHistory.ts",
+          "  return target instanceof Element && target.closest('[data-postr-history-buttons]') !== null;",
+          "  return true;"
+        ]
+      ]
+    },
+    "D-own-typing-written-back": {
+      "undoes": "D — the editor does not write its own typing back into the field (only a change from outside: an undo, the other copy, a row inserted)",
+      "expect": "survive",
+      "why": "jsdom inserts typed text as text nodes, so the DOM always equals what is stored; a browser stores a sanitized copy that can differ (after Enter, Chromium, Firefox and WebKit put the new line in a <div>, which the sanitizer flattens), and only there does writing it back show",
+      "browser": {
+        "harness": "scripts/undo-history-check.mjs",
+        "scenarios": [
+          "W3"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/useEditableHistory.ts",
+          "    if (!el || shown.current === value) return;",
+          "    if (!el) return;"
+        ]
+      ]
+    }
+  }
+}

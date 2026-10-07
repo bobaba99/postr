@@ -549,6 +549,37 @@ Record `docs/fixes/07-figure-script-kept.md`; browser instrument `apps/web/scrip
 
 ---
 
+# PART 7 — ONE UNDO HISTORY (plan item 12)
+
+## 27. Undo and redo work the same from every field of the poster
+
+Record `docs/fixes/12-one-undo-history.md`; browser instrument `apps/web/scripts/undo-history-check.mjs` (its claims are named after each check). Do it in Chrome, Firefox and Safari, with a real keyboard: what each OS sends for ⌘⇧Z and Ctrl+Shift+Z, the real Edit menu and the right-click menu were not driven by the harness.
+
+- **Set up:** any poster in the editor.
+- [ ] Type two words at the end of a text block, " hello world", without pausing. ⌘Z with the caret still in the block: only "world" goes, the toast says "Undo", and the caret sits where "world" was. ⌘Z again: "hello " goes. ⌘⇧Z: "hello " comes back and is selected; ⌘Y (Ctrl+Y) redoes "world" (W1, U1, U2, K1).
+- [ ] The same after clicking the empty canvas: the same steps, and the block gets the caret back (U3–U5, K1). Type, pause a few seconds in the middle of a word, finish it: one ⌘Z removes the whole word (W2).
+- [ ] Enter, a paste, cutting or deleting a selection, and the toolbar's B are each one step of their own; the word typed after one is undone on its own (F-*). After Enter and typing, the new line stays on its own line on screen (W3; note: the line break is not saved, see the record's §10 and the plan's Later list).
+- [ ] Style › Font, then click into a text block and ⌘Z: the font change is undone (U6). Delete an image with Backspace, click into a text block, ⌘Z: the image comes back (E7). Type in block A, click into block B, ⌘Z: A's typing goes and A gets the caret (U8, K2).
+- [ ] From Authors › Author name, Edit block › Font size (type 60), the Content box, the caption field, the caption-spacing slider and a select: ⌘Z there undoes the poster's last step (the field's own change when it was the last), never the browser's per-field undo (U9, bsf, E1, E17, E2). In the Content box the caret stays in the box.
+- [ ] Type in a table cell: the letters keep their order ("abc" stays "abc"); one ⌘Z removes the word; 55 characters in a cell do not push an earlier change out of the history (U12r, U12, U12e).
+- [ ] The Figure tab's code box, Layout › Poster name, Versions' name, the Authors and References paste boxes, References' Manual Entry, the style preset name and the guidelines' notes keep the browser's own undo for their own text, and ⌘Z there never changes the poster (in Chrome and Safari, pressing ⌘Z on past the field's own steps does nothing) (E4, N1).
+- [ ] With the size dialog open (Layout width ↑ Enter), in Copy a design, in the palette designer, or in Preview: ⌘Z changes nothing on the poster and the focus stays in the dialog; a text field in a dialog keeps its own undo (E15, E14).
+- [ ] The Undo and Redo buttons at the poster area's top-left: both greyed on a freshly opened poster; Undo enabled after an edit; each does what the keys do. Keyboard: on a poster without a table Tab reaches them; on a poster with a table forward Tab stops in the table's last cell (an older defect, the plan's Later list), so use Shift+Tab (Safari: Option+Tab / Option+Shift+Tab, or turn on "Press Tab to highlight each item") (B1, B1t). Enter or Space presses them and the focus stays on the button: pressing again undoes (or redoes) again and never types into the poster (B2). A click with the mouse puts the caret back in the text the step changed. With the sidebar hidden they sit right of its Show button.
+- [ ] Type two words in a text block, click the empty canvas, Tab to Undo (Shift+Tab on a poster with a table) and press Enter: no block shows as selected. Again without the click (the block stays selected, as for a keyboard-only user): in both cases press each of ←, →, ↑, ↓, Backspace, Delete and ⌘D (Ctrl+D) on Undo: nothing on the poster moves, goes or is copied, Redo stays enabled and the focus stays on Undo; the same on Redo. Select a table column by its handle (or drag across cells), Shift+Tab to Undo, Backspace: the column (the cells' text) stays (B3, B3k, B3r, B3s, B3t). Control: with a block selected and the focus off the buttons, the arrows still nudge it. On Windows or Linux, where a click is expected to focus a button, note whether an arrow after clicking Undo nudges the selected block (by the code it does not until the poster is clicked, since the key lands on the button; on a Mac a click leaves the focus off the button and the arrow nudges: record 12 §10).
+- [ ] With nothing to undo, ⌘Z shows nothing (U16). 60 arrow-key nudges are all undone by 60 ⌘Z (U17, 100 steps).
+- [ ] Versions › Restore › Restore, then ⌘Z: the poster as it was before the restore, and the edits before that are still undoable; ⌘⇧Z restores the version again (V1).
+- [ ] The selection toolbar (and its copy above the Content box) has no A+/A− and no alignment buttons; text size is Edit block › Font, heading alignment is Style › Headings (TB).
+- [ ] Select a text block, Edit block › colour: drag around the picker, close it, ⌘Z: the colour from before the drag comes back in one press (W4; the harness fires the picker's events, a real drag is this check).
+- [ ] Type " ZQAB" in a text block, select "B" (Shift+←), ⌘C, ⌘↓, ⌘V, type "CD": ⌘Z removes "CD", the next ⌘Z the pasted "B" (W5). The same in Authors › Author name: one pasted character is a step of its own.
+- [ ] Put the caret in front of a word and type a new word that starts with the same letter, with a space after it (e.g. "a " in front of "about"): ⌘Z removes the new word alone (W6).
+- [ ] With the caret in Authors › Author name after typing, use the browser's own Edit › Undo (menu bar, or right-click › Undo): the poster's history undoes, or nothing changes; the field and the poster never disagree, and ⌘Z afterwards never brings text back (E5i, with the real menus the harness does not drive).
+- [ ] On a Dvorak layout, ⌘ with the key that types ";" (where QWERTY has Z) does not undo, and ⌘ with the key that types "z" does; on a Cyrillic layout ⌘Я and ⌘Н (the Z and Y keys) undo and redo.
+- [ ] With an input method (Japanese, Chinese, Korean), a dead key (Mac: Option+E, then e) and a phone's keyboard, in a text block, a table cell and Authors › Author name: type a few words; each ⌘Z removes one whole word, never showing letters or kana that were on the way ("にほんg"); in Chinese each composed word is one step; 12 words do not push an earlier change out of the history. Firefox and Safari by hand: the harness drives Chromium's own IME only (I1–I7). Cancel a composition with Escape: the text is as before; note that the next ⌘Z then shows "Undo" and changes nothing, and a redo held before is gone (record 12 §10).
+- [ ] On a Mac, Ctrl+Y redoes (owner decision 1), so the system's Ctrl+K / Ctrl+Y (kill to the end of the line, then yank it back) no longer brings the text back in a text block; ⌘Z undoes the kill (an owner question, record 12 §10).
+- [ ] Select a word in a text block and drag it to another place in the same block, then ⌘Z once: note whether the word goes back where it was, or is missing from both places until a second ⌘Z (the harness cannot drive a native text drag; the second case would be two steps, the plan's Later list).
+
+---
+
 ## Quick findings summary (things the trace flagged as broken/unverified/contradictory)
 
 **Fixed 2026-09-11 (lifecycle audit `docs/plans/2026-09-10-lifecycle-evaluation.md`, branch `claude/core-features-mvp-lifecycle-66ddcd`):**

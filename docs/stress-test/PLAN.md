@@ -35,14 +35,16 @@ One branch per cause.
 - Undo is PowerPoint-style: one history, works inside text, large changes too.
 - A pasted plot script survives a reload.
 - Owner check: undo of deleted text/components works in real Chrome. Redo
-  after undoing typing is still unconfirmed (settled by item 12).
+  after undoing typing is still unconfirmed (settled by item 12: measured
+  in Playwright's Chromium, Firefox and WebKit, record 12; real browsers
+  with a physical keyboard are the owner's check, manual flow 27).
 
 ## Assumptions accepted with the plan
 
 - Poster gutter 64 px (owner decision; fix 03 measured handles still under the rulers at large fitted zooms, 4 of 12 cases, record 03 section 10). The owner kept the gutter and chose to fix the controls instead: item 19 (2026-09-30).
 - "Small screen" = viewport narrower than 1600 px.
 - Pasted script saved per poster in this browser (localStorage), not in the poster.
-- Undo history 50 -> 100 steps.
+- Undo history 50 -> 100 steps (applied by fix 12, `UNDO_HISTORY_LIMIT`).
 
 ## Order
 
@@ -160,6 +162,11 @@ scope becomes a plan item or a question for the owner.
   the likeliest path, and ⌘Z restores the block (6 of 6) (MEASURED by the
   ranking evidence on main, 2026-09-30). The cause is one key guard, copied at
   three places in `PosterEditor.tsx`, that covers text fields but not SELECT.
+  Fix 12 (review R3-F1) keeps its new Undo and Redo buttons out of it
+  (`onHistoryButtons`), and the table's two Delete / Backspace listeners
+  from them too; every other control that is not a text field still passes
+  the keys (MEASURED by fix 12's harness, B3s before its change: ArrowRight
+  on Zoom out moved the block a keyboard press of Undo had selected).
 - From fix 07's confirmer (2026-10-06), for items 6 and 12 to settle, not
   re-measured: in Playwright's Chromium and WebKit, ⌘Z with focus outside the
   figure checker's code box undid the pasted script (325 → 0 characters;
@@ -186,6 +193,65 @@ scope becomes a plan item or a question for the owner.
   poster: " and the database's message, `pages/Home.tsx:126-127` showing
   `data/posters.ts:464`), against the rule that user-facing errors stay
   generic.
+- **From fix 12 (2026-10-06):** Enter in a text block is not saved as a
+  line break: Chromium, Firefox and WebKit put the new line in a `<div>`,
+  which the sanitizer flattens with no separator, so " ZQA", Enter, "ZQB"
+  is stored as "ZQAZQB" (MEASURED in 3 engines on main and on the fix,
+  record 12 §10). The screen keeps two lines until the block is drawn
+  again from the store (a reload; since fix 12 also an undo or redo of
+  that block's text). A text-formatting item, not undo.
+- From fix 12: the comments panel's fields (hidden with sharing) are not
+  marked to keep their own undo; when sharing returns, mark them
+  `data-own-undo` (owner decision 2 lists comments) and add a test.
+- From fix 12: importing a `.postr` over the open poster ("Replace current
+  poster") still loads it with `setPoster`, which wipes the undo history
+  (INSPECTED); version restore no longer does. An owner question.
+- From fix 12: the Edit tab sets text size per text level (title, heading,
+  body), not per block, and body text has no alignment control (headings
+  have Style › Headings). The removed toolbar buttons never saved either;
+  per-block size or alignment would be a feature (owner).
+- From fix 12's review, round 1, for the owner to confirm (choices beyond
+  the wording of the decisions, record 12 §10): more fields keep their own
+  undo than decision 2 lists (the whole Figure tab, the Authors and
+  References paste boxes, References' Manual Entry, the preset and version
+  names, the guidelines panel); the palette designer became a modal
+  dialog; A+/A− and alignment also left the docked toolbar above the
+  Content box (it shares the floating one's buttons); a version restore
+  keeps the locked credit mark.
+- From fix 12's review, round 2, for the owner (record 12 §9 and §10):
+  Undo and Redo pressed from the keyboard (or by assistive technology)
+  keep the focus on the button and select nothing, while ⌘Z and a mouse
+  click put the caret back in the text (decision 4 and decision 5 met
+  here: a press that moved the focus let the next Enter type into the
+  poster); a redo selects the redone text, so the next keystroke replaces
+  it (decision 4 as written); on a Mac Ctrl+Y is redo (decision 1), so the
+  system's Ctrl+K / Ctrl+Y yank no longer works in a text block; the
+  caption-spacing slider is one step per change, not one per drag like
+  the other sliders; in Chinese and Japanese each composed word is a step
+  of its own (the space rule alone would make a paragraph one step).
+- From fix 12's review, round 2 (R2-F3, older than fix 12): the table's
+  last cell keeps forward Tab (`blocks.tsx` `onCellKeyDown`: Tab with no
+  next cell is cancelled and goes nowhere), so on a poster with a table
+  forward Tab never reaches the controls after it, the Undo and Redo
+  buttons included; Shift+Tab does (MEASURED, record 12). Tab out of the
+  last cell, and Shift+Tab out of the first, should leave the table.
+- From fix 12's review, round 2 (R2-I2, INSPECTED, not measured: no
+  harness can drive a native text drag): a word dragged within a block is
+  probably two undo steps (the browser's deleteByDrag, then its
+  insertFromDrop), so one ⌘Z would leave it missing from both places.
+  Manual flow 27 checks it; if confirmed, join the two inputs of one drop
+  into one step.
+- From fix 12's review, round 2 (MEASURED in Chromium): a composition
+  cancelled (Escape in an input method) leaves the text as it was, but an
+  undo step that changes nothing (the next ⌘Z shows "Undo" and does
+  nothing) and drops a redo held before it.
+- From fix 12's review, round 3, for the owner (record 12 §10): keys
+  pressed on the Undo and Redo buttons are theirs, so where a click focuses
+  a button (Windows and Linux, by their conventions: UNVERIFIED on the Mac
+  host, where a click leaves the focus off it in Chromium, Firefox and
+  WebKit), an arrow or Delete after clicking Undo does nothing until the
+  poster is clicked; and a press from the keyboard now selects no block, so
+  the block whose text it restored is not outlined.
 - The "five steps in and five out" zoom test passes on its own when Zoom in
   does nothing; the 10× ceiling test in the same file catches that
   (MEASURED by the step 9 reviewer of 60ca7b3, mutant F6; it predates that
@@ -314,17 +380,26 @@ Found while fixing one item, belonging to another (details in the record named):
   default 3-column template at 48×36 never gets a credit mark, because its
   column bottoms (338.8–342.2) overlap the bottom band the mark needs
   (338–350).
-- **Item 12**, from fix 01:
+- **Item 12**, from fix 01 (state after fix 12, record 12 §10):
   - ⌘Z with focus in a sidebar input runs the browser's native undo, which
     reverted canvas typing; a second ⌘Z brought it back. MEASURED in Chromium.
+    **Fixed by fix 12** (one history; the browser's undo never reaches the
+    poster: its beforeinput is cancelled where it fires one, and where it
+    does not, nothing is stored in that task, record 12 §7 B).
   - The caption-spacing slider goes through `updateBlock` unkeyed: 60 events
-    make 50 history entries. MEASURED on main.
+    make 50 history entries. MEASURED on main. **Not changed** (owner
+    decision 3 keeps non-text grouping); the history now holds 100.
   - Version restore resets history, and drops the credit mark (review 2,
     MEASURED; this contradicts the comment at `Editor.tsx:182-185`).
+    **Both fixed by fix 12** (one undoable step; the locked mark is kept as
+    on undo).
   - Edit-tab caption and note text, and caption spacing, go through
     `updateBlock` unkeyed. 10 events make 10 steps, and a 60-character
     caption pushes older work out of the history (review 2, MEASURED).
+    **Caption and note fixed by fix 12** (grouped by word); caption spacing
+    as above.
   - Auto-Arrange with font scaling takes 3 undo steps (review 2, MEASURED).
+    Not changed (not re-measured).
 - **Unplanned, possible data loss** (review 2, INSPECTED only).
   `migrateBase64ToStorage` calls `setBlocksSilent` with the load-time blocks,
   which would overwrite edits made while images upload. Reproduce before
@@ -347,4 +422,5 @@ Found while fixing one item, belonging to another (details in the record named):
 | 4 | `editor/rulers-match-sheet` (local, parked) | hidden — the owner hid the rulers on 2026-09-30 (`RULERS_ENABLED`, `config/features.ts`); the fix is parked unmerged with its record, instruments and open review findings |
 | 13 | `checker/python-reads-own-fix` | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md` (the fix raises the text it saves, and its re-check reads it); part 2, the parser's own misreads, not started |
 | 7 | `fix/07-figure-script-kept` | done (three review rounds); review round 1 answered (a blank-line regression fixed, tests added, legal copy corrected); round 2 answered (a result checked against an image block is no longer shown under the preview's size, and a kept result says the size it is for; a long script edited after its Check stays stored); round 3 answered (a note no longer promises an image check comes back) — `docs/fixes/07-figure-script-kept.md`; the owner's decisions of 2026-10-06: the script kept per poster in this browser and re-checked on return, sessionStorage on the public page, Check stays up once a script is in, and the same cause fixed in the Authors, References, Make-a-figure, poster-name and version-name drafts (memory only) |
+| 12 | `fix/12-one-undo-history` | steps 1 to 8 done (reproduced, confirmed, owner decisions 2026-10-06, fix, tests red on main, browser instrument green in three engines, mutants) — `docs/fixes/12-one-undo-history.md`; ONE undo history for everything that edits the poster (keys from every field, the browser's own history kept off the poster, a step per typed word, the caret back where the change was, Undo/Redo buttons, a version restore is one step, nothing shown on an empty history, 100 steps, no A+/alignment on the toolbar, table cells keep the order of typed letters); review round 1 answered (a colour drag is one step again, not one per hex digit; a one-character paste, drop, cut or deleted selection is a step of its own in every field; the browser's own undo in a sidebar field is never stored; a word starts where the caret is; ⌘; on Dvorak is not undo; five untested parts tested); review round 2 answered (text typed through an input method, a dead key or a phone keyboard is one step per composed word, not one per composition update, and no longer pushes older history out; Undo and Redo pressed from the keyboard keep the focus on the button, so a second Enter no longer types into the poster; the table's Tab trap, Ctrl+Y on a Mac, the slider's steps and a drag within a block handed to the Later list and the owner); review round 3 answered (keys pressed on the Undo and Redo buttons no longer reach the poster: after Undo pressed from the keyboard an arrow had moved the selected block and Backspace or Delete removed it, the redo lost; a keyboard press selects no block; the table's own Delete / Backspace kept off the buttons too); round 4 (a re-check of round 3's response, which changed keyboard handling) next, from the frozen copy `fix12-frozen-4` |
 | 15 | `fix/15-checker-language` | done (three review rounds) — `docs/fixes/15-checker-language.md` (Check answers when it cannot tell R from Python; unsupported plotting systems are named, not scored; a result on screen stays, marked out of date, and one a new print size hides is said to be hidden; detection reads live code only, re-landing 9ea9f38; a string in `aes()` or seaborn's `barplot()` places nothing on its own: code with only such a token gets the could-not-tell answer (an R package name such as `library(tidyverse)` is an R signal and is checked as ggplot2)) |

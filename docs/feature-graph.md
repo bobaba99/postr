@@ -418,7 +418,7 @@ flowchart LR
   - [ ] "Start from the poster you already have" / "Already have a poster in PowerPoint, as a PDF, or as an image? Open it here and keep editing it, blocks and all — title, headings, body text and figures land where they were, each one still yours to move and rewrite." — `start-from-work` milestone — `About.tsx:63-66`. **Rewritten 2026-09-10** (paper-to-poster deactivated — see routes.tsx header): the manuscript sentence was dropped. Old copy, kept as the reactivation reference: ~~"Start from the work you already have" / "Paste a manuscript or drop a .docx and answer a few short questions about what to emphasise — you get a structured poster draft rather than a blank canvas. Already have a poster in PowerPoint? Open the .pptx here and keep editing it, blocks and all…"~~
   - [ ] "The right figure, drawn for print" / "Paste a table or answer three questions in the Figure tab and Postr ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once and insert them straight onto the poster." — `About.tsx` (rewritten 2026-09-10: names the editor's Figure tab instead of "the plot picker" and no longer promises SVG/PNG downloads — those lived on the deactivated standalone page)
   - [ ] "Borrow a look you like" / "Upload a poster you admire and Postr lifts its colours and type onto yours — the look, never the content. Print-safe clamping keeps the result legible on paper rather than only on screen." — `About.tsx:79-81`
-  - [ ] "Iterate, export, print" / "Undo and redo through the entire session. Export to PDF, to PowerPoint with every block still editable, or to LaTeX with a compilable poster.tex and references.bib for Overleaf." — `About.tsx:84-90` (the share-link sentence removed with sharing, fix 23)
+  - [ ] "Iterate, export, print" / "Undo and redo up to 100 steps. Save a PDF for free. PowerPoint and LaTeX exports are paid: …" — `About.tsx:122` (the step count is `UNDO_HISTORY_LIMIT`, `stores/posterStore.ts:35`, pinned by `oneUndoHistory.test.tsx`; 50 before fix 12; the share-link sentence removed with sharing, fix 23)
 - [ ] "Shape what ships next" — eyebrow — `About.tsx:180`
 - [ ] "Tell us what's missing." — h2 — `About.tsx:183`
 - [ ] "Every bug report and feature request lands in the developer's queue. The loudest feedback wins the most attention — so if something's broken, missing, or could be better, say so." — para — `About.tsx:185-189`
@@ -1112,7 +1112,7 @@ flowchart LR
 - [ ] hidden file input (filled image) — `<input type="file" accept="image/*">` — `blocks.tsx:397` — upload → Supabase Storage (`uploadPosterImage`) or base64 fallback
 - [ ] `+ Upload figure` (empty-image click target) — div button — `blocks.tsx:403-433` — clicks hidden file input
 - [ ] hidden file input (empty image) — `<input type="file" accept="image/*">` — `blocks.tsx:432`
-- [ ] table cell editor — contentEditable div (one per cell) — `blocks.tsx:1001-1034` — edits cell HTML → `updateCell`
+- [ ] table cell editor — `TableCellEditor` (one per cell, `poster/TableCellEditor.tsx`) — `blocks.tsx:1030-1061` — edits cell HTML → `updateCell`; writes the cell only when the stored value changes from outside, so typing keeps its order (it used `dangerouslySetInnerHTML`, rewritten on every keystroke: "abc" typed became "cba"); its typing joins the one undo history by word under `cell:<block id>:<index>` (fix 12)
 - [ ] `Drag to resize column` — column-border drag handle ×(cols−1) — `blocks.tsx:904-918` — pointer drag redistributes `colWidths`
 - [ ] `Select row ${r + 1}` / title `Select row ${r + 1} (Delete to remove)` — row selector strip ×rows — `blocks.tsx:1056-1090` — selects whole row
 - [ ] `Select column ${c + 1}` / title `Select column ${c + 1} (Delete to remove)` — column selector strip ×cols — `blocks.tsx:1102-1136` — selects whole column
@@ -1129,8 +1129,8 @@ flowchart LR
 - [ ] `Tab` / `Shift+Tab` — keyboard — `blocks.tsx:591-602` — focus next/previous cell
 - [ ] `ArrowUp/Down/Left/Right` (at content edge) — keyboard — `blocks.tsx:623-626` — move cell focus
 - [ ] `Escape` — keyboard — `blocks.tsx:628,1243-1249` — closes table context menu
-- [ ] `Delete`/`Backspace` (row/col selected) — keyboard — `blocks.tsx:652-670` — deletes selected row/column
-- [ ] `Delete`/`Backspace` (multi-cell range) — keyboard — `blocks.tsx:674-699` — clears all cells in range
+- [ ] `Delete`/`Backspace` (row/col selected) — keyboard — `blocks.tsx:652-670` — deletes selected row/column; not from a text field, nor from the Undo / Redo buttons (`blocks.tsx:685`, fix 12 review R3-F1)
+- [ ] `Delete`/`Backspace` (multi-cell range) — keyboard — `blocks.tsx:674-699` — clears all cells in range; not from a text field, nor from the Undo / Redo buttons (`blocks.tsx:712`, fix 12 review R3-F1)
 - [ ] paste TSV/CSV/HTML — clipboard — `blocks.tsx:781-789` — `parseTablePaste` replaces/grows table
 - [ ] cell drag-select — mouse drag across cells — `blocks.tsx:940-970` — rectangular range selection
 - [ ] block click — click — `blocks.tsx:1908-1924` — selects block; `Shift`/`⌘`/`Ctrl`+click = additive toggle (`blocks.tsx:1910`)
@@ -1216,20 +1216,16 @@ flowchart LR
 
 #### `poster/FloatingFormatToolbar.tsx` — Notion-style selection toolbar (+ docked variant for sidebar)
 
-**Elements** (`FormatToolbarButtons`, `FloatingFormatToolbar.tsx:244-402`; floating mount `:435-482`; docked export `:423-433` used by sidebar Edit tab)
+**Elements** (`FormatToolbarButtons`, `FloatingFormatToolbar.tsx:230-328`; floating mount `:361-408`; docked export `:349-359` used by sidebar Edit tab). Each button's `execCommand` fires an `input` event the editor commits; a format change is an undo step of its own (fix 12). Line numbers below are from before fix 12 except where noted.
 - [ ] `B` `Bold` — execCommand button (`aria-pressed`) — `FloatingFormatToolbar.tsx:256` — `execCommand('bold')`
 - [ ] `I` `Italic` — execCommand button — `FloatingFormatToolbar.tsx:257` — `execCommand('italic')`
 - [ ] `U` `Underline` — execCommand button — `FloatingFormatToolbar.tsx:258` — `execCommand('underline')`
 - [ ] `S` `Strike Through` (label "S", title via cmdButton = 'S') — execCommand button — `FloatingFormatToolbar.tsx:259` — `execCommand('strikeThrough')`
-- [ ] `⟸` — align-left button — `FloatingFormatToolbar.tsx:272` — `execCommand('justifyLeft')`
-- [ ] `≡` — align-center button — `FloatingFormatToolbar.tsx:273` — `execCommand('justifyCenter')`
-- [ ] `⟹` — align-right button — `FloatingFormatToolbar.tsx:274` — `execCommand('justifyRight')`
 - [ ] `•` — bulleted-list button — `FloatingFormatToolbar.tsx:287` — `execCommand('insertUnorderedList')`
 - [ ] `1.` — numbered-list button — `FloatingFormatToolbar.tsx:288` — `execCommand('insertOrderedList')`
 - [ ] `⇥` — indent button — `FloatingFormatToolbar.tsx:289` — `execCommand('indent')`
 - [ ] `⇤` — outdent button — `FloatingFormatToolbar.tsx:290` — `execCommand('outdent')`
-- [ ] `A−` `Smaller` — button — `FloatingFormatToolbar.tsx:312-323` — wraps selection in `font-size:0.94em` span (fallback `execCommand('fontSize','3')`)
-- [ ] `A+` `Larger` — button — `FloatingFormatToolbar.tsx:324-335` — `font-size:1.06em` span (fallback `'4'`)
+- [ ] (removed by fix 12, owner decision 8: the alignment buttons `⟸ ≡ ⟹` and `A−` / `A+`. Neither ever reached the poster: A+ fired no input event, and the sanitizer keeps only `color` and `background-color`, so a size or an alignment was dropped by the next save. Text size is the Edit tab's Font size field, per text level; headings' alignment is Style › Headings. Record `docs/fixes/12-one-undo-history.md`.)
 - [ ] `Highlight · Yellow` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:115`) — `execCommand('hiliteColor','#FFEB3B66')`
 - [ ] `Highlight · Green` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:116`) — `'#4CAF5055'`
 - [ ] `Highlight · Blue` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:117`) — `'#2196F355'`
@@ -1362,10 +1358,10 @@ flowchart LR
 - [ ] `AreaCommentOverlay` — full-canvas drag layer (area-comment mode) — `PosterEditor.tsx:3704-3817` — drag rect → `postr:comment-area`; right-click cancels (`:3792-3795`)
 - [ ] `Escape` (area-comment mode) — keyboard — `PosterEditor.tsx:3713-3721` — cancels area comment
 - [ ] `⌘/` or `Ctrl+/` — keyboard — `PosterEditor.tsx:915-918` — toggles sidebar
-- [ ] `⌘Z` / `Ctrl+Z` — keyboard — `PosterEditor.tsx:920-927` — store `undo()` + toast "Undo"
-- [ ] `Ctrl+Y` or `⌘⇧Z` / `Ctrl+Shift+Z` — keyboard — `PosterEditor.tsx:929-939` — store `redo()` + toast "Redo"
+- [ ] `⌘Z` / `Ctrl+Z` (undo) and `⌘⇧Z` / `Ctrl+Shift+Z` / `⌘Y` / `Ctrl+Y` (redo) — keyboard, one history (fix 12) — `useEditorHistory.ts:84-95` (keydown, capture, on window; installed in preview too), routed by `editorHistory.ts:103` `routeHistoryKey`: from anywhere that edits the poster (canvas text blocks, table cells, the Content box, number fields, sliders, selects, caption, note, authors, buttons, the page) the key is cancelled and the store's history runs (`runEditorHistory`, `PosterEditor.tsx:705`: toast "Undo"/"Redo" only when a step was applied; after a text step its block is selected and its editor takes the caret with the restored text selected, `useEditableHistory.ts:130`, except after a button pressed from the keyboard, which changes neither the focus nor the selection, fix 12 review R3-F1); in a text field inside `[data-own-undo]` (the Figure tab, the poster name, the version name, the paste boxes, References' manual entry, the preset name, the guidelines panel) or in a dialog, the browser's own undo for that field; with a dialog or the preview open and the focus elsewhere, cancelled and nothing else. The letter is matched without case, and by `code` only when the layout types a letter that is not Latin there (Cyrillic, Greek; not Dvorak's ";"); Alt (AltGr) is not the shortcut (`editorHistory.ts:56`). The browser's own `beforeinput` historyUndo/historyRedo is cancelled wherever it would change the poster and routed to the store when it comes from the Edit menu with the focus in the poster (`useEditorHistory.ts:97-106`, `editorHistory.ts:132`); an `input` of those types (the browser applied its undo with no `beforeinput` first) is never stored: the text editors refuse it and put themselves back (`useEditableHistory.ts:154`), and for a sidebar field the document's `input` listener notes it (`useEditorHistory.ts:108`), the store stores nothing in that task, and React puts the controlled field back (fix 12 review R1-F3)
+- [ ] `Undo` / `Redo` — buttons over the poster area's top-left (`HistoryButtons.tsx`, mounted `PosterEditor.tsx:3425`; left 12 px, 64 px when the sidebar is hidden), disabled with nothing to undo/redo, hidden for read-only viewers (the phone share view is read-only); titles "Undo (⌘Z)" and "Redo (⌘⇧Z)" (Ctrl+Z / Ctrl+Y off a Mac). A mouse or touch press puts the caret back in the text the step changed (decision 4); a press from the keyboard or by assistive technology (a click with `detail` 0) leaves the focus on the button and selects nothing, neither text nor a block, so pressing again undoes again instead of typing into the poster (`runHistory`'s `keepFocus`, `editorHistory.ts:162`; fix 12 review R2-F2; the block not selected since review R3-F1). Other keys pressed on the buttons are theirs: the delete / nudge / duplicate keys and the table's Delete / Backspace do not act from the group `[data-postr-history-buttons]` (`onHistoryButtons`, `editorHistory.ts:43`; fix 12 review R3-F1: an arrow had moved the selected block and Backspace removed it, the redo lost). On a poster with a table, forward Tab stops in the table's last cell (`blocks.tsx` `onCellKeyDown`, older than fix 12, PLAN's Later list); Shift+Tab reaches the buttons
 - [ ] `⌘S` / `Ctrl+S` — keyboard (edit mode only) — `PosterEditor.tsx:1068-1085` — `saveVersionNow()` (Supabase `poster_versions`)
-- [ ] `Delete` / `Backspace` (selection active) — keyboard — `PosterEditor.tsx:2006-2014` — batch-deletes selected blocks (`filterDeletable`)
+- [ ] `Delete` / `Backspace` (selection active) — keyboard — `PosterEditor.tsx:2006-2014` — batch-deletes selected blocks (`filterDeletable`). This handler and the two below act from any focus that is not a text field (item 22, parked: a focused select passes them on), except the Undo / Redo buttons (`onHistoryButtons`, `PosterEditor.tsx:2207`, fix 12 review R3-F1)
 - [ ] `⌘D` / `Ctrl+D` — keyboard — `PosterEditor.tsx:2017-2021` — duplicates selected block
 - [ ] `ArrowLeft/Right/Up/Down` — keyboard — `PosterEditor.tsx:2023-2044` — nudge selection by SNAP_GRID (½")
 - [ ] `Shift`+Arrow — keyboard — `PosterEditor.tsx:2024` — nudge by 1 unit (1/10")
@@ -1384,11 +1380,10 @@ flowchart LR
 **Copy**
 - [ ] "No poster loaded." — empty state — `PosterEditor.tsx:1090`
 - [ ] `{POSTER_SIZES[sizeKey]!.label} · {doc.fontFamily} · {palName || 'Custom'}` — preview-mode footer — `PosterPreviewOverlay.tsx:213-215` (labels from `constants.ts:81-88`: `48"×36" Landscape`, `36"×48" Portrait`, `42"×36" Landscape`, `36"×42" Portrait`, `42"×42" Square`, `24"×36" Small`, `A0 Landscape`, `A0 Portrait`; font names from `constants.ts:110-123`)
-- [ ] "Undo" — toast — `PosterEditor.tsx:926`
-- [ ] "Redo" — toast — `PosterEditor.tsx:938`
+- [ ] "Undo" / "Redo" — toast, only when a step was undone or redone (fix 12) — `PosterEditor.tsx:709`
 - [ ] "Version saved" — toast — `PosterEditor.tsx:1024`
 - [ ] "Could not save version" — toast — `PosterEditor.tsx:1028`
-- [ ] "Version restored" — toast — `PosterEditor.tsx:1062`
+- [ ] "Version restored" — toast — `PosterEditor.tsx:1210`; the restore is one undoable step (`restoreVersion`, `PosterEditor.tsx:1208` → `posterStore.restoreVersion`, fix 12)
 - [ ] `Before restore — {stamp}` — auto-saved version name (visible in VersionPanel) — `PosterEditor.tsx:1058`
 - [ ] "Failed to duplicate poster" — duplicate-error fallback — `PosterEditor.tsx:1004`
 - [ ] `{duplicateError}` — dynamic error text in toast — `PosterEditor.tsx:2416`
@@ -1435,7 +1430,7 @@ flowchart LR
 #### `poster/RichTextEditor.tsx` — contentEditable editor with slash-command symbol menu
 
 **Elements**
-- [ ] contentEditable surface — text input — `RichTextEditor.tsx:301-323` — typing → `onChange(sanitized HTML)`; placeholder via `data-placeholder`
+- [ ] contentEditable surface — text input — `RichTextEditor.tsx:335-365` — typing → `onChange(sanitized HTML)`; placeholder via `data-placeholder`; `historyKey` (`content:<block id>`) and `surface` (canvas, or the sidebar's Content box) put it in the one undo history: an undo or redo of its text is written in even while it has focus, and the caret goes back where the change was (`useEditableHistory.ts`, fix 12); a click or a caret key ends the typing step (`:243`, `:357`; not a key released inside a composition, fix 12 review R2-F1); its paste (`:256`) is a step of its own through the paste event, which the editor's document listener notes (the input event `execCommand` fires says '' or 'insertText', fix 12 review R1-F2)
 - [ ] `/prefix` — slash-command trigger — `RichTextEditor.tsx:176-194` — opens symbol listbox at caret
 - [ ] symbol option `/{key}` (up to 8, role="option") — listbox item — `RichTextEditor.tsx:350-373` — click/mousedown inserts symbol, replacing `/prefix`
 - [ ] `Tab` / `Enter` (slash open) — keyboard — `RichTextEditor.tsx:211-218` — inserts first matching symbol
@@ -4699,14 +4694,16 @@ flowchart LR
 
 **Elements** — none (store; modal UI in `components/FeedbackModal.tsx`). **Copy** — none. **Graphics** — none.
 
-#### `stores/posterStore.ts` — central editor store: current PosterDoc + undo/redo (50-entry stacks) + locked-block invariant
+#### `stores/posterStore.ts` — central editor store: current PosterDoc + undo/redo (`UNDO_HISTORY_LIMIT` = 100-entry stacks, fix 12) + locked-block invariant
+
+- [ ] Step rules (fix 12, `stores/historySteps.ts`, `textEdit` `:332`): a text field (a block's content, one table cell, the caption, the note, one string of a keyed sidebar edit such as an author's name) is grouped BY WORD: a non-space character typed where the character before the caret is a space (or at the start) starts a new step; consecutive single-character deletions are one step; a paste, a drop, a cut, a deleted selection, Enter, a format change are steps of their own, even of one character; a character typed over a selection starts one. A composition (an input method, a dead key, a phone keyboard composing a word) is typed as one unit: every update and its commit join one step, a new one when it starts after a space, at the start of the field, after a Han, Hiragana or Katakana character, or over a selection, otherwise continuing the word being typed (`inputHint.ts` `noteCompositionStart` `:111`, `compositionEditNow` `:121`, noted by `useEditorHistory.ts`'s `compositionstart` listener; fix 12 review R2-F1: each update had been a step, "にほんご" 10 ⌘Z). What the browser said in that task decides first (`stores/inputHint.ts`, noted by `useEditorHistory.ts`'s document listeners: `beforeinput`, `paste`), the text diff second. A keyed sidebar string is text only when the browser reported typing, deleting or a paste (`textEditOfDocPatch` `:313`): a colour input fires no `beforeinput`, so a colour drag, even one hex digit at a time, is not typing (fix 12 review R1-F1). No pause splits a word. Other keyed edits (number fields, sliders, colours) keep the 600 ms / 5 s windows. Nothing is stored in a task where the browser's own undo or redo changed a field (`withUndo` `:258`). `updateBlock` adds no step for a patch that changes nothing; `undo()` / `redo()` return whether a step was applied.
 
 - [ ] State fields: `posterId: string | null` (`:47`), `posterOwnerId: string | null` (`:49`, fix 23), `posterTitle: string` (`:50`), `doc: PosterDoc | null` (`:51`), `canUndo: boolean` (`:54`), `canRedo: boolean` (`:55`). Module-level (non-reactive): `undoStack`/`redoStack` (`:101-102`), `lockedBaseline` (`:120`).
-- [ ] `posterOwnerId` (fix 23) — the poster's owner as the editor checked it when it opened the poster; initial `null` (`:299`); set by `setPoster` from `options.ownerId`, kept when the same poster is loaded again without one (a version restore), else cleared (`:335`). Readers: `poster/PosterEditor.tsx:649` (the `userId` image blocks upload under), `components/ImportPosterModal.tsx:174-175` (Import over the open poster puts its images in the owner's folder).
-- [ ] `setPoster(posterId, doc, title?, options?)` — loads a poster; resets undo history + locked baseline; opt-in ack seeding (`seedAcknowledgement`) for editing entries only (impl `:305`). Options (`SetPosterOptions`, `:22-44`): `seedAcknowledgement`, `sizeFallback`, and `ownerId` (`:43`, fix 23: the owner whose storage folder receives the poster's images). Callers: `pages/Editor.tsx:284` (editing; passes `ownerId: row.user_id`), `pages/Share.tsx:72` (read-only view; unrouted since fix 23), `components/ImportPosterModal.tsx:296` (post-import), `poster/PosterEditor.tsx:1203` (version restore, `sizeFallback`)
+- [ ] `posterOwnerId` (fix 23) — the poster's owner as the editor checked it when it opened the poster; initial `null` (`:299`); set by `setPoster` from `options.ownerId`, kept when the same poster is loaded again without one (Import over the open poster, `ImportPosterModal.tsx:296`), else cleared (`:375`); a version restore does not go through `setPoster` since fix 12 (`restoreVersion`), so it leaves the owner as it is. Readers: `poster/PosterEditor.tsx:649` (the `userId` image blocks upload under), `components/ImportPosterModal.tsx:174-175` (Import over the open poster puts its images in the owner's folder).
+- [ ] `setPoster(posterId, doc, title?, options?)` — loads a poster; resets undo history + locked baseline; opt-in ack seeding (`seedAcknowledgement`) for editing entries only (impl `:305`). Options (`SetPosterOptions`, `:22-44`): `seedAcknowledgement`, `sizeFallback`, and `ownerId` (`:43`, fix 23: the owner whose storage folder receives the poster's images). Callers: `pages/Editor.tsx:284` (editing; passes `ownerId: row.user_id`), `pages/Share.tsx:72` (read-only view; unrouted since fix 23), `components/ImportPosterModal.tsx:296` (post-import). A version restore no longer loads through it (fix 12): `restoreVersion(doc, { sizeFallback })` (`:413`) puts the version in place as one undoable step, keeping the history, the display name and the locked credit mark (as undo does, `restoreFromHistory`); caller `poster/PosterEditor.tsx:1208`
 - [ ] `setPosterTitle(title)` — sets display title, no undo (`:174`). Caller: `poster/PosterEditor.tsx:610`
 - [ ] `addBlock(block)` — append block with undo (`:176`). **No production callers** (tests only) — PosterEditor's local `addBlock` (`PosterEditor.tsx:1681`) routes through `setBlocks`
-- [ ] `updateBlock(id, patch)` — patch one block with undo (`:184`). **No production callers** — local wrapper `PosterEditor.tsx:1550` uses `setBlocks`
+- [ ] `updateBlock(id, patch)` — patch one block with undo (`:431`); no step when the patch changes nothing; a single text field is keyed and grouped by word (fix 12). Caller: PosterEditor's `updateBlock` wrapper (every canvas and sidebar block edit)
 - [ ] `removeBlock(id)` — delete with undo; locked blocks refused silently, no undo entry (`:199`). **No production callers** — UI delete path is `filterDeletable` + `setBlocks` (`PosterEditor.tsx:1560-1564`)
 - [ ] `setStyle(level, patch)` — patch a TypeStyle level with undo (`:210`). Caller: `poster/PosterEditor.tsx:1240`
 - [ ] `setPalette(palette)` — replace palette with undo (`:221`). **No production callers** (tests only)
@@ -4714,8 +4711,8 @@ flowchart LR
 - [ ] `applyExtractedStyle({palette?, fontFamily?})` — applies copied design as ONE undo step; empty patch = no-op (`:227`). Caller: `components/CopyDesignModal.tsx:54`
 - [ ] `setBlocks(blocks)` — whole-list replace with undo; re-inserts missing locked blocks (`guardLocked`) — the chokepoint for all UI delete/move/layout paths (`:248`). Caller: `poster/PosterEditor.tsx:1238`
 - [ ] `setBlocksSilent(blocks)` — same but no undo push; for drag intermediates (`:257`). Callers: `poster/PosterEditor.tsx:1239`, `pages/Editor.tsx:126`
-- [ ] `undo()` — restores previous doc, re-applies locked guard (`:275`). Caller: `poster/PosterEditor.tsx:857`
-- [ ] `redo()` — restores next doc, re-applies locked guard (`:296`). Caller: `poster/PosterEditor.tsx:858`
+- [ ] `undo()` — restores previous doc, re-applies locked guard, returns false when there was nothing to undo (`:546`). Caller: `poster/editorHistory.ts:178` `runHistory` (keys, the Undo button, the Edit menu)
+- [ ] `redo()` — restores next doc, re-applies locked guard, returns false when there was nothing to redo (`:569`). Caller: the same
 - [ ] Field readers: `doc` — `PosterEditor.tsx:590`, `sidebar/ImportSection.tsx:20`, `sidebar/PostrExportButton.tsx:13`, `sidebar/EditableExportButtons.tsx:88`, `components/CopyDesignModal.tsx:52`; `posterId` — `PosterEditor.tsx:592,1306`, `ImportSection.tsx:18`, `CopyDesignModal.tsx:53`; `posterTitle` — `PosterEditor.tsx:609,1307`, `ImportSection.tsx:19`, `PostrExportButton.tsx:14`, `EditableExportButtons.tsx:89`, `Share.tsx:33`, `Editor.tsx:140`
 
 **Elements** — none. **Copy** — none. **Graphics** — none.
