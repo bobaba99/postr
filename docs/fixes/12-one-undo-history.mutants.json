@@ -8,7 +8,8 @@
     "src/poster/__tests__/sidebarHistory.test.tsx",
     "src/stores/__tests__/posterStore.test.ts",
     "src/poster/__tests__/previewMode.test.tsx",
-    "src/poster/__tests__/restoreSheetSize.test.tsx"
+    "src/poster/__tests__/restoreSheetSize.test.tsx",
+    "src/poster/__tests__/undoDragSteps.test.tsx"
   ],
   "mutants": {
     "A-key-case-sensitive": {
@@ -672,22 +673,22 @@
       ]
     },
     "E-buttons-under-reveal": {
-      "undoes": "E — with the sidebar hidden the buttons move clear of its Show button",
+      "undoes": "E — with the sidebar hidden the buttons move clear of its Show button (since the merge with main, in the top bar)",
       "edits": [
         [
-          "src/poster/PosterEditor.tsx",
-          "<HistoryButtons left={sidebarOpen ? 12 : 64} onRun={runEditorHistory} />",
-          "<HistoryButtons left={12} onRun={runEditorHistory} />"
+          "src/poster/EditorTopBar.tsx",
+          "<HistoryButtons left={sidebarOpen ? 12 : 64} onRun={onRun} />",
+          "<HistoryButtons left={12} onRun={onRun} />"
         ]
       ]
     },
     "E-buttons-read-only": {
-      "undoes": "E — a read-only viewer gets no buttons",
+      "undoes": "E — a read-only viewer gets no buttons, nor the top bar that holds them (since the merge with main)",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "        {!readOnly && (\n          // Not for viewers",
-          "        {(\n          // Not for viewers"
+          "      {!readOnly && (\n        // Not for viewers",
+          "      {(\n        // Not for viewers"
         ]
       ]
     },
@@ -1226,6 +1227,202 @@
           "src/poster/useEditableHistory.ts",
           "    if (!el || shown.current === value) return;",
           "    if (!el) return;"
+        ]
+      ]
+    },
+    "G-drag-step-never-begins": {
+      "undoes": "G — a drag holds one undo step from pointerdown to pointerup (merge review F1: one step per pointer move)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "  dragStep = `drag:${++dragSeq}`;",
+          "  dragSeq += 1;"
+        ]
+      ]
+    },
+    "G-drag-step-time-window": {
+      "undoes": "G — a held drag is one step however long it is held still (no 600 ms / 5 s window)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "    (dragStep !== null ||\n",
+          "    (false ||\n"
+        ]
+      ]
+    },
+    "G-drag-step-never-ends": {
+      "undoes": "G — the drag's step ends with the drag: the next edit is a step of its own",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "export function endDragStep() {\n  dragStep = null;\n}",
+          "export function endDragStep() {\n}"
+        ]
+      ]
+    },
+    "G-break-ends-held-drag": {
+      "undoes": "G — a focus change during a held drag does not end its step (Firefox moves the focus to a slider after its first value: G5 read 2 presses there)",
+      "edits": [
+        [
+          "src/stores/posterStore.ts",
+          "  if (dragStep !== null) return;\n  lastPush = null;",
+          "  lastPush = null;"
+        ]
+      ]
+    },
+    "G-hold-not-ended-on-pointerup": {
+      "undoes": "G — the step ends when the pointer is released",
+      "edits": [
+        [
+          "src/poster/dragStep.ts",
+          "  window.addEventListener('pointerup', end, true);\n",
+          ""
+        ]
+      ]
+    },
+    "G-hold-not-ended-on-pointercancel": {
+      "undoes": "G — the step ends when the browser cancels the pointer",
+      "edits": [
+        [
+          "src/poster/dragStep.ts",
+          "  window.addEventListener('pointercancel', end, true);\n",
+          ""
+        ]
+      ]
+    },
+    "G-hold-not-ended-on-blur": {
+      "undoes": "G — the step ends when the window loses the focus (a release outside it may never arrive)",
+      "edits": [
+        [
+          "src/poster/dragStep.ts",
+          "  window.addEventListener('blur', end);\n",
+          ""
+        ]
+      ]
+    },
+    "G-hold-not-ended-on-contextmenu": {
+      "undoes": "G — the step ends when the browser's context menu opens (its release may never reach the page)",
+      "edits": [
+        [
+          "src/poster/dragStep.ts",
+          "  window.addEventListener('contextmenu', onMenu, true);\n",
+          ""
+        ]
+      ]
+    },
+    "G-menu-cancelled-ends-drag": {
+      "undoes": "G — a menu the page shows itself (it cancels the event) leaves the drag one step: the press goes on (the review of the merge answer, MEDIUM-1)",
+      "edits": [
+        [
+          "src/poster/dragStep.ts",
+          "      if (!ev.defaultPrevented) end();\n",
+          "      end();\n"
+        ]
+      ]
+    },
+    "G-hold-secondary-press": {
+      "undoes": "G — a secondary press (the context menu's) holds no step, or the edits after it would join it",
+      "edits": [
+        [
+          "src/poster/dragStep.ts",
+          "  if (e?.button !== undefined && e.button !== 0) return;\n",
+          ""
+        ]
+      ]
+    },
+    "G-crop-edge-not-held": {
+      "undoes": "G — a crop-edge drag is one step (merge review F1)",
+      "edits": [
+        [
+          "src/poster/CropOverlay.tsx",
+          "    holdDragStep(ev);\n",
+          ""
+        ]
+      ]
+    },
+    "G-column-grip-not-held": {
+      "undoes": "G — a table column-width drag is one step (merge review F1)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "    // One undo step for the whole drag (fix 12, the merge review's F1).\n    holdDragStep(e);\n",
+          ""
+        ]
+      ]
+    },
+    "G-caption-slider-not-held": {
+      "undoes": "G — a drag of the caption-spacing slider is one step (review R2-I1, decision 3)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "            // it stays a step of its own.\n            onPointerDown={holdDragStep}\n",
+          "            // it stays a step of its own.\n"
+        ]
+      ]
+    },
+    "G-line-slider-not-held": {
+      "undoes": "G — a drag of the line-spacing slider is one step, held still or not",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "            // review's F1); key presses keep the time windows.\n            onPointerDown={holdDragStep}\n",
+          "            // review's F1); key presses keep the time windows.\n"
+        ]
+      ]
+    },
+    "E-buttons-back-in-the-workspace": {
+      "undoes": "E — the Undo and Redo buttons are in the editor's top bar, not over the workspace (decision 5; merge review F2): 5af43b8's placement",
+      "edits": [
+        [
+          "src/poster/EditorTopBar.tsx",
+          "      <HistoryButtons left={sidebarOpen ? 12 : 64} onRun={onRun} />\n",
+          ""
+        ],
+        [
+          "src/poster/PosterEditor.tsx",
+          "        <ZoomBar zoom={zoom}",
+          "        {!readOnly && <HistoryButtons left={sidebarOpen ? 12 : 64} onRun={runEditorHistory} />}\n        <ZoomBar zoom={zoom}"
+        ],
+        [
+          "src/poster/PosterEditor.tsx",
+          "import { EditorTopBar, TOP_BAR_HEIGHT } from './EditorTopBar';\n",
+          "import { EditorTopBar, TOP_BAR_HEIGHT } from './EditorTopBar';\nimport { HistoryButtons } from './HistoryButtons';\n"
+        ]
+      ]
+    },
+    "E-top-bar-not-on-top": {
+      "undoes": "E — the top bar is a row above the editor, so the group lies over no part of the workspace (layout: jsdom has none)",
+      "expect": "survive",
+      "why": "jsdom performs no layout: with the root a row again the bar is still the group's parent and outside the workspace in the DOM, and only a browser draws the group over the workspace's top gutter (sidebar hidden)",
+      "browser": {
+        "harness": "scripts/undo-history-check.mjs",
+        "scenarios": [
+          "B4"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        // The top bar over the editor's row (sidebar, workspace, guidelines).\n        flexDirection: 'column',\n",
+          ""
+        ]
+      ]
+    },
+    "E-reveal-below-the-bar": {
+      "undoes": "E — the sidebar's Show button is centred in the top bar, clear of the workspace",
+      "expect": "survive",
+      "why": "its place is layout (a fixed button's top), which jsdom does not draw",
+      "browser": {
+        "harness": "scripts/undo-history-check.mjs",
+        "scenarios": [
+          "B4o"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "            top: readOnly ? 16 : (TOP_BAR_HEIGHT - 36) / 2,",
+          "            top: 16,"
         ]
       ]
     }
