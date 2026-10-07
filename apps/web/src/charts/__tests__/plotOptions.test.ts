@@ -54,10 +54,11 @@ function specFor(key: string) {
 }
 
 describe('buildPlotOptions', () => {
-  it('enforces the print-size minimums from the readability checker', () => {
+  it('draws its text at 18 pt and axis titles at 24 pt, above the canonical minimums (14 and 18 pt)', () => {
     const { plot } = recordingPlot();
     const build = buildPlotOptions(specFor('grouped-means'), theme, plot);
-    // 18 pt ticks and 24 pt axis titles at PX = 10 → 25 px / 33.3 px.
+    // 18 pt ticks and 24 pt axis titles at PX = 10 → 25 px / 33.3 px
+    // (charts/chartLayout.ts; the minimums are poster/figureTextMinimums.ts).
     expect(build.tickPx).toBeCloseTo(25, 0);
     expect(build.labelPx).toBeCloseTo(33.3, 0);
     const style = build.options['style'] as Record<string, string>;

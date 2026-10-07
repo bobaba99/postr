@@ -17,6 +17,10 @@
  *     "browser": { "harness": "scripts/fit-check.mjs", "scenarios": ["tour-export-step-1440"] },
  *     "edits": [...]
  *   }
+ * A "browser" entry may add "env" (for example {"POSTR_BROWSER": "webkit"})
+ * when only one engine shows the part: the control and the mutant run both
+ * get it (fix 13c).
+ *
  * A blind spot with no "browser" entry is reported NOT GUARDED, unless it
  * says why no check can or needs to exist, in "unguarded" (with its evidence
  * label): it is then reported ACCEPTED, with the reason, for the claims
@@ -69,8 +73,8 @@ for (const [n, m] of blind) {
 }
 
 /** Run one harness with the given scenarios; the mutant (if any) via env. */
-function run(harness, scenarios, mutant) {
-  const env = { ...process.env };
+function run(harness, scenarios, mutant, extraEnv = {}) {
+  const env = { ...process.env, ...extraEnv };
   if (mutant) env.POSTR_MUTANT = `${specPath}#${mutant}`;
   else delete env.POSTR_MUTANT;
   const r = spawnSync(process.execPath, [harness, '--only', scenarios.join(',')], { cwd: WEB, env, encoding: 'utf8', timeout: 600_000 });
@@ -88,18 +92,20 @@ for (const [name, m] of blind) {
     continue;
   }
   const harness = path.resolve(WEB, m.browser.harness);
-  const key = `${harness} ${m.browser.scenarios.join(',')}`;
+  const extraEnv = m.browser.env ?? {};
+  const key = `${harness} ${m.browser.scenarios.join(',')} ${JSON.stringify(extraEnv)}`;
   if (!controls.has(key)) {
-    const c = run(harness, m.browser.scenarios, null);
+    const c = run(harness, m.browser.scenarios, null, extraEnv);
     controls.set(key, c);
     if (c.code !== 0) {
       process.stdout.write(`CONTROL FAILED ${path.basename(harness)} --only ${m.browser.scenarios.join(',')} (exit ${c.code})\n  ${c.lines.join('\n  ')}\n`);
       process.exit(2);
     }
   }
-  const r = run(harness, m.browser.scenarios, name);
+  const r = run(harness, m.browser.scenarios, name, extraEnv);
   const verdict = r.code === 1 ? 'guarded' : r.code === 0 ? 'NOT GUARDED' : 'HARNESS ERROR';
-  rows.push({ name, verdict, detail: `${path.basename(harness)} --only ${m.browser.scenarios.join(',')} → exit ${r.code}`, lines: r.lines, m });
+  const envNote = Object.keys(extraEnv).length ? ` (${Object.entries(extraEnv).map(([k, v]) => `${k}=${v}`).join(' ')})` : '';
+  rows.push({ name, verdict, detail: `${path.basename(harness)} --only ${m.browser.scenarios.join(',')}${envNote} → exit ${r.code}`, lines: r.lines, m });
 }
 
 for (const r of rows) {

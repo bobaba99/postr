@@ -83,7 +83,10 @@ export function FigureTab({
   const chartHasSeries =
     selectedChartSpec !== null && distinctSeries(selectedChartSpec).length >= 2;
   return (
-    <div>
+    // The checker's code box, its preview size and Make's table are not
+    // the poster: their text fields keep the browser's own undo, and the
+    // editor's history never reaches them (fix 12).
+    <div data-own-undo>
       {/* Per-chart palette control — contextual to the current
           selection, so it sits above the make/check modes and shows
           only when a multi-series chart block is selected. Recolours
@@ -169,9 +172,10 @@ export function FigureTab({
                 busyLabel: (n) => (n > 1 ? `Inserting ${n} figures…` : 'Inserting…'),
               },
             ]}
-            // No size promise: with a legend, renderChart grows the svg and
-            // the viewBox shrinks all its text, so 18 pt tick and legend text
-            // prints at 14.9-16.8 pt (measured on the seeded samples).
+            // No size promise: chart text prints at 18 pt (axis titles 24)
+            // unless the block is too small for its legend at that size, and
+            // then no smaller than the canonical minimums, 14 and 18 pt
+            // (charts/chartLayout.ts; record 13c).
             confirmation="Inserted on your poster"
           />
         </div>

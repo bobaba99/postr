@@ -12,7 +12,7 @@
  */
 import type { Lang } from './lang';
 
-/** The engine's row names (readability.ts R_ELEMENTS, PY_ELEMENTS), in French. */
+/** The engine's row names (readabilityTypes.ts R_ELEMENTS, PY_ELEMENTS), in French. */
 const ELEMENT_NAMES_FR: Readonly<Record<string, string>> = {
   'Plot title': 'Titre du graphique',
   'Axis titles': 'Titres des axes',

@@ -38,6 +38,9 @@ import { PosterPreviewOverlay } from './PosterPreviewOverlay';
 import { SelectionRect } from './SelectionRect';
 import { GroupFrame, groupBounds } from './GroupFrame';
 import { UndoToast } from './UndoToast';
+import { EditorTopBar, TOP_BAR_HEIGHT } from './EditorTopBar';
+import { onHistoryButtons, runHistory, type HistoryDirection, type HistoryRunOptions } from './editorHistory';
+import { useEditorHistory } from './useEditorHistory';
 import { checkBounds, checkCollisions, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
@@ -81,6 +84,7 @@ import {
 import { snap } from './snap';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
 import { buildPrintDocument } from '@/export/printDocument';
+import { stripEditorChrome } from '@/export/stripEditorChrome';
 import { useHasPosterScript } from './figureScriptDraft';
 
 // =========================================================================
@@ -640,7 +644,6 @@ const GUIDELINES_CLOSED_QUERY = '(max-width: 1599px)';
 
 export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) {
   const doc = usePosterStore((s) => s.doc);
-  const setPoster = usePosterStore((s) => s.setPoster);
   const posterId = usePosterStore((s) => s.posterId);
 
   // Whose storage folder image blocks upload into: the poster's owner, as
@@ -690,6 +693,27 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     setUndoToast({ msg, seq: undoSeqRef.current });
   }, []);
   const dismissUndoToast = useCallback(() => setUndoToast(null), []);
+
+  // The editor's ONE undo history (fix 12, docs/fixes/12-one-undo-history.md):
+  // ⌘Z / ⌘⇧Z / ⌘Y and Ctrl's from any field that edits the poster, the
+  // browser's own history kept off the poster, and the Undo / Redo buttons.
+  // Nothing is shown when there was nothing to undo or redo. After a text
+  // step, its block is selected and its editor takes the caret (the
+  // editors do that part, useEditableHistory.ts). A button pressed from the
+  // keyboard keeps the focus (`keepFocus`), and the selection with it: a
+  // block selected while the focus stayed on the button armed the delete /
+  // nudge keys of every control that is not a text field (review R3-F1).
+  const runEditorHistory = useCallback(
+    (dir: HistoryDirection, opts?: HistoryRunOptions) => {
+      const { applied, target } = runHistory(dir, opts);
+      if (!applied) return;
+      showToast(dir === 'undo' ? 'Undo' : 'Redo');
+      if (target && !opts?.keepFocus) {
+        setSelectedIds((prev) => (prev.size === 1 && prev.has(target.blockId) ? prev : new Set([target.blockId])));
+      }
+    },
+    [showToast],
+  );
 
   // Scroll position for ruler rendering — updated on scroll events.
   const [scrollPos, setScrollPos] = useState({ x: 0, y: 0 });
@@ -925,10 +949,6 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // title lines don't collide with the authors row / body blocks.
   const [titleOverflowPx, setTitleOverflowPx] = useState(0);
 
-  // Undo/redo keyboard shortcuts
-  const undo = usePosterStore((s) => s.undo);
-  const redo = usePosterStore((s) => s.redo);
-
   // Review mode: when the Comments tab is active, reviewers (owner or
   // guests via the share link) should be able to *anchor* feedback
   // onto blocks/text/areas but NEVER mutate the poster. We toggle
@@ -973,15 +993,14 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     };
   }, [sidebarTab]);
 
-  // ⌘/ or Ctrl+/ toggles the sidebar (Notion shortcut).
-  // ⌘Z / Ctrl+Z = undo, ⌘⇧Z / Ctrl+Y = redo.
+  // ⌘/ or Ctrl+/ toggles the sidebar (Notion shortcut). Undo and redo
+  // are the one history's (useEditorHistory, below), which stays installed
+  // in preview: there it cancels ⌘Z, so the browser's own undo cannot
+  // change the poster unseen behind the overlay (fix 12).
   useEffect(() => {
     // Preview is a chromeless full-screen overlay with no visible
-    // selection, but the editor's DOM stays mounted beneath it. Without
-    // this guard a stray Backspace there deletes the still-selected block
-    // with nothing on screen to show it happened, and the confirming
-    // toast renders behind the overlay. Undo/redo and arrow-nudge are
-    // equally invisible. Bail while previewing.
+    // selection, but the editor's DOM stays mounted beneath it: the
+    // sidebar toggle has nothing to do there. Bail while previewing.
     if (previewMode) return;
     const handler = (e: KeyboardEvent) => {
       if (modalDialogOpen()) return;
@@ -989,31 +1008,12 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         e.preventDefault();
         setSidebarOpen((v) => !v);
       }
-      // Undo: Ctrl+Z / Cmd+Z (not in a contentEditable or input)
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
-        const tag = (e.target as HTMLElement)?.tagName;
-        const isEditable = (e.target as HTMLElement)?.isContentEditable;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || isEditable) return;
-        e.preventDefault();
-        undo();
-        showToast('Undo');
-      }
-      // Redo: Ctrl+Y or Cmd+Shift+Z
-      if (
-        ((e.metaKey || e.ctrlKey) && e.key === 'y') ||
-        ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'z')
-      ) {
-        const tag = (e.target as HTMLElement)?.tagName;
-        const isEditable = (e.target as HTMLElement)?.isContentEditable;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || isEditable) return;
-        e.preventDefault();
-        redo();
-        showToast('Redo');
-      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [previewMode]);
+
+  useEditorHistory({ onRun: runEditorHistory });
 
   const canvasRef = useRef<HTMLDivElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -1180,16 +1180,17 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   );
 
   // Restore a snapshot. Auto-saves the current state as a "Before
-  // restore" version FIRST so the action is never destructive, then
-  // loads the chosen snapshot into the store (autosave persists it).
-  // The current display title is preserved — the snapshot only carries
-  // the PosterDoc, and setPoster would otherwise blank the title.
+  // restore" version FIRST so the action is never destructive, then puts
+  // the chosen snapshot in place as ONE undoable step (owner decision 6,
+  // fix 12): ⌘Z returns to the poster as it was. It used to load the
+  // snapshot with setPoster, which wiped the history. The display title
+  // is untouched (the snapshot only carries the PosterDoc), and the
+  // credit mark, a locked block, is kept as on undo.
   const restoreVersion = useCallback(
     async (versionId: string) => {
       const state = usePosterStore.getState();
       const currentId = state.posterId;
       const currentDoc = state.doc;
-      const currentTitle = state.posterTitle;
       if (!currentId) return;
       // Load the target FIRST: if it's gone (deleted in another tab),
       // fail before creating a spurious "Before restore" snapshot.
@@ -1205,11 +1206,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         await saveVersion(currentId, `Before restore — ${stamp}`, currentDoc);
       }
       // A snapshot with no usable size takes the poster's current size.
-      setPoster(currentId, restored, currentTitle, { sizeFallback: currentDoc ?? undefined });
+      usePosterStore.getState().restoreVersion(restored, { sizeFallback: currentDoc ?? undefined });
       window.dispatchEvent(new Event('postr:versions-changed'));
       showToast('Version restored');
     },
-    [setPoster, showToast],
+    [showToast],
   );
 
   // Cmd/Ctrl+S → save a version (and swallow the browser save dialog).
@@ -2201,6 +2202,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       // Review mode: disallow destructive/structural keyboard actions
       // (delete, duplicate, nudge) so reviewers can't mutate the poster.
       if (sidebarTab === 'comments') return;
+      // A key pressed on the Undo or Redo button is the button's (fix 12
+      // review R3-F1). Other controls that are not text fields still pass
+      // these keys to the selection (item 22, parked on the Later list).
+      if (onHistoryButtons(e.target)) return;
       const target = document.activeElement as HTMLElement | null;
       const isInput =
         target?.tagName === 'INPUT' ||
@@ -2340,13 +2345,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     const canvas = document.getElementById('poster-canvas');
     if (!canvas) return;
 
-    // Deep-clone and strip editor overlays. Grid and ruler are marked
-    // with `data-postr-overlay` so we can pull them out cleanly
-    // without touching user-added SVG content inside blocks.
+    // Deep-clone and strip the editor's chrome: the grid and ruler
+    // overlays, and a selected block's handles, handle row and accent
+    // border (a block just inserted is selected, and clicking the Export
+    // tab does not deselect it; fix 13c review Q-R5). Marked with data
+    // attributes, so user-added SVG content inside blocks is untouched.
     const clone = canvas.cloneNode(true) as HTMLElement;
-    clone.querySelectorAll('[data-postr-overlay]').forEach((el) => {
-      el.parentNode?.removeChild(el);
-    });
+    stripEditorChrome(clone);
     // Reset the editor's zoom-slider transform on the clone itself —
     // we scale via `zoom` in the print window instead.
     clone.style.transform = '';
@@ -2395,6 +2400,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       inert={previewMode ? true : undefined}
       style={{
         display: previewMode ? 'none' : 'flex',
+        // The top bar over the editor's row (sidebar, workspace, guidelines).
+        flexDirection: 'column',
         height: '100vh',
         width: '100vw',
         background: '#0a0a12',
@@ -2402,6 +2409,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         overflow: 'hidden',
       }}
     >
+      {!readOnly && (
+        // Not for viewers (the phone share view is one: it is read-only).
+        <EditorTopBar sidebarOpen={sidebarOpen} onRun={runEditorHistory} />
+      )}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0 }}>
       {/* Review-mode CSS gate — hides resize/rotate handles on both
           single-block frames and group bounding boxes so reviewers
           can't resize things while commenting. Single selector, so
@@ -2736,10 +2748,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           style={{
             all: 'unset',
             position: 'fixed',
-            top: 16,
+            // In the top bar, centred, when there is one (not for viewers).
+            top: readOnly ? 16 : (TOP_BAR_HEIGHT - 36) / 2,
             left: 16,
             width: 36,
             height: 36,
+            // 36 px with its border, as tall as the History group beside it.
+            boxSizing: 'border-box',
             borderRadius: 8,
             cursor: 'pointer',
             display: 'flex',
@@ -3526,6 +3541,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           over someone else's poster is noise at any width, so this is
           gated on readOnly rather than on the phone breakpoint. */}
       {!readOnly && <OnboardingTour />}
+      </div>
     </div>
     {previewMode && (
       <PosterPreviewOverlay

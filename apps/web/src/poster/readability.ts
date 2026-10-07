@@ -18,6 +18,7 @@
  */
 import { pythonParams } from './readabilityPyModel';
 import { rParams } from './readabilityRModel';
+import { figureTextStatus } from './figureTextMinimums';
 import { maskCodeForRewrite } from './readabilitySource';
 import {
   PY_ELEMENTS,
@@ -136,8 +137,9 @@ export function parsePythonCode(code: string, options: ParseOptions = {}): Figur
 
 // ── Readability Computation ──────────────────────────────────────────
 
-const verdict = (pt: number, min: number): 'pass' | 'warn' | 'fail' =>
-  pt >= min ? 'pass' : pt >= min * 0.85 ? 'warn' : 'fail';
+// The warning band is the shared module's (FIGURE_TEXT_WARN_RATIO, fix 13c;
+// it was a literal 0.85 here, review Q-R8).
+const verdict = figureTextStatus;
 
 export function computeReadability(
   params: FigureParams,

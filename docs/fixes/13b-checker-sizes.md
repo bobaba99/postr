@@ -1,6 +1,6 @@
 # Fix 13b — the plot checker reads sizes by a rule table and hands back a script to use
 
-**Plan item:** 13, part 2 · **Branch:** `fix/13p2-checker-sizes` (off main `f554eaa`) · **Status:** implemented; review rounds 1 (code review on `fix13p2-frozen-1`), 2 (a new angle, on `fix13p2-frozen-2`) and 3 (a re-check, decision 7: a result the user relies on, on `fix13p2-frozen-3`) done and answered (section 9)
+**Plan item:** 13, part 2 · **Branch:** `fix/13p2-checker-sizes` (off main `f554eaa`) · **Status:** implemented; review rounds 1 (code review on `fix13p2-frozen-1`), 2 (a new angle, on `fix13p2-frozen-2`) and 3 (a re-check, decision 7: a result the user relies on, on `fix13p2-frozen-3`) done and answered (section 9); fix 13c (with main f3b365b) merged in, its minimums and warning band read from the shared module (section 11)
 
 Part 1 is `docs/fixes/13-checker-reads-its-own-fix.md`. This record follows the
 fix process: reproduce, hypothesis, measure, shared cause, fix, audit. Every
@@ -1190,3 +1190,35 @@ tick-label loop idiom.
   judgement; the shape harness's layout controls keep a grid's own size, so
   they cannot say what a grid at the print size would cost with the text
   sized by any other rule.
+
+## 11. Merge of fix 13c (chart text minimums, with main) into this branch (2026-10-07)
+
+`fix/13p2-chart-text` (fdad478: fix 13c and main f3b365b, so fixes 12, 19, 24–26 and the MVP editor design doc) merged into this branch. Record 13c is kept as written but for the lines on its review finding Q-R8, answered here.
+
+**Conflicts and how each was resolved.**
+- `poster/readability.ts`: 13c changed only the element tables' `minPt` (to `FIGURE_TEXT_MIN_PT`) in the file this fix split. This branch's file is kept; the tables live in `readabilityTypes.ts`, which now imports `FIGURE_TEXT_MIN_PT` and takes every `minPt` from it (no value and no multiplier changed: 13b's own multipliers, R caption 0.8, Python ticks and caption 1.0, stay). The row status, a literal `min * 0.85` here (13c's review Q-R8, left to this stream), is now `figureTextStatus`, so the code check, the image scan and the inserted charts read one set of minimums and one warning band (`poster/figureTextMinimums.ts`).
+- `poster/ReadabilityPanel.tsx`: both import lines kept (`printedImageBox` from this fix, the shared module from 13c); 13c's `PX` import dropped, nothing reads it here. 13c's image-scan table and status merged without conflict.
+- `docs/stress-test/PLAN.md`: this fix's row 13 kept and 13c's stream Q row added after it; 13c's "for stream P" Later note now says Q-R8 is answered.
+- Merged without conflict and checked: `feature-graph.md` (a revision line for this merge; the scan row says what box it scales to), `fixes/README.md` (both sides' harness rows), `manual-test-flows.md` (this fix's part was PART 9 / §29, the numbers fix 12 took: now PART 11 / §31, after 13c's §30, with one check of the shared minimums and warning band), record 26's spec (13b's retarget of `warnings-python-canvas-untranslated` and fix 12's `fr-undo-50-steps` in different hunks).
+
+**Meanings that changed.**
+- The code check's warning band comes from the shared module (equal today: 0.85), so a change there moves the code check's ⚠/✗ line too. New test: `figureTextMinimums.test.tsx` "the code check takes its warning band from the shared module" (the public page at 7 × 5 in, `theme_minimal(base_size = 11)`, a sentinel band 0.5: Axis titles 11 pt and Tick labels 8.8 pt ⚠, Plot title 13.2 pt ✗). TESTED, red first: with the literal 0.85 back it fails (1 of 6), with the tables' literals back the R, Python and band tests fail (3 of 6); 6 of 6 with the merge.
+- The image scan sizes the figure by the picture's printed box (`imageBox.ts`: the frame's 1-unit border each side and a side caption's 35 % off), as the code check does since this fix, not by the block. This was already so on this branch (the panel feeds both from `blockWidthIn`); 13c's two scan tests had a 100 × 70 block meaning a 10 × 7 in picture and read 18.6 pt where they expected 19.0 (and 17.6 for 18.0). Their fixture is now a 102 × 70 block, whose picture is 10 × 7 in; the expected numbers are unchanged. A block of 100 units scans at 9.8 in: 2 % smaller print sizes than 13c's branch reported.
+- 13c's mutants `r-elements-own-minimums` and `py-elements-own-minimums` now edit `readabilityTypes.ts` (the R caption line's spacing differs); a new mutant `code-check-warn-literal` puts the literal 0.85 back. Every edit of the 20 specs in `docs/fixes` applies to the merged sources (1113 edits, dry run).
+
+**Numbers on the merged tree** (Chromium; the working tree before the commit, on `450d7e6` plus the merge):
+
+| check | result |
+|---|---|
+| web suite (TESTED) | 4109 of 4109 tests, 227 files; the French dictionaries, the French pages and the checker copy tests 58 of 58 |
+| `tsc -b` (TESTED) | exit 0 (a deliberate type error in a probe file: exit 1) |
+| `npm run build` (TESTED) | exit 0; 19 pages prerendered, 16 sitemap URLs |
+| `checker-truth-check.mjs` (MEASURED) | `GATE fp=10 rcfp=0 L=5 run=0 cut=0 cutPlain=17 ffw=16 rcffw=0 \| fpU=0 rcfpU=0 \| SAVED fpU=0 rcfp=0 \| F=0/396`, instrument `1b025d31c909709b`, 116 of 116 scripts × 4 sizes; every control held (K-truth, C 380 element-runs and 400 scales, K-known, K-page 510 of 510); SNIPLOW 0 of 153, SNIPNOOP 0 of 44, all-pass banner over a failing figure 0 of 68, EDIMG 0 of 40. The same as section 8's "now" column; exit 1 from the marked and known claims recorded there (fp 10 all marked, L 5) |
+| `checker-r-truth-check.mjs` (MEASURED) | `GATE-R fp=6 rcfp=0 F=0/190 L=15 ffw=22 rcffw=0 \| fpU=0 rcfpU=0 \| Lsrc=0 Llost=0`, 61 scripts × 4 sizes; controls held (K-truth, C 280, K-page 244 of 244); SNIPLOW 0 of 110, SNIPNOOP 0 of 100. The same as section 8; exit 1 from the same known claims |
+| `language-detect-check.mjs` (MEASURED) | exit 0: 421 scripts, every claim 0 (DEAD, LABEL, WRONG, NOANSWER, SYSTEM, REFUSED, SILENT, VANISH, REPEAT, KEPT, RESIZE), controls ok; INFO: 4 of 351 edited scripts on the page and 3 of 54 in the editor do not parse, all 7 from originals that parse in neither language (IPython magics, an R Markdown chunk) |
+| `figure-script-check.mjs` (MEASURED) | exit 0: 0 of 38 counted readings, 0 scenarios errored, 0 controls failed |
+| `chart-print-size-check.mjs` (MEASURED) | exit 0: over 1706 chart-sizes BELOW 0, CLIP 0, COLLIDE 0, PRINT 0; CHROME 0 of 91 print documents; REDRAW 0 of 25; K-geom and K-frame 1844, K-U 7 of 7, K-count, K-min held; GROWN 99, SHRUNK 234 (as record 13c) |
+| record 13b's mutants (TESTED) | control 345 of 345; 160 of 160 killed, the 2 documented blind spots (`advice-unfloored`, `r1-14-block-merge-dups`); run in two parts after the first run was stopped from outside at mutant 71 (exit 144), the rest with `--only`, control 345 of 345 in each |
+| record 13c's mutants (TESTED) | control 103 of 103; 49 of 49 killed (13c's 48 and `code-check-warn-literal`); 11 documented blind spots |
+| record 15's mutants (TESTED) | control 326 of 326; 89 of 89 killed |
+| record 07's mutants (TESTED) | control 328 of 328; 95 of 96 killed. `clear-leaves-storage` survives, alone too, and survives on a copy of the merge base `f554eaa` (MEASURED, control 328 of 328): neither side touched `figureScriptDraft.ts`, `accountDeletion.ts` or the spec's tests. Its line removes the stored scripts in `clearStoredFigureScripts`, whose one caller, account deletion, has already removed every `postr.*` key by name since fix 24 (INSPECTED), so through the user's entry the mutant changes nothing. Not changed here: a blind-spot entry or removing the line is the lead's call |

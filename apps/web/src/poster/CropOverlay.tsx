@@ -28,6 +28,7 @@ import {
 } from 'react';
 import type { Block } from '@postr/shared';
 import { HIT, UNZOOM, ctl } from './selectionLayout';
+import { holdDragStep } from './dragStep';
 
 export interface CropOverlayProps {
   block: Block;
@@ -100,6 +101,9 @@ export function CropOverlay({ block, onUpdate, onClose }: CropOverlayProps) {
     const startCrop = { ...crop };
     const startX = ev.clientX;
     const startY = ev.clientY;
+    // The drag is one undo step, however many moves it commits (fix 12,
+    // the merge review's F1: one step per move had emptied the history).
+    holdDragStep(ev);
 
     const onMove = (moveEv: PointerEvent) => {
       const dx = moveEv.clientX - startX;

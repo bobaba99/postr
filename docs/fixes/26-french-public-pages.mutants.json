@@ -547,13 +547,13 @@
         ]
       ]
     },
-    "fr-undo-100-steps": {
-      "undoes": "H (R1-02) — the French About page says the English limit, 50 undo steps (D6)",
+    "fr-undo-50-steps": {
+      "undoes": "H (R1-02) — the French About page says the English limit, 100 undo steps (D6; was fr-undo-100-steps while the limit was 50, before fix 12 merged)",
       "edits": [
         [
           "src/i18n/about.ts",
-          "jusqu’à 50\\u00a0étapes",
-          "jusqu’à 100\\u00a0étapes"
+          "jusqu’à 100\\u00a0étapes",
+          "jusqu’à 50\\u00a0étapes"
         ]
       ]
     },

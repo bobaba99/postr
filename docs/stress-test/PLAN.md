@@ -35,14 +35,16 @@ One branch per cause.
 - Undo is PowerPoint-style: one history, works inside text, large changes too.
 - A pasted plot script survives a reload.
 - Owner check: undo of deleted text/components works in real Chrome. Redo
-  after undoing typing is still unconfirmed (settled by item 12).
+  after undoing typing is still unconfirmed (settled by item 12: measured
+  in Playwright's Chromium, Firefox and WebKit, record 12; real browsers
+  with a physical keyboard are the owner's check, manual flow 29).
 
 ## Assumptions accepted with the plan
 
 - Poster gutter 64 px (owner decision; fix 03 measured handles still under the rulers at large fitted zooms, 4 of 12 cases, record 03 section 10). The owner kept the gutter and chose to fix the controls instead: item 19 (2026-09-30).
 - "Small screen" = viewport narrower than 1600 px.
 - Pasted script saved per poster in this browser (localStorage), not in the poster.
-- Undo history 50 -> 100 steps.
+- Undo history 50 -> 100 steps (applied by fix 12, `UNDO_HISTORY_LIMIT`).
 
 ## Order
 
@@ -160,6 +162,11 @@ scope becomes a plan item or a question for the owner.
   the likeliest path, and ⌘Z restores the block (6 of 6) (MEASURED by the
   ranking evidence on main, 2026-09-30). The cause is one key guard, copied at
   three places in `PosterEditor.tsx`, that covers text fields but not SELECT.
+  Fix 12 (review R3-F1) keeps its new Undo and Redo buttons out of it
+  (`onHistoryButtons`), and the table's two Delete / Backspace listeners
+  from them too; every other control that is not a text field still passes
+  the keys (MEASURED by fix 12's harness, B3s before its change: ArrowRight
+  on Zoom out moved the block a keyboard press of Undo had selected).
 - From fix 07's confirmer (2026-10-06), for items 6 and 12 to settle, not
   re-measured: in Playwright's Chromium and WebKit, ⌘Z with focus outside the
   figure checker's code box undid the pasted script (325 → 0 characters;
@@ -186,6 +193,116 @@ scope becomes a plan item or a question for the owner.
   poster: " and the database's message, `pages/Home.tsx:126-127` showing
   `data/posters.ts:464`), against the rule that user-facing errors stay
   generic.
+- **From fix 12 (2026-10-06):** Enter in a text block is not saved as a
+  line break: Chromium, Firefox and WebKit put the new line in a `<div>`,
+  which the sanitizer flattens with no separator, so " ZQA", Enter, "ZQB"
+  is stored as "ZQAZQB" (MEASURED in 3 engines on main and on the fix,
+  record 12 §10). The screen keeps two lines until the block is drawn
+  again from the store (a reload; since fix 12 also an undo or redo of
+  that block's text). A text-formatting item, not undo.
+- From fix 12: the comments panel's fields (hidden with sharing) are not
+  marked to keep their own undo; when sharing returns, mark them
+  `data-own-undo` (owner decision 2 lists comments) and add a test.
+- From fix 12: importing a `.postr` over the open poster ("Replace current
+  poster") still loads it with `setPoster`, which wipes the undo history
+  (INSPECTED); version restore no longer does. An owner question.
+- From fix 12: the Edit tab sets text size per text level (title, heading,
+  body), not per block, and body text has no alignment control (headings
+  have Style › Headings). The removed toolbar buttons never saved either;
+  per-block size or alignment would be a feature (owner).
+- From fix 12's review, round 1, for the owner to confirm (choices beyond
+  the wording of the decisions, record 12 §10): more fields keep their own
+  undo than decision 2 lists (the whole Figure tab, the Authors and
+  References paste boxes, References' Manual Entry, the preset and version
+  names, the guidelines panel); the palette designer became a modal
+  dialog; A+/A− and alignment also left the docked toolbar above the
+  Content box (it shares the floating one's buttons); a version restore
+  keeps the locked credit mark.
+- From fix 12's review, round 2, for the owner (record 12 §9 and §10):
+  Undo and Redo pressed from the keyboard (or by assistive technology)
+  keep the focus on the button and select nothing, while ⌘Z and a mouse
+  click put the caret back in the text (decision 4 and decision 5 met
+  here: a press that moved the focus let the next Enter type into the
+  poster); a redo selects the redone text, so the next keystroke replaces
+  it (decision 4 as written); on a Mac Ctrl+Y is redo (decision 1), so the
+  system's Ctrl+K / Ctrl+Y yank no longer works in a text block; in
+  Chinese and Japanese each composed word is a step of its own (the space
+  rule alone would make a paragraph one step). (The caption-spacing
+  slider's steps, asked here too, were settled by the lead on the merge
+  review: every drag is one step, record 12 §11.)
+- From fix 12's review, round 2 (R2-F3, older than fix 12): the table's
+  last cell keeps forward Tab (`blocks.tsx` `onCellKeyDown`: Tab with no
+  next cell is cancelled and goes nowhere), so on a poster with a table
+  forward Tab never reaches the controls after it, the Undo and Redo
+  buttons included; Shift+Tab does (MEASURED, record 12). Tab out of the
+  last cell, and Shift+Tab out of the first, should leave the table.
+- From fix 12's review, round 2 (R2-I2, INSPECTED, not measured: no
+  harness can drive a native text drag): a word dragged within a block is
+  probably two undo steps (the browser's deleteByDrag, then its
+  insertFromDrop), so one ⌘Z would leave it missing from both places.
+  Manual flow 29 checks it; if confirmed, join the two inputs of one drop
+  into one step.
+- From fix 12's review, round 2 (MEASURED in Chromium): a composition
+  cancelled (Escape in an input method) leaves the text as it was, but an
+  undo step that changes nothing (the next ⌘Z shows "Undo" and does
+  nothing) and drops a redo held before it.
+- From fix 12's review, round 3, for the owner (record 12 §10): keys
+  pressed on the Undo and Redo buttons are theirs, so where a click focuses
+  a button, an arrow or Delete after clicking Undo does nothing until the
+  poster is clicked: on the Mac host a click leaves the focus on Undo in
+  Chromium and Firefox while there is still something to undo, on the page
+  in WebKit (MEASURED, merge review finding 7 and record 12 §11; corrected:
+  round 3 had read "off the button in all three", from a click that
+  emptied the history and disabled the button); and a press from the
+  keyboard now selects no block, so the block whose text it restored is not
+  outlined.
+- **Table rows and columns cannot be deleted** (from fix 12's merge review,
+  2026-10-07; older than fix 12; the owner, 2026-10-07: "For more advanced
+  table editing, leave it to later"). (1) With a row or a column selected by
+  its strip, Backspace or Delete removes the whole table block, not the row
+  or column (MEASURED by the merge reviewer, `table-keys.mjs`: column strip
+  then Delete, and row strip then Delete, leave no table, in Chromium,
+  Firefox and WebKit at the fit, the column case at the floor too; one ⌘Z
+  brings it back with its cells; TESTED in jsdom on main, on fix 12 and on
+  the merge by the integrator): the editor's own Delete handler acts on the
+  selected block before the table's (item 22's family). (2) The table's
+  right-click menu shows its items, but "Insert row below", "Delete column"
+  and "Clear cell" do nothing: the table stays 4 × 3, its cell "4.2 (0.8)"
+  kept, the menu closes (MEASURED by the reviewer, `ctxmenu.mjs`, Chromium
+  and WebKit). Edit block's table editor still removes the last row or
+  the last column, not a chosen one (INSPECTED, `Sidebar.tsx` `deleteRowAt`
+  / `deleteColAt`).
+- From fix 12's merge review (2026-10-07; LOW): in WebKit, with Undo reached
+  by Option+Tab and the document's selection left at the start of a text
+  block, forward Delete pressed on the focused button deletes a character
+  there ("ZQSENT4 …" → "QSENT4 …") and drops the redo, and ArrowRight
+  moves the focus into that block (MEASURED by the reviewer,
+  `wk-focus.mjs`; Chromium: nothing changes). The engine applies the key to
+  the selection, not to the focused button; Safari UNVERIFIED.
+- From fix 12's merge review (2026-10-07): the delete / nudge / duplicate
+  keys' own dialog guard (`modalDialogOpen` in `PosterEditor.tsx`) has had no
+  test since fix 12 moved ⌘Z out of that handler: its mutant survives the
+  whole web suite (TESTED by the reviewer, 0 of 3906 tests fail). Add a test
+  that presses Delete and an arrow with the size dialog open.
+- From fix 12's merge review (2026-10-07; LOW): Undo pressed while crop mode
+  is open puts the crop back in the store and on the picture, but the crop
+  frame and its edge handles stay where they were until Apply (MEASURED by
+  the reviewer in Chromium, Firefox and WebKit, C3: the stored right crop
+  30.4 % → 25.3 % → 0, the edge drawn at 69.3 % from the left throughout).
+  Since the merge review's F1 one Undo takes a whole crop drag back, so the
+  frame now lags one whole drag (INSPECTED). `CropOverlay` keeps its own
+  copy of the crop from when it opened.
+- From the independent read of fix 12's merge answer (2026-10-07, a code
+  review agent; INSPECTED by it, not measured; record 12 §11): (1) whether a
+  touch drag of an Edit-block slider sends `pointercancel` when the browser
+  takes the gesture, which would end its undo step early (UNVERIFIED: no
+  touch device); (2) an edit that lands while a drag is held (an image
+  upload finishing) joins the drag's undo step; (3) older: `CropOverlay`
+  keeps its `pointermove` listener after Escape, an unmount, a
+  `pointercancel` or a blur, so moves after Cancel keep cropping; (4) the
+  sidebar's Show button is drawn left of Undo and Redo in the top bar but
+  comes after them in the Tab order (WCAG 2.4.3), and the bar has no
+  toolbar role or name.
 - **From fix 19 (2026-10-06), the owner's MVP triage of its questions**
   (record 19, section 10; MEASURED with `control-size-check.mjs` on the
   fix, Chromium, at the 1280 × 800 fit unless marked):
@@ -241,13 +358,18 @@ scope becomes a plan item or a question for the owner.
     edge overruns the sheet by 9 to 12 px and its bottom corner handles
     meet the zoom bar at the fits, as on main. Q3's zoom bar test could
     cover the bottom corner handles.
-- On main, found by fix 19 (2026-10-06, MEASURED in Chromium by a scratch
+- ~~On main, found by fix 19 (2026-10-06, MEASURED in Chromium by a scratch
   probe on main `e09c0ea` and on the fix): Save PDF with a block selected
   copies its selection controls into the print document (8 handles, the
   row and the rotate control on main; `printPoster` strips only
   `[data-postr-overlay]`, `PosterEditor.tsx`, where the thumbnail strips
   the selection markers too). Whether they show in the PDF was not
-  measured; with fix 19 they are drawn at the editor's zoom of the moment.
+  measured; with fix 19 they are drawn at the editor's zoom of the moment.~~
+  FIXED by fix 13c's review round 1 (2026-10-07; finding Q-R5): the print
+  copy is stripped as the thumbnail's is (`export/stripEditorChrome.ts`),
+  and a selected or out-of-bounds frame prints with a 1 px border
+  (MEASURED, `chart-print-size-check.mjs` CHROME 0 of 91 print documents,
+  7 on the frozen copy).
 - Still in the sheet's units after fix 19, growing with the zoom: a
   selected block's own border (1.5 units: 15 px at 10×; it is the block's
   box, so a thinner one would change where its text wraps) and the crop
@@ -527,9 +649,12 @@ it gave them; not re-measured for this list, so UNVERIFIED here).
   `plt.xlabel(…, fontsize=…)`, `plt.xticks(fontsize=…)` or
   `plt.legend(fontsize=…)` are not read, so a too-small label passes (claims
   g3-…-04, -05); the R fix does nothing when the script's `theme()` comes
-  after `theme_*()`; two sets of minimums exist (the code check's 18/14/12 pt
+  after `theme_*()`; ~~two sets of minimums exist (the code check's 18/14/12 pt
   and the image scan's and inserted charts' 24/18 pt; claims g3-…-07, -30,
-  -45); inserted charts with a legend print their text at 14.9–16.8 pt.
+  -45); inserted charts with a legend print their text at 14.9–16.8 pt~~
+  (these two FIXED by fix 13c, 2026-10-07: one module of minimums, and
+  inserted charts at 18/24 pt or, in a box too small for the legend, never
+  below 14/18; record `docs/fixes/13c-chart-text-minimums.md`).
 - **LaTeX re-enable checklist** (the export is hidden by the owner,
   2026-10-06; stream B's flag). Before switching it back on: it may not
   compile (9 of 12 coloured text arguments contain a paragraph break, which
@@ -598,6 +723,45 @@ the evidence label of each.
 - **`poster/ReadabilityPanel.tsx` is 1,208 lines** (1,202 on main): splitting
   it (the result table and the fix box) is left for a change that can
   re-run fixes 07 and 15's mutant specs in full.
+
+### Queued by fix 13c (Postr's own charts, 2026-10-07)
+
+Record `docs/fixes/13c-chart-text-minimums.md` section 10 has the detail and
+the evidence label of each.
+
+- ~~**Category labels that do not fit their band meet**~~ and ~~**charts
+  smaller than 6 × 4.5 in can still print under the minimum**~~: FIXED by the
+  review round 1 corrections (labels never wider than their room, each band
+  holding its label's lines; a chart too small for its text at the
+  minimums grows its block): tick labels whose glyphs meet 0 of 1706
+  chart-sizes, now a gate; below the range (4 × 3, 5 × 7) 0 of 138 under
+  the minimum (MEASURED, Chromium).
+- **Insert places a chart by its stored size**: its frame, with the caption
+  now shown, is 12.8 to 18.2 units taller, so on the 3-column template the
+  caption covers another block in 7 of 7 inserts (MEASURED, INFO
+  INSERT-COVER; ISSUES counts it). Images with captions do the same on main.
+  An older poster's captioned chart grows the same way when opened. Since
+  review round 1 a chart whose text at the minimums does not fit its
+  block's height also grows (a long legend or long category labels at 6 ×
+  4.5 to 8 × 6: 96 of 757 pasted chart-sizes, by up to 5.35 in, median
+  0.9 in; 3 of the chooser's 949, by 0.07 in), and may cover the block under
+  it the same way. Placing by the drawn size, or telling the user the
+  chart needs more room (an owner's choice: the lead's decision 6 asked
+  for the legend inside the block's height).
+- **A caption made from an upper-case column name lower-cases its first
+  letter** ("Mean sCORE … by cONDITION"; `captionFor`'s `lower()` in
+  `charts/buildSpec.ts`; review Q-R9, INSPECTED, on main too).
+- **Answered in the merge of 13c into 13b (record 13b section 11):** the
+  code check's row status used a literal 0.85 where the image scan reads
+  `FIGURE_TEXT_WARN_RATIO` (review Q-R8); `readability.ts` now judges
+  each row with `figureTextStatus`, and 13b's element tables
+  (`readabilityTypes.ts`) take `minPt` from the shared module.
+- **Found in passing, on main:** an out-of-bounds text block's white editor
+  text (`blocks.tsx` `txtStyle`, `color: isOutOfBounds ? '#ffffff'`) is
+  copied into the print document; the part on the sheet prints white
+  (INSPECTED; the print copy now resets only the frame's border).
+- **Charts are not in the PPTX export** (no chart case in
+  `export/pptx/writer.ts`; INSPECTED, on main too).
 
 ## LaTeX export: before it is switched back on
 
@@ -743,17 +907,27 @@ Found while fixing one item, belonging to another (details in the record named):
   default 3-column template at 48×36 never gets a credit mark, because its
   column bottoms (338.8–342.2) overlap the bottom band the mark needs
   (338–350).
-- **Item 12**, from fix 01:
+- **Item 12**, from fix 01 (state after fix 12, record 12 §10):
   - ⌘Z with focus in a sidebar input runs the browser's native undo, which
     reverted canvas typing; a second ⌘Z brought it back. MEASURED in Chromium.
+    **Fixed by fix 12** (one history; the browser's undo never reaches the
+    poster: its beforeinput is cancelled where it fires one, and where it
+    does not, nothing is stored in that task, record 12 §7 B).
   - The caption-spacing slider goes through `updateBlock` unkeyed: 60 events
-    make 50 history entries. MEASURED on main.
+    make 50 history entries. MEASURED on main. **A drag is one step since
+    fix 12's merge review** (pointerdown to pointerup, like every drag;
+    record 12 §11); a key press on the slider stays a step of its own.
   - Version restore resets history, and drops the credit mark (review 2,
     MEASURED; this contradicts the comment at `Editor.tsx:182-185`).
+    **Both fixed by fix 12** (one undoable step; the locked mark is kept as
+    on undo).
   - Edit-tab caption and note text, and caption spacing, go through
     `updateBlock` unkeyed. 10 events make 10 steps, and a 60-character
     caption pushes older work out of the history (review 2, MEASURED).
+    **Caption and note fixed by fix 12** (grouped by word); caption spacing
+    one step per drag (above).
   - Auto-Arrange with font scaling takes 3 undo steps (review 2, MEASURED).
+    Not changed (not re-measured).
 - **Unplanned, possible data loss** (review 2, INSPECTED only).
   `migrateBase64ToStorage` calls `setBlocksSilent` with the load-time blocks,
   which would overwrite edits made while images upload. Reproduce before
@@ -774,8 +948,10 @@ Found while fixing one item, belonging to another (details in the record named):
 | 3 | `editor/fit-whole-sheet` (A, B), `editor/guidelines-closed-small-screens` (C, D, and A and B's review follow-ups) | done — `docs/fixes/03-fit-whole-sheet.md`; the owner answered its questions on 2026-09-30 (items 19–22; Firefox and WebKit engines installed) |
 | 23 | `fix/new-poster-owner-only` | done — `docs/fixes/23-new-poster-owner-only.md`; sharing and comments hidden (`SHARING_ENABLED`) |
 | 4 | `editor/rulers-match-sheet` (local, parked) | hidden — the owner hid the rulers on 2026-09-30 (`RULERS_ENABLED`, `config/features.ts`); the fix is parked unmerged with its record, instruments and open review findings |
-| 13 | `checker/python-reads-own-fix` (part 1), `fix/13p2-checker-sizes` (part 2) | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md`; part 2 implemented, review rounds 1 (17 findings: a tight save cut what it drew outside the plots, a `fontdict=`/`prop=` overwritten so the script raised, R theme order, `theme_void()`, a theme that is not ggplot2's, `ggsave(filename = …)`, `**kwargs`, and more) and 2 (13 findings: an R figure combining plots themed as a whole, a blank image for gridExtra; a panel letter replacing the centre title; a size the check cannot read pinned at the default and lowered; R names with a comment; PdfPages; colorbars seaborn and pandas make; sup-labels; legend guides; png() devices; advice from rows not drawn; `%+replace%`; loops over Axes) and 3 (5 findings: a theme held in a name or a function dropped from a combined figure's plots and base 11 written over it; the floor on a string font.size, an import above `from __future__`, `FontProperties as FP`; a passing unread size left unfloored; a plot drawn on its own line in a device, `grid.arrange()`, ragg; a cut legend at 4 × 3 in, accepted) done and answered — `docs/fixes/13b-checker-sizes.md` (the owner's design of 2026-10-07: a bounded rule table read by position, the last setting winning; a size or canvas the code leaves out marked `*` and set in the script the page asks you to use in place of yours; plain edits instead of part 1's helper. On the corpora with every review scenario, 116 Python and 61 R scripts × 4 sizes in real matplotlib, seaborn and ggplot2: first-check false passes 201 → 0 unmarked (Python; 10 on rows marked `*`) and 126 → 0 unmarked (R; 6 marked), re-check false greens 151 → 0 and 141 → 0, scripts whose fix leaves a text short or does not run 31 → 0 and 51 → 0, texts cut from the image 0 → 0, false fails 151 → 16 and 86 → 22 (rows marked `*`); R sizes written below what ggplot2 draws 68 → 0 (R texts printed smaller 78 → 15, all from a canvas the check cannot read, set to the size checked); Python 0 → 5, pass to pass: two seaborn grids at 14 × 10 in, an owner question, and a reset inside an `if`) |
+| 13 | `checker/python-reads-own-fix` (part 1), `fix/13p2-checker-sizes` (part 2, stream P: 13b; stream Q, 13c, merged in, next row) | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md`; part 2 implemented, review rounds 1 (17 findings: a tight save cut what it drew outside the plots, a `fontdict=`/`prop=` overwritten so the script raised, R theme order, `theme_void()`, a theme that is not ggplot2's, `ggsave(filename = …)`, `**kwargs`, and more) and 2 (13 findings: an R figure combining plots themed as a whole, a blank image for gridExtra; a panel letter replacing the centre title; a size the check cannot read pinned at the default and lowered; R names with a comment; PdfPages; colorbars seaborn and pandas make; sup-labels; legend guides; png() devices; advice from rows not drawn; `%+replace%`; loops over Axes) and 3 (5 findings: a theme held in a name or a function dropped from a combined figure's plots and base 11 written over it; the floor on a string font.size, an import above `from __future__`, `FontProperties as FP`; a passing unread size left unfloored; a plot drawn on its own line in a device, `grid.arrange()`, ragg; a cut legend at 4 × 3 in, accepted) done and answered — `docs/fixes/13b-checker-sizes.md` (the owner's design of 2026-10-07: a bounded rule table read by position, the last setting winning; a size or canvas the code leaves out marked `*` and set in the script the page asks you to use in place of yours; plain edits instead of part 1's helper. On the corpora with every review scenario, 116 Python and 61 R scripts × 4 sizes in real matplotlib, seaborn and ggplot2: first-check false passes 201 → 0 unmarked (Python; 10 on rows marked `*`) and 126 → 0 unmarked (R; 6 marked), re-check false greens 151 → 0 and 141 → 0, scripts whose fix leaves a text short or does not run 31 → 0 and 51 → 0, texts cut from the image 0 → 0, false fails 151 → 16 and 86 → 22 (rows marked `*`); R sizes written below what ggplot2 draws 68 → 0 (R texts printed smaller 78 → 15, all from a canvas the check cannot read, set to the size checked); Python 0 → 5, pass to pass: two seaborn grids at 14 × 10 in, an owner question, and a reset inside an `if`) |
+| 13 part 2, stream Q (13c) | `fix/13p2-chart-text` | fixed; its one review round (the browser, the user's entry points, the print path) answered: Q-R1 to Q-R5 held and are corrected (text measured in the chart's font, Plot's tick labels read back for the margins and spacing, legend and long labels wrapped inside the chart, each band holding its label's lines, a chart too small for its text at the minimums growing its block, "⎙ Save PDF" stripping the editor's chrome), Q-R7's cause found (a 1.5 px border the editor draws 1 px wide and the print 1.458 units), the rest on the Later list; re-measured in Chromium, Firefox and WebKit on the review's partition folded into the harness, 48 of 48 mutants killed, 10 blind spots guarded in the browser and 1 accepted; one more round is the lead's call (the corrections add mechanisms) — `docs/fixes/13c-chart-text-minimums.md` (one module of minimums for figure text, read by the code check's tables, the image scan and the charts; an inserted chart is drawn at the box it is laid out in, text at 18/24 pt never rounded and never below 14/18 (its floor 0.5 % above them, for print's rounding); chart blocks have an image's caption chrome, so the caption and its "Sample data, not real results." prefix show whole; in each of Chromium, Firefox and WebKit 0 of 1706 chart-sizes below the minimum, clipped, colliding or printed differently, from 408, 1705, 1077 and 18 on main in Chromium; 99 of 1706 grow their block, all at 6 × 4.5 to 8 × 6); the queued items above |
 | 7 | `fix/07-figure-script-kept` | done (three review rounds); review round 1 answered (a blank-line regression fixed, tests added, legal copy corrected); round 2 answered (a result checked against an image block is no longer shown under the preview's size, and a kept result says the size it is for; a long script edited after its Check stays stored); round 3 answered (a note no longer promises an image check comes back) — `docs/fixes/07-figure-script-kept.md`; the owner's decisions of 2026-10-06: the script kept per poster in this browser and re-checked on return, sessionStorage on the public page, Check stays up once a script is in, and the same cause fixed in the Authors, References, Make-a-figure, poster-name and version-name drafts (memory only) |
+| 12 | `fix/12-one-undo-history` | steps 1 to 8 done (reproduced, confirmed, owner decisions 2026-10-06, fix, tests red on main, browser instrument green in three engines, mutants) — `docs/fixes/12-one-undo-history.md`; ONE undo history for everything that edits the poster (keys from every field, the browser's own history kept off the poster, a step per typed word, the caret back where the change was, Undo/Redo buttons, a version restore is one step, nothing shown on an empty history, 100 steps, no A+/alignment on the toolbar, table cells keep the order of typed letters); review round 1 answered (a colour drag is one step again, not one per hex digit; a one-character paste, drop, cut or deleted selection is a step of its own in every field; the browser's own undo in a sidebar field is never stored; a word starts where the caret is; ⌘; on Dvorak is not undo; five untested parts tested); review round 2 answered (text typed through an input method, a dead key or a phone keyboard is one step per composed word, not one per composition update, and no longer pushes older history out; Undo and Redo pressed from the keyboard keep the focus on the button, so a second Enter no longer types into the poster; the table's Tab trap, Ctrl+Y on a Mac, the slider's steps and a drag within a block handed to the Later list and the owner); review round 3 answered (keys pressed on the Undo and Redo buttons no longer reach the poster: after Undo pressed from the keyboard an arrow had moved the selected block and Backspace or Delete removed it, the redo lost; a keyboard press selects no block; the table's own Delete / Backspace kept off the buttons too); round 4 (a re-check of round 3's response, which changed keyboard handling) next, from the frozen copy `fix12-frozen-4`; main merged in (fixes 19, 24, 25, 26), and the merge review's F1 and F2 answered (2026-10-07, record 12 §11): every drag is one undo step (a crop edge, a table column's width, the two Edit-block sliders; one crop gesture had emptied the 100-step history), and the Undo and Redo buttons moved into a new top bar across the editor (owner decision 5), where nothing on the sheet can lie under them; the table, WebKit, dialog-guard and crop-mode findings of that review are on the Later list |
 | 15 | `fix/15-checker-language` | done (three review rounds) — `docs/fixes/15-checker-language.md` (Check answers when it cannot tell R from Python; unsupported plotting systems are named, not scored; a result on screen stays, marked out of date, and one a new print size hides is said to be hidden; detection reads live code only, re-landing 9ea9f38; a string in `aes()` or seaborn's `barplot()` places nothing on its own: code with only such a token gets the could-not-tell answer (an R package name such as `library(tidyverse)` is an R signal and is checked as ggplot2)) |
 | 19 | `fix/19-controls-one-size` | fixed; its one review round (the browser, through the user's entry points) answered: on a turned block the handle row now turns about its own centre (near 180° it lay on the block's own handles, and a click on one deleted the block), and crop mode's edge handles no longer animate their size after a zoom change; after the round, by the lead's decision, zoomed out under 35% a handle row wider than its block draws only its move button (there a click meant for another block could delete the selected image: F3; the threshold measured); three cosmetic or older items and F3's remainder went to the Later list — `docs/fixes/19-controls-one-size.md` (a selected block's handles, row, rotate control, a selected table's strips and grips, crop mode's edges and bar and a group's handles and outline are the same size on screen at every zoom, 24 px to grab with 8 px squares and 20 px circles; a block small on screen draws fewer controls; the rotate control moves into the handle row where below it would meet the ZoomBar or leave the canvas; the owner's Q5–Q9 are on the Later list) |
 | 24 | `fix/legal-canada-law25` | done (three review rounds; round 3 found nothing left) — `docs/fixes/24-legal-canada-law25.md`: the Privacy, Cookies and Terms pages (EN and FR) rewritten for Quebec's Law 25 and PIPEDA first, Global Privacy Control honoured, poster ids kept out of the analytics address and its Referer, the feedback console log opt-in, account deletion clearing every Postr browser entry, the French Terms linked at sign-up; internal file `docs/legal/quebec-law-25.md`; the claims audit's product defects queued above |

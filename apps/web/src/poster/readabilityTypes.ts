@@ -6,6 +6,7 @@
  * and the script generators share one copy; readability.ts re-exports the
  * public ones.
  */
+import { FIGURE_TEXT_MIN_PT } from './figureTextMinimums';
 
 export type ElementKey = 'axisTitle' | 'axisText' | 'legendText' | 'legendTitle' | 'plotTitle' | 'stripText' | 'caption';
 
@@ -197,16 +198,20 @@ export const DEFAULT_SIZE_LABEL = 'figure preview size';
 export const R_DEFAULTS = { baseSize: 11, width: 7, height: 7 };
 export const PY_DEFAULTS = { baseSize: 10, width: 6.4, height: 4.8 };
 
+// minPt: the canonical minimums for figure text, one set shared with the
+// image scan and the inserted charts (figureTextMinimums.ts, fix 13c).
+const MIN = FIGURE_TEXT_MIN_PT;
+
 export const R_ELEMENTS: ElementSpec[] = [
-  { name: 'Plot title',   key: 'plotTitle',   relMultiplier: 1.2, minPt: 18, selector: 'plot.title' },
-  { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0, minPt: 18, selector: 'axis.title' },
-  { name: 'Tick labels',  key: 'axisText',    relMultiplier: 0.8, minPt: 14, selector: 'axis.text' },
-  { name: 'Legend text',  key: 'legendText',  relMultiplier: 0.8, minPt: 14, selector: 'legend.text' },
-  { name: 'Legend title', key: 'legendTitle', relMultiplier: 1.0, minPt: 14, selector: 'legend.title' },
-  { name: 'Strip text',   key: 'stripText',   relMultiplier: 0.8, minPt: 14, selector: 'strip.text' },
+  { name: 'Plot title',   key: 'plotTitle',   relMultiplier: 1.2, minPt: MIN.plotTitle,   selector: 'plot.title' },
+  { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0, minPt: MIN.axisTitle,   selector: 'axis.title' },
+  { name: 'Tick labels',  key: 'axisText',    relMultiplier: 0.8, minPt: MIN.axisText,    selector: 'axis.text' },
+  { name: 'Legend text',  key: 'legendText',  relMultiplier: 0.8, minPt: MIN.legendText,  selector: 'legend.text' },
+  { name: 'Legend title', key: 'legendTitle', relMultiplier: 1.0, minPt: MIN.legendTitle, selector: 'legend.title' },
+  { name: 'Strip text',   key: 'stripText',   relMultiplier: 0.8, minPt: MIN.stripText,   selector: 'strip.text' },
   // ggplot2's plot.caption is rel(0.8) of title (fix 13b: 0.67 drew 10.05 pt
   // where ggplot2 4.0.3 draws 12 at base_size 15).
-  { name: 'Caption',      key: 'caption',     relMultiplier: 0.8, minPt: 12, selector: 'plot.caption' },
+  { name: 'Caption',      key: 'caption',     relMultiplier: 0.8, minPt: MIN.caption,     selector: 'plot.caption' },
 ];
 
 export const PY_ELEMENTS: ElementSpec[] = [
@@ -215,14 +220,14 @@ export const PY_ELEMENTS: ElementSpec[] = [
   // per-Axes calls (ax.set_xlabel(fontsize=), ax.tick_params(labelsize=))
   // only reach the Axes they are called on, which is wrong advice for a
   // figure with subplots — and legend text has no per-Axes setter at all.
-  { name: 'Plot title',   key: 'plotTitle',   relMultiplier: 1.2,  minPt: 18, selector: 'axes.titlesize' },
-  { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0,  minPt: 18, selector: 'axes.labelsize' },
+  { name: 'Plot title',   key: 'plotTitle',   relMultiplier: 1.2,  minPt: MIN.plotTitle,  selector: 'axes.titlesize' },
+  { name: 'Axis titles',  key: 'axisTitle',   relMultiplier: 1.0,  minPt: MIN.axisTitle,  selector: 'axes.labelsize' },
   // matplotlib's x/ytick.labelsize is 'medium', 1.0 × font.size (fix 13b;
   // 0.83 under-read every inherited tick label by 17 %).
-  { name: 'Tick labels',  key: 'axisText',    relMultiplier: 1.0,  minPt: 14, selector: 'xtick.labelsize' },
-  { name: 'Legend text',  key: 'legendText',  relMultiplier: 1.0,  minPt: 14, selector: 'legend.fontsize' },
+  { name: 'Tick labels',  key: 'axisText',    relMultiplier: 1.0,  minPt: MIN.axisText,   selector: 'xtick.labelsize' },
+  { name: 'Legend text',  key: 'legendText',  relMultiplier: 1.0,  minPt: MIN.legendText, selector: 'legend.fontsize' },
   // No selector: matplotlib has no rcParams key that moves a caption
   // (`figure.titlesize` moves fig.suptitle). A figure text is drawn at
   // font.size, 1.0 × (fix 13b); the fix sets the caption's own fontsize=.
-  { name: 'Caption',      key: 'caption',     relMultiplier: 1.0,  minPt: 12, selector: null },
+  { name: 'Caption',      key: 'caption',     relMultiplier: 1.0,  minPt: MIN.caption,    selector: null },
 ];
