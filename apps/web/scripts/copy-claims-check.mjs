@@ -34,6 +34,24 @@
  *       months; review round 1, B-R1-03). Also recorded, not judged: the
  *       /auth?plan= label's text and its line count at 375 and 1440 px
  *
+ * Fix 26 (docs/fixes/26-french-public-pages.md) adds the French pages
+ * (/fr, /about/fr, … /auth/fr?plan=term, /billing/cancel/fr): P1–P4 hold
+ * in French (the patterns read « 18,99 $ CA », « taxes », « / 4 mois »),
+ * and:
+ *   L1  a page's <html lang> is not its language (fr-CA for a /fr page,
+ *       en otherwise)
+ *   L2  a page shows no link to its twin in the other language
+ *       (« Français » / "English", the query kept) that a visitor can see
+ *       at 1440 px, or at 375 px once the menu is open
+ *   L3  a French page shows a line of text its English twin shows too,
+ *       names aside (SAME_IN_BOTH)
+ *   W1  a public page scrolls sideways at 375 or 320 px (the French header
+ *       carries « Connexion »; the English page is the control)
+ *   W2  the English landing's "Get started" and "Try as guest" leave the one
+ *       row they share on main, at 375 or 320 px (review round 1, R1-01: a
+ *       `flex-wrap` added for the French labels stacked the English pair
+ *       below about 389 px; the French pair may wrap)
+ *
  * NOT COVERED: the legal pages (stream A of 2026-10-06 owns them); the
  * prerendered HTML a crawler reads (the copy inventory,
  * src/__tests__/copyInventory.test.ts, reads its source, seo/routes.json);
@@ -58,6 +76,9 @@ const PRICE = /(?:CA|C|US)\$\s?\d+(?:[.,]\d{2})?|\$\s?\d+[.,]\d{2}\b|\b\d+[.,]\d
 const TAX_NOTE = /\btax(?:e|es)?\b/i;
 const TAX_BEFORE_PERIOD =
   /\btax(?:e|es)?\b(?:\s+applicables?|\s+en\s+sus)?\s*(?:\/|\bper\b|\bevery\b|\beach\b|\bpar\b)\s*(?:\d+[\s-]*)?(?:months?|years?|weeks?|days?|terms?|mois|ans?|semaines?|jours?)\b/i;
+
+/** Shown the same in both languages: names, and words French and English share. */
+const SAME_IN_BOTH = new Set(['Postr', 'PowerPoint', 'Python', 'R', 'ggplot2', 'matplotlib', 'Google', 'Menu', 'Auto', 'Source', '404', 'Resila Technologies Inc.', 'support@resila.ai', 'BibTeX']);
 
 const args = process.argv.slice(2);
 const port = Number(args.includes('--port') ? args[args.indexOf('--port') + 1] : 5880);
@@ -175,11 +196,19 @@ try {
     });
   }
 
-  // The public pages, and the checkout-resume banners.
-  const PAGES = [
+  // The public pages, and the checkout-resume banners, in English and in
+  // French (fix 26: the French page is the English path + /fr, query kept).
+  const ENGLISH_PAGES = [
     ['/', 0], ['/about', 0], ['/why-posters', 0], ['/pricing', 2], ['/tools/figure-readability', 0],
     ['/auth', 0], ['/auth?plan=term', 1], ['/auth?plan=pack', 1], ['/billing/cancel', 0],
   ];
+  const frenchOf = (route) => {
+    const [path, query] = route.split('?');
+    return `${path === '/' ? '' : path}/fr${query ? `?${query}` : ''}`;
+  };
+  const PAGES = [...ENGLISH_PAGES, ...ENGLISH_PAGES.map(([route, n]) => [frenchOf(route), n])];
+  /** Each English page's visible lines, for L3. */
+  const englishLines = new Map();
   for (const [route, expectPrices] of PAGES) {
     await scenario(`page ${route}`, async () => {
       const state = newState();
@@ -195,7 +224,8 @@ try {
           text: document.body.innerText,
         }));
         const t = judgeText(`page ${route}`, `${r.title}\n${r.description}\n${r.text}`, { expectPrices });
-        if (!route.startsWith('/auth?plan=')) return { landed: r.path, ...t };
+        const lang = await languageClaims(page, route, r.text);
+        if (!/^\/auth(\/fr)?\?plan=/.test(route)) return { landed: r.path, ...t, ...lang };
         // The plan label above "Change plan": its text and how many lines it takes.
         const label = {};
         for (const width of [375, 1440]) {
@@ -203,7 +233,7 @@ try {
           await page.waitForTimeout(200);
           label[width] = await page.evaluate(() => {
             const el = [...document.querySelectorAll('div')].find(
-              (d) => d.children.length === 0 && /^(Term|Export pack) · /.test(d.textContent || ''),
+              (d) => d.children.length === 0 && /^(Term|Export pack|Forfait à terme|Lot d’exportation) · /.test(d.textContent || ''),
             );
             if (!el) return null;
             const box = el.getBoundingClientRect();
@@ -211,11 +241,78 @@ try {
             return { text: el.innerText, height: Math.round(box.height), lines: Math.round(box.height / lh) };
           });
         }
-        return { landed: r.path, ...t, label };
+        return { landed: r.path, ...t, ...lang, label };
       } finally {
         await context.close();
       }
     });
+  }
+
+  /**
+   * L1–L3 and W1 on a page already open at 1440 px (fix 26). The French
+   * pages come after the English ones, so their twins' lines are known.
+   */
+  async function languageClaims(page, route, text) {
+    const french = /\/fr($|\?)/.test(route.split('#')[0]);
+    const where = `page ${route}`;
+    const twin = french ? route.replace(/\/fr(?=$|\?)/, '') || '/' : frenchOf(route);
+    const twinHref = twin.startsWith('/?') ? twin.slice(1) : twin;
+    const htmlLang = await page.evaluate(() => document.documentElement.lang);
+    if (htmlLang !== (french ? 'fr-CA' : 'en')) note('L1', where, `<html lang="${htmlLang}">`);
+    const linkText = french ? 'English' : 'Français';
+    const visibleLink = async () =>
+      page.evaluate(
+        ({ linkText, twinHref }) =>
+          [...document.querySelectorAll('a')].some((a) => {
+            const box = a.getBoundingClientRect();
+            return a.textContent.trim() === linkText && a.getAttribute('href') === twinHref && box.width > 0 && box.height > 0;
+          }),
+        { linkText, twinHref },
+      );
+    const at1440 = await visibleLink();
+    await page.setViewportSize({ width: 375, height: 800 });
+    await page.waitForTimeout(250);
+    const menu = page.locator('header button[aria-haspopup="true"]');
+    if (await menu.count()) await menu.first().click();
+    await page.waitForTimeout(250);
+    const at375 = await visibleLink();
+    if (!at1440 || !at375) note('L2', where, `« ${linkText} » to ${twinHref}: ${at1440 ? '' : 'not seen at 1440 px'} ${at375 ? '' : 'not seen at 375 px'}`.trim());
+    if (await menu.count()) await menu.first().click();
+    const overflow = {};
+    const ctaRows = {};
+    for (const width of [375, 320]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.waitForTimeout(250);
+      overflow[width] = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      if (overflow[width] > 0) note('W1', where, `${overflow[width]} px wider than a ${width} px window`);
+      if (route === '/') {
+        const apart = await page.evaluate(() => {
+          const a = [...document.querySelectorAll('[data-postr-hero-item] a')].filter((x) =>
+            /^(Get started|Try as guest)$/.test(x.textContent.trim()),
+          );
+          return a.length === 2 ? Math.abs(a[0].getBoundingClientRect().top - a[1].getBoundingClientRect().top) : null;
+        });
+        ctaRows[width] = apart === null ? null : apart < 3 ? 1 : 2;
+        if (apart === null) note('W2', where, `the two buttons were not found at ${width} px`);
+        else if (apart >= 3) note('W2', where, `"Get started" and "Try as guest" on two rows at ${width} px (${Math.round(apart)} px apart)`);
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const lines = new Set(
+      text
+        .split('\n')
+        .map((l) => l.trim())
+        .filter((l) => /[A-Za-zÀ-ÿ]{2,}/.test(l) && !SAME_IN_BOTH.has(l) && !l.startsWith('©')),
+    );
+    let shared = [];
+    if (french) {
+      const en = englishLines.get(twin) ?? new Set();
+      shared = [...lines].filter((l) => en.has(l));
+      for (const l of shared.slice(0, 3)) note('L3', where, JSON.stringify(l.slice(0, 120)));
+    } else {
+      englishLines.set(route, lines);
+    }
+    return { htmlLang, languageLink: { at1440, at375 }, overflow, ...(route === '/' ? { ctaRows } : {}), sharedWithEnglish: shared.length };
   }
 } finally {
   await h.stop();
