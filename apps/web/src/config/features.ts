@@ -65,3 +65,20 @@ export const SHARING_ENABLED = false;
  * The ruler code and its toggle's state remain.
  */
 export const RULERS_ENABLED = false;
+
+/**
+ * LATEX_EXPORT_ENABLED — the LaTeX export was hidden on 2026-10-06 (owner
+ * decision: "unnecessary for now"; docs/fixes/25-latex-hidden-prices.md).
+ * Frozen, not removed: export/latex/ (the writer, its escaping, the .bib)
+ * and its tests remain. What is switched off:
+ *   - poster/sidebar/EditableExportButtons.tsx: no "LaTeX source (.zip)"
+ *     button, no hint under it, no size note pointing to it, and the
+ *     handler runs nothing (the writer is imported only inside the switch)
+ * Every other mention of LaTeX was taken out of the copy (the public
+ * pages, pricing, the paywall, the profile, the sign-in banner, the
+ * crawler copy, index.html); src/__tests__/copyInventory.test.ts fails if
+ * one comes back while this is false. Turning it back on is a checklist,
+ * not a flip: docs/stress-test/PLAN.md, "LaTeX export: before it is
+ * switched back on".
+ */
+export const LATEX_EXPORT_ENABLED = false;

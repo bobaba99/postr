@@ -114,7 +114,9 @@ describe('planPptxScale — the 56-inch ceiling', () => {
       expect.unreachable('should have thrown');
     } catch (err) {
       expect(err).toBeInstanceOf(PptxSizeLimitError);
-      expect((err as PptxSizeLimitError).userMessage).toContain('LaTeX');
+      // The LaTeX export is hidden (fix 25): the way out is the PDF.
+      expect((err as PptxSizeLimitError).userMessage).toContain('Save a PDF instead');
+      expect((err as PptxSizeLimitError).userMessage).not.toMatch(/latex/i);
     }
   });
 

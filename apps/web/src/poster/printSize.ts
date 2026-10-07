@@ -9,6 +9,7 @@
  * thin controlled input and the numbers are testable without the DOM.
  */
 import { POSTER_SIZES } from './constants';
+import { FIGURE_READABILITY_COPY } from '@/i18n/figureReadability';
 
 export interface PrintSize {
   /** Width in inches. */
@@ -73,8 +74,11 @@ function quarterOf(key: keyof typeof POSTER_SIZES): PrintSize {
   return { w: clampInches(floorTenth(size.w / 2)), h: clampInches(floorTenth(size.h / 2)) };
 }
 
-function labelled(id: string, prefix: string, size: PrintSize): PrintSizePreset {
-  return { id, label: `${prefix} — ${size.w} × ${size.h}`, ...size };
+/** The English names (i18n/figureReadability.ts; PrintSizeFields shows the page's language). */
+const PRESET_NAMES = FIGURE_READABILITY_COPY.en.size.presets;
+
+function labelled(id: keyof typeof PRESET_NAMES, size: PrintSize): PrintSizePreset {
+  return { id, label: `${PRESET_NAMES[id]} — ${size.w} × ${size.h}`, ...size };
 }
 
 const QUARTER_48x36 = quarterOf('48×36');
@@ -91,10 +95,10 @@ const COLUMN_36x48: PrintSize = { w: 11, h: 8 };
  * `POSTER_SIZES` so they track the editor's canonical poster sizes.
  */
 export const PRINT_SIZE_PRESETS: ReadonlyArray<PrintSizePreset> = [
-  labelled('small', 'Small figure', DEFAULT_PRINT_SIZE),
-  labelled('quarter-48x36', 'Quarter of a 48 × 36 poster', QUARTER_48x36),
-  labelled('quarter-a0-landscape', 'Quarter of an A0 landscape', QUARTER_A0_LANDSCAPE),
-  labelled('column-36x48', 'One column of a 36 × 48 portrait', COLUMN_36x48),
+  labelled('small', DEFAULT_PRINT_SIZE),
+  labelled('quarter-48x36', QUARTER_48x36),
+  labelled('quarter-a0-landscape', QUARTER_A0_LANDSCAPE),
+  labelled('column-36x48', COLUMN_36x48),
 ];
 
 /** Tolerance for treating a typed size as "this preset" (aria-pressed). */

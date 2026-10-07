@@ -7,14 +7,28 @@
  * "Feedback" link opens the global FeedbackModal instead of
  * navigating, so visitors can send feedback from any page without
  * losing their place.
+ *
+ * In French on a French page (fix 26): labels from i18n/chrome.ts, links
+ * to the French pages (the legal ones too: /privacy/fr …), and the link
+ * to the page in the other language beside the copyright line, the one
+ * place every public page with this footer shows it at every width.
+ * Profile stays English (it has no French page).
  */
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { useFeedbackStore } from '@/stores/feedbackStore';
+import { CHROME_COPY } from '@/i18n/chrome';
+import { counterpartPath, localizedPath, useLang } from '@/i18n/lang';
+import { LanguageLink } from '@/components/LanguageLink';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
 export function PublicFooter() {
   const openFeedback = useFeedbackStore((s) => s.open);
+  const lang = useLang();
+  const c = CHROME_COPY[lang].footer;
+  const to = (path: string) => localizedPath(path, lang);
+  // No language landmark on a page with no other language (the profile).
+  const hasCounterpart = counterpartPath(useLocation().pathname) !== null;
 
   return (
     <footer className="border-t border-[#1f1f2e] bg-[#0a0a12] px-8 py-12 text-[#8b8f99]">
@@ -22,7 +36,7 @@ export function PublicFooter() {
         <div className="grid grid-cols-2 gap-8 sm:grid-cols-[1.2fr_1fr_1fr_1fr_1fr]">
           {/* Brand column */}
           <div className="col-span-2 sm:col-span-1">
-            <Link to="/" className="flex min-h-11 items-center gap-3 no-underline">
+            <Link to={to('/')} className="flex min-h-11 items-center gap-3 no-underline">
               <svg width="32" height="32" viewBox="0 0 64 64" fill="none">
                 <rect width="64" height="64" rx="12" fill="#7c6aed" />
                 <path d="M12 52 C30 52, 34 12, 52 12" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
@@ -35,7 +49,7 @@ export function PublicFooter() {
                 the docs says who builds Postr, so only the audience half
                 of the line can be checked. */}
             <p className="mt-3 max-w-xs text-[14pt] leading-relaxed">
-              A poster editor built for researchers.
+              {c.tagline}
             </p>
           </div>
 
@@ -47,34 +61,39 @@ export function PublicFooter() {
               were removed here: deactivated — see routes.tsx header.
               Re-add them after "Pricing", picker first, in front of
               the checker. Mirrors PublicHeader TOOL_LINKS. */}
-          <FooterColumn title="Product">
-            <FooterLink to="/">Home</FooterLink>
-            <FooterLink to="/pricing">Pricing</FooterLink>
-            <FooterLink to="/tools/figure-readability">Plot checker</FooterLink>
+          <FooterColumn title={c.product}>
+            <FooterLink to={to('/')}>{c.home}</FooterLink>
+            <FooterLink to={to('/pricing')}>{c.pricing}</FooterLink>
+            <FooterLink to={to('/tools/figure-readability')}>{c.plotChecker}</FooterLink>
           </FooterColumn>
 
-          <FooterColumn title="Learn">
-            <FooterLink to="/about">About</FooterLink>
-            <FooterLink to="/why-posters">Why poster sessions</FooterLink>
+          <FooterColumn title={c.learn}>
+            <FooterLink to={to('/about')}>{c.about}</FooterLink>
+            <FooterLink to={to('/why-posters')}>{c.whyPosters}</FooterLink>
             <FooterButton onClick={() => openFeedback('other')}>
-              Send feedback
+              {c.sendFeedback}
             </FooterButton>
           </FooterColumn>
 
-          <FooterColumn title="Account">
-            <FooterLink to="/auth">Sign in</FooterLink>
-            <FooterLink to="/profile">Profile</FooterLink>
+          <FooterColumn title={c.account}>
+            <FooterLink to={to('/auth')}>{c.signIn}</FooterLink>
+            <FooterLink to="/profile">{c.profile}</FooterLink>
           </FooterColumn>
 
-          <FooterColumn title="Legal">
-            <FooterLink to="/privacy">Privacy Policy</FooterLink>
-            <FooterLink to="/cookies">Cookies Policy</FooterLink>
-            <FooterLink to="/terms">Terms of Service</FooterLink>
+          <FooterColumn title={c.legal}>
+            <FooterLink to={to('/privacy')}>{c.privacy}</FooterLink>
+            <FooterLink to={to('/cookies')}>{c.cookies}</FooterLink>
+            <FooterLink to={to('/terms')}>{c.terms}</FooterLink>
           </FooterColumn>
         </div>
 
-        <div className="mt-10 border-t border-[#1f1f2e] pt-6 text-[14pt]">
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t border-[#1f1f2e] pt-6 text-[14pt]">
           <span>© {CURRENT_YEAR} Resila Technologies Inc.</span>
+          {hasCounterpart && (
+            <nav aria-label={c.languageNav}>
+              <LanguageLink className="-my-2.5 inline-block py-2.5 text-[14pt] text-[#9ca3af] underline-offset-4 hover:text-white hover:underline" />
+            </nav>
+          )}
         </div>
       </div>
     </footer>

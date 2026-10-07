@@ -29,6 +29,8 @@
     { "source": "/admin/gallery", "destination": "/" },
     { "source": "/billing/success", "destination": "/" },
     { "source": "/billing/cancel", "destination": "/" },
+    { "source": "/billing/success/fr", "destination": "/" },
+    { "source": "/billing/cancel/fr", "destination": "/" },
     { "source": "/presentation-checker", "destination": "/" }
   ],
   "headers": [
@@ -77,6 +79,10 @@
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     },
     {
+      "source": "/auth/fr",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
+    },
+    {
       "source": "/presentation-checker",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow" }]
     },
@@ -110,7 +116,7 @@
         },
         {
           "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
+          "value": "strict-origin"
         },
         {
           "key": "Permissions-Policy",

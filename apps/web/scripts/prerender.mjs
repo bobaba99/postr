@@ -27,11 +27,21 @@
  * directory WITH a real 404 status. The file is the SPA shell plus
  * noindex head tags, so browsers hydrate the branded NotFound page
  * while crawlers see an honest 404 instead of the old soft-404 space.
+ *
+ * French pages (fix 26): a record with language fr-CA is written like any
+ * other, with its French head; a page whose twin is prerendered too names
+ * both in hreflang alternates (lib/headTags.mjs alternatesFor). The
+ * fallback links for readers that run no script are in the page's own
+ * language, plus one link to its twin in the other language.
+ *
+ * src/seo/__tests__/prerenderFrench.test.ts runs this script (a copy of it
+ * and of lib/headTags.mjs and routes.json, so a mutant of any of them is
+ * what runs) on a copy of the shell, and reads what it writes.
  */
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildPageMeta, injectHead } from './lib/headTags.mjs';
+import { buildPageMeta, injectHead, twinPath } from './lib/headTags.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = resolve(HERE, '..');
@@ -60,13 +70,32 @@ try {
   process.exit(1);
 }
 
-const fallbackLinks = [
-  ...Object.entries(routes.static).map(([href, record]) => ({
-    href,
-    label: href === '/' ? 'Home' : record.h1,
-  })),
-  { href: '/auth', label: 'Sign in' },
-];
+/** French when the record says fr-CA (lib/headTags.mjs reads the same field). */
+const isFrench = (record) => (record.language ?? routes.language) === 'fr-CA';
+
+/** The fallback nav's words, per language. */
+const FALLBACK_WORDS = {
+  en: { nav: 'Postr pages', home: 'Home', signIn: 'Sign in', languageName: 'English' },
+  fr: { nav: 'Pages de Postr', home: 'Accueil', signIn: 'Connexion', languageName: 'Français' },
+};
+
+/**
+ * The fallback links of a page: the static pages in its language, sign-in
+ * in its language, and its twin in the other language when there is one.
+ */
+function fallbackNavFor(routePath, record) {
+  const lang = isFrench(record) ? 'fr' : 'en';
+  const other = lang === 'fr' ? 'en' : 'fr';
+  const words = FALLBACK_WORDS[lang];
+  const links = Object.entries(routes.static)
+    .filter(([, r]) => isFrench(r) === (lang === 'fr'))
+    .map(([href, r]) => ({ href, label: href === '/' || href === '/fr' ? words.home : r.h1 }));
+  links.push({ href: lang === 'fr' ? '/auth/fr' : '/auth', label: words.signIn });
+  const twin = twinPath(routePath);
+  const prerenderedTwin = routes.static[twin] ?? (routes.app?.[twin]?.prerender ? routes.app[twin] : null);
+  if (prerenderedTwin) links.push({ href: twin, label: FALLBACK_WORDS[other].languageName });
+  return { links, navLabel: words.nav };
+}
 
 /** Route path -> file to write. Root overwrites the shell itself. */
 function outputPathFor(routePath) {
@@ -77,11 +106,11 @@ function outputPathFor(routePath) {
 const written = [];
 
 for (const [routePath, record] of Object.entries(routes.static)) {
-  const meta = buildPageMeta(routePath, record, site);
+  const meta = buildPageMeta(routePath, record, site, routes);
   const html = injectHead(shell, meta, site, {
     h1: record.h1,
     copy: record.copy,
-    links: fallbackLinks,
+    ...fallbackNavFor(routePath, record),
   });
 
   const outPath = outputPathFor(routePath);
@@ -99,10 +128,10 @@ for (const [routePath, record] of Object.entries(routes.app ?? {}).filter(
     );
     process.exit(1);
   }
-  const html = injectHead(shell, buildPageMeta(routePath, record, site), site, {
+  const html = injectHead(shell, buildPageMeta(routePath, record, site, routes), site, {
     h1: record.h1,
     copy: record.copy,
-    links: fallbackLinks,
+    ...fallbackNavFor(routePath, record),
   });
   const outPath = outputPathFor(routePath);
   mkdirSync(dirname(outPath), { recursive: true });
@@ -123,12 +152,12 @@ if (!notFoundRecord?.h1 || !notFoundRecord?.copy?.length) {
 
 const notFoundHtml = injectHead(
   shell,
-  buildPageMeta('/404', notFoundRecord, site),
+  buildPageMeta('/404', notFoundRecord, site, routes),
   site,
   {
     h1: notFoundRecord.h1,
     copy: notFoundRecord.copy,
-    links: fallbackLinks,
+    ...fallbackNavFor('/404', notFoundRecord),
   },
 );
 const notFoundPath = join(DIST, '404.html');

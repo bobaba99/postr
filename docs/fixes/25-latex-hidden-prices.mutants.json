@@ -1,0 +1,340 @@
+{
+  "tests": [
+    "src/__tests__/copyInventory.test.ts",
+    "src/poster/__tests__/latexHidden.test.tsx",
+    "src/components/__tests__/pricesTax.test.tsx",
+    "src/pages/__tests__/Auth.audit.test.tsx",
+    "src/pages/__tests__/Profile.dangerZone.test.tsx",
+    "src/profile/__tests__/SubscriptionPanel.test.tsx",
+    "src/export/__tests__/units.test.ts",
+    "src/poster/__tests__/EditableExportPaywall.test.tsx",
+    "src/poster/__tests__/EditableExportButtons.test.tsx",
+    "src/poster/sidebar/__tests__/EditableExportButtons.test.tsx",
+    "src/poster/sidebar/__tests__/EditableExportButtons.credits.test.tsx",
+    "src/components/__tests__/PricingSection.test.tsx",
+    "src/components/__tests__/toolDiscoverability.test.tsx",
+    "src/seo/__tests__/siteMeta.test.ts"
+  ],
+  "mutants": {
+    "switch-on": {
+      "undoes": "A — the LaTeX export is switched off (config/features.ts LATEX_EXPORT_ENABLED = false)",
+      "edits": [
+        [
+          "src/config/features.ts",
+          "export const LATEX_EXPORT_ENABLED = false;",
+          "export const LATEX_EXPORT_ENABLED = true;"
+        ]
+      ]
+    },
+    "button-unguarded": {
+      "undoes": "A — the LaTeX button and its hint render only with the switch on",
+      "edits": [
+        [
+          "src/poster/sidebar/EditableExportButtons.tsx",
+          "      {LATEX_EXPORT_ENABLED && (\n        <>",
+          "      {(\n        <>"
+        ]
+      ]
+    },
+    "handler-unguarded": {
+      "undoes": "A — the LaTeX writer is imported and run only inside the switch",
+      "edits": [
+        [
+          "src/poster/sidebar/EditableExportButtons.tsx",
+          "    if (LATEX_EXPORT_ENABLED) {\n      void run('latex'",
+          "    if (true) {\n      void run('latex'"
+        ]
+      ]
+    },
+    "half-size-note-sends-to-latex": {
+      "undoes": "A — the half-size note names LaTeX only with the switch on",
+      "edits": [
+        [
+          "src/poster/sidebar/EditableExportButtons.tsx",
+          "{LATEX_EXPORT_ENABLED && ' For a full-size editable export, use LaTeX below.'}",
+          "{' For a full-size editable export, use LaTeX below.'}"
+        ]
+      ]
+    },
+    "too-big-note-sends-to-latex": {
+      "undoes": "A — a poster too big for PowerPoint is sent to the PDF, not to LaTeX",
+      "edits": [
+        [
+          "src/poster/sidebar/EditableExportButtons.tsx",
+          "per side). Save a PDF instead.",
+          "per side). Export LaTeX or PDF instead; neither has a size limit."
+        ]
+      ]
+    },
+    "paywall-names-overleaf": {
+      "undoes": "A — the paywall heading names PowerPoint only",
+      "edits": [
+        [
+          "src/poster/sidebar/EditableExportButtons.tsx",
+          "            Keep editing in PowerPoint\n",
+          "            Keep editing in PowerPoint or Overleaf\n"
+        ]
+      ]
+    },
+    "credit-line-names-latex": {
+      "undoes": "A — the pack holder's credit line names PowerPoint only",
+      "edits": [
+        [
+          "src/poster/sidebar/EditableExportButtons.tsx",
+          "each PowerPoint export uses one.",
+          "each PowerPoint or LaTeX export uses one."
+        ]
+      ]
+    },
+    "saved-status-unguarded": {
+      "undoes": "A — the screen-reader 'LaTeX source saved' status is reachable only with the switch on",
+      "edits": [
+        [
+          "src/poster/sidebar/EditableExportButtons.tsx",
+          ": LATEX_EXPORT_ENABLED && 'LaTeX source saved'}",
+          ": 'LaTeX source saved'}"
+        ]
+      ]
+    },
+    "size-error-names-latex": {
+      "undoes": "B — PptxSizeLimitError's message sends to the PDF, not to LaTeX",
+      "edits": [
+        [
+          "src/export/units.ts",
+          "'Save a PDF instead.';",
+          "'Export LaTeX or PDF instead — neither has a size limit.';"
+        ]
+      ]
+    },
+    "landing-card-names-latex": {
+      "undoes": "B — the landing Editable exports card names PowerPoint only and says it is paid",
+      "edits": [
+        [
+          "src/i18n/landing.ts",
+          "  exportsBody: 'Import and edit a PowerPoint, then export an editable one. PowerPoint exports are paid.',\n",
+          "  exportsBody: 'Import, edit, and export PowerPoint, or continue in LaTeX.',\n"
+        ]
+      ]
+    },
+    "about-card-names-latex": {
+      "undoes": "B — the About 'Iterate, export, print' card names PowerPoint only",
+      "edits": [
+        [
+          "src/i18n/about.ts",
+          "PowerPoint exports are paid, and keep text, images and tables editable.",
+          "PowerPoint and LaTeX exports are paid: PowerPoint keeps text, images and tables editable, and LaTeX gives you a poster.tex for XeLaTeX."
+        ]
+      ]
+    },
+    "pricing-hero-names-latex": {
+      "undoes": "B — the /pricing hero names PowerPoint only",
+      "edits": [
+        [
+          "src/i18n/pricing.ts",
+          "Pay only for editable PowerPoint exports.",
+          "Pay only for editable PowerPoint or LaTeX exports."
+        ]
+      ]
+    },
+    "pricing-card-names-latex": {
+      "undoes": "B — the pricing cards name PowerPoint only",
+      "edits": [
+        [
+          "src/i18n/pricing.ts",
+          "'Three PowerPoint exports.'",
+          "'Three PowerPoint or LaTeX exports.'"
+        ]
+      ]
+    },
+    "profile-names-latex": {
+      "undoes": "B — the profile's active-term line names PowerPoint only",
+      "edits": [
+        [
+          "src/profile/SubscriptionPanel.tsx",
+          "Your term is active — PowerPoint export is unlocked, no watermark.",
+          "Your term is active — PowerPoint and LaTeX export are unlocked, no watermark."
+        ]
+      ]
+    },
+    "auth-notice-names-latex": {
+      "undoes": "B — /auth's already-subscribed notice names PowerPoint only",
+      "edits": [
+        [
+          "src/i18n/auth.ts",
+          "'You already have an active term — PowerPoint export is unlocked.',",
+          "'You already have an active term — PowerPoint and LaTeX export are unlocked.',"
+        ]
+      ]
+    },
+    "billing-result-names-latex": {
+      "undoes": "B — /billing/success names PowerPoint only",
+      "edits": [
+        [
+          "src/i18n/billing.ts",
+          "Editable PowerPoint exports are unlocked",
+          "Editable PowerPoint and LaTeX exports are unlocked"
+        ]
+      ]
+    },
+    "guest-modal-names-latex": {
+      "undoes": "B — the guest's export modal names PowerPoint only",
+      "edits": [
+        [
+          "src/poster/SecureWorkModal.tsx",
+          "PowerPoint files then need a paid term or pack.",
+          "PowerPoint and LaTeX files then need a paid term or pack."
+        ]
+      ]
+    },
+    "crawler-title-names-latex": {
+      "undoes": "B — the /pricing crawler title names PowerPoint only",
+      "edits": [
+        [
+          "src/seo/routes.json",
+          "Postr Pricing: Free PDF Export, Paid PowerPoint Export",
+          "Postr Pricing: Free PDF Export, Paid PowerPoint & LaTeX"
+        ]
+      ]
+    },
+    "crawler-dashboard-names-latex": {
+      "undoes": "B — the /dashboard crawler description names PowerPoint only",
+      "edits": [
+        [
+          "src/seo/routes.json",
+          "or unlock editable PowerPoint files.",
+          "or unlock editable PowerPoint and LaTeX files."
+        ]
+      ]
+    },
+    "index-html-names-latex": {
+      "undoes": "B — index.html's default description names PowerPoint only (read from disk: needs the POSTR_MUTANT_SOURCES overlay)",
+      "edits": [
+        [
+          "index.html",
+          "Editing and PDF export are free; PowerPoint exports are paid.",
+          "Editing and PDF export are free; PowerPoint and LaTeX exports are paid."
+        ]
+      ]
+    },
+    "pricing-card-no-tax-line": {
+      "undoes": "C — each paid pricing card prints its tax note under the price",
+      "edits": [
+        [
+          "src/components/PricingSection.tsx",
+          "      {tier.taxNote && (\n        <p className=\"mt-1 text-xs text-[#8b8f99]\">{tier.taxNote}</p>\n      )}\n",
+          ""
+        ]
+      ]
+    },
+    "term-card-no-tax-note": {
+      "undoes": "C — the term card has a tax note (not only the pack)",
+      "edits": [
+        [
+          "src/i18n/pricing.ts",
+          "    cadence: 'every 4 months',\n    taxNote: '+ applicable taxes',\n",
+          "    cadence: 'every 4 months',\n"
+        ]
+      ]
+    },
+    "paywall-prices-untaxed": {
+      "undoes": "C — the paywall's two prices each say + applicable taxes",
+      "edits": [
+        [
+          "src/poster/sidebar/EditableExportButtons.tsx",
+          "term at CA$18.99 + applicable taxes (renews",
+          "term at CA$18.99 (renews"
+        ],
+        [
+          "src/poster/sidebar/EditableExportButtons.tsx",
+          "pack at CA$9.99 + applicable taxes (its",
+          "pack at CA$9.99 (its"
+        ]
+      ]
+    },
+    "profile-pack-price-untaxed": {
+      "undoes": "C — the profile's free-plan panel says the pack price is before tax",
+      "edits": [
+        [
+          "src/profile/SubscriptionPanel.tsx",
+          "'From an export pack, CA$9.99 + applicable taxes. Credits never expire once purchased.'",
+          "'From a CA$9.99 export pack. Credits never expire once purchased.'"
+        ]
+      ]
+    },
+    "auth-labels-untaxed": {
+      "undoes": "C — /auth?plan= labels say the price is before tax",
+      "edits": [
+        [
+          "src/i18n/auth.ts",
+          "'Term · CA$18.99 every 4 months + applicable taxes'",
+          "'Term · CA$18.99 / 4 months'"
+        ],
+        [
+          "src/i18n/auth.ts",
+          "'Export pack · CA$9.99 + applicable taxes'",
+          "'Export pack · CA$9.99'"
+        ]
+      ]
+    },
+    "crawler-prices-untaxed": {
+      "undoes": "C — the /pricing crawler description says each price is before tax, beside it",
+      "edits": [
+        [
+          "src/seo/routes.json",
+          "or a pack of 3, CA$9.99 + applicable taxes.\"",
+          "or a pack of 3, CA$9.99.\""
+        ]
+      ]
+    },
+    "slides-drawer-untaxed": {
+      "undoes": "C — the (hidden) slides export drawer's price line says tax is extra",
+      "edits": [
+        [
+          "src/manuscript/slides/ExportDrawer.tsx",
+          "$9.99 CAD for 3 exports + applicable taxes';",
+          "$9.99 CAD for 3 exports';"
+        ]
+      ]
+    },
+    "danger-zone-price-back": {
+      "undoes": "C — the account-deletion line names no price",
+      "edits": [
+        [
+          "src/profile/DangerZone.tsx",
+          "'This also cancels your term and any add-on immediately.'",
+          "'This also cancels your CA$18.99 term and any add-on immediately.'"
+        ]
+      ]
+    },
+    "crawler-term-untaxed": {
+      "undoes": "C — the /pricing crawler description's term price has its own tax note (one note at the end of the sentence is not beside both)",
+      "edits": [
+        [
+          "src/seo/routes.json",
+          "the 4-month term, CA$18.99 + applicable taxes, or a pack of 3",
+          "the 4-month term, CA$18.99, or a pack of 3"
+        ]
+      ]
+    },
+    "auth-term-tax-before-period": {
+      "undoes": "C, review round 1 (B-R1-03) — the /auth?plan=term label puts the period before the tax note, so it does not read as taxes per 4 months",
+      "edits": [
+        [
+          "src/i18n/auth.ts",
+          "'Term · CA$18.99 every 4 months + applicable taxes'",
+          "'Term · CA$18.99 + applicable taxes / 4 months'"
+        ]
+      ]
+    },
+    "slides-drawer-tax-before-period": {
+      "undoes": "C, review round 1 (B-R1-03) — the (hidden) slides drawer's term price puts the period before the tax note",
+      "edits": [
+        [
+          "src/manuscript/slides/ExportDrawer.tsx",
+          "'$18.99 CAD every 4 months + applicable taxes ·",
+          "'$18.99 CAD + applicable taxes / 4-month term ·"
+        ]
+      ]
+    }
+  }
+}

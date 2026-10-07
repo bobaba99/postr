@@ -15,43 +15,50 @@
  * `keptResultNote` is its companion in the editor: the line that says
  * which size a kept result is for when that is not the size named here
  * (plan item 7, review round 2).
+ *
+ * In French on the French page (fix 26; i18n/readability.ts `sizing`),
+ * the pill in French style (10,0 po × 7,0 po). `keptResultNote` is the
+ * editor's only, so English.
  */
 import type { CheckedInputs } from './figureScriptDraft';
 import type { ReadabilityLayout } from './readabilityLayout';
+import { READABILITY_COPY } from '@/i18n/readability';
+import { formatNumber, type Lang } from '@/i18n/lang';
 
 interface Props {
   layout: ReadabilityLayout;
+  /** The page's language; the editor passes none. */
+  lang?: Lang;
   /** True only when an image block sizes the check (editor layout). */
   isImage: boolean;
   widthIn: number;
   heightIn: number;
 }
 
-export function ReadabilitySizingNote({ layout, isImage, widthIn, heightIn }: Props) {
-  const w = widthIn.toFixed(1);
-  const h = heightIn.toFixed(1);
+export function ReadabilitySizingNote({ layout, lang = 'en', isImage, widthIn, heightIn }: Props) {
+  const c = READABILITY_COPY[lang];
+  const s = c.sizing;
+  const w = formatNumber(widthIn, lang, 1);
+  const h = formatNumber(heightIn, lang, 1);
   const pill = (
     <span key={`${w}-${h}`} className="postr-dimension-pill">
-      {w}&quot; × {h}&quot;
+      {lang === 'fr' ? `${w}\u00a0po × ${h}\u00a0po` : `${w}" × ${h}"`}
     </span>
   );
 
   if (isImage) {
-    return <>Using selected image block {pill}.</>;
+    return <>{s.image} {pill}.</>;
   }
   if (layout === 'page') {
     return (
       <>
-        Sizing against the print size you entered above {pill}. Change the
-        width or height and click <b>Check</b> again.
+        {s.pageLead} {pill}{s.pageMiddle} <b>{c.introCheck}</b>{s.pageTail}
       </>
     );
   }
   return (
     <>
-      Sizing against the gray <b>figure preview</b> on the canvas {pill} — drag
-      or resize it to match your real figure, or click an existing image block
-      to use its exact dimensions.
+      {s.panelLead} <b>{s.panelPreview}</b> {s.panelMiddle} {pill} {s.panelTail}
     </>
   );
 }

@@ -10,8 +10,14 @@
  *
  * No Supabase or store imports: this must stay mountable on a page that
  * creates no session.
+ *
+ * In French on /tools/figure-readability/fr (fix 26): the labels and the
+ * preset names come from i18n/figureReadability.ts, and the numbers are
+ * shown with a decimal comma (parseInches already reads one).
  */
 import { useId, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { FIGURE_READABILITY_COPY } from '@/i18n/figureReadability';
+import { formatNumber, type Lang } from '@/i18n/lang';
 import {
   PRINT_SIZE_PRESETS,
   clampInches,
@@ -23,6 +29,8 @@ import {
 interface Props {
   value: PrintSize;
   onChange: (next: PrintSize) => void;
+  /** The page's language (the editor does not mount this). */
+  lang?: Lang;
 }
 
 type Axis = 'w' | 'h';
@@ -32,13 +40,10 @@ interface Draft {
   text: string;
 }
 
-const AXIS_LABEL: Record<Axis, string> = { w: 'Width', h: 'Height' };
-
-function format(n: number): string {
-  return String(n);
-}
-
-export function PrintSizeFields({ value, onChange }: Props) {
+export function PrintSizeFields({ value, onChange, lang = 'en' }: Props) {
+  const c = FIGURE_READABILITY_COPY[lang].size;
+  const axisLabel: Record<Axis, string> = { w: c.width, h: c.height };
+  const format = (n: number) => formatNumber(n, lang);
   const [draft, setDraft] = useState<Draft | null>(null);
   const baseId = useId();
   const pressedId = matchingPresetId(value.w, value.h);
@@ -68,7 +73,7 @@ export function PrintSizeFields({ value, onChange }: Props) {
     return (
       <div className="flex flex-col gap-1.5">
         <label htmlFor={id} className="text-sm font-medium text-[#c8cad0]">
-          {AXIS_LABEL[axis]}
+          {axisLabel[axis]}
         </label>
         <div className="relative">
           {/* type="text", not "number": Chromium drops the "," keystroke
@@ -97,7 +102,7 @@ export function PrintSizeFields({ value, onChange }: Props) {
             aria-hidden="true"
             className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[#8b8f99]"
           >
-            in
+            {c.unit}
           </span>
         </div>
       </div>
@@ -110,7 +115,7 @@ export function PrintSizeFields({ value, onChange }: Props) {
         id={`${baseId}-legend`}
         className="block text-[13px] font-bold uppercase tracking-[1.2px] text-[#9ca3af]"
       >
-        Printed figure size
+        {c.legend}
       </span>
 
       {/* Side by side even on a phone: two short numeric fields fit a
@@ -126,7 +131,7 @@ export function PrintSizeFields({ value, onChange }: Props) {
 
       <div
         role="group"
-        aria-label="Print size presets"
+        aria-label={c.presetsLabel}
         className="mt-3 flex flex-wrap gap-2"
       >
         {PRINT_SIZE_PRESETS.map((preset) => {
@@ -148,7 +153,7 @@ export function PrintSizeFields({ value, onChange }: Props) {
                 cursor: 'pointer',
               }}
             >
-              {preset.label}
+              {`${(c.presets as Record<string, string>)[preset.id] ?? preset.label} — ${format(preset.w)} × ${format(preset.h)}`}
             </button>
           );
         })}
@@ -157,11 +162,7 @@ export function PrintSizeFields({ value, onChange }: Props) {
       {/* parsePythonCode no longer takes the typed size as its canvas
           (fix 13): with no figsize it uses matplotlib's 6.4 × 4.8 in. */}
       <p className="mt-3 max-w-[62ch] text-sm leading-relaxed text-[#8b8f99]">
-        Measure the space the figure will fill on the printed poster, not the
-        image file. If your code sets its canvas (ggsave() in R, figsize in
-        Python), the check scales from that canvas to this size. Without one,
-        it assumes R code renders at this size and Python code at
-        matplotlib&rsquo;s default of 6.4 × 4.8 in.
+        {c.note}
       </p>
     </div>
   );

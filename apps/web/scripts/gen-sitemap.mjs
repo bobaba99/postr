@@ -9,6 +9,9 @@
  * not genuinely tied to content changes is worse than none, because
  * Google demotes the signal site-wide once it catches a site stamping
  * build time on unchanged pages.
+ *
+ * The French pages (fix 26) are static indexable records, so they are
+ * listed like the English ones (src/seo/__tests__/prerenderFrench.test.ts).
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';

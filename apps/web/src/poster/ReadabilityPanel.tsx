@@ -30,6 +30,9 @@ import { CodeView, CopyButton } from './ReadabilityCodeView';
 import { FullCodeModal } from './FullCodeModal';
 import { btnStyle, labelStyle, panelStyle, primaryBtnStyle } from './readabilityStyles';
 import { useScriptDraft, type CheckedInputs, type ScriptDraftSlot } from './figureScriptDraft';
+import { READABILITY_COPY, type ReadabilityCopy } from '@/i18n/readability';
+import { elementName, engineWarning } from '@/i18n/readabilityWarnings';
+import { formatNumber, type Lang } from '@/i18n/lang';
 
 interface Props {
   selectedBlock: Block | null;
@@ -59,6 +62,13 @@ interface Props {
    * panels by the poster id.
    */
   draftSlot?: ScriptDraftSlot | null;
+  /**
+   * The page's language (fix 26): 'fr' on /tools/figure-readability/fr.
+   * The editor passes none and stays English. The copy is in
+   * i18n/readability.ts; the engine's row names and warnings are put in
+   * French by i18n/readabilityWarnings.ts.
+   */
+  lang?: Lang;
 }
 
 interface ScanRegion {
@@ -103,10 +113,11 @@ interface CodeEditorProps {
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
+  label: string;
   layout: ReadabilityLayout;
 }
 
-function CodeEditor({ value, onChange, placeholder, layout }: CodeEditorProps) {
+function CodeEditor({ value, onChange, placeholder, label, layout }: CodeEditorProps) {
   const t = layoutTokens(layout);
   const id = useId();
   const taRef = useRef<HTMLTextAreaElement | null>(null);
@@ -188,7 +199,7 @@ function CodeEditor({ value, onChange, placeholder, layout }: CodeEditorProps) {
         // pasted); the ring is drawn by `.postr-code-editor:focus-
         // visible` in index.css, inside the frame, instead of the UA
         // outline this textarea used to reset.
-        aria-label="Your R or Python plotting code"
+        aria-label={label}
         className="postr-code-editor"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -225,37 +236,40 @@ function CodeEditor({ value, onChange, placeholder, layout }: CodeEditorProps) {
 // go unseen. Before fix 15, code the check could not place left Check
 // doing nothing at all, and wiped any result on screen.
 
-const SYSTEM_NAME: Record<PlotSystem, string> = {
-  ggplot2: 'ggplot2',
-  matplotlib: 'matplotlib',
-  base: 'base graphics',
-  lattice: 'lattice',
-  plotly: 'plotly',
-  plotnine: 'plotnine',
-  altair: 'Altair',
-};
+/** A system's name; base graphics has a name in each language (i18n/readability.ts). */
+function systemName(system: PlotSystem, c: ReadabilityCopy): string {
+  const names: Record<PlotSystem, string> = {
+    ggplot2: 'ggplot2',
+    matplotlib: 'matplotlib',
+    base: c.systemNames.base,
+    lattice: 'lattice',
+    plotly: 'plotly',
+    plotnine: 'plotnine',
+    altair: 'Altair',
+  };
+  return names[system];
+}
 
 /** "R / ggplot2", or "R (checked as ggplot2)" when no call named the system. */
-function plotLabel(plot: PlotCode): string {
+function plotLabel(plot: PlotCode, c: ReadabilityCopy): string {
   const language = plot.language === 'r' ? 'R' : 'Python';
-  const system = SYSTEM_NAME[plot.system!];
-  return plot.assumed ? `${language} (checked as ${system})` : `${language} / ${system}`;
+  const system = systemName(plot.system!, c);
+  return plot.assumed ? c.assumedLabel(language, system) : `${language} / ${system}`;
 }
-
-const CANNOT_TELL = 'Couldn’t tell R from Python — pick R (ggplot2) or Python (matplotlib).';
 
 /** The answer to an unsupported system names it and what the check reads. */
-function unsupportedAnswer(system: PlotSystem): string {
-  const name = system === 'base' ? 'base R graphics' : SYSTEM_NAME[system];
-  return `Not supported yet: ${name}. The check reads R (ggplot2) and Python (matplotlib).`;
+function unsupportedAnswer(system: PlotSystem, c: ReadabilityCopy): string {
+  return c.unsupported(system === 'base' ? c.systemNames.baseR : systemName(system, c));
 }
 
-/**
- * Said when the page hides a result because the print size changed: a
- * table no longer on screen must not go without a word (round 2 of fix
- * 15's review; the page hides it by design, fix 13).
- */
-const RESIZED = 'The print size changed: click Check again for a result at this size.';
+/** A point size as the panel shows it: "12.1pt", « 12,1 pt ». */
+function pt(n: number, lang: Lang): string {
+  return lang === 'fr' ? `${formatNumber(n, lang)}\u00a0pt` : `${n}pt`;
+}
+
+// Said when the page hides a result because the print size changed (`resized`
+// in i18n/readability.ts): a table no longer on screen must not go without a
+// word (round 2 of fix 15's review; the page hides it by design, fix 13).
 
 interface CheckAnswer {
   /** 'checked' is announced only; the table below is what a sighted user reads. */
@@ -322,8 +336,12 @@ export function ReadabilityPanel({
   defaultFigureHeightIn = 7,
   layout = 'panel',
   draftSlot = null,
+  // `lang` in this panel is the code's language (the draft's); the page's
+  // is `uiLang`.
+  lang: uiLang = 'en',
 }: Props) {
   const t = layoutTokens(layout);
+  const c = READABILITY_COPY[uiLang];
   // The script, its language and the last Check live in the draft, not
   // in this panel's state: the sidebar unmounts the panel on every tab
   // change, and the editor's poster can be reloaded (plan item 7).
@@ -419,14 +437,14 @@ export function ReadabilityPanel({
     // of vanishing without a word as it did; the draft keeps it, so a
     // reload or a tab change brings it back too (fix 7).
     if (!plot.language || !plot.system) {
-      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });
+      setAnswer({ ...at, kind: 'cannot-tell', text: c.cannotTell });
       return;
     }
     // Including after a hand pick: a ggplot2 table and edited code for a
     // base R plot would be wrong (the reproducer: the edit ran and saved a
     // blank figure), so the system is named instead.
     if (!SUPPORTED_SYSTEMS.includes(plot.system)) {
-      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });
+      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system, c) });
       return;
     }
     // The check's inputs go into the draft; the table is computed from
@@ -453,11 +471,7 @@ export function ReadabilityPanel({
     setAnswer({
       ...at,
       kind: 'checked',
-      text: `Checked as ${plotLabel({ ...plot, assumed: false })}: ${
-        below === 0
-          ? 'every text element meets its minimum'
-          : `${below} of ${result.elements.length} text elements are below the minimum`
-      }.`,
+      text: `${c.checkedAs(plotLabel({ ...plot, assumed: false }, c))}${c.belowCount(below, result.elements.length)}`,
     });
   };
 
@@ -494,7 +508,7 @@ export function ReadabilityPanel({
   const shownAnswer: { kind: CheckAnswer['kind'] | 'resized'; text: string; key: string } | null = answer
     ? { kind: answer.kind, text: answer.text, key: `press-${answer.press}` }
     : resized
-      ? { kind: 'resized', text: RESIZED, key: 'resized' }
+      ? { kind: 'resized', text: c.resized, key: 'resized' }
       : null;
   const answerOnScreen = shownAnswer !== null && shownAnswer.kind !== 'checked';
   const checkedParams = stale ? null : checked?.params ?? null;
@@ -553,7 +567,7 @@ export function ReadabilityPanel({
           blockHeightIn={blockHeightIn}
         />
       )}
-      <div style={labelStyle}>Code Readability Check</div>
+      <div style={labelStyle}>{c.heading}</div>
       <p
         style={{
           color: '#c8cad0',
@@ -566,11 +580,10 @@ export function ReadabilityPanel({
           padding: '10px 12px',
         }}
       >
-        🔎 Paste your R or Python plotting code, then click <b>Check</b> to
-        see how large its titles, labels and legend will print on the
-        poster.{' '}
+        {c.introLead} <b>{c.introCheck}</b> {c.introTail}{' '}
         <ReadabilitySizingNote
           layout={layout}
+          lang={uiLang}
           isImage={isImage}
           widthIn={blockWidthIn}
           heightIn={blockHeightIn}
@@ -593,7 +606,7 @@ export function ReadabilityPanel({
               fontSize: t.buttonFontSize,
             }}
           >
-            {l === 'auto' ? 'Auto' : l === 'r' ? 'R' : 'Python'}
+            {c.languages[l]}
           </button>
         ))}
       </div>
@@ -601,7 +614,8 @@ export function ReadabilityPanel({
       <CodeEditor
         value={code}
         onChange={changeCode}
-        placeholder="# Paste your ggplot / matplotlib code here..."
+        placeholder={c.editorPlaceholder}
+        label={c.editorLabel}
         layout={layout}
       />
 
@@ -639,10 +653,10 @@ export function ReadabilityPanel({
           {!answerOnScreen && (
             <div style={{ color: plot.language ? '#89b4fa' : t.mutedColor }}>
               {plot.language
-                ? `Detected: ${plotLabel(plot)}`
+                ? c.detected(plotLabel(plot, c))
                 : code.trim()
-                  ? 'Can’t tell R from Python. Pick one above.'
-                  : 'Auto-detect waiting for code…'}
+                  ? c.cantTellIdle
+                  : c.waiting}
             </div>
           )}
         </div>
@@ -661,7 +675,7 @@ export function ReadabilityPanel({
             fontSize: t.buttonFontSize,
           }}
         >
-          ▶ Check
+          {c.check}
         </button>
       </div>
 
@@ -680,7 +694,7 @@ export function ReadabilityPanel({
             lineHeight: 1.4,
           }}
         >
-          ✓ Copied to clipboard — {t.copiedBannerTail}
+          {c.copiedLead} {c.copiedTail[layout]}
         </div>
       )}
 
@@ -704,7 +718,7 @@ export function ReadabilityPanel({
                 padding: '6px 10px',
               }}
             >
-              Out of date: this result is from your last check, before the code or the language changed.
+              {c.outOfDate}
             </div>
           )}
           {result.warnings.map((w, i) => (
@@ -717,29 +731,29 @@ export function ReadabilityPanel({
                 gap: 4,
               }}
             >
-              <span>&#9888;</span> {w}
+              <span>&#9888;</span> {engineWarning(w, uiLang)}
             </div>
           ))}
 
           <div style={{ fontSize: 13, color: t.mutedColor }}>
-            Scale factor: {result.scale.toFixed(2)}x
-            {!isImage && t.scaleSuffix}
+            {c.scale(formatNumber(result.scale, uiLang, 2))}
+            {!isImage && c.scaleSuffix[layout]}
           </div>
 
           <table style={{ width: '100%', fontSize: t.tableFontSize, borderCollapse: 'collapse', fontVariantNumeric: 'tabular-nums' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #45475a', color: '#9ca3af' }}>
-                <th style={{ textAlign: 'left', padding: '4px 0' }}>Element</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="The size the check read from your code">Source</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="What it measures once the figure is scaled onto the poster">Print</th>
-                <th style={{ textAlign: 'right', padding: '4px 4px' }} title="Postr’s minimum for this element on a poster">Min</th>
-                <th style={{ textAlign: 'center', padding: '4px 0', width: 20 }} aria-label="Verdict"></th>
+                <th style={{ textAlign: 'left', padding: '4px 0' }}>{c.table.element}</th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title={c.table.sourceTitle}>{c.table.source}</th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title={c.table.printTitle}>{c.table.print}</th>
+                <th style={{ textAlign: 'right', padding: '4px 4px' }} title={c.table.minTitle}>{c.table.min}</th>
+                <th style={{ textAlign: 'center', padding: '4px 0', width: 20 }} aria-label={c.table.verdict}></th>
               </tr>
             </thead>
             <tbody>
               {result.elements.map((el) => (
                 <tr key={el.name} style={{ borderBottom: '1px solid #313244' }}>
-                  <td style={{ padding: '4px 0', color: '#cdd6f4' }}>{el.name}</td>
+                  <td style={{ padding: '4px 0', color: '#cdd6f4' }}>{elementName(el.name, uiLang)}</td>
                   <td
                     style={{
                       textAlign: 'right',
@@ -747,7 +761,7 @@ export function ReadabilityPanel({
                       color: '#bac2de',
                     }}
                   >
-                    {el.sourcePt}pt
+                    {pt(el.sourcePt, uiLang)}
                   </td>
                   <td
                     style={{
@@ -762,7 +776,7 @@ export function ReadabilityPanel({
                       fontWeight: 600,
                     }}
                   >
-                    {el.effectivePt}pt
+                    {pt(el.effectivePt, uiLang)}
                   </td>
                   <td
                     style={{
@@ -771,7 +785,7 @@ export function ReadabilityPanel({
                       color: t.mutedColor,
                     }}
                   >
-                    {el.minPt}pt
+                    {pt(el.minPt, uiLang)}
                   </td>
                   {/* Coloured to match the legend below. It used to be
                       grey while only the Print number carried the colour,
@@ -811,43 +825,36 @@ export function ReadabilityPanel({
             }}
           >
             <div style={{ color: '#9ca3af', fontWeight: 600, letterSpacing: 0.3 }}>
-              What the flags mean
+              {c.legend.title}
             </div>
             <div>
               <span style={{ color: '#a6e3a1', fontWeight: 700 }}>✓</span>{' '}
               <span style={{ color: '#bac2de' }}>
-                <strong style={{ color: '#cdd6f4' }}>At or above the minimum.</strong> Nothing to
-                change.
+                <strong style={{ color: '#cdd6f4' }}>{c.legend.passLead}</strong> {c.legend.passBody}
               </span>
             </div>
             <div>
               <span style={{ color: '#f9e2af', fontWeight: 700 }}>⚠</span>{' '}
               <span style={{ color: '#bac2de' }}>
-                <strong style={{ color: '#cdd6f4' }}>Up to 15% below the minimum.</strong> Legible
-                close up, hard to read from the back of the room — and one small change to the
-                figure size drops it into red. Worth fixing, not safe to ignore.
+                <strong style={{ color: '#cdd6f4' }}>{c.legend.warnLead}</strong> {c.legend.warnBody}
               </span>
             </div>
             <div>
               <span style={{ color: '#f38ba8', fontWeight: 700 }}>✗</span>{' '}
               <span style={{ color: '#bac2de' }}>
-                <strong style={{ color: '#cdd6f4' }}>More than 15% below.</strong> Raise it before
-                you print.
+                <strong style={{ color: '#cdd6f4' }}>{c.legend.failLead}</strong> {c.legend.failBody}
               </span>
             </div>
             <div style={{ color: '#7f849c', marginTop: 2 }}>
-              <strong style={{ color: '#9ca3af' }}>Source</strong> is the size the check read from
-              your code. <strong style={{ color: '#9ca3af' }}>Print</strong> is what it measures on
-              the poster after the figure is scaled to fit the block, and it is the number compared
-              against <strong style={{ color: '#9ca3af' }}>Min</strong>.{' '}
+              <strong style={{ color: '#9ca3af' }}>{c.legend.sourceWord}</strong> {c.legend.sourceText}{' '}
+              <strong style={{ color: '#9ca3af' }}>{c.legend.printWord}</strong> {c.legend.printText}{' '}
+              <strong style={{ color: '#9ca3af' }}>{c.legend.minWord}</strong>{c.legend.minTail}{' '}
               {/* What the parsers read (readability.ts parseRCode /
                   parsePythonCode). A size set any other way is scored at
                   the inherited size, which can show a 6 pt label as a pass:
                   R `theme(text = element_text(size = 6))`, Python
                   `plt.xlabel(..., fontsize=6)`. */}
-              {checkedParams?.language === 'python'
-                ? 'It reads font.size in plt.rcParams, seaborn’s context and font_scale, and the sizes given to set_xlabel(), set_ylabel(), set_title() and tick_params(). Check sizes set any other way yourself.'
-                : 'It reads base_size and the sizes theme() sets for the elements in this table. Check sizes set any other way, such as on text or title, yourself.'}
+              {checkedParams?.language === 'python' ? c.legend.readsPython : c.legend.readsR}
             </div>
           </div>
 
@@ -879,7 +886,7 @@ export function ReadabilityPanel({
                     }}
                   >
                     <div style={{ fontSize: t.tableFontSize, color: '#cdd6f4', fontWeight: 600 }}>
-                      Raise these text elements
+                      {c.fix.title}
                     </div>
                     {/* Copies the whole corrected script, not the theme()
                         fragment — splicing a fragment into the right place
@@ -891,7 +898,8 @@ export function ReadabilityPanel({
                         copy cannot promise the result is corrected. */}
                     <CopyButton
                       text={fullFixedCode}
-                      label="Copy edited code"
+                      label={c.fix.copyEdited}
+                      copiedLabel={c.copied}
                       onCopied={handleCopied}
                       style={{ minHeight: t.buttonMinHeight, fontSize: t.buttonFontSize }}
                     />
@@ -906,9 +914,9 @@ export function ReadabilityPanel({
                   >
                     {result.fontFixes.map((f) => (
                       <li key={f.name} style={{ marginBottom: 2 }}>
-                        {f.name}: <strong>{f.currentPt}pt</strong> →{' '}
-                        <strong style={{ color: '#a6e3a1' }}>{f.neededPt}pt</strong>
-                        {f.wasOverridden && <span style={{ color: '#6b7280' }}> (you set this)</span>}
+                        {elementName(f.name, uiLang)}{uiLang === 'fr' ? '\u00a0:' : ':'} <strong>{pt(f.currentPt, uiLang)}</strong> →{' '}
+                        <strong style={{ color: '#a6e3a1' }}>{pt(f.neededPt, uiLang)}</strong>
+                        {f.wasOverridden && <span style={{ color: '#6b7280' }}>{c.fix.youSetThis}</span>}
                       </li>
                     ))}
                   </ul>
@@ -924,19 +932,17 @@ export function ReadabilityPanel({
                       fontSize: t.buttonFontSize,
                     }}
                   >
-                    Open full edited code →
+                    {c.fix.openFull}
                   </button>
                   <div style={{ fontSize: 12, color: '#7f849c', lineHeight: 1.5 }}>
-                    Your script with the sizes above added. Copy it whole and run it.{' '}
+                    {c.fix.yourScript}{' '}
                     {/* R: applyFontFixes inserts after the LAST theme_*()
                         call, so a later theme() of the user's own still wins
                         for the sizes it sets. Python: the helper raises each
                         listed class at the save (fix 13); "never makes text
                         smaller" was dropped because f03 in fix 13's record
                         prints text below what the script alone draws. */}
-                    {checkedParams?.language === 'r'
-                      ? 'The new theme() goes right after your theme_*() call, or at the end of the plot when there is none, and sets only the sizes listed. ggplot applies theme calls in order and the last one wins, so if a theme() of your own comes later and sets one of these sizes, change the number there.'
-                      : 'A small function raises these elements to at least the sizes listed when the figure is saved, so settings earlier in your script cannot undo it.'}
+                    {checkedParams?.language === 'r' ? c.fix.whereR : c.fix.wherePython}
                   </div>
                 </div>
               )}
@@ -954,21 +960,20 @@ export function ReadabilityPanel({
                       (base_size 20 with axis.text set to 7 suggests 18):
                       the note says what it moves, not that it grows. */}
                   <summary style={{ cursor: 'pointer', fontSize: t.tableFontSize, color: '#9ca3af' }}>
-                    Or change one number:{' '}
-                    {checkedParams?.language === 'python' ? 'font.size' : 'base_size'} ={' '}
-                    {result.suggestedBaseSize}
+                    {c.fix.orChangeOne(
+                      checkedParams?.language === 'python' ? 'font.size' : 'base_size',
+                      result.suggestedBaseSize,
+                    )}
                   </summary>
                   <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ fontSize: 12, color: '#7f849c', lineHeight: 1.5 }}>
-                      Simpler to paste. It moves every text size that follows{' '}
-                      {checkedParams?.language === 'python' ? 'font.size' : 'base_size'}, including
-                      the ones already large enough, and leaves the sizes your code sets
-                      directly as they are.
+                      {c.fix.simplerToPaste(checkedParams?.language === 'python' ? 'font.size' : 'base_size')}
                     </div>
                     <CodeView text={result.copySnippet} layout={layout} />
                     <CopyButton
                       text={result.copySnippet}
-                      label="Copy snippet"
+                      label={c.fix.copySnippet}
+                      copiedLabel={c.copied}
                       onCopied={handleCopied}
                       style={{ minHeight: t.buttonMinHeight, fontSize: t.buttonFontSize }}
                     />
@@ -988,7 +993,7 @@ export function ReadabilityPanel({
                 color: '#a6e3a1',
               }}
             >
-              Every element in the table meets its minimum at this poster size.
+              {c.allPass}
             </div>
           )}
         </div>
@@ -1000,6 +1005,7 @@ export function ReadabilityPanel({
         onClose={() => setFullCodeOpen(false)}
         onCopied={handleCopied}
         layout={layout}
+        lang={uiLang}
       />
     </div>
   );

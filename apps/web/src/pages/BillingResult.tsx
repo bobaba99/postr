@@ -13,22 +13,41 @@
  * poll the user's own plan for a few seconds so the confirmation reflects
  * the just-completed grant even if the webhook lands a beat late, then
  * send them back into the app to use it.
+ *
+ * In English at /billing/success and /billing/cancel, and in French at
+ * their /fr twins, where a checkout started from a French page returns
+ * (fix 26): the copy is in i18n/billing.ts; each page links to its twin.
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { usePlan } from '@/hooks/usePlan';
 import { supabase } from '@/lib/supabase';
+import { BILLING_COPY, type BillingCopy } from '@/i18n/billing';
+import { localizedPath, useLang } from '@/i18n/lang';
+import { LanguageLink } from '@/components/LanguageLink';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
 type Outcome = 'success' | 'cancel';
 
 export default function BillingResult({ outcome }: { outcome: Outcome }) {
-  useDocumentMeta(APP_ROUTE_META[`/billing/${outcome}`] ?? null);
-  return outcome === 'success' ? <Success /> : <Cancelled />;
+  const lang = useLang();
+  useDocumentMeta(APP_ROUTE_META[localizedPath(`/billing/${outcome}`, lang)] ?? null);
+  const c = BILLING_COPY[lang];
+  const pricing = localizedPath('/pricing', lang);
+  return outcome === 'success' ? <Success c={c} pricing={pricing} /> : <Cancelled c={c} pricing={pricing} />;
 }
 
-function Success() {
+/** The link to the page in the other language, under the page's links. */
+function OtherLanguage() {
+  return (
+    <div className="mt-4">
+      <LanguageLink className="text-xs text-[#8b8f99] underline-offset-4 hover:text-[#c8cad0] hover:underline" />
+    </div>
+  );
+}
+
+function Success({ c, pricing }: { c: BillingCopy; pricing: string }) {
   const navigate = useNavigate();
   const plan = usePlan();
   // Re-read the plan for a short window: the webhook usually fulfills
@@ -77,17 +96,17 @@ function Success() {
             webhook, which may land after the one re-read below. So no
             "payment received" or "ready" claim until the plan shows it. */}
         <h1 className="mt-6 text-2xl font-semibold text-[#e2e2e8]">
-          Checkout complete
+          {c.successTitle}
         </h1>
 
         <p className="mt-3 text-sm leading-relaxed text-[#9ca3af]">
           {plan.hasActiveTerm
-            ? 'Your term is active. Editable PowerPoint and LaTeX exports are unlocked — no watermark.'
+            ? c.termActive
             : plan.credits > 0
-              ? `You have ${plan.credits} export credit${plan.credits === 1 ? '' : 's'} to use whenever. Credits never expire.`
+              ? c.creditsLeft(plan.credits)
               : stillProcessing
-                ? 'Checking your account for the purchase.'
-                : 'Your purchase hasn’t reached your account yet. It appears once Stripe confirms the payment. Check your profile page to see it.'}
+                ? c.checking
+                : c.notYet}
         </p>
 
         <button
@@ -95,28 +114,28 @@ function Success() {
           onClick={() => navigate('/dashboard')}
           className="mt-7 w-full rounded-lg bg-[#5641b8] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#4c39a6]"
         >
-          Back to your posters
+          {c.backToPosters}
         </button>
 
         <Link
-          to="/pricing"
+          to={pricing}
           className="mt-3 inline-block text-xs text-[#8b8f99] no-underline hover:text-[#c8cad0]"
         >
-          View plans
+          {c.viewPlans}
         </Link>
+        <OtherLanguage />
       </div>
     </main>
   );
 }
 
-function Cancelled() {
+function Cancelled({ c, pricing }: { c: BillingCopy; pricing: string }) {
   return (
     <main className="flex min-h-screen w-screen flex-col items-center justify-center bg-[#0a0a12] px-6 text-center text-[#c8cad0]">
       <div className="w-full max-w-md">
-        <h1 className="text-2xl font-semibold text-[#e2e2e8]">Checkout cancelled</h1>
+        <h1 className="text-2xl font-semibold text-[#e2e2e8]">{c.cancelTitle}</h1>
         <p className="mt-3 text-sm leading-relaxed text-[#9ca3af]">
-          No charge was made. Your poster is exactly as you left it — you can
-          keep editing for free, or pick up checkout again anytime.
+          {c.cancelBody}
         </p>
         {/* history.back() returns to the previous history entry. After a
             Stripe cancel that entry can be the Stripe Checkout page, and a
@@ -127,14 +146,15 @@ function Cancelled() {
           onClick={() => window.history.back()}
           className="mt-7 w-full rounded-lg bg-[#5641b8] px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#4c39a6]"
         >
-          Go back
+          {c.goBack}
         </button>
         <Link
-          to="/pricing"
+          to={pricing}
           className="mt-3 inline-block text-xs text-[#8b8f99] no-underline hover:text-[#c8cad0]"
         >
-          See plans
+          {c.seePlans}
         </Link>
+        <OtherLanguage />
       </div>
     </main>
   );

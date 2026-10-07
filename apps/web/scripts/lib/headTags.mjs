@@ -41,8 +41,41 @@ export function canonicalFor(path, siteOrigin) {
   return `${siteOrigin}${trimmed}`;
 }
 
-/** Mirrors toPageMeta() in src/seo/siteMeta.ts. */
-export function buildPageMeta(path, record, site) {
+/** Mirrors twinPath() in src/seo/siteMeta.ts: `/about` ↔ `/about/fr`, `/` ↔ `/fr`. */
+export function twinPath(path) {
+  if (path === '/fr') return '/';
+  if (path.endsWith('/fr')) return path.slice(0, -'/fr'.length);
+  return path === '/' ? '/fr' : `${path}/fr`;
+}
+
+/**
+ * Mirrors alternatesFor() in src/seo/siteMeta.ts: the hreflang alternates
+ * of a prerendered page whose twin is prerendered too (fix 26), or null.
+ */
+export function alternatesFor(path, routes, site) {
+  const prerendered = {
+    ...routes.static,
+    ...Object.fromEntries(Object.entries(routes.app ?? {}).filter(([, r]) => r.prerender === true)),
+  };
+  const twin = twinPath(path);
+  const self = prerendered[path];
+  const other = prerendered[twin];
+  if (!self || !other) return null;
+  const french = path === '/fr' || path.endsWith('/fr');
+  const [en, fr] = french ? [twin, path] : [path, twin];
+  const [enRecord, frRecord] = french ? [other, self] : [self, other];
+  return [
+    { hreflang: enRecord.language ?? site.language, href: canonicalFor(en, site.siteOrigin) },
+    { hreflang: frRecord.language ?? site.language, href: canonicalFor(fr, site.siteOrigin) },
+    { hreflang: 'x-default', href: canonicalFor(en, site.siteOrigin) },
+  ];
+}
+
+/**
+ * Mirrors toPageMeta() in src/seo/siteMeta.ts. `routes` (the whole
+ * routes.json) decides the hreflang alternates; without it there are none.
+ */
+export function buildPageMeta(path, record, site, routes = null) {
   const indexable = record.robots === INDEXABLE;
   const hasDefaultImage = Boolean(site.defaultOgImage);
   const hasShareImage =
@@ -62,8 +95,12 @@ export function buildPageMeta(path, record, site) {
       : null,
     ogImageAlt:
       hasShareImage ? `${site.siteName}: free conference poster maker` : null,
+    alternates: routes ? alternatesFor(path, routes, site) : null,
   };
 }
+
+/** Mirrors HREFLANG_SLOTS in src/seo/useDocumentMeta.ts. */
+const HREFLANG_SLOTS = ['en', 'fr-CA', 'x-default'];
 
 /**
  * The tag set for a page, as {kind, key, id, value} records.
@@ -77,6 +114,12 @@ export function tagSpecsFor(meta, site) {
     { kind: 'meta', key: 'name', id: 'description', value: meta.description },
     { kind: 'meta', key: 'name', id: 'robots', value: meta.robots },
     { kind: 'link', rel: 'canonical', value: meta.canonical },
+    ...HREFLANG_SLOTS.map((hreflang) => ({
+      kind: 'link',
+      rel: 'alternate',
+      hreflang,
+      value: meta.alternates?.find((a) => a.hreflang === hreflang)?.href ?? null,
+    })),
 
     { kind: 'meta', key: 'property', id: 'og:title', value: meta.title },
     { kind: 'meta', key: 'property', id: 'og:description', value: meta.description },
@@ -102,7 +145,8 @@ export function tagSpecsFor(meta, site) {
 function renderTag(spec) {
   if (spec.value === null) return null;
   if (spec.kind === 'link') {
-    return `<link rel="${escapeAttr(spec.rel)}" href="${escapeAttr(spec.value)}" />`;
+    const lang = spec.hreflang ? ` hreflang="${escapeAttr(spec.hreflang)}"` : '';
+    return `<link rel="${escapeAttr(spec.rel)}"${lang} href="${escapeAttr(spec.value)}" />`;
   }
   return `<meta ${spec.key}="${escapeAttr(spec.id)}" content="${escapeAttr(spec.value)}" />`;
 }
@@ -118,7 +162,12 @@ function stripOwnedTags(html, specs) {
   for (const spec of specs) {
     const pattern =
       spec.kind === 'link'
-        ? new RegExp(`\\s*<link[^>]*rel=["']${spec.rel}["'][^>]*>`, 'gi')
+        ? new RegExp(
+            spec.hreflang
+              ? `\\s*<link[^>]*rel=["']${spec.rel}["'][^>]*hreflang=["']${spec.hreflang}["'][^>]*>`
+              : `\\s*<link[^>]*rel=["']${spec.rel}["'][^>]*>`,
+            'gi',
+          )
         : new RegExp(
             `\\s*<meta[^>]*${spec.key}=["']${spec.id.replace(/:/g, '\\:')}["'][^>]*>`,
             'gi',
@@ -134,8 +183,9 @@ function stripOwnedTags(html, specs) {
  * @param shell    contents of the Vite-built dist/index.html
  * @param meta     PageMeta-shaped object
  * @param site     { siteName, locale }
- * @param bodyCopy optional { h1, copy[], links[] } rendered as a temporary
- *                 progressive-enhancement fallback next to #root
+ * @param bodyCopy optional { h1, copy[], links[], navLabel } rendered as a
+ *                 temporary progressive-enhancement fallback next to #root
+ *                 (navLabel names the links' nav, in the page's language)
  */
 export function injectHead(shell, meta, site, bodyCopy = null) {
   const specs = tagSpecsFor(meta, site);
@@ -175,8 +225,9 @@ export function injectHead(shell, meta, site, bodyCopy = null) {
           `<a href="${escapeAttr(href)}">${escapeText(label)}</a>`,
       )
       .join('\n        ');
+    const navLabel = escapeAttr(bodyCopy.navLabel ?? 'Postr pages');
     const navigation = links
-      ? `\n      <nav aria-label="Postr pages">\n        ${links}\n      </nav>`
+      ? `\n      <nav aria-label="${navLabel}">\n        ${links}\n      </nav>`
       : '';
     html = html.replace(
       '<div id="root"></div>',

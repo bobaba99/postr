@@ -44,7 +44,7 @@ interface ExportDrawerProps {
 
 /** Pricing is DISPLAY-ONLY in Phase 1 (spec §6). One canonical string,
  *  kept here so the price never drifts between the drawer and the plan. */
-const PRICE_LINE = '$18.99 CAD / 4-month term · or $9.99 for 3 exports';
+const PRICE_LINE = '$18.99 CAD every 4 months + applicable taxes · or $9.99 CAD for 3 exports + applicable taxes';
 
 export function ExportDrawer({
   open,

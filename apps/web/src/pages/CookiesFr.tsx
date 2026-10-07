@@ -4,7 +4,8 @@
  * Miroir de Cookies.tsx. Contenu factuel identique ; seul le texte
  * destiné à l'utilisateur est traduit. Les classes, hrefs, ancres,
  * liens mailto et cibles de route restent identiques à la version
- * anglaise.
+ * anglaise. Global Privacy Control, Google Fonts and the deletion
+ * lifetimes follow Cookies.tsx (record 24); see that file's header.
  */
 import { Link } from 'react-router';
 import { PublicFooter } from '@/components/PublicFooter';
@@ -25,7 +26,7 @@ export default function CookiesFr() {
       <article className="mx-auto max-w-3xl px-8 py-16">
         <div className="mb-4 flex items-center justify-between">
           <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#7c6aed]">
-            Légal
+            Juridique
           </div>
           <Link to="/cookies" className="text-[#7c6aed] underline text-sm">
             English
@@ -52,12 +53,12 @@ export default function CookiesFr() {
 
         <SectionHeading n="2" title="Ce que sont les témoins (et les technologies similaires)" />
         <Body>
-          Un <em>témoin</em> est un petit fichier texte qu'un site Web demande à
-          votre navigateur de conserver afin de pouvoir vous reconnaître lors d'un
+          Un <em>témoin</em> est un petit fichier texte qu’un site Web demande à
+          votre navigateur de conserver afin de pouvoir vous reconnaître lors d’un
           chargement de page ultérieur. Les applications Web modernes utilisent
           aussi deux fonctions de navigateur connexes, le <em>localStorage</em> et
           le <em>sessionStorage</em>, qui jouent un rôle semblable (mémoriser un
-          état d'un chargement de page à l'autre) mais résident dans une partie
+          état d’un chargement de page à l’autre) mais résident dans une partie
           différente du navigateur. Partout où la présente politique dit
           « témoins », nous entendons collectivement les témoins, le localStorage
           et le sessionStorage.
@@ -69,24 +70,26 @@ export default function CookiesFr() {
           demander la permission. Le stockage facultatif, par exemple pour la
           publicité ou les contenus intégrés de tiers, exige généralement votre{' '}
           <strong>consentement préalable, éclairé et donné librement</strong>, et
-          les règles sur l'analytique varient d'une autorité à l'autre.
+          les règles sur la mesure d’audience varient d’une autorité à l’autre.
         </Body>
 
-        <SectionHeading n="3" title="Ce que Postr utilise aujourd'hui" />
+        <SectionHeading n="3" title="Ce que Postr utilise aujourd’hui" />
         <CalloutBox>
           <strong className="text-[#e2e2e8]">
             Tout ce que Postr stocke sur votre appareil figure dans le tableau
             ci-dessous.
           </strong>
           <br />
-          Chaque entrée sert au fonctionnement d'une fonctionnalité de Postr ou
+          Chaque entrée sert au fonctionnement d’une fonctionnalité de Postr ou
           conserve quelque chose que vous avez enregistré, et aucune ne sert à la
-          publicité ni à vous suivre d'un site à l'autre. Nous n'exécutons pas
+          publicité ni à vous suivre d’un site à l’autre. Nous n’exécutons pas
           Google Analytics, le pixel Facebook, de traceurs publicitaires ni de
           boutons de partage de médias sociaux. Nous comptons bien les pages vues
-          au moyen de Vercel Web Analytics, qui, tel que Postr l'utilise, ne
-          dépose aucun témoin et n'écrit rien dans votre navigateur. La section 4
-          explique son fonctionnement.
+          au moyen de Vercel Web Analytics, et nous n’utilisons rien d’autre. Tel
+          que Postr l’utilise, il ne dépose aucun témoin et n’écrit rien dans votre
+          navigateur, et Postr ne le charge pas lorsque votre navigateur envoie le
+          signal Global Privacy Control. La section 4 explique son
+          fonctionnement.
         </CalloutBox>
 
         <Table
@@ -102,7 +105,7 @@ export default function CookiesFr() {
               'postr.style-presets, postr.custom-palettes, postr.checklist-templates, postr.scratch-pad, postr.scratch-note',
               'localStorage',
               'Les préréglages de style, palettes de couleurs, modèles de liste de vérification et notes du bloc-notes (Scratch Pad) que vous enregistrez dans l’éditeur, afin qu’ils soient là à votre prochaine visite. L’entrée des préréglages de style est créée vide la première fois que vous ouvrez l’éditeur.',
-              'Jusqu’à ce que vous les supprimiez ou effaciez les données du navigateur. La suppression de votre compte les efface aussi, sauf les palettes.',
+              'Jusqu’à ce que vous les supprimiez, supprimiez votre compte dans ce navigateur ou effaciez les données du navigateur.',
             ],
             [
               'postr.profile',
@@ -114,19 +117,19 @@ export default function CookiesFr() {
               'postr.onboarding-done, postr.cb-random-pref',
               'localStorage',
               'Retiennent que vous avez terminé ou passé la visite guidée de l’éditeur, et si les palettes aléatoires doivent être adaptées au daltonisme.',
-              'Jusqu’à ce que vous effaciez les données du navigateur. La suppression de votre compte ou le bouton Replay tour de votre page Profil efface aussi l’entrée de la visite guidée.',
+              'Jusqu’à ce que vous supprimiez votre compte dans ce navigateur ou effaciez les données du navigateur. Le bouton Replay tour de votre page Profil efface aussi l’entrée de la visite guidée.',
             ],
             [
               'postr.welcome-seeded:<ID du compte>',
               'localStorage',
               'Indique que votre affiche de bienvenue a été créée, afin qu’elle ne soit pas créée de nouveau. Le nom de la clé contient l’identifiant de votre compte.',
-              'Jusqu’à ce que vous effaciez les données du navigateur',
+              'Jusqu’à ce que vous supprimiez ce compte dans ce navigateur ou effaciez les données du navigateur',
             ],
             [
               'postr.active-editor.<ID de l’affiche>',
               'localStorage',
               'Permet à Postr de vous avertir quand la même affiche est ouverte dans deux onglets. Le nom de la clé contient l’identifiant de l’affiche, ou « new » lorsque l’éditeur s’ouvre à l’adresse /p/new. L’entrée contient un identifiant d’onglet aléatoire et le moment où l’affiche a été ouverte pour la dernière fois.',
-              'Jusqu’à ce que vous effaciez les données du navigateur',
+              'Jusqu’à ce que vous supprimiez votre compte dans ce navigateur ou effaciez les données du navigateur',
             ],
             [
               'postr.figure-script.<ID de l’affiche>',
@@ -169,68 +172,77 @@ export default function CookiesFr() {
         <Body>
           La bibliothèque de connexion écrit aussi une entrée de test nommée
           lswt-… et la supprime aussitôt, pour vérifier que votre navigateur
-          permet le stockage. Elle n'est pas conservée.
+          permet le stockage. Elle n’est pas conservée.
         </Body>
         <Body>
-          Nous traitons toutes ces entrées comme relevant de l'exemption
+          Nous traitons toutes ces entrées comme relevant de l’exemption
           « strictement nécessaire à la fourniture du service expressément demandé
-          par l'utilisateur » prévue à l'article 5(3) de la directive vie privée
+          par l’utilisateur » prévue à l’article 5(3) de la directive vie privée
           et communications électroniques et aux dispositions équivalentes de la
-          LPRPDE et de la Loi 25 du Québec. C'est pourquoi Postr n'affiche aucune
-          bannière de consentement. Aucune d'elles ne vous suit à travers d'autres
+          LPRPDE et de la Loi 25 du Québec. C’est pourquoi Postr n’affiche aucune
+          bannière de consentement. Aucune d’elles ne vous suit à travers d’autres
           sites, et Postr lui-même ne dépose aucun témoin.
         </Body>
         <Body>
-          Certaines fonctions chargent des fichiers directement depuis d'autres
+          Certaines fonctions chargent des fichiers directement depuis d’autres
           services, qui ont leurs propres politiques relatives aux témoins.
-          L'éditeur charge les polices des affiches depuis Google Fonts. Le
-          sélecteur de logo s'ouvre sur son onglet Presets, qui charge des icônes
-          d'universités depuis Google, et un logo que vous y choisissez est chargé
+          L’éditeur charge les polices des affiches depuis Google Fonts : chaque
+          fois, votre navigateur transmet à Google votre adresse IP et votre agent
+          utilisateur, comme pour toute requête. Les pages publiques ne chargent
+          pas Google Fonts. Le
+          sélecteur de logo s’ouvre sur son onglet Presets, qui charge des icônes
+          d’universités depuis Google, et un logo que vous y choisissez est chargé
           depuis des sites Wikimedia ou, à défaut, depuis Google. La connexion
           avec Google ouvre les pages de connexion de Google, qui ont leur propre
           politique relative aux témoins. Les paiements et la facturation
-          s'ouvrent sur les pages de Stripe.
+          s’ouvrent sur les pages de Stripe.
         </Body>
 
-        <SectionHeading n="4" title="Le comptage des pages, et ce que Postr n'utilise toujours pas" />
+        <SectionHeading n="4" title="Le comptage des pages, et ce que Postr n’utilise toujours pas" />
         <Body>
           Postr compte les pages vues avec{' '}
           <strong className="text-[#e2e2e8]">Vercel Web Analytics</strong>, afin
           que nous puissions voir quelles pages les gens trouvent utiles. Il vaut
-          la peine d'être précis sur ce que cela implique et n'implique pas. Tel
-          que Postr l'utilise, cet outil ne dépose{' '}
-          <strong>aucun témoin</strong> et n'écrit rien dans votre navigateur.
-          Chaque page vue envoie à Vercel l'adresse de la page, et peut inclure
-          l'adresse de la page d'où vous venez, ainsi que ce que transmet toute
-          requête Web, comme votre adresse IP et le type de navigateur. Selon
-          Vercel, l'outil distingue les visites au moyen d'une valeur dérivée de
-          la requête et supprime cette valeur en moins de 24 heures.
+          la peine d’être précis sur ce que cela implique et n’implique pas. Tel
+          que Postr l’utilise, cet outil ne dépose{' '}
+          <strong>aucun témoin</strong> et n’écrit rien dans votre navigateur.
+          Chaque page vue envoie à Vercel l’adresse de la page, ainsi que ce que
+          transmet toute requête Web, comme votre adresse IP et le type de
+          navigateur. Sur la première page que vous ouvrez, il envoie aussi
+          l’adresse du site Web qui vous a envoyé vers Postr, s’il y en a un; il
+          n’envoie jamais une page de Postr comme cette adresse. Selon la
+          documentation de Vercel, celui-ci peut enregistrer avec chaque page vue
+          une localisation approximative (pays, région et ville), ainsi que le
+          type d’appareil, le système d’exploitation et le navigateur. Elle indique aussi que l’outil distingue les visites au
+          moyen d’une valeur dérivée de la requête et supprime cette valeur en
+          moins de 24 heures.
         </Body>
         <Body>
-          Dans l'adresse de page qu'il transmet, Postr remplace les pages
-          d'affiches et d'administration par leur forme, par exemple{' '}
+          Dans l’adresse de page qu’il transmet, Postr remplace les pages
+          d’affiches et d’administration par leur forme, par exemple{' '}
           <code className="text-[#c8b6ff]">/p/[redacted]</code> au lieu de
-          l'identifiant de votre affiche, et écarte entièrement les chaînes de
-          requête. Postr ne retire pas l'adresse de la page d'où vous
-          venez, qui peut être une autre page de Postr.
+          l’identifiant de votre affiche, et écarte entièrement les chaînes de
+          requête. Les pages de Postr indiquent aussi à votre navigateur de
+          n’envoyer que l’adresse du site (https://www.postr.sh/), et non le
+          chemin de la page, avec la requête de comptage.
         </Body>
         <List
           items={[
             'Témoins publicitaires : il n’y a aucune publicité sur Postr.',
             'Google Analytics, Matomo, PostHog ou Plausible : aucun de ceux-là.',
-            'Suivi intersite ou empreinte numérique : nous ne vous profilons pas d’une visite à l’autre ni à travers d’autres sites Web.',
-            'Widgets de médias sociaux : aucun bouton Facebook, Twitter ou LinkedIn qui transmet des données.',
+            'Suivi intersite ou empreinte numérique : nous n’établissons pas votre profil d’une visite à l’autre ni à travers d’autres sites Web.',
+            'Modules de médias sociaux : aucun bouton Facebook, Twitter ou LinkedIn qui transmet des données.',
             'Identifiants publicitaires ou de suivi : les seuls identifiants que Postr stocke sur votre appareil sont ceux du tableau ci-dessus, chacun utilisé par la fonction décrite à côté.',
-            'Enregistrement du contenu de vos affiches dans l’analytique, ou des identifiants d’affiches et des chaînes de requête dans l’adresse de page que Postr transmet.',
+            'Enregistrement du contenu de vos affiches dans la mesure d’audience, ou des identifiants d’affiches et des chaînes de requête dans l’adresse de page que Postr transmet.',
           ]}
         />
         <Body>
           Si nous ajoutons un jour quelque chose qui <em>stocke</em> ou lit
           effectivement des données sur votre appareil à des fins facultatives,
           nous mettrons à jour la présente politique, afficherons une bannière de
-          consentement offrant des choix « Accepter » et « Refuser » d'égale
+          consentement offrant des choix « Accepter » et « Refuser » d’égale
           visibilité, et nous abstiendrons de déposer tout stockage non essentiel
-          jusqu'à ce que vous cliquiez sur « Accepter ».
+          jusqu’à ce que vous cliquiez sur « Accepter ».
         </Body>
 
         <SectionHeading n="5" title="Comment contrôler les témoins" />
@@ -241,8 +253,8 @@ export default function CookiesFr() {
           navigateur. Les affiches, la rétroaction et les paramètres enregistrés
           avec votre compte restent sur nos serveurs, et vos affiches et
           paramètres reviennent quand vous vous reconnectez. Si vous utilisez
-          Postr en tant qu'invité, sans compte, la session de connexion est la
-          seule clé de vos affiches : une fois qu'elle est supprimée, vous ne
+          Postr en tant qu’invité, sans compte, la session de connexion est la
+          seule clé de vos affiches : une fois qu’elle est supprimée, vous ne
           pouvez plus les ouvrir.
         </Body>
         <Body>
@@ -262,26 +274,34 @@ export default function CookiesFr() {
           La plupart des navigateurs vous permettent aussi de bloquer les témoins
           et autres données de site, pour tous les sites ou seulement pour les
           tiers. Si vous bloquez le stockage pour postr.sh, Postr ne peut pas
-          garder votre session ouverte d'un chargement de page à l'autre, et
-          l'éditeur pourrait ne pas fonctionner.
+          garder votre session ouverte d’un chargement de page à l’autre, et
+          l’éditeur pourrait ne pas fonctionner.
         </Body>
 
-        <SectionHeading n="6" title="Do Not Track et Global Privacy Control" />
+        <SectionHeading n="6" title="Global Privacy Control et Do Not Track" />
         <Body>
-          Le code de Postr ne lit pas les en-têtes « Do Not Track » (DNT) ni le
-          signal plus récent <em>Global Privacy Control</em> (GPC), et ne
-          désactive pas le comptage des pages quand votre navigateur les envoie.
-          Postr n'exécute aucune publicité ni aucun suivi intersite que ces
-          signaux pourraient désactiver.
+          Postr respecte le signal <em>Global Privacy Control</em> (GPC), un
+          réglage de confidentialité offert par certains navigateurs, comme
+          Firefox, Brave et DuckDuckGo. Lorsque votre navigateur l’envoie, Postr
+          ne charge pas Vercel Web Analytics : vos pages vues ne sont pas
+          comptées. Le comptage des pages est la seule chose facultative que le
+          GPC pourrait désactiver : Postr n’exécute aucune publicité ni aucun
+          suivi intersite. Postr ne lit pas l’ancien en-tête « Do Not Track »
+          (DNT); activez plutôt le GPC. Vous pouvez aussi vous opposer au
+          comptage des pages en écrivant à{' '}
+          <a className="text-[#7c6aed] underline" href={`mailto:${CONTACT_EMAIL}`}>
+            {CONTACT_EMAIL}
+          </a>
+          .
         </Body>
 
         <SectionHeading n="7" title="Conservation" />
         <Body>
           Chaque entrée du tableau ci-dessus subsiste pendant la durée de vie qui
-          y est indiquée. Postr ne fixe aucune date d'expiration à ses entrées
-          localStorage : chacune reste jusqu'à ce que l'événement indiqué dans le
+          y est indiquée. Postr ne fixe aucune date d’expiration à ses entrées
+          localStorage : chacune reste jusqu’à ce que l’événement indiqué dans le
           tableau se produise, peu importe le temps que cela prend. Les entrées
-          sessionStorage prennent fin au plus tard à la fermeture de l'onglet. Si
+          sessionStorage prennent fin au plus tard à la fermeture de l’onglet. Si
           nous ajoutons un jour un témoin de consentement, il expirera après{' '}
           <strong>6 mois</strong>, conformément à la recommandation de la CNIL.
         </Body>
@@ -291,8 +311,8 @@ export default function CookiesFr() {
           Nous pouvons mettre à jour la présente Politique relative aux témoins à
           mesure que le produit évolue. La date de « Dernière mise à jour » en haut
           reflète la version courante. Si une modification est importante, par
-          exemple la première fois que nous introduirons un témoin d'analytique ou
-          de publicité, nous afficherons un avis clair dans l'application avant que
+          exemple la première fois que nous introduirons un témoin de mesure d’audience ou
+          de publicité, nous afficherons un avis clair dans l’application avant que
           la modification prenne effet.
         </Body>
 

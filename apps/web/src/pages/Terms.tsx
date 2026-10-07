@@ -1,10 +1,24 @@
 /**
  * Terms of Service — public, plain-language.
  *
- * This document is a starting point. Several placeholders (legal
- * entity name, governing law, dispute-resolution jurisdiction) must
- * be filled in and the document reviewed by qualified counsel before
- * Postr launches to a paying audience.
+ * The owner's decisions of 2026-10-06 (record
+ * docs/fixes/24-legal-canada-law25.md): Resila Technologies Inc. is
+ * incorporated in Quebec; prices are before tax (Stripe Managed Payments
+ * adds tax at checkout); cancelling takes effect at the end of the paid
+ * period, except that an unused term is refundable in full within 14 days
+ * of the charge and then ends at once (apps/api/src/billing.ts,
+ * TERM_REFUND_WINDOW_DAYS and termRefundEligible); the pack rule is
+ * packRefund.ts's; the editable export is PowerPoint only (LaTeX is
+ * hidden); Quebec law governs, and the Montréal-courts clause keeps a
+ * Quebec consumer's right under the Consumer Protection Act to sue where
+ * they live (no arbitration clause, no class-action waiver). Each clause
+ * that may not apply to a Quebec consumer (indemnification §5.5, the
+ * disclaimer §10, the limitation of liability §11, "continued use means you
+ * accept" §13) is immediately preceded by a prominent statement saying so,
+ * as Consumer Protection Act s. 19.1 asks (record 24, review round 2;
+ * which clauses need it is counsel's call).
+ * pages/__tests__/legalPagesContent.test.tsx checks these, in English and
+ * French. Counsel has not reviewed this text.
  *
  * The "Your content" section is deliberately strict to cover the
  * public gallery feature: users represent that they are the rightful
@@ -17,7 +31,7 @@ import { PublicHeader } from '@/components/PublicHeader';
 import { STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
-const LAST_UPDATED = 'October 5, 2026';
+const LAST_UPDATED = 'October 6, 2026';
 const CONTACT_EMAIL = 'support@resila.ai';
 
 export default function Terms() {
@@ -44,20 +58,21 @@ export default function Terms() {
           These Terms of Service (“Terms”) form a legal agreement between you and
           Postr (“we”, “us”), operated by{' '}
           <strong className="text-[#e2e2e8]">Resila Technologies Inc.</strong>, a
-          corporation registered in the Province of Quebec, Canada. By creating an
+          corporation incorporated in Quebec, Canada. By creating an
           account, signing in, or otherwise using Postr, including using the
-          editor without signing up, you agree to these Terms and to our{' '}
+          editor without signing up, you agree to these Terms. Our{' '}
           <Link to="/privacy" className="text-[#7c6aed] underline">
             Privacy Policy
-          </Link>
-          . If you do not agree, do not use the service.
+          </Link>{' '}
+          explains how we handle your personal information. If you do not agree to
+          these Terms, do not use the service.
         </Body>
 
         <SectionHeading n="2" title="What Postr is" />
         <Body>
           Postr is an academic poster editor. It lets you create posters at
-          standard conference sizes, store drafts, export your posters to PDF,
-          PowerPoint or LaTeX, and submit feedback.
+          standard conference sizes, store drafts, export your posters to PDF or
+          PowerPoint, and submit feedback.
         </Body>
         <CalloutBox>
           <strong className="text-[#e2e2e8]">
@@ -164,6 +179,7 @@ export default function Terms() {
         </Body>
 
         <SubHeading>5.5 Indemnification</SubHeading>
+        <QuebecNotice />
         <Body>
           You agree to defend, indemnify, and hold Postr and its operator harmless
           from any claim, demand, loss, damage, cost, or expense (including
@@ -186,28 +202,33 @@ export default function Terms() {
         <SectionHeading n="7" title="Fees, subscriptions, and refunds" />
         <Body>
           Building and editing posters, and exporting a print-ready PDF, are free.
-          Some features are paid, in Canadian dollars (CAD):
+          Some features are paid. Prices are in Canadian dollars (CAD) and before
+          tax: applicable taxes are added at checkout.
         </Body>
         <List
           items={[
-            'Term — CA$18.99 billed every 4 months. A recurring subscription that unlocks unlimited PowerPoint and LaTeX export with no watermark. It renews automatically every 4 months until you cancel.',
-            'Export pack — CA$9.99, one time, for 3 export credits. Each PowerPoint or LaTeX export uses one credit. Credits never expire.',
+            'Term — CA$18.99 plus applicable taxes, billed every 4 months. A recurring subscription that unlocks unlimited PowerPoint export with no visible watermark. It renews automatically every 4 months until you cancel.',
+            'Export pack — CA$9.99 plus applicable taxes, one time, for 3 export credits. Each PowerPoint export uses one credit. Credits never expire.',
           ]}
         />
         <Body>
-          Prices are shown at checkout before you pay and may change from time to
-          time; a price change never affects a purchase you have already made.
-          Payments are processed by our payment provider, which acts as the merchant
-          of record and handles billing, receipts, and applicable taxes.
+          The total, with tax, is shown at checkout before you pay. Prices may change
+          from time to time; a price change never affects a purchase you have already
+          made. Payments are processed by our payment provider, Stripe, through its
+          merchant-of-record service, which bills you, issues your receipts, and
+          calculates and collects the tax.
         </Body>
 
         <SubHeading>7.1 Cancelling your subscription</SubHeading>
         <Body>
           You can cancel the term at any time through Stripe, which handles billing
           for Postr. The “Manage subscription” button on your Profile page takes you
-          there. Cancelling stops the next renewal; your term stays
-          active until the end of the period you already paid for. There is no fee to
-          cancel, and cancelling is not a refund.
+          there. Cancellation takes effect at the end of the period you already paid
+          for: it stops the next renewal, and your term stays active until the end of
+          the paid period. There is no fee to cancel, and cancelling is not a refund.
+          The one exception is an unused term: if you have not taken a paid
+          PowerPoint export since the charge, you can ask for a full refund within 14
+          days of that charge, and the term then ends at once (Section 7.2).
         </Body>
 
         <SubHeading id="refunds">7.2 Refunds</SubHeading>
@@ -215,21 +236,21 @@ export default function Terms() {
           <strong className="text-[#e2e2e8]">Term — 14-day money-back guarantee.</strong>
           <br />
           If you change your mind, we will refund your most recent term charge in
-          full within 14 days of that charge, as long as you have not completed a
-          PowerPoint or LaTeX export in that period. A refund also cancels the term
-          straight away, which ends its PowerPoint and LaTeX exports. Taking a paid
-          export uses the product you paid for, so the guarantee ends there. After
-          14 days, or once you have exported, the guarantee no longer covers that
-          charge. You can still cancel at any time to stop future renewals.
+          full within 14 days of that charge, as long as you have not taken a paid
+          PowerPoint export since that charge. The refund ends the term straight
+          away, and with it its PowerPoint exports. Taking a paid export uses the
+          product you paid for, so the guarantee ends there. After 14 days, or once
+          you have exported, the guarantee no longer covers that charge. You can still
+          cancel at any time to stop future renewals.
         </CalloutBox>
         <CalloutBox>
           <strong className="text-[#e2e2e8]">Export pack — refundable in full until you use a credit.</strong>
           <br />
-          If you change your mind, we will refund the CA$9.99 charge for your most
-          recent pack in full, as long as none of your export credits has been used,
-          from that pack or an earlier one. Each credit is a PowerPoint or LaTeX
-          export you paid for, so once any credit has been used the pack is no
-          longer refundable, not even in part. Refunding a pack removes its 3
+          If you change your mind, we will refund the full amount you paid for your
+          most recent pack (CA$9.99 plus the tax charged), as long as none of your
+          export credits has been used, from that pack or an earlier one. Each credit
+          is a PowerPoint export you paid for, so once any credit has been used the
+          pack is no longer refundable, not even in part. Refunding a pack removes its 3
           credits from your account.
         </CalloutBox>
         <Body>
@@ -275,6 +296,7 @@ export default function Terms() {
         />
 
         <SectionHeading n="10" title="Disclaimers" />
+        <QuebecNotice />
         <CalloutBox>
           <strong className="text-[#e2e2e8]">“As is” and “as available”.</strong>
           <br />
@@ -286,6 +308,7 @@ export default function Terms() {
         </CalloutBox>
 
         <SectionHeading n="11" title="Limitation of liability" />
+        <QuebecNotice />
         <Body>
           To the maximum extent permitted by applicable law, Postr and its operator
           will not be liable for any indirect, incidental, special, consequential,
@@ -298,6 +321,9 @@ export default function Terms() {
           Nothing in these Terms limits liability for death or personal injury
           caused by our negligence, fraud or fraudulent misrepresentation, or any
           other liability that cannot be limited or excluded under applicable law.
+          If you are a consumer, nothing in these Terms takes away a right that
+          Quebec’s Consumer Protection Act, or the consumer-protection law of the
+          place where you live, gives you and that cannot be waived.
         </Body>
 
         <SectionHeading n="12" title="Governing law and disputes" />
@@ -305,10 +331,16 @@ export default function Terms() {
           These Terms are governed by the laws of the Province of Quebec and the
           federal laws of Canada applicable therein, without regard to
           conflict-of-laws rules. Any dispute arising from these Terms or your use
-          of Postr will be brought exclusively before the courts sitting in the
-          judicial district of Montréal, Quebec, except where mandatory
-          consumer-protection laws in your country of residence grant you the
-          right to bring proceedings locally.
+          of Postr will be brought before the courts sitting in the judicial
+          district of Montréal, Quebec, subject to the exceptions below.
+        </Body>
+        <Body>
+          If you are a consumer in Quebec, you keep your right under the Consumer
+          Protection Act to bring proceedings before the court of the district where
+          you live. These Terms do not require arbitration, and they do not stop you
+          from bringing or taking part in a class action. If you are a consumer
+          elsewhere, you also keep any right the mandatory consumer-protection law of
+          the place where you live gives you to bring proceedings there.
         </Body>
 
         <SectionHeading n="13" title="Changes to these Terms" />
@@ -316,8 +348,12 @@ export default function Terms() {
           We may update these Terms as the product evolves or the law changes. The
           “Last updated” date at the top always reflects the current version. If a
           change materially affects your rights, we will tell signed-in users in the
-          app or by email before it takes effect. Continued use of Postr after the
-          effective date means you accept the updated Terms.
+          app or by email before it takes effect.
+        </Body>
+        <QuebecNotice />
+        <Body>
+          Continued use of Postr after the effective date means you accept the
+          updated Terms.
         </Body>
 
         <SectionHeading n="14" title="Contact" />
@@ -351,6 +387,23 @@ function SubHeading({ children, id }: { children: React.ReactNode; id?: string }
     <h3 id={id} className="mt-6 mb-3 scroll-mt-24 text-[15px] font-semibold text-[#c8cad0]">
       {children}
     </h3>
+  );
+}
+
+/**
+ * Consumer Protection Act s. 19.1: a stipulation that is inapplicable in
+ * Quebec under a provision that prohibits it "must be immediately preceded
+ * by an explicit and prominently presented statement to that effect". Put
+ * right before each clause it covers; set in bold, brighter than the body.
+ */
+function QuebecNotice() {
+  return (
+    <p className="mb-3 text-[14pt] leading-relaxed text-[#e2e2e8]">
+      <strong>
+        The following clause does not apply to consumers in Quebec to the extent
+        that Quebec’s Consumer Protection Act prohibits it.
+      </strong>
+    </p>
   );
 }
 

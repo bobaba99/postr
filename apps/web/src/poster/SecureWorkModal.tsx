@@ -13,7 +13,7 @@ interface Props {
   onConverted?: () => void;
 }
 
-// A free account does not unlock PowerPoint/LaTeX on its own (the paywall
+// A free account does not unlock PowerPoint on its own (the paywall
 // still applies after conversion), and guest posters are deleted by the
 // weekly cron 14 days after the guest's last sign-in (apps/api/src/cron.ts
 // STALE_GUEST_DAYS), so the copy says both instead of "finish" and "after
@@ -21,7 +21,7 @@ interface Props {
 const COPY = {
   export: {
     title: 'Create an account to export',
-    body: 'Your poster is saved to a guest session. Create a free account to keep it. PowerPoint and LaTeX files then need a paid term or pack.',
+    body: 'Your poster is saved to a guest session. Create a free account to keep it. PowerPoint files then need a paid term or pack.',
     dismiss: 'Cancel',
   },
   leave: {

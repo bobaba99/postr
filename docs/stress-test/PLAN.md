@@ -281,6 +281,283 @@ scope becomes a plan item or a question for the owner.
   titles, axis labels, legend and figure texts only; panel letters or tick
   labels changed after the layout are not replayed (a03, a06; record 13,
   section 10).
+- ~~**Record 24 review round 1, the refund button as an automated decision**~~
+  FIXED 2026-10-06 (`fix/refund-review-note`): every refusal the endpoint
+  sends (a 409: `window_expired`, `already_used` for a term or a pack,
+  `no_pack_purchase`, and `no_subscription`, `no_invoice`, `no_payment`, which
+  showed the generic "try again" before and now read "This purchase can’t be
+  refunded here.") ends "This answer was given automatically. To have a person
+  review it, email support@resila.ai."; a failure that is not a 409 keeps the
+  generic message without it (`profile/__tests__/SubscriptionPanel.test.tsx`:
+  7 of 13 red on main's component, 13 of 13 after; its one review found the
+  three unmapped codes).
+  Was (LOW, INSPECTED; the legal reading UNVERIFIED). Privacy §7 and §10 name
+  the self-serve refund button as the one decision made only by automated
+  processing, with review by a person on request by email. Law 25 s. 12.1
+  asks that the person be told so no later than when they are told the
+  decision, but the refusal messages (`profile/SubscriptionPanel.tsx:49-58`,
+  stream B's Profile copy) say neither that the answer was automatic nor how
+  to have a person review it. Owner decides: keep the exception and add a
+  line to those messages (for example "This answer was given automatically.
+  Email support@resila.ai to have a person review it."), or decide the
+  button is not such a decision and drop it from Privacy §7 and §10.
+- **Record 24 review round 1, the Terms line on the other sign-up paths**
+  (INFO, INSPECTED). Accounts are also created from the editor ("Create
+  account" in `poster/SecureWorkModal.tsx`) and from Profile
+  (`profile/GuestConversionCard.tsx`); neither shows a Terms line in any
+  language, while `/auth` does, in English and French.
+- **Record 24 review round 1, the merchant of record** (LOW, UNVERIFIED).
+  Under Managed Payments the code's comments call Stripe the merchant of
+  record in four places (`apps/api/src/billing.ts:22,305`,
+  `billing/refundReconcile.ts:3,21`) and Link in four others
+  (`billing.ts:474`, `profile/SubscriptionPanel.tsx:4`,
+  `data/billing.ts:146`, `pages/Profile.tsx:642`). The Terms and Privacy now name Stripe's
+  merchant-of-record service without naming the seller. Check a sandbox
+  receipt, then align the comments (and name the seller if wanted).
+- **Record 24 review round 1, found in passing: a failed sign-out after a
+  deletion** (LOW, INSPECTED, not measured). `runAccountDeletion` ignores
+  the result of `signOut({ scope: 'global' })`; supabase-js 2.103.0 keeps
+  the session in localStorage (`sb-<ref>-auth-token`, which holds a copy of
+  the account record) when the sign-out request fails with anything but
+  401, 403 or 404, a network error included. The Postr entries are cleared
+  before it. Whether the next page load drops the dead session was not
+  checked.
+- **Record 24 review round 2, page counting is on by default** (owner
+  decision; the legal reading UNVERIFIED). Vercel Web Analytics loads for
+  every visitor whose browser does not send Global Privacy Control
+  (MEASURED: a page view on 8 of 8 production page loads without GPC,
+  `--live` 2026-10-06; the script on 3 of 3 pages without GPC in G1's
+  control on this branch; the round-2 reviewer counted 57 of 57 on the
+  production build, its own figure), and Vercel's documentation says it may
+  record with each page view an approximate location (country, region,
+  city), the device type, operating system and browser. The pages now say so
+  (Privacy §6–§8, Cookies §4) instead of listing counting as a private
+  default. Whether Law 25 s. 8.1 (a function that locates, off by default)
+  or s. 9.1 asks for counting to be off until the visitor agrees is
+  counsel's reading; turning it into opt-in (a consent choice before
+  `<Analytics>` mounts) is the owner's call.
+- ~~**Record 24 review round 2, the crawler copy of the legal pages**~~ FIXED in the
+  merge of 24 with 25 (2026-10-06): the six legal entries of `seo/routes.json`
+  now summarise the new pages (no region, Resila responsible, recipients in the
+  pages' order, GPC, the rights, prices before tax, the 14-day refund, « lot
+  d’exportation », « Fondation Wikimedia »; the Cookies entry no longer says the
+  referring address is unchanged). Was (MEDIUM,
+  INSPECTED; stream B's file). `apps/web/src/seo/routes.json`, which the
+  build prerenders into the HTML of `/privacy` and `/privacy/fr` (what search
+  engines and a visitor without JavaScript read), still says "Supabase
+  (database, sign-in and file storage, in Oregon, United States)" and « en
+  Oregon, aux États-Unis », a region the owner dropped (decision 10) and the
+  Privacy Policy no longer states; `/privacy/fr` says « la Wikimedia
+  Foundation » and `/terms/fr` « pack d’exportation », where the pages now say
+  « Fondation Wikimedia » and « lot d’exportation ». Align the crawler copy
+  with the pages (no region; the French terms).
+- **Record 24 review round 2, after the deploy** (check, not a defect).
+  `node scripts/analytics-privacy-check.mjs --live https://www.postr.sh`
+  (from `apps/web`) must exit 0 once this branch is live: no analytics under
+  GPC (L1), the page view's Referer the origin only (L2). On 2026-10-06,
+  before the deploy, it exited 1 (L1 8 of 8, L2 6 of 6, every document
+  `Referrer-Policy: strict-origin-when-cross-origin`; record 24, section 9).
+- **Record 24 review round 2, for counsel: the Consumer Protection Act
+  statements in the Terms** (LOW, UNVERIFIED legal reading). §5.5, §10, §11
+  and §13's "continued use means you accept" are now each immediately
+  preceded by a bold "The following clause does not apply to consumers in
+  Quebec to the extent that Quebec’s Consumer Protection Act prohibits it."
+  (s. 19.1, EN and FR). Counsel to confirm the wording ("to the extent")
+  and the list: §4 (suspend or terminate "at our sole discretion") and §9
+  (change or discontinue "at any time") may need it too; Terms §12 credits
+  the CPA with the right to sue in one's own district, where the source is
+  arguably the Code of Civil Procedure (art. 42) and the Civil Code
+  (art. 3149), CPA s. 11.1 banning its restriction.
+- **Record 24 review round 2, the guest button on `/auth`** (INFO,
+  INSPECTED). "Start creating — no account needed" starts a guest session
+  with no Terms line beside it; Terms §1 makes using the editor without
+  signing up acceptance, and the `/auth` footer links the English Terms. The
+  same holds for the landing page's way into `/p/new` (stream B). The Terms
+  line now on `/auth` sits in the sign-in card, next to "Continue with
+  Google".
+
+### Queued by the claims audit (owner decisions, 2026-10-06)
+
+The claims audit of 2026-10-05/06 (report artifact; its findings by claim id
+in `audit-summary.json` of that session) found these product defects. The
+owner's decisions of 2026-10-06 (record 24, `docs/fixes/24-legal-canada-law25.md`)
+send them here: the copy now describes them honestly, and each is a
+behaviour fix to rank. Every number below is the audit agent's (labels as
+it gave them; not re-measured for this list, so UNVERIFIED here).
+
+- **HIGH — the paid PowerPoint export leaves out charts made in the Figure
+  tab, with no warning.** A 15-block poster with and without one chart block
+  exports the same slide (18 shapes, 0 pictures, 1 frame), the chart's title
+  and caption absent and the warning count unchanged (MEASURED by the audit,
+  `g2-export-probe.mjs`; claims g2-…-88, g2-…-79). A paid feature.
+- **HIGH — no screen to set a new password.** "Forgot password?" sends
+  Supabase's recovery email (`Auth.tsx` `resetPasswordForEmail`, no
+  `redirectTo`); the app has no `PASSWORD_RECOVERY` handler and no
+  `updateUser({ password })` outside guest conversion, so the link at most
+  signs the user in once and the password is never reset (INSPECTED by the
+  audit; claim g2-…-59). Email accounts only. The /auth copy already says
+  "we emailed it a sign-in link".
+- **MEDIUM — a replace-import re-arranges the poster.** `ImportPosterModal`
+  sets `postr.autoArrangeOnLoad` and the editor runs Auto-Arrange when the
+  import lands: a `.postr` replace-import of the 48 × 36 template moved 13 of
+  14 blocks (up to 310.9 units, about 31 in), control 0 of 14 (MEASURED by
+  the audit, `g5vt/importpos.mjs`; claims g5-…-71, -76, -103). A second
+  replace-import in the same editor mount leaves the flag set, which
+  re-arranges that poster on its next open, over manual edits; a `.postr`
+  backup is therefore not a restore.
+- **MEDIUM — billing: a term renewal stays refundable after a re-export,
+  and pack refunds are pooled.** `termRefundEligible` reads
+  `first_paid_export_at`, stamped once ever, so an export taken after a
+  renewal does not end that charge's refund (the code is more generous than
+  Terms §7.2); `packRefundEligible` refuses every pack once any credit of
+  any pack is spent, so a second pack bought after the first was used is not
+  refundable before its own first export, and a pack holder with an active
+  term has no self-serve pack refund (INSPECTED by the audit; claims
+  g2-…-09, g2-…-29, g6-…-70, g6-…-72). Money: decide the rule, then make
+  code and Terms match.
+- **MEDIUM — the EU/UK withdrawal waiver is asked on one path and never
+  recorded.** The checkbox is only in the editor's paywall
+  (`EditableExportButtons.tsx`); `/pricing` → `/auth?plan=` → Stripe asks
+  nothing, and no confirmation is stored (INSPECTED by the audit; claims
+  g2-…-82, g6-…-78). Terms §7.2 already says a Pricing-page purchase is not
+  asked and that the statutory right then applies regardless of use.
+- **MEDIUM — retention clean-ups.** Nothing deletes feedback (kept after
+  account deletion with `user_id` set null, including any console log the
+  user chose to send, and, when a file was attached, its storage path, which
+  starts with the account id: `storage://<account id>/feedback/…`, MEASURED
+  in record 24's review round 1 from the feedback form; a deletion step in
+  the API could remove that path from the text), the `account_deletions` audit rows, or API logs
+  beyond the hosts' own retention; the orphan files of deleted guests are
+  already queued (948 of 961 poster files belonged to users who no longer
+  exist, MEASURED by the audit). The Privacy Policy states retention as it is
+  (§9); a clean-up job would let it state periods.
+- **MEDIUM — extend "Download my data".** `export_my_data` returns the
+  account snapshot, posters, gallery entries and feedback only: not versions,
+  logos, uploaded images, billing records or email choices (INSPECTED by the
+  audit; claims g5-…-134, g7-…-58). The Privacy Policy offers the rest by
+  email within 30 days (Law 25 s. 27 portability).
+- **LOW — paid exports name Postr in their file properties.** The PPTX's
+  `docProps/app.xml` Company and `core.xml` Subject say "made with postr.sh
+  (https://postr.sh)" (`export/pptx/writer.ts`), while the visible mark is
+  gone for paid exports (MEASURED by the audit; claims g2-…-21, -145).
+- **Item 13 part 2, the plot checker's misses** (already queued; these are
+  its sub-items from the audit, UNVERIFIED here): R sizes set with
+  `theme(text = element_text(size = …))` and Python sizes set with
+  `plt.xlabel(…, fontsize=…)`, `plt.xticks(fontsize=…)` or
+  `plt.legend(fontsize=…)` are not read, so a too-small label passes (claims
+  g3-…-04, -05); the R fix does nothing when the script's `theme()` comes
+  after `theme_*()`; two sets of minimums exist (the code check's 18/14/12 pt
+  and the image scan's and inserted charts' 24/18 pt; claims g3-…-07, -30,
+  -45); inserted charts with a legend print their text at 14.9–16.8 pt.
+- **LaTeX re-enable checklist** (the export is hidden by the owner,
+  2026-10-06; stream B's flag). Before switching it back on: it may not
+  compile (9 of 12 coloured text arguments contain a paragraph break, which
+  `xcolor`'s `\textcolor` does not allow; INSPECTED by the audit, no TeX
+  engine was available); it drops Figure-tab charts (MEASURED: 15 text
+  blocks with and without a chart, claim g2-…-92); it needs XeLaTeX or
+  LuaLaTeX (Overleaf's default is pdfLaTeX); side captions, cover-fit,
+  crops and custom table borders are not reproduced (claim g2-…-157); the
+  Terms, Privacy and Pricing copy must name it again (record 24 removed it).
+- **Fix 25, Stripe's own text (an owner check):** the product names and
+  descriptions Stripe shows on Checkout and on receipts come from the Stripe
+  Dashboard, not the repo, so no test can read them. Whether they still name
+  LaTeX is UNVERIFIED (fix 25's implementer and its round 1 reviewer, B-R1-04;
+  `apps/api/src` has 0 strings naming LaTeX and sends no `custom_text`,
+  MEASURED). The owner reads them in the Dashboard.
+
+### Queued by fix 26 (the French public pages, 2026-10-06)
+
+Record `docs/fixes/26-french-public-pages.md` section 10 has the detail and
+the evidence label of each.
+
+- **Owner checks before the French pages deploy.** (1) Supabase Auth →
+  URL Configuration: the Redirect URLs must allow `/auth/fr` (a French
+  e-mail sign-up's confirmation link comes back there, and a French Google
+  sign-in that is buying a plan comes back to `/auth/fr?plan=…`);
+  if they list exact paths, a French visitor lands on the Site URL instead
+  (UNVERIFIED: the production setting is not in the repo). (2) Stripe
+  Checkout with `locale: 'fr-CA'` under Managed Payments has not been run in
+  the sandbox (UNVERIFIED; Stripe refused `custom_text` with Managed
+  Payments, so a sandbox checkout from `/auth/fr?plan=term` should be tried
+  once). (3) The Stripe Dashboard's product names and descriptions are
+  shown on a French Checkout in whatever language they are written.
+- **Still English on a French page:** the feedback form (`FeedbackModal`,
+  opened from the French footer's « Envoyer une rétroaction » and the French
+  About page's buttons), which the editor shares; Supabase's own error
+  messages beyond the six the French sign-in page translates (others show a
+  generic French line).
+- **Out of the owner's scope for now (English only):** the editor and its
+  panels, the dashboard, the profile, the emails Supabase, Stripe and the API
+  send, and Stripe's own pages beyond the Checkout locale.
+- **Owner question:** whether the French pages should say the editor is in
+  English for now (they do not: fix 26 adds no claim the English pages do
+  not make).
+- **Found in passing, English pages (unchanged by fix 26):** at 320 px the
+  English header wraps "Sign in" onto two lines and the wordmark touches the
+  menu button (0 px apart on main and on the branch, in Chromium, Firefox
+  and WebKit, English and French; 11.4 px French and 29.1 px English at
+  360 px: review round 1, R1-10, the reviewer's measurement, not re-run);
+  the crawler h1 of `/about` ("About Postr") and `/why-posters` ("Why
+  poster sessions matter") is not the page's h1 (the French records use the
+  page's h1).
+  Below about 389 px the English landing's "Get started" and "Try as guest"
+  shrink side by side and each label takes two lines (main's layout, kept:
+  R1-01); stacking them is a design choice for the owner.
+- **From review round 1 (record 26 section 9), not changed here:**
+  (1) and (2) FIXED in the merge of 26 (2026-10-06): the French Terms §7.2
+  now name the pricing page « Tarifs », as the French page is titled (R1-07),
+  and the `/terms/fr` and `/cookies/fr` crawler copy says « facturation » and
+  « fonctionnalités », as the French Terms do (R1-03); (3) on main already: when Supabase answers an e-mail
+  sign-up with the user and `is_anonymous: false` but no session (a pending
+  confirmation, if GoTrue sends that field), `Auth.tsx` skips « Check your
+  inbox » and sends one create-checkout request with no session (R1-09,
+  the reviewer's measurement against a faked response, not re-run here; the
+  production payload is UNVERIFIED): decide "pending" by `session === null` for
+  sign-up, after checking a real sign-up response.
+- **`poster/ReadabilityPanel.tsx` is 1,208 lines** (1,202 on main): splitting
+  it (the result table and the fix box) is left for a change that can
+  re-run fixes 07 and 15's mutant specs in full.
+
+## LaTeX export: before it is switched back on
+
+The owner hid the LaTeX export on 2026-10-06 ("unnecessary for now"):
+`LATEX_EXPORT_ENABLED = false` in `apps/web/src/config/features.ts`, fix 25
+(`docs/fixes/25-latex-hidden-prices.md`). The writer (`src/export/latex/`)
+and its tests are kept; the button, its hint and its handler are behind the
+switch in `poster/sidebar/EditableExportButtons.tsx`. Turning it back on is
+this list, not a flip:
+
+- **It compiles.** The claims audit (2026-10-06) could not show that the
+  `.zip` compiles: compile `poster.tex` with XeLaTeX and LuaLaTeX on a set of
+  real posters (every block kind, images, references, a 120 × 60 in sheet)
+  and record the numbers before the button returns.
+- **Charts.** The writer has no case for chart blocks (`latex/writer.ts`
+  EMITTERS), and the button's hint says so; the PowerPoint export has the
+  same gap (queued, HIGH). Decide the warning for both.
+- **The copy fix 25 took out** comes back, each sentence checked against the
+  code again: record 25 section 7 lists every string and where it was (main
+  `e09c0ea` holds the old wording): the landing "Editable exports" card, the
+  About "Iterate, export, print" card, the /pricing hero, the pricing cards,
+  the paywall heading and body, the pack holder's credit line, the size
+  notes (the too-big note's way out; the half-size note's LaTeX sentence is
+  already behind the switch), the already-subscribed notices (`Auth.tsx`,
+  `EditableExportButtons.tsx`), `/billing/success`, the guest's export
+  modal, the profile's subscription panel (four strings),
+  `PptxSizeLimitError`, the crawler copy (`seo/routes.json`: `/pricing`
+  title, description and copy, `/auth`, `/dashboard`, `/billing/cancel`)
+  and `index.html`'s description. The legal pages (Terms §7 and the privacy
+  pages, EN and FR) name the paid exports too: stream A of 2026-10-06 owns
+  their wording.
+- **The tests that lock it hidden flip:** `poster/__tests__/latexHidden.test.tsx`
+  (no button for any plan) becomes a test that the button is there for a
+  paid user; `src/__tests__/copyInventory.test.ts` stops checking LaTeX by
+  itself (`describe.runIf(!LATEX_EXPORT_ENABLED)`); the mutant spec
+  `docs/fixes/25-latex-hidden-prices.mutants.json` part A is retired.
+- **Prices still say tax is extra** on every new string, after the billing
+  period ("CA$18.99 every 4 months + applicable taxes"; the inventory checks
+  both whatever the switch).
+- **Stripe's own text** (product names and descriptions in the Dashboard,
+  shown on Checkout and receipts) is not in the repo; check it says the same.
 
 ## Handed on by finished fixes
 
@@ -420,3 +697,6 @@ Found while fixing one item, belonging to another (details in the record named):
 | 7 | `fix/07-figure-script-kept` | done (three review rounds); review round 1 answered (a blank-line regression fixed, tests added, legal copy corrected); round 2 answered (a result checked against an image block is no longer shown under the preview's size, and a kept result says the size it is for; a long script edited after its Check stays stored); round 3 answered (a note no longer promises an image check comes back) — `docs/fixes/07-figure-script-kept.md`; the owner's decisions of 2026-10-06: the script kept per poster in this browser and re-checked on return, sessionStorage on the public page, Check stays up once a script is in, and the same cause fixed in the Authors, References, Make-a-figure, poster-name and version-name drafts (memory only) |
 | 15 | `fix/15-checker-language` | done (three review rounds) — `docs/fixes/15-checker-language.md` (Check answers when it cannot tell R from Python; unsupported plotting systems are named, not scored; a result on screen stays, marked out of date, and one a new print size hides is said to be hidden; detection reads live code only, re-landing 9ea9f38; a string in `aes()` or seaborn's `barplot()` places nothing on its own: code with only such a token gets the could-not-tell answer (an R package name such as `library(tidyverse)` is an R signal and is checked as ggplot2)) |
 | 19 | `fix/19-controls-one-size` | fixed; its one review round (the browser, through the user's entry points) answered: on a turned block the handle row now turns about its own centre (near 180° it lay on the block's own handles, and a click on one deleted the block), and crop mode's edge handles no longer animate their size after a zoom change; after the round, by the lead's decision, zoomed out under 35% a handle row wider than its block draws only its move button (there a click meant for another block could delete the selected image: F3; the threshold measured); three cosmetic or older items and F3's remainder went to the Later list — `docs/fixes/19-controls-one-size.md` (a selected block's handles, row, rotate control, a selected table's strips and grips, crop mode's edges and bar and a group's handles and outline are the same size on screen at every zoom, 24 px to grab with 8 px squares and 20 px circles; a block small on screen draws fewer controls; the rotate control moves into the handle row where below it would meet the ZoomBar or leave the canvas; the owner's Q5–Q9 are on the Later list) |
+| 24 | `fix/legal-canada-law25` | done (three review rounds; round 3 found nothing left) — `docs/fixes/24-legal-canada-law25.md`: the Privacy, Cookies and Terms pages (EN and FR) rewritten for Quebec's Law 25 and PIPEDA first, Global Privacy Control honoured, poster ids kept out of the analytics address and its Referer, the feedback console log opt-in, account deletion clearing every Postr browser entry, the French Terms linked at sign-up; internal file `docs/legal/quebec-law-25.md`; the claims audit's product defects queued above |
+| 25 | `fix/latex-hidden-prices` | one review round (browser and entry points), answered: the `/auth?plan=term` label puts the period before the tax note, a stale code comment reworded — `docs/fixes/25-latex-hidden-prices.md`; the owner's decisions of 2026-10-06: the LaTeX export hidden (`LATEX_EXPORT_ENABLED`, `config/features.ts`; before it returns: the section above), every price shown says tax is extra, the landing "Editable exports" card says the export is paid; a copy inventory test keeps both true |
+| 26 | `feat/french-public-pages` | implemented, review round 1 done and corrected (one round: a simple feature; 12 findings: 7 corrected, 1 left to the owner, 4 informational) — `docs/fixes/26-french-public-pages.md`; the owner's decision of 2026-10-06 (Quebec, Bill 96): every public page in French at its path + `/fr` (`/fr` for the landing page, `/auth/fr?plan=term`), its language read from the URL, a « Français » / "English" link on every page, the French heads with hreflang and the French pages in the sitemap, a French Stripe Checkout from `/auth/fr`; the editor stays English; queued above: "Queued by fix 26" |

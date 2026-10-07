@@ -44,11 +44,18 @@ describe('canonicalFor parity', () => {
 
 describe('buildPageMeta parity', () => {
   const staticRecords: Record<string, unknown> = routes.static;
+  const appRecords: Record<string, unknown> = routes.app;
 
+  // The whole routes.json goes in as the fourth argument: the hreflang
+  // alternates (fix 26) depend on which pages exist.
   it.each(staticPaths)('%s produces an identical PageMeta', (path) => {
-    expect(mjs.buildPageMeta(path, staticRecords[path], site)).toEqual(
+    expect(mjs.buildPageMeta(path, staticRecords[path], site, routes)).toEqual(
       STATIC_ROUTE_META[path],
     );
+  });
+
+  it.each(Object.keys(routes.app))('app record %s produces an identical PageMeta', (path) => {
+    expect(mjs.buildPageMeta(path, appRecords[path], site, routes)).toEqual(APP_ROUTE_META[path]);
   });
 });
 
@@ -58,6 +65,8 @@ describe('tagSpecsFor parity', () => {
       (p) => [p, STATIC_ROUTE_META[p] as PageMeta] as [string, PageMeta],
     ),
     ['/dashboard (noindex)', APP_ROUTE_META['/dashboard'] as PageMeta],
+    ['/auth/fr (prerendered, alternates)', APP_ROUTE_META['/auth/fr'] as PageMeta],
+    ['/billing/success/fr (no alternates)', APP_ROUTE_META['/billing/success/fr'] as PageMeta],
     [
       'with an image',
       {

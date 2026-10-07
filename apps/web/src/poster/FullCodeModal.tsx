@@ -14,6 +14,8 @@ import { useEffect, useId, useRef, type KeyboardEvent } from 'react';
 import { layoutTokens, type ReadabilityLayout } from './readabilityLayout';
 import { CodeView, CopyButton } from './ReadabilityCodeView';
 import { btnStyle, labelStyle } from './readabilityStyles';
+import { READABILITY_COPY } from '@/i18n/readability';
+import type { Lang } from '@/i18n/lang';
 
 interface Props {
   open: boolean;
@@ -21,13 +23,16 @@ interface Props {
   onClose: () => void;
   onCopied: () => void;
   layout: ReadabilityLayout;
+  /** The page's language (fix 26); the editor passes none. */
+  lang?: Lang;
 }
 
 const FOCUSABLE =
   'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function FullCodeModal({ open, code, onClose, onCopied, layout }: Props) {
+export function FullCodeModal({ open, code, onClose, onCopied, layout, lang = 'en' }: Props) {
   const t = layoutTokens(layout);
+  const c = READABILITY_COPY[lang];
   const titleId = useId();
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
@@ -116,14 +121,14 @@ export function FullCodeModal({ open, code, onClose, onCopied, layout }: Props) 
           }}
         >
           <div id={titleId} style={{ ...labelStyle, letterSpacing: 1 }}>
-            Full edited code
+            {c.modal.title}
           </div>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
-            aria-label="Close"
-            title="Close (Esc)"
+            aria-label={c.modal.close}
+            title={c.modal.closeTitle}
             style={{
               ...btnStyle,
               padding: '4px 10px',
@@ -150,7 +155,8 @@ export function FullCodeModal({ open, code, onClose, onCopied, layout }: Props) 
         >
           <CopyButton
             text={code}
-            label="Copy full code"
+            label={c.modal.copyFull}
+            copiedLabel={c.copied}
             onCopied={onCopied}
             style={{ minHeight: t.buttonMinHeight, fontSize: t.buttonFontSize }}
           />

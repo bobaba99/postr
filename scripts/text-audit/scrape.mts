@@ -43,6 +43,9 @@ const ROUTES = [
   '/privacy', '/privacy/fr', '/cookies', '/cookies/fr', '/terms', '/terms/fr',
   '/auth', '/dashboard', '/profile', '/billing/success', '/billing/cancel',
   '/p/new', '/404',
+  // The French public pages (fix 26).
+  '/fr', '/about/fr', '/why-posters/fr', '/pricing/fr', '/tools/figure-readability/fr',
+  '/auth/fr', '/billing/success/fr', '/billing/cancel/fr',
 ];
 
 // ---------- in-page extraction (plain JS — runs in the browser) ----------

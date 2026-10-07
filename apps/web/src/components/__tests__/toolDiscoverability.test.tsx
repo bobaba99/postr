@@ -121,13 +121,15 @@ describe('PublicHeader tool links', () => {
     expect(hrefsOf(container)).not.toContain(path);
   });
 
-  it('renders the tools then the Learn pages flat, in order', () => {
+  it('renders the tools then the Learn pages flat, in order, then the page in French', () => {
     const { container } = renderIn(<PublicHeader />);
     const header = container.querySelector('header') as HTMLElement;
     const navHrefs = hrefsOf(header).filter(
       (href) => href !== '/' && href !== '/auth' && href !== '/profile',
     );
-    expect(navHrefs).toEqual(PUBLIC_NAV_PATHS);
+    // The language link (fix 26) closes the flat row: « Français » on an
+    // English page, to the same page in French (/fr for the landing page).
+    expect(navHrefs).toEqual([...PUBLIC_NAV_PATHS, '/fr']);
   });
 
   it('labels the checker "Plot checker" in the flat nav', () => {
@@ -178,7 +180,7 @@ describe('PublicHeader mobile menu', () => {
     expect(hrefsOf(panel)).toContain(path);
   });
 
-  it('lists the workspace link, the live tools, then the Learn pages — nothing else', async () => {
+  it('lists the workspace link, the live tools, the Learn pages, then the page in French — nothing else', async () => {
     renderIn(<PublicHeader />);
     // Wait for the session to resolve so the workspace row has landed
     // and the menu content is final.
@@ -188,9 +190,9 @@ describe('PublicHeader mobile menu', () => {
     const panel = await screen.findByRole('list');
     // Workspace row first, then the blurbed tool rows, then the Learn
     // pages — no empty group left behind by the deactivated tools.
-    expect(hrefsOf(panel)).toEqual(['/p/new', ...PUBLIC_NAV_PATHS]);
+    expect(hrefsOf(panel)).toEqual(['/p/new', ...PUBLIC_NAV_PATHS, '/fr']);
     const rows = within(panel).getAllByRole('listitem');
-    expect(rows).toHaveLength(1 + PUBLIC_NAV_PATHS.length);
+    expect(rows).toHaveLength(1 + PUBLIC_NAV_PATHS.length + 1);
   });
 
   it('reports expanded state to assistive tech', () => {

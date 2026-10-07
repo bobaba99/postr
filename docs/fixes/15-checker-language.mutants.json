@@ -468,7 +468,7 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });\n",
+          "      setAnswer({ ...at, kind: 'cannot-tell', text: c.cannotTell });\n",
           ""
         ]
       ]
@@ -478,8 +478,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });\n",
-          "      updateDraft({ checked: null });\n      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });\n"
+          "      setAnswer({ ...at, kind: 'cannot-tell', text: c.cannotTell });\n",
+          "      updateDraft({ checked: null });\n      setAnswer({ ...at, kind: 'cannot-tell', text: c.cannotTell });\n"
         ]
       ]
     },
@@ -488,7 +488,7 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "    if (!SUPPORTED_SYSTEMS.includes(plot.system)) {\n      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });\n      return;\n    }\n",
+          "    if (!SUPPORTED_SYSTEMS.includes(plot.system)) {\n      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system, c) });\n      return;\n    }\n",
           ""
         ]
       ]
@@ -498,8 +498,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });\n",
-          "      updateDraft({ checked: null });\n      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });\n"
+          "      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system, c) });\n",
+          "      updateDraft({ checked: null });\n      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system, c) });\n"
         ]
       ]
     },
@@ -593,8 +593,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "                ? `Detected: ${plotLabel(plot)}`",
-          "                ? `Detected: ${plot.language === 'r' ? 'R / ggplot2' : 'Python / matplotlib'}`"
+          "                ? c.detected(plotLabel(plot, c))",
+          "                ? c.detected(plot.language === 'r' ? 'R / ggplot2' : 'Python / matplotlib')"
         ]
       ]
     },
@@ -908,7 +908,7 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "      ? { kind: 'resized', text: RESIZED, key: 'resized' }\n      : null;",
+          "      ? { kind: 'resized', text: c.resized, key: 'resized' }\n      : null;",
           "      ? null\n      : null;"
         ]
       ]
@@ -918,8 +918,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "= answer\n    ? { kind: answer.kind, text: answer.text, key: `press-${answer.press}` }\n    : resized\n      ? { kind: 'resized', text: RESIZED, key: 'resized' }\n      : null;",
-          "= resized && answer?.kind !== 'checked'\n    ? { kind: 'resized', text: RESIZED, key: 'resized' }\n    : answer\n      ? { kind: answer.kind, text: answer.text, key: `press-${answer.press}` }\n      : null;"
+          "= answer\n    ? { kind: answer.kind, text: answer.text, key: `press-${answer.press}` }\n    : resized\n      ? { kind: 'resized', text: c.resized, key: 'resized' }\n      : null;",
+          "= resized && answer?.kind !== 'checked'\n    ? { kind: 'resized', text: c.resized, key: 'resized' }\n    : answer\n      ? { kind: answer.kind, text: answer.text, key: `press-${answer.press}` }\n      : null;"
         ]
       ]
     },
@@ -928,8 +928,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "    : resized\n      ? { kind: 'resized', text: RESIZED, key: 'resized' }",
-          "    : checked !== null\n      ? { kind: 'resized', text: RESIZED, key: 'resized' }"
+          "    : resized\n      ? { kind: 'resized', text: c.resized, key: 'resized' }",
+          "    : checked !== null\n      ? { kind: 'resized', text: c.resized, key: 'resized' }"
         ]
       ]
     }

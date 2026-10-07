@@ -532,7 +532,8 @@ function bytesToBase64(bytes: Uint8Array): string {
 /**
  * Export a poster as an editable .pptx. Throws `PptxSizeLimitError`
  * (from units.ts) when the poster exceeds 112 in — the UI steers
- * the user to LaTeX/PDF instead of clipping.
+ * the user to the PDF (Save PDF) instead of clipping; the LaTeX export
+ * is hidden (config/features.ts LATEX_EXPORT_ENABLED).
  */
 export async function exportPosterPptx(
   input: PosterDoc,

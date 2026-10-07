@@ -7,6 +7,7 @@ import { SessionExpiredModal } from '@/components/SessionExpiredModal';
 import { RouteScrollManager } from '@/components/RouteScrollManager';
 import { MobileNotice } from '@/components/MobileNotice';
 import { redactUrl } from '@/analytics/redactUrl';
+import { globalPrivacyControlOn } from '@/analytics/globalPrivacyControl';
 
 export default function App() {
   return (
@@ -30,8 +31,14 @@ export default function App() {
         records the URL of every page view, and /s/:slug is a share
         link to unpublished research where the slug IS the capability.
         See analytics/redactUrl.ts.
+
+        Not mounted at all when the browser sends Global Privacy Control
+        (analytics/globalPrivacyControl.ts): no script, no beacon. The
+        Privacy and Cookies policies say so.
       */}
-      <Analytics beforeSend={(event) => ({ ...event, url: redactUrl(event.url) })} />
+      {!globalPrivacyControlOn() && (
+        <Analytics beforeSend={(event) => ({ ...event, url: redactUrl(event.url) })} />
+      )}
     </BrowserRouter>
   );
 }

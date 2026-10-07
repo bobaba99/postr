@@ -33,10 +33,15 @@
  * dismissed, and the editor has no document flow to push content into
  * anyway. A fixed bottom strip behaves identically on every page and
  * respects the iOS home-indicator inset.
+ *
+ * In French on a French page (fix 26, i18n/chrome.ts), and off on the
+ * French figure-readability page as on the English one.
  */
 import { useState } from 'react';
 import { useLocation } from 'react-router';
 import { SMALL_SCREEN_QUERY, useIsSmallScreen } from '@/hooks/useIsSmallScreen';
+import { CHROME_COPY } from '@/i18n/chrome';
+import { englishPath, langFromPath } from '@/i18n/lang';
 
 /**
  * The phone breakpoint — the app's single source of truth, NOT a second
@@ -52,10 +57,10 @@ const FIGURE_READABILITY_PATH = '/tools/figure-readability';
  * Routes that already have a phone-optimised layout, where the notice's
  * claim is false and its strip would hide the page's own controls.
  * Today: the public read-only share view and the figure-readability
- * check.
+ * check, in English and in French (`/tools/figure-readability/fr`).
  */
 export function isPhoneOptimisedPath(pathname: string): boolean {
-  return /^\/s\//.test(pathname) || pathname.replace(/\/+$/, '') === FIGURE_READABILITY_PATH;
+  return /^\/s\//.test(pathname) || englishPath(pathname) === FIGURE_READABILITY_PATH;
 }
 
 /** sessionStorage flag: "1" once the visitor dismissed the strip. */
@@ -84,6 +89,7 @@ export function MobileNotice() {
   const [dismissed, setDismissed] = useState(readDismissed);
 
   if (!isPhone || dismissed || isPhoneOptimisedPath(pathname)) return null;
+  const c = CHROME_COPY[langFromPath(pathname)].mobileNotice;
 
   const dismiss = () => {
     writeDismissed();
@@ -97,18 +103,18 @@ export function MobileNotice() {
   return (
     <aside
       role="region"
-      aria-label="The editor is not optimised for phones"
+      aria-label={c.regionLabel}
       className="postr-rise-in fixed inset-x-0 bottom-0 z-[60] flex items-start gap-3 border-t border-[#2a2a3a] bg-[#111118]/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-[#c8cad0] shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur"
     >
       <span aria-hidden className="mt-0.5 text-lg leading-none">💻</span>
       <p className="m-0 flex-1 text-[13px] leading-snug">
-        <span className="font-semibold text-[#e2e2e8]">The editor is not optimised for phones.</span>{' '}
-        Open Postr on a laptop or desktop computer to make and edit posters.
+        <span className="font-semibold text-[#e2e2e8]">{c.lead}</span>{' '}
+        {c.body}
       </p>
       <button
         type="button"
         onClick={dismiss}
-        aria-label="Dismiss"
+        aria-label={c.dismiss}
         className="-mr-2 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-[#8b8f99] transition-colors duration-fast ease-smooth hover:bg-[#1a1a26] hover:text-[#e2e2e8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#7c6aed]"
       >
         <svg

@@ -22,7 +22,14 @@ const OWNED = 'data-pm';
 
 type TagSpec =
   | { kind: 'meta'; key: 'name' | 'property'; id: string; value: string | null }
-  | { kind: 'link'; rel: string; value: string | null };
+  | { kind: 'link'; rel: string; hreflang?: string; value: string | null };
+
+/**
+ * The hreflang slots every page has (fix 26), filled from the page's
+ * alternates or empty: a slot always exists so that leaving a page that had
+ * alternates removes them.
+ */
+const HREFLANG_SLOTS = ['en', 'fr-CA', 'x-default'] as const;
 
 function upsertMeta(
   key: 'name' | 'property',
@@ -53,8 +60,10 @@ function upsertMeta(
   document.head.appendChild(created);
 }
 
-function upsertLink(rel: string, value: string | null): void {
-  const selector = `link[rel="${CSS.escape(rel)}"]`;
+function upsertLink(rel: string, value: string | null, hreflang?: string): void {
+  const selector = hreflang
+    ? `link[rel="${CSS.escape(rel)}"][hreflang="${CSS.escape(hreflang)}"]`
+    : `link[rel="${CSS.escape(rel)}"]`;
   const existing = document.head.querySelector<HTMLLinkElement>(selector);
 
   if (value === null) {
@@ -68,6 +77,7 @@ function upsertLink(rel: string, value: string | null): void {
   }
   const created = document.createElement('link');
   created.setAttribute('rel', rel);
+  if (hreflang) created.setAttribute('hreflang', hreflang);
   created.setAttribute('href', value);
   created.setAttribute(OWNED, '');
   document.head.appendChild(created);
@@ -103,6 +113,14 @@ export function tagSpecsFor(meta: PageMeta): TagSpec[] {
     { kind: 'meta', key: 'name', id: 'description', value: meta.description },
     { kind: 'meta', key: 'name', id: 'robots', value: meta.robots },
     { kind: 'link', rel: 'canonical', value: meta.canonical },
+    ...HREFLANG_SLOTS.map(
+      (hreflang): TagSpec => ({
+        kind: 'link',
+        rel: 'alternate',
+        hreflang,
+        value: meta.alternates?.find((a) => a.hreflang === hreflang)?.href ?? null,
+      }),
+    ),
 
     { kind: 'meta', key: 'property', id: 'og:title', value: meta.title },
     { kind: 'meta', key: 'property', id: 'og:description', value: meta.description },
@@ -152,7 +170,7 @@ export function useDocumentMeta(
     document.documentElement.lang = resolved.language;
     for (const spec of tagSpecsFor(resolved)) {
       if (spec.kind === 'meta') upsertMeta(spec.key, spec.id, spec.value);
-      else upsertLink(spec.rel, spec.value);
+      else upsertLink(spec.rel, spec.value, spec.hreflang);
     }
   }, [serializedMeta, serializedJsonLd]);
 }
