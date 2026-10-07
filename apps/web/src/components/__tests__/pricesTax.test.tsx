@@ -12,6 +12,10 @@
  * the copy inventory (src/__tests__/copyInventory.test.ts) checks every
  * other string with a price.
  *
+ * Fix 26 adds the French /pricing/fr page, entered at its URL: its cards
+ * print « 18,99 $ CA » and « 9,99 $ CA » with « + taxes applicables » under
+ * them (the copy inventory lists them in BARE_PRICES).
+ *
  * Re-run: npx vitest run src/components/__tests__/pricesTax.test.tsx
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -21,7 +25,13 @@ import type { PlanState } from '@/hooks/usePlan';
 import { pricesWithTax } from '@/test/copyScan';
 
 vi.mock('@/lib/supabase', () => ({
-  supabase: { auth: { getSession: vi.fn(() => new Promise<never>(() => {})) } },
+  supabase: {
+    auth: {
+      getSession: vi.fn(() => new Promise<never>(() => {})),
+      // The /pricing/fr page's header listens for sign-in changes.
+      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+    },
+  },
 }));
 
 const FREE_ACCOUNT: PlanState = {
@@ -49,6 +59,7 @@ vi.mock('@/data/billing', () => ({
 }));
 
 import { PricingSection } from '../PricingSection';
+import Pricing from '@/pages/Pricing';
 import { EditableExportButtons } from '@/poster/sidebar/EditableExportButtons';
 import { SubscriptionPanel } from '@/profile/SubscriptionPanel';
 import { usePosterStore } from '@/stores/posterStore';
@@ -75,6 +86,19 @@ const inRouter = (ui: React.ReactElement) => render(<MemoryRouter>{ui}</MemoryRo
 describe('every price a buyer is shown says tax is extra', () => {
   it('the /pricing cards: both paid tiers', () => {
     const { container } = inRouter(<PricingSection />);
+    expectTaxBesideEveryPrice(container, 2);
+  });
+
+  it('the /pricing/fr cards: both paid tiers, in French', () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/pricing/fr']}>
+        <Pricing />
+      </MemoryRouter>,
+    );
+    const text = visibleText(container);
+    expect(text).toContain('18,99\u00a0$\u00a0CA');
+    expect(text).toContain('9,99\u00a0$\u00a0CA');
+    expect(text).not.toMatch(/CA\$/);
     expectTaxBesideEveryPrice(container, 2);
   });
 

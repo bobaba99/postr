@@ -140,6 +140,32 @@ describe('MobileNotice', () => {
     expect(close.className).toMatch(/\bw-11\b/);
   });
 
+  // Fix 26: the French pages get the strip in French, and the French
+  // figure-readability page is exempt like the English one.
+  it('speaks French on a French page', () => {
+    restore = stubMatchMedia((q) => q === MOBILE_NOTICE_QUERY);
+    render(<MobileNotice />, '/pricing/fr');
+    const region = screen.getByRole('region', { name: 'L’éditeur n’est pas optimisé pour les téléphones' });
+    expect(region).toHaveTextContent('Ouvrez Postr sur un ordinateur portable ou de bureau pour créer et modifier des affiches.');
+    expect(region).not.toHaveTextContent(/computer|not optimi[sz]ed/);
+    expect(screen.getByRole('button', { name: 'Fermer' })).toBeInTheDocument();
+  });
+
+  it('stays English on an English page next to a French one', () => {
+    restore = stubMatchMedia(() => true);
+    render(<MobileNotice />, '/pricing');
+    expect(screen.getByRole('region', { name: /not optimi[sz]ed for phones/i })).toBeInTheDocument();
+  });
+
+  it('renders nothing on the French figure-readability page either', () => {
+    restore = stubMatchMedia(() => true);
+    const { container } = render(<MobileNotice />, '/tools/figure-readability/fr');
+    expect(container).toBeEmptyDOMElement();
+    expect(isPhoneOptimisedPath('/tools/figure-readability/fr')).toBe(true);
+    expect(isPhoneOptimisedPath('/tools/figure-readability/fr/')).toBe(true);
+    expect(isPhoneOptimisedPath('/tools/fr')).toBe(false);
+  });
+
   it('does not crash when sessionStorage throws', () => {
     restore = stubMatchMedia(() => true);
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {

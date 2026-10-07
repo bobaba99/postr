@@ -18,10 +18,10 @@
  * server-side coverage, or if a catch-all quietly reopens the
  * unbounded soft-404 space.
  */
-import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { readSource } from '@/test/copyScan';
 import routes from '../routes.json';
 
 interface Rewrite {
@@ -42,8 +42,10 @@ interface HeaderRule {
 }
 
 const WEB_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
+// Read through readSource, so a mutant of vercel.json (scripts/mutation-check.mjs)
+// reaches these tests too (fix 26: two vercel.json mutants survived a plain read).
 const vercelConfig = JSON.parse(
-  readFileSync(resolve(WEB_ROOT, 'vercel.json'), 'utf8'),
+  readSource(resolve(WEB_ROOT, 'vercel.json')),
 ) as {
   rewrites?: Rewrite[];
   redirects?: Redirect[];
@@ -88,6 +90,18 @@ const CLIENT_ROUTES = [
   '/profile',
   '/admin/gallery',
   '/presentation-checker',
+  // The French public pages (fix 26): prerendered, or (the billing
+  // result pages) rewritten to the shell like their English twins.
+  '/fr',
+  '/about/fr',
+  '/why-posters/fr',
+  '/pricing/fr',
+  '/tools/figure-readability/fr',
+  '/auth/fr',
+  '/billing/success',
+  '/billing/cancel',
+  '/billing/success/fr',
+  '/billing/cancel/fr',
 ];
 
 /**
@@ -342,6 +356,24 @@ describe('vercel.json headers for deactivated routes', () => {
     expect(robots?.value, `${route} must not be indexed while it only redirects`).toMatch(
       /noindex/i,
     );
+  });
+});
+
+describe('the French pages (fix 26)', () => {
+  function headersFor(path: string): Array<{ key: string; value: string }> {
+    return headerRules
+      .filter((rule) => new RegExp(`^${rule.source}$`).test(path))
+      .flatMap((rule) => rule.headers);
+  }
+
+  it.each(['/auth/fr', '/billing/success/fr', '/billing/cancel/fr'])('%s is never indexed, like its English twin', (path) => {
+    const robots = headersFor(path).find((header) => header.key.toLowerCase() === 'x-robots-tag');
+    expect(robots?.value).toMatch(/noindex/i);
+  });
+
+  it('serves /auth/fr from its own prerendered file, not a rewrite', () => {
+    expect(PRERENDERED.has('/auth/fr')).toBe(true);
+    expect(rewriteMatching('/auth/fr')).toBeUndefined();
   });
 });
 

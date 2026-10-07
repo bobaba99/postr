@@ -265,8 +265,11 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
       }
 
       const user = (res.locals as AuthLocals).user;
-      const successUrl = billingUrl('success');
-      const cancelUrl = billingUrl('cancel');
+      // The page language the checkout started from (fix 26): the web app's
+      // French /auth/fr sends 'fr'. Anything else is English, as before.
+      const french = req.body?.lang === 'fr';
+      const successUrl = billingUrl('success', french);
+      const cancelUrl = billingUrl('cancel', french);
 
       // The caller's billing row: the duplicate-term guard and the Stripe
       // customer to reuse. Read errors fail CLOSED (a second term must
@@ -333,6 +336,10 @@ export function createBillingRouter(deps: BillingDeps = {}): Router {
           metadata: { user_id: user.id, sku },
           success_url: successUrl,
           cancel_url: cancelUrl,
+          // A French page opens Stripe's Canadian French Checkout, the
+          // pages' own fr-CA. Without it Stripe picks the language from the
+          // browser ('auto'), as every session did before fix 26.
+          ...(french ? { locale: 'fr-CA' as const } : {}),
         };
 
         if (sku === 'term' || sku === 'review_addon') {
@@ -1211,9 +1218,13 @@ function priceIdForSku(sku: BillingSku | undefined): string | null {
   return null;
 }
 
-/** Build a success/cancel redirect URL from the configured app origin. */
-function billingUrl(outcome: 'success' | 'cancel'): string {
+/**
+ * Build a success/cancel redirect URL from the configured app origin; the
+ * French result page (`/billing/success/fr`) for a checkout started from a
+ * French page (fix 26).
+ */
+function billingUrl(outcome: 'success' | 'cancel', french = false): string {
   const base = process.env.APP_ORIGIN ?? 'http://localhost:5173';
-  return `${base}/billing/${outcome}`;
+  return `${base}/billing/${outcome}${french ? '/fr' : ''}`;
 }
 

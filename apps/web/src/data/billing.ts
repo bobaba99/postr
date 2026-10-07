@@ -8,6 +8,7 @@
  * docs/plans/2026-07-28-payment-and-paywall.md.
  */
 import { ApiError, postJson } from '@/lib/apiClient';
+import type { Lang } from '@/i18n/lang';
 
 export type BillingSku = 'term' | 'pack' | 'review_pack' | 'review_addon';
 
@@ -50,13 +51,18 @@ export class NoExportCreditError extends Error {
   }
 }
 
-/** Create a checkout session and return its hosted Stripe URL. */
-export async function createCheckout(sku: BillingSku): Promise<string> {
+/**
+ * Create a checkout session and return its hosted Stripe URL. From a French
+ * page (`lang` 'fr') the API opens Stripe in Canadian French and returns to
+ * the French result pages (apps/api/src/billing.ts create-checkout, fix
+ * 26); an English page sends `{ sku }` only, as before.
+ */
+export async function createCheckout(sku: BillingSku, lang: Lang = 'en'): Promise<string> {
   let url: string | null;
   try {
     ({ url } = await postJson<{ url: string | null }>(
       '/billing/create-checkout',
-      { sku },
+      lang === 'fr' ? { sku, lang } : { sku },
       { auth: true },
     ));
   } catch (err) {

@@ -18,6 +18,20 @@
         "Writing guide: short prompts in each template section, word targets for the introduction, methods and conclusions, and a checklist from the title to the final proofread."
       ]
     },
+    "/fr": {
+      "title": "Créateur d’affiches scientifiques pour chercheurs | Postr",
+      "description": "Un éditeur d’affiches conçu pour les chercheurs. Formats prêts à imprimer, vérification de la lisibilité des figures, auteurs et affiliations, citations BibTeX.",
+      "robots": "index,follow",
+      "language": "fr-CA",
+      "locale": "fr_CA",
+      "h1": "Des affiches scientifiques, sans les tracas.",
+      "copy": [
+        "Un éditeur d’affiches qui s’occupe des détails fastidieux\u00a0: le déplacement des blocs, le texte qui se replace tout seul, les styles de citation BibTeX, la recherche des formats de congrès, les auteurs et les affiliations, et le calcul de la taille du texte des figures, pour que vous puissiez vous consacrer à la science. Partez d’un modèle de mise en page, puis gardez la maîtrise de chaque décision de conception.",
+        "Modèles d’affiches\u00a0: quatre mises en page et un départ vierge, avec des palettes par discipline et des formats d’affiche universitaires standard. Chaque affiche commence à une vraie taille d’impression.",
+        "Lisibilité des figures\u00a0: collez votre code de tracé R ou Python et voyez si les étiquettes des axes seront encore lisibles à la taille d’impression, avec une correction prête à copier.",
+        "Guide de rédaction\u00a0: de courtes consignes dans chaque section des modèles, des cibles de nombre de mots pour l’introduction, les méthodes et les conclusions, et une liste de vérification du titre à la relecture finale."
+      ]
+    },
     "/about": {
       "title": "How Postr Works: Features for Academic Posters",
       "description": "See how Postr handles authors and affiliations, BibTeX citations, Greek symbols, print sizing, and figure text checks for academic conference posters.",
@@ -28,6 +42,20 @@
         "Enter institutions once, then click to assign them to authors. Superscript numbering stays in sync when you add or remove an affiliation.",
         "Export a .bib from your reference manager and drop it in. Postr reads BibTeX and RIS files and formats the reference list in APA 7, Vancouver, IEEE or Harvard style. Switch styles at any time and the imported entries are reformatted for you.",
         "Every poster starts at a real print size, and Save PDF sets the page to that size."
+      ]
+    },
+    "/about/fr": {
+      "title": "Fonctionnement de Postr\u00a0: affiches scientifiques",
+      "description": "Voyez comment Postr gère auteurs et affiliations, citations BibTeX, symboles grecs, formats d’impression et vérification du texte des figures d’affiche.",
+      "robots": "index,follow",
+      "language": "fr-CA",
+      "locale": "fr_CA",
+      "h1": "Tout ce qu’il faut pour livrer une excellente affiche.",
+      "copy": [
+        "Postr est un éditeur d’affiches scientifiques gratuit pour les étudiants et les chercheurs. Il existe parce que les outils habituels ont été conçus pour autre chose. La structure de la recherche, les contraintes d’impression et les fichiers modifiables restent réunis dans un seul flux de travail ciblé.",
+        "Entrez les établissements une seule fois, puis cliquez pour les attribuer aux auteurs. La numérotation en exposant reste synchronisée quand vous ajoutez ou retirez une affiliation.",
+        "Exportez un fichier .bib depuis votre gestionnaire de références et déposez-le. Postr lit les fichiers BibTeX et RIS et met en forme la liste de références selon le style APA\u00a07, Vancouver, IEEE ou Harvard. Changez de style en tout temps et les entrées importées sont remises en forme pour vous.",
+        "Chaque affiche commence à une vraie taille d’impression, et le bouton Save PDF règle la page à cette taille."
       ]
     },
     "/why-posters": {
@@ -43,6 +71,21 @@
         "You cannot fit the project on the board, so you decide the one claim the poster defends. Framing early, on a deadline, is unusually good practice."
       ]
     },
+    "/why-posters/fr": {
+      "title": "Pourquoi les séances d’affiches comptent | Postr",
+      "description": "Présenter une affiche apprend à expliquer son travail en trois longueurs, à argumenter visuellement et à répondre en direct. Et comment en tirer plus.",
+      "robots": "index,follow",
+      "language": "fr-CA",
+      "locale": "fr_CA",
+      "h1": "Une affiche est une échéance qui vous apprend à expliquer.",
+      "copy": [
+        "Les séances d’affiches passent pour le prix de consolation des formats de congrès. Cette lecture passe à côté de ce que le format fait remarquablement bien.",
+        "Une visite à votre affiche peut durer un coup d’œil ou une longue conversation\u00a0: vous préparez donc une version en une phrase, une version de deux minutes et la présentation complète.",
+        "Une affiche n’a pas de place pour le paragraphe qui sauve une figure confuse\u00a0: la mise en page doit donc porter la logique. C’est un travail éditorial, pas de la décoration.",
+        "Les réunions de comité, l’évaluation par les pairs et les entrevues reposent toutes sur la réponse aux questions en temps réel. Une séance d’affiches est un endroit sans grand enjeu pour l’apprendre.",
+        "Vous ne pouvez pas faire tenir le projet sur le panneau\u00a0: vous choisissez donc la seule affirmation que l’affiche défend. Cadrer tôt, avec une échéance, est un exercice remarquablement utile."
+      ]
+    },
     "/pricing": {
       "title": "Postr Pricing: Free PDF Export, Paid PowerPoint Export",
       "description": "Editing and PDF export are free. PowerPoint exports need the 4-month term, CA$18.99 + applicable taxes, or a pack of 3, CA$9.99 + applicable taxes.",
@@ -56,6 +99,21 @@
         "You only pay to export to PowerPoint. The editor, its tools and the PDF export have no paywall. A guest can keep up to 25 posters and an account up to 200, and some tools, such as import and Copy a design, have daily limits. Prices are shown in Canadian dollars, before applicable taxes, and payments go through Stripe."
       ]
     },
+    "/pricing/fr": {
+      "title": "Tarifs Postr\u00a0: PDF gratuit, PowerPoint payant",
+      "description": "Modification et PDF gratuits. Exportations PowerPoint\u00a0: forfait à terme de 4\u00a0mois, 18,99\u00a0$\u00a0CA + taxes applicables, ou lot de 3, 9,99\u00a0$\u00a0CA + taxes applicables.",
+      "robots": "index,follow",
+      "language": "fr-CA",
+      "locale": "fr_CA",
+      "h1": "Gratuit pour créer. Payez seulement pour aller plus loin.",
+      "copy": [
+        "Une affiche terminée et prête à imprimer ne coûte rien sur Postr. La modification et l’exportation PDF sont gratuites, et chaque PDF porte la mention «\u00a0made with postr.sh\u00a0». Aucune carte ni aucun compte n’est requis pour terminer et imprimer votre travail.",
+        "Le forfait à terme de 18,99\u00a0$\u00a0CA, plus les taxes applicables, donne des exportations PowerPoint illimitées sans filigrane tant qu’il est actif. Il se renouvelle tous les quatre mois et vous pouvez l’annuler en tout temps.",
+        "Le lot de 9,99\u00a0$\u00a0CA, plus les taxes applicables, donne trois exportations PowerPoint. Chaque exportation utilise un crédit, même une deuxième exportation de la même affiche. C’est un achat unique, et les crédits n’expirent jamais.",
+        "Remboursements\u00a0: un forfait à terme est remboursable intégralement dans les 14\u00a0jours suivant une facturation si vous n’avez fait aucune exportation payante. Un lot est remboursable intégralement jusqu’à ce que vous utilisiez un crédit d’exportation, et pas après.",
+        "Vous payez seulement pour exporter vers PowerPoint. L’éditeur, ses outils et l’exportation PDF n’ont aucun mur payant. Un invité peut conserver jusqu’à 25\u00a0affiches et un compte jusqu’à 200, et certains outils, comme l’importation et l’outil Copy a design, ont des limites quotidiennes. Les prix sont affichés en dollars canadiens, avant les taxes applicables, et les paiements passent par Stripe."
+      ]
+    },
     "/tools/figure-readability": {
       "title": "Poster Figure Font Size Checker: ggplot2, matplotlib | Postr",
       "description": "Paste ggplot2 or matplotlib code and a print size. See which titles, axis labels, tick labels and legends fall below poster minimums. Free, no signup.",
@@ -67,6 +125,21 @@
         "In R it reads base_size and the sizes theme() sets for the elements it scores. It does not read a size set on text or title. In Python it reads font.size in plt.rcParams, seaborn’s context and font_scale, and the sizes given to set_xlabel(), set_ylabel(), set_title() and tick_params(). Check sizes set any other way yourself.",
         "If anything falls short, it lists the size each element needs and adds those sizes to a copy of your script. When some sizes still follow base_size (font.size in Python), it also gives the smallest base_size at which they meet their minimums, as a one-line snippet.",
         "Postr is a free academic poster editor with this same check in its Figure tab: drag a figure box on the canvas and the check sizes against it, or select an image block to use its exact print dimensions."
+      ]
+    },
+    "/tools/figure-readability/fr": {
+      "title": "Taille du texte des figures\u00a0: ggplot2, matplotlib | Postr",
+      "description": "Collez du code ggplot2 ou matplotlib et une taille d’impression. Voyez quels titres, étiquettes et légendes sont sous les minimums. Gratuit, sans compte.",
+      "robots": "index,follow",
+      "language": "fr-CA",
+      "locale": "fr_CA",
+      "h1": "Les étiquettes de votre figure seront-elles lisibles à la taille de l’affiche?",
+      "copy": [
+        "Collez votre code de tracé R (ggplot2) ou Python (matplotlib) et entrez la taille à laquelle la figure sera imprimée. La vérification évalue ses titres, ses titres d’axes, ses étiquettes de graduation, sa légende et sa note à cette taille, par rapport à des minimums de 18\u00a0pt pour les titres d’axes, de 14\u00a0pt pour les étiquettes de graduation et de 12\u00a0pt pour les notes. Si un élément est trop petit, elle ajoute la taille dont il a besoin dans une copie de votre script. Aucun compte requis, et votre code ne quitte jamais le navigateur.",
+        "La vérification met votre figure à l’échelle, de son canevas source à la taille imprimée. En R, le canevas est la largeur et la hauteur de ggsave(), ou la taille que vous avez saisie s’il n’y a pas de ggsave(). En Python, c’est le figsize ou le set_size_inches() que votre code fixe, ou la taille par défaut de matplotlib, soit 6,4 × 4,8\u00a0po. Elle évalue ensuite chaque élément de texte par rapport à un minimum\u00a0: 18\u00a0pt pour les titres et les titres d’axes, 14\u00a0pt pour les étiquettes de graduation, les légendes et les bandeaux, 12\u00a0pt pour les notes.",
+        "En R, elle lit base_size et les tailles que theme() fixe pour les éléments qu’elle évalue. Elle ne lit pas une taille fixée sur text ou title. En Python, elle lit font.size dans plt.rcParams, le contexte et le font_scale de seaborn, et les tailles données à set_xlabel(), set_ylabel(), set_title() et tick_params(). Vérifiez vous-même les tailles fixées autrement.",
+        "Si un élément est trop petit, elle indique la taille dont chaque élément a besoin et ajoute ces tailles à une copie de votre script. Quand certaines tailles suivent encore base_size (font.size en Python), elle donne aussi le plus petit base_size auquel elles atteignent leurs minimums, sous forme d’extrait d’une ligne.",
+        "Postr est un éditeur d’affiches scientifiques gratuit qui offre cette même vérification dans son onglet Figure\u00a0: faites glisser un cadre de figure sur le canevas et la vérification se règle sur sa taille, ou sélectionnez un bloc d’image pour utiliser ses dimensions d’impression exactes."
       ]
     },
     "/privacy": {
@@ -161,6 +234,20 @@
         "Poster editing and print-ready PDF export are free. Paid plans only unlock editable PowerPoint exports."
       ]
     },
+    "/auth/fr": {
+      "title": "Connexion ou création de compte | Postr",
+      "description": "Connectez-vous à Postr, créez un compte ou continuez en invité pour créer, enregistrer et exporter vos affiches de congrès en sécurité depuis votre navigateur.",
+      "robots": "noindex,nofollow",
+      "language": "fr-CA",
+      "locale": "fr_CA",
+      "shareImage": true,
+      "prerender": true,
+      "h1": "Connectez-vous ou créez votre compte",
+      "copy": [
+        "Connectez-vous, créez un compte ou continuez en tant qu’invité pour commencer à créer une affiche de congrès.",
+        "La modification des affiches et l’exportation en PDF prêt à imprimer sont gratuites. Les forfaits payants débloquent seulement les exportations PowerPoint modifiables."
+      ]
+    },
     "/dashboard": {
       "title": "Conference Poster Dashboard | Postr",
       "description": "Create, manage, and reopen conference posters in Postr, then export print-ready PDFs for free or unlock editable PowerPoint files.",
@@ -191,10 +278,24 @@
       "description": "Checkout is complete. Postr checks your account for the purchase, which appears once Stripe confirms the payment. Then go back to your conference posters.",
       "robots": "noindex,nofollow"
     },
+    "/billing/success/fr": {
+      "title": "Étape de paiement terminée\u00a0: votre achat | Postr",
+      "description": "L’étape de paiement est terminée. Postr cherche l’achat dans votre compte, où il apparaît dès que Stripe confirme le paiement. Revenez ensuite à vos affiches.",
+      "robots": "noindex,nofollow",
+      "language": "fr-CA",
+      "locale": "fr_CA"
+    },
     "/billing/cancel": {
       "title": "Checkout Cancelled — Return to Postr",
       "description": "No charge was made. Go back and keep editing your conference poster for free, including PDF export, or see the plans for editable PowerPoint export.",
       "robots": "noindex,nofollow"
+    },
+    "/billing/cancel/fr": {
+      "title": "Paiement annulé — retour à Postr",
+      "description": "Rien ne vous a été facturé. Continuez à modifier votre affiche gratuitement, PDF compris, ou consultez les forfaits d’exportation PowerPoint modifiable.",
+      "robots": "noindex,nofollow",
+      "language": "fr-CA",
+      "locale": "fr_CA"
     },
     "/404": {
       "title": "Page Not Found — Return to Postr",
@@ -204,6 +305,13 @@
       "copy": [
         "That page does not exist. Check the address for typos, or head back to the Postr home page to start a conference poster."
       ]
+    },
+    "/404/fr": {
+      "title": "Page introuvable — retour à Postr",
+      "description": "Cette page de Postr n’existe pas. Vérifiez l’adresse, revenez à l’accueil ou commencez une affiche de congrès gratuite, prête à imprimer.",
+      "robots": "noindex,nofollow",
+      "language": "fr-CA",
+      "locale": "fr_CA"
     }
   }
 }

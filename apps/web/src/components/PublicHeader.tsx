@@ -24,17 +24,27 @@
  * standalone picker was deactivated (see the routes.tsx header). The
  * "Plot checker" entry is the one standalone tool that is live.
  *
- * TOOL_LINKS exists because the first standalone tool once shipped with
+ * The tool list (toolLinksFor) exists because the first standalone tool once shipped with
  * nothing linking to it from anywhere in the app — not the header, not
  * the footer, not the landing page. It was only reachable by typing the
  * URL, which is how the owner came to not be able to find it. The list
  * (and the footer/landing entries that mirror it) was that fix, and it
  * is what every tool, live or restored, goes into.
+ *
+ * In French on a French page (fix 26; the page's language is its URL,
+ * i18n/lang.ts): the labels come from i18n/chrome.ts, the public links
+ * lead to the French pages, and the language link (« Français » /
+ * "English") sits at the end of the flat row and of the phone menu. The
+ * editor, the dashboard and the profile are English only, so their links
+ * do not change.
  */
 import { useEffect, useId, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { useFeedbackStore } from '@/stores/feedbackStore';
+import { CHROME_COPY, type ChromeCopy } from '@/i18n/chrome';
+import { counterpartPath, localizedPath, useLang, type Lang } from '@/i18n/lang';
+import { LanguageLink } from '@/components/LanguageLink';
 import type { User } from '@supabase/supabase-js';
 
 /** One standalone tool as the nav shows it. */
@@ -66,14 +76,18 @@ interface ToolLink {
  * Typed explicitly rather than `as const` so an empty list (if every
  * tool is ever off again) is `readonly ToolLink[]` rather than
  * `readonly []`, whose `never` element type breaks `.map` / `.some`.
+ * Built per language: the French page's links lead to the French tool.
  */
-const TOOL_LINKS: readonly ToolLink[] = [
-  {
-    to: '/tools/figure-readability',
-    label: 'Plot checker',
-    blurb: 'Check figure text at poster print size',
-  },
-];
+function toolLinksFor(lang: Lang): readonly ToolLink[] {
+  const c = CHROME_COPY[lang].header;
+  return [
+    {
+      to: localizedPath('/tools/figure-readability', lang),
+      label: c.plotChecker,
+      blurb: c.plotCheckerBlurb,
+    },
+  ];
+}
 
 /**
  * The full public nav set, in display order — the tools plus the two
@@ -84,20 +98,29 @@ const TOOL_LINKS: readonly ToolLink[] = [
  * Those two had drifted to listing only About, so a signed-in user lost
  * the standalone tools the moment they left a marketing page. Three
  * hand-maintained copies of the same list is what caused that drift, so
- * the list lives here once.
+ * the list lives here once. Those headers are English only, so they take
+ * NAV_LINKS (the English list); the public header takes its page's.
  */
-export const NAV_LINKS = [
-  ...TOOL_LINKS.map(({ to, label }) => ({ to, label })),
-  { to: '/pricing', label: 'Pricing' },
-  { to: '/why-posters', label: 'Why posters' },
-  { to: '/about', label: 'About' },
-] as const;
+export function navLinksFor(lang: Lang): ReadonlyArray<{ to: string; label: string }> {
+  const c = CHROME_COPY[lang].header;
+  return [
+    ...toolLinksFor(lang).map(({ to, label }) => ({ to, label })),
+    { to: localizedPath('/pricing', lang), label: c.pricing },
+    { to: localizedPath('/why-posters', lang), label: c.whyPosters },
+    { to: localizedPath('/about', lang), label: c.about },
+  ];
+}
+
+/** The English nav, for the English-only signed-in headers (Home, AdminGallery). */
+export const NAV_LINKS = navLinksFor('en');
 
 /** Shared styling for a top-level nav link, gated until it fits flat. */
 export const NAV_LINK_CLASS =
   'hidden text-[14pt] font-normal text-[#8b8f99] no-underline hover:text-[#c8cad0] xl:inline';
 
 export function PublicHeader() {
+  const lang = useLang();
+  const c = CHROME_COPY[lang].header;
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
   const openFeedback = useFeedbackStore((s) => s.open);
@@ -131,8 +154,8 @@ export function PublicHeader() {
   // /p/new, which EnsureSession will recognise and create an anonymous
   // session behind, so a visitor lands in the editor without a signup wall.
   const workspaceLink = signedIn
-    ? { to: '/dashboard', label: 'My posters' }
-    : { to: '/p/new', label: 'Editor' };
+    ? { to: '/dashboard', label: c.myPosters }
+    : { to: '/p/new', label: c.editor };
 
   // Minimum font size for nav chrome is 14pt, matching the design
   // plan's readability minimum (docs/plans/2026-04-10-figure-
@@ -143,7 +166,7 @@ export function PublicHeader() {
   // same tokens so nav chrome never flickers between pages.
   return (
     <header className="flex items-center justify-between px-8 py-5">
-      <Link to="/" className="flex min-h-11 items-center gap-3 no-underline">
+      <Link to={localizedPath('/', lang)} className="flex min-h-11 items-center gap-3 no-underline">
         <svg width="36" height="36" viewBox="0 0 64 64" fill="none">
           <rect width="64" height="64" rx="12" fill="#7c6aed" />
           <path d="M12 52 C30 52, 34 12, 52 12" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
@@ -185,13 +208,16 @@ export function PublicHeader() {
           </Link>
         )}
 
-        {NAV_LINKS.map((link) => (
+        {navLinksFor(lang).map((link) => (
           <Link key={link.to} to={link.to} className={NAV_LINK_CLASS}>
             {link.label}
           </Link>
         ))}
 
+        <LanguageLink className={NAV_LINK_CLASS} />
+
         <MobileNav
+          lang={lang}
           signedIn={signedIn}
           workspaceLink={ready ? workspaceLink : null}
           onFeedback={() => openFeedback('feature')}
@@ -203,17 +229,17 @@ export function PublicHeader() {
               type="button"
               onClick={() => openFeedback('feature')}
               className="hidden h-10 items-center gap-2 rounded-md border border-[#2a2a3a] bg-[#111118] px-4 text-[14pt] font-normal text-[#c8cad0] hover:border-[#7c6aed] hover:text-[#fff] xl:flex"
-              title="Send feedback"
+              title={c.feedbackTitle}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
-              Feedback
+              {c.feedback}
             </button>
             <Link
               to="/profile"
               className="flex h-10 w-10 items-center justify-center rounded-full border border-[#2a2a3a] text-[#8b8f99] hover:border-[#7c6aed] hover:text-[#c8cad0]"
-              title="Profile & Settings"
+              title={c.profileTitle}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -222,11 +248,14 @@ export function PublicHeader() {
             </Link>
           </>
         ) : (
+          // « Connexion » is wider than "Sign in": at 320 px the French
+          // header scrolled sideways by 13 px (fix 26, copy-claims-check
+          // W1), so its button is narrower below `sm`. English unchanged.
           <Link
-            to="/auth"
-            className="rounded-md border border-[#7c6aed] px-5 py-2 text-[14pt] font-semibold text-[#7c6aed] no-underline hover:bg-[#5641b8] hover:text-white transition-colors"
+            to={localizedPath('/auth', lang)}
+            className={`rounded-md border border-[#7c6aed] ${lang === 'fr' ? 'px-3 sm:px-5' : 'px-5'} py-2 text-[14pt] font-semibold text-[#7c6aed] no-underline hover:bg-[#5641b8] hover:text-white transition-colors`}
           >
-            Sign in
+            {c.signIn}
           </Link>
         )}
       </div>
@@ -257,16 +286,21 @@ export function PublicHeader() {
  * target floor — the same reason PublicFooter's links carry padding.
  */
 function MobileNav({
+  lang,
   signedIn,
   workspaceLink,
   onFeedback,
 }: {
+  lang: Lang;
   signedIn: boolean;
   /** Auth-aware workspace link (Editor / My posters), or null until
    *  the session has resolved. */
   workspaceLink: { to: string; label: string } | null;
   onFeedback: () => void;
 }) {
+  const c: ChromeCopy['header'] = CHROME_COPY[lang].header;
+  const toolLinks = toolLinksFor(lang);
+  const hasCounterpart = counterpartPath(useLocation().pathname) !== null;
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -307,7 +341,7 @@ function MobileNav({
         aria-expanded={open}
         aria-haspopup="true"
         aria-controls={open ? panelId : undefined}
-        aria-label="Menu"
+        aria-label={c.menu}
         className="flex h-11 w-11 items-center justify-center rounded-md border border-[#2a2a3a] bg-[#111118] text-[#c8cad0]"
       >
         <svg
@@ -376,7 +410,7 @@ function MobileNav({
             </li>
           )}
 
-          {TOOL_LINKS.map((tool) => (
+          {toolLinks.map((tool) => (
             <li key={tool.to}>
               <Link
                 to={tool.to}
@@ -395,8 +429,8 @@ function MobileNav({
 
           {/* The Learn pages — the entries NAV_LINKS carries beyond the
               tools, which get their own blurbed rows above. */}
-          {NAV_LINKS.filter(
-            (link) => !TOOL_LINKS.some((tool) => tool.to === link.to),
+          {navLinksFor(lang).filter(
+            (link) => !toolLinks.some((tool) => tool.to === link.to),
           ).map((link) => (
             <li key={link.to}>
               <Link
@@ -422,8 +456,19 @@ function MobileNav({
                 }}
                 className="block w-full cursor-pointer rounded-lg border-0 bg-transparent px-3 py-3 text-left text-[14pt] font-medium text-[#c8cad0] hover:bg-[#1a1a26]"
               >
-                Send feedback
+                {c.sendFeedback}
               </button>
+            </li>
+          )}
+
+          {/* The page in the other language, last: the phone's route to
+              it (the flat row's link is `xl:`-gated like the rest). */}
+          {hasCounterpart && (
+            <li>
+              <LanguageLink
+                onClick={() => setOpen(false)}
+                className="block rounded-lg px-3 py-3 text-[14pt] font-medium text-[#c8cad0] no-underline hover:bg-[#1a1a26]"
+              />
             </li>
           )}
         </ul>

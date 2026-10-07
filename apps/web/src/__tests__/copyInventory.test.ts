@@ -32,6 +32,10 @@
  * A bare price is allowed only where BARE_PRICES lists it, each with the
  * rendered test that shows its tax note next to it.
  *
+ * The French public pages (fix 26) keep their copy in src/i18n/, which
+ * the inventory reads like any source file: the same rules hold in French
+ * (the patterns read « 18,99 $ CA », « taxes » and « / 4 mois »).
+ *
  * Re-run: npx vitest run src/__tests__/copyInventory.test.ts
  */
 import { readdirSync, statSync } from 'node:fs';
@@ -59,8 +63,10 @@ const NOT_SHIPPED = /(^|\/)(__tests__|__spikes__)\/|\.(test|spec)\.tsx?$|\.d\.ts
 /** Bare prices (no tax note in the same string), and what shows their tax. */
 const BARE_PRICES: Readonly<Record<string, readonly string[]>> = {
   // The pricing cards print the amount large and "+ applicable taxes"
-  // right under it: src/components/__tests__/pricesTax.test.tsx.
-  'apps/web/src/components/PricingSection.tsx': ['CA$18.99', 'CA$9.99'],
+  // (« + taxes applicables ») right under it, in English and in French
+  // (fix 26 moved the card copy to i18n/pricing.ts):
+  // src/components/__tests__/pricesTax.test.tsx.
+  'apps/web/src/i18n/pricing.ts': ['CA$18.99', 'CA$9.99', '18,99\u00a0$\u00a0CA', '9,99\u00a0$\u00a0CA'],
 };
 
 const REGISTERED_IN_QUEBEC = /registered in (the province of )?qu[eé]bec/i;
@@ -133,6 +139,13 @@ describe('the inventory reads what it should', () => {
       'apps/web/src/pages/Auth.tsx',
       'apps/api/src/billing.ts',
       'apps/web/api/shell/_lib.ts',
+      // Fix 26: the dictionaries of the public pages, English and French.
+      'apps/web/src/i18n/landing.ts',
+      'apps/web/src/i18n/pricing.ts',
+      'apps/web/src/i18n/auth.ts',
+      'apps/web/src/i18n/billing.ts',
+      'apps/web/src/i18n/readability.ts',
+      'apps/web/src/data/refundCopy.ts',
     ]) {
       expect(files.has(f), f).toBe(true);
     }
@@ -140,6 +153,16 @@ describe('the inventory reads what it should', () => {
     expect(rawLines.some((l) => l.where.startsWith('apps/web/public/robots.txt'))).toBe(true);
     expect(routeStrings().some((s) => s.where.startsWith('routes.json.static./pricing'))).toBe(true);
     expect(routeStrings().some((s) => s.where.includes('./privacy'))).toBe(false);
+  });
+
+  it('reads the French prices (fix 26): the cards, the /auth/fr labels and the crawler copy', () => {
+    const FRENCH_PRICE = /\d+,\d{2}\s\$/;
+    const frenchSource = scanned.filter((t) => t.kind !== 'module' && FRENCH_PRICE.test(t.text));
+    expect(frenchSource.map((t) => t.file)).toEqual(
+      expect.arrayContaining(['apps/web/src/i18n/pricing.ts', 'apps/web/src/i18n/auth.ts']),
+    );
+    expect(frenchSource.length).toBeGreaterThanOrEqual(4);
+    expect(routeStrings().some((s) => s.where.startsWith('routes.json.static./pricing/fr') && FRENCH_PRICE.test(s.text))).toBe(true);
   });
 });
 

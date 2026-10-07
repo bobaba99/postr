@@ -49,18 +49,25 @@ describe('STATIC_ROUTE_META', () => {
     // deactivated and their routes redirect to the landing page (see
     // the routes.tsx header). A static record here would prerender and
     // sitemap a page that only redirects.
+    // Each public page has its French twin at its path + /fr, and /fr
+    // for the landing page (fix 26).
     expect(Object.keys(STATIC_ROUTE_META).sort()).toEqual([
       '/',
       '/about',
+      '/about/fr',
       '/cookies',
       '/cookies/fr',
+      '/fr',
       '/pricing',
+      '/pricing/fr',
       '/privacy',
       '/privacy/fr',
       '/terms',
       '/terms/fr',
       '/tools/figure-readability',
+      '/tools/figure-readability/fr',
       '/why-posters',
+      '/why-posters/fr',
     ]);
   });
 
@@ -79,6 +86,11 @@ describe('STATIC_ROUTE_META', () => {
     ['/privacy/fr', 'fr-CA', 'fr_CA'],
     ['/cookies/fr', 'fr-CA', 'fr_CA'],
     ['/terms/fr', 'fr-CA', 'fr_CA'],
+    ['/fr', 'fr-CA', 'fr_CA'],
+    ['/about/fr', 'fr-CA', 'fr_CA'],
+    ['/why-posters/fr', 'fr-CA', 'fr_CA'],
+    ['/pricing/fr', 'fr-CA', 'fr_CA'],
+    ['/tools/figure-readability/fr', 'fr-CA', 'fr_CA'],
   ])('%s has French language and locale signals', (path, language, locale) => {
     const meta = STATIC_ROUTE_META[path];
     expect(meta?.language).toBe(language);
@@ -134,6 +146,26 @@ describe('STATIC_ROUTE_META', () => {
       expect(`${meta.title} ${meta.description}`).not.toMatch(/\bAI\b/i);
     }
   });
+
+  it('never mentions AI in the French copy either (« IA »), outside the legal pages', () => {
+    for (const [path, meta] of entries) {
+      if (meta.language !== 'fr-CA' || /^\/(privacy|cookies|terms)\//.test(path)) continue;
+      const copy = staticCopyFor(path);
+      expect(`${meta.title} ${meta.description} ${copy?.h1} ${copy?.copy.join(' ')}`).not.toMatch(
+        /\bIA\b|intelligence artificielle/i,
+      );
+    }
+  });
+
+  it('gives every English page with a French twin a different French title and description', () => {
+    for (const [path, meta] of entries.filter(([, m]) => m.language === 'fr-CA')) {
+      const english = STATIC_ROUTE_META[path === '/fr' ? '/' : path.replace(/\/fr$/, '')];
+      expect(english, `${path} has an English page`).toBeDefined();
+      expect(meta.title).not.toBe(english?.title);
+      expect(meta.description).not.toBe(english?.description);
+      expect(staticCopyFor(path)?.copy.length).toBe(staticCopyFor(path === '/fr' ? '/' : path.replace(/\/fr$/, ''))?.copy.length);
+    }
+  });
 });
 
 describe('APP_ROUTE_META', () => {
@@ -166,6 +198,18 @@ describe('APP_ROUTE_META', () => {
     expect(APP_ROUTE_META['/billing/success']).toBeDefined();
     expect(APP_ROUTE_META['/billing/cancel']).toBeDefined();
   });
+
+  it.each(['/auth/fr', '/billing/success/fr', '/billing/cancel/fr', '/404/fr'])(
+    'defines French metadata for %s (fix 26)',
+    (path) => {
+      const meta = APP_ROUTE_META[path];
+      expect(meta?.language).toBe('fr-CA');
+      expect(meta?.locale).toBe('fr_CA');
+      const english = APP_ROUTE_META[path.replace(/\/fr$/, '')];
+      expect(meta?.title).not.toBe(english?.title);
+      expect(meta?.description).not.toBe(english?.description);
+    },
+  );
 });
 
 describe('staticCopyFor', () => {
