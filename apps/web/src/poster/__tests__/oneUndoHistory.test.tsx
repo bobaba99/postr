@@ -633,6 +633,21 @@ describe('5, 7, 10 — buttons, nothing shown on an empty history, 100 steps', (
     expect(q<HTMLElement>('[data-postr-history-buttons]').style.left).toBe('64px');
   });
 
+  // Decision 5 ("in the editor's top bar"), the lead's decision on the
+  // merge review's F2: over the workspace, the group covered a top-left
+  // block's controls at the fit on some poster shapes (MEASURED in the
+  // browser: undo-history-check B4). Where it sits on screen needs layout
+  // (B4); here, that it is in the bar and the bar holds no part of the
+  // workspace, so nothing on the sheet can be drawn under it.
+  it('the buttons sit in the editor’s top bar, which holds no part of the workspace', async () => {
+    renderEditor();
+    const group = screen.getByRole('group', { name: 'History' });
+    const bar = group.closest('[data-postr-editor-topbar]');
+    expect(bar, 'the History group is in the top bar').not.toBeNull();
+    expect(bar!.contains(q('[data-postr-canvas-outer]')), 'the workspace is not inside the bar').toBe(false);
+    expect(q('[data-postr-canvas-outer]').contains(group), 'the group is not inside the workspace').toBe(false);
+  });
+
   it('a read-only viewer gets no Undo or Redo buttons', async () => {
     render(
       <MemoryRouter initialEntries={['/p/fixture']}>
@@ -641,6 +656,7 @@ describe('5, 7, 10 — buttons, nothing shown on an empty history, 100 steps', (
     );
     await nextTask();
     expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+    expect(q('[data-postr-editor-topbar]'), 'nor the bar that holds them').toBeNull();
   });
 
   it('with nothing to undo or redo, ⌘Z and ⌘⇧Z show nothing', async () => {

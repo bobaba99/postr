@@ -63,6 +63,7 @@ import {
 import { auditPaletteCB } from './colorblind';
 import { CommentsPanel } from './CommentsPanel';
 import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
+import { holdDragStep } from './dragStep';
 import { DockedFormatToolbar, FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { FigureTab, type FigureMode } from './sidebar/FigureTab';
 import type { PosterTableRef } from '@/charts/ladder/DataStep';
@@ -3166,6 +3167,10 @@ function CaptionEditor(props: {
             max={24}
             step={1}
             value={block.captionGap ?? 0}
+            // A drag of the thumb is one undo step (decision 3; fix 12,
+            // review R2-I1 and the merge review's F1); each key press on
+            // it stays a step of its own.
+            onPointerDown={holdDragStep}
             onChange={(e) =>
               onUpdateBlock(block.id, {
                 captionGap: Number(e.target.value),
@@ -4084,6 +4089,9 @@ function TextBlockEditor(props: {
             max={3}
             step={0.05}
             value={styleLevel.lineHeight}
+            // One undo step per drag, held still or not (fix 12, the merge
+            // review's F1); key presses keep the time windows.
+            onPointerDown={holdDragStep}
             onChange={(e) => onUpdateStyle('lineHeight', +e.target.value, true)}
             style={{ flex: 1, accentColor: '#7c6aed' }}
           />

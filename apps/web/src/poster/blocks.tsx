@@ -43,6 +43,7 @@ import {
 import { ResizeHandles, type ResizeHandle } from './resizeHandles';
 import { BUTTON_MARK, HIT, ROTATE_GAP, ROW_GAP, ROW_LIFT, UNZOOM, UNZOOM_X, UNZOOM_Y, blockControls, ctl } from './selectionLayout';
 import { useSelectionRoom } from './selectionRoom';
+import { holdDragStep } from './dragStep';
 import { useStorageUrl } from '@/hooks/useStorageUrl';
 import { isStoragePath, uploadPosterImage } from '@/data/posterImages';
 import { ChartBlock } from '@/charts/ChartBlock';
@@ -801,6 +802,8 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
     if (tableWidthPx <= 0) return;
     const startWidths = [...colWidths];
     const MIN = 8;
+    // One undo step for the whole drag (fix 12, the merge review's F1).
+    holdDragStep(e);
     const onMove = (ev: PointerEvent) => {
       const dxPct = ((ev.clientX - startX) / tableWidthPx) * 100;
       const next = [...startWidths];

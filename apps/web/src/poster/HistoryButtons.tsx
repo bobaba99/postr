@@ -1,6 +1,6 @@
 /**
- * Undo and Redo buttons over the poster area's top-left corner, opposite
- * the save status (owner decision 5 of 2026-10-06, fix 12; record
+ * Undo and Redo buttons, at the left of the editor's top bar
+ * (`EditorTopBar`; owner decision 5 of 2026-10-06, fix 12; record
  * docs/fixes/12-one-undo-history.md). Before, the keyboard was the only
  * way to undo: a touch screen without one had none.
  *
@@ -68,8 +68,10 @@ export function HistoryButtons({ left, onRun }: { left: number; onRun: (dir: His
       aria-label="History"
       data-postr-history-buttons
       style={{
+        // Centred in the 44 px bar: 36 px tall (28 px buttons, 3 px of
+        // padding and a 1 px border each side).
         position: 'absolute',
-        top: 12,
+        top: 4,
         left,
         zIndex: 10,
         display: 'flex',

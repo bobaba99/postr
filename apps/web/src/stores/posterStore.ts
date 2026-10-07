@@ -166,9 +166,37 @@ const COALESCE_MAX_MS = 5_000;
  */
 let lastPush: { key: string; at: number; startedAt: number; text: TextEdit['kind'] | null } | null = null;
 
-/** End the current burst, so the next edit starts a fresh undo entry. */
+/**
+ * End the current burst, so the next edit starts a fresh undo entry. Not
+ * while a drag is held (below): the focus a slider takes, or the text it
+ * leaves, is part of the same gesture (Firefox moves the focus after the
+ * slider's first value; fix 12, merge review F1).
+ */
 export function breakUndoCoalescing() {
+  if (dragStep !== null) return;
   lastPush = null;
+}
+
+/**
+ * The pointer gesture being held, if any: a crop edge, a table column's
+ * width grip, a slider's thumb. Every edit made while it is held is ONE
+ * undo step, however many pointer moves and however long it takes, as a
+ * move, resize or rotate drag already is (PowerPoint; owner decision 3,
+ * the lead's decision on fix 12's merge review F1: a crop drag of ~330
+ * moves had been ~330 steps, pushing older edits out of the history).
+ * Begun at pointerdown and ended at pointerup (`poster/dragStep.ts`).
+ */
+let dragStep: string | null = null;
+let dragSeq = 0;
+
+/** A drag begins: its edits, until `endDragStep`, are one undo step. */
+export function beginDragStep() {
+  dragStep = `drag:${++dragSeq}`;
+}
+
+/** The drag ends: the next edit starts a step of its own. */
+export function endDragStep() {
+  dragStep = null;
 }
 
 /**
@@ -208,21 +236,25 @@ function keyForThisRun(requested: string | null): string {
  */
 function pushUndo(doc: PosterDoc, coalesceKey?: string, text?: TextEdit) {
   const now = Date.now();
+  // A held drag groups whatever it edits under its own key, with no time
+  // window: pointerdown to pointerup is one step.
+  const key = dragStep ?? coalesceKey;
   const sameThing =
-    coalesceKey !== undefined &&
+    key !== undefined &&
     lastPush !== null &&
-    lastPush.key === coalesceKey &&
+    lastPush.key === key &&
     // Nothing to coalesce ONTO if the stack is empty — the first push
     // must always land, or the burst would have no undo point at all.
     undoStack.length > 0;
   const inBurst =
     sameThing &&
-    (text
-      ? // Text: by word, whatever the pauses (historySteps.ts).
-        continuesTextStep(lastPush!.text, text)
-      : lastPush!.text === null &&
-        now - lastPush!.at < COALESCE_IDLE_MS &&
-        now - lastPush!.startedAt < COALESCE_MAX_MS);
+    (dragStep !== null ||
+      (text
+        ? // Text: by word, whatever the pauses (historySteps.ts).
+          continuesTextStep(lastPush!.text, text)
+        : lastPush!.text === null &&
+          now - lastPush!.at < COALESCE_IDLE_MS &&
+          now - lastPush!.startedAt < COALESCE_MAX_MS));
 
   if (inBurst) {
     lastPush = { ...lastPush!, at: now, text: text?.kind ?? null };
@@ -233,10 +265,7 @@ function pushUndo(doc: PosterDoc, coalesceKey?: string, text?: TextEdit) {
 
   undoStack = [...undoStack, doc].slice(-MAX_HISTORY);
   redoStack = [];
-  lastPush =
-    coalesceKey === undefined
-      ? null
-      : { key: coalesceKey, at: now, startedAt: now, text: text?.kind ?? null };
+  lastPush = key === undefined ? null : { key, at: now, startedAt: now, text: text?.kind ?? null };
 }
 
 /**

@@ -38,7 +38,7 @@ import { PosterPreviewOverlay } from './PosterPreviewOverlay';
 import { SelectionRect } from './SelectionRect';
 import { GroupFrame, groupBounds } from './GroupFrame';
 import { UndoToast } from './UndoToast';
-import { HistoryButtons } from './HistoryButtons';
+import { EditorTopBar, TOP_BAR_HEIGHT } from './EditorTopBar';
 import { onHistoryButtons, runHistory, type HistoryDirection, type HistoryRunOptions } from './editorHistory';
 import { useEditorHistory } from './useEditorHistory';
 import { checkBounds, checkCollisions, type OobWarning } from './boundsCheck';
@@ -2399,6 +2399,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       inert={previewMode ? true : undefined}
       style={{
         display: previewMode ? 'none' : 'flex',
+        // The top bar over the editor's row (sidebar, workspace, guidelines).
+        flexDirection: 'column',
         height: '100vh',
         width: '100vw',
         background: '#0a0a12',
@@ -2406,6 +2408,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         overflow: 'hidden',
       }}
     >
+      {!readOnly && (
+        // Not for viewers (the phone share view is one: it is read-only).
+        <EditorTopBar sidebarOpen={sidebarOpen} onRun={runEditorHistory} />
+      )}
+      <div style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0 }}>
       {/* Review-mode CSS gate — hides resize/rotate handles on both
           single-block frames and group bounding boxes so reviewers
           can't resize things while commenting. Single selector, so
@@ -2740,10 +2747,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           style={{
             all: 'unset',
             position: 'fixed',
-            top: 16,
+            // In the top bar, centred, when there is one (not for viewers).
+            top: readOnly ? 16 : (TOP_BAR_HEIGHT - 36) / 2,
             left: 16,
             width: 36,
             height: 36,
+            // 36 px with its border, as tall as the History group beside it.
+            boxSizing: 'border-box',
             borderRadius: 8,
             cursor: 'pointer',
             display: 'flex',
@@ -3424,12 +3434,6 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           </div>
         )}
 
-        {!readOnly && (
-          // Not for viewers (the phone share view is one: it is read-only).
-          // Clear of the sidebar's reveal button (fixed, 16–52 px) when
-          // the sidebar is hidden.
-          <HistoryButtons left={sidebarOpen ? 12 : 64} onRun={runEditorHistory} />
-        )}
         <ZoomBar zoom={zoom} fit={fitZoom} setZoom={setZoom} onFit={fitToScreen} touch={mobileShare} />
         <AutosaveStatusPill
           status={autosave.status}
@@ -3536,6 +3540,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           over someone else's poster is noise at any width, so this is
           gated on readOnly rather than on the phone breakpoint. */}
       {!readOnly && <OnboardingTour />}
+      </div>
     </div>
     {previewMode && (
       <PosterPreviewOverlay
