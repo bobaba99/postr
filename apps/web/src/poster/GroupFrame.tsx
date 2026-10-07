@@ -3,11 +3,18 @@
  *
  * Renders a dashed accent border around the union bounding box of all
  * selected blocks, with 8 resize handles for proportional group resize
- * and a move affordance (drag anywhere inside to move all).
+ * and a move affordance (drag anywhere inside to move all). The dashed
+ * outline and the handles are the same size on screen at every zoom, and a
+ * box small on screen draws fewer handles, as a block does (plan item 19,
+ * `selectionLayout.ts`). The outline is four strips along the box, each
+ * scaled back to 1.5 px across, with dashes of 4 px every 7 px along it:
+ * a dashed border would be drawn in the sheet's units and grow with the
+ * zoom (as on main: 15 px at 10×).
  */
 import { useRef } from 'react';
 import type { Block, Palette } from '@postr/shared';
 import { ResizeHandles, type ResizeHandle } from './resizeHandles';
+import { UNZOOM_X, UNZOOM_Y, blockControls, ctl } from './selectionLayout';
 
 interface GroupFrameProps {
   blocks: Block[];
@@ -96,6 +103,14 @@ export function GroupFrame({
 
   if (!Number.isFinite(x)) return null;
 
+  // A 1.5 px dashed line along each side: 4 px dashes, 3 px gaps.
+  const line = `${palette.accent}88`;
+  const dashes = (deg: number) => `repeating-linear-gradient(${deg}deg, ${line} 0 ${ctl(4)}, transparent 0 ${ctl(7)})`;
+  const side = (s: 'top' | 'bottom' | 'left' | 'right'): React.CSSProperties =>
+    s === 'top' || s === 'bottom'
+      ? { position: 'absolute', left: 0, right: 0, [s]: 0, height: 1.5, transform: UNZOOM_Y, transformOrigin: `center ${s}`, backgroundImage: dashes(90), pointerEvents: 'none' }
+      : { position: 'absolute', top: 0, bottom: 0, [s]: 0, width: 1.5, transform: UNZOOM_X, transformOrigin: `${s} center`, backgroundImage: dashes(180), pointerEvents: 'none' };
+
   return (
     <div
       data-postr-selection-ui="true"
@@ -106,16 +121,19 @@ export function GroupFrame({
         top: y,
         width: w,
         height: h,
-        border: `1.5px dashed ${palette.accent}88`,
-        borderRadius: 2,
         cursor: 'move',
         zIndex: 3,
         pointerEvents: 'auto',
       }}
     >
+      <div style={side('top')} />
+      <div style={side('bottom')} />
+      <div style={side('left')} />
+      <div style={side('right')} />
       <ResizeHandles
         accent={palette.accent}
         onPointerDown={(e, handle) => handlePointerDown(e, 'resize', handle)}
+        handles={blockControls({ wPx: w * zoom, hPx: h * zoom }).handles}
       />
     </div>
   );

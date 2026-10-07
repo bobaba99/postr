@@ -10,6 +10,13 @@
  * Storage model is the same as the sidebar sliders — one
  * `clip-path: inset()` rule on the existing `<img>` — so cropping
  * stays losslessly reversible. No pixels baked.
+ *
+ * Its edge handles and Cancel / Reset / Apply bar are the same size on
+ * screen at every zoom (plan item 19, selectionLayout.ts): each is drawn
+ * in px, in a box scaled back by the sheet's zoom about the corner it is
+ * placed by, and each control a user grabs has a 24 × 24 px hit area. The
+ * frame around the kept area stays in the sheet's units, as the block's own
+ * selection border does.
  */
 import {
   useCallback,
@@ -20,6 +27,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import type { Block } from '@postr/shared';
+import { HIT, UNZOOM, ctl } from './selectionLayout';
 
 export interface CropOverlayProps {
   block: Block;
@@ -166,13 +174,15 @@ export function CropOverlay({ block, onUpdate, onClose }: CropOverlayProps) {
       {/* Done / Cancel toolbar — pinned BELOW the block (not over it)
           and sized to be unobtrusive. Anything bigger competes with
           the block-frame controls (move / crop-toggle / delete) for
-          attention right above. */}
+          attention right above. Its top stays 4 px under the block. */}
       <div
         style={{
           position: 'absolute',
           left: '50%',
-          bottom: -28,
-          transform: 'translateX(-50%)',
+          top: '100%',
+          marginTop: ctl(4),
+          transform: `translateX(-50%) ${UNZOOM}`,
+          transformOrigin: 'center top',
           display: 'flex',
           gap: 2,
           padding: '2px 3px',
@@ -212,47 +222,58 @@ function Handle({
 }) {
   const horizontal = edge === 'top' || edge === 'bottom';
   const cursor = horizontal ? 'ns-resize' : 'ew-resize';
-  // Keep the handles small enough that the cropped image is always
-  // visually dominant. Hit-area is extended via an invisible
-  // padding wrapper (`paddingPx`) so users can still grab the
-  // handles comfortably even though the visible glyph is tiny.
-  const size = 5;
-  const length = 12;
-  const center = `calc(${
+  // Keep the visible handle small enough that the cropped image is always
+  // visually dominant; the hit area around it is a 24 px square centred on
+  // the crop edge (plan item 19), one size on screen at every zoom.
+  const size = 6;
+  const length = 16;
+  const centre = `calc(${
     horizontal
       ? crop.left + (100 - crop.left - crop.right) / 2
       : crop.top + (100 - crop.top - crop.bottom) / 2
-  }% - ${(horizontal ? length : size) / 2}px)`;
+  }% - ${ctl(HIT / 2)})`;
+  const onEdge = `calc(${crop[edge]}% - ${ctl(HIT / 2)})`;
+  // Placed by its top-left corner (the bottom and right edges by theirs),
+  // and scaled back about that corner.
   const positional: CSSProperties = horizontal
-    ? {
-        left: center,
-        width: length,
-        height: size,
-        [edge === 'top' ? 'top' : 'bottom']: `calc(${edge === 'top' ? crop.top : crop.bottom}% - ${size / 2}px)`,
-      }
-    : {
-        top: center,
-        width: size,
-        height: length,
-        [edge === 'left' ? 'left' : 'right']: `calc(${edge === 'left' ? crop.left : crop.right}% - ${size / 2}px)`,
-      };
+    ? { left: centre, [edge]: onEdge, transformOrigin: `left ${edge}` }
+    : { top: centre, [edge]: onEdge, transformOrigin: `${edge} top` };
 
   return (
     <div
       role="button"
       aria-label={`crop ${edge} edge`}
+      // Out of index.css's transition on `[role='button']`: its transform
+      // is the scale back, which would animate for 120 ms after each zoom
+      // change (plan item 19).
+      data-no-anim
       onPointerDown={(e) => onDown(edge, e)}
       style={{
         position: 'absolute',
-        background: '#c8b6ff',
-        border: '1.5px solid #fff',
-        borderRadius: 3,
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.6)',
+        width: HIT,
+        height: HIT,
+        transform: UNZOOM,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         cursor,
         touchAction: 'none',
         ...positional,
       }}
-    />
+    >
+      <div
+        style={{
+          width: horizontal ? length : size,
+          height: horizontal ? size : length,
+          background: '#c8b6ff',
+          border: '1.5px solid #fff',
+          borderRadius: 3,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.6)',
+          boxSizing: 'border-box',
+          pointerEvents: 'none',
+        }}
+      />
+    </div>
   );
 }
 
@@ -262,19 +283,20 @@ function clamp(v: number, lo: number, hi: number): number {
 
 const btnStyle: CSSProperties = {
   cursor: 'pointer',
-  width: 18,
-  height: 18,
+  width: HIT,
+  height: HIT,
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: 0,
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 600,
   color: '#c8cad0',
   background: '#1a1a26',
   border: '1px solid #2a2a3a',
   borderRadius: 3,
   lineHeight: 1,
+  boxSizing: 'border-box',
 };
 
 const primary: CSSProperties = {
