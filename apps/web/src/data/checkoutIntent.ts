@@ -16,6 +16,7 @@
  * docs/plans/2026-07-28-payment-and-paywall.md.
  */
 import { createCheckout, type BillingSku } from '@/data/billing';
+import type { Lang } from '@/i18n/lang';
 
 /** The paid plans a pricing CTA can pre-select. Mirrors BillingSku. */
 export type CheckoutPlan = BillingSku;
@@ -83,10 +84,11 @@ export function resolveCheckoutPlan(planParam: string | null): CheckoutPlan | nu
  * The caller must already be signed in with a permanent account — the
  * create-checkout route requires it. Clears the stashed intent so a
  * back-navigation doesn't re-trigger. Throws on failure so the caller can
- * surface an error (the user is still on our page at that point).
+ * surface an error (the user is still on our page at that point). `lang`
+ * is the page's language: a French page opens a French checkout (fix 26).
  */
-export async function startCheckoutForPlan(plan: CheckoutPlan): Promise<void> {
-  const url = await createCheckout(plan);
+export async function startCheckoutForPlan(plan: CheckoutPlan, lang: Lang = 'en'): Promise<void> {
+  const url = await createCheckout(plan, lang);
   clearCheckoutIntent();
   // Full navigation (not the SPA router) — Stripe's checkout is off-origin.
   window.location.assign(url);

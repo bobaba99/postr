@@ -14,6 +14,12 @@
  * This module adds types, canonical-URL rules, and builders for the
  * dynamic routes (gallery entries, share links) that have no fixed
  * entry in the JSON.
+ *
+ * Fix 26: each public page has a French twin at its path + /fr (/fr for
+ * the landing page), with its own record (language fr-CA, locale fr_CA).
+ * A prerendered page whose twin is prerendered too names both in hreflang
+ * alternates, x-default English (`alternatesFor`; the build script's copy
+ * is scripts/lib/headTags.mjs, held equal by headTagParity.test.ts).
  */
 import routes from './routes.json';
 
@@ -47,6 +53,12 @@ export const NOINDEX = 'noindex,nofollow';
 export const PREVIEW_DIRECTIVES =
   'max-image-preview:large,max-snippet:-1,max-video-preview:-1';
 
+/** One hreflang alternate: the language and the page in it. */
+export interface Alternate {
+  hreflang: string;
+  href: string;
+}
+
 export interface PageMeta {
   title: string;
   description: string;
@@ -64,6 +76,11 @@ export interface PageMeta {
   ogType: string;
   ogImage: string | null;
   ogImageAlt: string | null;
+  /**
+   * The page and its twin in the other language (en, fr-CA, x-default),
+   * or null when it has none: only prerendered pairs carry them.
+   */
+  alternates: Alternate[] | null;
 }
 
 interface StaticRouteRecord {
@@ -91,6 +108,39 @@ interface AppRouteRecord {
 
 const STATIC_RECORDS = routes.static as Record<string, StaticRouteRecord>;
 const APP_RECORDS = routes.app as Record<string, AppRouteRecord>;
+
+/** The records the build writes a file for: the static ones, and app ones marked prerender. */
+const PRERENDERED: Record<string, { language?: string }> = {
+  ...STATIC_RECORDS,
+  ...Object.fromEntries(Object.entries(APP_RECORDS).filter(([, record]) => record.prerender === true)),
+};
+
+/** A path's twin in the other language: `/about` ↔ `/about/fr`, `/` ↔ `/fr`. */
+export function twinPath(path: string): string {
+  if (path === '/fr') return '/';
+  if (path.endsWith('/fr')) return path.slice(0, -'/fr'.length);
+  return path === '/' ? '/fr' : `${path}/fr`;
+}
+
+/**
+ * hreflang alternates for a prerendered page whose twin is prerendered
+ * too: English, French, and x-default English. Null otherwise (the
+ * billing pages, the 404, the editor).
+ */
+export function alternatesFor(path: string): Alternate[] | null {
+  const twin = twinPath(path);
+  const self = PRERENDERED[path];
+  const other = PRERENDERED[twin];
+  if (!self || !other) return null;
+  const french = path === '/fr' || path.endsWith('/fr');
+  const [en, fr] = french ? [twin, path] : [path, twin];
+  const [enRecord, frRecord] = french ? [other, self] : [self, other];
+  return [
+    { hreflang: enRecord.language ?? SITE_LANGUAGE, href: canonicalFor(en) },
+    { hreflang: frRecord.language ?? SITE_LANGUAGE, href: canonicalFor(fr) },
+    { hreflang: 'x-default', href: canonicalFor(en) },
+  ];
+}
 
 /**
  * Canonical URL rule, applied uniformly: origin + lowercased path, no
@@ -134,6 +184,7 @@ function toPageMeta(
     ogImage: hasShareImage ? `${SITE_ORIGIN}${DEFAULT_OG_IMAGE}` : null,
     ogImageAlt:
       hasShareImage ? `${SITE_NAME}: free conference poster maker` : null,
+    alternates: alternatesFor(path),
   };
 }
 
@@ -171,6 +222,11 @@ export const NOT_FOUND_META: PageMeta =
     robots: NOINDEX,
   });
 
+/** The not-found page's meta in a language: French for an address ending in /fr (fix 26). */
+export function notFoundMeta(lang: 'en' | 'fr'): PageMeta {
+  return lang === 'fr' ? (APP_ROUTE_META['/404/fr'] ?? NOT_FOUND_META) : NOT_FOUND_META;
+}
+
 /** Truncate on a word boundary so descriptions never end mid-word. */
 export function clampDescription(text: string, max = 155): string {
   const collapsed = text.replace(/\s+/g, ' ').trim();
@@ -207,6 +263,7 @@ export function noindexMeta(
     ogImageAlt: DEFAULT_OG_IMAGE
       ? `${SITE_NAME}: free conference poster maker`
       : null,
+    alternates: null,
   };
 }
 
@@ -275,6 +332,7 @@ export function galleryEntryMeta(entry: GalleryEntryMetaInput): PageMeta {
     ogType: 'article',
     ogImage: entry.imageUrl,
     ogImageAlt: `Conference poster: ${entry.title}`,
+    alternates: null,
   };
 }
 
@@ -325,5 +383,6 @@ export function shareMeta(input: {
         ? `Research poster: ${posterTitle}`
         : `${SITE_NAME}: free conference poster maker`
       : null,
+    alternates: null,
   };
 }

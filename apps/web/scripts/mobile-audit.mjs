@@ -17,7 +17,11 @@ const BASE = 'http://localhost:5173';
 // is the live standalone checker: a phone-first page with a code
 // editor, numeric inputs and preset chips — exactly what this audit is
 // for (16px inputs, 44px targets, no sideways scroll at 375px).
-const ROUTES = ['/', '/about', '/privacy', '/cookies', '/terms', '/tools/figure-readability'];
+// The French pages (fix 26) too: their labels are longer (« Connexion »).
+const ROUTES = [
+  '/', '/about', '/privacy', '/cookies', '/terms', '/tools/figure-readability',
+  '/fr', '/about/fr', '/why-posters/fr', '/pricing/fr', '/tools/figure-readability/fr', '/auth/fr',
+];
 const WIDTHS = [
   { w: 375, h: 812, label: 'iPhone SE/13 mini' },
   { w: 414, h: 896, label: 'iPhone Plus/Max' },

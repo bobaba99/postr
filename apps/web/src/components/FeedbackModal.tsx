@@ -25,7 +25,9 @@ export function FeedbackModal() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [includeAttachment, setIncludeAttachment] = useState(true);
-  const [includeLog, setIncludeLog] = useState(true);
+  // The console log is sent only when the user ticks it: privacy by
+  // default (Quebec Law 25, s. 9.1; owner decision 2026-10-06, record 24).
+  const [includeLog, setIncludeLog] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -37,7 +39,7 @@ export function FeedbackModal() {
       setTitle(context?.title ?? '');
       setBody(context?.body ?? '');
       setIncludeAttachment(true);
-      setIncludeLog(true);
+      setIncludeLog(false);
       setError(null);
       setDone(false);
       setSubmitting(false);

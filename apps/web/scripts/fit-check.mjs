@@ -57,9 +57,11 @@
  *       (claim Hf-sidebar), handed on.
  *   Hh  INFORMATION, not counted in the exit code: a selected block's
  *       handle row, above a block at the top of the sheet, starts under
- *       the 24 px top ruler after Fit. The row is drawn inside the zoomed
- *       sheet, so it sits 24 × zoom px above its block; it happens on main
- *       too, and is handed on (record section 10), not fixed here.
+ *       the 24 px top ruler after Fit. Until fix 19 the row was drawn in
+ *       the sheet's units, 24 × zoom px above its block; since fix 19
+ *       (docs/fixes/19-controls-one-size.md) it starts 38 px above the
+ *       block at every zoom, inside the 64 px gutter. The rulers are
+ *       hidden (RULERS_ENABLED); item 4 re-measures this when they return.
  *   Control: the phone share view (its gutter matches its padding) hides
  *   nothing. Skipped (printed as [skipped], not counted, never an error)
  *   on a tree that hides sharing, read at run time: the share link

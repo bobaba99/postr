@@ -39,23 +39,33 @@
       ]
     },
     "shortcuts-under-dialog": {
-      "undoes": "B/C — editor shortcuts wait while a dialog is open",
+      "undoes": "B/C — editor shortcuts wait while a dialog is open (since fix 12, ⌘Z / ⌘⇧Z are the one history's, editorHistory.ts; the other shortcuts keep PosterEditor's guard)",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
           "      if (modalDialogOpen()) return;\n",
           "",
           2
+        ],
+        [
+          "src/poster/editorHistory.ts",
+          "return overlayOpen ? 'block' : 'history';",
+          "return 'history';"
         ]
       ]
     },
     "shortcut-guard-counts-closing": {
-      "undoes": "the shortcut guard ignores a dialog that is fading out (⌘Z right after confirming works)",
+      "undoes": "the shortcut guard ignores a dialog that is fading out (⌘Z right after confirming works; since fix 12 ⌘Z's guard is editorHistory.ts's)",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
           "'[role=\"dialog\"][aria-modal=\"true\"]:not([data-state=\"closing\"])'",
           "'[role=\"dialog\"][aria-modal=\"true\"]'"
+        ],
+        [
+          "src/poster/editorHistory.ts",
+          ".some((d) => d.getAttribute('data-state') !== 'closing')",
+          ".length > 0"
         ]
       ]
     },

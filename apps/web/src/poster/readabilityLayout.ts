@@ -11,6 +11,12 @@
  *
  * Kept out of ReadabilityPanel.tsx so the panel reads as one component
  * with a few `t.*` lookups instead of a thicket of ternaries.
+ *
+ * The copy that differs per host (the scale factor's suffix, the copied
+ * banner's second half) moved to i18n/readability.ts, keyed by layout, so
+ * it can be French on the French page (fix 26). `defaultSizeLabel` stays:
+ * it is an argument of the engine, which writes English (the French page
+ * translates the whole warning, i18n/readabilityWarnings.ts).
  */
 import type { CSSProperties } from 'react';
 
@@ -32,10 +38,6 @@ export interface ReadabilityLayoutTokens {
   readonly mutedColor: string;
   /** Whether the code editor turns Tab into two spaces. */
   readonly tabIndents: boolean;
-  /** Suffix after "Scale factor: 1.40x" when no image block sizes it. */
-  readonly scaleSuffix: string;
-  /** Second half of the "✓ Copied to clipboard —" banner. */
-  readonly copiedBannerTail: string;
   /** How the parser's "no canvas size" warning names the fallback. */
   readonly defaultSizeLabel: string | undefined;
 }
@@ -50,8 +52,6 @@ const PANEL_TOKENS: ReadabilityLayoutTokens = {
   tableFontSize: 13,
   mutedColor: '#6b7280',
   tabIndents: true,
-  scaleSuffix: ' (default block size)',
-  copiedBannerTail: 'paste it into your editor, re-run, and re-upload the image.',
   defaultSizeLabel: undefined,
 };
 
@@ -63,8 +63,6 @@ const PAGE_TOKENS: ReadabilityLayoutTokens = {
   tableFontSize: 15,
   mutedColor: '#8b8f99',
   tabIndents: false,
-  scaleSuffix: ' (source canvas → printed size)',
-  copiedBannerTail: 'paste it into your script, re-run, and print at this size.',
   defaultSizeLabel: 'the print size you entered,',
 };
 

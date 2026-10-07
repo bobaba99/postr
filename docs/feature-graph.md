@@ -1,5 +1,9 @@
 # Postr — Feature Graph & Refactoring Checklist (v2)
 
+**Revised 2026-10-06 — fix 26, the public pages in French** (`docs/fixes/26-french-public-pages.md`; owner: Resila Technologies Inc. is a Quebec company, Bill 96). Every public page has a French twin at its path + `/fr` (`/fr` for the landing page; `/auth/fr?plan=term` keeps its query): `/fr`, `/about/fr`, `/why-posters/fr`, `/pricing/fr`, `/tools/figure-readability/fr`, `/auth/fr`, `/billing/success/fr`, `/billing/cancel/fr`, beside the legal pages' existing `/privacy/fr`, `/cookies/fr`, `/terms/fr`. One component per page renders either language, read from the URL (`i18n/lang.ts` `useLang`, `langFromPath`, `localizedPath`, `counterpartPath`); the copy of each page or feature is a dictionary in `i18n/` (`chrome.ts` header/footer/phone notice, `landing.ts`, `about.ts`, `whyPosters.ts`, `pricing.ts`, `auth.ts`, `billing.ts`, `notFound.ts`, `figureReadability.ts`, `readability.ts`; `readabilityWarnings.ts` puts the checker engine's English row names and warnings in French), English and French side by side, the French typed with the English shape. **So the verbatim English strings this file lists for §6.1 (NotFound), §6.2, §6.3 (Pricing, PricingSection, BillingResult), §6.5 (Auth, PasswordStrength), §6.10 (FigureReadability, PrintSizeFields, the checker panel when on the page) and the public header/footer now live in those dictionaries, not in the page files; their French twins are beside them.** `components/LanguageLink.tsx` is the « Français » / "English" link (header flat row and phone menu, footer, `/auth`'s legal footer, the billing pages, the 404). The French pages are prerendered with French heads (`<html lang="fr-CA">`, og:locale `fr_CA`) and hreflang alternates between each prerendered pair, x-default English (`seo/siteMeta.ts` `alternatesFor`, `scripts/lib/headTags.mjs`); the sitemap lists them. A checkout from `/auth/fr` sends `lang: 'fr'` (`data/billing.ts createCheckout`) and the API opens Stripe with `locale: 'fr-CA'` and returns to `/billing/*/fr` (`apps/api/src/billing.ts`). The editor, dashboard and profile stay English. §6.1, §6.2 and §6.2b below updated.
+**Revised 2026-10-06 — legal pages and privacy (record 24, `docs/fixes/24-legal-canada-law25.md`).** §6.4 rewritten (Privacy, Cookies and Terms, EN and FR, for Quebec's Law 25 and PIPEDA first; the person in charge as a role of Resila; recipients read from the code; the line-by-line copy listing replaced by section summaries and the test that pins the required elements). §6.1 and §6.15: Vercel Web Analytics is not mounted under Global Privacy Control, `/gallery/:id` is redacted, every page is served with `Referrer-Policy: strict-origin`; the `ConsentNotice` this file listed does not exist in the code. §6.5: the sign-up Terms line links the French pages. §6.13: the feedback form's console log starts unticked. §8: account deletion clears every Postr entry in the browser that deletes, in localStorage and sessionStorage, except another account's welcome marker. Review round 1 (same record): `redactUrl` matches the path as the router reads it (case, percent-escapes, doubled slashes), the sign-up line and Terms §1 present the Privacy Policy as information rather than something agreed to, the Terms and Privacy name Stripe's merchant-of-record service without naming the seller, the pack refund is the amount paid with tax, and Privacy §9 says a feedback report with an attached file keeps the account id in the file's storage path. Review round 2 (same record): the `/auth` Terms line is shown in both modes, right under `Continue with Google` ("By continuing, you agree to…"; `data-testid="auth-terms-line"`); Privacy §8 no longer lists page counting among the private defaults (it is on by default); Privacy §6/§7 and Cookies §4 say what Vercel's documentation says it may record from a page view (an approximate location, device type, operating system, browser), and "no technology that locates" carries that exception; Privacy §15 names Canada's adequacy and how to learn a provider's safeguard, and GDPR portability to another organization; portability (§10) is to a person or body the law authorizes; the Terms precede §5.5, §10, §11 and §13's "continued use" sentence with the Consumer Protection Act s. 19.1 statement (EN and FR); the French pages are labelled « Juridique » and use Quebec usage (« 18,99 $ CA », « lot », « Finalité », Quebec civil-law terms, curly apostrophes). Internal: `docs/legal/quebec-law-25.md`.
+**Revised 2026-10-06 — fix 25.** The LaTeX export is **hidden, not deleted** (`LATEX_EXPORT_ENABLED = false`, `config/features.ts`; owner: "unnecessary for now"): the Export tab offers PowerPoint only, and no copy outside the legal pages names LaTeX or Overleaf. Every displayed price says tax is extra ("CA$18.99 + applicable taxes"; Stripe prices are before tax), after its billing period where it has one ("CA$18.99 every 4 months + applicable taxes"; review round 1). `src/__tests__/copyInventory.test.ts` keeps both true. Updated here: §6.2 (Landing, About, Pricing, BillingResult, PricingSection), §6.5 (Auth label), the Profile rows, §6.8 `EditableExportButtons.tsx`, §6.11's export graph, §6.14 `config/features.ts`, §10 and §11. The legal pages' copy (Terms §7, Privacy) is stream A's.
+
 **Revised 2026-09-10 — hide pass.** The manuscript pipelines (§6.12 `/paper-to-poster`, §6.16 `/paper-to-slides`), the Presentation Checker (§6.17: `/presentation-checker`, the editor `review` tab, the `review_pack` / `review_addon` SKUs), the paper-to-talk waitlist callout (§6.3) **and — same day, second pass — the standalone plot picker page (§6.10 `pages/ChartChooser.tsx`, `/chart-chooser` + alias `/plot-picker`)** are **DEACTIVATED, not deleted** — routes redirect to `/`, nav/footer/landing/dashboard/pricing entries are removed, SEO records are gone, the API routers mount only behind `FEATURE_MANUSCRIPT` / `FEATURE_REVIEW`. The product's nav carries **one standalone tool** — the figure-readability check at `/tools/figure-readability` (alias `/plot-checker`), added 2026-09-11 and inventoried in §6.10 `pages/FigureReadability.tsx`; `charts/*` itself stays LIVE inside the editor's Figure tab (§6.8). Every file named in those sections still exists and stays unit-tested. Canonical restore recipe: the `apps/web/src/routes.tsx` header; summary in §10 "Deactivated features". The per-element inventories in §6.10 / §6.12 / §6.16 / §6.17 are kept verbatim as the reactivation reference and are NOT re-extracted.
 
 **Revised 2026-07-29** (v2 second pass was 2026-07-28, superseding v1 from earlier that day; 2026-07-29 updates added §6.16 Manuscript → Slides and — documented from the `feat/presentation-checker` branch ahead of its launch gate — §6.17 Presentation Checker). Source of truth: `apps/web/src/` (React 19 + react-router 8 + Vite SPA) plus `apps/api/src/` for the external-services map. Every file:line reference and verbatim UI string below was extracted from the code as of **2026-07-28 ~16:00 local** (§6.16 and §6.17 extracted 2026-07-29; §6.17 from the feature branch). If the doc and the code disagree, **the code wins** — regenerate this doc.
@@ -13,7 +17,7 @@ What changed in the repo since v1 was generated:
 - **Stripe billing shipped** — `apps/api/src/billing.ts` (checkout, webhook, consume-credit, mark-export, refund, portal), `pages/BillingResult.tsx` serving the new `/billing/success` + `/billing/cancel` routes, `talk_waitlist` table + `TalkWaitlistCallout` (inside `components/PricingSection.tsx`) on `/pricing`.
 - **`/pricing` page shipped** — `pages/Pricing.tsx` + `components/PricingSection.tsx` with three tiers: Free, Term **CA$18.99 / 4 months**, Export pack **CA$9.99 / 3 credits**.
 - **French legal page variants shipped** — `/privacy/fr`, `/cookies/fr`, `/terms/fr` (`pages/PrivacyFr.tsx`, `CookiesFr.tsx`, `TermsFr.tsx`), cross-linked from the EN pages.
-- **Always-visible `ConsentNotice`** mounted in `App.tsx:24` — bottom-left, non-dismissible, on every route.
+- **Always-visible `ConsentNotice`** mounted in `App.tsx:24` — bottom-left, non-dismissible, on every route. *(2026-10-06: no such component exists in the code or its git history; see §6.1.)*
 - **Persona-testing docs deleted** from `docs/`; **MCP / public-API plans ditched**; **business-model experiments archived** to `docs/archive/`.
 
 What changed in the doc:
@@ -93,7 +97,7 @@ All of `apps/web/src/` is covered (test files excluded by rule) — the earlier 
 
 ## 5. Master graph
 
-All routes from `routes.tsx`. Auth gating via `AuthGuard` (`components/AuthGuard.tsx`) on `/dashboard`, `/profile`, `/admin/gallery` — these require a real account and bounce a session-less visitor to `/auth`. The editor route `/p/:posterId` instead uses `EnsureSession` (`components/EnsureSession.tsx`): it silently creates an ANONYMOUS session (`ensureSession`) so a logged-out visitor edits immediately with no signup (the no-auth editor, 2026-07-29). On `SIGNED_OUT` it re-bootstraps a fresh anonymous session (`resetEnsureSession` + `ensureSession`) rather than dead-ending. Global mounts in `App.tsx`: `AppRoutes`, `FeedbackModal`, `PublishFlow`, `SessionExpiredModal`, `ConsentNotice`, `Analytics` beacon.
+All routes from `routes.tsx`. Auth gating via `AuthGuard` (`components/AuthGuard.tsx`) on `/dashboard`, `/profile`, `/admin/gallery` — these require a real account and bounce a session-less visitor to `/auth`. The editor route `/p/:posterId` instead uses `EnsureSession` (`components/EnsureSession.tsx`): it silently creates an ANONYMOUS session (`ensureSession`) so a logged-out visitor edits immediately with no signup (the no-auth editor, 2026-07-29). On `SIGNED_OUT` it re-bootstraps a fresh anonymous session (`resetEnsureSession` + `ensureSession`) rather than dead-ending. Global mounts in `App.tsx`: `RouteScrollManager`, `MobileNotice`, `AppRoutes`, `FeedbackModal`, `PublishFlow`, `SessionExpiredModal`, and the `Analytics` beacon unless the browser sends Global Privacy Control (record 24). There is no `ConsentNotice` component in the code (checked 2026-10-06: no file, no history).
 
 **No-auth editor (2026-07-29):** logged-out "Editor" nav link, the Landing "Try as guest" hero, and the Pricing free-tier CTA all point at `/p/new` → `EnsureSession` mints an anonymous session behind it → `Editor.tsx` load-or-creates the user's OWN most recent poster (`loadMostRecentPoster` filters by `user_id`: the read policy also returns shared posters, fix 23) → edits autosave. An anonymous editor is prompted to secure their work to a permanent account only on EXPORT (`EditableExportButtons` gates `run()` on `plan.isGuest` → `SecureWorkModal reason="export"`) or on LEAVE (`useLeaveGuard` arms a `beforeunload` dialog when `isGuest && canUndo` — the live path, covering tab-close/refresh and the editor's `<a href>` exits; it also exposes a `requestLeave()` gate for a styled in-app-nav `SecureWorkModal reason="leave"`, but that has no caller yet — wiring it needs prop-drilling through the frozen `PosterEditor`, deferred). Conversion is in place via `lib/convertGuest.ts` (`convertGuestWithGoogle` → `linkIdentity`; `convertGuestWithEmail` → `updateUser`) — NEVER `signUp`, so the poster carries over. The same `PosterEditor` serves logged-in and anonymous users unchanged; a permanent user never sees either prompt.
 
@@ -159,11 +163,10 @@ flowchart LR
   end
 
   subgraph Global["Global mounts (App.tsx)"]
-    G_fb["FeedbackModal :14"]
-    G_pub["PublishFlow :15 (dead — gallery flag off)"]
-    G_sess["SessionExpiredModal :16"]
-    G_consent["ConsentNotice :24"]
-    G_an["Analytics beacon :38"]
+    G_fb["FeedbackModal :19"]
+    G_pub["PublishFlow :20 (dead — gallery flag off)"]
+    G_sess["SessionExpiredModal :21"]
+    G_an["Analytics beacon :39-41 (not under GPC)"]
   end
 
   AG[["AuthGuard"]]
@@ -275,41 +278,27 @@ One sub-section per feature area. Every file gets a sub-heading; under it the ex
 
 ### 6.1 App Shell & Routing & Consent
 
-Root bootstrap, the route table, the always-on privacy notice, the dev-only debug page, and the 404 catch-all.
+Root bootstrap, the route table, the dev-only debug page, and the 404 catch-all. (An always-on `ConsentNotice` was listed here; no such component exists in the code or its history, checked 2026-10-06 for record 24. The privacy notice is the Privacy and Cookies pages, §6.4.)
 
 ```mermaid
 flowchart LR
   main["main.tsx"] -->|"installConsoleCapture + render"| App["App.tsx"]
-  App -->|"mounts :13"| Routes["AppRoutes (routes.tsx)"]
-  App -->|"mounts :14"| FB["FeedbackModal"]
-  App -->|"mounts :15"| PF["PublishFlow (dead — flag off)"]
-  App -->|"mounts :16"| SE["SessionExpiredModal"]
-  App -->|"mounts :24"| CN["ConsentNotice"]
-  App -->|"mounts :38"| AN["Analytics (beforeSend=redactUrl)"]
-  CN -->|"Details link"| C["/cookies"]
+  App -->|"mounts :18"| Routes["AppRoutes (routes.tsx)"]
+  App -->|"mounts :19"| FB["FeedbackModal"]
+  App -->|"mounts :20"| PF["PublishFlow (dead — flag off)"]
+  App -->|"mounts :21"| SE["SessionExpiredModal"]
+  App -->|"mounts :39-41 unless GPC"| AN["Analytics (beforeSend=redactUrl)"]
 ```
 
-#### `App.tsx` — root shell: router + global modals + consent notice + analytics
+#### `App.tsx` — root shell: router + global modals + analytics
 
 No elements, copy, or graphics of its own. Mount sites only:
-- [ ] `<AppRoutes />` — `App.tsx:13`
-- [ ] `<FeedbackModal />` global modal — `App.tsx:14` (see §6.13)
-- [ ] `<PublishFlow />` global modal — `App.tsx:15` (dead — `GALLERY_PUBLIC_ENABLED=false`, see §6.13, §10)
-- [ ] `<SessionExpiredModal />` global modal — `App.tsx:16` (see §6.5)
-- [ ] `<ConsentNotice />` — `App.tsx:24` (this section, below)
-- [ ] `<Analytics beforeSend={…redactUrl}>` Vercel Web Analytics — `App.tsx:38` (see §6.15)
-
-#### `components/ConsentNotice.tsx` — always-visible, non-dismissible privacy notice (bottom-left fixed, every route)
-
-**Elements**
-- [ ] `Details` — router link — `ConsentNotice.tsx:44` — navigates to `/cookies`
-
-**Copy**
-- [ ] "Privacy notice" — aria-label on `role="note"` container — `ConsentNotice.tsx:24`
-- [ ] "Postr counts page visits and bounce rates — no cookies, no cross-site tracking." — body text — `ConsentNotice.tsx:42`
-- [ ] Note: deliberately NO close button (header comment `ConsentNotice.tsx:1-17`); z-index 40 sits under modals/tour.
-
-**Graphics** — none.
+- [ ] `<RouteScrollManager />` — `App.tsx:15` · `<MobileNotice />` — `App.tsx:17`
+- [ ] `<AppRoutes />` — `App.tsx:18`
+- [ ] `<FeedbackModal />` global modal — `App.tsx:19` (see §6.13)
+- [ ] `<PublishFlow />` global modal — `App.tsx:20` (dead — `GALLERY_PUBLIC_ENABLED=false`, see §6.13, §10)
+- [ ] `<SessionExpiredModal />` global modal — `App.tsx:21` (see §6.5)
+- [ ] `<Analytics beforeSend={…redactUrl}>` Vercel Web Analytics — `App.tsx:39-41`, rendered only when `globalPrivacyControlOn()` is false (`analytics/globalPrivacyControl.ts`; record 24) (see §6.15)
 
 #### `main.tsx` — React root bootstrap
 
@@ -320,6 +309,7 @@ No UI — logic only.
 #### `routes.tsx` — route table + lazy-load fallback
 
 Route inventory: see §5 master graph + route table. All inside `<Suspense>`; lazy chunks: Editor, Share, AdminGallery (ChartChooser + PaperToPoster lazy imports removed 2026-09-10 — deactivated).
+- [ ] French routes (fix 26): `/fr` (Landing), `/about/fr`, `/why-posters/fr`, `/pricing/fr`, `/tools/figure-readability/fr` (lazy checker), `/auth/fr`, `/billing/success/fr`, `/billing/cancel/fr` — the same components as the English routes; the language comes from the URL (§6.2b)
 
 **Copy**
 - [ ] "Loading…" — LazyFallback text — `routes.tsx:101`
@@ -347,11 +337,12 @@ Route inventory: see §5 master graph + route table. All inside `<Suspense>`; la
 #### `pages/NotFound.tsx` — catch-all 404
 
 **Elements**
-- [ ] `Back home` — router link — `NotFound.tsx:12-17` — `/dashboard`
+- [ ] `Go to your posters` (« Aller à vos affiches ») — router link — `/dashboard`
+- [ ] the language link — `LanguageLink` to the same address in the other language (`/x` ↔ `/x/fr`) (fix 26)
 
-**Copy**
-- [ ] "404" — h1 — `NotFound.tsx:10`
-- [ ] "Page not found." — para — `NotFound.tsx:11`
+**Copy** (`i18n/notFound.ts`; an address ending in `/fr` is answered in French, head from `routes.json` app `/404/fr`)
+- [ ] "404" — h1
+- [ ] "Page not found." / « Page introuvable. » — para
 
 **Graphics** — none.
 
@@ -387,14 +378,14 @@ flowchart LR
 - [ ] "Academic posters," + "without the hassle." — h1 — `Landing.tsx:126-127`
 - [ ] "A poster editor that handles" + rotating slot + "so you can work on the science." — hero sentence — `Landing.tsx:146-151`; rotating phrases from HERO_FRICTIONS `Landing.tsx:62-69` (rendered by `RotatingWord`, §6.13): "the fiddly block nudging" · "the text reflowing on you" · "the BibTeX citation styles" · "the conference size specs" · "the authors and affiliations" · "the unreadable tiny figures"
 - [ ] "Best on a laptop." + "The editor needs a bigger screen to drag blocks and see your poster at full size." — mobile notice (sm:hidden) — `Landing.tsx` (the trailing "The plot picker and figure checker work fine on a phone." sentence was cut 2026-09-10 — no standalone tool page is live)
-- [ ] Feature cards (6, each title+body) — `Landing.tsx:188-253`: "Smart templates" / "5 conference-ready layouts with discipline-specific palettes. APA, SfN, ECNP size presets built in." · "Figure readability" / "Paste your R or Python code. See if axis labels will be readable at print size. Get a copy-ready fix." · "Writing guide" / "Section-by-section tips, word count targets, and a checklist to follow from intro to conclusion." · "PowerPoint, both ways" / "Open an existing .pptx poster and keep editing it here, or export one back out with every block still editable." · "LaTeX source" / "Download a compilable poster.tex with your figures and a references.bib — keep working in Overleaf if you prefer." · "Copy a design" / "Upload a poster you admire and apply its colours and type to yours. Copies the look, never the content."
+- [ ] Feature cards (4, each title+body, ≤15 words per body — `toolDiscoverability.test.tsx`) — `Landing.tsx`, section "Core poster tools". The "Editable exports" card (🎞️) reads "Import and edit a PowerPoint, then export an editable one. PowerPoint exports are paid." (fix 25, 2026-10-06: the LaTeX export is hidden, and the card says the export is paid). The other three cards were not re-extracted for fix 25.
 - [ ] ~~"Tools you can use on their own" — h2~~ — section removed 2026-09-10 (all standalone tools deactivated)
 - [ ] ~~"Figure tools that work without an account, and without opening the editor." — lede~~ — removed 2026-09-10 (was "Two parts of the poster workflow…" before the manuscript card went)
 - [ ] ~~ToolCard props: "Paper to poster" / "Paste your manuscript or upload a .docx, answer a few short questions about what to emphasise, and download a poster draft as a PDF." / cta "Start from a paper" · "Plot picker" / "Paste a table or answer three short questions, and get ranked chart suggestions drawn as journal-style panels. Download any panel as SVG or PNG." / cta "Find your figure"~~ — removed 2026-09-10 (deactivated; kept here verbatim as the reactivation reference)
 - [ ] JSON-LD description: "A web app for making academic conference posters, built for researchers and students." — `Landing.tsx:41-42`
 
 **Graphics**
-- [ ] 📐 — emoji — `Landing.tsx:192` ("Smart templates") · [ ] 📊 — `Landing.tsx:203` ("Figure readability") · [ ] ✍️ — `Landing.tsx:214` ("Writing guide") · [ ] 🎞️ — `Landing.tsx:225` ("PowerPoint, both ways") · [ ] 📐 — `Landing.tsx:236` ("LaTeX source") · [ ] 🎨 — `Landing.tsx:247` ("Copy a design") · ~~📄 / 📊 (ToolCard)~~ — removed 2026-09-10 with the ToolCard
+- [ ] Card emoji — `Landing.tsx` — 🎞️ on "Editable exports", ✍️ on "Writing guide"; the others were not re-extracted for fix 25 (the earlier six-card list with a "LaTeX source" card is gone)
 - [ ] ~~"→" — text arrow appended to ToolCard cta~~ — removed 2026-09-10 with the ToolCard
 
 #### `pages/About.tsx` — /about feature tour as vertical timeline + feedback CTA
@@ -418,7 +409,7 @@ flowchart LR
   - [ ] "Start from the poster you already have" / "Already have a poster in PowerPoint, as a PDF, or as an image? Open it here and keep editing it, blocks and all — title, headings, body text and figures land where they were, each one still yours to move and rewrite." — `start-from-work` milestone — `About.tsx:63-66`. **Rewritten 2026-09-10** (paper-to-poster deactivated — see routes.tsx header): the manuscript sentence was dropped. Old copy, kept as the reactivation reference: ~~"Start from the work you already have" / "Paste a manuscript or drop a .docx and answer a few short questions about what to emphasise — you get a structured poster draft rather than a blank canvas. Already have a poster in PowerPoint? Open the .pptx here and keep editing it, blocks and all…"~~
   - [ ] "The right figure, drawn for print" / "Paste a table or answer three questions in the Figure tab and Postr ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once and insert them straight onto the poster." — `About.tsx` (rewritten 2026-09-10: names the editor's Figure tab instead of "the plot picker" and no longer promises SVG/PNG downloads — those lived on the deactivated standalone page)
   - [ ] "Borrow a look you like" / "Upload a poster you admire and Postr lifts its colours and type onto yours — the look, never the content. Print-safe clamping keeps the result legible on paper rather than only on screen." — `About.tsx:79-81`
-  - [ ] "Iterate, export, print" / "Undo and redo up to 100 steps. Save a PDF for free. PowerPoint and LaTeX exports are paid: …" — `About.tsx:122` (the step count is `UNDO_HISTORY_LIMIT`, `stores/posterStore.ts:35`, pinned by `oneUndoHistory.test.tsx`; 50 before fix 12; the share-link sentence removed with sharing, fix 23)
+  - [ ] "Iterate, export, print" / "Undo and redo up to 100 steps. Save a PDF for free. PowerPoint exports are paid, and keep text, images and tables editable. Charts made in Postr are not included." — `i18n/about.ts` `milestones` id `ship`, rendered by `About.tsx` (the French entry: « Annulez et rétablissez jusqu’à 100 étapes. … »; the step count is `UNDO_HISTORY_LIMIT`, `stores/posterStore.ts:35`, pinned in both languages on the rendered page by `oneUndoHistory.test.tsx`; 50 before fix 12; the share-link sentence removed with sharing, fix 23; the LaTeX sentence removed with the LaTeX export, fix 25)
 - [ ] "Shape what ships next" — eyebrow — `About.tsx:180`
 - [ ] "Tell us what's missing." — h2 — `About.tsx:183`
 - [ ] "Every bug report and feature request lands in the developer's queue. The loudest feedback wins the most attention — so if something's broken, missing, or could be better, say so." — para — `About.tsx:185-189`
@@ -445,6 +436,50 @@ flowchart LR
 - [ ] "When you are ready to build one" — h2 — `WhyPosters.tsx:197`; "The skills above come from presenting, not from formatting. Postr exists so the formatting is not the hard part — real print sizes, authors and affiliations that stay in sync, and figures checked for legibility before you get to the print shop." — `:199-204`
 
 **Graphics** — none.
+
+---
+
+### 6.2b French public pages (fix 26)
+
+The public pages in English and French. Owner decision 2026-10-06; record `docs/fixes/26-french-public-pages.md`. The editor, dashboard and profile are English only.
+
+```mermaid
+flowchart LR
+  URL["URL: /x or /x/fr (/fr for /)"] -->|"langFromPath"| L["useLang() — i18n/lang.ts"]
+  L --> D["i18n/*.ts dictionaries (EN + FR, French typed with the English shape)"]
+  D --> P["pages: Landing, About, WhyPosters, Pricing+PricingSection, Auth+PasswordStrength, BillingResult, NotFound, FigureReadability+PrintSizeFields+ReadabilityPanel"]
+  D --> C["chrome: PublicHeader, PublicFooter, MobileNotice"]
+  LL["components/LanguageLink.tsx"] -->|"counterpartPath (query + hash kept)"| URL
+  R["seo/routes.json French records (fr-CA, fr_CA)"] --> H["head: useDocumentMeta + headTags.mjs (hreflang en / fr-CA / x-default)"]
+  R --> PR["scripts/prerender.mjs (French heads, French fallback nav) + gen-sitemap.mjs"]
+  A["/auth/fr"] -->|"createCheckout(sku, 'fr')"| API["apps/api billing.ts: locale fr-CA, /billing/*/fr"]
+```
+
+#### `i18n/lang.ts` — the two languages; no UI
+- [ ] `Lang` (`'en' | 'fr'`), `Bilingual<T>`, `HTML_LANG` (`en`, `fr-CA`)
+- [ ] `BILINGUAL_PATHS` — the English paths with a French twin (the public pages, `/auth`, `/billing/*`, the legal pages)
+- [ ] `langFromPath`, `englishPath`, `localizedPath(path, lang)` (an English-only path is returned as it is), `counterpartPath(pathname, search, hash)`, `useLang()`, `formatNumber` (decimal comma in French)
+
+#### `i18n/*.ts` — the dictionaries; no UI of their own
+- [ ] `chrome.ts` (header, footer, phone notice, each language's own name), `landing.ts`, `about.ts` (with the code behind each milestone), `whyPosters.ts`, `pricing.ts` (tier cards: « 18,99 $ CA » « + taxes applicables »), `auth.ts` (plan labels, Terms line, password rules, the French lines for six Supabase error codes), `billing.ts`, `notFound.ts`, `figureReadability.ts` (page, size fields, preset names), `readability.ts` (the checker panel), `readabilityWarnings.ts` (engine row names and warnings in French), `dictionaries.ts` (the registry the parity test reads); the refund lines are `data/refundCopy.ts` `REFUND_LINES` (EN and FR)
+
+#### `components/LanguageLink.tsx` — the « Français » / "English" link
+- [ ] `<Link lang hrefLang>` to `counterpartPath`; renders nothing on an English-only page unless `to` is given (the 404). Mounted in PublicHeader (flat row `xl:`, phone menu last row), PublicFooter (`<nav aria-label="Language">` beside the copyright, only on a bilingual page), Auth's legal footer, BillingResult, NotFound
+
+#### Head, prerender, routing
+- [ ] `seo/routes.json` — static `/fr`, `/about/fr`, `/why-posters/fr`, `/pricing/fr`, `/tools/figure-readability/fr`; app `/auth/fr` (prerender), `/billing/success/fr`, `/billing/cancel/fr`, `/404/fr`
+- [ ] `seo/siteMeta.ts` `alternatesFor`, `twinPath`, `notFoundMeta(lang)`; `PageMeta.alternates`
+- [ ] `seo/useDocumentMeta.ts` — three hreflang slots (`en`, `fr-CA`, `x-default`), emptied on a page with none; `scripts/lib/headTags.mjs` mirrors it (`buildPageMeta(path, record, site, routes)`)
+- [ ] `scripts/prerender.mjs` — French fallback nav (« Pages de Postr »), the twin linked once; 19 pages; `gen-sitemap.mjs` 16 URLs
+- [ ] `vercel.json` — rewrites for `/billing/success/fr`, `/billing/cancel/fr`; `X-Robots-Tag: noindex` on `/auth/fr` (and `/billing/(.*)` already)
+- [ ] `index.html` WebSite `inLanguage: ["en-US", "fr-CA"]`
+
+#### Checkout in French
+- [ ] `data/billing.ts createCheckout(sku, lang)` — sends `{ sku, lang: 'fr' }` from a French page, `{ sku }` otherwise; `data/checkoutIntent.ts startCheckoutForPlan(plan, lang)`
+- [ ] `apps/api/src/billing.ts` — `lang === 'fr'` → `locale: 'fr-CA'`, success/cancel `…/billing/success/fr`, `…/billing/cancel/fr`
+
+#### Tests and instruments
+- [ ] `src/__tests__/frenchPages.test.tsx`, `src/i18n/__tests__/dictionaries.test.ts`, `src/i18n/__tests__/readabilityWarnings.test.ts`, `src/pages/__tests__/FigureReadability.french.test.tsx`, `src/pages/__tests__/Auth.checkoutLocale.test.tsx`, `src/seo/__tests__/prerenderFrench.test.ts`, `apps/api/src/__tests__/billing.locale.test.ts`; `scripts/copy-claims-check.mjs` (L1–L3, W1, W2); `scripts/api-mutation-check.mjs`
 
 ---
 
@@ -480,10 +515,10 @@ flowchart LR
 
 **Lifecycle guards — added 2026-09-11 (lifecycle audit, `docs/plans/2026-09-10-lifecycle-evaluation.md`).** The paid path is now guarded server-side; the client mirrors each rule:
 
-- **P0-1 term refund cancels the subscription.** `POST /billing/refund` (`apps/api/src/billing.ts` refundTerm → `billing/termCancel.ts` `cancelSubscriptionImmediately`, `prorate:false`) cancels the Stripe subscription immediately, and `billing/refundLedger.ts` writes `plan='free', plan_expires_at=now(), subscription_status='canceled'` in the same update (the sub id is kept for reconciliation). The response carries `subscription_cancelled: true`; `data/billing.ts requestRefund` returns `{ amountCents, subscriptionCancelled }` and `profile/SubscriptionPanel.tsx` shows "Refunded CA$… — … Your term has been cancelled and PowerPoint/LaTeX export is locked again." then `plan.refresh()`es into the free state.
+- **P0-1 term refund cancels the subscription.** `POST /billing/refund` (`apps/api/src/billing.ts` refundTerm → `billing/termCancel.ts` `cancelSubscriptionImmediately`, `prorate:false`) cancels the Stripe subscription immediately, and `billing/refundLedger.ts` writes `plan='free', plan_expires_at=now(), subscription_status='canceled'` in the same update (the sub id is kept for reconciliation). The response carries `subscription_cancelled: true`; `data/billing.ts requestRefund` returns `{ amountCents, subscriptionCancelled }` and `profile/SubscriptionPanel.tsx` shows "Refunded CA$… — … Your term has been cancelled, so its unlimited PowerPoint exports have ended." (fix 25) then `plan.refresh()`es into the free state.
 - **Refund rule (owner decision, 2026-09-11): no refund after ANY paid export — both SKUs.** Term: unchanged (`termRefundEligible` — within 14 days of the last charge AND `first_paid_export_at` not since it; the window stays because the Terms state it). Pack: `billing/packRefund.ts packRefundEligible` — eligible only while `users.export_credits` still covers the total `credits_granted` of the buyer's unrefunded `billing_fulfilled_sessions` (one pack → `export_credits = 3`); then the MOST RECENT unrefunded pack is refunded in FULL (`refunds.create({ payment_intent })`, no `amount`, key `pack-refund:{session_id}`), ledgered `kind='pack', credits_revoked = credits_granted, session_id`, and exactly that pack's credits are revoked (`revoke_export_credits`). Any consumed credit → `409 already_used` (no Stripe call, no ledger row). The per-unused-credit CA$3.33 proration (`packRefundAmountCents`) is gone; `billing/constants.ts packCreditsForRefundAmount` survives only so `refundReconcile.ts` can attribute an EXTERNAL partial refund to credits (external refunds are reconciled, not gated). Client: `profile/SubscriptionPanel.tsx` button "Refund export pack" + "A pack is refundable in full (CA$9.99) only if you haven't taken a paid export. Refunding removes its 3 credits from your account."; `already_used` is mapped per kind ("This pack isn't refundable once you've taken a paid export — not even in part."); `no_unused_credits` is no longer emitted. Terms §7.2 EN/FR restated (`LAST_UPDATED` bumped to 2026-09-11).
 - **Refund rule in front of the buyer BEFORE purchase (owner rule, 2026-09-11).** One wording source, `data/refundCopy.ts`: `REFUND_LINE.term` "Full refund within 14 days of a charge if you haven’t taken a paid export.", `REFUND_LINE.pack` "Full refund until your first export. No refund after, even in part.", `REFUND_LINE_BOTH` "Term: full refund within 14 days of a charge if you haven’t taken a paid export. Pack: full refund until your first export, none after — even in part." (the paywall, which offers both CTAs), `REFUND_TERMS_PATH` = `/terms#refunds`, `refundLineFor(plan)` (null for the dormant review SKUs) — numbers/conditions mirror Terms §7.2 + `SubscriptionPanel`. Surfaces: `PricingSection` (`PricingTier.refund` rendered right under each paid CTA — `:229`, kept for an active term holder — plus the section fine print "A term is refundable in full within 14 days of a charge, a pack until its first export; taking a paid export ends either refund. Full details in the refund terms." → `/terms#refunds`, `:156-160`), `EditableExportButtons` paywall (`REFUND_LINE_BOTH` directly above the buy buttons, `:353`), `Auth` `?plan=` banner (`refundLineFor(checkoutPlan)` under the plan label, `:451`), and the `/pricing` crawler copy (`seo/routes.json`). **Stripe-hosted page: none** — `custom_text.submit` is refused together with `managed_payments` (sandbox 2026-09-11, `StripeInvalidRequestError` "You cannot use custom_text with Managed Payments."), and `consent_collection.terms_of_service='required'` is refused with AND without MoR until a Terms URL is set in Dashboard → Public business details (not enabled in code; `billing.guard.test.ts` pins both absent). Tests: `PricingSection.test.tsx`, `EditableExportButtons.credits.test.tsx`, `Auth.audit.test.tsx`, `siteMeta.test.ts`.
-- **P0-2 one term per user.** `POST /billing/create-checkout` refuses `sku:'term'` with `409 already_subscribed` when `billing/subscriptionGuard.ts hasActiveTerm(row)` — `plan='term'` with a future expiry, OR a live `subscription_status` (active/trialing/past_due) whose `plan_expires_at` is absent or still in the future (a status stuck past a lapsed expiry is logged, not enforced, so a missed terminal webhook can never dead-end a repurchase). Checkout passes the stored `stripe_customer_id` as `customer` (one Stripe customer per account — partial unique index `users_stripe_customer_id_unique_idx`, `20260911000100`). Client: `data/billing.ts` throws `AlreadySubscribedError`; `EditableExportButtons.startCheckout` and `Auth.proceedToCheckout` re-read the plan (`usePlan().refresh()` resolves the fresh snapshot) and show "You already have an active term — PowerPoint and LaTeX export are unlocked…" ONLY when the fresh row agrees, else the generic failure; `PricingSection` / `/auth?plan=term` hide the term CTA when `hasActiveTerm`.
+- **P0-2 one term per user.** `POST /billing/create-checkout` refuses `sku:'term'` with `409 already_subscribed` when `billing/subscriptionGuard.ts hasActiveTerm(row)` — `plan='term'` with a future expiry, OR a live `subscription_status` (active/trialing/past_due) whose `plan_expires_at` is absent or still in the future (a status stuck past a lapsed expiry is logged, not enforced, so a missed terminal webhook can never dead-end a repurchase). Checkout passes the stored `stripe_customer_id` as `customer` (one Stripe customer per account — partial unique index `users_stripe_customer_id_unique_idx`, `20260911000100`). Client: `data/billing.ts` throws `AlreadySubscribedError`; `EditableExportButtons.startCheckout` and `Auth.proceedToCheckout` re-read the plan (`usePlan().refresh()` resolves the fresh snapshot) and show "You already have an active term — PowerPoint export is unlocked…" ONLY when the fresh row agrees, else the generic failure; `PricingSection` / `/auth?plan=term` hide the term CTA when `hasActiveTerm`.
 - **P0-2 subscription-id-scoped webhooks.** `handleSubscriptionChange` revokes only when the event's sub id IS the stored one (`canRevokeTerm`); `advanceTermAccess` re-grants the same sub unless its stored status is irreversibly terminal (`canceled` / `incomplete_expired` — `unpaid` is recoverable: paying the dunning invoice re-activates the SAME sub), refuses a DIFFERENT sub while the stored one is live (duplicate term, operator-logged), and logs a refused `skip_terminal`.
 - **P0-3 deleted accounts.** `POST /account/delete` (`apps/api/src/account.ts`, client `data/account.ts` + `profile/accountDeletion.ts`) cancels every live sub, deletes the Stripe customer, removes Storage objects (`storageCleanup.ts`), writes `public.account_deletions`, THEN `auth.admin.deleteUser`. Nothing is deleted client-side first. A later webhook resolving that user id (`billing/termRow.ts readTermRow`) is acknowledged (200, no write) when an `account_deletions` row exists, and is an operator-visible 500 (`UserRowMissingError`) when none does — a genuine orphan.
 - **H-8 live credit balance.** `POST /billing/consume-credit` answers the remaining balance (`409 no_credit` at zero → `NoExportCreditError`); `usePlan().applyCredits()` folds it in so the "N exports left" hint and the paywall track it.
@@ -497,7 +532,7 @@ flowchart LR
 **Copy**
 - [ ] "Pricing" — eyebrow — `Pricing.tsx:30`
 - [ ] "Free to build." + "Pay only to take it further." — h1 — `Pricing.tsx:33-35`
-- [ ] "A finished, print-ready poster costs nothing. You pay when you want to keep editing in PowerPoint or LaTeX, or turn a paper into a talk — the parts that go beyond the free workflow." — lede — `Pricing.tsx:37-41`
+- [ ] "Build and print free. Pay only for editable PowerPoint exports." — lede — `Pricing.tsx` (fix 25: no LaTeX)
 
 **Graphics** — none.
 
@@ -511,7 +546,7 @@ flowchart LR
 
 **Copy**
 - [ ] "You're all set" — success h1 — `BillingResult.tsx:73`
-- [ ] "Your term is active. Editable PowerPoint and LaTeX exports are unlocked — no watermark." — status para — `BillingResult.tsx:78`
+- [ ] "Your term is active. Editable PowerPoint exports are unlocked — no watermark." — status para — `BillingResult.tsx` (fix 25: no LaTeX)
 - [ ] "Your export pack is ready — {credits} export{s} to use whenever. Credits never expire." — status para — `BillingResult.tsx:80`
 - [ ] "Payment received — finalizing your account. This takes just a moment." — status para (≤6s grace) — `BillingResult.tsx:82`
 - [ ] "Payment received. Your access will appear shortly — head back in and it'll be ready." — status para — `BillingResult.tsx:83`
@@ -534,19 +569,19 @@ flowchart LR
 
 **Copy**
 - [ ] "Simple pricing, no surprises" — H2 — `PricingSection.tsx:130`
-- [ ] "Editing and PDF export are always free — with a small “made with postr.sh” mark. You only pay to export to PowerPoint or LaTeX." — sub — `PricingSection.tsx:132-135`
+- [ ] ~~sub line~~ — not in the current component: the section's H2 is "Choose your export access" (`PricingSection.tsx`); re-extracted for fix 25 only where it changed (below)
 - [ ] "Free" / "$0" / "always" — tier 1 name/price/cadence (constant `TIERS :66-69`)
 - [ ] "Everything you need to build and print a poster." — tier 1 tagline — `:70`
 - [ ] "Making a poster and printing or presenting it." — tier 1 forWho — `:73`
 - [ ] "Unlimited editing, every tool" / "PDF export — print-ready" / "Paper to poster" / "Unlimited editing and every design tool" / "A small “made with postr.sh” mark on the PDF" — tier 1 features — `:74-80`
-- [ ] "Term" / "$18.99 CAD" / "every 4 months" — tier 2 — `:84-86`
+- [ ] "Term" / "CA$18.99" / "every 4 months" / "+ applicable taxes" — tier 2 name, price, cadence and tax note (`PricingTier.taxNote`, rendered right under the price; fix 25: Stripe prices are before tax) — `PRICING_TIERS`
 - [ ] "The full workflow, all term. About CA$4.75 a month, cancel anytime." — tier 2 tagline — `:87`
 - [ ] "Presenting through the term, or making several posters." — tier 2 forWho — `:91`
-- [ ] "Everything in Free — no watermark" / "Export to PowerPoint & LaTeX" / "Keep editing your poster anywhere" / "Renews every 4 months — cancel anytime" — tier 2 features — `:96-101`
-- [ ] "Export pack" / "$9.99 CAD" / "one-time · 3 exports" — tier 3 — `:104-107`
+- [ ] "PowerPoint exports with no watermark." / "No export limit while your term is active." — tier 2 features — `PRICING_TIERS` (fix 25: no LaTeX)
+- [ ] "Export pack" / "CA$9.99" / "one-time · 3 exports" / "+ applicable taxes" — tier 3 name, price, cadence and tax note — `PRICING_TIERS`
 - [ ] "Just need a couple of clean exports? Pay only for those — credits never expire." — tier 3 tagline — `:108`
 - [ ] "A one-off export, without committing to a term." — tier 3 forWho — `:111`
-- [ ] "Export 3 posters to PowerPoint or LaTeX" / "No watermark on those exports" / "Credits never expire — use them whenever" / "No subscription, no term" / "Talk export counts too, when it lands" — tier 3 features — `:112-118`
+- [ ] "Three PowerPoint exports." / "Purchased exports have no watermark." — tier 3 features — `PRICING_TIERS` (fix 25: no LaTeX)
 - [ ] "Recommended" — featured badge — `PricingSection.tsx:177`
 - [ ] "Full refund within 14 days of a charge if you haven’t taken a paid export." — term card refund line, right under the CTA (`PricingTier.refund`, `data/refundCopy.ts REFUND_LINE.term`) — `PricingSection.tsx:107` / rendered `:229` (2026-09-11)
 - [ ] "Full refund until your first export. No refund after, even in part." — pack card refund line — `PricingSection.tsx:122` / rendered `:229` (2026-09-11)
@@ -594,163 +629,54 @@ Writes to Supabase table `talk_waitlist` (§9). Its only caller, `TalkWaitlistCa
 
 ### 6.4 Legal Pages EN/FR
 
-Six legal pages: Privacy, Cookies, Terms, each in EN + FR variants. EN pages link to their FR variant (`Français`); FR pages link back (`English`). Note: FR cross-links to other legal pages target the EN URLs (e.g. `CookiesFr` → `/privacy`, not `/privacy/fr`). Shared presentational components `SectionHeading/Body/List/Table/CalloutBox` are duplicated per legal page (defined e.g. `Cookies.tsx:274-338`).
+Six legal pages: Privacy, Cookies, Terms, each in EN + FR (Quebec French), kept sentence for sentence. EN pages link to their FR variant (`Français`), FR pages back (`English`); FR cross-links target the FR pages (`/privacy/fr`, `/cookies/fr`, `/terms/fr#refunds`). Rewritten for record 24 (`docs/fixes/24-legal-canada-law25.md`, owner decisions 2026-10-06): Canada first (Quebec's Law 25 and PIPEDA), then the EU/UK GDPR and US state law; Resila Technologies Inc. "incorporated in Quebec"; the person in charge published as a ROLE ("Person in charge of the protection of personal information (Privacy Officer), Resila Technologies Inc." / « Responsable de la protection des renseignements personnels, Resila Technologies Inc. »), never a name or "President"; every data flow read from the code (file references in `docs/legal/quebec-law-25.md`). Shared presentational components `SectionHeading/SubHeading/Body/List/Table/CalloutBox` are duplicated per page.
+
+**Contracts (tests):** `pages/__tests__/legalPagesContent.test.tsx` renders all six pages and checks every element the decisions require (Law 25 list, rights table with "how to use it", Vercel/Render/Supabase first among recipients, GPC, Google Fonts, Terms: before tax, cancellation at period end, unused-term refund, PowerPoint only, the Quebec consumer's own court, no arbitration/class-action waiver), that nothing dropped is stated (LaTeX, SCCs, a region, a DPO, a CCPA-applies claim), that no page names a President, and that EN and FR have the same shape (h2, h3, li, tr, callouts, ids). Since review round 2 it also checks page counting is not listed as a private default, what Vercel may record from a page view, Canada's adequacy and the safeguard request (no safeguard claimed), portability as the law gives it, the s. 19.1 statement right before each Quebec-inapplicable Terms clause (in bold), and Quebec French usage on the three FR pages. `pages/__tests__/cookiesStorageInventory.test.ts` pins the Cookies table to the code's storage writers and the GPC claim to the code that reads GPC.
 
 ```mermaid
 flowchart LR
   P["/privacy Privacy"] <-->|"Français / English"| PF["/privacy/fr PrivacyFr"]
   C["/cookies Cookies"] <-->|"Français / English"| CF["/cookies/fr CookiesFr"]
   T["/terms Terms"] <-->|"Français / English"| TF["/terms/fr TermsFr"]
-  C -->|"Privacy Policy link"| P
-  CF -->|"Politique de confidentialité (targets EN)"| P
-  T -->|"Privacy Policy link"| P
-  TF -->|"Politique de confidentialité (targets EN)"| P
-  CN["ConsentNotice (global)"] -->|"Details"| C
+  C -->|"Privacy Policy"| P
+  CF -->|"Politique de confidentialité"| PF
+  T -->|"Privacy Policy"| P
+  TF -->|"Politique de confidentialité"| PF
+  P -->|"Cookies Policy · Terms of Service (#refunds) · Profile page"| C
+  PF -->|"Politique relative aux témoins · Conditions (#refunds)"| CF
+  AU["Auth Terms line (both modes)"] -->|"Terms · Privacy · Conditions · Politique"| T
   EEB["EditableExportButtons paywall"] -->|"Refund terms"| TR["/terms#refunds"]
 ```
 
-#### `pages/Privacy.tsx` — /privacy policy (EN)
+#### `pages/Privacy.tsx` — /privacy (EN) · `pages/PrivacyFr.tsx` — /privacy/fr (FR)
 
-**Elements**
-- [ ] `Français` — router link — `Privacy.tsx:31` — `/privacy/fr`
-- [ ] `{support@resila.ai}` — mailto ×5 — `Privacy.tsx:46,272,279,331,348`
-- [ ] `Terms of Service` — router link — `Privacy.tsx:190` — `/terms`
-- [ ] `Profile page` — router link — `Privacy.tsx:284` — `/profile`
+`LAST_UPDATED` `Privacy.tsx:32` ('October 6, 2026') · `PrivacyFr.tsx:21` ('6 octobre 2026'). The FR page's label is « Juridique » (`PrivacyFr.tsx:34`). An intro paragraph (`:54-64`; Law 25 + PIPEDA first; sections 15–16 for EU/UK and US), then 18 sections (EN line · FR line):
+- [ ] §1 Who is responsible — Resila, incorporated in Quebec; callout with the Privacy Officer role + mailto — `:66` · `:58`
+- [ ] §2 What we collect, and how — table When / What / How, and is it needed? (10 rows: every visit, page counting, guest account, sign-up, profile details (browser only), posters, the four language-model features, buying a plan, feedback (console log only if ticked), technical records) + sensitive-data paragraph — `:88` · `:80`
+- [ ] §3 Why we use it — table Purpose / Information used (FR « Finalité »; 9 rows) + no sale, no ads, no training — `:155` · `:149`
+- [ ] §4 Who receives your information — table Provider / What it does / What it receives, and when: **Vercel, Render, Supabase first**, then Anthropic, Stripe, Google (sign-in, Fonts, logo-picker icons), Wikimedia Foundation (FR « Fondation Wikimedia »); Staples mail draft; legal requests; Sharing callout (gallery retract → `/profile`) — `:178` · `:174`
+- [ ] §5 Information communicated outside Quebec — "United States or other countries", no region, no contract claim — `:249` · `:246`
+- [ ] §6 Page counting, cookies and browser storage — Vercel Web Analytics only (what a beacon carries, MEASURED on production; what Vercel's documentation says it may record from it: an approximate location (country, region, city), device type, operating system, browser; review round 2); how to object (GPC → not loaded; or email); Google Fonts (IP + user agent, editor only); browser storage → `/cookies` — `:260` · `:258`
+- [ ] §7 Language-model features, profiling and automated decisions — the 4 Anthropic features; the plot checker sends code nowhere; apart from the approximate location Vercel derives from each page view, no technology that identifies, locates or profiles (GPC turns page counting off); the refund button as the one automated decision, with human review by email (→ `/terms#refunds`) — `:305` · `:309`
+- [ ] §8 Privacy by default — 5 defaults (emails off, console log unticked, profile in browser, nothing published, nothing to the model until used), then the two things that do not start at the most private choice: page counting, on by default (off under GPC), and the attachment box — `:344` · `:353`
+- [ ] §9 How long we keep it, and how it is destroyed — 11-row retention table (no period the code does not enforce) + destruction — `:363` · `:374`
+- [ ] §10 Your rights in Canada and Quebec — how to write (guest: the id from "Download my data"), 30-day written reply, free; table Right / What it means / How to use it in Postr today (Access, Rectification, Withdrawal of consent, Deletion, De-indexation, Portability (to a person or body the law authorizes, s. 27), Explanation of an automated decision, Complaint → CAI / OPC) + account-deletion consequences — `:409` · `:421`
+- [ ] §11 How we govern personal information — roles and responsibilities, life cycle, complaints process — `:472` · `:486`
+- [ ] §12 Confidentiality incidents — register; notice to the CAI and the people affected on a risk of serious injury; OPC under PIPEDA — `:503` · `:521`
+- [ ] §13 Security · §14 Children (16) — `:513`, `:524` · `:533`, `:545`
+- [ ] §15 If you are in the EU or the UK — legal bases table (8 rows; FR citations « art. 6, par. 1, point b) »), restriction, portability to another organization (art. 20(2)), supervisory authority; transfers: Canada's adequacy for organizations subject to PIPEDA, the US only for Data Privacy Framework companies, write to learn whether a decision or safeguard covers a provider (none claimed); Art. 21 objection callout — `:532` · `:554`
+- [ ] §16 If you are in the United States — no sale/sharing for cross-context ads, GPC, state rights — `:580` · `:609`
+- [ ] §17 Changes · §18 Contact — `:590`, `:598` · `:620`, `:630`
 
-**Copy** (`LAST_UPDATED = 'April 10, 2026'` `Privacy.tsx:16`)
-- [ ] "Legal" eyebrow — `Privacy.tsx:29` · [ ] "Privacy Policy" h1 — `Privacy.tsx:35` · [ ] "Last updated: {LAST_UPDATED}" — `Privacy.tsx:36`
-- [ ] §1 "Who we are" + bodies: "Postr ("we", "us") is an academic poster editor operated by Resila Technologies Inc., a corporation registered in the Province of Quebec, Canada. If you have any question about how we handle your personal data — or want to exercise any of the rights described in Section 7 — contact us at {email}." (`:40-50`) · "We act as the data controller (the "enterprise" under Quebec law). Under Quebec's Act respecting the protection of personal information in the private sector (the "Law 25" reform), the person responsible for the protection of personal information within Resila Technologies Inc. is reachable at the same address above. We will name a dedicated Data Protection Officer if and when legal thresholds require it." (`:51-58`)
-- [ ] §2 "What data we collect" + intro body (`:61-64`) + Table "When / What / Required?" 7 rows (`:65-104`): rows for "Anonymous first visit", "When you sign up", "Profile details (optional)", "When you edit a poster", "When you use the figure-readability feature", "When you send feedback", "Technical logs" — each with What + Required cells verbatim at those lines
-- [ ] body "We do not intentionally collect any special-category data (health, biometric, political, religious, sexual orientation, ethnic origin, trade-union membership, genetic data). If you type such information into a poster block yourself, it is stored as the poster content you wrote — we do not process it further." — `:105-111`
-- [ ] §3 "Why we process your data (and our legal basis)" + Table "Purpose / Legal basis / Data categories" 6 rows (`:114-148`) + body "We do not sell personal data, we do not run profiling or automated decision-making that produces legal or similarly significant effects, and we do not use your poster content to train any AI model. We only email you about product research if you have explicitly opted in, and you can withdraw that consent at any time in your account settings — it never affects your access to Postr." — `:149-156`
-- [ ] §4 "Who receives your data" + body (`:159-163`) + Table "Provider / What it does / Location" 5 rows (`:164-173`): Supabase / Vercel / Render / Anthropic / Google rows verbatim + body "We do not share your personal data with advertisers, data brokers, or social networks. If a legal authority issues a valid request compelling disclosure, we will comply, and will tell you unless we are legally prohibited from doing so." (`:174-179`)
-- [ ] Callout "Public gallery." + "If you choose to publish a poster to the public gallery, or create a read-only share link, the poster content and any name you put on it becomes visible to anyone on the internet — including visitors who don't have a Postr account. It may be indexed by search engines and cached by third parties. Retracting the poster removes it from Postr but cannot recall copies that others may have already made. Think before publishing. See Section 5.3 of the Terms of Service for the full rules." — `:180-194`
-- [ ] §5 "International transfers" + body "Some of the processors above are based in the United States. When your data is transferred outside the European Economic Area, we rely on appropriate safeguards: Standard Contractual Clauses approved by the European Commission, and, where applicable, the EU–US Data Privacy Framework certification of the recipient. You can request a copy of the specific safeguards we rely on by emailing us." — `:196-204`
-- [ ] §6 "How long we keep your data" + Table "Data / Retention" 5 rows (`:207-231`): "Poster drafts and assets", "Anonymous guest accounts", "Feedback submissions", "Server/error logs", "Legal/tax records" rows verbatim
-- [ ] §7 "Your rights" + body "Several privacy laws may apply to you depending on where you live. Postr is operated from Quebec, Canada, so the federal Personal Information Protection and Electronic Documents Act (PIPEDA) and Quebec's Act respecting the protection of personal information in the private sector ("Law 25") apply. If you are in the European Economic Area or the United Kingdom, the EU/UK GDPR applies. If you are in California, the California Consumer Privacy Act (CCPA) applies. Across these regimes you have the following rights over your personal data:" (`:234-243`)
-- [ ] List 9 items (`:244-256`): "Access — ask for a copy of the personal information we hold about you and the categories of people it has been shared with." · "Rectification — ask us to correct inaccurate or incomplete information." · "Erasure / de-indexing — ask us to delete your data or stop disseminating it, subject to legal exceptions." · "Restriction — ask us to pause processing while a dispute is resolved." · "Portability — ask for your data in a structured, commonly used, machine-readable format (GDPR and, since September 2024, Quebec Law 25)." · "Objection — object to processing based on our legitimate interest." · "Withdraw consent — where processing is based on consent, withdraw it at any time without affecting processing already carried out." · "Non-discrimination (CCPA) — we will not treat you differently for exercising your CCPA rights." · "Lodge a complaint — with the appropriate regulator (see below)."
-- [ ] body "You can file a complaint with the Commission d'accès à l'information du Québec (CAI) if you are a Quebec resident, the Office of the Privacy Commissioner of Canada (OPC) for matters under PIPEDA, your local EU data-protection authority under GDPR, the UK Information Commissioner's Office (ICO) under UK GDPR, or the California Privacy Protection Agency (CPPA) under CCPA." — `:257-265`
-- [ ] Callout "Right to object (Art. 21 GDPR)." + "You have the right to object at any time — on grounds relating to your particular situation — to processing of your personal data based on our legitimate interest, including any profiling. Send an email to {email}." — `:266-276`
-- [ ] body "To exercise any of these rights, email us at {email}. We will respond within one month, as required by the GDPR. For most actions you can also use the buttons in your Profile page — deleting your account there erases everything associated with it." — `:277-288`
-- [ ] §8 "Cookies and similar technologies" + bodies "We only set cookies and local-storage items that are strictly necessary to run the app — authenticating your session, remembering the poster you last opened, and preventing cross-site request forgery. These do not require consent under the ePrivacy Directive." (`:291-296`) · "We currently do not run third-party analytics or advertising trackers. If we add optional analytics in the future, we will update this notice and ask for your explicit consent before any non-essential cookies are set." (`:297-301`) — note: second para is stale vs. Cookies §4/§8 (Vercel Analytics exists) — drift to flag (§10)
-- [ ] §9 "AI features and automated processing" + bodies (`:303-314`)
-- [ ] §10 "Security" + body "We use encryption in transit (HTTPS everywhere), encryption at rest for database and storage, scoped service-role credentials, row-level security policies on every table, and least-privilege access for everyone who operates the service. No system is perfectly secure, but we take reasonable steps appropriate to the size of the service and the sensitivity of the data." — `:316-324`
-- [ ] §11 "Children's data" + body — `:326-335`
-- [ ] §12 "Changes to this notice" + body — `:337-343`
-- [ ] §13 "Contact" + body — `:345-352`
+**Elements:** `Français`/`English` (`Privacy.tsx:47` · `PrivacyFr.tsx:36`); mailto `support@resila.ai` ×5 (EN `:80,413,494,574,602` · FR `:72,425,511,602,635`); `Profile page` → `/profile` (`:242` · `:239`); `Cookies Policy` → `/cookies` (`:299`) · `/cookies/fr` (`:303`); `Terms of Service` → `/terms#refunds` (`:336`) · `/terms/fr#refunds` (`:345`). **Graphics** — none.
 
-**Graphics** — none.
+#### `pages/Cookies.tsx` — /cookies (EN) · `pages/CookiesFr.tsx` — /cookies/fr (FR)
 
-#### `pages/PrivacyFr.tsx` — /privacy/fr policy (FR)
+`LAST_UPDATED` `Cookies.tsx:42` · `CookiesFr.tsx:16`. Nine sections: §1 Scope (→ `/privacy` · `/privacy/fr`), §2 What cookies are, §3 What Postr uses today (callout: Vercel Web Analytics only, not loaded under GPC; the storage table, one row per key family, lifetimes as the code sets them, account deletion clearing every Postr entry in the browser that deletes, the welcome marker only for that account; the lswt test entry; the strictly-necessary position; Google Fonts with IP + user agent, the logo picker, Google sign-in, Stripe), §4 Page counting (what a beacon carries; what Vercel's documentation says it may record from it, an approximate location, device type, operating system and browser; `/p/[redacted]`, no query; the referring address only from another site on the first page; Referrer-Policy keeps the path out), §5 How to control cookies, §6 Global Privacy Control and Do Not Track (GPC honoured: analytics not loaded; DNT not read; objection by email), §7 Retention, §8 Changes, §9 Contact. The FR page is labelled « Juridique » (`CookiesFr.tsx:29`), uses « mesure d’audience » for analytics and curly apostrophes throughout. **Elements:** `Français`/`English` (`:57` · `:31`), `postr.sh` external link (§1), mailto ×2 (§6 `:293` · `:293`, §9 `:321` · `:323`). **Graphics** — none.
 
-**Elements**
-- [ ] `English` — router link — `PrivacyFr.tsx:29` — `/privacy`
-- [ ] `{support@resila.ai}` — mailto ×5 — `PrivacyFr.tsx:46,284,291,349,368`
-- [ ] `Conditions d'utilisation` — router link — `PrivacyFr.tsx:196` — `/terms` (targets EN)
-- [ ] `page de profil` — router link — `PrivacyFr.tsx:296` — `/profile`
+#### `pages/Terms.tsx` — /terms (EN) · `pages/TermsFr.tsx` — /terms/fr (FR)
 
-**Copy** (`LAST_UPDATED = '10 avril 2026'` `PrivacyFr.tsx:14`) — full FR mirror of Privacy: "Légal" (:27), "Politique de confidentialité" h1 (:34), "Dernière mise à jour : {…}" (:36); §1 "Qui nous sommes" + 2 bodies (:38-59); §2 "Quelles données nous recueillons" + intro + Table "Quand / Quoi / Obligatoire ?" 7 rows (:61-106) + special-category body (:107-114); §3 "Pourquoi nous traitons vos données (et notre base juridique)" + Table "Finalité / Base juridique / Catégories de données" 6 rows (:116-151) + no-sale body (:152-161); §4 "Qui reçoit vos données" + body + Table "Fournisseur / Rôle / Emplacement" 5 rows (:163-179) + no-sharing body (:180-185) + "Galerie publique." callout (:186-200); §5 "Transferts internationaux" + body (:202-211); §6 "Combien de temps nous conservons vos données" + Table "Données / Conservation" 5 rows (:213-238); §7 "Vos droits" + intro body (:240-252) + List 9 items (:253-265) + complaint body naming CAI/CPVP/ICO/CPPA (:266-276) + "Droit d'opposition (art. 21 RGPD)." callout (:277-288) + exercise-rights body (:289-300); §8 "Témoins et technologies semblables" + 2 bodies (:302-316, same stale "aucun outil d'analyse" drift); §9 "Fonctions d'IA et traitement automatisé" + 2 bodies (:318-330); §10 "Sécurité" + body (:332-341); §11 "Données des enfants" + body (:343-353); §12 "Modifications du présent avis" + body (:355-362); §13 "Nous joindre" + body (:364-372). All strings verbatim at the cited line ranges; every FR string enumerated structurally identical to EN list above (counted individually in totals).
-
-**Graphics** — none.
-
-#### `pages/Cookies.tsx` — /cookies policy (EN)
-
-**Elements**
-- [ ] `Français` — router link — `Cookies.tsx:47` — `/cookies/fr`
-- [ ] `postr.sh` — external link — `Cookies.tsx:59` — https://postr.sh
-- [ ] `Privacy Policy` — router link — `Cookies.tsx:61` — `/privacy`
-- [ ] `{support@resila.ai}` — mailto link — `Cookies.tsx:260` — mail client
-
-**Copy** (constants: `LAST_UPDATED = 'July 28, 2026'` `Cookies.tsx:32`)
-- [ ] "Legal" — eyebrow — `Cookies.tsx:45` · [ ] "Cookies Policy" — h1 — `Cookies.tsx:51` · [ ] "Last updated: {LAST_UPDATED}" — `Cookies.tsx:52`
-- [ ] §1 "Scope" — heading — `Cookies.tsx:55`; body "This Cookies Policy explains how Resila Technologies Inc. (the company behind Postr) uses cookies and similar client-side storage technologies on postr.sh. It supplements our Privacy Policy." — `Cookies.tsx:56-65`
-- [ ] §2 "What cookies (and similar technologies) are" — `Cookies.tsx:67`; body "A cookie is a small text file a website asks your browser to store so that it can recognise you on a later page load. Modern web apps also use related browser features — localStorage and sessionStorage — which serve the same purpose (remembering state between visits) but live in a different part of the browser. Wherever this policy says "cookies", we mean cookies, localStorage, and sessionStorage collectively." — `Cookies.tsx:68-76`
-- [ ] body "Regulators (CAI, CNIL, ICO, OPC) treat these technologies the same way: strictly necessary storage can be used without asking, but anything optional — analytics, advertising, third-party embeds — requires your prior, informed, freely-given consent." — `Cookies.tsx:77-82`
-- [ ] §3 "What Postr uses today" — `Cookies.tsx:84`; callout "Postr uses only strictly-necessary storage." + "We do not run Google Analytics, Facebook Pixel, advertising trackers, social-media share buttons with tracking, or any other technology that stores something on your device. We do count page views, using Vercel Web Analytics — it sets no cookie, writes nothing to your browser, and cannot recognise you on a second visit or on any other site. No consent banner is shown because none of the entries below require consent under GDPR, the ePrivacy Directive, PIPEDA, or Quebec Law 25 — that duty attaches to storing or reading data on your device, and page counting does neither. The small notice at the bottom-left of every page repeats this and links here; it is not a consent banner — there is nothing to accept or refuse." — `Cookies.tsx:85-99`
-- [ ] Table headers "Entry / Stored where / What it does / Lifetime" + 5 rows — `Cookies.tsx:101-135`: ("sb-<project-ref>-auth-token", "localStorage", "Holds your Supabase authentication session (JWT + refresh token). Without it, the app cannot tell who you are and your drafts cannot be loaded.", "Until you sign out or the session expires") · ("postr-onboarding-*", "localStorage", "Remembers whether you have seen the onboarding tour so we do not show it again on every visit.", "Until you clear browser data") · ("postr-templates", "localStorage", "Holds custom poster templates you save from the editor's Scratch Pad so they are available on your next visit.", "Until you delete the template or clear browser data") · ("Supabase refresh/session timers", "sessionStorage", "Short-lived technical flags used by the Supabase client to coordinate token refresh between tabs.", "Until you close the browser tab") · ("Aggregate usage measurement", "No device storage", "Counts page visits and bounce rates with Vercel Web Analytics, so we can tell which pages people find useful. Sets no cookie and writes nothing to your browser; visits are never linked to your account or to activity on other sites.", "The per-visit identifier is discarded within 24 hours; only aggregates are kept")
-- [ ] body "The storage entries above fall under the "strictly necessary to provide the service the user explicitly requested" exemption in Article 5(3) of the ePrivacy Directive and the equivalent provisions of PIPEDA and Quebec Law 25. The measurement row needs no exemption: it stores nothing on your device, and the consent duty attaches only to storing or reading data on the device. None of these track you across other sites." — `Cookies.tsx:136-144`
-- [ ] §4 "Page counting, and what Postr still does not use" — `Cookies.tsx:146`; body "Postr counts page views with Vercel Web Analytics, so we can see which pages people find useful. It is worth being precise about what that does and does not involve. It sets no cookie and writes nothing to your browser. There is no identifier that persists: a visit is counted using a value derived from the request itself and discarded within 24 hours, so a second visit tomorrow is a stranger. Every figure is an aggregate — a count of views on a page, never a record of what you did." — `Cookies.tsx:147-157`
-- [ ] body "We also strip the address before it is counted. Poster URLs, share links and admin pages are recorded only as their shape — `/s/[redacted]` rather than the slug you were sent. A share link is a link to unpublished work, and the slug is what opens it, so it never leaves the app. Query strings are discarded entirely." — `Cookies.tsx:158-165`
-- [ ] List, 6 items — `Cookies.tsx:166-175`: "Advertising cookies — there are no ads on Postr." · "Google Analytics, Matomo, PostHog, Plausible — none of these." · "Cross-site tracking or fingerprinting — we do not profile you between visits or across other websites." · "Social-media widgets — no Facebook, Twitter, or LinkedIn buttons that phone home." · "Persistent identifiers beyond what your authentication session requires." · "Recording of your poster contents, share-link slugs, or query strings in analytics."
-- [ ] body "If we ever add something that does store or read data on your device for optional purposes, we will update this policy, display a consent banner with equally-visible "Accept" and "Reject" choices, and refrain from setting any non-essential storage until you click "Accept"." — `Cookies.tsx:176-182`
-- [ ] §5 "How to control cookies" — `Cookies.tsx:184`; body "Because Postr currently only stores what is strictly necessary for sign-in and editing, deleting these entries will sign you out and discard your locally-saved templates and onboarding state. Your server-side data (posters, profile, feedback) is unaffected." — `Cookies.tsx:185-190`; body "You can clear Postr's storage in the usual ways for your browser:" — `Cookies.tsx:191-193`
-- [ ] List, 4 items — `Cookies.tsx:194-201`: 'Chrome / Edge: Settings → Privacy and security → Cookies and other site data → See all site data and permissions → search "postr.sh" → Delete.' · 'Firefox: Settings → Privacy & Security → Cookies and Site Data → Manage Data → search "postr.sh" → Remove.' · 'Safari: Settings → Privacy → Manage Website Data → search "postr.sh" → Remove.' · "Mobile: follow your browser's instructions for clearing site data."
-- [ ] body "Most browsers also let you block all cookies, block third-party cookies, or receive a prompt before each cookie is set. Blocking strictly-necessary cookies will prevent Postr from working." — `Cookies.tsx:202-206`
-- [ ] §6 "Do Not Track and Global Privacy Control" — `Cookies.tsx:208`; body "We respect "Do Not Track" (DNT) headers and the newer Global Privacy Control (GPC) signal. To be precise about what runs today: Postr counts page visits and bounce rates with Vercel Web Analytics. That measurement is cookieless — nothing is stored on your device, there is no cross-site tracking, and there is no separate telemetry layer — so today these signals have nothing to opt out of. Targeted advertising: none. If we ever introduce optional tracking, receiving DNT or GPC from your browser will be treated as an automatic opt-out." — `Cookies.tsx:209-219`
-- [ ] §7 "Retention" — `Cookies.tsx:221`; body "Each entry in the table above lives until the lifetime listed there. None of them outlive 13 months, which is the maximum retention period allowed for consent records under French CNIL guidance and a common reference across EU regulators. When we add a consent cookie in the future, we will default it to 6 months in line with CNIL's recommendation." — `Cookies.tsx:222-229`
-- [ ] §8 "Changes to this policy" — `Cookies.tsx:231`; body "We may update this Cookies Policy as the product evolves. The "Last updated" date at the top reflects the current version. If a change is material — for example, the first time we introduce an analytics or advertising cookie — we will show a clear notice in the app before the change takes effect." — `Cookies.tsx:232-238`
-- [ ] changelog "Changed on July 27, 2026: we added aggregate page counting with Vercel Web Analytics (disclosed in §3 and §4 above), and narrowed the consent-banner commitment in §4: it previously promised a banner for "any non-essential technology", and now attaches to technologies that store or read data on your device or could identify you across visits or other sites. We are noting the narrowing here rather than making it quietly, because it is a narrowing." — `Cookies.tsx:239-248`
-- [ ] changelog "Changed on July 28, 2026: we corrected §6, which previously stated that we do not run analytics — we do count page visits and bounce rates, as described in §4 — and added a small always-visible notice at the bottom of every page that says so and links here." — `Cookies.tsx:249-255`
-- [ ] §9 "Contact" — `Cookies.tsx:257`; body "Questions about cookies or this policy: {email}." — `Cookies.tsx:258-264`
-
-**Graphics** — none. Shared presentational components `SectionHeading/Body/List/Table/CalloutBox` defined `Cookies.tsx:274-338` (duplicated per legal page).
-
-#### `pages/CookiesFr.tsx` — /cookies/fr policy (FR, Québécois)
-
-**Elements**
-- [ ] `English` — router link — `CookiesFr.tsx:30` — `/cookies`
-- [ ] `postr.sh` — external link — `CookiesFr.tsx:45` — https://postr.sh
-- [ ] `Politique de confidentialité` — router link — `CookiesFr.tsx:47` — `/privacy` (note: targets EN page, not /privacy/fr)
-- [ ] `{support@resila.ai}` — mailto — `CookiesFr.tsx:234`
-
-**Copy** (`LAST_UPDATED = '27 juillet 2026'` `CookiesFr.tsx:15`; note EN page is 'July 28' — FR lags one revision)
-- [ ] "Légal" — `CookiesFr.tsx:28` · [ ] "Politique relative aux témoins" — h1 — `CookiesFr.tsx:35` · [ ] "Dernière mise à jour : {LAST_UPDATED}" — `CookiesFr.tsx:37`
-- [ ] §1 "Portée" + body "La présente Politique relative aux témoins explique comment Resila Technologies Inc. (la société derrière Postr) utilise les témoins et les technologies de stockage côté client similaires sur postr.sh. Elle complète notre Politique de confidentialité." — `CookiesFr.tsx:39-51`
-- [ ] §2 "Ce que sont les témoins (et les technologies similaires)" + body "Un témoin est un petit fichier texte qu'un site Web demande à votre navigateur de conserver afin de pouvoir vous reconnaître lors d'un chargement de page ultérieur. Les applications Web modernes utilisent aussi des fonctions de navigateur connexes — localStorage et sessionStorage — qui remplissent le même rôle (mémoriser un état d'une visite à l'autre) mais résident dans une partie différente du navigateur. Partout où la présente politique dit « témoins », nous entendons collectivement les témoins, le localStorage et le sessionStorage." — `CookiesFr.tsx:53-64`
-- [ ] body "Les autorités de réglementation (CAI, CNIL, ICO, CPVP) traitent ces technologies de la même manière : le stockage strictement nécessaire peut être utilisé sans demander la permission, mais tout ce qui est facultatif — analytique, publicité, contenus intégrés de tiers — exige votre consentement préalable, éclairé et donné librement." — `CookiesFr.tsx:65-72`
-- [ ] §3 "Ce que Postr utilise aujourd'hui" + callout "Postr n'utilise que du stockage strictement nécessaire." + "Nous n'exécutons pas Google Analytics, le pixel Facebook, de traceurs publicitaires, de boutons de partage de médias sociaux avec suivi, ni aucune autre technologie qui stocke quoi que ce soit sur votre appareil. Nous comptons bien les pages vues, au moyen de Vercel Web Analytics — cet outil ne dépose aucun témoin, n'écrit rien dans votre navigateur et ne peut pas vous reconnaître lors d'une deuxième visite ni sur aucun autre site. Aucune bannière de consentement n'est affichée parce qu'aucune des entrées ci-dessous n'exige de consentement en vertu du RGPD, de la directive vie privée et communications électroniques, de la LPRPDE ou de la Loi 25 du Québec — cette obligation s'applique au stockage ou à la lecture de données sur votre appareil, et le comptage des pages ne fait ni l'un ni l'autre." — `CookiesFr.tsx:74-90`
-- [ ] Table headers "Entrée / Stockée où / Ce qu'elle fait / Durée de vie" + 4 rows (FR table omits the 5th "Aggregate usage measurement" row present in EN — content drift to flag, §10) — `CookiesFr.tsx:92-120`: ("sb-<project-ref>-auth-token", "localStorage", "Conserve votre session d'authentification Supabase (JWT + jeton de rafraîchissement). Sans elle, l'application ne peut pas savoir qui vous êtes et vos brouillons ne peuvent pas être chargés.", "Jusqu'à votre déconnexion ou l'expiration de la session") · ("postr-onboarding-*", "localStorage", "Retient si vous avez vu la visite guidée d'accueil afin que nous ne l'affichions pas à chaque visite.", "Jusqu'à ce que vous effaciez les données du navigateur") · ("postr-templates", "localStorage", "Conserve les modèles d'affiche personnalisés que vous enregistrez depuis le bloc-notes de l'éditeur afin qu'ils soient disponibles lors de votre prochaine visite.", "Jusqu'à ce que vous supprimiez le modèle ou effaciez les données du navigateur") · ("Minuteries de rafraîchissement/session Supabase", "sessionStorage", "Indicateurs techniques de courte durée utilisés par le client Supabase pour coordonner le rafraîchissement des jetons entre les onglets.", "Jusqu'à ce que vous fermiez l'onglet du navigateur")
-- [ ] body "Toutes ces entrées relèvent de l'exemption « strictement nécessaire à la fourniture du service expressément demandé par l'utilisateur » prévue à l'article 5(3) de la directive vie privée et communications électroniques et aux dispositions équivalentes de la LPRPDE et de la Loi 25 du Québec. Aucune d'elles ne vous suit à travers d'autres sites." — `CookiesFr.tsx:121-127`
-- [ ] §4 "Le comptage des pages, et ce que Postr n'utilise toujours pas" + body "Postr compte les pages vues avec Vercel Web Analytics, afin que nous puissions voir quelles pages les gens trouvent utiles. Il vaut la peine d'être précis sur ce que cela implique et n'implique pas. Cet outil ne dépose aucun témoin et n'écrit rien dans votre navigateur. Il n'existe aucun identifiant qui persiste : une visite est comptée à l'aide d'une valeur dérivée de la requête elle-même et supprimée en moins de 24 heures, de sorte qu'une deuxième visite demain est celle d'un inconnu. Chaque chiffre est un agrégat — un décompte des consultations d'une page, jamais un enregistrement de ce que vous avez fait." — `CookiesFr.tsx:129-142`
-- [ ] body "Nous retirons également l'adresse avant qu'elle ne soit comptée. Les URL d'affiches, les liens de partage et les pages d'administration ne sont enregistrés que sous leur forme — /s/[caviardé] plutôt que l'identifiant qui vous a été envoyé. Un lien de partage est un lien vers un travail non publié, et l'identifiant est ce qui l'ouvre, si bien qu'il ne quitte jamais l'application. Les chaînes de requête sont entièrement écartées." — `CookiesFr.tsx:143-152`
-- [ ] List, 6 items — `CookiesFr.tsx:153-162`: "Témoins publicitaires — il n'y a aucune publicité sur Postr." · "Google Analytics, Matomo, PostHog, Plausible — aucun de ceux-là." · "Suivi intersite ou empreinte numérique — nous ne vous profilons pas d'une visite à l'autre ni à travers d'autres sites Web." · "Widgets de médias sociaux — aucun bouton Facebook, Twitter ou LinkedIn qui transmet des données." · "Identifiants persistants au-delà de ce qu'exige votre session d'authentification." · "Enregistrement du contenu de vos affiches, des identifiants de liens de partage ou des chaînes de requête dans l'analytique."
-- [ ] body "Si nous ajoutons un jour quelque chose qui stocke ou lit effectivement des données sur votre appareil à des fins facultatives, nous mettrons à jour la présente politique, afficherons une bannière de consentement offrant des choix « Accepter » et « Refuser » d'égale visibilité, et nous abstiendrons de déposer tout stockage non essentiel jusqu'à ce que vous cliquiez sur « Accepter »." — `CookiesFr.tsx:163-170`
-- [ ] §5 "Comment contrôler les témoins" + bodies "Comme Postr ne stocke actuellement que ce qui est strictement nécessaire à la connexion et à l'édition, la suppression de ces entrées vous déconnectera et effacera vos modèles enregistrés localement ainsi que votre état d'accueil. Vos données côté serveur (affiches, profil, rétroaction) ne sont pas touchées." / "Vous pouvez effacer le stockage de Postr des façons habituelles pour votre navigateur :" — `CookiesFr.tsx:172-183`
-- [ ] List, 4 items — `CookiesFr.tsx:184-191`: "Chrome / Edge : Paramètres → Confidentialité et sécurité → Cookies et autres données de site → Afficher toutes les données et autorisations des sites → rechercher « postr.sh » → Supprimer." · "Firefox : Paramètres → Vie privée et sécurité → Cookies et données de sites → Gérer les données → rechercher « postr.sh » → Supprimer." · "Safari : Réglages → Confidentialité → Gérer les données de site Web → rechercher « postr.sh » → Supprimer." · "Mobile : suivez les instructions de votre navigateur pour effacer les données de site."
-- [ ] body "La plupart des navigateurs vous permettent aussi de bloquer tous les témoins, de bloquer les témoins de tiers ou de recevoir une invite avant le dépôt de chaque témoin. Bloquer les témoins strictement nécessaires empêchera Postr de fonctionner." — `CookiesFr.tsx:192-197`
-- [ ] §6 "Do Not Track et Global Privacy Control" + body "Nous respectons les en-têtes « Do Not Track » (DNT) et le signal plus récent Global Privacy Control (GPC). À ce jour, ces signaux n'ont rien à désactiver, puisque nous n'exécutons ni analytique ni publicité ciblée. Si nous introduisons un jour un suivi facultatif, la réception d'un signal DNT ou GPC de votre navigateur sera traitée comme un retrait automatique du consentement." — `CookiesFr.tsx:199-208` (note: FR §6 retains the outdated "ni analytique" claim the EN July-28 changelog corrected — content drift, §10)
-- [ ] §7 "Conservation" + body "Chaque entrée du tableau ci-dessus subsiste jusqu'à la durée de vie qui y est indiquée. Aucune d'elles ne dépasse 13 mois, qui est la période de conservation maximale autorisée pour les registres de consentement selon les lignes directrices de la CNIL française et une référence courante parmi les autorités de réglementation de l'UE. Lorsque nous ajouterons un témoin de consentement à l'avenir, nous le fixerons par défaut à 6 mois, conformément à la recommandation de la CNIL." — `CookiesFr.tsx:210-219`
-- [ ] §8 "Modifications de la présente politique" + body "Nous pouvons mettre à jour la présente Politique relative aux témoins à mesure que le produit évolue. La date de « Dernière mise à jour » en haut reflète la version courante. Si une modification est importante — par exemple, la première fois que nous introduirons un témoin d'analytique ou de publicité — nous afficherons un avis clair dans l'application avant que la modification prenne effet." — `CookiesFr.tsx:221-229` (no July-27/28 changelog entries — drift vs EN)
-- [ ] §9 "Contact" + body "Questions sur les témoins ou sur la présente politique : {email}." — `CookiesFr.tsx:231-238`
-
-**Graphics** — none.
-
-#### `pages/Terms.tsx` — /terms (EN)
-
-**Elements**
-- [ ] `Français` — router link — `Terms.tsx:35` — `/terms/fr`
-- [ ] `Privacy Policy` — router link — `Terms.tsx:50` — `/privacy`
-- [ ] `{support@resila.ai}` — mailto ×3 — `Terms.tsx:176,253,338`
-
-**Copy** (`LAST_UPDATED = 'September 11, 2026'` `Terms.tsx:20`)
-- [ ] "Legal" (:33) · "Terms of Service" h1 (:39) · "Last updated: {…}" (:40)
-- [ ] §1 "Agreement" + body "These Terms of Service ("Terms") form a legal agreement between you and Postr ("we", "us"), operated by Resila Technologies Inc., a corporation registered in the Province of Quebec, Canada. By creating an account, signing in, or otherwise using Postr — including browsing the public gallery without an account — you agree to these Terms and to our Privacy Policy. If you do not agree, do not use the service." — `:42-54`
-- [ ] §2 "What Postr is" + body "Postr is an academic poster editor and sharing platform. It lets you create conference-quality posters, store drafts, share read-only links, submit feedback, and — if you choose — publish posters to a public gallery so that other users and visitors can see them." (`:56-62`) + callout "Postr is a sharing platform, not a publisher." + "We host and display the content you upload. We do not review it for accuracy, originality, or lawful use before it goes live. You are solely responsible for what you publish — see Section 5 below." (`:63-71`)
-- [ ] §3 "Accounts" + List 5 items — `:73-82`
-- [ ] §4 "Acceptable use" + lead "You agree not to use Postr to:" + List 7 items (`:86-96`: copyright-infringing / defamatory / unlawful-or-malware / impersonation / probing / feedback-abuse-scraping / ML-training) + body "We may suspend or terminate accounts — and remove content — that violate these rules, with or without notice, at our sole discretion." — `:84-100`
-- [ ] §5 "Your content" + ownership body (`:102-107`); §5.1 "Your warranties" + lead + List 4 items (`:109-121`); §5.2 "Licence you grant to us" + 2 bodies (`:123-140`); §5.3 "The public gallery — read carefully" + callout "Anything you publish to the gallery is public.…" (`:142-154`) + confirm lead (`:155-158`) + List 4 items (`:159-166`) + retract body (`:167-171`); §5.4 "Copyright and DMCA-style takedowns" + body (`:173-184`); §5.5 "Indemnification" + body (`:186-194`)
-- [ ] §6 "Postr's content and trademarks" + body — `:196-203`
-- [ ] §7 "Fees, subscriptions, and refunds" + body "Building and editing posters, and exporting a print-ready PDF, are free. Some features are paid, in Canadian dollars (CAD):" (`:206-209`) + List 2 items: "Term — CA$18.99 billed every 4 months. A recurring subscription that unlocks unlimited PowerPoint and LaTeX export with no watermark. It renews automatically every 4 months until you cancel." · "Export pack — CA$9.99, one time, for 3 export credits. Each PowerPoint or LaTeX export uses one credit. Credits never expire." (`:210-215`) + body "Prices are shown at checkout before you pay…" (`:216-221`); §7.1 "Cancelling your subscription" + body (`:223-229`); §7.2 "Refunds" (id="refunds") + callout "Term — 14-day money-back guarantee.…" (`:232-241`) + callout "Export pack — refundable in full until you export.… we will refund the CA$9.99 charge in full, as long as you have not completed a PowerPoint or LaTeX export with it… once any credit has been used the pack is no longer refundable — not even in part…" (`:242-250`) + body "You can request a refund from the Subscription section of your Profile page, or by emailing {email}. Refunds are returned to your original payment method and may take a few business days to appear." (`:250-258`) + EU/EEA/UK withdrawal-rights body (`:259-269`)
-- [ ] §8 "Feedback" + body — `:271-277`
-- [ ] §9 "Availability, changes, and termination" + List 4 items — `:279-287`
-- [ ] §10 "Disclaimers" + callout ""As is" and "as available". Postr is provided without warranties of any kind… The figure-readability feature is a helpful guide, not a guarantee that your poster will print correctly." — `:289-298`
-- [ ] §11 "Limitation of liability" + 2 bodies — `:300-313`
-- [ ] §12 "Governing law and disputes" + body (Quebec law, Montréal courts) — `:315-324`
-- [ ] §13 "Changes to these Terms" + body — `:326-333`
-- [ ] §14 "Contact" + body "Questions, notices, or legal requests: {email}." — `:335-342`
-
-**Graphics** — none.
-
-#### `pages/TermsFr.tsx` — /terms/fr (FR)
-
-**Elements**
-- [ ] `English` — router link — `TermsFr.tsx:34` — `/terms`
-- [ ] `Politique de confidentialité` — router link — `TermsFr.tsx:50` — `/privacy` (targets EN)
-- [ ] `{support@resila.ai}` — mailto ×3 — `TermsFr.tsx:185,272,365`
-
-**Copy** (`LAST_UPDATED = '11 septembre 2026'` `TermsFr.tsx:19`) — full FR mirror of Terms: "Légal" (:32), "Conditions d'utilisation" h1 (:38), "Dernière mise à jour : {…}" (:39); §1 "Entente" (:41-54); §2 "Ce qu'est Postr" + body + callout "Postr est une plateforme de partage, et non un éditeur au sens juridique." (:56-74); §3 "Comptes" + List 5 (:76-85); §4 "Utilisation acceptable" + lead + List 7 + suspension body (:87-103); §5 "Votre contenu" + §5.1 "Vos garanties" + List 4, §5.2 "Licence que vous nous accordez" + 2 bodies, §5.3 "La galerie publique — à lire attentivement" + callout + List 4 + body, §5.4 "Droit d'auteur et retraits de type DMCA", §5.5 "Indemnisation" (:105-206); §6 "Contenu et marques de commerce de Postr" (:208-216); §7 "Frais, abonnements et remboursements" + List 2 ("Forfait à terme — CA$18.99 facturés tous les 4 mois…" · "Pack d'exportation — CA$9.99, une seule fois, pour 3 crédits d'exportation…") + §7.1 "Annulation de votre abonnement" + §7.2 "Remboursements" (id="refunds") + 2 callouts ("Forfait à terme — garantie de remboursement de 14 jours." · "Pack d'exportation — remboursable intégralement jusqu'à votre première exportation.") + refund-request body + EU/EEE/R-U body (:218-290); §8 "Commentaires" (:292-299); §9 "Disponibilité, modifications et résiliation" + List 4 (:301-309); §10 "Exclusions de garantie" + callout "« Tel quel » et « selon disponibilité »." (:311-321); §11 "Limitation de responsabilité" + 2 bodies (:323-338); §12 "Droit applicable et différends" (:340-349); §13 "Modifications des présentes Conditions" (:351-360); §14 "Nous joindre" (:362-369). All verbatim at cited ranges.
-
-**Graphics** — none.
+`LAST_UPDATED` `Terms.tsx:29` · `TermsFr.tsx:21`. Fourteen sections, unchanged in order: §1 Agreement (Resila "incorporated in Quebec"; the user agrees to the Terms, and the Privacy Policy, → `/privacy` · `/privacy/fr`, "explains how we handle your personal information"), §2 What Postr is (PDF or PowerPoint), §3 Accounts, §4 Acceptable use, §5 Your content (5.1–5.5), §6 Postr's content, §7 Fees, subscriptions, and refunds (prices in CAD and before tax, tax added at checkout; term CA$18.99 + taxes / 4 months, PowerPoint only; pack CA$9.99 + taxes, 3 credits (FR « 18,99 $ CA », « lot d’exportation »); payments through Stripe's merchant-of-record service, which bills, issues receipts and collects the tax; no entity named as the seller) with 7.1 Cancelling (end of the paid period; the unused-term exception) and 7.2 Refunds `id="refunds"` (`Terms.tsx:234` · `TermsFr.tsx:241`: term within 14 days if no paid export since the charge, ends at once; pack: the full amount paid, CA$9.99 plus the tax charged, only while no credit used, pooled; EU/UK withdrawal paragraph), §8 Feedback, §9 Availability, §10 Disclaimers, §11 Limitation of liability (+ consumer rights that cannot be waived), §12 Governing law and disputes (Quebec law; Montréal courts subject to: a Quebec consumer's own court under the Consumer Protection Act, no arbitration required, class actions kept; other consumers' local courts), §13 Changes, §14 Contact. Since review round 2, `QuebecNotice` ("The following clause does not apply to consumers in Quebec to the extent that Quebec’s Consumer Protection Act prohibits it." / « La clause qui suit ne s’applique pas aux consommateurs du Québec dans la mesure où la Loi sur la protection du consommateur l’interdit. », bold) immediately precedes §5.5, §10, §11 and §13's "continued use" sentence (Consumer Protection Act s. 19.1; `Terms.tsx:182,299,311,353` · `TermsFr.tsx:182,314,327,375`); the FR page is labelled « Juridique » and uses Quebec civil-law terms (« responsabilité extracontractuelle », « honoraires extrajudiciaires », « dommages-intérêts punitifs », « marchand officiel »). **Elements:** `Français`/`English` (`:44` · `:36`), mailto ×3 (`:171,259,362` · `:170,270,384`). **Graphics** — none.
 
 ---
 
@@ -777,21 +703,23 @@ flowchart LR
 #### `pages/Auth.tsx` — /auth sign-in/sign-up/guest + account-first checkout
 
 **Elements**
-- [ ] Postr logo + wordmark — router link — `Auth.tsx:363` — navigates to `/`
-- [ ] `Start creating — no account needed` (busy: `Loading…`) — button — `Auth.tsx:389-395` — `handleGuest()` → `supabase.auth.signInAnonymously()` then `/dashboard` (hidden when checkout plan intent present)
-- [ ] `Continue with Google` — button — `Auth.tsx:443-455` — `handleGoogle()` → `signInWithOAuth`/`linkIdentity` (google), redirects to `/dashboard` or back to `/auth?plan=…`
-- [ ] email field — input type=email, required — `Auth.tsx:465-472` — form state
-- [ ] password field — input type=password, required, minLength 8 — `Auth.tsx:474-482` — form state; signup mode renders `<PasswordStrength>` (§6.13) at `Auth.tsx:483`
-- [ ] `Forgot password?` — button — `Auth.tsx:491-497` — `supabase.auth.resetPasswordForEmail` (signin mode only)
-- [ ] `consent-research` — checkbox, unchecked by default — `Auth.tsx:513-519` — sets researchOptIn (signup mode only)
-- [ ] `consent-marketing` — checkbox, unchecked by default — `Auth.tsx:529-535` — sets marketingOptIn (signup mode only)
-- [ ] submit: `Sign in` / `Create account` / `Create account & continue` / busy `Loading…` / `Continuing to checkout…` — button type=submit — `Auth.tsx:545-559` — `handleEmailAuth` → `signUp`/`updateUser`/`signInWithPassword`; on checkout intent → `startCheckoutForPlan` (Stripe redirect)
-- [ ] `Sign up` — mode-toggle button — `Auth.tsx:566-568` — switches to signup mode
-- [ ] `Sign in` — mode-toggle button — `Auth.tsx:573-575` — switches to signin mode
+- [ ] Postr logo + wordmark — router link — `Auth.tsx:416` — navigates to `/`
+- [ ] `Start creating — no account needed` (busy: `Loading…`) — button — `Auth.tsx:480-486` — `handleGuest()` → `supabase.auth.signInAnonymously()` then `/dashboard` (hidden when checkout plan intent present)
+- [ ] `Continue with Google` — button — `Auth.tsx:539-551` — `handleGoogle()` → `signInWithOAuth`/`linkIdentity` (google), redirects to `/dashboard` or back to `/auth?plan=…`; in either mode, creates an account for a Google user Postr has not seen (Supabase, while sign-ups are enabled)
+- [ ] Terms line (both modes, right under `Continue with Google`, before the email form; `data-testid="auth-terms-line"`, record 24, placed by review round 2) — `Auth.tsx:564-582` — links `Terms of Service` → `/terms`, `Privacy Policy` → `/privacy`, `Conditions d’utilisation` → `/terms/fr`, `Politique de confidentialité` → `/privacy/fr`; copy "By continuing, you agree to the Terms of Service. The Privacy Policy explains how we handle your information. En français : Conditions d’utilisation et Politique de confidentialité." (the Privacy Policy is not presented as agreed to, review round 1). Tested by `pages/__tests__/Auth.termsFrench.test.tsx` (the default sign-in view, the switch to sign-up, `/auth?plan=term`; the line is the Google button's next element) and in the browser by `scripts/analytics-privacy-check.mjs` T1 (12 px under the button, in the first view, 3 engines × 3 window sizes × 2 modes)
+- [ ] email field — input type=email, required — `Auth.tsx:592-600` — form state
+- [ ] password field — input type=password, required, minLength 8 — `Auth.tsx:602-611` — form state; signup mode renders `<PasswordStrength>` (§6.13) at `Auth.tsx:612`
+- [ ] `Forgot password?` — button — `Auth.tsx:624-630` — `supabase.auth.resetPasswordForEmail` (signin mode only)
+- [ ] `consent-research` — checkbox, unchecked by default — `Auth.tsx:647-653` — sets researchOptIn (signup mode only)
+- [ ] `consent-marketing` — checkbox, unchecked by default — `Auth.tsx:659-665` — sets marketingOptIn (signup mode only)
+- [ ] submit: `Sign in` / `Create account` / `Create account & continue` / busy `Loading…` / `Continuing to checkout…` — button type=submit — `Auth.tsx:674-688` — `handleEmailAuth` → `signUp`/`updateUser`/`signInWithPassword`; on checkout intent → `startCheckoutForPlan` (Stripe redirect)
+- [ ] `Sign up` — mode-toggle button — `Auth.tsx:695-697` — switches to signup mode
+- [ ] `Sign in` — mode-toggle button — `Auth.tsx:702-704` — switches to signin mode
+- [ ] Legal footer `nav[aria-label="Legal"]` — `Privacy` / `Terms` / `Cookies` — `AuthLegalFooter`, `Auth.tsx:717-741`
 
 **Copy**
 - [ ] "Postr" — wordmark next to logo — `Auth.tsx:370`
-- [ ] "Term · CA$18.99 / 4 months" or "Export pack · CA$9.99" — paid-intent banner label — `Auth.tsx:379`
+- [ ] "Term · CA$18.99 every 4 months + applicable taxes" or "Export pack · CA$9.99 + applicable taxes" — paid-intent banner label — `Auth.tsx` (fix 25: the price says tax is extra); the already-subscribed notice reads "You already have an active term — PowerPoint export is unlocked."
 - [ ] "Full refund within 14 days of a charge if you haven’t taken a paid export." / "Full refund until your first export. No refund after, even in part." — plan-specific refund line under the banner label (`refundLineFor(checkoutPlan)`, `data/refundCopy.ts`) — `Auth.tsx:451` (2026-09-11)
 - [ ] "Continuing to secure checkout…" / "Create your account below to continue to secure checkout." — banner body — `Auth.tsx:382-384`
 - [ ] "Jump straight into the editor as a guest. Your work saves in this browser. Link an account anytime to sync across devices." — guest pitch — `Auth.tsx:396-399`
@@ -942,7 +870,7 @@ flowchart LR
 - [ ] `Get a subscription` — router link — `Profile.tsx:1199-1204` — `/pricing`
 - [ ] `↓ Download my data (JSON)` (busy `Preparing…`) — button — `Profile.tsx:682-689` — RPC `export_my_data` → JSON file download `postr-export-{ts}.json`
 - [ ] `Delete all posters` — DangerAction button — `Profile.tsx:704-710` — ConfirmModal → deletes all posters (disabled at 0; `deletePoster` removes each one's kept plot script, plan item 7)
-- [ ] `Delete account` — DangerAction button (`profile/DangerZone.tsx`) — ConfirmModal with typed confirmation `I confirm the deletion of my account` → `profile/accountDeletion.ts runAccountDeletion()` → `POST /account/delete` (`data/account.ts`; server cancels Stripe subs, deletes the customer, removes Storage, writes `account_deletions`, deletes the auth user — nothing is deleted client-side first) → clear 6 localStorage keys and every `postr.figure-script.*` entry (`clearStoredFigureScripts`, plan item 7) + global signOut → `/auth`. Failure: generic "Something went wrong deleting your account. Nothing was removed — please try again or send feedback." (true: the API leaves the account intact on every pre-final-step failure). With `hasActiveTerm` the description/modal add that deleting also cancels the CA$18.99 term. **Changed 2026-09-11 (P0-3)** — was: delete posters client-side + RPC `delete_own_account`.
+- [ ] `Delete account` — DangerAction button (`profile/DangerZone.tsx`) — ConfirmModal with typed confirmation `I confirm the deletion of my account` → `profile/accountDeletion.ts runAccountDeletion()` → `POST /account/delete` (`data/account.ts`; server cancels Stripe subs, deletes the customer, removes Storage, writes `account_deletions`, deletes the auth user — nothing is deleted client-side first) → clear every Postr entry this browser keeps, in localStorage and sessionStorage: every key named `postr.…` or `postr-…` (the Cookies Policy's naming), except another account's `postr.welcome-seeded:<id>` (this account's id is read from the session before the delete), then `clearStoredFigureScripts` (plan item 7: it also drops scripts too long to store, held in memory) (record 24: first the palettes, the preference, the welcome marker and the two-tab markers; review round 1, the tab's sessionStorage entries and the guest commenter name; `pages/__tests__/Profile.dangerZone.test.tsx` seeds every key in `pages/__tests__/storageWriters.ts`) + global signOut → `/auth`. Failure: generic "Something went wrong deleting your account. Nothing was removed — please try again or send feedback." (true: the API leaves the account intact on every pre-final-step failure). With `hasActiveTerm` the description/modal add that deleting also cancels the term ("This also cancels your term and any add-on immediately."; no price since fix 25). **Changed 2026-09-11 (P0-3)** — was: delete posters client-side + RPC `delete_own_account`.
 - [ ] `<PresetEditModal>` — `Profile.tsx:723-727`; `<ConfirmModal>` — `Profile.tsx:729-738` (§6.13)
 
 **Copy**
@@ -952,8 +880,8 @@ flowchart LR
 - [ ] "Preferences" section — `:402`; "🎨 Saved style presets" — `:405`; "{n} preset{s} saved locally." — `:407`; "Create new presets from the Style tab inside the editor — use the "Save as style preset" row to name your font + palette + typography combo." — `:409-411`; "Onboarding tour" + "Click-through tutorial of the editor interface" — `:436-439`; "Product-research emails" + "Let us occasionally email you to invite you to a short interview or survey about Postr. Turn it on or off anytime. It never affects your access." — `:463-468`; "Product-update emails" + "Occasional emails about new Postr features and updates. Turn it on or off anytime; unsubscribe links are in every email too." — `:493-498`; "Checklist templates" + "Custom templates you saved from the Scratch Pad. Built-in templates cannot be deleted." — `:524-527`; "{t.name} (built-in)" + "{n} items" — `:537-540`; empty "No custom templates yet. Use "Save as..." in the editor's Scratch Pad to create one." — `:558-560`
 - [ ] "Gallery submissions" section — `:572` (rendered when flag on OR entries exist); flag-on body "Posters you have published to the public gallery. You can retract any entry at any time — it disappears from the public listing immediately." — `:574-581`; flag-off body "Posters you published while the gallery was open. The gallery is currently offline, but you can still retract any entry at any time — the entry row and stored image are deleted." — `:583-587`; empty states "You haven't published anything yet. Use the Publish button on a poster card, the Publish button in the editor, or the upload button above." (`:601-603`) / "You haven't published anything to the gallery." (`:613`); row meta "Published {date} · {conference} · {year}" — `:828-830`; badge "Retracted by moderator" — `:811`; "Moderator note: {reason}" — `:834`
 - [ ] "Feedback" section + body "Found a bug? Have an idea? Send it in — everything lands in the developer's queue and shapes what ships next." — `:633-637`; "Your submissions" — `:652-654`; kind badges "Bug"/"Feature"/"Other" — `:873`; status labels FEEDBACK_STATUS_LABEL `:851-857`: "Received", "Triaged", "In progress", "Shipped", "Declined"
-- [ ] "Subscription" section — `:668`; "Loading your plan…" — `:1105`; term-active body "Your term is active — PowerPoint and LaTeX export are unlocked, no watermark." + past-due "There's a payment issue on your latest renewal — update your card to keep your term." — `:1111-1119`; "The term renews every 4 months. Manage it — update your card, see receipts, or cancel — through Stripe, which handles billing for Postr." — `:1121-1124`; "Refundable in full within 14 days of your charge if you haven't taken a paid export." — `:1143-1146`; refund outcomes "Refunded CA${amount}. It may take a few days to appear." (:1088), "The 14-day refund window has passed. You can cancel anytime to stop renewals." (:1093), "This term isn't refundable once you've taken a paid export." / pack: "This pack isn't refundable once you've taken a paid export — not even in part." (`already_used`, per kind — `profile/SubscriptionPanel.tsx`), "No refundable pack purchase found." (:1096), "We couldn't process that refund. Please try again or contact support." (:1098)
-- [ ] Free-state body "You're on the free plan — unlimited editing and print-ready PDF export, with a small "made with postr.sh" mark." — `:1158-1161`; "Export credits" + "{n}" — `:1167-1170`; "{n} PowerPoint or LaTeX export{s} left — credits never expire." / "From a $9.99 export pack. Credits never expire once purchased." — `:1173-1175`; "A pack is refundable in full (CA$9.99) only if you haven't taken a paid export. Refunding removes its 3 credits from your account." — `profile/SubscriptionPanel.tsx`; "Unlock clean PowerPoint & LaTeX export with the term, or a one-time export pack whose credits never expire." — `:1195-1198`
+- [ ] "Subscription" section — `:668`; "Loading your plan…" — `:1105`; term-active body "Your term is active — PowerPoint export is unlocked, no watermark." (fix 25) + past-due "There's a payment issue on your latest renewal — update your card to keep your term." — `:1111-1119`; "The term renews every 4 months. Manage it — update your card, see receipts, or cancel — through Stripe, which handles billing for Postr." — `:1121-1124`; "Refundable in full within 14 days of your charge if you haven't taken a paid export." — `:1143-1146`; refund outcomes "Refunded CA${amount}. It may take a few days to appear." (:1088), "The 14-day refund window has passed. You can cancel anytime to stop renewals." (:1093), "This term isn't refundable once you've taken a paid export." / pack: "This pack isn't refundable once you've taken a paid export — not even in part." (`already_used`, per kind — `profile/SubscriptionPanel.tsx`), "No refundable pack purchase found." (:1096) — each of these refusals, and any other 409 from `/billing/refund` ("This purchase can’t be refunded here."), followed by "This answer was given automatically. To have a person review it, email support@resila.ai." (`AUTOMATED_DECISION_NOTE`, Law 25 s. 12.1, Privacy §7; 2026-10-06), "We couldn't process that refund. Please try again or contact support." (:1098)
+- [ ] Free-state body "You're on the free plan — unlimited editing and print-ready PDF export, with a small "made with postr.sh" mark." — `:1158-1161`; "Export credits" + "{n}" — `:1167-1170`; "{n} PowerPoint export{s} left — credits never expire." / "From an export pack, CA$9.99 + applicable taxes. Credits never expire once purchased." (fix 25) — `:1173-1175`; "A pack is refundable in full (CA$9.99) only if you haven't taken a paid export. Refunding removes its 3 credits from your account." — `profile/SubscriptionPanel.tsx`; "Unlock clean PowerPoint export with the term, or a one-time export pack whose credits never expire." (fix 25) — `:1195-1198`
 - [ ] "Your data" section + body "Download everything Postr has stored for your account as a single JSON file — your posters (with full contents), gallery submissions, feedback you've sent, and your profile. Useful for backups, or to comply with GDPR Art. 15 / 20 right-of-access requests." — `:673-681`
 - [ ] "Danger Zone" — `:702`; "Delete all posters" + "Permanently delete all {n} poster(s). This cannot be undone." — `:705-706`; "Delete account" + "Permanently delete your account and all associated data. You will be signed out and a new guest account will be created." — `:713-714`
 - [ ] ConfirmModal strings `confirmModalTitle/Message/Label` — `:747-771`: "Retract from gallery" / "Remove "{title}" from the public gallery? The entry row and stored image will be deleted. Third parties may still have cached copies." / "Retract" · "Delete account" / "This will permanently delete your account, all posters, and all preferences. You will be signed out. This action cannot be undone." / "Delete my account" · "Delete all posters" / "Permanently delete all {n} poster(s)? This cannot be undone." / "Delete all"
@@ -1112,10 +1040,10 @@ flowchart LR
 - [ ] hidden file input (filled image) — `<input type="file" accept="image/*">` — `blocks.tsx:397` — upload → Supabase Storage (`uploadPosterImage`) or base64 fallback
 - [ ] `+ Upload figure` (empty-image click target) — div button — `blocks.tsx:403-433` — clicks hidden file input
 - [ ] hidden file input (empty image) — `<input type="file" accept="image/*">` — `blocks.tsx:432`
-- [ ] table cell editor — `TableCellEditor` (one per cell, `poster/TableCellEditor.tsx`) — `blocks.tsx:1030-1061` — edits cell HTML → `updateCell`; writes the cell only when the stored value changes from outside, so typing keeps its order (it used `dangerouslySetInnerHTML`, rewritten on every keystroke: "abc" typed became "cba"); its typing joins the one undo history by word under `cell:<block id>:<index>` (fix 12)
-- [ ] `Drag to resize column` — column-border drag handle ×(cols−1) — `blocks.tsx:904-918` — pointer drag redistributes `colWidths`
-- [ ] `Select row ${r + 1}` / title `Select row ${r + 1} (Delete to remove)` — row selector strip ×rows — `blocks.tsx:1056-1090` — selects whole row
-- [ ] `Select column ${c + 1}` / title `Select column ${c + 1} (Delete to remove)` — column selector strip ×cols — `blocks.tsx:1102-1136` — selects whole column
+- [ ] table cell editor — `TableCellEditor` (one per cell, `poster/TableCellEditor.tsx`) — `blocks.tsx:1066-1097` — edits cell HTML → `updateCell`; writes the cell only when the stored value changes from outside, so typing keeps its order (it used `dangerouslySetInnerHTML`, rewritten on every keystroke: "abc" typed became "cba"); its typing joins the one undo history by word under `cell:<block id>:<index>` (fix 12)
+- [ ] `Drag to resize column` — column-border drag handle ×(cols−1) — `blocks.tsx:966-982` — pointer drag redistributes `colWidths`; on a selected table a 24 px grip on screen at every zoom (scaled back across, `UNZOOM_X`), on an unselected one 6 sheet units as before (plan item 19, `docs/fixes/19-controls-one-size.md`)
+- [ ] `Select row ${r + 1}` / title `Select row ${r + 1} (Delete to remove)` — row selector strip ×rows — `blocks.tsx:1119-1164` — selects whole row; on a selected table a 24 px hit area ending 2 px left of the table with the 8 px band at its inner edge, one size on screen (`stripAcross`, `blocks.tsx:875-893`); unselected: 8 units, 10 units out, as before (plan item 19, `docs/fixes/19-controls-one-size.md`; where they show at all is on the Later list)
+- [ ] `Select column ${c + 1}` / title `Select column ${c + 1} (Delete to remove)` — column selector strip ×cols — `blocks.tsx:1177-1221` — selects whole column; the same, 2 px above the table (`stripDown`)
 - [ ] `Add row` — hover-only bottom bar button — `blocks.tsx:1147-1168` — `insertRow(data, rows-1, 'below')`
 - [ ] `Add column` — hover-only right bar button — `blocks.tsx:1171-1193` — `insertCol(data, cols-1, 'right')`
 - [ ] right-click on cell — gesture — `blocks.tsx:971-975` — opens `TableContextMenu` at cursor
@@ -1129,19 +1057,20 @@ flowchart LR
 - [ ] `Tab` / `Shift+Tab` — keyboard — `blocks.tsx:591-602` — focus next/previous cell
 - [ ] `ArrowUp/Down/Left/Right` (at content edge) — keyboard — `blocks.tsx:623-626` — move cell focus
 - [ ] `Escape` — keyboard — `blocks.tsx:628,1243-1249` — closes table context menu
-- [ ] `Delete`/`Backspace` (row/col selected) — keyboard — `blocks.tsx:652-670` — deletes selected row/column; not from a text field, nor from the Undo / Redo buttons (`blocks.tsx:685`, fix 12 review R3-F1)
-- [ ] `Delete`/`Backspace` (multi-cell range) — keyboard — `blocks.tsx:674-699` — clears all cells in range; not from a text field, nor from the Undo / Redo buttons (`blocks.tsx:712`, fix 12 review R3-F1)
+- [ ] `Delete`/`Backspace` (row/col selected) — keyboard — `blocks.tsx:688-711` — deletes selected row/column; not from a text field, nor from the Undo / Redo buttons (`blocks.tsx:699`, fix 12 review R3-F1)
+- [ ] `Delete`/`Backspace` (multi-cell range) — keyboard — `blocks.tsx:713-742` — clears all cells in range; not from a text field, nor from the Undo / Redo buttons (`blocks.tsx:726`, fix 12 review R3-F1)
 - [ ] paste TSV/CSV/HTML — clipboard — `blocks.tsx:781-789` — `parseTablePaste` replaces/grows table
 - [ ] cell drag-select — mouse drag across cells — `blocks.tsx:940-970` — rectangular range selection
 - [ ] block click — click — `blocks.tsx:1908-1924` — selects block; `Shift`/`⌘`/`Ctrl`+click = additive toggle (`blocks.tsx:1910`)
 - [ ] block drag from body — pointer drag (not image/logo) — `blocks.tsx:1925-1937` — move block
 - [ ] block right-click — gesture (non-table, non-text blocks) — `blocks.tsx:1938-1957` — opens block context menu
-- [ ] `ResizeHandles` — 8 (or 4 corner) drag handles — `blocks.tsx:2221-2239` — resize block; corners-only for contain-mode images (`:2237`)
-- [ ] `Drag to move (or use arrow keys)` — circular move handle — `blocks.tsx:2289-2323` — drag → move block
-- [ ] `Replace logo` / `Replace image` — circular button (image/logo only) — `blocks.tsx:2372-2406` — dispatches `postr:replace-block` → opens picker/file input
-- [ ] `Crop image` / `Exit crop` — circular toggle (image/logo only, `aria-pressed`) — `blocks.tsx:2407-2436` — toggles `CropOverlay`
-- [ ] `Delete block` — red circular button — `blocks.tsx:2440-2468` — `onDelete(b.id)`
-- [ ] `Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)` — circular rotate handle below block — `blocks.tsx:2500-2529` — drag → rotate
+- [ ] `ResizeHandles` — 8 (or 4 corner) drag handles — `blocks.tsx:2367-2374` — resize block; corners-only for contain-mode images; which of them a block draws follows its size on screen (`blockControls`, `selectionLayout.ts`; `blocks.tsx:1929-1949`, from the padding box as rendered, `selectionRoom.ts`): no edge handles along an axis under 72 px, only the bottom row (or right column) under 24 px on one axis, only the bottom-right corner under 24 px on both (plan item 19, `docs/fixes/19-controls-one-size.md`)
+- [ ] handle row (move, type label, replace, crop, delete, and rotate when below has no room) — `blocks.tsx:2379-2619` — drawn in px and scaled back by the zoom about its bottom edge (`UNZOOM`), its bottom 14 px above the block at every zoom; on a turned block it is counter-rotated about its own centre, 26 px out from the block's edge, so it stays upright and clear of the block's handles at 180° (`blocks.tsx:2414-2417`; record 19, review F1) (plan item 19, `docs/fixes/19-controls-one-size.md`); the label only from 120 px wide, replace/crop/delete hidden under 24 px on both axes; zoomed out under 35 % (`OVERVIEW_ZOOM`, measured), a row whose buttons are wider than its block on screen (`handleRowWidth`: move, delete, and an image's or logo's replace and crop, 24 px each 4 px apart: 52 px, 108 px for an image or logo) draws only the move button, no replace, crop, delete or rotate control (record 19, review F3); delete then stays on the Delete/Backspace keys and the right-click menu's `Delete` (blocks other than the table and the text-like ones); from 35 % up the row is whole however narrow the block; where the buttons are drawn the label shows only if the row has room for it
+- [ ] `Drag to move (or use arrow keys)` — circular move handle (24 px hit area, 20 px circle) — `blocks.tsx:2437-2469` — drag → move block
+- [ ] `Replace logo` / `Replace image` — circular button (image/logo only; not drawn under 35 % zoom while the row is wider than the block, review F3) — `blocks.tsx:2515-2554` — dispatches `postr:replace-block` → opens picker/file input
+- [ ] `Crop image` / `Exit crop` — circular toggle (image/logo only, `aria-pressed`; not drawn under 35 % zoom while the row is wider than the block, review F3: crop mode, once on, keeps its own Cancel / Apply bar) — `blocks.tsx:2555-2582` — toggles `CropOverlay`
+- [ ] `Delete block` — red circular button (not drawn under 35 % zoom while the row is wider than the block, review F3) — `blocks.tsx:2586-2613` — `onDelete(b.id)`
+- [ ] `Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)` — circular rotate handle (`rotateButton`, `blocks.tsx:1952-1979`) — below the block in a box scaled back by the zoom, its 24 px hit area 14 px under the block (`blocks.tsx:2637-2681`); the last button of the handle row when below it would meet the ZoomBar or leave the visible canvas (`rotateFitsBelow`, `selectionLayout.ts`; read from the screen on each render and when the canvas resizes, `selectionRoom.ts`); none under 24 px on both axes, nor under 35 % zoom while the handle row is wider than the block (review F3) (plan item 19, `docs/fixes/19-controls-one-size.md`) — drag → rotate
 - [ ] `Duplicate` `⌘D` — block context-menu item — `blocks.tsx:2580` — `onDuplicate(b.id)`
 - [ ] `Bring Forward` — block context-menu item — `blocks.tsx:2581` — `onReorder(b.id, 1)`
 - [ ] `Send Back` — block context-menu item — `blocks.tsx:2582` — `onReorder(b.id, -1)`
@@ -1169,8 +1098,8 @@ flowchart LR
 - [ ] "References" — refs-block heading — `blocks.tsx:1482`
 - [ ] `Poster made with postr.sh https://postr.sh` — injected last reference entry (rawText from `@/export/attribution.ts:276`; bold via `ACK_REFERENCE_ID` check at `blocks.tsx:1493`)
 - [ ] `Figure {N}.` / `Table {N}.` — auto caption prefix — `blocks.tsx:1624`
-- [ ] `{b.type}` (e.g. "image", "table") — block-type pill on selection chrome — `blocks.tsx:2355`
-- [ ] `{rotation}°` — rotation readout in pill — `blocks.tsx:2358`
+- [ ] `{b.type}` (e.g. "image", "table") — block-type pill on selection chrome — `blocks.tsx:2504` — only on a block 120 px wide or more on screen (plan item 19); its width, read on each render (`selectionRoom.ts`), counts in the handle row's (review F3)
+- [ ] `{rotation}°` — rotation readout in pill — `blocks.tsx:2507`
 - [ ] "Poster Title" — editor placeholder — `blocks.tsx:2075`
 - [ ] "Section Heading" — editor placeholder — `blocks.tsx:2117`
 - [ ] "Type here… (type / for symbols)" — editor placeholder — `blocks.tsx:2140`
@@ -1181,12 +1110,12 @@ flowchart LR
 
 **Graphics**
 - [ ] 1×1 transparent GIF (`PLACEHOLDER_SRC`) — img data-URI — `blocks.tsx:48-49` — fills img while `storage://` URL resolves
-- [ ] move icon (4-arrow cross) — inline-svg — `blocks.tsx:2304-2322` — move handle
-- [ ] replace icon (circular arrows) — inline-svg — `blocks.tsx:2389-2405` — replace button
-- [ ] crop icon — inline-svg — `blocks.tsx:2421-2435` — crop toggle
-- [ ] X icon — inline-svg — `blocks.tsx:2453-2467` — delete button
-- [ ] rotate icon (two chasing arrows) — inline-svg — `blocks.tsx:2523-2528` — rotate handle
-- [ ] rotate stem — css line — `blocks.tsx:2484-2499` — connects rotate handle to block
+- [ ] move icon (4-arrow cross) — inline-svg — `blocks.tsx:2444-2460` — move handle
+- [ ] replace icon (circular arrows) — inline-svg — `blocks.tsx:2530-2543` — replace button
+- [ ] crop icon — inline-svg — `blocks.tsx:2560-2572` — crop toggle
+- [ ] X icon — inline-svg — `blocks.tsx:2591-2603` — delete button
+- [ ] rotate icon (two chasing arrows) — inline-svg — `blocks.tsx:1968-1973` — rotate handle
+- [ ] rotate stem — css line, 1.5 × 16 px on screen (scaled back) — `blocks.tsx:2630-2649` — connects rotate handle to block, only while the rotate is below
 - [ ] active-cell row + column bands — css overlay — `blocks.tsx:865-900` — table focus guides (Excel-style)
 - [ ] affiliation `*` / `†` superscript markers — text glyphs — `blocks.tsx:1410-1411` — author line
 
@@ -1199,20 +1128,21 @@ flowchart LR
 #### `poster/CropOverlay.tsx` — Inline 4-edge crop UI for image/logo blocks
 
 **Elements**
-- [ ] `crop top edge` — edge drag handle (`role="button"`) — `CropOverlay.tsx:161` (handle render `:240-256`) — drag grows top crop %
-- [ ] `crop right edge` — edge drag handle — `CropOverlay.tsx:162` — drag grows right crop %
-- [ ] `crop bottom edge` — edge drag handle — `CropOverlay.tsx:163` — drag grows bottom crop %
-- [ ] `crop left edge` — edge drag handle — `CropOverlay.tsx:164` — drag grows left crop %
-- [ ] `✕` `Cancel (Esc)` — button — `CropOverlay.tsx:186-188` — reverts to open-time snapshot, exits
-- [ ] `↺` `Reset crop (revert to no crop, stay in crop mode)` — button — `CropOverlay.tsx:189-195` — clears crop, stays open
-- [ ] `✓` `Apply crop (Enter)` — primary button — `CropOverlay.tsx:196-198` — closes (crop already committed live)
+- [ ] `crop top edge` — edge drag handle (`role="button"`) — `CropOverlay.tsx:169` (handle render `:214-278`: a 24 px hit area centred on the crop line around a 16 × 6 px pill, scaled back by the zoom about its placing corner, out of the stylesheet's button transition (`data-no-anim`, `:246-249`) so it does not animate for 120 ms after a zoom change (record 19, review F2); plan item 19, `docs/fixes/19-controls-one-size.md`) — drag grows top crop %
+- [ ] `crop right edge` — edge drag handle — `CropOverlay.tsx:170` — drag grows right crop %
+- [ ] `crop bottom edge` — edge drag handle — `CropOverlay.tsx:171` — drag grows bottom crop %
+- [ ] `crop left edge` — edge drag handle — `CropOverlay.tsx:172` — drag grows left crop %
+- [ ] Cancel / Reset / Apply bar — `CropOverlay.tsx:174-209` — 24 px buttons, its top 4 px under the image at every zoom (scaled back about its top edge; plan item 19)
+- [ ] `✕` `Cancel (Esc)` — button — `CropOverlay.tsx:196-198` — reverts to open-time snapshot, exits
+- [ ] `↺` `Reset crop (revert to no crop, stay in crop mode)` — button — `CropOverlay.tsx:199-205` — clears crop, stays open
+- [ ] `✓` `Apply crop (Enter)` — primary button — `CropOverlay.tsx:206-208` — closes (crop already committed live)
 - [ ] `Escape` — keyboard — `CropOverlay.tsx:74-76` — cancel
 - [ ] `Enter` — keyboard — `CropOverlay.tsx:77-79` — apply
 
 **Copy** — none beyond the button labels/titles above.
 
 **Graphics**
-- [ ] kept-region rect with 9999px dark dim mask — css overlay — `CropOverlay.tsx:135-144,159` — darkens cropped-away area
+- [ ] kept-region rect with 9999px dark dim mask — css overlay — `CropOverlay.tsx:143-152` — darkens cropped-away area; its 2-unit frame stays in the sheet's units (grows with the zoom), as the block's selection border does
 
 #### `poster/FloatingFormatToolbar.tsx` — Notion-style selection toolbar (+ docked variant for sidebar)
 
@@ -1251,13 +1181,13 @@ flowchart LR
 #### `poster/GroupFrame.tsx` — Multi-select bounding box (union rect + group move/resize)
 
 **Elements**
-- [ ] group bounding box — drag-anywhere move surface — `GroupFrame.tsx:100-115` — drag → `onGroupMove(dx,dy)`
-- [ ] `ResizeHandles` — 8 group resize handles — `GroupFrame.tsx:116-119` — drag → `onGroupResize(handle,dx,dy)`
+- [ ] group bounding box — drag-anywhere move surface — `GroupFrame.tsx:114-128` — drag → `onGroupMove(dx,dy)`; placed from the blocks' stored geometry (95.6 units below a text block's rendered bottom in fix 19's harness, claim Gf: on the Later list)
+- [ ] `ResizeHandles` — 8 group resize handles — `GroupFrame.tsx:133-137` — drag → `onGroupResize(handle,dx,dy)`; fewer on a box small on screen, by the block rule (`blockControls`; plan item 19, `docs/fixes/19-controls-one-size.md`)
 
 **Copy** — none.
 
 **Graphics**
-- [ ] dashed accent union border — css — `GroupFrame.tsx:109`
+- [ ] dashed accent outline — four 1.5 px strips (4 px dashes every 7 px), one size on screen (scaled back across; plan item 19) — `GroupFrame.tsx:106-112,129-132`
 
 #### `poster/GuidelinesPanel.tsx` — Right-side reference rail: scratch-pad checklist, conference specs, writing guide, shortcuts cheatsheet, resources
 
@@ -1359,7 +1289,7 @@ flowchart LR
 - [ ] `Escape` (area-comment mode) — keyboard — `PosterEditor.tsx:3713-3721` — cancels area comment
 - [ ] `⌘/` or `Ctrl+/` — keyboard — `PosterEditor.tsx:915-918` — toggles sidebar
 - [ ] `⌘Z` / `Ctrl+Z` (undo) and `⌘⇧Z` / `Ctrl+Shift+Z` / `⌘Y` / `Ctrl+Y` (redo) — keyboard, one history (fix 12) — `useEditorHistory.ts:84-95` (keydown, capture, on window; installed in preview too), routed by `editorHistory.ts:103` `routeHistoryKey`: from anywhere that edits the poster (canvas text blocks, table cells, the Content box, number fields, sliders, selects, caption, note, authors, buttons, the page) the key is cancelled and the store's history runs (`runEditorHistory`, `PosterEditor.tsx:705`: toast "Undo"/"Redo" only when a step was applied; after a text step its block is selected and its editor takes the caret with the restored text selected, `useEditableHistory.ts:130`, except after a button pressed from the keyboard, which changes neither the focus nor the selection, fix 12 review R3-F1); in a text field inside `[data-own-undo]` (the Figure tab, the poster name, the version name, the paste boxes, References' manual entry, the preset name, the guidelines panel) or in a dialog, the browser's own undo for that field; with a dialog or the preview open and the focus elsewhere, cancelled and nothing else. The letter is matched without case, and by `code` only when the layout types a letter that is not Latin there (Cyrillic, Greek; not Dvorak's ";"); Alt (AltGr) is not the shortcut (`editorHistory.ts:56`). The browser's own `beforeinput` historyUndo/historyRedo is cancelled wherever it would change the poster and routed to the store when it comes from the Edit menu with the focus in the poster (`useEditorHistory.ts:97-106`, `editorHistory.ts:132`); an `input` of those types (the browser applied its undo with no `beforeinput` first) is never stored: the text editors refuse it and put themselves back (`useEditableHistory.ts:154`), and for a sidebar field the document's `input` listener notes it (`useEditorHistory.ts:108`), the store stores nothing in that task, and React puts the controlled field back (fix 12 review R1-F3)
-- [ ] `Undo` / `Redo` — buttons over the poster area's top-left (`HistoryButtons.tsx`, mounted `PosterEditor.tsx:3425`; left 12 px, 64 px when the sidebar is hidden), disabled with nothing to undo/redo, hidden for read-only viewers (the phone share view is read-only); titles "Undo (⌘Z)" and "Redo (⌘⇧Z)" (Ctrl+Z / Ctrl+Y off a Mac). A mouse or touch press puts the caret back in the text the step changed (decision 4); a press from the keyboard or by assistive technology (a click with `detail` 0) leaves the focus on the button and selects nothing, neither text nor a block, so pressing again undoes again instead of typing into the poster (`runHistory`'s `keepFocus`, `editorHistory.ts:162`; fix 12 review R2-F2; the block not selected since review R3-F1). Other keys pressed on the buttons are theirs: the delete / nudge / duplicate keys and the table's Delete / Backspace do not act from the group `[data-postr-history-buttons]` (`onHistoryButtons`, `editorHistory.ts:43`; fix 12 review R3-F1: an arrow had moved the selected block and Backspace removed it, the redo lost). On a poster with a table, forward Tab stops in the table's last cell (`blocks.tsx` `onCellKeyDown`, older than fix 12, PLAN's Later list); Shift+Tab reaches the buttons
+- [ ] `Undo` / `Redo` — buttons over the poster area's top-left (`HistoryButtons.tsx`, mounted `PosterEditor.tsx:3431`; left 12 px, 64 px when the sidebar is hidden), disabled with nothing to undo/redo, hidden for read-only viewers (the phone share view is read-only); not marked `[data-postr-canvas-chrome]`, and at the fit they lie on a top-left block's handle row when the poster's shape matches the canvas's (8 of 624 selections, three engines, record 12 §11); titles "Undo (⌘Z)" and "Redo (⌘⇧Z)" (Ctrl+Z / Ctrl+Y off a Mac). A mouse or touch press puts the caret back in the text the step changed (decision 4); a press from the keyboard or by assistive technology (a click with `detail` 0) leaves the focus on the button and selects nothing, neither text nor a block, so pressing again undoes again instead of typing into the poster (`runHistory`'s `keepFocus`, `editorHistory.ts:162`; fix 12 review R2-F2; the block not selected since review R3-F1). Other keys pressed on the buttons are theirs: the delete / nudge / duplicate keys and the table's Delete / Backspace do not act from the group `[data-postr-history-buttons]` (`onHistoryButtons`, `editorHistory.ts:43`; fix 12 review R3-F1: an arrow had moved the selected block and Backspace removed it, the redo lost). On a poster with a table, forward Tab stops in the table's last cell (`blocks.tsx` `onCellKeyDown`, older than fix 12, PLAN's Later list); Shift+Tab reaches the buttons
 - [ ] `⌘S` / `Ctrl+S` — keyboard (edit mode only) — `PosterEditor.tsx:1068-1085` — `saveVersionNow()` (Supabase `poster_versions`)
 - [ ] `Delete` / `Backspace` (selection active) — keyboard — `PosterEditor.tsx:2006-2014` — batch-deletes selected blocks (`filterDeletable`). This handler and the two below act from any focus that is not a text field (item 22, parked: a focused select passes them on), except the Undo / Redo buttons (`onHistoryButtons`, `PosterEditor.tsx:2207`, fix 12 review R3-F1)
 - [ ] `⌘D` / `Ctrl+D` — keyboard — `PosterEditor.tsx:2017-2021` — duplicates selected block
@@ -1422,10 +1352,19 @@ flowchart LR
 #### `poster/resizeHandles.tsx` — Shared 8-handle (or 4-corner) resize component
 
 **Elements**
-- [ ] resize handle ×8 (`nw,n,ne,e,se,s,sw,w`) or ×4 corners when `cornersOnly` — drag handles (`data-postr-resize-handle`) — `resizeHandles.tsx:51-81` — `onPointerDown(e, handle)`; cursors from `CURSORS` (`:14-23`)
+- [ ] resize handle ×(the `handles` given: up to 8, `nw,n,ne,e,se,s,sw,w`) — drag handles (`data-postr-resize-handle="<direction>"`) — `resizeHandles.tsx:56-88` — `onPointerDown(e, handle)`; cursors from `CURSORS` (`:19-28`); a 24 × 24 px hit area on screen at every zoom, centred on its corner or edge midpoint (half a hit area out, `ctl`, scaled back about that corner, `UNZOOM`; plan item 19, `docs/fixes/19-controls-one-size.md`)
 
 **Copy** — none. **Graphics**
-- [ ] 5×5 white square with accent border per handle — css — `resizeHandles.tsx:71-79`
+- [ ] 8×8 px white square with a 1 px accent border per handle — css — `resizeHandles.tsx:77-86`
+
+#### `poster/selectionLayout.ts`, `poster/selectionRoom.ts` — one size on screen for a selected block's controls (plan item 19, `docs/fixes/19-controls-one-size.md`)
+
+**Logic** (no elements of their own)
+- [ ] `ctl(px)` — an offset in the zoomed sheet that is `px` CSS px on screen (`calc(px / var(--postr-zoom, 1))`); `UNZOOM` / `UNZOOM_X` / `UNZOOM_Y` — the transform that scales a box drawn in px back to screen size; `--postr-zoom` is set on `#poster-canvas` next to its `scale(zoom)` (`PosterEditor.tsx:2962-2966`)
+- [ ] sizes (the owner's Q1): `HIT` 24 px hit areas, `HANDLE_MARK` 8 px squares, `BUTTON_MARK` 20 px circles; the row's and the rotate's hit areas start 14 px from the block (`ROW_LIFT`, `ROTATE_GAP`)
+- [ ] `blockControls({ wPx, hPx, cornersOnly, row })` — which handles, whether the label, the delete/replace/crop buttons and the rotate control show, for a block's size on screen (Q2, plus one axis under 24 px); with `row` (the label's width, whether the block has replace and crop) and `zoom`, under `OVERVIEW_ZOOM` (0.35, measured with claim Fz) a row whose buttons are wider than the block (`handleRowWidth`) keeps only the move button (the lead's rule for review F3; a group's frame passes no `row`)
+- [ ] `rotateFitsBelow(…)` — whether the rotate control's hit area below the block is inside the visible canvas and clear of the ZoomBar (`[data-postr-canvas-chrome]`, `PosterEditor.tsx:3617`), the block turned by its rotation (Q3)
+- [ ] `useSelectionRoom` — the padding box as rendered (ResizeObserver), the rotate's room and the type label's width (its computed width, review F3), read on each render of a selected block and when the canvas resizes
 
 #### `poster/RichTextEditor.tsx` — contentEditable editor with slash-command symbol menu
 
@@ -1908,7 +1847,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:181-1
 - [ ] "⌨️ Tab / Shift+Tab to jump between cells." — tips list item — `Sidebar.tsx:2828`
 - [ ] "✨ Type **bold**, *italic*, or M (SD)* in a cell, then click Format table in the Caption section below." — tips list item — `Sidebar.tsx:2829`
 - [ ] "✂︎ Crop" — section label — `Sidebar.tsx:2847`
-- [ ] "Click the ✂︎ button on the block's top toolbar to crop the image directly. Drag any edge to trim, press Enter to apply, Esc to cancel. The original is preserved — nothing is baked." — helper — `Sidebar.tsx:2848-2852`
+- [ ] "Click the ✂︎ button on the block's top toolbar to crop the image directly. Drag any edge to trim, press Enter to apply, Esc to cancel. The original is preserved — nothing is baked." — helper — `Sidebar.tsx:2947-2949` — under 35 % zoom the ✂︎ button shows only while the image is wider on screen than its row of buttons (108 px; review F3, record 19): zoomed that far out, the hint names a button that is not there (the Later list)
 - [ ] "Image fit" — section label — `Sidebar.tsx:2885`
 - [ ] "Off (default): keep the image's aspect ratio — block padding may appear if you resize freely. On: image fills the block exactly, distorting if needed. Use when the source image has whitespace baked in that you can't crop away." — helper — `Sidebar.tsx:2912-2916`
 - [ ] "{Figure|Table} Caption" — section label — `Sidebar.tsx:2997`
@@ -2009,7 +1948,7 @@ Mounted from: imported `Sidebar.tsx:64`, rendered `Sidebar.tsx:795-801` under `t
 
 **Graphics**: none.
 
-#### `poster/sidebar/EditableExportButtons.tsx` — paid PowerPoint (.pptx) + LaTeX (.zip) export buttons with paywall, size-ceiling warnings, and credit spend
+#### `poster/sidebar/EditableExportButtons.tsx` — paid PowerPoint (.pptx) export button with paywall, size-ceiling warnings, and credit spend; the LaTeX (.zip) button kept behind `LATEX_EXPORT_ENABLED` (off since 2026-10-06, fix 25)
 
 (Mounted in `Sidebar.tsx:1166`, under the `✎ Editable formats` label at `Sidebar.tsx:1165`. See also the cross-listing in §6.11, which has the more exact export-flow copy.)
 
@@ -2019,23 +1958,23 @@ Mounted from: imported `Sidebar.tsx:64`, rendered `Sidebar.tsx:795-801` under `t
 - [ ] `Get the term` — button — `EditableExportButtons.tsx:280-296` — `startCheckout('term')` → API `createCheckout` (billing) then `window.location.href = url`; guests → `stashCheckoutIntent` + navigate `/auth?plan=term`; disabled until checkbox ticked
 - [ ] `Get the pack` — button — `EditableExportButtons.tsx:297-313` — `startCheckout('pack')`, same flow
 - [ ] `✓ Saved` / busy `Building slides…` / `▤ PowerPoint (.pptx)` — button (`data-postr-export-pptx`) — `EditableExportButtons.tsx:335-356` — dynamic-imports `@/export/pptx/writer`, downloads `{title}.pptx`; consumes 1 export credit post-export (`consumeExportCredit` API) or `markPaidExport` on term; disabled when busy/over-112″/no plan
-- [ ] `✓ Saved` / busy `Writing LaTeX…` / `⌨ LaTeX source (.zip)` — button (`data-postr-export-latex`) — `EditableExportButtons.tsx:384-402` — dynamic-imports `@/export/latex/exportLatex`, downloads `{title}-latex.zip`; same credit flow
+- [ ] `✓ Saved` / busy `Writing LaTeX…` / `⌨ LaTeX source (.zip)` — button (`data-postr-export-latex`) and its hint — **not rendered while `LATEX_EXPORT_ENABLED` is false** (fix 25); `handleLatex` imports `@/export/latex/exportLatex` only inside `if (LATEX_EXPORT_ENABLED)`, downloads `{title}-latex.zip`; same credit flow. Locked by `poster/__tests__/latexHidden.test.tsx` (guest, free, pack, term)
 - [ ] paywall panel (heading + copy + checkbox + 2 buy buttons + guest note) — conditional panel — `EditableExportButtons.tsx:239-326` — shown when `!plan.loading && !canExport`
 
 **Copy**
-- [ ] "Keep editing in PowerPoint or Overleaf" — paywall heading — `EditableExportButtons.tsx:250`
-- [ ] "Your PDF export is free. Unlock clean PowerPoint & LaTeX with the CA$18.99 term (renews every 4 months, cancel anytime), or a CA$9.99 3-export pack whose credits never expire." — paywall body — `EditableExportButtons.tsx:253-256`
+- [ ] "Keep editing in PowerPoint" — paywall heading (fix 25)
+- [ ] "Your PDF export is free. Unlock clean PowerPoint export with the term at CA$18.99 + applicable taxes (renews every 4 months, cancel anytime), or a 3-export pack at CA$9.99 + applicable taxes (its credits never expire)." — paywall body (fix 25: no LaTeX; each price says tax is extra, `components/__tests__/pricesTax.test.tsx`)
 - [ ] "I want access right away and understand I lose my 14-day refund right once I take a paid export. Refund terms." — checkbox label — `EditableExportButtons.tsx:271-277`
 - [ ] "Term: full refund within 14 days of a charge if you haven’t taken a paid export. Pack: full refund until your first export, none after — even in part." — refund rule directly above the buy buttons (`REFUND_LINE_BOTH`, `data/refundCopy.ts`) — `EditableExportButtons.tsx:353` (2026-09-11)
 - [ ] "You're working as a guest — you'll create a free account (or sign in with Google) first, so your purchase and posters stay yours across devices." — guest note — `EditableExportButtons.tsx:319-323`
-- [ ] "{n} export{s} left in your pack — each PowerPoint or LaTeX export uses one. Credits never expire." — credits hint — `EditableExportButtons.tsx:331-333`
-- [ ] "This poster is {w}×{h} in — too large for PowerPoint even at half size (its limit is {PPTX_MAX_DIMENSION_IN} in per side). Export LaTeX or PDF instead; neither has a size limit." — over-2×-ceiling error — `EditableExportButtons.tsx:358-362`
-- [ ] "Your poster is {w}×{h} in. PowerPoint's limit is {n} in per side, so this file will be exactly half size ({w/2}×{h/2} in) — print at 200%. The note is also written inside the file. For a full-size editable export, use LaTeX below." — over-ceiling warning — `EditableExportButtons.tsx:365-372`
+- [ ] "{n} export{s} left in your pack — each PowerPoint export uses one. Credits never expire." — credits hint (fix 25)
+- [ ] "This poster is {w}×{h} in — too large for PowerPoint even at half size (its limit is {PPTX_MAX_DIMENSION_IN} in per side). Save a PDF instead." — over-2×-ceiling error (fix 25: no LaTeX, and no size-limit claim for the PDF)
+- [ ] "Your poster is {w}×{h} in. PowerPoint's limit is {n} in per side, so this file will be exactly half size ({w/2}×{h/2} in) — print at 200%. The note is also written inside the file." — over-ceiling warning; its "For a full-size editable export, use LaTeX below." is behind `LATEX_EXPORT_ENABLED` (fix 25)
 - [ ] "One editable slide — every block stays a real PowerPoint text box, image, or table. Also opens in Keynote, Google Slides, and LibreOffice." — pptx hint — `EditableExportButtons.tsx:375-379`
-- [ ] "A compilable poster.tex with your figures and a references.bib — every block keeps its exact position, ready to keep editing in Overleaf or any TeX setup. Full size at any poster dimension." — latex hint — `EditableExportButtons.tsx:403-408`
+- [ ] "A poster.tex for XeLaTeX or LuaLaTeX, with your images and, when the poster has references, a references.bib. Each block keeps its position. Charts made in Postr are not included. Full size at any poster dimension." — latex hint — not rendered while `LATEX_EXPORT_ENABLED` is false
 - [ ] "{note/warning strings from the pptx/latex writers}" — dynamic notes list items — `EditableExportButtons.tsx:410-424`
 - [ ] "Something went wrong. Try again, or use Send Feedback so we can look into it." — export error (role=alert) — `EditableExportButtons.tsx:426-429`
-- [ ] "PowerPoint file saved" / "LaTeX source saved" — sr-only aria-live status — `EditableExportButtons.tsx:431-435`
+- [ ] "PowerPoint file saved" / "LaTeX source saved" (the second only with `LATEX_EXPORT_ENABLED`) — sr-only aria-live status
 
 **Graphics**
 - [ ] `▤` / `⌨` — unicode glyphs — `EditableExportButtons.tsx:354,400` — pptx/latex button labels
@@ -2701,7 +2640,7 @@ The editor's Figure › Check tab (`poster/ReadabilityPanel.tsx`, §6.8) as a pu
 ```mermaid
 flowchart LR
   EEB["EditableExportButtons (§6.8)"] -->|"exportPosterPptx"| PW["export/pptx/writer.ts → {title}.pptx"]
-  EEB -->|"exportLatex"| LW["export/latex/exportLatex.ts → {title}-latex.zip"]
+  EEB -.->|"exportLatex (only with LATEX_EXPORT_ENABLED, off since fix 25)"| LW["export/latex/exportLatex.ts → {title}-latex.zip"]
   PE["PosterEditor printPoster()"] --> PD["export/printDocument.ts (popup + window.print)"]
   SB["Sidebar ⎙ Save PDF"] --> PD
   SPM["StaplesPrintModal (§6.13)"] --> PD
@@ -2894,28 +2833,28 @@ No UI — logic only.
 #### `export/units.ts` — unit conversions + the PowerPoint 56-inch ceiling policy
 
 **Copy**
-- [ ] `This poster is {widthIn}×{heightIn} in. PowerPoint cannot represent it even at half size (its limit is 56 in per side). Export LaTeX or PDF instead — neither has a size limit.` — `PptxSizeLimitError.userMessage` (>112 in) — `units.ts:93-96`
+- [ ] `This poster is {widthIn}×{heightIn} in. PowerPoint cannot represent it even at half size (its limit is 56 in per side). Save a PDF instead.` — `PptxSizeLimitError.userMessage` (>112 in; fix 25: no LaTeX, no size-limit claim for the PDF) — `units.ts`
 - [ ] `This poster is {widthIn}×{heightIn} in. PowerPoint's limit is 56 in per side, so this file is exactly half size ({halfW}×{halfH} in). Print at 200% to restore full size.` — `PptxScalePlan.note` (shown in export UI AND written into the file's core properties + off-slide box) — `units.ts:141-144`
 - [ ] `Invalid poster dimensions: {widthIn}×{heightIn} in` — internal Error (not product copy) — `units.ts:115`
 
 #### `poster/sidebar/EditableExportButtons.tsx` — CROSS-LISTING (paywall + export flow; full element list in §6.8)
 
 **Copy** (paywall panel, shown when `!plan.loading && !canExport`)
-- [ ] `Keep editing in PowerPoint or Overleaf` — paywall heading — `EditableExportButtons.tsx:250`
-- [ ] `Your PDF export is free. Unlock clean PowerPoint & LaTeX with the CA$18.99 term (renews every 4 months, cancel anytime), or a CA$9.99 3-export pack whose credits never expire.` — paywall body (CA$ prices) — `EditableExportButtons.tsx:253-255`
+- [ ] `Keep editing in PowerPoint` — paywall heading (fix 25) — `EditableExportButtons.tsx`
+- [ ] `Your PDF export is free. Unlock clean PowerPoint export with the term at CA$18.99 + applicable taxes (renews every 4 months, cancel anytime), or a 3-export pack at CA$9.99 + applicable taxes (its credits never expire).` — paywall body (fix 25: no LaTeX; a tax note beside each price) — `EditableExportButtons.tsx`
 - [ ] `I want access right away and understand I lose my 14-day refund right once I take a paid export.` — checkbox label (followed by Refund terms link + `.`) — `EditableExportButtons.tsx:271-276`
 - [ ] `Term: full refund within 14 days of a charge if you haven’t taken a paid export. Pack: full refund until your first export, none after — even in part.` — refund rule directly above the buy buttons (`REFUND_LINE_BOTH`) — `EditableExportButtons.tsx:353` (2026-09-11)
 - [ ] `You're working as a guest — you'll create a free account (or sign in with Google) first, so your purchase and posters stay yours across devices.` — guest note (plan.isGuest only) — `EditableExportButtons.tsx:320-322`
 
 **Copy** (export area)
-- [ ] `{plan.credits} export{s} left in your pack — each PowerPoint or LaTeX export uses one. Credits never expire.` — credit-holder reassurance (usesCredit only) — `EditableExportButtons.tsx:331-332`
+- [ ] `{plan.credits} export{s} left in your pack — each PowerPoint export uses one. Credits never expire.` — credit-holder reassurance (usesCredit only; fix 25) — `EditableExportButtons.tsx`
 - [ ] `✓ Saved` — transient done label on both buttons (2.5 s) — `EditableExportButtons.tsx:347,396`
 - [ ] `Building slides…` — BusyIndicator label during PPTX export — `EditableExportButtons.tsx:352`
-- [ ] `Writing LaTeX…` — BusyIndicator label during LaTeX export — `EditableExportButtons.tsx:398`
-- [ ] `This poster is {w}×{h} in — too large for PowerPoint even at half size (its limit is 56 in per side). Export LaTeX or PDF instead; neither has a size limit.` — red hint, beyond-half (>112 in) — `EditableExportButtons.tsx:359-361`
-- [ ] `Your poster is {w}×{h} in. PowerPoint's limit is 56 in per side, so this file will be exactly half size ({w/2}×{h/2} in) — print at 200%. The note is also written inside the file. For a full-size editable export, use LaTeX below.` — yellow hint, over-ceiling (56–112 in); `print at 200%` bolded — `EditableExportButtons.tsx:366-371`
+- [ ] `Writing LaTeX…` — BusyIndicator label during LaTeX export — only with `LATEX_EXPORT_ENABLED` (off since fix 25)
+- [ ] `This poster is {w}×{h} in — too large for PowerPoint even at half size (its limit is 56 in per side). Save a PDF instead.` — red hint, beyond-half (>112 in; fix 25) — `EditableExportButtons.tsx`
+- [ ] `Your poster is {w}×{h} in. PowerPoint's limit is 56 in per side, so this file will be exactly half size ({w/2}×{h/2} in) — print at 200%. The note is also written inside the file.` — yellow hint, over the ceiling; its ` For a full-size editable export, use LaTeX below.` only with `LATEX_EXPORT_ENABLED` (fix 25) — `EditableExportButtons.tsx`
 - [ ] `One editable slide — every block stays a real PowerPoint text box, image, or table. Also opens in Keynote, Google Slides, and LibreOffice.` — PPTX hint (hidden when beyond-half) — `EditableExportButtons.tsx:376-379`
-- [ ] `A compilable poster.tex with your figures and a references.bib — every block keeps its exact position, ready to keep editing in Overleaf or any TeX setup. Full size at any poster dimension.` — LaTeX hint (`poster.tex`/`references.bib` in `<code>`) — `EditableExportButtons.tsx:404-407`
+- [ ] `A poster.tex for XeLaTeX or LuaLaTeX, with your images and, when the poster has references, a references.bib. …` — LaTeX hint — only with `LATEX_EXPORT_ENABLED` (off since fix 25)
 - [ ] `Something went wrong. Try again, or use Send Feedback so we can look into it.` — `role="alert"` failure line — `EditableExportButtons.tsx:427-429`
 - [ ] `PowerPoint file saved` / `LaTeX source saved` — sr-only `role="status"` aria-live announcement — `EditableExportButtons.tsx:432-434`
 - [ ] writer notes/warnings (`state.notes`, from units.ts/writer.ts above) rendered as a yellow `<ul>` — `EditableExportButtons.tsx:410-424`
@@ -3500,7 +3439,7 @@ Label strings (Copy, `stepConfig.ts:25-30`):
 - [ ] "Icon-library slide, ready to reuse" — PPTX feature (incl) — `ExportDrawer.tsx:138`
 - [ ] "4-palette slide, ready to reuse" — PPTX feature (incl) — `ExportDrawer.tsx:139`
 - [ ] "No watermark" — PPTX feature (incl) — `ExportDrawer.tsx:140`
-- [ ] "$18.99 CAD / 4-month term · or $9.99 for 3 exports" — canonical price line (PRICE_LINE const) — `ExportDrawer.tsx:47`, rendered `ExportDrawer.tsx:149`
+- [ ] "$18.99 CAD every 4 months + applicable taxes · or $9.99 CAD for 3 exports + applicable taxes" — canonical price line (PRICE_LINE const; fix 25: tax note after each price and after the period) — `ExportDrawer.tsx:47`, rendered `ExportDrawer.tsx:149`
 - [ ] "Account asked only here — no card to preview." — account note — `ExportDrawer.tsx:152`
 - [ ] "Export PowerPoint (.pptx)" — paid button label — `ExportDrawer.tsx:160`
 
@@ -4091,8 +4030,8 @@ flowchart LR
 - [ ] `Other` — kind-select button — same — `setKind('other')`
 - [ ] title input — text input — `FeedbackModal.tsx:206` — maxLength 120
 - [ ] details textarea — textarea — `FeedbackModal.tsx:245` — maxLength 4000, 6 rows
-- [ ] `Attach {filename}` — checkbox — `FeedbackModal.tsx:312` — toggles attachment inclusion
-- [ ] `Include console log` — checkbox — `FeedbackModal.tsx:346` — toggles log inclusion
+- [ ] `Attach {filename}` — checkbox, ticked on every open — `FeedbackModal.tsx:316` — toggles attachment inclusion
+- [ ] `Include console log` — checkbox, **unticked on every open** (privacy by default, Law 25 s. 9.1; record 24) — `FeedbackModal.tsx:350` — the log is sent only when ticked (`:76`); `components/__tests__/FeedbackModal.privacyDefault.test.tsx` enters at Copy a design's failed read → "Send feedback"
 - [ ] `Cancel` — button — `FeedbackModal.tsx:382` — `close()`
 - [ ] `Send` / `Sending…` — submit button — `FeedbackModal.tsx:398` — `submitFeedback(...)` (`@/data/feedback`); disabled while submitting or title/body blank
 - [ ] `Close` — button (success view) — `FeedbackModal.tsx:459` — `close()`
@@ -4683,6 +4622,7 @@ flowchart LR
   CFG["config/features.ts GALLERY_PUBLIC_ENABLED=false"] --> G1["Home / Profile / HistoryRows / PosterEditor / Sidebar / OnboardingTour"]
   CFG2["config/features.ts SHARING_ENABLED=false (fix 23)"] --> G2["routes / Sidebar / FloatingFormatToolbar / PosterEditor"]
   CFG3["config/features.ts RULERS_ENABLED=false (rulers hidden)"] --> G3["PosterEditor / Sidebar"]
+  CFG4["config/features.ts LATEX_EXPORT_ENABLED=false (fix 25)"] --> G4["EditableExportButtons"]
 ```
 
 #### `stores/feedbackStore.ts` — global Feedback-modal state (open from anywhere, optional diagnostic context)
@@ -4770,7 +4710,7 @@ No UI — logic only. `useSessionDraft(key, initial)` returns `[value, set]` lik
 
 #### `poster/figureScriptDraft.ts` — the plot checker's draft, kept per poster (localStorage) or per tab (sessionStorage) (plan item 7)
 
-No UI — logic only. `useScriptDraft(slot)` (`:281`), `readScriptDraft` / `writeScriptDraft` (`:225`, `:245`), `useHasPosterScript(posterId)` (`:305`, PosterEditor's Figure-mode default; a box of blank lines is not a script), `forgetPosterScript(posterId)` (`:313`, called by `data/posters.ts deletePoster` `:466` once the delete has succeeded), `clearStoredFigureScripts()` (`:325`, called by `profile/accountDeletion.ts` `:47`), `readPageSize` / `writePageSize` (`:343`, `:356`; a stored size outside 1–96 in is ignored). A stored entry is validated field by field (another version, an unknown language, text that is not JSON read as no entry; a bad check, including one whose figure is neither null nor a block id or whose `picked` is not a boolean, is dropped and the script kept; a check stored without `picked`, before the merge with fix 15, is read as Auto's). Storage is the record whenever it works; a draft it cannot take, and a box of blank lines (never stored), is kept in memory while the page is open (a reload loses it). Bounds: 50,000 characters per copy of a script as stored (`tooLongToStore`, `:178`; the script and the version last checked are capped separately, so an edit after a Check never unstores a script that fits, review round 2), 10 posters (`:81-82`): about a million characters in all.
+No UI — logic only. `useScriptDraft(slot)` (`:281`), `readScriptDraft` / `writeScriptDraft` (`:225`, `:245`), `useHasPosterScript(posterId)` (`:305`, PosterEditor's Figure-mode default; a box of blank lines is not a script), `forgetPosterScript(posterId)` (`:313`, called by `data/posters.ts deletePoster` `:466` once the delete has succeeded), `clearStoredFigureScripts()` (`:325`, called by `profile/accountDeletion.ts` `:73`), `readPageSize` / `writePageSize` (`:343`, `:356`; a stored size outside 1–96 in is ignored). A stored entry is validated field by field (another version, an unknown language, text that is not JSON read as no entry; a bad check, including one whose figure is neither null nor a block id or whose `picked` is not a boolean, is dropped and the script kept; a check stored without `picked`, before the merge with fix 15, is read as Auto's). Storage is the record whenever it works; a draft it cannot take, and a box of blank lines (never stored), is kept in memory while the page is open (a reload loses it). Bounds: 50,000 characters per copy of a script as stored (`tooLongToStore`, `:178`; the script and the version last checked are capped separately, so an edit after a Check never unstores a script that fits, review round 2), 10 posters (`:81-82`): about a million characters in all.
 **Elements** — none. **Copy** — none. **Graphics** — none.
 
 #### `hooks/useStorageUrl.ts` — resolves `storage://` image srcs to Supabase signed URLs (50 min TTL cache)
@@ -4816,12 +4756,13 @@ Imported by 28 files (all `data/*`, auth components, import modules, pages, `hoo
 - [ ] "Missing Supabase env vars: VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY must be set in apps/web/.env" — module-load throw — `supabase.ts:15-17`
 **Graphics** — none.
 
-#### `config/features.ts` — product feature switches (three flags, all off)
+#### `config/features.ts` — product feature switches (four flags, all off)
 
 No UI — logic only. 8 non-test files import it (grep, 2026-09-30).
 - `GALLERY_PUBLIC_ENABLED = false` (`features.ts:21`) — **the public gallery is OFF**; flag hides all publish/browse entry points. Importers: `pages/Profile.tsx`, `pages/Home.tsx`, `profile/HistoryRows.tsx`, `poster/PosterEditor.tsx`, `poster/Sidebar.tsx`, `components/OnboardingTour.tsx`. `components/PosterCard.tsx` no longer imports it; only its comment at `PosterCard.tsx:281` names the file (this list was stale before fix 23). Reactivation checklist (routes.tsx redirects, vercel.json noindex, sitemap, deleted api/shell files, PosterCard "Publish" action deleted-not-gated) documented in the header comment `features.ts:4-19`.
 - `SHARING_ENABLED = false` (`features.ts:53`, added 2026-09-30, fix 23) — **share links and comments are OFF**. Importers: `routes.tsx` (`/s/:slug` redirects to `/`, `:294`), `poster/Sidebar.tsx` (no comments tab `:643`; panel not rendered `:806`), `poster/FloatingFormatToolbar.tsx` (no "Comment on selection", `:377`), `poster/PosterEditor.tsx` (ignores `postr:comment-text` and `postr:comment-area`, `:782`, `:814`). The header comment `features.ts:23-52` lists what is switched off and summarises the database hardening needed before it returns; the full list is `docs/fixes/23-new-poster-owner-only.md` §10 ("Before sharing is turned back on").
 - `RULERS_ENABLED = false` (`features.ts:67`, added 2026-09-30) — **the workspace rulers are hidden** (owner decision; they were off the sheet by up to 30 in, PLAN.md item 4). Importers: `poster/PosterEditor.tsx` (the rulers are not drawn, `showRulerEffective` `:746`), `poster/Sidebar.tsx` (no "Show ruler" toggle, `:1070`). The fix in progress is parked on the local branch `editor/rulers-match-sheet` (its record `docs/fixes/04-rulers-match-sheet.md` and instruments are there).
+- `LATEX_EXPORT_ENABLED = false` (added 2026-10-06, fix 25) — **the LaTeX export is hidden** (owner: "unnecessary for now"). Importer: `poster/sidebar/EditableExportButtons.tsx` (no LaTeX button or hint, the half-size note's LaTeX sentence, the "LaTeX source saved" status and `handleLatex`'s writer import are all behind it). Every other LaTeX claim was taken out of the copy; `src/__tests__/copyInventory.test.ts` fails if one comes back while it is off. Before it returns: `docs/stress-test/PLAN.md`, "LaTeX export: before it is switched back on".
 **Elements** — none. **Copy** — none. **Graphics** — none.
 
 #### `globals.d.ts` — declares `__BUILD_ID__` (git SHA baked by vite `define`)
@@ -4838,7 +4779,9 @@ Per-route metadata (`seo/routes.json` → `seo/siteMeta.ts` → `seo/useDocument
 ```mermaid
 flowchart LR
   RJ["seo/routes.json"] --> SM["seo/siteMeta.ts (builders + canonical rules)"] --> UDM["seo/useDocumentMeta.ts"] --> HEAD["document.head (title/og/canonical/JSON-LD)"]
-  APP["App.tsx:38"] -->|"beforeSend redactUrl"| RU["analytics/redactUrl.ts"] --> VA["Vercel Web Analytics"]
+  GPC["analytics/globalPrivacyControl.ts"] -->|"GPC on: not mounted"| APP
+  APP["App.tsx:39-41"] -->|"beforeSend redactUrl"| RU["analytics/redactUrl.ts"] --> VA["Vercel Web Analytics"]
+  VJ["vercel.json Referrer-Policy: strict-origin"] -->|"beacon Referer = origin"| VA
 ```
 
 #### `seo/routes.json` — per-route metadata data source (consumed by siteMeta.ts + prerender script)
@@ -4850,7 +4793,7 @@ No UI directly; all values below are user-visible (tab titles, search snippets, 
 - [ ] "/" — title "Academic Poster Maker for Researchers | Postr", description, h1 "Academic posters, without the hassle.", 4 crawler copy lines — `routes.json:8-19`
 - [ ] "/about" — title "How Postr Works: Features for Academic Posters", description, h1 "About Postr", 4 copy lines — `:20-31` (note: h1 "About Postr" does NOT match the live About h1 "Everything you need to ship a great poster." — parity drift, §10)
 - [ ] "/why-posters" — title "Why Poster Sessions Matter: Skills That Outlast Them", description, h1 "Why poster sessions matter", 5 copy lines — `:32-44` (h1 matches eyebrow, not live h1)
-- [ ] "/pricing" — title "Postr Pricing: Free Poster Maker, Paid Export", description (CA$18.99 term / CA$9.99 pack), h1 "Free to build. Pay only to take it further.", 4 copy lines — `:45-56`
+- [ ] "/pricing" — title "Postr Pricing: Free PDF Export, Paid PowerPoint Export", description "Editing and PDF export are free. PowerPoint exports need the 4-month term, CA$18.99 + applicable taxes, or a pack of 3, CA$9.99 + applicable taxes.", h1 "Free to build. Pay only to take it further.", 5 copy lines (fix 25: no LaTeX; a tax note beside each price; "Prices are shown in Canadian dollars, before applicable taxes") — `routes.json`
 - [ ] ~~"/chart-chooser" — title "Chart Chooser: Which Chart Fits Your Data? | Postr", description, h1 "Which chart fits your data?", 4 copy lines — `:57-68`~~ — **record DELETED 2026-09-10** (deactivated)
 - [ ] "/tools/figure-readability" — title "Figure Font Size Checker for Posters — R & Python | Postr", description "Paste ggplot2 or matplotlib code. Get the printed point size of every label at your poster size, and the exact base_size to fix it. Free, no signup.", h1 "Will your figure labels be readable at poster size?", 4 copy lines (copy[0] = the page lede verbatim) — added 2026-09-11 (§6.10)
 - [ ] "/privacy" — title "Privacy Policy | Postr", description, h1 "Privacy Policy", 1 copy line — `:69-77`
@@ -4876,14 +4819,19 @@ No UI — logic only (upserts title, description, robots, canonical, og:*, twitt
 
 #### `analytics/redactUrl.ts` — redacts identifier-bearing routes before Vercel Web Analytics beacons
 
-No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) => ({ ...event, url: redactUrl(event.url) })} />`); behavior described in policy text at `pages/Cookies.tsx` (§6.4).
+No UI — logic only. Consumed by `App.tsx:40` (`<Analytics beforeSend={(event) => ({ ...event, url: redactUrl(event.url) })} />`); behavior described in policy text at `pages/Cookies.tsx` §4 and `pages/Privacy.tsx` §6 (§6.4). The vendor script (production v0.1.3, MEASURED on www.postr.sh for record 24) calls `beforeSend` with `{ type, url: location.href }` and sends `o` (the returned url), `sv`, `sdkn`, `sdkv`, `ts`, and `r` (the referrer) only on the first page view and only when the referrer's host is not the page's. `analytics/__tests__/redactUrl.test.ts` reads every `:param` route from `routes.tsx` and fails until a new one is redacted here. The match is made on the path as the router reads it (`routeKey`, `:71`: percent-escapes decoded, lower case), because the router serves `/P/<id>` and `/%70/<id>` as the editor, with repeated slashes also collapsed, so a not-found `//p/<id>` is redacted too (record 24, review round 1); the test spells each route four ways and checks the router's own matcher serves the first three.
 **Elements** — none.
 **Copy** (analytics payloads, not user-visible, listed for refactor sweep):
-- [ ] `/s/[redacted]` — redaction shape for share-link slugs — `redactUrl.ts:40`
-- [ ] `/p/[redacted]` — redaction shape for poster ids — `redactUrl.ts:41`
-- [ ] `/admin/[redacted]` — redaction shape for the whole `/admin` subtree — `redactUrl.ts:45,91`
-- [ ] `https://www.postr.sh/[unparseable]` — fallback for unparseable URLs — `redactUrl.ts:48,78`
+- [ ] `/s/[redacted]` — redaction shape for share-link slugs — `redactUrl.ts:54`
+- [ ] `/p/[redacted]` — redaction shape for poster ids — `redactUrl.ts:55`
+- [ ] `/gallery/[redacted]` — redaction shape for gallery entries (route redirects to `/`; record 24) — `redactUrl.ts:56`
+- [ ] `/admin/[redacted]` — redaction shape for the whole `/admin` subtree — `redactUrl.ts:60,123`
+- [ ] `https://www.postr.sh/[unparseable]` — fallback for unparseable URLs — `redactUrl.ts:63,109`
 **Graphics** — none.
+
+#### `analytics/globalPrivacyControl.ts` — reads Global Privacy Control (record 24)
+
+No UI — logic only. `globalPrivacyControlOn()` is true only when `navigator.globalPrivacyControl === true` (Firefox, Brave, DuckDuckGo send it; Chromium has no setting). `App.tsx:39` renders `<Analytics>` only when it is false, so under GPC no script, no queue, no beacon (`src/__tests__/analyticsPrivacy.test.tsx`; `scripts/analytics-privacy-check.mjs` claim G1 with Firefox's own GPC setting). `apps/web/vercel.json` serves every page with `Referrer-Policy: strict-origin` so the beacon's Referer header carries only the origin, never `/p/<id>` (claim B1).
 
 ---
 
@@ -4975,20 +4923,20 @@ No UI — logic only. Consumed by `App.tsx:38` (`<Analytics beforeSend={(event) 
 
 ## 8. Storage-key sweep list
 
-Every localStorage / sessionStorage key the app reads or writes, with file:line (from the stores/hooks slice sweep, 2026-07-28). The "delete my data" sweep point is `profile/accountDeletion.ts` (`LOCAL_KEYS` and `clearLocalData`; it moved there from `pages/Profile.tsx` on 2026-09-11) — any NEW key added anywhere must be added there too, and to the Cookies Policy table (EN and FR), which `pages/__tests__/cookiesStorageInventory.test.ts` pins to the code.
+Every localStorage / sessionStorage key the app reads or writes, with file:line (from the stores/hooks slice sweep, 2026-07-28). The "delete my data" sweep point is `profile/accountDeletion.ts` (`clearLocalData`; it moved there from `pages/Profile.tsx` on 2026-09-11): since record 24's review round 1 it removes every key named `postr.…` or `postr-…` from both storage areas (another account's welcome marker aside), so a NEW key must keep that naming; it must also be added to the Cookies Policy table (EN and FR) and to `pages/__tests__/storageWriters.ts`, which `cookiesStorageInventory.test.ts` pins to the code and `Profile.dangerZone.test.tsx` seeds to check deletion clears it. Keys below with no "removed by account deletion" note are removed by it too.
 
 **localStorage**
-- [ ] `postr.custom-palettes` — const `poster/customPalettes.ts:9`; read `:13`, write `:30`
+- [ ] `postr.custom-palettes` — const `poster/customPalettes.ts:9`; read `:13`, write `:30`; removed by account deletion (`profile/accountDeletion.ts`, every `postr.…` key, record 24)
 - [ ] `postr.checklist-templates` — const `poster/GuidelinesPanel.tsx:390`; read `:457`, write `:465`
 - [ ] `postr.scratch-pad` — const `poster/GuidelinesPanel.tsx:389`; read `:478`, write `:486`; removed `pages/Profile.tsx:291`
 - [ ] `postr.scratch-note` — inline `poster/GuidelinesPanel.tsx:502` (read), `:526` (write); removed `pages/Profile.tsx:292`
 - [ ] `postr.style-presets` — inline `poster/PosterEditor.tsx:718` (read), `:726` (write); const `components/PresetEditModal.tsx:40` (read `:44`, write `:53`); read `pages/Profile.tsx:73`; removed `pages/Profile.tsx:162,290`
 - [ ] `postr.profile` — const `pages/Profile.tsx:1266`; read `:1278`, write `:1299`; removed `:294`
 - [ ] `postr.onboarding-done` — const `components/OnboardingTour.tsx:111`; read `:174`, write `:184,281`, remove `:410` (`resetOnboarding()`, called from `pages/Profile.tsx:414`)
-- [ ] `postr.cb-random-pref` — const `components/PaletteDesigner.tsx:34`; read `:38`, write `:46`
-- [ ] `postr.welcome-seeded:{userId}` — prefix const `data/seedWelcomePoster.ts:36`; read `:40`, write `:50`
+- [ ] `postr.cb-random-pref` — const `components/PaletteDesigner.tsx:34`; read `:38`, write `:46`; removed by account deletion (every `postr.…` key, record 24)
+- [ ] `postr.welcome-seeded:{userId}` — prefix const `data/seedWelcomePoster.ts:36`; read `:40`, write `:50`; the deleted account's own key removed by account deletion, another account's kept (`profile/accountDeletion.ts:48-50`, record 24)
 - [ ] `postr.comment-name` — const `hooks/useComments.ts:153`; read `:157`, write `:165`
-- [ ] `postr.active-editor.{posterId}` — prefix const `hooks/useTwoTabGuard.ts:37`; read `:97`, write `:113,122` (30 s heartbeat)
+- [ ] `postr.active-editor.{posterId}` — prefix const `hooks/useTwoTabGuard.ts:37`; read `:97`, write `:113,122` (30 s heartbeat); all removed by account deletion (every `postr.…` key, `profile/accountDeletion.ts`, record 24)
 - [ ] `postr.figure-script.{posterId}` — prefix const `poster/figureScriptDraft.ts:76`; read `readScriptDraft` `:225`, write `writeScriptDraft` `:245` (every change), removed when the code box is emptied, by `deletePoster` once the delete has succeeded (`forgetPosterScript` `:313`), by account deletion (`clearStoredFigureScripts` `:325`) and by the 10-poster cap (`pruneStoredScripts` `:195`) (plan item 7)
 - [ ] `sb-*` (Supabase auth token keys, owned by supabase-js) — enabled by `lib/supabase.ts:22` (`persistSession: true`); wiped via `signOut({scope:'local'})` `lib/auth.ts:54`; enumerated `pages/Debug.tsx:61`; bulk-cleared `pages/Debug.tsx:136`
 
@@ -5081,9 +5029,10 @@ Every localStorage / sessionStorage key the app reads or writes, with file:line 
 
 ### Vercel Web Analytics
 
-- [ ] Beacon mounted `App.tsx:38` — `<Analytics beforeSend={…redactUrl}>`; cookieless page-view + bounce counting
-- [ ] URL redaction `analytics/redactUrl.ts` (`/s/[redacted]`, `/p/[redacted]`, `/admin/[redacted]`, unparseable fallback)
-- [ ] Disclosed in Cookies §3/§4/§6 and the ConsentNotice body (§6.4, §6.1)
+- [ ] Beacon mounted `App.tsx:39-41` — `<Analytics beforeSend={…redactUrl}>`; cookieless page-view counting; **not mounted when the browser sends Global Privacy Control** (`analytics/globalPrivacyControl.ts`, record 24)
+- [ ] URL redaction `analytics/redactUrl.ts` (`/s/[redacted]`, `/p/[redacted]`, `/gallery/[redacted]`, `/admin/[redacted]`, matched however the router would read the path — `/P/<id>`, `/%70/<id>`, `//p/<id>` too; query dropped, unparseable fallback); every page served with `Referrer-Policy: strict-origin` (`apps/web/vercel.json`), so the beacon's Referer carries only the origin
+- [ ] Production script v0.1.3 (MEASURED on www.postr.sh, 2026-10-06): beacon fields `o`, `sv`, `sdkn`, `sdkv`, `ts`, plus `r` only on the first page view when the referrer is another host; 0 localStorage / 0 sessionStorage keys and no cookie after three page views
+- [ ] Disclosed in Privacy §2/§4/§6/§8 and Cookies §3/§4/§6 (§6.4); internal file `docs/legal/quebec-law-25.md`
 
 ### Anthropic (Claude)
 
@@ -5125,6 +5074,7 @@ Switched off to keep the product to its core — the poster editor. After the se
 - [ ] **Public gallery (`GALLERY_PUBLIC_ENABLED = false`, `config/features.ts:21`)** — full surface: routes `/gallery`, `/gallery/:entryId` redirect to `/` (`routes.tsx:116-117`); `pages/Gallery.tsx` + `pages/GalleryEntry.tsx` unreachable but kept for reactivation; flag gates Home Gallery link (`Home.tsx:148`), Profile upload button + entry links (`Profile.tsx:571-595,814`), Sidebar "Share to gallery" (`Sidebar.tsx:1186-1205`), `?publish=1` auto-open (`PosterEditor.tsx:1220-1235`), OnboardingTour step-7 flag-ON body (`OnboardingTour.tsx:85`); dead flow: `PublishFlow` (mounted `App.tsx:15`), `PublishConsentModal`, `PublishGalleryModal`, `stores/publishFlowStore.ts`, `data/gallery.ts` publish path; `PublishConsentModal` `mode="share"` has NO caller anywhere; PosterCard "Publish" hover action was DELETED not gated (comment `PosterCard.tsx:262-271`); gallery siteMeta templates (`siteMeta.ts:213-219`) unused; reactivation checklist in `features.ts:4-19` header comment. `/admin/gallery` + `data/gallery.ts` read paths remain live.
 - [ ] **Sharing and comments (`SHARING_ENABLED = false`, `config/features.ts:53`) — switched off 2026-09-30, fix 23** (owner decision: editor only). Same pattern as the gallery: files kept, route redirects, flag off. Switched off: `/s/:slug` redirects to `/` (`routes.tsx:294`); `vercel.json:20` rewrites `/s/:slug` to `/` (the app shell), not `api/shell/share.ts`; the Sidebar has no comments tab (`Sidebar.tsx:643`) and renders `CommentsPanel` only with the flag on (`Sidebar.tsx:806`); `FloatingFormatToolbar` has no "Comment on selection" (`FloatingFormatToolbar.tsx:377`); `PosterEditor` ignores `postr:comment-text` (`:782`) and `postr:comment-area` (`:814`); the About `ship` card no longer offers share links (`About.tsx:84-85`). Share-only surfaces, kept but unreachable: `pages/Share.tsx` (and the Sidebar's `readOnly` rail, `Sidebar.tsx:630-631`), `poster/CommentsPanel.tsx` (its "Copy share link" was the only control that made a poster public), `hooks/useComments.ts`, `data/comments.ts`, `data/posters.ts` `ensureShareLink`, `api/shell/share.ts`. The database is unchanged: `public.posters` share read path and `public.poster_comments` are frozen — UI flag-gated (§9); an owner can still set `is_public` through the API (`features.ts:39-40`). Before turning it back on: the database hardening summarised in `features.ts:42-51`, full list in `docs/fixes/23-new-poster-owner-only.md` §10. Tests that lock it: `poster/__tests__/sharingHidden.test.tsx`, `src/__tests__/routes.test.tsx`, `seo/__tests__/vercelRouting.test.ts`. Flip these when restoring.
 - [ ] **Workspace rulers (`RULERS_ENABLED = false`, `config/features.ts:67`) — hidden 2026-09-30** (owner decision: hide them and come back later). The ruler bars and corner (`PosterEditor.tsx:3273-3367`) are not drawn, and the Layout tab has no "Show ruler" toggle (`Sidebar.tsx:1070-1080`); the toggle's state and the ruler code remain. Main's rulers were off the sheet by up to 30 in (PLAN.md item 4); the fix is parked on the local branch `editor/rulers-match-sheet`. `fit-check.mjs` claim Hr measures nothing while they are hidden (it says so). Test that locks it: `poster/__tests__/rulersHidden.test.tsx`. Flip it when restoring.
+- [ ] **LaTeX export (`LATEX_EXPORT_ENABLED = false`, `config/features.ts`) — hidden 2026-10-06, fix 25** (owner: "unnecessary for now"). The Export tab has no "⌨ LaTeX source (.zip)" button or hint, and the writer is imported only inside the switch (`EditableExportButtons.tsx` `handleLatex`). Kept: `export/latex/*` and its tests (`latexWriter`, `latexEscape`, `latexBib`, `exportLatex`, `ackExports`). Copy taken out (landing, About, /pricing, pricing cards, paywall, credit line, size notes, already-subscribed notices, /billing/success, the guest's export modal, the profile, `PptxSizeLimitError`, `seo/routes.json`, `index.html`); the full list with the old wording is record 25 §7. Tests that lock it: `poster/__tests__/latexHidden.test.tsx`, `src/__tests__/copyInventory.test.ts`. Before turning it back on: `docs/stress-test/PLAN.md`, "LaTeX export: before it is switched back on" (it must be shown to compile first).
 - [ ] **Dead `AuthBootstrap`** — `components/AuthBootstrap.tsx` defined but never mounted in `src/`; referenced only by a comment in `pages/Share.tsx:4` and the consumer list in `lib/auth.ts`.
 - [ ] **Unused `SORT_MODE_LABELS`** — `poster/citations.ts:111-115` ("Manual order" / "Alphabetical (first author)" / "Year (newest first)" / "Year (oldest first)"); `sortMode` is hardcoded `'alpha'` with "no user-facing toggle" (`PosterEditor.tsx:651-653`) — labels have no live render site.
 - [ ] **Unused DB tables** — `public.presets` (`20260408000200_presets.sql`), `public.authors_lib` / `public.institutions_lib` / `public.references_lib` (`20260408000300_library.sql`, PRD §21) — nothing in `apps/web/src` reads or writes them (style presets live in localStorage `postr.style-presets`).
@@ -5151,7 +5101,7 @@ Switched off to keep the product to its core — the poster editor. After the se
 
 ## 11. Maintenance note
 
-- This doc reflects the code as of **2026-07-28 ~16:00 local** (post-billing, post-`/pricing`, post-FR-legal, post-ConsentNotice); §6.16 reflects main as of 2026-07-29 and §6.17 (Presentation Checker) reflects the `feat/presentation-checker` branch as of 2026-07-29. **2026-09-10:** §6.12 / §6.16 / §6.17, the §6.3 talk waitlist and — second pass — the §6.10 standalone plot picker page are DEACTIVATED (banners on each section, route table + §5 edges + §9 rows updated, full summary in §10 "Deactivated features"); their inventories are frozen as the reactivation reference. `charts/*` stays live in the editor. **2026-09-11:** the standalone figure-readability check (`/tools/figure-readability`, §6.10 `pages/FigureReadability.tsx`; `ReadabilityPanel` `layout` prop, §6.8) went LIVE — route table, §6.2, §6.13 and §6.15 updated. **2026-09-30 (fix 23):** sharing and comments are switched off (`SHARING_ENABLED = false`, `config/features.ts`): `/s/:slug` redirects to `/`, the sidebar has 10 tabs, and nothing in the app opens the comments panel. Updated: route table + §5 edge (`R_share` now redirects, like the gallery), §6.7 (Editor and Share entries), §6.8 (tab count, comments tab, CommentsPanel banner), §6.14 (`config/features.ts`, `useSignedInUser`, `posterStore` owner field), §7, §9 rows (frozen — UI flag-gated) and §10. The same fix makes the editor open only the signed-in user's own posters and close one when that user changes. In the same pass the §5 editor-route edge was corrected from `AuthGuard` to `EnsureSession`; that error predates fix 23.
+- This doc reflects the code as of **2026-07-28 ~16:00 local** (post-billing, post-`/pricing`, post-FR-legal, post-ConsentNotice); §6.16 reflects main as of 2026-07-29 and §6.17 (Presentation Checker) reflects the `feat/presentation-checker` branch as of 2026-07-29. **2026-09-10:** §6.12 / §6.16 / §6.17, the §6.3 talk waitlist and — second pass — the §6.10 standalone plot picker page are DEACTIVATED (banners on each section, route table + §5 edges + §9 rows updated, full summary in §10 "Deactivated features"); their inventories are frozen as the reactivation reference. `charts/*` stays live in the editor. **2026-09-11:** the standalone figure-readability check (`/tools/figure-readability`, §6.10 `pages/FigureReadability.tsx`; `ReadabilityPanel` `layout` prop, §6.8) went LIVE — route table, §6.2, §6.13 and §6.15 updated. **2026-09-30 (fix 23):** sharing and comments are switched off (`SHARING_ENABLED = false`, `config/features.ts`): `/s/:slug` redirects to `/`, the sidebar has 10 tabs, and nothing in the app opens the comments panel. Updated: route table + §5 edge (`R_share` now redirects, like the gallery), §6.7 (Editor and Share entries), §6.8 (tab count, comments tab, CommentsPanel banner), §6.14 (`config/features.ts`, `useSignedInUser`, `posterStore` owner field), §7, §9 rows (frozen — UI flag-gated) and §10. The same fix makes the editor open only the signed-in user's own posters and close one when that user changes. In the same pass the §5 editor-route edge was corrected from `AuthGuard` to `EnsureSession`; that error predates fix 23. **2026-10-06 (fix 25):** the LaTeX export is hidden (`LATEX_EXPORT_ENABLED = false`) and every displayed price says tax is extra; the rows listed in the header's fix 25 note were updated (only those: the Landing and PricingSection inventories were stale before and are re-extracted only where fix 25 changed them).
 - **Regenerate or update this doc whenever**: a route is added/removed/redirected in `routes.tsx` (+ `seo/routes.json` + `vercel.json` aliases), a store gains/losses a field or action, a feature folder under `poster/`, `components/`, `import/`, `export/`, `manuscript/`, `charts/`, `data/` changes shape, a feature flag flips (`config/features.ts`), or a storage key is added (update §8 AND the `pages/Profile.tsx:290-295` sweep).
 - When you check off a feature's boxes during a removal, also strike its rows in §7, its keys in §8, and its externals in §9 — then add any newly-orphaned leftovers to §10.
 

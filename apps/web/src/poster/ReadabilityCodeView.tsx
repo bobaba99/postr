@@ -14,12 +14,14 @@ import { btnStyle } from './readabilityStyles';
 interface CopyButtonProps {
   text: string;
   label?: string;
+  /** What the button says for 2.4s after a copy (the French page passes its own, fix 26). */
+  copiedLabel?: string;
   onCopied?: () => void;
   style?: CSSProperties;
 }
 
 /** Copy to clipboard with a 2.4s "✓ Copied" state. */
-export function CopyButton({ text, label = 'Copy', onCopied, style }: CopyButtonProps) {
+export function CopyButton({ text, label = 'Copy', copiedLabel = '✓ Copied', onCopied, style }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
@@ -48,7 +50,7 @@ export function CopyButton({ text, label = 'Copy', onCopied, style }: CopyButton
         ...style,
       }}
     >
-      {copied ? '✓ Copied' : label}
+      {copied ? copiedLabel : label}
     </button>
   );
 }

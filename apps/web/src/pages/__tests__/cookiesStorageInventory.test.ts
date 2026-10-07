@@ -10,7 +10,8 @@
  *
  * How: every non-test source file under src that calls
  * localStorage.setItem or sessionStorage.setItem must appear in WRITERS
- * below, each WRITERS key must be written by its file, and both policy
+ * (storageWriters.ts, which the account-deletion test shares), each
+ * WRITERS key must be written by its file, and both policy
  * pages must list each key in a row whose "Stored where" cell names the
  * same area. In the other direction, every postr key either page names
  * must be one of these. A new writer fails here until the policy lists it.
@@ -18,50 +19,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { SHARING_ENABLED } from '@/config/features';
-
-type Area = 'localStorage' | 'sessionStorage';
-
-interface Writer {
-  /** The key as the code writes it; a prefix for keys with an id suffix. */
-  stored: string;
-  area: Area;
-  /** File under src that writes it. */
-  file: string;
-}
-
-const WRITERS: readonly Writer[] = [
-  { stored: 'postr.onboarding-done', area: 'localStorage', file: 'components/OnboardingTour.tsx' },
-  { stored: 'postr.style-presets', area: 'localStorage', file: 'poster/PosterEditor.tsx' },
-  { stored: 'postr.style-presets', area: 'localStorage', file: 'components/PresetEditModal.tsx' },
-  { stored: 'postr.custom-palettes', area: 'localStorage', file: 'poster/customPalettes.ts' },
-  { stored: 'postr.cb-random-pref', area: 'localStorage', file: 'components/PaletteDesigner.tsx' },
-  { stored: 'postr.checklist-templates', area: 'localStorage', file: 'poster/GuidelinesPanel.tsx' },
-  { stored: 'postr.scratch-pad', area: 'localStorage', file: 'poster/GuidelinesPanel.tsx' },
-  { stored: 'postr.scratch-note', area: 'localStorage', file: 'poster/GuidelinesPanel.tsx' },
-  { stored: 'postr.profile', area: 'localStorage', file: 'profile/ProfileFields.tsx' },
-  { stored: 'postr.welcome-seeded:', area: 'localStorage', file: 'data/seedWelcomePoster.ts' },
-  { stored: 'postr.active-editor.', area: 'localStorage', file: 'hooks/useTwoTabGuard.ts' },
-  { stored: 'postr.figure-script.', area: 'localStorage', file: 'poster/figureScriptDraft.ts' },
-  { stored: 'postr.figure-script-page', area: 'sessionStorage', file: 'poster/figureScriptDraft.ts' },
-  { stored: 'postr.figure-size-page', area: 'sessionStorage', file: 'poster/figureScriptDraft.ts' },
-  { stored: 'postr.tab-id', area: 'sessionStorage', file: 'hooks/useTwoTabGuard.ts' },
-  { stored: 'postr.signupConsent', area: 'sessionStorage', file: 'data/consent.ts' },
-  { stored: 'postr.checkoutIntent', area: 'sessionStorage', file: 'data/checkoutIntent.ts' },
-  { stored: 'postr.autoArrangeOnLoad', area: 'sessionStorage', file: 'components/ImportPosterModal.tsx' },
-  { stored: 'postr-just-refreshed', area: 'sessionStorage', file: 'components/UpdateAvailableToast.tsx' },
-  { stored: 'postr-acknowledged-build', area: 'sessionStorage', file: 'components/UpdateAvailableToast.tsx' },
-  { stored: 'postr.mobile-notice-dismissed', area: 'sessionStorage', file: 'components/MobileNotice.tsx' },
-];
-
-/**
- * Writers the page may leave out, with the reason. The guest commenter
- * name is written only by the comments panel, which is not rendered
- * while sharing and comments are switched off (config/features.ts).
- */
-const UNREACHABLE_WRITERS: readonly Writer[] = SHARING_ENABLED
-  ? []
-  : [{ stored: 'postr.comment-name', area: 'localStorage', file: 'hooks/useComments.ts' }];
+import { type Area, UNREACHABLE_WRITERS, WRITERS } from './storageWriters';
 
 const SUPABASE_SESSION_KEY = 'sb-<project-ref>-auth-token';
 const POLICY_PAGES = ['pages/Cookies.tsx', 'pages/CookiesFr.tsx'] as const;
@@ -144,13 +102,23 @@ describe('Cookies Policy storage inventory', () => {
     expect(tableRows(source).some((row) => /Supabase .*timer|Minuteries/i.test(row.entry))).toBe(false);
   });
 
-  it.each(POLICY_PAGES)('%s does not claim to honour DNT or GPC while no code reads them', (page) => {
-    const readers = sourceFiles(srcRoot)
+  /** Non-policy source files whose text matches `pattern`. */
+  const codeReading = (pattern: RegExp) =>
+    sourceFiles(srcRoot)
       .filter((path) => !POLICY_PAGES.some((p) => path.endsWith(p)))
-      .filter((path) => /doNotTrack|globalPrivacyControl|Sec-GPC/.test(readFileSync(path, 'utf8')));
-    if (readers.length > 0) return;
+      .filter((path) => pattern.test(readFileSync(path, 'utf8')));
 
+  it.each(POLICY_PAGES)('%s does not claim to honour Do Not Track while no code reads it', (page) => {
+    if (codeReading(/doNotTrack/).length > 0) return;
     const source = sourceOf(page);
-    expect(source).not.toMatch(/We respect “Do Not Track”|Nous respectons les en-têtes/);
+    expect(source).not.toMatch(/We respect “Do Not Track”|Nous respectons les en-têtes|honou?rs? .{0,20}Do Not Track|respecte .{0,30}Do Not Track/);
+  });
+
+  it.each(POLICY_PAGES)('%s claims to honour Global Privacy Control only while the code reads it', (page) => {
+    // Record 24: App.tsx does not mount Vercel Web Analytics when
+    // navigator.globalPrivacyControl is true (analytics/globalPrivacyControl.ts).
+    const reads = codeReading(/navigator[^;]{0,80}globalPrivacyControl/).length > 0;
+    const claims = /Postr honours <em>Global Privacy Control|Postr respecte le signal <em>Global Privacy Control/.test(sourceOf(page));
+    expect(claims).toBe(reads);
   });
 });

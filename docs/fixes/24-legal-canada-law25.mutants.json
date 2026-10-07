@@ -1,0 +1,888 @@
+{
+ "tests": [
+  "src/__tests__/analyticsPrivacy.test.tsx",
+  "src/analytics/__tests__/redactUrl.test.ts",
+  "src/components/__tests__/FeedbackModal.privacyDefault.test.tsx",
+  "src/pages/__tests__/Profile.dangerZone.test.tsx",
+  "src/pages/__tests__/Auth.termsFrench.test.tsx",
+  "src/pages/__tests__/Auth.audit.test.tsx",
+  "src/pages/__tests__/Auth.termResume.test.tsx",
+  "src/pages/__tests__/legalPagesContent.test.tsx",
+  "src/pages/__tests__/privacyFeedbackRetention.test.tsx",
+  "src/pages/__tests__/cookiesStorageInventory.test.ts",
+  "src/seo/__tests__/vercelRouting.test.ts"
+ ],
+ "mutants": {
+  "a-analytics-mounted-under-gpc": {
+   "undoes": "A — Vercel Web Analytics is not mounted when the browser sends Global Privacy Control",
+   "edits": [
+    [
+     "src/App.tsx",
+     "{!globalPrivacyControlOn() && (",
+     "{true && ("
+    ]
+   ]
+  },
+  "a-gpc-never-read": {
+   "undoes": "A — the GPC reader sees navigator.globalPrivacyControl === true",
+   "edits": [
+    [
+     "src/analytics/globalPrivacyControl.ts",
+     ".globalPrivacyControl === true;",
+     ".globalPrivacyControl === 'on';"
+    ]
+   ]
+  },
+  "a-gpc-false-counts-as-on": {
+   "undoes": "A — only true counts: an explicit false (GPC off) still loads analytics",
+   "edits": [
+    [
+     "src/analytics/globalPrivacyControl.ts",
+     ".globalPrivacyControl === true;",
+     ".globalPrivacyControl !== undefined;"
+    ]
+   ]
+  },
+  "b-poster-id-reported": {
+   "undoes": "B — /p/<poster id> is reported as /p/[redacted] (on main; pinned from the user's page load here)",
+   "edits": [
+    [
+     "src/analytics/redactUrl.ts",
+     "  { prefix: '/p', shape: '/p/[redacted]' },\n",
+     ""
+    ]
+   ]
+  },
+  "b-gallery-id-reported": {
+   "undoes": "B — /gallery/<entry id> is reported as /gallery/[redacted]",
+   "edits": [
+    [
+     "src/analytics/redactUrl.ts",
+     "  { prefix: '/gallery', shape: '/gallery/[redacted]' },\n",
+     ""
+    ]
+   ]
+  },
+  "b-query-string-reported": {
+   "undoes": "B — the query string is dropped from every reported address (on main)",
+   "edits": [
+    [
+     "src/analytics/redactUrl.ts",
+     "  return `${origin}${parsed.pathname}`;",
+     "  return `${origin}${parsed.pathname}${parsed.search}`;"
+    ]
+   ]
+  },
+  "b-path-matched-raw": {
+   "undoes": "B (review round 1) — the id routes are matched on the path as the router reads it, not the raw path",
+   "edits": [
+    [
+     "src/analytics/redactUrl.ts",
+     "  const key = routeKey(parsed.pathname);",
+     "  const key = parsed.pathname;"
+    ]
+   ]
+  },
+  "b-upper-case-reported": {
+   "undoes": "B (review round 1) — /P/<id>, which the router serves as the editor, is redacted",
+   "edits": [
+    [
+     "src/analytics/redactUrl.ts",
+     "  return decoded.toLowerCase().replace(/\\/{2,}/g, '/');",
+     "  return decoded.replace(/\\/{2,}/g, '/');"
+    ]
+   ]
+  },
+  "b-escapes-reported": {
+   "undoes": "B (review round 1) — /%70/<id>, which the router decodes to /p/<id>, is redacted",
+   "edits": [
+    [
+     "src/analytics/redactUrl.ts",
+     "    decoded = decodeURIComponent(pathname);",
+     "    decoded = pathname;"
+    ]
+   ]
+  },
+  "b-doubled-slash-reported": {
+   "undoes": "B (review round 1) — //p/<id>, a not-found page whose address carries the id, is redacted",
+   "edits": [
+    [
+     "src/analytics/redactUrl.ts",
+     "  return decoded.toLowerCase().replace(/\\/{2,}/g, '/');",
+     "  return decoded.toLowerCase();"
+    ]
+   ]
+  },
+  "b-referer-carries-path": {
+   "undoes": "B — every page is served with Referrer-Policy: strict-origin, so the beacon's Referer is the origin, not /p/<id>",
+   "edits": [
+    [
+     "vercel.json",
+     "\"value\": \"strict-origin\"",
+     "\"value\": \"strict-origin-when-cross-origin\""
+    ]
+   ]
+  },
+  "c-log-ticked-on-open": {
+   "undoes": "C — the console-log box is unticked each time the feedback form opens",
+   "edits": [
+    [
+     "src/components/FeedbackModal.tsx",
+     "      setIncludeLog(false);",
+     "      setIncludeLog(true);"
+    ]
+   ]
+  },
+  "c-log-sent-unticked": {
+   "undoes": "C — the console log is sent only when the box is ticked",
+   "edits": [
+    [
+     "src/components/FeedbackModal.tsx",
+     "        log: includeLog ? context?.log : undefined,",
+     "        log: context?.log,"
+    ]
+   ]
+  },
+  "c-initial-state-ticked": {
+   "undoes": "C — (equivalent) the box's initial state; the form's open effect sets it unticked before anything can be sent",
+   "expect": "survive",
+   "edits": [
+    [
+     "src/components/FeedbackModal.tsx",
+     "  const [includeLog, setIncludeLog] = useState(false);",
+     "  const [includeLog, setIncludeLog] = useState(true);"
+    ]
+   ]
+  },
+  "d-local-storage-kept": {
+   "undoes": "D — account deletion clears every Postr entry in localStorage",
+   "edits": [
+    [
+     "src/profile/accountDeletion.ts",
+     "  clearArea(() => localStorage, userId);\n",
+     ""
+    ]
+   ]
+  },
+  "d-session-storage-kept": {
+   "undoes": "D (review round 1) — account deletion clears every Postr entry in sessionStorage (the tab’s entries the Privacy Policy says deletion clears)",
+   "edits": [
+    [
+     "src/profile/accountDeletion.ts",
+     "  clearArea(() => sessionStorage, userId);\n",
+     ""
+    ]
+   ]
+  },
+  "d-dash-keys-kept": {
+   "undoes": "D (review round 1) — the postr-… keys (postr-just-refreshed, postr-acknowledged-build) go too, not only postr.…",
+   "edits": [
+    [
+     "src/profile/accountDeletion.ts",
+     "const POSTR_KEY = /^postr[.-]/;",
+     "const POSTR_KEY = /^postr\\./;"
+    ]
+   ]
+  },
+  "d-welcome-marker-kept": {
+   "undoes": "D — account deletion clears this account’s welcome-poster marker (its key holds the account id)",
+   "edits": [
+    [
+     "src/profile/accountDeletion.ts",
+     "  return key.startsWith(WELCOME_SEEDED_PREFIX) && key !== `${WELCOME_SEEDED_PREFIX}${userId}`;",
+     "  return key.startsWith(WELCOME_SEEDED_PREFIX);"
+    ]
+   ]
+  },
+  "d-every-welcome-marker-cleared": {
+   "undoes": "D — another account’s welcome-poster marker in the same browser stays",
+   "edits": [
+    [
+     "src/profile/accountDeletion.ts",
+     "  return key.startsWith(WELCOME_SEEDED_PREFIX) && key !== `${WELCOME_SEEDED_PREFIX}${userId}`;",
+     "  return false;"
+    ]
+   ]
+  },
+  "d-account-read-after-sign-out": {
+   "undoes": "D — the account id is read before the deletion and sign-out (after them there is no session to read)",
+   "edits": [
+    [
+     "src/profile/accountDeletion.ts",
+     "  const userId = await currentUserId();\n  try {",
+     "  try {"
+    ],
+    [
+     "src/profile/accountDeletion.ts",
+     "  clearLocalData(userId);\n  await supabase.auth.signOut({ scope: 'global' });",
+     "  await supabase.auth.signOut({ scope: 'global' });\n  clearLocalData(await currentUserId());"
+    ]
+   ]
+  },
+  "d-clear-before-server": {
+   "undoes": "D — nothing is cleared in the browser until the server deletion succeeded (round 1 reviewer’s mutant)",
+   "edits": [
+    [
+     "src/profile/accountDeletion.ts",
+     "  const userId = await currentUserId();\n  try {",
+     "  const userId = await currentUserId();\n  clearLocalData(userId);\n  try {"
+    ],
+    [
+     "src/profile/accountDeletion.ts",
+     "  clearLocalData(userId);\n  await supabase.auth.signOut",
+     "  await supabase.auth.signOut"
+    ]
+   ]
+  },
+  "d-in-memory-scripts-kept": {
+   "undoes": "D — deletion also drops plot scripts too long to store, held in memory (record 07’s call, still needed once the sweep removes the stored ones)",
+   "edits": [
+    [
+     "src/profile/accountDeletion.ts",
+     "  clearStoredFigureScripts();\n",
+     ""
+    ]
+   ]
+  },
+  "e-terms-line-english-only": {
+   "undoes": "E — the Terms line on /auth links the French Terms and Privacy Policy",
+   "edits": [
+    [
+     "src/pages/Auth.tsx",
+     "{c.privacyTail} <span lang={HTML_LANG[other]}>{o.inThisLanguage}{' '}\n      <Link className={link} to={localizedPath('/terms', other)}>\n        {o.termsLink}\n      </Link>{' '}\n      {o.and}{' '}\n      <Link className={link} to={localizedPath('/privacy', other)}>\n        {o.privacyLink}\n      </Link>\n      .</span>",
+     "{c.privacyTail}"
+    ]
+   ]
+  },
+  "e-terms-line-absent": {
+   "undoes": "E — a user who continues on /auth is told it is accepting the Terms (Terms §1)",
+   "edits": [
+    [
+     "src/pages/Auth.tsx",
+     "          <TermsLine lang={lang} />",
+     "          {false && <TermsLine lang={lang} />}"
+    ]
+   ]
+  },
+  "e-privacy-policy-agreed": {
+   "undoes": "E (review round 1) — the /auth line asks the user to agree to the Terms only; the Privacy Policy is presented as information",
+   "edits": [
+    [
+     "src/i18n/auth.ts",
+     "  privacyLead: '. The',\n",
+     "  privacyLead: ' and the',\n"
+    ],
+    [
+     "src/i18n/auth.ts",
+     "  privacyTail: 'explains how we handle your information.',\n",
+     "  privacyTail: '',\n"
+    ]
+   ]
+  },
+  "e-fr-terms-link-english": {
+   "undoes": "E — the sign-up line’s French Terms link goes to /terms/fr (round 1 reviewer’s mutant)",
+   "edits": [
+    [
+     "src/pages/Auth.tsx",
+     "      <Link className={link} to={localizedPath('/terms', other)}>",
+     "      <Link className={link} to={localizedPath('/terms', lang)}>"
+    ]
+   ]
+  },
+  "e-fr-privacy-link-english": {
+   "undoes": "E — the sign-up line’s French Privacy link goes to /privacy/fr (round 1 reviewer’s mutant)",
+   "edits": [
+    [
+     "src/pages/Auth.tsx",
+     "      <Link className={link} to={localizedPath('/privacy', other)}>",
+     "      <Link className={link} to={localizedPath('/privacy', lang)}>"
+    ]
+   ]
+  },
+  "f-person-in-charge-named-president": {
+   "undoes": "F — the person in charge is published as a role of Resila, never as President",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "            Person in charge of the protection of personal information (Privacy\n            Officer), Resila Technologies Inc.",
+     "            Person in charge of the protection of personal information: the\n            President of Resila Technologies Inc."
+    ]
+   ]
+  },
+  "f-core-recipients-not-first": {
+   "undoes": "F — Vercel, Render and Supabase are listed first among the recipients",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "              'Vercel',",
+     "              'Google Cloud (as Vercel’s host)',"
+    ]
+   ]
+  },
+  "f-quebec-consumer-court-dropped": {
+   "undoes": "F — the Montréal-courts clause keeps a Quebec consumer's own court, and no arbitration or class-action waiver",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "          If you are a consumer in Quebec, you keep your right under the Consumer\n          Protection Act to bring proceedings before the court of the district where\n          you live. These Terms do not require arbitration, and they do not stop you\n          from bringing or taking part in a class action. If you are a consumer\n          elsewhere, you also keep any right the mandatory consumer-protection law of\n          the place where you live gives you to bring proceedings there.",
+     "          Disputes go to Montréal."
+    ]
+   ]
+  },
+  "f-terms-latex-back": {
+   "undoes": "F — the Terms offer PDF and PowerPoint export only (LaTeX hidden)",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "export your posters to PDF or\n          PowerPoint, and submit feedback.",
+     "export your posters to PDF,\n          PowerPoint or LaTeX, and submit feedback."
+    ]
+   ]
+  },
+  "f-cookies-gpc-claim-dropped": {
+   "undoes": "F — the Cookies Policy says Postr honours GPC while the code reads it",
+   "edits": [
+    [
+     "src/pages/Cookies.tsx",
+     "          Postr honours <em>Global Privacy Control</em> (GPC), a privacy setting",
+     "          Postr reads <em>Global Privacy Control</em> (GPC), a privacy setting"
+    ]
+   ]
+  },
+  "f-en-reply-60-days": {
+   "undoes": "F (A-R1-01) — Privacy EN §10: the written reply within 30 days; §11 keeps its own 30",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "We reply in writing within 30",
+     "We reply in writing within 60"
+    ]
+   ]
+  },
+  "f-fr-reply-60-days": {
+   "undoes": "F (A-R1-01) — Privacy FR §10: the written reply within 30 days",
+   "edits": [
+    [
+     "src/pages/PrivacyFr.tsx",
+     "Nous répondons par écrit dans les 30 jours",
+     "Nous répondons par écrit dans les 60 jours"
+    ]
+   ]
+  },
+  "f-en-arbitration-required": {
+   "undoes": "F (A-R1-01) — Terms EN §12: no arbitration, no class-action waiver (inverted)",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "These Terms do not require arbitration, and they do not stop you",
+     "These Terms require arbitration, and they stop you"
+    ]
+   ]
+  },
+  "f-fr-arbitration-required": {
+   "undoes": "F (A-R1-01) — Terms FR §12: no arbitration, no class-action waiver (inverted)",
+   "edits": [
+    [
+     "src/pages/TermsFr.tsx",
+     "Les présentes Conditions n’imposent pas",
+     "Les présentes Conditions imposent"
+    ],
+    [
+     "src/pages/TermsFr.tsx",
+     "l’arbitrage et ne vous empêchent pas d’intenter",
+     "l’arbitrage et vous empêchent d’intenter"
+    ]
+   ]
+  },
+  "f-en-profiling-used": {
+   "undoes": "F (A-R1-01) — Privacy EN §7: NO technology that identifies, locates or profiles (inverted)",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "Postr uses no technology that identifies, locates or profiles",
+     "Postr uses technology that identifies, locates or profiles"
+    ]
+   ]
+  },
+  "f-fr-profiling-used": {
+   "undoes": "F (A-R1-01) — Privacy FR §7: NO technology that identifies, locates or profiles (inverted)",
+   "edits": [
+    [
+     "src/pages/PrivacyFr.tsx",
+     "Postr n’utilise aucune technologie qui permet de vous\n          identifier",
+     "Postr utilise une technologie qui permet de vous\n          identifier"
+    ]
+   ]
+  },
+  "f-en-gpc-still-loads": {
+   "undoes": "F (A-R1-01) — Privacy EN §6: under GPC Postr does not load Vercel Web Analytics (inverted)",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "Postr does not load Vercel Web Analytics at\n          all, so your page views are not counted.",
+     "Postr still loads Vercel Web Analytics,\n          so your page views are counted."
+    ]
+   ]
+  },
+  "f-en-term-refund-30-days": {
+   "undoes": "F (A-R1-01) — Terms EN §7.1: the unused-term refund window is billing.ts TERM_REFUND_WINDOW_DAYS; §7.2 keeps its own 14",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "you can ask for a full refund within 14",
+     "you can ask for a full refund within 30"
+    ]
+   ]
+  },
+  "f-en-term-price-tax-dropped": {
+   "undoes": "F (A-R1-01) — Terms EN §7: the term’s price says plus applicable taxes",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "'Term — CA$18.99 plus applicable taxes, billed every 4 months.",
+     "'Term — CA$18.99 billed every 4 months."
+    ]
+   ]
+  },
+  "f-en-officer-personal-name": {
+   "undoes": "F (A-R1-01) — Privacy EN §1: the person in charge published as a role, no personal name",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "            Officer), Resila Technologies Inc.\n          </strong>",
+     "            Officer), Resila Technologies Inc.: John Smith\n          </strong>"
+    ]
+   ]
+  },
+  "f-fr-refund-link-english": {
+   "undoes": "F (A-R1-01) — Privacy FR §7: the refund rule links the French Terms",
+   "edits": [
+    [
+     "src/pages/PrivacyFr.tsx",
+     "/terms/fr#refunds",
+     "/terms#refunds"
+    ]
+   ]
+  },
+  "f-fr-cookies-gpc-dropped": {
+   "undoes": "F — Cookies FR §6: Postr honours GPC (round 1 reviewer’s mutant)",
+   "edits": [
+    [
+     "src/pages/CookiesFr.tsx",
+     "Postr respecte le signal <em>Global Privacy Control</em>",
+     "Postr lit le signal <em>Global Privacy Control</em>"
+    ]
+   ]
+  },
+  "f-fr-terms-latex-back": {
+   "undoes": "F — Terms FR §2: PDF or PowerPoint only (round 1 reviewer’s mutant)",
+   "edits": [
+    [
+     "src/pages/TermsFr.tsx",
+     "d’exporter vos affiches en PDF ou PowerPoint et de",
+     "d’exporter vos affiches en PDF, PowerPoint ou LaTeX et de"
+    ]
+   ]
+  },
+  "f-en-guest-period-30-days": {
+   "undoes": "F (review round 1) — Privacy EN §9: guest accounts go after cron.ts STALE_GUEST_DAYS",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "once 14 days have passed since their last sign-in",
+     "once 30 days have passed since their last sign-in"
+    ]
+   ]
+  },
+  "f-en-feedback-unlinked": {
+   "undoes": "F (A-R1-02) — Privacy EN §9: a report with an attached file keeps the account id in its text",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "If you attached a file, the file is deleted with your account, but your feedback still says where the file was stored, and that contains your account identifier.",
+     "It is no longer linked to your account. A file you attached is deleted with your account."
+    ]
+   ]
+  },
+  "f-fr-feedback-unlinked": {
+   "undoes": "F (A-R1-02) — Privacy FR §9: the same",
+   "edits": [
+    [
+     "src/pages/PrivacyFr.tsx",
+     "Si vous avez joint un fichier, ce fichier est supprimé avec votre compte, mais vos commentaires indiquent encore où il était stocké, et cette indication contient votre identifiant de compte.",
+     "Ils ne sont plus liés à votre compte. Un fichier joint est supprimé avec votre compte."
+    ]
+   ]
+  },
+  "f-en-pack-refund-untaxed": {
+   "undoes": "F (A-R1-06) — Terms EN §7.2: the pack refund is the amount paid, tax included",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "refund the full amount you paid for your\n          most recent pack (CA$9.99 plus the tax charged),",
+     "refund the CA$9.99 charge for your\n          most recent pack in full,"
+    ]
+   ]
+  },
+  "f-fr-pack-refund-untaxed": {
+   "undoes": "F (A-R1-06) — Terms FR §7.2: the same",
+   "edits": [
+    [
+     "src/pages/TermsFr.tsx",
+     "rembourserons intégralement le montant payé pour\n          votre plus récent lot (9,99&nbsp;$&nbsp;CA plus les taxes facturées),",
+     "rembourserons intégralement la facturation de\n          9,99&nbsp;$&nbsp;CA de votre plus récent lot,"
+    ]
+   ]
+  },
+  "f-en-merchant-named": {
+   "undoes": "F (A-R1-07) — Privacy EN §4: Stripe’s merchant-of-record service, no seller named",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "runs subscriptions through its merchant-of-record service, which also calculates and collects tax.",
+     "runs subscriptions as the merchant of record, and calculates and collects tax."
+    ]
+   ]
+  },
+  "f-en-terms-merchant-named": {
+   "undoes": "F (A-R1-07) — Terms EN §7: the same",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "through its\n          merchant-of-record service, which bills you,",
+     "which acts as\n          the merchant of record: it bills you,"
+    ]
+   ]
+  },
+  "f-fr-terms-merchant-named": {
+   "undoes": "F (A-R1-07) — Terms FR §7: the same",
+   "edits": [
+    [
+     "src/pages/TermsFr.tsx",
+     "au moyen de son service de\n          marchand officiel (merchant of record), qui vous facture,",
+     "qui agit à titre de\n          marchand officiel (merchant of record) : il vous facture,"
+    ]
+   ]
+  },
+  "f-en-terms-privacy-agreed": {
+   "undoes": "F (A-R1-08) — Terms EN §1: the Privacy Policy is presented as information, not agreed to",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "          explains how we handle your personal information. If you do not agree to",
+     "          governs our use of your information, which you also agree to. If you do not agree to"
+    ]
+   ]
+  },
+  "e-terms-line-signup-only": {
+   "undoes": "E (review round 2, A-R2-01) — the line is shown in sign-in mode too, the page's default, where Continue with Google can create an account",
+   "edits": [
+    [
+     "src/pages/Auth.tsx",
+     "          <TermsLine lang={lang} />",
+     "          {mode === 'signup' && <TermsLine lang={lang} />}"
+    ]
+   ]
+  },
+  "e-terms-line-below-form": {
+   "undoes": "E (review round 2, A-R2-01) — the line sits right under Continue with Google, before the email form (it was under the form, 279 px below the button)",
+   "edits": [
+    [
+     "src/pages/Auth.tsx",
+     "          <TermsLine lang={lang} />\n\n",
+     ""
+    ],
+    [
+     "src/pages/Auth.tsx",
+     "          </form>\n",
+     "          </form>\n\n          <TermsLine lang={lang} />\n"
+    ]
+   ]
+  },
+  "e-terms-line-says-creating": {
+   "undoes": "E (review round 2, A-R2-01) — the line is mode-neutral: 'By continuing', read before signing in or creating an account",
+   "edits": [
+    [
+     "src/i18n/auth.ts",
+     "  termsLead: 'By continuing, you agree to the',\n",
+     "  termsLead: 'By creating an account, you agree to the',\n"
+    ]
+   ]
+  },
+  "f-en-counting-listed-as-private-default": {
+   "undoes": "F (review round 2, A-R2-02) — Privacy EN §8: page counting is not listed among the defaults that start at the most private choice",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "            'Nothing goes to the language model until you use a feature that needs it.',",
+     "            'Page counting is not loaded when your browser sends Global Privacy Control.',\n            'Nothing goes to the language model until you use a feature that needs it.',"
+    ]
+   ]
+  },
+  "f-fr-counting-listed-as-private-default": {
+   "undoes": "F (review round 2, A-R2-02) — Privacy FR §8: the same",
+   "edits": [
+    [
+     "src/pages/PrivacyFr.tsx",
+     "            'Rien n’est transmis au modèle de langage tant que vous n’utilisez pas une fonction qui en a besoin.',",
+     "            'Le comptage des pages vues n’est pas chargé lorsque votre navigateur envoie le signal Global Privacy Control.',\n            'Rien n’est transmis au modèle de langage tant que vous n’utilisez pas une fonction qui en a besoin.',"
+    ]
+   ]
+  },
+  "f-en-counting-on-by-default-unsaid": {
+   "undoes": "F (review round 2, A-R2-02) — Privacy EN §8 says page counting is on by default",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "Page counting is on by\n          default. ",
+     ""
+    ]
+   ]
+  },
+  "f-en-vercel-location-unsaid": {
+   "undoes": "F (review round 2, A-R2-03) — Privacy EN §6 says what Vercel's documentation says it may record (approximate location, device type, operating system, browser)",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "Vercel’s\n          documentation says it may record with each page view an approximate\n          location (country, region and city), your device type, operating system\n          and browser. It also says",
+     "Vercel says"
+    ]
+   ]
+  },
+  "f-fr-vercel-location-unsaid": {
+   "undoes": "F (review round 2, A-R2-03) — Privacy FR §6: the same",
+   "edits": [
+    [
+     "src/pages/PrivacyFr.tsx",
+     "Selon la documentation de Vercel, celui-ci\n          peut enregistrer avec chaque page vue une localisation approximative (pays,\n          région et ville), votre type d’appareil, votre système d’exploitation et\n          votre navigateur. Vercel indique aussi",
+     "Vercel indique"
+    ]
+   ]
+  },
+  "f-en-nothing-locates-unqualified": {
+   "undoes": "F (review round 2, A-R2-03) — Privacy EN §7: 'no technology that locates' carries the page-counting location as its exception",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "Apart from the approximate location Vercel derives from each page view\n          (Section 6), Postr uses",
+     "Postr uses"
+    ]
+   ]
+  },
+  "f-fr-nothing-locates-unqualified": {
+   "undoes": "F (review round 2, A-R2-03) — Privacy FR §7: the same",
+   "edits": [
+    [
+     "src/pages/PrivacyFr.tsx",
+     "Hormis la localisation approximative que Vercel déduit de chaque page vue\n          (section 6), Postr n’utilise",
+     "Postr n’utilise"
+    ]
+   ]
+  },
+  "f-cookies-en-location-unsaid": {
+   "undoes": "F (review round 2, A-R2-03) — Cookies EN §4 says Vercel may record an approximate location",
+   "edits": [
+    [
+     "src/pages/Cookies.tsx",
+     "an approximate\n          location (country, region and city), the device type",
+     "a\n          value, the device type"
+    ]
+   ]
+  },
+  "f-cookies-fr-location-unsaid": {
+   "undoes": "F (review round 2, A-R2-03) — Cookies FR §4: the same",
+   "edits": [
+    [
+     "src/pages/CookiesFr.tsx",
+     "une localisation approximative (pays, région et ville), ainsi que le",
+     "une valeur, ainsi que le"
+    ]
+   ]
+  },
+  "f-en-adequacy-unsaid": {
+   "undoes": "F (review round 2, A-R2-04) — Privacy EN §15 names Canada's adequacy (GDPR art. 13(1)(f))",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "The\n          European Commission and the United Kingdom recognise Canada as giving\n          adequate protection to information held by organizations subject to PIPEDA.\n",
+     ""
+    ]
+   ]
+  },
+  "f-fr-adequacy-unsaid": {
+   "undoes": "F (review round 2, A-R2-04) — Privacy FR §15: the same",
+   "edits": [
+    [
+     "src/pages/PrivacyFr.tsx",
+     "La\n          Commission européenne et le Royaume-Uni reconnaissent que le Canada offre une\n          protection adéquate aux renseignements détenus par les organisations\n          assujetties à la LPRPDE. ",
+     ""
+    ]
+   ]
+  },
+  "f-en-safeguard-claimed": {
+   "undoes": "F (review round 2, A-R2-04) — Privacy EN §15 claims no safeguard for a provider; it says how to learn which applies",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "Write to the Privacy Officer to learn whether an adequacy\n          decision or another safeguard covers a provider, and to get a copy of any\n          safeguard.",
+     "Our providers are certified under it."
+    ]
+   ]
+  },
+  "f-en-portability-any-recipient": {
+   "undoes": "F (review round 2, A-R2-08) — Privacy EN §10: portability to a person or body the law authorizes (Law 25 s. 27), not anyone the user chooses",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "have it sent to a person or body that the law authorizes to collect it.",
+     "have it sent to a person or organization you choose."
+    ]
+   ]
+  },
+  "f-fr-portability-any-recipient": {
+   "undoes": "F (review round 2, A-R2-08) — Privacy FR §10: the same",
+   "edits": [
+    [
+     "src/pages/PrivacyFr.tsx",
+     "les faire transmettre à une personne ou à un organisme que la loi autorise à les recueillir.",
+     "les faire transmettre à la personne ou à l’organisme de votre choix."
+    ]
+   ]
+  },
+  "f-en-gdpr-portability-unsaid": {
+   "undoes": "F (review round 2, A-R2-08) — Privacy EN §15: GDPR art. 20(2), sent directly to another organization where technically feasible",
+   "edits": [
+    [
+     "src/pages/Privacy.tsx",
+     "a dispute is settled, and to have the information you gave us sent directly\n          to another organization, where technically feasible. You",
+     "a dispute is settled. You"
+    ]
+   ]
+  },
+  "f-en-indemnity-notice-dropped": {
+   "undoes": "F (review round 2, A-R2-05) — Terms EN §5.5 is immediately preceded by the Quebec statement (CPA s. 19.1)",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "        <SubHeading>5.5 Indemnification</SubHeading>\n        <QuebecNotice />\n",
+     "        <SubHeading>5.5 Indemnification</SubHeading>\n"
+    ]
+   ]
+  },
+  "f-en-liability-notice-dropped": {
+   "undoes": "F (review round 2, A-R2-05) — Terms EN §11: the same",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "title=\"Limitation of liability\" />\n        <QuebecNotice />\n",
+     "title=\"Limitation of liability\" />\n"
+    ]
+   ]
+  },
+  "f-en-continued-use-notice-dropped": {
+   "undoes": "F (review round 2, A-R2-05 sibling) — Terms EN §13: 'continued use means you accept' is immediately preceded by the Quebec statement (CPA s. 11.2, s. 19.1)",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "        </Body>\n        <QuebecNotice />\n        <Body>\n          Continued use",
+     "        </Body>\n        <Body>\n          Continued use"
+    ]
+   ]
+  },
+  "f-en-quebec-notice-not-prominent": {
+   "undoes": "F (review round 2, A-R2-05) — the Quebec statement is set in bold (prominently presented)",
+   "edits": [
+    [
+     "src/pages/Terms.tsx",
+     "      <strong>\n        The following clause",
+     "      <span>\n        The following clause"
+    ],
+    [
+     "src/pages/Terms.tsx",
+     "prohibits it.\n      </strong>",
+     "prohibits it.\n      </span>"
+    ]
+   ]
+  },
+  "f-fr-disclaimer-notice-dropped": {
+   "undoes": "F (review round 2, A-R2-05) — Terms FR §10 is immediately preceded by the Quebec statement",
+   "edits": [
+    [
+     "src/pages/TermsFr.tsx",
+     "title=\"Exclusions de garantie\" />\n        <QuebecNotice />\n",
+     "title=\"Exclusions de garantie\" />\n"
+    ]
+   ]
+  },
+  "f-fr-price-english-format": {
+   "undoes": "F (review round 2, A-R2-06) — Terms FR writes prices as 18,99 $ CA",
+   "edits": [
+    [
+     "src/pages/TermsFr.tsx",
+     "'Forfait à terme — 18,99\\u00a0$\\u00a0CA",
+     "'Forfait à terme — CA$18.99"
+    ]
+   ]
+  },
+  "f-fr-pack-back": {
+   "undoes": "F (review round 2, A-R2-06) — Terms FR calls the export pack « lot »",
+   "edits": [
+    [
+     "src/pages/TermsFr.tsx",
+     "          même en partie. Le remboursement d’un lot retire",
+     "          même en partie. Le remboursement d’un pack retire"
+    ]
+   ]
+  },
+  "f-fr-delit-back": {
+   "undoes": "F (review round 2, A-R2-06) — Terms FR §11 uses Quebec civil-law vocabulary (responsabilité extracontractuelle)",
+   "edits": [
+    [
+     "src/pages/TermsFr.tsx",
+     "en matière de responsabilité\n          contractuelle ou extracontractuelle (y compris la négligence), en vertu d’une",
+     "sur le fondement d’un contrat,\n          d’un délit (y compris la négligence), d’une"
+    ]
+   ]
+  },
+  "f-fr-legal-label": {
+   "undoes": "F (review round 2, A-R2-06) — the FR pages are labelled « Juridique »",
+   "edits": [
+    [
+     "src/pages/CookiesFr.tsx",
+     "            Juridique\n",
+     "            Légal\n"
+    ]
+   ]
+  },
+  "f-fr-straight-apostrophe": {
+   "undoes": "F (review round 2, A-R2-06) — Cookies FR uses curly apostrophes",
+   "edits": [
+    [
+     "src/pages/CookiesFr.tsx",
+     "Elle n’est pas conservée.",
+     "Elle n'est pas conservée."
+    ]
+   ]
+  },
+  "f-fr-widgets-back": {
+   "undoes": "F (review round 2, A-R2-06) — Cookies FR: « Modules », not « Widgets »",
+   "edits": [
+    [
+     "src/pages/CookiesFr.tsx",
+     "'Modules de médias sociaux",
+     "'Widgets de médias sociaux"
+    ]
+   ]
+  },
+  "f-fr-purpose-header": {
+   "undoes": "F (review round 2, A-R2-06) — Privacy FR: the purpose column is « Finalité »",
+   "edits": [
+    [
+     "src/pages/PrivacyFr.tsx",
+     "headers={['Finalité', 'Renseignements utilisés']}",
+     "headers={['Fin', 'Renseignements utilisés']}"
+    ]
+   ]
+  }
+ }
+}

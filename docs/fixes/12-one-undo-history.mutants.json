@@ -722,12 +722,22 @@
       ]
     },
     "E-about-50": {
-      "undoes": "E — the About page states the limit the editor keeps",
+      "undoes": "E — the About page states the limit the editor keeps (since the merge with fix 26 the copy is i18n/about.ts)",
       "edits": [
         [
-          "src/pages/About.tsx",
+          "src/i18n/about.ts",
           "'Undo and redo up to 100 steps.",
           "'Undo and redo up to 50 steps."
+        ]
+      ]
+    },
+    "E-about-fr-50": {
+      "undoes": "E — the French About page (/about/fr, fix 26) states the same limit",
+      "edits": [
+        [
+          "src/i18n/about.ts",
+          "jusqu’à 100\\u00a0étapes",
+          "jusqu’à 50\\u00a0étapes"
         ]
       ]
     },

@@ -57,6 +57,10 @@ vi.mock('@/data/posters', async (orig) => ({
   upsertPoster: vi.fn(async () => ({})),
 }));
 vi.mock('@/data/thumbnails', () => ({ captureThumbnail: vi.fn(async () => null) }));
+// The About page's scroll reveals (GSAP) do not run in jsdom; its copy does.
+vi.mock('@/motion/timelines/aboutRoadtrip', () => ({
+  aboutRoadtrip: vi.fn(() => ({ revert: vi.fn() })),
+}));
 vi.mock('@/data/posterVersions', async (orig) => ({
   ...(await orig<typeof import('@/data/posterVersions')>()),
   listVersions: vi.fn(async () => [
@@ -68,7 +72,7 @@ vi.mock('@/data/posterVersions', async (orig) => ({
 
 import { UNDO_HISTORY_LIMIT, usePosterStore } from '@/stores/posterStore';
 import { ACK_BLOCK_ID } from '@/export/ackBlock';
-import aboutSource from '@/pages/About.tsx?raw';
+import About from '@/pages/About';
 import { PosterEditor } from '../PosterEditor';
 import { choosePreset, click, confirmButton, dialog } from './editorKit';
 import {
@@ -669,9 +673,21 @@ describe('5, 7, 10 — buttons, nothing shown on an empty history, 100 steps', (
 });
 
 describe('10 — the About page states the history the editor keeps', () => {
-  it('"Undo and redo up to N steps" is the store’s limit', () => {
+  // Read where a visitor reads it: the page rendered at its English and its
+  // French address (fix 26 moved the copy to i18n/about.ts; the merge of
+  // main into fix 12 carried the number into both languages).
+  it.each([
+    ['/about', `Undo and redo up to ${UNDO_HISTORY_LIMIT} steps.`],
+    ['/about/fr', `Annulez et rétablissez jusqu’à ${UNDO_HISTORY_LIMIT}\u00a0étapes.`],
+  ])('%s says "up to N steps", N the store’s limit', (path, sentence) => {
     expect(UNDO_HISTORY_LIMIT).toBe(100);
-    expect(aboutSource).toContain(`Undo and redo up to ${UNDO_HISTORY_LIMIT} steps.`);
+    const page = render(
+      <MemoryRouter initialEntries={[path]}>
+        <About />
+      </MemoryRouter>,
+    );
+    expect(page.container.textContent).toContain(sentence);
+    page.unmount();
   });
 });
 

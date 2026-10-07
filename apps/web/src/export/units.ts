@@ -83,8 +83,9 @@ export interface PptxScalePlan {
 /**
  * Thrown when even half scale cannot fit PowerPoint's ceiling
  * (poster dimension > 112 in). Carries designed user-facing copy —
- * the export UI steers the user to LaTeX / PDF, which have no such
- * limit. We refuse rather than scale by anything other than 0.5.
+ * the export UI steers the user to the PDF (the LaTeX export is
+ * hidden, config/features.ts LATEX_EXPORT_ENABLED). We refuse rather
+ * than scale by anything other than 0.5.
  */
 export class PptxSizeLimitError extends Error {
   readonly userMessage: string;
@@ -93,7 +94,7 @@ export class PptxSizeLimitError extends Error {
     const msg =
       `This poster is ${widthIn}×${heightIn} in. PowerPoint cannot represent it ` +
       `even at half size (its limit is ${PPTX_MAX_DIMENSION_IN} in per side). ` +
-      'Export LaTeX or PDF instead — neither has a size limit.';
+      'Save a PDF instead.';
     super(msg);
     this.name = 'PptxSizeLimitError';
     this.userMessage = msg;

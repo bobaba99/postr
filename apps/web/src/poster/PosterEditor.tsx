@@ -2959,6 +2959,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
                 height: cH,
                 transform: `scale(${zoom})`,
                 transformOrigin: 'top left',
+                // The same zoom for the selection controls drawn inside the
+                // sheet: they divide their offsets by it and scale what they
+                // draw back by it (`ctl`, `UNZOOM`, selectionLayout.ts), so
+                // they stay one size on screen (plan item 19).
+                ...({ '--postr-zoom': zoom } as React.CSSProperties),
                 background: doc.palette.bg,
                 position: 'relative',
                 // Same no-transition rationale as the frame above —
@@ -3202,6 +3207,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
                   citationStyle={citationStyle}
                   headingNumber={headingNumbers[b.id] ?? 0}
                   selected={selectedIds.has(b.id)}
+                  zoom={zoom}
                   justInserted={justInsertedId === b.id}
                   onSelect={(id, additive) => {
                     // Comments tab: block clicks are inert. Selection
@@ -3606,6 +3612,9 @@ function ZoomBar({
 
   return (
     <div
+      // Chrome over the canvas: a selected block's rotate control moves
+      // above the block rather than sit under it (selectionRoom.ts).
+      data-postr-canvas-chrome="zoombar"
       style={{
         position: 'absolute',
         // Clears the mobile share bar pinned to the bottom edge.

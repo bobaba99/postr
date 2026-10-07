@@ -86,7 +86,7 @@ describe('/auth?plan=term resume (P0-2)', () => {
     checkout.startCheckoutForPlan.mockResolvedValue(undefined);
     renderAt('/auth?plan=term');
 
-    await waitFor(() => expect(checkout.startCheckoutForPlan).toHaveBeenCalledWith('term'));
+    await waitFor(() => expect(checkout.startCheckoutForPlan).toHaveBeenCalledWith('term', 'en'));
     expect(checkout.startCheckoutForPlan).toHaveBeenCalledTimes(1);
   });
 
@@ -117,7 +117,7 @@ describe('/auth?plan=term resume (P0-2)', () => {
     checkout.startCheckoutForPlan.mockResolvedValue(undefined);
     renderAt('/auth?plan=pack');
 
-    await waitFor(() => expect(checkout.startCheckoutForPlan).toHaveBeenCalledWith('pack'));
+    await waitFor(() => expect(checkout.startCheckoutForPlan).toHaveBeenCalledWith('pack', 'en'));
     expect(screen.queryByText(/You already have an active term/i)).toBeNull();
   });
 

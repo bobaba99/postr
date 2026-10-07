@@ -1,0 +1,602 @@
+{
+  "tests": [
+    "src/__tests__/frenchPages.test.tsx",
+    "src/pages/__tests__/FigureReadability.french.test.tsx",
+    "src/seo/__tests__/prerenderFrench.test.ts",
+    "src/pages/__tests__/Auth.checkoutLocale.test.tsx",
+    "src/i18n/__tests__/dictionaries.test.ts",
+    "src/i18n/__tests__/readabilityWarnings.test.ts",
+    "src/components/__tests__/MobileNotice.test.tsx",
+    "src/components/__tests__/pricesTax.test.tsx",
+    "src/components/__tests__/toolDiscoverability.test.tsx",
+    "src/__tests__/copyInventory.test.ts",
+    "src/seo/__tests__/siteMeta.test.ts",
+    "src/seo/__tests__/vercelRouting.test.ts",
+    "src/seo/__tests__/headTagParity.test.ts",
+    "src/pages/__tests__/Auth.termResume.test.tsx"
+  ],
+  "mutants": {
+    "lang-always-english": {
+      "undoes": "A — a page’s language is its URL: /fr and …/fr are French (i18n/lang.ts langFromPath)",
+      "edits": [
+        [
+          "src/i18n/lang.ts",
+          "  return key === FR || key.endsWith(FR) ? 'fr' : 'en';",
+          "  return 'en';"
+        ]
+      ]
+    },
+    "localized-path-english-only": {
+      "undoes": "A — a French page’s links lead to the French twins (localizedPath)",
+      "edits": [
+        [
+          "src/i18n/lang.ts",
+          "  if (lang === 'en' || !isBilingual(english)) return `${english}${rest}`;",
+          "  if (true) return `${english}${rest}`;"
+        ]
+      ]
+    },
+    "counterpart-drops-query": {
+      "undoes": "A — the language link keeps the query (/auth?plan=term ↔ /auth/fr?plan=term)",
+      "edits": [
+        [
+          "src/i18n/lang.ts",
+          "  return localizedPath(`${english}${search}${hash}`, other);",
+          "  return localizedPath(english, other);"
+        ]
+      ]
+    },
+    "auth-not-bilingual": {
+      "undoes": "A — /auth is one of the bilingual pages (its language link, its French links)",
+      "edits": [
+        [
+          "src/i18n/lang.ts",
+          "  '/auth',\n",
+          "",
+          1
+        ]
+      ]
+    },
+    "route-about-fr-missing": {
+      "undoes": "A — /about/fr is a route (routes.tsx)",
+      "edits": [
+        [
+          "src/routes.tsx",
+          "        <Route path=\"/about/fr\" element={<About />} />\n",
+          ""
+        ]
+      ]
+    },
+    "route-billing-success-fr-missing": {
+      "undoes": "A — /billing/success/fr is a route (where a French checkout returns)",
+      "edits": [
+        [
+          "src/routes.tsx",
+          "        <Route path=\"/billing/success/fr\" element={<BillingResult outcome=\"success\" />} />\n",
+          ""
+        ]
+      ]
+    },
+    "runtime-no-hreflang": {
+      "undoes": "B — the head names both pages of a prerendered pair (useDocumentMeta tagSpecsFor)",
+      "edits": [
+        [
+          "src/seo/useDocumentMeta.ts",
+          "    ...HREFLANG_SLOTS.map(\n",
+          "    ...[].map(\n"
+        ]
+      ]
+    },
+    "runtime-hreflang-never-removed": {
+      "undoes": "B — leaving a page with alternates removes them (a slot always exists, empty when none)",
+      "edits": [
+        [
+          "src/seo/useDocumentMeta.ts",
+          "        value: meta.alternates?.find((a) => a.hreflang === hreflang)?.href ?? null,\n      }),\n    ),",
+          "        value: meta.alternates?.find((a) => a.hreflang === hreflang)?.href ?? null,\n      }),\n    ).filter((spec) => spec.value !== null),"
+        ]
+      ]
+    },
+    "x-default-french": {
+      "undoes": "B — x-default is the English page (siteMeta alternatesFor)",
+      "edits": [
+        [
+          "src/seo/siteMeta.ts",
+          "    { hreflang: 'x-default', href: canonicalFor(en) },",
+          "    { hreflang: 'x-default', href: canonicalFor(fr) },"
+        ]
+      ]
+    },
+    "alternates-for-unprerendered": {
+      "undoes": "B — only prerendered pairs carry alternates (not the billing pages)",
+      "edits": [
+        [
+          "src/seo/siteMeta.ts",
+          "const PRERENDERED: Record<string, { language?: string }> = {\n  ...STATIC_RECORDS,\n  ...Object.fromEntries(Object.entries(APP_RECORDS).filter(([, record]) => record.prerender === true)),\n};",
+          "const PRERENDERED: Record<string, { language?: string }> = {\n  ...STATIC_RECORDS,\n  ...APP_RECORDS,\n};"
+        ]
+      ]
+    },
+    "build-no-hreflang": {
+      "undoes": "B — the prerendered head names both pages of a pair (headTags.mjs buildPageMeta)",
+      "edits": [
+        [
+          "scripts/lib/headTags.mjs",
+          "    alternates: routes ? alternatesFor(path, routes, site) : null,",
+          "    alternates: null,"
+        ]
+      ]
+    },
+    "build-x-default-french": {
+      "undoes": "B — the prerendered x-default is the English page",
+      "edits": [
+        [
+          "scripts/lib/headTags.mjs",
+          "    { hreflang: 'x-default', href: canonicalFor(en, site.siteOrigin) },",
+          "    { hreflang: 'x-default', href: canonicalFor(fr, site.siteOrigin) },"
+        ]
+      ]
+    },
+    "prerender-english-nav": {
+      "undoes": "B — a French page’s fallback links are French, plus its English twin",
+      "edits": [
+        [
+          "scripts/prerender.mjs",
+          "  const lang = isFrench(record) ? 'fr' : 'en';",
+          "  const lang = 'en';"
+        ]
+      ]
+    },
+    "prerender-no-alternates": {
+      "undoes": "B — prerender gives the static pages their alternates (routes passed)",
+      "edits": [
+        [
+          "scripts/prerender.mjs",
+          "  const meta = buildPageMeta(routePath, record, site, routes);",
+          "  const meta = buildPageMeta(routePath, record, site);"
+        ]
+      ]
+    },
+    "sitemap-english-only": {
+      "undoes": "B — the French pages are in the sitemap",
+      "edits": [
+        [
+          "scripts/gen-sitemap.mjs",
+          "  .filter(([, record]) => record.robots === INDEXABLE)",
+          "  .filter(([, record]) => record.robots === INDEXABLE && !record.language)"
+        ]
+      ]
+    },
+    "routes-pricing-fr-english-locale": {
+      "undoes": "B — /pricing/fr is a fr_CA page in routes.json (og:locale; a mutant of its language would change how many tests run)",
+      "edits": [
+        [
+          "src/seo/routes.json",
+          "    \"/pricing/fr\": {\n      \"title\": \"Tarifs Postr\\u00a0: PDF gratuit, PowerPoint payant\",\n      \"description\": \"Modification et PDF gratuits. Exportations PowerPoint\\u00a0: forfait à terme de 4\\u00a0mois, 18,99\\u00a0$\\u00a0CA + taxes applicables, ou lot de 3, 9,99\\u00a0$\\u00a0CA + taxes applicables.\",\n      \"robots\": \"index,follow\",\n      \"language\": \"fr-CA\",\n      \"locale\": \"fr_CA\",",
+          "    \"/pricing/fr\": {\n      \"title\": \"Tarifs Postr\\u00a0: PDF gratuit, PowerPoint payant\",\n      \"description\": \"Modification et PDF gratuits. Exportations PowerPoint\\u00a0: forfait à terme de 4\\u00a0mois, 18,99\\u00a0$\\u00a0CA + taxes applicables, ou lot de 3, 9,99\\u00a0$\\u00a0CA + taxes applicables.\",\n      \"robots\": \"index,follow\",\n      \"language\": \"fr-CA\",\n      \"locale\": \"en_US\","
+        ]
+      ]
+    },
+    "header-english-nav": {
+      "undoes": "C — the header’s links are in the page’s language",
+      "edits": [
+        [
+          "src/components/PublicHeader.tsx",
+          "        {navLinksFor(lang).map((link) => (",
+          "        {navLinksFor('en').map((link) => ("
+        ]
+      ]
+    },
+    "header-no-language-link": {
+      "undoes": "C — the header’s flat row ends with the language link",
+      "edits": [
+        [
+          "src/components/PublicHeader.tsx",
+          "        <LanguageLink className={NAV_LINK_CLASS} />\n",
+          ""
+        ]
+      ]
+    },
+    "menu-no-language-row": {
+      "undoes": "C — the phone menu ends with the language link",
+      "edits": [
+        [
+          "src/components/PublicHeader.tsx",
+          "          {hasCounterpart && (",
+          "          {false && ("
+        ]
+      ]
+    },
+    "footer-no-language-link": {
+      "undoes": "C — the footer shows the language link on a bilingual page",
+      "edits": [
+        [
+          "src/components/PublicFooter.tsx",
+          "          {hasCounterpart && (",
+          "          {false && ("
+        ]
+      ]
+    },
+    "footer-legal-english": {
+      "undoes": "C — the French footer links the French legal pages",
+      "edits": [
+        [
+          "src/components/PublicFooter.tsx",
+          "            <FooterLink to={to('/privacy')}>{c.privacy}</FooterLink>",
+          "            <FooterLink to=\"/privacy\">{c.privacy}</FooterLink>"
+        ]
+      ]
+    },
+    "mobile-notice-english": {
+      "undoes": "C — the phone notice is French on a French page",
+      "edits": [
+        [
+          "src/components/MobileNotice.tsx",
+          "  const c = CHROME_COPY[langFromPath(pathname)].mobileNotice;",
+          "  const c = CHROME_COPY.en.mobileNotice;"
+        ]
+      ]
+    },
+    "mobile-notice-fr-checker": {
+      "undoes": "C — the French plot checker is exempt from the phone notice, like the English one",
+      "edits": [
+        [
+          "src/components/MobileNotice.tsx",
+          "  return /^\\/s\\//.test(pathname) || englishPath(pathname) === FIGURE_READABILITY_PATH;",
+          "  return /^\\/s\\//.test(pathname) || pathname.replace(/\\/+$/, '') === FIGURE_READABILITY_PATH;"
+        ]
+      ]
+    },
+    "landing-english-copy": {
+      "undoes": "C — the landing page’s copy is in its language",
+      "edits": [
+        [
+          "src/pages/Landing.tsx",
+          "  const c = LANDING_COPY[lang];",
+          "  const c = LANDING_COPY.en;"
+        ]
+      ]
+    },
+    "about-english-meta": {
+      "undoes": "C — /about/fr carries its own title and description",
+      "edits": [
+        [
+          "src/pages/About.tsx",
+          "  useDocumentMeta(STATIC_ROUTE_META[localizedPath('/about', lang)] ?? null);",
+          "  useDocumentMeta(STATIC_ROUTE_META['/about'] ?? null);"
+        ]
+      ]
+    },
+    "pricing-english-cards": {
+      "undoes": "C — the French pricing page’s cards are French",
+      "edits": [
+        [
+          "src/pages/Pricing.tsx",
+          "      <PricingSection lang={lang} />",
+          "      <PricingSection />"
+        ]
+      ]
+    },
+    "pricing-cta-english-auth": {
+      "undoes": "C — a French card sends the buyer to /auth/fr, plan kept",
+      "edits": [
+        [
+          "src/components/PricingSection.tsx",
+          "    { id: 'term', ...c.term, featured: true, ctaTo: localizedPath('/auth?plan=term', lang), refund: refund.term },",
+          "    { id: 'term', ...c.term, featured: true, ctaTo: '/auth?plan=term', refund: refund.term },"
+        ]
+      ]
+    },
+    "auth-english-labels": {
+      "undoes": "C — /auth/fr?plan= shows the French plan label",
+      "edits": [
+        [
+          "src/pages/Auth.tsx",
+          "                  {(c.planLabels as Record<CheckoutPlan, string>)[checkoutPlan]}",
+          "                  {(AUTH_COPY.en.planLabels as Record<CheckoutPlan, string>)[checkoutPlan]}"
+        ]
+      ]
+    },
+    "auth-english-return": {
+      "undoes": "C — Supabase sends a French sign-up back to /auth/fr",
+      "edits": [
+        [
+          "src/pages/Auth.tsx",
+          "  const authPath = localizedPath('/auth', lang);",
+          "  const authPath = '/auth';"
+        ]
+      ]
+    },
+    "auth-password-rules-english": {
+      "undoes": "C — the password rules are French on /auth/fr",
+      "edits": [
+        [
+          "src/pages/Auth.tsx",
+          "<PasswordStrength password={password} lang={lang} />",
+          "<PasswordStrength password={password} />"
+        ]
+      ]
+    },
+    "auth-raw-errors-in-french": {
+      "undoes": "C — the French page never shows Supabase’s English error text",
+      "edits": [
+        [
+          "src/pages/Auth.tsx",
+          "  if (lang === 'en') return err.message;",
+          "  return err.message;"
+        ]
+      ]
+    },
+    "auth-refund-line-english": {
+      "undoes": "C — the French plan banner shows the French refund line",
+      "edits": [
+        [
+          "src/pages/Auth.tsx",
+          "  const refundLine = checkoutPlan ? refundLineFor(checkoutPlan, lang) : null;",
+          "  const refundLine = checkoutPlan ? refundLineFor(checkoutPlan) : null;"
+        ]
+      ]
+    },
+    "billing-english-copy": {
+      "undoes": "C — the French result pages are French",
+      "edits": [
+        [
+          "src/pages/BillingResult.tsx",
+          "  const c = BILLING_COPY[lang];",
+          "  const c = BILLING_COPY.en;"
+        ]
+      ]
+    },
+    "not-found-english-meta": {
+      "undoes": "C — a not-found address under /fr gets the French head (lang fr-CA)",
+      "edits": [
+        [
+          "src/pages/NotFound.tsx",
+          "  useDocumentMeta(notFoundMeta(lang));",
+          "  useDocumentMeta(notFoundMeta('en'));"
+        ]
+      ]
+    },
+    "checker-panel-english": {
+      "undoes": "C — the plot checker panel is French on the French page",
+      "edits": [
+        [
+          "src/pages/FigureReadability.tsx",
+          "            layout=\"page\"\n            lang={lang}\n",
+          "            layout=\"page\"\n"
+        ]
+      ]
+    },
+    "checker-size-fields-english": {
+      "undoes": "C — the size fields and presets are French on the French page",
+      "edits": [
+        [
+          "src/pages/FigureReadability.tsx",
+          "          <PrintSizeFields value={size} onChange={changeSize} lang={lang} />",
+          "          <PrintSizeFields value={size} onChange={changeSize} />"
+        ]
+      ]
+    },
+    "checker-warnings-english": {
+      "undoes": "C — the engine’s warnings are French on the French page",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "<span>&#9888;</span> {engineWarning(w, uiLang)}",
+          "<span>&#9888;</span> {w}"
+        ]
+      ]
+    },
+    "checker-row-names-english": {
+      "undoes": "C — the table’s row names are French on the French page",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "{elementName(el.name, uiLang)}",
+          "{el.name}"
+        ]
+      ]
+    },
+    "checker-pt-english": {
+      "undoes": "C — point sizes in French style (« 12,1 pt »)",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  return lang === 'fr' ? `${formatNumber(n, lang)}\\u00a0pt` : `${n}pt`;",
+          "  return `${n}pt`;"
+        ]
+      ]
+    },
+    "warnings-python-canvas-untranslated": {
+      "undoes": "C — every engine warning has a French sentence (readabilityWarnings.ts)",
+      "edits": [
+        [
+          "src/i18n/readabilityWarnings.ts",
+          "    /^No canvas size found — assuming matplotlib default ([\\d.]+)\"×([\\d.]+)\"\\.$/,",
+          "    /^No canvas size found — assuming matplotlib default ([\\d.]+)\"×([\\d.]+)\"\\. never$/,"
+        ]
+      ]
+    },
+    "client-drops-lang": {
+      "undoes": "D — a French page asks the API for a French checkout (data/billing.ts createCheckout)",
+      "edits": [
+        [
+          "src/data/billing.ts",
+          "      lang === 'fr' ? { sku, lang } : { sku },",
+          "      { sku },"
+        ]
+      ]
+    },
+    "client-always-lang": {
+      "undoes": "D — an English page asks what it asked before ({ sku } only)",
+      "edits": [
+        [
+          "src/data/billing.ts",
+          "      lang === 'fr' ? { sku, lang } : { sku },",
+          "      { sku, lang },"
+        ]
+      ]
+    },
+    "auth-checkout-no-lang": {
+      "undoes": "D — /auth/fr hands its language to the checkout",
+      "edits": [
+        [
+          "src/pages/Auth.tsx",
+          "        await startCheckoutForPlan(sku, lang); // full-page redirect to Stripe",
+          "        await startCheckoutForPlan(sku); // full-page redirect to Stripe"
+        ]
+      ]
+    },
+    "fr-term-card-no-tax-note": {
+      "undoes": "E — the French term card says tax is extra",
+      "edits": [
+        [
+          "src/i18n/pricing.ts",
+          "    taxNote: '+ taxes applicables',\n    cta: 'Obtenir le forfait à terme',",
+          "    cta: 'Obtenir le forfait à terme',"
+        ]
+      ]
+    },
+    "fr-auth-label-untaxed": {
+      "undoes": "E — the French /auth/fr?plan=term label says tax is extra",
+      "edits": [
+        [
+          "src/i18n/auth.ts",
+          "    term: 'Forfait à terme · 18,99\\u00a0$\\u00a0CA tous les 4\\u00a0mois + taxes applicables',",
+          "    term: 'Forfait à terme · 18,99\\u00a0$\\u00a0CA tous les 4\\u00a0mois',"
+        ]
+      ]
+    },
+    "fr-auth-tax-before-period": {
+      "undoes": "E — the French label puts the period before the tax note",
+      "edits": [
+        [
+          "src/i18n/auth.ts",
+          "    term: 'Forfait à terme · 18,99\\u00a0$\\u00a0CA tous les 4\\u00a0mois + taxes applicables',",
+          "    term: 'Forfait à terme · 18,99\\u00a0$\\u00a0CA + taxes applicables / 4\\u00a0mois',"
+        ]
+      ]
+    },
+    "fr-about-names-latex": {
+      "undoes": "E — the French About page names no LaTeX",
+      "edits": [
+        [
+          "src/i18n/about.ts",
+          "Les exportations PowerPoint sont payantes et gardent le texte",
+          "Les exportations PowerPoint et LaTeX sont payantes et gardent le texte"
+        ]
+      ]
+    },
+    "fr-string-left-english": {
+      "undoes": "F — no French string is left in English (dictionaries.test D3)",
+      "edits": [
+        [
+          "src/i18n/whyPosters.ts",
+          "  closeTitle: 'Quand vous serez prêt à en créer une',",
+          "  closeTitle: 'When you are ready to build one',"
+        ]
+      ]
+    },
+    "fr-straight-apostrophe": {
+      "undoes": "F — French typography: curly apostrophes (D4)",
+      "edits": [
+        [
+          "src/i18n/chrome.ts",
+          "    tagline: 'Un éditeur d’affiches conçu pour les chercheurs.',",
+          "    tagline: \"Un éditeur d'affiches conçu pour les chercheurs.\","
+        ]
+      ]
+    },
+    "vercel-no-billing-fr-rewrite": {
+      "undoes": "G — /billing/success/fr is served (a rewrite to the shell)",
+      "edits": [
+        [
+          "vercel.json",
+          "    { \"source\": \"/billing/success/fr\", \"destination\": \"/\" },\n",
+          ""
+        ]
+      ]
+    },
+    "vercel-auth-fr-indexable": {
+      "undoes": "G — /auth/fr carries X-Robots-Tag noindex",
+      "edits": [
+        [
+          "vercel.json",
+          "    {\n      \"source\": \"/auth/fr\",\n      \"headers\": [{ \"key\": \"X-Robots-Tag\", \"value\": \"noindex, nofollow\" }]\n    },\n",
+          ""
+        ]
+      ]
+    },
+    "fr-refund-pack-rule-changed": {
+      "undoes": "H (review round 1, R1-02) — a French refund line cannot say another rule than its English one (dictionaries.test D6: the numbers in each pair)",
+      "edits": [
+        [
+          "src/data/refundCopy.ts",
+          "pack: 'Remboursement intégral jusqu’à ce que vous utilisiez un crédit d’exportation. Aucun remboursement ensuite, même partiel.',",
+          "pack: 'Remboursement intégral dans les 30\\u00a0jours, même après une exportation.',"
+        ]
+      ]
+    },
+    "fr-refund-lead-30-days": {
+      "undoes": "H (R1-02) — the French refund window is the English one, 14 days (D6)",
+      "edits": [
+        [
+          "src/i18n/pricing.ts",
+          "remboursable intégralement dans les 14\\u00a0jours",
+          "remboursable intégralement dans les 30\\u00a0jours"
+        ]
+      ]
+    },
+    "fr-undo-50-steps": {
+      "undoes": "H (R1-02) — the French About page says the English limit, 100 undo steps (D6; was fr-undo-100-steps while the limit was 50, before fix 12 merged)",
+      "edits": [
+        [
+          "src/i18n/about.ts",
+          "jusqu’à 100\\u00a0étapes",
+          "jusqu’à 50\\u00a0étapes"
+        ]
+      ]
+    },
+    "fr-guest-30-days": {
+      "undoes": "H (R1-02) — the French guest note says the English 14 days (D6)",
+      "edits": [
+        [
+          "src/i18n/auth.ts",
+          "supprimées après 14\\u00a0jours",
+          "supprimées après 30\\u00a0jours"
+        ]
+      ]
+    },
+    "fr-claim-free-powerpoint": {
+      "undoes": "H (R1-02) — a French sentence names no product its English sentence does not (D6: the names in each pair; here a free PowerPoint export)",
+      "edits": [
+        [
+          "src/i18n/whyPosters.ts",
+          "et une vérification du texte des figures que vous pouvez lancer avant d’aller chez l’imprimeur.",
+          "et une vérification du texte des figures que vous pouvez lancer avant d’aller chez l’imprimeur, et une exportation PowerPoint gratuite."
+        ]
+      ]
+    },
+    "fr-checker-title-no-matplotlib": {
+      "undoes": "H (R1-04) — the French checker title names matplotlib as the English one does (D6 on the routes.json records)",
+      "edits": [
+        [
+          "src/seo/routes.json",
+          "\"title\": \"Taille du texte des figures\\u00a0: ggplot2, matplotlib | Postr\",",
+          "\"title\": \"Taille du texte des figures\\u00a0: ggplot2 | Postr\","
+        ]
+      ]
+    },
+    "landing-english-wraps": {
+      "undoes": "H (R1-01) — the English landing’s two buttons keep main’s one row (flex-wrap in French only). jsdom has no layout: a blind spot of these tests, killed in the browser by copy-claims-check W2 (POSTR_MUTANT=…#landing-english-wraps, record 26 section 9)",
+      "edits": [
+        [
+          "src/pages/Landing.tsx",
+          "className={`mt-10 flex items-center justify-center gap-4 ${lang === 'fr' ? 'flex-wrap' : ''}`}",
+          "className=\"mt-10 flex flex-wrap items-center justify-center gap-4\""
+        ]
+      ],
+      "expect": "survive"
+    }
+  }
+}

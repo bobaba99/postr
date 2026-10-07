@@ -9,6 +9,9 @@
  * skip past it. Without this redirect, the user can click "Try as
  * guest" again and accidentally create a duplicate anonymous
  * account that orphans their existing posters.
+ *
+ * In English at / and in French at /fr (fix 26): the copy is in
+ * i18n/landing.ts, chosen by the URL (i18n/lang.ts).
  */
 import { useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -17,6 +20,8 @@ import { landingEntrance } from '@/motion/timelines/landingEntrance';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
 import { RotatingWord } from '@/components/RotatingWord';
+import { LANDING_COPY } from '@/i18n/landing';
+import { HTML_LANG, localizedPath, useLang, type Lang } from '@/i18n/lang';
 import { SITE_ORIGIN, STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 
@@ -31,16 +36,18 @@ import { useDocumentMeta } from '@/seo/useDocumentMeta';
  * nothing, which is accurate, rather than asserting something that
  * will age badly.
  */
-const LANDING_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'WebApplication',
-  name: 'Postr',
-  url: `${SITE_ORIGIN}/`,
-  applicationCategory: 'DesignApplication',
-  operatingSystem: 'Any (web browser)',
-  description:
-    'A web app for making academic conference posters, built for researchers and students.',
-} as const;
+function landingJsonLd(lang: Lang) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'Postr',
+    url: `${SITE_ORIGIN}${localizedPath('/', lang)}`,
+    applicationCategory: 'DesignApplication',
+    operatingSystem: 'Any (web browser)',
+    inLanguage: HTML_LANG[lang],
+    description: LANDING_COPY[lang].jsonLdDescription,
+  } as const;
+}
 
 /**
  * The hero's rotating slot. These are FRICTIONS REMOVED, not features
@@ -67,18 +74,14 @@ const LANDING_JSON_LD = {
  * printed point size (poster/readability.ts) and charts drawn in the
  * Figure tab start at print-legible sizes (charts/plotOptions.ts), but
  * nothing catches small text on its own.
+ *
+ * The phrases are `frictions` in i18n/landing.ts (the French ones are
+ * built to follow « qui s’occupe »: « du … », « des … »).
  */
-const HERO_FRICTIONS = [
-  'the fiddly block nudging',
-  'the text reflowing on you',
-  'the BibTeX citation styles',
-  'the conference size lookups',
-  'the authors and affiliations',
-  'the figure font-size math',
-] as const;
-
 export default function Landing() {
-  useDocumentMeta(STATIC_ROUTE_META['/'] ?? null, LANDING_JSON_LD);
+  const lang = useLang();
+  const c = LANDING_COPY[lang];
+  useDocumentMeta(STATIC_ROUTE_META[localizedPath('/', lang)] ?? null, landingJsonLd(lang));
   const navigate = useNavigate();
   const scopeRef = useRef<HTMLElement>(null);
 
@@ -126,14 +129,21 @@ export default function Landing() {
           data-postr-hero-item
           className="inline-block rounded-full border border-[#7c6aed]/40 bg-[#7c6aed]/10 px-3 py-1 text-xs font-medium uppercase tracking-wider text-[#b8a9ff]"
         >
-          Built for researchers
+          {c.badge}
         </span>
         <h1
           data-postr-hero-item
-          className="mt-5 text-5xl font-bold leading-[1.05] tracking-[-0.02em] text-white sm:text-6xl"
+          // « scientifiques, » at 48 px is wider than a phone's line: at
+          // 320 px the French title ran 28 px past the window (fix 26,
+          // copy-claims-check W1). Below `sm` it is set at 36 px, may
+          // hyphenate (the page is lang fr-CA), and breaks anywhere where the
+          // browser has no French hyphenation. The English title is unchanged.
+          className={`mt-5 font-bold leading-[1.05] tracking-[-0.02em] text-white sm:text-6xl ${
+            lang === 'fr' ? 'text-4xl hyphens-auto [overflow-wrap:anywhere]' : 'text-5xl'
+          }`}
         >
-          Academic posters,<br />
-          <span className="text-[#7c6aed]">without the hassle.</span>
+          {c.titleLead}<br />
+          <span className="text-[#7c6aed]">{c.titleAccent}</span>
         </h1>
         {/*
           The typed phrase sits on its OWN LINE rather than inline in
@@ -152,25 +162,37 @@ export default function Landing() {
           data-postr-hero-item
           className="mx-auto mt-7 max-w-[46ch] text-xl leading-relaxed text-[#a3a7b3] sm:text-2xl"
         >
-          <p>A poster editor that handles</p>
+          <p>{c.heroLead}</p>
+          {/* Keyed by language: a switch starts the typing over in the
+              new language instead of finishing an old phrase. */}
           <RotatingWord
-            phrases={HERO_FRICTIONS}
+            key={lang}
+            phrases={c.frictions}
             className="font-medium text-[#c8b6ff]"
           />
-          <p>so you can work on the science.</p>
+          <p>{c.heroTail}</p>
         </div>
-        <div data-postr-hero-item className="mt-10 flex items-center justify-center gap-4">
+        {/* flex-wrap, in French only: the French labels (« Essayer en tant
+            qu’invité ») are wider, and at 320 px the pair ran past the window
+            (fix 26, copy-claims-check W1). The English row is main's: below
+            about 389 px its two buttons shrink and each label takes two
+            lines; wrapping it there stacked them instead (review round 1,
+            R1-01; copy-claims-check W2 holds it). */}
+        <div
+          data-postr-hero-item
+          className={`mt-10 flex items-center justify-center gap-4 ${lang === 'fr' ? 'flex-wrap' : ''}`}
+        >
           <Link
-            to="/auth"
+            to={localizedPath('/auth', lang)}
             className="rounded-lg bg-[#5641b8] px-8 py-3 text-base font-semibold text-white no-underline hover:bg-[#4c39a6] transition-colors"
           >
-            Get started
+            {c.getStarted}
           </Link>
           <Link
             to="/p/new"
             className="rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-8 py-3 text-base font-semibold text-[#c8cad0] no-underline hover:border-[#7c6aed] transition-colors"
           >
-            Try as guest
+            {c.tryAsGuest}
           </Link>
         </div>
 
@@ -186,15 +208,14 @@ export default function Landing() {
           role="note"
           className="postr-rise-in mx-auto mt-8 max-w-[46ch] rounded-lg border border-[#2a2a3a] bg-[#111118] px-4 py-3 text-sm leading-relaxed text-[#8b8f99] sm:hidden"
         >
-          <strong className="font-semibold text-[#c8cad0]">Best on a laptop.</strong>{' '}
-          The editor needs a bigger screen to drag blocks and see your poster at
-          full size.
+          <strong className="font-semibold text-[#c8cad0]">{c.phoneNoteLead}</strong>{' '}
+          {c.phoneNoteBody}
         </p>
       </section>
 
       <section className="mx-auto w-full max-w-4xl flex-1 px-8 pb-24">
         <h2 className="text-center text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8]">
-          Core poster tools
+          {c.coreTools}
         </h2>
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2">
           <div
@@ -205,10 +226,9 @@ export default function Landing() {
             {/* poster/templates.ts LAYOUT_TEMPLATES: four layouts plus
                 "Blank" (title and authors only). Not "smart": the
                 templates are fixed layouts scaled to the sheet. */}
-            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Poster templates</h3>
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">{c.templatesTitle}</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Four layouts and a blank start, with disciplinary palettes and
-              standard academic size presets.
+              {c.templatesBody}
             </p>
           </div>
           <div
@@ -216,17 +236,17 @@ export default function Landing() {
             className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
           >
             <div className="text-2xl mb-3">📊</div>
-            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Figure readability</h3>
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">{c.figureTitle}</h3>
             {/* The same check runs as a public page; the trailing link
                 is the only way the four feature cards point anywhere.
                 Keep the whole paragraph at fifteen words or fewer. */}
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Check chart labels at print size and copy the fix.{' '}
+              {c.figureBody}{' '}
               <Link
-                to="/tools/figure-readability"
+                to={localizedPath('/tools/figure-readability', lang)}
                 className="font-semibold text-[#b8a9ff] no-underline transition-colors duration-base ease-smooth hover:text-white"
               >
-                Try it standalone.
+                {c.figureLink}
               </Link>
             </p>
           </div>
@@ -235,19 +255,23 @@ export default function Landing() {
             className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
           >
             <div className="text-2xl mb-3">✍️</div>
-            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Writing guide</h3>
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">{c.writingTitle}</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Follow section prompts, word targets, and a poster-ready checklist.
+              {c.writingBody}
             </p>
           </div>
+          {/* The import reads .pptx (ImportPosterModal); the export needs a
+              term or a pack credit (usePlan canExport), so the card says it
+              is paid (owner, 2026-10-06). The LaTeX export is hidden
+              (config/features.ts), so the card does not name it (fix 25). */}
           <div
             data-postr-reveal
             className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6 transition-colors duration-base ease-smooth [@media(hover:hover)]:hover:border-[#2a2a3a]"
           >
             <div className="text-2xl mb-3">🎞️</div>
-            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">Editable exports</h3>
+            <h3 className="text-lg font-semibold tracking-[-0.01em] text-[#e2e2e8] mb-2">{c.exportsTitle}</h3>
             <p className="text-sm text-[#8b8f99] leading-relaxed">
-              Import, edit, and export PowerPoint, or continue in LaTeX.
+              {c.exportsBody}
             </p>
           </div>
         </div>
@@ -270,20 +294,19 @@ export default function Landing() {
       */}
       <section className="mx-auto w-full max-w-4xl px-8 pb-24">
         <h2 className="text-center text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8]">
-          A tool you can use on its own
+          {c.toolsTitle}
         </h2>
         <p className="mx-auto mt-3 max-w-[52ch] text-center text-sm leading-relaxed text-[#8b8f99]">
-          The part of the poster workflow that works without an account,
-          and without opening the editor.
+          {c.toolsIntro}
         </p>
 
         <div className="mx-auto mt-8 grid max-w-md grid-cols-1 gap-6">
           <ToolCard
-            to="/tools/figure-readability"
+            to={localizedPath('/tools/figure-readability', lang)}
             icon="🔍"
-            title="Plot checker"
-            body="Paste your R or Python plotting code and the size it will print at. See which labels fall below poster minimums and copy your script with the sizes they need added."
-            cta="Check your figure"
+            title={c.checkerTitle}
+            body={c.checkerBody}
+            cta={c.checkerCta}
           />
         </div>
       </section>

@@ -97,7 +97,7 @@ describe('EditableExportButtons — anonymous export gate', () => {
     // The button must be enabled for a guest, or the click can't reach the gate.
     expect(pptxBtn.disabled).toBe(false);
     // And the payment/upgrade block is not shown to a guest.
-    expect(screen.queryByText(/Keep editing in PowerPoint or Overleaf/i)).toBeNull();
+    expect(screen.queryByText(/Keep editing in PowerPoint/i)).toBeNull();
 
     fireEvent.click(pptxBtn);
 

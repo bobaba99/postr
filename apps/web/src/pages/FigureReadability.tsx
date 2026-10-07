@@ -28,11 +28,19 @@
  *
  * Sibling of the deactivated pages/ChartChooser.tsx — same page shell,
  * same phone-first ergonomics (px-5 gutter, 44px targets, 16px inputs).
+ *
+ * In English here and in French at /tools/figure-readability/fr (fix 26):
+ * the page's copy is in i18n/figureReadability.ts and the panel's in
+ * i18n/readability.ts (the panel takes `lang`; the editor's stays
+ * English). The script draft is the tab's either way, so a switch of
+ * language keeps it.
  */
 import { useState } from 'react';
 import { Link } from 'react-router';
 import { PublicFooter } from '@/components/PublicFooter';
 import { PublicHeader } from '@/components/PublicHeader';
+import { FIGURE_READABILITY_COPY } from '@/i18n/figureReadability';
+import { HTML_LANG, localizedPath, useLang, type Lang } from '@/i18n/lang';
 import { SITE_ORIGIN, STATIC_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
 import { PrintSizeFields } from '@/poster/PrintSizeFields';
@@ -40,19 +48,27 @@ import { DEFAULT_PRINT_SIZE, type PrintSize } from '@/poster/printSize';
 import { ReadabilityPanel } from '@/poster/ReadabilityPanel';
 import { PAGE_SCRIPT_SLOT, readPageSize, writePageSize } from '@/poster/figureScriptDraft';
 
-const CHECKER_JSON_LD = {
-  '@context': 'https://schema.org',
-  '@type': 'WebApplication',
-  name: 'Postr Plot Checker',
-  url: `${SITE_ORIGIN}/tools/figure-readability`,
-  applicationCategory: 'DesignApplication',
-  operatingSystem: 'Any (web browser)',
-  description:
-    'Paste ggplot2 or matplotlib code and the size the figure will print at. The check scores its titles, axis labels, tick labels and legend against poster minimums and adds the sizes they need to a copy of your script.',
-} as const;
+function checkerJsonLd(lang: Lang) {
+  const c = FIGURE_READABILITY_COPY[lang];
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: c.jsonLdName,
+    url: `${SITE_ORIGIN}${localizedPath('/tools/figure-readability', lang)}`,
+    applicationCategory: 'DesignApplication',
+    operatingSystem: 'Any (web browser)',
+    inLanguage: HTML_LANG[lang],
+    description: c.jsonLdDescription,
+  } as const;
+}
 
 export default function FigureReadabilityPage() {
-  useDocumentMeta(STATIC_ROUTE_META['/tools/figure-readability'] ?? null, CHECKER_JSON_LD);
+  const lang = useLang();
+  const c = FIGURE_READABILITY_COPY[lang];
+  useDocumentMeta(
+    STATIC_ROUTE_META[localizedPath('/tools/figure-readability', lang)] ?? null,
+    checkerJsonLd(lang),
+  );
   const [size, setSize] = useState<PrintSize>(() => readPageSize() ?? DEFAULT_PRINT_SIZE);
   const changeSize = (next: PrintSize) => {
     writePageSize(next);
@@ -68,29 +84,28 @@ export default function FigureReadabilityPage() {
           table below are the widest things on the page. */}
       <section className="mx-auto w-full max-w-3xl flex-1 px-5 pb-24 pt-10 sm:px-8 sm:pt-14">
         <h1 className="text-3xl font-bold leading-[1.1] tracking-[-0.02em] text-white sm:text-4xl">
-          Will your figure labels be readable at poster size?
+          {c.title}
         </h1>
         <p className="mt-4 max-w-[62ch] text-base leading-relaxed text-[#a3a7b3] sm:mt-5 sm:text-lg">
-          Paste your R (ggplot2) or Python (matplotlib) plotting code and type
-          the size the figure will print at. The check scores its titles, axis
-          labels, tick labels, legend and caption at that size against minimums
-          of 18 pt for axis titles, 14 pt for tick labels and 12 pt for
-          captions. If anything falls short, it adds the size each element
-          needs to a copy of your script. No account, and your code never
-          leaves the browser.
+          {c.lede}
         </p>
 
         {/* The printed size stands in for the editor's canvas overlay:
             the check scores the pasted code against whatever is typed
             here, and the panel's sizing note re-keys its pill on it. */}
         <div className="mt-8">
-          <PrintSizeFields value={size} onChange={changeSize} />
+          <PrintSizeFields value={size} onChange={changeSize} lang={lang} />
         </div>
 
         <div className="mt-8">
-          <h2 className="sr-only">Check your code</h2>
+          <h2 className="sr-only">{c.checkHeading}</h2>
+          {/* Keyed by language: a switch of language mounts it afresh, so an
+              answer said in the other language goes; the script and its
+              last Check are the tab's draft and come back, in this one. */}
           <ReadabilityPanel
+            key={lang}
             layout="page"
+            lang={lang}
             selectedBlock={null}
             defaultFigureWidthIn={size.w}
             defaultFigureHeightIn={size.h}
@@ -100,37 +115,23 @@ export default function FigureReadabilityPage() {
 
         <section className="mt-14" aria-labelledby="how-it-works">
           <h2 id="how-it-works" className="text-lg font-semibold text-white">
-            How the check works
+            {c.howHeading}
           </h2>
           {/* Canvas: parseRCode falls back to the typed size; parsePythonCode
               does not (fix 13): it reads figsize / set_size_inches /
               rcParams['figure.figsize'], else matplotlib's 6.4 × 4.8 in. */}
           <p className="mt-2 max-w-[62ch] text-[15px] leading-relaxed text-[#a3a7b3]">
-            The check scales your figure from its source canvas to the printed
-            size. In R the canvas is the ggsave() width and height, or the size
-            you typed when there is no ggsave(). In Python it is the figsize or
-            set_size_inches() your code sets, or matplotlib&rsquo;s default of
-            6.4 × 4.8 in. It then scores each text element against a minimum:
-            18 pt for titles and axis titles, 14 pt for tick labels, legends and
-            strips, 12 pt for captions.
+            {c.howCanvas}
           </p>
           {/* What the parsers read. A size set any other way is scored at
               the inherited size, which can pass a 6 pt label (measured:
               R theme(text = element_text(size = 6)), Python
               plt.xlabel(fontsize=6)). */}
           <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-[#a3a7b3]">
-            In R it reads base_size and the sizes theme() sets for the elements
-            it scores. It does not read a size set on text or title. In Python
-            it reads font.size in plt.rcParams, seaborn&rsquo;s context and
-            font_scale, and the sizes given to set_xlabel(), set_ylabel(),
-            set_title() and tick_params(). Check sizes set any other way
-            yourself.
+            {c.howReads}
           </p>
           <p className="mt-3 max-w-[62ch] text-[15px] leading-relaxed text-[#a3a7b3]">
-            If anything falls short, it lists the size each element needs and
-            adds those sizes to a copy of your script. When some sizes still
-            follow base_size (font.size in Python), it also gives the smallest
-            base_size at which they meet their minimums, as a one-line snippet.
+            {c.howFix}
           </p>
         </section>
 
@@ -140,19 +141,16 @@ export default function FigureReadabilityPage() {
             in the editor on a silent anonymous session, no wall. */}
         <div className="mt-16 rounded-xl border border-[#1e1e2e] bg-[#0f0f17] px-6 py-6">
           <h2 className="text-lg font-semibold text-white">
-            Need this check while you build the poster?
+            {c.editorTitle}
           </h2>
           <p className="mt-2 max-w-[60ch] text-[15px] leading-relaxed text-[#a3a7b3]">
-            Postr is a free academic poster editor with this same check in its
-            Figure tab: drag a figure box on the canvas and the check sizes
-            against it, or select an image block to use its exact print
-            dimensions.
+            {c.editorBody}
           </p>
           <Link
             to="/p/new"
             className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-[#5641b8] px-6 text-[15px] font-semibold text-white no-underline transition-colors duration-base ease-smooth hover:bg-[#4c39a6]"
           >
-            Open the editor
+            {c.openEditor}
           </Link>
         </div>
       </section>

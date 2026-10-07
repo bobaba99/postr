@@ -36,7 +36,7 @@ echo "Prerendered routes carry real HTML:"
 # tools/figure-readability is the one live standalone tool: a nested
 # path, prerendered to dist/tools/figure-readability/index.html and
 # served by cleanUrls exactly like the flat routes.
-for route in "" about privacy cookies terms tools/figure-readability; do
+for route in "" about privacy cookies terms tools/figure-readability fr about/fr why-posters/fr pricing/fr tools/figure-readability/fr auth/fr; do
   url="${BASE}/${route}"
   body="$(curl -sL --max-time 20 "$url")"
   bytes="${#body}"
@@ -59,7 +59,7 @@ done
 
 echo
 echo "Every route has a distinct title:"
-titles="$(for route in "" about privacy cookies terms tools/figure-readability; do
+titles="$(for route in "" about privacy cookies terms tools/figure-readability fr about/fr why-posters/fr pricing/fr tools/figure-readability/fr auth/fr; do
   curl -sL --max-time 20 "${BASE}/${route}" |
     grep -o '<title>[^<]*</title>' | head -1
 done)"
@@ -87,7 +87,7 @@ esac
 
 echo
 echo "Private and deactivated routes are noindex:"
-for route in s/smoke-test-slug dashboard profile gallery chart-chooser paper-to-poster paper-to-slides presentation-checker; do
+for route in s/smoke-test-slug dashboard profile gallery chart-chooser paper-to-poster paper-to-slides presentation-checker auth/fr billing/success/fr billing/cancel/fr; do
   hdr="$(curl -sIL --max-time 20 "${BASE}/${route}" | tr -d '\r' | grep -i '^x-robots-tag:' | tail -1)"
   if grep -qi 'noindex' <<<"$hdr"; then
     pass "/${route} → ${hdr}"
@@ -101,7 +101,7 @@ echo "Real client routes still serve the app (200):"
 # The deactivated routes (gallery, chart-chooser, paper-to-poster,
 # paper-to-slides, presentation-checker) must serve the shell so the
 # in-app <Navigate> to / runs, not 404.
-for route in auth dashboard profile p/smoke-test-id admin/gallery gallery chart-chooser paper-to-poster paper-to-slides presentation-checker s/smoke-test-slug; do
+for route in auth auth/fr billing/success/fr billing/cancel/fr dashboard profile p/smoke-test-id admin/gallery gallery chart-chooser paper-to-poster paper-to-slides presentation-checker s/smoke-test-slug; do
   code="$(curl -s -o /dev/null --max-time 20 -w '%{http_code}' "${BASE}/${route}")"
   if [ "$code" = "200" ]; then
     pass "/${route} → ${code}"

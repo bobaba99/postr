@@ -202,7 +202,7 @@
  *   - A native drag of selected text cannot be driven (Chromium fires no
  *     drag events, Firefox no drop, WebKit selects nothing on a
  *     double-click; MEASURED in round 2): a drag within a block is a manual
- *     check (docs/manual-test-flows.md, flow 27).
+ *     check (docs/manual-test-flows.md, flow 29).
  *
  * RUN (from apps/web)
  *   node scripts/undo-history-check.mjs [--only id,id] [--json file]

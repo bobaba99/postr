@@ -23,7 +23,12 @@
  * Copy names the workflow, never a capability, and makes no AI claim
  * (feedback_marketing_no_ai_framing). Every line is checked against what
  * the product actually does: editing + watermarked PDF are free today;
- * PPTX/LaTeX export is the paid line.
+ * the PowerPoint export is the paid line (the LaTeX export is hidden,
+ * config/features.ts LATEX_EXPORT_ENABLED, fix 25).
+ *
+ * Stripe prices are before tax (owner, 2026-10-06): each paid card says
+ * "+ applicable taxes" right under its price (`taxNote`), and
+ * src/components/__tests__/pricesTax.test.tsx reads it there.
  *
  * The paid tier CTAs route to /auth?plan=<sku> — the account-first
  * checkout flow: a signed-out user creates a REAL account (never guest,
@@ -48,13 +53,20 @@
  * <TalkWaitlistCallout /> (the paper-to-talk launch list) is no longer
  * rendered under the grid: deactivated — see routes.tsx header. The
  * component, data/talkWaitlist.ts and the talk_waitlist table remain.
+ *
+ * In English and in French (fix 26): the tiers are built per language
+ * (`pricingTiers`) from i18n/pricing.ts; the French CTAs go to /auth/fr
+ * and the French fine print to /terms/fr#refunds. PRICING_TIERS is the
+ * English set.
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { supabase } from '@/lib/supabase';
 import { isOnTalkWaitlist, joinTalkWaitlist } from '@/data/talkWaitlist';
 import { usePlan } from '@/hooks/usePlan';
-import { REFUND_LINE, REFUND_TERMS_PATH } from '@/data/refundCopy';
+import { REFUND_LINES, REFUND_TERMS_PATH } from '@/data/refundCopy';
+import { PRICING_COPY, type PricingCopy } from '@/i18n/pricing';
+import { localizedPath, type Lang } from '@/i18n/lang';
 
 export interface PricingTier {
   readonly id: string;
@@ -65,6 +77,8 @@ export interface PricingTier {
   readonly featured?: boolean;
   readonly cta: string;
   readonly ctaTo: string;
+  /** Said right under the price: the price is before tax. Paid tiers only. */
+  readonly taxNote?: string;
   /** Plain-language "who is this for". */
   readonly forWho: string;
   /** Essential purchase condition that must remain visible. */
@@ -75,55 +89,26 @@ export interface PricingTier {
   readonly refund?: string;
 }
 
-export const PRICING_TIERS = [
-  {
-    id: 'free',
-    name: 'Free',
-    price: '$0',
-    cadence: 'always',
-    cta: 'Start free',
-    ctaTo: '/p/new',
-    forWho: 'For posters you print or present.',
-    condition: 'Includes a “made with postr.sh” credit.',
-    features: [
-      'Unlimited editing and every design tool.',
-      'Print-ready PDF, saved from your browser.',
-    ],
-  },
-  {
-    id: 'term',
-    name: 'Term',
-    price: 'CA$18.99',
-    cadence: 'every 4 months',
-    featured: true,
-    cta: 'Get the term',
-    ctaTo: '/auth?plan=term',
-    forWho: 'For unlimited editable exports while your term runs.',
-    condition: 'Renews every four months. Cancel anytime.',
-    features: [
-      'PowerPoint and LaTeX exports with no watermark.',
-      'No export limit while your term is active.',
-    ],
-    refund: REFUND_LINE.term,
-  },
-  {
-    id: 'pack',
-    name: 'Export pack',
-    price: 'CA$9.99',
-    cadence: 'one-time · 3 exports',
-    cta: 'Get the pack',
-    ctaTo: '/auth?plan=pack',
-    forWho: 'For a few editable exports without a subscription.',
-    condition: 'One-time purchase. Credits never expire.',
-    features: [
-      'Three PowerPoint or LaTeX exports.',
-      'Purchased exports have no watermark.',
-    ],
-    refund: REFUND_LINE.pack,
-  },
-] as const satisfies readonly PricingTier[];
+/**
+ * The three tiers in a language. The paid tiers carry the tax note (Stripe
+ * adds the tax at checkout) and their refund line; their CTAs keep the
+ * plan through sign-up (`/auth?plan=term`, `/auth/fr?plan=term`).
+ */
+export function pricingTiers(lang: Lang): readonly PricingTier[] {
+  const c = PRICING_COPY[lang];
+  const refund = REFUND_LINES[lang];
+  return [
+    { id: 'free', ...c.free, ctaTo: '/p/new' },
+    { id: 'term', ...c.term, featured: true, ctaTo: localizedPath('/auth?plan=term', lang), refund: refund.term },
+    { id: 'pack', ...c.pack, ctaTo: localizedPath('/auth?plan=pack', lang), refund: refund.pack },
+  ];
+}
 
-export function PricingSection() {
+/** The English tiers. */
+export const PRICING_TIERS = pricingTiers('en');
+
+export function PricingSection({ lang = 'en' }: { lang?: Lang }) {
+  const c: PricingCopy = PRICING_COPY[lang];
   const plan = usePlan();
   const termActive = !plan.loading && plan.hasActiveTerm;
   return (
@@ -133,7 +118,7 @@ export function PricingSection() {
           id="pricing-heading"
           className="text-2xl font-semibold tracking-[-0.01em] text-[#e2e2e8] sm:text-3xl"
         >
-          Choose your export access
+          {c.sectionTitle}
         </h2>
       </div>
 
@@ -141,10 +126,11 @@ export function PricingSection() {
         data-pricing-grid
         className="mt-10 grid grid-cols-1 items-start gap-5 md:grid-cols-2 lg:grid-cols-3"
       >
-        {PRICING_TIERS.map((tier) => (
+        {pricingTiers(lang).map((tier) => (
           <PricingCard
             key={tier.id}
             tier={tier}
+            copy={c}
             alreadyOwned={tier.id === 'term' && termActive}
           />
         ))}
@@ -153,16 +139,14 @@ export function PricingSection() {
       {/* The refund rule, in one place for the whole section, linking to
           the full Terms wording — every buyer passes this before a CTA. */}
       <p className="mx-auto mt-6 max-w-2xl text-center text-xs leading-relaxed text-[#a3a7b3]">
-        A term is refundable in full within 14 days of a charge if you haven’t
-        taken a paid export. A pack is refundable in full until you use an
-        export credit. Full details in the{' '}
+        {c.refundLead}{' '}
         <Link
-          to={REFUND_TERMS_PATH}
+          to={localizedPath(REFUND_TERMS_PATH, lang)}
           className="font-medium text-[#b4a9f5] underline-offset-4 hover:underline"
         >
-          refund terms
+          {c.refundLink}
         </Link>
-        .
+        {c.refundTail}
       </p>
 
       {/* <TalkWaitlistCallout /> — deactivated, not deleted; see routes.tsx header. */}
@@ -172,9 +156,11 @@ export function PricingSection() {
 
 function PricingCard({
   tier,
+  copy,
   alreadyOwned,
 }: {
   tier: PricingTier;
+  copy: PricingCopy;
   /** The signed-in user already holds this plan — show a notice, not a CTA. */
   alreadyOwned: boolean;
 }) {
@@ -189,7 +175,7 @@ function PricingCard({
         // — below AA. The darker step is 7.38:1. Border/accents keep the
         // brighter brand; only the white-text surfaces darken.
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#5641b8] px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-white">
-          Recommended
+          {copy.recommended}
         </span>
       )}
       <h3 className="text-lg font-semibold text-[#e2e2e8]">{tier.name}</h3>
@@ -197,6 +183,9 @@ function PricingCard({
         <span className="text-3xl font-bold tracking-tight text-white">{tier.price}</span>
         <span className="text-sm text-[#8b8f99]">{tier.cadence}</span>
       </div>
+      {tier.taxNote && (
+        <p className="mt-1 text-xs text-[#8b8f99]">{tier.taxNote}</p>
+      )}
       <p className="mt-3 text-sm leading-relaxed text-[#a3a7b3]">{tier.forWho}</p>
       <p className="mt-3 text-sm font-medium leading-relaxed text-[#c8cad0]">
         {tier.condition}
@@ -207,9 +196,9 @@ function PricingCard({
           role="status"
           className="mt-5 rounded-lg border border-[#7c6aed]/40 bg-[#1a1a26] px-5 py-2.5 text-center text-sm text-[#c8cad0]"
         >
-          You already have an active term.{' '}
+          {copy.alreadyOwned}{' '}
           <Link to="/profile" className="font-semibold text-[#b4a9f5] underline-offset-4 hover:underline">
-            Manage it
+            {copy.manageIt}
           </Link>
         </div>
       ) : (
@@ -232,7 +221,7 @@ function PricingCard({
 
       <details className="mt-4 rounded-lg border border-[#2a2a3a] px-3 py-2 sm:hidden">
         <summary className="cursor-pointer text-sm font-semibold text-[#c8cad0]">
-          What’s included
+          {copy.whatsIncluded}
         </summary>
         <FeatureList features={tier.features} className="mt-3 flex flex-col gap-2.5" />
       </details>

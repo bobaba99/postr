@@ -41,6 +41,8 @@ import {
   updateCell,
 } from './tableOps';
 import { ResizeHandles, type ResizeHandle } from './resizeHandles';
+import { BUTTON_MARK, HIT, ROTATE_GAP, ROW_GAP, ROW_LIFT, UNZOOM, UNZOOM_X, UNZOOM_Y, blockControls, ctl } from './selectionLayout';
+import { useSelectionRoom } from './selectionRoom';
 import { useStorageUrl } from '@/hooks/useStorageUrl';
 import { isStoragePath, uploadPosterImage } from '@/data/posterImages';
 import { ChartBlock } from '@/charts/ChartBlock';
@@ -459,20 +461,32 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
   );
 }
 
-/** Circular handle button — shared base for move, delete, rotate. */
+/**
+ * Circular handle button — shared base for move, replace, crop, delete,
+ * rotate. Drawn in CSS px inside a box scaled back to screen size (plan
+ * item 19): a 24 px hit area showing a 20 px circle, its colour
+ * (`backgroundColor`, never the `background` shorthand, which would reset
+ * the clip) painted inside the padding only. The shadow follows what is
+ * painted, not the hit area. It never shrinks in the row.
+ */
 const circleBtn: CSSProperties = {
-  width: 18,
-  height: 18,
+  width: HIT,
+  height: HIT,
+  flex: '0 0 auto',
   borderRadius: '50%',
   color: '#fff',
   border: 'none',
   display: 'grid',
   placeItems: 'center',
   placeContent: 'center',
-  boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
-  padding: 0,
+  filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.4))',
+  padding: (HIT - BUTTON_MARK) / 2,
+  backgroundClip: 'content-box',
   boxSizing: 'border-box',
 };
+
+/** A round button's icon. */
+const iconSize = (px: number): CSSProperties => ({ display: 'block', width: px, height: px });
 
 
 // =========================================================================
@@ -858,6 +872,25 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
     return { borderTop: t, borderRight: ri, borderBottom: b, borderLeft: l };
   };
 
+  // Row and column strips: an 8-unit band 2 units out from the table. On a
+  // selected table, one size on screen at every zoom (plan item 19): a 24
+  // px hit area reaching outward from 2 px out, scaled back across its
+  // thickness, the 8 px band at its inner edge (the colour paints inside the
+  // padding only). Not selected: as before, in the sheet's units (where they
+  // show at all is Q7, on the Later list).
+  const stripAcross: CSSProperties = selected
+    ? {
+        right: `calc(100% + ${ctl(2)})`, width: HIT, paddingLeft: HIT - 8, backgroundClip: 'content-box', borderRadius: 2,
+        transform: UNZOOM_X, transformOrigin: 'right center',
+      }
+    : { left: -10, width: 8, borderRadius: 2 };
+  const stripDown: CSSProperties = selected
+    ? {
+        bottom: `calc(100% + ${ctl(2)})`, height: HIT, paddingTop: HIT - 8, backgroundClip: 'content-box', borderRadius: 2,
+        transform: UNZOOM_Y, transformOrigin: 'center bottom',
+      }
+    : { top: -10, height: 8, borderRadius: 2 };
+
   // Shared handle button style (circle with + or ×).
   return (
     <div
@@ -938,8 +971,11 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
               position: 'absolute',
               top: 0,
               bottom: 0,
-              left: `calc(${leftPct}% - 3px)`,
-              width: 6,
+              // Selected: a 24 px grip on screen at every zoom (plan item
+              // 19), scaled back across. Not selected: as before.
+              left: selected ? `calc(${leftPct}% - ${ctl(HIT / 2)})` : `calc(${leftPct}% - 3px)`,
+              width: selected ? HIT : 6,
+              ...(selected ? { transform: UNZOOM_X, transformOrigin: 'left center' } : {}),
               cursor: 'col-resize',
               zIndex: 2,
             }}
@@ -1110,21 +1146,19 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
               position: 'absolute',
               top: `${topPct}%`,
               height: `${heightPct}%`,
-              left: -10,
-              width: 8,
+              ...stripAcross,
               cursor: 'pointer',
-              background: isSel ? palette.accent : 'transparent',
-              borderRadius: 2,
+              backgroundColor: isSel ? palette.accent : 'transparent',
               opacity: isSel ? 0.9 : 0.2,
-              transition: 'opacity 100ms, background 100ms',
+              transition: 'opacity 100ms, background-color 100ms',
               zIndex: 3,
             }}
             onMouseEnter={(e) => {
-              if (!isSel) e.currentTarget.style.background = palette.accent + '55';
+              if (!isSel) e.currentTarget.style.backgroundColor = palette.accent + '55';
               e.currentTarget.style.opacity = '1';
             }}
             onMouseLeave={(e) => {
-              if (!isSel) e.currentTarget.style.background = 'transparent';
+              if (!isSel) e.currentTarget.style.backgroundColor = 'transparent';
               e.currentTarget.style.opacity = isSel ? '0.9' : '0.2';
             }}
           />
@@ -1167,23 +1201,21 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
             }}
             style={{
               position: 'absolute',
-              top: -10,
-              height: 8,
+              ...stripDown,
               left: `${leftPct}%`,
               width: `${widthPct}%`,
               cursor: 'pointer',
-              background: isSel ? palette.accent : 'transparent',
-              borderRadius: 2,
+              backgroundColor: isSel ? palette.accent : 'transparent',
               opacity: isSel ? 0.9 : 0.2,
-              transition: 'opacity 100ms, background 100ms',
+              transition: 'opacity 100ms, background-color 100ms',
               zIndex: 3,
             }}
             onMouseEnter={(e) => {
-              if (!isSel) e.currentTarget.style.background = palette.accent + '55';
+              if (!isSel) e.currentTarget.style.backgroundColor = palette.accent + '55';
               e.currentTarget.style.opacity = '1';
             }}
             onMouseLeave={(e) => {
-              if (!isSel) e.currentTarget.style.background = 'transparent';
+              if (!isSel) e.currentTarget.style.backgroundColor = 'transparent';
               e.currentTarget.style.opacity = isSel ? '0.9' : '0.2';
             }}
           />
@@ -1732,6 +1764,12 @@ interface BlockFrameProps {
   headingNumber: number;
   selected: boolean;
   /**
+   * The sheet's zoom (screen px per sheet unit). The controls are drawn
+   * the same size on screen at every zoom; it decides which of them a
+   * block small on screen draws (plan item 19). 1 where nothing zooms.
+   */
+  zoom?: number;
+  /**
    * True for ~700 ms after the block was inserted via the Insert
    * tab. Drives the one-shot `postr-block-insert` CSS mount
    * animation in index.css — scale-bounce + fade-in + purple
@@ -1796,6 +1834,7 @@ export function BlockFrame(props: BlockFrameProps) {
     citationStyle,
     headingNumber,
     selected,
+    zoom = 1,
     justInserted,
     onSelect,
     onPointerDown,
@@ -1887,6 +1926,57 @@ export function BlockFrame(props: BlockFrameProps) {
     b.type === 'table';
   const level = b.type === 'title' ? st.title : b.type === 'authors' ? st.authors : isHeading ? st.heading : st.body;
   const frameRef = useRef<HTMLDivElement | null>(null);
+  // Which controls the selected block draws for its size on screen, and
+  // where the rotate control goes (plan item 19, selectionLayout.ts): from
+  // the box the handles sit on as rendered (a block growing with its text
+  // does not store its height), and the type label's width (a handle row
+  // wider than its block shows only its move button: review F3).
+  const labelRef = useRef<HTMLDivElement | null>(null);
+  const room = useSelectionRoom(frameRef, { active: selected, zoom, rotationDeg: b.rotation ?? 0, stored: { w: b.w, h: b.h }, labelRef });
+  const controls = blockControls({
+    wPx: room.widthUnits * zoom,
+    hPx: room.heightUnits * zoom,
+    // Images: corners-only in default (contain) mode so edge drags can't
+    // unintentionally reshape a figure block — the figure should mostly
+    // match its source aspect. "Stretch to fit" (imageFit: 'fill') opts
+    // into freeform 8-handle resize. Logos: always 8 handles (utility
+    // marks the user often wants to give more breathing room).
+    cornersOnly: b.type === 'image' && b.imageFit !== 'fill',
+    row: { labelPx: room.labelPx, imageButtons: b.type === 'image' || b.type === 'logo' },
+    zoom,
+  });
+  const rotateInRow = controls.rotate && !room.rotateBelow;
+  // The rotate control: below the block on a stem, or the last button of
+  // the handle row when below there is no room (plan item 19). Dragging it
+  // turns the block about its centre, wherever the control sits.
+  const rotateButton = (inRow: boolean) => (
+    <button
+      type="button"
+      data-no-anim
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        onPointerDown(e, b.id, 'rotate');
+      }}
+      style={{
+        ...circleBtn,
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        cursor: 'grab',
+        pointerEvents: 'auto',
+        // Below the block: counter-rotate so the icon stays upright
+        // even when the block is rotated (the row is counter-rotated
+        // already).
+        transform: !inRow && b.rotation ? `rotate(${-b.rotation}deg)` : undefined,
+      }}
+      title="Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={iconSize(11)}>
+        <path d="M21 2v6h-6" />
+        <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+        <path d="M3 22v-6h6" />
+        <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+      </svg>
+    </button>
+  );
   // Selection info for the floating format toolbar — populated by
   // the RichTextEditor inside this block when the user highlights
   // a range. null = no selection, toolbar hidden.
@@ -2278,19 +2368,9 @@ export function BlockFrame(props: BlockFrameProps) {
         <ResizeHandles
           accent={p.accent}
           onPointerDown={(e, handle) => onPointerDown(e, b.id, 'resize', handle)}
-          // Images: corners-only in default (contain) mode so edge
-          // drags can't unintentionally reshape a figure block — the
-          // figure should mostly match its source aspect. "Stretch
-          // to fit" (imageFit: 'fill') opts into freeform 8-handle
-          // resize.
-          //
-          // Logos: always 8 handles. Logos are utility marks where
-          // the user often wants to adjust block dimensions freely
-          // (give the logo more horizontal breathing room, etc.) —
-          // in contain mode the logo stays centered with its
-          // original aspect, in fill mode it stretches. Either way
-          // they get all four edges.
-          cornersOnly={b.type === 'image' && b.imageFit !== 'fill'}
+          // Corners only for a contained image; fewer on a block small on
+          // screen (`controls` above).
+          handles={controls.handles}
         />
       )}
 
@@ -2309,33 +2389,45 @@ export function BlockFrame(props: BlockFrameProps) {
             more button overlap. Wider blocks grow the container via
             `width: 100%` so the three items still span the block's
             full width when there's room.
+            Since plan item 19 (review F3), zoomed far out, a row whose
+            buttons are wider than the block on screen draws only the move
+            button: there it reached over the neighbouring blocks
+            (`blockControls`).
           */}
           <div
             data-postr-selection-ui="true"
             style={{
               position: 'absolute',
-              top: -24,
+              // Its bottom 14 px above the block on screen at every
+              // zoom, clear of the resize handles' reach; drawn in
+              // px and scaled back about that edge (plan item 19).
+              bottom: '100%',
+              marginBottom: ctl(ROW_LIFT),
               left: '50%',
               // Row stays glued to the block's horizontal center no
               // matter how the block is sized or rotated. The
-              // rotation is cancelled so the handles stay upright.
+              // rotation is cancelled so the handles stay upright,
+              // about the row's own centre (half its height above
+              // its bottom on screen), not the bottom edge it is
+              // scaled about: turned about that edge, a block near
+              // 180° would hang the row back over its own handles.
               transform: b.rotation
-                ? `translateX(-50%) rotate(${-b.rotation}deg)`
-                : 'translateX(-50%)',
-              transformOrigin: 'center center',
-              // Width is driven by the row's three children — the
-              // two fixed 20 px buttons + the pill sized to its
+                ? `translateX(-50%) translateY(${ctl(-HIT / 2)}) rotate(${-b.rotation}deg) translateY(${ctl(HIT / 2)}) ${UNZOOM}`
+                : `translateX(-50%) ${UNZOOM}`,
+              transformOrigin: 'center bottom',
+              // Width is driven by the row's children — the
+              // fixed 24 px buttons + the pill sized to its
               // text content. This makes the total handle row
               // **independent of the block's own width** so
               // resizing the block shrinks/grows the block but
               // leaves the control row the same length. The row
               // just stays horizontally centered above the block.
-              width: 'fit-content',
-              height: 18,
+              width: 'max-content',
+              height: HIT,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 4,
+              gap: ROW_GAP,
               boxSizing: 'border-box',
               zIndex: 10,
             }}
@@ -2351,15 +2443,13 @@ export function BlockFrame(props: BlockFrameProps) {
               }}
               style={{
                 ...circleBtn,
-                background: p.accent,
+                backgroundColor: p.accent,
                 cursor: 'move',
                 pointerEvents: 'auto',
               }}
               title="Drag to move (or use arrow keys)"
             >
               <svg
-                width="10"
-                height="10"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -2367,7 +2457,7 @@ export function BlockFrame(props: BlockFrameProps) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden
-                style={{ display: 'block' }}
+                style={iconSize(11)}
               >
                 <polyline points="5 9 2 12 5 15" />
                 <polyline points="9 5 12 2 15 5" />
@@ -2378,25 +2468,28 @@ export function BlockFrame(props: BlockFrameProps) {
               </svg>
             </button>
 
+            {controls.label && (
             <div
+              ref={labelRef}
               style={{
                 // Pill sizes to its text content — never grows or
                 // shrinks with block width. The outer row is
-                // `width: fit-content` so this intrinsic size
+                // `width: max-content` so this intrinsic size
                 // bubbles up and the whole control row stays a
                 // constant length regardless of the block's own
-                // dimensions.
+                // dimensions. Hidden on a block under 120 px wide on
+                // screen (plan item 19).
                 flex: '0 0 auto',
-                height: 18,
+                height: BUTTON_MARK,
                 boxSizing: 'border-box',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 8,
+                fontSize: 10,
                 background: p.accent,
                 color: '#fff',
                 padding: '0 8px',
-                borderRadius: 9,
+                borderRadius: BUTTON_MARK / 2,
                 border: 'none',
                 fontFamily: 'system-ui',
                 fontWeight: 700,
@@ -2415,8 +2508,9 @@ export function BlockFrame(props: BlockFrameProps) {
                 </span>
               )}
             </div>
+            )}
 
-            {(b.type === 'image' || b.type === 'logo') && (
+            {controls.buttons && (b.type === 'image' || b.type === 'logo') && (
               <>
                 {/* Replace button — opens the LogoPicker (logo blocks)
                     or the file input (image blocks). The block itself
@@ -2436,15 +2530,13 @@ export function BlockFrame(props: BlockFrameProps) {
                   }}
                   style={{
                     ...circleBtn,
-                    background: 'rgba(0,0,0,0.6)',
+                    backgroundColor: 'rgba(0,0,0,0.6)',
                     cursor: 'pointer',
                     pointerEvents: 'auto',
                   }}
                   title={b.type === 'logo' ? 'Replace logo' : 'Replace image'}
                 >
                   <svg
-                    width="11"
-                    height="11"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -2452,7 +2544,7 @@ export function BlockFrame(props: BlockFrameProps) {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     aria-hidden
-                    style={{ display: 'block' }}
+                    style={iconSize(12)}
                   >
                     <path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3" />
                     <polyline points="21 4 21 9 16 9" />
@@ -2467,7 +2559,7 @@ export function BlockFrame(props: BlockFrameProps) {
                   }}
                   style={{
                     ...circleBtn,
-                    background: cropMode ? '#7c6aed' : 'rgba(0,0,0,0.6)',
+                    backgroundColor: cropMode ? '#7c6aed' : 'rgba(0,0,0,0.6)',
                     cursor: 'pointer',
                     pointerEvents: 'auto',
                   }}
@@ -2475,8 +2567,6 @@ export function BlockFrame(props: BlockFrameProps) {
                   aria-pressed={cropMode}
                 >
                   <svg
-                    width="11"
-                    height="11"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="currentColor"
@@ -2484,7 +2574,7 @@ export function BlockFrame(props: BlockFrameProps) {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     aria-hidden
-                    style={{ display: 'block' }}
+                    style={iconSize(12)}
                   >
                     <path d="M6 2v14a2 2 0 0 0 2 2h14" />
                     <path d="M18 22V8a2 2 0 0 0-2-2H2" />
@@ -2493,6 +2583,7 @@ export function BlockFrame(props: BlockFrameProps) {
               </>
             )}
 
+            {controls.buttons && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -2500,15 +2591,13 @@ export function BlockFrame(props: BlockFrameProps) {
               }}
               style={{
                 ...circleBtn,
-                background: '#d33',
+                backgroundColor: '#d33',
                 cursor: 'pointer',
                 pointerEvents: 'auto',
               }}
               title="Delete block"
             >
               <svg
-                width="10"
-                height="10"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -2516,73 +2605,80 @@ export function BlockFrame(props: BlockFrameProps) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden
-                style={{ display: 'block' }}
+                style={iconSize(11)}
               >
                 <line x1="6" y1="6" x2="18" y2="18" />
                 <line x1="18" y1="6" x2="6" y2="18" />
               </svg>
             </button>
+            )}
+
+            {/* The rotate control, when below the block it would meet
+                the ZoomBar or leave the visible canvas (plan item 19). */}
+            {rotateInRow && rotateButton(true)}
           </div>
 
           {/*
             External ROTATE handle — BELOW the block, centered.
             Moved from top-center to bottom-center on 2026-04-11 so
             the top row is just move + delete (no three-button
-            crowding). The handle sits 26px below the block's
-            bottom edge with a short visual stem connecting it
-            back to the block — standard rotation-handle UX from
-            design tools.
+            crowding). Its 24 px hit area starts 14 px below the
+            block's bottom edge (clear of the resize handles' reach),
+            with a short visual stem connecting it back to the block —
+            standard rotation-handle UX from design tools. Where below
+            the block it would meet the ZoomBar or leave the visible
+            canvas, it is the last button of the handle row instead
+            (plan item 19, selectionRoom.ts).
 
             Drag in a circle around the block's center to rotate.
             Magnetic snap at 0/45/90/135/180/270° with a 4° catch
             radius (always on). Hold Shift for harder 15° snaps.
           */}
-          <div
-            data-postr-selection-ui="true"
-            // Stem connecting the handle to the block. `pointerEvents:
-            // none` so clicks pass through to the handle below it.
-            style={{
-              position: 'absolute',
-              bottom: -12,
-              left: '50%',
-              marginLeft: -1,
-              width: 1.5,
-              height: 12,
-              background: p.accent,
-              opacity: 0.5,
-              pointerEvents: 'none',
-            }}
-          />
-          <button
-            type="button"
-            data-postr-selection-ui="true"
-            data-no-anim
-            onPointerDown={(e) => {
-              e.stopPropagation();
-              onPointerDown(e, b.id, 'rotate');
-            }}
-            style={{
-              ...circleBtn,
-              position: 'absolute',
-              bottom: -30,
-              left: '50%',
-              marginLeft: -9,
-              background: 'rgba(0, 0, 0, 0.6)',
-              cursor: 'grab',
-              zIndex: 10,
-              // Counter-rotate so the icon stays upright even when
-              // the block is rotated.
-              transform: b.rotation ? `rotate(${-b.rotation}deg)` : undefined,
-            }}
-            title="Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ display: 'block' }}>
-              <path d="M21 2v6h-6" />
-              <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-              <path d="M3 22v-6h6" />
-              <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-            </svg>
-          </button>
+          {controls.rotate && room.rotateBelow && (
+            <>
+              <div
+                data-postr-selection-ui="true"
+                // Stem connecting the handle to the block. `pointerEvents:
+                // none` so clicks pass through to the handle below it.
+                // From the block's edge to the circle, 1.5 × 16 px on
+                // screen: drawn in px, scaled back about its top.
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '50%',
+                  marginLeft: ctl(-0.75),
+                  width: 1.5,
+                  height: ROTATE_GAP + (HIT - BUTTON_MARK) / 2,
+                  transform: UNZOOM,
+                  transformOrigin: 'left top',
+                  background: p.accent,
+                  opacity: 0.5,
+                  pointerEvents: 'none',
+                }}
+              />
+              <div
+                data-postr-selection-ui="true"
+                // The rotate control's 24 px hit area, 14 px below the
+                // block: a box scaled back about its top-left corner
+                // (no transform on the button but its upright turn).
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  marginTop: ctl(ROTATE_GAP),
+                  left: '50%',
+                  marginLeft: ctl(-HIT / 2),
+                  width: HIT,
+                  height: HIT,
+                  transform: UNZOOM,
+                  transformOrigin: 'left top',
+                  zIndex: 10,
+                  pointerEvents: 'none',
+                }}
+              >
+                {rotateButton(false)}
+              </div>
+            </>
+          )}
         </>
       )}
 

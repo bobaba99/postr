@@ -9,6 +9,10 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import type { PlanState } from '@/hooks/usePlan';
 import { openBillingPortal, requestRefund } from '@/data/billing';
+import { ApiError } from '@/lib/apiClient';
+
+const AUTOMATED_DECISION_NOTE =
+  'This answer was given automatically. To have a person review it, email support@resila.ai.';
 
 // ── SubscriptionPanel — plan state + manage/upgrade, always shown ──
 
@@ -38,7 +42,7 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
       const amount = `CA$${(amountCents / 100).toFixed(2)}`;
       setRefundMsg(
         subscriptionCancelled
-          ? `Refunded ${amount}. It may take a few days to appear. Your term has been cancelled, so its unlimited PowerPoint and LaTeX exports have ended.`
+          ? `Refunded ${amount}. It may take a few days to appear. Your term has been cancelled, so its unlimited PowerPoint exports have ended.`
           : `Refunded ${amount}. It may take a few days to appear.`,
       );
       // The server just changed the billing row (term → free, or fewer
@@ -48,6 +52,9 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
     } catch (err) {
       // Map known eligibility reasons; fall back to generic.
       const reason = (err as { body?: { error?: string } })?.body?.error;
+      // Every 409 from /billing/refund is the automated check saying no
+      // (apps/api/src/billing.ts); anything else is a failure to retry.
+      const refused = err instanceof ApiError && err.status === 409 && Boolean(reason);
       const map: Record<string, string> = {
         window_expired: 'The 14-day refund window has passed. You can cancel anytime to stop renewals.',
         already_used:
@@ -56,7 +63,14 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
             : 'This pack isn’t refundable once an export credit has been used, not even in part.',
         no_pack_purchase: 'No refundable pack purchase found.',
       };
-      setRefundMsg(reason && map[reason] ? map[reason] : 'We couldn’t process that refund. Please try again or contact support.');
+      // A refusal is a decision made only by automated processing (Privacy
+      // §7): Quebec's Law 25 s. 12.1 asks that the person be told so, and how
+      // to have a person review it, when they are told the decision.
+      setRefundMsg(
+        refused
+          ? `${(reason && map[reason]) || 'This purchase can’t be refunded here.'} ${AUTOMATED_DECISION_NOTE}`
+          : 'We couldn’t process that refund. Please try again or contact support.',
+      );
     } finally {
       setRefunding(false);
     }
@@ -70,8 +84,7 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
     return (
       <div className="space-y-3">
         <p className="text-[14pt] text-[#c8cad0]">
-          Your term is active — PowerPoint and LaTeX export are unlocked, no
-          watermark.
+          Your term is active — PowerPoint export is unlocked, no watermark.
           {plan.subscriptionStatus === 'past_due' && (
             <span className="text-[#fbbf24]">
               {' '}There’s a payment issue on your latest renewal — update your
@@ -136,8 +149,8 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
         </div>
         <p className="mt-1 text-[13pt] text-[#8b8f99]">
           {hasCredits
-            ? `${plan.credits} PowerPoint or LaTeX export${plan.credits === 1 ? '' : 's'} left — credits never expire.`
-            : 'From a CA$9.99 export pack. Credits never expire once purchased.'}
+            ? `${plan.credits} PowerPoint export${plan.credits === 1 ? '' : 's'} left — credits never expire.`
+            : 'From an export pack, CA$9.99 + applicable taxes. Credits never expire once purchased.'}
         </p>
         {refundMsg && !hasCredits && (
           <p className="mt-2 text-[13pt] text-[#a3a7b3]">{refundMsg}</p>
@@ -163,8 +176,8 @@ export function SubscriptionPanel({ plan }: { plan: PlanState }) {
       </div>
 
       <p className="text-[14pt] text-[#8b8f99]">
-        Unlock clean PowerPoint &amp; LaTeX export with the term, or a one-time
-        export pack whose credits never expire.
+        Unlock clean PowerPoint export with the term, or a one-time export
+        pack whose credits never expire.
       </p>
       <Link
         to="/pricing"

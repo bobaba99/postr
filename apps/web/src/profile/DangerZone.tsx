@@ -1,14 +1,15 @@
 /**
  * Danger Zone — the destructive actions block on the Profile page, plus
  * the copy for its confirmation modal. When a paid term is active the
- * account-deletion row says so explicitly: the API cancels the CA$18.99
- * term (and any add-on) immediately as part of deletion (P0-3).
+ * account-deletion row says so explicitly: the API cancels the term (and
+ * any add-on) immediately as part of deletion (P0-3). No price here: a
+ * price shown must say tax is extra (fix 25), and this line needs none.
  */
 import { Section } from './ProfileChrome';
 import { btnDanger } from './styles';
 
 export const TERM_CANCEL_LINE =
-  'This also cancels your CA$18.99 term and any add-on immediately.';
+  'This also cancels your term and any add-on immediately.';
 
 /** The confirmation phrase the user must type before deleting the account. */
 export const DELETE_ACCOUNT_PHRASE = 'I confirm the deletion of my account';

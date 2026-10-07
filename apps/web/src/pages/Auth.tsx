@@ -21,6 +21,13 @@
  * when hasActiveTerm, and the banner says so. If the API still answers
  * 409 already_subscribed (a stale client), the same friendly message is
  * shown rather than the generic checkout failure.
+ *
+ * In English at /auth and in French at /auth/fr, query kept (fix 26):
+ * the copy is in i18n/auth.ts. A French visitor's checkout opens in French
+ * (createCheckout's `lang`). Supabase sends a French e-mail sign-up's
+ * confirmation back to /auth/fr (with ?plan= when there is one); a French
+ * Google sign-in comes back to /auth/fr?plan= only when a plan is being
+ * bought, and to /dashboard otherwise, as the English page does.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router';
@@ -46,16 +53,31 @@ import {
 import { isAlreadySubscribedError } from '@/data/billing';
 import { refundLineFor } from '@/data/refundCopy';
 import { usePlan } from '@/hooks/usePlan';
-
-/** Shown instead of starting checkout when the user already holds an
- *  active term (P0-2). Generic on purpose — never the raw API text. */
-const ALREADY_SUBSCRIBED_MESSAGE =
-  'You already have an active term — PowerPoint and LaTeX export are unlocked.';
+import { AUTH_COPY } from '@/i18n/auth';
+import { HTML_LANG, localizedPath, useLang, type Lang } from '@/i18n/lang';
+import { LanguageLink } from '@/components/LanguageLink';
 
 type Mode = 'signin' | 'signup';
 
+/**
+ * A Supabase auth error as the page shows it. English: Supabase's own
+ * message, as before. French: Supabase writes only English, so a code the
+ * French copy knows gets its French line and any other the generic one.
+ */
+function authErrorMessage(err: { message: string; code?: string }, lang: Lang): string {
+  if (lang === 'en') return err.message;
+  const errors = AUTH_COPY.fr.authErrors;
+  return err.code && err.code in errors ? errors[err.code as keyof typeof errors] : errors.generic;
+}
+
 export default function Auth() {
-  useDocumentMeta(APP_ROUTE_META['/auth'] ?? null);
+  const lang = useLang();
+  const c = AUTH_COPY[lang];
+  // The page's own address in its language: where Supabase sends an e-mail
+  // sign-up's confirmation, and a Google sign-in that is buying a plan, so
+  // it lands in French (a Google sign-in with no plan goes to /dashboard).
+  const authPath = localizedPath('/auth', lang);
+  useDocumentMeta(APP_ROUTE_META[authPath] ?? null);
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -110,7 +132,7 @@ export default function Auth() {
     checkoutPlan === 'term' && !plan.loading && plan.hasActiveTerm;
   // The refund rule for the plan about to be sold, under the plan label —
   // in front of the buyer BEFORE checkout (owner rule, 2026-09-11).
-  const refundLine = checkoutPlan ? refundLineFor(checkoutPlan) : null;
+  const refundLine = checkoutPlan ? refundLineFor(checkoutPlan, lang) : null;
 
   /**
    * Record a NEW account's signup consent from the given choice. Best-
@@ -149,7 +171,7 @@ export default function Auth() {
       setCheckingOut(true);
       setError(null);
       try {
-        await startCheckoutForPlan(sku); // full-page redirect to Stripe
+        await startCheckoutForPlan(sku, lang); // full-page redirect to Stripe
         return true;
       } catch (err) {
         // The server refused a second term (P0-2). Confirm against a fresh
@@ -164,7 +186,7 @@ export default function Auth() {
           if (fresh?.hasActiveTerm) {
             clearCheckoutIntent();
             setCheckingOut(false);
-            setError(ALREADY_SUBSCRIBED_MESSAGE);
+            setError(c.alreadySubscribed);
             return true;
           }
         }
@@ -179,11 +201,11 @@ export default function Auth() {
         // the email-confirm-return path (stash only, no URL) is preserved.
         if (!intentFromUrl) clearCheckoutIntent();
         setCheckingOut(false);
-        setError('We couldn’t start checkout. Please try again.');
+        setError(c.checkoutFailed);
         return false;
       }
     },
-    [intentFromUrl, plan],
+    [intentFromUrl, plan, lang, c],
   );
 
   // If ?guest=1, auto-trigger guest login — but NEVER when a paid checkout
@@ -261,12 +283,12 @@ export default function Auth() {
     }
     const { error: err } = await supabase.auth.signInAnonymously();
     if (err) {
-      setError(err.message);
+      setError(authErrorMessage(err, lang));
       setLoading(false);
       return;
     }
     navigate('/dashboard', { replace: true });
-  }, [navigate]);
+  }, [navigate, lang]);
 
   const handleEmailAuth = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -280,8 +302,8 @@ export default function Auth() {
       // checkout, or sign in — instead of a bare app root that reads as a
       // dead-end "headless" landing.
       const emailRedirectTo = checkoutPlan
-        ? `${window.location.origin}/auth?plan=${checkoutPlan}`
-        : `${window.location.origin}/auth`;
+        ? `${window.location.origin}${authPath}?plan=${checkoutPlan}`
+        : `${window.location.origin}${authPath}`;
       // Read the session FRESH here rather than trusting isAnonGuest state:
       // that state is set by an async effect, and a fast submit (password-
       // manager autofill) can fire before it resolves. Reading now is
@@ -305,7 +327,7 @@ export default function Auth() {
             options: { emailRedirectTo },
           });
       if (err) {
-        setError(err.message);
+        setError(authErrorMessage(err, lang));
         setLoading(false);
         return;
       }
@@ -340,7 +362,7 @@ export default function Auth() {
         password,
       });
       if (err) {
-        setError(err.message);
+        setError(authErrorMessage(err, lang));
         setLoading(false);
         return;
       }
@@ -348,11 +370,11 @@ export default function Auth() {
       if (checkoutPlan && (await proceedToCheckout(checkoutPlan))) return;
       navigate('/dashboard', { replace: true });
     }
-  }, [email, password, mode, navigate, checkoutPlan, proceedToCheckout, researchOptIn, marketingOptIn, recordSignupConsent]);
+  }, [email, password, mode, navigate, checkoutPlan, proceedToCheckout, researchOptIn, marketingOptIn, recordSignupConsent, authPath, lang]);
 
   const handleForgotPassword = useCallback(async () => {
     if (!email.trim()) {
-      setError('Enter your email address first.');
+      setError(c.enterEmailFirst);
       return;
     }
     setError(null);
@@ -360,11 +382,11 @@ export default function Auth() {
       email.trim(),
     );
     if (err) {
-      setError(err.message);
+      setError(authErrorMessage(err, lang));
       return;
     }
     setResetSent(true);
-  }, [email]);
+  }, [email, c, lang]);
 
   const handleGoogle = useCallback(async () => {
     setError(null);
@@ -382,7 +404,7 @@ export default function Auth() {
       stashSignupConsent({ research: researchOptIn, marketing: marketingOptIn });
     }
     const redirectTo = checkoutPlan
-      ? `${window.location.origin}/auth?plan=${checkoutPlan}`
+      ? `${window.location.origin}${authPath}?plan=${checkoutPlan}`
       : `${window.location.origin}/dashboard`;
     // Read the session FRESH (not the async isAnonGuest state) — a fast
     // click can beat the effect that sets it, and converting the wrong way
@@ -404,16 +426,16 @@ export default function Auth() {
           options: { redirectTo },
         });
     if (err) {
-      setError(err.message);
+      setError(authErrorMessage(err, lang));
     }
-  }, [checkoutPlan, mode, researchOptIn, marketingOptIn]);
+  }, [checkoutPlan, mode, researchOptIn, marketingOptIn, authPath, lang]);
 
   return (
     <main className="flex min-h-screen w-screen flex-col bg-[#0a0a12] text-[#c8cad0]">
       <div className="flex flex-1 items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <Link to="/" className="flex items-center justify-center gap-3 mb-8 no-underline">
+        <Link to={localizedPath('/', lang)} className="flex items-center justify-center gap-3 mb-8 no-underline">
           <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
             <rect width="64" height="64" rx="12" fill="#7c6aed" />
             <path d="M12 52 C30 52, 34 12, 52 12" stroke="white" strokeWidth="4.5" strokeLinecap="round" opacity="0.95" />
@@ -435,16 +457,7 @@ export default function Auth() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-[#9b8cf0]">
-                  {
-                    (
-                      {
-                        term: 'Term · CA$18.99 / 4 months',
-                        pack: 'Export pack · CA$9.99',
-                        review_pack: 'Review pack · credits never expire',
-                        review_addon: 'Review add-on · weekly reviews',
-                      } as Record<CheckoutPlan, string>
-                    )[checkoutPlan]
-                  }
+                  {(c.planLabels as Record<CheckoutPlan, string>)[checkoutPlan]}
                 </div>
                 {refundLine && (
                   <p className="mt-1 text-[12px] leading-relaxed text-[#a3a7b3]">
@@ -453,25 +466,25 @@ export default function Auth() {
                 )}
                 <p className="mt-2 text-sm leading-relaxed text-[#c8cad0]">
                   {termAlreadyActive
-                    ? ALREADY_SUBSCRIBED_MESSAGE
+                    ? c.alreadySubscribed
                     : checkingOut
-                      ? 'Continuing to secure checkout…'
-                      : 'Create your account to continue.'}
+                      ? c.continuingToSecureCheckout
+                      : c.createToContinue}
                 </p>
                 {termAlreadyActive && (
                   <Link
                     to="/profile"
                     className="mt-2 inline-block text-sm font-semibold text-[#b4a9f5] underline decoration-[#7c6aed] underline-offset-4"
                   >
-                    Go to your profile
+                    {c.goToProfile}
                   </Link>
                 )}
               </div>
               <Link
-                to="/pricing"
+                to={localizedPath('/pricing', lang)}
                 className="shrink-0 text-sm font-semibold text-[#b4a9f5] underline decoration-[#7c6aed] underline-offset-4"
               >
-                Change plan
+                {c.changePlan}
               </Link>
             </div>
           </div>
@@ -482,7 +495,7 @@ export default function Auth() {
             disabled={loading}
             className="w-full rounded-lg bg-[#5641b8] px-4 py-3.5 text-base font-semibold text-white hover:bg-[#4c39a6] transition-colors disabled:opacity-50"
           >
-            {loading ? 'Loading…' : 'Start creating — no account needed'}
+            {loading ? c.loading : c.startAsGuest}
           </button>
           {/* handleGuest lands on /dashboard, guest posters are stored on
               Postr's servers under the anonymous session, and the weekly
@@ -490,8 +503,7 @@ export default function Auth() {
               (apps/api/src/cron.ts STALE_GUEST_DAYS). "May" because the
               deletion runs weekly, so it can come later than day 14. */}
           <p className="mt-3 text-center text-[14pt] leading-relaxed text-[#8b8f99]">
-            Go straight to your dashboard as a guest. Guest posters may be
-            deleted after 14 days. Create an account to keep them on any device.
+            {c.guestNote}
           </p>
         </div>
         )}
@@ -500,31 +512,27 @@ export default function Auth() {
         <div className="rounded-xl border border-[#1f1f2e] bg-[#111118] p-6">
           <h1 className="mb-1 text-base font-bold text-[#e2e2e8]">
             {mode === 'signin'
-              ? 'Sign in'
+              ? c.titleSignIn
               : checkoutPlan
-                ? 'Create your account'
-                : 'Or create an account'}
+                ? c.titleCreate
+                : c.titleOrCreate}
           </h1>
           <p className="mb-5 text-[14pt] text-[#8b8f99]">
-            {mode === 'signin'
-              ? 'Access your posters from any device.'
-              : 'Save posters and continue on any device.'}
+            {mode === 'signin' ? c.subSignIn : c.subSignUp}
           </p>
 
           {confirmEmail && (
             <div className="mb-4 rounded-md border border-[#34d399]/40 bg-[#34d399]/10 px-4 py-3 text-[13px] text-[#a7f3d0]">
-              <div className="font-semibold text-[#34d399]">Check your inbox</div>
+              <div className="font-semibold text-[#34d399]">{c.checkInbox}</div>
               <p className="mt-1 leading-relaxed">
-                We sent a confirmation link to{' '}
-                <span className="font-medium text-[#d1fae5]">{email.trim()}</span>.
-                Click it to finish setting up your account
-                {isAnonGuest ? ' — your posters stay with you' : ''}.
-                {checkoutPlan
-                  ? ' Then come back here and we’ll continue to checkout.'
-                  : ' Then come back to sign in.'}
+                {c.confirmSentLead}{' '}
+                <span className="font-medium text-[#d1fae5]">{email.trim()}</span>.{' '}
+                {c.confirmClick}
+                {isAnonGuest ? c.confirmPostersStay : ''}.
+                {checkoutPlan ? c.confirmThenCheckout : c.confirmThenSignIn}
               </p>
               <p className="mt-2 text-[12px] text-[#6ee7b7]/70">
-                Don’t see it? Check your spam folder.
+                {c.noEmailSeen}
               </p>
             </div>
           )}
@@ -547,12 +555,25 @@ export default function Auth() {
               <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
-            Continue with Google
+            {c.continueWithGoogle}
           </button>
+
+          {/* Continuing here is accepting the Terms (Terms §1: creating an
+              account or signing in), so this line sits right under the
+              Google button, in both modes: "Continue with Google" creates an
+              account for a Google user Postr has never seen, whatever the
+              mode, and the page opens in sign-in mode (record 24, review
+              round 2). It comes before the email form, so it is read before
+              either way of continuing. Both languages are linked (owner
+              decision 2026-10-06, Bill 96). The Privacy Policy is
+              information, not something the user agrees to (Law 25 s. 14
+              asks for consent separately from other information; record 24,
+              review round 1). */}
+          <TermsLine lang={lang} />
 
           <div className="my-4 flex items-center gap-3">
             <div className="h-px flex-1 bg-[#2a2a3a]" />
-            <span className="text-[13px] text-[#8b8f99]">or use email</span>
+            <span className="text-[13px] text-[#8b8f99]">{c.orUseEmail}</span>
             <div className="h-px flex-1 bg-[#2a2a3a]" />
           </div>
 
@@ -562,8 +583,8 @@ export default function Auth() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email address"
-              aria-label="Email address"
+              placeholder={c.emailPlaceholder}
+              aria-label={c.emailPlaceholder}
               required
               className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
             />
@@ -572,13 +593,13 @@ export default function Auth() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === 'signup' ? 'Create password' : 'Password'}
-                aria-label={mode === 'signup' ? 'Create password' : 'Password'}
+                placeholder={mode === 'signup' ? c.createPassword : c.password}
+                aria-label={mode === 'signup' ? c.createPassword : c.password}
                 required
                 minLength={8}
                 className="w-full rounded-lg border border-[#2a2a3a] bg-[#1a1a26] px-4 py-3 text-sm text-[#e2e2e8] outline-none focus:border-[#7c6aed] placeholder:text-[#8b8f99]"
               />
-              {mode === 'signup' && <PasswordStrength password={password} />}
+              {mode === 'signup' && <PasswordStrength password={password} lang={lang} />}
               {mode === 'signin' && (
                 <div className="mt-1.5 text-right">
                   {/* The recovery link signs the user in; the app has no
@@ -587,7 +608,7 @@ export default function Auth() {
                       sends nothing to an address with no account. */}
                   {resetSent ? (
                     <span className="text-[13px] text-[#34d399]">
-                      If {email} has an account, we emailed it a sign-in link.
+                      {c.resetSent(email)}
                     </span>
                   ) : (
                     <button
@@ -595,7 +616,7 @@ export default function Auth() {
                       onClick={handleForgotPassword}
                       className="text-[13px] text-[#7c6aed] bg-transparent border-none cursor-pointer hover:underline"
                     >
-                      Forgot password?
+                      {c.forgotPassword}
                     </button>
                   )}
                 </div>
@@ -609,7 +630,7 @@ export default function Auth() {
             {mode === 'signup' && (
               <details className="rounded-lg border border-[#2a2a3a] bg-[#0f0f18] px-3 py-2.5">
                 <summary className="cursor-pointer text-[13px] font-semibold text-[#c8cad0]">
-                  Email preferences (optional)
+                  {c.emailPreferences}
                 </summary>
                 <div className="mt-2 space-y-1">
                   <label htmlFor="consent-research" className="flex cursor-pointer items-start gap-2.5 py-1">
@@ -621,7 +642,7 @@ export default function Auth() {
                       className="mt-0.5 h-4 w-4 shrink-0 accent-[#7c6aed]"
                     />
                     <span className="text-[13px] leading-snug text-[#c8cad0]">
-                      Invite me to research interviews or surveys.
+                      {c.researchOptIn}
                     </span>
                   </label>
                   <label htmlFor="consent-marketing" className="flex cursor-pointer items-start gap-2.5 py-1">
@@ -633,7 +654,7 @@ export default function Auth() {
                       className="mt-0.5 h-4 w-4 shrink-0 accent-[#7c6aed]"
                     />
                     <span className="text-[13px] leading-snug text-[#c8cad0]">
-                      Email me product updates and new features.
+                      {c.marketingOptIn}
                     </span>
                   </label>
                 </div>
@@ -646,30 +667,30 @@ export default function Auth() {
               className="w-full rounded-lg border border-[#7c6aed] bg-transparent px-4 py-3 text-sm font-semibold text-[#7c6aed] hover:bg-[#5641b8] hover:text-white transition-colors disabled:opacity-50"
             >
               {checkingOut
-                ? 'Continuing to checkout…'
+                ? c.continuingToCheckout
                 : loading
-                  ? 'Loading…'
+                  ? c.loading
                   : mode === 'signin'
-                    ? 'Sign in'
+                    ? c.submitSignIn
                     : checkoutPlan
-                      ? 'Create account & continue'
-                      : 'Create account'}
+                      ? c.submitCreateContinue
+                      : c.submitCreate}
             </button>
           </form>
 
           <div className="mt-4 text-center text-[14pt] text-[#8b8f99]">
             {mode === 'signin' ? (
               <>
-                Don't have an account?{' '}
+                {c.noAccount}{' '}
                 <button onClick={() => { setMode('signup'); setResetSent(false); setConfirmEmail(false); setError(null); }} className="text-[#7c6aed] font-semibold bg-transparent border-none cursor-pointer">
-                  Sign up
+                  {c.signUp}
                 </button>
               </>
             ) : (
               <>
-                Already have an account?{' '}
+                {c.haveAccount}{' '}
                 <button onClick={() => { setMode('signin'); setResetSent(false); setConfirmEmail(false); setError(null); }} className="text-[#7c6aed] font-semibold bg-transparent border-none cursor-pointer">
-                  Sign in
+                  {c.signIn}
                 </button>
               </>
             )}
@@ -678,30 +699,68 @@ export default function Auth() {
       </div>
       </div>
 
-      <AuthLegalFooter />
+      <AuthLegalFooter lang={lang} />
     </main>
   );
 }
 
-function AuthLegalFooter() {
+/**
+ * The Terms consent line (record 24): this language's Terms and Privacy
+ * Policy, then the other language's, in a span marked with that language.
+ */
+function TermsLine({ lang }: { lang: Lang }) {
+  const c = AUTH_COPY[lang];
+  const other: Lang = lang === 'fr' ? 'en' : 'fr';
+  const o = AUTH_COPY[other];
+  const link = 'text-[#9ca3af] underline underline-offset-4';
+  return (
+    <p data-testid="auth-terms-line" className="mt-3 text-[13px] leading-relaxed text-[#8b8f99]">
+      {c.termsLead}{' '}
+      <Link className={link} to={localizedPath('/terms', lang)}>
+        {c.termsLink}
+      </Link>
+      {c.privacyLead}{' '}
+      <Link className={link} to={localizedPath('/privacy', lang)}>
+        {c.privacyLink}
+      </Link>{' '}
+      {c.privacyTail} <span lang={HTML_LANG[other]}>{o.inThisLanguage}{' '}
+      <Link className={link} to={localizedPath('/terms', other)}>
+        {o.termsLink}
+      </Link>{' '}
+      {o.and}{' '}
+      <Link className={link} to={localizedPath('/privacy', other)}>
+        {o.privacyLink}
+      </Link>
+      .</span>
+    </p>
+  );
+}
+
+function AuthLegalFooter({ lang }: { lang: Lang }) {
+  const c = AUTH_COPY[lang];
+  const link = 'text-[#9ca3af] underline-offset-4 hover:underline';
   return (
     <footer className="border-t border-[#1f1f2e] px-4 py-5 text-sm text-[#8b8f99]">
-      <nav aria-label="Legal" className="mx-auto max-w-sm">
+      <nav aria-label={c.legalNav} className="mx-auto max-w-sm">
         <ul className="flex list-none flex-wrap justify-center gap-x-5 gap-y-2">
           <li>
-            <Link className="text-[#9ca3af] underline-offset-4 hover:underline" to="/privacy">
-              Privacy
+            <Link className={link} to={localizedPath('/privacy', lang)}>
+              {c.legalPrivacy}
             </Link>
           </li>
           <li>
-            <Link className="text-[#9ca3af] underline-offset-4 hover:underline" to="/terms">
-              Terms
+            <Link className={link} to={localizedPath('/terms', lang)}>
+              {c.legalTerms}
             </Link>
           </li>
           <li>
-            <Link className="text-[#9ca3af] underline-offset-4 hover:underline" to="/cookies">
-              Cookies
+            <Link className={link} to={localizedPath('/cookies', lang)}>
+              {c.legalCookies}
             </Link>
+          </li>
+          {/* The page in the other language (fix 26), plan kept. */}
+          <li>
+            <LanguageLink className={link} />
           </li>
         </ul>
       </nav>

@@ -5,6 +5,15 @@
  *   /about              → About (public, feature tour)
  *   /why-posters        → Why posters (public)
  *   /pricing            → Pricing (public)
+ *   /fr, /about/fr, /why-posters/fr, /pricing/fr,
+ *   /tools/figure-readability/fr, /auth/fr, /billing/success/fr,
+ *   /billing/cancel/fr  → the same pages in French (fix 26): one component
+ *                         per page, its language read from the URL
+ *                         (i18n/lang.ts); the legal pages keep their own
+ *                         French components at /privacy/fr, /cookies/fr,
+ *                         /terms/fr. Query strings are kept
+ *                         (/auth/fr?plan=term). The editor, the dashboard
+ *                         and the profile are English only.
  *   /tools/figure-readability → Plot checker — the standalone figure-readability check (public, no
  *                         session, code-split — the one live standalone
  *                         tool; the editor's Check tab as a page)
@@ -247,6 +256,16 @@ export function AppRoutes() {
         <Route path="/about" element={<About />} />
         <Route path="/why-posters" element={<WhyPosters />} />
         <Route path="/pricing" element={<Pricing />} />
+        {/* The public pages in French (fix 26): same components, the
+            language read from the URL (i18n/lang.ts). */}
+        <Route path="/fr" element={<Landing />} />
+        <Route path="/about/fr" element={<About />} />
+        <Route path="/why-posters/fr" element={<WhyPosters />} />
+        <Route path="/pricing/fr" element={<Pricing />} />
+        <Route path="/tools/figure-readability/fr" element={<FigureReadabilityPage />} />
+        <Route path="/auth/fr" element={<Auth />} />
+        <Route path="/billing/success/fr" element={<BillingResult outcome="success" />} />
+        <Route path="/billing/cancel/fr" element={<BillingResult outcome="cancel" />} />
         {/* Public gallery is deactivated — see the header comment. */}
         <Route path="/gallery" element={<Navigate to="/" replace />} />
         <Route path="/gallery/:entryId" element={<Navigate to="/" replace />} />
