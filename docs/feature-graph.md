@@ -1113,9 +1113,9 @@ flowchart LR
 - [ ] `+ Upload figure` (empty-image click target) — div button — `blocks.tsx:403-433` — clicks hidden file input
 - [ ] hidden file input (empty image) — `<input type="file" accept="image/*">` — `blocks.tsx:432`
 - [ ] table cell editor — contentEditable div (one per cell) — `blocks.tsx:1001-1034` — edits cell HTML → `updateCell`
-- [ ] `Drag to resize column` — column-border drag handle ×(cols−1) — `blocks.tsx:904-918` — pointer drag redistributes `colWidths`
-- [ ] `Select row ${r + 1}` / title `Select row ${r + 1} (Delete to remove)` — row selector strip ×rows — `blocks.tsx:1056-1090` — selects whole row
-- [ ] `Select column ${c + 1}` / title `Select column ${c + 1} (Delete to remove)` — column selector strip ×cols — `blocks.tsx:1102-1136` — selects whole column
+- [ ] `Drag to resize column` — column-border drag handle ×(cols−1) — `blocks.tsx:960-976` — pointer drag redistributes `colWidths`; on a selected table a 24 px grip on screen at every zoom (scaled back across, `UNZOOM_X`), on an unselected one 6 sheet units as before (plan item 19, `docs/fixes/19-controls-one-size.md`)
+- [ ] `Select row ${r + 1}` / title `Select row ${r + 1} (Delete to remove)` — row selector strip ×rows — `blocks.tsx:1115-1160` — selects whole row; on a selected table a 24 px hit area ending 2 px left of the table with the 8 px band at its inner edge, one size on screen (`stripAcross`, `blocks.tsx:869-887`); unselected: 8 units, 10 units out, as before (plan item 19, `docs/fixes/19-controls-one-size.md`; where they show at all is on the Later list)
+- [ ] `Select column ${c + 1}` / title `Select column ${c + 1} (Delete to remove)` — column selector strip ×cols — `blocks.tsx:1173-1217` — selects whole column; the same, 2 px above the table (`stripDown`)
 - [ ] `Add row` — hover-only bottom bar button — `blocks.tsx:1147-1168` — `insertRow(data, rows-1, 'below')`
 - [ ] `Add column` — hover-only right bar button — `blocks.tsx:1171-1193` — `insertCol(data, cols-1, 'right')`
 - [ ] right-click on cell — gesture — `blocks.tsx:971-975` — opens `TableContextMenu` at cursor
@@ -1136,12 +1136,13 @@ flowchart LR
 - [ ] block click — click — `blocks.tsx:1908-1924` — selects block; `Shift`/`⌘`/`Ctrl`+click = additive toggle (`blocks.tsx:1910`)
 - [ ] block drag from body — pointer drag (not image/logo) — `blocks.tsx:1925-1937` — move block
 - [ ] block right-click — gesture (non-table, non-text blocks) — `blocks.tsx:1938-1957` — opens block context menu
-- [ ] `ResizeHandles` — 8 (or 4 corner) drag handles — `blocks.tsx:2221-2239` — resize block; corners-only for contain-mode images (`:2237`)
-- [ ] `Drag to move (or use arrow keys)` — circular move handle — `blocks.tsx:2289-2323` — drag → move block
-- [ ] `Replace logo` / `Replace image` — circular button (image/logo only) — `blocks.tsx:2372-2406` — dispatches `postr:replace-block` → opens picker/file input
-- [ ] `Crop image` / `Exit crop` — circular toggle (image/logo only, `aria-pressed`) — `blocks.tsx:2407-2436` — toggles `CropOverlay`
-- [ ] `Delete block` — red circular button — `blocks.tsx:2440-2468` — `onDelete(b.id)`
-- [ ] `Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)` — circular rotate handle below block — `blocks.tsx:2500-2529` — drag → rotate
+- [ ] `ResizeHandles` — 8 (or 4 corner) drag handles — `blocks.tsx:2360-2367` — resize block; corners-only for contain-mode images; which of them a block draws follows its size on screen (`blockControls`, `selectionLayout.ts`; `blocks.tsx:1925-1945`, from the padding box as rendered, `selectionRoom.ts`): no edge handles along an axis under 72 px, only the bottom row (or right column) under 24 px on one axis, only the bottom-right corner under 24 px on both (plan item 19, `docs/fixes/19-controls-one-size.md`)
+- [ ] handle row (move, type label, replace, crop, delete, and rotate when below has no room) — `blocks.tsx:2372-2612` — drawn in px and scaled back by the zoom about its bottom edge (`UNZOOM`), its bottom 14 px above the block at every zoom; on a turned block it is counter-rotated about its own centre, 26 px out from the block's edge, so it stays upright and clear of the block's handles at 180° (`blocks.tsx:2407-2410`; record 19, review F1) (plan item 19, `docs/fixes/19-controls-one-size.md`); the label only from 120 px wide, replace/crop/delete hidden under 24 px on both axes; zoomed out under 35 % (`OVERVIEW_ZOOM`, measured), a row whose buttons are wider than its block on screen (`handleRowWidth`: move, delete, and an image's or logo's replace and crop, 24 px each 4 px apart: 52 px, 108 px for an image or logo) draws only the move button, no replace, crop, delete or rotate control (record 19, review F3); delete then stays on the Delete/Backspace keys and the right-click menu's `Delete` (blocks other than the table and the text-like ones); from 35 % up the row is whole however narrow the block; where the buttons are drawn the label shows only if the row has room for it
+- [ ] `Drag to move (or use arrow keys)` — circular move handle (24 px hit area, 20 px circle) — `blocks.tsx:2430-2462` — drag → move block
+- [ ] `Replace logo` / `Replace image` — circular button (image/logo only; not drawn under 35 % zoom while the row is wider than the block, review F3) — `blocks.tsx:2508-2547` — dispatches `postr:replace-block` → opens picker/file input
+- [ ] `Crop image` / `Exit crop` — circular toggle (image/logo only, `aria-pressed`; not drawn under 35 % zoom while the row is wider than the block, review F3: crop mode, once on, keeps its own Cancel / Apply bar) — `blocks.tsx:2548-2575` — toggles `CropOverlay`
+- [ ] `Delete block` — red circular button (not drawn under 35 % zoom while the row is wider than the block, review F3) — `blocks.tsx:2579-2606` — `onDelete(b.id)`
+- [ ] `Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)` — circular rotate handle (`rotateButton`, `blocks.tsx:1948-1975`) — below the block in a box scaled back by the zoom, its 24 px hit area 14 px under the block (`blocks.tsx:2630-2674`); the last button of the handle row when below it would meet the ZoomBar or leave the visible canvas (`rotateFitsBelow`, `selectionLayout.ts`; read from the screen on each render and when the canvas resizes, `selectionRoom.ts`); none under 24 px on both axes, nor under 35 % zoom while the handle row is wider than the block (review F3) (plan item 19, `docs/fixes/19-controls-one-size.md`) — drag → rotate
 - [ ] `Duplicate` `⌘D` — block context-menu item — `blocks.tsx:2580` — `onDuplicate(b.id)`
 - [ ] `Bring Forward` — block context-menu item — `blocks.tsx:2581` — `onReorder(b.id, 1)`
 - [ ] `Send Back` — block context-menu item — `blocks.tsx:2582` — `onReorder(b.id, -1)`
@@ -1169,8 +1170,8 @@ flowchart LR
 - [ ] "References" — refs-block heading — `blocks.tsx:1482`
 - [ ] `Poster made with postr.sh https://postr.sh` — injected last reference entry (rawText from `@/export/attribution.ts:276`; bold via `ACK_REFERENCE_ID` check at `blocks.tsx:1493`)
 - [ ] `Figure {N}.` / `Table {N}.` — auto caption prefix — `blocks.tsx:1624`
-- [ ] `{b.type}` (e.g. "image", "table") — block-type pill on selection chrome — `blocks.tsx:2355`
-- [ ] `{rotation}°` — rotation readout in pill — `blocks.tsx:2358`
+- [ ] `{b.type}` (e.g. "image", "table") — block-type pill on selection chrome — `blocks.tsx:2497` — only on a block 120 px wide or more on screen (plan item 19); its width, read on each render (`selectionRoom.ts`), counts in the handle row's (review F3)
+- [ ] `{rotation}°` — rotation readout in pill — `blocks.tsx:2500`
 - [ ] "Poster Title" — editor placeholder — `blocks.tsx:2075`
 - [ ] "Section Heading" — editor placeholder — `blocks.tsx:2117`
 - [ ] "Type here… (type / for symbols)" — editor placeholder — `blocks.tsx:2140`
@@ -1181,12 +1182,12 @@ flowchart LR
 
 **Graphics**
 - [ ] 1×1 transparent GIF (`PLACEHOLDER_SRC`) — img data-URI — `blocks.tsx:48-49` — fills img while `storage://` URL resolves
-- [ ] move icon (4-arrow cross) — inline-svg — `blocks.tsx:2304-2322` — move handle
-- [ ] replace icon (circular arrows) — inline-svg — `blocks.tsx:2389-2405` — replace button
-- [ ] crop icon — inline-svg — `blocks.tsx:2421-2435` — crop toggle
-- [ ] X icon — inline-svg — `blocks.tsx:2453-2467` — delete button
-- [ ] rotate icon (two chasing arrows) — inline-svg — `blocks.tsx:2523-2528` — rotate handle
-- [ ] rotate stem — css line — `blocks.tsx:2484-2499` — connects rotate handle to block
+- [ ] move icon (4-arrow cross) — inline-svg — `blocks.tsx:2437-2453` — move handle
+- [ ] replace icon (circular arrows) — inline-svg — `blocks.tsx:2523-2536` — replace button
+- [ ] crop icon — inline-svg — `blocks.tsx:2553-2565` — crop toggle
+- [ ] X icon — inline-svg — `blocks.tsx:2584-2596` — delete button
+- [ ] rotate icon (two chasing arrows) — inline-svg — `blocks.tsx:1964-1969` — rotate handle
+- [ ] rotate stem — css line, 1.5 × 16 px on screen (scaled back) — `blocks.tsx:2623-2642` — connects rotate handle to block, only while the rotate is below
 - [ ] active-cell row + column bands — css overlay — `blocks.tsx:865-900` — table focus guides (Excel-style)
 - [ ] affiliation `*` / `†` superscript markers — text glyphs — `blocks.tsx:1410-1411` — author line
 
@@ -1199,20 +1200,21 @@ flowchart LR
 #### `poster/CropOverlay.tsx` — Inline 4-edge crop UI for image/logo blocks
 
 **Elements**
-- [ ] `crop top edge` — edge drag handle (`role="button"`) — `CropOverlay.tsx:161` (handle render `:240-256`) — drag grows top crop %
-- [ ] `crop right edge` — edge drag handle — `CropOverlay.tsx:162` — drag grows right crop %
-- [ ] `crop bottom edge` — edge drag handle — `CropOverlay.tsx:163` — drag grows bottom crop %
-- [ ] `crop left edge` — edge drag handle — `CropOverlay.tsx:164` — drag grows left crop %
-- [ ] `✕` `Cancel (Esc)` — button — `CropOverlay.tsx:186-188` — reverts to open-time snapshot, exits
-- [ ] `↺` `Reset crop (revert to no crop, stay in crop mode)` — button — `CropOverlay.tsx:189-195` — clears crop, stays open
-- [ ] `✓` `Apply crop (Enter)` — primary button — `CropOverlay.tsx:196-198` — closes (crop already committed live)
+- [ ] `crop top edge` — edge drag handle (`role="button"`) — `CropOverlay.tsx:169` (handle render `:214-278`: a 24 px hit area centred on the crop line around a 16 × 6 px pill, scaled back by the zoom about its placing corner, out of the stylesheet's button transition (`data-no-anim`, `:246-249`) so it does not animate for 120 ms after a zoom change (record 19, review F2); plan item 19, `docs/fixes/19-controls-one-size.md`) — drag grows top crop %
+- [ ] `crop right edge` — edge drag handle — `CropOverlay.tsx:170` — drag grows right crop %
+- [ ] `crop bottom edge` — edge drag handle — `CropOverlay.tsx:171` — drag grows bottom crop %
+- [ ] `crop left edge` — edge drag handle — `CropOverlay.tsx:172` — drag grows left crop %
+- [ ] Cancel / Reset / Apply bar — `CropOverlay.tsx:174-209` — 24 px buttons, its top 4 px under the image at every zoom (scaled back about its top edge; plan item 19)
+- [ ] `✕` `Cancel (Esc)` — button — `CropOverlay.tsx:196-198` — reverts to open-time snapshot, exits
+- [ ] `↺` `Reset crop (revert to no crop, stay in crop mode)` — button — `CropOverlay.tsx:199-205` — clears crop, stays open
+- [ ] `✓` `Apply crop (Enter)` — primary button — `CropOverlay.tsx:206-208` — closes (crop already committed live)
 - [ ] `Escape` — keyboard — `CropOverlay.tsx:74-76` — cancel
 - [ ] `Enter` — keyboard — `CropOverlay.tsx:77-79` — apply
 
 **Copy** — none beyond the button labels/titles above.
 
 **Graphics**
-- [ ] kept-region rect with 9999px dark dim mask — css overlay — `CropOverlay.tsx:135-144,159` — darkens cropped-away area
+- [ ] kept-region rect with 9999px dark dim mask — css overlay — `CropOverlay.tsx:143-152` — darkens cropped-away area; its 2-unit frame stays in the sheet's units (grows with the zoom), as the block's selection border does
 
 #### `poster/FloatingFormatToolbar.tsx` — Notion-style selection toolbar (+ docked variant for sidebar)
 
@@ -1255,13 +1257,13 @@ flowchart LR
 #### `poster/GroupFrame.tsx` — Multi-select bounding box (union rect + group move/resize)
 
 **Elements**
-- [ ] group bounding box — drag-anywhere move surface — `GroupFrame.tsx:100-115` — drag → `onGroupMove(dx,dy)`
-- [ ] `ResizeHandles` — 8 group resize handles — `GroupFrame.tsx:116-119` — drag → `onGroupResize(handle,dx,dy)`
+- [ ] group bounding box — drag-anywhere move surface — `GroupFrame.tsx:114-128` — drag → `onGroupMove(dx,dy)`; placed from the blocks' stored geometry (95.6 units below a text block's rendered bottom in fix 19's harness, claim Gf: on the Later list)
+- [ ] `ResizeHandles` — 8 group resize handles — `GroupFrame.tsx:133-137` — drag → `onGroupResize(handle,dx,dy)`; fewer on a box small on screen, by the block rule (`blockControls`; plan item 19, `docs/fixes/19-controls-one-size.md`)
 
 **Copy** — none.
 
 **Graphics**
-- [ ] dashed accent union border — css — `GroupFrame.tsx:109`
+- [ ] dashed accent outline — four 1.5 px strips (4 px dashes every 7 px), one size on screen (scaled back across; plan item 19) — `GroupFrame.tsx:106-112,129-132`
 
 #### `poster/GuidelinesPanel.tsx` — Right-side reference rail: scratch-pad checklist, conference specs, writing guide, shortcuts cheatsheet, resources
 
@@ -1427,10 +1429,19 @@ flowchart LR
 #### `poster/resizeHandles.tsx` — Shared 8-handle (or 4-corner) resize component
 
 **Elements**
-- [ ] resize handle ×8 (`nw,n,ne,e,se,s,sw,w`) or ×4 corners when `cornersOnly` — drag handles (`data-postr-resize-handle`) — `resizeHandles.tsx:51-81` — `onPointerDown(e, handle)`; cursors from `CURSORS` (`:14-23`)
+- [ ] resize handle ×(the `handles` given: up to 8, `nw,n,ne,e,se,s,sw,w`) — drag handles (`data-postr-resize-handle="<direction>"`) — `resizeHandles.tsx:56-88` — `onPointerDown(e, handle)`; cursors from `CURSORS` (`:19-28`); a 24 × 24 px hit area on screen at every zoom, centred on its corner or edge midpoint (half a hit area out, `ctl`, scaled back about that corner, `UNZOOM`; plan item 19, `docs/fixes/19-controls-one-size.md`)
 
 **Copy** — none. **Graphics**
-- [ ] 5×5 white square with accent border per handle — css — `resizeHandles.tsx:71-79`
+- [ ] 8×8 px white square with a 1 px accent border per handle — css — `resizeHandles.tsx:77-86`
+
+#### `poster/selectionLayout.ts`, `poster/selectionRoom.ts` — one size on screen for a selected block's controls (plan item 19, `docs/fixes/19-controls-one-size.md`)
+
+**Logic** (no elements of their own)
+- [ ] `ctl(px)` — an offset in the zoomed sheet that is `px` CSS px on screen (`calc(px / var(--postr-zoom, 1))`); `UNZOOM` / `UNZOOM_X` / `UNZOOM_Y` — the transform that scales a box drawn in px back to screen size; `--postr-zoom` is set on `#poster-canvas` next to its `scale(zoom)` (`PosterEditor.tsx:2958-2962`)
+- [ ] sizes (the owner's Q1): `HIT` 24 px hit areas, `HANDLE_MARK` 8 px squares, `BUTTON_MARK` 20 px circles; the row's and the rotate's hit areas start 14 px from the block (`ROW_LIFT`, `ROTATE_GAP`)
+- [ ] `blockControls({ wPx, hPx, cornersOnly, row })` — which handles, whether the label, the delete/replace/crop buttons and the rotate control show, for a block's size on screen (Q2, plus one axis under 24 px); with `row` (the label's width, whether the block has replace and crop) and `zoom`, under `OVERVIEW_ZOOM` (0.35, measured with claim Fz) a row whose buttons are wider than the block (`handleRowWidth`) keeps only the move button (the lead's rule for review F3; a group's frame passes no `row`)
+- [ ] `rotateFitsBelow(…)` — whether the rotate control's hit area below the block is inside the visible canvas and clear of the ZoomBar (`[data-postr-canvas-chrome]`, `PosterEditor.tsx:3607`), the block turned by its rotation (Q3)
+- [ ] `useSelectionRoom` — the padding box as rendered (ResizeObserver), the rotate's room and the type label's width (its computed width, review F3), read on each render of a selected block and when the canvas resizes
 
 #### `poster/RichTextEditor.tsx` — contentEditable editor with slash-command symbol menu
 
@@ -1913,7 +1924,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:181-1
 - [ ] "⌨️ Tab / Shift+Tab to jump between cells." — tips list item — `Sidebar.tsx:2828`
 - [ ] "✨ Type **bold**, *italic*, or M (SD)* in a cell, then click Format table in the Caption section below." — tips list item — `Sidebar.tsx:2829`
 - [ ] "✂︎ Crop" — section label — `Sidebar.tsx:2847`
-- [ ] "Click the ✂︎ button on the block's top toolbar to crop the image directly. Drag any edge to trim, press Enter to apply, Esc to cancel. The original is preserved — nothing is baked." — helper — `Sidebar.tsx:2848-2852`
+- [ ] "Click the ✂︎ button on the block's top toolbar to crop the image directly. Drag any edge to trim, press Enter to apply, Esc to cancel. The original is preserved — nothing is baked." — helper — `Sidebar.tsx:2938-2940` — under 35 % zoom the ✂︎ button shows only while the image is wider on screen than its row of buttons (108 px; review F3, record 19): zoomed that far out, the hint names a button that is not there (the Later list)
 - [ ] "Image fit" — section label — `Sidebar.tsx:2885`
 - [ ] "Off (default): keep the image's aspect ratio — block padding may appear if you resize freely. On: image fills the block exactly, distorting if needed. Use when the source image has whitespace baked in that you can't crop away." — helper — `Sidebar.tsx:2912-2916`
 - [ ] "{Figure|Table} Caption" — section label — `Sidebar.tsx:2997`

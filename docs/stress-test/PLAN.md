@@ -186,6 +186,77 @@ scope becomes a plan item or a question for the owner.
   poster: " and the database's message, `pages/Home.tsx:126-127` showing
   `data/posters.ts:464`), against the rule that user-facing errors stay
   generic.
+- **From fix 19 (2026-10-06), the owner's MVP triage of its questions**
+  (record 19, section 10; MEASURED with `control-size-check.mjs` on the
+  fix, Chromium, at the 1280 × 800 fit unless marked):
+  - Q5: a group's members keep drawing their own handles, move, delete
+    and rotate, under the group frame and its handles: 10 covered and 14
+    overlaps (main: 20 covered, 36 overlaps). Hide them while a group is
+    selected, as PowerPoint and Figma do.
+  - Q6: crop mode's Cancel / Reset / Apply bar lies on the rotate control
+    (407.6 px²), and on a small image the crop edges overlap its corner
+    handles (about 75 px²) and each other. Hide rotate while cropping.
+  - Q7: a table's row and column strips are drawn when the table is not
+    selected (as before) and sit under its n, nw, ne and w handles (11
+    overlaps); on rows under 24 px on screen (12.25 px at 100%, 17.05 px at
+    the fit) the row strips fail WCAG 2.5.8 by size and by spacing (claim
+    Tl, 3 of 44 views), which no control size can change.
+  - Q8a: the group frame is placed from the blocks' stored geometry, 95.6
+    units below a text block's rendered bottom (133 px at the 1280 fit,
+    324.2 px at the 2560 fit; claim Gf, 8 of 8, three engines), with
+    record 02's drag guide and record 03's rubber band.
+  - Q8b: the floating format toolbar stays where it was after a pinch, 192
+    px from its text (191.8 Firefox, 189.3 WebKit; claim Tf).
+  - Q9: the ZoomBar's own buttons are under 24 px: 21.3 × 25, 50 × 17.5,
+    25 × 16 px.
+  - A 44 px size for a coarse pointer (touch, pen).
+- **From fix 19's review round 1 (2026-10-06)** (record 19, sections 9 and
+  10; `control-size-check.mjs`, three engines, unless marked):
+  - Zoomed far out, a selected block's handles, move button or rotate
+    control can still lie on another block's centre, so a click there
+    selects nothing (review F3's remainder, claim Ns, information): 14 of
+    78 clicks at the template's other blocks with its image, title or
+    table selected, at the 20% floor and 0.35 (Firefox and WebKit 13; main
+    4). None deletes, replaces or crops the selected block any more (claim
+    Fd 0 of 78: the lead's rule, under 35% zoom a handle row wider than its
+    block draws only its move button, record 19 section 9). Hide the
+    handles too on a block small on screen, or keep them.
+  - Replace and Crop under 35% zoom (after F3): an image narrower on screen
+    than its row of buttons (108 px) has neither until zoomed in to 35%,
+    and the Figure tab's crop hint names the ✂︎ button even then
+    (`Sidebar.tsx`, CropHint). The 35% threshold is measured on one
+    template and poster (the hazard last seen at 30%): another layout may
+    need it re-measured (`control-size-check.mjs --only overview-...`).
+  - A block turned off the square (10°, ±90°, ±135°, ±170°): its upright
+    handle row can lie on one of its own handles, 10 of 21 readings
+    (Firefox 8), at ±90° at every zoom; main 21 of 21 (claim Or-tilt). A
+    row placed out from the tilted edge by its own width would clear it.
+  - A round button's hover glow and focus outline follow its 24 px hit
+    area, not its 20 px circle: a dark band between the circle and the
+    glow (review I1, cosmetic; the reviewer's screenshots, UNVERIFIED here).
+  - Views claim R does not read (review I2, not regressions; the reviewer's
+    measurements, UNVERIFIED here): a pinch to 1.63 at 1280 × 800 puts an
+    edge image's corner handles 4.35 px out of the canvas (main: buttons up
+    to 54 px out); a captioned image flush with a portrait poster's bottom
+    edge overruns the sheet by 9 to 12 px and its bottom corner handles
+    meet the zoom bar at the fits, as on main. Q3's zoom bar test could
+    cover the bottom corner handles.
+- On main, found by fix 19 (2026-10-06, MEASURED in Chromium by a scratch
+  probe on main `e09c0ea` and on the fix): Save PDF with a block selected
+  copies its selection controls into the print document (8 handles, the
+  row and the rotate control on main; `printPoster` strips only
+  `[data-postr-overlay]`, `PosterEditor.tsx`, where the thumbnail strips
+  the selection markers too). Whether they show in the PDF was not
+  measured; with fix 19 they are drawn at the editor's zoom of the moment.
+- Still in the sheet's units after fix 19, growing with the zoom: a
+  selected block's own border (1.5 units: 15 px at 10×; it is the block's
+  box, so a thinner one would change where its text wraps) and the crop
+  frame's 2-unit line; the Check tab's figure-size corner, the drag
+  guides, the rubber band and the comment area's handles (hidden with
+  sharing) (record 19, section 10, INSPECTED).
+- The comment-mode style hides `[data-postr-rotate-handle]`, which nothing
+  carries, so a rotate control would show in comment mode (INSPECTED;
+  comments are hidden).
 - The "five steps in and five out" zoom test passes on its own when Zoom in
   does nothing; the 10× ceiling test in the same file catches that
   (MEASURED by the step 9 reviewer of 60ca7b3, mutant F6; it predates that
@@ -348,3 +419,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 13 | `checker/python-reads-own-fix` | part 1 done — `docs/fixes/13-checker-reads-its-own-fix.md` (the fix raises the text it saves, and its re-check reads it); part 2, the parser's own misreads, not started |
 | 7 | `fix/07-figure-script-kept` | done (three review rounds); review round 1 answered (a blank-line regression fixed, tests added, legal copy corrected); round 2 answered (a result checked against an image block is no longer shown under the preview's size, and a kept result says the size it is for; a long script edited after its Check stays stored); round 3 answered (a note no longer promises an image check comes back) — `docs/fixes/07-figure-script-kept.md`; the owner's decisions of 2026-10-06: the script kept per poster in this browser and re-checked on return, sessionStorage on the public page, Check stays up once a script is in, and the same cause fixed in the Authors, References, Make-a-figure, poster-name and version-name drafts (memory only) |
 | 15 | `fix/15-checker-language` | done (three review rounds) — `docs/fixes/15-checker-language.md` (Check answers when it cannot tell R from Python; unsupported plotting systems are named, not scored; a result on screen stays, marked out of date, and one a new print size hides is said to be hidden; detection reads live code only, re-landing 9ea9f38; a string in `aes()` or seaborn's `barplot()` places nothing on its own: code with only such a token gets the could-not-tell answer (an R package name such as `library(tidyverse)` is an R signal and is checked as ggplot2)) |
+| 19 | `fix/19-controls-one-size` | fixed; its one review round (the browser, through the user's entry points) answered: on a turned block the handle row now turns about its own centre (near 180° it lay on the block's own handles, and a click on one deleted the block), and crop mode's edge handles no longer animate their size after a zoom change; after the round, by the lead's decision, zoomed out under 35% a handle row wider than its block draws only its move button (there a click meant for another block could delete the selected image: F3; the threshold measured); three cosmetic or older items and F3's remainder went to the Later list — `docs/fixes/19-controls-one-size.md` (a selected block's handles, row, rotate control, a selected table's strips and grips, crop mode's edges and bar and a group's handles and outline are the same size on screen at every zoom, 24 px to grab with 8 px squares and 20 px circles; a block small on screen draws fewer controls; the rotate control moves into the handle row where below it would meet the ZoomBar or leave the canvas; the owner's Q5–Q9 are on the Later list) |

@@ -549,6 +549,27 @@ Record `docs/fixes/07-figure-script-kept.md`; browser instrument `apps/web/scrip
 
 ---
 
+# PART 7 — A SELECTED BLOCK'S CONTROLS (plan item 19)
+
+## 27. The controls are one size on screen at every zoom
+
+Record `docs/fixes/19-controls-one-size.md`; browser instrument `apps/web/scripts/control-size-check.mjs` (its claims are the checks below, in Chromium, Firefox and WebKit).
+
+- **Set up:** a guest at `/p/new` (the 3-column template). Click the title.
+- [ ] FIT, then Zoom out until it stops (20%), then Zoom in until it stops (1000%), and a pinch: the square handles (8 px, in a 24 px area you can grab), the round move and delete buttons (20 px circles in 24 px areas), the type label and the rotate control below the block stay the same size on screen, and crisp, at every zoom (S, Sw, Sp).
+- [ ] Each control a user grabs is at least 24 px at the 1280 × 800 fit, at 100% and at the 2560 × 1440 fit (T-fit); none sticks out of the canvas or lies under the zoom bar while the whole poster shows (R); selecting a block at the fit adds no scrolling (Ov); an unrotated block's own controls never overlap (Oc).
+- [ ] A block small on screen (Q2): under 72 px along an edge, no handle in the middle of that edge; under 24 px tall (the title at 100%), only the bottom row of handles; under 24 px on both axes (a logo at 20%), only the bottom-right handle and the move button; under 120 px wide, no type label (Cm).
+- [ ] A handle row wider than its block (review F3): insert a 3 in image and a 3 × 2 in logo and select each at FIT on a 1280 × 800 window, at 100% and at FIT on 2560 × 1440: move, replace, crop, delete and the rotate control all show, though the row (108 px) is wider than the block (Fr). Zoom out under 35% with a block narrower than its row selected (a wide, thin logo, or the template's image at 30%): only the move button shows, and no rotate control; at 35% the row comes back. With only the move button showing, press Delete (or Backspace), or right-click the logo › Delete: it goes (Cm; the keys and the menu: `controlsOneSize.test.tsx`).
+- [ ] Zoom out until it stops (20%) with the template's image selected, then click each other block at its centre; again at 35%: no click deletes the image, opens the file picker or turns crop mode on (Fd). Some clicks still select nothing, where a handle, the move button or the rotate control lies on that block's centre (Ns, information).
+- [ ] A wide logo (15 × 2 in, so its whole row fits) at the bottom edge of a portrait poster (36 × 48 or 24 × 36), at FIT: its rotate control is the last button of the row above it, not under the zoom bar. Zoom in, scroll so a selected block's bottom is near the canvas's bottom: the rotate control moves into the row; scroll back: it goes below again. Make the window narrower at a manual zoom so the zoom bar moves under it: it moves into the row (Rr).
+- [ ] Turn a block half a turn (drag its rotate control round it until it snaps at 180°): the handle row sits upright under it, clear of its handles, and the rotate control above it; at 100%, click each handle's square: the block stays where it is and the same size (Or, Pl-rot, Or-click). At other turns (10°, ±90°, ±135°, ±170°) the upright row can lie on one handle, as on main (the Later list).
+- [ ] A table: click it; its row and column strips (left of and above it) and the column-border grips are one size on screen; click elsewhere: the strips are as before (8 sheet units).
+- [ ] An image › Crop: the four edge handles and the ✕ ↺ ✓ bar stay one size as you zoom, in every frame while the zoom changes (no pulse after a Zoom in click or a pinch; St).
+- [ ] Shift + click a second block: the group's dashed outline (1.5 px) and its handles stay one size; a group small on screen draws fewer handles, by the same rule.
+- **Not changed (the Later list, PLAN.md):** a group's members still draw their own controls under its frame (Q5); the crop bar lies on the rotate control (Q6); table strips show on an unselected table and sit under its handles, and on rows under 24 px they are too short to grab comfortably (Q7); the group frame sits below text blocks by their stored height (Q8a); the format toolbar stays behind after a pinch (Q8b); the zoom bar's own buttons are under 24 px (Q9); 44 px sizes for touch; a selected block's own border and the crop frame still grow with the zoom; Save PDF with a block selected prints its controls (on main too); zoomed far out (20–35%), a selected block's handles, move button or rotate control can still lie on another block's centre, so a click there reaches the control and selects nothing (review F3's remainder; no longer Delete, Replace or Crop: Fd); under 35% replace and crop need the image wider on screen than its row, and the Figure tab's crop hint names the ✂︎ button even where it is not drawn.
+
+---
+
 ## Quick findings summary (things the trace flagged as broken/unverified/contradictory)
 
 **Fixed 2026-09-11 (lifecycle audit `docs/plans/2026-09-10-lifecycle-evaluation.md`, branch `claude/core-features-mvp-lifecycle-66ddcd`):**

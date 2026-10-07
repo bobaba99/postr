@@ -1,0 +1,838 @@
+{
+ "tests": [
+  "src/poster/__tests__/controlsOneSize.test.tsx",
+  "src/poster/__tests__/selectionLayout.test.ts",
+  "src/poster/__tests__/a11yKeyboard.test.tsx"
+ ],
+ "mutants": {
+  "sheet-zoom-unset": {
+   "undoes": "A — the sheet sets --postr-zoom next to its transform (without it every control falls back to 1: drawn in sheet units, as on main)",
+   "edits": [
+    [
+     "src/poster/PosterEditor.tsx",
+     "                ...({ '--postr-zoom': zoom } as React.CSSProperties),\n",
+     ""
+    ]
+   ]
+  },
+  "ctl-plain-px": {
+   "undoes": "A — ctl() divides an offset by the sheet's zoom",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "export const ctl = (px: number): string => `calc(${px}px / var(--postr-zoom, 1))`;",
+     "export const ctl = (px: number): string => `${px}px`;"
+    ]
+   ]
+  },
+  "unzoom-none": {
+   "undoes": "A — a control drawn in px is scaled back by the sheet's zoom",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "export const UNZOOM = 'scale(calc(1 / var(--postr-zoom, 1)))';",
+     "export const UNZOOM = 'scale(1)';"
+    ]
+   ]
+  },
+  "unzoom-x-none": {
+   "undoes": "A — a strip or grip is scaled back across its thickness",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "export const UNZOOM_X = 'scaleX(calc(1 / var(--postr-zoom, 1)))';",
+     "export const UNZOOM_X = 'scaleX(1)';"
+    ]
+   ]
+  },
+  "unzoom-y-none": {
+   "undoes": "A — a column strip and the group outline's top and bottom are scaled back across",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "export const UNZOOM_Y = 'scaleY(calc(1 / var(--postr-zoom, 1)))';",
+     "export const UNZOOM_Y = 'scaleY(1)';"
+    ]
+   ]
+  },
+  "hit-18": {
+   "undoes": "Q1 — every grabbable control's hit area is 24 px",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "export const HIT = 24;",
+     "export const HIT = 18;"
+    ]
+   ]
+  },
+  "handle-mark-5": {
+   "undoes": "Q1 — a resize handle's visible square is 8 px",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "export const HANDLE_MARK = 8;",
+     "export const HANDLE_MARK = 5;"
+    ]
+   ]
+  },
+  "handle-not-unzoomed": {
+   "undoes": "B — a resize handle is scaled back to one size",
+   "edits": [
+    [
+     "src/poster/resizeHandles.tsx",
+     "            transform: UNZOOM,\n",
+     ""
+    ]
+   ]
+  },
+  "handle-offset-units": {
+   "undoes": "B — a resize handle sits half a hit area past the edge at every zoom",
+   "edits": [
+    [
+     "src/poster/resizeHandles.tsx",
+     "const OFF = ctl(-HIT / 2);",
+     "const OFF = -HIT / 2;"
+    ]
+   ]
+  },
+  "handle-origin-centre": {
+   "undoes": "B — a resize handle scales about the corner it is placed by (so it stays centred on its corner or edge)",
+   "edits": [
+    [
+     "src/poster/resizeHandles.tsx",
+     "  se: { bottom: OFF, right: OFF, transformOrigin: 'right bottom' },",
+     "  se: { bottom: OFF, right: OFF, transformOrigin: 'left top' },"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout: a transform origin moves no length it reads; in Chromium the bottom-right handle leaves its corner: control-size-check.mjs Pl",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-48x36-title"
+    ]
+   }
+  },
+  "button-mark-unclipped": {
+   "undoes": "Q1 — a round button shows a 20 px circle (its colour painted inside the padding only)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "  padding: (HIT - BUTTON_MARK) / 2,\n  backgroundClip: 'content-box',\n",
+     "  padding: (HIT - BUTTON_MARK) / 2,\n"
+    ]
+   ]
+  },
+  "row-not-unzoomed": {
+   "undoes": "B — the handle row is scaled back to one size",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "                : `translateX(-50%) ${UNZOOM}`,",
+     "                : 'translateX(-50%)',"
+    ]
+   ]
+  },
+  "row-lift-units": {
+   "undoes": "B — the handle row sits one distance above the block on screen",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "              marginBottom: ctl(ROW_LIFT),",
+     "              marginBottom: ROW_LIFT,"
+    ]
+   ]
+  },
+  "row-origin-centre": {
+   "undoes": "B — the handle row scales about its bottom edge (so it stays 14 px above the block)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "              transformOrigin: 'center bottom',\n              // Width is driven",
+     "              transformOrigin: 'center center',\n              // Width is driven"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout; in Chromium the row leaves its place above the block: control-size-check.mjs Pl",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-48x36-title"
+    ]
+   }
+  },
+  "row-turns-about-bottom": {
+   "undoes": "Review F1 — on a turned block the handle row's counter-rotation turns about the row's own centre, not about the bottom edge it is scaled about",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "? `translateX(-50%) translateY(${ctl(-HIT / 2)}) rotate(${-b.rotation}deg) translateY(${ctl(HIT / 2)}) ${UNZOOM}`",
+     "? `translateX(-50%) rotate(${-b.rotation}deg) ${UNZOOM}`"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout and its fixture has no turned block; in Chromium a block turned 180 degrees has its row over its own handles and a click on the nw handle's square deletes it: control-size-check.mjs Or, Pl-rot and Or-click",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "rotated-180-1280x800-48x36",
+     "rotated-click-1280x800-48x36"
+    ]
+   }
+  },
+  "stem-not-unzoomed": {
+   "undoes": "B — the rotate stem is scaled back to one size",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "                  transform: UNZOOM,\n                  transformOrigin: 'left top',\n                  background: p.accent,",
+     "                  background: p.accent,"
+    ]
+   ]
+  },
+  "rotate-not-unzoomed": {
+   "undoes": "B — the rotate control's box is scaled back to one size",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "                  transform: UNZOOM,\n                  transformOrigin: 'left top',\n                  zIndex: 10,",
+     "                  zIndex: 10,"
+    ]
+   ]
+  },
+  "rotate-gap-units": {
+   "undoes": "B — the rotate control sits one distance below the block on screen",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "                  marginTop: ctl(ROTATE_GAP),",
+     "                  marginTop: ROTATE_GAP,"
+    ]
+   ]
+  },
+  "rotate-origin-centre": {
+   "undoes": "B — the rotate control scales about its top-left corner (so it stays 14 px under the block, centred)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "                  transform: UNZOOM,\n                  transformOrigin: 'left top',\n                  zIndex: 10,",
+     "                  transform: UNZOOM,\n                  transformOrigin: 'center center',\n                  zIndex: 10,"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout; in Chromium the rotate control leaves its place under the block: control-size-check.mjs Pl",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-48x36-title"
+    ]
+   }
+  },
+  "group-outline-units": {
+   "undoes": "B — a group's dashed outline is one width on screen",
+   "edits": [
+    [
+     "src/poster/GroupFrame.tsx",
+     "height: 1.5, transform: UNZOOM_Y,",
+     "height: 1.5,"
+    ]
+   ]
+  },
+  "group-dashes-units": {
+   "undoes": "B — a group outline's dashes are one length on screen",
+   "edits": [
+    [
+     "src/poster/GroupFrame.tsx",
+     "  const dashes = (deg: number) => `repeating-linear-gradient(${deg}deg, ${line} 0 ${ctl(4)}, transparent 0 ${ctl(7)})`;",
+     "  const dashes = (deg: number) => `repeating-linear-gradient(${deg}deg, ${line} 0 4px, transparent 0 7px)`;"
+    ]
+   ]
+  },
+  "crop-edge-not-unzoomed": {
+   "undoes": "B — a crop edge handle is scaled back to one size",
+   "edits": [
+    [
+     "src/poster/CropOverlay.tsx",
+     "        height: HIT,\n        transform: UNZOOM,\n",
+     "        height: HIT,\n"
+    ]
+   ]
+  },
+  "crop-edge-offset-units": {
+   "undoes": "B — a crop edge handle is centred on its crop line at every zoom",
+   "edits": [
+    [
+     "src/poster/CropOverlay.tsx",
+     "  const onEdge = `calc(${crop[edge]}% - ${ctl(HIT / 2)})`;",
+     "  const onEdge = `calc(${crop[edge]}% - ${HIT / 2}px)`;"
+    ]
+   ]
+  },
+  "crop-edge-origin-centre": {
+   "undoes": "B — a crop edge handle scales about the corner it is placed by",
+   "edits": [
+    [
+     "src/poster/CropOverlay.tsx",
+     "    ? { left: centre, [edge]: onEdge, transformOrigin: `left ${edge}` }",
+     "    ? { left: centre, [edge]: onEdge, transformOrigin: 'center' }"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout; in Chromium the top and bottom crop handles leave their lines: control-size-check.mjs Pl",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-48x36-crop"
+    ]
+   }
+  },
+  "crop-edge-animated": {
+   "undoes": "Review F2 — a crop edge handle is out of index.css's transition on [role='button'], so its scale back does not animate after a zoom change",
+   "edits": [
+    [
+     "src/poster/CropOverlay.tsx",
+     "      data-no-anim\n      onPointerDown={(e) => onDown(edge, e)}",
+     "      onPointerDown={(e) => onDown(edge, e)}"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom applies no stylesheet transition and does no layout; in Chromium the crop edges measure 12 to 36 px for about 120 ms after each zoom change: control-size-check.mjs St",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "settle-1280x800-48x36-crop"
+    ]
+   }
+  },
+  "crop-bar-not-unzoomed": {
+   "undoes": "B — the crop bar is scaled back to one size",
+   "edits": [
+    [
+     "src/poster/CropOverlay.tsx",
+     "          transform: `translateX(-50%) ${UNZOOM}`,",
+     "          transform: 'translateX(-50%)',"
+    ]
+   ]
+  },
+  "crop-bar-gap-units": {
+   "undoes": "B — the crop bar sits one distance under the image on screen",
+   "edits": [
+    [
+     "src/poster/CropOverlay.tsx",
+     "          marginTop: ctl(4),",
+     "          marginTop: 4,"
+    ]
+   ]
+  },
+  "crop-buttons-18": {
+   "undoes": "Q1 — the crop bar's buttons are 24 px",
+   "edits": [
+    [
+     "src/poster/CropOverlay.tsx",
+     "const btnStyle: CSSProperties = {\n  cursor: 'pointer',\n  width: HIT,\n  height: HIT,",
+     "const btnStyle: CSSProperties = {\n  cursor: 'pointer',\n  width: 18,\n  height: 18,"
+    ]
+   ]
+  },
+  "strips-not-unzoomed-selected": {
+   "undoes": "B — a selected table's row strips are scaled back across",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "        transform: UNZOOM_X, transformOrigin: 'right center',\n",
+     ""
+    ]
+   ]
+  },
+  "strips-gap-units-selected": {
+   "undoes": "B — a selected table's row strips end one distance outside the table",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "        right: `calc(100% + ${ctl(2)})`, width: HIT,",
+     "        right: 'calc(100% + 2px)', width: HIT,"
+    ]
+   ]
+  },
+  "strips-origin-left": {
+   "undoes": "B — a row strip scales about its inner edge (so it stays 2 px out from the table)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "        transform: UNZOOM_X, transformOrigin: 'right center',",
+     "        transform: UNZOOM_X, transformOrigin: 'left center',"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout; in Chromium the row strips leave the table's edge: control-size-check.mjs Pl",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-48x36-table"
+    ]
+   }
+  },
+  "col-strips-thin-selected": {
+   "undoes": "Q1 — a selected table's column strips have a 24 px hit area",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "        bottom: `calc(100% + ${ctl(2)})`, height: HIT, paddingTop: HIT - 8,",
+     "        bottom: `calc(100% + ${ctl(2)})`, height: 8, paddingTop: 0,"
+    ]
+   ]
+  },
+  "grips-not-unzoomed-selected": {
+   "undoes": "B — a selected table's column grips are scaled back across",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "              ...(selected ? { transform: UNZOOM_X, transformOrigin: 'left center' } : {}),\n",
+     ""
+    ]
+   ]
+  },
+  "grips-origin-centre": {
+   "undoes": "B — a column grip scales about its left edge (so it stays centred on its border)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "              ...(selected ? { transform: UNZOOM_X, transformOrigin: 'left center' } : {}),",
+     "              ...(selected ? { transform: UNZOOM_X, transformOrigin: 'right center' } : {}),"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout; in Chromium the grips leave the column borders: control-size-check.mjs Pl",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-48x36-table"
+    ]
+   }
+  },
+  "strips-always-one-size": {
+   "undoes": "B — an unselected table's strips stay as before, in the sheet's units (their hit area does not reach over neighbours)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "  const stripAcross: CSSProperties = selected\n",
+     "  const stripAcross: CSSProperties = true\n"
+    ]
+   ]
+  },
+  "narrow-keeps-n-s": {
+   "undoes": "Q2 — no n or s handle on a block under 72 px wide",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  if (wPx < EDGE_HANDLES_MIN) drop.add('n').add('s');\n",
+     ""
+    ]
+   ]
+  },
+  "short-keeps-e-w": {
+   "undoes": "Q2 — no e or w handle on a block under 72 px tall",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  if (hPx < EDGE_HANDLES_MIN) drop.add('e').add('w');\n",
+     ""
+    ]
+   ]
+  },
+  "tiny-not-collapsed": {
+   "undoes": "Q2 — under 24 px on both axes, only the bottom-right corner and the move button",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  if (wPx < CORNERS_MIN && hPx < CORNERS_MIN) {",
+     "  if (false) {"
+    ]
+   ]
+  },
+  "tiny-keeps-buttons": {
+   "undoes": "Q2 — under 24 px on both axes, no delete, replace or crop button",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "    return { handles: ['se'], label: false, buttons: false, rotate: false };",
+     "    return { handles: ['se'], label: false, buttons: true, rotate: false };"
+    ]
+   ]
+  },
+  "tiny-keeps-rotate": {
+   "undoes": "Q2 — under 24 px on both axes, no rotate control",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "    return { handles: ['se'], label: false, buttons: false, rotate: false };",
+     "    return { handles: ['se'], label: false, buttons: false, rotate: true };"
+    ]
+   ]
+  },
+  "label-always": {
+   "undoes": "Q2 — no type label under 120 px wide",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  const labelByRule = wPx >= LABEL_MIN;",
+     "  const labelByRule = true;"
+    ]
+   ]
+  },
+  "short-keeps-top-row": {
+   "undoes": "one axis under 24 px (implementer) — a block under 24 px tall keeps only its bottom row",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  if (hPx < CORNERS_MIN) drop.add('nw').add('n').add('ne');\n",
+     ""
+    ]
+   ]
+  },
+  "narrow-keeps-left-column": {
+   "undoes": "one axis under 24 px (implementer) — a block under 24 px wide keeps only its right column",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  if (wPx < CORNERS_MIN) drop.add('nw').add('w').add('sw');\n",
+     ""
+    ]
+   ]
+  },
+  "label-not-gated": {
+   "undoes": "Q2 — the block draws its label only when the rule says so",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "            {controls.label && (\n",
+     "            {true && (\n"
+    ]
+   ]
+  },
+  "image-buttons-not-gated": {
+   "undoes": "Q2 — replace and crop follow the rule",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "            {controls.buttons && (b.type === 'image' || b.type === 'logo') && (",
+     "            {(b.type === 'image' || b.type === 'logo') && ("
+    ]
+   ]
+  },
+  "delete-not-gated": {
+   "undoes": "Q2 — delete follows the rule",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "            {controls.buttons && (\n            <button",
+     "            {true && (\n            <button"
+    ]
+   ]
+  },
+  "rotate-not-gated": {
+   "undoes": "Q2 — the rotate control follows the rule",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "          {controls.rotate && room.rotateBelow && (",
+     "          {room.rotateBelow && ("
+    ]
+   ]
+  },
+  "row-never-collapses": {
+   "undoes": "Review F3 (the lead's rule) — zoomed far out, a handle row whose buttons are wider than its block draws only the move button: no delete, replace or crop button",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  const cut = !buttonsFit && zoom < OVERVIEW_ZOOM;",
+     "  const cut = false;"
+    ]
+   ]
+  },
+  "collapsed-keeps-rotate": {
+   "undoes": "Review F3 — with the row cut to its move button, no rotate control either",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  return { handles, label: labelByRule && labelFits, buttons: !cut, rotate: !cut };",
+     "  return { handles, label: labelByRule && labelFits, buttons: !cut, rotate: true };"
+    ]
+   ]
+  },
+  "overview-never": {
+   "undoes": "Review F3 — the row is cut under the overview zoom (35%): with no overview range it is never cut",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "export const OVERVIEW_ZOOM = 0.35;",
+     "export const OVERVIEW_ZOOM = 0;"
+    ]
+   ]
+  },
+  "overview-always": {
+   "undoes": "Review F3 (the lead, after the first version) — the row is cut only zoomed out: with every zoom an overview, a 3 in image or logo loses Replace, Crop and Delete at the fits (the first version)",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "export const OVERVIEW_ZOOM = 0.35;",
+     "export const OVERVIEW_ZOOM = Infinity;"
+    ]
+   ]
+  },
+  "row-zoom-not-passed": {
+   "undoes": "Review F3 — the block passes the sheet's zoom to the row rule",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "imageButtons: b.type === 'image' || b.type === 'logo' },\n    zoom,\n",
+     "imageButtons: b.type === 'image' || b.type === 'logo' },\n"
+    ]
+   ]
+  },
+  "label-does-not-yield": {
+   "undoes": "Review F3 (implementer) — where the buttons fit, the label shows only if the row has room for it too, so zooming in never takes the buttons away again",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  const labelFits = cut || handleRowWidth({ labelPx: row.labelPx, imageButtons: row.imageButtons }) <= wPx;",
+     "  const labelFits = true;"
+    ]
+   ]
+  },
+  "row-width-no-image-buttons": {
+   "undoes": "Review F3 — the row's width counts an image's or logo's replace and crop",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  const buttons = imageButtons ? 3 : 1;",
+     "  const buttons = 1;"
+    ]
+   ]
+  },
+  "row-rule-not-passed": {
+   "undoes": "Review F3 — the block applies the row rule (it passes its row's parts)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "    row: { labelPx: room.labelPx, imageButtons: b.type === 'image' || b.type === 'logo' },\n",
+     ""
+    ]
+   ]
+  },
+  "row-image-buttons-not-passed": {
+   "undoes": "Review F3 — an image's or logo's row has replace and crop",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "imageButtons: b.type === 'image' || b.type === 'logo' },",
+     "imageButtons: false },"
+    ]
+   ]
+  },
+  "label-not-measured": {
+   "undoes": "Review F3 — the type label's width is read from the screen, each render",
+   "edits": [
+    [
+     "src/poster/selectionRoom.ts",
+     "    const next = Number.isFinite(w) ? w : 0;",
+     "    const next = 0;"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout: the label has no width there; in Chromium the 15 x 2 in logo at 100% (148 px, its label 48 px) keeps its whole row of 160 px: control-size-check.mjs Cm",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-48x36-bottom"
+    ]
+   }
+  },
+  "label-ref-not-attached": {
+   "undoes": "Review F3 — the label measured is the row's label",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "              ref={labelRef}\n",
+     ""
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout: the label has no width there; in Chromium the 15 x 2 in logo at 100% keeps its whole row, wider than the logo: control-size-check.mjs Cm",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-48x36-bottom"
+    ]
+   }
+  },
+  "corners-only-lost": {
+   "undoes": "the contained image keeps to its corners (as before)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "    cornersOnly: b.type === 'image' && b.imageFit !== 'fill',",
+     "    cornersOnly: false,"
+    ]
+   ]
+  },
+  "group-handles-all": {
+   "undoes": "Q2 — a group's frame draws its handles by the same rule",
+   "edits": [
+    [
+     "src/poster/GroupFrame.tsx",
+     "        handles={blockControls({ wPx: w * zoom, hPx: h * zoom }).handles}",
+     "        handles={['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w']}"
+    ]
+   ]
+  },
+  "zoom-not-passed": {
+   "undoes": "Q2 — the block knows the zoom (its size on screen)",
+   "edits": [
+    [
+     "src/poster/PosterEditor.tsx",
+     "                  zoom={zoom}\n                  justInserted={justInsertedId === b.id}",
+     "                  justInserted={justInsertedId === b.id}"
+    ]
+   ]
+  },
+  "rendered-size-ignored": {
+   "undoes": "Q2 — the rule reads the box the handles sit on as rendered, not the stored size",
+   "edits": [
+    [
+     "src/poster/selectionRoom.ts",
+     "  const widthUnits = measured?.w ?? stored.w;\n  const heightUnits = measured?.h ?? stored.h;",
+     "  const widthUnits = stored.w;\n  const heightUnits = stored.h;"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom fires no ResizeObserver: the stored size is all it has; in Chromium the title (stored 45 units, rendered 18.1) keeps both rows of handles when it is under 24 px tall on screen: control-size-check.mjs Oc",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-48x36-title"
+    ]
+   }
+  },
+  "border-box-size": {
+   "undoes": "Q2 — the rule reads the padding box (the handles sit inside the selection border), not the border box",
+   "edits": [
+    [
+     "src/poster/selectionRoom.ts",
+     "      const box = entry.contentBoxSize?.[0];",
+     "      const box = entry.borderBoxSize?.[0];"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom fires no ResizeObserver; in Chromium the title at the 1280 × 800 fit is 25.2 px tall outside its border and 22.4 inside, so its two rows of handles overlap: control-size-check.mjs Oc",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-48x36-title"
+    ]
+   }
+  },
+  "rotate-fits-ignores-obstacles": {
+   "undoes": "Q3 — below meeting the ZoomBar is no room",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  return inside && !obstacles.some(meets);",
+     "  return inside;"
+    ]
+   ]
+  },
+  "rotate-fits-ignores-view": {
+   "undoes": "Q3 — below leaving the visible canvas is no room",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  return inside && !obstacles.some(meets);",
+     "  return !obstacles.some(meets);"
+    ]
+   ]
+  },
+  "rotate-fits-ignores-rotation": {
+   "undoes": "Q3 — \"below\" turns with the block",
+   "edits": [
+    [
+     "src/poster/selectionLayout.ts",
+     "  const t = (rotationDeg * Math.PI) / 180;",
+     "  const t = 0 * rotationDeg;"
+    ]
+   ]
+  },
+  "rotate-never-flips": {
+   "undoes": "Q3 — the rotate control moves into the row when below has no room",
+   "edits": [
+    [
+     "src/poster/selectionRoom.ts",
+     "    setRotateBelow((prev) => (prev === fits ? prev : fits));",
+     "    setRotateBelow(true);"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout: the canvas has no size, so the control stays below in every jsdom test; in Chromium a logo flush with the bottom of a portrait poster keeps its rotate under the ZoomBar: control-size-check.mjs R",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-36x48-bottom"
+    ]
+   }
+  },
+  "zoombar-unmarked": {
+   "undoes": "Q3 — the ZoomBar is marked as chrome the rotate control avoids",
+   "edits": [
+    [
+     "src/poster/PosterEditor.tsx",
+     "      data-postr-canvas-chrome=\"zoombar\"\n",
+     ""
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout; in Chromium the logo flush with the bottom of a portrait poster keeps its rotate under the ZoomBar: control-size-check.mjs R",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "controls-1280x800-36x48-bottom"
+    ]
+   }
+  },
+  "room-not-measured-on-render": {
+   "undoes": "Q3 — the room below is read again each time the block renders (a move, a zoom, a scroll: the editor renders on scroll)",
+   "edits": [
+    [
+     "src/poster/selectionRoom.ts",
+     "  useLayoutEffect(() => {\n    if (active) measure();\n  });",
+     "  useLayoutEffect(() => {\n    if (active) measure();\n  }, [active]);"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout; in Chromium a scroll leaves the rotate control where it was: control-size-check.mjs Rr",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "room-scroll-1280x800-48x36-bottom"
+    ]
+   }
+  },
+  "room-not-measured-on-resize": {
+   "undoes": "Q3 — the room below is read again when the canvas changes size without a render",
+   "edits": [
+    [
+     "src/poster/selectionRoom.ts",
+     "    const ro = new ResizeObserver(() => measure());\n    ro.observe(outer);\n    return () => ro.disconnect();",
+     "    return undefined;"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no layout and fires no ResizeObserver; in Chromium a narrower window moves the ZoomBar under the rotate control with no render: control-size-check.mjs Rr",
+   "browser": {
+    "harness": "scripts/control-size-check.mjs",
+    "scenarios": [
+     "room-resize-1280x800-24x36-bottom"
+    ]
+   }
+  }
+ }
+}
