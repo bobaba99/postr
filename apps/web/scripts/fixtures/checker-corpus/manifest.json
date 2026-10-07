@@ -1,5 +1,5 @@
 {
-  "_about": "Corpus for scripts/checker-truth-check.mjs (plan item 13). Made-up data and generic labels only. For each script, `elements` names the claim that owns the comparison of each text element the REAL figure draws (from scripts/truth/mpl_truth.py): C = control (the size comes from plt.rcParams['font.size'] or its update() dict form, or from ax.set_xlabel/set_ylabel/set_title(fontsize=) and ax.tick_params(labelsize=), all of which the checker is meant to read; must agree or the run exits 2), T = tick labels inheriting font.size (the 0.83x multiplier), W2 = a per-element rcParams key, SA = the rcParams alias (mpl.rcParams, from matplotlib import rcParams), SR = plt.rc(), SK = a fontsize= keyword the parser does not read, SK2 = a further keyword idiom (size=, fontdict=, a named size in fontsize=/labelsize=, legend(prop=), Text.set_fontsize), READTIME = an rcParams key set after the figure exists, G = Postr's own generated code (charts/codegen/toPython.ts) sets it through a variable. '-' = drawn but not scored (a mismatch there would be confounded by another claim, or belongs to another plan item). `what` says what the script exercises; it is documentation, not an input to the scoring. A script with `generated` is not a file here: the harness generates it at run time through the app's own module (`generated.module`, export `generated.export`) from `generated.spec`, so it always matches the shipped generator. `scaleClaim` names the claim that owns the scale comparison: C (the default, a control), G (G-scale: the canvas is set through variables), CANVAS (the canvas is not a literal figsize), '-' (not scored). `expect` makes the script a known answer (control K-known) for the claims it names: {claim: {observed, ofAtLeast}} - the claim's own comparison must observe exactly `observed` of at least `ofAtLeast`, and the script is kept out of that claim's k of n. Legend titles and Axes texts (claim AXTEXT), bbox_inches='tight' (TIGHT) and show() (SHOWSAVE) need no entry: the harness reads them from the real render.",
+  "_about": "Corpus for scripts/checker-truth-check.mjs (plan item 13). Made-up data and generic labels only. For each script, `elements` names the claim that owns the comparison of each text element the REAL figure draws (from scripts/truth/mpl_truth.py): C = control (the size comes from plt.rcParams['font.size'] or its update() dict form, or from ax.set_xlabel/set_ylabel/set_title(fontsize=) and ax.tick_params(labelsize=), all of which the checker is meant to read; must agree or the run exits 2), T = tick labels inheriting font.size (the 0.83x multiplier), W2 = a per-element rcParams key, SA = the rcParams alias (mpl.rcParams, from matplotlib import rcParams), SR = plt.rc(), SK = a fontsize= keyword the parser does not read, SK2 = a further keyword idiom (size=, fontdict=, a named size in fontsize=/labelsize=, legend(prop=), Text.set_fontsize), READTIME = an rcParams key set after the figure exists, G = Postr's own generated code (charts/codegen/toPython.ts) sets it through a variable. '-' = drawn but not scored (a mismatch there would be confounded by another claim, or belongs to another plan item). `what` says what the script exercises; it is documentation, not an input to the scoring. A script with `generated` is not a file here: the harness generates it at run time through the app's own module (`generated.module`, export `generated.export`) from `generated.spec`, so it always matches the shipped generator. `scaleClaim` names the claim that owns the scale comparison: C (the default, a control), G (G-scale: the canvas is set through variables), CANVAS (the canvas is not a literal figsize), '-' (not scored). `expect` makes the script a known answer (control K-known) for the claims it names: {claim: {observed, ofAtLeast}} - the claim's own comparison must observe exactly `observed` of at least `ofAtLeast`, and the script is kept out of that claim's k of n. Legend titles and Axes texts (claim AXTEXT), bbox_inches='tight' (TIGHT) and show() (SHOWSAVE) need no entry: the harness reads them from the real render. Part 2 (record 13 section 10; ids p2-*): VAR = a size held in a name (font.size or a fontsize= keyword), CTX = a size set by plt.rc_context around the figure; the claims SAVED (verdicts against the image savefig writes) and SNIPLOW / SNIPL (the page's 'Or change one number' font.size, applied as the user is told to) need no entry. Fix 13b review round 1 (ids r1-*, the reviewer's probe scripts that found defects; record docs/fixes/13b-checker-sizes.md section 9): owners R1-GRID, R1-FONTDICT, R1-TUPLE, R1-KW, R1-TIGHTDEF, R1-SNSPOS, R1-COND; the claim CUT (a text the original's image holds, cut from the corrected script's image) needs no entry. Fix 13b review round 2 (ids r2-*, the reviewer's scripts that found defects, and siblings; record section 9): owners R2-TITLELOC, R2-LOOP, R2-UNREAD, R2-PDF, R2-CBAR, R2-SUP, R2-ADVICE, R2-TIGHT. Fix 13b review round 3 (ids r3-*, the reviewer's scripts that found defects; record section 9): owners R3-RUN (P21's floor on a string font.size, the FontProperties import after `from __future__` and by its own name), R3-UNREAD (every drawn row resting on an unread size floored).",
   "scripts": {
     "ctl-fontsize": {
       "what": "plt.rcParams['font.size'] = 12, nothing per element",
@@ -453,7 +453,7 @@
       }
     },
     "ctl-tight-full": {
-      "what": "K-known for TIGHT and TIGHT-fix: an invisible frame over the whole 8 x 6 in canvas and everything else inside it, saved with bbox_inches='tight', pad_inches=0, so the image written is the canvas",
+      "what": "K-known for TIGHT and TIGHT-fix: an invisible frame over the whole 8 x 6 in canvas and everything else inside it, saved with bbox_inches='tight', pad_inches=0, so the image written is the canvas. Fix 13b: the edited script saves the whole figure (no tight crop), so no re-check is of a tight save and TIGHT-fix expects none (ofAtLeast 0)",
       "expect": {
         "TIGHT": {
           "observed": 0,
@@ -461,7 +461,7 @@
         },
         "TIGHT-fix": {
           "observed": 0,
-          "ofAtLeast": 1
+          "ofAtLeast": 0
         }
       },
       "elements": {
@@ -544,6 +544,719 @@
         "plotTitle": "SK",
         "legendText": "SK",
         "axisText": "C"
+      }
+    },
+    "p2-sa-small": {
+      "what": "part 2 (A): the alias mpl.rcParams['font.size'] = 7, BELOW the default (the corpus's SA scripts all set it above, so they could only show false fails)",
+      "elements": {
+        "axisTitle": "SA",
+        "plotTitle": "SA",
+        "legendText": "SA",
+        "axisText": "SA"
+      }
+    },
+    "p2-sr-small": {
+      "what": "part 2 (A): plt.rc('font', size=7), below the default",
+      "elements": {
+        "axisTitle": "SR",
+        "plotTitle": "SR",
+        "legendText": "SR",
+        "axisText": "SR"
+      }
+    },
+    "p2-var-rc": {
+      "what": "part 2 (A): font.size held in a name, BASE_FONT = 7; plt.rcParams['font.size'] = BASE_FONT",
+      "elements": {
+        "axisTitle": "VAR",
+        "plotTitle": "VAR",
+        "legendText": "VAR",
+        "axisText": "VAR"
+      }
+    },
+    "p2-var-kw": {
+      "what": "part 2 (A): font.size 18 with set_xlabel/set_ylabel(fontsize=LABEL_SIZE) and set_title(fontsize=TITLE_SIZE), the sizes held in names (8 and 9)",
+      "elements": {
+        "axisTitle": "VAR",
+        "plotTitle": "VAR",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "p2-ctx-override": {
+      "what": "part 2 (A, R5-13): plt.rcParams['font.size'] = 20, then the figure made and saved inside plt.rc_context({'font.size': 7})",
+      "elements": {
+        "axisTitle": "CTX",
+        "plotTitle": "CTX",
+        "legendText": "CTX",
+        "axisText": "CTX"
+      }
+    },
+    "p2-relplot": {
+      "what": "part 2 (C): a seaborn figure-level grid, relplot(col=, height=4, aspect=1.2) saved with g.savefig (FacetGrid.savefig saves with bbox_inches='tight'): the canvas sizes itself (two panels and a legend, 10.6 x 4 in), no figsize",
+      "scaleClaim": "CANVAS",
+      "elements": {
+        "axisTitle": "C",
+        "axisText": "T",
+        "plotTitle": "-",
+        "legendText": "C"
+      }
+    },
+    "p2-catplot": {
+      "what": "part 2 (C): seaborn catplot(col=, kind='bar', height=3.5): three panels, 10.6 x 3.5 in, g.savefig",
+      "scaleClaim": "CANVAS",
+      "elements": {
+        "axisTitle": "C",
+        "axisText": "T",
+        "plotTitle": "-"
+      }
+    },
+    "p2-facetgrid": {
+      "what": "part 2 (C): seaborn FacetGrid(col=, height=3, aspect=1.3) with g.map(plt.hist): two panels, 7.8 x 3 in, g.savefig",
+      "scaleClaim": "CANVAS",
+      "elements": {
+        "axisTitle": "C",
+        "axisText": "T",
+        "plotTitle": "-"
+      }
+    },
+    "p2-tight-figlegend": {
+      "what": "part 2 (C, R2-10/s12): the default 6.4 x 4.8 in canvas with a figure legend outside it, saved with bbox_inches='tight': the saved image is wider than the canvas (claim SAVED)",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "p2-snip-26": {
+      "what": "part 2 (D, g28's shape): font.size 26, axis titles set to 10 with set_xlabel/set_ylabel(fontsize=): only the axis titles fail, so the 'change one number' font.size the page offers is computed from the other rows and is below 26",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "p2-snip-22-ticks": {
+      "what": "part 2 (D, g40's shape): rcParams.update({'font.size': 22}), set_title(fontsize=12) and tick_params(labelsize=8)",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "C"
+      }
+    },
+    "p2-snip-22-labels": {
+      "what": "part 2 (D, g41's shape): font.size 22 with axis titles at 9 (set_xlabel/set_ylabel(fontsize=)), 8 x 6 in",
+      "elements": {
+        "axisTitle": "C",
+        "plotTitle": "C",
+        "legendText": "C",
+        "axisText": "T"
+      }
+    },
+    "c-sns-theme-after-rc": {
+      "what": "part 2, the confirmer's partition (SNS-RESET): font.size 20, then sns.set_theme(): seaborn writes every per-element size (titles 12, ticks 11), so the font.size changes nothing drawn",
+      "elements": {
+        "plotTitle": "SNS-RESET",
+        "axisTitle": "SNS-RESET",
+        "axisText": "SNS-RESET",
+        "legendText": "SNS-RESET",
+        "caption": "SNS-RESET"
+      }
+    },
+    "c-sns-rc-after-theme": {
+      "what": "part 2, the confirmer's partition (SNS-RESET): sns.set_theme() then font.size 20: the per-element sizes stay seaborn's",
+      "elements": {
+        "plotTitle": "SNS-RESET",
+        "axisTitle": "SNS-RESET",
+        "axisText": "SNS-RESET",
+        "legendText": "SNS-RESET",
+        "caption": "SNS-RESET"
+      }
+    },
+    "c-sns-ctx-paper": {
+      "what": "part 2, the confirmer's partition (SNS-CTX): sns.set_context('paper'): 0.8 x seaborn's notebook sizes",
+      "elements": {
+        "plotTitle": "SNS-CTX",
+        "axisTitle": "SNS-CTX",
+        "axisText": "SNS-CTX",
+        "legendText": "SNS-CTX",
+        "caption": "SNS-CTX"
+      }
+    },
+    "c-sns-ctx-notebook": {
+      "what": "part 2, the confirmer's partition (SNS-CTX): sns.set_context('notebook'): titles 12, ticks and legend 11",
+      "elements": {
+        "plotTitle": "SNS-CTX",
+        "axisTitle": "SNS-CTX",
+        "axisText": "SNS-CTX",
+        "legendText": "SNS-CTX",
+        "caption": "SNS-CTX"
+      }
+    },
+    "c-sns-ctx-rc": {
+      "what": "part 2, the confirmer's partition (SNS-CTX): set_context('talk', rc={'axes.titlesize': 9, 'axes.labelsize': 9}): the rc overrides the context",
+      "elements": {
+        "plotTitle": "SNS-CTX",
+        "axisTitle": "SNS-CTX",
+        "axisText": "SNS-CTX",
+        "legendText": "SNS-CTX",
+        "caption": "SNS-CTX"
+      }
+    },
+    "c-sns-theme-ctx-kw": {
+      "what": "part 2, the confirmer's partition (SNS-CTX): set_theme(context='paper')",
+      "elements": {
+        "plotTitle": "SNS-CTX",
+        "axisTitle": "SNS-CTX",
+        "axisText": "SNS-CTX",
+        "legendText": "SNS-CTX",
+        "caption": "SNS-CTX"
+      }
+    },
+    "c-sns-set-legacy": {
+      "what": "part 2, the confirmer's partition (SNS-CTX): sns.set(font_scale=0.7): notebook sizes x 0.7",
+      "elements": {
+        "plotTitle": "SNS-CTX",
+        "axisTitle": "SNS-CTX",
+        "axisText": "SNS-CTX",
+        "legendText": "SNS-CTX",
+        "caption": "SNS-CTX"
+      }
+    },
+    "c-style-paper": {
+      "what": "part 2, the confirmer's partition (STYLE): plt.style.use('seaborn-v0_8-paper'): a built-in style sheet's sizes",
+      "elements": {
+        "plotTitle": "STYLE",
+        "axisTitle": "STYLE",
+        "axisText": "STYLE",
+        "legendText": "STYLE",
+        "caption": "STYLE"
+      }
+    },
+    "c-style-context-talk": {
+      "what": "part 2, the confirmer's partition (STYLE): with plt.style.context('seaborn-v0_8-talk'): the figure made inside it",
+      "elements": {
+        "plotTitle": "STYLE",
+        "axisTitle": "STYLE",
+        "axisText": "STYLE",
+        "legendText": "STYLE",
+        "caption": "STYLE"
+      }
+    },
+    "c-rcdefaults": {
+      "what": "part 2, the confirmer's partition (RESET): font.size 22, then plt.rcdefaults(): matplotlib's defaults again",
+      "elements": {
+        "plotTitle": "RESET",
+        "axisTitle": "RESET",
+        "axisText": "RESET",
+        "legendText": "RESET",
+        "caption": "RESET"
+      }
+    },
+    "c-oo-label-setters": {
+      "what": "part 2, the confirmer's partition (OO): ax.title.set_fontsize(8), ax.xaxis.label.set_fontsize(7), ax.yaxis.label.set_size(7) under font.size 16",
+      "elements": {
+        "plotTitle": "OO",
+        "axisTitle": "OO",
+        "axisText": "OO",
+        "legendText": "OO",
+        "caption": "OO"
+      }
+    },
+    "c-oo-set-xticks-labels": {
+      "what": "part 2, the confirmer's partition (OO): set_xticks/set_yticks(labels=, fontsize=7) under font.size 18",
+      "elements": {
+        "plotTitle": "OO",
+        "axisTitle": "OO",
+        "axisText": "OO",
+        "legendText": "OO",
+        "caption": "OO"
+      }
+    },
+    "c-multi-axes-partial": {
+      "what": "part 2, the confirmer's partition (MULTI): two Axes: the first sized with keywords, the second at the defaults",
+      "elements": {
+        "plotTitle": "MULTI",
+        "axisTitle": "MULTI",
+        "axisText": "MULTI",
+        "legendText": "MULTI",
+        "caption": "MULTI"
+      }
+    },
+    "c-twinx": {
+      "what": "part 2, the confirmer's partition (MULTI): keyword sizes on ax, a twinx() whose y label is at the default",
+      "elements": {
+        "plotTitle": "MULTI",
+        "axisTitle": "MULTI",
+        "axisText": "MULTI",
+        "legendText": "MULTI",
+        "caption": "MULTI"
+      }
+    },
+    "c-colorbar": {
+      "what": "part 2, the confirmer's partition (MULTI): keyword sizes on ax, a colorbar whose label and ticks are at the defaults",
+      "elements": {
+        "plotTitle": "MULTI",
+        "axisTitle": "MULTI",
+        "axisText": "MULTI",
+        "legendText": "MULTI",
+        "caption": "MULTI"
+      }
+    },
+    "c-suptitle": {
+      "what": "part 2, the confirmer's partition (SUPT): fig.suptitle(fontsize=9) and no Axes title: the suptitle is the plot title",
+      "elements": {
+        "plotTitle": "SUPT",
+        "axisTitle": "SUPT",
+        "axisText": "SUPT",
+        "legendText": "SUPT",
+        "caption": "SUPT"
+      }
+    },
+    "c-units-cm-small": {
+      "what": "part 2, the confirmer's partition (UNITS): figsize=(8.5 * cm, 6 * cm) with cm = 1 / 2.54",
+      "elements": {
+        "plotTitle": "UNITS",
+        "axisTitle": "UNITS",
+        "axisText": "UNITS",
+        "legendText": "UNITS",
+        "caption": "UNITS"
+      },
+      "scaleClaim": "UNITS"
+    },
+    "c-units-mm-large": {
+      "what": "part 2, the confirmer's partition (UNITS): figsize=(250 / 25.4, 180 / 25.4)",
+      "elements": {
+        "plotTitle": "UNITS",
+        "axisTitle": "UNITS",
+        "axisText": "UNITS",
+        "legendText": "UNITS",
+        "caption": "UNITS"
+      },
+      "scaleClaim": "UNITS",
+      "editorImage": true
+    },
+    "c-units-setsize-expr": {
+      "what": "part 2, the confirmer's partition (UNITS): fig.set_size_inches(26 / 2.54, 19 / 2.54)",
+      "elements": {
+        "plotTitle": "UNITS",
+        "axisTitle": "UNITS",
+        "axisText": "UNITS",
+        "legendText": "UNITS",
+        "caption": "UNITS"
+      },
+      "scaleClaim": "UNITS"
+    },
+    "c-nb-inline": {
+      "what": "part 2, the confirmer's partition (NB): a notebook export (get_ipython().run_line_magic) shown with plt.show(): the inline display saves with bbox_inches='tight'",
+      "elements": {
+        "plotTitle": "NB",
+        "axisTitle": "NB",
+        "axisText": "NB",
+        "legendText": "NB",
+        "caption": "NB"
+      },
+      "notebook": true
+    },
+    "c-nb-magic": {
+      "what": "part 2, the confirmer's partition (NB): %matplotlib inline cell magic, shown with plt.show()",
+      "elements": {
+        "plotTitle": "NB",
+        "axisTitle": "NB",
+        "axisText": "NB",
+        "legendText": "NB",
+        "caption": "NB"
+      },
+      "notebook": true
+    },
+    "c-jointplot": {
+      "what": "part 2, the confirmer's partition (FIGLEVEL): sns.jointplot(height=8): a square 8 x 8 in figure",
+      "elements": {
+        "plotTitle": "FIGLEVEL",
+        "axisTitle": "FIGLEVEL",
+        "axisText": "FIGLEVEL",
+        "legendText": "FIGLEVEL",
+        "caption": "FIGLEVEL"
+      },
+      "scaleClaim": "FIGLEVEL"
+    },
+    "c-lmplot": {
+      "what": "part 2, the confirmer's partition (FIGLEVEL): sns.lmplot(col=, hue=, height=4, aspect=1.1): facets and a legend size the figure",
+      "elements": {
+        "plotTitle": "FIGLEVEL",
+        "axisTitle": "FIGLEVEL",
+        "axisText": "FIGLEVEL",
+        "legendText": "FIGLEVEL",
+        "caption": "FIGLEVEL"
+      },
+      "scaleClaim": "FIGLEVEL"
+    },
+    "c-pairplot": {
+      "what": "part 2, the confirmer's partition (FIGLEVEL): sns.pairplot(hue=, height=3): the variables and a legend size the figure",
+      "elements": {
+        "plotTitle": "FIGLEVEL",
+        "axisTitle": "FIGLEVEL",
+        "axisText": "FIGLEVEL",
+        "legendText": "FIGLEVEL",
+        "caption": "FIGLEVEL"
+      },
+      "scaleClaim": "FIGLEVEL"
+    },
+    "c-displot": {
+      "what": "part 2, the confirmer's partition (FIGLEVEL): sns.displot(hue=, height=6, aspect=1.6): a legend outside widens the figure",
+      "elements": {
+        "plotTitle": "FIGLEVEL",
+        "axisTitle": "FIGLEVEL",
+        "axisText": "FIGLEVEL",
+        "legendText": "FIGLEVEL",
+        "caption": "FIGLEVEL"
+      },
+      "scaleClaim": "FIGLEVEL"
+    },
+    "c-tight-annot": {
+      "what": "part 2, the confirmer's partition (TIGHT): ax.text outside the Axes, saved with bbox_inches='tight'",
+      "elements": {
+        "plotTitle": "TIGHT",
+        "axisTitle": "TIGHT",
+        "axisText": "TIGHT",
+        "legendText": "TIGHT",
+        "caption": "TIGHT"
+      }
+    },
+    "c-tight-suptitle-high": {
+      "what": "part 2, the confirmer's partition (TIGHT): a suptitle at y=1.25, saved with bbox_inches='tight'",
+      "elements": {
+        "plotTitle": "TIGHT",
+        "axisTitle": "TIGHT",
+        "axisText": "TIGHT",
+        "legendText": "TIGHT",
+        "caption": "TIGHT"
+      }
+    },
+    "c-tight-crop": {
+      "what": "part 2, the confirmer's partition (TIGHT): wide margins cropped by bbox_inches='tight' (the image prints larger)",
+      "elements": {
+        "plotTitle": "TIGHT",
+        "axisTitle": "TIGHT",
+        "axisText": "TIGHT",
+        "legendText": "TIGHT",
+        "caption": "TIGHT"
+      }
+    },
+    "c-ctl-oo-literal": {
+      "what": "part 2, the confirmer's partition (CTL): keyword sizes on every element but the legend, font.size 16",
+      "elements": {
+        "plotTitle": "CTL",
+        "axisTitle": "CTL",
+        "axisText": "CTL",
+        "legendText": "CTL",
+        "caption": "CTL"
+      },
+      "editorImage": true
+    },
+    "c-ctl-axes-level-sns": {
+      "what": "part 2, the confirmer's partition (CTL): seaborn axes-level violinplot under font.size 15, ticks via tick_params",
+      "elements": {
+        "plotTitle": "CTL",
+        "axisTitle": "CTL",
+        "axisText": "CTL",
+        "legendText": "CTL",
+        "caption": "CTL"
+      }
+    },
+    "c-d-bigfont-smallticks": {
+      "what": "part 2, the confirmer's partition (D-LOWER): font.size 24, tick_params(labelsize=8): only the ticks fail, so the one-number advice must not lower font.size",
+      "elements": {
+        "plotTitle": "D-LOWER",
+        "axisTitle": "D-LOWER",
+        "axisText": "D-LOWER",
+        "legendText": "D-LOWER",
+        "caption": "D-LOWER"
+      }
+    },
+    "r1-grid-noshow": {
+      "what": "fix 13b review round 1 (P13B-R1-03): a seaborn relplot with hue and col, shown with plt.show() and never saved: the fix adds a save, which must come after the grid is set to the print size",
+      "scaleClaim": "CANVAS",
+      "elements": {
+        "axisTitle": "R1-GRID",
+        "axisText": "R1-GRID",
+        "plotTitle": "-",
+        "legendText": "R1-GRID"
+      }
+    },
+    "r1-fontdict-name": {
+      "what": "review round 1 (P13B-R1-02): font = {'family': 'serif', 'size': 8} passed as fontdict=font: read from the dict, raised in it (the fix once wrote fontdict=16, which raised)",
+      "elements": {
+        "plotTitle": "R1-FONTDICT",
+        "axisTitle": "R1-FONTDICT",
+        "axisText": "R1-FONTDICT",
+        "legendText": "R1-FONTDICT",
+        "caption": "R1-FONTDICT"
+      }
+    },
+    "r1-fontdict-weight": {
+      "what": "review round 1 (P13B-R1-02): set_title(fontdict={'fontweight': 'bold'}), a fontdict with no size: rcParams decides",
+      "elements": {
+        "plotTitle": "R1-FONTDICT",
+        "axisTitle": "R1-FONTDICT",
+        "axisText": "R1-FONTDICT",
+        "legendText": "R1-FONTDICT",
+        "caption": "R1-FONTDICT"
+      }
+    },
+    "r1-legend-prop-family": {
+      "what": "review round 1 (P13B-R1-02): ax.legend(prop={'family': 'serif'}), a prop with no size: legend.fontsize decides",
+      "elements": {
+        "plotTitle": "R1-FONTDICT",
+        "axisTitle": "R1-FONTDICT",
+        "axisText": "R1-FONTDICT",
+        "legendText": "R1-FONTDICT",
+        "caption": "R1-FONTDICT"
+      }
+    },
+    "r1-prop-name": {
+      "what": "review round 1 (P13B-R1-02): legend(prop=fp) with fp = FontProperties(family='serif', size=8): read and raised in the FontProperties call",
+      "elements": {
+        "plotTitle": "R1-FONTDICT",
+        "axisTitle": "R1-FONTDICT",
+        "axisText": "R1-FONTDICT",
+        "legendText": "R1-FONTDICT",
+        "caption": "R1-FONTDICT"
+      }
+    },
+    "r1-tuple-axes": {
+      "what": "review round 1 (P13B-R1-13): fig, (ax1, ax2) = plt.subplots(1, 2), each Axes' ticks at 18 pt",
+      "elements": {
+        "plotTitle": "R1-TUPLE",
+        "axisTitle": "R1-TUPLE",
+        "axisText": "R1-TUPLE",
+        "legendText": "R1-TUPLE",
+        "caption": "R1-TUPLE"
+      }
+    },
+    "r1-two-axes-advice": {
+      "what": "review round 1 (the reviewer's probe): two Axes named axs[0] and axs[1], only the second's ticks sized (11 pt)",
+      "elements": {
+        "plotTitle": "R1-TUPLE",
+        "axisTitle": "R1-TUPLE",
+        "axisText": "R1-TUPLE",
+        "legendText": "R1-TUPLE",
+        "caption": "R1-TUPLE"
+      }
+    },
+    "r1-rc-font-kwargs": {
+      "what": "review round 1 (P13B-R1-11): matplotlib.rc('font', **font) with font = {..., 'size': 22}: read (the fix once lowered every size it sets)",
+      "elements": {
+        "plotTitle": "R1-KW",
+        "axisTitle": "R1-KW",
+        "axisText": "R1-KW",
+        "legendText": "R1-KW",
+        "caption": "R1-KW"
+      }
+    },
+    "r1-kwargs-label": {
+      "what": "review round 1 (P13B-R1-08): label_kw = {'fontsize': 8} passed as **label_kw to set_title/set_xlabel/set_ylabel: read and raised in the dict",
+      "elements": {
+        "plotTitle": "R1-KW",
+        "axisTitle": "R1-KW",
+        "axisText": "R1-KW",
+        "legendText": "R1-KW",
+        "caption": "R1-KW"
+      }
+    },
+    "r1-tight-default": {
+      "what": "review round 1 (P13B-R1-09): font.size 9, matplotlib's default canvas, a legend outside the Axes and bbox_inches='tight': the scale is unknown, so no one-number advice",
+      "elements": {
+        "plotTitle": "R1-TIGHTDEF",
+        "axisTitle": "R1-TIGHTDEF",
+        "axisText": "R1-TIGHTDEF",
+        "legendText": "R1-TIGHTDEF",
+        "caption": "R1-TIGHTDEF"
+      }
+    },
+    "r1-sns-positional": {
+      "what": "review round 1 (P13B-R1-12): sns.set_theme('notebook', 'whitegrid', 'deep', 'sans-serif', 0.8): font_scale given positionally",
+      "elements": {
+        "plotTitle": "R1-SNSPOS",
+        "axisTitle": "R1-SNSPOS",
+        "axisText": "R1-SNSPOS",
+        "legendText": "R1-SNSPOS",
+        "caption": "R1-SNSPOS",
+        "legendTitle": "-"
+      }
+    },
+    "r1-conditional-reset": {
+      "what": "review round 1 (P13B-R1-10): sns.set_theme(context='paper') inside an if: the settings block must not land between the if-body and its else: (a SyntaxError). The check reads the reset as made (static order), so with POSTER = False it shows the paper sizes, below what is drawn (a false fail)",
+      "elements": {
+        "plotTitle": "R1-COND",
+        "axisTitle": "R1-COND",
+        "axisText": "R1-COND",
+        "legendText": "R1-COND",
+        "caption": "R1-COND"
+      }
+    },
+    "r2-panel-letters": {
+      "what": "fix 13b review round 2 (P13B-R2-02, -13, -10): a 9 pt centre title and a 20 pt panel letter set with set_title(loc='left') on each Axes; axis titles and tick sizes set in a loop over the unpacked Axes",
+      "elements": {
+        "plotTitle": "R2-TITLELOC",
+        "axisTitle": "R2-LOOP",
+        "axisText": "R2-LOOP",
+        "legendText": "R2-LOOP",
+        "caption": "R2-LOOP"
+      },
+      "editorImage": true
+    },
+    "r2-config-dict": {
+      "what": "review round 2 (P13B-R2-03): font.size from a config dict, CONFIG['font_size'] = 20: unread, so its rows are marked and the fix never pins them at the default (it lowered every class)",
+      "elements": {
+        "plotTitle": "R2-UNREAD",
+        "axisTitle": "R2-UNREAD",
+        "axisText": "R2-UNREAD",
+        "legendText": "R2-UNREAD",
+        "caption": "R2-UNREAD"
+      }
+    },
+    "r2-unread-kw": {
+      "what": "review round 2 (P13B-R2-03, a sibling): fontsize=SIZES['label'] (8) and fontsize=SIZES['title'] ('large'): unread, floored where written when short",
+      "elements": {
+        "plotTitle": "R2-UNREAD",
+        "axisTitle": "R2-UNREAD",
+        "axisText": "R2-UNREAD",
+        "legendText": "R2-UNREAD",
+        "caption": "R2-UNREAD"
+      }
+    },
+    "r2-pdfpages-tight": {
+      "what": "review round 2 (P13B-R2-05): PdfPages' pdf.savefig(fig, bbox_inches='tight') inside a with-block: the fit block measures fig (it took the PdfPages object, and the edited script raised)",
+      "elements": {
+        "plotTitle": "R2-PDF",
+        "axisTitle": "R2-PDF",
+        "axisText": "R2-PDF",
+        "legendText": "R2-PDF",
+        "caption": "R2-PDF"
+      }
+    },
+    "r2-heatmap-cbar": {
+      "what": "review round 2 (P13B-R2-06): sns.heatmap with cbar_kws={'label': ...} and ax.tick_params(labelsize=16): the colorbar seaborn makes keeps its ticks at 11 and its label at 12",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "R2-CBAR",
+        "axisText": "R2-CBAR",
+        "legendText": "R2-CBAR",
+        "caption": "R2-CBAR"
+      }
+    },
+    "r2-scatter-cbar": {
+      "what": "review round 2 (P13B-R2-06): pandas df.plot.scatter(c='oxygen'): a colorbar labelled with the column at axes.labelsize",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "R2-CBAR",
+        "axisText": "R2-CBAR",
+        "legendText": "R2-CBAR",
+        "caption": "R2-CBAR"
+      }
+    },
+    "r2-supxlabel": {
+      "what": "review round 2 (P13B-R2-07): fig.supxlabel / supylabel at 9 pt on a 2 x 3 grid with no per-Axes labels (font.size 16)",
+      "elements": {
+        "plotTitle": "R2-SUP",
+        "axisTitle": "R2-SUP",
+        "axisText": "R2-SUP",
+        "legendText": "R2-SUP",
+        "caption": "R2-SUP"
+      },
+      "editorImage": true
+    },
+    "r2-xticks-direct": {
+      "what": "review round 2 (P13B-R2-10): every drawn text sized directly (xticks/yticks 8, ylabel 12, title 14), no legend: no one-number advice",
+      "elements": {
+        "plotTitle": "R2-ADVICE",
+        "axisTitle": "R2-ADVICE",
+        "axisText": "R2-ADVICE",
+        "legendText": "R2-ADVICE",
+        "caption": "R2-ADVICE"
+      }
+    },
+    "r2-twinx-figlegend": {
+      "what": "review round 2 (P13B-R2-10): twinx with a figure legend, no title drawn: the Plot title row must not drive the one-number advice",
+      "elements": {
+        "plotTitle": "R2-ADVICE",
+        "axisTitle": "R2-ADVICE",
+        "axisText": "R2-ADVICE",
+        "legendText": "R2-ADVICE",
+        "caption": "R2-ADVICE"
+      }
+    },
+    "r2-figlegend-below-tight": {
+      "what": "review round 2 (P13B-R2-12): three panels, fig.legend below, bbox_inches='tight' (the fit block keeps the legend where it fits the canvas)",
+      "elements": {
+        "plotTitle": "R2-TIGHT",
+        "axisTitle": "R2-TIGHT",
+        "axisText": "R2-TIGHT",
+        "legendText": "R2-TIGHT",
+        "caption": "R2-TIGHT"
+      }
+    },
+    "r3-configparser-fontsize": {
+      "what": "fix 13b review round 3 (P13B-R3-02): plt.rcParams['font.size'] = cfg['plot']['font_size'], a string from configparser: the floor is max(N, float(EXPR)) (max(N, EXPR) raised TypeError)",
+      "elements": {
+        "plotTitle": "R3-RUN",
+        "axisTitle": "R3-RUN",
+        "axisText": "R3-RUN",
+        "legendText": "R3-RUN",
+        "caption": "R3-RUN"
+      }
+    },
+    "r3-argparse-update": {
+      "what": "review round 3 (P13B-R3-02): rcParams.update({'font.size': args.font_size}) with argparse's default '9', a string",
+      "elements": {
+        "plotTitle": "R3-RUN",
+        "axisTitle": "R3-RUN",
+        "axisText": "R3-RUN",
+        "legendText": "R3-RUN",
+        "caption": "R3-RUN"
+      }
+    },
+    "r3-rc-font-kw-unread": {
+      "what": "review round 3 (P13B-R3-02): plt.rc('font', size=cfg.get('plot', 'font_size')), a string",
+      "elements": {
+        "plotTitle": "R3-RUN",
+        "axisTitle": "R3-RUN",
+        "axisText": "R3-RUN",
+        "legendText": "R3-RUN",
+        "caption": "R3-RUN"
+      }
+    },
+    "r3-future-main": {
+      "what": "review round 3 (P13B-R3-02): `from __future__ import annotations` first and matplotlib imported only inside main(): FontProperties is imported after the __future__ line (an import above it was a SyntaxError)",
+      "elements": {
+        "plotTitle": "R3-RUN",
+        "axisTitle": "R3-RUN",
+        "axisText": "R3-RUN",
+        "legendText": "R3-RUN",
+        "caption": "R3-RUN"
+      }
+    },
+    "r3-fp-alias": {
+      "what": "review round 3 (P13B-R3-02): `from matplotlib.font_manager import FontProperties as FP` binds FP only: FontProperties is imported by its own name (NameError before)",
+      "elements": {
+        "plotTitle": "R3-RUN",
+        "axisTitle": "R3-RUN",
+        "axisText": "R3-RUN",
+        "legendText": "R3-RUN",
+        "caption": "R3-RUN"
+      }
+    },
+    "r3-sns-unread-scale": {
+      "what": "review round 3 (P13B-R3-03): sns.set_theme(context='paper', font_scale=cfg['scale']) with a scale of 0.8: ticks and legend pass at the assumed size and are floored too (the re-check showed ✓ over 10.27 pt)",
+      "elements": {
+        "plotTitle": "R3-UNREAD",
+        "axisTitle": "R3-UNREAD",
+        "axisText": "R3-UNREAD",
+        "legendText": "R3-UNREAD",
+        "caption": "R3-UNREAD"
       }
     }
   }
