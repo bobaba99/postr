@@ -1,5 +1,6 @@
 # Postr — Feature Graph & Refactoring Checklist (v2)
 
+**Revised 2026-10-06 — fix 26, the public pages in French** (`docs/fixes/26-french-public-pages.md`; owner: Resila Technologies Inc. is a Quebec company, Bill 96). Every public page has a French twin at its path + `/fr` (`/fr` for the landing page; `/auth/fr?plan=term` keeps its query): `/fr`, `/about/fr`, `/why-posters/fr`, `/pricing/fr`, `/tools/figure-readability/fr`, `/auth/fr`, `/billing/success/fr`, `/billing/cancel/fr`, beside the legal pages' existing `/privacy/fr`, `/cookies/fr`, `/terms/fr`. One component per page renders either language, read from the URL (`i18n/lang.ts` `useLang`, `langFromPath`, `localizedPath`, `counterpartPath`); the copy of each page or feature is a dictionary in `i18n/` (`chrome.ts` header/footer/phone notice, `landing.ts`, `about.ts`, `whyPosters.ts`, `pricing.ts`, `auth.ts`, `billing.ts`, `notFound.ts`, `figureReadability.ts`, `readability.ts`; `readabilityWarnings.ts` puts the checker engine's English row names and warnings in French), English and French side by side, the French typed with the English shape. **So the verbatim English strings this file lists for §6.1 (NotFound), §6.2, §6.3 (Pricing, PricingSection, BillingResult), §6.5 (Auth, PasswordStrength), §6.10 (FigureReadability, PrintSizeFields, the checker panel when on the page) and the public header/footer now live in those dictionaries, not in the page files; their French twins are beside them.** `components/LanguageLink.tsx` is the « Français » / "English" link (header flat row and phone menu, footer, `/auth`'s legal footer, the billing pages, the 404). The French pages are prerendered with French heads (`<html lang="fr-CA">`, og:locale `fr_CA`) and hreflang alternates between each prerendered pair, x-default English (`seo/siteMeta.ts` `alternatesFor`, `scripts/lib/headTags.mjs`); the sitemap lists them. A checkout from `/auth/fr` sends `lang: 'fr'` (`data/billing.ts createCheckout`) and the API opens Stripe with `locale: 'fr-CA'` and returns to `/billing/*/fr` (`apps/api/src/billing.ts`). The editor, dashboard and profile stay English. §6.1, §6.2 and §6.2b below updated.
 **Revised 2026-10-06 — legal pages and privacy (record 24, `docs/fixes/24-legal-canada-law25.md`).** §6.4 rewritten (Privacy, Cookies and Terms, EN and FR, for Quebec's Law 25 and PIPEDA first; the person in charge as a role of Resila; recipients read from the code; the line-by-line copy listing replaced by section summaries and the test that pins the required elements). §6.1 and §6.15: Vercel Web Analytics is not mounted under Global Privacy Control, `/gallery/:id` is redacted, every page is served with `Referrer-Policy: strict-origin`; the `ConsentNotice` this file listed does not exist in the code. §6.5: the sign-up Terms line links the French pages. §6.13: the feedback form's console log starts unticked. §8: account deletion clears every Postr entry in the browser that deletes, in localStorage and sessionStorage, except another account's welcome marker. Review round 1 (same record): `redactUrl` matches the path as the router reads it (case, percent-escapes, doubled slashes), the sign-up line and Terms §1 present the Privacy Policy as information rather than something agreed to, the Terms and Privacy name Stripe's merchant-of-record service without naming the seller, the pack refund is the amount paid with tax, and Privacy §9 says a feedback report with an attached file keeps the account id in the file's storage path. Review round 2 (same record): the `/auth` Terms line is shown in both modes, right under `Continue with Google` ("By continuing, you agree to…"; `data-testid="auth-terms-line"`); Privacy §8 no longer lists page counting among the private defaults (it is on by default); Privacy §6/§7 and Cookies §4 say what Vercel's documentation says it may record from a page view (an approximate location, device type, operating system, browser), and "no technology that locates" carries that exception; Privacy §15 names Canada's adequacy and how to learn a provider's safeguard, and GDPR portability to another organization; portability (§10) is to a person or body the law authorizes; the Terms precede §5.5, §10, §11 and §13's "continued use" sentence with the Consumer Protection Act s. 19.1 statement (EN and FR); the French pages are labelled « Juridique » and use Quebec usage (« 18,99 $ CA », « lot », « Finalité », Quebec civil-law terms, curly apostrophes). Internal: `docs/legal/quebec-law-25.md`.
 **Revised 2026-10-06 — fix 25.** The LaTeX export is **hidden, not deleted** (`LATEX_EXPORT_ENABLED = false`, `config/features.ts`; owner: "unnecessary for now"): the Export tab offers PowerPoint only, and no copy outside the legal pages names LaTeX or Overleaf. Every displayed price says tax is extra ("CA$18.99 + applicable taxes"; Stripe prices are before tax), after its billing period where it has one ("CA$18.99 every 4 months + applicable taxes"; review round 1). `src/__tests__/copyInventory.test.ts` keeps both true. Updated here: §6.2 (Landing, About, Pricing, BillingResult, PricingSection), §6.5 (Auth label), the Profile rows, §6.8 `EditableExportButtons.tsx`, §6.11's export graph, §6.14 `config/features.ts`, §10 and §11. The legal pages' copy (Terms §7, Privacy) is stream A's.
 
@@ -308,6 +309,7 @@ No UI — logic only.
 #### `routes.tsx` — route table + lazy-load fallback
 
 Route inventory: see §5 master graph + route table. All inside `<Suspense>`; lazy chunks: Editor, Share, AdminGallery (ChartChooser + PaperToPoster lazy imports removed 2026-09-10 — deactivated).
+- [ ] French routes (fix 26): `/fr` (Landing), `/about/fr`, `/why-posters/fr`, `/pricing/fr`, `/tools/figure-readability/fr` (lazy checker), `/auth/fr`, `/billing/success/fr`, `/billing/cancel/fr` — the same components as the English routes; the language comes from the URL (§6.2b)
 
 **Copy**
 - [ ] "Loading…" — LazyFallback text — `routes.tsx:101`
@@ -335,11 +337,12 @@ Route inventory: see §5 master graph + route table. All inside `<Suspense>`; la
 #### `pages/NotFound.tsx` — catch-all 404
 
 **Elements**
-- [ ] `Back home` — router link — `NotFound.tsx:12-17` — `/dashboard`
+- [ ] `Go to your posters` (« Aller à vos affiches ») — router link — `/dashboard`
+- [ ] the language link — `LanguageLink` to the same address in the other language (`/x` ↔ `/x/fr`) (fix 26)
 
-**Copy**
-- [ ] "404" — h1 — `NotFound.tsx:10`
-- [ ] "Page not found." — para — `NotFound.tsx:11`
+**Copy** (`i18n/notFound.ts`; an address ending in `/fr` is answered in French, head from `routes.json` app `/404/fr`)
+- [ ] "404" — h1
+- [ ] "Page not found." / « Page introuvable. » — para
 
 **Graphics** — none.
 
@@ -433,6 +436,50 @@ flowchart LR
 - [ ] "When you are ready to build one" — h2 — `WhyPosters.tsx:197`; "The skills above come from presenting, not from formatting. Postr exists so the formatting is not the hard part — real print sizes, authors and affiliations that stay in sync, and figures checked for legibility before you get to the print shop." — `:199-204`
 
 **Graphics** — none.
+
+---
+
+### 6.2b French public pages (fix 26)
+
+The public pages in English and French. Owner decision 2026-10-06; record `docs/fixes/26-french-public-pages.md`. The editor, dashboard and profile are English only.
+
+```mermaid
+flowchart LR
+  URL["URL: /x or /x/fr (/fr for /)"] -->|"langFromPath"| L["useLang() — i18n/lang.ts"]
+  L --> D["i18n/*.ts dictionaries (EN + FR, French typed with the English shape)"]
+  D --> P["pages: Landing, About, WhyPosters, Pricing+PricingSection, Auth+PasswordStrength, BillingResult, NotFound, FigureReadability+PrintSizeFields+ReadabilityPanel"]
+  D --> C["chrome: PublicHeader, PublicFooter, MobileNotice"]
+  LL["components/LanguageLink.tsx"] -->|"counterpartPath (query + hash kept)"| URL
+  R["seo/routes.json French records (fr-CA, fr_CA)"] --> H["head: useDocumentMeta + headTags.mjs (hreflang en / fr-CA / x-default)"]
+  R --> PR["scripts/prerender.mjs (French heads, French fallback nav) + gen-sitemap.mjs"]
+  A["/auth/fr"] -->|"createCheckout(sku, 'fr')"| API["apps/api billing.ts: locale fr-CA, /billing/*/fr"]
+```
+
+#### `i18n/lang.ts` — the two languages; no UI
+- [ ] `Lang` (`'en' | 'fr'`), `Bilingual<T>`, `HTML_LANG` (`en`, `fr-CA`)
+- [ ] `BILINGUAL_PATHS` — the English paths with a French twin (the public pages, `/auth`, `/billing/*`, the legal pages)
+- [ ] `langFromPath`, `englishPath`, `localizedPath(path, lang)` (an English-only path is returned as it is), `counterpartPath(pathname, search, hash)`, `useLang()`, `formatNumber` (decimal comma in French)
+
+#### `i18n/*.ts` — the dictionaries; no UI of their own
+- [ ] `chrome.ts` (header, footer, phone notice, each language's own name), `landing.ts`, `about.ts` (with the code behind each milestone), `whyPosters.ts`, `pricing.ts` (tier cards: « 18,99 $ CA » « + taxes applicables »), `auth.ts` (plan labels, Terms line, password rules, the French lines for six Supabase error codes), `billing.ts`, `notFound.ts`, `figureReadability.ts` (page, size fields, preset names), `readability.ts` (the checker panel), `readabilityWarnings.ts` (engine row names and warnings in French), `dictionaries.ts` (the registry the parity test reads); the refund lines are `data/refundCopy.ts` `REFUND_LINES` (EN and FR)
+
+#### `components/LanguageLink.tsx` — the « Français » / "English" link
+- [ ] `<Link lang hrefLang>` to `counterpartPath`; renders nothing on an English-only page unless `to` is given (the 404). Mounted in PublicHeader (flat row `xl:`, phone menu last row), PublicFooter (`<nav aria-label="Language">` beside the copyright, only on a bilingual page), Auth's legal footer, BillingResult, NotFound
+
+#### Head, prerender, routing
+- [ ] `seo/routes.json` — static `/fr`, `/about/fr`, `/why-posters/fr`, `/pricing/fr`, `/tools/figure-readability/fr`; app `/auth/fr` (prerender), `/billing/success/fr`, `/billing/cancel/fr`, `/404/fr`
+- [ ] `seo/siteMeta.ts` `alternatesFor`, `twinPath`, `notFoundMeta(lang)`; `PageMeta.alternates`
+- [ ] `seo/useDocumentMeta.ts` — three hreflang slots (`en`, `fr-CA`, `x-default`), emptied on a page with none; `scripts/lib/headTags.mjs` mirrors it (`buildPageMeta(path, record, site, routes)`)
+- [ ] `scripts/prerender.mjs` — French fallback nav (« Pages de Postr »), the twin linked once; 19 pages; `gen-sitemap.mjs` 16 URLs
+- [ ] `vercel.json` — rewrites for `/billing/success/fr`, `/billing/cancel/fr`; `X-Robots-Tag: noindex` on `/auth/fr` (and `/billing/(.*)` already)
+- [ ] `index.html` WebSite `inLanguage: ["en-US", "fr-CA"]`
+
+#### Checkout in French
+- [ ] `data/billing.ts createCheckout(sku, lang)` — sends `{ sku, lang: 'fr' }` from a French page, `{ sku }` otherwise; `data/checkoutIntent.ts startCheckoutForPlan(plan, lang)`
+- [ ] `apps/api/src/billing.ts` — `lang === 'fr'` → `locale: 'fr-CA'`, success/cancel `…/billing/success/fr`, `…/billing/cancel/fr`
+
+#### Tests and instruments
+- [ ] `src/__tests__/frenchPages.test.tsx`, `src/i18n/__tests__/dictionaries.test.ts`, `src/i18n/__tests__/readabilityWarnings.test.ts`, `src/pages/__tests__/FigureReadability.french.test.tsx`, `src/pages/__tests__/Auth.checkoutLocale.test.tsx`, `src/seo/__tests__/prerenderFrench.test.ts`, `apps/api/src/__tests__/billing.locale.test.ts`; `scripts/copy-claims-check.mjs` (L1–L3, W1, W2); `scripts/api-mutation-check.mjs`
 
 ---
 

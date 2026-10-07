@@ -259,8 +259,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });\n",
-          "      updateDraft({ checked: null });\n      setAnswer({ ...at, kind: 'cannot-tell', text: CANNOT_TELL });\n"
+          "      setAnswer({ ...at, kind: 'cannot-tell', text: c.cannotTell });\n",
+          "      updateDraft({ checked: null });\n      setAnswer({ ...at, kind: 'cannot-tell', text: c.cannotTell });\n"
         ]
       ]
     },
@@ -269,8 +269,8 @@
       "edits": [
         [
           "src/poster/ReadabilityPanel.tsx",
-          "      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });\n",
-          "      updateDraft({ checked: null });\n      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system) });\n"
+          "      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system, c) });\n",
+          "      updateDraft({ checked: null });\n      setAnswer({ ...at, kind: 'unsupported', text: unsupportedAnswer(plot.system, c) });\n"
         ]
       ]
     },

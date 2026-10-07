@@ -1,0 +1,48 @@
+{
+  "tests": [
+    "src/__tests__/billing.locale.test.ts",
+    "src/__tests__/billing.test.ts"
+  ],
+  "mutants": {
+    "no-locale": {
+      "undoes": "D — a checkout started from a French page opens Stripe in Canadian French (locale fr-CA)",
+      "edits": [
+        [
+          "src/billing.ts",
+          "          ...(french ? { locale: 'fr-CA' as const } : {}),\n",
+          ""
+        ]
+      ]
+    },
+    "locale-always": {
+      "undoes": "D — an English page's checkout keeps Stripe's own choice (no locale), as before",
+      "edits": [
+        [
+          "src/billing.ts",
+          "          ...(french ? { locale: 'fr-CA' as const } : {}),",
+          "          locale: 'fr-CA' as const,"
+        ]
+      ]
+    },
+    "english-return": {
+      "undoes": "D — a French checkout returns to /billing/success/fr and /billing/cancel/fr",
+      "edits": [
+        [
+          "src/billing.ts",
+          "  return `${base}/billing/${outcome}${french ? '/fr' : ''}`;",
+          "  return `${base}/billing/${outcome}`;"
+        ]
+      ]
+    },
+    "lang-loose": {
+      "undoes": "D — only lang 'fr' asks for French (not 'FR-ca', ['fr'] or anything starting with fr)",
+      "edits": [
+        [
+          "src/billing.ts",
+          "      const french = req.body?.lang === 'fr';",
+          "      const french = String(req.body?.lang ?? '').toLowerCase().startsWith('fr');"
+        ]
+      ]
+    }
+  }
+}

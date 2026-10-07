@@ -249,8 +249,8 @@
    "edits": [
     [
      "src/pages/Auth.tsx",
-     "explains how we handle your information. <span lang=\"fr\">En français :{' '}\n            <Link className=\"text-[#9ca3af] underline underline-offset-4\" to=\"/terms/fr\">\n              Conditions d’utilisation\n            </Link>{' '}\n            et{' '}\n            <Link className=\"text-[#9ca3af] underline underline-offset-4\" to=\"/privacy/fr\">\n              Politique de confidentialité\n            </Link>\n            .</span>",
-     "explains how we handle your information."
+     "{c.privacyTail} <span lang={HTML_LANG[other]}>{o.inThisLanguage}{' '}\n      <Link className={link} to={localizedPath('/terms', other)}>\n        {o.termsLink}\n      </Link>{' '}\n      {o.and}{' '}\n      <Link className={link} to={localizedPath('/privacy', other)}>\n        {o.privacyLink}\n      </Link>\n      .</span>",
+     "{c.privacyTail}"
     ]
    ]
   },
@@ -259,13 +259,8 @@
    "edits": [
     [
      "src/pages/Auth.tsx",
-     "          <p data-testid=\"auth-terms-line\"",
-     "          {false && <p data-testid=\"auth-terms-line\""
-    ],
-    [
-     "src/pages/Auth.tsx",
-     "            .</span>\n          </p>\n",
-     "            .</span>\n          </p>}\n"
+     "          <TermsLine lang={lang} />",
+     "          {false && <TermsLine lang={lang} />}"
     ]
    ]
   },
@@ -273,14 +268,14 @@
    "undoes": "E (review round 1) — the /auth line asks the user to agree to the Terms only; the Privacy Policy is presented as information",
    "edits": [
     [
-     "src/pages/Auth.tsx",
-     "            </Link>\n            . The{' '}",
-     "            </Link>{' '}\n            and the{' '}"
+     "src/i18n/auth.ts",
+     "  privacyLead: '. The',\n",
+     "  privacyLead: ' and the',\n"
     ],
     [
-     "src/pages/Auth.tsx",
-     "            </Link>{' '}\n            explains how we handle your information. <span",
-     "            </Link>\n            . <span"
+     "src/i18n/auth.ts",
+     "  privacyTail: 'explains how we handle your information.',\n",
+     "  privacyTail: '',\n"
     ]
    ]
   },
@@ -289,8 +284,8 @@
    "edits": [
     [
      "src/pages/Auth.tsx",
-     "to=\"/terms/fr\"",
-     "to=\"/terms\""
+     "      <Link className={link} to={localizedPath('/terms', other)}>",
+     "      <Link className={link} to={localizedPath('/terms', lang)}>"
     ]
    ]
   },
@@ -299,8 +294,8 @@
    "edits": [
     [
      "src/pages/Auth.tsx",
-     "to=\"/privacy/fr\"",
-     "to=\"/privacy\""
+     "      <Link className={link} to={localizedPath('/privacy', other)}>",
+     "      <Link className={link} to={localizedPath('/privacy', lang)}>"
     ]
    ]
   },
@@ -584,13 +579,8 @@
    "edits": [
     [
      "src/pages/Auth.tsx",
-     "          <p data-testid=\"auth-terms-line\"",
-     "          {mode === 'signup' && <p data-testid=\"auth-terms-line\""
-    ],
-    [
-     "src/pages/Auth.tsx",
-     "            .</span>\n          </p>\n",
-     "            .</span>\n          </p>}\n"
+     "          <TermsLine lang={lang} />",
+     "          {mode === 'signup' && <TermsLine lang={lang} />}"
     ]
    ]
   },
@@ -599,13 +589,13 @@
    "edits": [
     [
      "src/pages/Auth.tsx",
-     "          {/* Continuing here is accepting the Terms (Terms §1: creating an\n              account or signing in), so this line sits right under the\n              Google button, in both modes: \"Continue with Google\" creates an\n              account for a Google user Postr has never seen, whatever the\n              mode, and the page opens in sign-in mode (record 24, review\n              round 2). It comes before the email form, so it is read before\n              either way of continuing. Both languages are linked (owner\n              decision 2026-10-06, Bill 96). The Privacy Policy is\n              information, not something the user agrees to (Law 25 s. 14\n              asks for consent separately from other information; record 24,\n              review round 1). */}\n          <p data-testid=\"auth-terms-line\" className=\"mt-3 text-[13px] leading-relaxed text-[#8b8f99]\">\n            By continuing, you agree to the{' '}\n            <Link className=\"text-[#9ca3af] underline underline-offset-4\" to=\"/terms\">\n              Terms of Service\n            </Link>\n            . The{' '}\n            <Link className=\"text-[#9ca3af] underline underline-offset-4\" to=\"/privacy\">\n              Privacy Policy\n            </Link>{' '}\n            explains how we handle your information. <span lang=\"fr\">En français :{' '}\n            <Link className=\"text-[#9ca3af] underline underline-offset-4\" to=\"/terms/fr\">\n              Conditions d’utilisation\n            </Link>{' '}\n            et{' '}\n            <Link className=\"text-[#9ca3af] underline underline-offset-4\" to=\"/privacy/fr\">\n              Politique de confidentialité\n            </Link>\n            .</span>\n          </p>\n\n",
+     "          <TermsLine lang={lang} />\n\n",
      ""
     ],
     [
      "src/pages/Auth.tsx",
      "          </form>\n",
-     "          </form>\n\n          {/* Continuing here is accepting the Terms (Terms §1: creating an\n              account or signing in), so this line sits right under the\n              Google button, in both modes: \"Continue with Google\" creates an\n              account for a Google user Postr has never seen, whatever the\n              mode, and the page opens in sign-in mode (record 24, review\n              round 2). It comes before the email form, so it is read before\n              either way of continuing. Both languages are linked (owner\n              decision 2026-10-06, Bill 96). The Privacy Policy is\n              information, not something the user agrees to (Law 25 s. 14\n              asks for consent separately from other information; record 24,\n              review round 1). */}\n          <p data-testid=\"auth-terms-line\" className=\"mt-3 text-[13px] leading-relaxed text-[#8b8f99]\">\n            By continuing, you agree to the{' '}\n            <Link className=\"text-[#9ca3af] underline underline-offset-4\" to=\"/terms\">\n              Terms of Service\n            </Link>\n            . The{' '}\n            <Link className=\"text-[#9ca3af] underline underline-offset-4\" to=\"/privacy\">\n              Privacy Policy\n            </Link>{' '}\n            explains how we handle your information. <span lang=\"fr\">En français :{' '}\n            <Link className=\"text-[#9ca3af] underline underline-offset-4\" to=\"/terms/fr\">\n              Conditions d’utilisation\n            </Link>{' '}\n            et{' '}\n            <Link className=\"text-[#9ca3af] underline underline-offset-4\" to=\"/privacy/fr\">\n              Politique de confidentialité\n            </Link>\n            .</span>\n          </p>\n\n"
+     "          </form>\n\n          <TermsLine lang={lang} />\n"
     ]
    ]
   },
@@ -613,9 +603,9 @@
    "undoes": "E (review round 2, A-R2-01) — the line is mode-neutral: 'By continuing', read before signing in or creating an account",
    "edits": [
     [
-     "src/pages/Auth.tsx",
-     "            By continuing, you agree to the{' '}",
-     "            By creating an account, you agree to the{' '}"
+     "src/i18n/auth.ts",
+     "  termsLead: 'By continuing, you agree to the',\n",
+     "  termsLead: 'By creating an account, you agree to the',\n"
     ]
    ]
   },

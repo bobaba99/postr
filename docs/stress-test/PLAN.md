@@ -385,6 +385,61 @@ it gave them; not re-measured for this list, so UNVERIFIED here).
   `apps/api/src` has 0 strings naming LaTeX and sends no `custom_text`,
   MEASURED). The owner reads them in the Dashboard.
 
+### Queued by fix 26 (the French public pages, 2026-10-06)
+
+Record `docs/fixes/26-french-public-pages.md` section 10 has the detail and
+the evidence label of each.
+
+- **Owner checks before the French pages deploy.** (1) Supabase Auth →
+  URL Configuration: the Redirect URLs must allow `/auth/fr` (a French
+  e-mail sign-up's confirmation link comes back there, and a French Google
+  sign-in that is buying a plan comes back to `/auth/fr?plan=…`);
+  if they list exact paths, a French visitor lands on the Site URL instead
+  (UNVERIFIED: the production setting is not in the repo). (2) Stripe
+  Checkout with `locale: 'fr-CA'` under Managed Payments has not been run in
+  the sandbox (UNVERIFIED; Stripe refused `custom_text` with Managed
+  Payments, so a sandbox checkout from `/auth/fr?plan=term` should be tried
+  once). (3) The Stripe Dashboard's product names and descriptions are
+  shown on a French Checkout in whatever language they are written.
+- **Still English on a French page:** the feedback form (`FeedbackModal`,
+  opened from the French footer's « Envoyer une rétroaction » and the French
+  About page's buttons), which the editor shares; Supabase's own error
+  messages beyond the six the French sign-in page translates (others show a
+  generic French line).
+- **Out of the owner's scope for now (English only):** the editor and its
+  panels, the dashboard, the profile, the emails Supabase, Stripe and the API
+  send, and Stripe's own pages beyond the Checkout locale.
+- **Owner question:** whether the French pages should say the editor is in
+  English for now (they do not: fix 26 adds no claim the English pages do
+  not make).
+- **Found in passing, English pages (unchanged by fix 26):** at 320 px the
+  English header wraps "Sign in" onto two lines and the wordmark touches the
+  menu button (0 px apart on main and on the branch, in Chromium, Firefox
+  and WebKit, English and French; 11.4 px French and 29.1 px English at
+  360 px: review round 1, R1-10, the reviewer's measurement, not re-run);
+  the crawler h1 of `/about` ("About Postr") and `/why-posters` ("Why
+  poster sessions matter") is not the page's h1 (the French records use the
+  page's h1).
+  Below about 389 px the English landing's "Get started" and "Try as guest"
+  shrink side by side and each label takes two lines (main's layout, kept:
+  R1-01); stacking them is a design choice for the owner.
+- **From review round 1 (record 26 section 9), not changed here:**
+  (1) the French Terms §7.2 call the pricing page « Pricing », and the
+  French page is now titled « Tarifs » (legal text; owner or legal decision,
+  R1-07); (2) fix 24's `routes.json` crawler copy for `/terms/fr` and
+  `/cookies/fr` says « prélèvement » and « fonctions » where the French
+  Terms say « facturation » and « fonctionnalités » (the public pages were
+  aligned, R1-03); (3) on main already: when Supabase answers an e-mail
+  sign-up with the user and `is_anonymous: false` but no session (a pending
+  confirmation, if GoTrue sends that field), `Auth.tsx` skips « Check your
+  inbox » and sends one create-checkout request with no session (R1-09,
+  the reviewer's measurement against a faked response, not re-run here; the
+  production payload is UNVERIFIED): decide "pending" by `session === null` for
+  sign-up, after checking a real sign-up response.
+- **`poster/ReadabilityPanel.tsx` is 1,208 lines** (1,202 on main): splitting
+  it (the result table and the fix box) is left for a change that can
+  re-run fixes 07 and 15's mutant specs in full.
+
 ## LaTeX export: before it is switched back on
 
 The owner hid the LaTeX export on 2026-10-06 ("unnecessary for now"):
@@ -565,3 +620,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 15 | `fix/15-checker-language` | done (three review rounds) — `docs/fixes/15-checker-language.md` (Check answers when it cannot tell R from Python; unsupported plotting systems are named, not scored; a result on screen stays, marked out of date, and one a new print size hides is said to be hidden; detection reads live code only, re-landing 9ea9f38; a string in `aes()` or seaborn's `barplot()` places nothing on its own: code with only such a token gets the could-not-tell answer (an R package name such as `library(tidyverse)` is an R signal and is checked as ggplot2)) |
 | 24 | `fix/legal-canada-law25` | done (three review rounds; round 3 found nothing left) — `docs/fixes/24-legal-canada-law25.md`: the Privacy, Cookies and Terms pages (EN and FR) rewritten for Quebec's Law 25 and PIPEDA first, Global Privacy Control honoured, poster ids kept out of the analytics address and its Referer, the feedback console log opt-in, account deletion clearing every Postr browser entry, the French Terms linked at sign-up; internal file `docs/legal/quebec-law-25.md`; the claims audit's product defects queued above |
 | 25 | `fix/latex-hidden-prices` | one review round (browser and entry points), answered: the `/auth?plan=term` label puts the period before the tax note, a stale code comment reworded — `docs/fixes/25-latex-hidden-prices.md`; the owner's decisions of 2026-10-06: the LaTeX export hidden (`LATEX_EXPORT_ENABLED`, `config/features.ts`; before it returns: the section above), every price shown says tax is extra, the landing "Editable exports" card says the export is paid; a copy inventory test keeps both true |
+| 26 | `feat/french-public-pages` | implemented, review round 1 done and corrected (one round: a simple feature; 12 findings: 7 corrected, 1 left to the owner, 4 informational) — `docs/fixes/26-french-public-pages.md`; the owner's decision of 2026-10-06 (Quebec, Bill 96): every public page in French at its path + `/fr` (`/fr` for the landing page, `/auth/fr?plan=term`), its language read from the URL, a « Français » / "English" link on every page, the French heads with hreflang and the French pages in the sitemap, a French Stripe Checkout from `/auth/fr`; the editor stays English; queued above: "Queued by fix 26" |

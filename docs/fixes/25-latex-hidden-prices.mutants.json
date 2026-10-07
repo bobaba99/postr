@@ -110,9 +110,9 @@
       "undoes": "B — the landing Editable exports card names PowerPoint only and says it is paid",
       "edits": [
         [
-          "src/pages/Landing.tsx",
-          "              Import and edit a PowerPoint, then export an editable one.\n              PowerPoint exports are paid.",
-          "              Import, edit, and export PowerPoint, or continue in LaTeX."
+          "src/i18n/landing.ts",
+          "  exportsBody: 'Import and edit a PowerPoint, then export an editable one. PowerPoint exports are paid.',\n",
+          "  exportsBody: 'Import, edit, and export PowerPoint, or continue in LaTeX.',\n"
         ]
       ]
     },
@@ -120,7 +120,7 @@
       "undoes": "B — the About 'Iterate, export, print' card names PowerPoint only",
       "edits": [
         [
-          "src/pages/About.tsx",
+          "src/i18n/about.ts",
           "PowerPoint exports are paid, and keep text, images and tables editable.",
           "PowerPoint and LaTeX exports are paid: PowerPoint keeps text, images and tables editable, and LaTeX gives you a poster.tex for XeLaTeX."
         ]
@@ -130,7 +130,7 @@
       "undoes": "B — the /pricing hero names PowerPoint only",
       "edits": [
         [
-          "src/pages/Pricing.tsx",
+          "src/i18n/pricing.ts",
           "Pay only for editable PowerPoint exports.",
           "Pay only for editable PowerPoint or LaTeX exports."
         ]
@@ -140,9 +140,9 @@
       "undoes": "B — the pricing cards name PowerPoint only",
       "edits": [
         [
-          "src/components/PricingSection.tsx",
-          "      'Three PowerPoint exports.',",
-          "      'Three PowerPoint or LaTeX exports.',"
+          "src/i18n/pricing.ts",
+          "'Three PowerPoint exports.'",
+          "'Three PowerPoint or LaTeX exports.'"
         ]
       ]
     },
@@ -160,9 +160,9 @@
       "undoes": "B — /auth's already-subscribed notice names PowerPoint only",
       "edits": [
         [
-          "src/pages/Auth.tsx",
-          "'You already have an active term — PowerPoint export is unlocked.';",
-          "'You already have an active term — PowerPoint and LaTeX export are unlocked.';"
+          "src/i18n/auth.ts",
+          "'You already have an active term — PowerPoint export is unlocked.',",
+          "'You already have an active term — PowerPoint and LaTeX export are unlocked.',"
         ]
       ]
     },
@@ -170,7 +170,7 @@
       "undoes": "B — /billing/success names PowerPoint only",
       "edits": [
         [
-          "src/pages/BillingResult.tsx",
+          "src/i18n/billing.ts",
           "Editable PowerPoint exports are unlocked",
           "Editable PowerPoint and LaTeX exports are unlocked"
         ]
@@ -230,8 +230,8 @@
       "undoes": "C — the term card has a tax note (not only the pack)",
       "edits": [
         [
-          "src/components/PricingSection.tsx",
-          "    cadence: 'every 4 months',\n    taxNote: TAX_NOTE,\n",
+          "src/i18n/pricing.ts",
+          "    cadence: 'every 4 months',\n    taxNote: '+ applicable taxes',\n",
           "    cadence: 'every 4 months',\n"
         ]
       ]
@@ -265,12 +265,12 @@
       "undoes": "C — /auth?plan= labels say the price is before tax",
       "edits": [
         [
-          "src/pages/Auth.tsx",
+          "src/i18n/auth.ts",
           "'Term · CA$18.99 every 4 months + applicable taxes'",
           "'Term · CA$18.99 / 4 months'"
         ],
         [
-          "src/pages/Auth.tsx",
+          "src/i18n/auth.ts",
           "'Export pack · CA$9.99 + applicable taxes'",
           "'Export pack · CA$9.99'"
         ]
@@ -320,7 +320,7 @@
       "undoes": "C, review round 1 (B-R1-03) — the /auth?plan=term label puts the period before the tax note, so it does not read as taxes per 4 months",
       "edits": [
         [
-          "src/pages/Auth.tsx",
+          "src/i18n/auth.ts",
           "'Term · CA$18.99 every 4 months + applicable taxes'",
           "'Term · CA$18.99 + applicable taxes / 4 months'"
         ]
