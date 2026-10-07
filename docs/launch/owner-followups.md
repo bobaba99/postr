@@ -42,6 +42,14 @@ Detail: `docs/legal/quebec-law-25.md` (internal, not legal advice) and record 24
   - commitments the pages now make that are not code: page counting is used only for
     page totals, never to locate a person; an EU or UK user who asks is told which
     adequacy decision or safeguard covers a provider.
+- **Supabase redirect for French sign-ups.** In Supabase › Authentication › URL
+  Configuration, the Redirect URLs must allow `https://www.postr.sh/auth/fr` (a
+  wildcard such as `https://www.postr.sh/**` covers it). If not, a French sign-up's
+  confirmation link or Google sign-in lands on the English site instead (it still
+  works, in English). Not checked from here.
+- **One French test purchase in Stripe's sandbox.** A purchase started on a French
+  page opens Stripe Checkout with locale `fr-CA`; whether Managed Payments shows it in
+  French was not tried (no sandbox run from here).
 - **After each deploy that touches analytics:** from `apps/web`,
   `node scripts/analytics-privacy-check.mjs --live https://www.postr.sh` must exit 0
   (it did on 2026-10-06: with GPC on, 0 analytics scripts and 0 page views on 4
@@ -69,6 +77,12 @@ Under your rule that only unclear or blocking legal issues come back to you:
   than the block on screen, it shows only the move button (being built on 2026-10-06;
   Delete stays available from the keyboard), because otherwise, zoomed far out, a click
   meant for a neighbouring block could delete the selected one.
+- **French public pages (fix 26):** each French page sits at its English address plus
+  `/fr` (`/fr` for the landing), with a « Français » / "English" link on every public
+  page and no automatic redirect by browser language; Stripe Checkout opens in
+  `fr-CA` from a French page; the editor, the feedback form and emails stay English
+  for now. Below about 389 px the English landing's two buttons keep main's layout
+  (side by side, each label on two lines); stacking them would be a design change.
 - **Item 12 (undo):** built to your answers (one history, each word a step, A+/A− and
   alignment buttons removed, table typing folded in). Its open questions will be added
   here when its review rounds finish.
@@ -84,6 +98,12 @@ Detail: `docs/stress-test/PLAN.md` (Later list).
 - No Terms line on the other ways to start: the guest "Start creating" button, the
   landing's way into the editor, the editor's "Create account" and Profile's guest
   conversion (only `/auth` shows one).
+- Still English on French pages: the feedback form, the editor, and the emails
+  Supabase and Stripe send.
+- Found by the French pages' review, on main already: when an e-mail sign-up gets no
+  session back (a pending confirmation), `/auth` may skip "Check your inbox" and try a
+  checkout with no session (measured against a faked reply; the real reply is
+  unverified). Queued.
 - Queued from the claims audit as UX bugs (they will be fixed, listed for awareness):
   the paid PowerPoint export drops Figure-tab charts (HIGH); no screen to set a new
   password (HIGH); a replace-import re-arranges the poster; billing refund edge cases
