@@ -770,7 +770,9 @@ describe('FigureReadabilityPage: R\'s aes() takes strings too (fix 15, round 1)'
     pasteCode(lines.join('\n'));
     expect(checkLabel()).toBe('Detected: R / ggplot2');
     clickCheck();
-    expect(screen.getByText('Tick labels')).toBeInTheDocument();
+    // The table renders. Its Plot title row, not Tick labels: theme_void()
+    // draws no tick labels, so that row is left out (fix 13b, P13B-R1-06).
+    expect(screen.getByText('Plot title')).toBeInTheDocument();
     expect(checkLabel()).toBe('Detected: R / ggplot2');
   });
 
