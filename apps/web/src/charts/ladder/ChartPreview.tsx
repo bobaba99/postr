@@ -1,8 +1,11 @@
 /**
  * ChartPreview — renders one candidate spec as a live SVG preview.
  * Previews render at the natural print-legible size and scale down
- * via the svg viewBox, so what the user sees is exactly what the
- * poster (or download) will contain.
+ * via the svg viewBox: the download's 8 × 5.6 in box, with its text at
+ * the size it prints. On the poster the chart is laid out again for its
+ * block's box (ChartBlock): the same text sizes in a different shape,
+ * unless the block is too small for its legend at those sizes
+ * (chartLayout.ts, never below the canonical minimums).
  */
 import { useEffect, useRef, useState } from 'react';
 import type { ChartSpec, Palette } from '@postr/shared';

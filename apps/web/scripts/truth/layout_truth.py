@@ -5,7 +5,16 @@ step 9 reviewer; tick labels and the figures left open added in round 6).
 
 At every Figure.savefig, after a draw, measures in square inches of the
 saved canvas:
-  clip_in2    text area outside the figure (cut off in a plain savefig)
+  clip_in2    Axes text area outside the image the save writes: the figure
+              for a plain save, its tight bounding box plus the pad for
+              bbox_inches='tight', the box itself for an explicit Bbox (fix
+              13b review round 1: measured against the figure alone, a fix
+              that dropped a tight crop and cut text out looked like the
+              controls, which keep the crop)
+  cut_in2     the same for every text drawn: the Axes texts above, legend
+              texts and titles, ax.text and annotations, figure texts and the
+              suptitle (fix 13b review round 1: a legend outside the Axes
+              was in no measure)
   cross_in2   overlap between the text of one Axes (title, axis labels, tick
               labels) and the tight box of ANOTHER Axes (panels colliding)
   figleg_in2  overlap of figure legends / suptitle with any Axes tight box
@@ -71,6 +80,7 @@ matplotlib.use("Agg")
 import numpy as np  # noqa: E402
 from matplotlib.backends.backend_agg import RendererAgg  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
+from matplotlib.transforms import Bbox, BboxBase  # noqa: E402
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from shape_truth import classes  # noqa: E402
@@ -98,6 +108,33 @@ def ax_texts(ax):
     for axis in (ax.xaxis, ax.yaxis):
         out += drawn_tick_labels(axis)
     return [t for t in out if t is not None and t.get_visible() and t.get_text().strip()]
+
+
+def other_texts(fig):
+    """Every text drawn besides ax_texts: legends, Axes texts, figure texts and the suptitle."""
+    out = []
+    for ax in fig.axes:
+        leg = ax.get_legend()
+        if leg is not None and leg.get_visible():
+            out += list(leg.get_texts()) + [leg.get_title()]
+        out += list(ax.texts)
+    for leg in fig.legends:
+        if leg.get_visible():
+            out += list(leg.get_texts()) + [leg.get_title()]
+    out += list(fig.texts)
+    return [t for t in out if t is not None and t.get_visible() and t.get_text().strip()]
+
+
+def image_box(fig, r, kw):
+    """The image a save with these keywords writes, in display pixels."""
+    box = kw.get("bbox_inches", matplotlib.rcParams["savefig.bbox"])
+    if isinstance(box, BboxBase):
+        return Bbox(np.asarray(box.get_points()) * fig.dpi)
+    if isinstance(box, str) and box == "tight":
+        pad = kw.get("pad_inches", matplotlib.rcParams["savefig.pad_inches"])
+        pad = matplotlib.rcParams["savefig.pad_inches"] if pad in (None, "layout") else pad
+        return Bbox(np.asarray(fig.get_tightbbox(r).padded(pad).get_points()) * fig.dpi)
+    return fig.bbox
 
 
 def all_axes(fig):
@@ -225,11 +262,11 @@ def tick_overlaps(fig, r):
     return rows
 
 
-def measure(fig):
+def measure(fig, kw=None):
     fig.canvas.draw()
     r = fig.canvas.get_renderer()
     dpi = fig.dpi
-    fb = fig.bbox
+    fb = image_box(fig, r, kw) if kw is not None else fig.bbox
     clip = 0.0
     cross = 0.0
     tight = [ax.get_tightbbox(r) for ax in fig.axes]
@@ -240,6 +277,7 @@ def measure(fig):
             for j, tb in enumerate(tight):
                 if j != i and not (ax.bbox.overlaps(fig.axes[j].bbox)):
                     cross += inter(bb, tb)
+    cut = clip + sum(bb.width * bb.height - inter(bb, fb) for bb in (t.get_window_extent(r) for t in other_texts(fig)))
     boxes = [lg.get_window_extent(r) for lg in fig.legends]
     if getattr(fig, "_suptitle", None) is not None:
         boxes.append(fig._suptitle.get_window_extent(r))
@@ -254,7 +292,7 @@ def measure(fig):
     for cls, texts in classes(fig).items():
         if cls in LISTED and texts:
             sizes[cls] = round(min(t.get_fontsize() for t in texts), 3)
-    return {"clip_in2": round(clip / px, 3), "cross_in2": round(cross / px, 3),
+    return {"clip_in2": round(clip / px, 3), "cut_in2": round(cut / px, 3), "cross_in2": round(cross / px, 3),
             "figleg_in2": round(figleg / px, 3),
             "overlap_in2": round(overlap / px, 3),
             "tick_in2": round(sum(t[3] for t in ticks) / px, 4),
@@ -291,7 +329,7 @@ def measure_on_agg(fig):
 
 def save(self, *a, **k):
     def work():
-        rec = measure(self)
+        rec = measure(self, k)
         if phase["after"] is None:
             recs.append(rec)
         else:

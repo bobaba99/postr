@@ -6,11 +6,15 @@
  * lazy-loaded in renderChart.ts. No Plot API leaks outside
  * `apps/web/src/charts/` (v1 plan, decided default #5).
  *
- * Print legibility is enforced here, not checked after the fact:
- * tick/legend text renders at ≥ 18 pt and axis titles at ≥ 24 pt of
- * printed size — the same MIN_PT_BY_ROLE thresholds the figure
- * readability checker measures against — so a chart the picker
- * inserts can never fail our own linter.
+ * Print legibility is enforced here, not checked after the fact
+ * (chartLayout.ts): tick, legend and line-end text is drawn at 18 pt and
+ * axis titles at 24 pt of printed size, above the canonical minimums for
+ * figure text the readability checker measures against (14 and 18 pt,
+ * poster/figureTextMinimums.ts). The legend, the tick labels and the axis
+ * titles are laid out inside the box the chart is drawn in and the plot
+ * area takes what is left, so the text prints at those sizes; only in a
+ * box too small for the legend at full size does the text scale down, and
+ * never below the minimums.
  *
  * Styling rules (dataviz method): hairline gridlines, thin marks,
  * direct labels over legends for lines, no number-on-every-point,
@@ -25,6 +29,45 @@ import {
   resolveSlot,
   sequentialRamp,
 } from './chartColors';
+import {
+  bandAxisRange,
+  bandBelowLabels,
+  bandLabelRoom,
+  bandLeftMargin,
+  chartHeightAt,
+  chartText,
+  directLabelRoom,
+  directRightMargin,
+  EDGE,
+  fitTextScale,
+  layoutLegend,
+  minTextScale,
+  plotHeight,
+  verticalMargins,
+  widestUnbreakable,
+  wrapLabels,
+  wrapText,
+  type ChartNeeds,
+  type ChartText,
+  type LegendEntry,
+  type LegendLayout,
+} from './chartLayout';
+import { estimateTextWidth, type MeasureText } from './textMeasure';
+
+export type { LegendEntry, LegendLayout } from './chartLayout';
+
+/**
+ * What a drawn chart's own tick labels asked for (tickFit.ts reads them
+ * after Plot draws): margins wide enough for the widest y tick label and
+ * the x tick labels at the plot's ends, and ticks far enough apart that
+ * the x labels do not meet. Each only ever widens what the layout gave.
+ */
+export interface LayoutOverrides {
+  marginLeft?: number;
+  marginRight?: number;
+  /** Plot's x `tickSpacing`, px (Plot's default is 80). */
+  xTickSpacing?: number;
+}
 
 /** Loose view of the Plot module — only what we call. */
 export type PlotLike = Record<string, (...args: never[]) => unknown> & {
@@ -35,30 +78,44 @@ export interface ChartTheme {
   palette: Palette;
   /** CSS font-family for every piece of chart text. */
   fontFamily: string;
-  /** Natural render size in px (the block's on-canvas pixel size). */
+  /**
+   * Render size in px: the box the chart is drawn in (ChartBlock: the box
+   * its host is laid out in, at 10 px per poster unit). The svg comes out
+   * this size, legend included.
+   */
   widthPx: number;
   heightPx: number;
   /** Pixels per printed point at this render size. */
   pxPerPt: number;
-}
-
-export interface LegendEntry {
-  label: string;
-  color: string;
+  /** How wide a text is drawn (textMeasure.ts); the estimate when absent. */
+  measure?: MeasureText;
 }
 
 export interface PlotBuild {
   options: Record<string, unknown>;
   /** Entries for the custom SVG legend (empty = no legend). */
   legendEntries: LegendEntry[];
-  /** Font sizes in px, for the legend painter. */
+  /** Where the legend's entries go, and its height (0 = no legend). */
+  legend: LegendLayout;
+  /** Font sizes in px, for the legend painter and the axis titles. */
   tickPx: number;
   labelPx: number;
+  /** The share of the design sizes the text is drawn at (1 unless the box is too small). */
+  textScale: number;
+  /** The axis titles' lines, as the margins hold them. */
+  titleLines: { x: string[]; y: string[] };
+  /** The width each axis title may take before it wraps, px. */
+  titleRoom: { x: number; y: number };
+  /**
+   * The least height the chart takes at the minimum text sizes, px: the
+   * legend, the margins and the plot's floor. A box shorter than this
+   * cannot hold the chart without printing text below the minimums; the
+   * svg then comes out this tall and ChartBlock grows the block to it.
+   */
+  minHeightPx: number;
+  /** Which axes Plot ticks itself (numbers, dates), so their labels are read after it draws. */
+  continuous: { x: boolean; y: boolean };
 }
-
-/** MIN_PT_BY_ROLE, ReadabilityPanel.tsx — axis-tick/legend 18, titles 24. */
-const MIN_TICK_PT = 18;
-const MIN_LABEL_PT = 24;
 
 type DataRow = Record<string, string | number | Date | null>;
 
@@ -94,11 +151,6 @@ function distinctStrings(data: DataRow[], field: string | undefined): string[] {
   return seen;
 }
 
-function longestLabelChars(data: DataRow[], field: string | undefined): number {
-  if (!field) return 0;
-  return data.reduce((max, row) => Math.max(max, String(row[field] ?? '').length), 0);
-}
-
 /**
  * Distinct values of a spec's `series` encoding, first-seen order.
  * Shared by the palette picker (swatch count) and buildPlotOptions so
@@ -113,33 +165,144 @@ const LIKERT_NEUTRAL = /^(neutral|neither)/i;
 
 /**
  * Build the Plot options for a spec. `plot` is the (lazily imported)
- * Plot module.
+ * Plot module. Laid out at full text size first; when the box cannot hold
+ * the legend, the margins and the plot's floor at that size, again at the
+ * text scale chartLayout's fit finds. `overrides` are what a first draw's
+ * tick labels asked for (tickFit.ts).
  */
-export function buildPlotOptions(spec: ChartSpec, theme: ChartTheme, plot: PlotLike): PlotBuild {
+export function buildPlotOptions(spec: ChartSpec, theme: ChartTheme, plot: PlotLike, overrides: LayoutOverrides = {}): PlotBuild {
+  const measure = theme.measure ?? estimateTextWidth;
+  const full = buildAt(spec, theme, plot, chartText(theme.pxPerPt, 1, measure), overrides);
+  // The x tick labels' lines and the titles' room as at full size: smaller
+  // text wraps onto no more lines, so the fit errs toward room.
+  const needsAt = (t: ChartText): ChartNeeds => ({
+    titles: { ...titlesOf(full.titleText, full.titleRoom, t), xTickLines: full.xTickLines },
+    rangeFloor: full.yBand ? bandAxisRange(full.yBand.labels.length, yBandWrap(full.yBand, theme.widthPx, t).maxLines, t) : 0,
+  });
+  const scale = fitTextScale(theme, theme.pxPerPt, full.legendEntries, needsAt, measure);
+  const built = scale === 1 ? full : buildAt(spec, theme, plot, chartText(theme.pxPerPt, scale, measure), overrides, full.xEvery);
+  const tMin = chartText(theme.pxPerPt, minTextScale(), measure);
+  return { ...built, minHeightPx: chartHeightAt(theme.widthPx, tMin, full.legendEntries, needsAt(tMin)) };
+}
+
+/** The axis titles' text, before wrapping. */
+interface TitleText {
+  /** Drawn under the x tick labels. */
+  x: string | null;
+  /** Drawn above the plot (a continuous y axis); a band y axis's title runs along it. */
+  yTop: string | null;
+}
+
+/** The width each axis title may take before it wraps, px. */
+interface TitleRoom {
+  x: number;
+  y: number;
+}
+
+function titleLines(text: TitleText, room: TitleRoom, t: ChartText): { x: string[]; y: string[] } {
+  return {
+    x: text.x ? wrapText(text.x, room.x, t.labelPx, t.measure) : [],
+    y: text.yTop ? wrapText(text.yTop, room.y, t.labelPx, t.measure) : [],
+  };
+}
+
+function titlesOf(text: TitleText, room: TitleRoom, t: ChartText): { xLines: number; yTopLines: number } {
+  const lines = titleLines(text, room, t);
+  return { xLines: lines.x.length, yTopLines: lines.y.length };
+}
+
+/**
+ * Where the titles may run (Plot places them, axis.js): a continuous x
+ * axis's title ends at the right edge and a band axis's is centred under
+ * the plot; the y title above the plot starts at the left edge and stops
+ * short of the line-end labels' margin, where the top line's label sits
+ * (review Q-R4: it ran into it).
+ */
+function titleRoom(widthPx: number, marginLeft: number, marginRight: number, xBand: boolean, directLabels: boolean): TitleRoom {
+  const centre = (marginLeft + widthPx - marginRight) / 2;
+  return {
+    x: xBand ? 2 * Math.min(centre - EDGE, widthPx - EDGE - centre) : widthPx - 2 * EDGE,
+    y: (directLabels ? widthPx - marginRight : widthPx - EDGE) - EDGE,
+  };
+}
+
+/** A category axis left of the plot: its labels, and whether its title runs along it. */
+interface YBand {
+  labels: string[];
+  along: boolean;
+}
+
+function yBandWrap(band: YBand, widthPx: number, t: ChartText) {
+  const room = bandLabelRoom(t, widthPx, band.along, widestUnbreakable(band.labels, t.tickPx, t.measure));
+  return wrapLabels(band.labels, room, t.tickPx, t.measure);
+}
+
+/** A scale's axis title as Plot draws it: its own label, or the default (the field name). */
+function labelOf(scale: unknown): string | null {
+  if (!scale || typeof scale !== 'object') return null;
+  const s = scale as { label?: unknown; axis?: unknown };
+  if (s.axis === null || typeof s.label !== 'string' || !s.label) return null;
+  return s.label;
+}
+
+/**
+ * The category axes whose labels wrap: the one under the plot (`x`, or
+ * `fx` for grouped bars' groups) and the one left of it (`y`), with their
+ * labels. Continuous axes (numbers, dates) and the binned heatmap have none.
+ */
+function categoryAxes(spec: ChartSpec, data: DataRow[]): { x: { scale: 'x' | 'fx'; values: string[] } | null; y: string[] | null } {
+  const e = spec.encoding;
+  const isCategory = (field: string | undefined) =>
+    !!field && spec.data.columns.some((c) => c.name === field && c.kind === 'category');
+  const below = (scale: 'x' | 'fx', field: string | undefined) => (field ? { scale, values: distinctStrings(data, field) } : null);
+  switch (spec.form) {
+    case 'bar':
+      return spec.options.horizontal ? { x: null, y: distinctStrings(data, e.x) } : { x: below('x', e.x), y: null };
+    case 'line':
+    case 'area':
+      return { x: isCategory(e.x) ? below('x', e.x) : null, y: null };
+    case 'box':
+    case 'bar-stacked':
+      return { x: below('x', e.x), y: null };
+    case 'bar-grouped':
+      return { x: below('fx', e.x), y: null };
+    case 'bar-diverging':
+      return { x: null, y: distinctStrings(data.map((row) => ({ y: (e.y ? row[e.y] : null) ?? 'All responses' })), 'y') };
+    case 'heatmap':
+      // A cell map's axes are bands whatever the field holds; the binned map's are continuous.
+      return e.value ? { x: below('x', e.x), y: distinctStrings(data, e.y) } : { x: null, y: null };
+    case 'dumbbell':
+      return { x: null, y: distinctStrings(data, e.y) };
+    default:
+      return { x: null, y: null };
+  }
+}
+
+type Built = Omit<PlotBuild, 'minHeightPx'> & { titleText: TitleText; xTickLines: number; xEvery: number; yBand: YBand | null };
+
+function buildAt(spec: ChartSpec, theme: ChartTheme, plot: PlotLike, text: ChartText, overrides: LayoutOverrides, xEveryFrom = 1): Built {
   const P = plot as unknown as Record<string, (...args: unknown[]) => unknown>;
   const { palette } = theme;
   const e = spec.encoding;
   const data = toObjects(spec);
-  const tickPx = MIN_TICK_PT * theme.pxPerPt;
-  const labelPx = MIN_LABEL_PT * theme.pxPerPt;
+  const { tickPx, labelPx, measure } = text;
   const color0 = resolveSlot(spec.paletteSlots[0] ?? 'accent', palette);
   const textColor = '#1c1b1a';
   const strokeW = Math.max(2, tickPx * 0.14);
 
   const marks: unknown[] = [];
   let legendEntries: LegendEntry[] = [];
+  // A height Plot must not exceed for this form (the single stacked bar).
+  let heightCap: number | null = null;
   const options: Record<string, unknown> = {
     width: theme.widthPx,
-    height: theme.heightPx,
-    marginTop: Math.round(tickPx * 1.2),
     marginRight: Math.round(tickPx * 1.5),
-    marginBottom: Math.round(labelPx * 2.2),
     marginLeft: Math.round(labelPx * 2.6),
     style: {
       background: 'transparent',
       color: textColor,
       fontFamily: theme.fontFamily,
-      fontSize: `${Math.round(tickPx)}px`,
+      fontSize: `${tickPx}px`,
     },
     x: { label: spec.xLabel ?? e.x ?? null },
     y: { label: spec.yLabel ?? e.y ?? null, grid: true },
@@ -156,16 +319,6 @@ export function buildPlotOptions(spec: ChartSpec, theme: ChartTheme, plot: PlotL
 
   const sortByValue = spec.options.sort === 'value';
   const horizontal = spec.options.horizontal;
-
-  // Generous left margin for horizontal category labels.
-  const catLabelChars = horizontal
-    ? Math.max(longestLabelChars(data, e.x), longestLabelChars(data, e.y))
-    : 0;
-  if (horizontal) {
-    options['marginLeft'] = Math.round(
-      Math.min(theme.widthPx * 0.42, Math.max(labelPx * 2, catLabelChars * tickPx * 0.62)),
-    );
-  }
 
   switch (spec.form) {
     case 'bar': {
@@ -208,20 +361,23 @@ export function buildPlotOptions(spec: ChartSpec, theme: ChartTheme, plot: PlotL
           const lastPerSeries = seriesValues
             .map((s) => data.filter((row) => String(row[e.series ?? '']) === s).at(-1))
             .filter((row): row is DataRow => row !== undefined);
+          // A long series name wraps (Plot draws "\n" as a line break) and
+          // the right margin holds its widest line, so it stays in the svg.
+          const dx = Math.round(tickPx * 0.4);
+          const names = wrapLabels(seriesValues, directLabelRoom(theme.widthPx, dx), tickPx, measure);
+          const seriesField = e.series;
           marks.push(
             P['text']?.(lastPerSeries, {
               x: e.x,
               y: e.y,
-              text: e.series,
+              text: (row: DataRow) => names.format(row[seriesField]),
               fill: e.series,
-              dx: Math.round(tickPx * 0.4),
+              dx,
               textAnchor: 'start',
               fontSize: tickPx,
             }),
           );
-          options['marginRight'] = Math.round(
-            Math.max(tickPx * 2, longestLabelChars(data, e.series) * tickPx * 0.62),
-          );
+          options['marginRight'] = directRightMargin(text, dx, names.widestPx);
         } else {
           legendEntries = seriesValues.map((label, i) => ({
             label,
@@ -290,7 +446,7 @@ export function buildPlotOptions(spec: ChartSpec, theme: ChartTheme, plot: PlotL
         marks.push(P['barX']?.(data, { x: e.y, fill: e.series }));
         options['y'] = { axis: null };
         options['x'] = { label: spec.yLabel ?? e.y ?? null };
-        options['height'] = Math.min(theme.heightPx, Math.round(labelPx * 6));
+        heightCap = Math.round(labelPx * 6);
       }
       options['color'] = colorScale;
       legendEntries = seriesValues.map((label, i) => ({ label, color: colors[i] ?? color0 }));
@@ -329,9 +485,6 @@ export function buildPlotOptions(spec: ChartSpec, theme: ChartTheme, plot: PlotL
       options['color'] = { domain: levels, range: ramp };
       options['x'] = { label: spec.yLabel ?? e.value ?? null };
       options['y'] = { label: null };
-      options['marginLeft'] = Math.round(
-        Math.min(theme.widthPx * 0.42, Math.max(labelPx * 2, longestLabelChars(data, e.y) * tickPx * 0.55)),
-      );
       legendEntries = levels.map((label, i) => ({ label, color: ramp[i] ?? color0 }));
       break;
     }
@@ -380,5 +533,64 @@ export function buildPlotOptions(spec: ChartSpec, theme: ChartTheme, plot: PlotL
 
   if (!spec.options.legend) legendEntries = [];
 
-  return { options, legendEntries, tickPx, labelPx };
+  // Category labels wrap to fit and the margins hold the wrapped labels, so
+  // none runs past the svg's edges (plan item 13 part 2): left of the plot
+  // up to MAX_BAND_LABEL_SHARE of the width; under it, within its band.
+  // The cell heatmap's y axis is a band whose title runs along it; the
+  // binned heatmap's is continuous, its title above the plot.
+  const yAlongAxis = spec.form === 'heatmap' && !!e.value;
+  const cats = categoryAxes(spec, data);
+  const yBand: YBand | null = cats.y ? { labels: cats.y, along: yAlongAxis && labelOf(options['y']) !== null } : null;
+  let yLines = 1;
+  if (yBand) {
+    const wrapped = yBandWrap(yBand, theme.widthPx, text);
+    options['marginLeft'] = bandLeftMargin(text, wrapped.widestPx, yBand.along);
+    options['y'] = { ...(options['y'] as object), tickFormat: wrapped.format };
+    yLines = wrapped.maxLines;
+  }
+  // What a first draw's tick labels asked for (tickFit.ts): only ever wider.
+  if (overrides.marginLeft !== undefined) options['marginLeft'] = Math.max(Number(options['marginLeft']), overrides.marginLeft);
+  if (overrides.marginRight !== undefined) options['marginRight'] = Math.max(Number(options['marginRight']), overrides.marginRight);
+  if (overrides.xTickSpacing !== undefined && !cats.x) options['x'] = { ...(options['x'] as object), tickSpacing: overrides.xTickSpacing };
+  let xTickLines = 1;
+  let xEvery = 1;
+  if (cats.x) {
+    const plotWidth = theme.widthPx - Number(options['marginLeft']) - Number(options['marginRight']);
+    const { every, wrapped } = bandBelowLabels(cats.x.values, plotWidth, tickPx, measure, xEveryFrom);
+    xEvery = every;
+    const ticks = every > 1 ? { ticks: cats.x.values.filter((_, i) => i % every === 0) } : {};
+    options[cats.x.scale] = { ...(options[cats.x.scale] as object), tickFormat: wrapped.format, ...ticks };
+    xTickLines = wrapped.maxLines;
+  }
+
+  // The titles Plot will draw, and where: the x (or facet) title under the
+  // x tick labels; a continuous y axis's title above the plot (a band y
+  // axis's runs along it, in marginLeft).
+  // Counted with the arrow Plot adds on a continuous axis ("↑ Score",
+  // "Month →"); a band axis draws none, so its title takes no more lines.
+  const xTitle = labelOf(options['fx']) ?? labelOf(options['x']);
+  const yTitle = yAlongAxis ? null : labelOf(options['y']);
+  const titleText: TitleText = {
+    x: xTitle === null ? null : `${xTitle} →`,
+    yTop: yTitle === null ? null : `↑ ${yTitle}`,
+  };
+  const room = titleRoom(theme.widthPx, Number(options['marginLeft']), Number(options['marginRight']), !!cats.x, hasDirectLabels(spec));
+  const lines = titleLines(titleText, room, text);
+  const legend = layoutLegend(legendEntries, theme.widthPx, tickPx, measure);
+  const margins = verticalMargins(text, { xLines: lines.x.length, yTopLines: lines.y.length, xTickLines });
+  const rangeFloor = yBand ? bandAxisRange(yBand.labels.length, yLines, text) : 0;
+  const height = plotHeight(theme.heightPx, legend.height, text, margins, rangeFloor);
+  options['marginTop'] = margins.top;
+  options['marginBottom'] = margins.bottom;
+  options['height'] = heightCap === null ? height : Math.min(height, heightCap);
+
+  return {
+    options, legendEntries, legend, tickPx, labelPx, textScale: text.scale, titleLines: lines, titleText, titleRoom: room, xTickLines, xEvery, yBand,
+    continuous: { x: !cats.x, y: !cats.y },
+  };
+}
+
+/** Whether the lines end in labels (a series line chart whose direct labels are on). */
+function hasDirectLabels(spec: ChartSpec): boolean {
+  return (spec.form === 'line' || spec.form === 'area') && !!spec.encoding.series && spec.options.directLabel !== 'none';
 }

@@ -732,10 +732,13 @@ describe('item 7 — a kept result says which figure and size it is for (review 
     await k.nextTask();
   }
 
+  // Fix 13b: an image block sizes the check by the picture it prints, not
+  // the block: 120 × 80 units less the frame's two 1-unit borders across, a
+  // caption above (the default) keeping the height: 11.8 × 8.0 in.
   it('a check against an image block is not shown under the figure preview after a deselect; selecting the image shows it again', async () => {
     await checkOnImage();
     const table = resultTable()?.textContent;
-    expect(pill()).toBe('12.0" × 8.0"');
+    expect(pill()).toBe('11.8" × 8.0"');
     expect(scaleLine()).not.toMatch(/default block size/);
     await clickEmptyCanvas();
     expect(pressed('Check a figure')).toBe(true);
@@ -744,7 +747,7 @@ describe('item 7 — a kept result says which figure and size it is for (review 
     expect(scaleLine()).toBeNull();
     // A status line (fix 15's answer region, always mounted, is another).
     expect(Array.from(document.querySelectorAll('[role="status"]'), (el) => el.textContent)).toContain(
-      'The last result is for an image block at 12.0" × 8.0". Click Check to check the size above.',
+      'The last result is for an image block at 11.8" × 8.0". Click Check to check the size above.',
     );
     await clickBlock('img1');
     expect(resultTable()?.textContent).toBe(table);
@@ -760,7 +763,7 @@ describe('item 7 — a kept result says which figure and size it is for (review 
     expect(pressed('Check a figure')).toBe(true);
     expect(codeBox()?.value).toBe(SCRIPT);
     expect(resultRows()).toBe(0);
-    expect(panelText()).toContain('The last result is for an image block at 12.0" × 8.0"');
+    expect(panelText()).toContain('The last result is for an image block at 11.8" × 8.0"');
     await clickBlock('img1');
     expect(resultTable()?.textContent).toBe(table);
   });
@@ -768,9 +771,9 @@ describe('item 7 — a kept result says which figure and size it is for (review 
   it('a check against one image block is not shown for another image block', async () => {
     await checkOnImage('img1');
     await clickBlock('img2');
-    expect(pill()).toBe('6.0" × 4.0"');
+    expect(pill()).toBe('5.8" × 4.0"');
     expect(resultRows()).toBe(0);
-    expect(panelText()).toContain('The last result is for an image block at 12.0" × 8.0"');
+    expect(panelText()).toContain('The last result is for an image block at 11.8" × 8.0"');
   });
 
   it('a check against the figure preview is not shown while an image block is selected, and comes back on a deselect', async () => {
@@ -812,9 +815,9 @@ describe('item 7 — a kept result says which figure and size it is for (review 
     await k.nextTask();
     await clickEmptyCanvas();
     await clickBlock('img1');
-    // 120 units scaled by 48.1 / 48: 12.025 in, which the pill shows as 12.0.
+    // 120 units scaled by 48.1 / 48: 120.25, a picture 11.825 in wide, which the pill shows as 11.8.
     expect(k.doc().blocks.find((b) => b.id === 'img1')?.w, 'premise: the image was scaled').toBeCloseTo(120.25, 2);
-    expect(pill()).toBe('12.0" × 8.0"');
+    expect(pill()).toBe('11.8" × 8.0"');
     expect(resultRows()).toBe(rows);
     expect(panelText()).not.toMatch(/result is for/);
   });

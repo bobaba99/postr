@@ -1,0 +1,1662 @@
+{
+  "_about": "Mutants for fix 13b (docs/fixes/13b-checker-sizes.md): each undoes one rule of the table, one edit of the script or one part of the panel. Review round 1 added the r1-* mutants, review round 2 the r2-* mutants and review round 3 the r3-* mutants (record section 9); round 2 retargeted 25 mutants' anchors to the refactored R reader (readabilityROutput.ts, per-plot reads) and the floors, and round 3 retargeted 9 to the order R15 gives, the floors and the device reader, each undoing the same rule as before. Run from apps/web: node scripts/mutation-check.mjs ../../docs/fixes/13b-checker-sizes.mutants.json",
+  "tests": [
+    "src/poster/__tests__/readability.test.ts",
+    "src/poster/__tests__/readabilityScript.test.ts",
+    "src/poster/__tests__/readabilityFullFix.test.ts",
+    "src/pages/__tests__/figureReadabilitySizes.test.tsx",
+    "src/i18n/__tests__/readabilityWarnings.test.ts",
+    "src/pages/__tests__/figureReadabilityReview.test.tsx",
+    "src/pages/__tests__/figureReadabilityReview2.test.tsx",
+    "src/pages/__tests__/figureReadabilityReview3.test.tsx",
+    "src/poster/__tests__/readabilityReview3.test.ts"
+  ],
+  "mutants": {
+    "py-ticks-0.83": {
+      "undoes": "the tick model — x/ytick.labelsize is 'medium', 1.0 × font.size (part 1's 0.83 under-read every inherited tick label by 17 %)",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "  'xtick.labelsize': { kind: 'named', name: 'medium', span: null, origin: 'default' },",
+          "  'xtick.labelsize': { kind: 'named', name: 'small', span: null, origin: 'default' },"
+        ],
+        [
+          "src/poster/readabilityPyRules.ts",
+          "  'ytick.labelsize': { kind: 'named', name: 'medium', span: null, origin: 'default' },",
+          "  'ytick.labelsize': { kind: 'named', name: 'small', span: null, origin: 'default' },"
+        ]
+      ]
+    },
+    "py-rc-only-plt": {
+      "undoes": "P1 — rcParams['key'] = v under any alias (mpl., matplotlib., bare), not only plt.",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "  const item = /\\brcParams\\s*\\[",
+          "  const item = /\\bplt\\.rcParams\\s*\\["
+        ]
+      ]
+    },
+    "py-rc-update-unread": {
+      "undoes": "P2 — rcParams.update({...}) is read",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "    if (c.name === 'update' && !/rcParams$/.test(c.receiver)) continue;",
+          "    if (c.name === 'update') continue;"
+        ]
+      ]
+    },
+    "py-rc-call-unread": {
+      "undoes": "P3 — plt.rc('font', size=) and its groups are read",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "    const keys = group ? RC_GROUPS[group] : undefined;",
+          "    const keys = undefined as Record<string, RcKey> | undefined;"
+        ]
+      ]
+    },
+    "py-rc-context-unread": {
+      "undoes": "P4 — rc_context({...}) is read from its position",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "    const arg = c.name === 'rc_context' ? (argOf(c, 'rc', 0) ?? null) : (c.args.find((a) => a.name === null && !a.star) ?? c.args.find((a) => a.star === 2) ?? null);",
+          "    const arg = c.name === 'rc_context' ? null : (c.args.find((a) => a.name === null && !a.star) ?? c.args.find((a) => a.star === 2) ?? null);"
+        ]
+      ]
+    },
+    "py-seaborn-paper-1.0": {
+      "undoes": "P5 — seaborn's contexts scale its notebook sizes (paper 0.8; part 1 took paper as 1.0 of matplotlib's)",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "{ paper: 0.8, notebook: 1, talk: 1.5, poster: 2 }",
+          "{ paper: 1, notebook: 1, talk: 1.5, poster: 2 }"
+        ]
+      ]
+    },
+    "py-seaborn-no-reset": {
+      "undoes": "P5 — set_theme/set_context write every font key, so a font.size before them changes nothing seaborn sets",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "      for (const k of FONT_KEYS) set[k] = { kind: 'pt', pt: SEABORN_BASE[k]! * SEABORN_SCALING[ctx]! * scale, span: null, origin: 'code' };",
+          "      set['font.size'] = { kind: 'pt', pt: SEABORN_BASE['font.size']! * SEABORN_SCALING[ctx]! * scale, span: null, origin: 'code' };"
+        ]
+      ]
+    },
+    "py-rcdefaults-unread": {
+      "undoes": "P6 — rcdefaults() puts matplotlib's defaults back",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "  for (const c of calls(src, /rcdefaults/)) out.rc.push(rcEvent(src, c.start, 'P6', {}, true));",
+          "  void 0;"
+        ]
+      ]
+    },
+    "py-style-unread": {
+      "undoes": "P7 — a built-in style sheet's sizes are read",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "      const sheet = name !== null ? STYLE_SHEETS[name] : undefined;",
+          "      const sheet = undefined as (typeof STYLE_SHEETS)[string] | undefined;"
+        ]
+      ]
+    },
+    "py-readtime-at-call": {
+      "undoes": "read time — axis titles take rcParams when their Axes is made, not at the label call",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "      else if (d.draws && !labels.has(k)) labels.set(k, instance('axisTitle', fromRc(scan, 'axes.labelsize', creationAt(d)), false));",
+          "      else if (d.draws && !labels.has(k)) labels.set(k, instance('axisTitle', fromRc(scan, 'axes.labelsize', d.at), false));"
+        ]
+      ]
+    },
+    "py-keyword-loses": {
+      "undoes": "override — an explicit size on a call beats rcParams for that text",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "      if (d.size) labels.set(k, instance('axisTitle', fromValue(scan, d.size, 'axes.labelsize', d.at, d.addAt), true));",
+          "      if (d.size) labels.set(k, instance('axisTitle', fromRc(scan, 'axes.labelsize', creationAt(d)), true));"
+        ]
+      ]
+    },
+    "py-named-keyword-unread": {
+      "undoes": "named sizes — fontsize='x-small' is a size (scale × font.size), not unread",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "    return FONT_SCALINGS[named] !== undefined ? { kind: 'named', name: named, span, origin: 'code' } : { kind: 'unread', span, origin: 'code' };",
+          "    return { kind: 'unread', span, origin: 'code' };"
+        ]
+      ]
+    },
+    "py-names-unread": {
+      "undoes": "P17 — a name holding a number is read at the call that uses it",
+      "edits": [
+        [
+          "src/poster/readabilityCalls.ts",
+          "    if (/^[A-Za-z_]/.test(t)) return resolve(t);",
+          "    if (/^[A-Za-z_]/.test(t)) return null;"
+        ]
+      ]
+    },
+    "py-tuple-names-unread": {
+      "undoes": "P17 — names assigned together (fig_w, fig_h, dpi = 8, 5.6, 300, the line Postr's own code writes)",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "    if (parts.length === targets.length) targets.forEach((t, k) => add(t, m!.index, parts[k]![0], parts[k]![1]));",
+          "    void parts;"
+        ]
+      ]
+    },
+    "py-arithmetic-unread": {
+      "undoes": "P17 — a size written as arithmetic (250 / 25.4) is read",
+      "edits": [
+        [
+          "src/poster/readabilityCalls.ts",
+          "      v = op === '*' ? v * r : r === 0 ? null : v / r;",
+          "      v = null;"
+        ]
+      ]
+    },
+    "py-axes-merged": {
+      "undoes": "per Axes — a size set on one Axes is that Axes', not every Axes' (a receiver the check cannot name is not the current Axes)",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "  if (plots.length === 1 && (receiver === 'plt' || (!plots[0]!.receivers.size && !receiver.startsWith('<')))) return plots[0]!;",
+          "  return all[all.length - 1] ?? null;"
+        ]
+      ]
+    },
+    "py-unnamed-dropped": {
+      "undoes": "per Axes — a size set on Axes the check cannot name (a loop over them) is a text of its own",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "  out.push(...unnamed.values());",
+          "  void unnamed;"
+        ]
+      ]
+    },
+    "py-suptitle-not-title": {
+      "undoes": "the suptitle is a plot title",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "  fold('suptitle', 'figure.titlesize', 'plotTitle');",
+          "  void 0;"
+        ]
+      ]
+    },
+    "py-caption-always-shown": {
+      "undoes": "rows — a caption row only when the code draws one (no rcParams key could raise it)",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "    if (!all.length) { hidden[spec.key] = true; continue; }",
+          "    if (!all.length) { sizes[spec.key] = 10; continue; }"
+        ]
+      ]
+    },
+    "py-loop-setter-unread": {
+      "undoes": "P14 — the tick-label loop (for t in ax.get_xticklabels(): t.set_fontsize(n)) is read",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "      while ((m = head.exec(src.masked)) !== null && m.index < c.start) found = m;",
+          "      void head;"
+        ]
+      ]
+    },
+    "py-setp-unread": {
+      "undoes": "P14 — plt.setp(ax.get_xticklabels(), fontsize=) is read",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "    } else if (c.name === 'setp') {",
+          "    } else if (c.name === 'setp' && false) {"
+        ]
+      ]
+    },
+    "py-oo-title-unread": {
+      "undoes": "P12 — ax.title.set_fontsize(n) is read",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "    if (t) d.push(draw('plotTitle', null, c, who(t[1]!), size, false, 'P12'));",
+          "    if (t) void 0;"
+        ]
+      ]
+    },
+    "py-pandas-fontsize-unread": {
+      "undoes": "P14 — pandas' df.plot(fontsize=) sizes its tick labels",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "    if (a) d.push({ cls: 'axisText', axis: null, at: c.start, receiver: 'plt', size: sizeValue(src, nm, a.start, a.end), draws: false, addAt: null, rule: 'P14' });",
+          "    void a;"
+        ]
+      ]
+    },
+    "py-colorbar-label-unread": {
+      "undoes": "P13 — colorbar(label=) draws an axis title",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "  for (const m of out.creations.filter((x) => x.kind === 'colorbar' && x.label)) {",
+          "  for (const m of out.creations.filter(() => false)) {"
+        ]
+      ]
+    },
+    "py-grid-canvas-guessed": {
+      "undoes": "P10 — a seaborn grid with facets or a legend has no canvas the code states: assumed, never guessed from height × aspect",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "    return pick(g.canvas ? { canvas: g.canvas, canvasWhy: why(null), canvasSpan: null, gridName, firstCreation: first } : { canvas: typed, canvasWhy: 'grid', canvasSpan: null, gridName, firstCreation: first });",
+          "    return pick({ canvas: g.canvas ?? { w: 5, h: 5 }, canvasWhy: why(null), canvasSpan: null, gridName, firstCreation: first });"
+        ]
+      ]
+    },
+    "py-tight-not-assumed": {
+      "undoes": "P11 — a save cropped with bbox_inches='tight' makes the printed scale unknown",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "  if (s.bboxArg) return s.tight;",
+          "  if (s.bboxArg) return false;"
+        ]
+      ]
+    },
+    "py-notebook-not-assumed": {
+      "undoes": "P11 — a notebook's display crops the figure",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "!save && scan.notebook && scan.shows.length ? 'notebook' : w",
+          "w"
+        ]
+      ]
+    },
+    "py-advice-two-sources": {
+      "undoes": "advice — one number only when every row that follows a base follows the same one",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "  if (sources.size === 1) {",
+          "  if (sources.size >= 1) {"
+        ]
+      ]
+    },
+    "py-advice-unknown-scale": {
+      "undoes": "advice — withheld when the printed scale is unknown",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "    scaleUnknown: m.canvasWhy !== null && m.canvasWhy !== 'default',",
+          "    scaleUnknown: false,"
+        ]
+      ]
+    },
+    "fix-span-not-edited": {
+      "undoes": "the script — a size the code writes is replaced where it is written",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "      spans.set(w.span[0], { at: w.span[0], end: w.span[1], text: valueText(val, kept) });",
+          "      void val; void kept;"
+        ]
+      ]
+    },
+    "fix-lowers": {
+      "undoes": "the script — never lowers: a value covers every text the same occurrence decides",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "  const valueFor = (w: Winner, pt: number) => Math.max(pt, ...m.instances.filter((i) => sameWinner(i.winner, w)).map((i) => i.pt));",
+          "  const valueFor = (w: Winner, pt: number) => (void sameWinner, pt);"
+        ]
+      ]
+    },
+    "fix-insert-anywhere": {
+      "undoes": "the script — a missing setting goes before the figure is made",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    const fallback = firstStmt ?? (scan.saves[0] ? statementStart(scan.src, scan.saves[0].at) : code.length);",
+          "    const fallback = code.length;"
+        ],
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    return firstStmt !== null && line <= firstStmt ? firstStmt : line;",
+          "    return line;"
+        ]
+      ]
+    },
+    "fix-before-reset": {
+      "undoes": "the script — after the last reset that would undo it (a seaborn set_theme after the figure)",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    if (after < 0) return fallback;",
+          "    if (after < 0 || true) return fallback;"
+        ]
+      ]
+    },
+    "fix-caption-no-kwarg": {
+      "undoes": "the script — a caption gets its own fontsize=",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "      edits.push(kwargEdit(code, { close: w.at }, w.at, 'fontsize', num(v)));",
+          "      void v;"
+        ]
+      ]
+    },
+    "fix-tight-kept": {
+      "undoes": "the script — a seaborn grid at the print size saves its whole figure: an explicit bbox_inches='tight' on its save is removed (a figure's save) or told None (g.savefig, which crops when it is not given)",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "      if (s.call && s.bboxArg && s.tight) edits.push(s.grid ? { at: s.bboxArg.start, end: s.bboxArg.end, text: 'None' } : removeArg(code, s.call, s.bboxArg.argStart, s.bboxArg.argEnd));",
+          "      if (s.call && s.bboxArg && s.tight) void 0;"
+        ]
+      ]
+    },
+    "fix-grid-size-unset": {
+      "undoes": "the script — a seaborn grid is set to the print size before its save",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "  if (m.canvasWhy === 'grid' && lastSave) {",
+          "  if (m.canvasWhy === 'grid' && lastSave && false) {"
+        ]
+      ]
+    },
+    "fix-default-canvas-unset": {
+      "undoes": "the script — a figure size the code leaves out is set",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "  if (m.canvasWhy === 'default') addInsert(firstStmt ?? code.length, 'figure.figsize', `(${W}, ${H})`);",
+          "  void W;"
+        ]
+      ]
+    },
+    "fix-canvas-no-brackets": {
+      "undoes": "the script — a figsize the check cannot read is replaced by a (w, h) pair",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "text: m.canvasArgs ? `${W}, ${H}` : `(${W}, ${H})` });",
+          "text: `${W}, ${H}` });"
+        ]
+      ]
+    },
+    "fix-save-after-show": {
+      "undoes": "the script — a save it adds goes before the first show()",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    const line = show !== undefined ? statementStart(scan.src, show) : code.length;",
+          "    const line = code.length;"
+        ]
+      ]
+    },
+    "fix-legend-title-left": {
+      "undoes": "the script — a legend title follows its legend text",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "      if (w.key === 'legend.fontsize') addInsert(line, 'legend.title_fontsize', valueText(val, kept ? atRun(title) : undefined));",
+          "      void prev; void title;"
+        ]
+      ]
+    },
+    "fix-block-stacks": {
+      "undoes": "the script — a second fix adds its keys to the block an earlier fix wrote",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    if (!b || brace < 0) continue;",
+          "    if (!b || brace < 0 || true) continue;"
+        ]
+      ]
+    },
+    "r-positional-base": {
+      "undoes": "R1 — base_size given positionally (theme_bw(6))",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    const a = c.args.find((x) => x.name === 'base_size') ?? c.args.filter((x) => x.name === null)[0];",
+          "    const a = c.args.find((x) => x.name === 'base_size');"
+        ]
+      ]
+    },
+    "r-text-root-unread": {
+      "undoes": "R2 — theme(text = element_text(size =)) sizes every text",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "      if (size && 'abs' in size) return { pt: size.abs, slope: 0, blank, theme: false };\n      if (size && 'rel' in size) return { pt: size.rel * base, slope: size.rel, blank, theme: true };",
+          "      if (size && 'abs' in size && false) return { pt: size.abs, slope: 0, blank, theme: false };\n      if (size && 'rel' in size) return { pt: size.rel * base, slope: size.rel, blank, theme: true };"
+        ]
+      ]
+    },
+    "r-title-root-skipped": {
+      "undoes": "R2 — title is a parent of every title (theme(title =))",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "  text: null, title: 'text',",
+          "  text: null, title: 'text', 'axis.title.x.top': 'title',"
+        ],
+        [
+          "src/poster/readabilityRModel.ts",
+          "  'axis.title': 'title', 'axis.title.x': 'axis.title', 'axis.title.y': 'axis.title',",
+          "  'axis.title': 'text', 'axis.title.x': 'axis.title', 'axis.title.y': 'axis.title',"
+        ],
+        [
+          "src/poster/readabilityRModel.ts",
+          "  'plot.title': 'title', 'plot.caption': 'title',",
+          "  'plot.title': 'text', 'plot.caption': 'text',"
+        ]
+      ]
+    },
+    "r-complete-keeps-earlier": {
+      "undoes": "R1 — a complete theme replaces every theme() written before it",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    mods = themeCalls.filter((c) => !inSet(c.e) && c.e > plotTheme.e).map((c) => c.x);",
+          "    mods = themeCalls.filter((c) => !inSet(c.e)).map((c) => c.x);"
+        ]
+      ]
+    },
+    "r-themeset-over-plot": {
+      "undoes": "R3 — a complete theme the plot adds replaces theme_set()'s",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "  const plotTheme = ranked(ctx.completes, (t) => t.at, ord).filter((t) => !inSet(t.e)).pop();",
+          "  const plotTheme = ranked(ctx.completes, (t) => t.at, ord).filter((t) => !inSet(t.e) && sets.length === 0).pop();"
+        ]
+      ]
+    },
+    "r-theme-update-unread": {
+      "undoes": "R4 — theme_update() changes the global theme's elements",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    const afterSet = ctx.updates.filter((c) => !lastSet || c.start > lastSet.close);",
+          "    const afterSet: Call[] = [];"
+        ]
+      ]
+    },
+    "r-caption-0.67": {
+      "undoes": "ggplot2's plot.caption is rel(0.8) of title (part 1 had 0.67)",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "'plot.title': { rel: 1.2 }, 'plot.caption': { rel: 0.8 },",
+          "'plot.title': { rel: 1.2 }, 'plot.caption': { rel: 0.67 },"
+        ]
+      ]
+    },
+    "r-ggsave-scale-unread": {
+      "undoes": "R5 — ggsave(scale =) multiplies the canvas",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "  const scale = num(args.get('scale')) ?? 1;",
+          "  const scale = 1;"
+        ]
+      ]
+    },
+    "r-strips-x-only": {
+      "undoes": "R7 — facet_grid's rows draw strips at the side (strip.text.y)",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "  const strips = [...(cols ? ['strip.text.x.top'] : []), ...(rows ? ['strip.text.y.right'] : [])];",
+          "  const strips = ['strip.text.x.top'];"
+        ]
+      ]
+    },
+    "r-blank-drawn": {
+      "undoes": "R6 — an element_blank() element is not drawn, and has no row",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    const got = drawn.map((sel) => ({ sel, ...resolve(sel) })).filter((x) => !x.blank);",
+          "    const got = drawn.map((sel) => ({ sel, ...resolve(sel) }));"
+        ]
+      ]
+    },
+    "r-advice-ambiguous": {
+      "undoes": "advice — withheld when the base_size written is one the plot does not use",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "baseEditable: !merged.baseUnread && !(merged.baseAssumed && merged.otherBase)",
+          "baseEditable: !merged.baseUnread"
+        ]
+      ]
+    },
+    "r-fix-after-last-theme": {
+      "undoes": "the R script — its theme() goes into the plot ggsave() saves (part 1 put it after the last theme_*(), where a later theme(), a string or theme_update() took it)",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "      if (out.plot) edits.push({ at: out.plot.start, end: out.plot.end, text: out.bare ? `print(${themed})` : themed });",
+          "      if (out.plot) { const th = code.lastIndexOf('theme_'); const end = th < 0 ? out.plot.end : code.indexOf(')', th) + 1; edits.push({ at: end, end, text: ` +\\n  ${theme}` }); }"
+        ]
+      ]
+    },
+    "r-fix-bare-always": {
+      "undoes": "the R script — names only the child below its minimum when the user sized one or only one falls short",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "    const bare = !PER_AXIS.has(spec.key) || (failing.length === children.length && !(r.pinned[spec.key] ?? []).length);",
+          "    const bare = true;"
+        ]
+      ]
+    },
+    "r-fix-names-passing": {
+      "undoes": "the R script — never names a child that passes (it would set a drawn size lower)",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "    const short = all.filter((c) => c.pt < need.neededPt - 1e-9);",
+          "    const short = all;"
+        ]
+      ]
+    },
+    "r-fix-root-unset": {
+      "undoes": "the R script — with no base_size in the code, the root size the check assumed is set",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "  if (r.baseAssumed && !r.unknownTheme) args.push(`text = element_text(size = ${num(r.base)})`);",
+          "  void num;"
+        ]
+      ]
+    },
+    "r-fix-ggsave-unread-kept": {
+      "undoes": "the R script — a ggsave() size the check cannot read is replaced by the size it scored",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "  if (m.canvasWhy === 'unread' && out.call) {",
+          "  if (m.canvasWhy === 'unread' && out.call && false) {"
+        ]
+      ]
+    },
+    "advice-unfloored": {
+      "undoes": "advice — never below the script's own base (defensive: a failing row that follows the base already needs more than it)",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          "    return n > params.ownBase ? n : null;",
+          "    return n;"
+        ]
+      ],
+      "expect": "survive",
+      "why": "defensive code: a failing row that follows the script's base needs more than that base by its own arithmetic (at the base it falls short), so no ordinary input reaches the floor",
+      "unguarded": "INSPECTED: equivalent except at a float-rounding edge (min / (slope × scale) within 1e-9 above the script's own base, where the epsilon in the ceiling would give that base back); no corpus script, print size or test reaches it, and the gate measures the floor's purpose directly (SNIPLOW 0 of 119 Python and 0 of 63 R offers below the script's base)"
+    },
+    "ui-assumed-row-unmarked": {
+      "undoes": "the table — a size the code does not set is marked",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "                    {el.assumed && <span title={el.unread ? c.legend.unreadRow : c.legend.assumedRow}>*</span>}",
+          "                    {false && <span title={el.unread ? c.legend.unreadRow : c.legend.assumedRow}>*</span>}"
+        ]
+      ]
+    },
+    "ui-assumed-scale-unmarked": {
+      "undoes": "the table — a scale the code does not fix is marked",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "            {result.canvasAssumed && <span title={c.legend.assumedScale}>*</span>}",
+          "            {false && <span title={c.legend.assumedScale}>*</span>}"
+        ]
+      ]
+    },
+    "ui-banner-over-assumed": {
+      "undoes": "the table — no all-pass line over a row or scale the check assumed",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  const allPass = (result?.elements.every((e) => e.status === 'pass') ?? false) && !assumed;",
+          "  const allPass = result?.elements.every((e) => e.status === 'pass') ?? false;"
+        ]
+      ]
+    },
+    "ui-script-only-when-failing": {
+      "undoes": "the panel — the script is offered when a size or the canvas is assumed, not only when a row falls short",
+      "edits": [
+        [
+          "src/poster/readabilityFullFix.ts",
+          "  return result.canvasAssumed || result.elements.some((e) => e.status !== 'pass' || e.assumed);",
+          "  return result.elements.some((e) => e.status !== 'pass');"
+        ]
+      ]
+    },
+    "ui-block-not-picture": {
+      "undoes": "the editor — the check scales to the picture an image block prints, not the block",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "  const blockWidthIn = imageBox ? imageBox.widthIn : defaultFigureWidthIn;",
+          "  const blockWidthIn = isImage ? selectedBlock.w / 10 : defaultFigureWidthIn;"
+        ]
+      ]
+    },
+    "ui-side-caption-ignored": {
+      "undoes": "the editor — a side caption takes 35% of an image block's width",
+      "edits": [
+        [
+          "src/poster/imageBox.ts",
+          "const SIDE_CAPTION_SHARE = 0.35;",
+          "const SIDE_CAPTION_SHARE = 0;"
+        ]
+      ]
+    },
+    "r1-01-crop-dropped": {
+      "undoes": "P13B-R1-01 — a cropped save writes poster_box, the canvas with everything drawn in it (the edit back to the old: keep the crop as written, no box)",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "      if (s.bboxArg) edits.push({ at: s.bboxArg.start, end: s.bboxArg.end, text: 'poster_box' });\n      else edits.push(kwargEdit(code, s.call!, s.call!.close, 'bbox_inches', 'poster_box'));",
+          "      void s;"
+        ]
+      ]
+    },
+    "r1-01-no-fit-block": {
+      "undoes": "P13B-R1-01 — the fit block goes before the cropped save",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    edits.push({ at: line, end: line, text: fitBlock(m, m.tightSave, indentAt(code, line), W, H) });",
+          "    void line;"
+        ]
+      ]
+    },
+    "r1-01-fit-dpi-figure": {
+      "undoes": "P13B-R1-01 — the fit block measures at the save's dpi",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    `${i}poster_fig.set_dpi(${dpiExpr})`,",
+          "    `${i}poster_fig.set_dpi(poster_dpi)`, void dpiExpr,"
+        ]
+      ]
+    },
+    "r1-01-fit-pad-ignored": {
+      "undoes": "P13B-R1-01 — the fit block pads by the save's own pad_inches",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "  const padExpr = pad && stringAt(scan.src, pad.start, pad.end) === null ? scan.src.code.slice(pad.start, pad.end) : `${rc}['savefig.pad_inches']`;",
+          "  const padExpr = `${rc}['savefig.pad_inches']`;"
+        ]
+      ]
+    },
+    "r1-01-fit-not-read": {
+      "undoes": "P19 — the fit block and its box save are read back: the printed scale is known",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "  const fitted = !!resized?.fit && !!save?.bboxArg && scan.src.code.slice(save.bboxArg.start, save.bboxArg.end).trim() === 'poster_box';",
+          "  const fitted = false;"
+        ]
+      ]
+    },
+    "r1-02-prop-overwritten": {
+      "undoes": "P13B-R1-02 — a fontdict=/prop= value the check cannot read is never overwritten (part of the round: it was, with a number)",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "  return { kind: 'unread', span: null, origin: 'code', kw };\n}",
+          "  return { kind: 'unread', span: [a.start, a.end], origin: 'code', kw };\n}"
+        ]
+      ]
+    },
+    "r1-02-dict-no-size-unread": {
+      "undoes": "P13B-R1-02 — a fontdict/prop dict with no size sets none (rcParams decides)",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "    return e ? sizeValue(src, nm, e.start, e.end) : null;\n  }\n  return { kind: 'unread'",
+          "    return e ? sizeValue(src, nm, e.start, e.end) : { kind: 'unread', span: null, origin: 'code' };\n  }\n  return { kind: 'unread'"
+        ]
+      ]
+    },
+    "r1-02-fontprops-unread": {
+      "undoes": "P13B-R1-02 — a FontProperties (inline or in a name) is read where its size is written",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "  const fp = fontPropsAt(src, at);",
+          "  const fp = null as Call | null; void fontPropsAt;"
+        ]
+      ]
+    },
+    "r1-02-fontdict-no-keyword": {
+      "undoes": "P13B-R1-02 — a fontdict= the check cannot read takes a fontsize= keyword",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "    : v.kind === 'unread' && v.kw && addAt !== null ? { kind: 'kwarg', at: addAt } : { kind: 'none' };",
+          "    : { kind: 'none' }; void addAt;"
+        ]
+      ]
+    },
+    "r1-02-kept-not-said": {
+      "undoes": "the panel says to check a marked size the script leaves as written",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "{!keptDefault ? c.legend.assumedBody : fullFixedCode !== '' ? c.legend.assumedBodySome : c.legend.assumedBodyKept}",
+          "{c.legend.assumedBody}"
+        ]
+      ]
+    },
+    "r1-02-allpass-kept-not-said": {
+      "undoes": "with no script, the all-pass line says to check the marked sizes by hand",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "{allPass ? c.allPass : fullFixedCode !== '' && !assumedKept ? c.allPassAssumed : c.allPassAssumedKept}",
+          "{allPass ? c.allPass : c.allPassAssumed}"
+        ]
+      ]
+    },
+    "r1-02-unchanged-script-offered": {
+      "undoes": "no script is offered when it would be the user's own",
+      "edits": [
+        [
+          "src/poster/readabilityFullFix.ts",
+          "  return out === code ? '' : out;",
+          "  return out;"
+        ]
+      ]
+    },
+    "r1-03-grid-shown-unsized": {
+      "undoes": "P13B-R1-03 — a grid only shown is set to the print size before the save the fix adds",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    const before = m.canvasWhy === 'grid' ? gridBlock(m, indent, W, H) : fit ? fitBlock(m, null, indent, W, H) : '';",
+          "    const before = fit ? fitBlock(m, null, indent, W, H) : '';"
+        ]
+      ]
+    },
+    "r1-04-update-by-position": {
+      "undoes": "P13B-R1-04 — the plot's own theme() applies after theme_update(), whatever the order written",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    mods = [...fromSet, ...afterSet, ...themeCalls.filter((c) => !inSet(c.e)).map((c) => c.x)];",
+          "    mods = [...fromSet, ...afterSet, ...themeCalls.filter((c) => !inSet(c.e)).map((c) => c.x)].sort((a, b) => a.start - b.start);"
+        ]
+      ]
+    },
+    "r1-05-root-from-unknown": {
+      "undoes": "P13B-R1-05 — the root text is never written from ggplot2's 11 under a theme that is not ggplot2's",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "  if (r.baseAssumed && !r.unknownTheme) args.push",
+          "  if (r.baseAssumed) args.push"
+        ]
+      ]
+    },
+    "r1-05-unknown-unmarked": {
+      "undoes": "P13B-R1-05 — every size resting on a theme that is not ggplot2's is marked",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    if (unknownTheme && got.some((x) => x.theme)) themeDependent[spec.key] = true;",
+          ""
+        ]
+      ]
+    },
+    "r1-05-unknown-advice": {
+      "undoes": "P13B-R1-05 — no one-number advice under a theme that is not ggplot2's",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    baseEditable: !merged.baseUnread && !(merged.baseAssumed && merged.otherBase) && !merged.unknownTheme && !combined,",
+          "    baseEditable: !merged.baseUnread && !(merged.baseAssumed && merged.otherBase) && !combined,"
+        ]
+      ]
+    },
+    "r1-06-void-unblanked": {
+      "undoes": "P13B-R1-06 — theme_void() blanks axis.title and axis.text",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "const THEME_BLANK: Record<string, string[]> = { theme_void: ['axis.title', 'axis.text'] };",
+          "const THEME_BLANK: Record<string, string[]> = {};"
+        ]
+      ]
+    },
+    "r1-07-unnamed-count": {
+      "undoes": "P13B-R1-07 — ggsave()'s plot is found by R's matching, not by counting unnamed arguments",
+      "edits": [
+        [
+          "src/poster/readabilityCalls.ts",
+          "  call.args.filter((a) => a.name === null).forEach((a, k) => { if (order[k]) out.set(order[k]!, a); });",
+          "  call.args.filter((a) => a.name === null).forEach((a, k) => { if (formals[k] && left.has(formals[k]!)) out.set(formals[k]!, a); }); void order;"
+        ]
+      ]
+    },
+    "r1-07-no-partial": {
+      "undoes": "P13B-R1-07 — a partial argument name (file =) matches its formal",
+      "edits": [
+        [
+          "src/poster/readabilityCalls.ts",
+          "    if (hits.length === 1) { out.set(hits[0]!, a); left.delete(hits[0]!); }",
+          "    void hits;"
+        ]
+      ]
+    },
+    "r1-08-star-unread": {
+      "undoes": "P13B-R1-08 — a size in a dict passed as ** is read",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "    const e = entries.find((x) => x.key === 'fontsize' || x.key === 'size');\n    if (e) return sizeValue(src, nm, e.start, e.end);",
+          "    void entries;"
+        ]
+      ]
+    },
+    "r1-09-default-before-crop": {
+      "undoes": "P13B-R1-09 — a crop decides the scale before a default canvas does",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "canvasWhy: why(rc.origin === 'default' ? 'default' : null)",
+          "canvasWhy: rc.origin === 'default' ? 'default' : why(null)"
+        ]
+      ]
+    },
+    "r1-10-before-else": {
+      "undoes": "P13B-R1-10 — settings never go before an else:, elif, except or finally",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    if (body && own <= indent && !/^(?:else|elif|except|finally)\\b/.test(body)) return at;",
+          "    if (body && own <= indent) return at;"
+        ]
+      ]
+    },
+    "r1-10-inside-block": {
+      "undoes": "P13B-R1-10 — settings never go inside a deeper block, where they run only when it does",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    if (body && own <= indent && !/^(?:else|elif|except|finally)\\b/.test(body)) return at;",
+          "    if (body && !/^(?:else|elif|except|finally)\\b/.test(body)) return at; void own;"
+        ]
+      ]
+    },
+    "r1-11-rc-star-unread": {
+      "undoes": "P13B-R1-11 — rc('font', **font) is read",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "    for (const a of c.args.filter((x) => x.star === 2)) for (const e of dictAt(src, nm, a) ?? []) if (keys[e.key]) set[keys[e.key]!] = rcValue(src, nm, keys[e.key]!, e.start, e.end);\n",
+          ""
+        ]
+      ]
+    },
+    "r1-12-scale-position-5": {
+      "undoes": "P13B-R1-12 — set_theme's positional font_scale is its fifth argument",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "    const scaleArg = argOf(c, 'font_scale', c.name === 'set_context' ? 1 : 4);",
+          "    const scaleArg = argOf(c, 'font_scale', c.name === 'set_context' ? 1 : 5);"
+        ]
+      ]
+    },
+    "r1-13-tuple-unnamed": {
+      "undoes": "P13B-R1-13 — Axes unpacked from a tuple are each their own Axes",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "    if (own.length === c.axes) { own.forEach((n) => out.push({ creation: c, receivers: new Set([n]), axes })); continue; }\n",
+          ""
+        ]
+      ]
+    },
+    "r1-16-element-text-rescanned": {
+      "undoes": "P13B-R1-16 — element_text() calls are found once per source (linear time)",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "  return byStart.get(at);\n}",
+          "  return calls(src, /element_text/).find((c) => c.start === at);\n}"
+        ]
+      ]
+    },
+    "r1-14-imagebox-gap-ignored": {
+      "undoes": "a side caption's gap is taken from the picture's width",
+      "edits": [
+        [
+          "src/poster/imageBox.ts",
+          "Math.max(0, Math.min(24, block.captionGap ?? 0))",
+          "0"
+        ]
+      ]
+    },
+    "r1-14-imagebox-frame-height": {
+      "undoes": "with no caption chrome the frame border is taken from the height",
+      "edits": [
+        [
+          "src/poster/imageBox.ts",
+          "const height = chrome ? block.h : block.h - 2 * FRAME_BORDER;",
+          "const height = block.h;"
+        ]
+      ]
+    },
+    "r1-14-r-px-dpi-ignored": {
+      "undoes": "ggsave units='px' are divided by the call's dpi",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "units === 'px' ? dpi : 1",
+          "units === 'px' ? 300 : 1"
+        ]
+      ]
+    },
+    "r1-14-who-keeps-ax": {
+      "undoes": "cb.ax is the colorbar's own Axes",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          ".replace(/\\.ax$/, '')",
+          ""
+        ]
+      ]
+    },
+    "r1-14-kwarg-sep-fixed": {
+      "undoes": "kwargEdit handles a trailing comma",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "  const sep = code[k] === '(' || code[k] === ',' ? (code[k] === ',' ? ' ' : '') : ', ';",
+          "  const sep = ', ';"
+        ]
+      ]
+    },
+    "r1-14-r-update-before-set-kept": {
+      "undoes": "a theme_update() before theme_set() is wiped by it",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    const afterSet = ctx.updates.filter((c) => !lastSet || c.start > lastSet.close);",
+          "    const afterSet = ctx.updates;"
+        ]
+      ]
+    },
+    "r1-14-r-scale-kept": {
+      "undoes": "an unreadable ggsave() gets scale 1 with the replaced size",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "    if (scale) edits.push({ at: scale.start, end: scale.end, text: '1' });",
+          "    void scale;"
+        ]
+      ]
+    },
+    "r1-14-fig-legend-merged": {
+      "undoes": "a figure legend is its own legend, not the Axes'",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "const k = cls === 'legendText' && /figure$|gcf\\(\\)$|^fig/.test(d.receiver) ? `fig@${d.at}` : `${key(d)}:",
+          "const k = cls === 'legendText' && false ? `fig@${d.at}` : `${key(d)}:"
+        ]
+      ]
+    },
+    "r1-14-fix-title-assumed": {
+      "undoes": "the fix title says it sets sizes the code leaves out when nothing fails",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "{failing ? c.fix.title : c.fix.titleAssumed}",
+          "{c.fix.title}"
+        ]
+      ]
+    },
+    "r1-14-advice-hidden-default-canvas": {
+      "undoes": "the advice is offered on a default (known) canvas",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "scaleUnknown: m.canvasWhy !== null && m.canvasWhy !== 'default',",
+          "scaleUnknown: m.canvasWhy !== null,"
+        ]
+      ]
+    },
+    "r1-14-grid-save-not-tight": {
+      "undoes": "g.savefig crops tight by default",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "  if (s.grid) return true;",
+          "  if (s.grid) return false;"
+        ]
+      ]
+    },
+    "r1-14-block-merge-dups": {
+      "undoes": "a second fix adds only the keys the first block lacks",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          ".filter(([k]) => !existing.has(k))",
+          ".filter(() => true)"
+        ]
+      ],
+      "expect": "survive",
+      "why": "defensive: a key the block already holds is read as a value the code writes (P2, its span), so the fix edits it in place and never inserts it again; no ordinary input reaches the filter",
+      "unguarded": "INSPECTED (the insert path takes only keys whose winner is not a written value); served to the Python gate, the page output is compared with the unmutated run (record 13b section 9)"
+    },
+    "r1-05-no-floor": {
+      "undoes": "P13B-R1-05 — a row resting on a theme that is not ggplot2's is set to at least the size the theme draws (calc_element at run time)",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "    const floored = (c: (typeof all)[number]) => !!(c.theme || c.unread);",
+          "    const floored = (c: (typeof all)[number]) => !!(c.unread && false);"
+        ]
+      ]
+    },
+    "r1-05-floor-unread": {
+      "undoes": "R10 — the floor the fix writes is read back as at least its number",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "  if (floor) return { size: { abs: Number(floor[1]) }, span };\n",
+          ""
+        ]
+      ]
+    },
+    "r1-14-grid-tight-removed": {
+      "undoes": "an explicit bbox_inches='tight' on g.savefig is told None, not removed",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "edits.push(s.grid ? { at: s.bboxArg.start, end: s.bboxArg.end, text: 'None' } : removeArg(",
+          "edits.push(false ? { at: s.bboxArg.start, end: s.bboxArg.end, text: 'None' } : removeArg("
+        ]
+      ]
+    },
+    "r1-08-tick-star-unread": {
+      "undoes": "a sibling of P13B-R1-08: a labelsize in a ** dict passed to tick_params is read",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "      const a = argOf(c, 'labelsize') ?? c.args.filter((x) => x.star === 2).flatMap((x) => dictAt(src, nm, x) ?? []).find((e) => e.key === 'labelsize');",
+          "      const a = argOf(c, 'labelsize');"
+        ]
+      ]
+    },
+    "r2-01-combined-whole": {
+      "undoes": "P13B-R2-01 / R12 — a figure that combines plots is themed in each plot, not on the combined object",
+      "edits": [
+        [
+          "src/poster/readabilityROutput.ts",
+          "  if (out.kind === 'none' || !out.plot) return null;\n  const patchwork",
+          "  if (out.kind !== 'none' || !out.plot) return null;\n  const patchwork"
+        ]
+      ]
+    },
+    "r2-01-components-whole-script": {
+      "undoes": "R12 — each plot a figure combines is read from its own assignments (the smaller decides), not from every theme in the script",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "      return readPlot(ctx, themeOrder(names, spans, spans, combined.stmt), n);",
+          "      return readPlot(ctx, ordAll, n);"
+        ]
+      ]
+    },
+    "r2-01-declined-unmarked": {
+      "undoes": "R12 — plots the check cannot name: every row marked and kept",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    if (declined) { assumed[spec.key] = true; kept[spec.key] = true; }",
+          "    void declined;"
+        ]
+      ]
+    },
+    "r2-01-advice-combined": {
+      "undoes": "R12 / P13B-R2-10 — no one-number advice for a figure that combines plots",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          " && !merged.unknownTheme && !combined,",
+          " && !merged.unknownTheme,"
+        ]
+      ]
+    },
+    "r2-02-title-loc-merged": {
+      "undoes": "P13B-R2-02 / P12 — one title per loc: a panel letter does not replace the centre title",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "`${key(d)}:${d.loc ?? 'center'}:",
+          "`${key(d)}:center:"
+        ]
+      ]
+    },
+    "r2-03-unread-pinned": {
+      "undoes": "P13B-R2-03 — a size the check cannot read is never pinned at the default it assumed",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    if (inst.origin === 'unread') {\n      const f = n ?? floorNeed.get(inst.cls);\n      if (f !== undefined && (short || (inst.drawn && inst.winner.kind !== 'kwarg'))) targets.push({ inst, pt: f, floor: true });\n      continue;\n    }\n",
+          ""
+        ]
+      ]
+    },
+    "r2-03-font-floor-constant": {
+      "undoes": "P13B-R2-03 / P21 — font.size the check cannot read gets max(N, expr) where it is written, never a constant",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    edits.push({ at: span[0], end: span[1], text: `max(${num(f)}, float(${code.slice(span[0], span[1]).trim()}))` });",
+          "    edits.push({ at: span[0], end: span[1], text: num(f) });"
+        ]
+      ]
+    },
+    "r2-03-span-floor-constant": {
+      "undoes": "P13B-R2-03 / P21 — an unread size written in a call gets the FontProperties floor, never a constant",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "      const kept = w.floor ?? (floor ? atRun(code.slice(w.span[0], w.span[1]).trim()) : undefined);",
+          "      const kept = w.floor;"
+        ]
+      ]
+    },
+    "r2-03-floor-read-unread": {
+      "undoes": "P21 — Postr's floor is read back as at least its number",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "  if (floor) return { kind: 'pt', pt: Number(floor[1]), span, origin: 'code', floor: floor[2]!.trim() };\n",
+          ""
+        ]
+      ]
+    },
+    "r2-03-r-unread-constant": {
+      "undoes": "P13B-R2-03 / R10 — an R row resting on a base_size the check cannot read gets the floor at what ggplot2 draws",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "    const floored = (c: (typeof all)[number]) => !!(c.theme || c.unread);",
+          "    const floored = (c: (typeof all)[number]) => !!c.theme;"
+        ]
+      ]
+    },
+    "r2-03-unread-legend": {
+      "undoes": "P13B-R2-03 — the panel says 'Not read from your code', not 'Not in your code', for an unread size",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "            {assumedUnread && (",
+          "            {false && ("
+        ]
+      ]
+    },
+    "r2-04-comment-kept": {
+      "undoes": "P13B-R2-04 / R8 — a name's value ends before a comment after it",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "  while (end > found.start && /\\s/.test(src.masked[end - 1]!)) end--;\n",
+          ""
+        ]
+      ]
+    },
+    "r2-05-pdf-as-figure": {
+      "undoes": "P13B-R2-05 — PdfPages' pdf.savefig(fig): the fit block measures fig",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "  const fig = info?.figExpr ?? (",
+          "  const fig = (info?.figExpr && null) ?? ("
+        ]
+      ]
+    },
+    "r2-05-with-as-unbound": {
+      "undoes": "P13B-R2-05 — `with PdfPages(...) as pdf` binds pdf",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "    ...(/^\\s*as\\s+([A-Za-z_]\\w*)/.exec(src.masked.slice(c.close + 1, c.close + 80))?.slice(1, 2) ?? []),\n",
+          ""
+        ]
+      ]
+    },
+    "r2-06-heatmap-no-colorbar": {
+      "undoes": "P13B-R2-06 / P8 — sns.heatmap makes a colorbar",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "    if (seaborn && c.name === 'heatmap' && !isFalse(argOf(c, 'cbar'))) add(",
+          "    if (seaborn && c.name === 'heatmap' && false) add("
+        ]
+      ]
+    },
+    "r2-06-pandas-no-colorbar": {
+      "undoes": "P13B-R2-06 / P8 — df.plot.scatter(c='column') makes a labelled colorbar",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "      if (kind === 'scatter' && named !== null && !COLOUR.test(named)) add(",
+          "      if (kind === 'scatter' && false) add("
+        ]
+      ]
+    },
+    "r2-06-colorbar-unnamed": {
+      "undoes": "P8 — `cbar = ax.collections[0].colorbar` names the colorbar a library made",
+      "edits": [
+        [
+          "src/poster/readabilityPyRules.ts",
+          "    if (cb) cb.names = [a[1]!];",
+          "    void cb;"
+        ]
+      ]
+    },
+    "r2-06-bar-is-current": {
+      "undoes": "P8 — a colorbar's Axes is never the current Axes (plt.xticks sizes the plot)",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "  const plots = all.filter((s) => !isBar(s));\n  if (plots.length === 1 && (receiver",
+          "  const plots = all;\n  if (plots.length === 1 && (receiver"
+        ]
+      ]
+    },
+    "r2-07-sup-not-read": {
+      "undoes": "P13B-R2-07 / P13 — fig.supxlabel / supylabel are axis titles",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "      case 'supxlabel': case 'supylabel': if (r === 'plt' || isFig(r)) d.push(",
+          "      case 'supxlabel': case 'supylabel': if (false) d.push("
+        ]
+      ]
+    },
+    "r2-07-sup-not-folded": {
+      "undoes": "P13 — a sup-label reads figure.labelsize at the call",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "  fold('supLabel', 'figure.labelsize', 'axisTitle');\n",
+          ""
+        ]
+      ]
+    },
+    "r2-08-guide-theme-as-plot": {
+      "undoes": "P13B-R2-08 / R13 — a guide's own theme() is the guide's, not the plot's (never reset by a complete theme)",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "  const guides = calls(src, GUIDES).filter((c) => c.start < until);",
+          "  const guides: Call[] = [];"
+        ]
+      ]
+    },
+    "r2-08-guide-not-edited": {
+      "undoes": "R13 — a guide's own legend size is raised where it is written",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "      if (need && g.span && g.pt < need.neededPt - 1e-9) edits.push(",
+          "      if (need && g.span && false) edits.push("
+        ]
+      ]
+    },
+    "r2-08-label-theme-unread": {
+      "undoes": "R13 — guide_legend(label.theme = , title.theme = ) are read",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    for (const [arg, key, parent] of [['label.theme', 'legendText', 'text'], ['title.theme', 'legendTitle', 'title']] as const) {",
+          "    for (const [arg, key, parent] of [] as Array<['label.theme', 'legendText', 'text']>) {"
+        ]
+      ]
+    },
+    "r2-09-device-ignored": {
+      "undoes": "P13B-R2-09 / R11 — a png()/pdf() device a plot is printed to is the canvas and gets the theme",
+      "edits": [
+        [
+          "src/poster/readabilityROutput.ts",
+          "  if (d) {",
+          "  if (d && false) {"
+        ]
+      ]
+    },
+    "r2-09-device-unread-kept": {
+      "undoes": "R11 — a device size the check cannot read is set to the size checked, in inches, with a resolution",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "    if (out.kind === 'device' && out.px && !out.args.get('res')) set('res', '300');",
+          "    void set;"
+        ]
+      ]
+    },
+    "r2-10-undrawn-advice": {
+      "undoes": "P13B-R2-10 — a row for text the figure does not draw does not drive the one-number advice",
+      "edits": [
+        [
+          "src/poster/readability.ts",
+          " && !params.undrawn?.[s.key]);",
+          ");"
+        ]
+      ]
+    },
+    "r2-11-replace-merged": {
+      "undoes": "P13B-R2-11 / R14 — `%+replace%` replaces the element: a size it leaves out is not the complete theme's",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "  const replaced = /%\\+replace%\\s*$/.test(src.masked.slice(Math.max(0, c.start - 40), c.start));",
+          "  const replaced = false;"
+        ]
+      ]
+    },
+    "r2-13-loop-not-expanded": {
+      "undoes": "P13B-R2-13 / P20 — a size set in a loop over named Axes is set on each",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "  out.draws = loops(src, d);",
+          "  out.draws = d;"
+        ]
+      ]
+    },
+    "r2-13-array-not-expanded": {
+      "undoes": "P20 — a size set in a loop over a subplots array is set on each of its Axes",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "    const m = /^(.*)\\[\\*\\]$/.exec(d.receiver);\n    if (!m) return [d];",
+          "    const m = null as RegExpExecArray | null;\n    if (!m) return [d];"
+        ]
+      ]
+    },
+    "r2-12-copy-unqualified": {
+      "undoes": "P13B-R2-12 — the copy says a crop keeps what it kept only when that fits the canvas",
+      "edits": [
+        [
+          "src/i18n/readability.ts",
+          "keeps what its crop kept when that fits the canvas at the sizes needed, so text",
+          "keeps everything its crop kept, so text"
+        ]
+      ]
+    },
+    "r2-03-named-on-unread-known": {
+      "undoes": "P13B-R2-03 (a sibling) — a named size on a font.size the check cannot read is unread too",
+      "edits": [
+        [
+          "src/poster/readabilityPyModel.ts",
+          "origin: fs.kind === 'unread' ? 'unread' : 'code', winner, slope: 0, fontFrom: null };",
+          "origin: 'code', winner, slope: 0, fontFrom: null };"
+        ]
+      ]
+    },
+    "r3-01-combined-own-lines-only": {
+      "undoes": "P13B-R3-01 / R15 — each plot a figure combines takes the themes of the names it uses (a theme object, a function building the panel, a plot it is built from), not only its own assignment lines",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "      return readPlot(ctx, themeOrder(names, spans, spans, combined.stmt), n);",
+          "      return readPlot(ctx, (at) => (spans.some(([s, e]) => at >= s && at < e) ? at : null), n);"
+        ]
+      ]
+    },
+    "r3-01-one-plot-written-order": {
+      "undoes": "P13B-R3-01 / R15, one plot — a theme held in a name applies where the name is used, not where it is written",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "  const ordAll = themeOrder(names, [[0, until]], [], until);",
+          "  const ordAll = (at: number) => (at < until ? at : null);"
+        ]
+      ]
+    },
+    "r3-01-block-assignment-skipped": {
+      "undoes": "R15 — a name assigned again inside a block is not followed (the block's theme stays last, in source order)",
+      "edits": [
+        [
+          "src/poster/readabilityRNames.ts",
+          "    const list = byName.get(m[0]) ?? [];",
+          "    const list = (byName.get(m[0]) ?? []).filter((a) => a.top);"
+        ]
+      ]
+    },
+    "r3-01-part-is-a-use": {
+      "undoes": "R15 — `p$theme` (a part of p, in Postr's own R10 floor) is not p added again",
+      "edits": [
+        [
+          "src/poster/readabilityRNames.ts",
+          "(?![\\\\w.$@])(?![ \\\\t]*(?:<<-|<-|=(?!=)))",
+          "(?![\\\\w.])(?![ \\\\t]*(?:<<-|<-|=(?!=)))"
+        ]
+      ]
+    },
+    "r3-01-one-deep": {
+      "undoes": "R15 — names are followed three deep (a theme object built from another, added by a function)",
+      "edits": [
+        [
+          "src/poster/readabilityRNames.ts",
+          "    if (!m || m.depth >= 3) continue;",
+          "    if (!m || m.depth >= 1) continue;"
+        ]
+      ]
+    },
+    "r3-01-own-moved": {
+      "undoes": "R15 — a combined plot's own assignments are read in place and take none of the three levels (the edited script's `p1 <- p1 + theme(...)` pushed a theme out of reach)",
+      "edits": [
+        [
+          "src/poster/readabilityRNames.ts",
+          "    if (placed.has(h) || own.some(([s, e]) => h.start >= s && h.start < e)) continue;",
+          "    if (placed.has(h)) continue;"
+        ]
+      ]
+    },
+    "r3-02-float-dropped": {
+      "undoes": "P13B-R3-02 — the floor on a font.size the check cannot read converts it (a string from a config): max(N, float(EXPR))",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    edits.push({ at: span[0], end: span[1], text: `max(${num(f)}, float(${code.slice(span[0], span[1]).trim()}))` });",
+          "    edits.push({ at: span[0], end: span[1], text: `max(${num(f)}, ${code.slice(span[0], span[1]).trim()})` });"
+        ]
+      ]
+    },
+    "r3-02-import-at-top": {
+      "undoes": "P13B-R3-02 — FontProperties is imported after a docstring and `from __future__` (not at offset 0)",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    const at = importLine(scan.src);",
+          "    const at = 0;"
+        ]
+      ]
+    },
+    "r3-02-alias-binds": {
+      "undoes": "P13B-R3-02 — `import FontProperties as FP` does not bind FontProperties",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "    if (names.some((x) => /^\\s*(?:FontProperties|\\*)\\s*$/.test(x))) return true;",
+          "    if (names.some((x) => /FontProperties|\\*/.test(x))) return true;"
+        ]
+      ]
+    },
+    "r3-02-alias-unread": {
+      "undoes": "review round 3 (a sibling of P13B-R3-02) — a FontProperties called by an alias an import gives it (`FP(size=14)`) is read as FontProperties",
+      "edits": [
+        [
+          "src/poster/readabilityPyText.ts",
+          "    re = new RegExp(['FontProperties', ...aliases].join('|'));",
+          "    re = /FontProperties/;"
+        ]
+      ]
+    },
+    "r3-03-passing-unread-left": {
+      "undoes": "P13B-R3-03, Python — a size the check cannot read is floored whether or not it falls short at the size assumed",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "      if (f !== undefined && (short || (inst.drawn && inst.winner.kind !== 'kwarg'))) targets.push({ inst, pt: f, floor: true });",
+          "      if (f !== undefined && short) targets.push({ inst, pt: f, floor: true });"
+        ]
+      ]
+    },
+    "r3-03-fontdict-floored": {
+      "undoes": "P13B-R3-03 — a fontdict= the check cannot see into gets no plain fontsize= where it passes (it could lower a larger size)",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "      if (f !== undefined && (short || (inst.drawn && inst.winner.kind !== 'kwarg'))) targets.push({ inst, pt: f, floor: true });",
+          "      if (f !== undefined && (short || inst.drawn)) targets.push({ inst, pt: f, floor: true });"
+        ]
+      ]
+    },
+    "r3-03-title-reads-text": {
+      "undoes": "review round 3 — a floored legend title reads its own size first (legend.title_fontsize or legend.fontsize), never only the legend text's",
+      "edits": [
+        [
+          "src/poster/readabilityPyFix.ts",
+          "      const title = `${rcName}['legend.title_fontsize'] or ${rcName}['legend.fontsize']`;",
+          "      const title = `${rcName}['legend.fontsize']`;"
+        ]
+      ]
+    },
+    "r3-03-r-passing-left": {
+      "undoes": "P13B-R3-03, R — every drawn selector resting on an unread base_size or a theme that is not ggplot2's gets the R10 floor, short or not",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "    const at = need ?? floors.find((n) => n.key === spec.key);",
+          "    const at = need;"
+        ]
+      ]
+    },
+    "r3-03-theme-not-unread": {
+      "undoes": "review round 3 — a size resting on a theme that is not ggplot2's is \"Not read from your code\" (the code sets it, the check cannot read it)",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    if ((m.slope[spec.key]! > 0 && m.baseUnread) || m.themeDependent[spec.key]) unread[spec.key] = true;",
+          "    if (m.slope[spec.key]! > 0 && m.baseUnread) unread[spec.key] = true;"
+        ]
+      ]
+    },
+    "r3-03-kept-not-said": {
+      "undoes": "review round 3 — the unread legend line says when a size the script cannot edit is left as written",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "{unreadKept ? c.legend.unreadBodyKept : c.legend.unreadBody}",
+          "{c.legend.unreadBody}"
+        ]
+      ]
+    },
+    "r3-04-bare-not-drawn": {
+      "undoes": "P13B-R3-04 / R11 — a plot on a line of its own between a device and dev.off() is what the device draws (Rscript prints it)",
+      "edits": [
+        [
+          "src/poster/readabilityROutput.ts",
+          "    if (body && src.depth[s] === 0 && DRAWS.test(body) && (!best || s > best.stmt)) {",
+          "    if (body && src.depth[s] === 0 && DRAWS.test(body) && false) {"
+        ]
+      ]
+    },
+    "r3-04-bare-not-printed": {
+      "undoes": "P13B-R3-04 — the themed plot that stood on a line of its own is printed (R prints it only under Rscript)",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "text: out.bare ? `print(${themed})` : themed });",
+          "text: themed });"
+        ]
+      ]
+    },
+    "r3-04-past-dev-off": {
+      "undoes": "P13B-R3-04 — a print() after dev.off() draws on no device",
+      "edits": [
+        [
+          "src/poster/readabilityROutput.ts",
+          "  const stop = off.exec(src.masked)?.index ?? src.masked.length;",
+          "  const stop = src.masked.length;"
+        ]
+      ]
+    },
+    "r3-04-ragg": {
+      "undoes": "P13B-R3-04 — ragg's agg_png() is a device",
+      "edits": [
+        [
+          "src/poster/readabilityROutput.ts",
+          "  agg_png: { formals: ['filename', 'width', 'height', 'units', 'pointsize', 'background', 'res', 'scaling', 'snap_rect', 'bitsize', 'bg'], px: true },\n",
+          ""
+        ]
+      ]
+    },
+    "r3-04-noplot-not-said": {
+      "undoes": "P13B-R3-04 — a device whose plot the check cannot find is said (not \"no ggsave()\")",
+      "edits": [
+        [
+          "src/poster/readabilityRModel.ts",
+          "    if (!out.plot) warnings.push(",
+          "    if (false) warnings.push("
+        ]
+      ]
+    },
+    "r3-04-noplot-no-save": {
+      "undoes": "P13B-R3-04 — with a device whose plot the check cannot find, a ggsave() of poster_figure.png is added",
+      "edits": [
+        [
+          "src/poster/readabilityRFix.ts",
+          "  if (out.kind === 'ggsave' || out.plot || m.combined) return result;",
+          "  if (out.kind !== 'none' || m.combined) return result;"
+        ]
+      ]
+    },
+    "r3-04-grid-arrange-unread": {
+      "undoes": "P13B-R3-04 / R12 — grid.arrange() (found as `arrange` on `grid`) combines plots",
+      "edits": [
+        [
+          "src/poster/readabilityROutput.ts",
+          "find((c) => c.start === lead && COMBINERS.test(fullName(c)));",
+          "find((c) => c.start === lead && COMBINERS.test(c.name));"
+        ]
+      ]
+    }
+  }
+}

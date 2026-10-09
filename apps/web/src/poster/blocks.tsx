@@ -8,7 +8,7 @@
  * coupling. Re-split if any one of them grows past ~150 lines.
  */
 import ReactDOM from 'react-dom';
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { blockSelection } from '@/motion/timelines/blockSelection';
 import { LogoPicker } from '@/components/LogoPicker';
 import { stripHtmlToPlainText } from './academicMarkdown';
@@ -1613,6 +1613,11 @@ interface CaptionWrapperProps {
   captionNumber?: number;
   label: 'Figure' | 'Table';
   children: React.ReactNode;
+  /**
+   * A chart's least height at the minimum text sizes (ChartBlock's
+   * `onMinHeight`, poster units): its pinned body is never shorter.
+   */
+  bodyMinH?: number | null;
 }
 
 function CaptionWrapper({
@@ -1623,6 +1628,7 @@ function CaptionWrapper({
   captionNumber,
   label,
   children,
+  bodyMinH,
 }: CaptionWrapperProps) {
   const position = block.captionPosition ?? 'top';
   // Even an empty caption gets the auto-numbered prefix so users can
@@ -1676,7 +1682,12 @@ function CaptionWrapper({
   // tables, the body auto-sizes (the `<table>` determines its own
   // height by row count) — matches the long-standing behavior
   // where `growsWithContent` makes the frame hug the grid.
-  const isImageLike = block.type === 'image' || block.type === 'logo';
+  //
+  // Chart blocks are pinned the same way (plan item 13 part 2): a chart
+  // draws at the box it is laid out in, so a caption that took height from
+  // it shrank its text, and with the chart keeping its own aspect the
+  // caption, sample-data prefix and all, fell past the frame.
+  const isImageLike = block.type === 'image' || block.type === 'logo' || block.type === 'chart';
   const bodyAndNote = (
     <div
       style={{
@@ -1692,7 +1703,7 @@ function CaptionWrapper({
         data-postr-figure-area={isImageLike ? '' : undefined}
         style={{
           flex: '0 0 auto',
-          height: isImageLike ? block.h : 'auto',
+          height: isImageLike ? Math.max(block.h, bodyMinH ?? 0) : 'auto',
           minHeight: 0,
           minWidth: 0,
           position: 'relative',
@@ -1899,6 +1910,24 @@ export function BlockFrame(props: BlockFrameProps) {
       b.captionPosition !== 'right' &&
       captionNumber !== undefined) ||
       !!b.note);
+  // Chart blocks grow with any caption or note, a side caption included
+  // (plan item 13 part 2). The chart body is pinned to `b.h` like an
+  // image's, and a frame held at `b.h` has only `b.h` less its border
+  // inside, so a side caption's block would cut the chart's x-axis title
+  // and tick labels off, and a side caption taller than the chart would be
+  // cut too. Growing, the frame holds both whole.
+  const chartHasGrowingChrome =
+    b.type === 'chart' &&
+    ((b.captionPosition !== 'none' && captionNumber !== undefined) || !!b.note);
+  // A chart whose text at the minimum sizes does not fit the block's height
+  // (a long legend or long category labels in a small block) reports the
+  // least height it takes, and its box grows to it rather than the chart be
+  // scaled down below the minimums (fix 13c review Q-R1): the pinned body
+  // under a caption, or the frame itself (that height plus its border).
+  const [chartMinH, setChartMinH] = useState<number | null>(null);
+  const onChartMinHeight = useCallback((h: number) => setChartMinH((old) => (old === h ? old : h)), []);
+  const frameBorder = isOutOfBounds || selected ? 1.5 : 1;
+  const fixedHeight = b.type === 'chart' && chartMinH !== null ? Math.max(b.h, chartMinH + 2 * frameBorder) : b.h;
   // Blocks that grow with their text content (B1 fix). These use
   // minHeight: b.h as a floor, height: auto so the visible area
   // expands as the user adds more text. Prevents the "title
@@ -1920,6 +1949,7 @@ export function BlockFrame(props: BlockFrameProps) {
     b.type === 'references' ||
     b.type === 'authors' ||
     imageHasGrowingChrome ||
+    chartHasGrowingChrome ||
     // Tables auto-size too — otherwise the user's stored `b.h`
     // was forcing the frame taller than the grid needed, and
     // the caption wrapper's `flex: 1 content` stretched to
@@ -2119,7 +2149,7 @@ export function BlockFrame(props: BlockFrameProps) {
         // (image, logo, table, references, authors) stays at its
         // declared h. growsWithContent blocks use minHeight as the
         // floor so they never shrink below the user's resize.
-        height: isHeading || growsWithContent ? 'auto' : b.h,
+        height: isHeading || growsWithContent ? 'auto' : fixedHeight,
         // Text-like blocks (title / text / heading / authors /
         // references) snap to their natural content height instead
         // of a `minHeight: b.h` floor. Prior behavior left blank
@@ -2137,10 +2167,10 @@ export function BlockFrame(props: BlockFrameProps) {
           : undefined,
         background: bg,
         border: isOutOfBounds
-          ? '1.5px dashed #f87171'
+          ? `${frameBorder}px dashed #f87171`
           : selected
-            ? `1.5px solid ${p.accent}88`
-            : '1px solid transparent',
+            ? `${frameBorder}px solid ${p.accent}88`
+            : `${frameBorder}px solid transparent`,
         borderRadius: 2,
         // Smooth the selection ring so clicking a block fades the
         // border in over ~140ms instead of snapping. Scoped to
@@ -2363,8 +2393,9 @@ export function BlockFrame(props: BlockFrameProps) {
             styles={st}
             captionNumber={captionNumber}
             label="Figure"
+            bodyMinH={chartMinH}
           >
-            <ChartBlock block={b} palette={p} fontFamily={ff} />
+            <ChartBlock block={b} palette={p} fontFamily={ff} onMinHeight={onChartMinHeight} />
           </CaptionWrapper>
         )}
       </div>

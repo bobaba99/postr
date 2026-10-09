@@ -20,8 +20,10 @@
  *                judged.
  *
  * Judgements, each a DEFECT beyond its tolerance (round 6; v6.1; v6.2):
- *   grid    text outside the figure, over another panel, under a figure
- *           legend or suptitle, or Axes over each other: more than
+ *   grid    text outside the image the save writes (Axes text: clip; every
+ *           text, legends and figure texts too: cut, fix 13b review round
+ *           1), over another panel, under a figure legend or suptitle, or
+ *           Axes over each other: more than
  *           max(original, ideal) + LAYOUT_SLACK_IN2. The only judgement of
  *           the Axes laid out on a grid (a subplotspec, in the layout): the
  *           fix's replay may move them, and that is judged by what it does
@@ -102,7 +104,7 @@ export const LAYOUT_SLACK_IN2 = 0.05;
 /** How far an Axes placed by hand may sit, relative to the other Axes, from the nearer reference (v6.2; see the header). */
 export const HAND_SLACK_IN = 0.05;
 export const TICK_SLACK_IN2 = 0.005;
-const METRICS = ['clip_in2', 'cross_in2', 'figleg_in2', 'overlap_in2'] as const;
+const METRICS = ['clip_in2', 'cut_in2', 'cross_in2', 'figleg_in2', 'overlap_in2'] as const;
 const STALE_METRICS = ['clip_in2', 'cross_in2'] as const;
 const HAND = new Set(['out', 'free', 'child']);
 
@@ -116,7 +118,7 @@ type After = Save & { fig: number; how: 'display' | 'resave' };
 type Layout = { error: string | null; saves: Save[]; after: After[]; after_error: string | null };
 export type Page = { fix: string; need: Record<string, number> };
 
-const NONE: Save = { clip_in2: 0, cross_in2: 0, figleg_in2: 0, overlap_in2: 0, tick_in2: 0, tick_box_in2: 0, axes: [], sizes: {}, placed: [], stale: false, stale_why: null };
+const NONE: Save = { clip_in2: 0, cut_in2: 0, cross_in2: 0, figleg_in2: 0, overlap_in2: 0, tick_in2: 0, tick_box_in2: 0, axes: [], sizes: {}, placed: [], stale: false, stale_why: null };
 const EDGES = [1, 2, 3, 4] as const;
 
 /**
@@ -142,7 +144,7 @@ export function relMove(got: Placed[], ref: Placed[], k: number): number {
     Math.abs(((got[k]![c] as number) - (q[c] as number)) - ((ref[k]![c] as number) - (ref[j]![c] as number))))))));
 }
 
-const row = (l: Layout) => l.saves.map((s) => `${s.clip_in2} · ${s.cross_in2} · ${s.figleg_in2} · ${s.overlap_in2} · ${s.tick_in2}`).join(' | ');
+const row = (l: Layout) => l.saves.map((s) => `${s.clip_in2} · ${s.cut_in2} · ${s.cross_in2} · ${s.figleg_in2} · ${s.overlap_in2} · ${s.tick_in2}`).join(' | ');
 
 export type LayoutPaths = { layoutTruth: string; idealSource: string; freshSource: string; out: string };
 
@@ -256,7 +258,7 @@ export async function checkLayout(file: string, outDir: string, got: Page, paths
     }
   }
   const lines = [
-    `original ${row(orig)}; ideal ${row(ideal)}; fresh ${row(fresh)}; raised first ${row(control)}; fixed ${row(fixed)} (in²: clip · cross · figleg · overlap · ticks); Axes moved from the original ${shifts.join(' | ')} in`
+    `original ${row(orig)}; ideal ${row(ideal)}; fresh ${row(fresh)}; raised first ${row(control)}; fixed ${row(fixed)} (in²: clip · cut · cross · figleg · overlap · ticks); Axes moved from the original ${shifts.join(' | ')} in`
       + (afterRows.length ? `; after the end (ticks original/ideal/fixed) ${afterRows.join(', ')}` : ''),
   ];
   if (fresh.saves.length !== orig.saves.length) lines.push(`FRESH SAVES ${fresh.saves.length}, the original ${orig.saves.length} (a missing fresh save bounds the stale rule by the original alone)`);

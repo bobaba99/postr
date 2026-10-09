@@ -52,10 +52,12 @@
 import { M, POINTS_PER_UNIT } from '@/poster/constants';
 
 /**
- * The product's own readability floors, from `readability.ts`'s element
- * tables. Imported as numbers rather than re-derived so the colophon is
- * measured against the SAME thresholds the checker applies to a user's
- * figure — if those move, this moves with them.
+ * The colophon's own floors. They equal the caption and axis-title
+ * minimums for figure text (`poster/figureTextMinimums.ts`, the checker's)
+ * but are not tied to them: the colophon is poster text, not figure text,
+ * so a change to those minimums does not move it (plan item 13 part 2,
+ * the lead's decision 1 of 2026-10-06). Before, this comment said they
+ * were imported from the checker's tables; they were always literals.
  */
 const CAPTION_FLOOR_PT = 12;
 const AXIS_TITLE_FLOOR_PT = 18;

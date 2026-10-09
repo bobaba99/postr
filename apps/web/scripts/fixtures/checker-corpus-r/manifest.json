@@ -1,0 +1,787 @@
+{
+  "_about": "Corpus for scripts/checker-r-truth-check.mjs (plan item 13 part 2, sub-item B). Made-up data and generic labels. Each script saves with ggsave(width, height) so the canvas is known to both sides. `elements` names the claim that owns the comparison of each class the REAL plot draws (scripts/truth/gg_truth.R): C = control (base_size = N in theme_*(), or a theme() size for an element in the table, which the checker reads: source within 0.05 pt, verdict equal, or exit 2); TEXT = a size set on theme(text = element_text(size =)), TITLE = on theme(title = ...), POS = base_size given positionally (theme_bw(6)), RCAP = the caption, which ggplot2 draws at rel(0.8) of base_size. '-' = drawn, not scored. F (the fix leaves a listed element below its minimum: theme() after theme_*()), L, W1 and GEOMTEXT (an in-panel text drawn with no warning shown) need no entry. Fix 13b (record docs/fixes/13b-checker-sizes.md; ids rc-*, the confirmer's partition): owners R-ORDER (theme_set, theme() and complete themes in order), R-POS, R-TEXT (theme_update(text =)), R-STRIP (strip.text.x alone), R-CANVAS (ggsave scale = and a size written as arithmetic; also `scaleClaim`, which makes the scale comparison a claim instead of the C control), R-FIXPLACE (where the fix lands), D-LOWER (the one-number advice). `base` is the base_size of the complete theme ggplot2 uses for the plot (11 when the script sets none): claim SNIPLOW compares the page's 'Or change one number: base_size = N' with it. Fix 13b review round 1 (ids r1-*): owners R1-UPDATE, R1-UNKNOWN, R1-VOID, R1-GGSAVE; gg_truth.R now calls the real ggsave() with the arguments as bound, so a corrected script real ggsave() rejects does not run. Fix 13b review round 2 (ids r2-*, the reviewer's scripts that found defects; R's built-in datasets in some): owners R2-NAMES, R2-UNREAD, R2-DEVICE, R2-COMBINE, R2-REPLACE, R2-GUIDE; gg_truth.R measures a gtable and the plots inside a cowplot or gridExtra figure by their own cells, and a plot printed to a png() or pdf() device. Fix 13b review round 3 (ids r3-*, the reviewer's scripts that found defects, and siblings; record section 9): owners R3-NAMES (R15, a theme held in a name), R3-UNREAD (every row resting on an unread base floored), R3-DEVICE (a device's plot drawn on a line of its own, grid.arrange(), ragg), R3-COMBINE; gg_truth.R runs a script as Rscript does (autoprint), records grid.arrange() and ragg's devices, and closes the device at dev.off().",
+  "scripts": {
+    "r-ctl-base": {
+      "what": "theme_bw(base_size = 20), 8 x 6 in: every class from base_size",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C"
+      },
+      "base": 20
+    },
+    "r-ctl-caption-strip": {
+      "what": "theme_minimal(base_size = 16), a caption and facet strips",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C",
+        "stripText": "C",
+        "caption": "RCAP"
+      },
+      "base": 16
+    },
+    "r-text-small": {
+      "what": "theme_bw(base_size = 14) + theme(text = element_text(size = 6))",
+      "elements": {
+        "plotTitle": "TEXT",
+        "axisTitle": "TEXT",
+        "axisText": "TEXT",
+        "legendText": "TEXT",
+        "legendTitle": "TEXT"
+      },
+      "base": 14
+    },
+    "r-text-big": {
+      "what": "theme_minimal() + theme(text = element_text(size = 28))",
+      "elements": {
+        "plotTitle": "TEXT",
+        "axisTitle": "TEXT",
+        "axisText": "TEXT",
+        "legendText": "TEXT",
+        "legendTitle": "TEXT"
+      },
+      "base": 11
+    },
+    "r-title-small": {
+      "what": "theme_classic(base_size = 20) + theme(title = element_text(size = 8)): titles 8, the rest from base_size",
+      "elements": {
+        "plotTitle": "TITLE",
+        "axisTitle": "TITLE",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "TITLE"
+      },
+      "base": 20
+    },
+    "r-pos-small": {
+      "what": "theme_bw(6): base_size given positionally",
+      "elements": {
+        "plotTitle": "POS",
+        "axisTitle": "POS",
+        "axisText": "POS",
+        "legendText": "POS",
+        "legendTitle": "POS"
+      },
+      "base": 6
+    },
+    "r-pos-big": {
+      "what": "theme_classic(24): base_size given positionally",
+      "elements": {
+        "plotTitle": "POS",
+        "axisTitle": "POS",
+        "axisText": "POS",
+        "legendText": "POS",
+        "legendTitle": "POS"
+      },
+      "base": 24
+    },
+    "r-theme-after": {
+      "what": "theme_minimal(base_size = 16) + theme(axis.text = 7, legend.text = 8): the user's theme() after theme_*(), where the fix inserts its own",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C"
+      },
+      "base": 16
+    },
+    "r-theme-after-x": {
+      "what": "theme_bw(base_size = 18) + theme(axis.text.x = element_text(size = 8, angle = 45))",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C"
+      },
+      "base": 18
+    },
+    "r-geom-text": {
+      "what": "theme_bw(base_size = 22) and geom_text(size = 2): in-panel labels at 5.7 pt (warned, not scored)",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C"
+      },
+      "base": 22
+    },
+    "r-annotate-default": {
+      "what": "theme_bw(base_size = 9) and annotate('text') at the theme's default size",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C"
+      },
+      "base": 9
+    },
+    "rc-themeset-override": {
+      "what": "part 2, the confirmer's partition (R-ORDER): theme_set(theme_classic(base_size = 20)) and a plot theme_bw(): the plot's complete theme replaces theme_set's (base 11)",
+      "elements": {
+        "plotTitle": "R-ORDER",
+        "axisTitle": "R-ORDER",
+        "axisText": "R-ORDER",
+        "legendText": "R-ORDER",
+        "legendTitle": "R-ORDER",
+        "stripText": "R-ORDER",
+        "caption": "R-ORDER"
+      },
+      "base": 11
+    },
+    "rc-themeset-only": {
+      "what": "part 2, the confirmer's partition (R-CTL): theme_set(theme_bw(base_size = 7)) alone",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C",
+        "stripText": "C",
+        "caption": "C"
+      },
+      "base": 7
+    },
+    "rc-themeset-positional": {
+      "what": "part 2, the confirmer's partition (R-POS): theme_set(theme_minimal(9)): base_size given positionally inside theme_set",
+      "elements": {
+        "plotTitle": "R-POS",
+        "axisTitle": "R-POS",
+        "axisText": "R-POS",
+        "legendText": "R-POS",
+        "legendTitle": "R-POS",
+        "stripText": "R-POS",
+        "caption": "R-POS"
+      },
+      "base": 9
+    },
+    "rc-theme-update-text": {
+      "what": "part 2, the confirmer's partition (R-TEXT): theme_set(theme_gray(base_size = 16)) then theme_update(text = element_text(size = 7))",
+      "elements": {
+        "plotTitle": "R-TEXT",
+        "axisTitle": "R-TEXT",
+        "axisText": "R-TEXT",
+        "legendText": "R-TEXT",
+        "legendTitle": "R-TEXT",
+        "stripText": "R-TEXT",
+        "caption": "R-TEXT"
+      },
+      "base": 16
+    },
+    "rc-elem-before-complete": {
+      "what": "part 2, the confirmer's partition (R-ORDER): theme(axis.text = 20, ...) then theme_classic(base_size = 6): the complete theme wipes the earlier theme()",
+      "elements": {
+        "plotTitle": "R-ORDER",
+        "axisTitle": "R-ORDER",
+        "axisText": "R-ORDER",
+        "legendText": "R-ORDER",
+        "legendTitle": "R-ORDER",
+        "stripText": "R-ORDER",
+        "caption": "R-ORDER"
+      },
+      "base": 6
+    },
+    "rc-elem-before-bw": {
+      "what": "part 2, the confirmer's partition (R-ORDER): theme(axis.title = 22, ...) then theme_bw(): base 11",
+      "elements": {
+        "plotTitle": "R-ORDER",
+        "axisTitle": "R-ORDER",
+        "axisText": "R-ORDER",
+        "legendText": "R-ORDER",
+        "legendTitle": "R-ORDER",
+        "stripText": "R-ORDER",
+        "caption": "R-ORDER"
+      },
+      "base": 11
+    },
+    "rc-facet-strip-default": {
+      "what": "part 2, the confirmer's partition (R-CTL): facet_wrap strips at theme_bw(base_size = 12)'s rel(0.8)",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C",
+        "stripText": "C",
+        "caption": "C"
+      },
+      "base": 12
+    },
+    "rc-facet-grid-strip-x": {
+      "what": "part 2, the confirmer's partition (R-STRIP): facet_grid with only strip.text.x = 16: the y strips stay at rel(0.8) of 11",
+      "elements": {
+        "plotTitle": "R-STRIP",
+        "axisTitle": "R-STRIP",
+        "axisText": "R-STRIP",
+        "legendText": "R-STRIP",
+        "legendTitle": "R-STRIP",
+        "stripText": "R-STRIP",
+        "caption": "R-STRIP"
+      },
+      "base": 11
+    },
+    "rc-units-cm": {
+      "what": "part 2, the confirmer's partition (R-CTL): ggsave(width = 17, height = 12, units = 'cm')",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C",
+        "stripText": "C",
+        "caption": "C"
+      },
+      "base": 8
+    },
+    "rc-units-mm": {
+      "what": "part 2, the confirmer's partition (R-CTL): ggsave(units = 'mm', dpi = 600)",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C",
+        "stripText": "C",
+        "caption": "C"
+      },
+      "base": 14
+    },
+    "rc-units-px": {
+      "what": "part 2, the confirmer's partition (R-CTL): ggsave(width = 2400, height = 1800, units = 'px', dpi = 300)",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C",
+        "stripText": "C",
+        "caption": "C"
+      },
+      "base": 12
+    },
+    "rc-ggsave-scale": {
+      "what": "part 2, the confirmer's partition (R-CANVAS): ggsave(width = 6, height = 4, scale = 2): a 12 x 8 in device",
+      "elements": {
+        "plotTitle": "R-CANVAS",
+        "axisTitle": "R-CANVAS",
+        "axisText": "R-CANVAS",
+        "legendText": "R-CANVAS",
+        "legendTitle": "R-CANVAS",
+        "stripText": "R-CANVAS",
+        "caption": "R-CANVAS"
+      },
+      "scaleClaim": "R-CANVAS",
+      "base": 14
+    },
+    "rc-ggsave-expr": {
+      "what": "part 2, the confirmer's partition (R-CANVAS): ggsave(width = 180 / 25.4, height = 120 / 25.4)",
+      "elements": {
+        "plotTitle": "R-CANVAS",
+        "axisTitle": "R-CANVAS",
+        "axisText": "R-CANVAS",
+        "legendText": "R-CANVAS",
+        "legendTitle": "R-CANVAS",
+        "stripText": "R-CANVAS",
+        "caption": "R-CANVAS"
+      },
+      "scaleClaim": "R-CANVAS",
+      "base": 12
+    },
+    "rc-geomtext-pt": {
+      "what": "part 2, the confirmer's partition (R-GEOM): geom_text(size = 10, size.unit = 'pt'): in-panel text warned, not scored",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C",
+        "stripText": "C",
+        "caption": "C"
+      },
+      "base": 16
+    },
+    "rc-caption-sub": {
+      "what": "part 2, the confirmer's partition (R-CAP): theme_bw(base_size = 15) with a subtitle and a caption (rel(0.8): 12 pt)",
+      "elements": {
+        "plotTitle": "R-CAP",
+        "axisTitle": "R-CAP",
+        "axisText": "R-CAP",
+        "legendText": "R-CAP",
+        "legendTitle": "R-CAP",
+        "stripText": "R-CAP",
+        "caption": "RCAP"
+      },
+      "base": 15
+    },
+    "rc-ctl-named": {
+      "what": "part 2, the confirmer's partition (R-CTL): theme_classic(base_size = 16) + theme(axis.text = element_text(size = 13))",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C",
+        "stripText": "C",
+        "caption": "C"
+      },
+      "base": 16
+    },
+    "rc-ctl-rel": {
+      "what": "part 2, the confirmer's partition (R-CTL): theme_bw(base_size = 18) + theme(axis.text = rel(0.9), legend.text = rel(0.9))",
+      "elements": {
+        "plotTitle": "C",
+        "axisTitle": "C",
+        "axisText": "C",
+        "legendText": "C",
+        "legendTitle": "C",
+        "stripText": "C",
+        "caption": "C"
+      },
+      "base": 18
+    },
+    "rc-d-bigbase-smalltext": {
+      "what": "part 2, the confirmer's partition (D-LOWER): theme_bw(base_size = 24) + theme(axis.text = 7): only the ticks fail, so the one-number advice must not lower base_size",
+      "elements": {
+        "plotTitle": "D-LOWER",
+        "axisTitle": "D-LOWER",
+        "axisText": "D-LOWER",
+        "legendText": "D-LOWER",
+        "legendTitle": "D-LOWER",
+        "stripText": "D-LOWER",
+        "caption": "D-LOWER"
+      },
+      "base": 24
+    },
+    "rc-fix-in-string": {
+      "what": "part 2, the confirmer's partition (R-FIXPLACE): a caption string containing 'theme_bw()' after the real theme_bw(base_size = 8): the fix must not land in the string",
+      "elements": {
+        "plotTitle": "R-FIXPLACE",
+        "axisTitle": "R-FIXPLACE",
+        "axisText": "R-FIXPLACE",
+        "legendText": "R-FIXPLACE",
+        "legendTitle": "R-FIXPLACE",
+        "stripText": "R-FIXPLACE",
+        "caption": "R-FIXPLACE"
+      },
+      "base": 8
+    },
+    "rc-theme-update-elem": {
+      "what": "part 2, the confirmer's partition (R-FIXPLACE): theme_update(axis.text = element_text(size = 6)): the fix must not attach to theme_update()",
+      "elements": {
+        "plotTitle": "R-FIXPLACE",
+        "axisTitle": "R-FIXPLACE",
+        "axisText": "R-FIXPLACE",
+        "legendText": "R-FIXPLACE",
+        "legendTitle": "R-FIXPLACE",
+        "stripText": "R-FIXPLACE",
+        "caption": "R-FIXPLACE"
+      },
+      "base": 16
+    },
+    "r1-update-after": {
+      "what": "fix 13b review round 1 (P13B-R1-04): the plot's theme(axis.text = 6), then theme_update(axis.text = 30): ggplot2 applies the plot's theme() last, so 6 is drawn",
+      "elements": {
+        "plotTitle": "R1-UPDATE",
+        "axisTitle": "R1-UPDATE",
+        "axisText": "R1-UPDATE",
+        "legendText": "R1-UPDATE",
+        "legendTitle": "R1-UPDATE",
+        "stripText": "R1-UPDATE",
+        "caption": "R1-UPDATE"
+      },
+      "base": 11
+    },
+    "r1-cowplot": {
+      "what": "review round 1 (P13B-R1-05): + theme_cowplot(), a complete theme that is not ggplot2's (base 14): its sizes are marked, the fix never writes the root text from ggplot2's 11, no one-number advice",
+      "elements": {
+        "plotTitle": "R1-UNKNOWN",
+        "axisTitle": "R1-UNKNOWN",
+        "axisText": "R1-UNKNOWN",
+        "legendText": "R1-UNKNOWN",
+        "legendTitle": "R1-UNKNOWN",
+        "stripText": "R1-UNKNOWN",
+        "caption": "R1-UNKNOWN"
+      },
+      "base": 14
+    },
+    "r1-void": {
+      "what": "review round 1 (P13B-R1-06): + theme_void(), which blanks axis.title and axis.text: no axis rows, and the fix never draws them",
+      "elements": {
+        "plotTitle": "R1-VOID",
+        "axisTitle": "R1-VOID",
+        "axisText": "R1-VOID",
+        "legendText": "R1-VOID",
+        "legendTitle": "R1-VOID",
+        "stripText": "R1-VOID",
+        "caption": "R1-VOID"
+      },
+      "base": 11
+    },
+    "r1-filename-named": {
+      "what": "review round 1 (P13B-R1-07): ggsave(filename = \"fig.png\", p, ...): the first unnamed argument is the plot (the fix once bound p to device, and real ggsave() raised)",
+      "elements": {
+        "plotTitle": "R1-GGSAVE",
+        "axisTitle": "R1-GGSAVE",
+        "axisText": "R1-GGSAVE",
+        "legendText": "R1-GGSAVE",
+        "legendTitle": "R1-GGSAVE",
+        "stripText": "R1-GGSAVE",
+        "caption": "R1-GGSAVE"
+      },
+      "base": 9
+    },
+    "r1-file-partial": {
+      "what": "review round 1 (P13B-R1-07): ggsave(file = \"fig.png\", p, ...): file is a partial name for filename",
+      "elements": {
+        "plotTitle": "R1-GGSAVE",
+        "axisTitle": "R1-GGSAVE",
+        "axisText": "R1-GGSAVE",
+        "legendText": "R1-GGSAVE",
+        "legendTitle": "R1-GGSAVE",
+        "stripText": "R1-GGSAVE",
+        "caption": "R1-GGSAVE"
+      },
+      "base": 9
+    },
+    "r2-comment-names": {
+      "what": "fix 13b review round 2 (P13B-R2-04, -03): base_fs <- 22  # a comment, tick_fs <- 8  # a comment: names followed by a comment are read (the comment once made base_size unread, and the fix lowered text)",
+      "elements": {
+        "plotTitle": "R2-NAMES",
+        "axisTitle": "R2-NAMES",
+        "axisText": "R2-NAMES",
+        "legendText": "R2-NAMES",
+        "legendTitle": "R2-NAMES",
+        "stripText": "R2-NAMES",
+        "caption": "R2-NAMES"
+      },
+      "base": 22
+    },
+    "r2-ggsave-comment-width": {
+      "what": "review round 2 (P13B-R2-04): fig_w <- 18   # cm, fig_h <- 12   # cm, ggsave(width = fig_w, height = fig_h, units = 'cm')",
+      "elements": {
+        "plotTitle": "R2-NAMES",
+        "axisTitle": "R2-NAMES",
+        "axisText": "R2-NAMES",
+        "legendText": "R2-NAMES",
+        "legendTitle": "R2-NAMES",
+        "stripText": "R2-NAMES",
+        "caption": "R2-NAMES"
+      },
+      "scaleClaim": "R2-NAMES",
+      "base": 9
+    },
+    "r2-config-list": {
+      "what": "review round 2 (P13B-R2-03): theme_classic(base_size = cfg$base) and ggsave(width = cfg$width): unread, rows marked, the fix sets a short row with the R10 floor and never a smaller constant",
+      "elements": {
+        "plotTitle": "R2-UNREAD",
+        "axisTitle": "R2-UNREAD",
+        "axisText": "R2-UNREAD",
+        "legendText": "R2-UNREAD",
+        "legendTitle": "R2-UNREAD",
+        "stripText": "R2-UNREAD",
+        "caption": "R2-UNREAD"
+      },
+      "scaleClaim": "R2-UNREAD",
+      "base": 20
+    },
+    "r2-png-device": {
+      "what": "review round 2 (P13B-R2-09): png(width = 8, height = 6, units = 'in', res = 300); print(p); dev.off(): the device is the canvas and the fix themes the printed plot",
+      "elements": {
+        "plotTitle": "R2-DEVICE",
+        "axisTitle": "R2-DEVICE",
+        "axisText": "R2-DEVICE",
+        "legendText": "R2-DEVICE",
+        "legendTitle": "R2-DEVICE",
+        "stripText": "R2-DEVICE",
+        "caption": "R2-DEVICE"
+      },
+      "scaleClaim": "R2-DEVICE",
+      "base": 10
+    },
+    "r2-cowplot-grid": {
+      "what": "review round 2 (P13B-R2-01): cowplot plot_grid(p1, p2) of two theme_bw(base_size = 9) plots: themed in each plot before it is combined (a theme on the combined object once themed cowplot's canvas)",
+      "elements": {
+        "plotTitle": "R2-COMBINE",
+        "axisTitle": "R2-COMBINE",
+        "axisText": "R2-COMBINE",
+        "legendText": "R2-COMBINE",
+        "legendTitle": "R2-COMBINE",
+        "stripText": "R2-COMBINE",
+        "caption": "R2-COMBINE"
+      },
+      "base": 9
+    },
+    "r2-gridextra": {
+      "what": "review round 2 (P13B-R2-01): gridExtra arrangeGrob(p1, p2) saved as a gtable: themed in each plot (gtable + theme() is NULL and ggsave() wrote a blank image)",
+      "elements": {
+        "plotTitle": "R2-COMBINE",
+        "axisTitle": "R2-COMBINE",
+        "axisText": "R2-COMBINE",
+        "legendText": "R2-COMBINE",
+        "legendTitle": "R2-COMBINE",
+        "stripText": "R2-COMBINE",
+        "caption": "R2-COMBINE"
+      },
+      "base": 9
+    },
+    "r2-cowplot-mixed": {
+      "what": "review round 2 (P13B-R2-01): plot_grid of a base_size 9 plot and a base_size 20 plot written after it: each plot is read, the smaller decides",
+      "elements": {
+        "plotTitle": "R2-COMBINE",
+        "axisTitle": "R2-COMBINE",
+        "axisText": "R2-COMBINE",
+        "legendText": "R2-COMBINE",
+        "legendTitle": "R2-COMBINE",
+        "stripText": "R2-COMBINE",
+        "caption": "R2-COMBINE"
+      },
+      "base": 9
+    },
+    "r2-replace-inline": {
+      "what": "review round 2 (P13B-R2-11): theme_bw(base_size = 12) %+replace% theme(plot.title = element_text(face = 'bold')): the title is drawn at 12, not 1.2 x",
+      "elements": {
+        "plotTitle": "R2-REPLACE",
+        "axisTitle": "R2-REPLACE",
+        "axisText": "R2-REPLACE",
+        "legendText": "R2-REPLACE",
+        "legendTitle": "R2-REPLACE",
+        "stripText": "R2-REPLACE",
+        "caption": "R2-REPLACE"
+      },
+      "base": 12
+    },
+    "r2-guide-theme": {
+      "what": "review round 2 (P13B-R2-08): guide_legend(theme = theme(legend.text = 7, legend.title = 8)) before theme_bw(base_size = 18): the guide's own sizes are drawn and raised where they are written",
+      "elements": {
+        "plotTitle": "R2-GUIDE",
+        "axisTitle": "R2-GUIDE",
+        "axisText": "R2-GUIDE",
+        "legendText": "R2-GUIDE",
+        "legendTitle": "R2-GUIDE",
+        "stripText": "R2-GUIDE",
+        "caption": "R2-GUIDE"
+      },
+      "base": 18
+    },
+    "r2-guide-label-theme": {
+      "what": "review round 2 (P13B-R2-08): guide_legend(label.theme = element_text(size = 7), title.theme = element_text(size = 8)), the earlier idiom ggplot2 4.0.3 still draws",
+      "elements": {
+        "plotTitle": "R2-GUIDE",
+        "axisTitle": "R2-GUIDE",
+        "axisText": "R2-GUIDE",
+        "legendText": "R2-GUIDE",
+        "legendTitle": "R2-GUIDE",
+        "stripText": "R2-GUIDE",
+        "caption": "R2-GUIDE"
+      },
+      "base": 18
+    },
+    "r3-shared-theme-object": {
+      "what": "fix 13b review round 3 (P13B-R3-01): theme_fig <- theme_bw(base_size = 16) + theme(...) added to two plots that arrangeGrob() combines: R15 reads the theme where the name is used (the check assumed base 11 and the fix wrote text = 11, lowering 14 element-runs)",
+      "elements": {
+        "plotTitle": "R3-NAMES",
+        "axisTitle": "R3-NAMES",
+        "axisText": "R3-NAMES",
+        "legendText": "R3-NAMES",
+        "legendTitle": "R3-NAMES",
+        "stripText": "R3-NAMES",
+        "caption": "R3-NAMES"
+      },
+      "base": 16
+    },
+    "r3-function-panels": {
+      "what": "review round 3 (P13B-R3-01): make_panel <- function(d, xlab) ggplot(...) + theme_bw(base_size = 16), two panels combined by plot_grid(): R15 reads the function's theme where it is called",
+      "elements": {
+        "plotTitle": "R3-NAMES",
+        "axisTitle": "R3-NAMES",
+        "axisText": "R3-NAMES",
+        "legendText": "R3-NAMES",
+        "legendTitle": "R3-NAMES",
+        "stripText": "R3-NAMES",
+        "caption": "R3-NAMES"
+      },
+      "base": 16
+    },
+    "r3-function-single": {
+      "what": "review round 3 (P13B-R3-01, the reviewer's control): the same function building a single plot, read before and after the change",
+      "elements": {
+        "plotTitle": "R3-NAMES",
+        "axisTitle": "R3-NAMES",
+        "axisText": "R3-NAMES",
+        "legendText": "R3-NAMES",
+        "legendTitle": "R3-NAMES",
+        "stripText": "R3-NAMES",
+        "caption": "R3-NAMES"
+      },
+      "base": 16
+    },
+    "r3-plot-from-plot": {
+      "what": "review round 3 (P13B-R3-01, a sibling): p2 <- p1 + aes(x = hp) + labs(...) combined with p1: p2 takes p1's theme_bw(base_size = 16)",
+      "elements": {
+        "plotTitle": "R3-NAMES",
+        "axisTitle": "R3-NAMES",
+        "axisText": "R3-NAMES",
+        "legendText": "R3-NAMES",
+        "legendTitle": "R3-NAMES",
+        "stripText": "R3-NAMES",
+        "caption": "R3-NAMES"
+      },
+      "base": 16
+    },
+    "r3-theme-obj-after": {
+      "what": "review round 3 (P13B-R3-01, a sibling in one plot): theme_ticks <- theme(axis.text = element_text(size = 20)) added after theme_bw(base_size = 9): read where it is used, so the fix never lowers the 20 pt ticks",
+      "elements": {
+        "plotTitle": "R3-NAMES",
+        "axisTitle": "R3-NAMES",
+        "axisText": "R3-NAMES",
+        "legendText": "R3-NAMES",
+        "legendTitle": "R3-NAMES",
+        "stripText": "R3-NAMES",
+        "caption": "R3-NAMES"
+      },
+      "base": 9
+    },
+    "r3-complete-obj-after": {
+      "what": "review round 3 (R15): theme_big <- theme_bw(base_size = 20) added after theme(axis.text = 6): the complete theme replaces the element",
+      "elements": {
+        "plotTitle": "R3-NAMES",
+        "axisTitle": "R3-NAMES",
+        "axisText": "R3-NAMES",
+        "legendText": "R3-NAMES",
+        "legendTitle": "R3-NAMES",
+        "stripText": "R3-NAMES",
+        "caption": "R3-NAMES"
+      },
+      "base": 20
+    },
+    "r3-if-block": {
+      "what": "review round 3 (R15): p reassigned inside an if-block with theme_bw(base_size = 16): read in source order (the block's theme last), never moved to ggsave()'s use",
+      "elements": {
+        "plotTitle": "R3-NAMES",
+        "axisTitle": "R3-NAMES",
+        "axisText": "R3-NAMES",
+        "legendText": "R3-NAMES",
+        "legendTitle": "R3-NAMES",
+        "stripText": "R3-NAMES",
+        "caption": "R3-NAMES"
+      },
+      "base": 16
+    },
+    "r3-three-deep": {
+      "what": "review round 3 (R15): t2 <- t1 + theme(...), t1 <- theme_bw(base_size = 16), added by a function that builds each panel of a plot_grid()",
+      "elements": {
+        "plotTitle": "R3-NAMES",
+        "axisTitle": "R3-NAMES",
+        "axisText": "R3-NAMES",
+        "legendText": "R3-NAMES",
+        "legendTitle": "R3-NAMES",
+        "stripText": "R3-NAMES",
+        "caption": "R3-NAMES"
+      },
+      "base": 16
+    },
+    "r3-preview-print": {
+      "what": "review round 3 (a sibling): print(p + theme(axis.text = element_text(size = 30))) previews another version before ggsave() saves p: the preview's theme is not the saved plot's",
+      "elements": {
+        "plotTitle": "R3-NAMES",
+        "axisTitle": "R3-NAMES",
+        "axisText": "R3-NAMES",
+        "legendText": "R3-NAMES",
+        "legendTitle": "R3-NAMES",
+        "stripText": "R3-NAMES",
+        "caption": "R3-NAMES"
+      },
+      "base": 9
+    },
+    "r3-unread-base-small": {
+      "what": "review round 3 (P13B-R3-03): theme_bw(base_size = cfg$base) with cfg$base = 7: every drawn row resting on the unread base is floored, short or not at the assumed 11",
+      "elements": {
+        "plotTitle": "R3-UNREAD",
+        "axisTitle": "R3-UNREAD",
+        "axisText": "R3-UNREAD",
+        "legendText": "R3-UNREAD",
+        "legendTitle": "R3-UNREAD",
+        "stripText": "R3-UNREAD",
+        "caption": "R3-UNREAD"
+      },
+      "base": 7
+    },
+    "r3-png-autoprint": {
+      "what": "review round 3 (P13B-R3-04): png(8 x 6 in) then p on a line of its own (Rscript prints it): the device is the canvas and the fix prints the themed plot into the user's own file",
+      "elements": {
+        "plotTitle": "R3-DEVICE",
+        "axisTitle": "R3-DEVICE",
+        "axisText": "R3-DEVICE",
+        "legendText": "R3-DEVICE",
+        "legendTitle": "R3-DEVICE",
+        "stripText": "R3-DEVICE",
+        "caption": "R3-DEVICE"
+      },
+      "scaleClaim": "R3-DEVICE",
+      "base": 10
+    },
+    "r3-pdf-chain": {
+      "what": "review round 3 (P13B-R3-04): pdf(7 x 5) then a ggplot() chain on its own lines",
+      "elements": {
+        "plotTitle": "R3-DEVICE",
+        "axisTitle": "R3-DEVICE",
+        "axisText": "R3-DEVICE",
+        "legendText": "R3-DEVICE",
+        "legendTitle": "R3-DEVICE",
+        "stripText": "R3-DEVICE",
+        "caption": "R3-DEVICE"
+      },
+      "scaleClaim": "R3-DEVICE",
+      "base": 9
+    },
+    "r3-gridarrange-png": {
+      "what": "review round 3 (P13B-R3-04): png(10 x 4 in) then grid.arrange(p1, p2): each plot themed before it is arranged (grid.arrange was never read by R12: the scanner sees `arrange` on `grid`)",
+      "elements": {
+        "plotTitle": "R3-DEVICE",
+        "axisTitle": "R3-DEVICE",
+        "axisText": "R3-DEVICE",
+        "legendText": "R3-DEVICE",
+        "legendTitle": "R3-DEVICE",
+        "stripText": "R3-DEVICE",
+        "caption": "R3-DEVICE"
+      },
+      "scaleClaim": "R3-DEVICE",
+      "base": 9
+    },
+    "r3-agg-png": {
+      "what": "review round 3 (P13B-R3-04): ragg's agg_png(8 x 6 in) then print(p)",
+      "elements": {
+        "plotTitle": "R3-DEVICE",
+        "axisTitle": "R3-DEVICE",
+        "axisText": "R3-DEVICE",
+        "legendText": "R3-DEVICE",
+        "legendTitle": "R3-DEVICE",
+        "stripText": "R3-DEVICE",
+        "caption": "R3-DEVICE"
+      },
+      "scaleClaim": "R3-DEVICE",
+      "base": 10
+    },
+    "r3-ggsave-gridarrange": {
+      "what": "review round 3 (P13B-R3-04, a sibling): ggsave('f.png', grid.arrange(p1, p2)) of two theme_bw(base_size = 9) plots: themed in each plot (R12 now reads grid.arrange)",
+      "elements": {
+        "plotTitle": "R3-COMBINE",
+        "axisTitle": "R3-COMBINE",
+        "axisText": "R3-COMBINE",
+        "legendText": "R3-COMBINE",
+        "legendTitle": "R3-COMBINE",
+        "stripText": "R3-COMBINE",
+        "caption": "R3-COMBINE"
+      },
+      "base": 9
+    }
+  }
+}

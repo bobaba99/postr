@@ -465,7 +465,8 @@
       ]
     },
     "clear-leaves-storage": {
-      "undoes": "E — clearing the scripts removes them from storage",
+      "undoes": "E — (equivalent since fix 24) clearing the scripts removes them from storage; its only caller, account deletion (profile/accountDeletion.ts), already removes every postr.* key before calling it, so a user sees no difference",
+      "expect": "survive",
       "edits": [
         [
           "src/poster/figureScriptDraft.ts",
