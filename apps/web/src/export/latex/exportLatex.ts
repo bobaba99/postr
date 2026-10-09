@@ -16,7 +16,7 @@ import {
   extractPosterTitle,
   type ExportContentOptions,
 } from '../posterContent';
-import { FONTS } from '@/poster/constants';
+import { PX, FONTS } from '@/poster/constants';
 import { referencesToBib } from './bib';
 import { buildLatexDocument, hasPdflatexFallback } from './writer';
 import type { AttributionOptions } from '../attribution';
@@ -123,7 +123,7 @@ export async function exportPosterLatex(
   // caller gets the same answer.
   const doc = stripAckBlock(input, options.attribution);
   const { assets } = await resolvePosterAssets(doc, options.fetcher);
-  const captionNumbers = computeCaptionNumbers(doc.blocks);
+  const captionNumbers = computeCaptionNumbers(doc.blocks, doc.widthIn * PX);
 
   const files: Record<string, Uint8Array> = {};
   const assetPaths = new Map<string, string>();

@@ -260,7 +260,8 @@ export async function extractFromPdf(
     figureBlocks,
     sourceFonts,
     warnings: [
-      'Reading order auto-detected from column layout — re-order via Auto-Arrange if needed.',
+      // Auto-Arrange keeps the reading order (record 28): it no longer re-sorts.
+      'Reading order auto-detected from the column layout. To change it, move blocks where they belong; Auto-Arrange then tidies the columns in that order.',
       sourceFonts.length > 0
         ? `Source fonts (${sourceFonts.slice(0, 3).join(', ')}${sourceFonts.length > 3 ? '…' : ''}) replaced with the editor default.`
         : '',

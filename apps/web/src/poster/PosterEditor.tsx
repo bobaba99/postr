@@ -52,6 +52,7 @@ import {
 } from './Sidebar';
 import {
   FONTS,
+  M,
   PALETTES,
   PX,
   SNAP_GRID,
@@ -73,7 +74,9 @@ import {
   type CitationStyleKey,
   type SortMode,
 } from './citations';
-import { autoLayout } from './autoLayout';
+import { changesLayout, pastMarginArea } from './autoLayout';
+import { arrangeSheet } from './arrangeMeasure';
+import { numberBlocks } from './readingOrder';
 import { filterDeletable } from '@/export/blockLock';
 import { LAYOUT_TEMPLATES, makeBlocks, type LayoutKey } from './templates';
 import { formatSheetSize, moveOntoSheet } from './resizeSheet';
@@ -1389,7 +1392,6 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // Helper: replace blocks immutably
   const storeSetBlocks = usePosterStore((s) => s.setBlocks);
   const storeSetBlocksSilent = usePosterStore((s) => s.setBlocksSilent);
-  const setStyle = usePosterStore((s) => s.setStyle);
   const setBlocks = (next: Block[]) => storeSetBlocks(next);
 
   // Bound here so the typing path can reach the store action that
@@ -1472,29 +1474,14 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     groupDragOrigin.current = null;
   };
 
-  // Heading auto-numbering: use the block ARRAY ORDER as the source
-  // of truth, not geometry. Every previous attempt (row-first, then
-  // column-first with a bucket tolerance) broke on at least one
-  // template — row-first numbered Hypotheses as #5 in a 3-column
-  // poster, column-first mis-ordered 2-column-wide-figure layouts
-  // whose full-width heading spans all columns. The array order in
-  // doc.blocks is authored by each template to match the intended
-  // reading flow, and new headings append to the end which naturally
-  // gives them the next number. Drag-to-reorder on the canvas
-  // doesn't change array position, so numbers stay stable while
-  // the user fine-tunes layout — exactly what you'd expect from
-  // an "auto-number" feature.
-  const headingNumbers = useMemo(() => {
-    const m: Record<string, number> = {};
-    let counter = 0;
-    for (const b of doc.blocks) {
-      if (b.type === 'heading') {
-        counter++;
-        m[b.id] = counter;
-      }
-    }
-    return m;
-  }, [doc.blocks]);
+  // Heading, figure and table numbers: the poster's ONE reading order
+  // (readingOrder.ts; record 28). Headings used to follow the block array,
+  // which is also paint order, so Bring Forward renumbered them and a pasted
+  // heading took the last number wherever it landed; figures and tables
+  // followed top edge then left edge, so they were numbered across the
+  // columns. The exports read the same function (export/posterContent.ts).
+  const blockNumbers = useMemo(() => numberBlocks(doc.blocks, cW), [doc.blocks, cW]);
+  const headingNumbers = blockNumbers.headings;
 
   const sortedRefs = useMemo(
     () => sortReferences(doc.references, sortMode),
@@ -1518,33 +1505,9 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     [doc.blocks, measuredHeights, titleOverflowPx],
   );
 
-  // Auto-numbered captions for figure + table blocks. Number is
-  // driven by reading order (top-to-bottom primary, left-to-right
-  // secondary) — dragging a block to a new position on the canvas
-  // re-ranks everything automatically. Users never edit the number
-  // directly, only the descriptive caption text.
-  const captionNumbers = useMemo<Record<string, number>>(() => {
-    const out: Record<string, number> = {};
-    const readingOrder = (a: Block, b: Block) =>
-      a.y - b.y || a.x - b.x;
-    // Charts are figures — they share the "Figure N" number sequence
-    // with image blocks so a poster mixing both stays consistent.
-    doc.blocks
-      .filter((b) => b.type === 'image' || b.type === 'chart')
-      .slice()
-      .sort(readingOrder)
-      .forEach((b, i) => {
-        out[b.id] = i + 1;
-      });
-    doc.blocks
-      .filter((b) => b.type === 'table')
-      .slice()
-      .sort(readingOrder)
-      .forEach((b, i) => {
-        out[b.id] = i + 1;
-      });
-    return out;
-  }, [doc.blocks]);
+  // "Figure N." and "Table N." (charts share the figures' sequence), in
+  // reading order with the headings above.
+  const captionNumbers = blockNumbers.captions;
 
   // Table blocks offered to the chart chooser as zero-upload data
   // sources ("Or use a table from this poster"). Labels reuse the
@@ -1602,6 +1565,18 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         category: 'Blocks overlap',
         message: c.message,
         blockId: c.aId,
+      });
+    }
+
+    // The columns past the bottom margin, as drawn: what Auto-Arrange
+    // could not fit, or what the user has since added (record 28).
+    const past = pastMarginArea(doc.blocks, cH, titleOverflowPx, (b) => measuredHeights.get(b.id) ?? b.h);
+    if (past >= 0.05) {
+      out.push({
+        id: 'past-bottom-margin',
+        severity: 'warning',
+        category: 'Past the bottom margin',
+        message: `The columns run ${past.toFixed(1)} in² past the bottom margin, ${M / PX} in from the bottom edge. Shorten some text or make a figure smaller.`,
       });
     }
 
@@ -1710,6 +1685,9 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     doc.institutions,
     doc.references,
     oobWarnings,
+    cH,
+    titleOverflowPx,
+    measuredHeights,
   ]);
 
   // -----------------------------------------------------------------------
@@ -1978,107 +1956,19 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     setPendingSize(null);
   };
 
+  // Auto-Arrange (autoLayout.ts, arrangeMeasure.ts; record 28): the body in
+  // reading order, cut into the poster's columns and their widths chosen for
+  // the least area past the bottom margin, each block's height measured on
+  // the sheet at its new width. Font sizes never change (it used to shrink
+  // body and heading text, which took three undo steps): one `setBlocks`,
+  // one undo step, and none when no block moves further than 0.01 in (a
+  // second press can measure a block a hair different; review finding B-R7).
   const onAutoLayout = () => {
-    // Measure the NATURAL content height of every text-like block
-    // BEFORE auto-arrange so the layout packs them tightly.
-    //
-    // The subtlety: we can't measure the outer frame's BCR because
-    // grow-with-content blocks have `minHeight: b.h` set on them,
-    // which means the rendered frame is at LEAST the current b.h
-    // tall regardless of actual content. If auto-arrange previously
-    // committed b.h = 110 but the content is now only 2 lines, the
-    // frame is still 110 tall — so measuring it would never shrink.
-    //
-    // Instead we use a fresh hidden measurement DOM: clone the
-    // block's RichTextEditor content into a detached div at the
-    // block's width, with the same typography, let the browser lay
-    // it out, and read the resulting height. That gives us the
-    // natural content height independent of the current b.h floor.
-    //
-    // Only measures blocks that natively grow with content (title /
-    // text / heading / references / authors); image / logo / table
-    // blocks keep their declared height because their content is
-    // aspect-ratio or grid driven, not text-length driven.
-    const GROW_TYPES = new Set<Block['type']>([
-      'title',
-      'text',
-      'heading',
-      'references',
-      'authors',
-    ]);
-    const HEIGHT_SLACK_UNITS = 4; // padding + line-height slack so nothing clips
-
-    const ffc = FONTS[doc.fontFamily]?.css ?? doc.fontFamily;
-    const styleLevelFor = (t: Block['type']) =>
-      t === 'title' ? doc.styles.title
-      : t === 'authors' ? doc.styles.authors
-      : t === 'heading' ? doc.styles.heading
-      : doc.styles.body;
-
-    // Detached measurement host — positioned offscreen so it never
-    // flashes visually, but still rendered by the layout engine.
-    const host = document.createElement('div');
-    host.style.cssText =
-      'position:absolute;left:-99999px;top:0;visibility:hidden;pointer-events:none;';
-    document.body.appendChild(host);
-
-    const measureContent = (blk: Block): number => {
-      const level = styleLevelFor(blk.type);
-      const probe = document.createElement('div');
-      probe.style.cssText = [
-        `width:${blk.w}px`,
-        'box-sizing:border-box',
-        'padding:4px 6px',
-        `font-family:${ffc}`,
-        `font-size:${level.size}px`,
-        `font-weight:${level.weight}`,
-        `line-height:${level.lineHeight}`,
-        'white-space:pre-wrap',
-        'word-wrap:break-word',
-      ].join(';');
-
-      let text: string;
-      if (blk.type === 'references') {
-        // References don't use blk.content — they render from
-        // doc.references via the selected citation formatter plus a
-        // "References" header line. Reproduce that here so the probe
-        // actually measures the rendered refs block height.
-        const fmt = CITATION_STYLES[citationStyle] ?? CITATION_STYLES[DEFAULT_CITATION_STYLE];
-        const lines = doc.references.map((r, i) =>
-          fmt(r, i).replace(/_([^_]+)_/g, '$1'),
-        );
-        text = ['References', ...lines].join('\n');
-      } else {
-        // For title/text/heading/authors, use the raw content string
-        // (minus any inline HTML tags from rich text formatting).
-        text = (blk.content || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
-      }
-      probe.textContent = text || ' ';
-      host.appendChild(probe);
-      const h = probe.offsetHeight;
-      host.removeChild(probe);
-      return h;
-    };
-
-    const measured = doc.blocks.map((blk) => {
-      if (!GROW_TYPES.has(blk.type)) return blk;
-      const naturalH = Math.max(
-        20, // floor — same lower bound autoLayout uses
-        Math.ceil(measureContent(blk)) + HEIGHT_SLACK_UNITS,
-      );
-      if (Math.abs(naturalH - blk.h) < 2) return blk;
-      return { ...blk, h: naturalH };
-    });
-
-    document.body.removeChild(host);
-
-    const result = autoLayout(measured, cW, cH, doc.styles);
-    setBlocks(result.blocks);
-    // If Pass 2 scaled fonts, apply the new styles
-    if (result.scaledStyles) {
-      setStyle('body', { size: result.scaledStyles.body.size });
-      setStyle('heading', { size: result.scaledStyles.heading.size });
-    }
+    const canvas = canvasRef.current;
+    const latest = usePosterStore.getState().doc ?? doc;
+    if (!canvas) return;
+    const { blocks: next } = arrangeSheet(canvas, latest, cW, cH, titleOverflowPx);
+    if (changesLayout(latest.blocks, next)) setBlocks(next);
   };
 
   // Auto-arrange immediately after an import lands. The import
@@ -3551,6 +3441,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         sortedRefs={sortedRefs}
         citationStyle={citationStyle}
         headingNumbers={headingNumbers}
+        captionNumbers={captionNumbers}
         titleOverflowPx={titleOverflowPx}
         didDragRef={didDragRef}
         paletteName={palName}

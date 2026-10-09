@@ -1040,10 +1040,13 @@ export function LayoutTab(props: {
         Auto-Arrange
       </button>
       <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-        Tidy existing blocks into columns. It measures each text block's
-        content height so short sections don't leave empty space, and if
-        the blocks still don't fit, it makes body and heading text smaller.
-        Great after dragging things around or after editing a lot of text.
+        Lays your blocks out in columns, in reading order: down each
+        column, then the next. It chooses where each column breaks and how
+        wide it is, to keep blocks from running past the bottom margin and
+        to spread the white space evenly. Text sizes never change and
+        figures keep their shape. The title and authors stay where they
+        are. If the blocks still don't fit, Issues lists the area past the
+        bottom margin, or the blocks that overlap.
       </div>
 
       <div style={labelStyle}>Templates</div>
@@ -4282,9 +4285,10 @@ function IssuesTab(props: {
         </div>
         <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.55 }}>
           This tab scans for common pre-flight problems: blocks outside
-          the canvas, missing authors or institutions, empty image
-          blocks, very long titles, overlapping blocks, and references
-          missing key fields. Issues refresh automatically as you edit.
+          the canvas, columns past the bottom margin, missing authors or
+          institutions, empty image blocks, very long titles, overlapping
+          blocks, and references missing key fields. Issues refresh
+          automatically as you edit.
         </div>
       </div>
     );

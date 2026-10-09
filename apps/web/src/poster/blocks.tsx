@@ -1688,6 +1688,8 @@ function CaptionWrapper({
       }}
     >
       <div
+        // Auto-Arrange reads the image area as drawn (arrangeMeasure.ts).
+        data-postr-figure-area={isImageLike ? '' : undefined}
         style={{
           flex: '0 0 auto',
           height: isImageLike ? block.h : 'auto',

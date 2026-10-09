@@ -42,6 +42,7 @@ vi.mock('@/data/posters', async (orig) => ({
 vi.mock('@/data/thumbnails', () => ({ captureThumbnail: vi.fn(async () => null) }));
 
 import { makeBlocks } from '../templates';
+import { oracleRefined } from './arrangeOracle';
 import {
   NoopResizeObserver,
   choosePreset,
@@ -108,12 +109,15 @@ describe('A — a custom-size poster is drawn, laid out and checked at its own s
     expect(outside, 'blocks past the 300×400 sheet').toEqual([]);
   });
 
-  it('Auto-Arrange lays out inside a 30×40 sheet', async () => {
+  // Since record 28 the title and authors stay where they are; the blocks
+  // Auto-Arrange places are the body.
+  it('Auto-Arrange lays the body out inside a 30×40 sheet', async () => {
     load(makeDoc(30, 40));
     renderEditor();
     openTab(/layout/i);
     await click(findButton('Auto-Arrange'), 'auto-arrange');
-    const outside = userBlocks().filter((b) => !insideSheet(b)).map((b) => `${b.id}@${b.x + b.w},${b.y + b.h}`);
+    const body = userBlocks().filter((b) => b.type !== 'title' && b.type !== 'authors');
+    const outside = body.filter((b) => !insideSheet(b)).map((b) => `${b.id}@${b.x + b.w},${b.y + b.h}`);
     expect(outside, 'blocks past the 300×400 sheet').toEqual([]);
   });
 
@@ -255,24 +259,34 @@ describe('A — each edge is measured against the poster\'s own sheet, width and
     expect(bottom, 'lowest template block').toBeLessThanOrEqual(300);
   });
 
-  it('Auto-Arrange on a crowded 48×24 sheet shrinks text to fit its height', async () => {
+  // Record 28: Auto-Arrange no longer shrinks text. What reads the height
+  // now is how much it leaves past the bottom margin: the least possible on
+  // THIS sheet, found by a brute force written from the record's rule table.
+  it('Auto-Arrange on a crowded 48×24 sheet leaves the least area past its bottom margin, text sizes unchanged', async () => {
     const d = makeDoc(48, 24);
-    const base = d.blocks[2]!;
-    const many = Array.from({ length: 24 }, (_, i) => ({
-      ...base,
-      id: `t${i}`,
-      x: 20,
-      y: 20 + i * 8,
-      w: 100,
-      h: 8,
-      content: `Paragraph ${i} of the results section.`,
-    }));
-    load({ ...d, blocks: many } as PosterDoc);
-    renderEditor();
+    const fig = (i: number) => ({
+      ...d.blocks[2]!, id: `f${i}`, type: 'image' as const, content: '', x: 10 + (i % 2) * 235, y: 90 + Math.floor(i / 2) * 10,
+      w: 225, h: 160, imageSrc: 'data:image/png;base64,iVBORw0KGgo=', captionPosition: 'none' as const,
+    });
+    load({ ...d, blocks: [d.blocks[0]!, ...Array.from({ length: 6 }, (_, i) => fig(i))] } as PosterDoc);
+    const view = renderEditor();
     openTab(/layout/i);
-    const size0 = doc().styles.body.size;
+    const styles = structuredClone(doc().styles);
     await click(findButton('Auto-Arrange'), 'auto-arrange');
-    expect(doc().styles.body.size, 'body text size after arranging').toBeLessThan(size0);
+    expect(doc().styles, 'text sizes after arranging').toEqual(styles);
+    // Under the 1 in margin and the 0.6 in gap below the title (20 + 60).
+    const least = oracleRefined({
+      k: 2, bodyWidth: 45.4, bodyHeight: (240 - 10 - 86) / 10, minWidth: 0, wasIn: [0, 0, 0, 1, 1, 1],
+      heightAt: (_i, w) => (w * 160) / 225,
+    }).O;
+    expect(least).toBeGreaterThan(0);
+    // jsdom has no ResizeObserver to re-read the drawn heights after the
+    // blocks change size; a fresh editor reads them, as the observer would.
+    view.unmount();
+    renderEditor();
+    openTab(/issues/i);
+    const row = Array.from(document.querySelectorAll('button')).find((b) => /past the bottom margin/.test(b.textContent ?? ''));
+    expect(Number(row?.textContent?.match(/run ([\d.]+) in²/)?.[1]), 'in² past the bottom margin').toBeCloseTo(least, 1);
   });
 });
 

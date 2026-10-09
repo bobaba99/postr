@@ -196,3 +196,19 @@ describe('paragraphsToLatex', () => {
     expect(out).toContain('\\setcounter{enumi}{2}');
   });
 });
+
+// Record 28: the LaTeX export numbers figures in the poster's reading order.
+describe('buildLatexDocument — figure numbers follow the reading order', () => {
+  it('numbers the foot of column 1 before the top of column 2', () => {
+    const base = makeFixtureDoc();
+    const img = base.blocks.find((b) => b.id === 'img1')!;
+    const blocks = [
+      ...base.blocks.filter((b) => b.id !== 'img1'),
+      { ...img, id: 'colTwoTop', x: 250, y: 95, caption: 'Zqbeta' },
+      { ...img, id: 'colOneLow', x: 20, y: 250, caption: 'Zqalpha' },
+    ];
+    const { tex } = buildLatexDocument({ ...base, blocks }, { assetPaths: new Map() });
+    expect(tex).toContain('\\textbf{Figure 1.} Zqalpha');
+    expect(tex).toContain('\\textbf{Figure 2.} Zqbeta');
+  });
+});

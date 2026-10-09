@@ -24,37 +24,40 @@ const block = (partial: Partial<Block> & Pick<Block, 'id' | 'type'>): Block => (
   ...partial,
 });
 
+// Record 28: the exports number in the poster's reading order
+// (poster/readingOrder.ts), the same function the canvas uses. These used to
+// assert top-then-left for figures and array order for headings.
 describe('computeCaptionNumbers', () => {
-  it('numbers figures in reading order (y primary, x secondary)', () => {
+  it('numbers figures down each column, then the next', () => {
     const numbers = computeCaptionNumbers([
-      block({ id: 'low', type: 'image', x: 0, y: 100 }),
-      block({ id: 'topRight', type: 'image', x: 200, y: 10 }),
-      block({ id: 'topLeft', type: 'image', x: 10, y: 10 }),
-    ]);
-    expect(numbers['topLeft']).toBe(1);
-    expect(numbers['topRight']).toBe(2);
-    expect(numbers['low']).toBe(3);
+      block({ id: 'col1Low', type: 'image', x: 10, y: 100 }),
+      block({ id: 'col2Top', type: 'image', x: 200, y: 10 }),
+      block({ id: 'col1Top', type: 'image', x: 10, y: 10 }),
+    ], 480);
+    expect(numbers['col1Top']).toBe(1);
+    expect(numbers['col1Low']).toBe(2);
+    expect(numbers['col2Top']).toBe(3);
   });
 
   it('numbers tables independently from figures', () => {
     const numbers = computeCaptionNumbers([
       block({ id: 'fig', type: 'image', y: 50 }),
       block({ id: 'tbl', type: 'table', y: 90 }),
-    ]);
+    ], 480);
     expect(numbers['fig']).toBe(1);
     expect(numbers['tbl']).toBe(1);
   });
 });
 
 describe('computeHeadingNumbers', () => {
-  it('numbers headings by array order, not canvas position', () => {
+  it('numbers headings in reading order, not by their place in the array', () => {
     const numbers = computeHeadingNumbers([
       block({ id: 'h1', type: 'heading', y: 500 }),
       block({ id: 't', type: 'text' }),
       block({ id: 'h2', type: 'heading', y: 10 }),
-    ]);
-    expect(numbers['h1']).toBe(1);
-    expect(numbers['h2']).toBe(2);
+    ], 480);
+    expect(numbers['h2']).toBe(1);
+    expect(numbers['h1']).toBe(2);
   });
 });
 
