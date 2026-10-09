@@ -1097,13 +1097,13 @@ flowchart LR
 - [ ] "Add references in Refs tab →" — empty state — `blocks.tsx:1464`
 - [ ] "References" — refs-block heading — `blocks.tsx:1485`
 - [ ] `Poster made with postr.sh https://postr.sh` — injected last reference entry (rawText from `@/export/attribution.ts:276`; bold via `ACK_REFERENCE_ID` check at `blocks.tsx:1496`)
-- [ ] `Figure {N}.` / `Table {N}.` — auto caption prefix — `blocks.tsx:1627`
+- [ ] `Figure {N}.` / `Table {N}.` — auto caption prefix — `blocks.tsx:1627` — reading order, down each column (record 28; it was top edge then left edge, across the columns); charts share the figures' sequence in the editor and the exports; Export › Preview poster shows them too (it showed no caption before record 28)
 - [ ] `{b.type}` (e.g. "image", "table") — block-type pill on selection chrome — `blocks.tsx:2507` — only on a block 120 px wide or more on screen (plan item 19); its width, read on each render (`selectionRoom.ts`), counts in the handle row's (review F3)
 - [ ] `{rotation}°` — rotation readout in pill — `blocks.tsx:2510`
 - [ ] "Poster Title" — editor placeholder — `blocks.tsx:2078`
 - [ ] "Section Heading" — editor placeholder — `blocks.tsx:2120`
 - [ ] "Type here… (type / for symbols)" — editor placeholder — `blocks.tsx:2143`
-- [ ] `{headingNumber}.` — auto heading number — `blocks.tsx:2116`
+- [ ] `{headingNumber}.` — auto heading number — `blocks.tsx:2116` — numbered in the poster's reading order (`poster/readingOrder.ts`, record 28): bands of wide blocks top to bottom, then columns left to right, each top to bottom; not the block array, so Bring Forward or a pasted heading no longer renumbers; the exports use the same function (`export/posterContent.ts`)
 - [ ] "⌘D" — shortcut hint in context menu — `blocks.tsx:2583`
 - [ ] "⌫" — shortcut hint in context menu — `blocks.tsx:2586`
 - [ ] `Cell ({r + 1}, {c + 1})` — table context-menu header — `blocks.tsx:1305`
@@ -1332,7 +1332,7 @@ flowchart LR
 - [ ] resize-warning toasts (`PosterEditor.tsx:494-498`): "Heading height is auto-sized from font", "Authors height adjusts to content", "References height adjusts to content"
 - [ ] new-block default contents (`PosterEditor.tsx:1706`): "Section Title" (heading), "Enter your text here." (text)
 - [ ] `Table {N}` — poster-table chip label for chart chooser (Figure tab, sidebar) — `PosterEditor.tsx:1393`
-- [ ] posterIssues strings (defined here, rendered in sidebar Issues tab; `PosterEditor.tsx:1411-1524`): `{blockType} out of bounds` (category); "Empty figure" / "Image block has no file attached — it will export as a dashed placeholder."; "Default title" / "Poster title is still the default placeholder."; "Placeholder text" / `A text block still contains "Enter your text here."`; "Long title" / `Poster title is {N} characters — may wrap to 3+ lines at typical poster sizes.`; "Missing authors" / "No authors have been added yet. Use the Authors tab to add them."; "Missing institutions" / "Authors are listed but no institution affiliations are set."; "Empty references" / "References block is on the canvas but the Refs tab is empty."; "Reference missing title" / `Reference "{author} {year}" has no title.`; "Reference missing authors" / `Reference "{title}" has no authors listed.`
+- [ ] posterIssues strings (defined here, rendered in sidebar Issues tab; `PosterEditor.tsx:1411-1524`): `{blockType} out of bounds` (category); "Past the bottom margin" / `The columns run {X} in² past the bottom margin, 1 in from the bottom edge. Shorten some text or make a figure smaller.` (warning, from 0.05 in²; per column, the widest block reaching past the margin times how far the lowest reaches, as drawn: `pastMarginArea`, `autoLayout.ts`; right after Auto-Arrange it is the plan's O; record 28); "Empty figure" / "Image block has no file attached — it will export as a dashed placeholder."; "Default title" / "Poster title is still the default placeholder."; "Placeholder text" / `A text block still contains "Enter your text here."`; "Long title" / `Poster title is {N} characters — may wrap to 3+ lines at typical poster sizes.`; "Missing authors" / "No authors have been added yet. Use the Authors tab to add them."; "Missing institutions" / "Authors are listed but no institution affiliations are set."; "Empty references" / "References block is on the canvas but the Refs tab is empty."; "Reference missing title" / `Reference "{author} {year}" has no title.`; "Reference missing authors" / `Reference "{title}" has no authors listed.`
 - [ ] "Postr is free — this credit stays on the poster." — locked-block refusal toast (constant `@/export/blockLock.ts:33`) — shown via `PosterEditor.tsx:1562,2097`
 - [ ] `Postr` — publish flow fallback handled at `PosterEditor.tsx:1217` (see above); `Poster` — print-document title fallback — `PosterEditor.tsx:2162`
 
@@ -1639,7 +1639,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:181-1
 - [ ] poster-size select — select — `Sidebar.tsx:920-934` — options from `POSTER_SIZES` (see Copy below) + `Custom Size`; calls `onChangePosterSize` ('custom' option is display-only, no handler call)
 - [ ] width input — number input (min 10, max 100, step 0.1) — `Sidebar.tsx:938-949` — calls `onChangeCustomSize(w, h)`
 - [ ] height input — number input (min 10, max 100, step 0.1) — `Sidebar.tsx:954-965` — calls `onChangeCustomSize(w, h)`
-- [ ] `⬡ Auto-Arrange` — button — `Sidebar.tsx:970-1012` — calls `onAutoLayout`
+- [ ] `⬡ Auto-Arrange` — button — `Sidebar.tsx:970-1012` — calls `onAutoLayout` → `arrangeSheet` (`poster/arrangeMeasure.ts`) → `autoArrange` (`poster/autoLayout.ts`) → `planColumns` (`poster/arrangeColumns.ts`, the owner-approved prototype's function, `docs/fixes/28-auto-arrange-lab.html`): the body in reading order cut into the poster's own number of columns (a lone block dragged part-way across a column counts in that column: `posterColumns`), widths chosen on a ¼ in grid (½ in for 4+) and then refined in 0.05 in steps within ±0.5 in (2 to 4 columns; around the grid set with the lowest score without the keep term), for the lowest F = 1000·O + U + 8·moved + 2·Σ|w − w̄| (O: area past the bottom of the body, in²; U: uneven white space); each block measured on the sheet at its new width (a figure: what its caption adds as drawn, read through `data-postr-figure-area` in `blocks.tsx`, plus its image area at the width, its shape kept exactly); title, authors and logos stay: a title or authors block in the top half of the sheet is the header (the body starts 0.6 in under it), one in the bottom half is along the foot (the body ends 0.6 in above it); the credit mark moves to a free spot only when an arranged block now covers it; font sizes never change; one undo step, none when no block moves more than 0.01 in (`changesLayout`) (record 28, review round 1)
 - [ ] template button `3-Column Classic` — button — `Sidebar.tsx:1035-1054` (data `templates.ts:43-44`) — calls `onApplyTemplate('3col')`-style key
 - [ ] template button `2-Col Wide Figure` — button — `Sidebar.tsx:1035-1054` (data `templates.ts:87-88`) — calls `onApplyTemplate`
 - [ ] template button `Billboard` — button — `Sidebar.tsx:1035-1054` (data `templates.ts:110-111`) — calls `onApplyTemplate`
@@ -1771,7 +1771,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:181-1
 - [ ] "×" — dimension separator — `Sidebar.tsx:951`
 - [ ] "Height (in)" — field label — `Sidebar.tsx:953`
 - [ ] "Auto Layout" — section label — `Sidebar.tsx:969`
-- [ ] "Tidy existing blocks into an even grid — measures each text block's actual content height so short sections don't leave empty space. Great after dragging things around or after editing a lot of text." — helper — `Sidebar.tsx:1013-1017`
+- [ ] "Lays your blocks out in columns, in reading order: down each column, then the next. It chooses where each column breaks and how wide it is, to keep blocks from running past the bottom margin and to spread the white space evenly. Text sizes never change and figures keep their shape. The title and authors stay where they are. If the blocks still don't fit, Issues lists the area past the bottom margin, or the blocks that overlap." — helper — `Sidebar.tsx:1043-1049` (record 28; last sentence since its review round 1)
 - [ ] "Templates" — section label — `Sidebar.tsx:1019`
 - [ ] "Pick a starting column layout. Apply anytime — blocks rearrange without losing their content." — helper — `Sidebar.tsx:1028-1029`
 - [ ] template descriptions: "Traditional conference layout." / "Full-width figure zone." / "Award-winning assertion-evidence." / "Narrow text, wide visuals." / "Title + authors only." — template-button subtext (`templates.ts:44,88,111,133,162`, rendered `Sidebar.tsx:1053`)
@@ -1878,7 +1878,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:181-1
 - [ ] "Copy a table from Word, Excel, or Google Sheets, add a table block, then paste into any cell — Postr will expand the grid and fill every cell for you. No need to retype." — card body — `Sidebar.tsx:4132-4136`
 - [ ] "Issues" — section label (empty state) — `Sidebar.tsx:4158`
 - [ ] "✓ No issues detected. Your poster passes all automated checks — ready to export." — empty-state banner — `Sidebar.tsx:4170-4172`
-- [ ] "This tab scans for common pre-flight problems: blocks outside the canvas, missing authors or institutions, empty image blocks, very long titles, overlapping blocks, and references missing key fields. Issues refresh automatically as you edit." — empty-state explainer — `Sidebar.tsx:4173-4178`
+- [ ] "This tab scans for common pre-flight problems: blocks outside the canvas, columns past the bottom margin, missing authors or institutions, empty image blocks, very long titles, overlapping blocks, and references missing key fields. Issues refresh automatically as you edit." — empty-state explainer — `Sidebar.tsx:4286-4290`
 - [ ] "Issues ({n})" — section label with count — `Sidebar.tsx:4261-4263`
 - [ ] "Pre-flight checks scan for blocks outside the canvas, missing required content, empty figures, and other common problems. Click any issue to jump to the block it affects." — explainer — `Sidebar.tsx:4264-4268`
 - [ ] "⛔ Errors ({n})" / "⚠ Warnings ({n})" / "ℹ Suggestions ({n})" — severity section headings — `Sidebar.tsx:4269-4271` (renderer `:4194`)
@@ -2088,7 +2088,7 @@ flowchart LR
 - [ ] "Could not rasterize page for vision fallback." — `PdfImportError`, kind `parse-failed` — `pdfImport.ts:175`
 - [ ] "Daily AI import limit reached.{ Try again in {retryAfter}.}" — rate-limited error (daily) — `pdfImport.ts:93-95`
 - [ ] "Too many AI requests in the last minute.{ Try again in {retryAfter}.}" — rate-limited error (burst) — `pdfImport.ts:94-95`
-- [ ] "Reading order auto-detected from column layout — re-order via Auto-Arrange if needed." — import warning — `pdfImport.ts:263`
+- [ ] "Reading order auto-detected from the column layout. To change it, move blocks where they belong; Auto-Arrange then tidies the columns in that order." — import warning — `pdfImport.ts:264` (record 28: Auto-Arrange keeps the reading order)
 - [ ] "Source fonts ({first 3 font names}{…}) replaced with the editor default." — import warning — `pdfImport.ts:265`
 - [ ] "{n} figure{s} couldn't be uploaded (storage timeout). Drop the PDF again to retry the missing figures — your text has already been imported." — import warning — `pdfImport.ts:268`
 - [ ] "Verifying {n} small region{s}…" — progress detail — `pdfImport.ts:697`

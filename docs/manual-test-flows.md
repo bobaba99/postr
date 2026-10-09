@@ -615,6 +615,25 @@ Record `docs/fixes/12-one-undo-history.md`; browser instrument `apps/web/scripts
 - [ ] On a Mac, Ctrl+Y redoes (owner decision 1), so the system's Ctrl+K / Ctrl+Y (kill to the end of the line, then yank it back) no longer brings the text back in a text block; ⌘Z undoes the kill (an owner question, record 12 §10).
 - [ ] Select a word in a text block and drag it to another place in the same block, then ⌘Z once: note whether the word goes back where it was, or is missing from both places until a second ⌘Z (the harness cannot drive a native text drag; the second case would be two steps, the plan's Later list).
 
+
+# PART 10 — AUTO-ARRANGE AND THE POSTER'S NUMBERS (record 28)
+
+## 30. Auto-Arrange lays the body out in columns; numbers follow the reading order
+
+Record `docs/fixes/28-auto-arrange.md`; browser instrument `apps/web/scripts/auto-arrange-check.mjs` (its gates G1–G13 are named after each check; Chromium, Firefox and WebKit). The function is the owner-approved prototype's (`docs/fixes/28-auto-arrange-lab.html`, open it in a browser to compare), with its widths then refined in 0.05 in steps (record 28 §9, review finding B-R3).
+
+- **Set up:** a guest at `/p/new` (the 3-column template). Type a few sentences into each text block.
+- [ ] Layout › Auto-Arrange: the poster keeps its three columns; the blocks keep their order down each column, then the next (a block may move to the next or previous column); column widths may differ; the title and authors do not move; no text changes size (G1, G2). Nothing overlaps (G3).
+- [ ] The section numbers and "Figure N." / "Table N." are the same before and after (G4). One Undo (top bar, or ⌘Z) puts every block back (G5). Pressing Auto-Arrange again moves nothing, and adds no undo step: after it, one Undo goes back to the poster before the first press (G7).
+- [ ] Drag the authors block to the foot of the sheet, then Auto-Arrange: the authors block stays there, the columns start 0.6 in under the title and end at least 0.6 in above the authors block (G13; review finding B-R1: the body used to be laid out under the authors block, off the sheet).
+- [ ] Drag one text block about 5 in to the right (part of the way across its column), then Auto-Arrange: the poster still has three columns (G12; B-R2: it used to come back with four).
+- [ ] The click feels immediate: under 300 ms to the new layout on the largest template (G6; MEASURED: the largest template 138 ms in WebKit, any poster at most 183 ms; four columns on a 72 × 48 sheet take 0.5 to 0.7 s, on the Later list).
+- [ ] Paste long text into every text block (or use a 48 × 24 sheet), Auto-Arrange: the layout runs past the bottom margin; Issues › "Past the bottom margin" gives the area in in², and it shrinks as you shorten text or make a figure smaller, and goes when it fits (G9).
+- [ ] Drag a heading to the top of another column: it takes its number from where it now sits, and the headings after it renumber. Select a heading, ⌘D, and drag the copy to the top of column 1: the copy is section 1 (a copy used to take the last number wherever it sat). Right-click a figure › Bring Forward or Send Back: no number changes. Put two figures in columns 1 and 2, the one in column 1 lower: it is still Figure 1.
+- [ ] Export › Preview poster: every figure and table shows its "Figure N." / "Table N." and caption, the same as the canvas (G10). Save as PowerPoint (paid): the same numbers.
+- [ ] On the welcome poster: Issues already lists about 26 in² past the bottom margin before any press (the seed as shipped; B-R6). Auto-Arrange gives three columns and lowers it to about 24 in² (24.4 / 24.6 / 23.8 in Chromium / Firefox / WebKit, MEASURED); the credit mark is not covered.
+- [ ] After Auto-Arrange, drag a block of the last column straight down: note how far it moves sideways out of line with its column (up to 0.25 in; review finding B-R4, Later).
+- **Not changed (record 28 §10, the plan's Later list):** a heading can end a column with its text at the top of the next one; a wide figure or band becomes one column wide (no spanning); on a crowded poster of figures a column can be left empty (the drawn poster then shows one column fewer); Auto-Arrange never adds or removes a column itself; a figure never shrinks; logos below the header stay where they are; four columns on a large sheet take 0.5 to 0.7 s.
 ---
 
 ## Quick findings summary (things the trace flagged as broken/unverified/contradictory)

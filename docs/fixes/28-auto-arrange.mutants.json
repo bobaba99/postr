@@ -1,0 +1,626 @@
+{
+ "tests": [
+  "src/poster/__tests__/readingOrder.test.ts",
+  "src/poster/__tests__/arrangeColumns.test.ts",
+  "src/poster/__tests__/autoLayout.test.ts",
+  "src/poster/__tests__/arrangeMeasure.test.ts",
+  "src/poster/__tests__/autoArrangeEditor.test.tsx",
+  "src/poster/__tests__/sheetSize.test.tsx",
+  "src/export/__tests__/posterContent.test.ts",
+  "src/export/__tests__/pptxWriter.test.ts",
+  "src/export/__tests__/latexWriter.test.ts"
+ ],
+ "mutants": {
+  "column-tolerance-1in": {
+   "undoes": "A — left edges within 3 in share a column",
+   "edits": [
+    [
+     "src/poster/readingOrder.ts",
+     "export const COLUMN_TOLERANCE = 30;",
+     "export const COLUMN_TOLERANCE = 10;"
+    ]
+   ]
+  },
+  "wide-at-half": {
+   "undoes": "A — only a block 90 % as wide as the body is a band of its own",
+   "edits": [
+    [
+     "src/poster/readingOrder.ts",
+     "export const WIDE_SHARE = 0.9;",
+     "export const WIDE_SHARE = 0.5;"
+    ]
+   ]
+  },
+  "no-bands": {
+   "undoes": "A — wide blocks split the poster into bands",
+   "edits": [
+    [
+     "src/poster/readingOrder.ts",
+     "  const isWide = (b: Block) => b.w >= wideFrom;",
+     "  const isWide = (_b: Block) => false && wideFrom > 0;"
+    ]
+   ]
+  },
+  "rows-first": {
+   "undoes": "A — a column is read top to bottom before the next column",
+   "edits": [
+    [
+     "src/poster/readingOrder.ts",
+     "    col.get(a.id)! - col.get(b.id)! || a.y - b.y || a.x - b.x || arrayAt.get(a.id)! - arrayAt.get(b.id)!;",
+     "    a.y - b.y || col.get(a.id)! - col.get(b.id)! || a.x - b.x || arrayAt.get(a.id)! - arrayAt.get(b.id)!;"
+    ]
+   ]
+  },
+  "logos-read": {
+   "undoes": "A — logos (the credit mark among them) are not read",
+   "edits": [
+    [
+     "src/poster/readingOrder.ts",
+     "  return b.type === 'title' || b.type === 'authors' || b.type === 'logo';",
+     "  return b.type === 'title' || b.type === 'authors';"
+    ]
+   ]
+  },
+  "header-arranged": {
+   "undoes": "A/C — the title and the authors block are not read, so Auto-Arrange leaves them where they are",
+   "edits": [
+    [
+     "src/poster/readingOrder.ts",
+     "  return b.type === 'title' || b.type === 'authors' || b.type === 'logo';",
+     "  return b.type === 'logo';"
+    ]
+   ]
+  },
+  "charts-apart": {
+   "undoes": "A — charts share the figures' sequence",
+   "edits": [
+    [
+     "src/poster/readingOrder.ts",
+     "    else if (b.type === 'image' || b.type === 'chart') captions[b.id] = ++figure;",
+     "    else if (b.type === 'image') captions[b.id] = ++figure;"
+    ]
+   ]
+  },
+  "editor-headings-array": {
+   "undoes": "B — the canvas numbers headings in reading order",
+   "edits": [
+    [
+     "src/poster/PosterEditor.tsx",
+     "  const headingNumbers = blockNumbers.headings;",
+     "  const headingNumbers = Object.fromEntries(doc.blocks.filter((b) => b.type === 'heading').map((b, i) => [b.id, i + 1]));"
+    ]
+   ]
+  },
+  "editor-captions-rows": {
+   "undoes": "B — the canvas numbers figures and tables in reading order",
+   "edits": [
+    [
+     "src/poster/PosterEditor.tsx",
+     "  const captionNumbers = blockNumbers.captions;",
+     "  const captionNumbers = numberBlocks([...doc.blocks].sort((a, b) => a.y - b.y || a.x - b.x).map((b) => ({ ...b, x: 0, w: 1 })), cW).captions;"
+    ]
+   ]
+  },
+  "preview-no-numbers": {
+   "undoes": "B — the preview is given the figure and table numbers",
+   "edits": [
+    [
+     "src/poster/PosterPreviewOverlay.tsx",
+     "              captionNumber={captionNumbers[b.id]}\n",
+     ""
+    ]
+   ]
+  },
+  "export-headings-array": {
+   "undoes": "B — the exports number headings in reading order",
+   "edits": [
+    [
+     "src/export/posterContent.ts",
+     "  return numberBlocks(blocks, canvasWidth).headings;",
+     "  return Object.fromEntries(blocks.filter((b) => b.type === 'heading').map((b, i) => [b.id, i + 1 + canvasWidth * 0]));"
+    ]
+   ]
+  },
+  "pptx-no-sheet-width": {
+   "undoes": "B — the PowerPoint export reads the order on the poster's own width",
+   "edits": [
+    [
+     "src/export/pptx/writer.ts",
+     "    captionNumbers: computeCaptionNumbers(doc.blocks, doc.widthIn * PX),",
+     "    captionNumbers: computeCaptionNumbers(doc.blocks, 0),"
+    ]
+   ]
+  },
+  "latex-no-sheet-width": {
+   "undoes": "B — the LaTeX export reads the order on the poster's own width",
+   "edits": [
+    [
+     "src/export/latex/writer.ts",
+     "    captionNumbers: computeCaptionNumbers(doc.blocks, doc.widthIn * PX),",
+     "    captionNumbers: computeCaptionNumbers(doc.blocks, 0),"
+    ]
+   ]
+  },
+  "columns-plus-one": {
+   "undoes": "C — the number of columns never changes",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "  const k = Math.max(...col.values()) + 1;",
+     "  const k = Math.max(...col.values()) + 2;"
+    ]
+   ]
+  },
+  "no-gap-between": {
+   "undoes": "C — blocks stack 0.6 in apart",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "      y += h + GAP;",
+     "      y += h;"
+    ]
+   ]
+  },
+  "no-gap-under-header": {
+   "undoes": "C — the body starts 0.6 in under the header",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "  const top = headerBottom(blocks, titleOverflow, input.drawnHeight, H) + GAP;",
+     "  const top = headerBottom(blocks, titleOverflow, input.drawnHeight, H);"
+    ]
+   ]
+  },
+  "header-logos-ignored": {
+   "undoes": "C — logos that start inside the header push the body down",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "    if (top < bottom) bottom = Math.max(bottom, top + drawnHeight(b));",
+     "    if (top < bottom && b.id === '') bottom = Math.max(bottom, top + drawnHeight(b));"
+    ]
+   ]
+  },
+  "push-not-subtracted": {
+   "undoes": "C — a stored y is the drawn y less a grown title's push",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "y: r2(y - shift),",
+     "y: r2(y),"
+    ]
+   ]
+  },
+  "figure-stretched": {
+   "undoes": "C — a figure keeps its shape (its stored height is its image area at the new width)",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "      const stored = keepsShape(b) ? shapeHeight(b, r2(w)) : r2(h);",
+     "      const stored = r2(h);"
+    ]
+   ]
+  },
+  "mark-left-covered": {
+   "undoes": "C — the credit mark moves aside when an arranged block covers it",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "  if (!covered) return blocks;",
+     "  if (!covered || covered) return blocks;"
+    ]
+   ]
+  },
+  "mark-moved-by-header": {
+   "undoes": "C — only an arranged block moves the credit mark",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "    (o) => arranged.has(o.id) && o.x < m.x + m.w",
+     "    (o) => o.x < m.x + m.w"
+    ]
+   ]
+  },
+  "margin-line-at-edge": {
+   "undoes": "C — Issues measures past the bottom margin, not the sheet's edge",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "  const line = canvasHeight - M;",
+     "  const line = canvasHeight;"
+    ]
+   ]
+  },
+  "always-a-step": {
+   "undoes": "C — a press that moves nothing adds no undo step",
+   "edits": [
+    [
+     "src/poster/PosterEditor.tsx",
+     "    if (changesLayout(latest.blocks, next)) setBlocks(next);",
+     "    if (changesLayout(latest.blocks, next) || next.length > 0) setBlocks(next);"
+    ]
+   ]
+  },
+  "issues-row-off": {
+   "undoes": "C — Issues says how much is past the bottom margin",
+   "edits": [
+    [
+     "src/poster/PosterEditor.tsx",
+     "    if (past >= 0.05) {",
+     "    if (past >= 1e9) {"
+    ]
+   ]
+  },
+  "keep-zero": {
+   "undoes": "D — moving a block to another column costs 8",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "export const KEEP = 8;",
+     "export const KEEP = 0;"
+    ]
+   ]
+  },
+  "equal-zero": {
+   "undoes": "D — each inch from equal width costs 2",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "export const EQUAL = 2;",
+     "export const EQUAL = 0;"
+    ]
+   ]
+  },
+  "overflow-weight-1": {
+   "undoes": "D — area past the margin weighs 1000",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "    return { cost: 1000 * over + (Hb - H) ** 2 + keep * moved, H, over, moved };",
+     "    return { cost: 1 * over + (Hb - H) ** 2 + keep * moved, H, over, moved };"
+    ]
+   ]
+  },
+  "quarter-grid-for-four": {
+   "undoes": "D — 4 or more columns search a ½ in grid",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "    const step = k >= 4 ? 0.5 : 0.25;",
+     "    const step = 0.25;"
+    ]
+   ]
+  },
+  "wmax-double": {
+   "undoes": "D — no column wider than 1.6 × equal",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "  const wMax = wEq * 1.6;",
+     "  const wMax = wEq * 2;"
+    ]
+   ]
+  },
+  "wmin-no-line": {
+   "undoes": "D — no column narrower than a 40-character line",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "  const wMin = Math.max(wEq * 0.6, s.lineMin, s.tableMin);",
+     "  const wMin = Math.max(wEq * 0.6, s.tableMin);"
+    ]
+   ]
+  },
+  "no-forced-equal": {
+   "undoes": "D — equal widths are always tried",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "  consider(new Array<number>(k).fill(wEq), true);",
+     "  if (sets.length === 0) consider(new Array<number>(k).fill(wEq), true);"
+    ]
+   ]
+  },
+  "no-empty-column": {
+   "undoes": "D — the dynamic program may leave a column empty, as the prototype's does",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "        for (let i = 0; i <= j; i++) {",
+     "        for (let i = 0; i < j; i++) {"
+    ]
+   ]
+  },
+  "search-bound-100": {
+   "undoes": "D — 5+ columns search while the width sets stay under the bound",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "export const MAX_WIDTH_SETS = 20000;",
+     "export const MAX_WIDTH_SETS = 100;"
+    ]
+   ]
+  },
+  "measure-no-caption": {
+   "undoes": "E — a figure's caption adds to its height",
+   "edits": [
+    [
+     "src/poster/arrangeMeasure.ts",
+     "rows[j]![i] = (keepsShape(b) ? figureChrome(copy, b) + shapeHeight(b, w) : heightOf(copy)) / 10;",
+     "rows[j]![i] = (keepsShape(b) ? shapeHeight(b, w) : heightOf(copy)) / 10;"
+    ]
+   ]
+  },
+  "measure-own-width": {
+   "undoes": "E — a copy is laid out at the width asked",
+   "edits": [
+    [
+     "src/poster/arrangeMeasure.ts",
+     "          copy.style.width = `${w}px`;",
+     "          copy.style.width = copy.style.width;"
+    ]
+   ]
+  },
+  "measure-no-layout": {
+   "undoes": "E — a sheet that is laid out is measured, not read from stored heights",
+   "edits": [
+    [
+     "src/poster/arrangeMeasure.ts",
+     "    return frames.some((f, i) => f !== null && host.appendChild(copyAt(f, blocks[i]!.w)).offsetHeight > 0);",
+     "    return frames.length < 0;"
+    ]
+   ]
+  },
+  "line-min-zero": {
+   "undoes": "E — the 40-character line is measured in the body font",
+   "edits": [
+    [
+     "src/poster/arrangeMeasure.ts",
+     "  return (40 * (w ?? 0)) / 28;",
+     "  return 0 * (w ?? 0);"
+    ]
+   ]
+  },
+  "table-min-zero": {
+   "undoes": "E — a table's minimum width is measured",
+   "edits": [
+    [
+     "src/poster/arrangeMeasure.ts",
+     "  return need > 0 ? need + 4 : 0;",
+     "  return need * 0;"
+    ]
+   ]
+  },
+  "footer-is-header": {
+   "undoes": "F (B-R1) — only a title or authors block in the top half of the sheet is the header",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "(b.type === 'title' || b.type === 'authors') && effectiveTop(b, titleOverflow) < canvasHeight / 2;",
+     "(b.type === 'title' || b.type === 'authors') && canvasHeight > 0 && titleOverflow >= 0;"
+    ]
+   ]
+  },
+  "header-half-inclusive": {
+   "undoes": "F (B-R1) — a title or authors block whose top edge is at the sheet's middle is along the foot",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "effectiveTop(b, titleOverflow) < canvasHeight / 2;",
+     "effectiveTop(b, titleOverflow) <= canvasHeight / 2;"
+    ]
+   ]
+  },
+  "no-footer": {
+   "undoes": "F (B-R1) — the body ends 0.6 in above a title or authors block along the foot",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "  return Math.min(canvasHeight - M, ...foot.map((b) => effectiveTop(b, titleOverflow) - GAP));",
+     "  return canvasHeight - M + 0 * foot.length;"
+    ]
+   ]
+  },
+  "footer-no-gap": {
+   "undoes": "F (B-R1) — 0.6 in above the footer, not flush with it",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "...foot.map((b) => effectiveTop(b, titleOverflow) - GAP)",
+     "...foot.map((b) => effectiveTop(b, titleOverflow))"
+    ]
+   ]
+  },
+  "footer-not-pushed": {
+   "undoes": "F (B-R1) — the footer's top as drawn: a grown title pushes it down",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "...foot.map((b) => effectiveTop(b, titleOverflow) - GAP)",
+     "...foot.map((b) => b.y - GAP)"
+    ]
+   ]
+  },
+  "lone-block-own-column": {
+   "undoes": "G (B-R2) — a column of one block starting inside the column to its left counts in that column",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "const inside = c > 0 && lone !== null &&",
+     "const inside = c < 0 && lone !== null &&"
+    ]
+   ]
+  },
+  "any-lone-merges": {
+   "undoes": "G (B-R2) — only a lone block that starts inside the column to its left is merged into it",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "members[c - 1]!.every((o) => lone.x < o.x + o.w)",
+     "members[c - 1]!.length > 0"
+    ]
+   ]
+  },
+  "lone-inside-some": {
+   "undoes": "G (B-R2) — inside EVERY block of the column to its left (a wide band there does not swallow the next column)",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "members[c - 1]!.every((o) => lone.x < o.x + o.w)",
+     "members[c - 1]!.some((o) => lone.x < o.x + o.w)"
+    ]
+   ]
+  },
+  "no-refine": {
+   "undoes": "H (B-R3) — Auto-Arrange refines the grid's widths in 0.05 in steps",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "  const plan = refineColumns({ ...search, heightAt }, grid);",
+     "  const plan = heightAt ? grid : refineColumns({ ...search, heightAt }, grid);"
+    ]
+   ]
+  },
+  "refine-radius-zero": {
+   "undoes": "H (B-R3) — the refinement reaches ±0.5 in",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "export const REFINE_RADIUS = 0.5;",
+     "export const REFINE_RADIUS = 0;"
+    ]
+   ]
+  },
+  "refine-quarter-step": {
+   "undoes": "H (B-R3) — the refinement steps 0.05 in",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "export const REFINE_STEP = 0.05;",
+     "export const REFINE_STEP = 0.25;"
+    ]
+   ]
+  },
+  "refine-two-only": {
+   "undoes": "H (B-R3) — 3 and 4 columns are refined too",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "  if (k < 2 || k > 4) return [];",
+     "  if (k !== 2) return [];"
+    ]
+   ]
+  },
+  "refine-out-of-bounds": {
+   "undoes": "H (B-R3) — a refined width stays between the bounds",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "      if (set.every(inside)) out.push(set);",
+     "      if (set.length > 0 || set.every(inside)) out.push(set);"
+    ]
+   ]
+  },
+  "exact-compare": {
+   "undoes": "I (B-R7) — a press moving no block further than 0.01 in adds no undo step",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "export const STILL = 0.1;",
+     "export const STILL = 0;"
+    ]
+   ]
+  },
+  "editor-exact-compare": {
+   "undoes": "I (B-R7) — the editor stores the layout only when it moves a block (changesLayout)",
+   "edits": [
+    [
+     "src/poster/PosterEditor.tsx",
+     "    if (changesLayout(latest.blocks, next)) setBlocks(next);",
+     "    if (next.some((b, i) => b !== latest.blocks[i] && (b.x !== latest.blocks[i]!.x || b.y !== latest.blocks[i]!.y || b.w !== latest.blocks[i]!.w || b.h !== latest.blocks[i]!.h))) setBlocks(next);"
+    ]
+   ]
+  },
+  "figure-height-rounded": {
+   "undoes": "I (B-R7) — a figure's image area is stored exactly, not rounded to 0.01 units, so its shape does not drift between presses",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "      const stored = keepsShape(b) ? shapeHeight(b, r2(w)) : r2(h);",
+     "      const stored = keepsShape(b) ? r2(shapeHeight(b, r2(w))) : r2(h);"
+    ]
+   ]
+  },
+  "refine-centre-is-choice": {
+   "undoes": "H (B-R3/B-R7) — the refinement is centred on the width set with the lowest score without the keep term, not on the grid's choice, so a second press searches the same widths",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "refineSets(plan.centre, s, plan.wMin, plan.wMax)",
+     "refineSets(plan.cols.map((c) => c.w), s, plan.wMin, plan.wMax)",
+     2
+    ]
+   ]
+  },
+  "centre-with-keep": {
+   "undoes": "H (B-R3/B-R7) — the centre's score leaves out the keep term",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "  const free = searcher(s, wEq, 0);",
+     "  const free = searcher(s, wEq);"
+    ]
+   ]
+  },
+  "centre-prune-tight": {
+   "undoes": "H (B-R3/B-R7) — a set is skipped for the centre only when its F less KEEP·n cannot beat it",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "    if (e.F - KEEP * s.n < centreScore - 1e-9) {",
+     "    if (e.F < centreScore - 1e-9) {"
+    ]
+   ]
+  },
+  "figure-shape-at-unrounded-width": {
+   "undoes": "I (B-R7) — a figure's image area is taken at the width it is stored at (to 0.01 units), so its shape is exact",
+   "edits": [
+    [
+     "src/poster/autoLayout.ts",
+     "      const stored = keepsShape(b) ? shapeHeight(b, r2(w)) : r2(h);",
+     "      const stored = keepsShape(b) ? shapeHeight(b, w) : r2(h);"
+    ]
+   ]
+  },
+  "figure-area-from-stored": {
+   "undoes": "I (B-R7) — a figure's image area is read as drawn, not taken from its stored height",
+   "edits": [
+    [
+     "src/poster/arrangeMeasure.ts",
+     "  return heightOf(copy) - (area ? heightOf(area) : b.h);",
+     "  return heightOf(copy) - (area ? b.h : b.h);"
+    ]
+   ]
+  },
+  "fixed-frame-chrome": {
+   "undoes": "I (B-R7) — a figure frame of fixed height is drawn at its stored height: its image area at the width, nothing added",
+   "edits": [
+    [
+     "src/poster/arrangeMeasure.ts",
+     "  if (copy.style.height && copy.style.height !== 'auto') return 0;",
+     "  if (copy.style.height === 'never') return 0;"
+    ]
+   ]
+  },
+  "refine-radius-quarter": {
+   "undoes": "H (B-R3) — ±0.5 in, not ±0.25 in (Firefox's welcome poster: 30.90 in² at ±0.25, 24.63 at ±0.5, the least on the whole 0.05 in grid)",
+   "edits": [
+    [
+     "src/poster/arrangeColumns.ts",
+     "export const REFINE_RADIUS = 0.5;",
+     "export const REFINE_RADIUS = 0.25;"
+    ]
+   ]
+  }
+ }
+}

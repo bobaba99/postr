@@ -635,6 +635,64 @@ the evidence label of each.
   it (the result table and the fix box) is left for a change that can
   re-run fixes 07 and 15's mutant specs in full.
 
+### Queued by record 28 (Auto-Arrange and the reading order, 2026-10-07)
+
+Record `docs/fixes/28-auto-arrange.md` section 10 has the detail and the
+evidence label of each. The function is the owner-approved prototype's;
+these are what it does that a user may not expect, for the owner to rank.
+Review round 1's LOW and INFO findings that were not changed are here too
+(record section 9).
+
+- **Owner and lead decision: the refinement.** After review round 1 the
+  column widths are refined in 0.05 in steps within ±0.5 in of the ¼ in
+  grid's best set, on the owner's "finding the minimal" (the welcome poster
+  ends 24.4 in² past the margin in Chromium, not 30.4, and 24.6 and 23.8
+  in² in Firefox and WebKit; MEASURED). This departs from the prototype's function: to
+  confirm, or to turn off (`REFINE_RADIUS = 0` in `arrangeColumns.ts`).
+- **A heading can end a column**, its text at the top of the next one: 8 of
+  16 arranged posters in Chromium (MEASURED, `auto-arrange-check.mjs`'s
+  foot-heading read). Keeping a heading with the block under it is out of
+  the approved function's scope.
+- **Owner question: an empty column.** On a crowded poster of figures the
+  lowest score can leave a column empty (6 figures on a 48 × 24 sheet: all in
+  one 13.65 in column, the other 31.75 in wide and empty; the editor and the
+  brute force agree, MEASURED in jsdom on stored heights,
+  `sheetSize.test.tsx`); the prototype allows it too. A second press would
+  then arrange the poster in one column fewer (review finding B-R10,
+  UNVERIFIED in a browser).
+- **Owner question: the untouched 3-column template.** With the template's
+  short sample text the figure placeholder takes a 23.85 in middle column
+  and the side columns are 10.20 and 10.75 in (MEASURED, Chromium): the
+  score fills columns, and only the figure can grow.
+- **Wide blocks become one column wide** (the 2-Col Wide Figure's Key Results
+  heading and figure: 460 → 137 and 460 → 318 units; the Billboard's key
+  finding and figure: 430 and 460 → 239): figure spanning is Later.
+- **A drag after Auto-Arrange can move a block sideways** (B-R4): column
+  edges are off the ½ in grid, so a block dragged straight down snaps up to
+  0.25 in out of line with its column (2.5 units on the 3-column template,
+  MEASURED). A drag that keeps a block's left edge when it moves straight
+  down, or column edges on the grid.
+- **Large 4-column sheets are slow** (B-R5): four columns on 72 × 48 take
+  0.5 to 0.7 s to the new layout (MEASURED, read not gated); the width search
+  is bounded only from 5 columns. Bound or coarsen it from 4 columns, or run
+  it off the click's frame.
+- **The welcome poster opens with an Issues row** (B-R6): 26.2 in² past the
+  bottom margin before any press (MEASURED), true of the shipped seed. A seed
+  that fits.
+- **The web font after an import** (B-R8, INSPECTED): Auto-Arrange after an
+  import runs right after mount without waiting for the poster's web font;
+  main does the same. Reproduce with a slow font, then wait for it.
+- **One very wide table** (B-R9): a table wider than 1.6 × an equal column
+  turns the width search off for every column (the prototype's rule); give
+  its minimum only to the column that holds it.
+- **Not handled:** logos placed inside the body (they stay where they are,
+  and a column may run over them), rotated blocks, more than 4 columns beyond
+  20,000 width sets (equal widths then; time not measured past 4 columns), a
+  narrow footer (a title or authors block in the bottom half ends the body
+  for every column).
+- **Owner check:** Auto-Arrange in Safari on a real Mac (Playwright's WebKit:
+  138 ms at most to the new layout on the 3-column template).
+
 ## LaTeX export: before it is switched back on
 
 The owner hid the LaTeX export on 2026-10-06 ("unnecessary for now"):
@@ -799,7 +857,9 @@ Found while fixing one item, belonging to another (details in the record named):
     **Caption and note fixed by fix 12** (grouped by word); caption spacing
     one step per drag (above).
   - Auto-Arrange with font scaling takes 3 undo steps (review 2, MEASURED).
-    Not changed (not re-measured).
+    **Fixed by record 28**: Auto-Arrange never changes a font size and is
+    one undo step, none when nothing moves (MEASURED, gates G1, G5 and G7 of
+    `auto-arrange-check.mjs`, three engines).
 - **Unplanned, possible data loss** (review 2, INSPECTED only).
   `migrateBase64ToStorage` calls `setBlocksSilent` with the load-time blocks,
   which would overwrite edits made while images upload. Reproduce before
@@ -828,3 +888,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 24 | `fix/legal-canada-law25` | done (three review rounds; round 3 found nothing left) — `docs/fixes/24-legal-canada-law25.md`: the Privacy, Cookies and Terms pages (EN and FR) rewritten for Quebec's Law 25 and PIPEDA first, Global Privacy Control honoured, poster ids kept out of the analytics address and its Referer, the feedback console log opt-in, account deletion clearing every Postr browser entry, the French Terms linked at sign-up; internal file `docs/legal/quebec-law-25.md`; the claims audit's product defects queued above |
 | 25 | `fix/latex-hidden-prices` | one review round (browser and entry points), answered: the `/auth?plan=term` label puts the period before the tax note, a stale code comment reworded — `docs/fixes/25-latex-hidden-prices.md`; the owner's decisions of 2026-10-06: the LaTeX export hidden (`LATEX_EXPORT_ENABLED`, `config/features.ts`; before it returns: the section above), every price shown says tax is extra, the landing "Editable exports" card says the export is paid; a copy inventory test keeps both true |
 | 26 | `feat/french-public-pages` | implemented, review round 1 done and corrected (one round: a simple feature; 12 findings: 7 corrected, 1 left to the owner, 4 informational) — `docs/fixes/26-french-public-pages.md`; the owner's decision of 2026-10-06 (Quebec, Bill 96): every public page in French at its path + `/fr` (`/fr` for the landing page, `/auth/fr?plan=term`), its language read from the URL, a « Français » / "English" link on every page, the French heads with hreflang and the French pages in the sitemap, a French Stripe Checkout from `/auth/fr`; the editor stays English; queued above: "Queued by fix 26" |
+| 28 | `feat/auto-arrange` | implemented, review round 1 done and corrected (a layout aid: one round, the browser through the user's entry points; 10 findings: B-R1 HIGH, B-R2 and B-R3 MEDIUM and B-R7 LOW corrected, the other LOW and INFO findings queued above; the refinement departs from the prototype and is for the lead and the owner to confirm) — `docs/fixes/28-auto-arrange.md`; the owner's approval of the prototype's function (2026-10-07, `docs/fixes/28-auto-arrange-lab.html`): ONE reading order (bands of wide blocks, then columns, then top to bottom) for heading, figure and table numbers in the editor, the preview and the exports, and Auto-Arrange choosing the cut points of that order into the poster's own columns and their widths for the lowest F = 1000·O + U + 8·moved + 2·Σ\|w − w̄\|, with every block measured on the sheet at its new width; no font change, one undo step, the area past the bottom margin in Issues; the preview's missing figure and table numbers fixed in passing; queued above: "Queued by record 28" |
