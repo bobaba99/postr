@@ -1,0 +1,573 @@
+<title>Auto-Arrange Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Sans+3:wght@400;700&display=swap">
+<style>
+/* Layout: a lab bench — controls on the left, the poster drawn to scale on the right, the math underneath. */
+:root{
+  --bg:#f3f4f2; --panel:#ffffff; --fg:#1c2421; --muted:#5d6a65; --line:#d9dfdc;
+  --accent:#1f6f5c; --accent-soft:#dcefe8; --over:#c2412d; --over-soft:#f7dcd5;
+  --sheet:#ffffff; --block:#eef3f1; --block-line:#b8c6c0; --text-bar:#9fb0a9; --fig:#cfe0d9; --head:#1f6f5c;
+  --ok:#227a4c; --ok-soft:#dcf1e3;
+  --font-ui:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-poster:"Source Sans 3", "Source Sans Pro", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121715; --panel:#1a211e; --fg:#e4ebe8; --muted:#97a6a0; --line:#2c3632;
+  --accent:#5cc3a6; --accent-soft:#1d3a32; --over:#ff8a73; --over-soft:#3e211b;
+  --sheet:#f7f8f7; --block:#e9efec; --block-line:#b5c3bd; --text-bar:#9eaea8; --fig:#cddfd8; --head:#1f6f5c;
+  --ok:#62d098; --ok-soft:#173527; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121715; --panel:#1a211e; --fg:#e4ebe8; --muted:#97a6a0; --line:#2c3632;
+  --accent:#5cc3a6; --accent-soft:#1d3a32; --over:#ff8a73; --over-soft:#3e211b;
+  --sheet:#f7f8f7; --block:#e9efec; --block-line:#b5c3bd; --text-bar:#9eaea8; --fig:#cddfd8; --head:#1f6f5c;
+  --ok:#62d098; --ok-soft:#173527; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:14px/1.5 var(--font-ui);padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:1320px;margin:0 auto;display:grid;gap:20px}
+header h1{font-size:24px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted);max-width:75ch}
+.grid{display:grid;grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;display:grid;gap:12px;min-width:0}
+.panel h2{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+label{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
+select,input[type=number],input[type=text]{font:inherit;font-size:13px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:4px 6px;min-width:0}
+input[type=number]{width:64px;font-family:var(--font-mono)}
+input[type=range]{accent-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;border:0;background:var(--bg);color:var(--fg);padding:5px 12px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:#fff}
+button.btn{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:6px;padding:5px 10px;cursor:pointer}
+button.btn:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.blocks{display:grid;gap:6px;max-height:520px;overflow:auto;padding-right:2px}
+.blk{display:grid;grid-template-columns:22px 70px minmax(0,1fr) auto;gap:6px;align-items:center;border:1px solid var(--line);border-radius:6px;padding:6px;background:var(--bg)}
+.blk .n{font-family:var(--font-mono);font-size:12px;color:var(--muted);text-align:right}
+.badge{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:2px 5px;text-align:center;background:var(--accent-soft);color:var(--accent)}
+.blk .params{display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.blk .params input[type=text]{width:100%;max-width:150px}
+.blk .ctl{display:flex;gap:2px}
+.blk .ctl button{font:inherit;font-size:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);border-radius:4px;width:24px;height:24px;cursor:pointer;padding:0}
+.stage{display:grid;gap:12px;min-width:0}
+.score{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:baseline;font-variant-numeric:tabular-nums}
+.score .big{font-size:22px;font-weight:600}
+.score .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.chip{display:inline-block;font-size:12px;font-weight:600;border-radius:999px;padding:2px 10px}
+.chip.ok{background:var(--ok-soft);color:var(--ok)} .chip.bad{background:var(--over-soft);color:var(--over)}
+.svgbox{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto}
+.svgbox svg{display:block;width:100%;height:auto;min-width:520px}
+table.cols{border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;width:100%}
+table.cols th,table.cols td{border-bottom:1px solid var(--line);padding:4px 8px;text-align:right}
+table.cols th:first-child,table.cols td:first-child{text-align:left}
+table.cols th{color:var(--muted);font-weight:500;font-size:12px}
+.tablebox{overflow-x:auto}
+.explain{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;display:grid;gap:8px}
+.explain h2{font-size:16px;margin:0}
+.explain p,.explain li{max-width:78ch;margin:0}
+.explain ol{margin:0;padding-left:20px;display:grid;gap:4px}
+.mono{font-family:var(--font-mono);font-size:13px}
+.note{font-size:12px;color:var(--muted)}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Auto-Arrange Lab</h1>
+    <p>Postr's proposed Auto-Arrange, as one function. Font sizes never change. Blocks keep their reading order and may move between columns; column widths may change, and text gets taller as its column gets narrower. The layout with the least area past the sheet's bottom edge wins. Sample content, not a real poster.</p>
+  </header>
+
+  <div class="grid">
+    <aside class="panel" aria-label="Inputs">
+      <h2>Poster</h2>
+      <div class="row">
+        <label for="size">Size
+          <select id="size">
+            <option value="48x36">48 × 36 in landscape</option>
+            <option value="36x48">36 × 48 in portrait</option>
+            <option value="42x36">42 × 36 in landscape</option>
+            <option value="42x42">42 × 42 in square</option>
+            <option value="24x36">24 × 36 in small</option>
+            <option value="46.8x33.1">A0 landscape</option>
+            <option value="33.1x46.8">A0 portrait</option>
+          </select>
+        </label>
+      </div>
+      <div class="row">
+        <span class="note">Columns</span>
+        <div class="seg" role="group" aria-label="Number of columns">
+          <button type="button" data-k="2" aria-pressed="false">2</button>
+          <button type="button" data-k="3" aria-pressed="true">3</button>
+          <button type="button" data-k="4" aria-pressed="false">4</button>
+        </div>
+        <label for="bodyPt">Body text <input id="bodyPt" type="number" min="20" max="60" step="2" value="36"> pt</label>
+      </div>
+      <h2>What Auto-Arrange may change</h2>
+      <label for="optWidths"><input id="optWidths" type="checkbox" checked> Column widths (each between 0.6× and 1.6× an equal column, at least 40 characters a line)</label>
+      <label for="optShrink"><input id="optShrink" type="checkbox"> Figures narrower than their column, down to 70% (open question)</label>
+      <label for="eqw">Prefer equal column widths
+        <input id="eqw" type="range" min="0" max="20" step="0.5" value="2"> <span id="eqwV" class="mono">2</span>
+      </label>
+      <label for="stab">Keep blocks where they were
+        <input id="stab" type="range" min="0" max="40" step="1" value="8"> <span id="stabV" class="mono">8</span>
+      </label>
+      <h2>Blocks, in reading order</h2>
+      <div class="blocks" id="blocks"></div>
+      <div class="row">
+        <button type="button" class="btn" data-add="heading">+ Heading</button>
+        <button type="button" class="btn" data-add="text">+ Text</button>
+        <button type="button" class="btn" data-add="figure">+ Figure</button>
+        <button type="button" class="btn" data-add="table">+ Table</button>
+        <button type="button" class="btn" id="reset">Reset sample</button>
+      </div>
+      <p class="note">"Was in" is the column a block sits in before Auto-Arrange (the template's placement).</p>
+    </aside>
+
+    <section class="stage" aria-label="Result">
+      <div class="row">
+        <div class="seg" role="group" aria-label="View">
+          <button type="button" id="viewAuto" aria-pressed="true">Auto-Arranged</button>
+          <button type="button" id="viewTpl" aria-pressed="false">Before (as placed)</button>
+        </div>
+        <span id="perf" class="note mono"></span>
+      </div>
+      <div class="score" id="score"></div>
+      <div class="svgbox"><svg id="poster" role="img" aria-label="The poster drawn to scale"></svg></div>
+      <div class="tablebox"><table class="cols" id="cols"></table></div>
+    </section>
+  </div>
+
+  <section class="explain" aria-label="The function">
+    <h2>The function</h2>
+    <p>Fixed: sheet W × H, 1 in margins, 0.6 in gaps, every font size, the reading order b₁…bₙ, and the header across the top. Body height H<sub>b</sub> = H − 2 − header − 0.6.</p>
+    <p>Each block's height at width w: text h(w) from wrapping its words at the fixed font size (narrower → more lines → taller); a figure w ÷ aspect + its caption; a table from wrapping each cell.</p>
+    <p>Chosen: the cut points that split the reading order into k consecutive columns, and the widths w₁…w<sub>k</sub> (summing to the body width). Column height H<sub>c</sub> = Σ h<sub>i</sub>(w<sub>c</sub>) + gaps.</p>
+    <ol>
+      <li><b>Overflow</b> O = Σ w<sub>c</sub> · max(0, H<sub>c</sub> − H<sub>b</sub>), in in², always first.</li>
+      <li><b>Evenness</b> U = Σ (H<sub>b</sub> − H<sub>c</sub>)², spreading the white space.</li>
+      <li><b>Stability</b>: blocks moved to another column × "Keep blocks where they were", plus each inch a width moves from equal × "Prefer equal column widths".</li>
+    </ol>
+    <p class="mono">F = 1000·O + U + keep·moved + equal·Σ|w<sub>c</sub> − w̄|</p>
+    <p>For each candidate set of widths (¼ in steps; ½ in for 4 columns), a dynamic program finds the best cut points exactly. The best F over all candidates wins. Text is measured with Source Sans 3 here; the editor would measure its own fonts.</p>
+  </section>
+</div>
+
+<script>
+(() => {
+  // ---------- constants (Postr's defaults: 10 units/in, 7.2 pt/unit) ----------
+  const MARGIN = 1.0, GAP = 0.6, PAD = 0.15;
+  const LH = { body: 1.55, heading: 1.3, title: 1.15, authors: 1.15, caption: 1.4, table: 1.35, refs: 1.35 };
+  const TITLE_PT = 100.8, AUTHORS_PT = 36, HEADING_PT = 57.6;
+  const VOCAB = ('the results show that participants in each condition reported higher scores across all measures while the control group remained stable over time we found a significant interaction between task difficulty and sleep duration which suggests attention depends on prior rest these findings extend earlier work on visual search and highlight practical implications for shift workers further research should test larger samples with objective measures of fatigue').split(' ');
+  const TITLE = 'Effects of Sleep Deprivation on Visual Search Accuracy in Domestic Cats';
+  const AUTHORS = 'John Smith, Jane Doe, Alex Kim · Acme State University, Department of Feline Cognition';
+
+  // ---------- text measurement ----------
+  const cv = document.createElement('canvas').getContext('2d');
+  const widthCache = new Map();
+  function wordWidthPt(word, pt, weight) {
+    const key = weight + '|' + word;
+    let w100 = widthCache.get(key);
+    if (w100 === undefined) {
+      cv.font = `${weight} 100px "Source Sans 3", "Source Sans Pro", Arial, sans-serif`;
+      w100 = cv.measureText(word).width;
+      widthCache.set(key, w100);
+    }
+    return w100 * pt / 100;
+  }
+  // Greedy wrap: lines needed for `words` (array of paragraphs, each an array of words) at `maxPt` width.
+  function lineCount(paragraphs, pt, maxPt, weight = 400) {
+    const space = wordWidthPt(' ', pt, weight);
+    let lines = 0;
+    for (const words of paragraphs) {
+      if (!words.length) continue;
+      let x = 0; lines += 1;
+      for (const w of words) {
+        const ww = wordWidthPt(w, pt, weight);
+        if (x === 0) x = ww;
+        else if (x + space + ww <= maxPt) x += space + ww;
+        else { lines += 1; x = ww; }
+      }
+    }
+    return lines;
+  }
+  function wordsFor(seed, n, perPara = 55) {
+    const out = []; let p = [];
+    for (let i = 0; i < n; i++) {
+      p.push(VOCAB[(seed * 7 + i * 3 + (i % 5)) % VOCAB.length]);
+      if (p.length >= perPara) { out.push(p); p = []; }
+    }
+    if (p.length) out.push(p);
+    return out;
+  }
+
+  // ---------- state ----------
+  let uid = 1;
+  const mk = (type, props) => ({ id: uid++, type, ...props });
+  function sample() {
+    uid = 1;
+    return [
+      mk('heading', { label: 'Introduction', col: 0 }),
+      mk('text', { words: 60, col: 0 }),
+      mk('heading', { label: 'Hypotheses', col: 0 }),
+      mk('text', { words: 35, col: 0 }),
+      mk('figure', { label: 'Figure 1', aspect: '4:3', cap: 16, col: 0 }),
+      mk('heading', { label: 'Methods', col: 1 }),
+      mk('text', { words: 80, col: 1 }),
+      mk('figure', { label: 'Figure 2', aspect: '16:9', cap: 18, col: 1 }),
+      mk('heading', { label: 'Results', col: 1 }),
+      mk('text', { words: 55, col: 1 }),
+      mk('table', { label: 'Table 1', rows: 5, cols: 4, col: 1 }),
+      mk('heading', { label: 'Discussion', col: 2 }),
+      mk('text', { words: 50, col: 2 }),
+      mk('figure', { label: 'Figure 3', aspect: '16:9', cap: 14, col: 2 }),
+      mk('heading', { label: 'Conclusions', col: 2 }),
+      mk('text', { words: 35, col: 2 }),
+      mk('heading', { label: 'References', col: 2 }),
+      mk('refs', { refs: 4, col: 2 }),
+    ];
+  }
+  const state = { size: '48x36', k: 3, bodyPt: 36, optWidths: true, optShrink: false, stab: 8, eqw: 2, view: 'auto', blocks: sample() };
+  try {
+    const saved = JSON.parse(localStorage.getItem('aa-lab-v2') || 'null');
+    if (saved && Array.isArray(saved.blocks)) { Object.assign(state, saved); uid = Math.max(0, ...state.blocks.map(b => b.id)) + 1; }
+  } catch (e) { /* storage unavailable: start from the sample */ }
+  const save = () => { try { localStorage.setItem('aa-lab-v2', JSON.stringify(state)); } catch (e) { /* ignore */ } };
+
+  // ---------- block heights (inches) ----------
+  const aspectOf = a => { const [x, y] = a.split(':').map(Number); return x / y; };
+  function blockHeight(b, w, figScale = 1) {
+    const pt = state.bodyPt, inner = Math.max(0.5, w - 2 * PAD) * 72;
+    switch (b.type) {
+      case 'heading': {
+        const lines = lineCount([b.label.split(/\s+/)], HEADING_PT, inner, 700);
+        return lines * HEADING_PT * LH.heading / 72 + 2 * PAD + 0.12;
+      }
+      case 'text': {
+        const lines = lineCount(wordsFor(b.id, b.words), pt, inner);
+        return lines * pt * LH.body / 72 + 2 * PAD;
+      }
+      case 'refs': {
+        const rp = pt * 0.75, paras = [];
+        for (let i = 0; i < b.refs; i++) paras.push(wordsFor(b.id * 13 + i, 22, 999)[0]);
+        return lineCount(paras, rp, inner) * rp * LH.refs / 72 + 2 * PAD;
+      }
+      case 'figure': {
+        const cp = pt * 0.8, fw = (w - 2 * PAD) * figScale;
+        const cap = lineCount([[b.label + '.', ...wordsFor(b.id * 3, b.cap)[0]]], cp, inner);
+        return fw / aspectOf(b.aspect) + cap * cp * LH.caption / 72 + 2 * PAD + 0.1;
+      }
+      case 'table': {
+        const tp = pt * 0.85, colW = inner / b.cols - 10;
+        let h = 0;
+        for (let r = 0; r < b.rows; r++) {
+          let m = 1;
+          for (let c = 0; c < b.cols; c++) m = Math.max(m, lineCount([wordsFor(b.id * 31 + r * 7 + c, r === 0 ? 2 : 3, 99)[0]], tp, colW));
+          h += m * tp * LH.table / 72 + 0.12;
+        }
+        const cp = pt * 0.8;
+        const cap = lineCount([[b.label + '.', ...wordsFor(b.id * 5, 10)[0]]], cp, inner);
+        return h + cap * cp * LH.caption / 72 + 2 * PAD + 0.1;
+      }
+    }
+    return 1;
+  }
+  function tableMinWidth(b) {
+    const tp = state.bodyPt * 0.85;
+    let longest = 0;
+    for (let r = 0; r < b.rows; r++) for (let c = 0; c < b.cols; c++)
+      for (const w of wordsFor(b.id * 31 + r * 7 + c, 3, 99)[0]) longest = Math.max(longest, wordWidthPt(w, tp, 400));
+    return (b.cols * (longest + 12)) / 72 + 2 * PAD;
+  }
+
+  // ---------- the function ----------
+  function geometry() {
+    const [W, H] = state.size.split('x').map(Number);
+    const fullInner = (W - 2 * MARGIN) * 72;
+    const tLines = lineCount([TITLE.split(' ')], TITLE_PT, fullInner, 700);
+    const aLines = lineCount([AUTHORS.split(' ')], AUTHORS_PT, fullInner);
+    const header = tLines * TITLE_PT * LH.title / 72 + aLines * AUTHORS_PT * LH.authors / 72 + 0.3;
+    const BW = W - 2 * MARGIN - (state.k - 1) * GAP;
+    const Hb = H - 2 * MARGIN - header - GAP;
+    return { W, H, header, BW, Hb, tLines, aLines };
+  }
+
+  function arrange(useTemplate) {
+    const t0 = performance.now();
+    const g = geometry(), k = state.k, B = state.blocks, n = B.length;
+    const wEq = g.BW / k;
+    const avgChar = wordWidthPt('participants reported higher', state.bodyPt, 400) / 28;
+    let wMin = Math.max(wEq * 0.6, (40 * avgChar) / 72 + 2 * PAD);
+    for (const b of B) if (b.type === 'table') wMin = Math.max(wMin, tableMinWidth(b));
+    const wMax = wEq * 1.6;
+    // Per width: every block's height and the running sums, so a column's height is O(1).
+    const byWidth = new Map();
+    function at(w) {
+      const key = w.toFixed(3);
+      let d = byWidth.get(key);
+      if (!d) {
+        const h = new Float64Array(n), pref = new Float64Array(n + 1), figPref = new Float64Array(n + 1);
+        for (let i = 0; i < n; i++) {
+          h[i] = blockHeight(B[i], w);
+          pref[i + 1] = pref[i] + h[i];
+          figPref[i + 1] = figPref[i] + (B[i].type === 'figure' ? (w - 2 * PAD) / aspectOf(B[i].aspect) : 0);
+        }
+        d = { h, pref, figPref }; byWidth.set(key, d);
+      }
+      return d;
+    }
+    // Blocks before position j whose "was in" column is not c (for the stability term).
+    const movedPref = Array.from({ length: k }, (_, c) => { const a = new Int32Array(n + 1); for (let i = 0; i < n; i++) a[i + 1] = a[i] + (Math.min(B[i].col, k - 1) !== c ? 1 : 0); return a; });
+
+    // cost of putting blocks [i, j) in column c of width w
+    function segCost(c, i, j, w) {
+      const d = at(w);
+      let H = d.pref[j] - d.pref[i] + (j > i ? GAP * (j - i - 1) : 0);
+      const figs = d.figPref[j] - d.figPref[i];
+      let shrink = 0;
+      if (state.optShrink && H > g.Hb && figs > 0) { shrink = Math.min(H - g.Hb, figs * 0.3); H -= shrink; }
+      const over = Math.max(0, H - g.Hb) * w;
+      const moved = movedPref[c][j] - movedPref[c][i];
+      return { cost: 1000 * over + (g.Hb - H) ** 2 + state.stab * moved + 0.5 * shrink, H, over, moved, shrink, figScale: figs > 0 ? 1 - shrink / figs : 1 };
+    }
+
+    function solve(ws) {
+      const INF = 1e18;
+      const dp = Array.from({ length: k }, () => new Float64Array(n + 1).fill(INF));
+      const from = Array.from({ length: k }, () => new Int32Array(n + 1).fill(-1));
+      for (let j = 0; j <= n; j++) { dp[0][j] = segCost(0, 0, j, ws[0]).cost; from[0][j] = 0; }
+      for (let c = 1; c < k; c++) for (let j = 0; j <= n; j++) for (let i = 0; i <= j; i++) {
+        const v = dp[c - 1][i] + segCost(c, i, j, ws[c]).cost;
+        if (v < dp[c][j]) { dp[c][j] = v; from[c][j] = i; }
+      }
+      const cuts = new Array(k + 1); cuts[k] = n;
+      for (let c = k - 1; c >= 1; c--) cuts[c] = from[c][cuts[c + 1]];
+      cuts[0] = 0;
+      return cuts;
+    }
+
+    function evaluate(ws, cuts) {
+      const cols = []; let O = 0, U = 0, moved = 0;
+      for (let c = 0; c < k; c++) {
+        const s = segCost(c, cuts[c], cuts[c + 1], ws[c]);
+        O += s.over; U += (g.Hb - s.H) ** 2; moved += s.moved;
+        const idx = []; for (let i = cuts[c]; i < cuts[c + 1]; i++) idx.push(i);
+        cols.push({ w: ws[c], idx, H: s.H, over: s.over, shrink: s.shrink, figScale: s.figScale });
+      }
+      const dev = ws.reduce((a, w) => a + Math.abs(w - wEq), 0);
+      return { cols, O, U, moved, dev, F: 1000 * O + U + state.stab * moved + state.eqw * dev };
+    }
+
+    if (useTemplate) {
+      // Before: each block in its "was in" column, equal widths, reading order within a column.
+      const cols = []; let O = 0, U = 0;
+      const d = at(wEq);
+      for (let c = 0; c < k; c++) {
+        const idx = []; B.forEach((b, i) => { if (Math.min(b.col, k - 1) === c) idx.push(i); });
+        const H = idx.reduce((a, i) => a + d.h[i], 0) + (idx.length > 1 ? GAP * (idx.length - 1) : 0);
+        const over = Math.max(0, H - g.Hb) * wEq; O += over; U += (g.Hb - H) ** 2;
+        cols.push({ w: wEq, idx, H, over, shrink: 0, figScale: 1 });
+      }
+      return { g, k, cols, O, U, moved: 0, dev: 0, evaluated: 1, ms: performance.now() - t0, template: true };
+    }
+
+    let best = null, evaluated = 0;
+    const consider = (ws, force) => {
+      if (!force && ws.some(w => w < wMin - 1e-9 || w > wMax + 1e-9)) return;
+      const cuts = solve(ws); evaluated++;
+      const e = evaluate(ws, cuts);
+      if (!best || e.F < best.F - 1e-9) best = e;
+    };
+    const equal = new Array(k).fill(wEq);
+    if (state.optWidths && wMin <= wMax) {
+      const step = k >= 4 ? 0.5 : 0.25;
+      const grid = []; for (let w = Math.ceil(wMin / step) * step; w <= wMax + 1e-9; w += step) grid.push(+w.toFixed(3));
+      if (k === 2) for (const a of grid) consider([a, +(g.BW - a).toFixed(3)]);
+      else if (k === 3) for (const a of grid) for (const b of grid) consider([a, b, +(g.BW - a - b).toFixed(3)]);
+      else for (const a of grid) for (const b of grid) for (const c of grid) consider([a, b, c, +(g.BW - a - b - c).toFixed(3)]);
+    }
+    consider(equal, true);
+    return { g, k, cols: best.cols, O: best.O, U: best.U, moved: best.moved, dev: best.dev, evaluated, ms: performance.now() - t0, wMin, wMax, wEq };
+  }
+
+  // ---------- drawing ----------
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  function draw(res) {
+    const svg = document.getElementById('poster'); svg.innerHTML = '';
+    const { g } = res, S = 10; // 10 svg units per inch
+    const top = MARGIN + res.g.header + GAP;
+    const maxBottom = Math.max(g.H, ...res.cols.map(c => top + c.H + MARGIN));
+    const vbW = g.W * S + 40, vbH = maxBottom * S + 40;
+    svg.setAttribute('viewBox', `-20 -20 ${vbW} ${vbH}`);
+    const defs = el('defs', {}, svg);
+    const pat = el('pattern', { id: 'hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+    el('rect', { width: 6, height: 6, fill: css('--fig') }, pat);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: css('--block-line'), 'stroke-width': 2 }, pat);
+    const opat = el('pattern', { id: 'over', width: 8, height: 8, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(-45)' }, defs);
+    el('rect', { width: 8, height: 8, fill: css('--over-soft') }, opat);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 8, stroke: css('--over'), 'stroke-width': 2.5 }, opat);
+    // sheet
+    el('rect', { x: 0, y: 0, width: g.W * S, height: g.H * S, fill: css('--sheet'), stroke: css('--block-line'), 'stroke-width': 1.5 }, svg);
+    // header
+    const hx = MARGIN * S, hw = (g.W - 2 * MARGIN) * S;
+    el('rect', { x: hx, y: MARGIN * S, width: hw, height: g.header * S, fill: css('--block'), rx: 3 }, svg);
+    const tlh = TITLE_PT * LH.title / 72 * S;
+    for (let i = 0; i < g.tLines; i++) el('rect', { x: hx + 8, y: MARGIN * S + 6 + i * tlh, width: hw * (i === g.tLines - 1 ? 0.55 : 0.92), height: tlh * 0.62, fill: css('--head'), rx: 2 }, svg);
+    const alh = AUTHORS_PT * LH.authors / 72 * S, ay = MARGIN * S + 6 + g.tLines * tlh;
+    for (let i = 0; i < g.aLines; i++) el('rect', { x: hx + 8, y: ay + i * alh, width: hw * (i === g.aLines - 1 ? 0.45 : 0.85), height: alh * 0.55, fill: css('--text-bar'), rx: 2 }, svg);
+    // bottom edge of the body area
+    const bottom = (g.H - MARGIN) * S;
+    el('line', { x1: 0, y1: bottom, x2: g.W * S, y2: bottom, stroke: css('--over'), 'stroke-width': 1.2, 'stroke-dasharray': '6 4' }, svg);
+    // columns
+    let x = MARGIN;
+    res.cols.forEach((col, c) => {
+      let y = top;
+      col.idx.forEach((i, j) => {
+        const b = state.blocks[i];
+        const h = blockHeight(b, col.w, b.type === 'figure' ? col.figScale : 1);
+        drawBlock(svg, b, i, x * S, y * S, col.w * S, h * S, col);
+        y += h + GAP;
+      });
+      const usedBottom = top + col.H;
+      if (usedBottom > g.H - MARGIN + 1e-6) {
+        el('rect', { x: x * S, y: bottom, width: col.w * S, height: (usedBottom - (g.H - MARGIN)) * S, fill: 'url(#over)', opacity: 0.85 }, svg);
+      }
+      x += col.w + GAP;
+    });
+  }
+  function drawBlock(svg, b, i, x, y, w, h, col) {
+    const S = 10, num = i + 1;
+    el('rect', { x, y, width: w, height: h, fill: css('--block'), stroke: css('--block-line'), 'stroke-width': 1, rx: 2 }, svg);
+    const pad = PAD * S;
+    if (b.type === 'heading') {
+      const lh = HEADING_PT * LH.heading / 72 * S;
+      el('rect', { x: x + pad, y: y + pad + lh * 0.18, width: Math.min(w - 2 * pad, (b.label.length * HEADING_PT * 0.55 / 72) * S), height: lh * 0.6, fill: css('--head'), rx: 2 }, svg);
+    } else if (b.type === 'text' || b.type === 'refs') {
+      const pt = b.type === 'refs' ? state.bodyPt * 0.75 : state.bodyPt;
+      const lh = pt * (b.type === 'refs' ? LH.refs : LH.body) / 72 * S;
+      const lines = Math.max(1, Math.round((h - 2 * pad) / lh));
+      for (let l = 0; l < lines; l++) el('rect', { x: x + pad, y: y + pad + l * lh + lh * 0.25, width: (w - 2 * pad) * (l === lines - 1 ? 0.6 : 1), height: lh * 0.45, fill: css('--text-bar'), rx: 1.5 }, svg);
+    } else if (b.type === 'figure') {
+      const shrinkFrac = col.figScale || 1;
+      const fw = (w - 2 * pad) * shrinkFrac, fh = fw / aspectOf(b.aspect);
+      el('rect', { x: x + pad + ((w - 2 * pad) - fw) / 2, y: y + pad, width: fw, height: fh, fill: 'url(#hatch)', stroke: css('--block-line') }, svg);
+      const t = el('text', { x: x + pad + 6, y: y + pad + 16, 'font-size': 12, 'font-family': 'IBM Plex Sans, sans-serif', fill: css('--head'), 'font-weight': 600 }, svg); t.textContent = `${b.label} · ${b.aspect}`;
+      const cpt = state.bodyPt * 0.8, clh = cpt * LH.caption / 72 * S, capTop = y + pad + fh + 1;
+      const capLines = Math.max(1, Math.round((y + h - pad - capTop) / clh));
+      for (let l = 0; l < capLines; l++) el('rect', { x: x + pad, y: capTop + l * clh + clh * 0.3, width: (w - 2 * pad) * (l === capLines - 1 ? 0.5 : 1), height: clh * 0.4, fill: css('--text-bar'), rx: 1.5 }, svg);
+    } else if (b.type === 'table') {
+      const tw = w - 2 * pad, rh = (h - 2 * pad) * 0.8 / b.rows;
+      for (let r = 0; r <= b.rows; r++) el('line', { x1: x + pad, y1: y + pad + r * rh, x2: x + pad + tw, y2: y + pad + r * rh, stroke: css('--block-line'), 'stroke-width': r === 0 || r === 1 || r === b.rows ? 2 : 0.8 }, svg);
+      const t = el('text', { x: x + pad + 4, y: y + pad + rh * 0.7, 'font-size': 12, 'font-family': 'IBM Plex Sans, sans-serif', fill: css('--head'), 'font-weight': 600 }, svg); t.textContent = `${b.label} · ${b.rows}×${b.cols}`;
+    }
+    const pw = String(num).length * 8 + 8;
+    el('rect', { x: x + w - pw - 3, y: y + 3, width: pw, height: 15, rx: 7.5, fill: css('--sheet'), stroke: css('--block-line'), 'stroke-width': 0.8 }, svg);
+    const nb = el('text', { x: x + w - pw / 2 - 3, y: y + 14.5, 'text-anchor': 'middle', 'font-size': 11, 'font-family': 'IBM Plex Mono, monospace', fill: css('--head') }, svg);
+    nb.textContent = num;
+  }
+
+  // ---------- UI ----------
+  const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toFixed(d);
+  function renderScore(res, other) {
+    const fits = res.O < 0.05;
+    const spread = Math.max(...res.cols.map(c => c.H)) - Math.min(...res.cols.map(c => c.H));
+    document.getElementById('score').innerHTML =
+      `<div><div class="lbl">Area past the bottom edge</div><div class="big">${fmt(res.O)} in²</div></div>` +
+      `<div><span class="chip ${fits ? 'ok' : 'bad'}">${fits ? 'Fits the sheet' : 'Overflows'}</span></div>` +
+      `<div><div class="lbl">Column height spread</div><div class="big">${fmt(spread)} in</div></div>` +
+      `<div><div class="lbl">Blocks moved</div><div class="big">${res.moved}</div></div>` +
+      (other ? `<div><div class="lbl">${state.view === 'auto' ? 'Before' : 'After'}: past the edge</div><div class="big">${fmt(other.O)} in²</div></div>` : '');
+    const rows = res.cols.map((c, i) => {
+      const labels = c.idx.map(j => j + 1);
+      const range = labels.length ? (labels.length > 1 ? `${labels[0]}–${labels[labels.length - 1]}` : `${labels[0]}`) : '—';
+      return `<tr><td>Column ${i + 1}</td><td>${fmt(c.w, 2)}</td><td>${fmt(c.H, 1)}</td><td>${fmt(res.g.Hb - c.H, 1)}</td><td>${fmt(c.over, 1)}</td><td>${range}</td></tr>`;
+    }).join('');
+    document.getElementById('cols').innerHTML = `<thead><tr><th>Column</th><th>Width (in)</th><th>Height (in)</th><th>Room left (in)</th><th>Past edge (in²)</th><th>Blocks</th></tr></thead><tbody>${rows}</tbody>` +
+      `<tfoot><tr><td colspan="6" class="note" style="text-align:left">Body area ${fmt(res.g.BW + (state.k - 1) * GAP, 1)} × ${fmt(res.g.Hb, 1)} in under a ${fmt(res.g.header, 1)} in header.${res.wMin ? ` Widths allowed ${fmt(res.wMin, 2)}–${fmt(res.wMax, 2)} in (equal ${fmt(res.wEq, 2)}).` : ''}</td></tr></tfoot>`;
+    document.getElementById('perf').textContent = res.template ? 'blocks as placed, equal columns' : `${res.evaluated.toLocaleString()} width sets searched in ${fmt(res.ms, 0)} ms`;
+  }
+
+  const TYPES = { heading: 'Heading', text: 'Text', figure: 'Figure', table: 'Table', refs: 'Refs' };
+  function renderBlocks() {
+    const box = document.getElementById('blocks'); box.innerHTML = '';
+    state.blocks.forEach((b, i) => {
+      const row = document.createElement('div'); row.className = 'blk';
+      let params = '';
+      if (b.type === 'heading') params = `<input type="text" id="lbl-${b.id}" value="${b.label.replace(/"/g, '&quot;')}" aria-label="Heading text">`;
+      if (b.type === 'text') params = `<label for="w-${b.id}"><input id="w-${b.id}" type="number" min="5" max="400" step="5" value="${b.words}"> words</label>`;
+      if (b.type === 'refs') params = `<label for="r-${b.id}"><input id="r-${b.id}" type="number" min="1" max="30" value="${b.refs}"> refs</label>`;
+      if (b.type === 'figure') params = `<select id="a-${b.id}" aria-label="Figure shape">${['4:3','16:9','3:2','1:1','3:4','2:1'].map(a => `<option ${a === b.aspect ? 'selected' : ''}>${a}</option>`).join('')}</select><label for="c-${b.id}"><input id="c-${b.id}" type="number" min="0" max="80" step="2" value="${b.cap}"> caption words</label>`;
+      if (b.type === 'table') params = `<label for="tr-${b.id}"><input id="tr-${b.id}" type="number" min="2" max="15" value="${b.rows}"> rows</label><label for="tc-${b.id}"><input id="tc-${b.id}" type="number" min="1" max="8" value="${b.cols}"> cols</label>`;
+      params += `<label for="col-${b.id}">was in <select id="col-${b.id}">${Array.from({ length: state.k }, (_, c) => `<option value="${c}" ${Math.min(b.col, state.k - 1) === c ? 'selected' : ''}>${c + 1}</option>`).join('')}</select></label>`;
+      row.innerHTML = `<span class="n">${i + 1}</span><span class="badge">${TYPES[b.type]}</span><div class="params">${params}</div>
+        <div class="ctl"><button type="button" data-mv="-1" aria-label="Move up">↑</button><button type="button" data-mv="1" aria-label="Move down">↓</button><button type="button" data-del aria-label="Remove block">×</button></div>`;
+      row.addEventListener('input', e => {
+        const t = e.target, v = t.value;
+        if (t.id.startsWith('lbl-')) b.label = v || 'Heading';
+        else if (t.id.startsWith('w-')) b.words = clamp(+v, 5, 400);
+        else if (t.id.startsWith('r-')) b.refs = clamp(+v, 1, 30);
+        else if (t.id.startsWith('a-')) b.aspect = v;
+        else if (t.id.startsWith('c-')) b.cap = clamp(+v, 0, 80);
+        else if (t.id.startsWith('tr-')) b.rows = clamp(+v, 2, 15);
+        else if (t.id.startsWith('tc-')) b.cols = clamp(+v, 1, 8);
+        else if (t.id.startsWith('col-')) b.col = +v;
+        schedule();
+      });
+      row.querySelector('[data-mv="-1"]').onclick = () => move(i, -1);
+      row.querySelector('[data-mv="1"]').onclick = () => move(i, 1);
+      row.querySelector('[data-del]').onclick = () => { state.blocks.splice(i, 1); renderBlocks(); schedule(); };
+      box.appendChild(row);
+    });
+  }
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, Number.isFinite(v) ? v : a));
+  function move(i, d) { const j = i + d; if (j < 0 || j >= state.blocks.length) return; const B = state.blocks; [B[i], B[j]] = [B[j], B[i]]; renderBlocks(); schedule(); }
+
+  let timer = null;
+  function schedule() { clearTimeout(timer); timer = setTimeout(run, 60); }
+  function run() {
+    if (!state.blocks.length) { document.getElementById('poster').innerHTML = ''; return; }
+    const auto = arrange(false), tpl = arrange(true);
+    const shown = state.view === 'auto' ? auto : tpl, other = state.view === 'auto' ? tpl : auto;
+    draw(shown); renderScore(shown, other); save();
+  }
+
+  // controls
+  document.getElementById('size').value = state.size;
+  document.getElementById('bodyPt').value = state.bodyPt;
+  document.getElementById('optWidths').checked = state.optWidths;
+  document.getElementById('optShrink').checked = state.optShrink;
+  document.getElementById('stab').value = state.stab; document.getElementById('stabV').textContent = state.stab;
+  if (state.eqw === undefined) state.eqw = 2;
+  document.getElementById('eqw').value = state.eqw; document.getElementById('eqwV').textContent = state.eqw;
+  document.querySelectorAll('.seg [data-k]').forEach(btn => btn.setAttribute('aria-pressed', String(+btn.dataset.k === state.k)));
+  const setView = v => { state.view = v; document.getElementById('viewAuto').setAttribute('aria-pressed', String(v === 'auto')); document.getElementById('viewTpl').setAttribute('aria-pressed', String(v !== 'auto')); schedule(); };
+  setView(state.view);
+  document.getElementById('size').onchange = e => { state.size = e.target.value; schedule(); };
+  document.getElementById('bodyPt').oninput = e => { state.bodyPt = clamp(+e.target.value, 20, 60); schedule(); };
+  document.getElementById('optWidths').onchange = e => { state.optWidths = e.target.checked; schedule(); };
+  document.getElementById('optShrink').onchange = e => { state.optShrink = e.target.checked; schedule(); };
+  document.getElementById('eqw').oninput = e => { state.eqw = +e.target.value; document.getElementById('eqwV').textContent = state.eqw; schedule(); };
+  document.getElementById('stab').oninput = e => { state.stab = +e.target.value; document.getElementById('stabV').textContent = state.stab; schedule(); };
+  document.querySelectorAll('.seg [data-k]').forEach(btn => btn.onclick = () => {
+    state.k = +btn.dataset.k; document.querySelectorAll('.seg [data-k]').forEach(b2 => b2.setAttribute('aria-pressed', String(b2 === btn))); renderBlocks(); schedule();
+  });
+  document.getElementById('viewAuto').onclick = () => setView('auto');
+  document.getElementById('viewTpl').onclick = () => setView('tpl');
+  document.querySelectorAll('[data-add]').forEach(btn => btn.onclick = () => {
+    const t = btn.dataset.add, col = Math.min(state.k - 1, 2);
+    const nb = t === 'heading' ? mk('heading', { label: 'New section', col }) : t === 'text' ? mk('text', { words: 60, col }) : t === 'figure' ? mk('figure', { label: 'Figure', aspect: '4:3', cap: 14, col }) : mk('table', { label: 'Table', rows: 4, cols: 3, col });
+    state.blocks.push(nb); renderBlocks(); schedule();
+  });
+  document.getElementById('reset').onclick = () => { state.blocks = sample(); renderBlocks(); schedule(); };
+  const mq = matchMedia('(prefers-color-scheme: dark)'); mq.addEventListener?.('change', schedule);
+
+  renderBlocks();
+  const start = () => { widthCache.clear(); run(); };
+  (document.fonts && document.fonts.load ? Promise.all([document.fonts.load('400 100px "Source Sans 3"'), document.fonts.load('700 100px "Source Sans 3"')]).catch(() => {}) : Promise.resolve()).then(start);
+  run();
+})();
+</script>
