@@ -23,6 +23,13 @@
  * scenario can show it goes red when a part of a fix is taken away:
  * scripts/blind-spot-check.mjs runs it for a spec's blind spots.
  *
+ * POSTR_SERVE=preview serves the production build (apps/web/dist, made by
+ * `npm run build`) with `vite preview` instead of the dev server: the code
+ * users get, without React's StrictMode, which the dev server runs (each
+ * effect run twice at mount). A mutant edits sources as the dev server
+ * serves them, so POSTR_MUTANT is refused with it. From fix 27's review
+ * round 2, whose reviewer measured the editor on the build with this switch.
+ *
  * A page opened at a `route` the app redirects to another path throws
  * RouteRedirected at once, instead of waiting 90 s for a sheet that never
  * comes: a tree that hides a feature (fix 23 sends the share link /s/:slug
@@ -64,14 +71,28 @@ export async function startHarness({ name, port }) {
   const engines = await import(pathToFileURL(path.join(REPO, 'node_modules/playwright/index.mjs')).href);
   const engine = process.env.POSTR_BROWSER ?? 'chromium';
   if (!['chromium', 'firefox', 'webkit'].includes(engine)) throw new Error(`POSTR_BROWSER must be chromium, firefox or webkit, not "${engine}"`);
-  const { createServer } = await import(pathToFileURL(path.join(REPO, 'node_modules/vite/dist/node/index.js')).href);
+  const { createServer, preview } = await import(pathToFileURL(path.join(REPO, 'node_modules/vite/dist/node/index.js')).href);
   const mutant = mutantFromEnv();
-  const server = await createServer({
-    root: WEB, configFile: path.join(WEB, 'vite.config.ts'), cacheDir: path.join(out, '.vite-cache'),
-    server: { port, strictPort: true, host: '127.0.0.1', hmr: false }, logLevel: 'warn',
-    plugins: mutant ? [mutantPlugin(mutant.byFile)] : [],
-  });
-  await server.listen();
+  const serve = process.env.POSTR_SERVE || 'dev';
+  if (!['dev', 'preview'].includes(serve)) throw new Error(`POSTR_SERVE must be preview or unset, not "${serve}"`);
+  if (serve === 'preview' && mutant) throw new Error('POSTR_MUTANT needs the dev server: POSTR_SERVE=preview serves the built files as they are');
+  if (serve === 'preview' && !fs.existsSync(path.join(WEB, 'dist/index.html'))) {
+    throw new Error(`POSTR_SERVE=preview serves ${path.join(WEB, 'dist')}: run \`npm run build\` first`);
+  }
+  let server;
+  if (serve === 'preview') {
+    server = await preview({
+      root: WEB, configFile: path.join(WEB, 'vite.config.ts'),
+      preview: { port, strictPort: true, host: '127.0.0.1' }, logLevel: 'warn',
+    });
+  } else {
+    server = await createServer({
+      root: WEB, configFile: path.join(WEB, 'vite.config.ts'), cacheDir: path.join(out, '.vite-cache'),
+      server: { port, strictPort: true, host: '127.0.0.1', hmr: false }, logLevel: 'warn',
+      plugins: mutant ? [mutantPlugin(mutant.byFile)] : [],
+    });
+    await server.listen();
+  }
   const scrollbars = process.env.POSTR_SCROLLBARS || 'default';
   if (!['default', 'classic'].includes(scrollbars)) throw new Error(`POSTR_SCROLLBARS must be classic or unset, not "${scrollbars}"`);
   // Chromium and WebKit draw styled ::-webkit-scrollbar ones in the layout;
@@ -88,9 +109,9 @@ export async function startHarness({ name, port }) {
   try {
     git = (await import('node:child_process')).execSync('git rev-parse --short HEAD', { cwd: REPO }).toString().trim();
   } catch { /* not a git checkout */ }
-  log(`[harness] vite on ${base} (repo ${REPO}, ${git})${mutant ? ` MUTANT ${mutant.name} (${mutant.byFile.size} file(s))` : ''}${scrollbars === 'classic' ? ' SCROLLBARS classic' : ''}`);
+  log(`[harness] vite ${serve === 'preview' ? 'preview (the production build)' : 'dev'} on ${base} (repo ${REPO}, ${git})${mutant ? ` MUTANT ${mutant.name} (${mutant.byFile.size} file(s))` : ''}${scrollbars === 'classic' ? ' SCROLLBARS classic' : ''}`);
   return {
-    base, out, git, browser, engine, scrollbars, mutant: mutant?.name ?? null,
+    base, out, git, browser, engine, scrollbars, serve, mutant: mutant?.name ?? null,
     async stop() {
       await browser.close().catch(() => {});
       await server.close().catch(() => {});

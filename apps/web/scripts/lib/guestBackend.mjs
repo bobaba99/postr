@@ -14,7 +14,16 @@
  *   - PostgREST's shapes: `.single()` on 0 rows is 406 PGRST116; GET filters
  *     `col=eq.value`, `order=updated_at.desc`, `limit`;
  *   - fault injection through `state.faults` (patch, load, post, signup,
- *     refresh, postDelayMs).
+ *     refresh, postDelayMs, and `patchDelays`: a queue of delays, one per
+ *     PATCH in arrival order, each held before the row is written, so an
+ *     earlier save can land after a later one, as two requests in flight
+ *     can on the real network; fix 27);
+ *   - the plan the users row reports (`newState({ plan: 'term' })` for a
+ *     term holder, who may export to PowerPoint; default 'free'; fix 27);
+ *   - the poster_versions table (fix 27): owner-only reads, inserts and
+ *     deletes, and the database's cap of 30 versions per poster
+ *     (20260702000000_poster_versions.sql: the 31st insert raises P0001,
+ *     which PostgREST answers with 400).
  *
  * Nothing in the app is stubbed; only the network is faked. Use it with
  * editorHarness.mjs's startHarness (the app's own Vite server + a browser).
@@ -39,13 +48,14 @@ export const DEFAULT_DATA = {
   institutions: [], authors: [], references: [],
 };
 
-export function newState({ anonymous = true, expiresIn = 3600 } = {}) {
+export function newState({ anonymous = true, expiresIn = 3600, plan = 'free' } = {}) {
   return {
-    anonymous, expiresIn,
+    anonymous, expiresIn, plan,
     users: new Map(), // id -> user
     deleted: new Set(),
     rows: [], // posters table
-    faults: { patch: 'ok', load: 'ok', post: 'ok', signup: 'ok', refresh: 'ok', postDelayMs: 0 },
+    versions: [], // poster_versions table
+    faults: { patch: 'ok', load: 'ok', post: 'ok', signup: 'ok', refresh: 'ok', postDelayMs: 0, patchDelays: [] },
     log: [], // every posters/auth request: {t, method, path, status, sub, keys}
     signups: [],
     aborted: [], errors: [], console: [],
@@ -107,8 +117,8 @@ function applyFilters(rows, url) {
     if (!m) continue;
     out = out.filter((r) => String(r[k]) === m[1]);
   }
-  const order = url.searchParams.get('order');
-  if (order && /updated_at\.desc/.test(order)) out = [...out].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const order = /^(updated_at|created_at)\.desc/.exec(url.searchParams.get('order') ?? '');
+  if (order) out = [...out].sort((a, b) => String(b[order[1]]).localeCompare(String(a[order[1]])));
   const limit = url.searchParams.get('limit');
   if (limit) out = out.slice(0, Number(limit));
   return out;
@@ -124,6 +134,49 @@ export async function installGuestBackend(context, state, base, { tour = false }
     status, contentType: 'application/json', headers: { ...cors, ...headers }, body: body === undefined ? '' : JSON.stringify(body),
   });
   const rec = (entry) => { state.log.push({ t: Date.now(), ...entry }); };
+
+  // poster_versions, as 20260702000000_poster_versions.sql defines it: the
+  // owner reads, inserts (only onto a poster they own) and deletes; a
+  // trigger refuses a 31st version of one poster.
+  let versionClock = 0;
+  const versionsRoute = (route, req, url, method, sub, wantsObject) => {
+    const p = url.pathname;
+    if (method === 'GET') {
+      const rows = applyFilters(state.versions.filter((v) => v.user_id === sub), url);
+      rec({ method, path: p, status: 200, sub, n: rows.length });
+      if (wantsObject) return rows.length === 1 ? json(route, rows[0]) : json(route, PG.zeroRows.body, 406);
+      return json(route, rows);
+    }
+    if (method === 'DELETE') {
+      const gone = applyFilters(state.versions.filter((v) => v.user_id === sub), url).map((v) => v.id);
+      state.versions = state.versions.filter((v) => !gone.includes(v.id));
+      rec({ method, path: p, status: 204, sub, n: gone.length });
+      return json(route, undefined, 204);
+    }
+    if (method === 'POST') {
+      let b = {};
+      try { const body = JSON.parse(req.postData() || '{}'); b = Array.isArray(body) ? body[0] : body; } catch { /* keep {} */ }
+      const owns = state.rows.some((r) => r.id === b.poster_id && r.user_id === sub);
+      if (!sub || b.user_id !== sub || !owns) {
+        rec({ method, path: p, status: 403, sub });
+        return json(route, { code: '42501', details: null, hint: null, message: 'new row violates row-level security policy for table "poster_versions"' }, 403);
+      }
+      const count = state.versions.filter((v) => v.poster_id === b.poster_id).length;
+      if (count >= 30) {
+        rec({ method, path: p, status: 400, sub, n: count, name: b.name });
+        return json(route, { code: 'P0001', details: null, hint: null, message: 'version limit: max 30 versions per poster' }, 400);
+      }
+      versionClock += 1;
+      const row = {
+        id: randomUUID(), poster_id: b.poster_id, user_id: sub, name: b.name ?? '', data: b.data,
+        created_at: new Date(Date.now() + versionClock).toISOString(),
+      };
+      state.versions.push(row);
+      rec({ method, path: p, status: 201, sub, n: count + 1, name: row.name });
+      return json(route, wantsObject ? row : [row], 201);
+    }
+    return json(route, {}, 405);
+  };
 
   await context.route('**/*', (route) => {
     const u = route.request().url();
@@ -195,6 +248,8 @@ export async function installGuestBackend(context, state, base, { tour = false }
         const keys = Object.keys(b);
         const dataStr = b.data ? JSON.stringify(b.data) : '';
         if (method === 'PATCH') {
+          const delay = state.faults.patchDelays?.length ? state.faults.patchDelays.shift() : 0;
+          if (delay) await sleep(delay);
           const fault = state.faults.patch;
           if (fault === 'network') {
             rec({ method, path: p, status: 'aborted', sub, keys, dataStr, fault });
@@ -234,9 +289,15 @@ export async function installGuestBackend(context, state, base, { tour = false }
         }
       }
       if (table === 'users') {
-        const row = { id: sub, plan: 'free', plan_expires_at: null, export_credits: 0, review_credits: 0, review_addon: false, subscription_status: null, research_consent_at: null, marketing_consent_at: null };
+        const term = state.plan === 'term';
+        const row = {
+          id: sub, plan: term ? 'term' : 'free', plan_expires_at: term ? new Date(Date.now() + 30 * 86400e3).toISOString() : null,
+          export_credits: 0, review_credits: 0, review_addon: false, subscription_status: term ? 'active' : null,
+          research_consent_at: null, marketing_consent_at: null,
+        };
         return json(route, wantsObject ? row : [row]);
       }
+      if (table === 'poster_versions') return versionsRoute(route, req, url, method, sub, wantsObject);
       if (method === 'GET') return json(route, wantsObject ? null : [], wantsObject ? 406 : 200);
       return json(route, wantsObject ? {} : [], 201);
     }
