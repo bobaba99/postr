@@ -78,8 +78,13 @@ function run(harness, scenarios, mutant, extraEnv = {}) {
   if (mutant) env.POSTR_MUTANT = `${specPath}#${mutant}`;
   else delete env.POSTR_MUTANT;
   const r = spawnSync(process.execPath, [harness, '--only', scenarios.join(',')], { cwd: WEB, env, encoding: 'utf8', timeout: 600_000 });
-  const lines = `${r.stdout ?? ''}${r.stderr ?? ''}`.split('\n').filter((l) => /^\[(OBSERVED|not observed|ERROR|error)/i.test(l));
-  return { code: r.status ?? 2, lines };
+  const all = `${r.stdout ?? ''}${r.stderr ?? ''}`.split('\n');
+  const lines = all.filter((l) => /^\[(OBSERVED|not observed|ERROR|error)/i.test(l));
+  // A scenario skipped because a switch hides its control on this tree
+  // (lib/editorHarness.mjs SWITCH_OFF; the merge of main, record 30, into
+  // record 29) measured nothing: its exit 0 is not "not guarded".
+  const switchOff = all.filter((l) => /^\[skipped\]/.test(l) && l.includes('skipped (switch off)'));
+  return { code: r.status ?? 2, lines: [...lines, ...switchOff], switchOff: switchOff.length };
 }
 
 const rows = [];
@@ -103,7 +108,7 @@ for (const [name, m] of blind) {
     }
   }
   const r = run(harness, m.browser.scenarios, name, extraEnv);
-  const verdict = r.code === 1 ? 'guarded' : r.code === 0 ? 'NOT GUARDED' : 'HARNESS ERROR';
+  const verdict = r.code === 1 ? 'guarded' : r.code === 0 && r.switchOff >= m.browser.scenarios.length ? 'SWITCH OFF' : r.code === 0 ? 'NOT GUARDED' : 'HARNESS ERROR';
   const envNote = Object.keys(extraEnv).length ? ` (${Object.entries(extraEnv).map(([k, v]) => `${k}=${v}`).join(' ')})` : '';
   rows.push({ name, verdict, detail: `${path.basename(harness)} --only ${m.browser.scenarios.join(',')}${envNote} → exit ${r.code}`, lines: r.lines, m });
 }
@@ -115,5 +120,6 @@ for (const r of rows) {
 const errored = rows.filter((r) => r.verdict === 'HARNESS ERROR').length;
 const open = rows.filter((r) => r.verdict === 'NOT GUARDED').length;
 const accepted = rows.filter((r) => r.verdict === 'ACCEPTED').length;
-process.stdout.write(`\n${rows.length - open - errored - accepted}/${rows.length} blind spots guarded in the browser · ${accepted} accepted unguarded · controls ${controls.size} passed\n`);
+const switchedOff = rows.filter((r) => r.verdict === 'SWITCH OFF').length;
+process.stdout.write(`\n${rows.length - open - errored - accepted - switchedOff}/${rows.length} blind spots guarded in the browser · ${accepted} accepted unguarded · ${switchedOff} skipped (switch off): their scenario's control is hidden on this tree · controls ${controls.size} passed\n`);
 process.exit(errored ? 2 : open ? 1 : 0);

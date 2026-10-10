@@ -29,6 +29,12 @@
  * effect run twice at mount). A mutant edits sources as the dev server
  * serves them, so POSTR_MUTANT is refused with it. From fix 27's review
  * round 2, whose reviewer measured the editor on the build with this switch.
+ * The doc builders (`buildDoc` here, a harness's own preparation) import the
+ * app's modules from /src, which the build does not serve: in preview mode a
+ * dev server on PORT + 1 serves them, `h.docBase` (equal to `h.base` on the
+ * dev server). Record 30's review round 2 (R2-F5): `vite preview` answers
+ * a /src module with the app's index.html, so before it `buildDoc` failed
+ * under POSTR_SERVE=preview.
  *
  * A page opened at a `route` the app redirects to another path throws
  * RouteRedirected at once, instead of waiting 90 s for a sheet that never
@@ -80,11 +86,22 @@ export async function startHarness({ name, port }) {
     throw new Error(`POSTR_SERVE=preview serves ${path.join(WEB, 'dist')}: run \`npm run build\` first`);
   }
   let server;
+  let docServer = null;
   if (serve === 'preview') {
     server = await preview({
       root: WEB, configFile: path.join(WEB, 'vite.config.ts'),
       preview: { port, strictPort: true, host: '127.0.0.1' }, logLevel: 'warn',
     });
+    try {
+      docServer = await createServer({
+        root: WEB, configFile: path.join(WEB, 'vite.config.ts'), cacheDir: path.join(out, '.vite-cache-doc'),
+        server: { port: port + 1, strictPort: true, host: '127.0.0.1', hmr: false }, logLevel: 'warn',
+      });
+      await docServer.listen();
+    } catch (e) {
+      await server.close().catch(() => {});
+      throw e;
+    }
   } else {
     server = await createServer({
       root: WEB, configFile: path.join(WEB, 'vite.config.ts'), cacheDir: path.join(out, '.vite-cache'),
@@ -103,18 +120,21 @@ export async function startHarness({ name, port }) {
     browser = await engines[engine].launch(scrollbars === 'classic' && engine === 'chromium' ? { ignoreDefaultArgs: ['--hide-scrollbars'] } : {});
   } catch (e) {
     await server.close().catch(() => {});
+    await docServer?.close().catch(() => {});
     throw e;
   }
   let git = 'n/a';
   try {
     git = (await import('node:child_process')).execSync('git rev-parse --short HEAD', { cwd: REPO }).toString().trim();
   } catch { /* not a git checkout */ }
-  log(`[harness] vite ${serve === 'preview' ? 'preview (the production build)' : 'dev'} on ${base} (repo ${REPO}, ${git})${mutant ? ` MUTANT ${mutant.name} (${mutant.byFile.size} file(s))` : ''}${scrollbars === 'classic' ? ' SCROLLBARS classic' : ''}`);
+  const docBase = docServer ? `http://127.0.0.1:${port + 1}` : base;
+  log(`[harness] vite ${serve === 'preview' ? `preview (the production build; the doc builders' modules from a dev server on ${docBase})` : 'dev'} on ${base} (repo ${REPO}, ${git})${mutant ? ` MUTANT ${mutant.name} (${mutant.byFile.size} file(s))` : ''}${scrollbars === 'classic' ? ' SCROLLBARS classic' : ''}`);
   return {
-    base, out, git, browser, engine, scrollbars, serve, mutant: mutant?.name ?? null,
+    base, docBase, out, git, browser, engine, scrollbars, serve, mutant: mutant?.name ?? null,
     async stop() {
       await browser.close().catch(() => {});
       await server.close().catch(() => {});
+      await docServer?.close().catch(() => {});
     },
   };
 }
@@ -143,11 +163,12 @@ function makeJwt(sub) {
 
 /**
  * A fake backend holding one poster row (`state.row`) and recording every
- * write (`state.saves`). Anything that is not the dev server, a data/blob URL
- * or a faked host is aborted and recorded (`state.aborted`). The onboarding
- * tour is marked done unless `tour` is true.
+ * write (`state.saves`). Anything that is not the dev server (or `docBase`,
+ * the doc builders' server in preview mode), a data/blob URL or a faked host
+ * is aborted and recorded (`state.aborted`). The onboarding tour is marked
+ * done unless `tour` is true.
  */
-export async function installMocks(context, state, base, { tour = false } = {}) {
+export async function installMocks(context, state, base, { tour = false, docBase = base } = {}) {
   const t = new Date().toISOString();
   const user = {
     id: state.userId, aud: 'authenticated', role: 'authenticated', email: 'jane.doe@example.test', phone: '',
@@ -164,7 +185,7 @@ export async function installMocks(context, state, base, { tour = false } = {}) 
   });
   await context.route('**/*', (route) => {
     const u = route.request().url();
-    if (u.startsWith(base) || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('about:')) return route.continue();
+    if (u.startsWith(base) || u.startsWith(docBase) || u.startsWith('data:') || u.startsWith('blob:') || u.startsWith('about:')) return route.continue();
     if (u.startsWith('https://dummy.supabase.co/') || u.startsWith('http://localhost:3000/')) return route.fallback();
     state.aborted.push(u.slice(0, 120));
     return route.abort();
@@ -265,6 +286,27 @@ export function sourceFlag(name) {
 }
 
 /**
+ * The switches among `needs` (a switch's name, a list of names, or nothing)
+ * that the tree under test has off, read with `sourceFlag`. A scenario that
+ * drives a control record 29's switches hide (IMPORT_ENABLED,
+ * ADJUSTMENTS_ENABLED, EDITOR_EXTRAS_ENABLED) names them in its `needs` and
+ * is skipped while one is off, reported as SWITCH_OFF; a tree that has the
+ * switch on, or no such switch (before record 29), runs it. From the merge
+ * of main (record 30) into record 29, which gave the earlier records'
+ * harnesses their `needs`.
+ */
+export function switchesOff(needs) {
+  const list = needs == null ? [] : Array.isArray(needs) ? needs : [needs];
+  return list.filter((name) => sourceFlag(name) === false);
+}
+
+/** How every harness reports a scenario skipped for a switch that is off. */
+export const SWITCH_OFF = 'skipped (switch off)';
+
+/** The reason line of a SWITCH_OFF skip, given `switchesOff`'s list. */
+export const switchOffReason = (off) => `${SWITCH_OFF}: ${off.join(', ')} ${off.length > 1 ? 'are' : 'is'} off in this tree (config/features.ts)`;
+
+/**
  * A fresh browser context and editor page on a `w` × `h` inch poster.
  * `route` picks the page (default the editor, /p/:id). `ownedByOther` makes
  * the poster someone else's: an owner opening their own share link is sent
@@ -273,11 +315,13 @@ export function sourceFlag(name) {
  * `tour` leaves the onboarding tour to start, as for a first-time user.
  * `browser` and `scrollbars` override the harness's (a browser launched
  * with a device scale factor of its own); `viewport: null` takes that
- * browser's window as it is, with its own ratio.
+ * browser's window as it is, with its own ratio. `rowTitle` is the poster's
+ * name (the row's title; default "ZQ Display Name"): the print window's
+ * toolbar shows it (record 30's review round 1, a long name).
  */
 export async function openEditor(h, {
   viewport, poster, deviceScaleFactor = 1, route, ownedByOther = false, editDoc, tour = false,
-  browser = h.browser, scrollbars = h.scrollbars,
+  browser = h.browser, scrollbars = h.scrollbars, rowTitle = 'ZQ Display Name',
 }) {
   const context = await browser.newContext(viewport === null ? { viewport: null } : { viewport, deviceScaleFactor });
   if (scrollbars === 'classic') {
@@ -294,14 +338,14 @@ export async function openEditor(h, {
     });
   }
   const state = { userId: randomUUID(), row: null, saves: [], aborted: [], errors: [] };
-  await installMocks(context, state, h.base, { tour });
+  await installMocks(context, state, h.base, { tour, docBase: h.docBase ?? h.base });
   const page = await context.newPage();
   page.on('pageerror', (e) => state.errors.push(String(e).slice(0, 300)));
-  const built = await buildDoc(page, h.base, poster);
+  const built = await buildDoc(page, h.docBase ?? h.base, poster);
   const doc = editDoc ? editDoc(built) : built;
   const t = new Date().toISOString();
   state.row = {
-    id: randomUUID(), user_id: ownedByOther ? randomUUID() : state.userId, title: 'ZQ Display Name', width_in: poster.w, height_in: poster.h,
+    id: randomUUID(), user_id: ownedByOther ? randomUUID() : state.userId, title: rowTitle, width_in: poster.w, height_in: poster.h,
     data: doc, thumbnail_path: null, share_slug: 'zq-share', is_public: false, created_at: t, updated_at: t,
   };
   try {

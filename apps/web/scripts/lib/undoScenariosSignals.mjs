@@ -27,7 +27,7 @@ const recordInputTypes = (page) => page.evaluate(() => {
 
 export const SIGNALS = [
   {
-    id: 'W4-colour-drag', claims: ['W4'],
+    id: 'W4-colour-drag', claims: ['W4'], needs: 'ADJUSTMENTS_ENABLED', // Edit block's colour field is hidden (record 29)
     how: 'select block 1, Edit block, drag the colour field through 30 values one hex digit apart (the input event the picker fires, one per 16 ms task), click away, ⌘Z until the colour is back',
     async run(page, ids) {
       const [a] = ids;

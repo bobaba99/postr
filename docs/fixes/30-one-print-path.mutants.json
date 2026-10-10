@@ -1,0 +1,494 @@
+{
+  "tests": [
+    "src/poster/__tests__/onePrintPath.test.tsx",
+    "src/poster/__tests__/printShortcut.test.ts",
+    "src/export/__tests__/printDocument.test.ts",
+    "src/poster/__tests__/previewMode.test.tsx",
+    "src/poster/__tests__/chartBlockLayout.test.tsx"
+  ],
+  "mutants": {
+    "A-hidden-title-measured": {
+      "undoes": "A — the title's shift is not measured while Preview hides the editor (it measured 0 there)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  useLayoutEffect(() => {\n    if (previewMode) return;\n    if (!titleBlockId",
+          "  useLayoutEffect(() => {\n    if (!titleBlockId"
+        ]
+      ]
+    },
+    "A-print-not-remeasured": {
+      "undoes": "A — the print function measures the title again on the shown, unselected sheet before copying it",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    const overflow = readTitleOverflow();\n    flushSync(() => setTitleOverflowPx(overflow));\n",
+          ""
+        ]
+      ]
+    },
+    "A-preview-not-left": {
+      "undoes": "A — the print function leaves Preview, so the sheet it copies is shown and measured",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    flushSync(() => {\n      setPreviewMode(false);\n      clearSelection();\n    });",
+          "    flushSync(() => {\n      clearSelection();\n    });"
+        ]
+      ]
+    },
+    "C-selection-kept": {
+      "undoes": "C — the print function clears the selection before copying the sheet",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    flushSync(() => {\n      setPreviewMode(false);\n      clearSelection();\n    });",
+          "    flushSync(() => {\n      setPreviewMode(false);\n    });"
+        ]
+      ]
+    },
+    "C-pop-copied": {
+      "undoes": "C — a selection's pop still scaling a frame is ended before the copy",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    finishBlockSelections(canvas);\n",
+          ""
+        ]
+      ]
+    },
+    "D-window-opened-late": {
+      "undoes": "D — the window is opened first, so a blocked one changes nothing else (Preview, the selection)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    const printWin = window.open('', '_blank', 'width=900,height=700');\n    if (!printWin) {\n      alert(\n        'Popup blocked. Please allow popups for this site to use \"Save PDF\".',\n      );\n      return;\n    }\n    flushSync(() => {\n      setPreviewMode(false);\n      clearSelection();\n    });",
+          "    flushSync(() => {\n      setPreviewMode(false);\n      clearSelection();\n    });\n    const printWin = window.open('', '_blank', 'width=900,height=700');\n    if (!printWin) {\n      alert(\n        'Popup blocked. Please allow popups for this site to use \"Save PDF\".',\n      );\n      return;\n    }"
+        ]
+      ]
+    },
+    "D-alert-changed": {
+      "undoes": "D — the popup-blocked alert is today's, word for word",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "'Popup blocked. Please allow popups for this site to use \"Save PDF\".',",
+          "'Popup blocked. Allow popups to use \"Save PDF\".',"
+        ]
+      ]
+    },
+    "D-no-shortcut": {
+      "undoes": "D — ⌘P / Ctrl+P calls the print function",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  usePrintShortcut(printPoster);\n",
+          ""
+        ]
+      ]
+    },
+    "D-topbar-dead": {
+      "undoes": "D — the top bar's Save PDF calls the print function",
+      "edits": [
+        [
+          "src/poster/EditorTopBar.tsx",
+          "        onClick={onSavePdf}\n",
+          "        onClick={() => {}}\n"
+        ]
+      ]
+    },
+    "D-preview-own-print": {
+      "undoes": "D — Preview's Print / Save PDF is the print function itself (it used to leave Preview first and copy the sheet before it was shown)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        // Preview and measures the shown sheet before it copies it.\n        onPrint={printPoster}",
+          "        // Preview and measures the shown sheet before it copies it.\n        onPrint={() => {\n          setPreviewMode(false);\n          printPoster();\n        }}"
+        ],
+        [
+          "src/poster/PosterEditor.tsx",
+          "    flushSync(() => {\n      setPreviewMode(false);\n      clearSelection();\n    });",
+          "    flushSync(() => {\n      clearSelection();\n    });"
+        ]
+      ]
+    },
+    "D-key-any-modifier": {
+      "undoes": "D — ⌘P on a Mac, Ctrl+P elsewhere (Ctrl+P on a Mac is the system's caret key)",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "  if (mac ? !e.metaKey || e.ctrlKey : !e.ctrlKey || e.metaKey) return false;",
+          "  if (!(e.metaKey || e.ctrlKey)) return false;"
+        ]
+      ]
+    },
+    "D-key-shift": {
+      "undoes": "D — Shift with it is the browser's (⇧⌘P)",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "  if (e.altKey || e.shiftKey) return false;",
+          "  if (e.altKey) return false;"
+        ]
+      ]
+    },
+    "D-key-alt": {
+      "undoes": "D — Alt with it is the browser's (⌥⌘P)",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "  if (e.altKey || e.shiftKey) return false;",
+          "  if (e.shiftKey) return false;"
+        ]
+      ]
+    },
+    "D-key-physical": {
+      "undoes": "D — the physical P key where the layout types a letter that is not Latin",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "  return /^\\p{L}$/u.test(k) && e.code === 'KeyP';",
+          "  return false;"
+        ]
+      ]
+    },
+    "D-key-latin-physical": {
+      "undoes": "D — a Latin letter is matched by itself, not by its physical key (Dvorak)",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "  if (/^[a-z]$/.test(k)) return k === 'p';\n",
+          ""
+        ]
+      ]
+    },
+    "D-key-not-prevented": {
+      "undoes": "D — the browser's own print (of the editor page) is kept from running",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "      e.preventDefault();\n      if (e.isComposing || e.repeat",
+          "      if (e.isComposing || e.repeat"
+        ]
+      ]
+    },
+    "D-key-repeat": {
+      "undoes": "D — a held key prints once",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "      if (e.isComposing || e.repeat || otherDialogOpen()) return;",
+          "      if (e.isComposing || otherDialogOpen()) return;"
+        ]
+      ]
+    },
+    "D-key-in-dialog": {
+      "undoes": "D — with a dialog open the key prints nothing",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "      if (e.isComposing || e.repeat || otherDialogOpen()) return;",
+          "      if (e.isComposing || e.repeat) return;"
+        ]
+      ]
+    },
+    "D-key-not-in-preview": {
+      "undoes": "D — the key prints from Preview too",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "'[role=\"dialog\"][aria-modal=\"true\"]:not([data-postr-preview]), [data-postr-modal-content]'",
+          "'[role=\"dialog\"][aria-modal=\"true\"], [data-postr-modal-content]'"
+        ]
+      ]
+    },
+    "D-key-composing": {
+      "undoes": "D — inside an input method's composition nothing prints",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "      if (e.isComposing || e.repeat || otherDialogOpen()) return;",
+          "      if (e.repeat || otherDialogOpen()) return;"
+        ]
+      ]
+    },
+    "D-key-composing-default": {
+      "undoes": "D, review round 2 (R2-F3) — inside a composition the browser's own print of the editor page is kept away too (the key's default was left to run there)",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "      if (!isPrintShortcut(e, MAC)) return;\n      e.preventDefault();\n      if (e.isComposing || e.repeat || otherDialogOpen()) return;",
+          "      if (e.isComposing || !isPrintShortcut(e, MAC)) return;\n      e.preventDefault();\n      if (e.repeat || otherDialogOpen()) return;"
+        ]
+      ]
+    },
+    "D-key-stale-print": {
+      "undoes": "D — the key calls the print function of the poster as it is now, not of the first render (review round 1, R1-F1: a stale one printed a 48 × 36 in page for a 36 × 48 in poster)",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "      ref.current();",
+          "      onPrint();"
+        ]
+      ]
+    },
+    "D-key-closing-dialog": {
+      "undoes": "D — a dialog already answered (fading out, data-state=\"closing\") does not hold the key (review round 1, R1-F6)",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "  ).some((d) => d.getAttribute('data-state') !== 'closing');",
+          "  ).length > 0;"
+        ]
+      ]
+    },
+    "D-key-bubble": {
+      "undoes": "D — the key is caught at the window in the capture phase, before a handler on the page can stop it (review round 1, R1-F6)",
+      "edits": [
+        [
+          "src/poster/usePrintShortcut.ts",
+          "    window.addEventListener('keydown', onKeyDown, true);",
+          "    window.addEventListener('keydown', onKeyDown);"
+        ],
+        [
+          "src/poster/usePrintShortcut.ts",
+          "    return () => window.removeEventListener('keydown', onKeyDown, true);",
+          "    return () => window.removeEventListener('keydown', onKeyDown);"
+        ]
+      ]
+    },
+    "B-no-sheet-base": {
+      "undoes": "B — the print restates the editor's base styles for the sheet",
+      "edits": [
+        [
+          "src/export/printDocument.ts",
+          "${printSheetBaseCss()}\n",
+          "\n"
+        ]
+      ]
+    },
+    "B-no-inherited-base": {
+      "undoes": "B — the sheet inherits the editor's line height of 1.5",
+      "edits": [
+        [
+          "src/export/printSheetBase.ts",
+          "  line-height: 1.5;\n",
+          ""
+        ]
+      ]
+    },
+    "B-table-rule": {
+      "undoes": "B — a table's borders collapse, as in the editor (preflight's table rule)",
+      "edits": [
+        [
+          "src/export/printSheetBase.ts",
+          "  ['table', 'text-indent: 0; border-color: inherit; border-collapse: collapse;'],\n",
+          ""
+        ]
+      ]
+    },
+    "B-list-rule": {
+      "undoes": "B — lists inside blocks keep their bullets and indent (index.css)",
+      "edits": [
+        [
+          "src/export/printSheetBase.ts",
+          "  ['[data-block-id] li', 'list-style: revert; display: list-item;'],\n",
+          ""
+        ]
+      ]
+    },
+    "B-zoom": {
+      "undoes": "B — the print scales the sheet with a transform, not CSS zoom (which laid it out again at 9.6 times the size)",
+      "edits": [
+        [
+          "src/export/printDocument.ts",
+          "      transform: scale(${printScale});\n      transform-origin: 0 0;",
+          "      zoom: ${printScale};"
+        ]
+      ]
+    },
+    "E-no-color-adjust": {
+      "undoes": "E — print-color-adjust: exact keeps backgrounds without the dialog's Background graphics",
+      "edits": [
+        [
+          "src/export/printDocument.ts",
+          "    -webkit-print-color-adjust: exact;\n    print-color-adjust: exact;\n",
+          ""
+        ]
+      ]
+    },
+    "E-no-webkit-color-adjust": {
+      "undoes": "E — the -webkit- form for Safari",
+      "edits": [
+        [
+          "src/export/printDocument.ts",
+          "    -webkit-print-color-adjust: exact;\n",
+          ""
+        ]
+      ]
+    },
+    "F-sidebar-line": {
+      "undoes": "F — the Export tab says one line: \"Your browser’s print window opens. Choose Save as PDF.\"",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        Your browser’s print window opens. Choose Save as PDF.\n",
+          "        Click Save PDF, then in the dialog set Margins to None and enable Background graphics.\n"
+        ]
+      ]
+    },
+    "F-steps-background": {
+      "undoes": "F — the print window's steps say nothing about Background graphics",
+      "edits": [
+        [
+          "src/export/printDocument.ts",
+          "    <li><strong>Save</strong>.</li>",
+          "    <li>Options: tick <strong>Background graphics</strong>.</li>\n    <li><strong>Save</strong>.</li>"
+        ]
+      ]
+    },
+    "F-steps-paper": {
+      "undoes": "F — the print window's steps name the paper size, if the dialog shows one",
+      "edits": [
+        [
+          "src/export/printDocument.ts",
+          "    <li>Paper size, if it shows one: <strong>${widthIn} × ${heightIn} in</strong>.</li>\n",
+          ""
+        ]
+      ]
+    },
+    "F-steps-firefox-label": {
+      "undoes": "F — the first step names Firefox's PDF printer as its dialog does, Save to PDF (review round 1, R1-F3)",
+      "edits": [
+        [
+          "src/export/printDocument.ts",
+          "(in Firefox, Save to PDF; in Safari, the PDF menu",
+          "(in Safari, the PDF menu"
+        ]
+      ]
+    },
+    "F-header-fixed": {
+      "undoes": "F — the toolbar and steps sit in the page's flow above the poster (sticky), not fixed over a stage that starts 220 px down (review round 1, R1-F4)",
+      "edits": [
+        [
+          "src/export/printDocument.ts",
+          "  .print-header {\n    position: sticky;\n    top: 0;\n    z-index: 1000;\n  }",
+          "  .print-header {\n    position: fixed;\n    top: 0;\n    left: 0;\n    right: 0;\n    z-index: 1000;\n  }"
+        ],
+        [
+          "src/export/printDocument.ts",
+          "    padding: 30px 30px 60px;",
+          "    padding: 220px 30px 60px;"
+        ]
+      ]
+    },
+    "C-table-ui-copied": {
+      "undoes": "C, review round 2 (R2-F1) — the copy drops a block's own editing controls (data-postr-editor-ui)",
+      "edits": [
+        [
+          "src/export/stripEditorChrome.ts",
+          "'[data-postr-resize-handle], [data-postr-selection-ui], [data-postr-overlay], [data-postr-editor-ui]'",
+          "'[data-postr-resize-handle], [data-postr-selection-ui], [data-postr-overlay]'"
+        ]
+      ]
+    },
+    "C-table-add-column-untagged": {
+      "undoes": "C, review round 2 (R2-F1) — the table's hover \"Add column\" bar is tagged as editor UI",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "          title=\"Add column\"\n          data-postr-editor-ui=\"\"\n",
+          "          title=\"Add column\"\n"
+        ]
+      ]
+    },
+    "C-table-add-row-untagged": {
+      "undoes": "C, review round 2 (R2-F1) — the table's hover \"Add row\" bar is tagged as editor UI",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "          title=\"Add row\"\n          data-postr-editor-ui=\"\"\n",
+          "          title=\"Add row\"\n"
+        ]
+      ]
+    },
+    "C-table-strips-untagged": {
+      "undoes": "C, review round 2 (R2-F1) — the table's row and column strips are tagged as editor UI",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "            key={`row-sel-${r}`}\n            role=\"button\"\n            data-postr-editor-ui=\"\"\n",
+          "            key={`row-sel-${r}`}\n            role=\"button\"\n"
+        ],
+        [
+          "src/poster/blocks.tsx",
+          "            key={`col-sel-${c}`}\n            role=\"button\"\n            data-postr-editor-ui=\"\"\n",
+          "            key={`col-sel-${c}`}\n            role=\"button\"\n"
+        ]
+      ]
+    },
+    "C-table-grips-untagged": {
+      "undoes": "C, review round 2 (R2-F1) — the table's column-resize grips are tagged as editor UI",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "            title=\"Drag to resize column\"\n            data-postr-editor-ui=\"\"\n",
+          "            title=\"Drag to resize column\"\n"
+        ]
+      ]
+    },
+    "C-table-bands-untagged": {
+      "undoes": "C, review round 2 (R2-F1) — the active cell's bands are tagged as editor UI (the print clears the selection first, so the bands are gone before its copy; the dashboard thumbnail copies the sheet with the caret still in the cell)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "            aria-hidden=\"true\"\n            data-postr-editor-ui=\"\"\n",
+          "            aria-hidden=\"true\"\n",
+          2
+        ]
+      ]
+    },
+    "CREDIT-scaled-with-sheet": {
+      "undoes": "review round 2 (R2-F2) — in print the credit line is laid out at the page's own scale (its layer scaled back), not with the sheet at 10 px per inch",
+      "edits": [
+        [
+          "src/export/attribution.ts",
+          "  @media print {\n    .postr-attribution-page {",
+          "  @media zq-never {\n    .postr-attribution-page {"
+        ]
+      ]
+    },
+    "CREDIT-line-transformed": {
+      "undoes": "review round 2 (R2-F2) — the layer at the sheet's corner takes the transform, not the line (Chromium draws a transformed box from a whole px of its parent: the line moved 0.05 in)",
+      "edits": [
+        [
+          "src/export/attribution.ts",
+          "      transform: scale(${1 / pageScale});\n      transform-origin: 0 0;\n    }\n    .postr-attribution {\n",
+          "    }\n    .postr-attribution {\n      transform: scale(${1 / pageScale});\n      transform-origin: 100% 100%;\n"
+        ]
+      ]
+    },
+    "B-button-rule-value": {
+      "undoes": "B — the button rule is restated with the editor's values. BLIND SPOT of the jsdom tests (they match two of the rules' text, not this one); killed in the browser by print-path-check.mjs BASE, on the dev server. Review round 3 (R3-F2): BASE reads only transparent and rgba(0, 0, 0, 0) as one colour, so another colour is still a rule not restated",
+      "edits": [
+        [
+          "src/export/printSheetBase.ts",
+          "'-webkit-appearance: button; appearance: button; background-color: transparent; background-image: none;'",
+          "'-webkit-appearance: button; appearance: button; background-color: #fff; background-image: none;'"
+        ]
+      ],
+      "expect": "survive"
+    },
+    "B-sup-vertical-align": {
+      "undoes": "B — sub and sup sit on the baseline and are moved by position, as preflight sets them (the browser's own vertical-align: super and sub would raise them again). BLIND SPOT of the jsdom tests; killed in the browser by print-path-check.mjs BASE, on the dev server. Review round 3 (R3-F2): BASE drops a declaration at its initial value only for border-image, so vertical-align: baseline, its initial value, is still compared",
+      "edits": [
+        [
+          "src/export/printSheetBase.ts",
+          "['sub, sup', 'font-size: 75%; line-height: 0; position: relative; vertical-align: baseline;'],",
+          "['sub, sup', 'font-size: 75%; line-height: 0; position: relative;'],"
+        ]
+      ],
+      "expect": "survive"
+    }
+  }
+}

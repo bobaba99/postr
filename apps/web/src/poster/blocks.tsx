@@ -936,6 +936,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
           {/* Row band — full width, positioned at the active row's vertical slot */}
           <div
             aria-hidden="true"
+            data-postr-editor-ui=""
             style={{
               position: 'absolute',
               left: 0,
@@ -952,6 +953,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
           {/* Column band — full height, positioned at the active col's horizontal slot */}
           <div
             aria-hidden="true"
+            data-postr-editor-ui=""
             style={{
               position: 'absolute',
               top: 0,
@@ -977,6 +979,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
           <div
             key={`col-resize-${i}`}
             title="Drag to resize column"
+            data-postr-editor-ui=""
             onPointerDown={(e) => onColResizeStart(i, e)}
             style={{
               position: 'absolute',
@@ -1133,6 +1136,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
           <div
             key={`row-sel-${r}`}
             role="button"
+            data-postr-editor-ui=""
             aria-label={`Select row ${r + 1}`}
             title={`Select row ${r + 1} (Delete to remove)`}
             tabIndex={0}
@@ -1191,6 +1195,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
           <div
             key={`col-sel-${c}`}
             role="button"
+            data-postr-editor-ui=""
             aria-label={`Select column ${c + 1}`}
             title={`Select column ${c + 1} (Delete to remove)`}
             tabIndex={0}
@@ -1239,6 +1244,11 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
       {/*
         Hover-only "+" at bottom and right edges (Notion pattern).
         Only visible when the mouse is over the table — not permanent.
+        Like the strips, the grips and the active-cell bands, tagged
+        data-postr-editor-ui: the print copy and the thumbnail drop it
+        (export/stripEditorChrome.ts). ⌘P copies the sheet with the
+        pointer still here, and the bar printed as a 0.3 in accent bar
+        (record 30's review round 2, R2-F1).
         Single append action, no delete buttons on the canvas.
         All structural edits (insert-at-position, delete) live in the
         sidebar TableEditor stepper.
@@ -1247,6 +1257,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
         <button
           type="button"
           title="Add row"
+          data-postr-editor-ui=""
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -1271,6 +1282,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
         <button
           type="button"
           title="Add column"
+          data-postr-editor-ui=""
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -2671,6 +2683,17 @@ export function BlockFrame(props: BlockFrameProps) {
                 <line x1="18" y1="6" x2="6" y2="18" />
               </svg>
             </button>
+            )}
+
+            {/* The hidden crop button's slot (ADJUSTMENTS_ENABLED, record
+                29): empty, unpainted and inert, so the row, centred on
+                the block, keeps the width record 19 measured its overview
+                threshold with. Without it every button moved 14 px and,
+                zoomed out to 0.35, a 3 in image's Replace sat over the
+                blocks beside it (the merge of main, record 30, into
+                record 29; control-size-check Fd, Fh). */}
+            {!ADJUSTMENTS_ENABLED && controls.buttons && (b.type === 'image' || b.type === 'logo') && (
+              <span aria-hidden="true" data-postr-row-slot="" style={{ ...circleBtn, visibility: 'hidden', pointerEvents: 'none' }} />
             )}
 
             {/* The rotate control, when below the block it would meet

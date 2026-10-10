@@ -33,7 +33,11 @@
  *        T5n either inserted block shows text, or shows no prompt
  *   T7a  Save PDF's print window holds template text (the old title, a
  *        guidance sentence or an Insert string); T7b it holds a prompt, as
- *        text or as a drawn ::before
+ *        text or as a drawn ::before. Since the merge with record 30 (one
+ *        print path) the window is read from every way to print: Export ›
+ *        "⎙ Save PDF", the top bar's "Save PDF", Preview's "Print / Save
+ *        PDF" and ⌘P / Ctrl+P (numbers `printEntries`; an entry a tree
+ *        lacks is null); T7a and T7b are observed if any entry shows it
  *   T8a  the PowerPoint file holds template text; T8b it holds a prompt
  *   T9   on a new poster, Issues lists fewer empty-or-template rows than
  *        there are text and heading blocks still empty or holding template

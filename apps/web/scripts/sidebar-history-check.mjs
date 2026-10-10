@@ -50,6 +50,13 @@
  *   OUT_DIR=/some/dir POSTR_REPO=/path/to/repo node sidebar-history-check.mjs
  *   PORT=5203 node sidebar-history-check.mjs        # two runs side by side
  *
+ * A scenario with `needs` drives a control one of record 29's switches hides
+ * (config/features.ts): while the tree has the switch off it is skipped,
+ * printed "skipped (switch off)" and counted on the summary line of that
+ * name (since the merge of main, record 30, into record 29). Those with
+ * ADJUSTMENTS_ENABLED: custom-palette-save, style-preset, heading-style,
+ * typography (italic).
+ *
  * A scenario marked `knownDefect` names a DIFFERENT open defect; it prints
  * KNOWN and does not affect the exit code. Remove the mark when that item ships.
  *
@@ -61,6 +68,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { SWITCH_OFF, switchOffReason, switchesOff } from './lib/editorHarness.mjs';
 
 // ---------------------------------------------------------------- config
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -492,7 +500,7 @@ const SCENARIOS = [
     act: async (page) => { await openTab(page, 'style'); await page.getByRole('button', { name: /Nature \/ Biology/ }).first().click(); },
   },
   {
-    id: 'custom-palette-save', setting: S.palette, undoPushesExpected: 1, how: 'Style tab → "Create custom palette" → Primary text hex filled "#AA0000" + name typed → "Save palette and apply"',
+    id: 'custom-palette-save', needs: 'ADJUSTMENTS_ENABLED', setting: S.palette, undoPushesExpected: 1, how: 'Style tab → "Create custom palette" → Primary text hex filled "#AA0000" + name typed → "Save palette and apply"',
     act: async (page) => {
       await openTab(page, 'style');
       await page.getByRole('button', { name: /Create custom palette/ }).click();
@@ -526,15 +534,15 @@ const SCENARIOS = [
     act: async (page) => { await openTab(page, 'layout'); const w = page.locator('input[aria-label="Poster width in inches"]'); await w.click(); await page.keyboard.press('ArrowUp'); await page.keyboard.press('Enter'); await confirmSizeDialog(page); await w.click(); },
   },
   {
-    id: 'style-preset', wantPreset: true, setting: S.preset, undoPushesExpected: 1, how: `Style tab → click saved preset "${PRESET_NAME}" (seeded in localStorage)`,
+    id: 'style-preset', needs: 'ADJUSTMENTS_ENABLED', wantPreset: true, setting: S.preset, undoPushesExpected: 1, how: `Style tab → click saved preset "${PRESET_NAME}" (seeded in localStorage)`,
     act: async (page) => { await openTab(page, 'style'); await page.getByRole('button', { name: PRESET_NAME, exact: true }).click(); },
   },
   {
-    id: 'heading-style', setting: S.heading, undoPushesExpected: 1, how: 'Style tab → Headings Border "Box"',
+    id: 'heading-style', needs: 'ADJUSTMENTS_ENABLED', setting: S.heading, undoPushesExpected: 1, how: 'Style tab → Headings Border "Box"',
     act: async (page) => { await openTab(page, 'style'); await page.getByRole('button', { name: 'Box', exact: true }).click(); },
   },
   {
-    id: 'typography', setting: S.italic, undoPushesExpected: 1, how: 'Style tab → Typography Body italic toggle',
+    id: 'typography', needs: 'ADJUSTMENTS_ENABLED', setting: S.italic, undoPushesExpected: 1, how: 'Style tab → Typography Body italic toggle',
     act: async (page) => { await openTab(page, 'style'); await page.locator('button[aria-pressed]').filter({ hasText: /^I$/ }).nth(3).click(); },
   },
   {
@@ -724,7 +732,14 @@ try {
     try { const p = await openEditor(ctx, st); await p.close(); } catch (e) { log('[harness] warm-up:', String(e).slice(0, 200)); }
     await ctx.close();
   }
+  const switchSkips = [];
   for (const sc of list) {
+    const off = switchesOff(sc.needs);
+    if (off.length) {
+      switchSkips.push(sc.id);
+      log(`[skipped] ${sc.id.padEnd(22)} ${switchOffReason(off)}`);
+      continue;
+    }
     const t0 = Date.now();
     const r = await runScenario(browser, sc);
     r.ms = Date.now() - t0;
@@ -738,11 +753,12 @@ try {
   exitCode = !controlsOk || results.some((r) => r.verdict === 'HARNESS-ERROR' || r.verdict === 'INSTRUMENT-FAIL') ? 2 : defects.length ? 1 : 0;
   const summary = {
     ranAt: new Date().toISOString(), repo: REPO, git, base: BASE, displayName: DISPLAY_NAME, titleBlockText: TITLE_BLOCK_TEXT,
-    controlsOk, defects: defects.map((r) => r.id), exitCode,
+    controlsOk, defects: defects.map((r) => r.id), exitCode, switchSkips,
     table: results.map((r) => ({ id: r.id, control: r.control, informational: r.informational, how: r.how, key: r.key, verdict: r.verdict, ...r.checks, ...(r.metrics ?? {}), focusAtUndo1: r.focusAtUndo1, afterChangeFocus: r.afterChangeFocus, pageErrors: (r.errors ?? []).length })),
   };
   fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify({ summary, results }, null, 2));
   fs.writeFileSync(path.join(OUT, 'summary.json'), JSON.stringify(summary, null, 2));
+  log(`[harness] ${SWITCH_OFF}: ${switchSkips.length}${switchSkips.length ? ` (${switchSkips.join(', ')})` : ''}`);
   log(`[harness] controlsOk=${controlsOk} defects=${defects.length}/${results.filter((r) => !r.control && !r.informational).length} (informational excluded) exit=${exitCode}`);
   log(`[harness] wrote ${path.join(OUT, 'results.json')}`);
 } catch (e) {

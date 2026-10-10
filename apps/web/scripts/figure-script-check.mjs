@@ -113,6 +113,15 @@
  *   C4  every scenario's setup reached a results table with the script in
  *       the box before its action
  *
+ * SWITCHES (record 29's, config/features.ts; since the merge of main, record
+ *   30, into record 29): a scenario that drives a control a switch hides is
+ *   skipped while the tree has it off, printed "skipped (switch off)" and
+ *   counted on the summary line of that name (NEEDS below): `duplicate`
+ *   (L6) clicks the sidebar's Duplicate, EDITOR_EXTRAS_ENABLED (the
+ *   dashboard's Duplicate stays, but it is a full page load, not the copy
+ *   opened in the mounted editor L6 is about); `sib-scan` (S4) clicks
+ *   "🔎 Scan image", ADJUSTMENTS_ENABLED.
+ *
  * BLIND SPOTS
  *   - The script is put in the box with Playwright's fill() (an input event),
  *     not a clipboard paste; the defect is about keeping it, not pasting.
@@ -162,9 +171,9 @@ process.on('uncaughtException', fail);
 process.on('unhandledRejection', fail);
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-let startHarness, WEB, newState, newGuestPage, openNewPoster, makeRow;
+let startHarness, WEB, newState, newGuestPage, openNewPoster, makeRow, switchesOff, switchOffReason, SWITCH_OFF;
 try {
-  ({ startHarness, WEB } = await import('./lib/editorHarness.mjs'));
+  ({ startHarness, WEB, switchesOff, switchOffReason, SWITCH_OFF } = await import('./lib/editorHarness.mjs'));
   ({ newState, newGuestPage, openNewPoster, makeRow } = await import('./lib/guestBackend.mjs'));
 } catch (e) {
   fail(e);
@@ -869,6 +878,8 @@ async function siblingDraft(h, { id, tab, fill, read }) {
 }
 
 // ---------------------------------------------------------------- run
+/** The switch each scenario's hidden control needs (see SWITCHES in the header). */
+const NEEDS = { duplicate: 'EDITOR_EXTRAS_ENABLED', 'sib-scan': 'ADJUSTMENTS_ENABLED' };
 const ids = Object.keys(SCENARIOS).filter((id) => !ONLY || ONLY.includes(id));
 if (ONLY && ids.length !== ONLY.length) fail(`unknown --only id: ${ONLY.filter((id) => !SCENARIOS[id])}`);
 const stampFile = path.join(WEB, 'public/version.json');
@@ -877,8 +888,15 @@ restoreStamp = () => { if (stamp !== null) fs.writeFileSync(stampFile, stamp); }
 
 const h = await startHarness({ name: 'figure-script-check', port: PORT });
 let errored = 0;
+const switchSkips = [];
 try {
   for (const id of ids) {
+    const off = switchesOff(NEEDS[id]);
+    if (off.length) {
+      switchSkips.push(id);
+      log(`[skipped] ${id}: ${switchOffReason(off)}`);
+      continue;
+    }
     try {
       await SCENARIOS[id](h);
     } catch (e) {
@@ -903,6 +921,7 @@ const failedControls = results.filter((r) => r.kind === 'CONTROL' && !r.ok).leng
 log('');
 log(`[summary] ${h.engine} ${h.git}${h.mutant ? ` MUTANT ${h.mutant}` : ''}: ${observed.length} of ${counted.length} counted readings observed the defect; ${errored} scenario(s) errored; ${failedControls} control(s) failed`);
 for (const [c, v] of Object.entries(byClaim)) log(`[summary] ${c}: ${v.observed} of ${v.n}`);
-fs.writeFileSync(path.join(h.out, 'results.json'), JSON.stringify({ git: h.git, engine: h.engine, mutant: h.mutant, results, errored }, null, 1));
+log(`[summary] ${SWITCH_OFF}: ${switchSkips.length}${switchSkips.length ? ` (${switchSkips.join(', ')})` : ''}`);
+fs.writeFileSync(path.join(h.out, 'results.json'), JSON.stringify({ git: h.git, engine: h.engine, mutant: h.mutant, results, errored, switchSkips }, null, 1));
 log(`[summary] results: ${path.join(h.out, 'results.json')}`);
 process.exit(errored || failedControls ? 2 : observed.length ? 1 : 0);

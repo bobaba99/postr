@@ -125,7 +125,9 @@ export const IMPORT_ENABLED = false;
  * per-block styling. Frozen, not removed: the controls' code and the data
  * fields remain. What is switched off:
  *   - poster/blocks.tsx and selectionLayout.ts: no rotate control, no crop
- *     button (so no crop overlay); on a table, no row or column strips, no
+ *     button (so no crop overlay; its slot in an image's or logo's handle
+ *     row stays, empty and inert, so the row keeps the width record 19
+ *     measured its overview threshold with); on a table, no row or column strips, no
  *     column-border drag, no hover "+" to add a row or column, and no
  *     right-click menu (the browser's own menu shows)
  *   - poster/Sidebar.tsx: no "Show grid" (and so no Canvas overlays section

@@ -163,6 +163,22 @@
  *   - WCAG 2.5.8's exceptions ("equivalent": arrow keys move a block) are
  *     a judgment, not measured: T reports the raw test.
  *
+ * SWITCHES (record 29's ADJUSTMENTS_ENABLED, config/features.ts, hides the
+ *   rotate control, the crop button and so crop mode, and a table's strips,
+ *   grips and "+" bars; since the merge of main, record 30, into record 29):
+ *   while the tree has it off, the scenarios whose subject is a hidden
+ *   control are skipped, printed "skipped (switch off)" and counted on the
+ *   summary line of that name (`needsOf`): the crop subject's two
+ *   controls-…-crop and settle-…-crop, rotated-click (it turns the block
+ *   with the rotate control) and the two room-… scenarios (Rr, the rotate
+ *   control's place). The others run on the controls that stay: Cm does
+ *   not ask for rotate or crop (lib ruleCheck; an image's or logo's row
+ *   keeps crop's slot, drawn empty, blocks.tsx data-postr-row-slot, so its
+ *   width is checked as before), Fr asks for Replace and Delete
+ *   (lib/neighbourClicks.mjs), and the strips' readings are absent. Fd and
+ *   Fh found the slot missing on the merge (a 3 in image's Replace over the
+ *   blocks beside it at 0.35: Fd 2 of 78, Fh 1 of 42; 0 with crop back).
+ *
  * RUN (from apps/web)
  *   node scripts/control-size-check.mjs [--only id,id]
  *   (the control readers, the zoom steps and the WCAG test are in
@@ -180,7 +196,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { log, openEditor, startHarness } from './lib/editorHarness.mjs';
+import { SWITCH_OFF, log, openEditor, startHarness, switchOffReason, switchesOff } from './lib/editorHarness.mjs';
 import { roomScenarios } from './lib/rotateRoom.mjs';
 import { reviewScenarios, reviewVerdicts } from './lib/controlReview.mjs';
 import {
@@ -487,12 +503,22 @@ function sizeTable(results) {
 }
 
 const list = SCENARIOS.filter((s) => (ONLY ? ONLY.includes(s.id) : !s.onDemand));
+/** The switch a scenario's subject needs (see SWITCHES in the header). */
+const needsOf = (id) => (/-crop$|^rotated-click-|^room-/.test(id) ? 'ADJUSTMENTS_ENABLED' : null);
 if (ONLY && list.length !== ONLY.length) fail(`unknown --only id: ${ONLY.filter((id) => !SCENARIOS.some((s) => s.id === id))}`);
 const h = await startHarness({ name: 'control-size-check', port: PORT }).catch(fail);
 const results = [];
 let errors = 0;
+const switchSkips = [];
 try {
   for (const sc of list) {
+    const off = switchesOff(needsOf(sc.id));
+    if (off.length) {
+      switchSkips.push(sc.id);
+      results.push({ id: sc.id, skipped: switchOffReason(off) });
+      log(`[skipped] ${sc.id} ${switchOffReason(off)}`);
+      continue;
+    }
     try {
       const r = await sc.run(h);
       results.push({ id: sc.id, ...r });
@@ -752,7 +778,7 @@ Object.assign(claims, review.claims);
 Object.assign(controls, review.controls);
 const controlFailures = Object.values(controls).reduce((n, v) => n + v.length, 0);
 const summary = {
-  git: h.git, engine: h.engine, mutant: h.mutant, claims, controls, errors,
+  git: h.git, engine: h.engine, mutant: h.mutant, claims, controls, errors, switchSkips,
   table: sizeTable(results),
 };
 fs.writeFileSync(path.join(h.out, `results-${h.engine}.json`), JSON.stringify({ summary, results }, null, 2));
@@ -787,6 +813,7 @@ for (const k of ['T-fit', 'Tl', 'Oc', 'Cm', 'Rr', 'Pl', 'Or', 'Or-tilt', 'Pl-rot
 }
 log(`[harness] claims ${JSON.stringify(Object.fromEntries(Object.entries(claims).map(([k, v]) => [k, `${v.observed} of ${v.of}`])))}`);
 log(`[harness] controls ${JSON.stringify(controls)}`);
+log(`[harness] ${SWITCH_OFF}: ${switchSkips.length}${switchSkips.length ? ` (${switchSkips.join(', ')})` : ''}`);
 const DEFECT = ['S', 'Sw', 'Sp', 'T-fit', 'R', 'Ov', 'Oc', 'Cm', 'Rr', 'Pl', 'Or', 'Pl-rot', 'Or-click', 'St', 'Fd', 'Fh', 'Fr'];
 const exit = errors || controlFailures ? 2 : DEFECT.some((k) => claims[k].observed > 0) ? 1 : 0;
 log(`[harness] exit=${exit} wrote ${path.join(h.out, `results-${h.engine}.json`)}`);

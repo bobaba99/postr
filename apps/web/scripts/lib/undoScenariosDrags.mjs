@@ -107,7 +107,7 @@ export const DRAGS = [
     },
   },
   {
-    id: 'G1-crop-edge-drag', claims: ['G1'],
+    id: 'G1-crop-edge-drag', claims: ['G1'], needs: 'ADJUSTMENTS_ENABLED', // the crop button is hidden (record 29)
     editDoc: withPicture,
     how: 'the image selected, Crop, its right edge dragged 12 moves of 2 px inward, Apply; the Undo button until no crop, then ⌘⇧Z until it is back',
     async run(page) {
@@ -126,7 +126,7 @@ export const DRAGS = [
     },
   },
   {
-    id: 'G2-long-crop-gesture', claims: ['G2'],
+    id: 'G2-long-crop-gesture', claims: ['G2'], needs: 'ADJUSTMENTS_ENABLED', // the crop button is hidden (record 29)
     editDoc: withPicture,
     how: 'the image selected and nudged with ArrowRight; Crop, its right edge dragged back and forth for 330 moves of 1 px (each move a new crop), Apply; ⌘Z twice: no crop, then the nudge undone',
     async run(page) {
@@ -169,7 +169,7 @@ export const DRAGS = [
     },
   },
   {
-    id: 'G3-column-width-drag', claims: ['G3'],
+    id: 'G3-column-width-drag', claims: ['G3'], needs: 'ADJUSTMENTS_ENABLED', // the column grip is hidden (record 29)
     editDoc: withPicture,
     how: 'the table selected, the grip between its first two columns dragged 12 moves of 3 px; the Undo button until the widths are back',
     async run(page) {
@@ -187,7 +187,7 @@ export const DRAGS = [
     },
   },
   {
-    id: 'G4-caption-slider-drag', claims: ['G4'],
+    id: 'G4-caption-slider-drag', claims: ['G4'], needs: 'ADJUSTMENTS_ENABLED', // the caption spacing slider is hidden (record 29)
     editDoc: withPicture,
     how: 'the image selected, Edit block › Caption spacing: the slider pressed at its left end and dragged 12 moves to the right; the Undo button until the gap is back to 0',
     async run(page) {
@@ -206,7 +206,7 @@ export const DRAGS = [
     },
   },
   {
-    id: 'G5-line-spacing-drag-held', claims: ['G5'],
+    id: 'G5-line-spacing-drag-held', claims: ['G5'], needs: 'ADJUSTMENTS_ENABLED', // the line spacing slider is hidden (record 29)
     editDoc: withPicture,
     how: 'block 1 clicked, Edit block › Line spacing: the slider pressed at its thumb, dragged 6 moves, held still 0.8 s, 6 more moves, released; the Undo button until the spacing is back',
     async run(page, ids) {

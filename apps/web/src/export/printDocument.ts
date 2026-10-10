@@ -12,6 +12,7 @@
  * printed geometry.
  */
 import { attributionPrintCss, attributionPrintHtml, type AttributionOptions } from './attribution';
+import { printSheetBaseCss } from './printSheetBase';
 
 export interface PrintDocumentInput {
   /** Poster width in inches — drives `@page size` verbatim. */
@@ -32,6 +33,33 @@ export interface PrintDocumentInput {
   canvasHtml: string;
   /** Paid-plan seam — see export/attribution.ts. */
   attribution?: AttributionOptions;
+}
+
+/**
+ * The print dialog's steps, the only list of them (the MVP design doc
+ * §3.10; the Export tab says one line and points here). What they rest on
+ * (record docs/fixes/30-one-print-path.md §4, scripts/print-dialog-check.mjs):
+ * Chromium's dialog, with the page size set by `@page`, offers no paper size
+ * and no layout, and its "Save as PDF" at default settings (margins
+ * "Default", "Background graphics" unticked) gives one page of the poster's
+ * size, backgrounds kept by `print-color-adjust` (MEASURED). Firefox's
+ * dialog calls its PDF printer "Save to PDF" (its own strings, MEASURED by
+ * print-dialog-check.mjs LABEL; review round 1, R1-F3). Its print code
+ * hides the paper size and uses the page's size with Save to PDF when a
+ * setting is on (INSPECTED), and that setting's default looks on (its
+ * silent print, MEASURED); its dialog itself is UNVERIFIED, as is Safari's
+ * panel. Hence "if it shows". Nothing about "Background graphics": the page
+ * keeps its colours without it.
+ */
+export function printDialogSteps(widthIn: number, heightIn: number): string {
+  return `<strong>In your browser’s print window:</strong>
+  <ol class="print-steps">
+    <li>Destination or printer: <strong>Save as PDF</strong> (in Firefox, Save to PDF; in Safari, the PDF menu at the bottom › Save as PDF).</li>
+    <li>Margins, if it shows them: <strong>None</strong>.</li>
+    <li>Paper size, if it shows one: <strong>${widthIn} × ${heightIn} in</strong>.</li>
+    <li><strong>Save</strong>.</li>
+  </ol>
+  Your browser’s print window opens by itself once the poster’s fonts have loaded. Closed it? Press Print / Save as PDF above.`;
 }
 
 /**
@@ -56,7 +84,16 @@ export function buildPrintDocument(input: PrintDocumentInput): string {
   } = input;
   const naturalW = w * px;
   const naturalH = h * px;
-  const printZoom = 96 / px; // 9.6 at PX=10 → true 96 CSS-px/inch
+  // 9.6 at PX=10 → true 96 CSS-px/inch. Applied as a transform, not CSS
+  // zoom: the sheet is laid out at its natural size, as the editor lays it
+  // out (it too scales the sheet with a transform), and the result is
+  // scaled to the page. Zoomed instead, the print laid the sheet out again
+  // at 9.6 times the size: borders rounded to other widths (a table 0.07 in
+  // taller) and text measured at another size (a line of Charter broken
+  // after a different word), while a transform draws what the editor lays
+  // out (record 30, cause B: 0.000 to 0.002 in on 14 posters, in Chromium,
+  // Firefox and WebKit).
+  const printScale = 96 / px;
 
   return `<!DOCTYPE html>
 <html>
@@ -82,7 +119,15 @@ export function buildPrintDocument(input: PrintDocumentInput): string {
     size: ${w}in ${h}in;
     margin: 0;
   }
-  * { box-sizing: border-box; }
+  /* print-color-adjust: exact keeps the poster's backgrounds without the
+     dialog's "Background graphics" box, which is unticked by default
+     (record 30: a filled heading's colour was lost without it, and kept
+     with it, in Chromium's dialog and Firefox's silent print). */
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
   html, body {
     margin: 0;
     padding: 0;
@@ -96,12 +141,18 @@ export function buildPrintDocument(input: PrintDocumentInput): string {
      Print button and instructions. Close-tab reminder sits at
      the far right so they can dismiss the tab cleanly after
      printing. */
-  .print-toolbar {
-    position: fixed;
+  /* The toolbar and the print dialog's steps under it, held together at
+     the top: the steps used to sit in the page's flow, partly under the
+     fixed toolbar, and a list of four steps was half hidden there. Sticky,
+     in the page's flow: the poster starts below the header however tall
+     its lines wrap (fixed over a stage 220 px down, it covered the top of
+     the poster in a window 700 px wide or less; review round 1, R1-F4). */
+  .print-header {
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
     z-index: 1000;
+  }
+  .print-toolbar {
     display: flex;
     align-items: center;
     gap: 14px;
@@ -141,16 +192,20 @@ export function buildPrintDocument(input: PrintDocumentInput): string {
   }
   .print-toolbar button:hover { filter: brightness(1.1); }
   .print-toolbar-hint {
-    color: #6b7280;
-    font-size: 11px;
+    color: #9ca3af;
+    font-size: 12px;
+    line-height: 1.5;
     padding: 10px 20px;
-    background: rgba(124, 106, 237, 0.06);
+    background: #12121c;
     border-bottom: 1px solid #1f1f2e;
+    font-family: 'DM Sans', system-ui, sans-serif;
   }
   .print-toolbar-hint strong { color: #c8b6ff; }
+  .print-steps { margin: 4px 0 4px; padding-left: 20px; }
+  .print-steps li { margin: 1px 0; }
 
   .print-stage {
-    padding: 120px 30px 60px;
+    padding: 30px 30px 60px;
     min-height: 100vh;
     display: flex;
     justify-content: center;
@@ -178,6 +233,9 @@ export function buildPrintDocument(input: PrintDocumentInput): string {
   }
 ${attributionPrintCss(w, h, input.attribution)}
 
+  /* ── The sheet's base: what the editor's stylesheet gives it ── */
+${printSheetBaseCss()}
+
   /* ── Print view ──────────────────────────────────────────── */
   @media print {
     html, body {
@@ -185,7 +243,7 @@ ${attributionPrintCss(w, h, input.attribution)}
       width: ${w}in !important;
       height: ${h}in !important;
     }
-    .print-toolbar, .print-toolbar-hint { display: none !important; }
+    .print-header, .print-toolbar, .print-toolbar-hint { display: none !important; }
     .print-stage {
       padding: 0 !important;
       display: block !important;
@@ -195,7 +253,8 @@ ${attributionPrintCss(w, h, input.attribution)}
       position: fixed !important;
       left: 0 !important;
       top: 0 !important;
-      zoom: ${printZoom};
+      transform: scale(${printScale});
+      transform-origin: 0 0;
       box-shadow: none !important;
       margin: 0 !important;
     }
@@ -203,6 +262,7 @@ ${attributionPrintCss(w, h, input.attribution)}
 </style>
 </head>
 <body>
+<div class="print-header">
 <div class="print-toolbar">
   <div>
     <div class="print-toolbar-title">${title}</div>
@@ -213,10 +273,8 @@ ${attributionPrintCss(w, h, input.attribution)}
   <button class="secondary" id="postr-close-btn" type="button">Close tab</button>
 </div>
 <div class="print-toolbar-hint">
-  💡 <strong>Before printing:</strong> in the Print dialog, set Destination to
-  <strong>Save as PDF</strong>, Paper size to <strong>${w} × ${h} in</strong>,
-  Margins = <strong>None</strong>, and enable <strong>Background graphics</strong>.
-  The page will auto-open the Print dialog once the fonts finish loading.
+  ${printDialogSteps(w, h)}
+</div>
 </div>
 <div class="print-stage">
   <div id="poster-print-root">${canvasHtml}${attributionPrintHtml(input.attribution)}</div>

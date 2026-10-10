@@ -12,6 +12,7 @@
  * the editor with another window, poster size or document.
  */
 import { MOD, canonical, sleep } from './undoKit.mjs';
+import { switchesOff } from './editorHarness.mjs';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR4AWP4z8DwHwyBAMQgYGBgAAB1SQX7nHNiaQAAAABJRU5ErkJggg==';
 const logo = (id, x, rotation = 0) => ({ id, type: 'logo', x, y: 0, w: 30, h: 30, rotation, content: '', imageSrc: PNG, imageFit: 'contain', tableData: null });
@@ -165,6 +166,9 @@ export const PLACEMENT = [
           await context.close().catch(() => {});
         }
       }
+      // Record 29: no rotate or crop control while ADJUSTMENTS_ENABLED is
+      // off, so the logos' other controls are the ones read.
+      if (switchesOff('ADJUSTMENTS_ENABLED').length) numbers.note = 'the logos draw no rotate or crop control (ADJUSTMENTS_ENABLED off): their move, replace and resize controls are read';
       return { claims: { B4: observed }, numbers };
     },
   },
@@ -184,16 +188,20 @@ export const PLACEMENT = [
         const { context, page: p } = await openWith({ viewport, poster: { w: 48, h: 36 } });
         try {
           if (act === 'hide') await hideSidebar(p);
+          let panel = '';
           if (act === 'guidelines') {
             const t = p.locator('[data-postr-guidelines-toggle]');
             if (await t.count()) { await t.click(); await sleep(450); }
+            // Record 29 hides the guidelines panel (EDITOR_EXTRAS_ENABLED):
+            // the case then runs with the sidebar alone, and says so.
+            else if (switchesOff('EDITOR_EXTRAS_ENABLED').length) panel = '; no guidelines panel (EDITOR_EXTRAS_ENABLED off): the sidebar alone';
           }
           const r = await readFit(p);
           if (r.error) throw new Error(`${label}: ${r.error}`);
           const clipped = r.bar ? r.bar.scrollW > r.bar.w + 1 : false;
           const bad = clipped || !r.inWindow || r.noticeMeets || r.revealOverWorkspace > 0 || r.hits.some((x) => !x);
           if (bad) observed = true;
-          numbers[label] = `bar ${r.bar ? `${r.bar.w} px wide, scroll ${r.bar.scrollW}, ${r.bar.h} px tall` : 'none'}; group ${JSON.stringify(r.group)} in the window ${r.inWindow}; buttons on top ${JSON.stringify(r.hits)}; phone notice ${r.notice}${r.noticeMeets ? ' OVER the group' : ''}${r.reveal ? `; Show sidebar ${JSON.stringify(r.reveal)}, over the workspace ${r.revealOverWorkspace} px²` : ''}; fit zoom ${await zoomNow(p)}`;
+          numbers[label] = `bar ${r.bar ? `${r.bar.w} px wide, scroll ${r.bar.scrollW}, ${r.bar.h} px tall` : 'none'}; group ${JSON.stringify(r.group)} in the window ${r.inWindow}; buttons on top ${JSON.stringify(r.hits)}; phone notice ${r.notice}${r.noticeMeets ? ' OVER the group' : ''}${r.reveal ? `; Show sidebar ${JSON.stringify(r.reveal)}, over the workspace ${r.revealOverWorkspace} px²` : ''}; fit zoom ${await zoomNow(p)}${panel}`;
         } finally {
           await context.close().catch(() => {});
         }

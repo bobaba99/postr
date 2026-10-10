@@ -6,9 +6,12 @@
  * on a new poster and on an older one. Each scenario runs in a fresh
  * signed-in session at /p/new (lib/keepWorkKit.mjs openSignedIn).
  */
+import fs from 'node:fs';
+import path from 'node:path';
+import { WEB } from './editorHarness.mjs';
 import { DEFAULT_DATA } from './guestBackend.mjs';
 import { focusBlockEnd, openTab } from './undoKit.mjs';
-import { downloadPptx, openPrintWindow, pptxParagraphs, rowOf } from './keepWorkKit.mjs';
+import { PRINT_ENTRIES, downloadPptx, openPrintWindow, pptxParagraphs, rowOf } from './keepWorkKit.mjs';
 import {
   EDITOR_HINTS, OLD_GUIDANCE, OLD_INSERT_HEADING, OLD_INSERT_TEXT, OLD_SAMPLE_CELLS, OLD_SAMPLE_NUMBERS, OLD_STRINGS, OLD_TITLE,
   deselect, emptyBlock, inkIn, issueRows, openStoredPoster, plain, promptDrawn, promptStates, storedBlocks,
@@ -111,10 +114,22 @@ const insertBlocks = {
   },
 };
 
-/** A marker typed in the second text block; then Save PDF and PowerPoint read for prompts and template text. */
+/** The print window's text, the ::before content drawn on its placeholders, and how many it carries. */
+const readPrintWindow = (popup) => popup.evaluate(() => ({
+  text: document.body.innerText,
+  before: [...document.querySelectorAll('[data-placeholder]')].map((el) => getComputedStyle(el, '::before').content).filter((c) => c && c !== 'none' && c !== 'normal'),
+  placeholders: document.querySelectorAll('[data-placeholder]').length,
+}));
+
+/**
+ * A marker typed in the second text block; then the print window from every
+ * way to print (record 30: Export › "⎙ Save PDF", the top bar's "Save PDF",
+ * Preview's "Print / Save PDF", ⌘P / Ctrl+P; an entry this tree lacks is
+ * reported missing) and PowerPoint read for prompts and template text.
+ */
 const printAndPptx = {
   id: 'T7-print-pptx',
-  how: `"${MARK}" typed in the second text block; Save PDF's print window and Export › PowerPoint read for template text and prompts`,
+  how: `"${MARK}" typed in the second text block; the print window from each way to print (${PRINT_ENTRIES.join(', ')}) and Export › PowerPoint read for template text and prompts`,
   async run(h, s) {
     const { page } = s;
     await deselect(page);
@@ -126,26 +141,41 @@ const printAndPptx = {
     await page.waitForTimeout(1500);
     await deselect(page);
     const prompts = [...new Set([...DEFAULT_PROMPTS, ...states.map((x) => x.placeholder).filter(Boolean)])];
-    const popup = await openPrintWindow(page, MARK);
-    const print = await popup.evaluate(() => ({
-      text: document.body.innerText,
-      before: [...document.querySelectorAll('[data-placeholder]')].map((el) => getComputedStyle(el, '::before').content).filter((c) => c && c !== 'none' && c !== 'normal'),
-      placeholders: document.querySelectorAll('[data-placeholder]').length,
-    }));
-    await popup.close().catch(() => {});
+    const has = (text, list) => list.filter((t) => text.includes(t));
+    const prints = {};
+    for (const entry of PRINT_ENTRIES) {
+      await deselect(page);
+      const popup = await openPrintWindow(page, MARK, { entry });
+      if (!popup) { prints[entry] = null; continue; }
+      prints[entry] = await readPrintWindow(popup);
+      await popup.close().catch(() => {});
+    }
+    const read = Object.entries(prints).filter(([, p]) => p);
+    const print = prints.export;
+    if (!print) throw new Error('Export › ⎙ Save PDF opened no print window');
+    // A tree with record 30's one print path has the top bar's button and
+    // the key: there an entry that opens nothing is an instrument error,
+    // not one window fewer read.
+    const onePrintPath = fs.existsSync(path.join(WEB, 'src/poster/usePrintShortcut.ts'));
+    const silent = onePrintPath ? PRINT_ENTRIES.filter((e) => !prints[e]) : [];
+    if (silent.length) throw new Error(`no print window from ${silent.join(', ')} on a tree with the one print path`);
     const paras = pptxParagraphs(await downloadPptx(page));
     const pptText = paras.join('\n');
-    const has = (text, list) => list.filter((t) => text.includes(t));
     return {
       claims: {
-        T7a: has(print.text, OLD_STRINGS).length > 0,
-        T7b: has(print.text, prompts).length > 0 || print.before.length > 0,
+        T7a: read.some(([, p]) => has(p.text, OLD_STRINGS).length > 0),
+        T7b: read.some(([, p]) => has(p.text, prompts).length > 0 || p.before.length > 0),
         T8a: has(pptText, OLD_STRINGS).length > 0,
         T8b: has(pptText, prompts).length > 0,
       },
       numbers: {
         printOld: has(print.text, OLD_STRINGS).length, printPrompts: has(print.text, prompts).length,
         printPseudo: print.before.length, printPlaceholderAttrs: print.placeholders,
+        // Per entry: template strings, prompts as text, prompts drawn as
+        // ::before, [data-placeholder] elements; null: no such entry.
+        printEntries: JSON.stringify(Object.fromEntries(Object.entries(prints).map(([e, p]) => [e, p && {
+          old: has(p.text, OLD_STRINGS).length, prompts: has(p.text, prompts).length, pseudo: p.before.length, attrs: p.placeholders, mark: p.text.includes(MARK),
+        }]))),
         pptOld: has(pptText, OLD_STRINGS).length, pptPrompts: has(pptText, prompts).length,
         printHasMark: print.text.includes(MARK), pptHasMark: pptText.includes(MARK),
         // Information (R1-02, older than record 29): the editor's hints in

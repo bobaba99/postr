@@ -31,8 +31,13 @@
  * Rendering as an overlay from the editor's single return fixes all
  * four at once: no early return (so no TDZ and no hook-count change),
  * and the canvas is never unmounted (so images stay resolved and every
- * subscription keeps its live node). It is also why `onPrint` needs no
- * `flushSync` — `#poster-canvas` is still mounted underneath.
+ * subscription keeps its live node). `onPrint` is the editor's one print
+ * function (record 30): it leaves Preview, so the sheet underneath is shown
+ * and measured, then copies it.
+ *
+ * Hidden, the sheet measures 0: the editor keeps the title's shift it
+ * measured before Preview (OF-07; record 30), so the blocks drawn here sit
+ * where the editor draws them.
  *
  * Keep it that way. If this ever goes back to replacing the tree, all
  * four defects come back together.

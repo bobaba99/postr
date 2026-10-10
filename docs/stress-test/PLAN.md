@@ -938,22 +938,36 @@ evidence label of each. The three switches (`IMPORT_ENABLED`,
 `ADJUSTMENTS_ENABLED`, `EDITOR_EXTRAS_ENABLED`) hide; what turning each back
 on needs is in its header comment in `config/features.ts`.
 
-- **Harnesses that drive hidden controls:** `keep-work-check.mjs` skips E5,
-  D1 and K11 while their switch is off (MEASURED: they errored before the
-  skip); `fit-check.mjs` (the guidelines panel and the tour's guidelines
-  step), `control-size-check.mjs` and its libs (rotate, crop, table strips),
-  `undo-history-check.mjs` and its libs (crop edges, the column-border drag,
-  the caption spacing and line-spacing sliders, the Content box),
-  `sidebar-history-check.mjs` (style controls) and `figure-script-check.mjs`
-  name controls that are hidden now (INSPECTED, grep): give their scenarios a
-  `needs` switch, as keep-work-check's, before they are next run.
+- **Harnesses that drive hidden controls: done in the merge with main**
+  (record 29 §11): `keep-work-check`, `undo-history-check`,
+  `control-size-check`, `fit-check`, `sidebar-history-check`,
+  `figure-script-check` and `print-path-check` skip what a switch hides
+  ("skipped (switch off)", `lib/editorHarness.mjs switchesOff`) and exit 0
+  on the merged tree but `figure-script-check` (K4, below). Running them
+  found two of record 29's defects, fixed there: Auto-Arrange measured
+  outside `#poster-canvas`, so empty blocks were placed without their
+  prompt; and the image row without crop broke record 19's overview
+  threshold (now an empty slot keeps its width).
+- **K4: a first visitor's untouched poster gets new block ids on reload**
+  (`figure-script-check` "image check, image again"; record 29 §11): the
+  template is hydrated in memory (`pages/Editor.tsx hydrateIfEmpty`) and
+  stored only on the first edit, so the plot checker's kept result for the
+  image reads as another figure's after a reload (MEASURED: ids differ, no
+  image in the stored row). Not from records 29 or 30 (MEASURED with their
+  parts swapped out); on main `21e6671` UNVERIFIED. Fix later: store the
+  hydrated poster, or key the kept result on something a reload keeps.
 - **The closed poster's "Download a copy"** still saves a `.postr` file,
   which nothing in the app can import while `IMPORT_ENABLED` is off (the
   page no longer says it can be imported). Owner: keep it as the way out,
   or offer the PDF instead.
 - **The handle row keeps room for the hidden crop button** on images and
   logos, so far out of zoom it is cut to its move button a little sooner
-  than it needs (INSPECTED, `selectionLayout.ts handleRowWidth`).
+  than it needs (INSPECTED, `selectionLayout.ts handleRowWidth`). Since the
+  merge with main (record 29 §11) the room is drawn too, an empty inert
+  slot at the row's end (`data-postr-row-slot`): without it the centred row
+  moved 14 px and at 0.35 a 3 in image's Replace sat over the blocks beside
+  it (control-size-check Fd 2 of 78, Fh 1 of 42; MEASURED). The slot leaves
+  the visible buttons 14 px left of the block's centre.
 - **At 24 × 36 in the fresh 3-column table meets the heading below it**
   (MEASURED, `simplify-check.mjs` T12, three engines): the same with the
   old sample table (MEASURED, its control mutant), so older than record 29.
@@ -980,9 +994,88 @@ on needs is in its header comment in `config/features.ts`.
   0 against the tree's own package, MEASURED). With `node_modules` resolving
   `@postr/shared` to the tree's own package, `npm run build` exits 0
   (MEASURED in a scratch copy, record 29 §8; review round 1, R1-05): an artefact of the worktree.
-- **Not in record 29 (other items):** A−/A+ and the top bar's Save PDF, the
-  slash menu, paste and keys (bounded-designs.md §5.2 items 7, 10, 11, 12),
-  and `.enw` in the references file picker (item 14).
+- **Not in record 29 (other items):** A−/A+, the slash menu, paste and keys
+  (bounded-designs.md §5.2 items 7, 10, 11, 12), and `.enw` in the
+  references file picker (item 14). The top bar's Save PDF is record 30
+  (below).
+### Queued by record 30 (one print path, 2026-10-10)
+
+Record `docs/fixes/30-one-print-path.md` section 10 has the detail and the
+evidence label of each.
+
+- **Owner check: Firefox's and Safari's print dialogs.** Not driven by the
+  instruments. Firefox printing silently to its PDF printer at its default
+  settings makes a Letter page (11 × 8.5 in, the poster's orientation),
+  whatever the poster's size (MEASURED, `print-dialog-check.mjs`). Its
+  dialog calls the PDF printer "Save to PDF" (its strings, MEASURED; the
+  print window's step 1 says so since review round 1) and lists A5 to A0,
+  B5, B4, JIS-B5, JIS-B4, US Letter, US Legal and Tabloid; its print code
+  hides the paper size and uses the page's size with Save to PDF when
+  `print.save_as_pdf.use_page_rule_size_as_paper_size.enabled` is on
+  (INSPECTED), and Firefox 148's silent print follows that setting's
+  default as it follows true (MEASURED): so its dialog probably makes the
+  poster's size, UNVERIFIED there; Safari's page size UNVERIFIED. **For the
+  owner:** what step 3 ("Paper size, if it shows one") should say when a
+  dialog lists only other sizes. A PDF made without the dialog is out of
+  scope (§3.10).
+- **⌘P under Chrome's and Safari's popup blockers** (UNVERIFIED): Firefox's
+  is measured since review round 1 (its blocker on, ⌘P's window opens, no
+  alert; `print-path-check.mjs` blocker); Playwright's Chromium and WebKit
+  open even a window the page opens by itself, so theirs cannot be read
+  there. Keydown is a user activation in the HTML standard, so the window
+  should pass; a blocked one shows the alert.
+- **WebKit drops an empty placeholder's dashed border in print** (R1-X1,
+  record 30 §9; on main too). React's `all: 'unset'` then `border: …`
+  is serialised by WebKit with the logical border unset after the physical
+  border, so the copy made from `outerHTML` loses the border: an empty
+  figure's hint broke into 3 lines in print against 4 in the editor after a
+  size change (MEASURED), the empty logo the same pattern (INSPECTED).
+  Goes with the placeholders below (they should not print), or the two
+  buttons stop using `all: 'unset'`. `print-path-check.mjs` in WebKit exits
+  1 on it (key+resized) until then.
+- **⌘P for read-only viewers** (record 30 §10): the shortcut is installed
+  for viewers too (no top bar for them). Nobody reaches the editor
+  read-only today (fix 23); the owner decides when sharing returns.
+- **Placeholders print:** an empty references block prints "Add references
+  in Refs tab →" (in the editor's own font, DM Sans, which the print window
+  does not load) and an empty figure "+ Upload figure / click to browse ·
+  drag to move" (MEASURED in the print document, 7 of 14 posters). The
+  starting-text work (blocker 3) and Issues own them.
+- **The Staples help keeps its own dialog sentence** (Background graphics,
+  layout): hidden by record 29 (`EDITOR_EXTRAS_ENABLED`); bring it in line
+  if it comes back.
+- **A rule added to index.css that matches the sheet** must be restated in
+  `export/printSheetBase.ts`; `print-path-check.mjs` BASE fails until it is
+  (on the dev server and, since review round 2, on the build; since round 3
+  the build run exits 0 when nothing is lost).
+- **A control added inside a block's content** (a hover button, a strip, a
+  grip) must carry `data-postr-editor-ui`, or the print copy and the
+  dashboard thumbnail carry it (review round 2, R2-F1: the table's hover
+  "Add column" bar printed as a 0.3 in accent bar from ⌘P).
+  `print-path-check.mjs` INFO ui-copied lists what reaches the printed
+  sheet: today only an empty figure's placeholder (above).
+- **Owner check: ⌘P inside a real input method's composition** (review
+  round 2, R2-F3): the key does nothing there and the browser's own print
+  is kept away, measured with DevTools' simulated composition in Chromium;
+  whether a macOS input method hands ⌘P to the page while text is marked
+  is UNVERIFIED (manual flow §35).
+- **Chromium's print window script is not exercised by the harness**
+  (review round 2, R2-F4): under Playwright's routing the popup's font
+  stylesheet request never completes, so its auto-print, its wait for the
+  fonts and its buttons run in Firefox and WebKit only. The reviewer ran
+  them in Chromium with local servers and host-resolver rules (its probe
+  r2fonts3: print waited for the font, the PDF embedded it); fold that in
+  if the print window's script changes.
+- **Firefox's and WebKit's rule weights on a high-density screen**
+  (review round 2, R2-F6): the PDF draws the editor's whole-unit rules
+  (APA rules all 0.1 in, as the editor draws them in Chromium); Firefox and
+  WebKit draw borders to device pixels on a Retina screen, so their editors
+  may show thinner rules than the print: UNVERIFIED (their PDFs are not
+  read here).
+- **A chart printed within about 30 ms of a size change** is copied as
+  drawn for the old size (review round 2, R2-F7; faster than a person
+  acts): a scripted scenario that changes a chart poster's size and
+  prints at once must wait for the redraw.
 
 ## LaTeX export: before it is switched back on
 
@@ -1210,3 +1303,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 26 | `feat/french-public-pages` | implemented, review round 1 done and corrected (one round: a simple feature; 12 findings: 7 corrected, 1 left to the owner, 4 informational) — `docs/fixes/26-french-public-pages.md`; the owner's decision of 2026-10-06 (Quebec, Bill 96): every public page in French at its path + `/fr` (`/fr` for the landing page, `/auth/fr?plan=term`), its language read from the URL, a « Français » / "English" link on every page, the French heads with hreflang and the French pages in the sitemap, a French Stripe Checkout from `/auth/fr`; the editor stays English; queued above: "Queued by fix 26" |
 | 29 | `feat/mvp-simplify` | implemented; its one review round (a simple feature: the browser, through the user's entry points, on `simplify-frozen-1`) answered: 7 findings (2 LOW, 5 INFO); Preview no longer draws the grey prompts (R1-01: the rule is scoped to the canvas, T13), two editor sentences corrected (R1-06), Save PDF printing the editor's older hints of empty authors, image and references blocks queued above (R1-02), the rest recorded — `docs/fixes/29-mvp-simplify.md`; the owner's decisions D3 (hide import and the `.postr` backup) and D4 (the whole hide list) of 2026-10-07, charts kept (D1): three switches in `config/features.ts` (`IMPORT_ENABLED`, `ADJUSTMENTS_ENABLED`, `EDITOR_EXTRAS_ENABLED`) hide 44 controls counted where a user meets them, the tour's import and guidelines steps and the profile's two rows, with stored adjustments still drawn; new posters and new blocks start empty with grey prompts that never print or export (bounded-designs.md §5.2 items 1 and 4); Issues lists empty blocks, template text and the sample table, older posters included; the public copy (EN and FR) names no hidden control (copy inventory); queued above: "Queued by record 29" |
 | 28 | `feat/auto-arrange` | implemented, review round 1 done and corrected (a layout aid: one round, the browser through the user's entry points; 10 findings: B-R1 HIGH, B-R2 and B-R3 MEDIUM and B-R7 LOW corrected, the other LOW and INFO findings queued above; the refinement departs from the prototype and is for the lead and the owner to confirm) — `docs/fixes/28-auto-arrange.md`; the owner's approval of the prototype's function (2026-10-07, `docs/fixes/28-auto-arrange-lab.html`): ONE reading order (bands of wide blocks, then columns, then top to bottom) for heading, figure and table numbers in the editor, the preview and the exports, and Auto-Arrange choosing the cut points of that order into the poster's own columns and their widths for the lowest F = 1000·O + U + 8·moved + 2·Σ\|w − w̄\|, with every block measured on the sheet at its new width; no font change, one undo step, the area past the bottom margin in Issues; the preview's missing figure and table numbers fixed in passing; queued above: "Queued by record 28" |
+| 30 (item 5 + OF-08) | `fix/one-print-path` | implemented; reproduced from every entry in Chromium, Firefox and WebKit (Preview's print ran the title 0.32 to 0.33 in into the authors at 48 × 36 and 1.93 to 1.94 in at 36 × 48, a table printed up to 3.2 in shorter, a line broken differently; no top-bar button, no ⌘P), fixed, 0 of 69 print documents off by more than 0.05 in or broken differently in each engine (worst 0.001 in), 30 of 30 mutants killed; review round 1 (code review) answered: 7 findings, none above LOW; the print window's header no longer covers the poster in a narrow window and its first step names Firefox's "Save to PDF"; tests for ⌘P after a size change, while a dialog fades out and past a handler that stops keys; the popup-blocker claim corrected (Firefox's blocker measured: ⌘P's window opens); now 70 documents per engine, every claim 0 in Chromium and Firefox, WebKit one placeholder line (R1-X1, below); 35 of 35 mutants killed; review round 2 (a new angle: the build, the PDF pipeline, every size, editor states) answered: 7 findings, one MEDIUM (⌘P with the pointer resting on a selected table printed its hover "Add column" bar, a 0.3 in accent bar: the table's own controls now tagged and dropped from the copy and the thumbnail), the free PDF's credit mark back to its size (it printed 0.2 or 0.3 in under the sheet's scale), ⌘P's default prevented inside an input method's composition, the harness runs on the build; now 73 documents per engine, every claim 0 in Chromium and Firefox on the dev server, WebKit the same placeholder line; on the build the same in the three engines, BASE aside (two rules the CSS minifier rewrote, listed as known); 44 of 44 mutants killed; review round 3 (a re-check of the answers) answered: 2 LOW findings, both in the harness on the build, none in the product (the thirteen-size credit sweep measured the source there: it now prints from the build's own Save PDF; the two BASE rules still set the exit code: they now compare as equivalent, so the build run exits 0), each red before and green after, falsified by editing the build; on the build every claim 0 in Chromium and Firefox, WebKit the same placeholder line; 44 of 44 mutants killed and 2 new blind-spot mutants killed in the browser — `docs/fixes/30-one-print-path.md` (the MVP design doc §3.10: one print function behind Save PDF, the top bar's Save PDF, Preview's Print and ⌘P / Ctrl+P; the selection cleared first; `print-color-adjust: exact`; the print window holds the dialog's steps; the sheet laid out as the editor lays it out: its base styles restated, scaled by a transform instead of CSS zoom) |

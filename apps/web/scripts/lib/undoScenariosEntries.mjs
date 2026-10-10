@@ -12,6 +12,7 @@ import {
   KEY, MOD, activeIs, blockOf, canonical, caretIn, clickAway, contentBoxText, focusBlockEnd, focusContentBox, openTab,
   press, probeInstall, probeTake, read, selectFrame, selectLastWord, tabToward, typeWord,
 } from './undoKit.mjs';
+import { switchesOff } from './editorHarness.mjs';
 
 const has = (s, id, word) => (s.blocks[id].dom ?? '').includes(word);
 const agree = (s, id) => s.blocks[id].dom === s.blocks[id].store;
@@ -22,6 +23,8 @@ const engine = (page) => page.context().browser()?.browserType().name() ?? 'chro
 
 const GONE = ['Smaller', 'Larger', '⟸', '≡', '⟹'];
 const KEPT = ['B', 'I', 'U', 'S', '•', '1.', 'Highlight · Yellow', 'Text · Red', 'Clear formatting'];
+/** The selection toolbar's buttons ADJUSTMENTS_ENABLED hides (record 29). */
+const KEPT_ADJUSTMENTS = ['S', 'Highlight · Yellow', 'Text · Red'];
 
 /** The titles of a toolbar's buttons. */
 const toolbarTitles = (page, selector) => page.evaluate((sel) => {
@@ -88,22 +91,30 @@ export const ENTRIES = [
   },
   {
     id: 'TB-toolbar-no-size-or-align', claims: ['TB'],
-    how: 'select the last word of block 1: the selection toolbar\'s buttons; then the docked copy in Edit block',
+    how: 'select the last word of block 1: the selection toolbar\'s buttons; then the docked copy in Edit block (not while ADJUSTMENTS_ENABLED hides the Content box that holds it)',
     async run(page, ids) {
       const [a] = ids;
+      // Record 29: with ADJUSTMENTS_ENABLED off the Content box (and the
+      // docked toolbar in it) and the toolbar's S, highlight and colour are
+      // hidden; the claim is read on the selection toolbar that stays.
+      const adjustmentsOff = switchesOff('ADJUSTMENTS_ENABLED').length > 0;
+      const kept = adjustmentsOff ? KEPT.filter((k) => !KEPT_ADJUSTMENTS.includes(k)) : KEPT;
       await selectLastWord(page, a);
       await page.locator('div[style*="z-index: 9700"] button[title="B"]').first().waitFor({ state: 'visible', timeout: 3000 });
       const floating = await toolbarTitles(page, 'div[style*="z-index: 9700"]');
-      await openTab(page, 'edit block');
-      const docked = await page.evaluate(() => {
-        const label = [...document.querySelectorAll('label')].find((l) => l.textContent === 'Content');
-        return label ? [...label.parentElement.querySelectorAll('button')].map((b) => b.getAttribute('title')) : null;
-      });
+      let docked = [];
+      if (!adjustmentsOff) {
+        await openTab(page, 'edit block');
+        docked = await page.evaluate(() => {
+          const label = [...document.querySelectorAll('label')].find((l) => l.textContent === 'Content');
+          return label ? [...label.parentElement.querySelectorAll('button')].map((b) => b.getAttribute('title')) : null;
+        });
+      }
       if (!floating || !docked) throw new Error('a toolbar was not found');
-      if (!KEPT.every((k) => floating.includes(k) && docked.includes(k))) throw new Error(`a kept button is missing: ${floating.join(' ')}`);
+      if (!kept.every((k) => floating.includes(k) && (adjustmentsOff || docked.includes(k)))) throw new Error(`a kept button is missing: ${floating.join(' ')}`);
       return {
         claims: { TB: GONE.some((g) => floating.includes(g) || docked.includes(g)) },
-        numbers: { floating: floating.join(' '), docked: docked.join(' ') },
+        numbers: { floating: floating.join(' '), docked: adjustmentsOff ? 'hidden (ADJUSTMENTS_ENABLED off: no Content box)' : docked.join(' ') },
       };
     },
   },
@@ -314,7 +325,7 @@ export const ENTRIES = [
     },
   },
   {
-    id: 'E1-content-box', claims: ['E1'],
+    id: 'E1-content-box', claims: ['E1'], needs: 'ADJUSTMENTS_ENABLED', // the Content box is hidden (record 29)
     how: 'click block 1 (Edit block shows its Content box), click the box, type " ZQSB", ⌘Z in the box, then ⌘⇧Z',
     async run(page, ids) {
       const [a] = ids;
@@ -333,7 +344,7 @@ export const ENTRIES = [
     },
   },
   {
-    id: 'E1x-canvas-then-content-box', claims: ['E1x'],
+    id: 'E1x-canvas-then-content-box', claims: ['E1x'], needs: 'ADJUSTMENTS_ENABLED', // the Content box is hidden (record 29)
     how: 'type " ZQCV" on the canvas in block 1, then " ZQSB" in its Content box, ⌘Z four times in the box',
     async run(page, ids) {
       const [a] = ids;
@@ -350,7 +361,7 @@ export const ENTRIES = [
     },
   },
   {
-    id: 'E2-caption-slider', claims: ['E2'],
+    id: 'E2-caption-slider', claims: ['E2'], needs: 'ADJUSTMENTS_ENABLED', // the caption spacing slider is hidden (record 29)
     how: 'type " ZQSL" in block 1, click away; select the table, Edit block, focus Caption spacing, ArrowRight × 3, ⌘Z on the slider',
     async run(page, ids) {
       const [a] = ids;

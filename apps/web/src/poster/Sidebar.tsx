@@ -1201,39 +1201,11 @@ function ExportTab(props: {
       <button onClick={props.onPrint} style={buttonStyle(true)}>
         ⎙ Save PDF
       </button>
-      <div
-        style={{
-          fontSize: 12,
-          color: '#6b7280',
-          lineHeight: 1.6,
-          marginTop: 8,
-          background: '#1a1a26',
-          padding: 10,
-          borderRadius: 6,
-          border: '1px solid #2a2a3a',
-        }}
-      >
-        <strong style={{ color: '#9ca3af' }}>🖨️ Browser Print dialog steps:</strong>
-        <ol style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-          <li>Click "Save PDF" to open the print dialog</li>
-          <li>
-            Destination ={' '}
-            <strong style={{ color: '#c8cad0' }}>"Save as PDF"</strong>
-          </li>
-          <li>
-            Layout ={' '}
-            <strong style={{ color: '#c8cad0' }}>Landscape</strong>{' '}
-            (for landscape posters)
-          </li>
-          <li>
-            Margins = <strong style={{ color: '#c8cad0' }}>None</strong>
-          </li>
-          <li>
-            Enable{' '}
-            <strong style={{ color: '#c8cad0' }}>"Background graphics"</strong>
-          </li>
-          <li>Click Save</li>
-        </ol>
+      {/* One line: the print window holds the only list of the print
+          dialog's steps (the MVP design doc §3.10; record 30). The two
+          lists used to disagree. */}
+      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+        Your browser’s print window opens. Choose Save as PDF.
       </div>
 
       <div style={labelStyle}>✎ Editable formats</div>

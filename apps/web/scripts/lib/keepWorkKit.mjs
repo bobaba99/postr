@@ -179,16 +179,46 @@ export const saveKeys = (page) => page.evaluate(() => window.__zqSaveKeys.slice(
 /** The page clock (ms), for `since` arguments read in the page. */
 export const pageNow = (page) => page.evaluate(() => Date.now());
 
+/** The ways to print, by name (record 30: one print function behind all four). */
+export const PRINT_ENTRIES = ['export', 'topbar', 'preview', 'key'];
+
 /**
- * Export › Save PDF: the print window the editor opens. Returns the popup
- * once its sheet holds `marker`.
+ * The print window the editor opens, by default from Export › "⎙ Save PDF".
+ * Returns the popup once its sheet holds `marker`. `entry` (PRINT_ENTRIES):
+ * 'topbar' the top bar's "Save PDF", 'preview' Export › Preview poster ›
+ * "Print / Save PDF", 'key' ⌘P / Ctrl+P (as the page's system names it).
+ * Returns null when that entry has no control on this tree (the top bar's
+ * button and the key came with record 30) or opened no window.
+ *
+ * The Export tab's button is named exactly: since record 30 the top bar's
+ * "Save PDF" also matches /Save PDF/ and comes first in the page, so the
+ * first match was the top bar's.
  */
-export async function openPrintWindow(page, marker) {
-  await openTab(page, 'export');
-  const [popup] = await Promise.all([
-    page.waitForEvent('popup', { timeout: 15000 }),
-    page.getByRole('button', { name: /Save PDF/ }).first().click(),
-  ]);
+export async function openPrintWindow(page, marker, { entry = 'export' } = {}) {
+  const popupP = page.waitForEvent('popup', { timeout: 15000 });
+  // Handled here so a step below that throws first leaves no unhandled
+  // rejection behind (the await below still sees the timeout).
+  popupP.catch(() => {});
+  if (entry === 'export') {
+    await openTab(page, 'export');
+    await page.getByRole('button', { name: '⎙ Save PDF', exact: true }).click();
+  } else if (entry === 'topbar') {
+    const btn = page.locator('[data-postr-topbar-print]');
+    if (!(await btn.count())) return null;
+    await btn.click();
+  } else if (entry === 'preview') {
+    await openTab(page, 'export');
+    await page.getByRole('button', { name: /Preview poster/ }).click();
+    await page.waitForSelector('[data-postr-preview]');
+    await page.getByRole('button', { name: 'Print / Save PDF' }).click();
+  } else if (entry === 'key') {
+    const mac = await page.evaluate(() => /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent));
+    await page.keyboard.press(mac ? 'Meta+KeyP' : 'Control+KeyP');
+  } else {
+    throw new Error(`unknown print entry ${entry}`);
+  }
+  const popup = entry === 'key' ? await popupP.catch(() => null) : await popupP;
+  if (!popup) return null;
   await popup.waitForFunction((m) => (document.body?.textContent ?? '').includes(m), marker, { timeout: 15000 });
   await popup.evaluate(() => document.fonts.ready).catch(() => {});
   await popup.waitForTimeout(300);

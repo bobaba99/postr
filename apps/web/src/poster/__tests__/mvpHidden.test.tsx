@@ -196,6 +196,39 @@ describe('the adjustments are hidden (ADJUSTMENTS_ENABLED, D4)', () => {
     expect(doc().blocks.find((b) => b.id === 'im1')!.captionPosition).toBe('top');
   });
 
+  it('an image selected: the handle row keeps the hidden crop button’s slot, so Replace and Delete sit where record 19 measured them', async () => {
+    // The row is centred on the block. Without crop's 24 px it was 28 px
+    // narrower and every button moved 14 px: zoomed out to 0.35 (the
+    // overview threshold record 19 measured with crop in the row) a 3 in
+    // image's Replace sat over the heading and the text beside it, and a
+    // click meant for them opened the file picker (control-size-check Fd 2
+    // of 78, Fh 1 of 42; MEASURED on the merge of main, record 30, into
+    // record 29; 0 with crop back). An inert slot at the row's end keeps the
+    // row's width, Replace where it was and Delete where crop was.
+    await openEditor();
+    await select('im1');
+    const replace = blockEl('im1').querySelector('button[title="Replace image"]')!;
+    const row = replace.parentElement!;
+    const del = row.querySelector('button[title="Delete block"]')!;
+    const slot = del.nextElementSibling as HTMLElement | null;
+    expect(slot, 'a slot after Delete').not.toBeNull();
+    expect(slot!.hasAttribute('data-postr-row-slot')).toBe(true);
+    expect(slot!.getAttribute('aria-hidden')).toBe('true');
+    expect(slot!.children.length, 'empty').toBe(0);
+    expect(slot!.style.visibility).toBe('hidden');
+    expect(slot!.style.pointerEvents).toBe('none');
+    expect(slot!.style.width, 'one button wide').toBe(del instanceof HTMLElement ? del.style.width : 'n/a');
+    expect(row.querySelectorAll('[data-postr-row-slot]').length).toBe(1);
+  });
+
+  it('a text block selected: its handle row has no slot (it never had crop)', async () => {
+    await openEditor();
+    const textId = doc().blocks.find((b) => b.type === 'text')!.id;
+    await select(textId);
+    expect(blockEl(textId).querySelector('button[title="Delete block"]'), 'precondition: the handle row is drawn').not.toBeNull();
+    expect(blockEl(textId).querySelectorAll('[data-postr-row-slot]').length).toBe(0);
+  });
+
   it('an image selected, the Figure tab: no Scan image, and Check a figure stays', async () => {
     await openEditor();
     await select('im1');

@@ -109,6 +109,8 @@ describe('the switches turned on bring the hidden controls back', () => {
     await select('im1');
     const frame = q('#poster-canvas [data-block-id="im1"]');
     expect(frame.querySelector('button[title="Crop image"]')).not.toBeNull();
+    // With crop in the row there is no slot kept for it (mvpHidden's test).
+    expect(frame.querySelectorAll('[data-postr-row-slot]').length).toBe(0);
     expect(frame.querySelectorAll('button[title^="Drag to rotate"]').length).toBe(1);
     await tab(/^edit block$/);
     expect(has(/Caption position/) && has(/Stretch to fit block/)).toBe(true);

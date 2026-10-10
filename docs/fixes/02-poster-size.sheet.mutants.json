@@ -54,8 +54,8 @@
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "arrangeSheet(canvas, latest, cW, cH, titleOverflowPx)",
-          "arrangeSheet(canvas, latest, cW, 360, titleOverflowPx)"
+          "arrangeSheet(sheet, latest, cW, cH, titleOverflowPx)",
+          "arrangeSheet(sheet, latest, cW, 360, titleOverflowPx)"
         ]
       ]
     },

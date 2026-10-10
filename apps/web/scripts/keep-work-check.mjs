@@ -177,7 +177,10 @@
  *   - A scenario that needs a control a feature switch hides is skipped
  *     while the tree has that switch off (record 29: E5 the Content box,
  *     ADJUSTMENTS_ENABLED; D1 and K11 the sidebar's Duplicate,
- *     EDITOR_EXTRAS_ENABLED); `sourceFlag` reads the file on disk.
+ *     EDITOR_EXTRAS_ENABLED); `sourceFlag` reads the file on disk. Printed
+ *     as "skipped (switch off)" and counted on the summary line of that
+ *     name (lib/editorHarness.mjs switchesOff, since the merge with record
+ *     30).
  *   - Shift+Enter is pressed at a line's end only, and an input method's
  *     Enter is not driven (fix 12's undo-history-check drives composition).
  *   - H5's paste is a paste event carrying plain text (the system clipboard
@@ -197,7 +200,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { log, sourceFlag, startHarness } from './lib/editorHarness.mjs';
+import { SWITCH_OFF, log, startHarness, switchOffReason, switchesOff } from './lib/editorHarness.mjs';
 import { openSignedIn, versionPosts } from './lib/keepWorkKit.mjs';
 import { ENTER } from './lib/keepWorkEnter.mjs';
 import { SAVE } from './lib/keepWorkSave.mjs';
@@ -230,8 +233,9 @@ try {
     if (ONLY && !ONLY.some((o) => sc.id === o || sc.id.startsWith(o))) continue;
     // A scenario that drives a control a feature switch hides (`needs`,
     // record 29) is skipped while the tree under test has the switch off.
-    if (sc.needs && sourceFlag(sc.needs) === false) {
-      results.push({ id: sc.id, how: sc.how, skipped: `${sc.needs} is off in this tree (config/features.ts)` });
+    const off = switchesOff(sc.needs);
+    if (off.length) {
+      results.push({ id: sc.id, how: sc.how, skipped: switchOffReason(off), switchOff: true });
       continue;
     }
     const t0 = Date.now();
@@ -271,6 +275,8 @@ for (const r of results) {
   }
   if (r.pageErrors?.length) log(`           page errors: ${r.pageErrors.join(' | ').slice(0, 300)}`);
 }
+const switchSkips = results.filter((r) => r.switchOff).map((r) => r.id);
+log(`${SWITCH_OFF}: ${switchSkips.length}${switchSkips.length ? ` (${switchSkips.join(', ')})` : ''}`);
 if (JSON_OUT) fs.writeFileSync(path.resolve(JSON_OUT), JSON.stringify({ engine: h.engine, serve: h.serve, git: h.git, mutant: h.mutant, host: process.platform, results }, null, 2));
 log(`exit ${exit} (0 clean · 1 a claim observed · 2 instrument)`);
 process.exit(exit);

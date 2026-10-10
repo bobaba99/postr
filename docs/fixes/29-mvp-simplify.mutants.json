@@ -933,6 +933,24 @@
         ]
       ]
     },
+    "print-draws-prompts": {
+      "undoes": "4 — the prompts never print: the print window's stylesheet has no prompt rule (the merge with record 30, whose one print function serves Export › Save PDF, the top bar's Save PDF, Preview's Print and ⌘P; its sheet base restates the editor's rules that match the sheet, so a prompt rule restated there would print)",
+      "expect": "survive",
+      "why": "jsdom applies no stylesheet and these tests do not read the print document; simplify-check T7 reads the print window from all four entries (claim T7b: a prompt drawn as ::before)",
+      "browser": {
+        "harness": "scripts/simplify-check.mjs",
+        "scenarios": [
+          "T7-print-pptx"
+        ]
+      },
+      "edits": [
+        [
+          "src/export/printSheetBase.ts",
+          "  ['[data-block-id] li', 'list-style: revert; display: list-item;'],\n",
+          "  ['[data-block-id] li', 'list-style: revert; display: list-item;'],\n  ['[data-placeholder][data-empty]:not(:focus)::before', 'content: attr(data-placeholder); color: inherit; opacity: 0.4; pointer-events: none;'],\n"
+        ]
+      ]
+    },
     "scan-negated-guard": {
       "undoes": "1 — copyScan guards the false branch of a !FLAG condition",
       "edits": [
@@ -960,6 +978,16 @@
           "src/test/copyScan.ts",
           "      component = fn;\n",
           ""
+        ]
+      ]
+    },
+    "row-slot-dropped": {
+      "undoes": "1 ADJUSTMENTS — the hidden crop button's slot stays in an image's handle row, empty and inert (the merge of main, record 30: without it the centred row moved 14 px and broke record 19's overview threshold, control-size-check Fd and Fh)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "              <span aria-hidden=\"true\" data-postr-row-slot=\"\" style={{ ...circleBtn, visibility: 'hidden', pointerEvents: 'none' }} />",
+          "              null"
         ]
       ]
     }
