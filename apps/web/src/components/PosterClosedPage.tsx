@@ -20,6 +20,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePosterStore } from '@/stores/posterStore';
 import { exportPostrWithReport, savePostr, type PostrExport } from '@/import/postrFile';
+import { IMPORT_ENABLED } from '@/config/features';
 
 interface PosterClosedPageProps {
   /** The poster's owner was a guest. */
@@ -76,11 +77,16 @@ export function PosterClosedPage({ ownerWasGuest, canSignIn }: PosterClosedPageP
           {ownerWasGuest ? 'This guest poster was closed' : 'This poster is in another account'}
         </h1>
         <p className="text-xs text-[#888]">
+          {/* "you can import it" only while import is offered (IMPORT_ENABLED, record 29). */}
           {ownerWasGuest
-            ? 'The guest session that made it has ended in this browser. Download a copy to keep it; you can import it into any account.'
+            ? IMPORT_ENABLED
+              ? 'The guest session that made it has ended in this browser. Download a copy to keep it; you can import it into any account.'
+              : 'The guest session that made it has ended in this browser. Download a copy to keep it.'
             : canSignIn
               ? 'The account signed in here changed. Sign in to the account that owns this poster to keep editing it.'
-              : 'The account signed in here changed. Download a copy to keep this version; you can import it into any account.'}
+              : IMPORT_ENABLED
+                ? 'The account signed in here changed. Download a copy to keep this version; you can import it into any account.'
+                : 'The account signed in here changed. Download a copy to keep this version.'}
         </p>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <button type="button" onClick={downloadCopy} disabled={download.kind === 'busy'} className={BUTTON}>

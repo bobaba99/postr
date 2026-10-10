@@ -23,6 +23,13 @@
  * Re-run: npx vitest run src/poster/__tests__/posterSize.test.tsx --reporter=verbose
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Record 29 hid the sidebar's Duplicate (config/features.ts EDITOR_EXTRAS_ENABLED);
+// this file tests that kept code, so it turns the switch on. The shipped
+// configuration is src/poster/__tests__/mvpHidden.test.tsx.
+vi.mock('@/config/features', async (orig) => ({
+  ...(await orig<typeof import('@/config/features')>()),
+  EDITOR_EXTRAS_ENABLED: true,
+}));
 import { fireEvent } from '@testing-library/react';
 import type { PosterDoc } from '@postr/shared';
 

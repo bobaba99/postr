@@ -27,6 +27,14 @@
  * Re-run: npx vitest run src/poster/__tests__/oneUndoHistory.test.tsx
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+// Record 29 hid the Edit block font controls, the Content box, the caption spacing, the style presets, Copy a design, the palette designer and the guidelines panel (config/features.ts ADJUSTMENTS_ENABLED, EDITOR_EXTRAS_ENABLED);
+// this file tests that kept code, so it turns the switch on. The shipped
+// configuration is src/poster/__tests__/mvpHidden.test.tsx.
+vi.mock('@/config/features', async (orig) => ({
+  ...(await orig<typeof import('@/config/features')>()),
+  ADJUSTMENTS_ENABLED: true,
+  EDITOR_EXTRAS_ENABLED: true,
+}));
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import type { PosterDoc } from '@postr/shared';

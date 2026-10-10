@@ -183,6 +183,15 @@ export interface Block {
   h: number;
   /** Text content (title, heading, text) */
   content: string;
+  /**
+   * The grey prompt an empty block shows on the canvas, as PowerPoint's
+   * "Click to add text" does: a template text block's guidance sentence, or
+   * a table's hint in its first body cell. Optional; a block without one
+   * shows its type's default prompt. Never the block's text: it is not
+   * printed, exported or counted as content (record 29,
+   * docs/fixes/29-mvp-simplify.md; bounded-designs.md §3.1 rule 6).
+   */
+  prompt?: string;
   /** Storage path (post Phase 5) or base64 data URL (during prototype port) */
   imageSrc: string | null;
   imageFit: ImageFit;

@@ -12,10 +12,10 @@
       "robots": "index,follow",
       "h1": "Academic posters, without the hassle.",
       "copy": [
-        "A poster editor that handles the fiddly parts: block nudging, text that reflows on you, BibTeX citation styles, conference size lookups, authors and affiliations, and the figure font-size math, so you can work on the science. Start from a layout template, then keep every design decision under your control.",
+        "A poster editor that handles the fiddly parts: block nudging, text that reflows on you, BibTeX reference formatting, authors and affiliations, and the figure font-size math, so you can work on the science. Start from a layout template, then keep every design decision under your control.",
         "Poster templates: four layouts and a blank start, with disciplinary palettes and standard academic size presets. Every poster starts at a real print size.",
         "Figure readability: paste your R or Python plotting code and see whether the axis labels will still be readable at print size, with a copy-ready fix.",
-        "Writing guide: short prompts in each template section, word targets for the introduction, methods and conclusions, and a checklist from the title to the final proofread."
+        "Writing guide: each template section opens with a short prompt that never prints."
       ]
     },
     "/fr": {
@@ -26,10 +26,10 @@
       "locale": "fr_CA",
       "h1": "Des affiches scientifiques, sans les tracas.",
       "copy": [
-        "Un éditeur d’affiches qui s’occupe des détails fastidieux\u00a0: le déplacement des blocs, le texte qui se replace tout seul, les styles de citation BibTeX, la recherche des formats de congrès, les auteurs et les affiliations, et le calcul de la taille du texte des figures, pour que vous puissiez vous consacrer à la science. Partez d’un modèle de mise en page, puis gardez la maîtrise de chaque décision de conception.",
+        "Un éditeur d’affiches qui s’occupe des détails fastidieux\u00a0: le déplacement des blocs, le texte qui se replace tout seul, la mise en forme des références BibTeX, les auteurs et les affiliations, et le calcul de la taille du texte des figures, pour que vous puissiez vous consacrer à la science. Partez d’un modèle de mise en page, puis gardez la maîtrise de chaque décision de conception.",
         "Modèles d’affiches\u00a0: quatre mises en page et un départ vierge, avec des palettes par discipline et des formats d’affiche universitaires standard. Chaque affiche commence à une vraie taille d’impression.",
         "Lisibilité des figures\u00a0: collez votre code de tracé R ou Python et voyez si les étiquettes des axes seront encore lisibles à la taille d’impression, avec une correction prête à copier.",
-        "Guide de rédaction\u00a0: de courtes consignes dans chaque section des modèles, des cibles de nombre de mots pour l’introduction, les méthodes et les conclusions, et une liste de vérification du titre à la relecture finale."
+        "Guide de rédaction\u00a0: chaque section des modèles s’ouvre sur une courte consigne qui ne s’imprime jamais."
       ]
     },
     "/about": {
@@ -40,7 +40,7 @@
       "copy": [
         "Postr is a free academic poster editor for students and researchers. It exists because the usual tools were built for something else. Research structure, print constraints, and editable output stay in one focused workflow.",
         "Enter institutions once, then click to assign them to authors. Superscript numbering stays in sync when you add or remove an affiliation.",
-        "Export a .bib from your reference manager and drop it in. Postr reads BibTeX and RIS files and formats the reference list in APA 7, Vancouver, IEEE or Harvard style. Switch styles at any time and the imported entries are reformatted for you.",
+        "Export a .bib from your reference manager and drop it in. Postr reads BibTeX and RIS files and formats the imported references in APA 7.",
         "Every poster starts at a real print size, and Save PDF sets the page to that size."
       ]
     },
@@ -54,7 +54,7 @@
       "copy": [
         "Postr est un éditeur d’affiches scientifiques gratuit pour les étudiants et les chercheurs. Il existe parce que les outils habituels ont été conçus pour autre chose. La structure de la recherche, les contraintes d’impression et les fichiers modifiables restent réunis dans un seul flux de travail ciblé.",
         "Entrez les établissements une seule fois, puis cliquez pour les attribuer aux auteurs. La numérotation en exposant reste synchronisée quand vous ajoutez ou retirez une affiliation.",
-        "Exportez un fichier .bib depuis votre gestionnaire de références et déposez-le. Postr lit les fichiers BibTeX et RIS et met en forme la liste de références selon le style APA\u00a07, Vancouver, IEEE ou Harvard. Changez de style en tout temps et les entrées importées sont remises en forme pour vous.",
+        "Exportez un fichier .bib depuis votre gestionnaire de références et déposez-le. Postr lit les fichiers BibTeX et RIS et met en forme les références importées selon le style APA\u00a07.",
         "Chaque affiche commence à une vraie taille d’impression, et le bouton Save PDF règle la page à cette taille."
       ]
     },
@@ -96,7 +96,7 @@
         "The CA$18.99 term, plus applicable taxes, gives unlimited PowerPoint exports with no watermark while it is active. It renews every four months and you can cancel anytime.",
         "The CA$9.99 pack, plus applicable taxes, gives three PowerPoint exports. Each export uses one credit, even a second export of the same poster. It is a one-time purchase, and the credits never expire.",
         "Refunds: a term is refundable in full within 14 days of a charge if you haven't taken a paid export. A pack is refundable in full until you use an export credit, and not after.",
-        "You only pay to export to PowerPoint. The editor, its tools and the PDF export have no paywall. A guest can keep up to 25 posters and an account up to 200, and some tools, such as import and Copy a design, have daily limits. Prices are shown in Canadian dollars, before applicable taxes, and payments go through Stripe."
+        "You only pay to export to PowerPoint. The editor, its tools and the PDF export have no paywall. A guest can keep up to 25 posters and an account up to 200, and some tools, such as parsing pasted authors and references, have daily limits. Prices are shown in Canadian dollars, before applicable taxes, and payments go through Stripe."
       ]
     },
     "/pricing/fr": {
@@ -111,7 +111,7 @@
         "Le forfait à terme de 18,99\u00a0$\u00a0CA, plus les taxes applicables, donne des exportations PowerPoint illimitées sans filigrane tant qu’il est actif. Il se renouvelle tous les quatre mois et vous pouvez l’annuler en tout temps.",
         "Le lot de 9,99\u00a0$\u00a0CA, plus les taxes applicables, donne trois exportations PowerPoint. Chaque exportation utilise un crédit, même une deuxième exportation de la même affiche. C’est un achat unique, et les crédits n’expirent jamais.",
         "Remboursements\u00a0: un forfait à terme est remboursable intégralement dans les 14\u00a0jours suivant une facturation si vous n’avez fait aucune exportation payante. Un lot est remboursable intégralement jusqu’à ce que vous utilisiez un crédit d’exportation, et pas après.",
-        "Vous payez seulement pour exporter vers PowerPoint. L’éditeur, ses outils et l’exportation PDF n’ont aucun mur payant. Un invité peut conserver jusqu’à 25\u00a0affiches et un compte jusqu’à 200, et certains outils, comme l’importation et l’outil Copy a design, ont des limites quotidiennes. Les prix sont affichés en dollars canadiens, avant les taxes applicables, et les paiements passent par Stripe."
+        "Vous payez seulement pour exporter vers PowerPoint. L’éditeur, ses outils et l’exportation PDF n’ont aucun mur payant. Un invité peut conserver jusqu’à 25\u00a0affiches et un compte jusqu’à 200, et certains outils, comme l’analyse des auteurs et des références collés, ont des limites quotidiennes. Les prix sont affichés en dollars canadiens, avant les taxes applicables, et les paiements passent par Stripe."
       ]
     },
     "/tools/figure-readability": {
@@ -255,7 +255,7 @@
     },
     "/profile": {
       "title": "Profile, Billing, and Settings | Postr",
-      "description": "Manage your Postr profile details, saved style presets, email choices, plan and export credits, data download, and account deletion from one private page.",
+      "description": "Manage your Postr profile details, email choices, plan and export credits, data download, and account deletion from one private page.",
       "robots": "noindex,nofollow"
     },
     "/debug": {

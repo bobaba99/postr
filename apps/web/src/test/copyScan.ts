@@ -10,14 +10,18 @@
  * 'pptx'`) are not strings a user sees, and are left out. Import
  * specifiers are kept apart (`kind: 'module'`): they are not copy, but the
  * inventory checks that nothing imports the LaTeX writer outside the
- * switch.
+ * switch. Each JSX element whose tag is a component (`<ImportSection />`)
+ * is kept too (`kind: 'element'`, its tag name as the text), so the
+ * inventory can check where a hidden component is rendered (record 29).
  *
- * `guarded` marks a string the app can only reach while the LaTeX export
- * is switched on: inside `LATEX_EXPORT_ENABLED && …`, the true branch of
- * `LATEX_EXPORT_ENABLED ? … : …` or of `if (LATEX_EXPORT_ENABLED)` (the
+ * `guardedBy` lists the hide switches (HIDE_FLAGS, imported from
+ * config/features) a string can only be reached through: inside
+ * `FLAG && …`, the true branch of `FLAG ? … : …` or of `if (FLAG)` (the
  * switch as any `&&` conjunct of the condition), or the false branch of a
- * `!LATEX_EXPORT_ENABLED` condition. Only the switch imported from
- * config/features counts: a local variable of the same name does not.
+ * `!FLAG` condition. A local variable of the same name does not count.
+ * `guarded` is the LaTeX switch's entry (fix 25). `component` names the
+ * nearest enclosing function the string sits in (a declaration, or a
+ * function assigned to a `const`), or null at a module's top level.
  *
  * `readSource` is how the inventory reads a file. Under
  * scripts/mutation-check.mjs it returns the mutant's text (the child names
@@ -28,15 +32,22 @@ import { readFileSync, realpathSync } from 'node:fs';
 import ts from 'typescript';
 
 export const LATEX_FLAG = 'LATEX_EXPORT_ENABLED';
+/** The switches whose hidden copy the inventory checks (fix 25: LaTeX; record 29: the minimal editor). */
+export const HIDE_FLAGS = [LATEX_FLAG, 'IMPORT_ENABLED', 'ADJUSTMENTS_ENABLED', 'EDITOR_EXTRAS_ENABLED'] as const;
+export type HideFlag = (typeof HIDE_FLAGS)[number];
 
 export interface CopyText {
   /** 1-based line of the string's start. */
   readonly line: number;
-  /** The string; JSX whitespace collapsed; `{}` for an expression. */
+  /** The string; JSX whitespace collapsed; `{}` for an expression; a component's tag name for an element. */
   readonly text: string;
   /** Reachable only while the LaTeX export is switched on. */
   readonly guarded: boolean;
-  readonly kind: 'string' | 'jsx' | 'module';
+  /** The hide switches the string can only be reached through. */
+  readonly guardedBy: readonly HideFlag[];
+  /** The nearest enclosing named function, or null. */
+  readonly component: string | null;
+  readonly kind: 'string' | 'jsx' | 'module' | 'element';
 }
 
 function loadOverlay(): ReadonlyMap<string, string> {
@@ -77,54 +88,70 @@ function pieceText(e: ts.Expression): string {
   return '{}';
 }
 
-function importsFlag(sf: ts.SourceFile): boolean {
-  return sf.statements.some(
-    (st) =>
-      ts.isImportDeclaration(st) &&
-      ts.isStringLiteral(st.moduleSpecifier) &&
-      /(^|\/)config\/features$/.test(st.moduleSpecifier.text) &&
-      !!st.importClause?.namedBindings &&
-      ts.isNamedImports(st.importClause.namedBindings) &&
-      st.importClause.namedBindings.elements.some(
-        (el) => el.name.text === LATEX_FLAG && (el.propertyName?.text ?? LATEX_FLAG) === LATEX_FLAG,
-      ),
-  );
+/** The hide switches this file imports from config/features under their own names. */
+function importedFlags(sf: ts.SourceFile): ReadonlySet<string> {
+  const out = new Set<string>();
+  for (const st of sf.statements) {
+    if (
+      !ts.isImportDeclaration(st) ||
+      !ts.isStringLiteral(st.moduleSpecifier) ||
+      !/(^|\/)config\/features$/.test(st.moduleSpecifier.text)
+    ) continue;
+    const nb = st.importClause?.namedBindings;
+    if (!nb || !ts.isNamedImports(nb)) continue;
+    for (const el of nb.elements) {
+      const name = el.name.text;
+      if ((HIDE_FLAGS as readonly string[]).includes(name) && (el.propertyName?.text ?? name) === name) out.add(name);
+    }
+  }
+  return out;
 }
 
-/** Every string `fileName`'s source can show, with its line and guard. */
+type Guards = ReadonlySet<HideFlag>;
+const NO_GUARDS: Guards = new Set();
+const withFlags = (g: Guards, more: Iterable<HideFlag>): Guards => {
+  const next = new Set(g);
+  for (const f of more) next.add(f);
+  return next.size === g.size ? g : next;
+};
+
+/** Every string `fileName`'s source can show, with its line, guards and component. */
 export function scanSource(fileName: string, source: string): CopyText[] {
   const scriptKind = fileName.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
   const sf = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, scriptKind);
-  const flagImported = importsFlag(sf);
+  const flags = importedFlags(sf);
   const out: CopyText[] = [];
 
-  const add = (node: ts.Node, text: string, guarded: boolean, kind: CopyText['kind']) => {
+  let component: string | null = null;
+  const add = (node: ts.Node, text: string, guards: Guards, kind: CopyText['kind']) => {
     const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-    out.push({ line, text, guarded, kind });
+    out.push({ line, text, guarded: guards.has(LATEX_FLAG), guardedBy: [...guards], component, kind });
   };
-  const isFlag = (e: ts.Expression): boolean => {
+  const flagOf = (e: ts.Expression): HideFlag | null => {
     const x = unwrap(e);
-    return flagImported && ts.isIdentifier(x) && x.text === LATEX_FLAG;
+    return ts.isIdentifier(x) && flags.has(x.text) ? (x.text as HideFlag) : null;
   };
-  const hasFlagConjunct = (e: ts.Expression): boolean => {
+  /** The switches that are `&&` conjuncts of a condition. */
+  const conjunctFlags = (e: ts.Expression): HideFlag[] => {
     const x = unwrap(e);
-    if (isFlag(x)) return true;
-    return (
-      ts.isBinaryExpression(x) &&
-      x.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-      (hasFlagConjunct(x.left) || hasFlagConjunct(x.right))
-    );
+    const f = flagOf(x);
+    if (f) return [f];
+    if (ts.isBinaryExpression(x) && x.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+      return [...conjunctFlags(x.left), ...conjunctFlags(x.right)];
+    }
+    return [];
   };
-  const isNegatedFlag = (e: ts.Expression): boolean => {
+  /** The switch of a `!FLAG` condition. */
+  const negatedFlag = (e: ts.Expression): HideFlag[] => {
     const x = unwrap(e);
-    return (
-      ts.isPrefixUnaryExpression(x) &&
-      x.operator === ts.SyntaxKind.ExclamationToken &&
-      isFlag(x.operand)
-    );
+    if (ts.isPrefixUnaryExpression(x) && x.operator === ts.SyntaxKind.ExclamationToken) {
+      const f = flagOf(x.operand);
+      return f ? [f] : [];
+    }
+    return [];
   };
 
-  function visitJsxChildren(node: ts.JsxElement | ts.JsxFragment, guarded: boolean): void {
+  function visitJsxChildren(node: ts.JsxElement | ts.JsxFragment, guards: Guards): void {
     const textOf = (child: ts.JsxChild): string | null => {
       if (ts.isJsxText(child)) return child.text;
       if (ts.isJsxExpression(child) && child.expression && ts.isStringLiteralLike(child.expression)) {
@@ -136,77 +163,105 @@ export function scanSource(fileName: string, source: string): CopyText[] {
     const hasText = node.children.some(
       (child) => textOf(child) !== null && !(ts.isJsxText(child) && child.containsOnlyTriviaWhiteSpaces),
     );
-    if (hasText) add(node, parts.join('').replace(/\s+/g, ' ').trim(), guarded, 'jsx');
+    if (hasText) add(node, parts.join('').replace(/\s+/g, ' ').trim(), guards, 'jsx');
     for (const child of node.children) {
-      if (textOf(child) === null) visit(child, guarded);
+      if (textOf(child) === null) visit(child, guards);
     }
   }
 
-  function visit(node: ts.Node, guarded: boolean): void {
+  const tagIfComponent = (tag: ts.JsxTagNameExpression): string | null =>
+    ts.isIdentifier(tag) && /^[A-Z]/.test(tag.text) ? tag.text : null;
+
+  /** The name a function takes from its declaration or from the `const` it is assigned to. */
+  const functionName = (node: ts.Node): string | null => {
+    if (ts.isFunctionDeclaration(node)) return node.name?.text ?? null;
+    if ((ts.isArrowFunction(node) || ts.isFunctionExpression(node)) && ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)) {
+      return node.parent.name.text;
+    }
+    return null;
+  };
+
+  function visit(node: ts.Node, guards: Guards): void {
+    const fn = functionName(node);
+    if (fn) {
+      const outer = component;
+      component = fn;
+      ts.forEachChild(node, (child) => visit(child, guards));
+      component = outer;
+      return;
+    }
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       const spec = node.moduleSpecifier;
-      if (spec && ts.isStringLiteral(spec)) add(spec, spec.text, guarded, 'module');
+      if (spec && ts.isStringLiteral(spec)) add(spec, spec.text, guards, 'module');
       return;
     }
     if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
       const [arg] = node.arguments;
-      if (arg && ts.isStringLiteralLike(arg)) add(arg, arg.text, guarded, 'module');
+      if (arg && ts.isStringLiteralLike(arg)) add(arg, arg.text, guards, 'module');
       return;
     }
     if (ts.isLiteralTypeNode(node)) return;
     if (ts.isBinaryExpression(node)) {
       const op = node.operatorToken.kind;
       if (op === ts.SyntaxKind.AmpersandAmpersandToken) {
-        visit(node.left, guarded);
-        visit(node.right, guarded || hasFlagConjunct(node.left));
+        visit(node.left, guards);
+        visit(node.right, withFlags(guards, conjunctFlags(node.left)));
         return;
       }
       if (op === ts.SyntaxKind.PlusToken) {
         const operands = plusOperands(node);
         if (operands.some(isStringPiece)) {
-          add(node, operands.map(pieceText).join(''), guarded, 'string');
+          add(node, operands.map(pieceText).join(''), guards, 'string');
           for (const o of operands) {
-            if (ts.isTemplateExpression(o)) o.templateSpans.forEach((s) => visit(s.expression, guarded));
-            else if (!ts.isStringLiteralLike(o)) visit(o, guarded);
+            if (ts.isTemplateExpression(o)) o.templateSpans.forEach((s) => visit(s.expression, guards));
+            else if (!ts.isStringLiteralLike(o)) visit(o, guards);
           }
           return;
         }
       }
     }
     if (ts.isConditionalExpression(node)) {
-      visit(node.condition, guarded);
-      visit(node.whenTrue, guarded || hasFlagConjunct(node.condition));
-      visit(node.whenFalse, guarded || isNegatedFlag(node.condition));
+      visit(node.condition, guards);
+      visit(node.whenTrue, withFlags(guards, conjunctFlags(node.condition)));
+      visit(node.whenFalse, withFlags(guards, negatedFlag(node.condition)));
       return;
     }
     if (ts.isIfStatement(node)) {
-      visit(node.expression, guarded);
-      visit(node.thenStatement, guarded || hasFlagConjunct(node.expression));
-      if (node.elseStatement) visit(node.elseStatement, guarded || isNegatedFlag(node.expression));
+      visit(node.expression, guards);
+      visit(node.thenStatement, withFlags(guards, conjunctFlags(node.expression)));
+      if (node.elseStatement) visit(node.elseStatement, withFlags(guards, negatedFlag(node.expression)));
       return;
     }
     if (ts.isJsxElement(node)) {
-      visit(node.openingElement, guarded);
-      visitJsxChildren(node, guarded);
+      const tag = tagIfComponent(node.openingElement.tagName);
+      if (tag) add(node, tag, guards, 'element');
+      visit(node.openingElement, guards);
+      visitJsxChildren(node, guards);
+      return;
+    }
+    if (ts.isJsxSelfClosingElement(node)) {
+      const tag = tagIfComponent(node.tagName);
+      if (tag) add(node, tag, guards, 'element');
+      ts.forEachChild(node, (child) => visit(child, guards));
       return;
     }
     if (ts.isJsxFragment(node)) {
-      visitJsxChildren(node, guarded);
+      visitJsxChildren(node, guards);
       return;
     }
     if (ts.isStringLiteralLike(node)) {
-      add(node, node.text, guarded, 'string');
+      add(node, node.text, guards, 'string');
       return;
     }
     if (ts.isTemplateExpression(node)) {
-      add(node, templateText(node), guarded, 'string');
-      node.templateSpans.forEach((s) => visit(s.expression, guarded));
+      add(node, templateText(node), guards, 'string');
+      node.templateSpans.forEach((s) => visit(s.expression, guards));
       return;
     }
-    ts.forEachChild(node, (child) => visit(child, guarded));
+    ts.forEachChild(node, (child) => visit(child, guards));
   }
 
-  visit(sf, false);
+  visit(sf, NO_GUARDS);
   return out;
 }
 

@@ -21,7 +21,7 @@
 import { useMemo, type CSSProperties, type JSX } from 'react';
 import { createPortal } from 'react-dom';
 import type { SelectionInfo } from './RichTextEditor';
-import { SHARING_ENABLED } from '@/config/features';
+import { ADJUSTMENTS_ENABLED, SHARING_ENABLED } from '@/config/features';
 
 /**
  * Compute the plain-text character offset of `node` + `offset` within
@@ -216,8 +216,14 @@ function colorSwatch(
  *  and the sanitizer keeps only `color` and `background-color`, so a
  *  size or an alignment was dropped by the next keystroke's save
  *  (MEASURED by the item 12 reproducer, 3 of 3 engines; record
- *  docs/fixes/12-one-undo-history.md). Text size is the Edit tab's Font
- *  size field (per text level); headings' alignment is Style › Headings.
+ *  docs/fixes/12-one-undo-history.md). Text size is the Style tab's size
+ *  field per text level; headings' alignment is Style › Headings, hidden
+ *  with the other adjustments.
+ *
+ *  While ADJUSTMENTS_ENABLED is off (record 29, bounded-designs.md §3.2):
+ *  B, I, U, bullets, numbered and Clear only. Strikethrough, indent,
+ *  outdent, highlight and text colour are hidden; text already struck,
+ *  indented or coloured still draws, and Clear removes it.
  *
  *  Active-format highlighting requires a `formats` object — when it's
  *  null (no selection), buttons render unpressed but stay clickable;
@@ -242,7 +248,7 @@ export function FormatToolbarButtons({
       {cmdButton('B', 'bold', formats.bold, onChange, { fontWeight: 800 })}
       {cmdButton('I', 'italic', formats.italic, onChange, { fontStyle: 'italic' })}
       {cmdButton('U', 'underline', formats.underline, onChange, { textDecoration: 'underline' })}
-      {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}
+      {ADJUSTMENTS_ENABLED && cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}
 
         <div style={divider} />
 
@@ -257,26 +263,30 @@ export function FormatToolbarButtons({
         */}
         {cmdButton('•', 'insertUnorderedList', false, onChange, { fontSize: 14 })}
         {cmdButton('1.', 'insertOrderedList', false, onChange, { fontSize: 11, fontWeight: 600 })}
-        {cmdButton('⇥', 'indent', false, onChange, { fontSize: 14 })}
-        {cmdButton('⇤', 'outdent', false, onChange, { fontSize: 14 })}
+        {ADJUSTMENTS_ENABLED && (
+          <>
+            {cmdButton('⇥', 'indent', false, onChange, { fontSize: 14 })}
+            {cmdButton('⇤', 'outdent', false, onChange, { fontSize: 14 })}
 
-        <div style={divider} />
+            <div style={divider} />
 
-        {/* Highlight swatches */}
-        <div style={{ display: 'flex', gap: 3, padding: '0 4px' }}>
-          {HIGHLIGHT_COLORS.map((c) => colorSwatch(c.value, 'hiliteColor', onChange, `Highlight · ${c.name}`))}
-          {colorSwatch(null, 'hiliteColor', onChange, 'Clear highlight')}
-        </div>
+            {/* Highlight swatches */}
+            <div style={{ display: 'flex', gap: 3, padding: '0 4px' }}>
+              {HIGHLIGHT_COLORS.map((c) => colorSwatch(c.value, 'hiliteColor', onChange, `Highlight · ${c.name}`))}
+              {colorSwatch(null, 'hiliteColor', onChange, 'Clear highlight')}
+            </div>
 
-        <div style={divider} />
+            <div style={divider} />
 
-        {/* Text color swatches */}
-        <div style={{ display: 'flex', gap: 3, padding: '0 4px' }}>
-          {TEXT_COLORS.filter((c) => c.value).map((c) =>
-            colorSwatch(c.value, 'foreColor', onChange, `Text · ${c.name}`),
-          )}
-          {colorSwatch(null, 'foreColor', onChange, 'Default color')}
-        </div>
+            {/* Text color swatches */}
+            <div style={{ display: 'flex', gap: 3, padding: '0 4px' }}>
+              {TEXT_COLORS.filter((c) => c.value).map((c) =>
+                colorSwatch(c.value, 'foreColor', onChange, `Text · ${c.name}`),
+              )}
+              {colorSwatch(null, 'foreColor', onChange, 'Default color')}
+            </div>
+          </>
+        )}
 
         <div style={divider} />
 

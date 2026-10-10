@@ -8,6 +8,15 @@
  * Re-run: npx vitest run src/poster/__tests__/guidelinesDefault.test.tsx
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Record 29 hid the guidelines panel and the tour steps for import and the guidelines (config/features.ts IMPORT_ENABLED, ADJUSTMENTS_ENABLED, EDITOR_EXTRAS_ENABLED);
+// this file tests that kept code, so it turns the switch on. The shipped
+// configuration is src/poster/__tests__/mvpHidden.test.tsx.
+vi.mock('@/config/features', async (orig) => ({
+  ...(await orig<typeof import('@/config/features')>()),
+  IMPORT_ENABLED: true,
+  ADJUSTMENTS_ENABLED: true,
+  EDITOR_EXTRAS_ENABLED: true,
+}));
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { PosterEditor } from '../PosterEditor';

@@ -36,7 +36,7 @@ import {
   retractGalleryEntry,
   type GalleryEntryWithUrls,
 } from '@/data/gallery';
-import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
+import { ADJUSTMENTS_ENABLED, EDITOR_EXTRAS_ENABLED, GALLERY_PUBLIC_ENABLED } from '@/config/features';
 import type { User } from '@supabase/supabase-js';
 import { APP_ROUTE_META } from '@/seo/siteMeta';
 import { useDocumentMeta } from '@/seo/useDocumentMeta';
@@ -378,6 +378,9 @@ export default function Profile() {
 
         {/* Preferences */}
         <Section title="Preferences">
+          {/* Style presets are made in the editor's style tab, hidden with
+              the adjustments (ADJUSTMENTS_ENABLED, record 29). */}
+          {ADJUSTMENTS_ENABLED && (
           <div className="flex items-start justify-between py-2 gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-[14pt] text-[#c8cad0]">🎨 Saved style presets</div>
@@ -409,7 +412,8 @@ export default function Profile() {
               </button>
             </div>
           </div>
-          <div className="flex items-center justify-between py-2 border-t border-[#1f1f2e]">
+          )}
+          <div className={`flex items-center justify-between py-2${ADJUSTMENTS_ENABLED ? ' border-t border-[#1f1f2e]' : ''}`}>
             <div>
               <div className="text-sm text-[#c8cad0]">Onboarding tour</div>
               <div className="text-[13px] text-[#8b8f99]">
@@ -497,6 +501,10 @@ export default function Profile() {
               </div>
             </>
           )}
+          {/* Checklist templates come from the guidelines panel's scratch
+              pad, hidden with the editor extras (EDITOR_EXTRAS_ENABLED,
+              record 29). */}
+          {EDITOR_EXTRAS_ENABLED && (
           <div className="py-2 border-t border-[#1f1f2e]">
             <div className="text-sm text-[#c8cad0] mb-2">Checklist templates</div>
             <div className="text-[13px] text-[#8b8f99] mb-3">
@@ -540,6 +548,7 @@ export default function Profile() {
               );
             })()}
           </div>
+          )}
         </Section>
 
         {/* Gallery submissions — while the gallery is offline the section
@@ -690,11 +699,13 @@ export default function Profile() {
         </div>
       </div>
 
-      <PresetEditModal
-        open={presetModalOpen}
-        onClose={() => setPresetModalOpen(false)}
-        onChange={setPresetCount}
-      />
+      {ADJUSTMENTS_ENABLED && (
+        <PresetEditModal
+          open={presetModalOpen}
+          onClose={() => setPresetModalOpen(false)}
+          onChange={setPresetCount}
+        />
+      )}
 
       <ConfirmModal
         open={confirmAction !== null}

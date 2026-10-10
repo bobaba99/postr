@@ -9,6 +9,15 @@
  * Five templates: 3-column classic, 2-column wide figure, billboard,
  * sidebar+focus, blank. The picker in the Layout tab uses these names
  * + descriptions verbatim.
+ *
+ * Starting text (record 29, docs/fixes/29-mvp-simplify.md;
+ * bounded-designs.md §3.1): the headings keep their section names, which
+ * most posters keep; the title and the text blocks start empty, and each
+ * text block's guidance sentence is its `prompt`, drawn grey on the canvas
+ * and never printed or exported. Until record 29 these sentences, "Your
+ * Poster Title" and the sample table's made-up results were stored as
+ * text; older posters still hold them, and Issues lists them
+ * (startingText.ts compares with these prompts).
  */
 import { nanoid } from 'nanoid';
 import type { Block, BlockType } from '@postr/shared';
@@ -25,6 +34,9 @@ export interface LayoutTemplate {
 
 // Header (title + authors) area height in poster units
 const HEADER_HEIGHT = 71;
+
+/** The sample table's prompt, shown in its first body cell while the body is empty. */
+export const TABLE_PROMPT = 'Type or paste';
 
 function bodyMetrics(posterWidthIn: number, posterHeightIn: number) {
   const W = posterWidthIn * PX;
@@ -52,12 +64,12 @@ const threeCol: LayoutTemplate = {
       { type: 'authors', x: M, y: 57, w: W - M * 2, h: 22 },
       // Column 1 — Intro + Hypotheses
       { type: 'heading', x: M, y: bodyTop, w: c, h: 20, content: 'Introduction' },
-      { type: 'text', x: M, y: bodyTop + 22, w: c, h: bodyHeight * 0.40, content: 'Background and research question. Provide context, motivation, and the gap your work addresses.' },
+      { type: 'text', x: M, y: bodyTop + 22, w: c, h: bodyHeight * 0.40, prompt: 'Background and research question. Provide context, motivation, and the gap your work addresses.' },
       { type: 'heading', x: M, y: bodyTop + 24 + bodyHeight * 0.40, w: c, h: 20, content: 'Hypotheses' },
-      { type: 'text', x: M, y: bodyTop + 46 + bodyHeight * 0.40, w: c, h: bodyHeight * 0.40, content: 'State your specific hypotheses or research aims here.' },
+      { type: 'text', x: M, y: bodyTop + 46 + bodyHeight * 0.40, w: c, h: bodyHeight * 0.40, prompt: 'State your specific hypotheses or research aims here.' },
       // Column 2 — Methods + Figure
       { type: 'heading', x: M + c + GAP, y: bodyTop, w: c, h: 20, content: 'Methods' },
-      { type: 'text', x: M + c + GAP, y: bodyTop + 22, w: c, h: bodyHeight * 0.32, content: 'Participants, design, materials, procedure, and analysis approach.' },
+      { type: 'text', x: M + c + GAP, y: bodyTop + 22, w: c, h: bodyHeight * 0.32, prompt: 'Participants, design, materials, procedure, and analysis approach.' },
       { type: 'image', x: M + c + GAP, y: bodyTop + 24 + bodyHeight * 0.32, w: c, h: bodyHeight * 0.55 },
       // Column 3 — Results table + Conclusions + References
       { type: 'heading', x: M + (c + GAP) * 2, y: bodyTop, w: c, h: 20, content: 'Results' },
@@ -67,16 +79,19 @@ const threeCol: LayoutTemplate = {
         y: bodyTop + 22,
         w: c,
         h: bodyHeight * 0.28,
+        prompt: TABLE_PROMPT,
         tableData: {
           rows: 4,
           cols: 3,
-          cells: ['Measure', 'M (SD)', '𝑝', 'DV 1', '4.2 (0.8)', '< .01', 'DV 2', '3.1 (1.1)', '.03', 'DV 3', '2.8 (0.6)', '.12'],
+          // The header row is a label, like a heading; the results were
+          // made-up numbers, so the body starts empty (record 29).
+          cells: ['Measure', 'M (SD)', '𝑝', '', '', '', '', '', '', '', '', ''],
           colWidths: null,
           borderPreset: 'apa',
         },
       },
       { type: 'heading', x: M + (c + GAP) * 2, y: bodyTop + 24 + bodyHeight * 0.28, w: c, h: 20, content: 'Conclusions' },
-      { type: 'text', x: M + (c + GAP) * 2, y: bodyTop + 46 + bodyHeight * 0.28, w: c, h: bodyHeight * 0.22, content: 'Key findings, implications, and future directions.' },
+      { type: 'text', x: M + (c + GAP) * 2, y: bodyTop + 46 + bodyHeight * 0.28, w: c, h: bodyHeight * 0.22, prompt: 'Key findings, implications, and future directions.' },
       { type: 'references', x: M + (c + GAP) * 2, y: bodyTop + 48 + bodyHeight * 0.50, w: c, h: bodyHeight * 0.28 },
     ];
   },
@@ -93,13 +108,13 @@ const twoCol: LayoutTemplate = {
       { type: 'title', x: M, y: M, w: W - M * 2, h: 45 },
       { type: 'authors', x: M, y: 57, w: W - M * 2, h: 22 },
       { type: 'heading', x: M, y: bodyTop, w: c, h: 20, content: 'Introduction' },
-      { type: 'text', x: M, y: bodyTop + 22, w: c, h: bodyHeight * 0.22, content: 'Motivation and background.' },
+      { type: 'text', x: M, y: bodyTop + 22, w: c, h: bodyHeight * 0.22, prompt: 'Motivation and background.' },
       { type: 'heading', x: M + c + GAP, y: bodyTop, w: c, h: 20, content: 'Methods' },
-      { type: 'text', x: M + c + GAP, y: bodyTop + 22, w: c, h: bodyHeight * 0.22, content: 'Design and analysis approach.' },
+      { type: 'text', x: M + c + GAP, y: bodyTop + 22, w: c, h: bodyHeight * 0.22, prompt: 'Design and analysis approach.' },
       { type: 'heading', x: M, y: bodyTop + 24 + bodyHeight * 0.22, w: W - M * 2, h: 20, content: 'Key Results' },
       { type: 'image', x: M, y: bodyTop + 46 + bodyHeight * 0.22, w: W - M * 2, h: bodyHeight * 0.38 },
       { type: 'heading', x: M, y: bodyTop + 48 + bodyHeight * 0.6, w: c, h: 20, content: 'Discussion' },
-      { type: 'text', x: M, y: bodyTop + 70 + bodyHeight * 0.6, w: c, h: bodyHeight * 0.22, content: 'Interpretation of findings.' },
+      { type: 'text', x: M, y: bodyTop + 70 + bodyHeight * 0.6, w: c, h: bodyHeight * 0.22, prompt: 'Interpretation of findings.' },
       { type: 'references', x: M + c + GAP, y: bodyTop + 48 + bodyHeight * 0.6, w: c, h: bodyHeight * 0.28 },
     ];
   },
@@ -115,14 +130,14 @@ const billboard: LayoutTemplate = {
     return [
       { type: 'title', x: M, y: M, w: W - M * 2, h: 45 },
       { type: 'authors', x: M, y: 57, w: W - M * 2, h: 22 },
-      { type: 'text', x: M + 15, y: bodyTop, w: W - M * 2 - 30, h: 55, content: 'YOUR KEY FINDING IN ONE CLEAR SENTENCE. Make this the takeaway.' },
+      { type: 'text', x: M + 15, y: bodyTop, w: W - M * 2 - 30, h: 55, prompt: 'YOUR KEY FINDING IN ONE CLEAR SENTENCE. Make this the takeaway.' },
       { type: 'image', x: M, y: bodyTop + 60, w: W - M * 2, h: bodyHeight * 0.42 },
       { type: 'heading', x: M, y: bodyTop + 64 + bodyHeight * 0.42, w: c, h: 20, content: 'Background' },
-      { type: 'text', x: M, y: bodyTop + 86 + bodyHeight * 0.42, w: c, h: bodyHeight * 0.35, content: 'Brief context.' },
+      { type: 'text', x: M, y: bodyTop + 86 + bodyHeight * 0.42, w: c, h: bodyHeight * 0.35, prompt: 'Brief context.' },
       { type: 'heading', x: M + c + GAP, y: bodyTop + 64 + bodyHeight * 0.42, w: c, h: 20, content: 'Methods' },
-      { type: 'text', x: M + c + GAP, y: bodyTop + 86 + bodyHeight * 0.42, w: c, h: bodyHeight * 0.35, content: 'Essential method details.' },
+      { type: 'text', x: M + c + GAP, y: bodyTop + 86 + bodyHeight * 0.42, w: c, h: bodyHeight * 0.35, prompt: 'Essential method details.' },
       { type: 'heading', x: M + (c + GAP) * 2, y: bodyTop + 64 + bodyHeight * 0.42, w: c, h: 20, content: 'Implications' },
-      { type: 'text', x: M + (c + GAP) * 2, y: bodyTop + 86 + bodyHeight * 0.42, w: c, h: bodyHeight * 0.35, content: 'So what? Future directions.' },
+      { type: 'text', x: M + (c + GAP) * 2, y: bodyTop + 86 + bodyHeight * 0.42, w: c, h: bodyHeight * 0.35, prompt: 'So what? Future directions.' },
     ];
   },
 };
@@ -141,9 +156,9 @@ const sidebar: LayoutTemplate = {
       { type: 'authors', x: M, y: 57, w: W - M * 2, h: 22 },
       // Sidebar (30% left) — context stuff: Background, Methods, References
       { type: 'heading', x: M, y: bodyTop, w: sW, h: 20, content: 'Background' },
-      { type: 'text', x: M, y: bodyTop + 22, w: sW, h: bodyHeight * 0.30, content: 'Context and aims.' },
+      { type: 'text', x: M, y: bodyTop + 22, w: sW, h: bodyHeight * 0.30, prompt: 'Context and aims.' },
       { type: 'heading', x: M, y: bodyTop + 24 + bodyHeight * 0.30, w: sW, h: 20, content: 'Methods' },
-      { type: 'text', x: M, y: bodyTop + 46 + bodyHeight * 0.30, w: sW, h: bodyHeight * 0.28, content: 'Design and analysis.' },
+      { type: 'text', x: M, y: bodyTop + 46 + bodyHeight * 0.30, w: sW, h: bodyHeight * 0.28, prompt: 'Design and analysis.' },
       { type: 'references', x: M, y: bodyTop + 48 + bodyHeight * 0.58, w: sW, h: bodyHeight * 0.40 },
       // Main area (70% right) — the showcase: Results then Conclusions.
       // Array order matters for heading numbering: Background(1),
@@ -151,7 +166,7 @@ const sidebar: LayoutTemplate = {
       { type: 'heading', x: mX, y: bodyTop, w: mW, h: 20, content: 'Results' },
       { type: 'image', x: mX, y: bodyTop + 22, w: mW, h: bodyHeight * 0.52 },
       { type: 'heading', x: mX, y: bodyTop + 24 + bodyHeight * 0.52, w: mW, h: 20, content: 'Conclusions' },
-      { type: 'text', x: mX, y: bodyTop + 46 + bodyHeight * 0.52, w: mW, h: bodyHeight * 0.38, content: 'Key findings and implications.' },
+      { type: 'text', x: mX, y: bodyTop + 46 + bodyHeight * 0.52, w: mW, h: bodyHeight * 0.38, prompt: 'Key findings and implications.' },
     ];
   },
 };
@@ -203,7 +218,10 @@ export function makeBlocks(
       y: partial.y ?? 0,
       w: partial.w ?? 100,
       h: partial.h ?? 50,
-      content: partial.content ?? (type === 'title' ? 'Your Poster Title' : ''),
+      // Every block starts empty: the title too. What a template's text
+      // block used to say is its grey prompt now (record 29).
+      content: partial.content ?? '',
+      ...(partial.prompt ? { prompt: partial.prompt } : {}),
       imageSrc: partial.imageSrc ?? null,
       imageFit: partial.imageFit ?? 'contain',
       tableData:

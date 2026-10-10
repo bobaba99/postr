@@ -27,7 +27,13 @@ import { nanoid } from 'nanoid';
 import { breakUndoCoalescing } from '@/stores/posterStore';
 import { usePosterStore } from '@/stores/posterStore';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
-import { GALLERY_PUBLIC_ENABLED, RULERS_ENABLED, SHARING_ENABLED } from '@/config/features';
+import {
+  ADJUSTMENTS_ENABLED,
+  EDITOR_EXTRAS_ENABLED,
+  GALLERY_PUBLIC_ENABLED,
+  RULERS_ENABLED,
+  SHARING_ENABLED,
+} from '@/config/features';
 import { useAutosave } from '@/hooks/useAutosave';
 import { mediaQueryMatches, useIsSmallScreen } from '@/hooks/useIsSmallScreen';
 import { AutosaveStatusPill } from '@/components/AutosaveStatusPill';
@@ -79,6 +85,7 @@ import { arrangeSheet } from './arrangeMeasure';
 import { numberBlocks } from './readingOrder';
 import { filterDeletable } from '@/export/blockLock';
 import { LAYOUT_TEMPLATES, makeBlocks, type LayoutKey } from './templates';
+import { startingTextIssues } from './startingText';
 import { formatSheetSize, moveOntoSheet } from './resizeSheet';
 import { ignoreRepeatedEnter } from './ignoreRepeatedEnter';
 import {
@@ -748,6 +755,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // APA style requires alphabetical reference ordering, so the
   // sort is fixed — no user-facing toggle.
   const sortMode: SortMode = 'alpha';
+  // APA 7 unless the style menu changes it; the menu is hidden
+  // (ADJUSTMENTS_ENABLED, record 29), so references show in APA 7.
   const [citationStyle, setCitationStyle] = useState<CitationStyleKey>(DEFAULT_CITATION_STYLE);
   // K1 fix: presets persist across posters via localStorage (not
   // component state). Previously useState — lost on every poster open.
@@ -782,7 +791,9 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // visitor came for. The underlying toggles keep their state; only
   // the rendering is suppressed, so widening the window restores them.
   const showRulerEffective = RULERS_ENABLED && showRuler && !mobileShare;
-  const showGridEffective = showGrid && !mobileShare;
+  // The grid and its toggle are hidden (ADJUSTMENTS_ENABLED, record 29):
+  // hidden means off, though the toggle's state starts on.
+  const showGridEffective = ADJUSTMENTS_ENABLED && showGrid && !mobileShare;
 
   const [sidebarOpen, setSidebarOpen] = useState(!mobileShare);
   // The breakpoint can flip after mount (rotation, a desktop window
@@ -1624,19 +1635,6 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           blockId: b.id,
         });
       }
-      if (
-        b.type === 'text' &&
-        b.content &&
-        /Enter your text here/i.test(b.content)
-      ) {
-        out.push({
-          id: `placeholder-text-${b.id}`,
-          severity: 'info',
-          category: 'Placeholder text',
-          message: 'A text block still contains "Enter your text here."',
-          blockId: b.id,
-        });
-      }
       if (b.type === 'title' && b.content && b.content.length > 180) {
         out.push({
           id: `long-title-${b.id}`,
@@ -1647,6 +1645,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         });
       }
     }
+
+    // Starting text left in place: an empty heading or text block, a
+    // block still holding a template's or Insert's old text, a table still
+    // holding the old sample (record 29, startingText.ts).
+    out.push(...startingTextIssues(doc.blocks));
 
     // Document-level checks
     if (doc.authors.length === 0) {
@@ -1898,7 +1901,9 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       y,
       w,
       h,
-      content: type === 'heading' ? 'Section Title' : type === 'text' ? 'Enter your text here.' : '',
+      // Starts empty and shows its type's grey prompt (record 29); it used
+      // to store "Section Title" or "Enter your text here.", to be deleted.
+      content: '',
       imageSrc: null,
       imageFit: 'contain',
       tableData:
@@ -2470,7 +2475,9 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       />
       </div>
 
-      {/* Palette Designer — create or edit a custom palette */}
+      {/* Palette Designer — create or edit a custom palette; hidden with
+          custom palettes (ADJUSTMENTS_ENABLED, record 29). */}
+      {ADJUSTMENTS_ENABLED && (
       <PaletteDesigner
         open={paletteDesignerOpen}
         initialName={editingPaletteName ?? undefined}
@@ -2491,8 +2498,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           setEditingPaletteName(null);
         }}
       />
+      )}
 
-      {/* Staples Print & Go walkthrough */}
+      {/* Staples Print & Go walkthrough; hidden (EDITOR_EXTRAS_ENABLED, record 29). */}
+      {EDITOR_EXTRAS_ENABLED && (
       <StaplesPrintModal
         open={staplesPrintOpen}
         posterTitle={posterDisplayName}
@@ -2502,6 +2511,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           printPoster();
         }}
       />
+      )}
 
       <ConfirmModal
         open={pendingSize !== null}
@@ -3354,6 +3364,9 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         />
       </div>
 
+      {/* The guidelines panel is hidden (EDITOR_EXTRAS_ENABLED, record 29). */}
+      {EDITOR_EXTRAS_ENABLED && (
+      <>
       {/* Animated guidelines wrapper — mirrors the Sidebar pattern so
           the right-side panel collapses with the same width transition
           instead of unmounting abruptly. The inner GuidelinesPanel no
@@ -3394,13 +3407,15 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           }}
         />
       </div>
+      </>
+      )}
 
       {/* Show guidelines toggle when panel is closed.
           Positioned bottom-right instead of top-right so it doesn't
           collide with the AutosaveStatusPill (which also lives in the
           top-right corner). The ZoomBar is centered horizontally at
           the bottom, so bottom-right is free real estate. */}
-      {!guidelinesOpen && !mobileShare && (
+      {EDITOR_EXTRAS_ENABLED && !guidelinesOpen && !mobileShare && (
         <button
           ref={guidelinesOpenerRef}
           data-postr-guidelines-toggle

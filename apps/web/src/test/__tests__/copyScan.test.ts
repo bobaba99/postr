@@ -12,7 +12,7 @@ import { LATEX_CLAIM, PRICE, TAX_BEFORE_PERIOD, TAX_NOTE, pricesWithTax, scanSou
 
 const FLAG_IMPORT = "import { LATEX_EXPORT_ENABLED } from '@/config/features';\n";
 
-const texts = (src: string, file = 'a.tsx') => scanSource(file, src).filter((t) => t.kind !== 'module');
+const texts = (src: string, file = 'a.tsx') => scanSource(file, src).filter((t) => t.kind === 'string' || t.kind === 'jsx');
 const textOf = (src: string, needle: string) => texts(src).find((t) => t.text.includes(needle));
 
 describe('what the reader reads', () => {
@@ -95,6 +95,44 @@ describe('which strings only the LaTeX switch reaches', () => {
   it('a string after an early `if (!FLAG) return` is not guarded (the reader does not follow control flow)', () => {
     const src = `${FLAG_IMPORT}function go() { if (!LATEX_EXPORT_ENABLED) return; f('LaTeX late'); }`;
     expect(textOf(src, 'LaTeX late')?.guarded).toBe(false);
+  });
+});
+
+describe('record 29: the other hide switches, the enclosing component and the elements', () => {
+  const FLAGS = "import { IMPORT_ENABLED, ADJUSTMENTS_ENABLED, EDITOR_EXTRAS_ENABLED } from '@/config/features';\n";
+
+  it('lists every switch a string is reached through, nested guards included', () => {
+    const src = `${FLAGS}const a = IMPORT_ENABLED && 'Import one';
+      const b = ADJUSTMENTS_ENABLED ? (EDITOR_EXTRAS_ENABLED ? 'both' : 'adjust only') : 'neither';
+      const c = !EDITOR_EXTRAS_ENABLED ? 'plain' : 'Staples';`;
+    expect(textOf(src, 'Import one')?.guardedBy).toEqual(['IMPORT_ENABLED']);
+    expect([...(textOf(src, 'both')?.guardedBy ?? [])].sort()).toEqual(['ADJUSTMENTS_ENABLED', 'EDITOR_EXTRAS_ENABLED']);
+    expect(textOf(src, 'adjust only')?.guardedBy).toEqual(['ADJUSTMENTS_ENABLED']);
+    expect(textOf(src, 'neither')?.guardedBy).toEqual([]);
+    expect(textOf(src, 'Staples')?.guardedBy).toEqual(['EDITOR_EXTRAS_ENABLED']);
+    expect(textOf(src, 'plain')?.guardedBy).toEqual([]);
+    expect(textOf(src, 'Import one')?.guarded, 'the LaTeX entry stays apart').toBe(false);
+  });
+
+  it('a function call holding the switch is not a guard (the reader reads syntax)', () => {
+    const src = `${FLAGS}const only = (on, x) => (on ? [x] : []);\nconst steps = [...only(IMPORT_ENABLED, { body: 'Import it' })];`;
+    expect(textOf(src, 'Import it')?.guardedBy).toEqual([]);
+  });
+
+  it('names the enclosing function, declared or assigned to a const, else null', () => {
+    const src = `const top = 'module';
+      function Panel() { return <p>in panel</p>; }
+      const Card = () => { const inner = () => 'nested'; return 'in card'; };`;
+    expect(textOf(src, 'module')?.component).toBe(null);
+    expect(textOf(src, 'in panel')?.component).toBe('Panel');
+    expect(textOf(src, 'in card')?.component).toBe('Card');
+    expect(textOf(src, 'nested')?.component).toBe('inner');
+  });
+
+  it('keeps each component element with its guards; lowercase tags are not elements', () => {
+    const src = `${FLAGS}const el = <div><ImportSection />{ADJUSTMENTS_ENABLED && <CropHint a="b" />}<span>x</span></div>;`;
+    const elements = scanSource('a.tsx', src).filter((t) => t.kind === 'element');
+    expect(elements.map((t) => [t.text, t.guardedBy])).toEqual([['ImportSection', []], ['CropHint', ['ADJUSTMENTS_ENABLED']]]);
   });
 });
 

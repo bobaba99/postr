@@ -67,9 +67,10 @@ function landingJsonLd(lang: Lang) {
  * characters. That constraint is gone.
  *
  * Each phrase must be something the editor really does. "the
- * conference size lookups": the conference guidelines panel lists the
- * board sizes (poster/GuidelinesPanel.tsx GUIDELINES), but nothing
- * applies one to the sheet, so the phrase does not say "specs". "the
+ * conference size lookups" went with the guidelines panel, hidden
+ * (EDITOR_EXTRAS_ENABLED, record 29); "the BibTeX citation styles" became
+ * "the BibTeX reference formatting" when the style menu was hidden
+ * (ADJUSTMENTS_ENABLED): imported references are set in APA 7. "the
  * figure font-size math": the figure check works out each label's
  * printed point size (poster/readability.ts) and charts drawn in the
  * Figure tab start at print-legible sizes (charts/plotOptions.ts), but

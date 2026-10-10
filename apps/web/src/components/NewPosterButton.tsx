@@ -8,10 +8,15 @@
  *
  * Chevron menu kept for keyboard-menu users; same actions, plus a
  * place for future variants (templates, etc.).
+ *
+ * While IMPORT_ENABLED is off (record 29, owner decision D3) only
+ * "+ New poster" shows: no "Import…" and no menu, whose two items were New
+ * poster and Import.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { createPoster } from '@/data/posters';
+import { IMPORT_ENABLED } from '@/config/features';
 import { ImportPosterModal } from './ImportPosterModal';
 
 export function NewPosterButton() {
@@ -65,6 +70,8 @@ export function NewPosterButton() {
         >
           {busy ? 'Creating…' : '+ New poster'}
         </button>
+        {IMPORT_ENABLED && (
+        <>
         <button
           type="button"
           onClick={handleOpenImport}
@@ -87,6 +94,8 @@ export function NewPosterButton() {
         >
           ▾
         </button>
+        </>
+        )}
       </div>
 
       {/*
@@ -96,7 +105,7 @@ export function NewPosterButton() {
         already-designed poster (PDF / image / .pptx / .postr).
       */}
 
-      {menuOpen && (
+      {IMPORT_ENABLED && menuOpen && (
         <div
           role="menu"
           // Origin-aware entrance: the menu scales in from its top-left
@@ -132,11 +141,13 @@ export function NewPosterButton() {
 
       {error && <p className="text-xs text-[#f87171]">{error}</p>}
 
-      <ImportPosterModal
-        open={importOpen}
-        mode="new"
-        onClose={() => setImportOpen(false)}
-      />
+      {IMPORT_ENABLED && (
+        <ImportPosterModal
+          open={importOpen}
+          mode="new"
+          onClose={() => setImportOpen(false)}
+        />
+      )}
     </div>
   );
 }

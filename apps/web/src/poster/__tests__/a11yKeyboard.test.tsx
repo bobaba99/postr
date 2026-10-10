@@ -15,6 +15,13 @@
  * previously conveyed only by nearby visual copy.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+// Record 29 hid the table's row and column strips (config/features.ts ADJUSTMENTS_ENABLED);
+// this file tests that kept code, so it turns the switch on. The shipped
+// configuration is src/poster/__tests__/mvpHidden.test.tsx.
+vi.mock('@/config/features', async (orig) => ({
+  ...(await orig<typeof import('@/config/features')>()),
+  ADJUSTMENTS_ENABLED: true,
+}));
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import type { Block } from '@postr/shared';

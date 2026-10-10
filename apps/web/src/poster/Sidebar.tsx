@@ -17,7 +17,14 @@
  * actions in.
  */
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { GALLERY_PUBLIC_ENABLED, RULERS_ENABLED, SHARING_ENABLED } from '@/config/features';
+import {
+  ADJUSTMENTS_ENABLED,
+  EDITOR_EXTRAS_ENABLED,
+  GALLERY_PUBLIC_ENABLED,
+  IMPORT_ENABLED,
+  RULERS_ENABLED,
+  SHARING_ENABLED,
+} from '@/config/features';
 import type {
   Author,
   Block,
@@ -561,7 +568,9 @@ export function Sidebar(props: SidebarProps) {
           </svg>
           Back to My Posters
         </a>
-        {!props.readOnly && props.onDuplicatePoster && (
+        {/* Hidden inside the editor (EDITOR_EXTRAS_ENABLED, record 29): the
+            dashboard keeps Duplicate. */}
+        {EDITOR_EXTRAS_ENABLED && !props.readOnly && props.onDuplicatePoster && (
           <button
             type="button"
             onClick={() => props.onDuplicatePoster?.()}
@@ -999,7 +1008,8 @@ export function LayoutTab(props: {
         </div>
       )}
 
-      <ImportSection />
+      {/* Import is hidden (IMPORT_ENABLED, record 29). */}
+      {IMPORT_ENABLED && <ImportSection />}
 
       <div style={labelStyle}>Poster Size</div>
       <SheetSizeFields
@@ -1106,7 +1116,10 @@ export function LayoutTab(props: {
         })}
       </div>
 
-      <div style={labelStyle}>📐 Canvas overlays</div>
+      {/* The grid is hidden (ADJUSTMENTS_ENABLED, record 29) and so are the
+          rulers (RULERS_ENABLED): no overlays section while both are off. */}
+      {(ADJUSTMENTS_ENABLED || RULERS_ENABLED) && <div style={labelStyle}>📐 Canvas overlays</div>}
+      {ADJUSTMENTS_ENABLED && (
       <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer' }}>
         <input
           type="checkbox"
@@ -1116,6 +1129,7 @@ export function LayoutTab(props: {
         />
         Show grid
       </label>
+      )}
       {/* The rulers are hidden for now (RULERS_ENABLED, config/features.ts). */}
       {RULERS_ENABLED && (
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer', marginTop: 4 }}>
@@ -1128,9 +1142,11 @@ export function LayoutTab(props: {
           Show ruler
         </label>
       )}
-      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-        {RULERS_ENABLED ? 'Visual aids only — they never print or export.' : 'A visual aid only — it never prints or exports.'}
-      </div>
+      {(ADJUSTMENTS_ENABLED || RULERS_ENABLED) && (
+        <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+          {RULERS_ENABLED && ADJUSTMENTS_ENABLED ? 'Visual aids only — they never print or export.' : 'A visual aid only — it never prints or exports.'}
+        </div>
+      )}
 
       <div
         style={{
@@ -1146,9 +1162,14 @@ export function LayoutTab(props: {
       >
         💡 <strong style={{ color: '#c8b6ff' }}>Done building?</strong> Head to the{' '}
         <strong style={{ color: '#c8b6ff' }}>Export</strong> tab to preview,
-        {GALLERY_PUBLIC_ENABLED
+        {/* Staples is hidden (EDITOR_EXTRAS_ENABLED, record 29). */}
+        {GALLERY_PUBLIC_ENABLED && EDITOR_EXTRAS_ENABLED
           ? ' save PDF, print at Staples, or publish to the gallery.'
-          : ' save PDF, or print at Staples.'}
+          : GALLERY_PUBLIC_ENABLED
+            ? ' save PDF, or publish to the gallery.'
+            : EDITOR_EXTRAS_ENABLED
+              ? ' save PDF, or print at Staples.'
+              : ' save a PDF or export to PowerPoint.'}
       </div>
     </>
   );
@@ -1218,24 +1239,34 @@ function ExportTab(props: {
       <div style={labelStyle}>✎ Editable formats</div>
       <EditableExportButtons citationStyle={props.citationStyle} />
 
-      <div style={labelStyle}>📦 Backup file</div>
-      <PostrExportButton />
+      {/* The .postr backup is hidden with import (IMPORT_ENABLED, record 29). */}
+      {IMPORT_ENABLED && (
+        <>
+          <div style={labelStyle}>📦 Backup file</div>
+          <PostrExportButton />
+        </>
+      )}
 
-      <div style={labelStyle}>🏪 Print at Staples</div>
-      <button
-        onClick={props.onPrintAtStaples}
-        style={{
-          ...buttonStyle(false),
-          borderColor: '#cc0000',
-          color: '#ff6b6b',
-        }}
-      >
-        🏪 Email the PDF to Staples
-      </button>
-      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-        Staples mobile printing: you email the PDF, get a release code back,
-        and print at a Staples self-serve kiosk without a USB drive.
-      </div>
+      {/* Print-shop help is hidden (EDITOR_EXTRAS_ENABLED, record 29). */}
+      {EDITOR_EXTRAS_ENABLED && (
+        <>
+          <div style={labelStyle}>🏪 Print at Staples</div>
+          <button
+            onClick={props.onPrintAtStaples}
+            style={{
+              ...buttonStyle(false),
+              borderColor: '#cc0000',
+              color: '#ff6b6b',
+            }}
+          >
+            🏪 Email the PDF to Staples
+          </button>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+            Staples mobile printing: you email the PDF, get a release code back,
+            and print at a Staples self-serve kiosk without a USB drive.
+          </div>
+        </>
+      )}
 
       {GALLERY_PUBLIC_ENABLED && (
         <>
@@ -2137,6 +2168,10 @@ function RefsTab(props: {
       </button>
       <input ref={fileRef} type="file" accept=".bib,.bibtex,.ris,.enw" onChange={handleImport} style={{ display: 'none' }} />
 
+      {/* The citation style menu is hidden (ADJUSTMENTS_ENABLED, record 29):
+          references show in APA 7 (PosterEditor.tsx). */}
+      {ADJUSTMENTS_ENABLED && (
+      <>
       <div style={{ ...labelStyle, marginTop: 28 }}>Display</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -2154,6 +2189,8 @@ function RefsTab(props: {
           </select>
         </div>
       </div>
+      </>
+      )}
 
       {props.references.length > 0 && (
         <>
@@ -2195,8 +2232,10 @@ function RefsTab(props: {
         block here, one per line or separated by blank lines. Each entry
         keeps the text you pasted, so your existing APA / Vancouver /
         in-house formatting is preserved. A leading number such as "1."
-        may be dropped, and the Vancouver and IEEE styles put their own
-        number in front of each entry.
+        may be dropped
+        {ADJUSTMENTS_ENABLED
+          ? ', and the Vancouver and IEEE styles put their own number in front of each entry.'
+          : '. References you type or import are shown in APA 7.'}
       </p>
       <textarea
         // A draft until parsed: keeps the browser's own undo (fix 12).
@@ -2426,7 +2465,8 @@ function StyleTab(props: {
             )}
           </span>
         </button>
-        {isCustom && (
+        {/* Custom rows are drawn only with the switch on (record 29). */}
+        {ADJUSTMENTS_ENABLED && isCustom && (
           <>
             <button
               type="button"
@@ -2462,6 +2502,9 @@ function StyleTab(props: {
 
   return (
     <>
+      {/* Copy a design is hidden (ADJUSTMENTS_ENABLED, record 29). */}
+      {ADJUSTMENTS_ENABLED && (
+      <>
       <div style={labelStyle}>Copy a design</div>
       <button
         type="button"
@@ -2499,12 +2542,17 @@ function StyleTab(props: {
         open={copyDesignOpen}
         onClose={() => setCopyDesignOpen(false)}
       />
+      </>
+      )}
 
       <div style={labelStyle}>Palette</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {PALETTES.map((p) => renderPaletteRow(p, false))}
 
-        {props.customPalettes.length > 0 && (
+        {/* Custom palettes are hidden (ADJUSTMENTS_ENABLED, record 29). A
+            poster keeps its palette's colours, not its name, so one made
+            with a custom palette still draws in it. */}
+        {ADJUSTMENTS_ENABLED && props.customPalettes.length > 0 && (
           <div
             style={{
               fontSize: 10,
@@ -2519,8 +2567,10 @@ function StyleTab(props: {
             Your palettes
           </div>
         )}
-        {props.customPalettes.map((p) => renderPaletteRow(p, true))}
+        {ADJUSTMENTS_ENABLED && props.customPalettes.map((p) => renderPaletteRow(p, true))}
 
+        {ADJUSTMENTS_ENABLED && (
+        <>
         <button
           type="button"
           onClick={props.onCreateCustomPalette}
@@ -2552,6 +2602,8 @@ function StyleTab(props: {
           Build your own with color-theory randomizer, paste from Coolors,
           or extract from an image.
         </div>
+        </>
+        )}
       </div>
 
       <div style={labelStyle}>Font</div>
@@ -2579,6 +2631,10 @@ function StyleTab(props: {
       <div style={labelStyle}>Typography</div>
       <StyleEditor styles={props.styles} onChange={props.onChangeStyles} />
 
+      {/* Heading style and style presets are hidden (ADJUSTMENTS_ENABLED,
+          record 29): headings keep the poster's stored style. */}
+      {ADJUSTMENTS_ENABLED && (
+      <>
       <div style={labelStyle}>Headings</div>
       <HeadingEditor headingStyle={props.headingStyle} onChange={props.onChangeHeadingStyle} />
 
@@ -2628,6 +2684,8 @@ function StyleTab(props: {
             </button>
           ))}
         </div>
+      )}
+      </>
       )}
     </>
   );
@@ -2681,6 +2739,10 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles, coalesceKey?
               />
               <span style={miniLabel}>pt</span>
             </div>
+            {/* Weight, italic and line height are hidden (ADJUSTMENTS_ENABLED,
+                record 29); stored values still draw. */}
+            {ADJUSTMENTS_ENABLED && (
+            <>
             <select
               value={props.styles[t.k].weight}
               onChange={(e) => update(t.k, 'weight', +e.target.value)}
@@ -2733,6 +2795,8 @@ function StyleEditor(props: { styles: Styles; onChange: (s: Styles, coalesceKey?
                 title="Line height (1.0–3.0)"
               />
             </div>
+            </>
+            )}
           </div>
         </div>
       ))}
@@ -2866,8 +2930,9 @@ function EditTab(props: {
             label="Figure"
             onUpdateBlock={props.onUpdateBlock}
           />
-          <ImageFitToggle block={sb} onUpdateBlock={props.onUpdateBlock} />
-          <CropHint />
+          {/* Stretch and crop are hidden (ADJUSTMENTS_ENABLED, record 29). */}
+          {ADJUSTMENTS_ENABLED && <ImageFitToggle block={sb} onUpdateBlock={props.onUpdateBlock} />}
+          {ADJUSTMENTS_ENABLED && <CropHint />}
         </>
       ) : sb && sb.type === 'chart' ? (
         // Charts share the figure caption system — the picker seeds
@@ -2878,18 +2943,34 @@ function EditTab(props: {
           onUpdateBlock={props.onUpdateBlock}
         />
       ) : sb && sb.type === 'logo' ? (
-        <>
-          <ImageFitToggle block={sb} onUpdateBlock={props.onUpdateBlock} />
-          <CropHint />
-        </>
+        ADJUSTMENTS_ENABLED ? (
+          <>
+            <ImageFitToggle block={sb} onUpdateBlock={props.onUpdateBlock} />
+            <CropHint />
+          </>
+        ) : (
+          // Stretch and crop are hidden (ADJUSTMENTS_ENABLED, record 29).
+          // An empty logo (Insert › Logo) has none to replace yet.
+          <div style={{ fontSize: 14, color: '#8a8a95', padding: '16px 0', lineHeight: 1.5 }}>
+            Drag a corner of the logo to resize it, or press its Replace
+            button to choose {sb.imageSrc ? 'another' : 'one'}.
+          </div>
+        )
       ) : sb && isTextLike && styleLevel ? (
-        <TextBlockEditor
-          block={sb}
-          styleLevel={styleLevel}
-          palette={props.palette}
-          onUpdateBlock={props.onUpdateBlock}
-          onUpdateStyle={updateStyle}
-        />
+        ADJUSTMENTS_ENABLED ? (
+          <TextBlockEditor
+            block={sb}
+            styleLevel={styleLevel}
+            palette={props.palette}
+            onUpdateBlock={props.onUpdateBlock}
+            onUpdateStyle={updateStyle}
+          />
+        ) : (
+          // The font controls and the second text box are hidden
+          // (ADJUSTMENTS_ENABLED, record 29): the text is typed on the
+          // poster, and its size is the level's, set in the Style tab.
+          <TextLevelNote type={sb.type} styleLevel={styleLevel} />
+        )
       ) : (
         <div style={{ fontSize: 14, color: '#8a8a95', padding: '16px 0', lineHeight: 1.5 }}>
           Click a text, table, or image block on the canvas to edit it
@@ -2901,6 +2982,30 @@ function EditTab(props: {
         </div>
       )}
     </>
+  );
+}
+
+// =========================================================================
+// TextLevelNote — what the Edit tab says for a title, heading or text block
+// while the adjustments are hidden (record 29)
+// =========================================================================
+
+const LEVEL_NOTE: Record<string, string> = {
+  title: 'Title · {pt} pt.',
+  heading: 'Headings · {pt} pt, the same for every heading on this poster.',
+  text: 'Body text · {pt} pt, the same for all body text on this poster.',
+};
+
+function TextLevelNote({ type, styleLevel }: { type: Block['type']; styleLevel: TypeStyle }) {
+  const line = (LEVEL_NOTE[type] ?? LEVEL_NOTE.text!).replace('{pt}', String(Math.round(unitsToPt(styleLevel.size))));
+  return (
+    <div style={{ fontSize: 14, color: '#8a8a95', padding: '16px 0', lineHeight: 1.5 }}>
+      <div style={{ color: '#c8cad0', fontWeight: 600 }}>{line}</div>
+      <div style={{ marginTop: 6 }}>
+        Type on the poster to edit this block. Change the size in the{' '}
+        <span style={{ color: '#c8b6ff' }}>Style</span> tab, under Typography.
+      </div>
+    </div>
   );
 }
 
@@ -2939,12 +3044,15 @@ function TableTipsDropdown() {
       </summary>
       <ul style={{ margin: '8px 0 4px', paddingLeft: 18 }}>
         <li>✏️ Click any cell on the canvas to type directly.</li>
-        <li>🖱️ Click a row/column header strip to select the whole row or column.</li>
+        {/* The tips for the table's canvas controls and its Format button
+            go with them (ADJUSTMENTS_ENABLED, record 29). */}
+        {ADJUSTMENTS_ENABLED && <li>🖱️ Click a row/column header strip to select the whole row or column.</li>}
         <li>📋 Pasting into a cell replaces the whole table with what you paste, so rows copied from Word, Excel, or Google Sheets come in as a new grid.</li>
-        <li>↔️ Drag column borders to resize.</li>
-        <li>🗑️ Select a row/column and press Delete to remove it.</li>
+        {ADJUSTMENTS_ENABLED && <li>↔️ Drag column borders to resize.</li>}
+        {ADJUSTMENTS_ENABLED && <li>🗑️ Select a row/column and press Delete to remove it.</li>}
+        {!ADJUSTMENTS_ENABLED && <li>➕ Add or remove the last row or column with the Rows and Columns buttons below.</li>}
         <li>⌨️ Tab / Shift+Tab to jump between cells.</li>
-        <li>✨ Type <code>**bold**</code>, <code>*italic*</code>, or <code>M (SD)*</code> in a cell, then click <b>Format table</b> in the Caption section below.</li>
+        {ADJUSTMENTS_ENABLED && <li>✨ Type <code>**bold**</code>, <code>*italic*</code>, or <code>M (SD)*</code> in a cell, then click <b>Format table</b> in the Caption section below.</li>}
       </ul>
     </details>
   );
@@ -3058,6 +3166,10 @@ function CaptionEditor(props: {
 }) {
   const { block, label, onUpdateBlock } = props;
   const position = block.captionPosition ?? 'bottom';
+  // While the position buttons are hidden (ADJUSTMENTS_ENABLED, record 29)
+  // a caption sits where it is stored, else on top (the canvas's default);
+  // "Show caption" only hides it ('none') or brings it back on top.
+  const shown = (block.captionPosition ?? 'top') !== 'none';
   // Transient "✓ Formatted" pulse so the click is clearly acknowledged
   // even when the textarea shows the same plain text after re-strip.
   const [justFormatted, setJustFormatted] = useState(false);
@@ -3127,6 +3239,19 @@ function CaptionEditor(props: {
         placeholder={`${label.toLowerCase()} description…`}
         style={inputBase}
       />
+      {!ADJUSTMENTS_ENABLED && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c8cad0', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={shown}
+            onChange={(e) => onUpdateBlock(block.id, { captionPosition: e.target.checked ? 'top' : 'none' })}
+            style={{ accentColor: '#7c6aed' }}
+          />
+          Show caption
+        </label>
+      )}
+      {ADJUSTMENTS_ENABLED && (
+      <>
       <div style={{ fontSize: 13, color: '#8a8a95' }}>Caption position</div>
       <div
         style={{
@@ -3199,9 +3324,21 @@ function CaptionEditor(props: {
           />
         </>
       )}
+      </>
+      )}
 
       {/* ── Note (plain text — auto-formatter handles italics) ── */}
       <div style={{ ...labelStyle, marginTop: 8 }}>{label} Note</div>
+      {!ADJUSTMENTS_ENABLED && (
+        <p style={{ fontSize: 13, color: '#8a8a95', margin: 0, lineHeight: 1.5 }}>
+          Longer footnote shown directly below the {label.toLowerCase()}.
+          Just paste or type normally.
+        </p>
+      )}
+      {/* The Format button and its help are hidden (ADJUSTMENTS_ENABLED,
+          record 29). */}
+      {ADJUSTMENTS_ENABLED && (
+      <>
       <p style={{ fontSize: 13, color: '#8a8a95', margin: 0, lineHeight: 1.5 }}>
         Longer footnote shown directly below the {label.toLowerCase()}.
         Just paste or type normally. Clicking{' '}
@@ -3253,13 +3390,19 @@ function CaptionEditor(props: {
             ? `✨ Format ${label === 'Table' ? 'table' : 'note'}`
             : `✓ ${label === 'Table' ? 'Table' : 'Note'} formatted`}
       </button>
+      </>
+      )}
       <textarea
         value={stripHtmlToPlainText(block.note ?? '')}
         onChange={(e) => onUpdateBlock(block.id, { note: e.target.value })}
         placeholder={
-          label === 'Figure'
-            ? 'Error bars show 95% CI. **p** < .01.'
-            : '*Note.* *p* < .05. SD in parentheses.'
+          !ADJUSTMENTS_ENABLED
+            ? label === 'Figure'
+              ? 'Error bars show 95% CI.'
+              : 'Note. SD in parentheses.'
+            : label === 'Figure'
+              ? 'Error bars show 95% CI. **p** < .01.'
+              : '*Note.* *p* < .05. SD in parentheses.'
         }
         style={{
           ...inputBase,
@@ -3270,6 +3413,7 @@ function CaptionEditor(props: {
           lineHeight: 1.5,
         }}
       />
+      {ADJUSTMENTS_ENABLED && (
       <p
         style={{
           fontSize: 12,
@@ -3289,6 +3433,7 @@ function CaptionEditor(props: {
         them into bold / italic / superscript on the poster. Click it once:
         a second click removes the formatting your markers made.
       </p>
+      )}
     </div>
   );
 }
@@ -3555,6 +3700,10 @@ function TableEditor(props: {
           custom mode using the displayed layout as the starting
           point. Kept above the preset row so users see the live
           preview before scanning preset names. */}
+      {/* Table borders are hidden (ADJUSTMENTS_ENABLED, record 29): new
+          tables are APA 3-line, stored borders still draw. */}
+      {ADJUSTMENTS_ENABLED && (
+      <>
       <CustomBorderMockup
         border={displayBorder}
         rows={data.rows}
@@ -3616,6 +3765,8 @@ function TableEditor(props: {
           </button>
         </div>
       </div>
+      </>
+      )}
 
     </div>
   );
@@ -4204,7 +4355,9 @@ function AddBlockPanel(props: {
     ['text', 'Text', 'Paragraph with slash-command symbols'],
     ['image', 'Image', 'Figure or photo upload'],
     [null, 'Chart', 'Build a figure from your data'],
-    ['table', 'Table', 'Data table with border presets'],
+    // Border presets are hidden (ADJUSTMENTS_ENABLED, record 29): a new
+    // table is APA 3-line.
+    ['table', 'Table', ADJUSTMENTS_ENABLED ? 'Data table with border presets' : 'Data table, APA three-line style'],
     ['references', 'References', 'Auto-formatted from the References tab'],
     ['logo', 'Logo', 'Institution or sponsor mark'],
   ];

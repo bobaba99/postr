@@ -36,12 +36,25 @@
  * the inventory reads like any source file: the same rules hold in French
  * (the patterns read « 18,99 $ CA », « taxes » and « / 4 mois »).
  *
+ * Record 29 (owner decisions D3 and D4 of 2026-10-07,
+ * docs/fixes/29-mvp-simplify.md): while IMPORT_ENABLED,
+ * ADJUSTMENTS_ENABLED and EDITOR_EXTRAS_ENABLED are off, no copy a user
+ * can be shown, in English or French, points at a control they hide
+ * (HIDDEN_CLAIMS, one list of patterns per switch). A string reachable only
+ * with one of the switches on (copyScan's guards), or inside a component
+ * only rendered with its switch on (HIDDEN_COMPONENTS, checked here: every
+ * place that renders one is guarded by its switch), is not shown. A
+ * hidden control's own label outside such a component is listed in
+ * HIDDEN_LABELS with the test that shows the control is not drawn. The
+ * API's strings are left out of this rule: they are prompts for the
+ * model and error messages, and the editor's controls are the web app's.
+ *
  * Re-run: npx vitest run src/__tests__/copyInventory.test.ts
  */
 import { readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { LATEX_EXPORT_ENABLED } from '@/config/features';
+import { ADJUSTMENTS_ENABLED, EDITOR_EXTRAS_ENABLED, IMPORT_ENABLED, LATEX_EXPORT_ENABLED } from '@/config/features';
 import routes from '@/seo/routes.json';
 import {
   LATEX_CLAIM,
@@ -50,6 +63,7 @@ import {
   readSource,
   scanSource,
   type CopyText,
+  type HideFlag,
 } from '@/test/copyScan';
 
 const WEB = process.cwd();
@@ -125,6 +139,9 @@ const rawLines = RAW_FILES.flatMap((file) =>
 
 const at = (t: Found) => `${t.file}:${t.line}  ${JSON.stringify(t.text.slice(0, 140))}`;
 
+/** A string a user can read: not an import specifier, not a component's tag name. */
+const isCopy = (t: CopyText) => t.kind === 'string' || t.kind === 'jsx';
+
 describe('the inventory reads what it should', () => {
   it('reads the surfaces the decisions name, and not the legal pages', () => {
     const files = new Set(scanned.map((t) => t.file));
@@ -157,7 +174,7 @@ describe('the inventory reads what it should', () => {
 
   it('reads the French prices (fix 26): the cards, the /auth/fr labels and the crawler copy', () => {
     const FRENCH_PRICE = /\d+,\d{2}\s\$/;
-    const frenchSource = scanned.filter((t) => t.kind !== 'module' && FRENCH_PRICE.test(t.text));
+    const frenchSource = scanned.filter((t) => isCopy(t) && FRENCH_PRICE.test(t.text));
     expect(frenchSource.map((t) => t.file)).toEqual(
       expect.arrayContaining(['apps/web/src/i18n/pricing.ts', 'apps/web/src/i18n/auth.ts']),
     );
@@ -170,7 +187,7 @@ describe.runIf(!LATEX_EXPORT_ENABLED)('no copy claims the hidden LaTeX export', 
   it('no source string outside the switch names it', () => {
     const hits = scanned.filter(
       (t) =>
-        t.kind !== 'module' &&
+        isCopy(t) &&
         !t.guarded &&
         !LATEX_WRITER.test(t.file) &&
         // The export kind's name in code ('latex' | 'pptx'), never shown.
@@ -200,7 +217,7 @@ describe('every price shown says tax is extra', () => {
   it('every price in a source string has its tax note beside it, or is a listed bare price', () => {
     const hits = scanned.filter(
       (t) =>
-        t.kind !== 'module' &&
+        isCopy(t) &&
         hasUntaxedPrice(t.text) &&
         !(BARE_PRICES[t.file] ?? []).includes(t.text),
     );
@@ -225,7 +242,7 @@ describe('every price shown says tax is extra', () => {
   // Review round 1, B-R1-03: "CA$18.99 + applicable taxes / 4 months" reads
   // as taxes per 4 months. The period goes before the tax note.
   it('no tax note sits between a price and its billing period', () => {
-    expect(scanned.filter((t) => t.kind !== 'module' && TAX_BEFORE_PERIOD.test(t.text)).map(at)).toEqual([]);
+    expect(scanned.filter((t) => isCopy(t) && TAX_BEFORE_PERIOD.test(t.text)).map(at)).toEqual([]);
     expect(routeStrings().filter((s) => TAX_BEFORE_PERIOD.test(s.text))).toEqual([]);
     expect(rawLines.filter((l) => TAX_BEFORE_PERIOD.test(l.text))).toEqual([]);
   });
@@ -236,5 +253,157 @@ describe('Resila is incorporated in Quebec, not "registered"', () => {
     expect(scanned.filter((t) => REGISTERED_IN_QUEBEC.test(t.text)).map(at)).toEqual([]);
     expect(routeStrings().filter((s) => REGISTERED_IN_QUEBEC.test(s.text))).toEqual([]);
     expect(rawLines.filter((l) => REGISTERED_IN_QUEBEC.test(l.text))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------- record 29
+
+/**
+ * What points at a control each switch hides (bounded-designs.md §5.2), in
+ * English and French: the control named, or offered as something Postr
+ * does. A control's mere styling words ("italic", "rotate(90deg)") are not
+ * claims, and the controls themselves are counted hidden by
+ * src/poster/__tests__/mvpHidden.test.tsx and scripts/simplify-check.mjs.
+ */
+const HIDDEN_CLAIMS: Readonly<Record<Exclude<HideFlag, 'LATEX_EXPORT_ENABLED'>, readonly RegExp[]>> = {
+  IMPORT_ENABLED: [
+    // The file type, not a CSS class (.postr-ack) or the domain (postr.sh).
+    /(^|\s)\.postr(?![-\w.])/i,
+    /\bimport (an?|your|one|existing|the)( existing)? (poster|PowerPoint|PDF|file)\b/i,
+    /import one you already have|you can import it|Import (PDF|it\b)|Import…|Import and edit|Already have a poster/i,
+    /importez[- ](la|le|et modifiez)|importer (une|votre) affiche|affiche que vous avez déjà/i,
+  ],
+  ADJUSTMENTS_ENABLED: [
+    /\bcrop (the |an )?image|✂|Exit crop|Apply crop|Reset crop/i,
+    /Drag to rotate|rotate (handle|control)|Rotation tricks|faire pivoter/i,
+    /Stretch to fit|Show grid|Scan image|scan an image/i,
+    /custom palette|palette designer|build your own|créez la vôtre/i,
+    /Copy a design|Copier un design|poster you admire|affiche que vous admirez|Borrow a look/i,
+    /style presets?|préréglages? de style/i,
+    /line (height|spacing)|interligne/i,
+    /\b[Ss]trikethrough\b|Highlight ·|Text · |Default color|Reset to palette/,
+    /Caption (position|spacing)|✨ Format|Format (table|note)\b/i,
+    /border (style|presets?)|header strip|column borders|Drag to resize column/i,
+    /citation[- ]styles?|styles de citation|Pick APA|(Vancouver|IEEE)( and \w+)? styles?|APA 7, Vancouver/i,
+  ],
+  EDITOR_EXTRAS_ENABLED: [
+    /Staples/,
+    /guidelines? panel|consignes d’affiche|board sizes|conference size|recherche des formats de congrès/i,
+    /\bchecklist|liste de vérification|word targets|cibles de nombre de mots|Scratch Pad/i,
+    /Duplicate this poster/i,
+  ],
+};
+
+/** The switch each component is rendered only behind; the file it is defined in. */
+const HIDDEN_COMPONENTS: Readonly<Record<string, { flag: HideFlag; file: string }>> = {
+  ImportSection: { flag: 'IMPORT_ENABLED', file: 'apps/web/src/poster/sidebar/ImportSection.tsx' },
+  ImportTile: { flag: 'IMPORT_ENABLED', file: 'apps/web/src/poster/sidebar/ImportTile.tsx' },
+  ImportConfirmReplaceModal: { flag: 'IMPORT_ENABLED', file: 'apps/web/src/components/ImportConfirmReplaceModal.tsx' },
+  ImportPosterModal: { flag: 'IMPORT_ENABLED', file: 'apps/web/src/components/ImportPosterModal.tsx' },
+  PostrExportButton: { flag: 'IMPORT_ENABLED', file: 'apps/web/src/poster/sidebar/PostrExportButton.tsx' },
+  CopyDesignModal: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/components/CopyDesignModal.tsx' },
+  PaletteDesigner: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/components/PaletteDesigner.tsx' },
+  PresetEditModal: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/components/PresetEditModal.tsx' },
+  CropOverlay: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/poster/CropOverlay.tsx' },
+  ImageScanSection: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/poster/ReadabilityPanel.tsx' },
+  ImageFitToggle: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/poster/Sidebar.tsx' },
+  CropHint: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/poster/Sidebar.tsx' },
+  HeadingEditor: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/poster/Sidebar.tsx' },
+  TextBlockEditor: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/poster/Sidebar.tsx' },
+  CustomBorderMockup: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/poster/Sidebar.tsx' },
+  TableContextMenu: { flag: 'ADJUSTMENTS_ENABLED', file: 'apps/web/src/poster/blocks.tsx' },
+  StaplesPrintModal: { flag: 'EDITOR_EXTRAS_ENABLED', file: 'apps/web/src/components/StaplesPrintModal.tsx' },
+  GuidelinesPanel: { flag: 'EDITOR_EXTRAS_ENABLED', file: 'apps/web/src/poster/GuidelinesPanel.tsx' },
+};
+
+/**
+ * Files whose copy is reached only through a hidden component or a hidden
+ * route, with the reason. Every string in them, at the top level too, is
+ * not shown while their switch is off.
+ */
+const HIDDEN_FILES: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(
+    Object.values(HIDDEN_COMPONENTS)
+      .filter((c) => !/(Sidebar|ReadabilityPanel|blocks)\.tsx$/.test(c.file))
+      .map((c) => [c.file, `defines a component rendered only with ${c.flag} on`]),
+  ),
+  // The readers run only from the import modals; importPostr also builds the
+  // welcome poster, whose failure is caught and never shown
+  // (data/seedWelcomePoster.ts).
+  'apps/web/src/import/': 'run only from the hidden import',
+  // /paper-to-poster redirects to / (routes.tsx header).
+  'apps/web/src/pages/PaperToPoster.tsx': 'a page whose route redirects',
+};
+const inHiddenFile = (file: string) => Object.keys(HIDDEN_FILES).some((f) => (f.endsWith('/') ? file.startsWith(f) : file === f));
+
+/**
+ * A hidden control's own label, outside any hidden component, and the test
+ * that shows the control is not drawn while its switch is off.
+ */
+const HIDDEN_LABELS: Readonly<Record<string, readonly string[]>> = {
+  // The rotate control (blocks.tsx rotateButton): blockControls draws it only
+  // with ADJUSTMENTS_ENABLED (mvpHidden.test.tsx, "an image selected").
+  'apps/web/src/poster/blocks.tsx': ['Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)'],
+  // The status of the profile's presets row's "Clear all", a row drawn only
+  // with ADJUSTMENTS_ENABLED (mvpHiddenPages.test.tsx).
+  'apps/web/src/pages/Profile.tsx': ['Style presets cleared.'],
+};
+
+const WEB_APP = /^apps\/web\//;
+const RECORD_29 = Object.keys(HIDDEN_CLAIMS) as Array<keyof typeof HIDDEN_CLAIMS>;
+const SWITCH_ON: Readonly<Record<string, boolean>> = { IMPORT_ENABLED, ADJUSTMENTS_ENABLED, EDITOR_EXTRAS_ENABLED };
+
+/** Shown while every record-29 switch that is off stays off: no off switch guards it. */
+function shown(t: Found): boolean {
+  const off = (f: HideFlag) => f !== 'LATEX_EXPORT_ENABLED' && !SWITCH_ON[f];
+  if (t.guardedBy.some(off)) return false;
+  if (inHiddenFile(t.file)) return false;
+  const host = t.component ? HIDDEN_COMPONENTS[t.component] : undefined;
+  if (host && host.file === t.file && off(host.flag)) return false;
+  return !(HIDDEN_LABELS[t.file] ?? []).includes(t.text);
+}
+
+describe('record 29: no copy points at a control a switch hides', () => {
+  it('every hidden component is rendered only behind its switch, or inside another one hidden by it', () => {
+    const bad = scanned.filter((t) => {
+      if (t.kind !== 'element') return false;
+      const c = HIDDEN_COMPONENTS[t.text];
+      if (!c || SWITCH_ON[c.flag]) return false;
+      if (t.guardedBy.includes(c.flag)) return false;
+      const host = t.component ? HIDDEN_COMPONENTS[t.component] : undefined;
+      if (host && host.flag === c.flag) return false;
+      return !(inHiddenFile(t.file) && Object.values(HIDDEN_COMPONENTS).some((h) => h.file === t.file && h.flag === c.flag));
+    });
+    expect(bad.map(at)).toEqual([]);
+    // The list is live: each component is still defined where it says.
+    for (const [name, c] of Object.entries(HIDDEN_COMPONENTS)) {
+      expect(scanned.some((t) => t.file === c.file && t.component === name), `${name} in ${c.file}`).toBe(true);
+    }
+  });
+
+  for (const flag of RECORD_29) {
+    describe.runIf(!SWITCH_ON[flag])(`${flag} is off`, () => {
+      it('no web app string a user can be shown names a control it hides', () => {
+        const hits = scanned.filter(
+          (t) => isCopy(t) && WEB_APP.test(t.file) && shown(t) && HIDDEN_CLAIMS[flag].some((re) => re.test(t.text)),
+        );
+        expect(hits.map(at)).toEqual([]);
+      });
+
+      it('the crawler copy does not name one', () => {
+        expect(routeStrings().filter((r) => HIDDEN_CLAIMS[flag].some((re) => re.test(r.text)))).toEqual([]);
+      });
+
+      it('index.html and the public text files do not name one', () => {
+        expect(rawLines.filter((l) => HIDDEN_CLAIMS[flag].some((re) => re.test(l.text)))).toEqual([]);
+      });
+    });
+  }
+
+  it('each listed hidden label is still where the list says', () => {
+    for (const [file, labels] of Object.entries(HIDDEN_LABELS)) {
+      const there = scanned.filter((t) => t.file === file).map((t) => t.text);
+      for (const l of labels) expect(there, `${file} ${l}`).toContain(l);
+    }
   });
 });

@@ -10,6 +10,7 @@ import {
 } from 'react';
 import type { Block } from '@postr/shared';
 import { printedImageBox } from './imageBox';
+import { ADJUSTMENTS_ENABLED } from '@/config/features';
 import { FIGURE_TEXT_MIN_PT, figureTextStatus } from './figureTextMinimums';
 import {
   parseRCode,
@@ -574,7 +575,9 @@ export function ReadabilityPanel({
 
   return (
     <div style={panelStyle}>
-      {isImage && (
+      {/* "🔎 Scan image" is hidden (ADJUSTMENTS_ENABLED, record 29); the
+          code check below stays. */}
+      {isImage && ADJUSTMENTS_ENABLED && (
         <ImageScanSection
           state={scanState}
           onRun={runImageScan}

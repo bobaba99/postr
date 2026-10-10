@@ -60,6 +60,29 @@
   display: list-item;
 }
 
+/* =================================================================== *
+ * Grey prompts in empty blocks (record 29, docs/fixes/29-mvp-simplify.md;
+ * bounded-designs.md §3.1 rule 6)
+ * =================================================================== *
+ *
+ * An empty title, heading or text block, and a table's first body cell
+ * while its body is empty, show their prompt ("Poster title", a template's
+ * guidance sentence), as PowerPoint's "Click to add text" does. The editor
+ * marks an empty editable with data-empty (a browser can leave a lone <br>
+ * in a block the user emptied, which defeats :empty). The prompt goes while
+ * the caret is in the block, so it never sits beside the caret. On the
+ * canvas only (#poster-canvas): Export › Preview draws the same blocks
+ * outside it and shows the poster as it prints, without prompts (review
+ * round 1, R1-01). The print window builds its own stylesheet (export/
+ * printDocument.ts), and the exports read the block's text, which is empty.
+ */
+#poster-canvas [data-placeholder][data-empty]:not(:focus)::before {
+  content: attr(data-placeholder);
+  color: inherit;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 html,
 body,
 #root {
