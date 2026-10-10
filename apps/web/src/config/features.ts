@@ -17,6 +17,10 @@
  *     place, so it survived the deactivation as a dead end — it routed
  *     to /p/:id?publish=1, which PosterEditor ignores while this flag is
  *     false. Re-add it from git history if the gallery comes back.
+ *   - components/PublishGalleryModal.tsx: its capture draws #poster-canvas
+ *     itself, so the editor's hints and selection would reach the image;
+ *     capture through export/stripEditorChrome.ts's copy, as
+ *     data/thumbnails.ts does (record 31's review round 1, R1-I1).
  */
 export const GALLERY_PUBLIC_ENABLED = false;
 

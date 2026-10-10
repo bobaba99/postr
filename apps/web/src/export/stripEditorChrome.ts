@@ -37,6 +37,16 @@
  *     hovered strip as a tinted band beside it (record 30's review round 2,
  *     R2-F1). Its own marker, not data-postr-selection-ui: index.css and the
  *     control harnesses read that one as the selection's controls.
+ *     Since record 31 the same marker is on the editor's hints and prompts
+ *     inside a block: an empty figure's "+ Upload figure" and an empty
+ *     logo's "+ Logo" buttons, "Add authors in sidebar →", "Add references
+ *     in Refs tab →", and a chart's "Rendering chart…" and failure message
+ *     (blocks.tsx, charts/ChartBlock.tsx). The rule (record 31): editor
+ *     hints never reach the PDF, the thumbnail or the PowerPoint file; an
+ *     empty block prints no prompt (its numbering, a heading's "1." or a
+ *     figure's "Figure N.", is not a hint and still prints: record 31 §10).
+ *     A hint added later carries the marker, or it prints
+ *     (scripts/print-path-check.mjs HINT).
  */
 export function stripEditorChrome(clone: HTMLElement): void {
   clone

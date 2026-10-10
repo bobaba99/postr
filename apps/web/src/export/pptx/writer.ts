@@ -13,19 +13,16 @@
  * 2. Rich-text run mapping — `parseRichText` output is converted
  *    to pptxgenjs run objects here.
  *
- * Pure `PosterDoc → bytes` — no DOM, no store (plan §5).
+ * Pure `PosterDoc → bytes` — no DOM, no store (plan §5) — but for its two
+ * browser steps, each injected with a browser default: drawing an SVG to a
+ * PNG (rasterizeSvg.ts) and reading a chart's picture off the editor's sheet
+ * (chartPicture.ts, record 31).
  */
 import type PptxGenJS from 'pptxgenjs';
 import type { Block, PosterDoc, TypeStyle } from '@postr/shared';
-import { planPptxScale, unitsToInches, unitsToPoints } from '../units';
+import { planPptxScale } from '../units';
 import { PX } from '@/poster/constants';
-import {
-  cssColorToHex6,
-  parseRichText,
-  splitItalicMarkers,
-  type RichParagraph,
-  type RichRun,
-} from '../richText';
+import { parseRichText, splitItalicMarkers } from '../richText';
 import {
   computeCaptionNumbers,
   computeHeadingNumbers,
@@ -34,11 +31,7 @@ import {
   formatReferencesForExport,
   type ExportContentOptions,
 } from '../posterContent';
-import {
-  resolvePosterAssets,
-  type AssetFetcher,
-  type ResolvedAsset,
-} from '../resolveAssets';
+import { resolvePosterAssets, type AssetFetcher } from '../resolveAssets';
 import { tableCellBorders } from './tableBorders';
 import { attributionDocProperty, attributionPptxBox } from '../attribution';
 import { stripAckBlock } from '../stripAckBlock';
@@ -51,6 +44,25 @@ import {
 } from './masters';
 import { patchThemeColors } from './themePatch';
 import { browserRasterizeSvg, type SvgRasterizer } from './rasterizeSvg';
+import {
+  addMutedText,
+  bytesToBase64,
+  captionSplit,
+  captionText,
+  hex,
+  normalizeRotation,
+  orEmptyRun,
+  paragraphsToTextProps,
+  pt,
+  rect,
+  type Ctx,
+} from './shapeKit';
+import { addChart, type ChartPicture } from './chartShape';
+import { editorChartPicture, type ChartDraw, type ChartDrawer } from './chartPicture';
+import { SheetNotShownError } from '@/charts/chartDrawing';
+
+// Moved to shapeKit.ts (record 31); still exported from here for callers.
+export { normalizeRotation, paragraphsToTextProps };
 
 export interface PptxExportOptions extends ExportContentOptions {
   /** Injectable for tests / server pipelines. */
@@ -72,6 +84,15 @@ export interface PptxExportOptions extends ExportContentOptions {
    * or omit it (a doc with no SVG asset never calls it).
    */
   rasterizeSvg?: SvgRasterizer;
+  /**
+   * Reads a chart block off the editor's sheet, then draws its picture
+   * (record 31). Defaults to the editor's own drawing (chartPicture.ts);
+   * injectable for tests. Every chart is read before the writer's first
+   * await; a chart it cannot read or draw is left out of the file, with a
+   * warning. A reading that throws SheetNotShownError (the poster hidden
+   * or gone) stops the export: nothing is written.
+   */
+  drawChart?: ChartDrawer;
   // `attribution` (the paid-plan seam) is inherited from
   // ExportContentOptions, which also threads it into the references
   // formatter so the credit entry honours the same seam.
@@ -84,78 +105,6 @@ export interface PptxExportResult {
   /** The user-facing half-size note (also written into the file). */
   note: string | null;
   warnings: string[];
-}
-
-interface Ctx {
-  doc: PosterDoc;
-  /** `doc.fontFamily` restricted to the curated families. pptxgenjs
-   *  writes font names into `typeface="…"` WITHOUT escaping, so an
-   *  `&` or `<` in the name emits malformed XML that PowerPoint
-   *  refuses to open. Names can arrive from an imported deck, so
-   *  every emitter uses this rather than `doc.fontFamily` directly. */
-  font: string;
-  scale: number;
-  captionNumbers: Record<string, number>;
-  headingNumbers: Record<string, number>;
-  assets: Map<string, ResolvedAsset>;
-  options: PptxExportOptions;
-  warnings: string[];
-}
-
-/** Block geometry → slide inches at the plan's scale. */
-const rect = (b: Block, s: number) => ({
-  x: unitsToInches(b.x) * s,
-  y: unitsToInches(b.y) * s,
-  w: unitsToInches(b.w) * s,
-  h: unitsToInches(b.h) * s,
-});
-
-const pt = (sizeUnits: number, s: number): number =>
-  Math.round(unitsToPoints(sizeUnits) * s * 100) / 100;
-
-const hex = (css: string | null | undefined, fallback: string): string =>
-  cssColorToHex6(css ?? null) ?? fallback;
-
-function runOptions(run: RichRun): PptxGenJS.TextPropsOptions {
-  const opts: PptxGenJS.TextPropsOptions = {};
-  if (run.bold) opts.bold = true;
-  if (run.italic) opts.italic = true;
-  if (run.underline) opts.underline = { style: 'sng' };
-  if (run.strike) opts.strike = 'sngStrike';
-  if (run.sub) opts.subscript = true;
-  if (run.sup) opts.superscript = true;
-  const color = cssColorToHex6(run.color);
-  if (color) opts.color = color;
-  const highlight = cssColorToHex6(run.highlight);
-  if (highlight) opts.highlight = highlight;
-  return opts;
-}
-
-/** Guard: pptxgenjs needs at least one run per text shape. */
-const orEmptyRun = (runs: PptxGenJS.TextProps[]): PptxGenJS.TextProps[] =>
-  runs.length > 0 ? runs : [{ text: '', options: {} }];
-
-/** Paragraphs → pptxgenjs run array with breakLine + bullets. */
-export function paragraphsToTextProps(
-  paragraphs: readonly RichParagraph[],
-): PptxGenJS.TextProps[] {
-  const out: PptxGenJS.TextProps[] = [];
-  paragraphs.forEach((p, pi) => {
-    const last = pi === paragraphs.length - 1;
-    const bullet: PptxGenJS.TextPropsOptions['bullet'] =
-      p.list === 'unordered' ? true : p.list === 'ordered' ? { type: 'number' } : undefined;
-    if (p.runs.length === 0) {
-      out.push({ text: '', options: { breakLine: !last } });
-      return;
-    }
-    p.runs.forEach((run, ri) => {
-      const opts = runOptions(run);
-      if (bullet !== undefined && ri === 0) opts.bullet = bullet;
-      opts.breakLine = ri === p.runs.length - 1 && !last;
-      out.push({ text: run.text, options: opts });
-    });
-  });
-  return out;
 }
 
 function styleOptions(
@@ -288,93 +237,6 @@ function addText(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   });
 }
 
-interface SubBox {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-/** Caption layout: returns caption + content + note boxes within the
- *  block frame, mirroring the canvas CaptionWrapper geometry. The
- *  note always sits directly under the content (canvas keeps body +
- *  note in one vertical sub-column regardless of caption side). */
-function captionSplit(
-  b: Block,
-  ctx: Ctx,
-): { caption: SubBox | null; content: SubBox; note: SubBox | null } {
-  const box = rect(b, ctx.scale);
-  const position = b.captionPosition ?? 'top';
-  const n = ctx.captionNumbers[b.id];
-  const smallPt = pt(Math.round(ctx.doc.styles.body.size * 0.85), ctx.scale);
-  const smallH = (smallPt / 72) * 1.6; // one small-text line + breathing room, inches
-  const gap = 0.06 * ctx.scale;
-  const noteUnder = (content: SubBox): SubBox | null =>
-    b.note
-      ? { x: content.x, y: content.y + content.h + gap, w: content.w, h: smallH }
-      : null;
-  if (position === 'none' || n === undefined) {
-    return { caption: null, content: box, note: noteUnder(box) };
-  }
-  if (position === 'left' || position === 'right') {
-    const capW = box.w * 0.35;
-    const contentW = box.w - capW - gap;
-    const capX = position === 'left' ? box.x : box.x + contentW + gap;
-    const contentX = position === 'left' ? box.x + capW + gap : box.x;
-    const content = { x: contentX, y: box.y, w: contentW, h: box.h };
-    return {
-      caption: { x: capX, y: box.y, w: capW, h: box.h },
-      content,
-      note: noteUnder(content),
-    };
-  }
-  if (position === 'bottom') {
-    const note = noteUnder(box);
-    // Canvas order for bottom captions is content → note → caption,
-    // so the caption drops below the note when one exists.
-    const capY = note ? note.y + note.h + gap : box.y + box.h + gap;
-    return {
-      caption: { x: box.x, y: capY, w: box.w, h: smallH },
-      content: box,
-      note,
-    };
-  }
-  // top (default): caption above, content keeps its declared frame
-  // shifted below — same as the canvas where top captions grow the
-  // block downward rather than squeezing the image.
-  const content = { x: box.x, y: box.y + smallH + gap, w: box.w, h: box.h };
-  return {
-    caption: { x: box.x, y: box.y, w: box.w, h: smallH },
-    content,
-    note: noteUnder(content),
-  };
-}
-
-function captionText(b: Block, ctx: Ctx, label: 'Figure' | 'Table'): PptxGenJS.TextProps[] {
-  const n = ctx.captionNumbers[b.id];
-  const runs = paragraphsToTextProps(parseRichText(b.caption ?? ''));
-  return [{ text: `${label} ${n}. `, options: { bold: true } }, ...runs];
-}
-
-/** Small muted italic text shape — captions and figure/table notes,
- *  matching the canvas CaptionWrapper styling (0.85 × body size). */
-function addMutedText(
-  slide: PptxGenJS.Slide,
-  runs: PptxGenJS.TextProps[],
-  box: SubBox,
-  ctx: Ctx,
-): void {
-  slide.addText(orEmptyRun(runs), {
-    ...box,
-    fontFace: ctx.font,
-    fontSize: pt(Math.round(ctx.doc.styles.body.size * 0.85), ctx.scale),
-    color: hex(ctx.doc.palette.muted, '6B7280'),
-    italic: true,
-    align: 'left',
-    valign: 'top',
-  });
-}
-
 function addImage(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   const asset = ctx.assets.get(b.id);
   if (!asset && !b.imageSrc && !b.note) return; // fully empty image block
@@ -487,6 +349,10 @@ function addReferences(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   const st = ctx.doc.styles.body;
   const accent = hex(ctx.doc.palette.accent, '0F4C75');
   const entries = formatReferencesForExport(ctx.doc.references, ctx.options);
+  // A poster with no references: the editor shows only its hint there and
+  // the PDF nothing, so the file writes nothing either, not a "References"
+  // title over an empty list (record 31).
+  if (entries.length === 0) return;
   const entryPt = pt(st.size * 0.88, ctx.scale);
   const runs: PptxGenJS.TextProps[] = [
     { text: 'References', options: { bold: true, color: accent, breakLine: true } },
@@ -515,23 +381,6 @@ function addReferences(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   });
 }
 
-// ── helpers ──────────────────────────────────────────────────────────
-
-/** Ours: clockwise degrees, any sign. pptxgenjs: 0–359 clockwise. */
-export function normalizeRotation(rotation: number | undefined): number | undefined {
-  if (!rotation) return undefined;
-  return ((Math.round(rotation) % 360) + 360) % 360 || undefined;
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let bin = '';
-  const CHUNK = 0x8000;
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(bin);
-}
-
 // ── entry point ──────────────────────────────────────────────────────
 
 /**
@@ -551,6 +400,25 @@ export async function exportPosterPptx(
   // colophon box further down consults the same predicate.
   const doc = stripAckBlock(input, options.attribution);
   const plan = planPptxScale(doc.widthIn, doc.heightIn);
+  // Every chart block read off the editor's sheet now, in one pass before
+  // anything is awaited, so a scroll or a zoom while the file is built
+  // cannot move one (record 31's review round 1, R1-F1); drawn below.
+  const drawChart = options.drawChart ?? editorChartPicture;
+  const chartDraws = new Map<string, ChartDraw>();
+  for (const b of doc.blocks) {
+    if (b.type !== 'chart') continue;
+    let draw: ChartDraw | null = null;
+    try {
+      draw = drawChart(b, doc);
+    } catch (err) {
+      // The poster hidden (Preview) or gone: nothing can be copied, so
+      // nothing is written, rather than a file with no charts (review round
+      // 2, R2-F1). Any other failure leaves that chart out, with a warning.
+      if (err instanceof SheetNotShownError) throw err;
+      draw = null;
+    }
+    if (draw) chartDraws.set(b.id, draw);
+  }
   const { assets } = await resolvePosterAssets(doc, options.fetcher);
 
   // pptxgenjs cannot embed SVG (see rasterizeSvg.ts). Convert every
@@ -578,6 +446,14 @@ export async function exportPosterPptx(
       }
     }),
   );
+
+  // Each chart block's picture, from what was read above (record 31): one
+  // at a time, each picture is a canvas of up to 16.8 MP.
+  const chartPictures = new Map<string, ChartPicture>();
+  for (const [id, draw] of chartDraws) {
+    const picture = await draw(rasterizeSvg).catch(() => null);
+    if (picture) chartPictures.set(id, picture);
+  }
 
   // Lazy-load pptxgenjs so it stays out of the main bundle.
   const { default: PptxGen } = await import('pptxgenjs');
@@ -683,6 +559,9 @@ export async function exportPosterPptx(
         break;
       case 'references':
         addReferences(slide, b, ctx);
+        break;
+      case 'chart':
+        addChart(slide, b, ctx, chartPictures.get(b.id));
         break;
     }
   }
