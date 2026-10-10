@@ -641,6 +641,11 @@ function useZoom(
 /** Windows 1599 px wide or narrower open the editor with the guidelines panel closed. */
 const GUIDELINES_CLOSED_QUERY = '(max-width: 1599px)';
 
+/** What ⌘S says when the write failed: the save pill's words (fix 27). */
+const NOT_SAVED = 'Not saved — retrying…';
+/** The sidebar's Duplicate, refused while a change is not saved (fix 27, D1). */
+const NOT_SAVED_FOR_COPY = 'Your latest changes are not saved yet, so no copy was made. Try again when the poster says Saved.';
+
 export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) {
   const doc = usePosterStore((s) => s.doc);
   const posterId = usePosterStore((s) => s.posterId);
@@ -660,6 +665,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // Resistant Depression"). Persisted to posters.title via autosave.
   const posterDisplayName = usePosterStore((s) => s.posterTitle);
   const setPosterDisplayName = usePosterStore((s) => s.setPosterTitle);
+  // The Poster name's writes still out: its button says "✓ Saved" only once
+  // the write carrying the name is back. It said so while that write was
+  // out, before any failure (MEASURED, fix 27, keep-work-check K10, three
+  // engines; on main too).
+  const [nameWritesOut, setNameWritesOut] = useState(0);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   // Convenience: single selected block (null when 0 or 2+ selected).
   const selectedId = selectedIds.size === 1 ? [...selectedIds][0]! : null;
@@ -1143,7 +1153,13 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     if (!posterId) return;
     setDuplicateError(null);
     try {
-      await autosave.flushNow(posterDisplayName);
+      // The copy is made from the saved poster, so an unsaved change would
+      // be missing from it: after a failed save it copied the older row
+      // (MEASURED, fix 27, D1). Copy only once everything is saved.
+      if (!(await autosave.flushNow(posterDisplayName))) {
+        setDuplicateError(NOT_SAVED_FOR_COPY);
+        return;
+      }
       const copy = await duplicatePoster(posterId);
       setDuplicatedFromEditor(copy);
     } catch (err) {
@@ -1153,11 +1169,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   }, [posterId, autosave, posterDisplayName]);
 
   // ── Version control ─────────────────────────────────────────────
-  // Save a snapshot of the current in-memory doc. Reads store state at
-  // call time so the Cmd+S keydown handler (registered once) never sees
-  // a stale doc. An empty name is fine — the Versions list renders the
-  // created_at timestamp for unnamed snapshots. Broadcasts so an open
-  // VersionPanel refetches.
+  // Save a snapshot of the current in-memory doc, from the Versions tab's
+  // Save version (the only way to make one, with Restore's "Before
+  // restore"). Reads store state at call time. An empty name is fine —
+  // the Versions list renders the created_at timestamp for unnamed
+  // snapshots. Broadcasts so an open VersionPanel refetches.
   const saveVersionNow = useCallback(
     async (name = '') => {
       const state = usePosterStore.getState();
@@ -1212,25 +1228,28 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     [showToast],
   );
 
-  // Cmd/Ctrl+S → save a version (and swallow the browser save dialog).
+  // ⌘S / Ctrl+S saves now, as in PowerPoint: any pending change is written
+  // at once (a failed one is tried again), then "Saved", or "Not saved —
+  // retrying…" when the write fails. The browser's save dialog is
+  // swallowed. It used to make a version on every press; a PowerPoint hand
+  // pressing it by reflex filled the store's 30 versions, and Restore,
+  // which saves "Before restore" first, then failed (MEASURED, fix 27,
+  // K4; owner decision D8). Versions are made from the Versions tab only.
+  const flushNowRef = useRef(autosave.flushNow);
+  flushNowRef.current = autosave.flushNow;
   useEffect(() => {
     if (readOnly) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        // Ignore OS key auto-repeat — a held Cmd+S would otherwise
-        // insert a snapshot per repeat and blow through the cap.
+        // A held key's auto-repeat saves once.
         if (e.repeat) return;
-        // Swallow the rejection here: saveVersionNow re-throws for the
-        // awaited VersionPanel path, but the keydown path already gets
-        // the error toast, so an unhandled rejection would just double-
-        // report into the feedback/console-capture buffer.
-        void saveVersionNow().catch(() => {});
+        void flushNowRef.current().then((saved) => showToast(saved ? 'Saved' : NOT_SAVED));
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [readOnly, saveVersionNow]);
+  }, [readOnly, showToast]);
 
   if (!doc || !posterId) {
     return (
@@ -2477,13 +2496,15 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
           onToggleSidebar={() => setSidebarOpen(false)}
         onDuplicatePoster={readOnly ? undefined : handleDuplicateFromSidebar}
         posterTitle={posterDisplayName}
+        posterNameUnsaved={autosave.status === 'error' || nameWritesOut > 0}
         onChangePosterTitle={(title) => {
           setPosterDisplayName(title);
           // Persist immediately rather than waiting for the 800ms
           // autosave debounce — users expect "Save" to survive a
           // refresh. docRef inside useAutosave stays in sync so
           // flushNow writes the current doc plus the new title.
-          void autosave.flushNow(title);
+          setNameWritesOut((n) => n + 1);
+          void autosave.flushNow(title).finally(() => setNameWritesOut((n) => n - 1));
         }}
         posterSizeKey={sizeKey}
         posterWidthIn={doc.widthIn}

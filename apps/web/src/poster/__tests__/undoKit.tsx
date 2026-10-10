@@ -258,6 +258,73 @@ export async function typeText(el: HTMLElement, text: string) {
   }
 }
 
+/**
+ * Enter at the END of a multi-line field, as the engines do it (MEASURED in
+ * Chromium, Firefox and WebKit by scripts/keep-work-check.mjs, its
+ * `typedDom` readings; fix 27): the new line goes in a `<div>`, and the
+ * caret into it. Chromium and WebKit leave the line before as it was
+ * (`…ZQA<div>ZQB</div>`); Firefox wraps it too (`<div>…ZQA</div>
+ * <div>ZQB</div>`, `wrapFirst`). A line left empty keeps a `<br>`
+ * (`<div><br></div>`). This is what made Enter's line break vanish in the
+ * store (OF-01); `pressEnterIn` below inserts a `<br>`, which no engine
+ * does for Enter (it models Shift+Enter).
+ */
+export async function pressEnterNewLine(el: HTMLElement, { wrapFirst = false } = {}) {
+  const ok = el.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertParagraph', bubbles: true, cancelable: true }));
+  if (ok) {
+    const lines = Array.from(el.childNodes);
+    const last = lines[lines.length - 1];
+    if (last instanceof HTMLDivElement && (last.textContent ?? '') === '') last.replaceChildren(document.createElement('br'));
+    if (wrapFirst && !lines.some((n) => n instanceof HTMLDivElement)) {
+      const first = document.createElement('div');
+      first.append(...lines);
+      el.append(first);
+    }
+    const line = document.createElement('div');
+    const t = document.createTextNode('');
+    line.append(t);
+    el.append(line);
+    const r = document.createRange();
+    r.setStart(t, 0);
+    r.collapse(true);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(r);
+    fireInput(el, 'insertParagraph');
+  }
+  await nextTask();
+}
+
+/**
+ * Shift+Enter at the END of a multi-line field, as Chromium does it
+ * (MEASURED by scripts/keep-work-check.mjs E12, its `typedDom` readings;
+ * fix 27 review round 2): the fields are drawn pre-wrap, so the line break
+ * is a newline in the text, and at the end of the text a second one, since
+ * a newline that ends the text draws no line (`…ZQSA\n\n`, the caret between
+ * the two). Enter after it then adds its `<div>` (`…ZQSA\n\n<div>ZQSB
+ * </div>`). Typing after it is not modelled: Chromium then drops the second
+ * newline. Firefox's and WebKit's markup for the same keys are in
+ * sanitizeHtml.test.ts, as measured.
+ */
+export async function pressSoftReturn(el: HTMLElement) {
+  const ok = el.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertLineBreak', bubbles: true, cancelable: true }));
+  if (ok) {
+    const sel = window.getSelection()!;
+    if (sel.rangeCount === 0 || !el.contains(sel.getRangeAt(0).startContainer)) caretAtEnd(el);
+    const atEnd = caretAtEndOf(el);
+    const r = sel.getRangeAt(0);
+    r.deleteContents();
+    const t = document.createTextNode(atEnd ? '\n\n' : '\n');
+    r.insertNode(t);
+    r.setStart(t, 1);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    fireInput(el, 'insertLineBreak');
+  }
+  await nextTask();
+}
+
 /** Enter in a multi-line block: the browser inserts a line break at the caret. */
 export async function pressEnterIn(el: HTMLElement) {
   const ok = el.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertParagraph', bubbles: true, cancelable: true }));
@@ -358,7 +425,8 @@ export async function focusField(field: HTMLElement) {
 /**
  * One keystroke in a sidebar <input> or <textarea>, as a browser delivers
  * it: `beforeinput` with the field's selection as it stands (typing
- * `inputType: 'insertText'` with the character, or a deletion), then the
+ * `inputType: 'insertText'` with the character, Enter in a textarea
+ * `insertLineBreak` with a newline in the value, or a deletion), then the
  * change. Leaves the caret at the end of the new value, where jsdom puts it.
  * The field must have the focus (`focusField`): focusing it here would end
  * the undo step by itself, and a test could pass for that reason alone.
@@ -366,7 +434,7 @@ export async function focusField(field: HTMLElement) {
 export async function keyInto(
   field: HTMLInputElement | HTMLTextAreaElement,
   value: string,
-  inputType: 'insertText' | 'deleteContentBackward' | 'insertFromPaste' = 'insertText',
+  inputType: 'insertText' | 'insertLineBreak' | 'deleteContentBackward' | 'insertFromPaste' = 'insertText',
   data: string | null = inputType === 'insertText' ? value.slice(-1) : null,
 ) {
   if (document.activeElement !== field) throw new Error('keyInto: the field does not have the focus');

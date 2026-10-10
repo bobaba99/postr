@@ -14,9 +14,16 @@
  * under the key `cell:<block id>:<index>` (useEditableHistory.ts; record
  * docs/fixes/12-one-undo-history.md).
  *
- * The cell stores its innerHTML as typed (no sanitizer), as before.
+ * The cell stores its typed text the way a text block does
+ * (`sanitizeTyped`): the line Enter starts, which the browser puts in a
+ * `<div>`, is stored as a `<br>`. The cell used to store its innerHTML as
+ * typed, and the PowerPoint export wrote that `<div>` into the cell as text
+ * ("Measure ZQE<div>ZQF</div>", MEASURED in the three engines; fix 27,
+ * docs/fixes/27-keep-work-safe.md). It still shows a stored value as it
+ * is (`asIs`), so a cell saved before keeps its look.
  */
 import { useRef, type CSSProperties, type KeyboardEvent } from 'react';
+import { sanitizeTyped } from './sanitizeHtml';
 import { useEditableHistory } from './useEditableHistory';
 
 const asIs = (html: string) => html;
@@ -41,7 +48,7 @@ export function TableCellEditor({ html, historyKey, onCommit, onFocus, onBlur, o
       suppressContentEditableWarning
       data-history-key={historyKey}
       data-history-surface="canvas"
-      onInput={(e) => history.commitInput(e.nativeEvent, () => ref.current?.innerHTML ?? '', onCommit)}
+      onInput={(e) => history.commitInput(e.nativeEvent, () => sanitizeTyped(ref.current?.innerHTML ?? '', true), onCommit)}
       onFocus={onFocus}
       onBlur={onBlur}
       onKeyDown={onKeyDown}

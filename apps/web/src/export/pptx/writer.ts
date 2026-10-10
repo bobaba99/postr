@@ -438,9 +438,13 @@ function addTable(slide: PptxGenJS.Slide, b: Block, ctx: Ctx): void {
   for (let r = 0; r < data.rows; r++) {
     const row: PptxGenJS.TableCell[] = [];
     for (let c = 0; c < data.cols; c++) {
-      const runsCells: PptxGenJS.TableCell[] = parseRichText(data.cells[r * data.cols + c] ?? '')
-        .flatMap((p) => p.runs)
-        .map((run) => ({ text: run.text, options: runOptions(run) }));
+      // A cell's lines stay lines (`breakLine`): flattening its paragraphs
+      // into one run list joined the words either side of an Enter typed
+      // in the cell ("Measure ZQEZQF", MEASURED, fix 27,
+      // docs/fixes/27-keep-work-safe.md).
+      const runsCells: PptxGenJS.TableCell[] = paragraphsToTextProps(
+        parseRichText(data.cells[r * data.cols + c] ?? ''),
+      );
       row.push({
         text: runsCells.length > 0 ? runsCells : '',
         options: {

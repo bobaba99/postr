@@ -11,7 +11,9 @@
  * through PosterEditor callbacks because they need the Zustand store
  * (current doc + setPoster). Any version mutation dispatches a
  * `postr:versions-changed` window event; this panel listens and
- * refetches, so a Cmd+S save elsewhere keeps the list in sync.
+ * refetches, so the list stays in sync. ⌘S / Ctrl+S saves the poster now
+ * and makes no version (fix 27, docs/fixes/27-keep-work-safe.md): versions
+ * are made here only.
  */
 import { useCallback, useEffect, useState } from 'react';
 import {
@@ -217,7 +219,7 @@ export function VersionPanel({ posterId, draftScope = null, onSaveVersion, onRes
         <div style={emptyStyle}>Loading…</div>
       ) : versions.length === 0 ? (
         <div style={emptyStyle}>
-          No versions yet. Save one above, or press Cmd/Ctrl+S.
+          No versions yet. Save one above.
         </div>
       ) : (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>

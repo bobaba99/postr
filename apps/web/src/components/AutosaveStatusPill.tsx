@@ -7,7 +7,11 @@
  *   idle   → "Saved" (before anything has been saved this session)
  *   saving → "Saving…"
  *   saved  → "Saved · 2s ago" (relative time, refreshed every 10s)
- *   error  → "Save failed · retry" with the error message as a title
+ *   error  → "Not saved — retrying…": the change is kept and saved again
+ *            after 2, 5, 10 and 30 s, then every 30 s (useAutosave.ts; fix 27,
+ *            docs/fixes/27-keep-work-safe.md). It used to read "Save failed.
+ *            Recent changes are not saved." while nothing was retried. No raw
+ *            error text: user-facing errors stay generic.
  */
 import { useEffect, useState } from 'react';
 import type { AutosaveStatus } from '@/hooks/useAutosave';
@@ -15,6 +19,7 @@ import type { AutosaveStatus } from '@/hooks/useAutosave';
 export interface AutosaveStatusPillProps {
   status: AutosaveStatus;
   lastSavedAt: Date | null;
+  /** Not shown: the pill never prints the raw error. */
   error: Error | null;
 }
 
@@ -29,7 +34,7 @@ function formatRelative(from: Date, now: Date): string {
   return from.toLocaleDateString();
 }
 
-export function AutosaveStatusPill({ status, lastSavedAt, error }: AutosaveStatusPillProps) {
+export function AutosaveStatusPill({ status, lastSavedAt }: AutosaveStatusPillProps) {
   // Tick every 10s so the relative time updates without subscribing
   // the whole editor to a rerender on every second.
   const [, setTick] = useState(0);
@@ -44,11 +49,7 @@ export function AutosaveStatusPill({ status, lastSavedAt, error }: AutosaveStatu
       return { label: 'Saving…', color: '#9ca3af', title: undefined };
     }
     if (status === 'error') {
-      return {
-        label: 'Save failed. Recent changes are not saved.',
-        color: '#f87171',
-        title: error?.message ?? 'Unknown error',
-      };
+      return { label: 'Not saved — retrying…', color: '#f87171', title: undefined };
     }
     if (status === 'saved' && lastSavedAt) {
       return {

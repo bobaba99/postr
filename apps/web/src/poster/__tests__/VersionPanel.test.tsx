@@ -118,3 +118,12 @@ it('deletes only after confirmation and refetches on the change event', async ()
   // Delete broadcasts postr:versions-changed → panel refetches (initial + post-delete).
   await waitFor(() => expect(listVersionsMock.mock.calls.length).toBeGreaterThanOrEqual(2));
 });
+
+// Fix 27 (docs/fixes/27-keep-work-safe.md): ⌘S / Ctrl+S saves the poster
+// and makes no version, so the empty tab must not send the user to it.
+it('the empty list points to Save version only, not to a key that makes none', async () => {
+  render(<VersionPanel posterId="p1" onSaveVersion={vi.fn()} onRestoreVersion={vi.fn()} />);
+  const empty = await screen.findByText(/No versions yet/);
+  expect(empty.textContent).toBe('No versions yet. Save one above.');
+  expect(document.body.textContent).not.toMatch(/Cmd|Ctrl\+S|⌘S/);
+});

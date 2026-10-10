@@ -55,7 +55,7 @@ import type { EditorSurface } from './editorHistory';
 import { useEditableHistory } from './useEditableHistory';
 import { SYMBOLS, filterSymbols } from './symbols';
 import { matchSlashAtCaret } from './slashCommand';
-import { htmlToPlainText, sanitizeHtml } from './sanitizeHtml';
+import { htmlToPlainText, sanitizeHtml, sanitizeTyped } from './sanitizeHtml';
 
 export interface SelectionInfo {
   /** Viewport-coordinate bounding rect of the current selection. */
@@ -178,8 +178,10 @@ export function RichTextEditor({
 
   // Sanitize on every commit so execCommand output doesn't leak
   // disallowed tags into the store. The sanitizer is idempotent and fast
-  // (< 1 ms on typical block content).
-  const read = () => sanitizeHtml(ref.current?.innerHTML ?? '');
+  // (< 1 ms on typical block content). The browser puts a line started
+  // with Enter in a <div>; `sanitizeTyped` stores it as a <br>, as the
+  // paste path does (it used to join the words: OF-01, fix 27).
+  const read = () => sanitizeTyped(ref.current?.innerHTML ?? '', multiline);
 
   /** Commit after a change the editor made itself (a symbol, a paste). */
   const commit = () => {

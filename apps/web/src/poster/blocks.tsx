@@ -1654,6 +1654,12 @@ function CaptionWrapper({
     overflow: 'hidden',
   };
 
+  // The note is typed in a <textarea>, where Enter makes a newline, and it
+  // is stored as typed; PowerPoint makes each line a paragraph
+  // (export/richText.ts reads a newline as one). Drawn with white-space:
+  // normal, the lines ran together on the canvas and in the PDF (MEASURED in
+  // Chromium, Firefox and WebKit, fix 27 review round 1, keep-work-check
+  // E11). `pre-wrap`, as the caption above.
   const noteStyle: React.CSSProperties = {
     fontFamily,
     fontSize: Math.round(styles.body.size * 0.85),
@@ -1662,6 +1668,7 @@ function CaptionWrapper({
     fontStyle: 'italic',
     flex: '0 0 auto',
     paddingTop: 4,
+    whiteSpace: 'pre-wrap',
   };
 
   // Body + note share a vertical sub-column so the note always sits

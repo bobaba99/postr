@@ -132,6 +132,7 @@ function sanitizeNode(
   input: Node,
   doc: Document,
   blockSeparator: string,
+  keepWhitespace: boolean,
 ): DocumentFragment {
   const fragment = doc.createDocumentFragment();
 
@@ -143,6 +144,15 @@ function sanitizeNode(
   let emittedAny = false;
   let pendingBoundary = false;
   let justClosedBlock = false;
+  // Whether the line being written has content nothing has ended yet. A
+  // block boundary owes a separator only then: a line already ended by a
+  // list (`<ul>…</ul><div>b</div>`), by a `<br>` written at its end
+  // (`a<br><div>b</div>`) or by a newline at its end (`a\n<div>b</div>`)
+  // gets none, as the browser draws no line there.
+  // Without this, a list left with Enter gained a blank line once stored
+  // (MEASURED, fix 27, keep-work-check E10: the gap after the list 1.5
+  // lines while typing, 2.79 after a reload).
+  let lineOpen = false;
 
   const flushBoundary = (target: Node) => {
     if (!pendingBoundary || !emittedAny || !blockSeparator) {
@@ -170,6 +180,7 @@ function sanitizeNode(
     const holder = doc.createElement('div');
     holder.innerHTML = blockSeparator;
     for (const n of Array.from(holder.childNodes)) target.appendChild(n);
+    lineOpen = false;
   };
 
   const walk = (source: Node, target: Node) => {
@@ -185,8 +196,11 @@ function sanitizeNode(
         //
         // Gated on the separator being in use: with no separator this
         // function must stay byte-identical, and it has a test pinning
-        // that `sanitizeHtml('   ')` returns the spaces untouched.
-        if (blockSeparator && (justClosedBlock || !emittedAny) && data.trim() === '') {
+        // that `sanitizeHtml('   ')` returns the spaces untouched. Off for
+        // typed text (`keepWhitespace`): the editor's own markup is never
+        // pretty-printed, and every space in it is one the user typed.
+        const trim = !!blockSeparator && !keepWhitespace;
+        if (trim && (justClosedBlock || !emittedAny) && data.trim() === '') {
           continue;
         }
         // The rule above only fires for a node that is whitespace ENTIRELY.
@@ -198,7 +212,7 @@ function sanitizeNode(
         // to prevent, arriving by the other door. Same gating, so the
         // no-separator path stays byte-identical.
         let text = data;
-        if (blockSeparator && pendingBoundary && emittedAny) {
+        if (trim && pendingBoundary && emittedAny) {
           text = text.replace(/^\s+/, '');
           if (text === '') continue;
         }
@@ -209,6 +223,19 @@ function sanitizeNode(
             emittedAny = true;
             justClosedBlock = false;
           }
+          // Typed spaces alone are a line's content too.
+          if (text.trim() !== '' || keepWhitespace) lineOpen = true;
+          // A newline at the end of a line ends that line, as a `<br>` does:
+          // the fields are drawn pre-wrap, so the browser draws no further
+          // line for it before a block. Typed with Shift+Enter (Chromium and
+          // Firefox put a "\n" in the text), owing a `<br>` here stored a
+          // blank line more (MEASURED, fix 27 review round 2, R2-A1,
+          // keep-work-check E12: 2.58 glyph heights while typing, 3.87 after
+          // a reload). The same for a paste whose text ends a line with a
+          // newline (pretty-printed `<p>a\n</p><p>b</p>`): the rule was the
+          // typing path's only, and the paste stored a blank line the source
+          // does not show (fix 27, the first review round 3's mutant).
+          if (text.endsWith('\n')) lineOpen = false;
         }
         continue;
       }
@@ -227,7 +254,7 @@ function sanitizeNode(
         // original bug glued the last word of one paragraph to the
         // first of the next (`weeks.Accuracy`).
         const isBlock = BLOCK_TAGS.has(tag);
-        if (isBlock && emittedAny) pendingBoundary = true;
+        if (isBlock && emittedAny && lineOpen) pendingBoundary = true;
         walk(el, target);
         if (isBlock) {
           justClosedBlock = true;
@@ -243,7 +270,8 @@ function sanitizeNode(
           // ending in a block does not gain a dangling separator.
           // No `emittedAny` guard: flushBoundary re-checks it, so the
           // guard was measurably dead (0 divergences over 80k inputs).
-          pendingBoundary = true;
+          // A line already ended owes nothing (`lineOpen`, above).
+          if (lineOpen) pendingBoundary = true;
         }
         continue;
       }
@@ -252,7 +280,14 @@ function sanitizeNode(
       // pending separator would supply. Emitting both gave three breaks
       // where the author wrote one, compounding with every
       // block/`<br>` alternation.
+      // That `<br>` then starts a line of its own, an empty one until text
+      // follows (`<div><br></div>` is a blank line; `</p><br><p>` an empty
+      // line between paragraphs), which its block's end must close; a `<br>`
+      // written where nothing was owed ends the line it is on.
+      const brForBoundary = tag === 'BR' && pendingBoundary;
       if (tag === 'BR') pendingBoundary = false;
+      // A list item starts its own line.
+      if (tag === 'LI') lineOpen = false;
       flushBoundary(target);
       const clone = doc.createElement(tag.toLowerCase());
 
@@ -293,6 +328,13 @@ function sanitizeNode(
 
       walk(el, clone);
       target.appendChild(clone);
+      if (tag === 'BR') lineOpen = brForBoundary;
+      // A list, and each of its items, ends the line it closes: what a
+      // block inside the item owed is paid.
+      if (tag === 'UL' || tag === 'OL' || tag === 'LI') {
+        lineOpen = false;
+        pendingBoundary = false;
+      }
     }
   };
 
@@ -307,17 +349,22 @@ function sanitizeNode(
 export interface SanitizeOptions {
   /**
    * Emitted between two unwrapped block-level elements. Defaults to
-   * `''`, which is exactly today's behaviour — only the PASTE path asks
-   * for a separator, because that is the only place block-level HTML
-   * from another application arrives. The render, commit and .postr
-   * import paths all see already-inline content and must stay
-   * byte-identical.
+   * `''`: the render and .postr import paths see already-inline content
+   * and must stay byte-identical. Two paths ask for one, because block
+   * markup reaches them: the PASTE path (HTML from another application)
+   * and the TYPING path (`sanitizeTyped`: the browser's own new lines).
    *
    * `'<br>'` for a multi-line block; `' '` for a single-line one, where
    * a line break would put a break into text the editor refuses to let
    * the user make.
    */
   blockSeparator?: string;
+  /**
+   * Keep whitespace beside a block boundary. Off by default, so pasted,
+   * pretty-printed markup (`<p>a</p>\n<p>b</p>`) gains no blank line; on
+   * for typed text, where a space at the start of a line is the user's.
+   */
+  keepWhitespace?: boolean;
 }
 
 export function sanitizeHtml(html: string, options: SanitizeOptions = {}): string {
@@ -327,10 +374,31 @@ export function sanitizeHtml(html: string, options: SanitizeOptions = {}): strin
   const doc = parser.parseFromString(`<div id="__root">${html}</div>`, 'text/html');
   const root = doc.getElementById('__root');
   if (!root) return '';
-  const fragment = sanitizeNode(root, doc, options.blockSeparator ?? '');
+  const fragment = sanitizeNode(root, doc, options.blockSeparator ?? '', options.keepWhitespace ?? false);
   const container = doc.createElement('div');
   container.appendChild(fragment);
   return container.innerHTML;
+}
+
+/**
+ * What the editor stores for text the user typed into an editable field
+ * (a text block, the Content box, a table cell): the field's markup,
+ * sanitized, with each new line the browser started turned into a `<br>`.
+ *
+ * Enter in an editable field does not insert a `<br>`: Chromium and WebKit
+ * put the new line in a `<div>` (`ZQA<div>ZQB</div>`), Firefox wraps the
+ * first line too (`<div>…ZQA</div><div>ZQB</div>`), and a blank line is
+ * `<div><br></div>` (MEASURED in the three engines,
+ * scripts/keep-work-check.mjs, docs/fixes/27-keep-work-safe.md). Sanitized
+ * with no separator the `<div>` went and the words joined ("ZQAZQB") in the
+ * store, after a reload, in the copy, the PDF and PowerPoint (OF-01).
+ * Every space typed is kept (`keepWhitespace`). A newline typed with
+ * Shift+Enter (Chromium and Firefox put one in the text) ends its line as a
+ * `<br>` does, so a line Enter starts after it gains no blank line (fix 27
+ * review round 2).
+ */
+export function sanitizeTyped(html: string, multiline: boolean): string {
+  return sanitizeHtml(html, { blockSeparator: multiline ? '<br>' : ' ', keepWhitespace: true });
 }
 
 /**

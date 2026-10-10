@@ -64,10 +64,17 @@ const INITIAL_STATE: StyleState = {
 /** Browser default `<mark>` background. */
 const MARK_HIGHLIGHT = '#FFFF00';
 
-/** Tags the sanitizer can emit — anything else is literal text. */
+/**
+ * Tags the sanitizer can emit, plus `div` and `p` — anything else is
+ * literal text. A table cell stored its typed HTML unsanitized until fix
+ * 27, so a cell saved before it can hold the `<div>` a browser makes for a
+ * line started with Enter; this export wrote it out as text
+ * ("Measure ZQE<div>ZQF</div>", MEASURED in Chromium, Firefox and WebKit,
+ * docs/fixes/27-keep-work-safe.md). Read as a paragraph boundary instead.
+ */
 const KNOWN_TAGS = new Set([
   'b', 'strong', 'i', 'em', 'u', 's', 'strike', 'del', 'mark',
-  'sub', 'sup', 'br', 'span', 'ol', 'ul', 'li',
+  'sub', 'sup', 'br', 'span', 'ol', 'ul', 'li', 'div', 'p',
 ]);
 
 const NAMED_ENTITIES: Record<string, string> = {
@@ -189,7 +196,8 @@ const STYLE_TAGS = new Set([
 /**
  * Parse sanitized inline HTML into paragraphs of styled runs.
  * Paragraph boundaries: `<br>`, literal newlines (the editor renders
- * with `white-space: pre-wrap`), and `<li>` items. Trailing empty
+ * with `white-space: pre-wrap`), `<li>` items, and `<div>` / `<p>` (a
+ * table cell saved before fix 27). Trailing empty
  * paragraphs are dropped; empty input returns [].
  */
 export function parseRichText(html: string): RichParagraph[] {
@@ -251,6 +259,14 @@ export function parseRichText(html: string): RichParagraph[] {
 
     if (tag.name === 'br') {
       flushParagraph();
+      continue;
+    }
+
+    // A line in its own block (`a<div>b</div>`, `<div>a</div><div>b</div>`):
+    // the text before or inside it ends a paragraph. An empty line,
+    // `<div><br></div>`, is the <br>'s paragraph.
+    if (tag.name === 'div' || tag.name === 'p') {
+      if (runs.length > 0) flushParagraph();
       continue;
     }
 

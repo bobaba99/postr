@@ -17,7 +17,7 @@
  *   - nested disallowed tags unwrap recursively
  */
 import { describe, it, expect } from 'vitest';
-import { escapeHtml, htmlToPlainText, sanitizeHtml } from '../sanitizeHtml';
+import { escapeHtml, htmlToPlainText, sanitizeHtml, sanitizeTyped } from '../sanitizeHtml';
 
 describe('sanitizeHtml · allowlisted tags', () => {
   it('passes through bold, italic, underline', () => {
@@ -348,5 +348,95 @@ describe('a block boundary is owed on the way out, not just on the way in', () =
     // this function must stay byte-identical.
     expect(sanitizeHtml('<h2>Results</h2>Accuracy improved.')).toBe('ResultsAccuracy improved.');
     expect(sanitizeHtml('<table><tr><td>Mean</td><td>12.4</td></tr></table>')).toBe('Mean12.4');
+  });
+});
+
+describe('fix 27 — typed text: the browser\'s new lines become <br>, every space kept', () => {
+  // The three engines' markup after " ZQA", Enter, "ZQB" (MEASURED by
+  // scripts/keep-work-check.mjs; docs/fixes/27-keep-work-safe.md).
+  it('Chromium and WebKit: a new line in a <div>', () => {
+    expect(sanitizeTyped('words. ZQA<div>ZQB</div>', true)).toBe('words. ZQA<br>ZQB');
+  });
+
+  it('Firefox: the line before wrapped too', () => {
+    expect(sanitizeTyped('<div>words. ZQA</div><div>ZQB</div>', true)).toBe('words. ZQA<br>ZQB');
+  });
+
+  it('a blank line, <div><br></div>, is a second <br>', () => {
+    expect(sanitizeTyped('ZQG<div>ZQH</div><div><br></div><div>ZQK</div>', true)).toBe('ZQG<br>ZQH<br><br>ZQK');
+  });
+
+  it('keeps the spaces at the start of a line, and a block of spaces alone', () => {
+    expect(sanitizeTyped('ZQI<div>  ZQJ</div>', true)).toBe('ZQI<br>  ZQJ');
+    expect(sanitizeTyped('   ', true)).toBe('   ');
+    // The paste path still trims what sits beside a boundary.
+    expect(sanitizeHtml('ZQI<div>  ZQJ</div>', { blockSeparator: '<br>' })).toBe('ZQI<br>ZQJ');
+  });
+
+  it('a single-line block joins a stray line with a space, never a break', () => {
+    expect(sanitizeTyped('Title<div>more</div>', false)).toBe('Title more');
+  });
+
+  it('a line already ended owes no break: after a list, after a <br> at its end', () => {
+    // Enter twice in a toolbar list leaves it: `…</ul><div>c</div>` (MEASURED
+    // in Chromium, keep-work-check E10). A <br> after the list drew a blank
+    // line once stored.
+    expect(sanitizeTyped('<ul><li>a</li><li>b</li></ul><div>c</div>', true)).toBe('<ul><li>a</li><li>b</li></ul>c');
+    expect(sanitizeTyped('<ul><li>a</li></ul><div><br></div><div>c</div>', true)).toBe('<ul><li>a</li></ul><br>c');
+    expect(sanitizeTyped('a<br><div>b</div>', true)).toBe('a<br>b');
+    // The paste path too: Google Docs wraps each bullet's text in a <p>.
+    expect(sanitizeHtml('<ul><li><p>Item one</p></li><li><p>Item two</p></li></ul><p>After</p>', { blockSeparator: '<br>' }))
+      .toBe('<ul><li>Item one</li><li>Item two</li></ul>After');
+  });
+
+  it('typed text with no new line is unchanged, formatting and all', () => {
+    const html = 'Plain <b>bold</b> and <span style="color: #ff0000">red</span>&nbsp;';
+    expect(sanitizeTyped(html, true)).toBe(sanitizeHtml(html));
+  });
+
+  // Review round 1 (finding R1-A5): three parts of the line-end rule no test
+  // above reached (the reviewer's mutants survived 125 of 125 tests). The
+  // outputs on the left are the browser's drawing: a list item is a line of
+  // its own; a line of typed spaces is a line (the editor draws with
+  // white-space: pre-wrap); an empty inline element draws no line.
+  it('a list item starts its own line: no break at the start of an item after text', () => {
+    expect(sanitizeHtml('Intro<ul><li><p>Item one</p></li><li><p>Item two</p></li></ul>', { blockSeparator: '<br>' }))
+      .toBe('Intro<ul><li>Item one</li><li>Item two</li></ul>');
+  });
+
+  it('a line of typed spaces alone is a line: the next line still gets its break', () => {
+    expect(sanitizeTyped('a<div>  </div><div>b</div>', true)).toBe('a<br>  <br>b');
+  });
+
+  it('a break written for a boundary ends the line: an empty inline element adds no blank line', () => {
+    expect(sanitizeTyped('a<div><span></span></div><div>b</div>', true)).toBe('a<br>b');
+    expect(sanitizeHtml('<p>a</p><p><b></b></p><p>b</p>', { blockSeparator: '<br>' })).toBe('a<br><b></b>b');
+  });
+});
+
+describe('fix 27 review round 2 — a newline typed with Shift+Enter ends the line, as a <br> does', () => {
+  // Chromium and Firefox put a newline in the text for Shift+Enter (the
+  // fields are drawn pre-wrap), and the browser draws no further line for a
+  // newline that ends a line's text. The <div> Enter starts after it owed no
+  // <br>: one was stored, a blank line more after a reload, in the PDF and in
+  // PowerPoint (finding R2-A1). The inputs are the engines' markup, MEASURED
+  // by scripts/keep-work-check.mjs E12; the outputs draw what the user saw.
+  it('Shift+Enter, Enter, as Chromium types it', () => {
+    expect(sanitizeTyped('ZQSA\n\n<div>ZQSB</div>', true)).toBe('ZQSA\n\nZQSB');
+  });
+
+  it('Shift+Enter, Enter, as Firefox types it (the empty line in a <div>)', () => {
+    expect(sanitizeTyped('ZQSA\n<div><br></div><div>ZQSB</div>', true)).toBe('ZQSA\n<br>ZQSB');
+  });
+
+  it('Shift+Enter, a word, Enter, as Firefox types it, in a text block or a table cell', () => {
+    expect(sanitizeTyped('ZQSC\n<div>ZQSD</div><div>ZQSE</div>', true)).toBe('ZQSC\nZQSD<br>ZQSE');
+    expect(sanitizeTyped('Measure ZQSF\n<div>ZQSG</div><div>ZQSH</div>', true)).toBe('Measure ZQSF\nZQSG<br>ZQSH');
+  });
+
+  it('a newline inside the line, or spaces typed after it, leaves the line open', () => {
+    // Chromium's markup for Shift+Enter, a word, Enter (stored right before).
+    expect(sanitizeTyped('ZQSC\nZQSD<div>ZQSE</div>', true)).toBe('ZQSC\nZQSD<br>ZQSE');
+    expect(sanitizeTyped('a\n  <div>b</div>', true)).toBe('a\n  <br>b');
   });
 });

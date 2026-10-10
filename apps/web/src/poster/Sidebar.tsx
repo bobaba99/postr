@@ -130,6 +130,8 @@ interface SidebarProps {
   // poster meta
   posterTitle: string;
   onChangePosterTitle: (title: string) => void;
+  /** The Poster name is not stored yet (its write is out, or the poster's save is failing): its button says no "✓ Saved". */
+  posterNameUnsaved?: boolean;
   /** The preset this poster's size matches, or 'custom'. */
   posterSizeKey: PosterSizeKey | 'custom';
   posterWidthIn: number;
@@ -705,6 +707,7 @@ export function Sidebar(props: SidebarProps) {
             draftScope={props.posterId}
             posterTitle={props.posterTitle}
             onChangePosterTitle={props.onChangePosterTitle}
+            nameUnsaved={props.posterNameUnsaved}
             posterSizeKey={props.posterSizeKey}
             posterWidthIn={props.posterWidthIn}
             posterHeightIn={props.posterHeightIn}
@@ -881,6 +884,8 @@ export function LayoutTab(props: {
   draftScope?: string | null;
   posterTitle: string;
   onChangePosterTitle: (title: string) => void;
+  /** The name is not stored yet (its write is out, or the poster's save is failing), whatever the field shows. */
+  nameUnsaved?: boolean;
   /** The preset this poster's size matches, or 'custom'. */
   posterSizeKey: PosterSizeKey | 'custom';
   posterWidthIn: number;
@@ -907,6 +912,12 @@ export function LayoutTab(props: {
   const setLocalTitle = (text: string) => setTitleDraft({ text, over: props.posterTitle });
   const [titleSaved, setTitleSaved] = useState(!!props.posterTitle.trim());
   const titleDirty = localTitle !== props.posterTitle;
+  // "✓ Saved" only once the name is stored: the button said it while every
+  // save of the name failed, while the retry was out, and while the name's
+  // first write was out (MEASURED in three engines, fix 27, keep-work-check
+  // K9, K9r and K10; on main too). Pressed then, Save writes the poster at
+  // once.
+  const showSaved = titleSaved && !titleDirty && !props.nameUnsaved;
 
   // Sync from parent when the poster changes (e.g. navigating to a different poster)
   useEffect(() => {
@@ -945,6 +956,11 @@ export function LayoutTab(props: {
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') saveTitle();
+            // ⌘S / Ctrl+S saves the poster (the editor's handler, on the
+            // window, after this one): here it saves the name being typed
+            // first, as the Save button beside it would. It used to say
+            // "Saved" with the name unsaved (fix 27 review round 2, R2-A4).
+            else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's' && titleDirty && localTitle.trim()) saveTitle();
           }}
           placeholder="e.g. Smith Lab — APA 2026"
           style={{ ...inputBase, flex: 1, borderColor: !localTitle.trim() ? '#f87171' : titleDirty ? '#f9e2af' : '#2a2a3a' }}
@@ -959,14 +975,14 @@ export function LayoutTab(props: {
             borderRadius: 6,
             fontSize: 13,
             fontWeight: 600,
-            background: titleSaved && !titleDirty ? '#2d6a4f' : '#7c6aed',
+            background: showSaved ? '#2d6a4f' : '#7c6aed',
             color: '#fff',
             opacity: localTitle.trim() ? 1 : 0.4,
             whiteSpace: 'nowrap',
             transition: 'background 0.2s',
           }}
         >
-          {titleSaved && !titleDirty ? '✓ Saved' : 'Save'}
+          {showSaved ? '✓ Saved' : 'Save'}
         </button>
       </div>
       {!localTitle.trim() && (
