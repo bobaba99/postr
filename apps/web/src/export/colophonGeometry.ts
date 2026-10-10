@@ -29,8 +29,8 @@
  *
  * ── Units ─────────────────────────────────────────────────────────
  * Everything here is in POSTER UNITS: 1 unit = 1 CSS px in the print
- * stylesheet = 0.1 inch = 7.2 pt, because `printDocument` applies
- * `zoom: 96 / PX` to the whole print root. Mixing that up is what made
+ * stylesheet = 0.1 inch = 7.2 pt, because `printDocument` scales the
+ * whole print root by 96 / PX. Mixing that up is what made
  * the pre-2026-09-13 colophon print at 50.4 pt while its comment
  * claimed 7 pt. `POINTS_PER_UNIT` is imported rather than re-derived so
  * there is one definition of the conversion.

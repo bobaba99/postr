@@ -41,6 +41,7 @@ import { UndoToast } from './UndoToast';
 import { EditorTopBar, TOP_BAR_HEIGHT } from './EditorTopBar';
 import { onHistoryButtons, runHistory, type HistoryDirection, type HistoryRunOptions } from './editorHistory';
 import { useEditorHistory } from './useEditorHistory';
+import { usePrintShortcut } from './usePrintShortcut';
 import { checkBounds, checkCollisions, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
@@ -88,6 +89,7 @@ import { snap } from './snap';
 import { ensureFontLoaded, googleFontsUrl } from './fontLoader';
 import { buildPrintDocument } from '@/export/printDocument';
 import { stripEditorChrome } from '@/export/stripEditorChrome';
+import { finishBlockSelections } from '@/motion/timelines/blockSelection';
 import { useHasPosterScript } from './figureScriptDraft';
 
 // =========================================================================
@@ -1049,7 +1051,21 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     () => doc?.blocks.find((b) => b.type === 'title')?.h ?? 0,
     [doc?.blocks],
   );
+  //
+  // Not while Preview hides the editor (`display: none`): the hidden title
+  // measures 0 tall, and the shift fell to 0, so Preview drew, and its
+  // Print printed, the title over the authors (OF-07: 0.32 in at 48 × 36,
+  // 1.93 in for a 4-line title at 36 × 48; record 30, cause A). The last
+  // measurement stands while the editor is hidden: nothing can change the
+  // poster there. `printPoster` measures again once the editor is shown.
+  const readTitleOverflow = useCallback((): number => {
+    const el = titleBlockId
+      ? canvasRef.current?.querySelector<HTMLElement>(`[data-block-id="${titleBlockId}"]`)
+      : null;
+    return el && titleBlockH > 0 ? Math.max(0, el.offsetHeight - titleBlockH) : 0;
+  }, [titleBlockId, titleBlockH]);
   useLayoutEffect(() => {
+    if (previewMode) return;
     if (!titleBlockId || !canvasRef.current || titleBlockH <= 0) {
       setTitleOverflowPx(0);
       return;
@@ -1058,15 +1074,12 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       `[data-block-id="${titleBlockId}"]`,
     );
     if (!el) return;
-    const measure = () => {
-      const rendered = el.offsetHeight;
-      setTitleOverflowPx(Math.max(0, rendered - titleBlockH));
-    };
+    const measure = () => setTitleOverflowPx(readTitleOverflow());
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [titleBlockId, titleBlockH]);
+  }, [titleBlockId, titleBlockH, previewMode, readTitleOverflow]);
 
 
   // ── Measured block heights ────────────────────────────────────────
@@ -2229,30 +2242,53 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   // transforms, no overflow-hidden parents — so the browser's print
   // pipeline gets a pristine page to work with.
   //
-  // Flow:
-  //   1. Clone #poster-canvas (so we don't touch the live DOM)
-  //   2. Strip editor-only overlays (grid, ruler) from the clone
-  //   3. Open a new window via `window.open('', '_blank')`
-  //   4. Write a minimal HTML document with:
-  //        • Google Fonts <link>
-  //        • `@page { size: WxH in; margin: 0 }`
-  //        • A <div> that holds the cloned canvas at its natural
-  //          pixel dimensions (cW × cH) with `zoom: 96/PX` so it
-  //          scales up to true print size (96 CSS-px per inch)
-  //   5. Wait for fonts to load via `document.fonts.ready`
-  //   6. Call `window.print()` inside the new window
-  //   7. Auto-close on `afterprint` so the tab doesn't linger
-  //
-  // If the user's browser blocks popups, we fall back to in-window
-  // print with a warning — better than silent failure.
+  // The window gets a minimal document: the poster's Google Font, `@page`
+  // at the poster's size with no margin, the editor's base styles for the
+  // sheet (printSheetBase.ts), and the copied sheet at its natural pixel
+  // size, scaled by 96/PX in print to true size. It opens the print dialog
+  // once its fonts have loaded (`document.fonts.ready`).
   //
   // The HTML shell itself lives in `@/export/printDocument` as a pure
   // function so the printed sheet (page size, block geometry, and the
   // attribution colophon's position in the bottom margin) is testable
   // without a real popup. This callback is window plumbing only.
+  //
+  // ONE print function (the MVP design doc §3.10; record 30): the Export
+  // tab's and the top bar's Save PDF, Preview's Print / Save PDF, ⌘P /
+  // Ctrl+P and the Staples help's button all call it, so they write the same
+  // document. In order:
+  //   1. Open the window first, inside the click or key press that asked:
+  //      a popup blocker allows a window opened there. Blocked: today's
+  //      alert, and nothing else changes.
+  //   2. Show the editor (leave Preview) and clear the selection, committed
+  //      at once (`flushSync`): the sheet is copied as it is drawn, with
+  //      nothing selected (the copy used to carry the selected frame, and
+  //      the editor kept its selection; record 30, cause C).
+  //   3. Measure the title's overflow again on that sheet, committed at
+  //      once, so the copy carries the shift it draws whatever was measured
+  //      before (cause A); and end a selection's pop still scaling a frame
+  //      (a block selected and printed at once printed up to 0.6 in larger).
+  //   4. Copy the sheet and write the document.
   const printPoster = useCallback(() => {
+    const printWin = window.open('', '_blank', 'width=900,height=700');
+    if (!printWin) {
+      alert(
+        'Popup blocked. Please allow popups for this site to use "Save PDF".',
+      );
+      return;
+    }
+    flushSync(() => {
+      setPreviewMode(false);
+      clearSelection();
+    });
+    const overflow = readTitleOverflow();
+    flushSync(() => setTitleOverflowPx(overflow));
     const canvas = document.getElementById('poster-canvas');
-    if (!canvas) return;
+    if (!canvas) {
+      printWin.close();
+      return;
+    }
+    finishBlockSelections(canvas);
 
     // Deep-clone and strip the editor's chrome: the grid and ruler
     // overlays, and a selected block's handles, handle row and accent
@@ -2261,19 +2297,11 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     // attributes, so user-added SVG content inside blocks is untouched.
     const clone = canvas.cloneNode(true) as HTMLElement;
     stripEditorChrome(clone);
-    // Reset the editor's zoom-slider transform on the clone itself —
-    // we scale via `zoom` in the print window instead.
+    // Reset the editor's zoom-slider transform on the clone itself: the
+    // print window scales its root to the page instead.
     clone.style.transform = '';
     clone.style.transformOrigin = '';
     clone.style.position = 'relative';
-
-    const printWin = window.open('', '_blank', 'width=900,height=700');
-    if (!printWin) {
-      alert(
-        'Popup blocked. Please allow popups for this site to use "Save PDF".',
-      );
-      return;
-    }
 
     printWin.document.open();
     printWin.document.write(
@@ -2292,7 +2320,12 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       }),
     );
     printWin.document.close();
-  }, [doc.widthIn, doc.heightIn, doc.fontFamily, doc.palette.bg, posterDisplayName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- clearSelection is a plain closure over stable setters
+  }, [doc.widthIn, doc.heightIn, doc.fontFamily, doc.palette.bg, posterDisplayName, readTitleOverflow]);
+
+  // ⌘P on a Mac, Ctrl+P elsewhere: the same print function. Without it the
+  // browser printed the editor page, sidebar and all (record 30).
+  usePrintShortcut(printPoster);
 
 
   return (
@@ -2320,7 +2353,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     >
       {!readOnly && (
         // Not for viewers (the phone share view is one: it is read-only).
-        <EditorTopBar sidebarOpen={sidebarOpen} onRun={runEditorHistory} />
+        <EditorTopBar sidebarOpen={sidebarOpen} onRun={runEditorHistory} onSavePdf={printPoster} />
       )}
       <div style={{ flex: 1, display: 'flex', minHeight: 0, minWidth: 0 }}>
       {/* Review-mode CSS gate — hides resize/rotate handles on both
@@ -3468,13 +3501,10 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         didDragRef={didDragRef}
         paletteName={palName}
         onExit={() => setPreviewMode(false)}
-        // No `flushSync` needed: the editor is hidden, not unmounted, so
-        // `#poster-canvas` — and every resolved image URL in it — is still
-        // live when `printPoster` clones it.
-        onPrint={() => {
-          setPreviewMode(false);
-          printPoster();
-        }}
+        // The editor is hidden, not unmounted, so `#poster-canvas` (and
+        // every resolved image URL in it) is live; `printPoster` leaves
+        // Preview and measures the shown sheet before it copies it.
+        onPrint={printPoster}
       />
     )}
     </>

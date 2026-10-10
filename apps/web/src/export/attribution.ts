@@ -51,6 +51,7 @@
  */
 import { colophonMarkPngDataUri } from './colophonMarkPng';
 import { colophonGeometry } from './colophonGeometry';
+import { PX } from '@/poster/constants';
 
 /**
  * Frozen copy. Phrased as a credit line, not a maker's mark — see the
@@ -106,6 +107,10 @@ export function shouldAttribute(opts: AttributionOptions = {}): boolean {
  * on the print root, so the poster's `@page` size, its canvas
  * dimensions, and every block's x/y stay untouched.
  *
+ * The line sits in a layer the size of the sheet (`postr-attribution-page`):
+ * in print that layer is laid out at the page's own scale and scaled back
+ * (see `acknowledgementPrintCss`).
+ *
  * Returns `''` when suppressed so the caller can interpolate it
  * unconditionally.
  */
@@ -118,9 +123,11 @@ export function acknowledgementPrintHtml(opts: AttributionOptions = {}): string 
   // mark, not a vendor sticker; still governed by the same anti-"sticker"
   // intent as the text.
   return (
-    `<div class="postr-attribution" aria-hidden="true">` +
+    `<div class="postr-attribution-page" aria-hidden="true">` +
+    `<div class="postr-attribution">` +
     `<img class="postr-attribution-mark" src="${colophonMarkPngDataUri()}" alt="" />` +
     `<span>${ACKNOWLEDGEMENT_TEXT}</span>` +
+    `</div>` +
     `</div>`
   );
 }
@@ -149,8 +156,8 @@ export function acknowledgementPrintHtml(opts: AttributionOptions = {}): string 
  *      `bottom + mark <= M`, which is asserted per size in the tests.
  *
  * Sizes are CSS pixels at the canvas's NATURAL scale, where 1 poster
- * unit = 1 px = 0.1 INCH — not 1 pt. `printDocument` then applies
- * `zoom: 96 / PX` (9.6 at PX=10) to reach true print size. Ignoring
+ * unit = 1 px = 0.1 INCH — not 1 pt. `printDocument` then scales the
+ * print root by 96 / PX (9.6 at PX=10) to reach true print size. Ignoring
  * that conversion is what made the pre-2026-09-13 colophon print at
  * 50.4 pt while its own comment claimed "around 7 pt".
  *
@@ -198,10 +205,19 @@ export function acknowledgementPrintCss(
 ): string {
   if (!shouldAttribute(opts)) return '';
   const g = colophonGeometry(widthIn, heightIn);
+  // In print: the page's own scale, 96 CSS px per inch, over the sheet's PX.
+  const pageScale = 96 / PX;
+  const atPage = (units: number) => Number((units * pageScale).toFixed(4));
   return `
   /* Acknowledgement line — sits INSIDE the bottom margin band, anchored
      to its right end. Never in the canvas flow, so poster dimensions and
      block positions are unaffected. Geometry from colophonGeometry(). */
+  .postr-attribution-page {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+  }
   .postr-attribution {
     /* The right edge comes from 'right' alone — the box is absolutely
        positioned with no 'left' and no 'width', so it is shrink-to-fit
@@ -240,6 +256,39 @@ export function acknowledgementPrintCss(
     display: block;
     flex: none;
     opacity: 0.72;
+  }
+  /* In print the sheet is laid out at ${PX} px per inch and the print root
+     scaled ${pageScale} times (printDocument.ts). Laid out with the sheet,
+     the mark's image was drawn to a whole unit, a tenth of an inch: 0.2 or
+     0.3 in on paper, not the geometry's 0.21 to 0.26 in, and the text's
+     baseline moved by up to 0.05 in (record 30's review round 2, R2-F2;
+     Chromium's PDF). So in print the layer holding the line is laid out at
+     the page's own scale, 96 px per inch, as the line was before that
+     change, and scaled back from the sheet's top-left corner: the root's
+     scale undoes the layer's, so the line prints at the size it is laid
+     out at, drawn to whole print pixels. The layer, not the line, takes
+     the transform: Chromium draws a transformed box from a whole px of its
+     parent, a tenth of an inch here, and the layer starts at 0, 0. */
+  @media print {
+    .postr-attribution-page {
+      inset: auto;
+      left: 0;
+      top: 0;
+      width: ${atPage(widthIn * PX)}px;
+      height: ${atPage(heightIn * PX)}px;
+      transform: scale(${1 / pageScale});
+      transform-origin: 0 0;
+    }
+    .postr-attribution {
+      right: ${atPage(g.rightUnits)}px;
+      bottom: ${atPage(g.bottomUnits)}px;
+      gap: ${atPage(g.gapUnits)}px;
+      font-size: ${atPage(g.fontUnits)}px;
+    }
+    .postr-attribution-mark {
+      width: ${atPage(g.markUnits)}px;
+      height: ${atPage(g.markUnits)}px;
+    }
   }`;
 }
 
