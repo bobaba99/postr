@@ -15,6 +15,7 @@
  * defect is present. The claims are listed in the harness header.
  */
 import { MOD, activeIs, blockOf, canonical, clickAway, focusBlockEnd, press, read, selectFrame, tabToward, typeWord } from './undoKit.mjs';
+import { switchesOff } from './editorHarness.mjs';
 
 /** The engine a page runs in. */
 const engine = (page) => page.context().browser()?.browserType().name() ?? 'chromium';
@@ -170,13 +171,19 @@ export const BUTTON_KEYS = [
         return t ? { size: `${t.rows}x${t.cols}`, first: t.cells.slice(0, 2).join('|') } : { size: 'the table removed', first: 'the table removed' };
       }, table);
       const g0 = await grid();
-      await page.getByRole('button', { name: 'Select column 1' }).click();
-      await page.waitForTimeout(200);
       const undo = page.locator('button[aria-label="Undo"]');
       const url = await holdBackspaceNavigation(page);
-      await undo.focus();
-      await press(page, 'Backspace', 300); await press(page, 'Delete', 300);
-      const g1 = await grid();
+      // Record 29: the column strips are hidden while ADJUSTMENTS_ENABLED is
+      // off, so this half is left out then; the cell range below runs.
+      const stripsHidden = switchesOff('ADJUSTMENTS_ENABLED').length > 0;
+      let g1 = g0;
+      if (!stripsHidden) {
+        await page.getByRole('button', { name: 'Select column 1' }).click();
+        await page.waitForTimeout(200);
+        await undo.focus();
+        await press(page, 'Backspace', 300); await press(page, 'Delete', 300);
+        g1 = await grid();
+      }
       const td = (i) => page.locator(`#poster-canvas [data-block-id="${table}"] td`).nth(i);
       if (g1.size !== g0.size) {
         return { claims: { B3t: true }, numbers: { table: g0.size, columnSelectedThenKeysOnUndo: g1.size } };
@@ -195,7 +202,7 @@ export const BUTTON_KEYS = [
       const s = await read(page, [a]);
       return {
         claims: { B3t: g1.size !== g0.size || g2.first !== g0.first || !s.blocks[a].store.endsWith('ZQTT') || focus !== 'BUTTON[Undo]' },
-        numbers: { table: g0.size, columnSelectedThenKeysOnUndo: g1.size, rangeThenKeysOnUndo: `${JSON.stringify(g0.first)} → ${JSON.stringify(g2.first)}`, focus, block1: s.blocks[a].store.slice(-6) },
+        numbers: { table: g0.size, columnSelectedThenKeysOnUndo: stripsHidden ? 'left out (ADJUSTMENTS_ENABLED off: no column strips)' : g1.size, rangeThenKeysOnUndo: `${JSON.stringify(g0.first)} → ${JSON.stringify(g2.first)}`, focus, block1: s.blocks[a].store.slice(-6) },
       };
     },
   },

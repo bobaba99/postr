@@ -18,6 +18,13 @@
  * Re-run: npx vitest run src/poster/__tests__/sidebarDraftsKept.test.tsx
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Record 29 hid the import tile (config/features.ts IMPORT_ENABLED);
+// this file tests that kept code, so it turns the switch on. The shipped
+// configuration is src/poster/__tests__/mvpHidden.test.tsx.
+vi.mock('@/config/features', async (orig) => ({
+  ...(await orig<typeof import('@/config/features')>()),
+  IMPORT_ENABLED: true,
+}));
 
 vi.mock('@/lib/supabase', () => {
   const chain = {

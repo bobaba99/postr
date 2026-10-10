@@ -69,6 +69,26 @@
  *   src/config/features.ts sets SHARING_ENABLED = false. A redirect that
  *   the switch does not explain is an error (exit 2).
  *
+ * SWITCHES (record 29's, config/features.ts; since the merge of main, record
+ *   30, into record 29): a scenario whose subject a switch hides is skipped
+ *   while the tree has it off, printed "skipped (switch off)" and counted on
+ *   the summary line of that name (NEEDS, by id). EDITOR_EXTRAS_ENABLED
+ *   (the guidelines panel and its toggles): the fit-…-closed and
+ *   fit-…-open-dpr… scenarios, H4k's guidelines rail, H4, Hw, Hk2, Hf, the
+ *   guidelines' Hr2 and their controls, the tour's guidelines step (Ht's
+ *   last step, Hp's step 8), and H2, H3 and H6, which need both panels open
+ *   for their small canvas. IMPORT_ENABLED (the tour's targets in the
+ *   sidebar): Hp's step 2 (the Import tile) and Ht's export step (the .postr
+ *   button). Kept on the controls that stay: the fit-…-default scenarios,
+ *   and fit-…-default-dpr… (added by the merge) for the fractional device
+ *   pixel ratios as the editor opens; Hr3 reads the rail tab and the author
+ *   buttons, leaving out the guidelines headers and Save as (leftOut); Ht6
+ *   finds the Issues step by its title (5 of 6 with the switches off, 6 of 8
+ *   with them on); guidelinesOpen reads the panel itself, so it is false
+ *   where the panel is not mounted. tour-reopened-sidebar-sideways still
+ *   runs, but its step 2 now highlights the sidebar itself (Authors), not a
+ *   control inside it.
+ *
  * RUN (from apps/web)
  *   node scripts/fit-check.mjs [--only id,id]
  *   env PORT (default 5261), OUT_DIR, POSTR_REPO, POSTR_MUTANT (lib/editorHarness.mjs)
@@ -82,7 +102,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { RouteRedirected, log, openEditor, sourceFlag, startHarness } from './lib/editorHarness.mjs';
+import { RouteRedirected, SWITCH_OFF, log, openEditor, sourceFlag, startHarness, switchOffReason, switchesOff } from './lib/editorHarness.mjs';
 
 const PORT = Number(process.env.PORT ?? 5261);
 const onlyArg = process.argv.find((a) => a.startsWith('--only'));
@@ -139,7 +159,9 @@ async function measure(page) {
       hiddenMax: Math.max(...Object.values(hidden)),
       overflow: { x: outer.scrollWidth - outer.clientWidth, y: outer.scrollHeight - outer.clientHeight },
       scroll: { x: outer.scrollLeft, y: outer.scrollTop },
-      guidelinesOpen: !document.querySelector('[title="Show poster guidelines"]'),
+      // Open: the panel is in the page and its "Show" toggle is not (record
+      // 29's EDITOR_EXTRAS_ENABLED mounts neither while it is off).
+      guidelinesOpen: !!document.querySelector('[data-postr-guidelines]') && !document.querySelector('[title="Show poster guidelines"]'),
       rulerError,
     };
   });
@@ -210,9 +232,14 @@ for (const [vw, vh] of VIEWPORTS) for (const [pw, ph] of POSTERS) {
   SCENARIOS.push(fitScenario(vw, vh, pw, ph, 'closed'));
 }
 // Fractional device pixel ratios: a flush fit must not round to overflow.
+// With the guidelines panel open, and (since the merge with record 30) as
+// the editor opens: the layout left while record 29 hides the panel.
 for (const dpr of [1.25, 1.5]) {
   for (const [vw, vh] of [[1280, 800], [1366, 768], [1440, 900]]) {
-    for (const [pw, ph] of [[48, 36], [36, 48], [33.1, 46.8]]) SCENARIOS.push(fitScenario(vw, vh, pw, ph, 'open', dpr));
+    for (const [pw, ph] of [[48, 36], [36, 48], [33.1, 46.8]]) {
+      SCENARIOS.push(fitScenario(vw, vh, pw, ph, 'open', dpr));
+      SCENARIOS.push(fitScenario(vw, vh, pw, ph, 'default', dpr));
+    }
   }
 }
 
@@ -763,23 +790,30 @@ SCENARIOS.push({
       ).catch(() => {});
       const got = {};
       got.railTab = await read('button[data-postr-tab]');
-      // All five section headers: the worst offset counts.
-      const headers = await page.$$eval('[data-postr-section-header]', (els) => els.length);
-      if (headers < 5) throw new Error(`precondition: 5 guidelines section headers, found ${headers}`);
-      const offsets = [];
-      for (let i = 0; i < headers; i += 1) offsets.push(await read({ header: i }));
-      const unreadable = offsets.find((v) => v === 'missing' || v === 'no :focus-visible');
-      if (unreadable) throw new Error(`precondition: could not focus every guidelines header (${unreadable})`);
-      got.guidelinesHeaders = [...new Set(offsets)].join(' ');
-      // "Save as..." sits in a section that may start closed (inert): open it.
-      await page.evaluate(() => {
-        const b = document.querySelector('[title="Save current checklist as a reusable template"]');
-        let p = b?.closest('[inert]')?.parentElement;
-        while (p && !p.firstElementChild?.matches('button[data-postr-section-header]')) p = p.parentElement;
-        p?.firstElementChild.click();
-      });
-      await page.waitForFunction(() => !document.querySelector('[title="Save current checklist as a reusable template"]')?.closest('[inert]'), null, { timeout: 3000 }).catch(() => {});
-      got.guidelinesSaveAs = await read('[title="Save current checklist as a reusable template"]');
+      // The guidelines panel exists only where record 29's
+      // EDITOR_EXTRAS_ENABLED is on: read the tree's own switch, as for the
+      // comments tab below, so a missing header is still an error where the
+      // panel should be there.
+      const guidelinesShown = sourceFlag('EDITOR_EXTRAS_ENABLED') !== false;
+      if (guidelinesShown) {
+        // All five section headers: the worst offset counts.
+        const headers = await page.$$eval('[data-postr-section-header]', (els) => els.length);
+        if (headers < 5) throw new Error(`precondition: 5 guidelines section headers, found ${headers}`);
+        const offsets = [];
+        for (let i = 0; i < headers; i += 1) offsets.push(await read({ header: i }));
+        const unreadable = offsets.find((v) => v === 'missing' || v === 'no :focus-visible');
+        if (unreadable) throw new Error(`precondition: could not focus every guidelines header (${unreadable})`);
+        got.guidelinesHeaders = [...new Set(offsets)].join(' ');
+        // "Save as..." sits in a section that may start closed (inert): open it.
+        await page.evaluate(() => {
+          const b = document.querySelector('[title="Save current checklist as a reusable template"]');
+          let p = b?.closest('[inert]')?.parentElement;
+          while (p && !p.firstElementChild?.matches('button[data-postr-section-header]')) p = p.parentElement;
+          p?.firstElementChild.click();
+        });
+        await page.waitForFunction(() => !document.querySelector('[title="Save current checklist as a reusable template"]')?.closest('[inert]'), null, { timeout: 3000 }).catch(() => {});
+        got.guidelinesSaveAs = await read('[title="Save current checklist as a reusable template"]');
+      }
       await openTab('authors');
       await byText('×');
       for (const [key, author] of [['authorUp', '▲'], ['authorDown', '▼'], ['authorRemove', 'remove']]) got[key] = await read({ author });
@@ -796,7 +830,11 @@ SCENARIOS.push({
       const outside = Object.entries(got).filter(([, v]) => v !== '-2px').map(([k]) => k);
       // (guidelinesHeaders lists the distinct offsets of all five; anything
       // but exactly "-2px" is outside.)
-      const left = sourceFlag('SHARING_ENABLED') === false ? { leftOut: 'Post comment (the comments tab is hidden: SHARING_ENABLED is false)' } : {};
+      const leftOut = [
+        ...(sourceFlag('SHARING_ENABLED') === false ? ['Post comment (the comments tab is hidden: SHARING_ENABLED is false)'] : []),
+        ...(guidelinesShown ? [] : ['the guidelines headers and Save as (the panel is hidden: EDITOR_EXTRAS_ENABLED is false)']),
+      ];
+      const left = leftOut.length ? { leftOut: leftOut.join('; ') } : {};
       return { observed: outside.length > 0, outside: outside.join(' ') || 'none', ...got, ...left };
     } finally {
       await context.close();
@@ -809,11 +847,20 @@ SCENARIOS.push({
     const { context, page } = await openEditor(h, { viewport: { width: 1440, height: 900 }, poster: { w: 48, h: 36 }, editDoc: offSheet(1), tour: true });
     try {
       await page.getByRole('button', { name: 'Next →' }).waitFor({ timeout: 5000 });
-      for (let i = 0; i < 5; i += 1) await tourNext(page);
-      const step = await page.evaluate(() => [...document.querySelectorAll('span')].map((x) => x.textContent).find((t) => /^\d\/8$/.test(t)));
-      if (step !== '6/8') throw new Error(`precondition: at step 6, got ${step}`);
+      // The Issues step by its title: it was step 6 of 8; record 29's
+      // switches take the Import and guidelines steps out (5 of 6 then).
+      const counter = () => page.evaluate(() => [...document.querySelectorAll('span')].map((x) => x.textContent).find((t) => /^\d+\/\d+$/.test(t)));
+      const atIssues = () => page.evaluate(() => [...document.querySelectorAll('span')].some((x) => x.textContent.trim() === 'Pre-flight issues'));
+      for (let i = 0; i < 10 && !(await atIssues()); i += 1) await tourNext(page);
+      const step = await counter();
+      if (!(await atIssues())) throw new Error(`precondition: the tour reached its "Pre-flight issues" step, got ${step}`);
+      // Six steps, and one for each of the Import (before Issues) and the
+      // guidelines (last) the switches keep.
+      const imp = switchesOff('IMPORT_ENABLED').length ? 0 : 1;
+      const extra = switchesOff('EDITOR_EXTRAS_ENABLED').length ? 0 : 1;
+      if (step !== `${5 + imp}/${6 + imp + extra}`) throw new Error(`precondition: the Issues step's place, got ${step}`);
       const shown = await page.evaluate(() => /out of bounds/i.test(document.querySelector('[data-postr-sidebar]')?.textContent ?? ''));
-      return { observed: !shown, issuesTabShown: shown };
+      return { observed: !shown, issuesTabShown: shown, step };
     } finally {
       await context.close();
     }
@@ -1055,6 +1102,22 @@ SCENARIOS.push({
   },
 });
 
+/**
+ * The switch each scenario's subject needs (record 29's, config/features.ts;
+ * see SWITCHES in the header): while the tree has it off the scenario is
+ * skipped, printed "skipped (switch off)".
+ */
+const NEEDS = [
+  // The guidelines panel, its toggles and its tour step (EDITOR_EXTRAS_ENABLED).
+  [/^fit-.*-(closed|open)(-dpr[\d.]+)?$/, 'EDITOR_EXTRAS_ENABLED'],
+  [/^(ctl-|focus-ring-)?guidelines-/, 'EDITOR_EXTRAS_ENABLED'],
+  [/^tour-last-step-|^tour-step8-open-panel$/, 'EDITOR_EXTRAS_ENABLED'],
+  // Both panels open: the small canvas these need (H2, H3, H6).
+  [/^(zoom|pinch)-out-below-floor$|^fit-narrow-canvas-/, 'EDITOR_EXTRAS_ENABLED'],
+  // The tour's targets inside the sidebar: the Import tile, the .postr button.
+  [/^tour-reopened-sidebar-step2$|^tour-export-step-/, 'IMPORT_ENABLED'],
+];
+const needsOf = (id) => NEEDS.filter(([re]) => re.test(id)).map(([, sw]) => sw);
 const list = SCENARIOS.filter((s) => !ONLY || ONLY.includes(s.id));
 if (ONLY && list.length !== ONLY.length) fail(`unknown --only id: ${ONLY.filter((id) => !SCENARIOS.some((s) => s.id === id))}`);
 const h = await startHarness({ name: 'fit-check', port: PORT }).catch(fail);
@@ -1062,6 +1125,12 @@ const results = [];
 let errors = 0;
 try {
   for (const sc of list) {
+    const off = switchesOff(needsOf(sc.id));
+    if (off.length) {
+      results.push({ id: sc.id, skipped: switchOffReason(off), switchOff: true });
+      log(`[skipped] ${sc.id} ${switchOffReason(off)}`);
+      continue;
+    }
     try {
       const r = await sc.run(h);
       if (r.skipped) {
@@ -1101,7 +1170,8 @@ if (rulerRuns.length) {
 }
 const summary = {
   git: h.git, mutant: h.mutant, claims: byClaim,
-  skipped: results.filter((r) => r.skipped).map((r) => r.id),
+  skipped: results.filter((r) => r.skipped && !r.switchOff).map((r) => r.id),
+  switchOff: results.filter((r) => r.switchOff).length,
   mechanism132: `${mech.filter((r) => r.mechanism).length} of ${mech.length}`,
   scrollsAfterFit: `${mech.filter((r) => r.scrolls).length} of ${mech.length}`,
   rulerError: (() => {
@@ -1115,6 +1185,7 @@ const summary = {
 };
 fs.writeFileSync(path.join(h.out, 'results.json'), JSON.stringify({ summary, results }, null, 2));
 log(`[harness] ${JSON.stringify(summary)}`);
+log(`[harness] ${SWITCH_OFF}: ${summary.switchOff}`);
 const INFO_CLAIMS = new Set(['Hh', 'H4k-sidebar', 'Hf-sidebar']);
 const exit = errors ? 2
   : Object.entries(byClaim).some(([claim, c]) => !INFO_CLAIMS.has(claim) && c.observed > 0) ? 1 : 0;

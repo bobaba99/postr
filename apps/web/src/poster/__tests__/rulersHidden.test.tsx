@@ -5,11 +5,20 @@
  * editor/rulers-match-sheet (docs/fixes/04-rulers-match-sheet.md there).
  *
  * The editor draws no ruler and offers no "Show ruler" control. The grid
- * stays.
+ * and its toggle are hidden too since record 29 (ADJUSTMENTS_ENABLED): this
+ * file turns them back on, so the overlays section the ruler toggle would
+ * join is drawn and its absence there means something.
  *
  * Re-run: npx vitest run src/poster/__tests__/rulersHidden.test.tsx
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Record 29 hid the grid toggle (the overlays section this file reads) (config/features.ts ADJUSTMENTS_ENABLED);
+// this file tests that kept code, so it turns the switch on. The shipped
+// configuration is src/poster/__tests__/mvpHidden.test.tsx.
+vi.mock('@/config/features', async (orig) => ({
+  ...(await orig<typeof import('@/config/features')>()),
+  ADJUSTMENTS_ENABLED: true,
+}));
 import { act, screen } from '@testing-library/react';
 
 const authSpies = vi.hoisted(() => ({

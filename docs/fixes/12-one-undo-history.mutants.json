@@ -617,8 +617,8 @@
       "edits": [
         [
           "src/poster/blocks.tsx",
-          "            historyKey={`content:${b.id}`}\n            placeholder=\"Poster Title\"",
-          "            placeholder=\"Poster Title\""
+          "            historyKey={`content:${b.id}`}\n            placeholder={b.prompt ?? DEFAULT_PROMPTS.title}",
+          "            placeholder={b.prompt ?? DEFAULT_PROMPTS.title}"
         ]
       ]
     },
@@ -627,8 +627,8 @@
       "edits": [
         [
           "src/poster/blocks.tsx",
-          "              historyKey={`content:${b.id}`}\n              placeholder=\"Section Heading\"",
-          "              placeholder=\"Section Heading\""
+          "              historyKey={`content:${b.id}`}\n              placeholder={b.prompt ?? DEFAULT_PROMPTS.heading}",
+          "              placeholder={b.prompt ?? DEFAULT_PROMPTS.heading}"
         ]
       ]
     },
@@ -747,8 +747,8 @@
       "edits": [
         [
           "src/poster/FloatingFormatToolbar.tsx",
-          "      {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}\n",
-          "      {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}\n      {cmdButton('≡', 'justifyCenter', false, onChange, { fontSize: 16 })}\n"
+          "      {cmdButton('U', 'underline', formats.underline, onChange, { textDecoration: 'underline' })}\n",
+          "      {cmdButton('U', 'underline', formats.underline, onChange, { textDecoration: 'underline' })}\n      {cmdButton('≡', 'justifyCenter', false, onChange, { fontSize: 16 })}\n"
         ]
       ]
     },
@@ -757,8 +757,8 @@
       "edits": [
         [
           "src/poster/FloatingFormatToolbar.tsx",
-          "      {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}\n",
-          "      {cmdButton('S', 'strikeThrough', formats.strikethrough, onChange, { textDecoration: 'line-through' })}\n      <button type=\"button\" title=\"Larger\">A+</button>\n"
+          "      {cmdButton('U', 'underline', formats.underline, onChange, { textDecoration: 'underline' })}\n",
+          "      {cmdButton('U', 'underline', formats.underline, onChange, { textDecoration: 'underline' })}\n      <button type=\"button\" title=\"Larger\">A+</button>\n"
         ]
       ]
     },

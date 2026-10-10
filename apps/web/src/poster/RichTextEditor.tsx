@@ -56,6 +56,7 @@ import { useEditableHistory } from './useEditableHistory';
 import { SYMBOLS, filterSymbols } from './symbols';
 import { matchSlashAtCaret } from './slashCommand';
 import { htmlToPlainText, sanitizeHtml, sanitizeTyped } from './sanitizeHtml';
+import { isBlankHtml } from './startingText';
 
 export interface SelectionInfo {
   /** Viewport-coordinate bounding rect of the current selection. */
@@ -161,6 +162,10 @@ export function RichTextEditor({
   const ref = useRef<HTMLDivElement | null>(null);
   const [slash, setSlash] = useState<SlashMenuState>(INITIAL_SLASH);
   const [focused, setFocused] = useState(false);
+  // Empty for the grey prompt (index.css reads data-empty; record 29). Read
+  // from the stored value: the prompt shows only while the block has no
+  // focus (index.css), and by then the typing is stored.
+  const empty = isBlankHtml(value ?? '');
 
   // Mount + value sync. The editor's own typing is committed and left
   // alone (the DOM is the source while the user types); any other change
@@ -347,6 +352,7 @@ export function RichTextEditor({
         contentEditable
         suppressContentEditableWarning
         data-placeholder={placeholder}
+        data-empty={placeholder && empty ? '' : undefined}
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         onKeyUp={handleKeyUp}

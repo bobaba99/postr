@@ -30,6 +30,13 @@
  * button is covered too.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Record 29 hid the guidelines panel (the chrome this file sees hidden in preview) (config/features.ts EDITOR_EXTRAS_ENABLED);
+// this file tests that kept code, so it turns the switch on. The shipped
+// configuration is src/poster/__tests__/mvpHidden.test.tsx.
+vi.mock('@/config/features', async (orig) => ({
+  ...(await orig<typeof import('@/config/features')>()),
+  EDITOR_EXTRAS_ENABLED: true,
+}));
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import type { PosterDoc } from '@postr/shared';

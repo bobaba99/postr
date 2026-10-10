@@ -270,6 +270,8 @@ export const SAVE = [
   },
   {
     id: 'D1-duplicate-after-failed-save', claims: ['D1'],
+    // The sidebar's Duplicate is hidden while this is off (record 29).
+    needs: 'EDITOR_EXTRAS_ENABLED',
     how: 'the backend fails (network); " ZQDUP" typed; the sidebar\'s Duplicate pressed: is a copy made without the word?',
     async run(h, s) {
       const { page, state } = s;
@@ -285,9 +287,10 @@ export const SAVE = [
       return { claims: { D1: staleCopy }, numbers: { copyMade: !!copy, copyHasWord: copy ? !staleCopy : null, alert: JSON.stringify(alert) } };
     },
   },
-  nothingChanged('K11-duplicate-nothing-changed', 'K11', 'ZQK11', 'the sidebar\'s Duplicate', async (page) => {
+  // The sidebar's Duplicate is hidden while EDITOR_EXTRAS_ENABLED is off (record 29).
+  { ...nothingChanged('K11-duplicate-nothing-changed', 'K11', 'ZQK11', 'the sidebar\'s Duplicate', async (page) => {
     await page.locator('button[title="Duplicate this poster"]').first().click();
-  }),
+  }), needs: 'EDITOR_EXTRAS_ENABLED' },
   nothingChanged('K11n-name-enter-unchanged', 'K11n', 'ZQK11N', 'Layout › Poster name, Enter with the name unchanged', async (page) => {
     await openTab(page, 'layout');
     const field = page.locator('input[aria-label="Poster name"]').first();

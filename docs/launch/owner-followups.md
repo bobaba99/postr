@@ -26,6 +26,14 @@ Detail: `docs/legal/quebec-law-25.md` (internal, not legal advice) and record 24
   under PIPEDA; US adequacy only for Data Privacy Framework companies) and whether
   Vercel's approximate location counts as "locating" under s. 8.1.
 
+- **The legal pages still describe hidden features (record 29, not blocking).** The
+  privacy policy says what import, Copy a design, Scan image and the Staples print
+  helper send "if you use" them. All four are hidden since 2026-10-07
+  (`config/features.ts`), so nothing there is untrue, only about features a visitor
+  cannot reach. The Terms §5.2 (EN and FR) also gives "reading the PDFs and images you
+  import" as an example of what the licence covers (record 29's review round 1).
+  Counsel or you: leave it while they may return, or trim it.
+
 ## 2. Things only you can do
 
 - **Stripe Dashboard text.** Product names and descriptions shown on Stripe Checkout
@@ -84,10 +92,67 @@ Under your rule that only unclear or blocking legal issues come back to you:
   for now. Below about 389 px the English landing's two buttons keep main's layout
   (side by side, each label on two lines); stacking them would be a design change.
 - **Item 12 (undo):** built to your answers (one history, each word a step, A+/A− and
-  alignment buttons removed, table typing folded in). Its open questions will be added
-  here when its review rounds finish.
+  alignment buttons removed, table typing folded in). Its open questions are in
+  section 4 below.
+
+- **Record 29 (the minimal editor), your decisions D3 and D4 as built:** a grey
+  prompt goes while the caret is in its block (as PowerPoint's "Click to add text"),
+  so it never sits beside the caret; a caption's "Show caption" brings it back on top
+  (the stored left, right or bottom is kept until you untick it); the sample table
+  keeps its header row (Measure, M (SD), 𝑝) and shows "Type or paste" in its first
+  body cell (a longer prompt made the table run into the heading below it); the
+  tour's export step says "Save as PDF or export an editable PowerPoint file (paid)."
+  The landing page now names "the BibTeX reference formatting" and no longer "the
+  conference size lookups"; the About page lost its import and "Borrow a look you
+  like" cards and the custom-palette, guidelines and citation-style sentences (each
+  comes back with its switch).
 
 ## 4. Later list items that will want your opinion
+
+Questions the UX fixes raised. Each is built one way now (said first); answer only
+where you want the other way.
+
+- **Undo and Redo pressed from the keyboard** (item 12, record 12 §10): Tab to the
+  Undo button and press Enter or Space: the focus stays on the button, so a second
+  press undoes again instead of typing into the poster. A mouse click and ⌘Z put the
+  caret back in the text. A redo selects the redone words, so the next key replaces
+  them.
+- **Ctrl+Y on a Mac** (item 12): it is redo, as on Windows. In a Mac text box Ctrl+K
+  then Ctrl+Y normally cuts and pastes back a line ("yank"); in Postr's text blocks
+  Ctrl+Y now redoes instead. ⌘⇧Z redoes either way. Keep Ctrl+Y as redo on a Mac?
+- **The plot checker on a seaborn grid smaller than the print size** (13b, record 13b
+  §10): the script it hands back sets the grid to the print size, so text the smaller
+  grid printed larger now prints at the minimum (15.7 → 14 pt and 18 → 14 pt on the
+  two test scripts; both pass before and after). The other way, resizing only a grid
+  larger than the print size, is a branch the checker could not read back.
+- **A legend wider than the figure** (13b): at 4 × 3 in with two panels, a 14 pt
+  legend 2.9 in wide covers the plots; moving such a legend below them is not built.
+- **Postr's charts grow their block when the text cannot fit at the minimums** (13c):
+  in a small block (6 × 4.5 to 8 × 6 in) with a long legend or long labels, the chart
+  grows taller instead of printing text below the minimums: 96 of 757 tested
+  sizes, by 0.9 in typically and 5.35 in at most. A grown chart can cover the block
+  under it (Issues counts it). The other way is to keep the block and shrink the text.
+- **Two devices or two tabs on one poster** (record 27 §10): last save wins. If one
+  device's saves failed and it comes back online, its retry writes over newer work
+  saved on the other, with no warning (before the fix, the offline edit was lost
+  instead). A warning or a comparison would be a new feature.
+- **Auto-Arrange may leave a column empty** (record 28 §10): six figures on a 48 ×
+  24 in sheet fit best in one narrow column, so the other is empty (the prototype you
+  approved does the same). On the untouched 3-column template the figure gets the
+  wide middle column (23.9 in), because the sample text is short and only the
+  figure can grow.
+- **An empty figure's "Figure N." and an empty heading's number** (record 31 §10): an
+  empty figure prints "Figure 4." over blank space in the PDF, while the PowerPoint
+  file leaves an empty figure out (so later figure numbers there skip one); an empty
+  heading prints its number "1." in both. These are numbers, not hints: print them,
+  or leave them out?
+- From record 29: the closed poster's "Download a copy" still saves a `.postr` file,
+  which the app cannot import while import is hidden; keep it as the way out, or
+  offer the PDF instead.
+- From record 29: a new poster's Issues tab now shows 8 where it showed 4, because
+  each of the template's four empty text blocks adds "Empty block: type in it or
+  delete it." (a suggestion, as bounded-designs §3.12 asks). If that number on a
+  poster just made is unwelcome, the tab could count warnings and errors only.
 
 Detail: `docs/stress-test/PLAN.md` (Later list).
 
@@ -104,8 +169,8 @@ Detail: `docs/stress-test/PLAN.md` (Later list).
   session back (a pending confirmation), `/auth` may skip "Check your inbox" and try a
   checkout with no session (measured against a faked reply; the real reply is
   unverified). Queued.
-- Queued from the claims audit as UX bugs (they will be fixed, listed for awareness):
-  the paid PowerPoint export drops Figure-tab charts (HIGH); no screen to set a new
+- Queued from the claims audit as UX bugs (they will be fixed, listed for awareness;
+  the paid PowerPoint export's missing charts were fixed by record 31): no screen to set a new
   password (HIGH); a replace-import re-arranges the poster; billing refund edge cases
   (renewal after re-export, pooled packs); the EU withdrawal waiver not asked on every
   path; retention clean-ups; a fuller "Download my data"; file properties naming Postr.

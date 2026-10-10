@@ -41,8 +41,8 @@
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "      {!guidelinesOpen && !mobileShare && (",
-          "      {!guidelinesOpen && ("
+          "      {EDITOR_EXTRAS_ENABLED && !guidelinesOpen && !mobileShare && (",
+          "      {EDITOR_EXTRAS_ENABLED && !guidelinesOpen && ("
         ]
       ]
     },

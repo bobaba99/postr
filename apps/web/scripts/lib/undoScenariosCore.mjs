@@ -361,7 +361,8 @@ export const CORE = [
   ...['bold', 'paste', 'del'].flatMap((x) => [formatInside(x), formatOutside(x)]),
   { ...formatInside('boldkey'), info: true, chromiumOnly: true },
   ...['inside', 'outside'].map((where) => ({
-    id: `F-blocksize-${where}`, claims: [where === 'inside' ? 'bsf' : 'bso'],
+    // Edit block's Font size field is hidden (record 29).
+    id: `F-blocksize-${where}`, claims: [where === 'inside' ? 'bsf' : 'bso'], needs: 'ADJUSTMENTS_ENABLED',
     how: `click block 1, Edit block › Font size field: select all, type 60; ${where === 'inside' ? '⌘Z in the field, then ⌘⇧Z' : 'click away, ⌘Z'}`,
     async run(page, ids) {
       const [a] = ids;
@@ -529,7 +530,8 @@ export const CORE = [
     },
   },
   ...[['highlight', 'Highlight · Yellow']].map(([what, title]) => ({
-    id: `P1-${what}-kept`, info: true, claims: ['kept'],
+    // The format bar's highlight is hidden (record 29).
+    id: `P1-${what}-kept`, info: true, claims: ['kept'], needs: 'ADJUSTMENTS_ENABLED',
     how: `select the last word of block 1, click ${title} on the selection toolbar, then type "Q" at the end (a later keystroke commits the block)`,
     async run(page, ids) {
       const [a] = ids;

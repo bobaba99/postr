@@ -198,6 +198,21 @@
  *        the second arrow moves the block (B3's guard keeps keys pressed
  *        on the buttons off the poster; record 12 §10)
  *
+ * SWITCHES (record 29's, config/features.ts; since the merge of main, record
+ *   30, into record 29): a scenario that drives a control a switch hides
+ *   names it in `needs` and is skipped while the tree has it off, printed
+ *   "skipped (switch off)" and counted on the summary line of that name:
+ *   ADJUSTMENTS_ENABLED for F-blocksize (Edit block's font size), P1 (the
+ *   highlight), E1 and E1x (the Content box), E2 and G4 (caption spacing),
+ *   W4 (Edit block's colour), G1 and G2 (crop), G3 (the column grip), G5
+ *   (line spacing). Kept, measuring the controls that stay: TB reads the
+ *   selection toolbar alone while the docked copy (in the Content box) is
+ *   hidden, and does not ask for its hidden buttons (S, highlight, colour);
+ *   B3t's column-strip half is left out while the strips are hidden (its
+ *   cell-range half runs); B4's logos draw no rotate or crop control, so it
+ *   reads their other controls; B4o's 900 px case opens no guidelines panel
+ *   while EDITOR_EXTRAS_ENABLED is off (its numbers say so).
+ *
  * CONTROLS (exit 2 if one fails: the instrument is not trustworthy)
  *   C1  Style › Font change, click away: ⌘Z reverts it, ⌘⇧Z (key "z") and
  *       ⌘Y redo it
@@ -246,7 +261,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { log, openEditor, startHarness } from './lib/editorHarness.mjs';
+import { SWITCH_OFF, log, openEditor, startHarness, switchOffReason, switchesOff } from './lib/editorHarness.mjs';
 import { KEY, MOD, canonical, press, textBlockIds } from './lib/undoKit.mjs';
 import { CORE } from './lib/undoScenariosCore.mjs';
 import { ENTRIES } from './lib/undoScenariosEntries.mjs';
@@ -337,6 +352,13 @@ try {
       results.push({ id: sc.id, how: sc.how, skip: `Chromium only (${why})` });
       continue;
     }
+    // A scenario that drives a control record 29's switches hide (`needs`)
+    // is skipped while the tree under test has that switch off.
+    const off = switchesOff(sc.needs);
+    if (off.length) {
+      results.push({ id: sc.id, how: sc.how, skip: switchOffReason(off), switchOff: true });
+      continue;
+    }
     const t0 = Date.now();
     let opened;
     try {
@@ -380,6 +402,8 @@ for (const r of results) {
   }
   if (r.pageErrors?.length) log(`           page errors: ${r.pageErrors.join(' | ').slice(0, 300)}`);
 }
+const switchSkips = results.filter((r) => r.switchOff).map((r) => r.id);
+log(`${SWITCH_OFF}: ${switchSkips.length}${switchSkips.length ? ` (${switchSkips.join(', ')})` : ''}`);
 if (JSON_OUT) fs.writeFileSync(path.resolve(JSON_OUT), JSON.stringify({ engine: h.engine, git: h.git, mutant: h.mutant, host: process.platform, results }, null, 2));
 log(`exit ${exit} (0 clean · 1 a claim observed · 2 instrument)`);
 process.exit(exit);

@@ -29,6 +29,13 @@
  * Re-run: npx vitest run src/poster/__tests__/controlsOneSize.test.tsx
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Record 29 hid the rotate control, the crop button and the table strips (config/features.ts ADJUSTMENTS_ENABLED);
+// this file tests that kept code, so it turns the switch on. The shipped
+// configuration is src/poster/__tests__/mvpHidden.test.tsx.
+vi.mock('@/config/features', async (orig) => ({
+  ...(await orig<typeof import('@/config/features')>()),
+  ADJUSTMENTS_ENABLED: true,
+}));
 
 // Each test clicks the ZoomBar many times: give it room on a loaded machine.
 vi.setConfig({ testTimeout: 30_000 });

@@ -250,3 +250,32 @@ describe('review round 1 (record 28 §9)', () => {
     expect(geometry()).toEqual(before);
   });
 });
+
+describe('record 29’s grey prompts (the merge of main, record 30, into record 29)', () => {
+  it('Auto-Arrange measures on the sheet, where the prompts are drawn', async () => {
+    // An empty block's prompt is drawn only inside #poster-canvas (index.css,
+    // record 29 review round 1, R1-01) and sets its height there. Auto-Arrange
+    // measures copies of the frames laid out in a host it adds to the element
+    // it is given: given the workspace around the sheet, the copies drew no
+    // prompt, so on a fresh template each empty block was placed at its
+    // height without one and the block under it overlapped it
+    // (auto-arrange-check G3, G11, G13; MEASURED in Chromium: every copy's
+    // ::before "none", the 3-Column template's text blocks placed 12 units
+    // tall and drawn 17.5 to 25.25). jsdom lays nothing out, so this reads
+    // where the hosts go: inside the sheet.
+    load({ ...makeDoc(48, 36), blocks: makeBlocks('3col', 48, 36) });
+    renderEditor();
+    openTab(/layout/i);
+    const sheet = q('#poster-canvas');
+    const records: MutationRecord[] = [];
+    const seen = new MutationObserver((rs) => records.push(...rs));
+    seen.observe(document.body, { childList: true, subtree: true });
+    await arrange();
+    records.push(...seen.takeRecords());
+    seen.disconnect();
+    const hosts = records.flatMap((r) => [...r.addedNodes].map((n) => ({ n, parent: r.target })))
+      .filter(({ n }) => n instanceof HTMLElement && n.hasAttribute('data-postr-measure'));
+    expect(hosts.length, 'Auto-Arrange measured in a host').toBeGreaterThan(0);
+    expect(hosts.filter(({ parent }) => !(parent instanceof Element && (parent === sheet || sheet.contains(parent)))).length, 'every host inside #poster-canvas').toBe(0);
+  });
+});

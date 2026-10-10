@@ -621,6 +621,16 @@
      "export const REFINE_RADIUS = 0.25;"
     ]
    ]
+  },
+  "measures-in-workspace": {
+   "undoes": "the merge of main (record 30) into record 29: Auto-Arrange measures in a host inside #poster-canvas, where record 29's grey prompts are drawn, not in the workspace around the sheet (an empty block was placed at its height without its prompt)",
+   "edits": [
+    [
+     "src/poster/PosterEditor.tsx",
+     "    const sheet = canvasRef.current?.querySelector<HTMLElement>('#poster-canvas');",
+     "    const sheet = canvasRef.current;"
+    ]
+   ]
   }
  }
 }

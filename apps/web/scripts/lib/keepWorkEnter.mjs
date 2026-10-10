@@ -103,6 +103,8 @@ export const ENTER = [
   },
   {
     id: 'E5-content-box', claims: ['E5', 'E5r'],
+    // The Content box is hidden while this is off (record 29).
+    needs: 'ADJUSTMENTS_ENABLED',
     how: 'Edit block › Content box of the first text block: " ZQC", Enter, "ZQD"; reload',
     async run(h, s) {
       const { page, state, id } = s;

@@ -30,6 +30,8 @@ import { RichTextEditor, type SelectionInfo } from './RichTextEditor';
 import { CropOverlay } from './CropOverlay';
 import { FloatingFormatToolbar } from './FloatingFormatToolbar';
 import { TableCellEditor } from './TableCellEditor';
+import { DEFAULT_PROMPTS, tablePromptFor } from './startingText';
+import { ADJUSTMENTS_ENABLED } from '@/config/features';
 import { onHistoryButtons } from './editorHistory';
 import {
   DEFAULT_TABLE_DATA,
@@ -582,6 +584,8 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
     return arr[c - 1] === true;
   };
   const colWidths = data.colWidths ?? Array(data.cols).fill(100 / data.cols);
+  // The table's prompt, in its first body cell while the body is empty (record 29).
+  const bodyPrompt = tablePromptFor(block);
 
   const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const [hoveredCol, setHoveredCol] = useState<number | null>(null);
@@ -972,7 +976,11 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
           />
         </>
       )}
-      {colWidths.slice(0, -1).map((_, i) => {
+      {/* The table's canvas controls (column-border drag, row and column
+          strips, the hover "+", the right-click menu) are hidden
+          (ADJUSTMENTS_ENABLED, record 29); the Format tab's Rows and
+          Columns buttons stay (D5). */}
+      {ADJUSTMENTS_ENABLED && colWidths.slice(0, -1).map((_, i) => {
         const leftPct = colWidths.slice(0, i + 1).reduce((s, w) => s + w, 0);
         return (
           <div
@@ -1047,6 +1055,8 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
                     }
                   }}
                   onContextMenu={(e) => {
+                    // Hidden: the browser's own menu shows (record 29).
+                    if (!ADJUSTMENTS_ENABLED) return;
                     e.preventDefault();
                     e.stopPropagation();
                     setCtxMenu({ x: e.clientX, y: e.clientY, r, c });
@@ -1078,6 +1088,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
                 >
                   <TableCellEditor
                     html={data.cells[r * data.cols + c] ?? ''}
+                    placeholder={r === 1 && c === 0 ? bodyPrompt : undefined}
                     historyKey={`cell:${block.id}:${r * data.cols + c}`}
                     onCommit={(html) => updateCellValue(r, c, html)}
                     onFocus={() => {
@@ -1123,7 +1134,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
         the window listener above) removes the row. Header row 0 is
         included so users can delete it if they don't want a header.
       */}
-      {Array.from({ length: data.rows }).map((_, r) => {
+      {ADJUSTMENTS_ENABLED && Array.from({ length: data.rows }).map((_, r) => {
         // Row height is 100% / rows — use flex spacing via top %.
         const topPct = (r / data.rows) * 100;
         const heightPct = 100 / data.rows;
@@ -1183,7 +1194,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
         Column selector strip — narrow clickable band along the top
         edge. Same pattern as rows.
       */}
-      {Array.from({ length: data.cols }).map((_, c) => {
+      {ADJUSTMENTS_ENABLED && Array.from({ length: data.cols }).map((_, c) => {
         const leftPct = colWidths.slice(0, c).reduce((s, w) => s + w, 0);
         const widthPct = colWidths[c] ?? 100 / data.cols;
         const isSel = selectedCol === c;
@@ -1249,7 +1260,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
         All structural edits (insert-at-position, delete) live in the
         sidebar TableEditor stepper.
       */}
-      {hoveredRow !== null && hoveredRow === data.rows - 1 && (
+      {ADJUSTMENTS_ENABLED && hoveredRow !== null && hoveredRow === data.rows - 1 && (
         <button
           type="button"
           title="Add row"
@@ -1274,7 +1285,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
           }}
         />
       )}
-      {hoveredCol !== null && hoveredCol === data.cols - 1 && (
+      {ADJUSTMENTS_ENABLED && hoveredCol !== null && hoveredCol === data.cols - 1 && (
         <button
           type="button"
           title="Add column"
@@ -1302,7 +1313,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
       </div>
 
       {/* Figma-style right-click context menu */}
-      {ctxMenu && ReactDOM.createPortal(
+      {ADJUSTMENTS_ENABLED && ctxMenu && ReactDOM.createPortal(
         <TableContextMenu
           x={ctxMenu.x}
           y={ctxMenu.y}
@@ -1999,7 +2010,7 @@ export function BlockFrame(props: BlockFrameProps) {
   // wider than its block shows only its move button: review F3).
   const labelRef = useRef<HTMLDivElement | null>(null);
   const room = useSelectionRoom(frameRef, { active: selected, zoom, rotationDeg: b.rotation ?? 0, stored: { w: b.w, h: b.h }, labelRef });
-  const controls = blockControls({
+  const laidOut = blockControls({
     wPx: room.widthUnits * zoom,
     hPx: room.heightUnits * zoom,
     // Images: corners-only in default (contain) mode so edge drags can't
@@ -2011,6 +2022,10 @@ export function BlockFrame(props: BlockFrameProps) {
     row: { labelPx: room.labelPx, imageButtons: b.type === 'image' || b.type === 'logo' },
     zoom,
   });
+  // The rotate control is hidden (ADJUSTMENTS_ENABLED, record 29); a stored
+  // rotation still draws. The handle row keeps room for the hidden crop
+  // button, so it is cut to its move button a little sooner than it needs.
+  const controls = ADJUSTMENTS_ENABLED ? laidOut : { ...laidOut, rotate: false };
   const rotateInRow = controls.rotate && !room.rotateBelow;
   // The rotate control: below the block on a stem, or the last button of
   // the handle row when below there is no room (plan item 19). Dragging it
@@ -2282,7 +2297,7 @@ export function BlockFrame(props: BlockFrameProps) {
             value={b.content}
             onChange={(v) => update({ content: v })}
             historyKey={`content:${b.id}`}
-            placeholder="Poster Title"
+            placeholder={b.prompt ?? DEFAULT_PROMPTS.title}
             multiline={false}
             stopPointerDown
             onSelectionChange={setSelectionInfo}
@@ -2325,7 +2340,7 @@ export function BlockFrame(props: BlockFrameProps) {
               value={b.content}
               onChange={(v) => update({ content: v })}
               historyKey={`content:${b.id}`}
-              placeholder="Section Heading"
+              placeholder={b.prompt ?? DEFAULT_PROMPTS.heading}
               multiline={false}
               stopPointerDown
               onSelectionChange={setSelectionInfo}
@@ -2349,7 +2364,7 @@ export function BlockFrame(props: BlockFrameProps) {
             multiline
             stopPointerDown
             onSelectionChange={setSelectionInfo}
-            placeholder="Type here… (type / for symbols)"
+            placeholder={b.prompt ?? DEFAULT_PROMPTS.text}
             style={txtStyle}
           />
         )}
@@ -2374,7 +2389,7 @@ export function BlockFrame(props: BlockFrameProps) {
             label="Figure"
           >
             <ImageBlock block={b} palette={p} onUpdate={update} selected={selected} userId={userId} posterId={posterId} />
-            {selected && cropMode && (
+            {ADJUSTMENTS_ENABLED && selected && cropMode && (
               <CropOverlay
                 block={b}
                 onUpdate={(id, patch) => update(patch)}
@@ -2393,7 +2408,7 @@ export function BlockFrame(props: BlockFrameProps) {
             label="Figure"
           >
             <LogoBlock block={b} onUpdate={update} />
-            {selected && cropMode && (
+            {ADJUSTMENTS_ENABLED && selected && cropMode && (
               <CropOverlay
                 block={b}
                 onUpdate={(id, patch) => update(patch)}
@@ -2619,6 +2634,7 @@ export function BlockFrame(props: BlockFrameProps) {
                     <polyline points="3 20 3 15 8 15" />
                   </svg>
                 </button>
+                {ADJUSTMENTS_ENABLED && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -2647,6 +2663,7 @@ export function BlockFrame(props: BlockFrameProps) {
                     <path d="M18 22V8a2 2 0 0 0-2-2H2" />
                   </svg>
                 </button>
+                )}
               </>
             )}
 
@@ -2678,6 +2695,17 @@ export function BlockFrame(props: BlockFrameProps) {
                 <line x1="18" y1="6" x2="6" y2="18" />
               </svg>
             </button>
+            )}
+
+            {/* The hidden crop button's slot (ADJUSTMENTS_ENABLED, record
+                29): empty, unpainted and inert, so the row, centred on
+                the block, keeps the width record 19 measured its overview
+                threshold with. Without it every button moved 14 px and,
+                zoomed out to 0.35, a 3 in image's Replace sat over the
+                blocks beside it (the merge of main, record 30, into
+                record 29; control-size-check Fd, Fh). */}
+            {!ADJUSTMENTS_ENABLED && controls.buttons && (b.type === 'image' || b.type === 'logo') && (
+              <span aria-hidden="true" data-postr-row-slot="" style={{ ...circleBtn, visibility: 'hidden', pointerEvents: 'none' }} />
             )}
 
             {/* The rotate control, when below the block it would meet

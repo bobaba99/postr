@@ -313,10 +313,13 @@ export async function installGuestBackend(context, state, base, { tour = false }
   }, tour);
 }
 
-/** A fresh context + page, with the fake backend and error capture. */
-export async function newGuestPage(h, state, { viewport = { width: 1440, height: 900 } } = {}) {
+/**
+ * A fresh context + page, with the fake backend and error capture. `tour`
+ * leaves the onboarding tour to start, as for a first visit (record 29).
+ */
+export async function newGuestPage(h, state, { viewport = { width: 1440, height: 900 }, tour = false } = {}) {
   const context = await h.browser.newContext({ viewport });
-  await installGuestBackend(context, state, h.base);
+  await installGuestBackend(context, state, h.base, { tour });
   const page = await context.newPage();
   page.on('pageerror', (e) => state.errors.push(String(e).slice(0, 300)));
   page.on('console', (m) => { if (m.type() === 'error') state.console.push(m.text().slice(0, 200)); });

@@ -364,15 +364,30 @@ describe('record 30, cause D — one print function from every entry', () => {
   });
 });
 
+/** The table's controls in a written document: its buttons, role="button" strips and titled grips. */
+const tableControlsIn = (html: string) =>
+  [...parse(html).querySelectorAll('[data-block-id="tb1"] :is(button, [role="button"], [title])')].map(
+    (el) => el.getAttribute('title') || el.getAttribute('aria-label') || el.tagName,
+  );
+/** The active cell's grey row and column bands (#9ca3af at 9 %) in a sheet. */
+const bandsIn = (root: ParentNode) =>
+  [...root.querySelectorAll<HTMLElement>('[data-block-id="tb1"] div')].filter((el) => /9ca3af18|156, 163, 175, 0\.09/.test(el.getAttribute('style') ?? '')).length;
+
 describe('record 30, review round 2 (R2-F1) — the table’s own controls are not printed', () => {
-  /** The table's controls in a written document: its buttons, role="button" strips and titled grips. */
-  const tableControlsIn = (html: string) =>
-    [...parse(html).querySelectorAll('[data-block-id="tb1"] :is(button, [role="button"], [title])')].map(
-      (el) => el.getAttribute('title') || el.getAttribute('aria-label') || el.tagName,
-    );
-  /** The active cell's grey row and column bands (#9ca3af at 9 %) in a sheet. */
-  const bandsIn = (root: ParentNode) =>
-    [...root.querySelectorAll<HTMLElement>('[data-block-id="tb1"] div')].filter((el) => /9ca3af18|156, 163, 175, 0\.09/.test(el.getAttribute('style') ?? '')).length;
+  // Record 29 hid the table's strips, column grips and "+" bars
+  // (config/features.ts ADJUSTMENTS_ENABLED). These tests guard their print
+  // for when the switch is turned back on, so they turn it on: `openPoster`
+  // resets the modules, so the editor it imports reads the switch as mocked
+  // here. The shipped configuration is the describe below.
+  beforeEach(() => {
+    vi.doMock('@/config/features', async (orig) => ({
+      ...(await orig<typeof import('@/config/features')>()),
+      ADJUSTMENTS_ENABLED: true,
+    }));
+  });
+  afterEach(() => {
+    vi.doUnmock('@/config/features');
+  });
 
   it('⌘P with the caret in the last cell and the pointer resting on it prints no "+" bar, strip, grip or band', async () => {
     // The user clicks into the table's last cell, the pointer stays on it
@@ -429,6 +444,60 @@ describe('record 30, review round 2 (R2-F1) — the table’s own controls are n
     // Autosave captures the thumbnail from a copy of the sheet as it is,
     // the selection and the caret kept (data/thumbnails.ts): the same
     // copy-cleaning as the print, with the active cell's bands still on.
+    await openPoster({ table: true });
+    const cells = [...frame('tb1').querySelectorAll('td')];
+    const editable = cells[8]!.querySelector('[contenteditable]')!;
+    await rtl.act(async () => {
+      rtl.fireEvent.click(editable);
+      rtl.fireEvent.focus(editable);
+      rtl.fireEvent.mouseEnter(cells[8]!);
+    });
+    await k.nextTask();
+    expect(bandsIn(document), 'precondition: the active cell’s bands show').toBe(2);
+    const { capturePosterJpeg } = await vi.importActual<typeof import('@/data/thumbnails')>('@/data/thumbnails');
+    const offsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth')!;
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, get(this: HTMLElement) { return this.id === 'poster-canvas' ? 480 : 0; } });
+    drawn.length = 0;
+    try {
+      await capturePosterJpeg({ targetWidthPx: 400, quality: 0.8 });
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', offsetWidth);
+    }
+    expect(drawn, 'the copy reached the drawing step').toHaveLength(1);
+    expect(tableControlsIn(drawn[0]!)).toEqual([]);
+    expect(bandsIn(parse(drawn[0]!))).toBe(0);
+  });
+});
+
+describe('record 30 R2-F1 with record 29’s switches as shipped — the active cell’s bands still show, and are not printed', () => {
+  it('⌘P with the caret in the last cell and the pointer on it prints no band; the editor offers no "+" bar or strip', async () => {
+    // ADJUSTMENTS_ENABLED is off: no strips, grips or "+" bars to print.
+    // The active cell's bands are not behind the switch, so the copy must
+    // still drop them (data-postr-editor-ui, export/stripEditorChrome.ts).
+    stubWindows();
+    await openPoster({ table: true });
+    const cells = [...frame('tb1').querySelectorAll('td')];
+    const editable = cells[8]!.querySelector('[contenteditable]')!;
+    await rtl.act(async () => {
+      rtl.fireEvent.click(editable);
+      rtl.fireEvent.focus(editable);
+      rtl.fireEvent.mouseEnter(cells[8]!);
+    });
+    await k.nextTask();
+    expect(selected(), 'precondition: the table is selected').toBe(1);
+    expect(frame('tb1').querySelector('button[title="Add column"], button[title="Add row"], [role="button"]'), 'the switch hides the "+" bars and strips').toBeNull();
+    expect(bandsIn(document), 'precondition: the active cell’s bands show').toBe(2);
+    expect(await pressP(editable, { ctrlKey: true })).toBe(true);
+    expect(windows).toHaveLength(1);
+    expect(tableControlsIn(windows[0]!)).toEqual([]);
+    expect(bandsIn(parse(windows[0]!))).toBe(0);
+    expect(parse(windows[0]!).querySelectorAll('[data-block-id="tb1"] td').length, 'the table itself is printed').toBe(9);
+  });
+
+  it('the dashboard thumbnail, taken while the caret is in a cell, draws no band', async () => {
+    // The thumbnail copies the sheet with the selection kept, so only the
+    // bands' data-postr-editor-ui keeps them out of it (the print clears
+    // the selection first, which also takes the bands away).
     await openPoster({ table: true });
     const cells = [...frame('tb1').querySelectorAll('td')];
     const editable = cells[8]!.querySelector('[contenteditable]')!;

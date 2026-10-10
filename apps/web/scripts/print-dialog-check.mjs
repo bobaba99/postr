@@ -220,7 +220,8 @@ try {
   await prep.context().close();
   const ed = await openEditor(h, { viewport: { width: 1440, height: 900 }, poster: POSTER.size, editDoc: (doc) => ({ ...doc, ...POSTER.build(assets) }) });
   try {
-    ref = await ed.page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: POSTER.size.w });
+    // Without record 29's prompts (canvas only, never printed): lib/printPathRead.mjs.
+    ref = await ed.page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: POSTER.size.w, hidePrompts: true });
     headerBg = String(ed.state.row?.data?.palette?.headerBg ?? '').toLowerCase();
     await ed.page.evaluate(() => {
       window.__zqPrint = null;

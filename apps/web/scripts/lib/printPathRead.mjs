@@ -18,10 +18,26 @@
  * order (a table's cells side by side make one row), each word placed by
  * its own box (a Range over its characters). The editor's own marks
  * (resize handles, the selection's controls, overlays) are not read.
+ *
+ * `hidePrompts` reads the sheet without record 29's grey prompts: a style
+ * that draws no `::before` on a [data-placeholder] element is added for the
+ * reading and taken away before it returns (the page is never painted in
+ * between). The prompts are drawn on the canvas only and never print (record
+ * 29, its simplify-check T7 from every way to print), but an empty block's
+ * prompt sets its height in the editor (a text block grows with it, a
+ * table's row with its first body cell's): the editor's layout of what
+ * prints is the sheet read without them. From the merge of main (record 30)
+ * into record 29; on a tree without prompts it changes nothing.
  */
-export function readSheet({ sheetSel, posterW }) {
+export function readSheet({ sheetSel, posterW, hidePrompts = false }) {
   const sheet = document.querySelector(sheetSel);
   if (!sheet) return { error: `no ${sheetSel}` };
+  const noPrompts = hidePrompts ? document.createElement('style') : null;
+  if (noPrompts) {
+    noPrompts.textContent = `${sheetSel} [data-placeholder]::before { content: none !important; }`;
+    document.head.appendChild(noPrompts);
+  }
+  try {
   const s = sheet.getBoundingClientRect();
   const k = posterW / s.width;
   const inch = (v) => Math.round(v * k * 1000) / 1000;
@@ -90,6 +106,9 @@ export function readSheet({ sheetSel, posterW }) {
     };
   });
   return { sheetIn: [inch(s.width), inch(s.height)], blocks };
+  } finally {
+    noPrompts?.remove();
+  }
 }
 
 /** The largest of the four box differences, in inches. */

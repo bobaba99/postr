@@ -30,7 +30,10 @@
  *        2560 x 1440 fit), a 3 in image and a 3 x 2 in logo (narrower on
  *        screen than their 108 px row) do not draw Replace, Crop, Delete or
  *        the rotate control: the row rule must cut a row only zoomed out (the
- *        lead, 2026-10-06). Must be 0.
+ *        lead, 2026-10-06). Must be 0. While record 29's ADJUSTMENTS_ENABLED
+ *        is off (config/features.ts) Crop and the rotate control are hidden
+ *        and not asked for: Replace and Delete are (since the merge of main,
+ *        record 30, into record 29).
  *   Fz   INFORMATION, on demand (`--only overview-...`): Fd's clicks and Fh's
  *        sweep at zooms 0.2 to 1, served with the row rule taken away (the
  *        spec's `row-never-collapses`): from which zoom a whole row no
@@ -47,7 +50,7 @@
  *   moves the block on purpose); the logo's Replace (LogoPicker) is read as
  *   any dialog, and no logo is a subject.
  */
-import { openEditor } from './editorHarness.mjs';
+import { openEditor, switchesOff } from './editorHarness.mjs';
 import { centreSelection, clickOwnPoint, pinchTo, round, stepUntilStable, zoomNow } from './selectionControls.mjs';
 
 const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR4AWP4z8DwHwyBAMQgYGBgAAB1SQX7nHNiaQAAAABJRU5ErkJggg==';
@@ -259,8 +262,8 @@ const smallDoc = (doc) => {
   };
 };
 
-/** The selected block's row buttons and rotate control, and its width on screen inside its border. */
-const rowOf = (page, id) => page.evaluate((id) => {
+/** The selected block's row buttons and rotate control, and its width on screen inside its border; `adjustments` false leaves out Crop and rotate (record 29 hides them). */
+const rowOf = (page, id, adjustments = switchesOff('ADJUSTMENTS_ENABLED').length === 0) => page.evaluate(({ id, adjustments }) => {
   const sheet = document.getElementById('poster-canvas');
   const el = sheet.querySelector(`:scope > [data-block-id="${id}"]`);
   // Main draws its rotate button as a child of the block, itself marked.
@@ -270,9 +273,9 @@ const rowOf = (page, id) => page.evaluate((id) => {
   return {
     selected: [...sheet.querySelectorAll(':scope > [data-postr-selected="true"]')].map((e) => e.dataset.blockId),
     zoom, wPx: el.clientWidth * zoom,
-    missing: [['Replace', /^Replace /], ['Crop', /^(Crop image|Exit crop)/], ['Delete', /^Delete block/], ['rotate', /^Drag to rotate/]].filter(([, re]) => !has(re)).map(([n]) => n),
+    missing: [['Replace', /^Replace /], ...(adjustments ? [['Crop', /^(Crop image|Exit crop)/]] : []), ['Delete', /^Delete block/], ...(adjustments ? [['rotate', /^Drag to rotate/]] : [])].filter(([, re]) => !has(re)).map(([n]) => n),
   };
-}, id);
+}, { id, adjustments });
 
 /** Claim Fr: at the views a user edits at, a 3 in image and a 3 × 2 in logo keep Replace, Crop, Delete and the rotate control. */
 function rowScenario(vw, vh, views) {

@@ -14,7 +14,12 @@
  */
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { usePublishFlowStore } from '@/stores/publishFlowStore';
-import { GALLERY_PUBLIC_ENABLED } from '@/config/features';
+import {
+  ADJUSTMENTS_ENABLED,
+  EDITOR_EXTRAS_ENABLED,
+  GALLERY_PUBLIC_ENABLED,
+  IMPORT_ENABLED,
+} from '@/config/features';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 
 interface TourStep {
@@ -41,6 +46,21 @@ interface TourStep {
 // (the sidebar's display label), NOT the internal SidebarTab key.
 // When a label is renamed in Sidebar.tsx, update the `tabName` here
 // or the tour silently skips clicking the tab.
+// The export step names only what the Export tab offers (record 29: the
+// .postr backup goes with IMPORT_ENABLED, Staples with EDITOR_EXTRAS_ENABLED).
+const EXPORT_PARTS = [
+  'Save as PDF',
+  ...(EDITOR_EXTRAS_ENABLED ? ['email the PDF to Staples for kiosk printing'] : []),
+  ...(GALLERY_PUBLIC_ENABLED ? ['publish to the gallery'] : []),
+  ...(IMPORT_ENABLED ? ['download a .postr backup file to import again later'] : []),
+  ...(!IMPORT_ENABLED && !EDITOR_EXTRAS_ENABLED && !GALLERY_PUBLIC_ENABLED ? ['export an editable PowerPoint file (paid)'] : []),
+];
+const EXPORT_BODY = `${
+  EXPORT_PARTS.length > 2
+    ? `${EXPORT_PARTS.slice(0, -1).join(', ')}, or ${EXPORT_PARTS[EXPORT_PARTS.length - 1]}`
+    : EXPORT_PARTS.join(' or ')
+}.`;
+
 const STEPS: TourStep[] = [
   {
     selector: '[data-postr-canvas-frame]',
@@ -48,13 +68,16 @@ const STEPS: TourStep[] = [
     body: 'Click any block to select it, drag to move, and resize from the corner handle.',
     position: 'left',
   },
-  {
+  // Steps shown only while their feature's switch is on (record 29).
+  ...(IMPORT_ENABLED
+    ? [{
     selector: '[data-postr-import-tile]',
     tabName: 'layout',
     title: 'Already have a poster? Import it',
     body: 'Drop a PDF, image, or .postr bundle. PDFs with a text layer bring in their text and embedded images as editable blocks; charts drawn as vector graphics stay behind. Image-based files (flattened PDFs, JPG/PNG scans) bring in the text only, so re-add figures and tables with the Insert tab. Imports are arranged into columns. The "Import…" button on the dashboard does the same for a new poster.',
-    position: 'right',
-  },
+    position: 'right' as const,
+  }]
+    : []),
   {
     selector: '[data-postr-sidebar]',
     tabName: 'authors',
@@ -65,8 +88,11 @@ const STEPS: TourStep[] = [
   {
     selector: '[data-postr-sidebar]',
     tabName: 'references',
-    title: 'References with citation styles',
-    body: 'Import .bib or .ris files, add citations manually, or paste pre-formatted references straight from your manuscript. Pick APA, Vancouver, IEEE, or Harvard and imported or typed references are reformatted in that style.',
+    // The style menu is hidden (ADJUSTMENTS_ENABLED, record 29): APA 7.
+    title: ADJUSTMENTS_ENABLED ? 'References with citation styles' : 'References',
+    body: ADJUSTMENTS_ENABLED
+      ? 'Import .bib or .ris files, add citations manually, or paste pre-formatted references straight from your manuscript. Pick APA, Vancouver, IEEE, or Harvard and imported or typed references are reformatted in that style.'
+      : 'Import .bib or .ris files, add citations manually, or paste pre-formatted references straight from your manuscript. Imported and typed references are set in APA 7; pasted ones keep the text you pasted.',
     position: 'right',
   },
   {
@@ -87,15 +113,16 @@ const STEPS: TourStep[] = [
     position: 'right',
   },
   {
-    selector: '[data-postr-export-postr]',
+    // The .postr button is the step's target while it shows; the Export
+    // tab's panel otherwise (record 29).
+    selector: IMPORT_ENABLED ? '[data-postr-export-postr]' : '[data-postr-sidebar]',
     tabName: 'export',
-    title: 'Export, print, or save .postr',
-    body: GALLERY_PUBLIC_ENABLED
-      ? 'Save as PDF, email the PDF to Staples for kiosk printing, publish to the gallery, or download a .postr backup file to import again later.'
-      : 'Save as PDF, email the PDF to Staples for kiosk printing, or download a .postr backup file to import again later.',
+    title: IMPORT_ENABLED ? 'Export, print, or save .postr' : 'Export and print',
+    body: EXPORT_BODY,
     position: 'right',
   },
-  {
+  ...(EDITOR_EXTRAS_ENABLED
+    ? [{
     // Below 1600 px the panel starts closed (fix 03): point at its toggle
     // then, not at the panel clipped off the edge of the window.
     selector: ['[data-postr-guidelines-toggle]', '[data-postr-guidelines]'],
@@ -104,8 +131,9 @@ const STEPS: TourStep[] = [
       'Quick reference for board sizes from APA, SfN, APS, ECNP, and more, with suggested type sizes. Open it with this button when you need it.',
       'Quick reference for board sizes from APA, SfN, APS, ECNP, and more, with suggested type sizes. Close it to give the canvas more room.',
     ],
-    position: 'left',
-  },
+    position: 'left' as const,
+  }]
+    : []),
 ];
 
 const STORAGE_KEY = 'postr.onboarding-done';

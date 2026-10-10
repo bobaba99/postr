@@ -10,6 +10,8 @@
 **Revised 2026-10-06 — legal pages and privacy (record 24, `docs/fixes/24-legal-canada-law25.md`).** §6.4 rewritten (Privacy, Cookies and Terms, EN and FR, for Quebec's Law 25 and PIPEDA first; the person in charge as a role of Resila; recipients read from the code; the line-by-line copy listing replaced by section summaries and the test that pins the required elements). §6.1 and §6.15: Vercel Web Analytics is not mounted under Global Privacy Control, `/gallery/:id` is redacted, every page is served with `Referrer-Policy: strict-origin`; the `ConsentNotice` this file listed does not exist in the code. §6.5: the sign-up Terms line links the French pages. §6.13: the feedback form's console log starts unticked. §8: account deletion clears every Postr entry in the browser that deletes, in localStorage and sessionStorage, except another account's welcome marker. Review round 1 (same record): `redactUrl` matches the path as the router reads it (case, percent-escapes, doubled slashes), the sign-up line and Terms §1 present the Privacy Policy as information rather than something agreed to, the Terms and Privacy name Stripe's merchant-of-record service without naming the seller, the pack refund is the amount paid with tax, and Privacy §9 says a feedback report with an attached file keeps the account id in the file's storage path. Review round 2 (same record): the `/auth` Terms line is shown in both modes, right under `Continue with Google` ("By continuing, you agree to…"; `data-testid="auth-terms-line"`); Privacy §8 no longer lists page counting among the private defaults (it is on by default); Privacy §6/§7 and Cookies §4 say what Vercel's documentation says it may record from a page view (an approximate location, device type, operating system, browser), and "no technology that locates" carries that exception; Privacy §15 names Canada's adequacy and how to learn a provider's safeguard, and GDPR portability to another organization; portability (§10) is to a person or body the law authorizes; the Terms precede §5.5, §10, §11 and §13's "continued use" sentence with the Consumer Protection Act s. 19.1 statement (EN and FR); the French pages are labelled « Juridique » and use Quebec usage (« 18,99 $ CA », « lot », « Finalité », Quebec civil-law terms, curly apostrophes). Internal: `docs/legal/quebec-law-25.md`.
 **Revised 2026-10-06 — fix 25.** The LaTeX export is **hidden, not deleted** (`LATEX_EXPORT_ENABLED = false`, `config/features.ts`; owner: "unnecessary for now"): the Export tab offers PowerPoint only, and no copy outside the legal pages names LaTeX or Overleaf. Every displayed price says tax is extra ("CA$18.99 + applicable taxes"; Stripe prices are before tax), after its billing period where it has one ("CA$18.99 every 4 months + applicable taxes"; review round 1). `src/__tests__/copyInventory.test.ts` keeps both true. Updated here: §6.2 (Landing, About, Pricing, BillingResult, PricingSection), §6.5 (Auth label), the Profile rows, §6.8 `EditableExportButtons.tsx`, §6.11's export graph, §6.14 `config/features.ts`, §10 and §11. The legal pages' copy (Terms §7, Privacy) is stream A's.
 
+**Revised 2026-10-07 — record 29 (`docs/fixes/29-mvp-simplify.md`).** The minimal editor (owner decisions D3, D4 on `docs/launch/mvp-editor/bounded-designs.md` §6): three switches in `config/features.ts`, all off, **hide, not delete** — `IMPORT_ENABLED` (import and the `.postr` backup), `ADJUSTMENTS_ENABLED` (rotate, crop, stretch, show grid, Scan image, custom palettes, Copy a design, style presets, heading style, weight / italic / line height, the Edit block font controls and Content box, strikethrough / indent / highlight / colour in the format bar, caption position / spacing / Format, table borders, the table's canvas controls, the citation style menu), `EDITOR_EXTRAS_ENABLED` (the guidelines panel, the Staples help, Duplicate inside the editor). Every inventory row of a hidden control carries "**Hidden while `…` is off (record 29).**"; stored rotations, crops, borders, colours, weights and line heights still draw. And starting text: new posters and new blocks start empty and show grey prompts (`Block.prompt`, `poster/startingText.ts`, the `index.css` rule on `#poster-canvas [data-placeholder][data-empty]:not(:focus)::before`: the canvas only, so Export › Preview poster shows none, review round 1) that never print or export; Issues lists empty blocks, template text and the old sample table. Tests: `poster/__tests__/mvpHidden.test.tsx`, `mvpShown.test.tsx`, `startingText.test.tsx`, `src/__tests__/mvpHiddenPages.test.tsx`, the copy inventory's record-29 rules; browser: `scripts/simplify-check.mjs`. Updated here: §6.2 (landing hero, About), §6.6 (dashboard, Profile), §6.7 (blocks, prompts, Issues strings, PosterEditor guidelines, PosterClosedPage), §6.8 (the sidebar rows), `templates.ts`, §6.13 (NewPosterButton, OnboardingTour, the hidden modals), §6.14 `config/features.ts` and §10.
+
 **Revised 2026-09-10 — hide pass.** The manuscript pipelines (§6.12 `/paper-to-poster`, §6.16 `/paper-to-slides`), the Presentation Checker (§6.17: `/presentation-checker`, the editor `review` tab, the `review_pack` / `review_addon` SKUs), the paper-to-talk waitlist callout (§6.3) **and — same day, second pass — the standalone plot picker page (§6.10 `pages/ChartChooser.tsx`, `/chart-chooser` + alias `/plot-picker`)** are **DEACTIVATED, not deleted** — routes redirect to `/`, nav/footer/landing/dashboard/pricing entries are removed, SEO records are gone, the API routers mount only behind `FEATURE_MANUSCRIPT` / `FEATURE_REVIEW`. The product's nav carries **one standalone tool** — the figure-readability check at `/tools/figure-readability` (alias `/plot-checker`), added 2026-09-11 and inventoried in §6.10 `pages/FigureReadability.tsx`; `charts/*` itself stays LIVE inside the editor's Figure tab (§6.8). Every file named in those sections still exists and stays unit-tested. Canonical restore recipe: the `apps/web/src/routes.tsx` header; summary in §10 "Deactivated features". The per-element inventories in §6.10 / §6.12 / §6.16 / §6.17 are kept verbatim as the reactivation reference and are NOT re-extracted.
 
 **Revised 2026-07-29** (v2 second pass was 2026-07-28, superseding v1 from earlier that day; 2026-07-29 updates added §6.16 Manuscript → Slides and — documented from the `feat/presentation-checker` branch ahead of its launch gate — §6.17 Presentation Checker). Source of truth: `apps/web/src/` (React 19 + react-router 8 + Vite SPA) plus `apps/api/src/` for the external-services map. Every file:line reference and verbatim UI string below was extracted from the code as of **2026-07-28 ~16:00 local** (§6.16 and §6.17 extracted 2026-07-29; §6.17 from the feature branch). If the doc and the code disagree, **the code wins** — regenerate this doc.
@@ -382,7 +384,7 @@ flowchart LR
 **Copy**
 - [ ] "Built for researchers" — hero badge — `Landing.tsx:119`
 - [ ] "Academic posters," + "without the hassle." — h1 — `Landing.tsx:126-127`
-- [ ] "A poster editor that handles" + rotating slot + "so you can work on the science." — hero sentence — `Landing.tsx:146-151`; rotating phrases from HERO_FRICTIONS `Landing.tsx:62-69` (rendered by `RotatingWord`, §6.13): "the fiddly block nudging" · "the text reflowing on you" · "the BibTeX citation styles" · "the conference size specs" · "the authors and affiliations" · "the unreadable tiny figures"
+- [ ] "A poster editor that handles" + rotating slot + "so you can work on the science." — hero sentence — `Landing.tsx:146-151`; rotating phrases from `frictions` in `i18n/landing.ts` (rendered by `RotatingWord`, §6.13): "the fiddly block nudging" · "the text reflowing on you" · "the BibTeX reference formatting" · "the authors and affiliations" · "the figure font-size math" (record 29 took out "the conference size lookups", the hidden guidelines panel's, and turned "the BibTeX citation styles" into "the BibTeX reference formatting": references are set in APA 7)
 - [ ] "Best on a laptop." + "The editor needs a bigger screen to drag blocks and see your poster at full size." — mobile notice (sm:hidden) — `Landing.tsx` (the trailing "The plot picker and figure checker work fine on a phone." sentence was cut 2026-09-10 — no standalone tool page is live)
 - [ ] Feature cards (4, each title+body, ≤15 words per body — `toolDiscoverability.test.tsx`) — `Landing.tsx`, section "Core poster tools". The "Editable exports" card (🎞️) reads "Import and edit a PowerPoint, then export an editable one. PowerPoint exports are paid." (fix 25, 2026-10-06: the LaTeX export is hidden, and the card says the export is paid). The other three cards were not re-extracted for fix 25.
 - [ ] ~~"Tools you can use on their own" — h2~~ — section removed 2026-09-10 (all standalone tools deactivated)
@@ -841,6 +843,7 @@ flowchart LR
 - [ ] "{actionError}" — inline error banner — `Home.tsx:215-219` (fallbacks: "Failed to duplicate" `Home.tsx:101`, "Failed to delete" `Home.tsx:126`, "Failed to load posters" `Home.tsx:83`)
 - [ ] "Loading…" — `Home.tsx:222` · [ ] "Couldn't load posters: {status.message}" — `Home.tsx:226`
 - [ ] "Welcome to Postr" — welcome card h3 — `Home.tsx:239`
+- [ ] "Start a new poster on the three-column template." — welcome card body while `IMPORT_ENABLED` is off; ", or import one you already have." with it on (record 29) — `Home.tsx`
 - [ ] "Create conference-quality research posters in minutes, not hours." — `Home.tsx:240`
 - [ ] "Pick a template" / "5 layouts — 3-column classic, billboard, sidebar + focus, and more. Start with structure, not a blank page." — card — `Home.tsx:245-246`
 - [ ] "Write with guidance" / "Built-in writing guide, conference size specs, and a checklist to keep you on track from intro to references." — card — `Home.tsx:249-250`
@@ -883,7 +886,7 @@ flowchart LR
 - [ ] "Loading…" — `Profile.tsx:320` · [ ] "{actionStatus}" / "{actionError}" banners — `:331-340`; status strings: "Gallery entry retracted." (:142), "Retract failed." (:145), "Style presets cleared." (:163), "Could not save that preference. Please try again." (:180,196), "Data export downloaded." (:230), "Export failed. Please try again or contact support." (:236), "Deleting posters…" (:256), "Deleted {n} poster(s)." (:263), "Failed to delete posters" (:266), "Deleting account…" (:272), "Failed to delete account" (:301), "Account created! Your guest data has been linked." (:380), "Tour reset — it will play next time you open a poster." (:444), "Deleted template "{name}"." (:547), "Profile saved." (:1301)
 - [ ] "Create an Account" section title + body "You're using a guest account. Sign up to preserve your posters across devices and prevent data loss if your browser clears storage. All your current work will be linked to your new account automatically." — `:358-363` · [ ] "or use email" divider — `:375`
 - [ ] "Profile Details" + body "Optional — helps identify your posters and auto-fill author info." — `:391-394`; field hints "Used for author auto-fill", "Optional — links to your ORCID profile" — `:1319,1322`; placeholders "e.g. Dr. Jane Smith", "e.g. Acme State University", "e.g. Department of Psychology", "e.g. 0000-0002-1234-5678", "e.g. https://lab.example.com" — `:1319-1323`
-- [ ] "Preferences" section — `:402`; "🎨 Saved style presets" — `:405`; "{n} preset{s} saved locally." — `:407`; "Create new presets from the Style tab inside the editor — use the "Save as style preset" row to name your font + palette + typography combo." — `:409-411`; "Onboarding tour" + "Click-through tutorial of the editor interface" — `:436-439`; "Product-research emails" + "Let us occasionally email you to invite you to a short interview or survey about Postr. Turn it on or off anytime. It never affects your access." — `:463-468`; "Product-update emails" + "Occasional emails about new Postr features and updates. Turn it on or off anytime; unsubscribe links are in every email too." — `:493-498`; "Checklist templates" + "Custom templates you saved from the Scratch Pad. Built-in templates cannot be deleted." — `:524-527`; "{t.name} (built-in)" + "{n} items" — `:537-540`; empty "No custom templates yet. Use "Save as..." in the editor's Scratch Pad to create one." — `:558-560`
+- [ ] "Preferences" section — `:402`; "🎨 Saved style presets" — `:405`; "{n} preset{s} saved locally." — `:407`; "Create new presets from the Style tab inside the editor — use the "Save as style preset" row to name your font + palette + typography combo." — `:409-411`; "Onboarding tour" + "Click-through tutorial of the editor interface" — `:436-439`; "Product-research emails" + "Let us occasionally email you to invite you to a short interview or survey about Postr. Turn it on or off anytime. It never affects your access." — `:463-468`; "Product-update emails" + "Occasional emails about new Postr features and updates. Turn it on or off anytime; unsubscribe links are in every email too." — `:493-498`; "Checklist templates" + "Custom templates you saved from the Scratch Pad. Built-in templates cannot be deleted." — `:524-527`; "{t.name} (built-in)" + "{n} items" — `:537-540`; empty "No custom templates yet. Use "Save as..." in the editor's Scratch Pad to create one." — `:558-560` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "Gallery submissions" section — `:572` (rendered when flag on OR entries exist); flag-on body "Posters you have published to the public gallery. You can retract any entry at any time — it disappears from the public listing immediately." — `:574-581`; flag-off body "Posters you published while the gallery was open. The gallery is currently offline, but you can still retract any entry at any time — the entry row and stored image are deleted." — `:583-587`; empty states "You haven't published anything yet. Use the Publish button on a poster card, the Publish button in the editor, or the upload button above." (`:601-603`) / "You haven't published anything to the gallery." (`:613`); row meta "Published {date} · {conference} · {year}" — `:828-830`; badge "Retracted by moderator" — `:811`; "Moderator note: {reason}" — `:834`
 - [ ] "Feedback" section + body "Found a bug? Have an idea? Send it in — everything lands in the developer's queue and shapes what ships next." — `:633-637`; "Your submissions" — `:652-654`; kind badges "Bug"/"Feature"/"Other" — `:873`; status labels FEEDBACK_STATUS_LABEL `:851-857`: "Received", "Triaged", "In progress", "Shipped", "Declined"
 - [ ] "Subscription" section — `:668`; "Loading your plan…" — `:1105`; term-active body "Your term is active — PowerPoint export is unlocked, no watermark." (fix 25) + past-due "There's a payment issue on your latest renewal — update your card to keep your term." — `:1111-1119`; "The term renews every 4 months. Manage it — update your card, see receipts, or cancel — through Stripe, which handles billing for Postr." — `:1121-1124`; "Refundable in full within 14 days of your charge if you haven't taken a paid export." — `:1143-1146`; refund outcomes "Refunded CA${amount}. It may take a few days to appear." (:1088), "The 14-day refund window has passed. You can cancel anytime to stop renewals." (:1093), "This term isn't refundable once you've taken a paid export." / pack: "This pack isn't refundable once you've taken a paid export — not even in part." (`already_used`, per kind — `profile/SubscriptionPanel.tsx`), "No refundable pack purchase found." (:1096) — each of these refusals, and any other 409 from `/billing/refund` ("This purchase can’t be refunded here."), followed by "This answer was given automatically. To have a person review it, email support@resila.ai." (`AUTOMATED_DECISION_NOTE`, Law 25 s. 12.1, Privacy §7; 2026-10-06), "We couldn't process that refund. Please try again or contact support." (:1098)
@@ -1011,7 +1014,7 @@ flowchart LR
 - [ ] "Loading poster…" — loading state — `Editor.tsx:314`
 - [ ] "Poster not found" — not-found heading — `Editor.tsx:324`
 - [ ] "The poster you're looking for doesn't exist or you don't have access to it." — not-found body — `Editor.tsx:325-328`. Also shown for another user's poster, shared or not (fix 23)
-- [ ] "This poster is in another account" / "This guest poster was closed" — account-changed heading — `PosterClosedPage.tsx:75-77` (takes the focus); body `PosterClosedPage.tsx:78-84`: for a guest's poster "The guest session that made it has ended in this browser. Download a copy to keep it; you can import it into any account."; for an account's, "The account signed in here changed. Sign in to the account that owns this poster to keep editing it." when Sign in is offered, else "…Download a copy to keep this version; you can import it into any account." Download status (live region): "Preparing the file…", "Downloaded.", "Downloaded. N image(s) could not be included.", "Something went wrong. Try again." Shown when the signed-in user changes while a poster is open (fix 23); the tab title then drops the poster's name. A change not yet saved when the session ended is only in the copy, and the page neither says so nor warns before leaving (MEASURED, `keep-work-check.mjs` H3, fix 27 review round 2, R2-A3; the same on main; PLAN's Later list)
+- [ ] "This poster is in another account" / "This guest poster was closed" — account-changed heading — `PosterClosedPage.tsx:75-77` (takes the focus); body `PosterClosedPage.tsx:78-84`: for a guest's poster "The guest session that made it has ended in this browser. Download a copy to keep it."; for an account's, "The account signed in here changed. Sign in to the account that owns this poster to keep editing it." when Sign in is offered, else "…Download a copy to keep this version." (each adds "; you can import it into any account" while `IMPORT_ENABLED` is on; record 29) Download status (live region): "Preparing the file…", "Downloaded.", "Downloaded. N image(s) could not be included.", "Something went wrong. Try again." Shown when the signed-in user changes while a poster is open (fix 23); the tab title then drops the poster's name. A change not yet saved when the session ended is only in the copy, and the page neither says so nor warns before leaving (MEASURED, `keep-work-check.mjs` H3, fix 27 review round 2, R2-A3; the same on main; PLAN's Later list)
 - [ ] "Couldn’t load this poster" — error heading — `Editor.tsx:483`; "{message}" — `Editor.tsx:484`
 - [ ] "This poster is already open in another tab." — collision alert bold — `Editor.tsx:405-407`
 - [ ] "Postr autosave is last-write-wins, so edits in one tab can silently overwrite the other. Close the duplicate tab to avoid losing work." — collision alert body — `Editor.tsx:409-410`
@@ -1047,18 +1050,18 @@ flowchart LR
 - [ ] `+ Upload figure` (empty-image click target) — div button — `blocks.tsx:404-434` — clicks hidden file input
 - [ ] hidden file input (empty image) — `<input type="file" accept="image/*">` — `blocks.tsx:433`
 - [ ] table cell editor — `TableCellEditor` (one per cell, `poster/TableCellEditor.tsx`) — `blocks.tsx:1069-1100` — edits cell HTML → `updateCell`; writes the cell only when the stored value changes from outside, so typing keeps its order (it used `dangerouslySetInnerHTML`, rewritten on every keystroke: "abc" typed became "cba"); its typing joins the one undo history by word under `cell:<block id>:<index>` (fix 12); its typing is stored through `sanitizeTyped` (`sanitizeHtml.ts`), so the line Enter starts, which the browser puts in a `<div>`, is stored as a `<br>` (fix 27: it stored the `<div>` as typed, and the PowerPoint file wrote it out as text)
-- [ ] `Drag to resize column` — column-border drag handle ×(cols−1) — `blocks.tsx:969-985` (drag `:794-825`) — pointer drag redistributes `colWidths`, live on every move and ONE undo step from pointerdown to pointerup (`holdDragStep`, `blocks.tsx:806`; fix 12, the merge review's F1: it was one step per move); on a selected table a 24 px grip on screen at every zoom (scaled back across, `UNZOOM_X`), on an unselected one 6 sheet units as before (plan item 19, `docs/fixes/19-controls-one-size.md`)
-- [ ] `Select row ${r + 1}` / title `Select row ${r + 1} (Delete to remove)` — row selector strip ×rows — `blocks.tsx:1122-1167` — selects whole row; on a selected table a 24 px hit area ending 2 px left of the table with the 8 px band at its inner edge, one size on screen (`stripAcross`, `blocks.tsx:878-896`); unselected: 8 units, 10 units out, as before (plan item 19, `docs/fixes/19-controls-one-size.md`; where they show at all is on the Later list)
-- [ ] `Select column ${c + 1}` / title `Select column ${c + 1} (Delete to remove)` — column selector strip ×cols — `blocks.tsx:1180-1224` — selects whole column; the same, 2 px above the table (`stripDown`)
-- [ ] `Add row` — hover-only bottom bar button — `blocks.tsx:1150-1171` — `insertRow(data, rows-1, 'below')`
-- [ ] `Add column` — hover-only right bar button — `blocks.tsx:1174-1196` — `insertCol(data, cols-1, 'right')`
-- [ ] The table's strips, column grips, "+" bars and active-cell bands carry `data-postr-editor-ui`: the print copy and the thumbnail drop them (`export/stripEditorChrome.ts`; record 30's review round 2, R2-F1: ⌘P with the pointer resting on a last-column cell printed the "Add column" bar)
+- [ ] `Drag to resize column` — column-border drag handle ×(cols−1) — `blocks.tsx:969-985` (drag `:794-825`) — pointer drag redistributes `colWidths`, live on every move and ONE undo step from pointerdown to pointerup (`holdDragStep`, `blocks.tsx:806`; fix 12, the merge review's F1: it was one step per move); on a selected table a 24 px grip on screen at every zoom (scaled back across, `UNZOOM_X`), on an unselected one 6 sheet units as before (plan item 19, `docs/fixes/19-controls-one-size.md`) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Select row ${r + 1}` / title `Select row ${r + 1} (Delete to remove)` — row selector strip ×rows — `blocks.tsx:1122-1167` — selects whole row; on a selected table a 24 px hit area ending 2 px left of the table with the 8 px band at its inner edge, one size on screen (`stripAcross`, `blocks.tsx:878-896`); unselected: 8 units, 10 units out, as before (plan item 19, `docs/fixes/19-controls-one-size.md`; where they show at all is on the Later list) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Select column ${c + 1}` / title `Select column ${c + 1} (Delete to remove)` — column selector strip ×cols — `blocks.tsx:1180-1224` — selects whole column; the same, 2 px above the table (`stripDown`) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Add row` — hover-only bottom bar button — `blocks.tsx:1150-1171` — `insertRow(data, rows-1, 'below')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Add column` — hover-only right bar button — `blocks.tsx:1174-1196` — `insertCol(data, cols-1, 'right')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] The table's strips, column grips, "+" bars and active-cell bands carry `data-postr-editor-ui` (where shown: the strips, grips and "+" bars are hidden while `ADJUSTMENTS_ENABLED` is off, record 29): the print copy and the thumbnail drop them (`export/stripEditorChrome.ts`; record 30's review round 2, R2-F1: ⌘P with the pointer resting on a last-column cell printed the "Add column" bar)
 - [ ] right-click on cell — gesture — `blocks.tsx:974-978` — opens `TableContextMenu` at cursor
-- [ ] `Insert row above` — context-menu item — `blocks.tsx:1308` — `insertRow(r, 'above')`
-- [ ] `Insert row below` — context-menu item — `blocks.tsx:1309` — `insertRow(r, 'below')`
-- [ ] `Insert column left` — context-menu item — `blocks.tsx:1311` — `insertCol(c, 'left')`
-- [ ] `Insert column right` — context-menu item — `blocks.tsx:1312` — `insertCol(c, 'right')`
-- [ ] `Clear cell` — context-menu item — `blocks.tsx:1314` — `updateCell(r, c, '')`
+- [ ] `Insert row above` — context-menu item — `blocks.tsx:1308` — `insertRow(r, 'above')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Insert row below` — context-menu item — `blocks.tsx:1309` — `insertRow(r, 'below')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Insert column left` — context-menu item — `blocks.tsx:1311` — `insertCol(c, 'left')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Insert column right` — context-menu item — `blocks.tsx:1312` — `insertCol(c, 'right')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Clear cell` — context-menu item — `blocks.tsx:1314` — `updateCell(r, c, '')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `Delete row` — context-menu item (danger, disabled when rows ≤ 1) — `blocks.tsx:1316` — `deleteRowAt(r)`
 - [ ] `Delete column` — context-menu item (danger, disabled when cols ≤ 1) — `blocks.tsx:1317` — `deleteColAt(c)`
 - [ ] `Tab` / `Shift+Tab` — keyboard — `blocks.tsx:592-603` — focus next/previous cell
@@ -1075,15 +1078,15 @@ flowchart LR
 - [ ] handle row (move, type label, replace, crop, delete, and rotate when below has no room) — `blocks.tsx:2413-2653` — drawn in px and scaled back by the zoom about its bottom edge (`UNZOOM`), its bottom 14 px above the block at every zoom; on a turned block it is counter-rotated about its own centre, 26 px out from the block's edge, so it stays upright and clear of the block's handles at 180° (`blocks.tsx:2448-2451`; record 19, review F1) (plan item 19, `docs/fixes/19-controls-one-size.md`); the label only from 120 px wide, replace/crop/delete hidden under 24 px on both axes; zoomed out under 35 % (`OVERVIEW_ZOOM`, measured), a row whose buttons are wider than its block on screen (`handleRowWidth`: move, delete, and an image's or logo's replace and crop, 24 px each 4 px apart: 52 px, 108 px for an image or logo) draws only the move button, no replace, crop, delete or rotate control (record 19, review F3); delete then stays on the Delete/Backspace keys and the right-click menu's `Delete` (blocks other than the table and the text-like ones); from 35 % up the row is whole however narrow the block; where the buttons are drawn the label shows only if the row has room for it
 - [ ] `Drag to move (or use arrow keys)` — circular move handle (24 px hit area, 20 px circle) — `blocks.tsx:2471-2503` — drag → move block
 - [ ] `Replace logo` / `Replace image` — circular button (image/logo only; not drawn under 35 % zoom while the row is wider than the block, review F3) — `blocks.tsx:2549-2588` — dispatches `postr:replace-block` → opens picker/file input
-- [ ] `Crop image` / `Exit crop` — circular toggle (image/logo only, `aria-pressed`; not drawn under 35 % zoom while the row is wider than the block, review F3: crop mode, once on, keeps its own Cancel / Apply bar) — `blocks.tsx:2589-2616` — toggles `CropOverlay`
+- [ ] `Crop image` / `Exit crop` — circular toggle (image/logo only, `aria-pressed`; not drawn under 35 % zoom while the row is wider than the block, review F3: crop mode, once on, keeps its own Cancel / Apply bar) — `blocks.tsx:2589-2616` — toggles `CropOverlay` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `Delete block` — red circular button (not drawn under 35 % zoom while the row is wider than the block, review F3) — `blocks.tsx:2620-2647` — `onDelete(b.id)`
-- [ ] `Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)` — circular rotate handle (`rotateButton`, `blocks.tsx:1985-2012`) — below the block in a box scaled back by the zoom, its 24 px hit area 14 px under the block (`blocks.tsx:2671-2715`); the last button of the handle row when below it would meet the ZoomBar or leave the visible canvas (`rotateFitsBelow`, `selectionLayout.ts`; read from the screen on each render and when the canvas resizes, `selectionRoom.ts`); none under 24 px on both axes, nor under 35 % zoom while the handle row is wider than the block (review F3) (plan item 19, `docs/fixes/19-controls-one-size.md`) — drag → rotate
+- [ ] `Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)` — circular rotate handle (`rotateButton`, `blocks.tsx:1985-2012`) — below the block in a box scaled back by the zoom, its 24 px hit area 14 px under the block (`blocks.tsx:2671-2715`); the last button of the handle row when below it would meet the ZoomBar or leave the visible canvas (`rotateFitsBelow`, `selectionLayout.ts`; read from the screen on each render and when the canvas resizes, `selectionRoom.ts`); none under 24 px on both axes, nor under 35 % zoom while the handle row is wider than the block (review F3) (plan item 19, `docs/fixes/19-controls-one-size.md`) — drag → rotate · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `Duplicate` `⌘D` — block context-menu item — `blocks.tsx:2614` — `onDuplicate(b.id)`
 - [ ] `Bring Forward` — block context-menu item — `blocks.tsx:2615` — `onReorder(b.id, 1)`
 - [ ] `Send Back` — block context-menu item — `blocks.tsx:2616` — `onReorder(b.id, -1)`
 - [ ] `Delete` `⌫` — block context-menu item (danger) — `blocks.tsx:2617` — `onDelete(b.id)`
 - [ ] context-menu backdrop — click-catcher overlay — `blocks.tsx:2580-2593` — dismisses block menu
-- [ ] `CropOverlay` — inline crop UI mount (image/logo, selected+cropMode) — `blocks.tsx:2198-2204,2217-2223`
+- [ ] `CropOverlay` — inline crop UI mount (image/logo, selected+cropMode) — `blocks.tsx:2198-2204,2217-2223` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `FloatingFormatToolbar` — portal toolbar mount — `blocks.tsx:2571` — shows on text selection
 
 **Copy**
@@ -1107,9 +1110,10 @@ flowchart LR
 - [ ] `Figure {N}.` / `Table {N}.` — auto caption prefix — `blocks.tsx:1627` — reading order, down each column (record 28; it was top edge then left edge, across the columns); charts share the figures' sequence in the editor and the exports; Export › Preview poster shows them too (it showed no caption before record 28)
 - [ ] `{b.type}` (e.g. "image", "table") — block-type pill on selection chrome — `blocks.tsx:2507` — only on a block 120 px wide or more on screen (plan item 19); its width, read on each render (`selectionRoom.ts`), counts in the handle row's (review F3)
 - [ ] `{rotation}°` — rotation readout in pill — `blocks.tsx:2510`
-- [ ] "Poster Title" — editor placeholder — `blocks.tsx:2078`
-- [ ] "Section Heading" — editor placeholder — `blocks.tsx:2120`
-- [ ] "Type here… (type / for symbols)" — editor placeholder — `blocks.tsx:2143`
+- [ ] "Poster title" — the title's grey prompt (`DEFAULT_PROMPTS.title`, `poster/startingText.ts`; was "Poster Title" and never drawn: no stylesheet read `data-placeholder` until record 29) — `blocks.tsx` — drawn by `index.css` on an empty, unfocused block on the canvas (`#poster-canvas`; `data-empty`, set from the stored text; a lone `<br>` counts as empty); not in Export › Preview poster (review round 1, R1-01), never printed or exported; the dashboard thumbnail, a picture of the canvas, draws it
+- [ ] "Section Heading" — a heading's grey prompt (`DEFAULT_PROMPTS.heading`) — `blocks.tsx` — as above (record 29)
+- [ ] "Type here… (type / for symbols)" — a text block's grey prompt (`DEFAULT_PROMPTS.text`), or the block's own `prompt` (a template text block's guidance sentence) — `blocks.tsx` — as above (record 29)
+- [ ] the table's prompt ("Type or paste", `TABLE_PROMPT`, `templates.ts`) — in the first body cell (`TableCellEditor` `placeholder`) while every body cell is empty (`tablePromptFor`, `startingText.ts`) — record 29
 - [ ] `{headingNumber}.` — auto heading number — `blocks.tsx:2116` — numbered in the poster's reading order (`poster/readingOrder.ts`, record 28): bands of wide blocks top to bottom, then columns left to right, each top to bottom; not the block array, so Bring Forward or a pasted heading no longer renumbers; the exports use the same function (`export/posterContent.ts`)
 - [ ] "⌘D" — shortcut hint in context menu — `blocks.tsx:2583`
 - [ ] "⌫" — shortcut hint in context menu — `blocks.tsx:2586`
@@ -1119,10 +1123,10 @@ flowchart LR
 - [ ] 1×1 transparent GIF (`PLACEHOLDER_SRC`) — img data-URI — `blocks.tsx:49-50` — fills img while `storage://` URL resolves
 - [ ] move icon (4-arrow cross) — inline-svg — `blocks.tsx:2478-2494` — move handle
 - [ ] replace icon (circular arrows) — inline-svg — `blocks.tsx:2564-2577` — replace button
-- [ ] crop icon — inline-svg — `blocks.tsx:2594-2606` — crop toggle
+- [ ] crop icon — inline-svg — `blocks.tsx:2594-2606` — crop toggle · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] X icon — inline-svg — `blocks.tsx:2625-2637` — delete button
-- [ ] rotate icon (two chasing arrows) — inline-svg — `blocks.tsx:2001-2006` — rotate handle
-- [ ] rotate stem — css line, 1.5 × 16 px on screen (scaled back) — `blocks.tsx:2664-2683` — connects rotate handle to block, only while the rotate is below
+- [ ] rotate icon (two chasing arrows) — inline-svg — `blocks.tsx:2001-2006` — rotate handle · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] rotate stem — css line, 1.5 × 16 px on screen (scaled back) — `blocks.tsx:2664-2683` — connects rotate handle to block, only while the rotate is below · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] active-cell row + column bands — css overlay — `blocks.tsx:868-903` — table focus guides (Excel-style)
 - [ ] affiliation `*` / `†` superscript markers — text glyphs — `blocks.tsx:1413-1414` — author line
 
@@ -1132,7 +1136,7 @@ flowchart LR
 - [ ] `{block.type} block is completely outside the poster — it won't appear in print.` — warning message (severity full) — `boundsCheck.ts:58` — rendered in the Issues tab (since fix 03 the banner shows only the count, `PosterEditor.tsx:3416`)
 - [ ] `{block.type} block extends past the {edges.join(' and ')} edge{s} — content may be cut off in print.` — warning message (partial) — `boundsCheck.ts:59` — same render sites
 
-#### `poster/CropOverlay.tsx` — Inline 4-edge crop UI for image/logo blocks
+#### `poster/CropOverlay.tsx` — Inline 4-edge crop UI for image/logo blocks · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 
 **Elements**
 - [ ] `crop top edge` — edge drag handle (`role="button"`) — `CropOverlay.tsx:173` (handle render `:218-282`: a 24 px hit area centred on the crop line around a 16 × 6 px pill, scaled back by the zoom about its placing corner, out of the stylesheet's button transition (`data-no-anim`, `:250-253`) so it does not animate for 120 ms after a zoom change (record 19, review F2); plan item 19, `docs/fixes/19-controls-one-size.md`) — drag grows top crop %
@@ -1157,24 +1161,24 @@ flowchart LR
 - [ ] `B` `Bold` — execCommand button (`aria-pressed`) — `FloatingFormatToolbar.tsx:256` — `execCommand('bold')`
 - [ ] `I` `Italic` — execCommand button — `FloatingFormatToolbar.tsx:257` — `execCommand('italic')`
 - [ ] `U` `Underline` — execCommand button — `FloatingFormatToolbar.tsx:258` — `execCommand('underline')`
-- [ ] `S` `Strike Through` (label "S", title via cmdButton = 'S') — execCommand button — `FloatingFormatToolbar.tsx:259` — `execCommand('strikeThrough')`
+- [ ] `S` `Strike Through` (label "S", title via cmdButton = 'S') — execCommand button — `FloatingFormatToolbar.tsx:259` — `execCommand('strikeThrough')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `•` — bulleted-list button — `FloatingFormatToolbar.tsx:287` — `execCommand('insertUnorderedList')`
 - [ ] `1.` — numbered-list button — `FloatingFormatToolbar.tsx:288` — `execCommand('insertOrderedList')`
-- [ ] `⇥` — indent button — `FloatingFormatToolbar.tsx:289` — `execCommand('indent')`
-- [ ] `⇤` — outdent button — `FloatingFormatToolbar.tsx:290` — `execCommand('outdent')`
+- [ ] `⇥` — indent button — `FloatingFormatToolbar.tsx:289` — `execCommand('indent')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `⇤` — outdent button — `FloatingFormatToolbar.tsx:290` — `execCommand('outdent')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] (removed by fix 12, owner decision 8: the alignment buttons `⟸ ≡ ⟹` and `A−` / `A+`. Neither ever reached the poster: A+ fired no input event, and the sanitizer keeps only `color` and `background-color`, so a size or an alignment was dropped by the next save. Text size is the Edit tab's Font size field, per text level; headings' alignment is Style › Headings. Record `docs/fixes/12-one-undo-history.md`.)
-- [ ] `Highlight · Yellow` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:115`) — `execCommand('hiliteColor','#FFEB3B66')`
-- [ ] `Highlight · Green` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:116`) — `'#4CAF5055'`
-- [ ] `Highlight · Blue` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:117`) — `'#2196F355'`
-- [ ] `Highlight · Red` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:118`) — `'#FF572255'`
-- [ ] `Highlight · Purple` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:119`) — `'#9C27B055'`
-- [ ] `∅` `Clear highlight` — swatch button — `FloatingFormatToolbar.tsx:342` — `hiliteColor 'transparent'`
-- [ ] `Text · Red` — swatch button — `FloatingFormatToolbar.tsx:349-351` (constant `:124`) — `foreColor '#ef4444'`
-- [ ] `Text · Orange` — swatch button — constant `FloatingFormatToolbar.tsx:125` — `'#f97316'`
-- [ ] `Text · Green` — swatch button — constant `FloatingFormatToolbar.tsx:126` — `'#16a34a'`
-- [ ] `Text · Blue` — swatch button — constant `FloatingFormatToolbar.tsx:127` — `'#2563eb'`
-- [ ] `Text · Purple` — swatch button — constant `FloatingFormatToolbar.tsx:128` — `'#7c3aed'`
-- [ ] `∅` `Default color` — swatch button — `FloatingFormatToolbar.tsx:352` — `foreColor 'inherit'`
+- [ ] `Highlight · Yellow` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:115`) — `execCommand('hiliteColor','#FFEB3B66')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Highlight · Green` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:116`) — `'#4CAF5055'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Highlight · Blue` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:117`) — `'#2196F355'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Highlight · Red` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:118`) — `'#FF572255'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Highlight · Purple` — swatch button — `FloatingFormatToolbar.tsx:341` (constant `:119`) — `'#9C27B055'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `∅` `Clear highlight` — swatch button — `FloatingFormatToolbar.tsx:342` — `hiliteColor 'transparent'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Text · Red` — swatch button — `FloatingFormatToolbar.tsx:349-351` (constant `:124`) — `foreColor '#ef4444'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Text · Orange` — swatch button — constant `FloatingFormatToolbar.tsx:125` — `'#f97316'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Text · Green` — swatch button — constant `FloatingFormatToolbar.tsx:126` — `'#16a34a'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Text · Blue` — swatch button — constant `FloatingFormatToolbar.tsx:127` — `'#2563eb'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Text · Purple` — swatch button — constant `FloatingFormatToolbar.tsx:128` — `'#7c3aed'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `∅` `Default color` — swatch button — `FloatingFormatToolbar.tsx:352` — `foreColor 'inherit'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `Clear` `Clear formatting` — button — `FloatingFormatToolbar.tsx:357-374` — `execCommand('removeFormat')`
 - [ ] `💬` `Comment on selection` — button — `FloatingFormatToolbar.tsx:377-399` — dispatches `postr:comment-text` (blockId + offsets + quote). **Only with `SHARING_ENABLED`** (off since 2026-09-30, fix 23); `PosterEditor` also ignores the event while it is off
 
@@ -1196,7 +1200,7 @@ flowchart LR
 **Graphics**
 - [ ] dashed accent outline — four 1.5 px strips (4 px dashes every 7 px), one size on screen (scaled back across; plan item 19) — `GroupFrame.tsx:106-112,129-132`
 
-#### `poster/GuidelinesPanel.tsx` — Right-side reference rail: scratch-pad checklist, conference specs, writing guide, shortcuts cheatsheet, resources
+#### `poster/GuidelinesPanel.tsx` — Right-side reference rail: scratch-pad checklist, conference specs, writing guide, shortcuts cheatsheet, resources · **Hidden while `EDITOR_EXTRAS_ENABLED` is off (record 29).**
 
 **Elements**
 - [ ] `Hide guidelines` — X button — `GuidelinesPanel.tsx:576` — `onToggle()` → closes panel; a held Enter acts once (`ignoreRepeatedEnter`); focus returns to the Show toggle only if it was inside the panel (fix 03)
@@ -1287,7 +1291,7 @@ flowchart LR
 - [ ] `Reset zoom to fit` (`{percent}%` readout) — ZoomBar button — `PosterEditor.tsx:3623` — `fitToScreen()`
 - [ ] `Zoom in` (`+`) — ZoomBar button — `PosterEditor.tsx:3633` — `stepTo(zoom + 0.15)`, 10× ceiling
 - [ ] `Fit poster to screen` (`FIT`) — ZoomBar button — `PosterEditor.tsx:3641` — `fitToScreen()`: the fit keeps a 64 px gutter per side (8 px on the phone share view; a quarter of the canvas when that is less than 64 px, i.e. a canvas under 256 px) and scrolls back to 0,0 (`fitSheet`, `workspaceGeometry.ts`; fix 03)
-- [ ] `Show poster guidelines` — toggle button (guidelines closed) — `PosterEditor.tsx:3474` — opens GuidelinesPanel. The panel starts closed in windows 1599 px wide or narrower (`GUIDELINES_CLOSED_QUERY`, `:638`), read once on load; a held Enter acts once (`ignoreRepeatedEnter.ts`); focus follows into the panel only if it was on the toggle (`useGuidelinesFocus`, `:553`; fix 03)
+- [ ] `Show poster guidelines` — toggle button (guidelines closed) — `PosterEditor.tsx:3474` — opens GuidelinesPanel. The panel starts closed in windows 1599 px wide or narrower (`GUIDELINES_CLOSED_QUERY`, `:638`), read once on load; a held Enter acts once (`ignoreRepeatedEnter.ts`); focus follows into the panel only if it was on the toggle (`useGuidelinesFocus`, `:553`; fix 03) · **Hidden while `EDITOR_EXTRAS_ENABLED` is off (record 29).**
 - [ ] `FigureSizeOverlay` body — draggable gray rect (Check tab active, no image selected) — `PosterEditor.tsx:3046-3056,3541-3612` — drag moves `checkFigureRect`
 - [ ] `FigureSizeOverlay` corner — resize handle — `PosterEditor.tsx:3540-3555` — drag resizes rect
 - [ ] `PendingAreaAnchor` body — draggable comment-area rect — `PosterEditor.tsx:3670-3701` — move pending/focused area anchor
@@ -1343,7 +1347,7 @@ flowchart LR
 - [ ] resize-warning toasts (`PosterEditor.tsx:494-498`): "Heading height is auto-sized from font", "Authors height adjusts to content", "References height adjusts to content"
 - [ ] new-block default contents (`PosterEditor.tsx:1706`): "Section Title" (heading), "Enter your text here." (text)
 - [ ] `Table {N}` — poster-table chip label for chart chooser (Figure tab, sidebar) — `PosterEditor.tsx:1393`
-- [ ] posterIssues strings (defined here, rendered in sidebar Issues tab; `PosterEditor.tsx:1411-1524`): `{blockType} out of bounds` (category); "Past the bottom margin" / `The columns run {X} in² past the bottom margin, 1 in from the bottom edge. Shorten some text or make a figure smaller.` (warning, from 0.05 in²; per column, the widest block reaching past the margin times how far the lowest reaches, as drawn: `pastMarginArea`, `autoLayout.ts`; right after Auto-Arrange it is the plan's O; record 28); "Empty figure" / "Image block has no file attached — it will export as a dashed placeholder."; "Default title" / "Poster title is still the default placeholder."; "Placeholder text" / `A text block still contains "Enter your text here."`; "Long title" / `Poster title is {N} characters — may wrap to 3+ lines at typical poster sizes.`; "Missing authors" / "No authors have been added yet. Use the Authors tab to add them."; "Missing institutions" / "Authors are listed but no institution affiliations are set."; "Empty references" / "References block is on the canvas but the Refs tab is empty."; "Reference missing title" / `Reference "{author} {year}" has no title.`; "Reference missing authors" / `Reference "{title}" has no authors listed.`
+- [ ] posterIssues strings (defined here, rendered in sidebar Issues tab; `PosterEditor.tsx:1411-1524`): `{blockType} out of bounds` (category); "Past the bottom margin" / `The columns run {X} in² past the bottom margin, 1 in from the bottom edge. Shorten some text or make a figure smaller.` (warning, from 0.05 in²; per column, the widest block reaching past the margin times how far the lowest reaches, as drawn: `pastMarginArea`, `autoLayout.ts`; right after Auto-Arrange it is the plan's O; record 28); "Empty figure" / "Image block has no file attached — it will export as a dashed placeholder."; "Default title" / "Poster title is still the default placeholder."; "Empty block" / "Empty block: type in it or delete it." (info, an empty heading or text block); "Template text" / "This block still has the template's text." (info: the block holds a template prompt or Insert's old "Enter your text here." / "Section Title", so older posters are covered); "Sample numbers" / "This table still has the sample numbers." (warning: every cell still the old sample) — all three from `startingTextIssues` (`poster/startingText.ts`, record 29; the old "Placeholder text" row went); "Long title" / `Poster title is {N} characters — may wrap to 3+ lines at typical poster sizes.`; "Missing authors" / "No authors have been added yet. Use the Authors tab to add them."; "Missing institutions" / "Authors are listed but no institution affiliations are set."; "Empty references" / "References block is on the canvas but the Refs tab is empty."; "Reference missing title" / `Reference "{author} {year}" has no title.`; "Reference missing authors" / `Reference "{title}" has no authors listed.`
 - [ ] "Postr is free — this credit stays on the poster." — locked-block refusal toast (constant `@/export/blockLock.ts:33`) — shown via `PosterEditor.tsx:1562,2097`
 - [ ] `Postr` — publish flow fallback handled at `PosterEditor.tsx:1217` (see above); `Poster` — print-document title fallback — `PosterEditor.tsx:2162`
 
@@ -1416,7 +1420,8 @@ flowchart LR
 #### `poster/templates.ts` — Layout templates (logic; produces default on-canvas block content + picker names used by sidebar)
 
 **Copy** (default block content rendered on canvas; names/descriptions rendered in sidebar Layout picker)
-- [ ] "Your Poster Title" — default title content — `templates.ts:206`
+- [ ] the title starts empty (it stored "Your Poster Title" until record 29; its prompt is "Poster title") — `templates.ts` `makeBlocks`
+- [ ] the text blocks' guidance sentences below are their `prompt`s, not their text, since record 29 (they start empty); the headings keep their names as text; the 3-column table keeps its header row ("Measure", "M (SD)", "𝑝") with empty body cells (its made-up results went) and the prompt "Type or paste" (`TABLE_PROMPT`)
 - [ ] 3col (`templates.ts:54-79`): "Introduction", "Background and research question. Provide context, motivation, and the gap your work addresses.", "Hypotheses", "State your specific hypotheses or research aims here.", "Methods", "Participants, design, materials, procedure, and analysis approach.", "Results", "Conclusions", "Key findings, implications, and future directions."
 - [ ] 2col (`templates.ts:95-102`): "Introduction", "Motivation and background.", "Methods", "Design and analysis approach.", "Key Results", "Discussion", "Interpretation of findings."
 - [ ] billboard (`templates.ts:118-125`): "YOUR KEY FINDING IN ONE CLEAR SENTENCE. Make this the takeaway.", "Background", "Brief context.", "Methods", "Essential method details.", "Implications", "So what? Future directions."
@@ -1576,7 +1581,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:182-1
 - [ ] `×` (`aria-label="Close"`, `title="Close (Esc)"`) — modal close button, focused on open — `FullCodeModal.tsx`
 - [ ] `Copy full code` / `✓ Copied` — CopyButton inside modal — `FullCodeModal.tsx`
 - [ ] Copied-to-clipboard banner — toast/status (`role="status" aria-live="polite"`, auto-dismiss 3s) — `ReadabilityPanel.tsx:684-701`
-- [ ] `🔎 Scan image` / `Scanning…` — button (image block selected only) — `ReadabilityPanel.tsx:939-950` — API `POST /api/import/extract` (mode `measure-text`) via `postJson` (`:542-559`)
+- [ ] `🔎 Scan image` / `Scanning…` — button (image block selected only) — `ReadabilityPanel.tsx:939-950` — API `POST /api/import/extract` (mode `measure-text`) via `postJson` (`:542-559`) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `Clear` — button (after scan result) — `ReadabilityPanel.tsx:952-955` — resets scan state
 
 **Copy**
@@ -1653,23 +1658,23 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:182-1
 - [ ] poster-size select — select — `Sidebar.tsx:920-934` — options from `POSTER_SIZES` (see Copy below) + `Custom Size`; calls `onChangePosterSize` ('custom' option is display-only, no handler call)
 - [ ] width input — number input (min 10, max 100, step 0.1) — `Sidebar.tsx:938-949` — calls `onChangeCustomSize(w, h)`
 - [ ] height input — number input (min 10, max 100, step 0.1) — `Sidebar.tsx:954-965` — calls `onChangeCustomSize(w, h)`
-- [ ] `⬡ Auto-Arrange` — button — `Sidebar.tsx:970-1012` — calls `onAutoLayout` → `arrangeSheet` (`poster/arrangeMeasure.ts`) → `autoArrange` (`poster/autoLayout.ts`) → `planColumns` (`poster/arrangeColumns.ts`, the owner-approved prototype's function, `docs/fixes/28-auto-arrange-lab.html`): the body in reading order cut into the poster's own number of columns (a lone block dragged part-way across a column counts in that column: `posterColumns`), widths chosen on a ¼ in grid (½ in for 4+) and then refined in 0.05 in steps within ±0.5 in (2 to 4 columns; around the grid set with the lowest score without the keep term), for the lowest F = 1000·O + U + 8·moved + 2·Σ|w − w̄| (O: area past the bottom of the body, in²; U: uneven white space); each block measured on the sheet at its new width (a figure: what its caption adds as drawn, read through `data-postr-figure-area` in `blocks.tsx`, plus its image area at the width, its shape kept exactly); title, authors and logos stay: a title or authors block in the top half of the sheet is the header (the body starts 0.6 in under it), one in the bottom half is along the foot (the body ends 0.6 in above it); the credit mark moves to a free spot only when an arranged block now covers it; font sizes never change; one undo step, none when no block moves more than 0.01 in (`changesLayout`) (record 28, review round 1)
+- [ ] `⬡ Auto-Arrange` — button — `Sidebar.tsx:970-1012` — calls `onAutoLayout` → `arrangeSheet` (`poster/arrangeMeasure.ts`) → `autoArrange` (`poster/autoLayout.ts`) → `planColumns` (`poster/arrangeColumns.ts`, the owner-approved prototype's function, `docs/fixes/28-auto-arrange-lab.html`): the body in reading order cut into the poster's own number of columns (a lone block dragged part-way across a column counts in that column: `posterColumns`), widths chosen on a ¼ in grid (½ in for 4+) and then refined in 0.05 in steps within ±0.5 in (2 to 4 columns; around the grid set with the lowest score without the keep term), for the lowest F = 1000·O + U + 8·moved + 2·Σ|w − w̄| (O: area past the bottom of the body, in²; U: uneven white space); each block measured on the sheet at its new width, in a host inside `#poster-canvas` (`onAutoLayout` passes the sheet, not the workspace `canvasRef`: since the merge of main, record 30, into record 29 an empty block's grey prompt, drawn inside `#poster-canvas` only, counts in its height) (a figure: what its caption adds as drawn, read through `data-postr-figure-area` in `blocks.tsx`, plus its image area at the width, its shape kept exactly); title, authors and logos stay: a title or authors block in the top half of the sheet is the header (the body starts 0.6 in under it), one in the bottom half is along the foot (the body ends 0.6 in above it); the credit mark moves to a free spot only when an arranged block now covers it; font sizes never change; one undo step, none when no block moves more than 0.01 in (`changesLayout`) (record 28, review round 1)
 - [ ] template button `3-Column Classic` — button — `Sidebar.tsx:1035-1054` (data `templates.ts:43-44`) — calls `onApplyTemplate('3col')`-style key
 - [ ] template button `2-Col Wide Figure` — button — `Sidebar.tsx:1035-1054` (data `templates.ts:87-88`) — calls `onApplyTemplate`
 - [ ] template button `Billboard` — button — `Sidebar.tsx:1035-1054` (data `templates.ts:110-111`) — calls `onApplyTemplate`
 - [ ] template button `Sidebar + Focus` — button — `Sidebar.tsx:1035-1054` (data `templates.ts:132-133`) — calls `onApplyTemplate`
 - [ ] template button `Blank` — button — `Sidebar.tsx:1035-1054` (data `templates.ts:161-162`) — calls `onApplyTemplate`
-- [ ] `Show grid` — checkbox — `Sidebar.tsx:1060-1068` — calls `onToggleGrid`
+- [ ] `Show grid` — checkbox — `Sidebar.tsx:1060-1068` — calls `onToggleGrid` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `Show ruler` — checkbox — `Sidebar.tsx:1072-1080` — calls `onToggleRuler`; not shown while `RULERS_ENABLED` is off
-- [ ] `ImportSection` (tile + 2 modals) — panel render site — `Sidebar.tsx:917` — see `sidebar/ImportSection.tsx` / `ImportTile.tsx`
+- [ ] `ImportSection` (tile + 2 modals) — panel render site — `Sidebar.tsx:917` — see `sidebar/ImportSection.tsx` / `ImportTile.tsx` · **Hidden while `IMPORT_ENABLED` is off (record 29).**
 
 *Export tab (`ExportTab`, :1146-1247)*
-- [ ] `👁 Preview poster` — button — `Sidebar.tsx:1157-1159` — calls `onPreview`
+- [ ] `👁 Preview poster` — button — `Sidebar.tsx:1192-1194` — calls `onPreview`; the preview (`PosterPreviewOverlay.tsx`) draws the blocks outside `#poster-canvas`, so it shows no grey prompts, as the poster prints (record 29 review round 1); the editor's hints in empty authors, image and references blocks show there and print (older, PLAN's Later list)
 - [ ] `⎙ Save PDF` — button (accent style) — `Sidebar.tsx` `ExportTab` — calls `onPrint` = `printPoster` (record 30: the same function as the top bar's Save PDF, Preview's Print and ⌘P)
 - [ ] "Your browser’s print window opens. Choose Save as PDF." — the one line under it (record 30; the print window holds the dialog's steps) — `Sidebar.tsx` `ExportTab`
 - [ ] `EditableExportButtons` — panel render site — `Sidebar.tsx:1205` — see `sidebar/EditableExportButtons.tsx`
-- [ ] `PostrExportButton` — render site — `Sidebar.tsx:1169` — see `sidebar/PostrExportButton.tsx`
-- [ ] `🏪 Email to Staples kiosk` — button (red outline) — `Sidebar.tsx:1172-1181` — calls `onPrintAtStaples`
+- [ ] `PostrExportButton` — render site — `Sidebar.tsx:1169` — see `sidebar/PostrExportButton.tsx` · **Hidden while `IMPORT_ENABLED` is off (record 29).**
+- [ ] `🏪 Email to Staples kiosk` — button (red outline) — `Sidebar.tsx:1172-1181` — calls `onPrintAtStaples` · **Hidden while `EDITOR_EXTRAS_ENABLED` is off (record 29).**
 - [ ] `↗ Publish to gallery` — button — `Sidebar.tsx:1229-1238` — calls `onPublish` — **DEAD UI: inside `GALLERY_PUBLIC_ENABLED &&` (flag = false)**
 
 *Authors tab (`AuthorsTab` :1214-1264, `InstitutionManager` :1266-1343, `AuthorManager` :1554-1894)*
@@ -1693,7 +1698,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:182-1
 *Refs tab (`RefsTab`, :1900-2204)*
 - [ ] `Import .bib / .ris / .enw` — button — `Sidebar.tsx:2021-2041` — clicks hidden file input; parses via `parseBibtex`/`parseRis`, appends references
 - [ ] hidden file input (accept `.bib,.bibtex,.ris,.enw`) — file input — `Sidebar.tsx:2042` — **`.enw` is accept-listed but has no parser (§10)**
-- [ ] citation-style select — select — `Sidebar.tsx:2048-2058` — options `APA 7`, `Vancouver`, `IEEE`, `Harvard` (keys of `CITATION_STYLES`, `citations.ts:45,64-101`); calls `onChangeCitationStyle`
+- [ ] citation-style select — select — `Sidebar.tsx:2048-2058` — options `APA 7`, `Vancouver`, `IEEE`, `Harvard` (keys of `CITATION_STYLES`, `citations.ts:45,64-101`); calls `onChangeCitationStyle` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `×` (aria-label `Remove reference`) — button, one per reference — `Sidebar.tsx:2082-2089` — deletes reference
 - [ ] paste-references textarea — textarea — `Sidebar.tsx:2103-2120` — local `pasteText`
 - [ ] `✨ Parse with AI` / `✨ Parsing…` — button — `Sidebar.tsx:2122-2142` — calls API `POST /api/import/parse-references` (`:1419`) with line-splitter fallback
@@ -1704,60 +1709,63 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:182-1
 - [ ] `+ Add Reference` — button — `Sidebar.tsx:2183-2201` — appends manual reference (no-op if title blank)
 
 *Style tab (`StyleTab` :2210-2530, `StyleEditor` :2532-2632, `HeadingEditor` :2634-2699)*
-- [ ] `🎨 Copy a design` — button — `Sidebar.tsx:2365-2384` — opens `CopyDesignModal`
+- [ ] `🎨 Copy a design` — button — `Sidebar.tsx:2365-2384` — opens `CopyDesignModal` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `CopyDesignModal` — modal — `Sidebar.tsx:2397-2400` — external component; open/close via local state
 - [ ] palette row button (4 swatches + `{p.name}`) — button, one per palette (8 built-in + custom) — `Sidebar.tsx:2256-2327` — calls `onChangePalette(palette, name)`
-- [ ] `✏️` (title `Edit palette`) — button, custom palettes only — `Sidebar.tsx:2330-2340` — calls `onEditCustomPalette(name)`
-- [ ] `🗑️` (title `Delete palette`) — button, custom palettes only — `Sidebar.tsx:2341-2355` — `confirm()` dialog then `onDeleteCustomPalette(name)`
-- [ ] `➕ Create custom palette` — button — `Sidebar.tsx:2423-2441` — calls `onCreateCustomPalette`
+- [ ] `✏️` (title `Edit palette`) — button, custom palettes only — `Sidebar.tsx:2330-2340` — calls `onEditCustomPalette(name)` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `🗑️` (title `Delete palette`) — button, custom palettes only — `Sidebar.tsx:2341-2355` — `confirm()` dialog then `onDeleteCustomPalette(name)` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `➕ Create custom palette` — button — `Sidebar.tsx:2423-2441` — calls `onCreateCustomPalette` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] font select — select with `Sans`/`Serif` optgroups — `Sidebar.tsx:2457-2476` — options = 10 `FONTS` keys (`constants.ts:110-121`); calls `onChangeFont`
 - [ ] size number input (title `Font size (points)`, min 12, max 200, step 2) — number input, one per level ×4 (Title/Heading/Authors/Body) — `Sidebar.tsx:2563-2573` — updates `styles[level].size` (pt ↔ units)
-- [ ] weight select — select, one per level ×4 — `Sidebar.tsx:2576-2586` — options `300,400,500,600,700,800` (`FONT_WEIGHTS`, `constants.ts:216`)
-- [ ] `I` italic toggle (aria-pressed) — button, one per level ×4 — `Sidebar.tsx:2587-2611` — toggles `styles[level].italic`
-- [ ] line-height input (title `Line height (1.0–3.0)`, min 1, max 3, step 0.05) — number input, one per level ×4 — `Sidebar.tsx:2614-2626`
-- [ ] `None` / `Bottom` / `Left` / `Box` / `Thick` — heading-border pill buttons ×5 — `Sidebar.tsx:2665-2669` (factory `:2651-2655`) — sets `headingStyle.border`
-- [ ] `left` / `center` — heading-align pill buttons ×2 — `Sidebar.tsx:2677-2686` — sets `headingStyle.align`
-- [ ] `Fill` — checkbox — `Sidebar.tsx:2687-2695` — sets `headingStyle.fill`
-- [ ] preset-name input (placeholder `e.g. Smith Lab Green`) — text input — `Sidebar.tsx:2489-2494`
-- [ ] `💾 Save` / `✓ Saved!` — button — `Sidebar.tsx:2495-2513` — calls `onSavePreset(name)`; green flash ~1.6 s
-- [ ] saved-preset button `{p.name}` — button, one per saved preset — `Sidebar.tsx:2517-2526` — calls `onLoadPreset(p)`
+- [ ] weight select — select, one per level ×4 — `Sidebar.tsx:2576-2586` — options `300,400,500,600,700,800` (`FONT_WEIGHTS`, `constants.ts:216`) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `I` italic toggle (aria-pressed) — button, one per level ×4 — `Sidebar.tsx:2587-2611` — toggles `styles[level].italic` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] line-height input (title `Line height (1.0–3.0)`, min 1, max 3, step 0.05) — number input, one per level ×4 — `Sidebar.tsx:2614-2626` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `None` / `Bottom` / `Left` / `Box` / `Thick` — heading-border pill buttons ×5 — `Sidebar.tsx:2665-2669` (factory `:2651-2655`) — sets `headingStyle.border` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `left` / `center` — heading-align pill buttons ×2 — `Sidebar.tsx:2677-2686` — sets `headingStyle.align` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Fill` — checkbox — `Sidebar.tsx:2687-2695` — sets `headingStyle.fill` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] preset-name input (placeholder `e.g. Smith Lab Green`) — text input — `Sidebar.tsx:2489-2494` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `💾 Save` / `✓ Saved!` — button — `Sidebar.tsx:2495-2513` — calls `onSavePreset(name)`; green flash ~1.6 s · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] saved-preset button `{p.name}` — button, one per saved preset — `Sidebar.tsx:2517-2526` — calls `onLoadPreset(p)` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 
 *Edit tab (`EditTab` :2705-2787 + sub-editors)*
 - [ ] `💡 Tips for editing tables` — `<details>/<summary>` disclosure — `Sidebar.tsx:2801-2832` — native expand/collapse
-- [ ] `Stretch to fit block` — checkbox (`ImageFitToggle`) — `Sidebar.tsx:2899-2908` — sets `imageFit` `fill`/`contain` on image/logo blocks
+- [ ] `Stretch to fit block` — checkbox (`ImageFitToggle`) — `Sidebar.tsx:2899-2908` — sets `imageFit` `fill`/`contain` on image/logo blocks · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] "Drag a corner of the logo to resize it, or press its Replace button to choose another." — a logo's note while `ADJUSTMENTS_ENABLED` is off (in place of Stretch and the crop hint); "… to choose one." while the logo is empty (Insert › Logo; review round 1, R1-06) — `Sidebar.tsx` `EditTab` (record 29)
+- [ ] "Title · {pt} pt." / "Headings · {pt} pt, the same for every heading on this poster." / "Body text · {pt} pt, the same for all body text on this poster." and "Type on the poster to edit this block. Change the size in the Style tab, under Typography." — a title, heading or text block's Edit tab while `ADJUSTMENTS_ENABLED` is off (in place of the font controls and the Content box) — `Sidebar.tsx` `TextLevelNote` (record 29)
+- [ ] `Show caption` — checkbox (`CaptionEditor`, while `ADJUSTMENTS_ENABLED` is off, in place of the position buttons) — unticked stores `captionPosition: 'none'`, ticked `'top'`; a stored left, right or bottom shows ticked and is kept until unticked — `Sidebar.tsx` `CaptionEditor` (record 29)
 - [ ] caption input (placeholder `{figure|table} description…`) — text input (`CaptionEditor`) — `Sidebar.tsx:3004-3012` — sets `block.caption`
-- [ ] `Top` / `Bottom` / `Left` / `Right` / `Hide` — caption-position buttons ×5 — `Sidebar.tsx:3021-3043` (data `:2984-2993`) — sets `captionPosition`
-- [ ] caption-spacing slider (0–24 px) — range input — `Sidebar.tsx:3164-3181` — sets `captionGap`; only when position ≠ `none`; a drag is ONE undo step (`onPointerDown={holdDragStep}`, `:3173`; fix 12, review R2-I1 and the merge review's F1: it was a step per value), each key press on it a step of its own
-- [ ] `✨ Format {table|note}` / `✓ Formatted {table|note}` / `✓ {Table|Note} formatted` — button — `Sidebar.tsx` `CaptionEditor` — runs `autoFormatAPA` over caption+note+cells via `onUpdateBlock`; pulses; disabled when clean. `autoFormatAPA` strips every tag first, so a cell's line break (`<br>`, stored since fix 27) is joined (MEASURED in jsdom, fix 27 review round 1; PLAN's Later list; bounded-designs §3.2 takes the button out of the MVP)
+- [ ] `Top` / `Bottom` / `Left` / `Right` / `Hide` — caption-position buttons ×5 — `Sidebar.tsx:3021-3043` (data `:2984-2993`) — sets `captionPosition` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] caption-spacing slider (0–24 px) — range input — `Sidebar.tsx:3164-3181` — sets `captionGap`; only when position ≠ `none`; a drag is ONE undo step (`onPointerDown={holdDragStep}`, `:3173`; fix 12, review R2-I1 and the merge review's F1: it was a step per value), each key press on it a step of its own · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `✨ Format {table|note}` / `✓ Formatted {table|note}` / `✓ {Table|Note} formatted` — button — `Sidebar.tsx` `CaptionEditor` — runs `autoFormatAPA` over caption+note+cells via `onUpdateBlock`; pulses; disabled when clean. `autoFormatAPA` strips every tag first, so a cell's line break (`<br>`, stored since fix 27) is joined (MEASURED in jsdom, fix 27 review round 1; PLAN's Later list; bounded-designs §3.2 takes the button out of the MVP) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] note textarea (placeholder `Error bars show 95% CI. **p** < .01.` for figures, `*Note.* *p* < .05. SD in parentheses.` for tables) — textarea — `Sidebar.tsx` `CaptionEditor` (`value={stripHtmlToPlainText(block.note …)}`) — sets `block.note` as typed, Enter's newline included; drawn under the figure or table with `white-space: pre-wrap` (`blocks.tsx` `noteStyle`), so a line typed with Enter is a line on the canvas and in the PDF, as in PowerPoint (fix 27 review round 1, R1-A1: drawn with `normal`, the lines ran together). Shows the stored note through `stripHtmlToPlainText`, so text between `<` and a later `>` vanishes as it is typed (PLAN's Later list)
 - [ ] `−` (title `Remove last row`) — button — `Sidebar.tsx:3385-3392` — `deleteRowAt`; disabled at 1 row
 - [ ] `+` (title `Add row at bottom`) — button — `Sidebar.tsx:3396-3402` — `insertRow`
 - [ ] `−` (title `Remove last column`) — button — `Sidebar.tsx:3409-3416` — `deleteColAt`; disabled at 1 col
 - [ ] `+` (title `Add column at right`) — button — `Sidebar.tsx:3420-3426` — `insertCol`
-- [ ] border-preset buttons `None`, `APA 3-Line`, `All Lines`, `H-Lines`, `Header Box` — buttons ×5 — `Sidebar.tsx:3451-3472` (data `constants.ts:250-256`) — `setBorderPreset`
-- [ ] `Custom` — border-preset button — `Sidebar.tsx:3473-3495` — switches to `borderPreset: 'custom'`
+- [ ] border-preset buttons `None`, `APA 3-Line`, `All Lines`, `H-Lines`, `Header Box` — buttons ×5 — `Sidebar.tsx:3451-3472` (data `constants.ts:250-256`) — `setBorderPreset` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Custom` — border-preset button — `Sidebar.tsx:3473-3495` — switches to `borderPreset: 'custom'` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] outer-edge hit zones ×4 (aria/title `Add/Remove top edge line` `:3685`, `bottom` `:3690`, `left` `:3695`, `right` `:3700`) — transparent overlay buttons — `Sidebar.tsx:3687-3706` — toggles `topLine/bottomLine/leftLine/rightLine`
 - [ ] header-row-box hit zone (title `Add/Remove header row box`) — overlay button — `Sidebar.tsx:3709-3719` — toggles `headerBox`
 - [ ] header-separator hit zone (title `Add/Remove header separator`) — overlay button — `Sidebar.tsx:3722-3732` — toggles `headerLine`
 - [ ] inner-horizontal hit zones (title `Add/Remove line between row {i+2} and row {i+3}`) — overlay buttons, one per inner row gap — `Sidebar.tsx:3739-3758` — toggles `innerH[i]`
 - [ ] inner-vertical hit zones (title `Add/Remove line between col {i+1} and col {i+2}`) — overlay buttons, one per inner col gap — `Sidebar.tsx:3761-3778` — toggles `innerV[i]`
-- [ ] `All borders` — bulk-preset button — `Sidebar.tsx:3793-3795` — `applyBulkPreset('all')`
-- [ ] `No borders` — bulk-preset button — `Sidebar.tsx:3796-3798`
-- [ ] `Outer only` — bulk-preset button — `Sidebar.tsx:3799-3801`
-- [ ] `Inner only` — bulk-preset button — `Sidebar.tsx:3802-3804`
-- [ ] `Horizontal only` — bulk-preset button — `Sidebar.tsx:3805-3807`
-- [ ] `Vertical only` — bulk-preset button — `Sidebar.tsx:3808-3810`
-- [ ] `APA 3-line` — bulk-preset button — `Sidebar.tsx:3811-3813`
-- [ ] `RichTextEditor` content editor (placeholder `Type here… (type / for symbols)`) — rich-text editor (`TextBlockEditor`) — `Sidebar.tsx:3889-3896` — sets `block.content`
-- [ ] `DockedFormatToolbar` — toolbar render site — `Sidebar.tsx:3873` — external component
+- [ ] `All borders` — bulk-preset button — `Sidebar.tsx:3793-3795` — `applyBulkPreset('all')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `No borders` — bulk-preset button — `Sidebar.tsx:3796-3798` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Outer only` — bulk-preset button — `Sidebar.tsx:3799-3801` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Inner only` — bulk-preset button — `Sidebar.tsx:3802-3804` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Horizontal only` — bulk-preset button — `Sidebar.tsx:3805-3807` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Vertical only` — bulk-preset button — `Sidebar.tsx:3808-3810` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `APA 3-line` — bulk-preset button — `Sidebar.tsx:3811-3813` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `RichTextEditor` content editor (placeholder `Type here… (type / for symbols)`) — rich-text editor (`TextBlockEditor`) — `Sidebar.tsx:3889-3896` — sets `block.content` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `DockedFormatToolbar` — toolbar render site — `Sidebar.tsx:3873` — external component · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `FloatingFormatToolbar` — toolbar render site (selection-dependent) — `Sidebar.tsx:3898`
-- [ ] font-size input (title `Font size (points)`) — number input — `Sidebar.tsx:3906-3921` — updates style-level size
-- [ ] weight select — select — `Sidebar.tsx:3924-3940` — options `FONT_WEIGHTS`
-- [ ] `I` (title `Italic`, aria-pressed) — button — `Sidebar.tsx:3941-3966` — toggles style-level italic
-- [ ] line-spacing slider (1–3, step 0.05) — range input — `Sidebar.tsx:4086-4097`; a drag is ONE undo step however long it is held still (`onPointerDown={holdDragStep}`, `:4094`; before, the 600 ms / 5 s windows split it); key presses keep the windows
-- [ ] line-spacing number (title `Line height (1.0–3.0)`) — number input — `Sidebar.tsx:3984-4002`
-- [ ] text-color picker — color input — `Sidebar.tsx:4010-4023` — sets style-level color
-- [ ] `Reset to palette` — button — `Sidebar.tsx:4024-4040` — sets color to `null`
+- [ ] font-size input (title `Font size (points)`) — number input — `Sidebar.tsx:3906-3921` — updates style-level size · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] weight select — select — `Sidebar.tsx:3924-3940` — options `FONT_WEIGHTS` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `I` (title `Italic`, aria-pressed) — button — `Sidebar.tsx:3941-3966` — toggles style-level italic · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] line-spacing slider (1–3, step 0.05) — range input — `Sidebar.tsx:4086-4097`; a drag is ONE undo step however long it is held still (`onPointerDown={holdDragStep}`, `:4094`; before, the 600 ms / 5 s windows split it); key presses keep the windows · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] line-spacing number (title `Line height (1.0–3.0)`) — number input — `Sidebar.tsx:3984-4002` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] text-color picker — color input — `Sidebar.tsx:4010-4023` — sets style-level color · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Reset to palette` — button — `Sidebar.tsx:4024-4040` — sets color to `null` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 
 *Insert tab (`AddBlockPanel`, :4056-4132)*
 - [ ] `+ Heading` — button — `Sidebar.tsx:4085-4116` (data `:4065`) — calls `onAddBlock('heading')`
@@ -1792,15 +1800,15 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:182-1
 - [ ] template descriptions: "Traditional conference layout." / "Full-width figure zone." / "Award-winning assertion-evidence." / "Narrow text, wide visuals." / "Title + authors only." — template-button subtext (`templates.ts:44,88,111,133,162`, rendered `Sidebar.tsx:1053`)
 - [ ] "📐 Canvas overlays" — section label — `Sidebar.tsx:1060`
 - [ ] "Visual aids only — they never print or export." / "A visual aid only — it never prints or exports." — helper, the second while `RULERS_ENABLED` is off — `Sidebar.tsx:1083`
-- [ ] "💡 Done building? Head to the Export tab to preview, save PDF, or print at Staples." — footer tip (active branch; gallery branch adds "publish to the gallery", dead while flag=false) — `Sidebar.tsx:1094-1098`
+- [ ] "💡 Done building? Head to the Export tab to preview, save a PDF or export to PowerPoint." — footer tip (while `GALLERY_PUBLIC_ENABLED` and `EDITOR_EXTRAS_ENABLED` are off; with them on it adds "print at Staples" and "publish to the gallery", record 29) — `Sidebar.tsx` `LayoutTab`
 - [ ] "Preview" — section label — `Sidebar.tsx:1117`
 - [ ] "See the poster at full size without the editor chrome. Great for a final sanity check before exporting." — helper — `Sidebar.tsx:1121-1124`
 - [ ] "Save as PDF" — section label — `Sidebar.tsx:1126`
 - [ ] ~~"🖨️ Browser Print dialog steps:" and its six-item list (Click Save PDF, Destination, Layout = Landscape, Margins = None, Background graphics, Click Save)~~ — removed by record 30: they disagreed with the print window's own steps; one line now (above)
 - [ ] "✎ Editable formats" — section label — `Sidebar.tsx:1166`
 - [ ] "📦 Lossless backup" — section label — `Sidebar.tsx:1168`
-- [ ] "🏪 Print at Staples" — section label — `Sidebar.tsx:1171`
-- [ ] "Staples' Print & Go flow — email the PDF, get an 8-digit release code, print at any Staples kiosk without a USB drive." — helper — `Sidebar.tsx:1182-1185`
+- [ ] "🏪 Print at Staples" — section label — `Sidebar.tsx:1171` · **Hidden while `EDITOR_EXTRAS_ENABLED` is off (record 29).**
+- [ ] "Staples' Print & Go flow — email the PDF, get an 8-digit release code, print at any Staples kiosk without a USB drive." — helper — `Sidebar.tsx:1182-1185` · **Hidden while `EDITOR_EXTRAS_ENABLED` is off (record 29).**
 - [ ] "↗ Share to gallery" — section label — **DEAD (flag false)** — `Sidebar.tsx:1189`
 - [ ] "Publish to the public gallery at /gallery. You can retract at any time from your Profile → Gallery submissions." — helper — **DEAD (flag false)** — `Sidebar.tsx:1200-1204`
 - [ ] "① Institutions" — section label — `Sidebar.tsx:1227`
@@ -1815,8 +1823,8 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:182-1
 - [ ] "✓ Added {n} author{s} · {n} institution{s} · {n} linked to affiliations." — success feedback (parts joined) — `Sidebar.tsx:1669-1681`
 - [ ] "AI-assisted parsing handles messy bylines — Unicode superscripts, mixed scripts, footnote markers, range affiliations (1-3), parenthesised nicknames. Detects a trailing (1) X, (2) Y institution list, creates the institutions, and links each author's 1,2 markers automatically. Falls back to the offline regex parser if the API is unreachable." — explainer — `Sidebar.tsx:1883-1891`
 - [ ] "Import" — section label — `Sidebar.tsx:2020`
-- [ ] "Display" — section label — `Sidebar.tsx:2044`
-- [ ] "Style" — field label — `Sidebar.tsx:2047`
+- [ ] "Display" — section label — `Sidebar.tsx:2044` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] "Style" — field label — `Sidebar.tsx:2047` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "References ({n})" — section label with count — `Sidebar.tsx:2064`
 - [ ] formatted citation string per reference (from `CITATION_STYLES[style](r, i)`) — dynamic row text — `Sidebar.tsx:2079-2081`
 - [ ] "Paste from Manuscript" — section label — `Sidebar.tsx:2096`
@@ -1826,14 +1834,14 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:182-1
 - [ ] "No references detected." — feedback message — `Sidebar.tsx:1958`
 - [ ] "✓ Added {n} reference{s}." — success feedback — `Sidebar.tsx:1967-1969`
 - [ ] "Manual Entry" — section label — `Sidebar.tsx:2155`
-- [ ] "Copy a design" — section label — `Sidebar.tsx:2364`
-- [ ] "Upload a poster you admire and apply its colours and font to yours. Copies the look, not the content." — helper — `Sidebar.tsx:2394-2395`
+- [ ] "Copy a design" — section label — `Sidebar.tsx:2364` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] "Upload a poster you admire and apply its colours and font to yours. Copies the look, not the content." — helper — `Sidebar.tsx:2394-2395` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "Palette" — section label — `Sidebar.tsx:2402`
 - [ ] palette names: "Classic Academic", "Nature / Biology", "Medical / Clinical", "Engineering", "Psychology / Neuro", "Humanities / Arts", "Earth Sciences", "Clean Minimal" — palette row labels (`PALETTES`, `constants.ts:160-178`, rendered `Sidebar.tsx:2298`)
-- [ ] "custom" — badge on custom palette rows — `Sidebar.tsx:2310`
+- [ ] "custom" — badge on custom palette rows — `Sidebar.tsx:2310` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "Under {type}, \"{a}\" and \"{b}\" may look alike (ΔE {n})." — colorblind-warning tooltip (title attr) — `Sidebar.tsx:2315`
-- [ ] "Your palettes" — subsection heading — `Sidebar.tsx:2418`
-- [ ] "Delete custom palette \"{name}\"? This cannot be undone." — `confirm()` dialog text — `Sidebar.tsx:2346`
+- [ ] "Your palettes" — subsection heading — `Sidebar.tsx:2418` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] "Delete custom palette \"{name}\"? This cannot be undone." — `confirm()` dialog text — `Sidebar.tsx:2346` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "Build your own with color-theory randomizer, paste from Coolors, or extract from an image." — helper — `Sidebar.tsx:2451-2452`
 - [ ] "Font" — section label — `Sidebar.tsx:2456`
 - [ ] "Sans" / "Serif" — optgroup labels — `Sidebar.tsx:2458,2467`
@@ -1841,18 +1849,18 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:182-1
 - [ ] "Typography" — section label — `Sidebar.tsx:2478`
 - [ ] "Title" / "Heading" / "Authors" / "Body" — style-level headings (`levels` array `Sidebar.tsx:2534-2539`, rendered `:2559`)
 - [ ] "pt" — unit suffix — `Sidebar.tsx:2574` (also `:3917`)
-- [ ] "LH" — field label — `Sidebar.tsx:2613`
+- [ ] "LH" — field label — `Sidebar.tsx:2613` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "Headings" — section label — `Sidebar.tsx:2481`
-- [ ] "Border" — subsection heading — `Sidebar.tsx:2662`
-- [ ] "Alignment" — subsection heading — `Sidebar.tsx:2674`
-- [ ] "🎨 Save as style preset" — section label — `Sidebar.tsx:2484`
-- [ ] "Name your current font + palette + typography combo to reuse it on your next poster. Manage saved presets from your Profile → Preferences." — helper — `Sidebar.tsx:2485-2487`
+- [ ] "Border" — subsection heading — `Sidebar.tsx:2662` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] "Alignment" — subsection heading — `Sidebar.tsx:2674` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] "🎨 Save as style preset" — section label — `Sidebar.tsx:2484` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] "Name your current font + palette + typography combo to reuse it on your next poster. Manage saved presets from your Profile → Preferences." — helper — `Sidebar.tsx:2485-2487` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "Click a text, table, or image block on the canvas to edit it here, or switch to the Insert tab to add a new one. Open the Figure tab to build a chart from your data or check figure readability." — Edit-tab empty state — `Sidebar.tsx:2777-2784`
 - [ ] "✏️ Click any cell on the canvas to type directly." — tips list item — `Sidebar.tsx:2824`
-- [ ] "🖱️ Click a row/column header strip to select the whole row or column." — tips list item — `Sidebar.tsx:2825`
+- [ ] "🖱️ Click a row/column header strip to select the whole row or column." — tips list item — `Sidebar.tsx:2825` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "📋 Pasting into a cell replaces the whole table with what you paste, so rows copied from Word, Excel, or Google Sheets come in as a new grid." — tips list item — `Sidebar.tsx` `TableTipsDropdown` (the claims audit's wording, `f153cf7`; matches the paste, `keep-work-check.mjs` H5)
-- [ ] "↔️ Drag column borders to resize." — tips list item — `Sidebar.tsx:2827`
-- [ ] "🗑️ Select a row/column and press Delete to remove it." — tips list item — `Sidebar.tsx:2828`
+- [ ] "↔️ Drag column borders to resize." — tips list item — `Sidebar.tsx:2827` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] "🗑️ Select a row/column and press Delete to remove it." — tips list item — `Sidebar.tsx:2828` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "⌨️ Tab / Shift+Tab to jump between cells." — tips list item — `Sidebar.tsx:2829`
 - [ ] "✨ Type **bold**, *italic*, or M (SD)* in a cell, then click Format table in the Caption section below." — tips list item — `Sidebar.tsx:2830`
 - [ ] "✂︎ Crop" — section label — `Sidebar.tsx:2848`
@@ -2004,7 +2012,7 @@ Mounted from: imported `Sidebar.tsx:64`, rendered `Sidebar.tsx:796-802` under `t
 
 **Graphics** — none.
 
-#### `poster/sidebar/ImportSection.tsx` — wrapper owning the import-modal flow (confirm-replace → import) for the Layout tab
+#### `poster/sidebar/ImportSection.tsx` — wrapper owning the import-modal flow (confirm-replace → import) for the Layout tab · **Hidden while `IMPORT_ENABLED` is off (record 29).**
 
 **Elements**
 - [ ] `ImportTile` — button render site — `ImportSection.tsx:37` — click opens confirm modal if >2 blocks (`REPLACE_THRESHOLD = 2`, `:15`) else import modal directly
@@ -2014,7 +2022,7 @@ Mounted from: imported `Sidebar.tsx:64`, rendered `Sidebar.tsx:796-802` under `t
 **Copy** — none of its own (all strings live in the modals / ImportTile).
 **Graphics** — none.
 
-#### `poster/sidebar/ImportTile.tsx` — Layout-tab import entry tile: prominent purple tile on blank posters, subtle pill on populated ones
+#### `poster/sidebar/ImportTile.tsx` — Layout-tab import entry tile: prominent purple tile on blank posters, subtle pill on populated ones · **Hidden while `IMPORT_ENABLED` is off (record 29).**
 
 **Elements**
 - [ ] `📥 Import existing poster` — prominent tile button (`data-postr-import-tile`, shown when ≤2 blocks) — `ImportTile.tsx:19-80` — calls `onClick` (opens import flow in `ImportSection`)
@@ -2027,7 +2035,7 @@ Mounted from: imported `Sidebar.tsx:64`, rendered `Sidebar.tsx:796-802` under `t
 - [ ] `📥` — emoji — `ImportTile.tsx:65` — prominent tile title
 - [ ] `📥` (aria-hidden) — emoji — `ImportTile.tsx:104` — subtle pill
 
-#### `poster/sidebar/PostrExportButton.tsx` — Export-tab button downloading the poster as a lossless `.postr` zip bundle
+#### `poster/sidebar/PostrExportButton.tsx` — Export-tab button downloading the poster as a lossless `.postr` zip bundle · **Hidden while `IMPORT_ENABLED` is off (record 29).**
 
 **Elements**
 - [ ] `✓ Saved` / `Packing…` / `📦 Save as .postr` — button (`data-postr-export-postr`) — `PostrExportButton.tsx:46-64` — calls `exportPostr(doc)`, triggers download `{title}.postr`; disabled while busy
@@ -3723,20 +3731,20 @@ No UI — logic only. Three route registrations, each `requireAuth(getSupabase)`
 
 **Elements**
 - [ ] Primary "+ New poster" button — `<button>` — `NewPosterButton.tsx:60-67`
-- [ ] "Import…" button — `<button>` `aria-label="Import an existing poster"` `data-postr-import-cta` — `NewPosterButton.tsx:68-78`
-- [ ] Chevron "more options" button — `<button>` `aria-label="More poster options"` `aria-haspopup="menu"` `aria-expanded` — `NewPosterButton.tsx:79-89`
+- [ ] "Import…" button — `<button>` `aria-label="Import an existing poster"` `data-postr-import-cta` — `NewPosterButton.tsx:68-78` · **Hidden while `IMPORT_ENABLED` is off (record 29).**
+- [ ] Chevron "more options" button — `<button>` `aria-label="More poster options"` `aria-haspopup="menu"` `aria-expanded` — `NewPosterButton.tsx:79-89` · **Hidden while `IMPORT_ENABLED` is off (record 29).**
 - [ ] ~~"Import manuscript" link to `/paper-to-poster` — `<Link>` `data-postr-import-manuscript-cta`~~ — removed 2026-09-10 (deactivated)
 - [ ] ~~Privacy-notice paragraph — `<p>`~~ — removed 2026-09-10
-- [ ] Options dropdown — `<div role="menu">` — `NewPosterButton.tsx:117-149`
-- [ ] "New blank poster" menu item — `<button role="menuitem">` — `NewPosterButton.tsx:127-134`
-- [ ] "Import PDF / image / .postr…" menu item — `<button role="menuitem">` — `NewPosterButton.tsx:135-147`
+- [ ] Options dropdown — `<div role="menu">` — `NewPosterButton.tsx:117-149` · **Hidden while `IMPORT_ENABLED` is off (record 29).**
+- [ ] "New blank poster" menu item — `<button role="menuitem">` — `NewPosterButton.tsx:127-134` · **Hidden while `IMPORT_ENABLED` is off (record 29).**
+- [ ] "Import PDF / image / .postr…" menu item — `<button role="menuitem">` — `NewPosterButton.tsx:135-147` · **Hidden while `IMPORT_ENABLED` is off (record 29).**
 - [ ] Error message — `<p>` — `NewPosterButton.tsx:151`
-- [ ] `ImportPosterModal` (mode="new") — `<ImportPosterModal>` — `NewPosterButton.tsx:153-157`
+- [ ] `ImportPosterModal` (mode="new") — `<ImportPosterModal>` — `NewPosterButton.tsx:153-157` · **Hidden while `IMPORT_ENABLED` is off (record 29).**
 
 **Copy**
 - [ ] "+ New poster" — primary button label — `NewPosterButton.tsx:66`
 - [ ] "Creating…" — primary button busy label — `NewPosterButton.tsx:66`
-- [ ] "Import…" — import button label — `NewPosterButton.tsx:77`
+- [ ] "Import…" — import button label — `NewPosterButton.tsx:77` · **Hidden while `IMPORT_ENABLED` is off (record 29).**
 - [ ] ~~"Import manuscript" — paper-to-poster link label~~ — removed 2026-09-10 (deactivated)
 - [ ] ~~"Your manuscript is never stored on our servers, and is never used to train AI." — privacy notice~~ — removed 2026-09-10
 - [ ] "Failed to create poster" — fallback error message — `NewPosterButton.tsx:46`
@@ -4028,7 +4036,7 @@ flowchart LR
 
 **Graphics** — none
 
-#### `components/CopyDesignModal.tsx` — "Copy a design": drop poster → extract style → before/after preview → apply palette/font
+#### `components/CopyDesignModal.tsx` — "Copy a design": drop poster → extract style → before/after preview → apply palette/font · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 
 **Elements**
 - [ ] backdrop click — overlay — `CopyDesignModal.tsx:184` — `onClose`
@@ -4134,7 +4142,7 @@ flowchart LR
 **Graphics**
 - [ ] 💾 — emoji — `ImportConfirmReplaceModal.tsx:93` — backup callout
 
-#### `components/ImportPosterModal.tsx` — PDF/PPTX/image/.postr import wizard (pick → extracting → preview → committing)
+#### `components/ImportPosterModal.tsx` — PDF/PPTX/image/.postr import wizard (pick → extracting → preview → committing) · **Hidden while `IMPORT_ENABLED` is off (record 29).**
 
 **Elements**
 - [ ] backdrop click — overlay — `ImportPosterModal.tsx:326` — `onClose` (inert while committing)
@@ -4296,7 +4304,7 @@ flowchart LR
 - [ ] pulsing purple highlight border — css-animation (`postr-tour-pulse`, injected `:193-198`) — `:360-376` — around target element
 - [ ] 4 dark overlay rects — css — `:346-358` — spotlight cutout, clamped to the window on all four sides (fix 03)
 
-#### `components/PaletteDesigner.tsx` — custom-palette builder modal (Manual / Random / From text / From image)
+#### `components/PaletteDesigner.tsx` — custom-palette builder modal (Manual / Random / From text / From image) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 
 **Elements**
 - [ ] backdrop click — overlay — `PaletteDesigner.tsx:272` — `onCancel`
@@ -4402,7 +4410,7 @@ flowchart LR
 
 - [ ] *Dead/removed UI: the per-card "Publish" hover action was deleted when the gallery froze — see comment `PosterCard.tsx:262-271` and `config/features.ts:15-19`.*
 
-#### `components/PresetEditModal.tsx` — manage/edit saved style presets from Profile (localStorage `postr.style-presets`)
+#### `components/PresetEditModal.tsx` — manage/edit saved style presets from Profile (localStorage `postr.style-presets`) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 
 **Elements**
 - [ ] backdrop click — overlay — `PresetEditModal.tsx:225` — `onClose`
@@ -4413,7 +4421,7 @@ flowchart LR
 - [ ] font-family select — select — `PresetEditModal.tsx:387` — options = `FONTS` keys (`poster/constants`)
 - [ ] palette select — select — `PresetEditModal.tsx:402` — optgroups "Curated" (`PALETTES`) + "Your palettes" (custom)
 - [ ] size (pt) number input — number input — `PresetEditModal.tsx:518` — min 8 / max 300, per level (levels constant `STYLE_LEVELS :67-72`)
-- [ ] weight select — select — `PresetEditModal.tsx:535` — options = `FONT_WEIGHTS` (`poster/constants`)
+- [ ] weight select — select — `PresetEditModal.tsx:535` — options = `FONT_WEIGHTS` (`poster/constants`) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] `Slanted` — italic checkbox — `PresetEditModal.tsx:563`
 - [ ] border select — select — `PresetEditModal.tsx:591` — options (constant `BORDER_OPTIONS :74-80`): `None`, `Underline`, `Left bar`, `Boxed`, `Thick underline`
 - [ ] alignment select — select — `PresetEditModal.tsx:608` — options `Left`, `Center`
@@ -4582,7 +4590,7 @@ No UI of its own — wiring only (renders the two modals per `usePublishFlowStor
 **Graphics**
 - [ ] blinking caret (`.postr-typed-line__caret`) — css — `RotatingWord.tsx:145` — after typed text
 
-#### `components/StaplesPrintModal.tsx` — 4-step Staples Print & Go walkthrough
+#### `components/StaplesPrintModal.tsx` — 4-step Staples Print & Go walkthrough · **Hidden while `EDITOR_EXTRAS_ENABLED` is off (record 29).**
 
 **Elements**
 - [ ] backdrop click — overlay — `StaplesPrintModal.tsx:90` — `onClose`
@@ -4596,7 +4604,7 @@ No UI of its own — wiring only (renders the two modals per `usePublishFlowStor
 
 **Copy**
 - [ ] "🏪 Print at Staples" — heading — `StaplesPrintModal.tsx:127`
-- [ ] "Staples' Print & Go flow — email your PDF, get a release code, print at any kiosk. No USB drive, no Staples account, no upload portal." — intro — `StaplesPrintModal.tsx:129-133`
+- [ ] "Staples' Print & Go flow — email your PDF, get a release code, print at any kiosk. No USB drive, no Staples account, no upload portal." — intro — `StaplesPrintModal.tsx:129-133` · **Hidden while `EDITOR_EXTRAS_ENABLED` is off (record 29).**
 - [ ] "Save your poster as PDF" — step 1 title — `StaplesPrintModal.tsx:147`
 - [ ] "Use your browser's Save as PDF dialog. Set layout to **Landscape**, margins to **None**, and enable **Background graphics** so fills don't print white." — step 1 body — `:149-155`
 - [ ] "Email the PDF to Staples" — step 2 title — `:169`
@@ -4814,12 +4822,13 @@ Imported by 28 files (all `data/*`, auth components, import modules, pages, `hoo
 - [ ] "Missing Supabase env vars: VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY must be set in apps/web/.env" — module-load throw — `supabase.ts:15-17`
 **Graphics** — none.
 
-#### `config/features.ts` — product feature switches (four flags, all off)
+#### `config/features.ts` — product feature switches (seven flags, all off)
 
 No UI — logic only. 8 non-test files import it (grep, 2026-09-30).
 - `GALLERY_PUBLIC_ENABLED = false` (`features.ts:21`) — **the public gallery is OFF**; flag hides all publish/browse entry points. Importers: `pages/Profile.tsx`, `pages/Home.tsx`, `profile/HistoryRows.tsx`, `poster/PosterEditor.tsx`, `poster/Sidebar.tsx`, `components/OnboardingTour.tsx`. `components/PosterCard.tsx` no longer imports it; only its comment at `PosterCard.tsx:281` names the file (this list was stale before fix 23). Reactivation checklist (routes.tsx redirects, vercel.json noindex, sitemap, deleted api/shell files, PosterCard "Publish" action deleted-not-gated) documented in the header comment `features.ts:4-19`.
 - `SHARING_ENABLED = false` (`features.ts:53`, added 2026-09-30, fix 23) — **share links and comments are OFF**. Importers: `routes.tsx` (`/s/:slug` redirects to `/`, `:294`), `poster/Sidebar.tsx` (no comments tab `:643`; panel not rendered `:806`), `poster/FloatingFormatToolbar.tsx` (no "Comment on selection", `:377`), `poster/PosterEditor.tsx` (ignores `postr:comment-text` and `postr:comment-area`, `:782`, `:814`). The header comment `features.ts:23-52` lists what is switched off and summarises the database hardening needed before it returns; the full list is `docs/fixes/23-new-poster-owner-only.md` §10 ("Before sharing is turned back on").
 - `RULERS_ENABLED = false` (`features.ts:67`, added 2026-09-30) — **the workspace rulers are hidden** (owner decision; they were off the sheet by up to 30 in, PLAN.md item 4). Importers: `poster/PosterEditor.tsx` (the rulers are not drawn, `showRulerEffective` `:746`), `poster/Sidebar.tsx` (no "Show ruler" toggle, `:1070`). The fix in progress is parked on the local branch `editor/rulers-match-sheet` (its record `docs/fixes/04-rulers-match-sheet.md` and instruments are there).
+- `IMPORT_ENABLED = false`, `ADJUSTMENTS_ENABLED = false`, `EDITOR_EXTRAS_ENABLED = false` (added 2026-10-07, record 29; owner decisions D3, D4) — **the minimal editor**: import and the `.postr` backup; the per-element adjustments; the guidelines panel, the Staples help and the editor's Duplicate. Importers: `poster/Sidebar.tsx`, `poster/blocks.tsx`, `poster/PosterEditor.tsx`, `poster/FloatingFormatToolbar.tsx`, `poster/ReadabilityPanel.tsx`, `components/NewPosterButton.tsx`, `components/OnboardingTour.tsx`, `components/PosterClosedPage.tsx`, `pages/Home.tsx`, `pages/Profile.tsx`, `i18n/about.ts`. Each header comment lists what is off, what stays, the value each hidden control stays at and what turning it back on needs. `poster/__tests__/mvpHidden.test.tsx` (off) and `mvpShown.test.tsx` (on), `src/__tests__/mvpHiddenPages.test.tsx` and the copy inventory's record-29 rules lock it.
 - `LATEX_EXPORT_ENABLED = false` (added 2026-10-06, fix 25) — **the LaTeX export is hidden** (owner: "unnecessary for now"). Importer: `poster/sidebar/EditableExportButtons.tsx` (no LaTeX button or hint, the half-size note's LaTeX sentence, the "LaTeX source saved" status and `handleLatex`'s writer import are all behind it). Every other LaTeX claim was taken out of the copy; `src/__tests__/copyInventory.test.ts` fails if one comes back while it is off. Before it returns: `docs/stress-test/PLAN.md`, "LaTeX export: before it is switched back on".
 **Elements** — none. **Copy** — none. **Graphics** — none.
 

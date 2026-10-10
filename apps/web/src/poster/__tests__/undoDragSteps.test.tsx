@@ -22,6 +22,13 @@
  * Re-run: npx vitest run src/poster/__tests__/undoDragSteps.test.tsx
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+// Record 29 hid the crop edges, the column-border drag and the sliders (config/features.ts ADJUSTMENTS_ENABLED);
+// this file tests that kept code, so it turns the switch on. The shipped
+// configuration is src/poster/__tests__/mvpHidden.test.tsx.
+vi.mock('@/config/features', async (orig) => ({
+  ...(await orig<typeof import('@/config/features')>()),
+  ADJUSTMENTS_ENABLED: true,
+}));
 import { fireEvent, screen } from '@testing-library/react';
 import type { Block, PosterDoc } from '@postr/shared';
 

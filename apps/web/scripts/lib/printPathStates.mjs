@@ -24,6 +24,8 @@
  * key pressed again, which must print (the control).
  */
 
+import { switchOffReason, switchesOff } from './editorHarness.mjs';
+
 /**
  * A table block's own controls (runs in the page): each button, role="button"
  * element and titled element inside the block (a cell's own text is none of
@@ -151,6 +153,10 @@ export async function fillsNear(bytes, { colour, box, margin = 1 }, { pdfjs }) {
  * variant's readings.
  */
 export async function tableStates({ page, P, ed, engine, sleep, clickAway, chord, readPrint, readSheet, compareSheets, tol, see, controlFails, pdfjs, savePdf }) {
+  // Record 29's ADJUSTMENTS_ENABLED hides the "+" bars and the strips: the
+  // cell and strip variants, whose subject they are, are skipped while the
+  // tree has it off; the control (off) still runs.
+  const off = switchesOff('ADJUSTMENTS_ENABLED');
   const tableId = await page.evaluate(() => [...document.querySelectorAll('#poster-canvas [data-block-type="table"]')]
     .sort((a, b) => b.querySelectorAll('td').length - a.querySelectorAll('td').length)[0]?.getAttribute('data-block-id'));
   const accent = String(ed.state.row?.data?.palette?.accent ?? '').toLowerCase();
@@ -158,6 +164,7 @@ export async function tableStates({ page, P, ed, engine, sleep, clickAway, chord
   let controlFills = null;
   for (const variant of ['off', 'cell', 'strip']) {
     const label = `key+table-${variant}`;
+    if (variant !== 'off' && off.length) { out[label] = { skipped: switchOffReason(off), switchOff: true }; continue; }
     const shown = await tableState(page, { tableId, variant, sleep, clickAway });
     const t = { shown };
     out[label] = t;
@@ -167,7 +174,7 @@ export async function tableStates({ page, P, ed, engine, sleep, clickAway, chord
     const popup = await popupP;
     if (!popup) { see('KEY', `${P.id} ${label}: no print window`); continue; }
     await popup.waitForSelector('#poster-print-root', { timeout: 15000 });
-    const now = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w });
+    const now = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w, hidePrompts: true });
     const pr = await readPrint(popup, P.size.w, P.size.h, `${P.id} ${label}`);
     const c = compareSheets(now, pr.sheet, tol[0], tol[1]);
     t.print = await popup.evaluate(tableControls, `#poster-print-root [data-block-id="${tableId}"]`);

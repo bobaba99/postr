@@ -970,6 +970,73 @@ Review round 1's LOW and INFO findings that were not changed are here too
 - **Owner check:** Auto-Arrange in Safari on a real Mac (Playwright's WebKit:
   138 ms at most to the new layout on the 3-column template).
 
+### Queued by record 29 (the minimal editor, 2026-10-07)
+
+Record `docs/fixes/29-mvp-simplify.md` section 10 has the detail and the
+evidence label of each. The three switches (`IMPORT_ENABLED`,
+`ADJUSTMENTS_ENABLED`, `EDITOR_EXTRAS_ENABLED`) hide; what turning each back
+on needs is in its header comment in `config/features.ts`.
+
+- **Harnesses that drive hidden controls: done in the merge with main**
+  (record 29 §11): `keep-work-check`, `undo-history-check`,
+  `control-size-check`, `fit-check`, `sidebar-history-check`,
+  `figure-script-check` and `print-path-check` skip what a switch hides
+  ("skipped (switch off)", `lib/editorHarness.mjs switchesOff`) and exit 0
+  on the merged tree but `figure-script-check` (K4, below). Running them
+  found two of record 29's defects, fixed there: Auto-Arrange measured
+  outside `#poster-canvas`, so empty blocks were placed without their
+  prompt; and the image row without crop broke record 19's overview
+  threshold (now an empty slot keeps its width).
+- **K4: a first visitor's untouched poster gets new block ids on reload**
+  (`figure-script-check` "image check, image again"; record 29 §11): the
+  template is hydrated in memory (`pages/Editor.tsx hydrateIfEmpty`) and
+  stored only on the first edit, so the plot checker's kept result for the
+  image reads as another figure's after a reload (MEASURED: ids differ, no
+  image in the stored row). Not from records 29 or 30 (MEASURED with their
+  parts swapped out); on main `21e6671` UNVERIFIED. Fix later: store the
+  hydrated poster, or key the kept result on something a reload keeps.
+- **The closed poster's "Download a copy"** still saves a `.postr` file,
+  which nothing in the app can import while `IMPORT_ENABLED` is off (the
+  page no longer says it can be imported). Owner: keep it as the way out,
+  or offer the PDF instead.
+- **The handle row keeps room for the hidden crop button** on images and
+  logos, so far out of zoom it is cut to its move button a little sooner
+  than it needs (INSPECTED, `selectionLayout.ts handleRowWidth`). Since the
+  merge with main (record 29 §11) the room is drawn too, an empty inert
+  slot at the row's end (`data-postr-row-slot`): without it the centred row
+  moved 14 px and at 0.35 a 3 in image's Replace sat over the blocks beside
+  it (control-size-check Fd 2 of 78, Fh 1 of 42; MEASURED). The slot leaves
+  the visible buttons 14 px left of the block's centre.
+- **At 24 × 36 in the fresh 3-column table meets the heading below it**
+  (MEASURED, `simplify-check.mjs` T12, three engines): the same with the
+  old sample table (MEASURED, its control mutant), so older than record 29.
+- **Save PDF prints the editor's own hints** in an empty authors, image or
+  references block ("Add authors in sidebar →", "+ Upload figure", "Add
+  references in Refs tab →"): MEASURED in the print window's text,
+  `simplify-check.mjs` T7 `printEditorHints`, 3 of 3 on main `21e6671` and
+  on record 29 (Chromium; review round 1, R1-02, read them in a printed
+  PDF); not in the PowerPoint file. Older than record 29, the same family as
+  its template text (editor guidance reaching the PDF). Issues already lists
+  each of those blocks. Fix later: draw them as non-printing prompts (the
+  `data-placeholder` rule) or strip them in `export/stripEditorChrome.ts`.
+- **The dashboard thumbnail draws the grey prompts** (review round 1,
+  R1-03, measured by the reviewer; INSPECTED here: `data/thumbnails.ts`
+  draws `#poster-canvas` with html-to-image, which copies pseudo-elements).
+  It is a picture of the canvas, not a print or export path: no change.
+  Preview no longer draws them (R1-01, MEASURED, T13: 6 drawn before, 0 after, three engines).
+- **Owner note: a new poster's Issues tab shows 8** where main shows 4 (the
+  four empty template text blocks add one "Empty block" suggestion each;
+  `docs/launch/owner-followups.md` §4).
+- **`tsc -b` in a worktree whose `node_modules` points at another tree**
+  reads that tree's `packages/shared`, so the new `Block.prompt` is missing
+  there (14 errors in this worktree, all "Property 'prompt' does not exist";
+  0 against the tree's own package, MEASURED). With `node_modules` resolving
+  `@postr/shared` to the tree's own package, `npm run build` exits 0
+  (MEASURED in a scratch copy, record 29 §8; review round 1, R1-05): an artefact of the worktree.
+- **Not in record 29 (other items):** A−/A+, the slash menu, paste and keys
+  (bounded-designs.md §5.2 items 7, 10, 11, 12), and `.enw` in the
+  references file picker (item 14). The top bar's Save PDF is record 30
+  (below).
 ### Queued by record 30 (one print path, 2026-10-10)
 
 Record `docs/fixes/30-one-print-path.md` section 10 has the detail and the
@@ -1020,7 +1087,8 @@ evidence label of each.
   →", a chart's loading and failure message) carries `data-postr-editor-ui`
   and the copy drops it; `print-path-check.mjs` HINT gates it.
 - **The Staples help keeps its own dialog sentence** (Background graphics,
-  layout): hidden by stream S; bring it in line if it comes back.
+  layout): hidden by record 29 (`EDITOR_EXTRAS_ENABLED`); bring it in line
+  if it comes back.
 - **A rule added to index.css that matches the sheet** must be restated in
   `export/printSheetBase.ts`; `print-path-check.mjs` BASE fails until it is
   (on the dev server and, since review round 2, on the build; since round 3
@@ -1037,7 +1105,7 @@ evidence label of each.
   round 2, R2-F3): the key does nothing there and the browser's own print
   is kept away, measured with DevTools' simulated composition in Chromium;
   whether a macOS input method hands ⌘P to the page while text is marked
-  is UNVERIFIED (manual flow §34).
+  is UNVERIFIED (manual flow §35).
 - **Chromium's print window script is not exercised by the harness**
   (review round 2, R2-F4): under Playwright's routing the popup's font
   stylesheet request never completes, so its auto-print, its wait for the
@@ -1129,7 +1197,7 @@ evidence label of each.
   files: 0 chart captions; the 1 caption past its box is an image block's,
   above), but the half-size poster's 6 captions end exactly at their box's
   bottom (0.000 in to spare), PowerPoint's default text insets included;
-  PowerPoint itself was not run (manual flow §35).
+  PowerPoint itself was not run (manual flow §36).
 - **The gallery's capture copies the sheet without the hints rule**
   (review round 1, R1-I1; INSPECTED): `components/PublishGalleryModal.tsx`
   `captureAt` draws `#poster-canvas` itself with html-to-image, not through
@@ -1141,7 +1209,7 @@ evidence label of each.
   instruments: LibreOffice's PDF (positions and captions), Quick Look's
   thumbnail (ink in each chart's box) and the app's own reader are
   (MEASURED). An owner check: open an exported file with charts in
-  PowerPoint (manual flow §35).
+  PowerPoint (manual flow §36).
 - **Production's font fetch is UNVERIFIED here**: the picture fetches the
   poster font's Google Fonts stylesheet and files again from the page
   (CORS); the harness serves a local stand-in. On failure the picture is
@@ -1379,6 +1447,7 @@ Found while fixing one item, belonging to another (details in the record named):
 | 25 | `fix/latex-hidden-prices` | one review round (browser and entry points), answered: the `/auth?plan=term` label puts the period before the tax note, a stale code comment reworded — `docs/fixes/25-latex-hidden-prices.md`; the owner's decisions of 2026-10-06: the LaTeX export hidden (`LATEX_EXPORT_ENABLED`, `config/features.ts`; before it returns: the section above), every price shown says tax is extra, the landing "Editable exports" card says the export is paid; a copy inventory test keeps both true |
 | 8 + OF-01 | `fix/keep-work-safe` | implemented; review round 1 answered (the table note's line break drawn on the canvas and in the PDF, as PowerPoint writes it; a failed write for a poster left behind no longer marks the poster opened next "Not saved"; on the dev server a poster opened and closed with no edit no longer asks to confirm leaving; ten untested parts tested; the hold, the note's text and "✨ Format table" on the Later list); review round 2 (other engines, the production build, the user's entry points) answered: Shift+Enter followed by Enter no longer stores a blank line more (Chromium and Firefox), ⌘S in the Poster name field saves the name being typed, the instrument runs on the production build too (`POSTR_SERVE=preview`); a retry overwriting another device's newer save, the session ending with a change unsaved, and paste fidelity on the Later list (the first the owner's call); a third round ran on `safe-frozen-3`, but its report never reached the record (the workflow stopped); when the workflow restarted (2026-10-09) its runs were read and answered: the Poster name's button no longer says "✓ Saved" while the save fails, the pill keeps "Not saved — retrying…" while a retry is out, a pasted line ending in a newline gains no blank line, three untested parts tested; three review rounds follow, from the frozen copy `safe-frozen-4`; their round 1 (code review on `safe-frozen-4`) answered: the Poster name's button no longer says "✓ Saved" while the name's first write is out (K10, three engines), four stale line references in feature-graph and a test comment corrected, a list item's `<div>` in a legacy table cell left on the Later list; round 2 (the production build, three engines, the reviewer's probes, on `safe-frozen-5`) answered: with nothing changed and saves failing, the sidebar's Duplicate makes its copy and Enter in the Poster name field leaves "Saved", where both said "not saved" and armed the leave warning (K11, three engines); a paste into a table cell replacing the whole table (older, the MVP's "pasting tables") proposed as a plan item, the lead's call; a token refresh during an outage holding the pill on "Saving…" on the Later list; round 3 (a re-check of the responses, on `safe-frozen-6`) answered: its three findings were about the docs (the table-paste sentences the app shows today, a stale line reference, the stated reason for keeping N1-F4), corrected, and Enter in an emptied Poster name field measured in the browser (H8) — `docs/fixes/27-keep-work-safe.md` (record 27): Enter's line break is saved in text blocks, the Content box and table cells, and survives a reload, the dashboard's Duplicate, the PDF and PowerPoint, and the table note's is drawn on the canvas and in the PDF after a reload (OF-01, MVP blocker 1); a failed save stays unsaved, is retried after 2, 5, 10 and 30 s, then every 30 s, at once when the browser is back online, the pill says "Not saved — retrying…", and the tab warns before closing while a change is unsaved (OF-05, item 8, blocker 2); one save at a time (an older, slower save had overwritten a newer one); the sidebar's Duplicate refuses while a change is unsaved; ⌘S / Ctrl+S saves now and says "Saved", making no version (owner decision D8, blocker 11). Left over (record 27 §10): the crash screen's "Try again" after a failed save (item 10's part of item 8), Restore at 30 versions from the Versions tab alone, two tabs or two devices (last write wins; a retry after an outage now writes over the other's newer save, MEASURED, review round 2) |
 | 26 | `feat/french-public-pages` | implemented, review round 1 done and corrected (one round: a simple feature; 12 findings: 7 corrected, 1 left to the owner, 4 informational) — `docs/fixes/26-french-public-pages.md`; the owner's decision of 2026-10-06 (Quebec, Bill 96): every public page in French at its path + `/fr` (`/fr` for the landing page, `/auth/fr?plan=term`), its language read from the URL, a « Français » / "English" link on every page, the French heads with hreflang and the French pages in the sitemap, a French Stripe Checkout from `/auth/fr`; the editor stays English; queued above: "Queued by fix 26" |
+| 29 | `feat/mvp-simplify` | implemented; its one review round (a simple feature: the browser, through the user's entry points, on `simplify-frozen-1`) answered: 7 findings (2 LOW, 5 INFO); Preview no longer draws the grey prompts (R1-01: the rule is scoped to the canvas, T13), two editor sentences corrected (R1-06), Save PDF printing the editor's older hints of empty authors, image and references blocks queued above (R1-02), the rest recorded — `docs/fixes/29-mvp-simplify.md`; the owner's decisions D3 (hide import and the `.postr` backup) and D4 (the whole hide list) of 2026-10-07, charts kept (D1): three switches in `config/features.ts` (`IMPORT_ENABLED`, `ADJUSTMENTS_ENABLED`, `EDITOR_EXTRAS_ENABLED`) hide 44 controls counted where a user meets them, the tour's import and guidelines steps and the profile's two rows, with stored adjustments still drawn; new posters and new blocks start empty with grey prompts that never print or export (bounded-designs.md §5.2 items 1 and 4); Issues lists empty blocks, template text and the sample table, older posters included; the public copy (EN and FR) names no hidden control (copy inventory); queued above: "Queued by record 29" |
 | 28 | `feat/auto-arrange` | implemented, review round 1 done and corrected (a layout aid: one round, the browser through the user's entry points; 10 findings: B-R1 HIGH, B-R2 and B-R3 MEDIUM and B-R7 LOW corrected, the other LOW and INFO findings queued above; the refinement departs from the prototype and is for the lead and the owner to confirm) — `docs/fixes/28-auto-arrange.md`; the owner's approval of the prototype's function (2026-10-07, `docs/fixes/28-auto-arrange-lab.html`): ONE reading order (bands of wide blocks, then columns, then top to bottom) for heading, figure and table numbers in the editor, the preview and the exports, and Auto-Arrange choosing the cut points of that order into the poster's own columns and their widths for the lowest F = 1000·O + U + 8·moved + 2·Σ\|w − w̄\|, with every block measured on the sheet at its new width; no font change, one undo step, the area past the bottom margin in Issues; the preview's missing figure and table numbers fixed in passing; queued above: "Queued by record 28" |
 | 30 (item 5 + OF-08) | `fix/one-print-path` | implemented; reproduced from every entry in Chromium, Firefox and WebKit (Preview's print ran the title 0.32 to 0.33 in into the authors at 48 × 36 and 1.93 to 1.94 in at 36 × 48, a table printed up to 3.2 in shorter, a line broken differently; no top-bar button, no ⌘P), fixed, 0 of 69 print documents off by more than 0.05 in or broken differently in each engine (worst 0.001 in), 30 of 30 mutants killed; review round 1 (code review) answered: 7 findings, none above LOW; the print window's header no longer covers the poster in a narrow window and its first step names Firefox's "Save to PDF"; tests for ⌘P after a size change, while a dialog fades out and past a handler that stops keys; the popup-blocker claim corrected (Firefox's blocker measured: ⌘P's window opens); now 70 documents per engine, every claim 0 in Chromium and Firefox, WebKit one placeholder line (R1-X1, below); 35 of 35 mutants killed; review round 2 (a new angle: the build, the PDF pipeline, every size, editor states) answered: 7 findings, one MEDIUM (⌘P with the pointer resting on a selected table printed its hover "Add column" bar, a 0.3 in accent bar: the table's own controls now tagged and dropped from the copy and the thumbnail), the free PDF's credit mark back to its size (it printed 0.2 or 0.3 in under the sheet's scale), ⌘P's default prevented inside an input method's composition, the harness runs on the build; now 73 documents per engine, every claim 0 in Chromium and Firefox on the dev server, WebKit the same placeholder line; on the build the same in the three engines, BASE aside (two rules the CSS minifier rewrote, listed as known); 44 of 44 mutants killed; review round 3 (a re-check of the answers) answered: 2 LOW findings, both in the harness on the build, none in the product (the thirteen-size credit sweep measured the source there: it now prints from the build's own Save PDF; the two BASE rules still set the exit code: they now compare as equivalent, so the build run exits 0), each red before and green after, falsified by editing the build; on the build every claim 0 in Chromium and Firefox, WebKit the same placeholder line; 44 of 44 mutants killed and 2 new blind-spot mutants killed in the browser — `docs/fixes/30-one-print-path.md` (the MVP design doc §3.10: one print function behind Save PDF, the top bar's Save PDF, Preview's Print and ⌘P / Ctrl+P; the selection cleared first; `print-color-adjust: exact`; the print window holds the dialog's steps; the sheet laid out as the editor lays it out: its base styles restated, scaled by a transform instead of CSS zoom) |
 | 31 (claims audit HIGH + record 30's placeholders) | `fix/exports-charts` | implemented; review round 1 (code review) answered: 6 findings, R1-F1 and R1-F2 MEDIUM (a scroll during the export moved a caption 5.000 in in the file; an export while a chart still drew left it out, called it "could not be drawn" and spent the pack's credit) and R1-F3, R1-F4 LOW (test gaps) corrected, 2 INFO noted; the export now waits for a chart still drawing (a redraw too, ≤ 10 s, past that nothing written or spent) and reads the page once; one sibling found and queued (the free PDF prints a chart still drawing as an empty box); 21 posters, every claim 0 in Chromium, Firefox and WebKit; 52 of 52 mutants killed; review round 2 (a new angle) answered: R2-F1 MEDIUM corrected (Preview opened, or the editor left, while the export waited wrote a paid file with 0 of 2 charts and spent the credit, MEASURED; the export now copies the charts only from a shown poster, waiting for Preview within the 10 s, and stops with nothing written or spent), R2-F2 and R2-F3 LOW doc claims corrected (fewer than 300 px per inch past about 186 sq in; an empty heading's number and an empty figure's "Figure N." still print, an owner question), 3 INFO noted; 25 posters, every claim 0 in Chromium, Firefox and WebKit; 59 of 59 mutants killed; round 3 due (a paid result) — `docs/fixes/31-exports-charts.md`; reproduced first: 0 pictures for 60 of 60 charts drawn in the editor, 57 of 57 captions absent, "References" written over an empty list on 6 of 6 posters, the editor's hints in 36 of 40 print documents (MEASURED, `pptx-export-check.mjs` and `print-path-check.mjs` HINT, Chromium); fixed: each chart block a picture of the editor's drawing at its box (300 px per printed inch, the poster's web font embedded), its caption and note as text boxes where the editor draws them, a chart not drawn left out with a note; the hints tagged `data-postr-editor-ui` so the one print function's copy drops them; the copy (Export tab, About page EN and FR) says charts become pictures; after: every claim 0 in Chromium, Firefox and WebKit (60 of 60 charts at their box within 0.001 in, pictures 0.00 % from the editor's svg, LibreOffice, Quick Look and the app's reader read them), 0 hints in every print document, WebKit's R1-X1 gone; 33 of 33 mutants killed, 2 blind spots guarded in the browser |

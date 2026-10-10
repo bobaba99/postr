@@ -16,6 +16,8 @@
  * a control's size is its size in units times the zoom.
  */
 
+import { switchesOff } from './editorHarness.mjs';
+
 export const round = (v, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
 
 /** Sheet units of each control as written in blocks.tsx / resizeHandles.tsx / GroupFrame.tsx. */
@@ -174,6 +176,10 @@ export async function readControls(page) {
         else if (ui.querySelector('button')) {
           add('row', ui, false, owner);
           for (const c of ui.children) {
+            // The hidden crop button's empty slot (record 29, blocks.tsx
+            // data-postr-row-slot) is part of the row's width, not a
+            // control: read through the row.
+            if (c.hasAttribute('data-postr-row-slot')) continue;
             const t = c.getAttribute('title') || '';
             // The rotate control can sit in the row (fix 19, when below the
             // block has no room).
@@ -446,6 +452,14 @@ const CORNERS = ['nw', 'ne', 'se', 'sw'];
  * yields to the buttons (implementer): a drawn label fits in the row with
  * them, and from 120 px wide it is drawn unless the row with it (at least
  * 40 px more, the narrowest label) would be wider than the block.
+ *
+ * Record 29's ADJUSTMENTS_ENABLED (config/features.ts) hides the rotate
+ * control and the crop button. While the tree has it off (`adjustments`
+ * false, read from the file by default; since the merge of main, record 30,
+ * into record 29) neither is asked for; an image's or logo's row keeps the
+ * crop button's slot, budgeted (selectionLayout handleRowWidth,
+ * imageButtons) and drawn empty (blocks.tsx data-postr-row-slot), so its
+ * width and parts are read as before.
  */
 /**
  * The zoom from which the handle row is never cut (the lead's rule for F3,
@@ -454,7 +468,7 @@ const CORNERS = ['nw', 'ne', 'se', 'sw'];
  */
 export const OVERVIEW_ZOOM = 0.35;
 
-export function ruleCheck(reading, cornersOnly) {
+export function ruleCheck(reading, cornersOnly, adjustments = switchesOff('ADJUSTMENTS_ENABLED').length === 0) {
   const out = [];
   for (const b of reading.blocks) {
     const mine = reading.controls.filter((c) => c.owner === b.owner);
@@ -480,15 +494,20 @@ export function ruleCheck(reading, cornersOnly) {
       const rot = mine.find((c) => c.kind === 'rotate');
       const rotInRow = !!rot && !!row && Math.abs(rot.r.y + rot.r.h / 2 - (row.r.y + row.r.h / 2)) < 1;
       const own = row ? row.r.w - (rotInRow ? 28 : 0) : 0;
-      const kinds = ['delete', ...(b.type === 'image' || b.type === 'logo' ? ['replace', 'crop'] : [])];
-      const full = 24 + kinds.length * 28;
+      const imageButtons = b.type === 'image' || b.type === 'logo';
+      const kinds = ['delete', ...(imageButtons ? ['replace', ...(adjustments ? ['crop'] : [])] : [])];
+      // The crop button's slot stays when it is hidden (record 29): the app
+      // budgets it and draws it empty (blocks.tsx data-postr-row-slot), so
+      // the row keeps its width.
+      const hiddenSlot = imageButtons && !adjustments ? 28 : 0;
+      const full = 24 + kinds.length * 28 + hiddenSlot;
       const drawn = kinds.filter(has);
       const overview = reading.zoom < OVERVIEW_ZOOM;
       if (drawn.length && row && own > b.w + 0.5 && (overview || label)) say(`${[...drawn, ...(label ? ['label'] : [])].join(', ')} drawn in a row ${round(own, 1)} px wide, wider than the block`);
       const parts = full + (label ? 4 + label.r.w : 0);
       if (drawn.length === kinds.length && row && Math.abs(own - parts) > 1) say(`the row is ${round(own, 1)} px wide, not the ${round(parts, 1)} px its parts add to`);
       if (b.w >= 120 && !has('label') && (!drawn.length || own + 44 <= b.w - 0.5)) say('no type label at 120 px wide or more, with room for one');
-      const all = [...kinds, 'rotate'];
+      const all = [...kinds, ...(adjustments ? ['rotate'] : [])];
       if (!overview || full <= b.w - 0.5) for (const k of all) { if (!has(k)) say(`no ${k} control (${overview ? `the row, ${round(full, 1)} px, fits` : `zoom ${round(reading.zoom, 3)}, not zoomed out`})`); }
       else if (full > b.w + 0.5) for (const k of all) { if (has(k)) say(`${k} drawn though the row (${round(full, 1)} px) is wider than the block, zoomed out`); }
       else if (all.some(has) && !all.every(has)) say(`part of the row drawn (${all.filter(has).join(', ')})`);

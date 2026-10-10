@@ -149,7 +149,22 @@
  *            loaded by the print window; ui-font); the editor's controls
  *            copied onto the printed sheet, by label (ui-copied: a button,
  *            role="button" strip or titled grip); each print window's
- *            readyState when read (popup-script, R2-F4)
+ *            readyState when read (popup-script, R2-F4); the boxes record
+ *            29's grey prompts change on the canvas (prompt-sized, below)
+ *
+ * RECORD 29 (the merge of main, record 30, into it). Its grey prompts are
+ *   drawn on the canvas only and never print (simplify-check T7, from
+ *   every way to print), but an empty block's prompt sets its height on the
+ *   canvas (a text block grows with it; a table's row with its first body
+ *   cell's). So the editor is read without them (lib/printPathRead.mjs
+ *   readSheet `hidePrompts`): POS, WRAP, LINEPOS and PREVIEW compare the
+ *   print document and Preview with the editor's layout of what prints;
+ *   INFO prompt-sized lists the boxes the prompts change (MEASURED on the
+ *   merge: a 3-Column text block 0.55 in, the 3-column table at 36 × 48
+ *   0.75 in, which POS reported before the projection). Its
+ *   ADJUSTMENTS_ENABLED hides the table's "+" bars and strips: TABLEUI's
+ *   cell and strip variants are skipped while the tree has it off, printed
+ *   on the "skipped (switch off)" summary line; the off variant runs.
  *
  * CONTROLS (exit 2 if one fails)
  *   K-self   the editor read twice gives the same reading
@@ -224,7 +239,7 @@ const PORT = Number(process.env.PORT ?? 5840);
 const OUT = path.resolve(process.env.OUT_DIR ?? path.join(os.tmpdir(), 'postr-print-path-check'));
 process.env.OUT_DIR = OUT;
 fs.mkdirSync(OUT, { recursive: true });
-const { REPO, WEB, startHarness, openEditor, sleep } = await import('./lib/editorHarness.mjs');
+const { REPO, WEB, startHarness, openEditor, sleep, SWITCH_OFF } = await import('./lib/editorHarness.mjs');
 const engines = await import(pathToFileURL(path.join(REPO, 'node_modules/playwright/index.mjs')).href);
 const { PDFDocument } = await import(pathToFileURL(path.join(REPO, 'node_modules/pdf-lib/cjs/index.js')).href);
 const pdfjs = await import(pathToFileURL(path.join(REPO, 'node_modules/pdfjs-dist/legacy/build/pdf.mjs')).href);
@@ -448,8 +463,13 @@ try {
       await page.keyboard.press('Escape');
       await sleep(300);
       await watchPrintKeys(page);
-      const ref = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w });
-      const again = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w });
+      // The editor without record 29's prompts (canvas only, never printed):
+      // its layout of what prints (lib/printPathRead.mjs readSheet). How far
+      // the prompts move a box on the canvas is INFO prompt-sized.
+      const ref = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w, hidePrompts: true });
+      const again = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w, hidePrompts: true });
+      const withPrompts = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w });
+      row.promptSized = compareSheets(ref, withPrompts, TOL).boxes.map((b) => ({ type: b.type, d: b.d }));
       const self = compareSheets(ref, again, 0);
       if (self.boxes.length || self.wraps.length || self.linePos.length) controlFails.push(`K-self ${P.id}: ${JSON.stringify(self).slice(0, 200)}`);
       const stored = new Map((ed.state.row?.data?.blocks ?? []).map((b) => [b.id, b]));
@@ -648,7 +668,7 @@ try {
         row.selected['key+typed'] = popup ? { opened: true } : { none: true };
         if (popup) {
           await popup.waitForSelector('#poster-print-root', { timeout: 15000 });
-          const now = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w });
+          const now = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w, hidePrompts: true });
           const pr = await readPrint(popup, P.size.w, P.size.h, `${P.id} key+typed`);
           const c = compareSheets(now, pr.sheet, TOL, LINE_TOL);
           Object.assign(row.selected['key+typed'], { worstBox: c.worstBox, worstLine: c.worstLine, boxes: c.boxes.slice(0, 3), wraps: c.wraps.length, title: titleOverlap(pr.sheet), editorTitle: titleOverlap(now) });
@@ -676,7 +696,7 @@ try {
           await popup.waitForSelector('#poster-print-root', { timeout: 15000 });
           await popup.evaluate(() => document.fonts.ready).catch(() => {});
           await sleep(300);
-          const now = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: nw });
+          const now = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: nw, hidePrompts: true });
           const pr = await readPrint(popup, nw, nh, `${P.id} key+resized`);
           const c = compareSheets(now, pr.sheet, TOL, LINE_TOL);
           const sizeOk = pr.page && pr.page.size.replace(/\s+/g, ' ') === `${nw}in ${nh}in`;
@@ -788,6 +808,10 @@ log(`[INFO ui-copied] editor controls copied onto the printed sheet, by label: $
 log(`[INFO hint-reads] ${hintReads.n} print documents read for the editor's hints (HINT)`);
 const uiFont = R.posters.filter((p) => p.editor?.uiFontText?.length).map((p) => `${p.id}: ${p.editor.uiFontText.length} (${p.editor.uiFontText.slice(0, 3).join(' | ')})`);
 log(`[INFO ui-font] ${uiFont.length ? uiFont.join(' · ') : 'no sheet text in the editor\'s UI font'}`);
+const promptSized = R.posters.filter((p) => p.promptSized?.length).map((p) => `${p.id}: ${p.promptSized.map((b) => `${b.type} ${b.d} in`).join(', ')}`);
+log(`[INFO prompt-sized] boxes record 29's prompts change on the canvas (not printed; POS reads the editor without them): ${promptSized.length ? promptSized.join(' · ') : 'none'}`);
+const switchSkips = R.posters.flatMap((p) => Object.entries(p.tableStates ?? {}).filter(([, t]) => t.switchOff).map(([label]) => `${p.id} ${label}`));
+log(`[harness] ${SWITCH_OFF}: ${switchSkips.length}${switchSkips.length ? ` (${switchSkips.join(', ')})` : ''}`);
 log(`[controls] ${controlFails.length ? `FAILED ${controlFails.length}: ${controlFails.slice(0, 4).join(' · ')}` : 'held'}; errors ${R.errors.length}${R.errors.length ? `: ${R.errors.slice(0, 3).join(' · ')}` : ''}`);
 log(`[out] ${path.join(OUT, 'results.json')}`);
 process.exitCode = controlFails.length || R.errors.length ? 2 : Object.values(claims).some((r) => r.length) ? 1 : 0;

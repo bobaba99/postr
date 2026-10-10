@@ -25,6 +25,7 @@
 import { useRef, type CSSProperties, type KeyboardEvent } from 'react';
 import { sanitizeTyped } from './sanitizeHtml';
 import { useEditableHistory } from './useEditableHistory';
+import { isBlankHtml } from './startingText';
 
 const asIs = (html: string) => html;
 
@@ -36,11 +37,15 @@ export interface TableCellEditorProps {
   onBlur: () => void;
   onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => void;
   style: CSSProperties;
+  /** The table's grey prompt, given to its first body cell while the body is empty (record 29). */
+  placeholder?: string;
 }
 
-export function TableCellEditor({ html, historyKey, onCommit, onFocus, onBlur, onKeyDown, style }: TableCellEditorProps) {
+export function TableCellEditor({ html, historyKey, onCommit, onFocus, onBlur, onKeyDown, style, placeholder }: TableCellEditorProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const history = useEditableHistory({ ref, value: html, toHtml: asIs, historyKey, surface: 'canvas' });
+  // Empty for the table's prompt, from the stored value (record 29).
+  const empty = isBlankHtml(html);
   return (
     <div
       ref={ref}
@@ -48,6 +53,8 @@ export function TableCellEditor({ html, historyKey, onCommit, onFocus, onBlur, o
       suppressContentEditableWarning
       data-history-key={historyKey}
       data-history-surface="canvas"
+      data-placeholder={placeholder}
+      data-empty={placeholder && empty ? '' : undefined}
       onInput={(e) => history.commitInput(e.nativeEvent, () => sanitizeTyped(ref.current?.innerHTML ?? '', true), onCommit)}
       onFocus={onFocus}
       onBlur={onBlur}

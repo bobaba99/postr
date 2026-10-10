@@ -286,6 +286,27 @@ export function sourceFlag(name) {
 }
 
 /**
+ * The switches among `needs` (a switch's name, a list of names, or nothing)
+ * that the tree under test has off, read with `sourceFlag`. A scenario that
+ * drives a control record 29's switches hide (IMPORT_ENABLED,
+ * ADJUSTMENTS_ENABLED, EDITOR_EXTRAS_ENABLED) names them in its `needs` and
+ * is skipped while one is off, reported as SWITCH_OFF; a tree that has the
+ * switch on, or no such switch (before record 29), runs it. From the merge
+ * of main (record 30) into record 29, which gave the earlier records'
+ * harnesses their `needs`.
+ */
+export function switchesOff(needs) {
+  const list = needs == null ? [] : Array.isArray(needs) ? needs : [needs];
+  return list.filter((name) => sourceFlag(name) === false);
+}
+
+/** How every harness reports a scenario skipped for a switch that is off. */
+export const SWITCH_OFF = 'skipped (switch off)';
+
+/** The reason line of a SWITCH_OFF skip, given `switchesOff`'s list. */
+export const switchOffReason = (off) => `${SWITCH_OFF}: ${off.join(', ')} ${off.length > 1 ? 'are' : 'is'} off in this tree (config/features.ts)`;
+
+/**
  * A fresh browser context and editor page on a `w` × `h` inch poster.
  * `route` picks the page (default the editor, /p/:id). `ownedByOther` makes
  * the poster someone else's: an owner opening their own share link is sent
