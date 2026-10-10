@@ -689,6 +689,39 @@ scope becomes a plan item or a question for the owner.
   out as text. If wanted: inside a list item, end the item's paragraph at
   `</li>`, not at `</div>` or `</p>`.
 
+- **Record 31, native editable PowerPoint charts** (owner option): charts
+  are pictures of the editor's drawing; an editable PowerPoint chart would
+  write the chart's data as one (pptxgenjs `addChart` covers some forms,
+  not heatmap, dumbbell or box: UNVERIFIED). On request (record 31 §10).
+- **Record 31, an image block's caption in the PowerPoint file** is placed
+  by the writer's own one-line layout, 0.2 to 1.25 in from where the
+  editor draws it (MEASURED, `pptx-export-check.mjs` INFO image-captions);
+  `chartPicture.ts`'s reading of a block's boxes could serve image blocks
+  (record 31 §10; also in record 31's queue below). With it, two older
+  details review round 2 noted (R2-I3, INSPECTED): an image block's
+  picture carries pptxgenjs's default alternative text `preencoded.png`
+  (a chart's carries its caption), and the "Figure N." label is bold
+  italic grey in the file where the editor draws it bold, upright, in the
+  primary colour.
+- **Record 31 review round 2, a large chart's picture has fewer than 300
+  px per printed inch** (R2-F2, LOW): a picture is at most 4096² px, so a
+  chart over about 186 sq in gets fewer: a 45.8 × 30 in chart (one filling
+  a 48 × 36 in poster) 110.5 (TESTED, `picturePixels`; the reviewer
+  measured 110.5 in the file), a 14.7 × 14.8 in chart 277 (MEASURED). Its
+  18 pt tick labels at 110 ppi are crisp at native size (INSPECTED, a crop
+  of the reviewer's file). If wanted: a note under the PowerPoint button
+  when a picture falls under some floor (200 ppi?), or a higher cap in the
+  engines that take one (the reviewer drew a 20460 px wide picture in
+  Chromium, WebKit and Firefox: UNVERIFIED here).
+- **Record 31 review round 2, a picture's side past 32767 px** (a
+  hypothesis, UNVERIFIED): the cap is on the area only; Chromium's and
+  Firefox's canvases refuse a side past 32767 px (knowledge, not
+  measured), which a chart over 109 in wide and under 1.75 in tall would
+  ask for (on a poster up to 112 in wide, the button's limit); its picture
+  would then be left out with "A chart could not be drawn". Whether a chart
+  can be that thin (its text minimums set a least height) is not checked.
+  If it can: cap each side too in `picturePixels`.
+
 ### Queued by the claims audit (owner decisions, 2026-10-06)
 
 The claims audit of 2026-10-05/06 (report artifact; its findings by claim id
@@ -698,11 +731,16 @@ send them here: the copy now describes them honestly, and each is a
 behaviour fix to rank. Every number below is the audit agent's (labels as
 it gave them; not re-measured for this list, so UNVERIFIED here).
 
-- **HIGH — the paid PowerPoint export leaves out charts made in the Figure
+- ~~**HIGH — the paid PowerPoint export leaves out charts made in the Figure
   tab, with no warning.** A 15-block poster with and without one chart block
   exports the same slide (18 shapes, 0 pictures, 1 frame), the chart's title
   and caption absent and the warning count unchanged (MEASURED by the audit,
-  `g2-export-probe.mjs`; claims g2-…-88, g2-…-79). A paid feature.
+  `g2-export-probe.mjs`; claims g2-…-88, g2-…-79). A paid feature.~~
+  FIXED by record 31 (`docs/fixes/31-exports-charts.md`, 2026-10-10): each
+  chart block is a picture of the editor's drawing at its box, its caption
+  and note as text boxes; reproduced first (0 pictures for 60 of 60 charts
+  drawn, MEASURED, `pptx-export-check.mjs`), 60 of 60 after in Chromium,
+  Firefox and WebKit.
 - **HIGH — no screen to set a new password.** "Forgot password?" sends
   Supabase's recovery email (`Auth.tsx` `resetPasswordForEmail`, no
   `redirectTo`); the app has no `PASSWORD_RECOVERY` handler and no
@@ -871,8 +909,9 @@ the evidence label of each.
   text (`blocks.tsx` `txtStyle`, `color: isOutOfBounds ? '#ffffff'`) is
   copied into the print document; the part on the sheet prints white
   (INSPECTED; the print copy now resets only the frame's border).
-- **Charts are not in the PPTX export** (no chart case in
-  `export/pptx/writer.ts`; INSPECTED, on main too).
+- ~~**Charts are not in the PPTX export** (no chart case in
+  `export/pptx/writer.ts`; INSPECTED, on main too).~~ FIXED by record 31
+  (above, in the claims audit's queue).
 ### Queued by record 28 (Auto-Arrange and the reading order, 2026-10-07)
 
 Record `docs/fixes/28-auto-arrange.md` section 10 has the detail and the
@@ -957,7 +996,7 @@ evidence label of each.
   open even a window the page opens by itself, so theirs cannot be read
   there. Keydown is a user activation in the HTML standard, so the window
   should pass; a blocked one shows the alert.
-- **WebKit drops an empty placeholder's dashed border in print** (R1-X1,
+- ~~**WebKit drops an empty placeholder's dashed border in print** (R1-X1,
   record 30 §9; on main too). React's `all: 'unset'` then `border: …`
   is serialised by WebKit with the logical border unset after the physical
   border, so the copy made from `outerHTML` loses the border: an empty
@@ -965,15 +1004,21 @@ evidence label of each.
   size change (MEASURED), the empty logo the same pattern (INSPECTED).
   Goes with the placeholders below (they should not print), or the two
   buttons stop using `all: 'unset'`. `print-path-check.mjs` in WebKit exits
-  1 on it (key+resized) until then.
+  1 on it (key+resized) until then.~~ Gone with record 31: the placeholder
+  no longer prints, and `print-path-check.mjs` in WebKit exits 0 (73
+  documents; MEASURED 2026-10-10). The buttons still use `all: 'unset'`,
+  which matters only if they print again.
 - **⌘P for read-only viewers** (record 30 §10): the shortcut is installed
   for viewers too (no top bar for them). Nobody reaches the editor
   read-only today (fix 23); the owner decides when sharing returns.
-- **Placeholders print:** an empty references block prints "Add references
+- ~~**Placeholders print:** an empty references block prints "Add references
   in Refs tab →" (in the editor's own font, DM Sans, which the print window
   does not load) and an empty figure "+ Upload figure / click to browse ·
   drag to move" (MEASURED in the print document, 7 of 14 posters). The
-  starting-text work (blocker 3) and Issues own them.
+  starting-text work (blocker 3) and Issues own them.~~ FIXED by record 31:
+  every hint inside a block (these two, "+ Logo", "Add authors in sidebar
+  →", a chart's loading and failure message) carries `data-postr-editor-ui`
+  and the copy drops it; `print-path-check.mjs` HINT gates it.
 - **The Staples help keeps its own dialog sentence** (Background graphics,
   layout): hidden by stream S; bring it in line if it comes back.
 - **A rule added to index.css that matches the sheet** must be restated in
@@ -985,7 +1030,9 @@ evidence label of each.
   dashboard thumbnail carry it (review round 2, R2-F1: the table's hover
   "Add column" bar printed as a 0.3 in accent bar from ⌘P).
   `print-path-check.mjs` INFO ui-copied lists what reaches the printed
-  sheet: today only an empty figure's placeholder (above).
+  sheet: nothing since record 31 (it was an empty figure's placeholder);
+  an editor hint added later must carry the marker too (HINT gates the
+  known ones).
 - **Owner check: ⌘P inside a real input method's composition** (review
   round 2, R2-F3): the key does nothing there and the browser's own print
   is kept away, measured with DevTools' simulated composition in Chromium;
@@ -1009,6 +1056,102 @@ evidence label of each.
   acts): a scripted scenario that changes a chart poster's size and
   prints at once must wait for the redraw.
 
+### Queued by record 31 (exports: charts and editor hints, 2026-10-10)
+
+Record `docs/fixes/31-exports-charts.md` section 10 has the detail and the
+evidence label of each.
+
+- **Owner option: native, editable PowerPoint charts.** Charts are
+  pictures of the editor's drawing (the lead's bounded design); a chart a
+  user can restyle in PowerPoint would need its data written as a
+  PowerPoint chart (pptxgenjs has `addChart` for some forms, not every
+  form Postr draws: heatmap, dumbbell, box UNVERIFIED). Later, on request.
+- **An image block's caption in the PowerPoint file is placed by the
+  writer's own one-line layout** (`captionSplit`), not where the editor
+  draws it: the welcome poster's two-line caption 1.3 in higher than in
+  the editor, the figures poster's 0.2 to 0.44 in off (MEASURED,
+  `pptx-export-check.mjs` INFO image-captions, Chromium, Firefox and
+  WebKit), so a long caption can run over its picture (inferred from the
+  offsets, not looked at in PowerPoint). A sibling of the
+  chart defect's cause (the writer guessing what the editor lays out);
+  `chartPicture.ts`'s reading of a block's boxes could serve image blocks.
+- **Owner question: an empty figure's "Figure N." and an empty heading's
+  number.** The caption number of a figure with no image still prints over
+  the empty space in the PDF (it is the caption, not a hint), while the
+  PowerPoint file leaves a fully empty figure out, so its later numbers
+  skip one; an empty heading prints its section number ("1.") in the PDF
+  and the PowerPoint file (review round 2, R2-F3; MEASURED,
+  `pptx-export-check.mjs` INFO empty-printed: "Figure 4." and "1." in the
+  PDF, "1." in the file). Print them, or leave them out?
+- ~~**Opening Preview while Export › PowerPoint waits** wrote a paid file
+  with no charts, spent the credit and said the charts "could not be
+  drawn"~~ (review round 2, R2-F1, MEDIUM; MEASURED 2 → 1 credit, 0 of 2
+  pictures; the browser's Back to the dashboard the same). FIXED in the
+  same record: the export copies the charts only from the poster as the
+  editor shows it, waiting up to 10 s while Preview hides it (back within
+  the wait, the file comes); past that, or with the editor left, nothing
+  is written or spent, and the Export tab says "The poster was hidden in
+  Preview, so its charts could not be copied and nothing was exported. Try
+  again." (`pptx-export-check.mjs` preview-export, preview-return-export,
+  preview-slow-export, leave-export).
+- ~~**A chart still loading when the user exports** is left out of the file,
+  with the note "A chart could not be drawn, so the PowerPoint file leaves
+  it out." (INSPECTED; a chart draws within about a second of opening).
+  Exporting again draws it. Waiting for it is not built.~~ Corrected by
+  review round 1 (R1-F2: it also spent the pack holder's credit, MEASURED
+  2 → 1): Export › PowerPoint waits for a chart still drawing (a redraw
+  too), up to 10 s; past that it writes nothing, spends nothing and says
+  "A chart is still drawing, so nothing was exported. Try again in a
+  moment." (`pptx-export-check.mjs` loading-export, loading-past-wait).
+- **The free PDF prints a chart still drawing as an empty box** (found
+  while correcting review round 1; the same cause as R1-F2, in record 30's
+  print function): Save PDF with the charts still drawing (Observable
+  Plot's chunk held) wrote both chart blocks into the print document with
+  0 of 2 drawings (2 of 2 once drawn; MEASURED, `pptx-export-check.mjs`
+  INFO print-while-drawing). Before record 31 the box printed "Rendering
+  chart…"; the hints rule now drops that. The print window must open
+  inside the click (popup blockers), so the PowerPoint export's wait does
+  not carry over: a fix would write a "a chart is still drawing" page into
+  the opened window and copy the sheet once the charts are drawn (≤ 10 s),
+  with record 30's R2-F7 (a chart printed within about 30 ms of a redraw
+  is copied as drawn for its old size) in the same change. For the lead
+  and the owner: rank it, or accept it (a print within the first second or
+  so after the editor opens, on a slow network).
+- **An edit made while Export › PowerPoint waits for a chart** (up to 10 s)
+  reaches the charts' pictures and boxes (read when the wait ends) but not
+  the rest of the file, which is the poster as it was at the click
+  (INSPECTED, `EditableExportButtons.tsx`: the writer is given the doc of
+  the click). Not changed: taking the store's doc after the wait would
+  write another poster's doc if the user left the editor meanwhile.
+- **Owner check: half-size posters' chart captions in PowerPoint** (review
+  round 1, R1-I2): in LibreOffice's PDFs no chart caption runs past its
+  text box (MEASURED with the reviewer's probe on the correction's 21
+  files: 0 chart captions; the 1 caption past its box is an image block's,
+  above), but the half-size poster's 6 captions end exactly at their box's
+  bottom (0.000 in to spare), PowerPoint's default text insets included;
+  PowerPoint itself was not run (manual flow §35).
+- **The gallery's capture copies the sheet without the hints rule**
+  (review round 1, R1-I1; INSPECTED): `components/PublishGalleryModal.tsx`
+  `captureAt` draws `#poster-canvas` itself with html-to-image, not through
+  `stripEditorChrome`, so the editor's hints and selection would reach a
+  published gallery image. The gallery is hidden (`GALLERY_PUBLIC_ENABLED`
+  is false): on its re-enable list (`config/features.ts`), capture through
+  the same copy-and-strip as `data/thumbnails.ts`.
+- **PowerPoint itself, Keynote and Google Slides are not driven** by the
+  instruments: LibreOffice's PDF (positions and captions), Quick Look's
+  thumbnail (ink in each chart's box) and the app's own reader are
+  (MEASURED). An owner check: open an exported file with charts in
+  PowerPoint (manual flow §35).
+- **Production's font fetch is UNVERIFIED here**: the picture fetches the
+  poster font's Google Fonts stylesheet and files again from the page
+  (CORS); the harness serves a local stand-in. On failure the picture is
+  drawn in another font and the export says so.
+- **A picture past 4096² px is drawn with fewer than 300 px per inch**: a
+  14.7 × 14.8 in chart at 277 (MEASURED); every engine's canvas takes that
+  size. Since review round 2 (R2-F2) the docs say so: 300 up to about 186
+  sq in, a chart filling a 48 × 36 in poster about 110 (on the Later
+  list, with a side-length hypothesis).
+
 ## LaTeX export: before it is switched back on
 
 The owner hid the LaTeX export on 2026-10-06 ("unnecessary for now"):
@@ -1023,8 +1166,11 @@ this list, not a flip:
   real posters (every block kind, images, references, a 120 × 60 in sheet)
   and record the numbers before the button returns.
 - **Charts.** The writer has no case for chart blocks (`latex/writer.ts`
-  EMITTERS), and the button's hint says so; the PowerPoint export has the
-  same gap (queued, HIGH). Decide the warning for both.
+  EMITTERS), and the button's hint says so. The PowerPoint export had the
+  same gap until record 31, which writes each chart block as a picture of
+  the editor's drawing (`export/pptx/chartPicture.ts`; its reading of the
+  page and its wait for a chart still drawing could serve LaTeX too).
+  Decide LaTeX's charts, or its warning.
 - **The copy fix 25 took out** comes back, each sentence checked against the
   code again: record 25 section 7 lists every string and where it was (main
   `e09c0ea` holds the old wording): the landing "Editable exports" card, the
@@ -1235,3 +1381,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 26 | `feat/french-public-pages` | implemented, review round 1 done and corrected (one round: a simple feature; 12 findings: 7 corrected, 1 left to the owner, 4 informational) — `docs/fixes/26-french-public-pages.md`; the owner's decision of 2026-10-06 (Quebec, Bill 96): every public page in French at its path + `/fr` (`/fr` for the landing page, `/auth/fr?plan=term`), its language read from the URL, a « Français » / "English" link on every page, the French heads with hreflang and the French pages in the sitemap, a French Stripe Checkout from `/auth/fr`; the editor stays English; queued above: "Queued by fix 26" |
 | 28 | `feat/auto-arrange` | implemented, review round 1 done and corrected (a layout aid: one round, the browser through the user's entry points; 10 findings: B-R1 HIGH, B-R2 and B-R3 MEDIUM and B-R7 LOW corrected, the other LOW and INFO findings queued above; the refinement departs from the prototype and is for the lead and the owner to confirm) — `docs/fixes/28-auto-arrange.md`; the owner's approval of the prototype's function (2026-10-07, `docs/fixes/28-auto-arrange-lab.html`): ONE reading order (bands of wide blocks, then columns, then top to bottom) for heading, figure and table numbers in the editor, the preview and the exports, and Auto-Arrange choosing the cut points of that order into the poster's own columns and their widths for the lowest F = 1000·O + U + 8·moved + 2·Σ\|w − w̄\|, with every block measured on the sheet at its new width; no font change, one undo step, the area past the bottom margin in Issues; the preview's missing figure and table numbers fixed in passing; queued above: "Queued by record 28" |
 | 30 (item 5 + OF-08) | `fix/one-print-path` | implemented; reproduced from every entry in Chromium, Firefox and WebKit (Preview's print ran the title 0.32 to 0.33 in into the authors at 48 × 36 and 1.93 to 1.94 in at 36 × 48, a table printed up to 3.2 in shorter, a line broken differently; no top-bar button, no ⌘P), fixed, 0 of 69 print documents off by more than 0.05 in or broken differently in each engine (worst 0.001 in), 30 of 30 mutants killed; review round 1 (code review) answered: 7 findings, none above LOW; the print window's header no longer covers the poster in a narrow window and its first step names Firefox's "Save to PDF"; tests for ⌘P after a size change, while a dialog fades out and past a handler that stops keys; the popup-blocker claim corrected (Firefox's blocker measured: ⌘P's window opens); now 70 documents per engine, every claim 0 in Chromium and Firefox, WebKit one placeholder line (R1-X1, below); 35 of 35 mutants killed; review round 2 (a new angle: the build, the PDF pipeline, every size, editor states) answered: 7 findings, one MEDIUM (⌘P with the pointer resting on a selected table printed its hover "Add column" bar, a 0.3 in accent bar: the table's own controls now tagged and dropped from the copy and the thumbnail), the free PDF's credit mark back to its size (it printed 0.2 or 0.3 in under the sheet's scale), ⌘P's default prevented inside an input method's composition, the harness runs on the build; now 73 documents per engine, every claim 0 in Chromium and Firefox on the dev server, WebKit the same placeholder line; on the build the same in the three engines, BASE aside (two rules the CSS minifier rewrote, listed as known); 44 of 44 mutants killed; review round 3 (a re-check of the answers) answered: 2 LOW findings, both in the harness on the build, none in the product (the thirteen-size credit sweep measured the source there: it now prints from the build's own Save PDF; the two BASE rules still set the exit code: they now compare as equivalent, so the build run exits 0), each red before and green after, falsified by editing the build; on the build every claim 0 in Chromium and Firefox, WebKit the same placeholder line; 44 of 44 mutants killed and 2 new blind-spot mutants killed in the browser — `docs/fixes/30-one-print-path.md` (the MVP design doc §3.10: one print function behind Save PDF, the top bar's Save PDF, Preview's Print and ⌘P / Ctrl+P; the selection cleared first; `print-color-adjust: exact`; the print window holds the dialog's steps; the sheet laid out as the editor lays it out: its base styles restated, scaled by a transform instead of CSS zoom) |
+| 31 (claims audit HIGH + record 30's placeholders) | `fix/exports-charts` | implemented; review round 1 (code review) answered: 6 findings, R1-F1 and R1-F2 MEDIUM (a scroll during the export moved a caption 5.000 in in the file; an export while a chart still drew left it out, called it "could not be drawn" and spent the pack's credit) and R1-F3, R1-F4 LOW (test gaps) corrected, 2 INFO noted; the export now waits for a chart still drawing (a redraw too, ≤ 10 s, past that nothing written or spent) and reads the page once; one sibling found and queued (the free PDF prints a chart still drawing as an empty box); 21 posters, every claim 0 in Chromium, Firefox and WebKit; 52 of 52 mutants killed; review round 2 (a new angle) answered: R2-F1 MEDIUM corrected (Preview opened, or the editor left, while the export waited wrote a paid file with 0 of 2 charts and spent the credit, MEASURED; the export now copies the charts only from a shown poster, waiting for Preview within the 10 s, and stops with nothing written or spent), R2-F2 and R2-F3 LOW doc claims corrected (fewer than 300 px per inch past about 186 sq in; an empty heading's number and an empty figure's "Figure N." still print, an owner question), 3 INFO noted; 25 posters, every claim 0 in Chromium, Firefox and WebKit; 59 of 59 mutants killed; round 3 due (a paid result) — `docs/fixes/31-exports-charts.md`; reproduced first: 0 pictures for 60 of 60 charts drawn in the editor, 57 of 57 captions absent, "References" written over an empty list on 6 of 6 posters, the editor's hints in 36 of 40 print documents (MEASURED, `pptx-export-check.mjs` and `print-path-check.mjs` HINT, Chromium); fixed: each chart block a picture of the editor's drawing at its box (300 px per printed inch, the poster's web font embedded), its caption and note as text boxes where the editor draws them, a chart not drawn left out with a note; the hints tagged `data-postr-editor-ui` so the one print function's copy drops them; the copy (Export tab, About page EN and FR) says charts become pictures; after: every claim 0 in Chromium, Firefox and WebKit (60 of 60 charts at their box within 0.001 in, pictures 0.00 % from the editor's svg, LibreOffice, Quick Look and the app's reader read them), 0 hints in every print document, WebKit's R1-X1 gone; 33 of 33 mutants killed, 2 blind spots guarded in the browser |

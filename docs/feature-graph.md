@@ -1,5 +1,7 @@
 # Postr — Feature Graph & Refactoring Checklist (v2)
 
+**Revised 2026-10-10 — record 31, exports: charts and editor hints** (`docs/fixes/31-exports-charts.md`). The paid PowerPoint export writes each chart block as a picture of the chart as the editor draws it: `export/pptx/chartPicture.ts` (new) copies the chart's svg off the sheet, puts the poster's web font in it (`export/pptx/chartFont.ts`, new: an svg drawn as an image cannot use the page's fonts) and draws it to a PNG at 300 px per printed inch (fewer past 4096² px), read with its caption's and note's boxes as drawn; `export/pptx/chartShape.ts` (new) places it at that box × the export's scale, turned with the chart, its caption ("Figure N.") and note as text boxes; a chart that cannot be drawn is left out with the warning "A chart could not be drawn, so the PowerPoint file leaves it out." The writer's shared emitter pieces moved unchanged to `export/pptx/shapeKit.ts` (new). An empty references block writes nothing (it wrote "References" over an empty list). The editor's hints and prompts inside blocks ("+ Upload figure", "+ Logo", "Add authors in sidebar →", "Add references in Refs tab →", a chart's "Rendering chart…" and failure message) carry `data-postr-editor-ui`, so the one print function's copy (and the thumbnail's) drops them: an empty block prints no prompt. The Export tab says "Charts made in Postr become pictures."; the About page's "ship" card says they are included as pictures (EN and FR). Instruments: `scripts/pptx-export-check.mjs` (new) and `print-path-check.mjs` HINT (new claim). Updated here: the header, §6.7 (blocks' hints), §6.8 (Export tab copy), §6.10 (ChartBlock), §6.11 (the export map and the writer's modules), §6.2 (About copy). **Review round 1's correction:** Export › PowerPoint waits for a chart still drawing (each `ChartBlock` carries `data-postr-chart-drawing` from the start of a drawing, a redraw included, until it is on screen or failed; `charts/chartDrawing.ts`, new), up to 10 s with the button busy; past that it writes nothing, spends no credit and records no paid export, and says "A chart is still drawing, so nothing was exported. Try again in a moment."; the writer then reads every chart (its svg and every box) before its first await, and draws the pictures after (`chartPicture.ts`'s two steps), so a scroll or zoom while the file is built moves nothing. **Review round 2's correction (R2-F1):** the export copies the charts only from the poster as the editor shows it: `waitForChartsReadable` (replacing `waitForChartsDrawn`) also waits while Preview hides the sheet (its box reads 0), and ends at once when the sheet is gone (the editor left); past the 10 s, nothing is written or spent and the Export tab says "The poster was hidden in Preview, so its charts could not be copied and nothing was exported. Try again."; the reading itself throws `SheetNotShownError` for a sheet hidden or gone and the writer then writes nothing (it read every chart as "could not be drawn", wrote a file with none and spent the credit). A poster without charts does not wait. The docs say a chart over about 186 sq in gets fewer than 300 px per inch (R2-F2), and that an empty heading's number and an empty figure's "Figure N." still print (R2-F3, an owner question).
+
 **Revised 2026-10-10 — record 30, one print path** (`docs/fixes/30-one-print-path.md`; the MVP design doc §3.10 and §5.1 blockers 4 and 7). One print function, `PosterEditor` `printPoster`, behind the Export tab's "⎙ Save PDF", the top bar's new "Save PDF" (`EditorTopBar.tsx`, owner decision D2), Preview's "Print / Save PDF", ⌘P / Ctrl+P in the editor and Preview (new: `poster/usePrintShortcut.ts`; ⌘P only on a Mac) and the Staples help's button. It opens the window first (blocked: today's alert, nothing else changes), leaves Preview and clears the selection at once (`flushSync`), measures the title's overflow again, ends a selection's pop still scaling a frame (`motion/timelines/blockSelection.ts` `finishBlockSelections`), then copies the sheet. The editor no longer measures the title's overflow while Preview hides it (it measured 0: OF-07). The print document (`export/printDocument.ts`) sets `print-color-adjust: exact` (and `-webkit-`), restates the editor's base styles for its sheet (`export/printSheetBase.ts`: Tailwind's preflight rules and index.css's list rules that match the sheet, and the line height 1.5, font and text rendering it inherits), scales the sheet to the page with `transform: scale(96/PX)` instead of CSS `zoom` (the sheet is laid out as the editor lays it out), and holds the only list of the print dialog's steps, in a header with its toolbar, sticky in the page's flow above the poster (review round 1: fixed, it covered the top of the poster in a window 700 px wide or less); the first step names Firefox's "Save to PDF" too; the Export tab says one line. Review round 2: the table's own editing controls (row and column strips, column grips, hover "+" bars, the active cell's bands) carry `data-postr-editor-ui`, which `export/stripEditorChrome.ts` drops from the print copy and the dashboard thumbnail (⌘P with the pointer on a selected table printed its "Add column" bar, a 0.3 in accent bar); the credit line sits in a layer the sheet's size that print lays out at the page's own scale (`attribution.ts` `postr-attribution-page`: its mark printed 0.2 or 0.3 in under the sheet's scale); ⌘P's default is prevented inside an input method's composition too. Instruments: `apps/web/scripts/print-path-check.mjs`, `apps/web/scripts/print-dialog-check.mjs`. §6.7 (the editor), §6.8 (Export tab) and §6.11 (`printDocument.ts`) below updated.
 
 **Revised 2026-10-07 — fix 13c merged into fix 13b** (record 13b section 11). The code check's element tables (`readabilityTypes.ts` `R_ELEMENTS`, `PY_ELEMENTS`) take `minPt` from `poster/figureTextMinimums.ts`, and `readability.ts` judges each row with its `figureTextStatus` (the warning band was a literal 0.85 there, 13c's review Q-R8): one set of minimums and one warning band for the code check, the image scan and the inserted charts. The image scan sizes the figure by the picture's printed box (`imageBox.ts`), as the code check does since fix 13b.
@@ -413,7 +415,7 @@ flowchart LR
   - [ ] "Start from the poster you already have" / "Already have a poster in PowerPoint, as a PDF, or as an image? Open it here and keep editing it, blocks and all — title, headings, body text and figures land where they were, each one still yours to move and rewrite." — `start-from-work` milestone — `About.tsx:63-66`. **Rewritten 2026-09-10** (paper-to-poster deactivated — see routes.tsx header): the manuscript sentence was dropped. Old copy, kept as the reactivation reference: ~~"Start from the work you already have" / "Paste a manuscript or drop a .docx and answer a few short questions about what to emphasise — you get a structured poster draft rather than a blank canvas. Already have a poster in PowerPoint? Open the .pptx here and keep editing it, blocks and all…"~~
   - [ ] "The right figure, drawn for print" / "Paste a table or answer three questions in the Figure tab and Postr ranks the chart forms that actually fit your data, drawn as journal-style panels with captions in methods voice. Pick several at once and insert them straight onto the poster." — `About.tsx` (rewritten 2026-09-10: names the editor's Figure tab instead of "the plot picker" and no longer promises SVG/PNG downloads — those lived on the deactivated standalone page)
   - [ ] "Borrow a look you like" / "Upload a poster you admire and Postr lifts its colours and type onto yours — the look, never the content. Print-safe clamping keeps the result legible on paper rather than only on screen." — `About.tsx:79-81`
-  - [ ] "Iterate, export, print" / "Undo and redo up to 100 steps. Save a PDF for free. PowerPoint exports are paid, and keep text, images and tables editable. Charts made in Postr are not included." — `i18n/about.ts` `milestones` id `ship`, rendered by `About.tsx` (the French entry: « Annulez et rétablissez jusqu’à 100 étapes. … »; the step count is `UNDO_HISTORY_LIMIT`, `stores/posterStore.ts:35`, pinned in both languages on the rendered page by `oneUndoHistory.test.tsx`; 50 before fix 12; the share-link sentence removed with sharing, fix 23; the LaTeX sentence removed with the LaTeX export, fix 25)
+  - [ ] "Iterate, export, print" / "Undo and redo up to 100 steps. Save a PDF for free. PowerPoint exports are paid, and keep text, images and tables editable. Charts made in Postr are included as pictures." — `i18n/about.ts` `milestones` id `ship` (record 31; French « Les graphiques créés dans Postr y sont inclus sous forme d’images. »), rendered by `About.tsx` (the French entry: « Annulez et rétablissez jusqu’à 100 étapes. … »; the step count is `UNDO_HISTORY_LIMIT`, `stores/posterStore.ts:35`, pinned in both languages on the rendered page by `oneUndoHistory.test.tsx`; 50 before fix 12; the share-link sentence removed with sharing, fix 23; the LaTeX sentence removed with the LaTeX export, fix 25)
 - [ ] "Shape what ships next" — eyebrow — `About.tsx:180`
 - [ ] "Tell us what's missing." — h2 — `About.tsx:183`
 - [ ] "Every bug report and feature request lands in the developer's queue. The loudest feedback wins the most attention — so if something's broken, missing, or could be better, say so." — para — `About.tsx:185-189`
@@ -1085,21 +1087,21 @@ flowchart LR
 - [ ] `FloatingFormatToolbar` — portal toolbar mount — `blocks.tsx:2571` — shows on text selection
 
 **Copy**
-- [ ] "+ Logo" — placeholder label — `blocks.tsx:249`
-- [ ] "presets · upload · reuse" — placeholder hint — `blocks.tsx:251`
+- [ ] "+ Logo" — placeholder label — `blocks.tsx:249` — editor only (`data-postr-editor-ui`, record 31)
+- [ ] "presets · upload · reuse" — placeholder hint — `blocks.tsx:251` — editor only (as above)
 - [ ] "Poster logo" — img alt — `blocks.tsx:181`
-- [ ] "+ Upload figure" — placeholder label — `blocks.tsx:431`
-- [ ] "click to browse · drag to move" — placeholder hint — `blocks.tsx:432`
+- [ ] "+ Upload figure" — placeholder label — `blocks.tsx:431` — editor only: the button carries `data-postr-editor-ui`, so the PDF, the thumbnail and the PowerPoint file never show it (record 31)
+- [ ] "click to browse · drag to move" — placeholder hint — `blocks.tsx:432` — editor only (as above)
 - [ ] `"{file.name}" doesn't look like an image (got {type}).\n\nUpload PNG, JPEG, GIF, WebP, or SVG instead.` — alert() error — `blocks.tsx:110-113`
 - [ ] `"{file.name}" is {mb} MB — too large.\n\nImages must be under 10 MB. Try compressing the PNG/JPEG in Preview (macOS) or an online tool.` — alert() error — `blocks.tsx:118-121`
 - [ ] `Couldn't read "{file.name}". The file may be corrupted or unreadable.` — alert() error — `blocks.tsx:127-129`
 - [ ] `{caption plain-text} || 'Figure'` — img alt — `blocks.tsx:349`
-- [ ] "Add authors in sidebar →" — empty state (×2 variants) — `blocks.tsx:1355,1370`
+- [ ] "Add authors in sidebar →" — empty state (×2 variants) — `blocks.tsx:1355,1370` — editor only (`data-postr-editor-ui`, record 31); with institutions and no author the institutions still print
 - [ ] " · " — institution separator — `blocks.tsx:1375,1430`
 - [ ] ", " — author separator — `blocks.tsx:1417`
 - [ ] "*Equal contribution" — footnote marker line — `blocks.tsx:1439`
 - [ ] "†Corresponding author" — footnote marker line — `blocks.tsx:1441`
-- [ ] "Add references in Refs tab →" — empty state — `blocks.tsx:1464`
+- [ ] "Add references in Refs tab →" — empty state — `blocks.tsx:1464` — editor only (`data-postr-editor-ui`, record 31); the PowerPoint file writes nothing for an empty references block
 - [ ] "References" — refs-block heading — `blocks.tsx:1485`
 - [ ] `Poster made with postr.sh https://postr.sh` — injected last reference entry (rawText from `@/export/attribution.ts:276`; bold via `ACK_REFERENCE_ID` check at `blocks.tsx:1496`)
 - [ ] `Figure {N}.` / `Table {N}.` — auto caption prefix — `blocks.tsx:1627` — reading order, down each column (record 28; it was top edge then left edge, across the columns); charts share the figures' sequence in the editor and the exports; Export › Preview poster shows them too (it showed no caption before record 28)
@@ -1976,7 +1978,7 @@ Mounted from: imported `Sidebar.tsx:64`, rendered `Sidebar.tsx:796-802` under `t
 - [ ] "{n} export{s} left in your pack — each PowerPoint export uses one. Credits never expire." — credits hint (fix 25)
 - [ ] "This poster is {w}×{h} in — too large for PowerPoint even at half size (its limit is {PPTX_MAX_DIMENSION_IN} in per side). Save a PDF instead." — over-2×-ceiling error (fix 25: no LaTeX, and no size-limit claim for the PDF)
 - [ ] "Your poster is {w}×{h} in. PowerPoint's limit is {n} in per side, so this file will be exactly half size ({w/2}×{h/2} in) — print at 200%. The note is also written inside the file." — over-ceiling warning; its "For a full-size editable export, use LaTeX below." is behind `LATEX_EXPORT_ENABLED` (fix 25)
-- [ ] "One editable slide — every block stays a real PowerPoint text box, image, or table. Also opens in Keynote, Google Slides, and LibreOffice." — pptx hint — `EditableExportButtons.tsx:375-379`
+- [ ] "One editable slide. Text, images and tables become PowerPoint text boxes, pictures and tables. Charts made in Postr become pictures." — pptx hint — `EditableExportButtons.tsx` (record 31: it ended "Charts made in Postr are not included."; the listing here had an older text)
 - [ ] "A poster.tex for XeLaTeX or LuaLaTeX, with your images and, when the poster has references, a references.bib. Each block keeps its position. Charts made in Postr are not included. Full size at any poster dimension." — latex hint — not rendered while `LATEX_EXPORT_ENABLED` is false
 - [ ] "{note/warning strings from the pptx/latex writers}" — dynamic notes list items — `EditableExportButtons.tsx:410-424`
 - [ ] "Something went wrong. Try again, or use Send Feedback so we can look into it." — export error (role=alert) — `EditableExportButtons.tsx:426-429`
@@ -2324,12 +2326,14 @@ flowchart LR
 - [ ] `Send Feedback` — button — `ChartBlock.tsx:178-191` — calls `useFeedbackStore.open('bug', { title: 'Chart failed to render' })` (opens feedback modal, prefilled); only rendered in the error state
 
 **Copy**
-- [ ] "Rendering chart…" — loading state text (first draw only: a chart on screen stays while it redraws for a new box) — `ChartBlock.tsx:173`
-- [ ] "Something went wrong rendering this chart." — error state text — `ChartBlock.tsx:176`
+- [ ] "Rendering chart…" — loading state text (first draw only: a chart on screen stays while it redraws for a new box) — `ChartBlock.tsx:173` — editor only: the overlay carries `data-postr-editor-ui`, so the PDF and the thumbnail drop it (record 31)
+- [ ] "Something went wrong rendering this chart." — error state text — `ChartBlock.tsx:176` — editor only (as above; the PowerPoint file leaves such a chart out and says so)
 - [ ] "Chart failed to render" — feedback-modal prefill title passed to the store — `ChartBlock.tsx:179`
 
 **Graphics**
 - [ ] none in-file — the chart `<svg>` is injected by `renderChartLaidOut()` into `hostRef` (`ChartBlock.tsx:139`), drawn at the host's laid-out box (fix 13c), which `BlockFrame` grows to the chart's least height when its text at the minimums does not fit (`onMinHeight`, review round 1); error/loading frame is a CSS dashed border, no glyph
+
+**State for the export** (record 31's review round 1, R1-F2): the block's outer div carries `data-postr-chart-drawing` (`charts/chartDrawing.ts` `CHART_DRAWING_ATTR`) from the start of each drawing, a redraw for a new box, palette or font included, until the svg is on screen or the drawing failed; Export › PowerPoint waits for none to carry it, and for the sheet to be shown (Preview hides it; review round 2), ≤ 10 s. Not shown; `status` stays `ready` through a redraw (no loading flash), so it is a state of its own.
 
 #### `charts/declaredVariables.ts` — declared-variable (mobile) data synthesis; no DOM UI
 
@@ -2651,6 +2655,12 @@ The editor's Figure › Check tab (`poster/ReadabilityPanel.tsx`, §6.8) as a pu
 ```mermaid
 flowchart LR
   EEB["EditableExportButtons (§6.8)"] -->|"exportPosterPptx"| PW["export/pptx/writer.ts → {title}.pptx"]
+  EEB -->|"waitForChartsReadable (record 31 R1-F2, R2-F1)"| CD["charts/chartDrawing.ts (the sheet shown, no chart on it drawing, ≤ 10 s; gone: stop)"]
+  PW -->|"drawChart (record 31): read all, then draw"| CP["export/pptx/chartPicture.ts (the editor's chart svg → PNG, 300 px/in)"]
+  CP --> CF["export/pptx/chartFont.ts (the poster's web font inside the picture)"]
+  CP --> RS["export/pptx/rasterizeSvg.ts"]
+  PW --> CS["export/pptx/chartShape.ts (picture + caption + note on the slide)"]
+  PW --> SK["export/pptx/shapeKit.ts (shared emitter pieces)"]
   EEB -.->|"exportLatex (only with LATEX_EXPORT_ENABLED, off since fix 25)"| LW["export/latex/exportLatex.ts → {title}-latex.zip"]
   PE["PosterEditor printPoster() (record 30: the one print function)"] -->|"stripEditorChrome (clone)"| PD["export/printDocument.ts (popup + window.print)"]
   SB["Sidebar ⎙ Save PDF"] --> PE
@@ -2810,19 +2820,45 @@ No UI — logic only. Silent-degradation note: failure keeps Office swatches (co
 - [ ] `An inline image crop is not applied in the PowerPoint export — the full image is included.` — warning — `writer.ts:391`
 - [ ] `An image could not be loaded — exported as a placeholder box.` — warning — `writer.ts:408`
 - [ ] `PowerPoint tables cannot rotate — a rotated table was exported upright.` — warning — `writer.ts:430`
+- [ ] `A chart could not be drawn, so the PowerPoint file leaves it out.` — warning (`CHART_LEFT_OUT`) — `pptx/chartShape.ts` (record 31): a chart not drawn on the sheet (its failure message showing; a chart still drawing is waited for, below), or whose picture could not be read or made
+- [ ] `A chart is still drawing, so nothing was exported. Try again in a moment.` — note under the PowerPoint button (`CHARTS_STILL_DRAWING`, `charts/chartDrawing.ts`; shown by `EditableExportButtons.tsx`) — record 31's review round 1 (R1-F2): a chart still drawing 10 s after the click; no file, no credit spent, no paid export recorded; not "Something went wrong" (editor copy: English only, as the editor)
+- [ ] `The poster was hidden in Preview, so its charts could not be copied and nothing was exported. Try again.` — note under the PowerPoint button (`SHEET_HIDDEN`, `charts/chartDrawing.ts`; shown by `EditableExportButtons.tsx`) — record 31's review round 2 (R2-F1): Preview still open 10 s after the click on a poster with charts; no file, no credit spent, no paid export recorded (editor copy: English only)
+- [ ] `The editor was left before the poster’s charts could be copied, so nothing was exported.` — `SHEET_GONE`, the message of the error that ends an export whose editor was left (R2-F1); no Export tab is left to show it
+- [ ] `A chart’s font could not be loaded for its picture, so the picture draws its text in another font.` — warning (`CHART_FONT_MISSING`) — `pptx/chartShape.ts` (record 31): the page had the poster's web font and its files could not be fetched again
 
 **Copy** (text inside the generated deck)
 - [ ] `Poster` — fallback document title — `writer.ts:596`
 - [ ] `missing image` — italic muted placeholder text — `writer.ts:409`
-- [ ] `References` — bold accent heading run — `writer.ts:486`
+- [ ] `References` — bold accent heading run — `writer.ts:486` — only when the poster has references (record 31: an empty references block writes nothing)
+- [ ] `Figure {n}. {caption}` — a chart picture's alternative text (`descr`) — `pptx/chartShape.ts` (record 31)
 - [ ] `Figure {n}. ` / `Table {n}. ` — bold caption prefixes — `writer.ts:354`
 - [ ] `⚠ {plan.note}` — red off-slide warning text box (half-scale note; note text from units.ts) — `writer.ts:702`
 - [ ] `Poster made with postr.sh` — colophon text box near bottom edge (from attribution.ts) — `writer.ts:686`
 - [ ] `Poster made with postr.sh (https://postr.sh)` — `company`/`subject` doc properties — `writer.ts:606,613`
 
+#### `export/pptx/chartPicture.ts` — a chart block's picture, from the editor's own drawing (record 31)
+
+No UI. `editorChartPicture` (the writer's default `drawChart`), in two steps since review round 1 (R1-F1): synchronously, it finds the chart's svg in its frame on `#poster-canvas` (not a handle's icon), its host's box (computed size, centred where drawn, so a turned chart is read before its turn; the svg's viewBox where the page gives no size), the caption's (`[data-postr-caption]`) and note's (`[data-postr-note]`) boxes, and copies the svg at `picturePixels` (300 px per printed inch, fewer past `CHART_MAX_PIXELS` = 4096²); it answers a function that later puts the poster's web font in the copy when the page has one loaded (`chartFont.ts`) and draws it with `rasterizeSvg.ts`. The writer reads every chart before its first await (a box read after an await moved with a scroll made meanwhile: 5 in). Null when the chart is not drawn; throws `SheetNotShownError` when the sheet is not shown (Preview) or not there (review round 2, R2-F1), and the writer then writes nothing (any other reading failure leaves that chart out with the warning).
+
+#### `charts/chartDrawing.ts` — whether the sheet's charts can be copied (record 31, review rounds 1 and 2)
+
+No UI. `CHART_DRAWING_ATTR` (`data-postr-chart-drawing`, on a `ChartBlock` from the start of a drawing, a redraw for a new box, palette or font included, until it is on screen or has failed); `editorSheet()` (`#poster-canvas`), `sheetShown(sheet)` (its box wider than 0: Preview's `display: none` reads 0), `chartsDrawing()` (how many on it); `waitForChartsReadable(timeoutMs = CHART_DRAW_WAIT_MS)` (10 000 ms; polls every 100 ms; resolves once the sheet is shown and no chart draws, at once when so; past the wait throws `ChartsStillDrawingError` or `SheetNotShownError('hidden')`, and `SheetNotShownError('gone')` at once when the sheet is gone; Export › PowerPoint calls it only for a poster with chart blocks); their copy `CHARTS_STILL_DRAWING`, `SHEET_HIDDEN`, `SHEET_GONE` (listed under `writer.ts`'s warnings). Used by Export › PowerPoint only: the free PDF copies the sheet inside the click (its window must open there) and does not wait (record 31 §10).
+
+#### `export/pptx/chartFont.ts` — the poster's web font inside a chart's picture (record 31)
+
+No UI. `documentHasWebFont(family)` (a loaded FontFace of that family); `embeddedFontCss(family, text)`: the family's Google Fonts stylesheet (`fontLoader.ts` `googleFontsUrl`, fetched once per page), only its normal weight-400 faces whose unicode-range holds a character of the chart's text, each file inlined as a `data:` URL; null when a fetch fails.
+
+#### `export/pptx/chartShape.ts` — a chart block on the slide (record 31)
+
+`addChart`: the picture at its box × the export's scale, turned with the block, alternative text `Figure N. {caption}`; the caption (`captionText`, image rules) and note as muted text boxes where the editor draws them (the image blocks' layout when not read); with no picture, the `CHART_LEFT_OUT` warning. Copy: the two warnings listed under `writer.ts`.
+
+#### `export/pptx/shapeKit.ts` — the emitters' shared pieces (record 31)
+
+No UI. Moved unchanged from `writer.ts`: `Ctx`, `rect`, `pt`, `hex`, rich-text runs (`paragraphsToTextProps`, re-exported from `writer.ts`), `captionSplit`, `captionText`, `addMutedText` (now with an optional turn), `normalizeRotation` (re-exported), `bytesToBase64`.
+
 #### `export/stripEditorChrome.ts` — no UI, logic only
 
-Takes the editor's own marks out of a copy of `#poster-canvas` before it leaves the editor: resize handles (`[data-postr-resize-handle]`), the selection's controls (`[data-postr-selection-ui]`), the grid and ruler overlays (`[data-postr-overlay]`), a block's own editing controls inside its content (`[data-postr-editor-ui]`: the table's strips, grips, hover "+" bars and active-cell bands; record 30's review round 2, R2-F1), and a selected or out-of-bounds frame's 1.5 px border, set back to the unselected 1 px transparent one. Used by `PosterEditor` `printPoster` ("⎙ Save PDF", Preview's Print) and by `data/thumbnails.ts`. Fix 13c review round 1 (Q-R5, Q-R7): the print path stripped only the overlays, so a selected block (a block just inserted is) printed its handles, and a chart in a selected frame printed 0.94 % smaller than drawn.
+Takes the editor's own marks out of a copy of `#poster-canvas` before it leaves the editor: resize handles (`[data-postr-resize-handle]`), the selection's controls (`[data-postr-selection-ui]`), the grid and ruler overlays (`[data-postr-overlay]`), a block's own editing controls inside its content (`[data-postr-editor-ui]`: the table's strips, grips, hover "+" bars and active-cell bands; record 30's review round 2, R2-F1; since record 31 also the editor's hints and prompts inside blocks — an empty figure's and logo's buttons, "Add authors in sidebar →", "Add references in Refs tab →", a chart's loading and failure overlay — so an empty block prints no prompt; its numbering, a heading's "1." or a figure's "Figure N.", still prints: record 31's R2-F3), and a selected or out-of-bounds frame's 1.5 px border, set back to the unselected 1 px transparent one. Used by `PosterEditor` `printPoster` ("⎙ Save PDF", Preview's Print) and by `data/thumbnails.ts`. Fix 13c review round 1 (Q-R5, Q-R7): the print path stripped only the overlays, so a selected block (a block just inserted is) printed its handles, and a chart in a selected frame printed 0.94 % smaller than drawn.
 
 #### `export/printDocument.ts` — print-window HTML shell (editor print/PDF flow)
 
@@ -2874,7 +2910,7 @@ No UI — logic only. Paragraph boundaries: `<br>`, a newline, `<li>`, and since
 - [ ] `Writing LaTeX…` — BusyIndicator label during LaTeX export — only with `LATEX_EXPORT_ENABLED` (off since fix 25)
 - [ ] `This poster is {w}×{h} in — too large for PowerPoint even at half size (its limit is 56 in per side). Save a PDF instead.` — red hint, beyond-half (>112 in; fix 25) — `EditableExportButtons.tsx`
 - [ ] `Your poster is {w}×{h} in. PowerPoint's limit is 56 in per side, so this file will be exactly half size ({w/2}×{h/2} in) — print at 200%. The note is also written inside the file.` — yellow hint, over the ceiling; its ` For a full-size editable export, use LaTeX below.` only with `LATEX_EXPORT_ENABLED` (fix 25) — `EditableExportButtons.tsx`
-- [ ] `One editable slide — every block stays a real PowerPoint text box, image, or table. Also opens in Keynote, Google Slides, and LibreOffice.` — PPTX hint (hidden when beyond-half) — `EditableExportButtons.tsx:376-379`
+- [ ] `One editable slide. Text, images and tables become PowerPoint text boxes, pictures and tables. Charts made in Postr become pictures.` — PPTX hint (hidden when beyond-half) — `EditableExportButtons.tsx` (record 31)
 - [ ] `A poster.tex for XeLaTeX or LuaLaTeX, with your images and, when the poster has references, a references.bib. …` — LaTeX hint — only with `LATEX_EXPORT_ENABLED` (off since fix 25)
 - [ ] `Something went wrong. Try again, or use Send Feedback so we can look into it.` — `role="alert"` failure line — `EditableExportButtons.tsx:427-429`
 - [ ] `PowerPoint file saved` / `LaTeX source saved` — sr-only `role="status"` aria-live announcement — `EditableExportButtons.tsx:432-434`
