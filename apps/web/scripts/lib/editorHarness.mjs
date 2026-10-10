@@ -297,10 +297,14 @@ export function sourceFlag(name) {
  * browser's window as it is, with its own ratio. `rowTitle` is the poster's
  * name (the row's title; default "ZQ Display Name"): the print window's
  * toolbar shows it (record 30's review round 1, a long name).
+ * `prepare(context)` runs after the fake backend's routes are installed and
+ * before the page opens: a route it adds takes precedence over theirs
+ * (Playwright runs the last one registered first), e.g. a faked font host
+ * (record 31, scripts/pptx-export-check.mjs).
  */
 export async function openEditor(h, {
   viewport, poster, deviceScaleFactor = 1, route, ownedByOther = false, editDoc, tour = false,
-  browser = h.browser, scrollbars = h.scrollbars, rowTitle = 'ZQ Display Name',
+  browser = h.browser, scrollbars = h.scrollbars, rowTitle = 'ZQ Display Name', prepare,
 }) {
   const context = await browser.newContext(viewport === null ? { viewport: null } : { viewport, deviceScaleFactor });
   if (scrollbars === 'classic') {
@@ -318,6 +322,7 @@ export async function openEditor(h, {
   }
   const state = { userId: randomUUID(), row: null, saves: [], aborted: [], errors: [] };
   await installMocks(context, state, h.base, { tour, docBase: h.docBase ?? h.base });
+  if (prepare) await prepare(context);
   const page = await context.newPage();
   page.on('pageerror', (e) => state.errors.push(String(e).slice(0, 300)));
   const built = await buildDoc(page, h.docBase ?? h.base, poster);
