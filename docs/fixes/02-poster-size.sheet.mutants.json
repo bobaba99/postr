@@ -50,12 +50,12 @@
       ]
     },
     "autoarrange-height-preset": {
-      "undoes": "Auto-Arrange fits the poster's own height",
+      "undoes": "Auto-Arrange fits the poster's own height (since record 28 the call is arrangeSheet)",
       "edits": [
         [
           "src/poster/PosterEditor.tsx",
-          "autoLayout(measured, cW, cH, doc.styles)",
-          "autoLayout(measured, cW, 360, doc.styles)"
+          "arrangeSheet(canvas, latest, cW, cH, titleOverflowPx)",
+          "arrangeSheet(canvas, latest, cW, 360, titleOverflowPx)"
         ]
       ]
     },

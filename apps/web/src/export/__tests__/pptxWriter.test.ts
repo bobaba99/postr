@@ -217,3 +217,26 @@ describe('normalizeRotation', () => {
     expect(normalizeRotation(360)).toBeUndefined();
   });
 });
+
+// Record 28: the export numbers figures in the poster's reading order, down
+// each column, as the canvas does (poster/readingOrder.ts).
+describe('exportPosterPptx — figure numbers follow the reading order', () => {
+  it('numbers the foot of column 1 before the top of column 2', async () => {
+    const base = makeFixtureDoc();
+    const img = base.blocks.find((b) => b.id === 'img1')!;
+    const blocks = [
+      ...base.blocks.filter((b) => b.id !== 'img1'),
+      { ...img, id: 'colTwoTop', x: 250, y: 95, caption: 'Zqbeta' },
+      { ...img, id: 'colOneLow', x: 20, y: 250, caption: 'Zqalpha' },
+    ];
+    const { entries } = await generate({ blocks });
+    const slide = decode(entries['ppt/slides/slide1.xml']);
+    const numberBefore = (word: string) => {
+      const at = slide.indexOf(word);
+      const all = [...slide.slice(0, at).matchAll(/Figure (\d+)\. /g)];
+      return all.at(-1)?.[1];
+    };
+    expect(numberBefore('Zqalpha')).toBe('1');
+    expect(numberBefore('Zqbeta')).toBe('2');
+  });
+});

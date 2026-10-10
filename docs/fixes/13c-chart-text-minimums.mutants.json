@@ -1,0 +1,755 @@
+{
+ "_about": "Mutants for fix 13c (docs/fixes/13c-chart-text-minimums.md): each undoes one part of the fix. Run from apps/web: node scripts/mutation-check.mjs ../../docs/fixes/13c-chart-text-minimums.mutants.json; the blind spots in the browser: node scripts/blind-spot-check.mjs ../../docs/fixes/13c-chart-text-minimums.mutants.json",
+ "tests": [
+  "src/poster/__tests__/chartBlockLayout.test.tsx",
+  "src/poster/__tests__/figureTextMinimums.test.tsx",
+  "src/poster/__tests__/imageScanMinimums.test.tsx",
+  "src/poster/__tests__/figureTextCopy.test.ts",
+  "src/charts/__tests__/chartLayout.test.ts",
+  "src/charts/__tests__/plotOptions.test.ts",
+  "src/charts/__tests__/renderChart.smoke.test.ts",
+  "src/charts/__tests__/download.test.ts",
+  "src/poster/__tests__/FigureTab.test.tsx"
+ ],
+ "mutants": {
+  "scan-own-minimums": {
+   "undoes": "RC5 — the image scan judges against the shared minimums (main: its own 24/24/18/18/18/18)",
+   "edits": [
+    [
+     "src/poster/ReadabilityPanel.tsx",
+     "  title: FIGURE_TEXT_MIN_PT.plotTitle,\n  'axis-title': FIGURE_TEXT_MIN_PT.axisTitle,\n  'axis-tick': FIGURE_TEXT_MIN_PT.axisText,\n  legend: FIGURE_TEXT_MIN_PT.legendText,\n  data: FIGURE_TEXT_MIN_PT.axisText,\n  other: FIGURE_TEXT_MIN_PT.axisText,",
+     "  title: 24,\n  'axis-title': 24,\n  'axis-tick': 18,\n  legend: 18,\n  data: 18,\n  other: 18,"
+    ]
+   ]
+  },
+  "scan-warn-75": {
+   "undoes": "RC5 — the image scan's warning band is the shared one, 15% (main: 25%)",
+   "edits": [
+    [
+     "src/poster/ReadabilityPanel.tsx",
+     "status: figureTextStatus(effectivePt, minPt), minPt };",
+     "status: effectivePt >= minPt ? 'pass' : effectivePt >= minPt * 0.75 ? 'warn' : 'fail', minPt };"
+    ]
+   ]
+  },
+  "r-elements-own-minimums": {
+   "undoes": "RC5 — the code check's R rows take their minimum from the shared module (the tables moved to readabilityTypes.ts in the merge into fix 13b)",
+   "edits": [
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.plotTitle,   selector: 'plot.title'",
+     "minPt: 18, selector: 'plot.title'"
+    ],
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.axisTitle,   selector: 'axis.title'",
+     "minPt: 18, selector: 'axis.title'"
+    ],
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.axisText,    selector: 'axis.text'",
+     "minPt: 14, selector: 'axis.text'"
+    ],
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.legendText,  selector: 'legend.text'",
+     "minPt: 14, selector: 'legend.text'"
+    ],
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.stripText,   selector: 'strip.text'",
+     "minPt: 14, selector: 'strip.text'"
+    ],
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.caption,     selector: 'plot.caption'",
+     "minPt: 12, selector: 'plot.caption'"
+    ]
+   ]
+  },
+  "py-elements-own-minimums": {
+   "undoes": "RC5 — the code check's Python rows take their minimum from the shared module (the tables moved to readabilityTypes.ts in the merge into fix 13b)",
+   "edits": [
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.plotTitle,  selector: 'axes.titlesize'",
+     "minPt: 18, selector: 'axes.titlesize'"
+    ],
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.axisTitle,  selector: 'axes.labelsize'",
+     "minPt: 18, selector: 'axes.labelsize'"
+    ],
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.axisText,   selector: 'xtick.labelsize'",
+     "minPt: 14, selector: 'xtick.labelsize'"
+    ],
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.legendText, selector: 'legend.fontsize'",
+     "minPt: 14, selector: 'legend.fontsize'"
+    ],
+    [
+     "src/poster/readabilityTypes.ts",
+     "minPt: MIN.caption,    selector: null",
+     "minPt: 12, selector: null"
+    ]
+   ]
+  },
+  "code-check-warn-literal": {
+   "undoes": "RC5, review Q-R8 (answered in the merge into fix 13b) — the code check's row status takes the shared module's warning band, not a literal 0.85",
+   "edits": [
+    [
+     "src/poster/readability.ts",
+     "const verdict = figureTextStatus;",
+     "const verdict = (pt: number, min: number): 'pass' | 'warn' | 'fail' =>\n  pt >= min ? 'pass' : pt >= min * 0.85 ? 'warn' : 'fail';"
+    ]
+   ]
+  },
+  "chart-pt-ignores-minimums": {
+   "undoes": "RC5 — the chart draws at least at the shared minimums, were they ever above its own sizes",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "    tick: Math.max(CHART_TEXT_PT.tick, PRINT_HEADROOM * Math.max(FIGURE_TEXT_MIN_PT.axisText, FIGURE_TEXT_MIN_PT.legendText)),\n    axisTitle: Math.max(CHART_TEXT_PT.axisTitle, PRINT_HEADROOM * FIGURE_TEXT_MIN_PT.axisTitle),",
+     "    tick: CHART_TEXT_PT.tick,\n    axisTitle: CHART_TEXT_PT.axisTitle,"
+    ]
+   ]
+  },
+  "chart-floor-own-numbers": {
+   "undoes": "RC5 — the chart's floor is the shared minimums, not its own copy of 14/18",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "  return PRINT_HEADROOM * Math.max(\n    FIGURE_TEXT_MIN_PT.axisText / pt.tick,\n    FIGURE_TEXT_MIN_PT.legendText / pt.tick,\n    FIGURE_TEXT_MIN_PT.axisTitle / pt.axisTitle,\n  );",
+     "  return PRINT_HEADROOM * Math.max(14 / pt.tick, 18 / pt.axisTitle);"
+    ]
+   ]
+  },
+  "module-caption-13": {
+   "undoes": "RC5 guard — the public page states the shared module's numbers (a module change shows in the copy test)",
+   "edits": [
+    [
+     "src/poster/figureTextMinimums.ts",
+     "  caption: 12,\n};",
+     "  caption: 13,\n};"
+    ]
+   ]
+  },
+  "box-stored-size": {
+   "undoes": "RC6 — the chart draws at the box its host is laid out in, not the block's stored size",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "  const box = laidOut ?? { w: block.w, h: block.h };",
+     "  const box = { w: block.w, h: block.h };"
+    ]
+   ]
+  },
+  "zero-box-redraws": {
+   "undoes": "RC6 — a box of zero (the editor hidden behind Export › Preview poster) keeps the last box: the chart is not redrawn for a box it is not shown in",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "      if (!r || r.width <= 0 || r.height <= 0) return;",
+     "      if (!r) return;"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom never reports a box of zero (the test plays the observer); in Chromium the editor hidden behind the preview redraws every chart at the 120 × 90 px floor, and the preview's Print copies it: chart-print-size-check.mjs PRINT",
+   "browser": {
+    "harness": "scripts/chart-print-size-check.mjs",
+    "scenarios": [
+     "preview"
+    ]
+   }
+  },
+  "no-wait-for-box": {
+   "undoes": "RC6 — in a laid-out page the chart waits for its box instead of drawing first at the stored size",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "    if (!known && hostRef.current && hostRef.current.offsetWidth > 0 && typeof ResizeObserver === 'function') return;\n",
+     ""
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom lays nothing out (offsetWidth is 0), so the wait never applies there; Chromium and Firefox cancel the first draw before it lands, so only WebKit shows it: each chart drawn twice as the editor opens, chart-print-size-check.mjs REDRAW (POSTR_BROWSER=webkit)",
+   "browser": {
+    "harness": "scripts/chart-print-size-check.mjs",
+    "scenarios": [
+     "draws"
+    ],
+    "env": {
+     "POSTR_BROWSER": "webkit"
+    }
+   }
+  },
+  "loading-flash": {
+   "undoes": "RC6 — a chart on screen stays while it redraws for a new box (no \"Rendering chart…\" flash)",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "    setStatus((s) => (s === 'ready' ? s : 'loading'));",
+     "    setStatus('loading');"
+    ]
+   ]
+  },
+  "legend-grows-svg": {
+   "undoes": "RC6 — the legend's rows come out of the box's height (main: the svg grew by the legend and the viewBox shrank every text)",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "  return Math.max(heightPx - legendH, plotFloor(t, m, rangeFloor));",
+     "  return Math.max(heightPx, plotFloor(t, m, rangeFloor));"
+    ]
+   ]
+  },
+  "round-text-px": {
+   "undoes": "RC6 — text sizes are not rounded (33.33 px is 24 pt, 33 px is 23.76)",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "    tickPx: pt.tick * scale * pxPerPt,\n    labelPx: pt.axisTitle * scale * pxPerPt,",
+     "    tickPx: Math.round(pt.tick * scale * pxPerPt),\n    labelPx: Math.round(pt.axisTitle * scale * pxPerPt),"
+    ]
+   ]
+  },
+  "round-base-font": {
+   "undoes": "RC6 — the svg's base font (the tick labels) is not rounded",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "      fontSize: `${tickPx}px`,",
+     "      fontSize: `${Math.round(tickPx)}px`,"
+    ]
+   ]
+  },
+  "round-legend-font": {
+   "undoes": "RC6 — legend text is not rounded",
+   "edits": [
+    [
+     "src/charts/renderChart.ts",
+     "    text.setAttribute('font-size', String(fontPx));",
+     "    text.setAttribute('font-size', String(Math.round(fontPx)));"
+    ]
+   ]
+  },
+  "round-axis-title": {
+   "undoes": "RC6 — axis titles are not rounded",
+   "edits": [
+    [
+     "src/charts/renderChart.ts",
+     "    g.setAttribute('font-size', String(build.labelPx));",
+     "    g.setAttribute('font-size', String(Math.round(build.labelPx)));"
+    ]
+   ]
+  },
+  "fit-off": {
+   "undoes": "RC6 — in a box too small for the legend at full size the text scales (toward the minimums) instead of the svg growing past the box",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "  const built = scale === 1 ? full : buildAt(spec, theme, plot, chartText(theme.pxPerPt, scale, measure), overrides, full.xEvery);",
+     "  const built = full;"
+    ]
+   ]
+  },
+  "fit-below-floor": {
+   "undoes": "RC6 — the fit never scales text below the minimums",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "  const floor = minTextScale();",
+     "  const floor = minTextScale() * 0.8;"
+    ]
+   ]
+  },
+  "margins-no-top-title": {
+   "undoes": "RC6 — the top margin holds a y title above the plot",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "  const top = titles.yTopLines\n",
+     "  const top = false\n"
+    ]
+   ]
+  },
+  "margins-no-x-title": {
+   "undoes": "RC6 — the bottom margin holds the x title under the tick labels",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "  const bottom = titles.xLines\n",
+     "  const bottom = false\n"
+    ]
+   ]
+  },
+  "legend-no-wrap": {
+   "undoes": "RC6 — legend entries wrap onto rows inside the chart's width",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "    if (x + w > widthPx - LEGEND_INSET && x > LEGEND_INSET) {",
+     "    if (false) {"
+    ]
+   ]
+  },
+  "title-placement-plot": {
+   "undoes": "RC6 — axis titles are placed inside the svg on the lines the margins hold (main: Plot's placement for its base font, so a 24 pt title ran past the top and bottom edges)",
+   "edits": [
+    [
+     "src/charts/renderChart.ts",
+     "      text.setAttribute('y', `${first}em`);\n",
+     ""
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no text layout: where a title's glyphs fall is invisible; in Chromium the y title's capitals and the x title's descenders pass the svg's edges: chart-print-size-check.mjs CLIP",
+   "browser": {
+    "harness": "scripts/chart-print-size-check.mjs",
+    "scenarios": [
+     "quick"
+    ]
+   }
+  },
+  "legend-anchor-middle": {
+   "undoes": "RC6 — legend labels start after their swatch (Plot's root sets text-anchor middle)",
+   "edits": [
+    [
+     "src/charts/renderChart.ts",
+     "  legend.setAttribute('text-anchor', 'start');\n",
+     ""
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no text layout; in Chromium a label centred on its start runs over its swatch and past the left edge: chart-print-size-check.mjs CLIP and COLLIDE",
+   "browser": {
+    "harness": "scripts/chart-print-size-check.mjs",
+    "scenarios": [
+     "quick"
+    ]
+   }
+  },
+  "y-band-no-wrap": {
+   "undoes": "RC6 — category labels left of the plot wrap",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "    options['y'] = { ...(options['y'] as object), tickFormat: wrapped.format };",
+     "    options['y'] = { ...(options['y'] as object) };"
+    ]
+   ]
+  },
+  "y-band-margin-fixed": {
+   "undoes": "RC6 — the left margin holds the widest wrapped category label",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "    options['marginLeft'] = bandLeftMargin(text, wrapped.widestPx, yBand.along);\n",
+     ""
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no text layout: a label past the svg's left edge is invisible; in Chromium the Likert statements, the dumbbell and the horizontal bars' labels are clipped: chart-print-size-check.mjs CLIP",
+   "browser": {
+    "harness": "scripts/chart-print-size-check.mjs",
+    "scenarios": [
+     "quick"
+    ]
+   }
+  },
+  "x-band-no-wrap": {
+   "undoes": "RC6 — category labels under the plot wrap within their band",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "    options[cats.x.scale] = { ...(options[cats.x.scale] as object), tickFormat: wrapped.format, ...ticks };",
+     "    options[cats.x.scale] = { ...(options[cats.x.scale] as object), ...ticks };"
+    ]
+   ]
+  },
+  "direct-no-wrap": {
+   "undoes": "RC6 — labels at the lines' ends wrap",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "              text: (row: DataRow) => names.format(row[seriesField]),",
+     "              text: e.series,"
+    ]
+   ]
+  },
+  "direct-margin-fixed": {
+   "undoes": "RC6 — the right margin holds the widest line of the labels at the lines' ends",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "          options['marginRight'] = directRightMargin(text, dx, names.widestPx);\n",
+     ""
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no text layout: a label past the svg's right edge is invisible; in Chromium the line charts' end labels are clipped: chart-print-size-check.mjs CLIP",
+   "browser": {
+    "harness": "scripts/chart-print-size-check.mjs",
+    "scenarios": [
+     "quick"
+    ]
+   }
+  },
+  "y-title-no-wrap": {
+   "undoes": "RC6 — a y title too long for the width wraps above the plot",
+   "edits": [
+    [
+     "src/charts/renderChart.ts",
+     "      const lines = wraps ? wrapText(own, room, build.labelPx, measure) : [own];",
+     "      const lines = [own];"
+    ]
+   ]
+  },
+  "stacked-no-cap": {
+   "undoes": "RC6 — the single stacked bar keeps its short height in a tall box",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "  options['height'] = heightCap === null ? height : Math.min(height, heightCap);",
+     "  options['height'] = height;"
+    ]
+   ]
+  },
+  "caption-body-not-pinned": {
+   "undoes": "RC6 — a chart's body is pinned to the block height under a caption, as an image's is",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "  const isImageLike = block.type === 'image' || block.type === 'logo' || block.type === 'chart';",
+     "  const isImageLike = block.type === 'image' || block.type === 'logo';"
+    ]
+   ]
+  },
+  "frame-not-growing": {
+   "undoes": "RC6 — a chart block's frame grows with its caption or note",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "    imageHasGrowingChrome ||\n    chartHasGrowingChrome ||\n",
+     "    imageHasGrowingChrome ||\n"
+    ]
+   ]
+  },
+  "frame-not-growing-side": {
+   "undoes": "RC6 — a side caption grows the frame too (the chart body is pinned, a frame held at the block height cut its x axis)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "    b.type === 'chart' &&\n    ((b.captionPosition !== 'none' && captionNumber !== undefined) || !!b.note);",
+     "    b.type === 'chart' &&\n    ((b.captionPosition !== 'none' && b.captionPosition !== 'left' && b.captionPosition !== 'right' && captionNumber !== undefined) || !!b.note);"
+    ]
+   ]
+  },
+  "measure-narrow": {
+   "undoes": "review Q-R2 to Q-R4 — text is measured in the chart's own font (main and round 0: a character count at 0.6 em, short for capitals); this mutant measures 15 % short",
+   "edits": [
+    [
+     "src/charts/textMeasure.ts",
+     "      w = ctx.measureText(text).width * PAD_RATIO + PAD_EM * fontPx;",
+     "      w = (ctx.measureText(text).width * PAD_RATIO + PAD_EM * fontPx) * 0.85;"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom has no canvas, so the estimate measures there and this line never runs; in Chromium labels laid out 15 % short run past the chart's edges: chart-print-size-check.mjs CLIP (18 of 75 chart-sizes in a trial run)",
+   "browser": {
+    "harness": "scripts/chart-print-size-check.mjs",
+    "scenarios": [
+     "quick"
+    ]
+   }
+  },
+  "tickfit-off": {
+   "undoes": "review Q-R2 — the tick labels Plot drew on a continuous axis are read back and the chart is laid out again with the margins they need",
+   "edits": [
+    [
+     "src/charts/renderChart.ts",
+     "    const next = fitTicks(svg, build, theme.widthPx, measure, overrides);",
+     "    const next = null;"
+    ]
+   ]
+  },
+  "tickfit-no-y": {
+   "undoes": "review Q-R2 — the left margin holds a continuous y axis's widest tick label (main: a constant, so \"1,000,000\" ran past the left edge)",
+   "edits": [
+    [
+     "src/charts/tickFit.ts",
+     "  if (build.continuous.y) {",
+     "  if (false) {"
+    ]
+   ]
+  },
+  "tickfit-no-x-edge": {
+   "undoes": "review Q-R2 — the right margin holds the x tick label at the plot's right end",
+   "edits": [
+    [
+     "src/charts/tickFit.ts",
+     "      widen('marginRight', marginRight + (last.x + last.w / 2 - (widthPx - EDGE)), marginRight);\n",
+     ""
+    ]
+   ]
+  },
+  "tickfit-no-x-spacing": {
+   "undoes": "review Q-R4 — a continuous x axis's ticks are spaced so their labels do not meet (Plot's default: one per 80 px)",
+   "edits": [
+    [
+     "src/charts/tickFit.ts",
+     "      if (worst > 1) {",
+     "      if (false) {"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom does no text layout and no test reads where Plot put its x labels against their widths; in Chromium the millions line chart's year labels meet at 6 × 4.5: chart-print-size-check.mjs COLLIDE (16 of 304 chart-sizes in a trial run)",
+   "browser": {
+    "harness": "scripts/chart-print-size-check.mjs",
+    "scenarios": [
+     "paste"
+    ]
+   }
+  },
+  "band-floor-off": {
+   "undoes": "review Q-R4 — a category axis left of the plot raises the plot's floor so each band holds its label's lines",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "  const rangeFloor = yBand ? bandAxisRange(yBand.labels.length, yLines, text) : 0;",
+     "  const rangeFloor = 0;"
+    ],
+    [
+     "src/charts/plotOptions.ts",
+     "    rangeFloor: full.yBand ? bandAxisRange(full.yBand.labels.length, yBandWrap(full.yBand, theme.widthPx, t).maxLines, t) : 0,",
+     "    rangeFloor: 0,"
+    ]
+   ]
+  },
+  "band-room-no-word": {
+   "undoes": "review Q-R4 — a category label's room on the left widens to hold its widest word (main: upper-case labels were cut at the left edge)",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "  return Math.max(room(MAX_BAND_LABEL_SHARE), Math.min(widestWordPx, room(MAX_BAND_LABEL_SHARE_WORD)));",
+     "  return room(MAX_BAND_LABEL_SHARE);"
+    ]
+   ]
+  },
+  "wrap-no-char-break": {
+   "undoes": "review Q-R4 — a word wider than its room breaks between characters, so no line is wider than the room",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "      for (const ch of part) {\n        if (place(ch, '')) continue;\n        breakLine();\n        line = ch;\n      }",
+     "      line = part;"
+    ]
+   ]
+  },
+  "wrap-no-hyphen-break": {
+   "undoes": "review Q-R4 — a word wider than its room breaks after its hyphens first",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "    for (const part of word.match(/[^-–/]+[-–/]*|[-–/]+/g) ?? [word]) {",
+     "    for (const part of [word]) {"
+    ]
+   ]
+  },
+  "legend-label-no-wrap": {
+   "undoes": "review Q-R3 — a legend label longer than a row wraps onto lines of its own (main: it ran past the right edge)",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "    const lines = wrapText(entry.label, room, tickPx, measure);",
+     "    const lines = [entry.label];"
+    ]
+   ]
+  },
+  "legend-painter-one-line": {
+   "undoes": "review Q-R3 — the legend painter draws a wrapped label's lines",
+   "edits": [
+    [
+     "src/charts/renderChart.ts",
+     "    if (lines.length < 2) {",
+     "    if (true) {"
+    ]
+   ]
+  },
+  "y-title-full-width": {
+   "undoes": "review Q-R4 — the y title above the plot stops short of the line-end labels' margin",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "    y: (directLabels ? widthPx - marginRight : widthPx - EDGE) - EDGE,",
+     "    y: widthPx - 2 * EDGE,"
+    ]
+   ]
+  },
+  "x-title-band-full-width": {
+   "undoes": "round 1 — a category axis's title, centred under the plot, wraps to the room between its centre and the nearer edge",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "    x: xBand ? 2 * Math.min(centre - EDGE, widthPx - EDGE - centre) : widthPx - 2 * EDGE,",
+     "    x: widthPx - 2 * EDGE,"
+    ]
+   ]
+  },
+  "grow-off": {
+   "undoes": "review Q-R1 — a chart reports the least height it takes at the minimum text sizes (main and round 0: the svg came out taller than its box and the viewBox scaled every text below the minimums)",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "        onMinHeightRef.current?.(minHeightPx / PX);\n",
+     ""
+    ]
+   ]
+  },
+  "grow-frame-off": {
+   "undoes": "review Q-R1 — a chart with no caption grows its frame to its least height",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "  const fixedHeight = b.type === 'chart' && chartMinH !== null ? Math.max(b.h, chartMinH + 2 * frameBorder) : b.h;",
+     "  const fixedHeight = b.h;"
+    ]
+   ]
+  },
+  "grow-body-off": {
+   "undoes": "review Q-R1 — under a caption, a chart's pinned body grows to its least height",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "          height: isImageLike ? Math.max(block.h, bodyMinH ?? 0) : 'auto',",
+     "          height: isImageLike ? block.h : 'auto',"
+    ]
+   ]
+  },
+  "min-height-at-full-size": {
+   "undoes": "review Q-R1 — the least height is taken at the minimum text sizes, so a block grows no more than they need",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "  const tMin = chartText(theme.pxPerPt, minTextScale(), measure);",
+     "  const tMin = chartText(theme.pxPerPt, 1, measure);"
+    ]
+   ]
+  },
+  "print-strips-overlays-only": {
+   "undoes": "review Q-R5 — \"⎙ Save PDF\" strips the editor's chrome as the thumbnail does (main: only the grid and rulers, so a selected block printed its handles)",
+   "edits": [
+    [
+     "src/poster/PosterEditor.tsx",
+     "    const clone = canvas.cloneNode(true) as HTMLElement;\n    stripEditorChrome(clone);",
+     "    const clone = canvas.cloneNode(true) as HTMLElement;\n    clone.querySelectorAll('[data-postr-overlay]').forEach((el) => el.remove());"
+    ]
+   ]
+  },
+  "strip-keeps-accent": {
+   "undoes": "review Q-R5 and Q-R7 — a selected or out-of-bounds frame's 1.5 px border goes back to the unselected 1 px transparent one in the copy (the print's zoom drew it 1.458 units wide where the editor drew it 1, and the chart printed 0.94 % smaller)",
+   "edits": [
+    [
+     "src/export/stripEditorChrome.ts",
+     "    el.style.border = '1px solid transparent';\n",
+     ""
+    ]
+   ]
+  },
+  "strip-selected-only": {
+   "undoes": "review Q-R7 — an out-of-bounds frame's border is reset in the copy too",
+   "edits": [
+    [
+     "src/export/stripEditorChrome.ts",
+     "'[data-postr-selected=\"true\"], [data-postr-oob=\"true\"]'",
+     "'[data-postr-selected=\"true\"]'"
+    ]
+   ]
+  },
+  "font-load-no-redraw": {
+   "undoes": "round 1 — a chart drawn before its font loaded is drawn again once it has (its layout is measured in the font it shows)",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "  }, [spec, palette, fontFamily, box.w, box.h, known, fontLoads]);",
+     "  }, [spec, palette, fontFamily, box.w, box.h, known]);"
+    ]
+   ]
+  },
+  "measure-no-pad": {
+   "undoes": "round 1 — a canvas width is padded by 2 % and 0.16 em (WebKit's SVG text comes out up to 1.3 % wider than the canvas measures, Firefox's text box 4 px wider)",
+   "edits": [
+    [
+     "src/charts/textMeasure.ts",
+     "      w = ctx.measureText(text).width * PAD_RATIO + PAD_EM * fontPx;",
+     "      w = ctx.measureText(text).width;"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom has no canvas; in Firefox labels laid out to the bare advance touch the chart's edges and each other: chart-print-size-check.mjs CLIP or COLLIDE",
+   "browser": {
+    "harness": "scripts/chart-print-size-check.mjs",
+    "scenarios": [
+     "paste"
+    ],
+    "env": {
+     "POSTR_BROWSER": "firefox"
+    }
+   }
+  },
+  "measure-scaled": {
+   "undoes": "round 1 — text is measured at the size it is drawn at, not at 100 px and scaled (the system font spaces small text wider: 3 to 4 % short at 25 px)",
+   "edits": [
+    [
+     "src/charts/textMeasure.ts",
+     "      ctx.font = `${fontPx}px ${fontFamily}`;\n      w = ctx.measureText(text).width * PAD_RATIO + PAD_EM * fontPx;",
+     "      ctx.font = `100px ${fontFamily}`;\n      w = (ctx.measureText(text).width / 100) * fontPx * PAD_RATIO + PAD_EM * fontPx;"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom has no canvas, so no test runs this line",
+   "unguarded": "MEASURED, equivalent for the gates: with the 2 % and 0.16 em pad, a measurer that scales from 100 px holds every claim on the partitions (chart-print-size-check.mjs --only paste in Firefox; --only paste-sides,paste-longcap,quick in Chromium and Firefox: exit 0 under this mutant). Measuring at the drawn size is kept for accuracy, not because a gate needs it: the scaling error grows as text shrinks (6.7 % short for a long title at 19.4 px in Chromium, scratch probe ffmeasure), and the pad is sized for the engines' differences, not for it."
+  },
+  "print-headroom-off": {
+   "undoes": "round 1 — the chart's floor sits 0.5 % above the minimums, so the print's rounding of a box laid out to the chart's least height cannot take its text below them",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "export const PRINT_HEADROOM = 1.005;",
+     "export const PRINT_HEADROOM = 1;"
+    ]
+   ]
+  },
+  "x-band-no-thinning": {
+   "undoes": "round 1 — where a band cannot hold even one character of its labels, every k-th band is labelled, each label with k bands of room",
+   "edits": [
+    [
+     "src/charts/chartLayout.ts",
+     "    if (wrapped.widestPx <= room + 1e-6 || every >= count) return { every, wrapped };",
+     "    return { every, wrapped };"
+    ]
+   ]
+  },
+  "thin-not-kept": {
+   "undoes": "round 1 — at a smaller text scale the chart keeps the full-size layout's choice of labelled bands, so the labels wrap onto no more lines than the fit counted",
+   "edits": [
+    [
+     "src/charts/plotOptions.ts",
+     "  const built = scale === 1 ? full : buildAt(spec, theme, plot, chartText(theme.pxPerPt, scale, measure), overrides, full.xEvery);",
+     "  const built = scale === 1 ? full : buildAt(spec, theme, plot, chartText(theme.pxPerPt, scale, measure), overrides);"
+    ]
+   ],
+   "expect": "survive",
+   "why": "jsdom lays nothing out and no test reaches a chart whose band labels are thinned at one scale and not at another; in Chromium the heatmap of ten series names beside a side caption at 6 × 4.5 came out taller than its box and printed its ticks at 13.79 pt: chart-print-size-check.mjs BELOW",
+   "browser": {
+    "harness": "scripts/chart-print-size-check.mjs",
+    "scenarios": [
+     "paste-sides"
+    ]
+   }
+  }
+ }
+}

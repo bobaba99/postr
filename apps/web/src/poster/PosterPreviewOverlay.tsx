@@ -57,6 +57,13 @@ export interface PosterPreviewOverlayProps {
   sortedRefs: PosterDoc['references'];
   citationStyle: CitationStyleKey;
   headingNumbers: Record<string, number>;
+  /**
+   * "Figure N." and "Table N." numbers, from the same reading order as the
+   * canvas (readingOrder.ts). Without them a figure or table showed no
+   * caption at all in the preview, while the canvas and the print did
+   * (record 28).
+   */
+  captionNumbers: Record<string, number>;
   titleOverflowPx: number;
   /** Shared with the editor so BlockFrame's drag guard behaves identically. */
   didDragRef: React.MutableRefObject<boolean>;
@@ -82,6 +89,7 @@ export function PosterPreviewOverlay({
   sortedRefs,
   citationStyle,
   headingNumbers,
+  captionNumbers,
   titleOverflowPx,
   didDragRef,
   paletteName,
@@ -166,6 +174,7 @@ export function PosterPreviewOverlay({
               references={sortedRefs}
               citationStyle={citationStyle}
               headingNumber={headingNumbers[b.id] ?? 0}
+              captionNumber={captionNumbers[b.id]}
               selected={false}
               onSelect={() => {}}
               onPointerDown={() => {}}

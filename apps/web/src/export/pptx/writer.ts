@@ -18,6 +18,7 @@
 import type PptxGenJS from 'pptxgenjs';
 import type { Block, PosterDoc, TypeStyle } from '@postr/shared';
 import { planPptxScale, unitsToInches, unitsToPoints } from '../units';
+import { PX } from '@/poster/constants';
 import {
   cssColorToHex6,
   parseRichText,
@@ -635,8 +636,8 @@ export async function exportPosterPptx(
     doc,
     font: themeFont,
     scale: plan.scale,
-    captionNumbers: computeCaptionNumbers(doc.blocks),
-    headingNumbers: computeHeadingNumbers(doc.blocks),
+    captionNumbers: computeCaptionNumbers(doc.blocks, doc.widthIn * PX),
+    headingNumbers: computeHeadingNumbers(doc.blocks, doc.widthIn * PX),
     assets,
     options,
     warnings,

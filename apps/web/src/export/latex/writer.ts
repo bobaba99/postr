@@ -15,7 +15,7 @@
  * Pure function — no DOM, no store, no network (plan §5).
  */
 import type { Block, PosterDoc, TypeStyle } from '@postr/shared';
-import { TABLE_BORDER_PRESETS } from '@/poster/constants';
+import { PX, TABLE_BORDER_PRESETS } from '@/poster/constants';
 import { escapeLatex } from './escape';
 import {
   cssColorToHex6,
@@ -489,8 +489,8 @@ export function buildLatexDocument(
   const ctx: EmitContext = {
     doc,
     options,
-    captionNumbers: computeCaptionNumbers(doc.blocks),
-    headingNumbers: computeHeadingNumbers(doc.blocks),
+    captionNumbers: computeCaptionNumbers(doc.blocks, doc.widthIn * PX),
+    headingNumbers: computeHeadingNumbers(doc.blocks, doc.widthIn * PX),
     warnings,
   };
 

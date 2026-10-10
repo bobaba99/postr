@@ -9,7 +9,8 @@ import {
   type KeyboardEvent,
 } from 'react';
 import type { Block } from '@postr/shared';
-import { PX } from './constants';
+import { printedImageBox } from './imageBox';
+import { FIGURE_TEXT_MIN_PT, figureTextStatus } from './figureTextMinimums';
 import {
   parseRCode,
   parsePythonCode,
@@ -25,7 +26,7 @@ import { resolveStorageUrl } from '@/data/posterImages';
 import { postJson } from '@/lib/apiClient';
 import { layoutTokens, type ReadabilityLayout } from './readabilityLayout';
 import { ReadabilitySizingNote, keptResultNote } from './ReadabilitySizingNote';
-import { generateFullFix, generateTargetedFullFix } from './readabilityFullFix';
+import { generateTargetedFullFix } from './readabilityFullFix';
 import { CodeView, CopyButton } from './ReadabilityCodeView';
 import { FullCodeModal } from './FullCodeModal';
 import { btnStyle, labelStyle, panelStyle, primaryBtnStyle } from './readabilityStyles';
@@ -313,13 +314,13 @@ function runReadabilityCheck(inputs: CheckedInputs, defaultSizeLabel: string | u
       ? parseRCode(inputs.code, parseOpts)
       : parsePythonCode(inputs.code, parseOpts);
   const result = computeReadability(params, inputs.heightIn, inputs.widthIn);
-  // The user gets their OWN script back with the targeted sizes applied.
+  // The user gets their OWN script back, edited, to use in place of theirs
+  // (fix 13b): every size below its minimum raised where it is written, and
+  // every size or canvas the code leaves out set at what the check assumed.
   // Handing over a theme() fragment asks them to work out where it goes,
   // and on a script that already has a theme() with ggsave() at the
   // bottom, that is a real chance to paste it somewhere it does nothing.
-  const fullFix = result.fontSnippet
-    ? generateTargetedFullFix(inputs.code, params, result.fontSnippet)
-    : generateFullFix(inputs.code, params, result.suggestedBaseSize);
+  const fullFix = generateTargetedFullFix(inputs.code, params, result, parseOpts);
   return {
     code: inputs.code,
     result,
@@ -395,8 +396,11 @@ export function ReadabilityPanel({
   // Hard gate, not just `selectedBlock={null}`: the page must never
   // mount the image-OCR scan path, whatever a caller passes.
   const isImage = layout === 'panel' && selectedBlock?.type === 'image';
-  const blockWidthIn = isImage ? selectedBlock.w / PX : defaultFigureWidthIn;
-  const blockHeightIn = isImage ? selectedBlock.h / PX : defaultFigureHeightIn;
+  // The picture's printed box, not the block's: the frame's border, and a
+  // side caption's 35% of the width (fix 13b; imageBox.ts).
+  const imageBox = isImage ? printedImageBox(selectedBlock) : null;
+  const blockWidthIn = imageBox ? imageBox.widthIn : defaultFigureWidthIn;
+  const blockHeightIn = imageBox ? imageBox.heightIn : defaultFigureHeightIn;
   // The figure that sizes the check: the selected image, else the preview.
   const imageId = isImage ? selectedBlock.id : null;
 
@@ -513,10 +517,22 @@ export function ReadabilityPanel({
   const answerOnScreen = shownAnswer !== null && shownAnswer.kind !== 'checked';
   const checkedParams = stale ? null : checked?.params ?? null;
   const fullFixedCode = stale ? '' : checked?.fullFix ?? '';
-  const needsFix =
-    result?.elements.some((e) => e.status !== 'pass') ?? false;
-  const allPass =
-    result?.elements.every((e) => e.status === 'pass') ?? false;
+  // The box with the edited script opens when a row falls short, or when a
+  // size or the canvas is assumed: the script sets what the code leaves out
+  // (fix 13b). The all-pass line is for a table with nothing assumed.
+  const failing = result?.elements.some((e) => e.status !== 'pass') ?? false;
+  const assumed = (result?.canvasAssumed ?? false) || (result?.elements.some((e) => e.assumed) ?? false);
+  const needsFix = (failing || assumed) && fullFixedCode !== '';
+  const allPass = (result?.elements.every((e) => e.status === 'pass') ?? false) && !assumed;
+  const allPassAssumed = (result?.elements.every((e) => e.status === 'pass') ?? false) && assumed;
+  const assumedKept = result?.elements.some((e) => e.assumed && e.kept) ?? false;
+  // Review round 2 (P13B-R2-03): a size the code sets but the check cannot read is "Not read from
+  // your code", not "Not in your code"; the two legend lines are shown for the rows they describe.
+  const assumedDefault = (result?.canvasAssumed ?? false) || (result?.elements.some((e) => e.assumed && !e.unread) ?? false);
+  const assumedUnread = result?.elements.some((e) => e.assumed && e.unread) ?? false;
+  // Review round 3: an unread size the script cannot edit in place (a FontProperties, a ** it cannot see into) is left.
+  const unreadKept = result?.elements.some((e) => e.assumed && e.unread && e.kept) ?? false;
+  const keptDefault = result?.elements.some((e) => e.assumed && !e.unread && e.kept) ?? false;
 
   const handleCopied = () => setCopiedBannerOpen(true);
 
@@ -737,6 +753,9 @@ export function ReadabilityPanel({
 
           <div style={{ fontSize: 13, color: t.mutedColor }}>
             {c.scale(formatNumber(result.scale, uiLang, 2))}
+            {/* Fix 13b: the canvas is not fixed by the code (none given, one
+                it cannot read, a seaborn grid, a cropped save). */}
+            {result.canvasAssumed && <span title={c.legend.assumedScale}>*</span>}
             {!isImage && c.scaleSuffix[layout]}
           </div>
 
@@ -762,6 +781,8 @@ export function ReadabilityPanel({
                     }}
                   >
                     {pt(el.sourcePt, uiLang)}
+                    {/* Fix 13b: a size the code does not set, or sets in a way the check cannot read; the default is assumed. */}
+                    {el.assumed && <span title={el.unread ? c.legend.unreadRow : c.legend.assumedRow}>*</span>}
                   </td>
                   <td
                     style={{
@@ -845,6 +866,24 @@ export function ReadabilityPanel({
                 <strong style={{ color: '#cdd6f4' }}>{c.legend.failLead}</strong> {c.legend.failBody}
               </span>
             </div>
+            {assumedDefault && (
+              <div>
+                <span style={{ color: '#f9e2af', fontWeight: 700 }}>*</span>{' '}
+                <span style={{ color: '#bac2de' }}>
+                  <strong style={{ color: '#cdd6f4' }}>{c.legend.assumedLead}</strong>{' '}
+                  {/* A size the script leaves as written (a theme that is not ggplot2's, a value it cannot read): checked by hand. */}
+                  {!keptDefault ? c.legend.assumedBody : fullFixedCode !== '' ? c.legend.assumedBodySome : c.legend.assumedBodyKept}
+                </span>
+              </div>
+            )}
+            {assumedUnread && (
+              <div>
+                <span style={{ color: '#f9e2af', fontWeight: 700 }}>*</span>{' '}
+                <span style={{ color: '#bac2de' }}>
+                  <strong style={{ color: '#cdd6f4' }}>{c.legend.unreadLead}</strong> {unreadKept ? c.legend.unreadBodyKept : c.legend.unreadBody}
+                </span>
+              </div>
+            )}
             <div style={{ color: '#7f849c', marginTop: 2 }}>
               <strong style={{ color: '#9ca3af' }}>{c.legend.sourceWord}</strong> {c.legend.sourceText}{' '}
               <strong style={{ color: '#9ca3af' }}>{c.legend.printWord}</strong> {c.legend.printText}{' '}
@@ -875,7 +914,7 @@ export function ReadabilityPanel({
                   is a fixed size, so text the figure did not need grows
                   into panel space the data did. Targeted sizes cost more
                   characters to paste and less of the plot. */}
-              {result.fontFixes.length > 0 && result.fontSnippet !== null && (
+              {fullFixedCode !== '' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div
                     style={{
@@ -886,16 +925,15 @@ export function ReadabilityPanel({
                     }}
                   >
                     <div style={{ fontSize: t.tableFontSize, color: '#cdd6f4', fontWeight: 600 }}>
-                      {c.fix.title}
+                      {failing ? c.fix.title : c.fix.titleAssumed}
                     </div>
                     {/* Copies the whole corrected script, not the theme()
                         fragment — splicing a fragment into the right place
                         is work the tool can do, and getting it wrong gives
                         code that runs and silently changes nothing. */}
-                    {/* "edited", not "corrected": in R a theme() of the
-                        user's own placed after theme_*() still wins over the
-                        inserted one (measured: axis.text 7 -> 7 pt), so the
-                        copy cannot promise the result is corrected. */}
+                    {/* "edited": the script is the user's own with plain edits
+                        (fix 13b), which the copy below asks them to use in
+                        place of theirs. */}
                     <CopyButton
                       text={fullFixedCode}
                       label={c.fix.copyEdited}
@@ -904,7 +942,7 @@ export function ReadabilityPanel({
                       style={{ minHeight: t.buttonMinHeight, fontSize: t.buttonFontSize }}
                     />
                   </div>
-                  <ul
+                  {result.fontFixes.length > 0 && <ul
                     style={{
                       margin: 0,
                       paddingLeft: 18,
@@ -919,7 +957,7 @@ export function ReadabilityPanel({
                         {f.wasOverridden && <span style={{ color: '#6b7280' }}>{c.fix.youSetThis}</span>}
                       </li>
                     ))}
-                  </ul>
+                  </ul>}
                   <CodeView text={fullFixedCode} layout={layout} />
                   <button
                     type="button"
@@ -936,12 +974,13 @@ export function ReadabilityPanel({
                   </button>
                   <div style={{ fontSize: 12, color: '#7f849c', lineHeight: 1.5 }}>
                     {c.fix.yourScript}{' '}
-                    {/* R: applyFontFixes inserts after the LAST theme_*()
-                        call, so a later theme() of the user's own still wins
-                        for the sizes it sets. Python: the helper raises each
-                        listed class at the save (fix 13); "never makes text
-                        smaller" was dropped because f03 in fix 13's record
-                        prints text below what the script alone draws. */}
+                    {/* R: readabilityRFix.ts puts one theme() in the plot
+                        ggsave() saves, after every theme of the user's, and
+                        a ggsave() with the size. Python: readabilityPyFix.ts
+                        replaces each size where it is written, sets the ones
+                        the code leaves out before the figure is made, and
+                        saves the whole figure (no tight crop). Neither writes
+                        a size below the one drawn now. */}
                     {checkedParams?.language === 'r' ? c.fix.whereR : c.fix.wherePython}
                   </div>
                 </div>
@@ -955,10 +994,10 @@ export function ReadabilityPanel({
                 <details style={{ borderTop: '1px solid #45475a', paddingTop: 10 }}>
                   {/* Python's snippet sets rcParams['font.size'], so the
                       summary names that, not ggplot's base_size. The
-                      number is computed from the elements that follow it
-                      only, so it can be LOWER than the script's own value
-                      (base_size 20 with axis.text set to 7 suggests 18):
-                      the note says what it moves, not that it grows. */}
+                      number is computed from the failing elements that
+                      follow it, and it is never below the script's own
+                      value: when no failing element follows it, it is not
+                      offered (fix 13b). */}
                   <summary style={{ cursor: 'pointer', fontSize: t.tableFontSize, color: '#9ca3af' }}>
                     {c.fix.orChangeOne(
                       checkedParams?.language === 'python' ? 'font.size' : 'base_size',
@@ -983,7 +1022,7 @@ export function ReadabilityPanel({
             </div>
           )}
 
-          {allPass && (
+          {(allPass || allPassAssumed) && (
             <div
               style={{
                 background: '#1a3a2a',
@@ -993,7 +1032,8 @@ export function ReadabilityPanel({
                 color: '#a6e3a1',
               }}
             >
-              {c.allPass}
+              {/* A row the script leaves as written cannot be promised to print this way (review round 2). */}
+              {allPass ? c.allPass : fullFixedCode !== '' && !assumedKept ? c.allPassAssumed : c.allPassAssumedKept}
             </div>
           )}
         </div>
@@ -1016,13 +1056,17 @@ export function ReadabilityPanel({
 // user doesn't have the original plotting code to paste.
 // ──────────────────────────────────────────────────────────────────────
 
+// The canonical minimums for figure text, the code check's too
+// (figureTextMinimums.ts). The scan cannot tell legend titles or strips
+// apart, so in-panel data labels and other text take the tick-label minimum,
+// as they did when this table had its own numbers (24/24/18, warning at 75%).
 const MIN_PT_BY_ROLE: Record<ScanRegion['role'], number> = {
-  title: 24,
-  'axis-title': 24,
-  'axis-tick': 18,
-  legend: 18,
-  data: 18,
-  other: 18,
+  title: FIGURE_TEXT_MIN_PT.plotTitle,
+  'axis-title': FIGURE_TEXT_MIN_PT.axisTitle,
+  'axis-tick': FIGURE_TEXT_MIN_PT.axisText,
+  legend: FIGURE_TEXT_MIN_PT.legendText,
+  data: FIGURE_TEXT_MIN_PT.axisText,
+  other: FIGURE_TEXT_MIN_PT.axisText,
 };
 
 function computeImageReadability(
@@ -1049,12 +1093,8 @@ function computeImageReadability(
   const regions: ScanRegion[] = raw.regions.map((r) => {
     const heightIn = r.bbox.h * printScale;
     const effectivePt = heightIn * 72;
-    const minPt = MIN_PT_BY_ROLE[r.role] ?? 18;
-    let status: ScanRegion['status'];
-    if (effectivePt >= minPt) status = 'pass';
-    else if (effectivePt >= minPt * 0.75) status = 'warn';
-    else status = 'fail';
-    return { ...r, effectivePt, status, minPt };
+    const minPt = MIN_PT_BY_ROLE[r.role] ?? MIN_PT_BY_ROLE.other;
+    return { ...r, effectivePt, status: figureTextStatus(effectivePt, minPt), minPt };
   });
 
   return {

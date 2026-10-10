@@ -85,26 +85,44 @@ const en = {
     minWord: 'Min',
     minTail: '.',
     readsPython:
-      'It reads font.size in plt.rcParams, seaborn’s context and font_scale, and the sizes given to set_xlabel(), set_ylabel(), set_title() and tick_params(). Check sizes set any other way yourself.',
+      'It reads the figure size, font.size and each element’s own size in rcParams (in plt.rc() and rc_context() too), seaborn’s set_theme() and set_context(), matplotlib’s built-in style sheets, and the sizes your code gives titles, axis labels, tick labels, legends, colorbars and captions, in the order your code sets them.',
     readsR:
-      'It reads base_size and the sizes theme() sets for the elements in this table. Check sizes set any other way, such as on text or title, yourself.',
+      'It reads base_size (named or not), the sizes theme() sets, text and title included, theme_set() and theme_update(), the sizes a legend’s own guide sets, each plot of a figure that combines plots (cowplot, gridExtra), and the size of ggsave() with its units and scale, or of a png(), pdf() or ragg device, and a theme held in a name or a function where it is used, in the order ggplot2 applies them.',
+    assumedLead: 'Not in your code.',
+    assumedBody: 'The size shown is the default the check assumed. The edited script below sets it, so the figure prints as shown.',
+    assumedBodySome:
+      'The size shown is the default the check assumed. The edited script below sets it, except a size in a plot the check cannot find by name, such as one made inside the call that combines plots: check that one yourself.',
+    assumedBodyKept:
+      'The size shown is the default the check assumed. It is in a plot the check cannot find by name, such as one made inside the call that combines plots, so the edited script cannot set it: check it yourself.',
+    assumedRow: 'Your code does not set this size: the default is assumed.',
+    unreadLead: 'Not read from your code.',
+    unreadBody:
+      'Your code sets this size in a way the check cannot read, such as a value from a configuration or a theme that is not ggplot2’s, so the size shown is the default it assumed. The edited script raises it to at least the size needed, read when the script runs, so never below what your code sets.',
+    unreadBodyKept:
+      'Your code sets this size in a way the check cannot read, so the size shown is the default it assumed. The edited script raises it to at least the size needed, read when the script runs, so never below what your code sets; a size in a FontProperties without a size, or in a ** or a fontdict= it cannot see into, can be left as written: check that one yourself.',
+    unreadRow: 'Your code sets this size in a way the check cannot read: the default is assumed.',
+    assumedScale: 'Your code does not fix the figure’s size, or saves it cropped: the edited script sets it.',
   },
   fix: {
     title: 'Raise these text elements',
+    titleAssumed: 'Set the sizes your code leaves out',
     copyEdited: 'Copy edited code',
     youSetThis: ' (you set this)',
     openFull: 'Open full edited code →',
-    yourScript: 'Your script with the sizes above added. Copy it whole and run it.',
+    yourScript: 'Replace your code with this version: your script with the sizes above set, and the figure saved at the size checked.',
     whereR:
-      'The new theme() goes right after your theme_*() call, or at the end of the plot when there is none, and sets only the sizes listed. ggplot applies theme calls in order and the last one wins, so if a theme() of your own comes later and sets one of these sizes, change the number there.',
+      'One theme() goes into the plot your ggsave() saves or your device draws (print(p), or the plot on a line of its own, which the edited script prints), after every theme of yours, so ggplot2 applies it last; a figure that combines plots gets one in each plot, before they are combined. It sets the sizes listed, never below the size the table shows, raises a size the check cannot read to at least the size needed, read when the script runs, raises a size a legend’s own guide sets where it is written, and sets the base text size when your code sets none and its theme is one of ggplot2’s. When the check finds no ggsave() and no plot drawn to a device, a ggsave() is added at the size checked, saving poster_figure.png.',
     wherePython:
-      'A small function raises these elements to at least the sizes listed when the figure is saved, so settings earlier in your script cannot undo it.',
+      'Each size is changed where your code sets it, and a size your code does not set is set before the text it sizes is made, so your layout calls make room for it. No size is set below the one the table shows, and a size your code sets in a way the check cannot read is raised to at least the size needed, read when the script runs, never below what your code sets. The figure is saved at the size checked; a save cropped with bbox_inches="tight" keeps what its crop kept when that fits the canvas at the sizes needed, so text outside the plots stays in the image.',
     orChangeOne: (setting: string, size: number) => `Or change one number: ${setting} = ${size}`,
     simplerToPaste: (setting: string) =>
       `Simpler to paste. It moves every text size that follows ${setting}, including the ones already large enough, and leaves the sizes your code sets directly as they are.`,
     copySnippet: 'Copy snippet',
   },
   allPass: 'Every element in the table meets its minimum at this poster size.',
+  allPassAssumed:
+    'Every element in the table meets its minimum, with the sizes marked * assumed. Replace your code with the version below so the figure prints this way.',
+  allPassAssumedKept: 'Every element in the table meets its minimum, with the sizes marked * assumed: check those yourself.',
   copied: '✓ Copied',
   modal: {
     title: 'Full edited code',
@@ -191,26 +209,46 @@ const fr: ReadabilityCopy = {
     minWord: 'Min.',
     minTail: '',
     readsPython:
-      'Elle lit font.size dans plt.rcParams, le contexte et le font_scale de seaborn, et les tailles données à set_xlabel(), set_ylabel(), set_title() et tick_params(). Vérifiez vous-même les tailles fixées autrement.',
+      'Elle lit la taille de la figure, font.size et la taille propre à chaque élément dans rcParams (aussi dans plt.rc() et rc_context()), set_theme() et set_context() de seaborn, les feuilles de style intégrées de matplotlib, et les tailles que votre code donne aux titres, aux titres d’axes, aux étiquettes de graduation, aux légendes, aux barres de couleurs et aux notes, dans l’ordre où votre code les fixe.',
     readsR:
-      'Elle lit base_size et les tailles que theme() fixe pour les éléments de ce tableau. Vérifiez vous-même les tailles fixées autrement, par exemple sur text ou title.',
+      'Elle lit base_size (nommé ou non), les tailles que theme() fixe, text et title compris, theme_set() et theme_update(), les tailles que fixe le guide propre d’une légende, chaque graphique d’une figure qui en assemble plusieurs (cowplot, gridExtra), et la taille de ggsave() avec ses unités et son facteur scale, ou d’un périphérique png(), pdf() ou ragg, et un thème rangé dans un nom ou une fonction là où il est utilisé, dans l’ordre où ggplot2 les applique.',
+    assumedLead: 'Absente de votre code.',
+    assumedBody:
+      'La taille affichée est la valeur par défaut que la vérification suppose. Le script modifié ci-dessous la fixe, pour que la figure s’imprime comme indiqué.',
+    assumedBodySome:
+      'La taille affichée est la valeur par défaut que la vérification suppose. Le script modifié ci-dessous la fixe, sauf une taille d’un graphique que la vérification ne trouve pas par son nom, par exemple un graphique créé dans l’appel qui assemble les graphiques\u00a0: vérifiez celle-là vous-même.',
+    assumedBodyKept:
+      'La taille affichée est la valeur par défaut que la vérification suppose. Elle appartient à un graphique que la vérification ne trouve pas par son nom, par exemple un graphique créé dans l’appel qui assemble les graphiques, et le script modifié ne peut donc pas la fixer\u00a0: vérifiez-la vous-même.',
+    assumedRow: 'Votre code ne fixe pas cette taille\u00a0: la valeur par défaut est supposée.',
+    unreadLead: 'Non lue dans votre code.',
+    unreadBody:
+      'Votre code fixe cette taille d’une façon que la vérification ne sait pas lire, par exemple une valeur tirée d’une configuration ou un thème qui n’est pas l’un de ceux de ggplot2\u00a0: la taille affichée est la valeur par défaut supposée. Le script modifié la relève au moins à la taille nécessaire, lue à l’exécution du script, donc jamais sous ce que fixe votre code.',
+    unreadBodyKept:
+      'Votre code fixe cette taille d’une façon que la vérification ne sait pas lire\u00a0: la taille affichée est la valeur par défaut supposée. Le script modifié la relève au moins à la taille nécessaire, lue à l’exécution du script, donc jamais sous ce que fixe votre code\u00a0; une taille rangée dans un FontProperties sans taille, ou dans un ** ou un fontdict= dont il ne voit pas le contenu, peut rester telle qu’écrite\u00a0: vérifiez celle-là vous-même.',
+    unreadRow: 'Votre code fixe cette taille d’une façon que la vérification ne sait pas lire\u00a0: la valeur par défaut est supposée.',
+    assumedScale: 'Votre code ne fixe pas la taille de la figure, ou l’enregistre rognée\u00a0: le script modifié la fixe.',
   },
   fix: {
     title: 'Augmentez ces éléments de texte',
+    titleAssumed: 'Fixez les tailles que votre code omet',
     copyEdited: 'Copier le code modifié',
     youSetThis: ' (vous l’avez fixé)',
     openFull: 'Ouvrir le code modifié complet →',
-    yourScript: 'Votre script, avec les tailles ci-dessus ajoutées. Copiez-le en entier et exécutez-le.',
+    yourScript:
+      'Remplacez votre code par cette version\u00a0: votre script, avec les tailles ci-dessus fixées et la figure enregistrée à la taille vérifiée.',
     whereR:
-      'Le nouveau theme() est placé juste après votre appel theme_*(), ou à la fin du graphique s’il n’y en a pas, et ne fixe que les tailles indiquées. ggplot applique les appels theme dans l’ordre et le dernier l’emporte\u00a0: si un theme() à vous vient plus loin et fixe l’une de ces tailles, changez le nombre à cet endroit.',
+      'Un theme() est placé dans le graphique qu’enregistre votre ggsave() ou que dessine votre périphérique (print(p), ou le graphique seul sur sa ligne, que le script modifié imprime), après chacun de vos thèmes, pour que ggplot2 l’applique en dernier\u00a0; une figure qui assemble plusieurs graphiques en reçoit un dans chacun d’eux, avant leur assemblage. Il fixe les tailles indiquées, jamais sous la taille qu’affiche le tableau, relève une taille que la vérification ne sait pas lire au moins à la taille nécessaire, lue à l’exécution du script, relève là où elle est écrite une taille que fixe le guide propre d’une légende, et fixe la taille de base du texte quand votre code n’en fixe pas et que son thème est l’un de ceux de ggplot2. Quand la vérification ne trouve ni ggsave() ni graphique dessiné dans un périphérique, un ggsave() est ajouté à la taille vérifiée, qui enregistre poster_figure.png.',
     wherePython:
-      'Une petite fonction porte ces éléments au moins aux tailles indiquées au moment d’enregistrer la figure, de sorte que des réglages plus tôt dans votre script ne peuvent pas l’annuler.',
+      'Chaque taille est modifiée là où votre code la fixe, et une taille que votre code ne fixe pas est fixée avant la création du texte qu’elle règle, pour que vos appels de mise en page lui fassent de la place. Aucune taille n’est fixée sous celle qu’affiche le tableau, et une taille que votre code fixe d’une façon que la vérification ne sait pas lire est relevée au moins à la taille nécessaire, lue à l’exécution du script, jamais sous ce que fixe votre code. La figure est enregistrée à la taille vérifiée; un enregistrement rogné par bbox_inches="tight" garde ce que son rognage gardait quand cela tient dans le canevas aux tailles nécessaires, pour que le texte hors des graphiques reste dans l’image.',
     orChangeOne: (setting: string, size: number) => `Ou changez un seul nombre\u00a0: ${setting} = ${size}`,
     simplerToPaste: (setting: string) =>
       `Plus simple à coller. Ce changement modifie toutes les tailles de texte qui suivent ${setting}, y compris celles qui sont déjà assez grandes, et laisse telles quelles les tailles que votre code fixe directement.`,
     copySnippet: 'Copier l’extrait',
   },
   allPass: 'Chaque élément du tableau atteint son minimum à cette taille d’affiche.',
+  allPassAssumed:
+    'Chaque élément du tableau atteint son minimum, avec les tailles marquées * supposées. Remplacez votre code par la version ci-dessous pour que la figure s’imprime ainsi.',
+  allPassAssumedKept: 'Chaque élément du tableau atteint son minimum, avec les tailles marquées * supposées\u00a0: vérifiez-les vous-même.',
   copied: '✓ Copié',
   modal: {
     title: 'Code modifié complet',

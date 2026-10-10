@@ -16,30 +16,46 @@
  * A second entry point, the editor's Figure tab › "Check a figure" (the same
  * panel), runs six of the scripts at the editor's default block; its size is
  * not set by the harness, so there only source sizes are compared (W1e, C).
+ * A third (fix 13b, the confirmer's scenario, claim EDIMG): the editor's
+ * Figure tab against an IMAGE BLOCK holding the PNG the script itself saves
+ * (manifest `editorImage`), 8 and 14 in wide, with each caption position
+ * (none, top, bottom, left, right): click the block, Figure tab › Check a
+ * figure, paste, Check; the picture's drawn box is read from the DOM
+ * (object-fit contain) and is the real print width.
  *
  * TRUTH: scripts/truth/mpl_truth.py runs the ORIGINAL script and every
  * CORRECTED script in real matplotlib (Agg) and reads back the size of
- * every text element drawn, and the canvas. It also measures the legend
+ * every text element drawn, and the canvas; since fix 13b review round 1
+ * also every text drawn and whether the image the save writes cuts it
+ * (claim CUT). It also measures the legend
  * title and Axes texts (no row), the image each savefig really writes
  * (TIGHT), and, with --inline, the Jupyter inline backend (SHOWSAVE). How
  * print sizes and verdicts are derived from it: lib/checkerScore.mjs.
+ *
+ * PAGE: lib/checkerPage.mjs drives and reads the page (shared with the R
+ * harness, scripts/checker-r-truth-check.mjs); it also reads the one-number
+ * advice under "Or change one number" (part 2, claims SNIPLOW and SNIPL: the
+ * score phase edits the script's own font.size to that number and runs it).
  *
  * SCORING: lib/checkerScore.mjs holds every claim, every control and the
  * GATE line; its header lists them. This file collects the runs (the page
  * and the editor), runs the truth (mpl_truth.py: its self-test, every
  * original, every corrected script, and the inline-backend runs SHOWSAVE
  * needs), hands both to scoreRuns() with the instrument hash (this file,
- * lib/checkerScore.mjs, lib/editorHarness.mjs, lib/mutants.mjs,
- * truth/mpl_truth.py and every file of fixtures/checker-corpus), writes
+ * lib/checkerScore.mjs, lib/checkerPage.mjs, lib/editorHarness.mjs,
+ * lib/mutants.mjs, truth/mpl_truth.py and every file of fixtures/checker-corpus), writes
  * OUT_DIR/results.json and prints the report.
  *
- * RUN (from apps/web; 45 scripts × 4 sizes + 6 editor runs: a full collect
- * took 24-88 s and a score 9-19 s on an M4 Max, shared; --only collects in parts)
+ * RUN (from apps/web; 116 scripts × 4 sizes + 6 editor runs + 20 image-block runs: 45 scripts are
+ * part 1's, 12 the reproducer's p2-*, 31 the confirmer's c-*, 12 review round 1's r1-*, 10 review
+ * round 2's r2-* and 6 review round 3's r3-* (fix 13b record section 9: a font.size from a config
+ * read as a string, `from __future__`, `FontProperties as FP`, a seaborn font_scale it cannot read);
+ * a full collect and score took about 13 min on an M4 Max, shared with a second run; --only collects in parts)
  *   node scripts/checker-truth-check.mjs                     # collect + score
  *   node scripts/checker-truth-check.mjs --phase collect --fresh --only ctl-fontsize,w2-rc-ticks
  *   node scripts/checker-truth-check.mjs --phase collect --only ...   # adds to OUT_DIR/runs
  *   node scripts/checker-truth-check.mjs --phase score
- *   options: --only id,id  --sizes 6x4.5,8x6,10x7,14x10 (default)  --fresh  --no-editor
+ *   options: --only id,id  --sizes 6x4.5,8x6,10x7,14x10 (default)  --fresh  --no-editor (skips both editor entries)
  *   env PORT (default 5391), OUT_DIR (default <tmp>/postr-checker-truth-check),
  *       PYTHON (default python3), POSTR_REPO, POSTR_MUTANT (lib/editorHarness.mjs)
  *   Needs Python >= 3.10 (the runner uses TemporaryDirectory's
@@ -85,10 +101,11 @@ process.on('unhandledRejection', fail);
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CORPUS = path.join(HERE, 'fixtures/checker-corpus');
-let WEB, installMocks, openEditor, startHarness, SHOWS, printReport, scoreRuns, MANIFEST;
+let WEB, installMocks, openEditor, startHarness, SHOWS, printReport, scoreRuns, MANIFEST, setSize, check, copyCorrected, allowClipboard;
 try {
   ({ WEB, installMocks, openEditor, startHarness } = await import('./lib/editorHarness.mjs'));
   ({ SHOWS, printReport, scoreRuns } = await import('./lib/checkerScore.mjs'));
+  ({ setSize, check, copyCorrected, allowClipboard } = await import('./lib/checkerPage.mjs'));
   MANIFEST = JSON.parse(fs.readFileSync(path.join(CORPUS, 'manifest.json'), 'utf8')).scripts;
   if (!MANIFEST || typeof MANIFEST !== 'object' || Object.values(MANIFEST).some((m) => !m?.elements)) {
     throw new Error('fixtures/checker-corpus/manifest.json: no "scripts" object, or a script without "elements"');
@@ -118,6 +135,11 @@ const SIZES = (opt('--sizes') ?? '6x4.5,8x6,10x7,14x10').split(',').map((s) => {
 const FRESH = argv.includes('--fresh');
 /** Scripts also checked in the editor's Figure tab (--no-editor skips them). */
 const EDITOR_IDS = argv.includes('--no-editor') ? [] : ['ctl-fontsize', 'ctl-explicit', 'w2-rc-ticks', 'w2-rc-fixblock', 's-alias-mpl', 's-kw-pyplot'];
+/** The editor against an image block holding the script's PNG (EDIMG): block widths in poster units (10 a inch), caption positions. */
+const IMAGE_BLOCK_WIDTHS = [80, 140];
+const CAPTIONS = ['none', 'top', 'bottom', 'left', 'right'];
+const imageIds = () => (argv.includes('--no-editor') ? [] : ids.filter((id) => MANIFEST[id].editorImage));
+const imageKey = (id, w, cap) => `edimg~${id}~${w}~${cap}`;
 
 const ids = Object.keys(MANIFEST).filter((id) => !ONLY || ONLY.includes(id));
 if (ONLY && ids.length !== ONLY.length) fail(`unknown --only id: ${ONLY.filter((id) => !MANIFEST[id])}`);
@@ -131,7 +153,9 @@ for (const id of ids) if (!MANIFEST[id].generated && !fs.existsSync(scriptPath(i
 const sha = (s) => createHash('sha256').update(s).digest('hex').slice(0, 16);
 /** What the page is built from: runs from different sources must not be scored together. */
 function sourceHash() {
-  const files = ['src/poster/readability.ts', 'src/poster/readabilityFullFix.ts', 'src/poster/ReadabilityPanel.tsx',
+  // Every module of the checker (fix 13b split readability.ts into several), and the page around it.
+  const checker = fs.readdirSync(path.join(WEB, 'src/poster')).filter((f) => /^(readability\w*|imageBox)\.ts$/i.test(f)).map((f) => `src/poster/${f}`).sort();
+  const files = [...checker, 'src/poster/ReadabilityPanel.tsx',
     'src/poster/ReadabilityCodeView.tsx', 'src/pages/FigureReadability.tsx', 'src/poster/PrintSizeFields.tsx'];
   return sha(files.map((f) => fs.readFileSync(path.join(WEB, f), 'utf8')).join('\u0000'));
 }
@@ -145,79 +169,13 @@ function instrumentHash() {
     .filter((f) => !/(^|[\\/])(__pycache__|\.DS_Store)/.test(f) && fs.statSync(path.join(CORPUS, f)).isFile())
     .map((f) => path.join('fixtures/checker-corpus', f)).sort();
   const h = createHash('sha256');
-  for (const f of ['checker-truth-check.mjs', 'lib/checkerScore.mjs', 'lib/editorHarness.mjs', 'lib/mutants.mjs', 'truth/mpl_truth.py', ...corpus]) {
+  for (const f of ['checker-truth-check.mjs', 'lib/checkerScore.mjs', 'lib/checkerPage.mjs', 'lib/editorHarness.mjs', 'lib/mutants.mjs', 'truth/mpl_truth.py', ...corpus]) {
     h.update(`${f}\u0000`).update(fs.readFileSync(path.join(HERE, f))).update('\u0000');
   }
   return h.digest('hex').slice(0, 16);
 }
 
-// ---------------------------------------------------------------- the page
-async function setSize(page, { w, h }) {
-  for (const [label, v] of [['Width', w], ['Height', h]]) {
-    const input = page.getByLabel(label, { exact: true });
-    await input.fill(String(v));
-    await input.press('Enter');
-  }
-}
-
-/** Everything the result area shows, read from the DOM of the FRESH table. */
-function readReport(page) {
-  return page.evaluate(() => {
-    const leaf = (re) => [...document.querySelectorAll('div')].find((d) => d.children.length === 0 && re.test(d.textContent.trim()));
-    const table = [...document.querySelectorAll('table')].find((t) => !t.dataset.zqOld && /Element/.test(t.querySelector('thead')?.textContent ?? ''));
-    const detected = leaf(/^(Detected: .*|Auto-detect waiting for code…|Can’t tell R from Python\. Pick one above\.)$/)?.textContent.trim() ?? null;
-    if (!table) return { detected, table: false, rows: [] };
-    const panel = table.parentElement;
-    const rows = [...table.querySelectorAll('tbody tr')].map((tr) => {
-      const td = [...tr.querySelectorAll('td')].map((c) => c.textContent.trim());
-      return { name: td[0], sourcePt: parseFloat(td[1]), printPt: parseFloat(td[2]), minPt: parseFloat(td[3]), glyph: td[4] };
-    });
-    const scaleEl = [...panel.querySelectorAll('div')].find((d) => /^Scale factor:/.test(d.textContent.trim()));
-    const scale = scaleEl ? parseFloat(scaleEl.textContent.trim().replace(/^Scale factor:\s*/, '')) : null;
-    const warnings = [...panel.children].filter((c) => c.textContent.trim().startsWith('⚠')).map((c) => c.textContent.trim().slice(1).trim());
-    const copyBtn = [...panel.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Copy edited code');
-    let fixShown = null;
-    let fixList = [];
-    if (copyBtn) {
-      const block = copyBtn.parentElement.parentElement; // the "Raise these text elements" column
-      fixShown = block.querySelector('pre')?.textContent ?? null;
-      fixList = [...block.querySelectorAll('li')].map((li) => {
-        const m = li.textContent.match(/^(.+?):\s*([\d.]+)pt\s*→\s*([\d.]+)pt/);
-        return m
-          ? { name: m[1], currentPt: parseFloat(m[2]), neededPt: parseFloat(m[3]), youSetThis: /\(you set this\)/.test(li.textContent) }
-          : { raw: li.textContent };
-      });
-    }
-    const allPassBanner = [...panel.querySelectorAll('div')].some((d) => d.textContent.trim() === 'Every element in the table meets its minimum at this poster size.');
-    return { detected, table: true, rows, scale, warnings, hasCopy: !!copyBtn, fixShown, fixList, allPassBanner };
-  });
-}
-
-async function check(page, code) {
-  // Mark the tables on screen, so the read below can only see the one this
-  // Check renders (the panel is keyed on the checked code and remounts).
-  await page.evaluate(() => document.querySelectorAll('table').forEach((t) => { t.dataset.zqOld = '1'; }));
-  await page.getByLabel('Your R or Python plotting code').fill(code);
-  await page.getByRole('button', { name: '▶ Check' }).click();
-  await page.waitForFunction(
-    () => [...document.querySelectorAll('table')].some((t) => !t.dataset.zqOld && /Element/.test(t.textContent)),
-    null, { timeout: 5000 },
-  ).catch(() => {});
-  return readReport(page);
-}
-
-/** Press "Copy edited code" and return what the page put on the clipboard. */
-async function copyCorrected(page) {
-  const SENTINEL = '__ZQ_CLIPBOARD_EMPTY__';
-  await page.evaluate((s) => navigator.clipboard.writeText(s), SENTINEL);
-  await page.getByRole('button', { name: 'Copy edited code' }).click();
-  const got = await page.waitForFunction(
-    async (s) => { const t = await navigator.clipboard.readText(); return t !== s ? t : null; },
-    SENTINEL, { timeout: 3000, polling: 50 },
-  ).then((hnd) => hnd.jsonValue()).catch(() => null);
-  return got;
-}
-
+// ---------------------------------------------------------------- the page (lib/checkerPage.mjs)
 /** One check of `code`, then the corrected code copied, pasted back and checked. */
 async function checkAndRecheck(page, code, rec) {
   rec.first = await check(page, code);
@@ -273,7 +231,7 @@ async function collectRuns() {
   try {
     // The public page: a size typed per run.
     const context = await h.browser.newContext({ viewport: { width: 1280, height: 900 } });
-    await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: h.base });
+    await allowClipboard(context, h.base, h.engine);
     const state = { userId: 'zq-checker-user', row: null, saves: [], aborted: [], errors: [] };
     await installMocks(context, state, h.base);
     const page = await context.newPage();
@@ -302,7 +260,7 @@ async function collectRuns() {
     if (edIds.length) {
       const ed = await openEditor(h, { viewport: { width: 1440, height: 900 }, poster: { w: 48, h: 36 } });
       try {
-        await ed.context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: h.base });
+        await allowClipboard(ed.context, h.base, h.engine);
         await ed.page.locator('button[data-postr-tab]', { hasText: /^figure$/ }).click();
         await ed.page.getByRole('button', { name: 'Check a figure' }).click();
         await ed.page.getByLabel('Your R or Python plotting code').waitFor({ timeout: 10000 });
@@ -310,6 +268,65 @@ async function collectRuns() {
         if (ed.state.errors.length) log(`[harness] editor page errors: ${ed.state.errors.join(' | ')}`);
       } finally {
         await ed.context.close();
+      }
+    }
+
+    // EDIMG: the editor against an image block holding the script's own PNG.
+    for (const id of imageIds()) {
+      const pngFile = path.join(OUT, 'png', `${id}.png`);
+      fs.mkdirSync(path.dirname(pngFile), { recursive: true });
+      const made = await runPython([...(MANIFEST[id].notebook ? ['--notebook'] : []), '--png', pngFile, scriptPath(id)]);
+      if (made.code !== 0 || !fs.existsSync(pngFile)) throw new Error(`could not render ${id} to a PNG: ${made.stderr}`);
+      const png = fs.readFileSync(pngFile);
+      const dataUrl = `data:image/png;base64,${png.toString('base64')}`;
+      const [iw, ih] = [png.readUInt32BE(16), png.readUInt32BE(20)];
+      for (const bw of IMAGE_BLOCK_WIDTHS) {
+        // The block's aspect is the image's: the app fits it on load anyway.
+        const bh = Math.round(bw * ih / iw);
+        for (const cap of CAPTIONS) {
+          const ed = await openEditor(h, {
+            viewport: { width: 1440, height: 900 }, poster: { w: 48, h: 36 },
+            editDoc: (doc) => ({ ...doc, blocks: [...doc.blocks, {
+              id: 'zq-img', type: 'image', x: 10, y: 60, w: bw, h: bh, content: '', imageSrc: dataUrl, imageFit: 'contain',
+              tableData: null, caption: 'Sample figure caption text for the check.', captionPosition: cap,
+            }] }),
+          });
+          const rec = { key: imageKey(id, bw, cap), id, size: null, entry: 'editorImage', block: { w: bw / 10, h: bh / 10 }, cap,
+            git: h.git, mutant: h.mutant, src, at: new Date().toISOString(), errors: [] };
+          try {
+            await ed.page.waitForFunction(() => document.querySelector('[data-block-id="zq-img"] img')?.naturalWidth > 8, null, { timeout: 15000 });
+            await ed.page.locator('[data-block-id="zq-img"]').click({ position: { x: 20, y: 20 } });
+            await ed.page.locator('button[data-postr-tab]', { hasText: /^figure$/ }).click();
+            await ed.page.getByRole('button', { name: 'Check a figure' }).click();
+            await ed.page.getByLabel('Your R or Python plotting code').waitFor({ timeout: 10000 });
+            const geom = await ed.page.evaluate(() => {
+              const blk = document.querySelector('[data-block-id="zq-img"]');
+              const img = blk.querySelector('img');
+              const br = blk.getBoundingClientRect();
+              const ir = img.getBoundingClientRect();
+              const aspect = img.naturalWidth / img.naturalHeight;
+              // object-fit: contain inside the img's own box
+              const drawnW = Math.min(ir.width, ir.height * aspect);
+              return { blockPx: [br.width, br.height], imgBoxPx: [ir.width, ir.height], drawnPx: [drawnW, drawnW / aspect] };
+            });
+            const code = fs.readFileSync(scriptPath(id), 'utf8');
+            rec.codeHash = sha(code);
+            rec.first = await check(ed.page, code);
+            if (!rec.first.table) rec.errors.push('no table after Check');
+            const pxPerIn = geom.blockPx[0] / rec.block.w;
+            rec.geom = geom;
+            rec.drawnIn = { w: geom.drawnPx[0] / pxPerIn, h: geom.drawnPx[1] / pxPerIn };
+            if (ed.state.errors.length) rec.errors.push(`page errors: ${ed.state.errors.join(' | ')}`);
+          } catch (e) {
+            rec.errors.push(`exception: ${String(e).slice(0, 200)}`);
+          } finally {
+            await ed.context.close();
+          }
+          n += 1;
+          if (rec.errors.length) errors += 1;
+          fs.writeFileSync(path.join(RUNS, `${rec.key}.json`), JSON.stringify(rec, null, 1));
+          log(`${rec.key}: ${(rec.first?.rows ?? []).map((x) => x.glyph).join('')} scale=${rec.first?.scale} drawn ${rec.drawnIn?.w?.toFixed(2)} of ${rec.block.w} in${rec.errors.length ? ` ERRORS ${rec.errors.join('; ')}` : ''}`);
+        }
       }
     }
   } finally {
@@ -357,6 +374,22 @@ async function pool(items, n, fn) {
   return out;
 }
 
+/**
+ * Part 2 (D): the user's edit for "Or change one number: font.size = N": the
+ * number of the script's one literal font.size setting (rcParams item form,
+ * any prefix; the update() dict form; plt.rc('font', size=)) replaced by N.
+ * `sets`: how many such settings the script has; code null unless exactly one.
+ */
+function snippetEdit(code, n) {
+  const forms = [/(rcParams\s*\[\s*['"]font\.size['"]\s*\]\s*=\s*)(\d+(?:\.\d*)?)/g,
+    /(['"]font\.size['"]\s*:\s*)(\d+(?:\.\d*)?)/g, /(\brc\s*\(\s*['"]font['"]\s*,\s*size\s*=\s*)(\d+(?:\.\d*)?)/g];
+  const hits = forms.flatMap((re) => [...code.matchAll(re)]);
+  if (hits.length !== 1) return { sets: hits.length, code: null };
+  const h = hits[0];
+  const at = h.index + h[1].length;
+  return { sets: 1, code: code.slice(0, at) + n + code.slice(at + h[2].length) };
+}
+
 // ---------------------------------------------------------------- scoring (lib/checkerScore.mjs)
 async function score() {
   if (!fs.existsSync(RUNS)) fail(`no runs in ${RUNS}: run --phase collect first`);
@@ -364,13 +397,15 @@ async function score() {
     .map((f) => JSON.parse(fs.readFileSync(path.join(RUNS, f), 'utf8')))
     .filter((r) => ids.includes(r.id) && (r.entry === 'editor'
       ? EDITOR_IDS.includes(r.id)
-      : SIZES.some((s) => s.w === r.size.w && s.h === r.size.h)))
+      : r.entry === 'editorImage' ? imageIds().includes(r.id)
+        : SIZES.some((s) => s.w === r.size.w && s.h === r.size.h)))
     .sort((a, b) => a.key.localeCompare(b.key));
   if (!recs.length) fail(`no runs in ${RUNS} match --only / --sizes`);
   const sources = [...new Set(recs.map((r) => `${r.git}|${r.src}|${r.mutant ?? ''}`))];
   if (sources.length > 1) fail(`runs from ${sources.length} different sources in ${RUNS} (${sources.join(', ')}): collect again with --fresh`);
   const missing = [...ids.flatMap((id) => SIZES.map((s) => `${id}@${s.w}x${s.h}`)),
-    ...EDITOR_IDS.filter((id) => ids.includes(id)).map((id) => `editor~${id}`)].filter((k) => !recs.some((r) => r.key === k));
+    ...EDITOR_IDS.filter((id) => ids.includes(id)).map((id) => `editor~${id}`),
+    ...imageIds().flatMap((id) => IMAGE_BLOCK_WIDTHS.flatMap((w) => CAPTIONS.map((cap) => imageKey(id, w, cap))))].filter((k) => !recs.some((r) => r.key === k));
 
   // K-truth: the instrument's own controls, before anything is scored with it.
   const st = await runPython(['--selftest']);
@@ -380,25 +415,41 @@ async function score() {
   const FIXED = path.join(OUT, 'fixed');
   fs.rmSync(FIXED, { recursive: true, force: true });
   fs.mkdirSync(FIXED, { recursive: true });
-  const jobs = [...new Set(recs.map((r) => r.id))].map((id) => ({ kind: 'orig', id, file: scriptPath(id) }));
+  const jobs = [...new Set(recs.map((r) => r.id))].map((id) => ({ kind: 'orig', id, file: scriptPath(id), notebook: !!MANIFEST[id].notebook }));
   for (const r of recs) {
     if (r.copied && !r.unchanged) {
       const file = path.join(FIXED, `${r.key}.py`);
       fs.writeFileSync(file, r.copied);
-      jobs.push({ kind: 'fixed', key: r.key, file });
-      if (r.entry !== 'editor' && SHOWS.test(r.copied)) jobs.push({ kind: 'inline', key: r.key, file });
+      jobs.push({ kind: 'fixed', key: r.key, file, notebook: !!MANIFEST[r.id].notebook });
+      if (r.entry === 'page' && SHOWS.test(r.copied)) jobs.push({ kind: 'inline', key: r.key, file });
     }
   }
-  const results = await pool(jobs, 6, (j) => runPython(j.kind === 'inline' ? ['--inline', j.file] : [j.file]));
+  // Part 2 (D): the page's "Or change one number: font.size = N", done as it
+  // says: the script's own font.size number changed to N (snippetEdit), and
+  // the edited script run in matplotlib. A script with no single literal
+  // font.size is not edited (recorded as such, never guessed).
+  const snipEdits = {};
+  for (const r of recs) {
+    const m = r.entry === 'page' && r.first?.snippetSummary?.match(/font\.size = (\d+(?:\.\d+)?)/);
+    if (!m) continue;
+    const edit = snippetEdit(fs.readFileSync(scriptPath(r.id), 'utf8'), m[1]);
+    snipEdits[r.key] = { n: Number(m[1]), sets: edit.sets, edited: edit.code !== null };
+    if (edit.code === null) continue;
+    const file = path.join(FIXED, `${r.key}.snip.py`);
+    fs.writeFileSync(file, edit.code);
+    jobs.push({ kind: 'snip', key: r.key, file });
+  }
+  const results = await pool(jobs, 6, (j) => runPython(j.kind === 'inline' ? ['--inline', j.file] : [...(j.notebook ? ['--notebook'] : []), j.file]));
   const truthOrig = {};
   const truthFixed = {};
   const truthInline = {};
+  const truthSnip = {};
   jobs.forEach((j, k) => {
     if (j.kind === 'orig') truthOrig[j.id] = results[k];
-    else (j.kind === 'inline' ? truthInline : truthFixed)[j.key] = results[k];
+    else ({ inline: truthInline, snip: truthSnip, fixed: truthFixed })[j.kind][j.key] = results[k];
   });
 
-  const result = scoreRuns({ recs, missing, selftest: st, truthOrig, truthFixed, truthInline, manifest: MANIFEST, ids,
+  const result = scoreRuns({ recs, missing, selftest: st, truthOrig, truthFixed, truthInline, truthSnip, snipEdits, manifest: MANIFEST, ids,
     scriptHash: (id) => sha(fs.readFileSync(scriptPath(id), 'utf8')), instrumentHash: instrumentHash(),
     scope: { scripts: ids.length, of: Object.keys(MANIFEST).length, sizes: SIZES.map((x) => `${x.w}x${x.h}`) } });
   const resultsPath = path.join(OUT, 'results.json');

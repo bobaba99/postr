@@ -176,9 +176,10 @@ if (spawnSync(PY, ['-c', 'import matplotlib, numpy, pandas, seaborn'], { encodin
 }
 if (SELFTEST) for (const k of Object.values(KNOWN)) for (const t of k.tags) if (t.figure !== null) t.figure /= 2;
 
-const MODULES = ['readability.ts', 'readabilityFullFix.ts'];
+/** The checker's modules (fix 13b split readability.ts into several; a mutant serves them all). */
+const MODULES = fs.readdirSync(path.join(REPO, 'apps/web/src/poster')).filter((f) => /^readability\w*\.ts$/.test(f)).sort();
 /**
- * POSTR_MUTANT=<spec.json>#<name> (the mutants.json format): the checker's two
+ * POSTR_MUTANT=<spec.json>#<name> (the mutants.json format): the checker's
  * modules with that mutant's edits, written under OUT_DIR and imported from
  * there; the tree is never written. It falsifies the parts of the fix that
  * are Python, which the unit tests never run.
@@ -192,7 +193,7 @@ function checkerSource(): string {
   const texts = Object.fromEntries(MODULES.map((f) => [f, fs.readFileSync(path.join(REPO, 'apps/web/src/poster', f), 'utf8')]));
   for (const [file, from, to, times = 1] of mutant.edits as Array<[string, string, string, number?]>) {
     const f = file.replace(/^src\/poster\//, '');
-    if (!MODULES.includes(f)) fail(`mutant "${name}" edits ${file}: only the checker's two modules can be served here`);
+    if (!MODULES.includes(f)) fail(`mutant "${name}" edits ${file}: only the checker's modules can be served here`);
     const found = texts[f]!.split(from).length - 1;
     if (found !== times) fail(`mutant "${name}": its text is found ${found}× in ${file}, not ${times}×`);
     texts[f] = texts[f]!.split(from).join(to);
@@ -208,25 +209,28 @@ const SOURCE = checkerSource();
 const moduleHash = MODULES.map((f) => `${f} ${crypto.createHash('sha256').update(fs.readFileSync(path.join(SOURCE, 'apps/web/src/poster', f))).digest('hex').slice(0, 12)}`).join(', ');
 const mod = await import(pathToFileURL(path.join(SOURCE, 'apps/web/src/poster/readability.ts')).href);
 const full = await import(pathToFileURL(path.join(SOURCE, 'apps/web/src/poster/readabilityFullFix.ts')).href);
+const pyFix = await import(pathToFileURL(path.join(SOURCE, 'apps/web/src/poster/readabilityPyFix.ts')).href);
 const KEY: Record<string, string> = { 'Plot title': 'plotTitle', 'Axis titles': 'axisTitle', 'Tick labels': 'axisText', 'Legend text': 'legendText', Caption: 'caption' };
 
 type Truth = { ok: boolean; error?: string; figures: Array<{ sizes: Record<string, number[]> }>; warnings?: string[];
   saves?: number; saved?: Array<[string, number]> };
 const truth = async (file: string): Promise<Truth> => (await runTruth<Truth>([TRUTH.shape, file], OUT)) ?? { ok: false, error: 'the instrument crashed', figures: [] };
 
-/** What the panel hands over for `code` at a print size of w × h in. */
+/** What the panel hands over for `code` at a print size of w × h in (fix 13b: '' when it offers none). */
 function page(code: string, w: number, h: number) {
-  const params = mod.parsePythonCode(code, { defaultWidthIn: w, defaultHeightIn: h, defaultSizeLabel: 'print size' });
+  const opts = { defaultWidthIn: w, defaultHeightIn: h, defaultSizeLabel: 'print size' };
+  const params = mod.parsePythonCode(code, opts);
   const res = mod.computeReadability(params, h, w);
-  const fix: string = res.fontSnippet ? full.generateTargetedFullFix(code, params, res.fontSnippet) : code;
+  const fix: string = full.generateTargetedFullFix(code, params, res, opts) || code;
   const need: Record<string, number> = {};
   for (const f of res.fontFixes) need[f.key ?? KEY[f.name]!] = f.neededPt;
   return { params, res, fix, need, scale: res.scale as number };
 }
-/** The copy button's code with a need handed over outright (as the panel's fontSnippet). */
+/** The copy button's code with a need handed over outright (fix 13b: the script generator itself). */
 function forced(code: string, need: Record<string, number>): string {
-  const params = mod.parsePythonCode(code, { defaultWidthIn: 6, defaultHeightIn: 4.5, defaultSizeLabel: 'print size' });
-  return full.generateTargetedFullFix(code, params, pyLiteral(need));
+  void pyLiteral;
+  return pyFix.fixPythonScript(code, Object.entries(need).map(([key, neededPt]) => ({ key, neededPt })),
+    { defaultWidthIn: 6, defaultHeightIn: 4.5, defaultSizeLabel: 'print size' });
 }
 
 const min = (a: number[]) => (a.length ? Math.min(...a) : null);

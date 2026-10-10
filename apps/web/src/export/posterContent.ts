@@ -5,13 +5,14 @@
  * WITHOUT touching the DOM or the store, so a `PosterDoc` that was
  * never opened in the editor exports identically (plan §5):
  *
- * - figure/table caption numbers — reading order (y, then x)
- * - heading numbers — doc.blocks array order
+ * - heading, figure and table numbers — the poster's reading order
+ *   (poster/readingOrder.ts), the same function the canvas uses
  * - the authors block's three lines (authors + markers,
  *   affiliations, equal-contrib/corresponding footnote)
  * - formatted reference strings for the active citation style
  */
 import type { Author, Block, Institution, PosterDoc, Reference } from '@postr/shared';
+import { numberBlocks } from '@/poster/readingOrder';
 import {
   withAcknowledgementReference,
   type AttributionOptions,
@@ -29,39 +30,18 @@ import {
 // =========================================================================
 
 /**
- * Auto-numbered captions for image + table blocks, keyed by block id.
- * Reading order: top-to-bottom primary, left-to-right secondary —
- * identical to PosterEditor's captionNumbers memo.
+ * "Figure N." (image and chart blocks) and "Table N." numbers, keyed by
+ * block id, in the poster's reading order — the canvas's own numbers
+ * (poster/readingOrder.ts `numberBlocks`). `canvasWidth` is the sheet's
+ * width in poster units (`doc.widthIn * PX`).
  */
-export function computeCaptionNumbers(blocks: readonly Block[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  const readingOrder = (a: Block, b: Block) => a.y - b.y || a.x - b.x;
-  for (const type of ['image', 'table'] as const) {
-    blocks
-      .filter((b) => b.type === type)
-      .slice()
-      .sort(readingOrder)
-      .forEach((b, i) => {
-        out[b.id] = i + 1;
-      });
-  }
-  return out;
+export function computeCaptionNumbers(blocks: readonly Block[], canvasWidth: number): Record<string, number> {
+  return numberBlocks(blocks, canvasWidth).captions;
 }
 
-/**
- * Section numbers for heading blocks — doc.blocks ARRAY order, not
- * canvas position (matches PosterEditor's headingNumbers memo).
- */
-export function computeHeadingNumbers(blocks: readonly Block[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  let counter = 0;
-  for (const b of blocks) {
-    if (b.type === 'heading') {
-      counter += 1;
-      out[b.id] = counter;
-    }
-  }
-  return out;
+/** Section numbers for heading blocks, in the poster's reading order (as above). */
+export function computeHeadingNumbers(blocks: readonly Block[], canvasWidth: number): Record<string, number> {
+  return numberBlocks(blocks, canvasWidth).headings;
 }
 
 // =========================================================================
