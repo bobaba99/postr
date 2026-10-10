@@ -15,7 +15,6 @@ import {
   deleteRowAt,
   insertCol,
   insertRow,
-  parseTablePaste,
   setBorderPreset,
   updateCell,
 } from '../tableOps';
@@ -190,34 +189,5 @@ describe('tableOps', () => {
     const next = setBorderPreset(t, 'all');
     expect(next.borderPreset).toBe('all');
     expect(next.cells).toEqual(t.cells);
-  });
-
-  describe('parseTablePaste', () => {
-    it('parses HTML <tr>/<td> into rows + cols', () => {
-      const html = '<table><tr><td>a</td><td>b</td></tr><tr><td>c</td><td>d</td></tr></table>';
-      const t = parseTablePaste(html, '');
-      expect(t?.rows).toBe(2);
-      expect(t?.cols).toBe(2);
-      expect(t?.cells).toEqual(['a', 'b', 'c', 'd']);
-    });
-
-    it('parses tab-delimited plain text', () => {
-      const txt = 'a\tb\tc\nd\te\tf';
-      const t = parseTablePaste('', txt);
-      expect(t?.rows).toBe(2);
-      expect(t?.cols).toBe(3);
-      expect(t?.cells).toEqual(['a', 'b', 'c', 'd', 'e', 'f']);
-    });
-
-    it('pads short rows to the max width', () => {
-      const txt = 'a\tb\tc\nd\te';
-      const t = parseTablePaste('', txt);
-      expect(t?.cols).toBe(3);
-      expect(t?.cells).toEqual(['a', 'b', 'c', 'd', 'e', '']);
-    });
-
-    it('returns null for empty input', () => {
-      expect(parseTablePaste('', '')).toBeNull();
-    });
   });
 });

@@ -947,7 +947,7 @@ function ShortcutsPanel() {
           Move to the next cell. <KeyCombo keys={['Shift', 'Tab']} /> goes backward.
         </ShortcutRow>
         <ShortcutRow label="Paste rows from Excel or Word" inline>
-          Tabs become columns, newlines become rows. The pasted grid replaces the whole table.
+          Tabs become columns, newlines become rows. The cells fill the table from the cell you paste into, and the table grows to fit.
         </ShortcutRow>
         <ShortcutRow label="Right-click a cell" inline>
           Custom context menu to insert or delete a row or column, or clear the cell.

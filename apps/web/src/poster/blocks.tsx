@@ -39,9 +39,9 @@ import {
   deleteRowAt,
   insertCol,
   insertRow,
-  parseTablePaste,
   updateCell,
 } from './tableOps';
+import { pasteGrid } from './tablePaste';
 import { ResizeHandles, type ResizeHandle } from './resizeHandles';
 import { BUTTON_MARK, HIT, ROTATE_GAP, ROW_GAP, ROW_LIFT, UNZOOM, UNZOOM_X, UNZOOM_Y, blockControls, ctl } from './selectionLayout';
 import { useSelectionRoom } from './selectionRoom';
@@ -828,16 +828,6 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
     window.addEventListener('pointercancel', onUp);
   };
 
-  const onPaste = (e: React.ClipboardEvent) => {
-    const html = e.clipboardData.getData('text/html');
-    const txt = e.clipboardData.getData('text/plain');
-    const next = parseTablePaste(html, txt);
-    if (next) {
-      e.preventDefault();
-      commit(next);
-    }
-  };
-
   // Per-cell border CSS based on the active preset.
   //
   // Named presets fall through the legacy path using
@@ -902,7 +892,6 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
   return (
     <div
       style={{ width: '100%', height: '100%', overflow: 'visible', padding: 2, position: 'relative' }}
-      onPasteCapture={onPaste}
       onMouseLeave={clearHover}
     >
       {/*
@@ -1101,6 +1090,7 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
                     }}
                     onBlur={() => setActiveCell((prev) => prev?.r === r && prev?.c === c ? null : prev)}
                     onKeyDown={(e) => onCellKeyDown(e, r, c)}
+                    onPasteGrid={(rows) => commit(pasteGrid(data, r, c, rows))}
                     style={{
                       outline: 'none',
                       width: '100%',

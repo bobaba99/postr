@@ -14,7 +14,9 @@
  *   - Slash commands using the shared matchSlashAtCaret helper,
  *     with a contentEditable caret adapter.
  *   - Paste sanitization: every paste is run through sanitizeHtml
- *     so stored XSS from copied-from-elsewhere markup is defanged.
+ *     so stored XSS from copied-from-elsewhere markup is defanged, and
+ *     takes the poster's style (pasteClean.ts: the source's colour,
+ *     highlight, font and size dropped; fix 32).
  *   - Single-line mode (multiline=false) swallows Enter so title
  *     and heading blocks stay on one line.
  *
@@ -56,6 +58,7 @@ import { useEditableHistory } from './useEditableHistory';
 import { SYMBOLS, filterSymbols } from './symbols';
 import { matchSlashAtCaret } from './slashCommand';
 import { htmlToPlainText, sanitizeHtml, sanitizeTyped } from './sanitizeHtml';
+import { pastedHtml } from './pasteClean';
 import { isBlankHtml } from './startingText';
 
 export interface SelectionInfo {
@@ -264,19 +267,20 @@ export function RichTextEditor({
     e.preventDefault();
     const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
-    // The ONLY call site that asks for block separators. Pasting from
-    // Word, Docs or a browser takes the text/html branch, whose markup
-    // is block-level — and the sanitizer's unwrap used to put NOTHING in
-    // place of those boundaries, gluing the last word of one paragraph
-    // to the first of the next (`weeks.Accuracy`).
+    // Pasting from Word, Docs or a browser takes the text/html branch,
+    // whose markup is block-level — and the sanitizer's unwrap used to put
+    // NOTHING in place of those boundaries, gluing the last word of one
+    // paragraph to the first of the next (`weeks.Accuracy`).
     //
     // `<br>` only where the editor would let the user press Enter. In a
     // single-line block a break is text the editor actively refuses to
     // let them make, so the boundary becomes a space instead.
-    const clean = sanitizeHtml(
-      html || text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
-      { blockSeparator: multiline ? '<br>' : ' ' },
-    );
+    //
+    // The poster's style wins (fix 32, pasteClean.ts): the source's colour
+    // and highlight go with its font and size, a style sheet on the
+    // clipboard is not pasted as text, and a line wrapped in the source's
+    // markup is not a line break (its review round, R1-F3).
+    const clean = pastedHtml(html, text, multiline);
     // A paste is an undo step of its own: this paste event says so (the
     // editor's document listener notes it, useEditorHistory.ts). The
     // input event execCommand fires does not: its type is '' in Chromium

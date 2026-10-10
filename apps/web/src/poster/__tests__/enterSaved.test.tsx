@@ -194,6 +194,10 @@ describe('Shift+Enter, then Enter, adds no blank line once stored (review round 
   // fields with that newline as the line's end. The paste path stored a
   // <br> there too, a blank line the source does not show (the first review
   // round 3's mutant, its probe "ZQA\n<br>ZQB"; reproduced here first).
+  // Since fix 32's review (R1-F3) a paste reads the source's whitespace as
+  // HTML draws it, so the pretty-printed newline is no line end of its own
+  // and the paragraph's end is the one break; a newline the source keeps
+  // (white-space: pre-wrap, as Google Docs writes) still reaches the rule.
   it('a paste whose line ends in a newline, before a paragraph, gains no blank line either', async () => {
     renderEditor();
     const ed = canvasEditor('b1');
@@ -201,7 +205,11 @@ describe('Shift+Enter, then Enter, adds no blank line once stored (review round 
     await act(async () => {
       fireEvent.paste(ed, { clipboardData: { getData: (t: string) => (t === 'text/html' ? '<p>ZQPA\n</p><p>ZQPB</p>' : '') } });
     });
-    expect(stored('b1')).toMatch(/ZQPA\nZQPB$/);
+    expect(stored('b1')).toMatch(/ZQPA(?:\n|<br>)ZQPB$/);
+    await act(async () => {
+      fireEvent.paste(ed, { clipboardData: { getData: (t: string) => (t === 'text/html' ? '<p><span style="white-space: pre-wrap">ZQPC\n</span></p><p>ZQPD</p>' : '') } });
+    });
+    expect(stored('b1')).toMatch(/ZQPC\nZQPD$/);
   });
 });
 

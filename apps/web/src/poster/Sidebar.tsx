@@ -3019,7 +3019,7 @@ function TableTipsDropdown() {
         {/* The tips for the table's canvas controls and its Format button
             go with them (ADJUSTMENTS_ENABLED, record 29). */}
         {ADJUSTMENTS_ENABLED && <li>🖱️ Click a row/column header strip to select the whole row or column.</li>}
-        <li>📋 Pasting into a cell replaces the whole table with what you paste, so rows copied from Word, Excel, or Google Sheets come in as a new grid.</li>
+        <li>📋 Paste cells copied from Word, Excel, or Google Sheets into a cell: they replace the cells from that cell, across and down (a single copied cell replaces that cell's text), and the table grows to fit. Other text with no tabs or line breaks goes in at the cursor.</li>
         {ADJUSTMENTS_ENABLED && <li>↔️ Drag column borders to resize.</li>}
         {ADJUSTMENTS_ENABLED && <li>🗑️ Select a row/column and press Delete to remove it.</li>}
         {!ADJUSTMENTS_ENABLED && <li>➕ Add or remove the last row or column with the Rows and Columns buttons below.</li>}
@@ -4385,9 +4385,9 @@ function AddBlockPanel(props: {
           📋 Pasting tables
         </div>
         <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
-          Copy a table from <strong style={{ color: '#c8b6ff' }}>Word</strong>,{' '}
+          Copy cells from <strong style={{ color: '#c8b6ff' }}>Word</strong>,{' '}
           <strong style={{ color: '#c8b6ff' }}>Excel</strong>, or{' '}
-          <strong style={{ color: '#c8b6ff' }}>Google Sheets</strong>, add a table block, then paste into any cell — Postr will expand the grid and fill every cell for you. No need to retype.
+          <strong style={{ color: '#c8b6ff' }}>Google Sheets</strong>, click a cell of a table block, then paste — the cells fill the table from there, and it adds the rows and columns they need. No need to retype.
         </div>
       </div>
     </div>
