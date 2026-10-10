@@ -26,10 +26,11 @@ export const SAVE_KEY = `${MOD}+s`;
  * `defaultPrevented`, read after the event finished. `expiresIn` is the
  * session token's lifetime in seconds (the fake backend's, 3600 by
  * default; H6 uses 30, a token the client refreshes before any request).
+ * `tour` leaves the onboarding tour to start (record 29's simplify-check).
  */
-export async function openSignedIn(h, { plan = 'term', expiresIn = 3600 } = {}) {
+export async function openSignedIn(h, { plan = 'term', expiresIn = 3600, tour = false } = {}) {
   const state = newState({ anonymous: false, plan, expiresIn });
-  const { context, page } = await newGuestPage(h, state);
+  const { context, page } = await newGuestPage(h, state, { tour });
   await context.addInitScript(() => {
     // The print window calls print() on a timer; nothing is printed here.
     window.print = () => {};

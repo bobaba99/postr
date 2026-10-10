@@ -174,6 +174,10 @@
  *     StrictMode, which runs each effect twice at mount (S9 is that server's
  *     case); POSTR_SERVE=preview runs every scenario on the production build
  *     (lib/editorHarness.mjs; `npm run build` first; no POSTR_MUTANT then).
+ *   - A scenario that needs a control a feature switch hides is skipped
+ *     while the tree has that switch off (record 29: E5 the Content box,
+ *     ADJUSTMENTS_ENABLED; D1 and K11 the sidebar's Duplicate,
+ *     EDITOR_EXTRAS_ENABLED); `sourceFlag` reads the file on disk.
  *   - Shift+Enter is pressed at a line's end only, and an input method's
  *     Enter is not driven (fix 12's undo-history-check drives composition).
  *   - H5's paste is a paste event carrying plain text (the system clipboard
@@ -193,7 +197,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { log, startHarness } from './lib/editorHarness.mjs';
+import { log, sourceFlag, startHarness } from './lib/editorHarness.mjs';
 import { openSignedIn, versionPosts } from './lib/keepWorkKit.mjs';
 import { ENTER } from './lib/keepWorkEnter.mjs';
 import { SAVE } from './lib/keepWorkSave.mjs';
@@ -224,6 +228,12 @@ let silentVersions = 0;
 try {
   for (const sc of SCENARIOS) {
     if (ONLY && !ONLY.some((o) => sc.id === o || sc.id.startsWith(o))) continue;
+    // A scenario that drives a control a feature switch hides (`needs`,
+    // record 29) is skipped while the tree under test has the switch off.
+    if (sc.needs && sourceFlag(sc.needs) === false) {
+      results.push({ id: sc.id, how: sc.how, skipped: `${sc.needs} is off in this tree (config/features.ts)` });
+      continue;
+    }
     const t0 = Date.now();
     let s;
     try {
@@ -246,6 +256,7 @@ log(`\n== keep-work-check · ${h.engine} · ${h.serve} · ${h.git}${h.mutant ? `
 let exit = 0;
 for (const r of results) {
   if (r.error) { exit = 2; log(`[ERROR]    ${r.id}: ${r.error}`); continue; }
+  if (r.skipped) { log(`[skipped]  ${r.id}: ${r.skipped}`); continue; }
   const nums = Object.entries(r.numbers ?? {}).map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`).join(' · ');
   if (r.control) {
     if (!r.ok) exit = 2;
