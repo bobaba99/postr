@@ -175,7 +175,7 @@ export async function tableStates({ page, P, ed, engine, sleep, clickAway, chord
     if (!popup) { see('KEY', `${P.id} ${label}: no print window`); continue; }
     await popup.waitForSelector('#poster-print-root', { timeout: 15000 });
     const now = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w, hidePrompts: true });
-    const pr = await readPrint(popup, P.size.w, P.size.h);
+    const pr = await readPrint(popup, P.size.w, P.size.h, `${P.id} ${label}`);
     const c = compareSheets(now, pr.sheet, tol[0], tol[1]);
     t.print = await popup.evaluate(tableControls, `#poster-print-root [data-block-id="${tableId}"]`);
     Object.assign(t, { worstBox: c.worstBox, worstLine: c.worstLine, wraps: c.wraps.length });

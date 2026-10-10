@@ -108,13 +108,14 @@ const en = {
       //
       // Undo keeps UNDO_HISTORY_LIMIT (100) steps (stores/posterStore.ts;
       // fix 12, docs/fixes/12-one-undo-history.md). PowerPoint needs a term
-      // or a pack credit (usePlan canExport). The PPTX writer has no case
-      // for chart blocks, so the card names what it does carry.
+      // or a pack credit (usePlan canExport). The PPTX writer draws a chart
+      // block as a picture (record 31, pptx/chartShape.ts), not an editable
+      // chart, so the card says so.
       // The LaTeX export is hidden (config/features.ts LATEX_EXPORT_ENABLED,
       // fix 25), so the card does not name it.
       id: 'ship',
       title: 'Iterate, export, print',
-      body: 'Undo and redo up to 100 steps. Save a PDF for free. PowerPoint exports are paid, and keep text, images and tables editable. Charts made in Postr are not included.',
+      body: 'Undo and redo up to 100 steps. Save a PDF for free. PowerPoint exports are paid, and keep text, images and tables editable. Charts made in Postr are included as pictures.',
     },
   ] as readonly Milestone[],
   feedbackEyebrow: 'Shape what ships next',
@@ -187,7 +188,7 @@ const fr: AboutCopy = {
     {
       id: 'ship',
       title: 'Itérer, exporter, imprimer',
-      body: 'Annulez et rétablissez jusqu’à 100\u00a0étapes. Enregistrez un PDF gratuitement. Les exportations PowerPoint sont payantes et gardent le texte, les images et les tableaux modifiables. Les graphiques créés dans Postr n’y sont pas inclus.',
+      body: 'Annulez et rétablissez jusqu’à 100\u00a0étapes. Enregistrez un PDF gratuitement. Les exportations PowerPoint sont payantes et gardent le texte, les images et les tableaux modifiables. Les graphiques créés dans Postr y sont inclus sous forme d’images.',
     },
   ],
   feedbackEyebrow: 'Influencez la suite',

@@ -17,6 +17,10 @@
  *     place, so it survived the deactivation as a dead end — it routed
  *     to /p/:id?publish=1, which PosterEditor ignores while this flag is
  *     false. Re-add it from git history if the gallery comes back.
+ *   - components/PublishGalleryModal.tsx: its capture draws #poster-canvas
+ *     itself, so the editor's hints and selection would reach the image;
+ *     capture through export/stripEditorChrome.ts's copy, as
+ *     data/thumbnails.ts does (record 31's review round 1, R1-I1).
  */
 export const GALLERY_PUBLIC_ENABLED = false;
 
@@ -46,6 +50,10 @@ export const GALLERY_PUBLIC_ENABLED = false;
  * move a comment to another poster, pgTAP tests for all of it; the
  * comments panel must take real ownership instead of `isOwner={true}`
  * (Sidebar.tsx); and sharing needs a way to stop sharing and a consent step.
+ * A table cell draws its stored value as it is (TableCellEditor.tsx
+ * `asIs`): since record 32 a paste stores text, but a cell stored with
+ * markup before it would reach whoever opens a shared poster, so draw
+ * stored cells through the sanitizer first (record 32, section 10).
  * This list is a summary. The full list, with items left out here, is
  * docs/fixes/23-new-poster-owner-only.md, section 10 ("Before sharing is
  * turned back on").

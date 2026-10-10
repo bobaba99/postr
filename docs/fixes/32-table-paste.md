@@ -172,7 +172,7 @@ One round (a simple feature, `README.md` "Review budget"): the browser, through 
 | R1-F2 MEDIUM | trailing line breaks counted: a paragraph copied with a triple-click spread into the cell below (Chromium) or added a blank line (WebKit); "ZQa\nZQb\n\n" emptied a cell | MEASURED: `T-triple-line` T1 in Chromium (cell 4 replaced by "ZQTB bold value", bold lost, the cell below emptied) and WebKit (a trailing `<br>`), Firefox clean; `T-lines-trailing` G2 in three engines | blank lines at the end of the plain text are not rows; rule 1's line ends with no `<br>` (`tablePaste.ts`) | 0 |
 | R1-F3 MEDIUM | a line wrapped in the clipboard's HTML source stored as a line break: new in a cell's one-line paste, older in text blocks | MEASURED: `T-word-wrap-line` T1, `F-text-word-wrap` C5 in three engines; the title, a sibling the finding did not name, `F-title-word-wrap` C5 in three engines; Firefox's own copy of a page, `T-web-wrap-line` T1 and `F-text-web-wrap` C5 (Chromium and WebKit write one space when they copy: clean); main (Chromium) C5 in the text block and the title | the source's whitespace read as HTML draws it in every paste (`parsePasted`): a run is one space, none at a line's edges; kept under `<pre>` and under a `white-space` other than normal or nowrap (Google Docs' `pre-wrap` spans) | 0 |
 | R1-F4 LOW | one copied spreadsheet cell replaces the cell's text, while the tip said text with no tabs or line breaks "goes into the cell itself" | the behaviour is rule 2 as briefed (any HTML table is a grid), MEASURED by `T-one-cell-html` (the cell's own text replaced); the sentence INSPECTED | the tip reworded (section 7): "…(a single copied cell replaces that cell's text)… Other text with no tabs or line breaks goes in at the cursor."; the behaviour kept, the alternative (a one-cell table at the caret) queued for the owner | — |
-| R1-F5 LOW | `powerpoint-reference.md:115` still describes the old paste; manual flow §36 claims Word's bold stays | INSPECTED (grep) | both updated; §36's bold line holds since R1-F1's correction, and §36 gains the review's cases | — |
+| R1-F5 LOW | `powerpoint-reference.md:115` still describes the old paste; manual flow §37 claims Word's bold stays | INSPECTED (grep) | both updated; §37's bold line holds since R1-F1's correction, and §37 gains the review's cases | — |
 | R1-F6 INFO | rule 2 makes a grid of any text with a tab or a line break, also text that is not a table | the rule as briefed (`T-lines-only`) | queued for the owner (PLAN.md, "Queued by record 32") | — |
 
 **Shared cause and siblings, checked before the corrections.**
@@ -212,3 +212,23 @@ One round (a simple feature, `README.md` "Review budget"): the browser, through 
 - **Whitespace a source keeps by a style sheet** (a class whose rule says `pre-wrap`) is collapsed: the style sheet is removed before the whitespace is read, and only an element's own `style` and `<pre>` are read. `pre-line` is kept like `pre-wrap` (its spaces too). UNVERIFIED which applications write either.
 
 **UNVERIFIED:** each application's real clipboard (the shapes stand in); Safari's and Firefox's own clipboards from another application (the engines' clipboards carried the shapes); whether a run writes the machine's clipboard on macOS; the PowerPoint file and print window of a pasted table (the same cells typed text makes, INSPECTED).
+
+## 11. Merge with main (record 31, PowerPoint charts), 2026-10-10
+
+Main had moved to 1d5addf (record 31 merged on records 29 and 30). Git merged `poster/blocks.tsx`
+on its own (record 31's markers and this record's cell wiring are different lines). Two docs
+conflicted, resolved by keeping both sides: `docs/stress-test/PLAN.md` (record 31's queue and
+status row, then this record's) and `docs/feature-graph.md` (the empty-state lines: record 31's
+notes kept). This record's checklist is renumbered PART 17, §37 (record 31 took PART 16, §36).
+The sharing switch's re-enable list (`config/features.ts`) gains the stored-cell item of
+section 10 (a cell stored with markup before this record).
+
+Found while merging, older than both records (MEASURED, not changed here): `docs/feature-graph.md`'s
+`blocks.tsx:N` references are stale by 7 to 117 lines on the 10 lines whose quoted string occurs
+once in the file (the code grew under them since record 29); each line names its string, so it
+can still be found. Queued.
+
+On the merged tree (lead, MEASURED): suite 4468 of 4468 (244 files), tsc 0, `npm run build` 0;
+in Chromium `table-paste-check.mjs` exit 0 (T1 0/7, G1–G3 and GD 0/13 each, G4 0/20, X 0/2,
+C1 0/9, C2 0/10, C3 0/9, C4 0/10, C5 0/3) and `pptx-export-check.mjs` exit 0 (every claim 0);
+`mutation-check.mjs` 54 of 54 mutants killed.

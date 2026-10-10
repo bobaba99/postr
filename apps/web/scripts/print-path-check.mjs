@@ -138,6 +138,13 @@
  *            and a property the sheet inherits (its font, line height,
  *            text rendering…) computed differently on the print sheet than
  *            on the editor's (both read in screen media)
+ *   HINT     an editor hint on the print document's sheet ("+ Upload
+ *            figure", "Add references in Refs tab →", "Add authors in sidebar
+ *            →", "+ Logo", a chart's "Rendering chart…" or its failure
+ *            message: HINTS, the harness's own list; record 31): an empty
+ *            block prints as empty space; the editor shows the hint, its
+ *            sheet read with it (K-self) and without it (WRAP skips the
+ *            editor's own marks, and since record 31 the hints carry one)
  *   INFO     text on the sheet in the editor's own UI font (DM Sans, not
  *            loaded by the print window; ui-font); the editor's controls
  *            copied onto the printed sheet, by label (ui-copied: a button,
@@ -191,11 +198,12 @@
  *   Firefox's silent print). Chart text is SVG and is the chart harness's
  *   (chart-print-size-check.mjs); here a chart block is its box.
  *
- * KNOWN (record 30 §9, R1-X1): in WebKit, WRAP on key+resized. WebKit's
- *   copy of the sheet loses an empty figure placeholder's dashed border
- *   (React's `all: 'unset'` serialised with the logical border unset after
- *   the physical border), so its hint breaks onto fewer lines in print.
- *   Placeholder text, not the user's; on main too; PLAN.md Later.
+ * KNOWN until record 31 (record 30 §9, R1-X1): in WebKit, WRAP on
+ *   key+resized. WebKit's copy of the sheet lost an empty figure
+ *   placeholder's dashed border (React's `all: 'unset'` serialised with the
+ *   logical border unset after the physical border), so its hint broke onto
+ *   fewer lines in print. Since record 31 the placeholder is an editor hint
+ *   the copy drops (HINT), and WebKit's run exits 0.
  *   (Until review round 3, BASE also reported two rules on the production
  *   build that the CSS minifier rewrote, so the build run could not exit 0;
  *   since R3-F2 they compare through DECL_EQUIV and the build run exits 0.)
@@ -250,6 +258,9 @@ const ALERT_TEXT = 'Popup blocked. Please allow popups for this site to use "Sav
 const SIDEBAR_LINE = 'Your browser’s print window opens. Choose Save as PDF.';
 const CREDIT_TEXT = 'made with postr.sh';
 const PRINT_SHEET = '#poster-print-root #poster-canvas';
+/** The editor's hints and prompts on the sheet (record 31's rule: never printed), the harness's own copy. */
+const HINTS = ['+ Upload figure', 'click to browse · drag to move', '+ Logo', 'presets · upload · reuse', 'Add authors in sidebar →',
+  'Add references in Refs tab →', 'Rendering chart…', 'Something went wrong rendering this chart.', 'Send Feedback'];
 
 const openTab = (page, name) => page.locator('button[data-postr-tab]', { hasText: new RegExp(`^${name}$`, 'i') }).click();
 const editorSelected = (page) => page.evaluate(() => document.querySelectorAll('#poster-canvas [data-postr-selected="true"]').length);
@@ -300,8 +311,19 @@ async function printVia(page, entry, posterW, { popupTimeout = 8000 } = {}) {
   return { ...out, popup };
 }
 
-/** The print window's own reading: copy in screen media, then the sheet in print media. */
-async function readPrint(popup, posterW, posterH) {
+/**
+ * The print window's own reading: copy in screen media, then the sheet in
+ * print media. `label` (the poster and the entry) names the document in a
+ * HINT claim: every print document is read for the editor's hints.
+ */
+async function readPrint(popup, posterW, posterH, label = '') {
+  const hints = await popup.evaluate((list) => {
+    const sheet = document.querySelector('#poster-print-root #poster-canvas');
+    const text = sheet ? sheet.textContent : '';
+    return list.filter((x) => text.includes(x));
+  }, HINTS);
+  if (hints.length) see('HINT', `${label}: ${hints.join(' | ')}`);
+  hintReads.n += 1;
   const inherited = await popup.evaluate(sheetInherited, { sel: PRINT_SHEET, props: INHERITED });
   const screen = await popup.evaluate(({ w, h }) => {
     const readyState = document.readyState;
@@ -354,7 +376,7 @@ async function readPrint(popup, posterW, posterH) {
       })(document.getElementById('poster-print-root')),
     };
   });
-  return { ...screen, inherited, sheet, ...print };
+  return { ...screen, inherited, sheet, ...print, hints };
 }
 
 /**
@@ -410,12 +432,14 @@ const h = await startHarness({ name: 'print-path-check', port: PORT }).catch((e)
 });
 const R = { git: h.git, engine: h.engine, mutant: h.mutant, serve: h.serve, dpr: DPR, posters: [], copy: null, errors: [] };
 const controlFails = [];
-const claims = Object.fromEntries(['POS', 'WRAP', 'LINEPOS', 'TITLE', 'PREVIEW', 'SAME', 'TOPBAR', 'KEY', 'SEL', 'TABLEUI', 'PAGE', 'ADJUST', 'PDFTEXT', 'STEPS', 'ALERT', 'HEADER', 'CREDIT', 'BASE'].map((c) => [c, []]));
+const claims = Object.fromEntries(['POS', 'WRAP', 'LINEPOS', 'TITLE', 'PREVIEW', 'SAME', 'TOPBAR', 'KEY', 'SEL', 'TABLEUI', 'PAGE', 'ADJUST', 'PDFTEXT', 'STEPS', 'ALERT', 'HEADER', 'CREDIT', 'BASE', 'HINT'].map((c) => [c, []]));
 const baseSeen = new Set();
 const see = (c, what) => claims[c].push(what);
 /** INFO tallies: each print window's readyState when read; the editor controls copied onto its sheet, by label. */
 const info = { readyState: {}, uiCopied: {} };
 const tally = (o, k) => { o[k] = (o[k] ?? 0) + 1; };
+/** How many print documents were read for HINT (every one readPrint reads). */
+const hintReads = { n: 0 };
 
 try {
   const prep = await (await h.browser.newContext()).newPage();
@@ -466,7 +490,8 @@ try {
         const w = document.createTreeWalker(document.getElementById('poster-canvas'), NodeFilter.SHOW_TEXT);
         for (let n = w.nextNode(); n; n = w.nextNode()) {
           const p = n.parentElement;
-          if (!n.textContent.trim() || !p || p.closest('[data-postr-selection-ui], [data-postr-resize-handle], [data-postr-overlay], button')) continue;
+          // The editor's own marks and hints (never printed since record 31) aside.
+          if (!n.textContent.trim() || !p || p.closest('[data-postr-selection-ui], [data-postr-resize-handle], [data-postr-overlay], [data-postr-editor-ui], button')) continue;
           if (/^\s*"?DM Sans/i.test(getComputedStyle(p).fontFamily)) out.push(n.textContent.trim().slice(0, 30));
         }
         return out;
@@ -495,7 +520,8 @@ try {
           else see('POS', `${P.id} ${label}: no print window`);
           return;
         }
-        const pr = await readPrint(got.popup, P.size.w, P.size.h);
+        const pr = await readPrint(got.popup, P.size.w, P.size.h, `${P.id} ${label}`);
+        r.hints = pr.hints;
         tally(info.readyState, pr.readyState);
         for (const u of pr.uiCopied) tally(info.uiCopied, u);
         r.readyState = pr.readyState;
@@ -601,7 +627,7 @@ try {
         row.selected['key+fresh'] = popup ? { opened: true } : { none: true };
         if (popup) {
           await popup.waitForSelector('#poster-print-root', { timeout: 15000 });
-          const pr = await readPrint(popup, P.size.w, P.size.h);
+          const pr = await readPrint(popup, P.size.w, P.size.h, `${P.id} key+fresh`);
           const c = compareSheets(ref, pr.sheet, TOL, LINE_TOL);
           Object.assign(row.selected['key+fresh'], { worstBox: c.worstBox, worstLine: c.worstLine, boxes: c.boxes.slice(0, 3), wraps: c.wraps.length });
           if (c.boxes.length) see('POS', `${P.id} key+fresh: ${c.boxes.length} blocks off, worst ${c.worstBox} in (${c.boxes.slice(0, 3).map((b) => b.type).join(', ')})`);
@@ -643,7 +669,7 @@ try {
         if (popup) {
           await popup.waitForSelector('#poster-print-root', { timeout: 15000 });
           const now = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: P.size.w, hidePrompts: true });
-          const pr = await readPrint(popup, P.size.w, P.size.h);
+          const pr = await readPrint(popup, P.size.w, P.size.h, `${P.id} key+typed`);
           const c = compareSheets(now, pr.sheet, TOL, LINE_TOL);
           Object.assign(row.selected['key+typed'], { worstBox: c.worstBox, worstLine: c.worstLine, boxes: c.boxes.slice(0, 3), wraps: c.wraps.length, title: titleOverlap(pr.sheet), editorTitle: titleOverlap(now) });
           if (c.boxes.length) see('POS', `${P.id} key+typed: ${c.boxes.length} blocks off, worst ${c.worstBox} in (${c.boxes.slice(0, 3).map((b) => b.type).join(', ')})`);
@@ -671,7 +697,7 @@ try {
           await popup.evaluate(() => document.fonts.ready).catch(() => {});
           await sleep(300);
           const now = await page.evaluate(readSheet, { sheetSel: '#poster-canvas', posterW: nw, hidePrompts: true });
-          const pr = await readPrint(popup, nw, nh);
+          const pr = await readPrint(popup, nw, nh, `${P.id} key+resized`);
           const c = compareSheets(now, pr.sheet, TOL, LINE_TOL);
           const sizeOk = pr.page && pr.page.size.replace(/\s+/g, ' ') === `${nw}in ${nh}in`;
           Object.assign(row.selected['key+resized'], { page: pr.page, sheetIn: pr.sheet.sheetIn, worstBox: c.worstBox, worstLine: c.worstLine, boxes: c.boxes.slice(0, 3), wraps: c.wraps.slice(0, 3) });
@@ -779,6 +805,7 @@ for (const [c, rows] of Object.entries(claims)) {
 R.info = info;
 log(`[INFO popup-script] print windows by readyState when read: ${JSON.stringify(info.readyState)} (Chromium: a popup's stylesheet request never reaches the harness's routing, so its document stays "loading" and its own script, the auto-print and the buttons, never runs: review round 2, R2-F4)`);
 log(`[INFO ui-copied] editor controls copied onto the printed sheet, by label: ${JSON.stringify(info.uiCopied)}`);
+log(`[INFO hint-reads] ${hintReads.n} print documents read for the editor's hints (HINT)`);
 const uiFont = R.posters.filter((p) => p.editor?.uiFontText?.length).map((p) => `${p.id}: ${p.editor.uiFontText.length} (${p.editor.uiFontText.slice(0, 3).join(' | ')})`);
 log(`[INFO ui-font] ${uiFont.length ? uiFont.join(' · ') : 'no sheet text in the editor\'s UI font'}`);
 const promptSized = R.posters.filter((p) => p.promptSized?.length).map((p) => `${p.id}: ${p.promptSized.map((b) => `${b.type} ${b.d} in`).join(', ')}`);

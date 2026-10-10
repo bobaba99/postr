@@ -36,6 +36,7 @@ import {
 import { stashCheckoutIntent, type CheckoutPlan } from '@/data/checkoutIntent';
 import { REFUND_LINE_BOTH } from '@/data/refundCopy';
 import { LATEX_EXPORT_ENABLED } from '@/config/features';
+import { CHART_DRAW_WAIT_MS, ChartsStillDrawingError, SheetNotShownError, waitForChartsReadable } from '@/charts/chartDrawing';
 
 type ExportKind = 'latex' | 'pptx';
 
@@ -169,6 +170,14 @@ export function EditableExportButtons({
       setState({ busy: null, done: kind, notes, failed: false });
       setTimeout(() => setState((s) => ({ ...s, done: null })), 2500);
     } catch (err) {
+      // A chart still drawing after the wait, or the poster hidden by
+      // Preview (record 31's review rounds 1 and 2, R1-F2 and R2-F1):
+      // nothing was written and nothing spent, and that is no failure: the
+      // note says so, and the next click exports.
+      if (err instanceof ChartsStillDrawingError || err instanceof SheetNotShownError) {
+        setState({ ...IDLE, notes: [err.message] });
+        return;
+      }
       // House rule: the user-facing message stays generic. But the
       // error itself must not vanish — an earlier revision swallowed it
       // entirely, which is why a real pptxgenjs failure (it cannot embed
@@ -256,6 +265,15 @@ export function EditableExportButtons({
         import('@/export/pptx/writer'),
         import('@/export/posterContent'),
       ]);
+      // Each chart's picture is copied from the editor's drawing, so the
+      // export waits (the button busy, at most CHART_DRAW_WAIT_MS) until the
+      // poster is shown (Preview hides it) and no chart on it is drawing;
+      // past that, or at once with the editor left, it throws before the
+      // credit is spent: nothing written, nothing spent (record 31's review
+      // rounds 1 and 2, R1-F2 and R2-F1). The writer reads the charts as
+      // soon as this resolves. A poster without charts reads nothing off
+      // the page and does not wait.
+      if (doc!.blocks.some((b) => b.type === 'chart')) await waitForChartsReadable(CHART_DRAW_WAIT_MS);
       const { bytes, note, warnings } = await exportPosterPptx(doc!, {
         citationStyle,
         attribution: { paidPlan: canExport },
@@ -455,14 +473,14 @@ export function EditableExportButtons({
           {LATEX_EXPORT_ENABLED && ' For a full-size editable export, use LaTeX below.'}
         </div>
       )}
-      {/* The PowerPoint writer does not handle `chart` blocks
-          (pptx/writer.ts block switch), so charts are named as left out.
-          Third-party app compatibility is not claimed: nothing here checks
-          it. */}
+      {/* Since record 31 the writer draws each chart block as a picture
+          of the editor's drawing (pptx/chartShape.ts), not an editable
+          chart. Third-party app compatibility is not claimed: nothing here
+          checks it. */}
       {!beyondHalf && (
         <div style={hintStyle}>
           One editable slide. Text, images and tables become PowerPoint text
-          boxes, pictures and tables. Charts made in Postr are not included.
+          boxes, pictures and tables. Charts made in Postr become pictures.
         </div>
       )}
 

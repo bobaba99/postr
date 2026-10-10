@@ -1,0 +1,610 @@
+{
+ "tests": [
+  "src/poster/__tests__/exportsCharts.test.tsx",
+  "src/export/__tests__/pptxCharts.test.ts",
+  "src/export/__tests__/pptxWriter.test.ts",
+  "src/poster/__tests__/onePrintPath.test.tsx"
+ ],
+ "mutants": {
+  "H-figure-hint-printed": {
+   "undoes": "part 2 — an empty figure’s \"+ Upload figure\" carries the editor’s marker, so the print copy and the thumbnail drop it",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "        // An editor prompt, not the poster: the print copy and the thumbnail\n        // drop it, so an empty figure prints as empty space\n        // (export/stripEditorChrome.ts; record 31).\n        data-postr-editor-ui=\"\"\n",
+     ""
+    ]
+   ]
+  },
+  "H-logo-hint-printed": {
+   "undoes": "part 2 — an empty logo’s \"+ Logo\" carries the marker",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "        // An editor prompt, not the poster: the print copy and the thumbnail\n        // drop it (export/stripEditorChrome.ts; record 31).\n        data-postr-editor-ui=\"\"\n",
+     ""
+    ]
+   ]
+  },
+  "H-authors-hint-printed": {
+   "undoes": "part 2 — \"Add authors in sidebar →\" (no author, no institution) carries the marker",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "<span data-postr-editor-ui=\"\" style={{ color: palette.muted, fontStyle: 'italic', fontSize: styles.authors.size }}>",
+     "<span style={{ color: palette.muted, fontStyle: 'italic', fontSize: styles.authors.size }}>"
+    ]
+   ]
+  },
+  "H-authors-institutions-hint-printed": {
+   "undoes": "part 2 — \"Add authors in sidebar →\" above the institutions carries the marker (the institutions print)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "<span data-postr-editor-ui=\"\" style={{ color: palette.muted, fontStyle: 'italic' }}>",
+     "<span style={{ color: palette.muted, fontStyle: 'italic' }}>"
+    ]
+   ]
+  },
+  "H-refs-hint-printed": {
+   "undoes": "part 2 — \"Add references in Refs tab →\" carries the marker",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "<div data-postr-editor-ui=\"\" style={{ color: palette.muted, fontSize: styles.body.size, fontStyle: 'italic' }}>",
+     "<div style={{ color: palette.muted, fontSize: styles.body.size, fontStyle: 'italic' }}>"
+    ]
+   ]
+  },
+  "H-chart-message-printed": {
+   "undoes": "part 2 — a chart’s \"Rendering chart…\" and failure message carry the marker",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "          data-postr-editor-ui=\"\"\n          style={{\n            position: 'absolute',",
+     "          style={{\n            position: 'absolute',"
+    ]
+   ]
+  },
+  "H-strip-keeps-hints": {
+   "undoes": "part 2 — the one print function’s copy-cleaning drops the marker (the hints’ and the table controls’)",
+   "edits": [
+    [
+     "src/export/stripEditorChrome.ts",
+     "'[data-postr-resize-handle], [data-postr-selection-ui], [data-postr-overlay], [data-postr-editor-ui]'",
+     "'[data-postr-resize-handle], [data-postr-selection-ui], [data-postr-overlay]'"
+    ]
+   ]
+  },
+  "E-empty-references-titled": {
+   "undoes": "part 2 (PowerPoint) — an empty references block writes nothing, not \"References\" over an empty list",
+   "edits": [
+    [
+     "src/export/pptx/writer.ts",
+     "  if (entries.length === 0) return;\n",
+     ""
+    ]
+   ]
+  },
+  "C-no-chart-case": {
+   "undoes": "part 1 — the writer has a case for chart blocks",
+   "edits": [
+    [
+     "src/export/pptx/writer.ts",
+     "      case 'chart':\n        addChart(slide, b, ctx, chartPictures.get(b.id));\n        break;\n",
+     ""
+    ]
+   ]
+  },
+  "C-no-picture-drawn": {
+   "undoes": "part 1 — the writer asks for each chart’s picture before the slide is drawn",
+   "edits": [
+    [
+     "src/export/pptx/writer.ts",
+     "    const picture = await draw(rasterizeSvg).catch(() => null);\n    if (picture) chartPictures.set(id, picture);\n",
+     ""
+    ]
+   ]
+  },
+  "C-box-unscaled": {
+   "undoes": "part 1 — the picture and its caption are placed at the export’s scale (half over 56 in)",
+   "edits": [
+    [
+     "src/export/pptx/chartShape.ts",
+     "  x: unitsToInches(box.x) * s,\n  y: unitsToInches(box.y) * s,\n  w: unitsToInches(box.w) * s,\n  h: unitsToInches(box.h) * s,",
+     "  x: unitsToInches(box.x) * (s / s),\n  y: unitsToInches(box.y) * (s / s),\n  w: unitsToInches(box.w) * (s / s),\n  h: unitsToInches(box.h) * (s / s),"
+    ]
+   ]
+  },
+  "C-picture-unturned": {
+   "undoes": "part 1 — the picture turns with the chart",
+   "edits": [
+    [
+     "src/export/pptx/chartShape.ts",
+     "      rotate,\n      altText:",
+     "      altText:"
+    ]
+   ]
+  },
+  "C-no-alt-text": {
+   "undoes": "part 1 — the picture carries the caption as its alternative text",
+   "edits": [
+    [
+     "src/export/pptx/chartShape.ts",
+     "      altText: n !== undefined ? `Figure ${n}. ${caption}`.trim() : caption || 'Chart',\n",
+     ""
+    ]
+   ]
+  },
+  "C-caption-placed-by-guess": {
+   "undoes": "part 1 — the caption goes where the editor draws it, not where the image blocks’ layout guesses",
+   "edits": [
+    [
+     "src/export/pptx/chartShape.ts",
+     "const at = picture?.caption ? inches(picture.caption, ctx.scale) : fallback.caption;",
+     "const at = fallback.caption;"
+    ]
+   ]
+  },
+  "C-caption-unturned": {
+   "undoes": "part 1 — the caption turns with the chart",
+   "edits": [
+    [
+     "src/export/pptx/chartShape.ts",
+     "addMutedText(slide, captionText(b, ctx, 'Figure'), at, ctx, rotate);",
+     "addMutedText(slide, captionText(b, ctx, 'Figure'), at, ctx);"
+    ]
+   ]
+  },
+  "C-left-out-silently": {
+   "undoes": "part 1 — a chart that cannot be drawn is named in the warnings",
+   "edits": [
+    [
+     "src/export/pptx/chartShape.ts",
+     "    ctx.warnings.push(CHART_LEFT_OUT);\n",
+     ""
+    ]
+   ]
+  },
+  "C-font-warning-dropped": {
+   "undoes": "part 1 — a picture without the poster font is named in the warnings",
+   "edits": [
+    [
+     "src/export/pptx/chartShape.ts",
+     "    if (picture.fontMissing) ctx.warnings.push(CHART_FONT_MISSING);\n",
+     ""
+    ]
+   ]
+  },
+  "P-low-dpi": {
+   "undoes": "part 1 — the picture is drawn at 300 px per printed inch",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     "export const CHART_DPI = 300;",
+     "export const CHART_DPI = 150;"
+    ]
+   ]
+  },
+  "P-no-pixel-cap": {
+   "undoes": "part 1 — a picture past 4096² px at 300 per inch is drawn with fewer",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     "  const dpi = Math.min(CHART_DPI, Math.sqrt(CHART_MAX_PIXELS / Math.max(1e-6, wIn * hIn)));",
+     "  const dpi = CHART_DPI;"
+    ]
+   ]
+  },
+  "P-handle-icon-drawn": {
+   "undoes": "part 1 — the picture is the chart’s own svg, not a selected frame’s handle icon",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     ".find((s) => !s.closest(EDITOR_UI) && !s.parentElement?.closest('svg'))",
+     ".find(() => true)"
+    ]
+   ]
+  },
+  "P-corner-not-centre": {
+   "undoes": "part 1 — a turned chart is placed by its centre (its bounding box’s), not its bounding box’s corner",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     "  const cx = ((r.left + r.right) / 2 - sheet.left) / scale;\n  const cy = ((r.top + r.bottom) / 2 - sheet.top) / scale;",
+     "  const cx = (r.left - sheet.left) / scale + w / 2;\n  const cy = (r.top - sheet.top) / scale + h / 2;"
+    ]
+   ]
+  },
+  "P-no-drawn-size": {
+   "undoes": "part 1 — where the page reports no laid-out size, the size the chart was drawn for (its viewBox)",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     "  const box = boxOnSheet(host, sheet, scale, vb[2]! > 0 && vb[3]! > 0 ? { w: vb[2]! / PX, h: vb[3]! / PX } : undefined);",
+     "  const box = boxOnSheet(host, sheet, scale);"
+    ]
+   ]
+  },
+  "P-svg-not-sized": {
+   "undoes": "part 1 — the copy asks for the picture’s pixel size (its width and height attributes)",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     "  copy.setAttribute('width', String(px.w));\n  copy.setAttribute('height', String(px.h));\n",
+     ""
+    ]
+   ]
+  },
+  "P-font-not-embedded": {
+   "undoes": "part 1 — the poster’s web font is put into the picture",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     "      copy.insertBefore(style, copy.firstChild);\n",
+     ""
+    ]
+   ]
+  },
+  "P-font-missing-unsaid": {
+   "undoes": "part 1 — a picture the font could not be put into says so",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     "      fontMissing = true;\n",
+     ""
+    ]
+   ]
+  },
+  "F-any-weight": {
+   "undoes": "part 1 (font) — only the weight-400 faces chart text uses",
+   "edits": [
+    [
+     "src/export/pptx/chartFont.ts",
+     "      if ((prop('font-style') ?? 'normal') !== 'normal' || !holds400(prop('font-weight'))) continue;",
+     "      if ((prop('font-style') ?? 'normal') !== 'normal') continue;"
+    ]
+   ]
+  },
+  "F-any-style": {
+   "undoes": "part 1 (font) — only normal-style faces",
+   "edits": [
+    [
+     "src/export/pptx/chartFont.ts",
+     "      if ((prop('font-style') ?? 'normal') !== 'normal' || !holds400(prop('font-weight'))) continue;",
+     "      if (!holds400(prop('font-weight'))) continue;"
+    ]
+   ]
+  },
+  "F-every-subset": {
+   "undoes": "part 1 (font) — only the subsets holding a character of the chart’s text",
+   "edits": [
+    [
+     "src/export/pptx/chartFont.ts",
+     "      if (range && ![...points].some((cp) => ranges(range).some(([a, b]) => cp >= a && cp <= b))) continue;\n",
+     ""
+    ]
+   ]
+  },
+  "F-weight-range-misread": {
+   "undoes": "part 1 (font) — a face whose weight range holds 400 is taken",
+   "edits": [
+    [
+     "src/export/pptx/chartFont.ts",
+     "  return w.length > 1 ? w[0]! <= 400 && 400 <= w[1]! : w[0] === 400;",
+     "  return w.length > 1 ? false : w[0] === 400;"
+    ]
+   ]
+  },
+  "F-unloaded-counts": {
+   "undoes": "part 1 (font) — only a web font the page has loaded asks for embedding",
+   "edits": [
+    [
+     "src/export/pptx/chartFont.ts",
+     "    if (familyKey(face.family) === familyKey(family) && face.status === 'loaded') found = true;",
+     "    if (familyKey(face.family) === familyKey(family)) found = true;"
+    ]
+   ]
+  },
+  "K-export-tab-left-out": {
+   "undoes": "copy — the Export tab says charts become pictures (it said they are not included)",
+   "edits": [
+    [
+     "src/poster/sidebar/EditableExportButtons.tsx",
+     "boxes, pictures and tables. Charts made in Postr become pictures.",
+     "boxes, pictures and tables. Charts made in Postr are not included."
+    ]
+   ]
+  },
+  "K-about-en-left-out": {
+   "undoes": "copy — the About page (English) says charts are included as pictures",
+   "edits": [
+    [
+     "src/i18n/about.ts",
+     "Charts made in Postr are included as pictures.",
+     "Charts made in Postr are not included."
+    ]
+   ]
+  },
+  "K-about-fr-left-out": {
+   "undoes": "copy — the About page (French) says the same",
+   "edits": [
+    [
+     "src/i18n/about.ts",
+     "Les graphiques créés dans Postr y sont inclus sous forme d’images.",
+     "Les graphiques créés dans Postr n’y sont pas inclus."
+    ]
+   ]
+  },
+  "B-caption-unmarked": {
+   "undoes": "part 1 — the caption is marked so the export reads where it is drawn. Killed in jsdom since review round 1 (the R1-F1 test plays the caption's laid-out box, found by this marker, as jsdom lays nothing out; the file's caption then falls back to the image blocks' layout); in the browser pptx-export-check.mjs CAPPOS kills it too, finding the caption by its bold \"Figure N.\", not by the marker (record 31 §8)",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "<div data-postr-caption=\"\" style={captionStyle}>",
+     "<div style={captionStyle}>"
+    ]
+   ]
+  },
+  "B-note-unmarked": {
+   "undoes": "part 1 — the note is marked so the export reads where it is drawn. Killed in jsdom since review round 1 (as above); in the browser by pptx-export-check.mjs CAPPOS, the note found by its text",
+   "edits": [
+    [
+     "src/poster/blocks.tsx",
+     "          data-postr-note=\"\"\n",
+     ""
+    ]
+   ]
+  },
+  "R1-F1-caption-read-late": {
+   "undoes": "review round 1, R1-F1 — the caption’s and the note’s boxes are read with the chart’s, before anything is awaited (read after the font fetch and the canvas step, a scroll made meanwhile moved them: 5 in in the browser)",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     "    return { png, box, caption, note, ...(fontMissing ? { fontMissing } : {}) };",
+     "    return { png, box, caption: capEl ? boxOnSheet(capEl, sheet, scale) : null, note: noteEl ? boxOnSheet(noteEl, sheet, scale) : null, ...(fontMissing ? { fontMissing } : {}) };"
+    ]
+   ]
+  },
+  "R1-F1-chart-read-while-drawing": {
+   "undoes": "review round 1, R1-F1 — the writer reads every chart before its first await, not each one just before its picture is drawn",
+   "edits": [
+    [
+     "src/export/pptx/writer.ts",
+     "    const picture = await draw(rasterizeSvg).catch(() => null);",
+     "    const b = doc.blocks.find((x) => x.id === id)!;\n    const picture = await (drawChart(b, doc) ?? draw)(rasterizeSvg).catch(() => null);"
+    ]
+   ]
+  },
+  "R1-F2-no-wait": {
+   "undoes": "review round 1, R1-F2 — Export › PowerPoint waits for a chart still drawing before the writer reads the charts",
+   "edits": [
+    [
+     "src/poster/sidebar/EditableExportButtons.tsx",
+     "      if (doc!.blocks.some((b) => b.type === 'chart')) await waitForChartsReadable(CHART_DRAW_WAIT_MS);\n",
+     ""
+    ]
+   ]
+  },
+  "R1-F2-wait-not-refused": {
+   "undoes": "review round 1, R1-F2 — a chart still drawing after the wait: nothing written, no credit spent, no paid export recorded",
+   "edits": [
+    [
+     "src/poster/sidebar/EditableExportButtons.tsx",
+     "      if (doc!.blocks.some((b) => b.type === 'chart')) await waitForChartsReadable(CHART_DRAW_WAIT_MS);",
+     "      if (doc!.blocks.some((b) => b.type === 'chart')) await waitForChartsReadable(CHART_DRAW_WAIT_MS).catch(() => undefined);"
+    ]
+   ]
+  },
+  "R1-F2-still-drawing-as-failure": {
+   "undoes": "review round 1, R1-F2 — a chart still drawing is a note under the button (\"A chart is still drawing…\"), not \"Something went wrong\"",
+   "edits": [
+    [
+     "src/poster/sidebar/EditableExportButtons.tsx",
+     "      if (err instanceof ChartsStillDrawingError || err instanceof SheetNotShownError) {",
+     "      if (err instanceof SheetNotShownError) {"
+    ]
+   ]
+  },
+  "R1-F2-drawing-unmarked": {
+   "undoes": "review round 1, R1-F2 — a chart block carries data-postr-chart-drawing while it draws",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "<div {...{ [CHART_DRAWING_ATTR]: drawing ? '' : undefined }} style=",
+     "<div style="
+    ]
+   ]
+  },
+  "R1-F2-redraw-unmarked": {
+   "undoes": "review round 1, R1-F2 (sibling) — a chart redrawing for a new box is marked as drawing too (its status stays ready)",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "    setStatus((s) => (s === 'ready' ? s : 'loading'));\n    setDrawing(true);\n",
+     "    setStatus((s) => (s === 'ready' ? s : 'loading'));\n"
+    ]
+   ]
+  },
+  "R1-F2-ready-stays-drawing": {
+   "undoes": "review round 1, R1-F2 — a chart on screen is no longer drawing",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "        setStatus('ready');\n        setDrawing(false);\n",
+     "        setStatus('ready');\n"
+    ]
+   ]
+  },
+  "R1-F2-error-stays-drawing": {
+   "undoes": "review round 1, R1-F2 — a chart that cannot be drawn is no longer drawing (the export does not wait for it)",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "        setStatus('error');\n        setDrawing(false);\n      });",
+     "        setStatus('error');\n      });"
+    ]
+   ]
+  },
+  "R1-F2-nospec-stays-drawing": {
+   "undoes": "review round 1, R1-F2 — a chart block with no chart is no longer drawing",
+   "edits": [
+    [
+     "src/charts/ChartBlock.tsx",
+     "      setStatus('error');\n      setDrawing(false);\n      return;",
+     "      setStatus('error');\n      return;"
+    ]
+   ]
+  },
+  "R1-F2-no-waiting": {
+   "undoes": "review round 1, R1-F2 — the export waits (up to 10 s) for a chart still drawing, rather than giving up at once",
+   "edits": [
+    [
+     "src/charts/chartDrawing.ts",
+     "      setTimeout(check, POLL_MS);",
+     "      return reject(shown ? new ChartsStillDrawingError() : new SheetNotShownError('hidden'));"
+    ]
+   ]
+  },
+  "R1-F4-read-throw-aborts": {
+   "undoes": "review round 1, R1-F4 — a chart whose reading throws is left out (with the warning), the file still written",
+   "edits": [
+    [
+     "src/export/pptx/writer.ts",
+     "      if (err instanceof SheetNotShownError) throw err;\n      draw = null;",
+     "      throw err;"
+    ]
+   ]
+  },
+  "R1-F4-draw-reject-aborts": {
+   "undoes": "review round 1, R1-F4 (the reviewer's R1-drawer-throw-aborts) — a chart whose picture fails to draw is left out (with the warning), the file still written",
+   "edits": [
+    [
+     "src/export/pptx/writer.ts",
+     "    const picture = await draw(rasterizeSvg).catch(() => null);",
+     "    const picture = await draw(rasterizeSvg);"
+    ]
+   ]
+  },
+  "R1-note-unturned": {
+   "undoes": "review round 1, R1-F3 (the reviewer's mutant) — a turned chart’s note turns with it",
+   "edits": [
+    [
+     "src/export/pptx/chartShape.ts",
+     "addMutedText(slide, paragraphsToTextProps(parseRichText(b.note ?? '')), at, ctx, rotate);",
+     "addMutedText(slide, paragraphsToTextProps(parseRichText(b.note ?? '')), at, ctx);"
+    ]
+   ]
+  },
+  "R1-note-placed-by-guess": {
+   "undoes": "review round 1, R1-F4 (the reviewer's mutant) — the note goes where the editor draws it, not where the image blocks’ layout guesses",
+   "edits": [
+    [
+     "src/export/pptx/chartShape.ts",
+     "const at = picture?.note ? inches(picture.note, ctx.scale) : fallback.note;",
+     "const at = fallback.note;"
+    ]
+   ]
+  },
+  "R1-failed-stylesheet-cached": {
+   "undoes": "review round 1, R1-F4 (the reviewer's mutant) — a stylesheet fetch that failed is tried again on the next export",
+   "edits": [
+    [
+     "src/export/pptx/chartFont.ts",
+     "    void p.then((css) => {\n      if (css === null) cssCache.delete(family);\n    });\n",
+     ""
+    ]
+   ]
+  },
+  "R1-empty-png-kept": {
+   "undoes": "review round 1, R1-F4 (the reviewer's mutant) — a canvas step that answers no bytes leaves the chart out (with the warning)",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     "if (!png || png.length === 0) return null;",
+     "if (!png) return null;"
+    ]
+   ]
+  },
+  "R2-F1-hidden-not-waited": {
+   "undoes": "review round 2, R2-F1 — the export waits (up to 10 s) while Preview hides the poster, and goes on once it is shown",
+   "edits": [
+    [
+     "src/charts/chartDrawing.ts",
+     "      if (shown && chartsDrawing() === 0) return resolve();",
+     "      if (chartsDrawing() === 0) return resolve();"
+    ]
+   ]
+  },
+  "R2-F1-gone-as-ready": {
+   "undoes": "review round 2, R2-F1 — a sheet gone (the editor left) ends the wait at once with nothing exported, not as \"no chart drawing\" (the shape of the defect: chartsDrawing() read 0 with no sheet)",
+   "edits": [
+    [
+     "src/charts/chartDrawing.ts",
+     "      if (!sheet) return reject(new SheetNotShownError('gone'));",
+     "      if (!sheet) return resolve();"
+    ]
+   ]
+  },
+  "R2-F1-read-hidden-as-undrawn": {
+   "undoes": "review round 2, R2-F1 — the reading throws for a sheet hidden or gone, rather than answer \"not drawn\" for every chart",
+   "edits": [
+    [
+     "src/export/pptx/chartPicture.ts",
+     "  if (!sheetEl) throw new SheetNotShownError('gone');\n  if (!sheetShown(sheetEl)) throw new SheetNotShownError('hidden');",
+     "  if (!sheetEl || !sheetShown(sheetEl)) return null;"
+    ]
+   ]
+  },
+  "R2-F1-writer-swallows-hidden": {
+   "undoes": "review round 2, R2-F1 — the writer writes nothing when a reading finds the poster hidden or gone (other reading failures leave that chart out)",
+   "edits": [
+    [
+     "src/export/pptx/writer.ts",
+     "      if (err instanceof SheetNotShownError) throw err;\n",
+     ""
+    ]
+   ]
+  },
+  "R2-F1-hidden-as-failure": {
+   "undoes": "review round 2, R2-F1 — the poster hidden is a note under the button (\"The poster was hidden in Preview…\"), not \"Something went wrong\"",
+   "edits": [
+    [
+     "src/poster/sidebar/EditableExportButtons.tsx",
+     "      if (err instanceof ChartsStillDrawingError || err instanceof SheetNotShownError) {",
+     "      if (err instanceof ChartsStillDrawingError) {"
+    ]
+   ]
+  },
+  "R2-F1-defect-restored": {
+   "undoes": "review round 2, R2-F1, both layers at once (the defect as found): the wait takes a hidden or gone sheet as ready, and the reading answers \"not drawn\"",
+   "edits": [
+    [
+     "src/charts/chartDrawing.ts",
+     "      if (shown && chartsDrawing() === 0) return resolve();",
+     "      if (chartsDrawing() === 0) return resolve();"
+    ],
+    [
+     "src/charts/chartDrawing.ts",
+     "      if (!sheet) return reject(new SheetNotShownError('gone'));",
+     "      if (!sheet) return resolve();"
+    ],
+    [
+     "src/export/pptx/chartPicture.ts",
+     "  if (!sheetEl) throw new SheetNotShownError('gone');\n  if (!sheetShown(sheetEl)) throw new SheetNotShownError('hidden');",
+     "  if (!sheetEl || !sheetShown(sheetEl)) return null;"
+    ]
+   ]
+  },
+  "R2-F1-chartless-waits": {
+   "undoes": "review round 2, R2-F1 — a poster without charts reads nothing off the page and does not wait for it",
+   "edits": [
+    [
+     "src/poster/sidebar/EditableExportButtons.tsx",
+     "      if (doc!.blocks.some((b) => b.type === 'chart')) await waitForChartsReadable(CHART_DRAW_WAIT_MS);",
+     "      if (doc!.blocks.length >= 0) await waitForChartsReadable(CHART_DRAW_WAIT_MS);"
+    ]
+   ]
+  }
+ }
+}

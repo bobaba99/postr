@@ -28,6 +28,7 @@ import type { Block, Palette } from '@postr/shared';
 import { PX, POINTS_PER_UNIT } from '@/poster/constants';
 import { useFeedbackStore } from '@/stores/feedbackStore';
 import { renderChartLaidOut } from './renderChart';
+import { CHART_DRAWING_ATTR } from './chartDrawing';
 
 interface ChartBlockProps {
   block: Block;
@@ -98,6 +99,13 @@ function useFontLoads(fontFamily: string): number {
 export function ChartBlock({ block, palette, fontFamily, onMinHeight }: ChartBlockProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [status, setStatus] = useState<Status>('loading');
+  // Drawing: from the start of a drawing (the first, or a redraw for a new
+  // box, palette or font) until it is on screen or has failed. Export ›
+  // PowerPoint waits until no chart is (chartDrawing.ts; record 31's review
+  // round 1, R1-F2), so it never copies a chart before it is drawn, or as
+  // drawn for its old box. `status` stays 'ready' through a redraw (no
+  // loading flash), so it cannot say this.
+  const [drawing, setDrawing] = useState(true);
   const openFeedback = useFeedbackStore((s) => s.open);
   const spec = block.chartSpec ?? null;
   const laidOut = useLaidOutBox(hostRef);
@@ -113,6 +121,7 @@ export function ChartBlock({ block, palette, fontFamily, onMinHeight }: ChartBlo
   useEffect(() => {
     if (!spec) {
       setStatus('error');
+      setDrawing(false);
       return;
     }
     // In a laid-out page the box comes from the observer, which reports it
@@ -124,6 +133,7 @@ export function ChartBlock({ block, palette, fontFamily, onMinHeight }: ChartBlo
     // A chart already on screen stays there while it redraws for a new box
     // (a resize, a selected frame's wider border): no loading flash.
     setStatus((s) => (s === 'ready' ? s : 'loading'));
+    setDrawing(true);
     renderChartLaidOut(spec, {
       palette,
       fontFamily,
@@ -139,9 +149,12 @@ export function ChartBlock({ block, palette, fontFamily, onMinHeight }: ChartBlo
         svg.style.display = 'block';
         hostRef.current.replaceChildren(svg);
         setStatus('ready');
+        setDrawing(false);
       })
       .catch(() => {
-        if (!cancelled) setStatus('error');
+        if (cancelled) return;
+        setStatus('error');
+        setDrawing(false);
       });
     return () => {
       cancelled = true;
@@ -149,10 +162,15 @@ export function ChartBlock({ block, palette, fontFamily, onMinHeight }: ChartBlo
   }, [spec, palette, fontFamily, box.w, box.h, known, fontLoads]);
 
   return (
-    <div style={{ width: '100%', height: '100%', minHeight: 0, position: 'relative' }}>
+    <div {...{ [CHART_DRAWING_ATTR]: drawing ? '' : undefined }} style={{ width: '100%', height: '100%', minHeight: 0, position: 'relative' }}>
       <div ref={hostRef} style={{ width: '100%', height: '100%' }} />
       {status !== 'ready' && (
+        // The editor's own message while the chart draws or when it cannot:
+        // not the poster, so the print copy and the thumbnail drop it
+        // (export/stripEditorChrome.ts; record 31) and the block prints as
+        // empty space.
         <div
+          data-postr-editor-ui=""
           style={{
             position: 'absolute',
             inset: 0,

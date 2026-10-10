@@ -234,6 +234,9 @@ export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
       <button
         type="button"
         onClick={() => setPickerOpen(true)}
+        // An editor prompt, not the poster: the print copy and the thumbnail
+        // drop it (export/stripEditorChrome.ts; record 31).
+        data-postr-editor-ui=""
         style={{
           // Reset native button chrome (same `all: unset` pattern the
           // "+ row"/"+ col" append buttons below use) so the tile
@@ -420,6 +423,10 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
       <button
         type="button"
         onClick={() => ref.current?.click()}
+        // An editor prompt, not the poster: the print copy and the thumbnail
+        // drop it, so an empty figure prints as empty space
+        // (export/stripEditorChrome.ts; record 31).
+        data-postr-editor-ui=""
         style={{
           // Reset native button chrome (same `all: unset` pattern the
           // "+ row"/"+ col" append buttons use) so the tile keeps its
@@ -1450,7 +1457,7 @@ export function AuthorLine({ authors, institutions, palette, fontFamily, styles 
   if (!validAuthors.length) {
     if (institutions.length === 0) {
       return (
-        <span style={{ color: palette.muted, fontStyle: 'italic', fontSize: styles.authors.size }}>
+        <span data-postr-editor-ui="" style={{ color: palette.muted, fontStyle: 'italic', fontSize: styles.authors.size }}>
           Add authors in sidebar →
         </span>
       );
@@ -1465,7 +1472,7 @@ export function AuthorLine({ authors, institutions, palette, fontFamily, styles 
           lineHeight: 1.15,
         }}
       >
-        <span style={{ color: palette.muted, fontStyle: 'italic' }}>
+        <span data-postr-editor-ui="" style={{ color: palette.muted, fontStyle: 'italic' }}>
           Add authors in sidebar →
         </span>
         <div style={{ fontSize: styles.authors.size * 0.82, color: palette.muted }}>
@@ -1559,7 +1566,8 @@ interface RefsBlockProps {
 export function RefsBlock({ references, palette, fontFamily, styles, citationStyle }: RefsBlockProps) {
   if (!references?.length) {
     return (
-      <div style={{ color: palette.muted, fontSize: styles.body.size, fontStyle: 'italic' }}>
+      // An editor prompt, not the poster (record 31): never printed.
+      <div data-postr-editor-ui="" style={{ color: palette.muted, fontSize: styles.body.size, fontStyle: 'italic' }}>
         Add references in Refs tab →
       </div>
     );
@@ -1733,6 +1741,7 @@ function CaptionWrapper({
       </div>
       {hasNote && (
         <div
+          data-postr-note=""
           style={noteStyle}
           dangerouslySetInnerHTML={{ __html: block.note! }}
         />
@@ -1740,8 +1749,11 @@ function CaptionWrapper({
     </div>
   );
 
+  // `data-postr-caption` and `data-postr-note`: where the PowerPoint export
+  // reads a chart's caption and note as drawn (export/pptx/chartPicture.ts;
+  // record 31).
   const captionEl = showCaption ? (
-    <div style={captionStyle}>
+    <div data-postr-caption="" style={captionStyle}>
       <b style={{ fontStyle: 'normal', color: palette.primary }}>
         {label} {captionNumber}.
       </b>
