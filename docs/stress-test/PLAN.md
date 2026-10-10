@@ -193,13 +193,11 @@ scope becomes a plan item or a question for the owner.
   poster: " and the database's message, `pages/Home.tsx:126-127` showing
   `data/posters.ts:464`), against the rule that user-facing errors stay
   generic.
-- **From fix 12 (2026-10-06):** Enter in a text block is not saved as a
-  line break: Chromium, Firefox and WebKit put the new line in a `<div>`,
-  which the sanitizer flattens with no separator, so " ZQA", Enter, "ZQB"
-  is stored as "ZQAZQB" (MEASURED in 3 engines on main and on the fix,
-  record 12 §10). The screen keeps two lines until the block is drawn
-  again from the store (a reload; since fix 12 also an undo or redo of
-  that block's text). A text-formatting item, not undo.
+- ~~**From fix 12 (2026-10-06):** Enter in a text block is not saved as a
+  line break~~ **Fixed by fix 27** (`docs/fixes/27-keep-work-safe.md`,
+  OF-01, MVP blocker 1): the typing commit now stores the browser's new
+  line as a `<br>`, in text blocks, the Content box and table cells, and
+  the PowerPoint file keeps a cell's lines (MEASURED in 3 engines).
 - From fix 12: the comments panel's fields (hidden with sharing) are not
   marked to keep their own undo; when sharing returns, mark them
   `data-own-undo` (owner decision 2 lists comments) and add a test.
@@ -492,6 +490,119 @@ scope becomes a plan item or a question for the owner.
   same holds for the landing page's way into `/p/new` (stream B). The Terms
   line now on `/auth` sits in the sign-in card, next to "Continue with
   Google".
+- **Record 27 review round 1, a save the server holds** (R1-A2, LOW;
+  MEASURED by the reviewer with a 45 s hold, and by `keep-work-check.mjs`
+  H1 with a 12 s one). One save at a time has no time limit: while a write
+  is out, the next save, ⌘S's "Saved" and the sidebar's Duplicate wait for
+  it, and the pill says "Saving…" (H1: the second word sent 12.9 s after
+  typing, as the held write came back; ⌘S answered nothing for 2 s). The
+  work is kept (main lost the newer word in the same case). A client
+  timeout would let the timed-out write land after a newer one unless
+  writes became conditional (on `updated_at`). A common trigger, found in
+  round 2 of the restarted review (N2-F2, LOW; the same on main): the write
+  waits inside the Supabase client while it refreshes a token in its last
+  90 s (expired, or about to, e.g. after a laptop wakes), retrying under
+  its lock, so during an outage no request goes out and the hook sees no
+  failure: "Saving…" in 45 of 45 one-second readings, ⌘S silent until the
+  network was back, the word stored 5.9–6.1 s after reconnecting
+  (MEASURED, `keep-work-check.mjs` H6, a 30 s token, 45 s offline, three
+  engines; the reviewer's 75 s outage read the same). Nothing is lost (the
+  change pending, the leave warning armed). With a fresh token the same
+  outage reads "Not saved — retrying…" (S5). If wanted: say "Not saved —
+  retrying…" from the time a write has been out (without aborting it), or
+  check `navigator.onLine` before writing; each has a trade-off (a write
+  still landing, a browser that misreports offline).
+- **Record 27 review round 1, the table note's text** (R1-A8, INFO, an MVP
+  field). The note's textarea shows the stored note through a tag
+  stripper, so text between a `<` and a later `>` vanishes as it is typed:
+  "p < .05; d > 0.5" becomes "p  0.5" (MEASURED in jsdom by the corrector,
+  the stripper on that text; in Chromium by the reviewer, the typed note);
+  and the canvas draws the note as raw HTML (`dangerouslySetInnerHTML`, a
+  pasted note unsanitized until the next keystroke; a self-XSS sink,
+  UNVERIFIED, sharing hidden). Store the note as text and escape it on
+  render, or sanitize it on commit and on render.
+- **Record 27 review round 1, "✨ Format table" joins a cell's lines**
+  (corrector, sibling of R1-A1). `autoFormatAPA` strips every tag, the
+  `<br>` that Enter now stores in a cell too: "Group ZQE<br>ZQF" becomes
+  "Group ZQEZQF" (MEASURED in jsdom, the function the button calls), and
+  the button calls such a cell unformatted. Matters only while the button
+  is shown: bounded-designs §3.2 takes "✨ Format table/note" out of the
+  MVP. On main the cell's `<div>` went the same way.
+- **Record 27 review round 2, a retry writes over another device's newer
+  save** (R2-A2, MEDIUM as a data-loss class; THE OWNER'S CALL). Every
+  write is unconditional (the last one wins). Device A's saves fail while a
+  word waits; device B (another browser, the same account) opens the poster
+  and saves its own word; when A's network comes back, A's retry writes its
+  older poster over B's, with no edit and no warning on either device
+  (MEASURED, `keep-work-check.mjs` H2: 1.5 s after A recovers in Chromium,
+  Firefox and WebKit, the stored poster then holds A's word, not B's; the
+  same in a second tab of one browser, where the two-tab banner shows, by
+  the reviewer). On main A's word was never retried and was lost instead,
+  and A's next edit would have overwritten B the same way. A fix shared with
+  the held save above: make each write conditional on the row's version
+  last seen (`updated_at`, which the thumbnail's own write also sets, or a
+  version column); 0 rows means the poster changed elsewhere: stop
+  retrying, keep the change, and ask (keep mine, or load theirs). That is
+  conflict resolution, which the stream's brief left out: the owner
+  decides whether the MVP needs it.
+- **Record 27 review round 2, the session ends with a change unsaved**
+  (R2-A3, LOW; the same on main). A save fails, then the session ends (the
+  refresh token refused, the access token expired): the editor closes on
+  the account change (fix 23's closed page), the change is only in its
+  "Download a copy", and the page neither says so nor warns before leaving
+  (MEASURED, `keep-work-check.mjs` H3 in three engines: not stored, the
+  copy holds it, no warning). Either the closed page says "Changes made
+  after your last save are only in this copy" and warns before leaving
+  until it is downloaded, or the pending change is kept per poster in
+  sessionStorage, as the drafts are.
+- **Record 27 review round 2, paste fidelity** (R2-A6, INFO, older than
+  fix 27: the branch and main identical, MEASURED by the reviewer with
+  synthetic pastes in Chromium). Word's blank paragraph
+  (`<p class=MsoNormal><o:p>&nbsp;</o:p></p>`) is dropped (the paste's trim
+  rule uses `trim()`, which strips U+00A0); a web list with newlines
+  between its `<li>` draws blank lines between the bullets, and PowerPoint
+  writes empty paragraphs there; Google Docs' `<b style="font-weight:
+  normal" id="docs-internal-guid-…">` wrapper is stored as `<b>` round the
+  whole paste (drawn bold, INSPECTED). Treat an `&nbsp;`-only paragraph as a
+  blank line, drop whitespace-only text inside `ul`/`ol` on paste, unwrap
+  that `<b>`. Also seen: the print window spaces table cells (1.0 line
+  against 1.25 on the canvas) and lists differently, on main too.
+- **Record 27, ⌘S with a Poster name typed and left** (R3-A3, LOW; from
+  the first review round 3's probe N1; on main "Version saved" over the
+  same draft). A name typed in Layout › Poster name, then a click
+  elsewhere, then ⌘S: "Saved" is said of the poster, the name stays a
+  draft in its field (kept for the tab) and closing the tab does not warn
+  (MEASURED, `keep-work-check.mjs` H4 in three engines). ⌘S saves the name
+  only from its own field. Saving every draft field from any focus, or
+  committing the name when its field loses the focus, is a wider rule than
+  "⌘S saves now". The sheet's width and height are drafts too, until Enter
+  or leaving the field asks "Change poster to …?": ⌘S there says "Saved",
+  the stored width unchanged, the field keeping its value (MEASURED,
+  `keep-work-check.mjs` H7 in three engines; N2-F4).
+- **Record 27, Enter in an emptied Poster name field** (LOW; older than fix
+  27, the field's `saveTitle` unchanged). Enter commits a blank name, while
+  the field's Save button is disabled for it and ⌘S there leaves it (round
+  2, R2-A4); the save then writes the title block's words as the
+  dashboard's title: the stored title "Untitled Poster" became "Your Poster
+  Title" (2 title writes), the field stayed empty with its "required" note,
+  and its disabled button read "✓ Saved" (MEASURED, `keep-work-check.mjs`
+  H8, Chromium, Firefox and WebKit, the dev server and the production
+  build; on main the same in Chromium; round 3 of the restarted review,
+  which measured it first in Chromium).
+  If wanted: `saveTitle` ignores a blank name, as the button does.
+
+- **Record 27, a list item's `<div>` in a legacy table cell** (N1-F4, INFO;
+  round 1 of the restarted review). The export parser now reads `<div>` and
+  `<p>` as paragraphs, so `<ul><li><div>x</div></li></ul>` gives the bullet
+  "x" and an empty bullet after it (MEASURED in Node on the parser:
+  `[["unordered","x"],["unordered",""]]`; two such items, an empty bullet
+  after each). No known path stores one (INSPECTED; round 3 of the
+  restarted review, N3-F3): a paste never reaches a cell (the table's paste
+  handler takes it, N2-F1 below); typed text and new cells are sanitized
+  since fix 27; before it a typed cell stored its raw HTML, and whether a
+  list can be made in a cell has not been checked. Main wrote such markup
+  out as text. If wanted: inside a list item, end the item's paragraph at
+  `</li>`, not at `</div>` or `</p>`.
 
 ### Queued by the claims audit (owner decisions, 2026-10-06)
 
@@ -804,6 +915,33 @@ Found while fixing one item, belonging to another (details in the record named):
   `migrateBase64ToStorage` calls `setBlocksSilent` with the load-time blocks,
   which would overwrite edits made while images upload. Reproduce before
   planning.
+- **For a new plan item (MVP scope: "pasting tables"), from fix 27** (round
+  2 of the restarted review, N2-F1, MEDIUM; older than fix 27, the same on
+  main; outside its three behaviours, so not fixed there: the lead's call).
+  A paste into a table cell replaces the whole table: the table's paste
+  handler (`blocks.tsx` `onPaste`, `onPasteCapture` on the whole table)
+  builds a new table from any paste with text (`tableOps.ts`
+  `parseTablePaste`: an HTML `<tr>`, else every non-empty line of the plain
+  text, split at tabs) and commits it in place of the old one, column widths
+  reset. One line, "ZQW 12.4", pasted into the fifth cell of the starting
+  4×3 table (12 cells filled) left a 1×1 table holding it, drawn and stored
+  by autosave; ⌘Z brought the 4×3 table back (MEASURED, `keep-work-check.mjs`
+  H5 in Chromium, Firefox and WebKit, a paste event carrying plain text; on
+  main the same; the reviewer's real ⌘C/⌘V in Chromium and Firefox the
+  same). Every rich paste carries plain text too, so no paste with text
+  reaches the cell. The undo history lives in memory: after a reload the
+  table is gone. Bounded-designs §3.3 says a paste into a focused table cell
+  "fills the table" (Today) and, in its table A, that "the field takes" any
+  paste with text: which one the cell follows is a design call. A plain
+  rule that keeps the user's cells: a paste that is not table-shaped (no
+  `<tr>`, no tab, one line) goes into the cell; a table-shaped one fills
+  from the focused cell and grows the table, never dropping a cell. One
+  in-app sentence still describes a growing grid, the Insert tab's
+  "📋 Pasting tables" card ("Postr will expand the grid and fill every cell
+  for you", `Sidebar.tsx` `AddBlockPanel`; feature-graph marks it for the
+  claims audit). The Guidelines panel's Tables row and the table block's
+  tips already say the paste replaces the whole table (the claims audit,
+  `f153cf7`; round 3 of the restarted review, N3-F1).
 
 ## Checked and retired
 
@@ -827,4 +965,5 @@ Found while fixing one item, belonging to another (details in the record named):
 | 19 | `fix/19-controls-one-size` | fixed; its one review round (the browser, through the user's entry points) answered: on a turned block the handle row now turns about its own centre (near 180° it lay on the block's own handles, and a click on one deleted the block), and crop mode's edge handles no longer animate their size after a zoom change; after the round, by the lead's decision, zoomed out under 35% a handle row wider than its block draws only its move button (there a click meant for another block could delete the selected image: F3; the threshold measured); three cosmetic or older items and F3's remainder went to the Later list — `docs/fixes/19-controls-one-size.md` (a selected block's handles, row, rotate control, a selected table's strips and grips, crop mode's edges and bar and a group's handles and outline are the same size on screen at every zoom, 24 px to grab with 8 px squares and 20 px circles; a block small on screen draws fewer controls; the rotate control moves into the handle row where below it would meet the ZoomBar or leave the canvas; the owner's Q5–Q9 are on the Later list) |
 | 24 | `fix/legal-canada-law25` | done (three review rounds; round 3 found nothing left) — `docs/fixes/24-legal-canada-law25.md`: the Privacy, Cookies and Terms pages (EN and FR) rewritten for Quebec's Law 25 and PIPEDA first, Global Privacy Control honoured, poster ids kept out of the analytics address and its Referer, the feedback console log opt-in, account deletion clearing every Postr browser entry, the French Terms linked at sign-up; internal file `docs/legal/quebec-law-25.md`; the claims audit's product defects queued above |
 | 25 | `fix/latex-hidden-prices` | one review round (browser and entry points), answered: the `/auth?plan=term` label puts the period before the tax note, a stale code comment reworded — `docs/fixes/25-latex-hidden-prices.md`; the owner's decisions of 2026-10-06: the LaTeX export hidden (`LATEX_EXPORT_ENABLED`, `config/features.ts`; before it returns: the section above), every price shown says tax is extra, the landing "Editable exports" card says the export is paid; a copy inventory test keeps both true |
+| 8 + OF-01 | `fix/keep-work-safe` | implemented; review round 1 answered (the table note's line break drawn on the canvas and in the PDF, as PowerPoint writes it; a failed write for a poster left behind no longer marks the poster opened next "Not saved"; on the dev server a poster opened and closed with no edit no longer asks to confirm leaving; ten untested parts tested; the hold, the note's text and "✨ Format table" on the Later list); review round 2 (other engines, the production build, the user's entry points) answered: Shift+Enter followed by Enter no longer stores a blank line more (Chromium and Firefox), ⌘S in the Poster name field saves the name being typed, the instrument runs on the production build too (`POSTR_SERVE=preview`); a retry overwriting another device's newer save, the session ending with a change unsaved, and paste fidelity on the Later list (the first the owner's call); a third round ran on `safe-frozen-3`, but its report never reached the record (the workflow stopped); when the workflow restarted (2026-10-09) its runs were read and answered: the Poster name's button no longer says "✓ Saved" while the save fails, the pill keeps "Not saved — retrying…" while a retry is out, a pasted line ending in a newline gains no blank line, three untested parts tested; three review rounds follow, from the frozen copy `safe-frozen-4`; their round 1 (code review on `safe-frozen-4`) answered: the Poster name's button no longer says "✓ Saved" while the name's first write is out (K10, three engines), four stale line references in feature-graph and a test comment corrected, a list item's `<div>` in a legacy table cell left on the Later list; round 2 (the production build, three engines, the reviewer's probes, on `safe-frozen-5`) answered: with nothing changed and saves failing, the sidebar's Duplicate makes its copy and Enter in the Poster name field leaves "Saved", where both said "not saved" and armed the leave warning (K11, three engines); a paste into a table cell replacing the whole table (older, the MVP's "pasting tables") proposed as a plan item, the lead's call; a token refresh during an outage holding the pill on "Saving…" on the Later list; round 3 (a re-check of the responses, on `safe-frozen-6`) answered: its three findings were about the docs (the table-paste sentences the app shows today, a stale line reference, the stated reason for keeping N1-F4), corrected, and Enter in an emptied Poster name field measured in the browser (H8) — `docs/fixes/27-keep-work-safe.md` (record 27): Enter's line break is saved in text blocks, the Content box and table cells, and survives a reload, the dashboard's Duplicate, the PDF and PowerPoint, and the table note's is drawn on the canvas and in the PDF after a reload (OF-01, MVP blocker 1); a failed save stays unsaved, is retried after 2, 5, 10 and 30 s, then every 30 s, at once when the browser is back online, the pill says "Not saved — retrying…", and the tab warns before closing while a change is unsaved (OF-05, item 8, blocker 2); one save at a time (an older, slower save had overwritten a newer one); the sidebar's Duplicate refuses while a change is unsaved; ⌘S / Ctrl+S saves now and says "Saved", making no version (owner decision D8, blocker 11). Left over (record 27 §10): the crash screen's "Try again" after a failed save (item 10's part of item 8), Restore at 30 versions from the Versions tab alone, two tabs or two devices (last write wins; a retry after an outage now writes over the other's newer save, MEASURED, review round 2) |
 | 26 | `feat/french-public-pages` | implemented, review round 1 done and corrected (one round: a simple feature; 12 findings: 7 corrected, 1 left to the owner, 4 informational) — `docs/fixes/26-french-public-pages.md`; the owner's decision of 2026-10-06 (Quebec, Bill 96): every public page in French at its path + `/fr` (`/fr` for the landing page, `/auth/fr?plan=term`), its language read from the URL, a « Français » / "English" link on every page, the French heads with hreflang and the French pages in the sitemap, a French Stripe Checkout from `/auth/fr`; the editor stays English; queued above: "Queued by fix 26" |

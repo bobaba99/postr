@@ -1,0 +1,707 @@
+{
+  "tests": [
+    "src/poster/__tests__/enterSaved.test.tsx",
+    "src/poster/__tests__/keepWorkSafe.test.tsx",
+    "src/hooks/__tests__/useAutosave.test.ts",
+    "src/poster/__tests__/sanitizeHtml.test.ts",
+    "src/poster/__tests__/VersionPanel.test.tsx",
+    "src/export/__tests__/pptxWriter.test.ts"
+  ],
+  "mutants": {
+    "A-typed-no-separator": {
+      "undoes": "A — a text block's typing is stored with the browser's new lines as <br> (RichTextEditor read)",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "  const read = () => sanitizeTyped(ref.current?.innerHTML ?? '', multiline);",
+          "  const read = () => sanitizeHtml(ref.current?.innerHTML ?? '');"
+        ]
+      ]
+    },
+    "A-typed-trims-spaces": {
+      "undoes": "A — every space typed is kept, at the start of a line too (keepWhitespace)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "multiline ? '<br>' : ' ', keepWhitespace: true });",
+          "multiline ? '<br>' : ' ', keepWhitespace: false });"
+        ]
+      ]
+    },
+    "A-typed-single-line-breaks": {
+      "undoes": "A — a single-line block never gains a line break (a space instead)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "multiline ? '<br>' : ' ', keepWhitespace: true });",
+          "'<br>', keepWhitespace: true });"
+        ]
+      ]
+    },
+    "A-cell-stored-raw": {
+      "undoes": "A — a table cell's typing is stored as a text block's is (TableCellEditor)",
+      "edits": [
+        [
+          "src/poster/TableCellEditor.tsx",
+          "() => sanitizeTyped(ref.current?.innerHTML ?? '', true), onCommit)",
+          "() => ref.current?.innerHTML ?? '', onCommit)"
+        ]
+      ]
+    },
+    "A-pptx-cell-flattened": {
+      "undoes": "A — a table cell's lines stay lines in PowerPoint (writer addTable)",
+      "edits": [
+        [
+          "src/export/pptx/writer.ts",
+          "      const runsCells: PptxGenJS.TableCell[] = paragraphsToTextProps(\n        parseRichText(data.cells[r * data.cols + c] ?? ''),\n      );",
+          "      const runsCells: PptxGenJS.TableCell[] = parseRichText(data.cells[r * data.cols + c] ?? '')\n        .flatMap((p) => p.runs)\n        .map((run) => ({ text: run.text, options: runOptions(run) }));"
+        ]
+      ]
+    },
+    "A-export-div-literal": {
+      "undoes": "A — a cell saved before the fix: its <div> is read as markup, not text (richText KNOWN_TAGS)",
+      "edits": [
+        [
+          "src/export/richText.ts",
+          "'sub', 'sup', 'br', 'span', 'ol', 'ul', 'li', 'div', 'p',",
+          "'sub', 'sup', 'br', 'span', 'ol', 'ul', 'li',"
+        ]
+      ]
+    },
+    "A-export-div-no-paragraph": {
+      "undoes": "A — a <div> or <p> line ends a paragraph in the export",
+      "edits": [
+        [
+          "src/export/richText.ts",
+          "      if (runs.length > 0) flushParagraph();\n      continue;\n    }\n\n    if (tag.name === 'ol'",
+          "      continue;\n    }\n\n    if (tag.name === 'ol'"
+        ]
+      ]
+    },
+    "A-list-owes-break": {
+      "undoes": "A — a list ends its line: no <br> after it (a list left with Enter gained a blank line once stored, E10)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "      if (tag === 'UL' || tag === 'OL' || tag === 'LI') {\n        lineOpen = false;\n        pendingBoundary = false;\n      }",
+          "      if (tag === 'UL' || tag === 'OL' || tag === 'LI') {\n        void 0;\n      }"
+        ]
+      ]
+    },
+    "A-br-at-line-end-owes-break": {
+      "undoes": "A — a <br> written at a line's end ends it: no second break at the block after it",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "      if (tag === 'BR') lineOpen = brForBoundary;",
+          "      if (tag === 'BR') lineOpen = true;"
+        ]
+      ]
+    },
+    "A-blank-line-closed": {
+      "undoes": "A — a <br> that stands in for a boundary starts an empty line, which its block's end must close (a blank line kept)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "      if (tag === 'BR') lineOpen = brForBoundary;",
+          "      if (tag === 'BR') lineOpen = false;"
+        ]
+      ]
+    },
+    "A-block-exit-owes-always": {
+      "undoes": "A — a block's end owes a break only while its line is open",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "          if (lineOpen) pendingBoundary = true;",
+          "          pendingBoundary = true;"
+        ]
+      ]
+    },
+    "A-li-keeps-line-open": {
+      "undoes": "A — a list item starts its own line: no break at the start of an item after text (review round 1, R1-A5)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "      if (tag === 'LI') lineOpen = false;\n",
+          ""
+        ]
+      ]
+    },
+    "A-separator-keeps-line-open": {
+      "undoes": "A — a break written for a boundary ends the line: an empty inline element adds no blank line (review round 1, R1-A5)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "    for (const n of Array.from(holder.childNodes)) target.appendChild(n);\n    lineOpen = false;\n",
+          "    for (const n of Array.from(holder.childNodes)) target.appendChild(n);\n"
+        ]
+      ]
+    },
+    "A-spaces-alone-not-a-line": {
+      "undoes": "A — a line of typed spaces alone is a line: the next line still gets its break (review round 1, R1-A5)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "if (text.trim() !== '' || keepWhitespace) lineOpen = true;",
+          "if (text.trim() !== '') lineOpen = true;"
+        ]
+      ]
+    },
+    "A-cell-single-line": {
+      "undoes": "A — a table cell is multi-line: Enter is a <br>, not a space (review round 1)",
+      "edits": [
+        [
+          "src/poster/TableCellEditor.tsx",
+          "sanitizeTyped(ref.current?.innerHTML ?? '', true)",
+          "sanitizeTyped(ref.current?.innerHTML ?? '', false)"
+        ]
+      ]
+    },
+    "A-export-p-not-boundary": {
+      "undoes": "A — a <p> is a paragraph boundary in the export, as a <div> is (review round 1)",
+      "edits": [
+        [
+          "src/export/richText.ts",
+          "    if (tag.name === 'div' || tag.name === 'p') {",
+          "    if (tag.name === 'div') {"
+        ]
+      ]
+    },
+    "A-note-newlines-collapsed": {
+      "undoes": "A — the table note's newlines are drawn (white-space: pre-wrap), as PowerPoint writes them (review round 1, R1-A1)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "    paddingTop: 4,\n    whiteSpace: 'pre-wrap',\n",
+          "    paddingTop: 4,\n"
+        ]
+      ]
+    },
+    "B-pending-cleared-on-send": {
+      "undoes": "B — a change stays pending until its write succeeds (it was cleared as the request went out)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    const change = pendingRef.current;\n    if (!change) return true;",
+          "    const change = pendingRef.current;\n    pendingRef.current = null;\n    if (!change) return true;"
+        ]
+      ]
+    },
+    "B-no-retry": {
+      "undoes": "B — a failed save is tried again",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (!timerRef.current) schedule(RETRY_DELAYS_MS[step]!);",
+          "      void step;"
+        ]
+      ]
+    },
+    "B-retry-flat": {
+      "undoes": "B — the waits grow: 2, 5, 10, then 30 s",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      const step = Math.min(saveFailStreakRef.current, RETRY_DELAYS_MS.length) - 1;",
+          "      const step = 0;"
+        ]
+      ]
+    },
+    "B-retry-replaces-edit-wait": {
+      "undoes": "B — an edit made during a failing write keeps its 800 ms wait (the retry does not push it back)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (!timerRef.current) schedule(RETRY_DELAYS_MS[step]!);",
+          "      schedule(RETRY_DELAYS_MS[step]!);"
+        ]
+      ]
+    },
+    "B-no-online-retry": {
+      "undoes": "B — back online, the pending change is written at once",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (pendingRef.current !== null) void flush();",
+          "      void 0;"
+        ]
+      ]
+    },
+    "B-no-leave-warning": {
+      "undoes": "B — the tab warns before closing while a change is unsaved (it used to warn only during the 800 ms debounce)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (pendingRef.current === null) return undefined;",
+          "      if (timerRef.current === null) return undefined;"
+        ]
+      ]
+    },
+    "B-two-writes-at-once": {
+      "undoes": "B — one write at a time",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    while (inFlightRef.current) await inFlightRef.current;\n",
+          ""
+        ]
+      ]
+    },
+    "B-newer-edit-dropped": {
+      "undoes": "B — an edit made during a write stays pending and is written next",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (pendingRef.current === change) pendingRef.current = null;",
+          "      pendingRef.current = null;"
+        ]
+      ]
+    },
+    "B-failure-says-saved": {
+      "undoes": "B — flushNow resolves false when the write failed (⌘S and Duplicate read it)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (!timerRef.current) schedule(RETRY_DELAYS_MS[step]!);\n      return false;",
+          "      if (!timerRef.current) schedule(RETRY_DELAYS_MS[step]!);\n      return true;"
+        ]
+      ]
+    },
+    "B-attempt-unclamped": {
+      "undoes": "B — the reported attempt stays within the diagnostics API's 1000",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "          attempt: Math.min(MAX_REPORTED_ATTEMPT, saveFailStreakRef.current),",
+          "          attempt: saveFailStreakRef.current,"
+        ]
+      ]
+    },
+    "B-retry-after-unmount": {
+      "undoes": "B — nothing is retried once the editor has gone",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (!aliveRef.current) return;\n",
+          ""
+        ]
+      ]
+    },
+    "B-switch-keeps-failure": {
+      "undoes": "B — opening another poster clears the pill's failure",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      setState({ status: 'idle', lastSavedAt: null, error: null });\n",
+          ""
+        ]
+      ]
+    },
+    "B-pill-old-words": {
+      "undoes": "B — the pill says \"Not saved — retrying…\"",
+      "edits": [
+        [
+          "src/components/AutosaveStatusPill.tsx",
+          "      return { label: 'Not saved — retrying…', color: '#f87171', title: undefined };",
+          "      return { label: 'Save failed. Recent changes are not saved.', color: '#f87171', title: undefined };"
+        ]
+      ]
+    },
+    "B-duplicate-ignores-unsaved": {
+      "undoes": "B — the sidebar's Duplicate makes no copy while a change is unsaved (D1)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      if (!(await autosave.flushNow(posterDisplayName))) {",
+          "      if (!(await autosave.flushNow(posterDisplayName)) && false) {"
+        ]
+      ]
+    },
+    "B-title-flush-waits": {
+      "undoes": "B — flushNow(title) with nothing pending writes the poster at once (the Poster name field) (review round 1, R1-A5)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (!pendingRef.current && id && data && overrideTitle !== storedTitleRef.current) {\n        pendingRef.current = { id, doc: data };\n      }\n",
+          ""
+        ]
+      ]
+    },
+    "B-alive-not-restored": {
+      "undoes": "B — the editor counts as alive again after StrictMode's second mount: edits are still saved (review round 1, R1-A5)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    aliveRef.current = true;\n",
+          ""
+        ]
+      ]
+    },
+    "B-switch-keeps-streak": {
+      "undoes": "B — the poster opened next starts its failures afresh: its first retry after 2 s (review round 1, R1-A5)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      pendingRef.current = null;\n      saveFailStreakRef.current = 0;\n",
+          "      pendingRef.current = null;\n"
+        ]
+      ]
+    },
+    "B-success-keeps-streak": {
+      "undoes": "B — a save that goes through ends the failure streak: the next failure is retried after 2 s again (review round 1, R1-A5)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      saveFailStreakRef.current = 0;\n      // Saved, unless",
+          "      // Saved, unless"
+        ]
+      ]
+    },
+    "B-flush-waits-once": {
+      "undoes": "B — a save waits until no write is out, not only for the first it saw (three saves at once) (review round 1, R1-A5)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    while (inFlightRef.current) await inFlightRef.current;",
+          "    if (inFlightRef.current) await inFlightRef.current;"
+        ]
+      ]
+    },
+    "B-unmount-no-flush": {
+      "undoes": "B — the editor closing sends the pending change (review round 1)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (hadPending) void flush();\n",
+          ""
+        ]
+      ]
+    },
+    "B-leave-no-flush": {
+      "undoes": "B — closing the tab sends the pending change at once (review round 1, R1-A5)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (pendingRef.current === null) return undefined;\n      void flush();\n",
+          "      if (pendingRef.current === null) return undefined;\n"
+        ]
+      ]
+    },
+    "B-nothing-pending-says-unsaved": {
+      "undoes": "B — flushNow says saved when nothing is pending (review round 1)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (!change) return true;",
+          "    if (!change) return false;"
+        ]
+      ]
+    },
+    "B-stale-failure-shown": {
+      "undoes": "B — a write for the poster left behind that fails after a switch is not shown or retried (review round 1, R1-A3)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (id !== posterIdRef.current) return false;\n",
+          ""
+        ]
+      ]
+    },
+    "B-unchanged-run-acts": {
+      "undoes": "B — an effect run that sees no change is skipped: the poster as loaded, and StrictMode's second run (review round 1, R1-A7)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    if (seen.doc === doc && seen.posterId === posterId && seen.displayTitle === displayTitle) return;\n",
+          ""
+        ]
+      ]
+    },
+    "B-seen-not-updated": {
+      "undoes": "B — the effect remembers what it last acted on: an edit on the poster opened next is saved, and a doc undone back to the loaded one too (review round 1, R1-A7)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    seenRef.current = { doc, posterId, displayTitle };\n",
+          ""
+        ]
+      ]
+    },
+    "C-save-key-makes-version": {
+      "undoes": "C — ⌘S saves now and makes no version",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        void flushNowRef.current().then((saved) => showToast(saved ? 'Saved' : NOT_SAVED));",
+          "        void saveVersionNow().catch(() => {});"
+        ]
+      ]
+    },
+    "C-save-key-silent": {
+      "undoes": "C — ⌘S says \"Saved\"",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        void flushNowRef.current().then((saved) => showToast(saved ? 'Saved' : NOT_SAVED));",
+          "        void flushNowRef.current();"
+        ]
+      ]
+    },
+    "C-save-key-always-saved": {
+      "undoes": "C — ⌘S never says \"Saved\" when the write failed",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "showToast(saved ? 'Saved' : NOT_SAVED)",
+          "showToast('Saved')"
+        ]
+      ]
+    },
+    "C-save-dialog-not-swallowed": {
+      "undoes": "C — ⌘S still swallows the browser's save dialog",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        e.preventDefault();\n        // A held key's auto-repeat saves once.",
+          "        // A held key's auto-repeat saves once."
+        ]
+      ]
+    },
+    "C-versions-text-names-key": {
+      "undoes": "C — the empty Versions tab no longer sends the user to ⌘S",
+      "edits": [
+        [
+          "src/poster/VersionPanel.tsx",
+          "          No versions yet. Save one above.",
+          "          No versions yet. Save one above, or press Cmd/Ctrl+S."
+        ]
+      ]
+    },
+    "C-save-key-repeat-saves": {
+      "undoes": "C — a held key's auto-repeat saves nothing more (review round 1, R1-A5)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "        if (e.repeat) return;\n",
+          ""
+        ]
+      ]
+    },
+    "A-typed-newline-keeps-line-open": {
+      "undoes": "A — a newline at a line's end (Shift+Enter in Chromium and Firefox; a paste's pretty-printed line) ends the line: Enter after it adds no blank line (review round 2, R2-A1)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "          if (text.endsWith('\\n')) lineOpen = false;\n",
+          ""
+        ]
+      ]
+    },
+    "A-typed-newline-any-newline": {
+      "undoes": "A — only a newline at the END of the text ends the line; one inside the line leaves it open (review round 2, R2-A1)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "if (text.endsWith('\\n')) lineOpen = false;",
+          "if (text.includes('\\n')) lineOpen = false;"
+        ]
+      ]
+    },
+    "A-typed-newline-then-spaces": {
+      "undoes": "A — spaces typed after the newline are the next line's content: that line stays open (review round 2, R2-A1)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "if (text.endsWith('\\n')) lineOpen = false;",
+          "if (/\\n\\s*$/.test(text)) lineOpen = false;"
+        ]
+      ]
+    },
+    "C-name-draft-not-saved-by-key": {
+      "undoes": "C — ⌘S in the Poster name field saves the name being typed, then the poster (review round 2, R2-A4)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "            else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's' && titleDirty && localTitle.trim()) saveTitle();\n",
+          ""
+        ]
+      ]
+    },
+    "C-name-key-saves-empty-name": {
+      "undoes": "C — ⌘S in an emptied Poster name field keeps the poster's name, as the disabled Save button does (review round 2, R2-A4)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "&& titleDirty && localTitle.trim()) saveTitle();",
+          "&& titleDirty) saveTitle();"
+        ]
+      ]
+    },
+    "A-newline-rule-typed-only": {
+      "undoes": "A — the newline line end is the stored dialect's: a paste whose line ends in a newline before a paragraph gains no blank line either (the first review round 3's mutant R3-newline-rule-on-paste-too)",
+      "edits": [
+        [
+          "src/poster/sanitizeHtml.ts",
+          "if (text.endsWith('\\n')) lineOpen = false;",
+          "if (keepWhitespace && text.endsWith('\\n')) lineOpen = false;"
+        ]
+      ]
+    },
+    "C-name-key-ctrl-ignored": {
+      "undoes": "C — Ctrl+S in the Poster name field saves the name being typed, as ⌘S does (the first review round 3's mutant R3-name-meta-only)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's'",
+          "else if (e.metaKey && e.key.toLowerCase() === 's'"
+        ]
+      ]
+    },
+    "C-name-any-chord-saves": {
+      "undoes": "C — only ⌘S / Ctrl+S commits the Poster name being typed; another chord (⌘A) leaves it a draft (the first review round 3's mutant R3-name-any-mod-key)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "(e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's' && titleDirty",
+          "(e.metaKey || e.ctrlKey) && titleDirty"
+        ]
+      ]
+    },
+    "B-retry-shows-saving": {
+      "undoes": "B — a write after a failure leaves the failure showing until a write succeeds: the pill keeps \"Not saved — retrying…\" while the retry is out (K9r)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "setState((s) => (s.status === 'error' ? s : { ...s, status: 'saving', error: null }));",
+          "setState((s) => ({ ...s, status: 'saving', error: null }));"
+        ]
+      ]
+    },
+    "C-name-saved-while-failing": {
+      "undoes": "C — the Poster name's button says \"✓ Saved\" only once the name is stored: not while the poster's save is failing (K9), nor while the name's write is out (K10)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "const showSaved = titleSaved && !titleDirty && !props.nameUnsaved;",
+          "const showSaved = titleSaved && !titleDirty;"
+        ]
+      ]
+    },
+    "C-name-failing-not-passed": {
+      "undoes": "C — the editor tells the sidebar the name is not stored while its save is failing (K9)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "posterNameUnsaved={autosave.status === 'error' || nameWritesOut > 0}",
+          "posterNameUnsaved={nameWritesOut > 0}"
+        ]
+      ]
+    },
+    "C-name-failing-not-forwarded": {
+      "undoes": "C — the sidebar hands the name's unsaved state to the Layout tab's Poster name field (K9, K10)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "            nameUnsaved={props.posterNameUnsaved}\n",
+          ""
+        ]
+      ]
+    },
+    "C-name-write-out-not-passed": {
+      "undoes": "C — the editor tells the sidebar the name is not stored while the name's write is out (K10; round 1 of the restarted review, N1-F1)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "posterNameUnsaved={autosave.status === 'error' || nameWritesOut > 0}",
+          "posterNameUnsaved={autosave.status === 'error'}"
+        ]
+      ]
+    },
+    "C-name-writes-not-counted": {
+      "undoes": "C — every name write out is counted: a second name saved while the first one's write is out keeps the button at \"Save\" until the second is stored (N1-F1)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "          setNameWritesOut((n) => n + 1);\n          void autosave.flushNow(title).finally(() => setNameWritesOut((n) => n - 1));",
+          "          setNameWritesOut(1);\n          void autosave.flushNow(title).finally(() => setNameWritesOut(0));"
+        ]
+      ]
+    },
+    "C-name-write-never-back": {
+      "undoes": "C — the name's write coming back ends its count, so the button says \"✓ Saved\" once the name is stored (K10a; N1-F1)",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "void autosave.flushNow(title).finally(() => setNameWritesOut((n) => n - 1));",
+          "void autosave.flushNow(title);"
+        ]
+      ]
+    },
+    "B-unchanged-name-written": {
+      "undoes": "B — a name passed to flushNow that the server already holds is no change: with nothing pending, nothing is written, so a failing write is not counted as unsaved (the sidebar's Duplicate, Enter in the Poster name field; round 2 of the restarted review, N2-F3)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (!pendingRef.current && id && data && overrideTitle !== storedTitleRef.current) {",
+          "      if (!pendingRef.current && id && data) {"
+        ]
+      ]
+    },
+    "B-stored-name-not-updated": {
+      "undoes": "B — a name once stored counts as the server's: Enter again with it unchanged writes nothing (N2-F3)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (id === posterIdRef.current) storedTitleRef.current = sentTitle;\n",
+          ""
+        ]
+      ]
+    },
+    "B-stored-name-any-poster": {
+      "undoes": "B — only a write of the open poster sets the stored name: one for the poster left behind that succeeds after a switch does not (N2-F3)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (id === posterIdRef.current) storedTitleRef.current = sentTitle;",
+          "      storedTitleRef.current = sentTitle;"
+        ]
+      ]
+    },
+    "B-stored-name-not-reset-on-switch": {
+      "undoes": "B — the poster opened next starts from its own name as loaded (N2-F3)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "      saveFailStreakRef.current = 0;\n      storedTitleRef.current = displayTitle;\n",
+          "      saveFailStreakRef.current = 0;\n"
+        ]
+      ]
+    },
+    "B-stored-name-starts-empty": {
+      "undoes": "B — the name as loaded counts as stored before any write (N2-F3)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "  const storedTitleRef = useRef<string | undefined>(displayTitle);",
+          "  const storedTitleRef = useRef<string | undefined>(undefined);"
+        ]
+      ]
+    },
+    "B-stored-name-derived": {
+      "undoes": "B — the stored name is the one asked for, not the title block's words that stand in for an empty one (N2-F3)",
+      "edits": [
+        [
+          "src/hooks/useAutosave.ts",
+          "    const sentTitle = pendingTitleRef.current;\n    try {\n",
+          "    try {\n"
+        ],
+        [
+          "src/hooks/useAutosave.ts",
+          "      if (titleText && !pendingTitleRef.current?.trim()) {\n        pendingTitleRef.current = titleText;\n      }\n",
+          "      if (titleText && !pendingTitleRef.current?.trim()) {\n        pendingTitleRef.current = titleText;\n      }\n      const sentTitle = pendingTitleRef.current;\n"
+        ]
+      ]
+    }
+  }
+}

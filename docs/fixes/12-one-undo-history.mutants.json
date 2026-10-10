@@ -587,8 +587,8 @@
       "edits": [
         [
           "src/poster/TableCellEditor.tsx",
-          "      onInput={(e) => history.commitInput(e.nativeEvent, () => ref.current?.innerHTML ?? '', onCommit)}",
-          "      onInput={(e) => onCommit(e.currentTarget.innerHTML)}"
+          "      onInput={(e) => history.commitInput(e.nativeEvent, () => sanitizeTyped(ref.current?.innerHTML ?? '', true), onCommit)}",
+          "      onInput={(e) => onCommit(sanitizeTyped(e.currentTarget.innerHTML, true))}"
         ]
       ]
     },
