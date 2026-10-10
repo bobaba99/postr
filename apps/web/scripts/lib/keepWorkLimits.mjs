@@ -48,14 +48,17 @@ function expiredJwt(req) {
 export const LIMITS = [
   {
     // N2-F1: the table's own paste handler (blocks.tsx, onPasteCapture on
-    // the whole table) builds a new table from any paste with text
-    // (tableOps.ts parseTablePaste) and replaces the old one, so a single
-    // word pasted into one cell leaves a 1×1 table, which autosave stores;
-    // ⌘Z brings the table back. Older than fix 27 (the same on main) and
+    // the whole table) built a new table from any paste with text
+    // (tableOps.ts parseTablePaste) and replaced the old one, so a single
+    // word pasted into one cell left a 1×1 table, which autosave stored;
+    // ⌘Z brought the table back. Older than fix 27 (the same on main) and
     // outside its three behaviours: the lead's call (record section 10).
-    // The paste is a paste event carrying plain text, as ⌘V delivers it:
-    // the system clipboard is not touched (the reviewer's real ⌘C/⌘V in
-    // Chromium and Firefox read the same).
+    // Fixed by record 32 (docs/fixes/32-table-paste.md): one line goes
+    // into the cell at the caret, the table stays 4×3; its claims, with
+    // the engines' real ⌘C/⌘V and grids, are scripts/table-paste-check.mjs.
+    // The paste here is a paste event carrying plain text, as ⌘V delivers
+    // it: the system clipboard is not touched (the reviewer's real ⌘C/⌘V
+    // in Chromium and Firefox read the same).
     id: 'H5-paste-into-table-cell', info: true,
     how: 'a change typed and stored; the caret in the starting table\'s fifth cell; one line pasted there, "ZQW 12.4"; then ⌘Z: the table drawn and stored before, after the paste and after ⌘Z',
     async run(h, s) {

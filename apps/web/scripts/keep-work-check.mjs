@@ -142,7 +142,8 @@
  *   H5   a change stored; one line, "ZQW 12.4", pasted into the starting
  *        table's fifth cell; then ⌘Z: the table drawn and stored before,
  *        after and after ⌘Z (round 2 of the restarted review, N2-F1: the
- *        table's paste handler replaces the table; older than fix 27)
+ *        table's paste handler replaced the table; older than fix 27; fixed
+ *        by record 32, whose claims are scripts/table-paste-check.mjs)
  *   H6   a 30 s session token; offline while " ZQTOK" waits; the pill every
  *        second for 45 s, ⌘S at 11 s; back online: when the word is stored
  *        (N2-F2: the write waits inside the client's token refresh, so the
