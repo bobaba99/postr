@@ -1,0 +1,967 @@
+{
+  "tests": [
+    "src/poster/__tests__/mvpHidden.test.tsx",
+    "src/__tests__/mvpHiddenPages.test.tsx",
+    "src/poster/__tests__/startingText.test.tsx",
+    "src/__tests__/copyInventory.test.ts",
+    "src/test/__tests__/copyScan.test.ts",
+    "src/poster/__tests__/mvpShown.test.tsx"
+  ],
+  "mutants": {
+    "import-tile-back": {
+      "undoes": "1 IMPORT — no Import tile in the layout tab",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {IMPORT_ENABLED && <ImportSection />}",
+          "      {<ImportSection />}"
+        ]
+      ]
+    },
+    "postr-backup-back": {
+      "undoes": "1 IMPORT — no Save as .postr in the export tab",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {IMPORT_ENABLED && (\n        <>\n          <div style={labelStyle}>📦 Backup file</div>",
+          "      {true && (\n        <>\n          <div style={labelStyle}>📦 Backup file</div>"
+        ]
+      ]
+    },
+    "dashboard-import-back": {
+      "undoes": "1 IMPORT — the dashboard offers + New poster alone",
+      "edits": [
+        [
+          "src/components/NewPosterButton.tsx",
+          "        {IMPORT_ENABLED && (\n        <>\n        <button",
+          "        {true && (\n        <>\n        <button"
+        ]
+      ]
+    },
+    "home-import-copy": {
+      "undoes": "1 IMPORT — the welcome card does not offer an import",
+      "edits": [
+        [
+          "src/pages/Home.tsx",
+          "                  {IMPORT_ENABLED\n                    ? 'Start a new poster",
+          "                  {true\n                    ? 'Start a new poster"
+        ]
+      ]
+    },
+    "tour-import-step": {
+      "undoes": "1 IMPORT — the tour has no Import step",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "  ...(IMPORT_ENABLED\n    ? [{\n    selector: '[data-postr-import-tile]',",
+          "  ...(true\n    ? [{\n    selector: '[data-postr-import-tile]',"
+        ]
+      ]
+    },
+    "tour-export-postr": {
+      "undoes": "1 IMPORT — the tour's export step names no .postr file",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "  ...(IMPORT_ENABLED ? ['download a .postr backup file to import again later'] : []),",
+          "  ...(true ? ['download a .postr backup file to import again later'] : []),"
+        ]
+      ]
+    },
+    "closed-page-import": {
+      "undoes": "1 IMPORT — the closed poster's page does not say the copy can be imported",
+      "edits": [
+        [
+          "src/components/PosterClosedPage.tsx",
+          "            ? IMPORT_ENABLED\n              ? 'The guest session",
+          "            ? true\n              ? 'The guest session"
+        ]
+      ]
+    },
+    "about-import-card": {
+      "undoes": "1 IMPORT — the about page has no import card",
+      "edits": [
+        [
+          "src/i18n/about.ts",
+          "    ...(IMPORT_ENABLED\n      ? [",
+          "    ...(true\n      ? [",
+          2
+        ]
+      ]
+    },
+    "landing-import-copy": {
+      "undoes": "1 IMPORT — the landing exports card names no import",
+      "edits": [
+        [
+          "src/i18n/landing.ts",
+          "  exportsBody: 'Export an editable PowerPoint file. PowerPoint exports are paid.',",
+          "  exportsBody: 'Import and edit a PowerPoint, then export an editable one. PowerPoint exports are paid.',"
+        ]
+      ]
+    },
+    "pricing-import-crawler": {
+      "undoes": "1 IMPORT/ADJUSTMENTS — the pricing crawler copy names neither import nor Copy a design",
+      "edits": [
+        [
+          "src/seo/routes.json",
+          "such as parsing pasted authors and references, have daily limits.",
+          "such as import and Copy a design, have daily limits."
+        ]
+      ]
+    },
+    "grid-drawn": {
+      "undoes": "1 ADJUSTMENTS — the grid is off while hidden",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "  const showGridEffective = ADJUSTMENTS_ENABLED && showGrid && !mobileShare;",
+          "  const showGridEffective = showGrid && !mobileShare;"
+        ]
+      ]
+    },
+    "grid-toggle-back": {
+      "undoes": "1 ADJUSTMENTS — no Show grid toggle",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {ADJUSTMENTS_ENABLED && (\n      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer' }}>",
+          "      {true && (\n      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 15, color: '#888', cursor: 'pointer' }}>"
+        ]
+      ]
+    },
+    "rotate-back": {
+      "undoes": "1 ADJUSTMENTS — no rotate control",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "  const controls = ADJUSTMENTS_ENABLED ? laidOut : { ...laidOut, rotate: false };",
+          "  const controls = laidOut;"
+        ]
+      ]
+    },
+    "crop-back": {
+      "undoes": "1 ADJUSTMENTS — no crop button",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "                {ADJUSTMENTS_ENABLED && (\n                <button\n                  onClick={(e) => {\n                    e.stopPropagation();\n                    setCropMode((s) => !s);",
+          "                {true && (\n                <button\n                  onClick={(e) => {\n                    e.stopPropagation();\n                    setCropMode((s) => !s);"
+        ]
+      ]
+    },
+    "crop-overlay-unguarded": {
+      "undoes": "1 ADJUSTMENTS — the crop overlay is rendered only behind the switch",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "            {ADJUSTMENTS_ENABLED && selected && cropMode && (",
+          "            {selected && cropMode && (",
+          2
+        ]
+      ]
+    },
+    "row-strips-back": {
+      "undoes": "1 ADJUSTMENTS — no row strips on a table",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      {ADJUSTMENTS_ENABLED && Array.from({ length: data.rows }).map((_, r) => {",
+          "      {Array.from({ length: data.rows }).map((_, r) => {"
+        ]
+      ]
+    },
+    "col-strips-back": {
+      "undoes": "1 ADJUSTMENTS — no column strips on a table",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      {ADJUSTMENTS_ENABLED && Array.from({ length: data.cols }).map((_, c) => {",
+          "      {Array.from({ length: data.cols }).map((_, c) => {"
+        ]
+      ]
+    },
+    "col-resize-back": {
+      "undoes": "1 ADJUSTMENTS — no column-border drag",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      {ADJUSTMENTS_ENABLED && colWidths.slice(0, -1).map((_, i) => {",
+          "      {colWidths.slice(0, -1).map((_, i) => {"
+        ]
+      ]
+    },
+    "hover-add-row-back": {
+      "undoes": "1 ADJUSTMENTS — no hover + to add a row",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      {ADJUSTMENTS_ENABLED && hoveredRow !== null && hoveredRow === data.rows - 1 && (",
+          "      {hoveredRow !== null && hoveredRow === data.rows - 1 && ("
+        ]
+      ]
+    },
+    "hover-add-col-back": {
+      "undoes": "1 ADJUSTMENTS — no hover + to add a column",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      {ADJUSTMENTS_ENABLED && hoveredCol !== null && hoveredCol === data.cols - 1 && (",
+          "      {hoveredCol !== null && hoveredCol === data.cols - 1 && ("
+        ]
+      ]
+    },
+    "table-menu-back": {
+      "undoes": "1 ADJUSTMENTS — a right-click on a cell shows the browser's menu, not Postr's",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "                    if (!ADJUSTMENTS_ENABLED) return;\n",
+          ""
+        ]
+      ]
+    },
+    "table-menu-unguarded": {
+      "undoes": "1 ADJUSTMENTS — the table menu is rendered only behind the switch",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      {ADJUSTMENTS_ENABLED && ctxMenu && ReactDOM.createPortal(",
+          "      {ctxMenu && ReactDOM.createPortal("
+        ]
+      ]
+    },
+    "copy-design-back": {
+      "undoes": "1 ADJUSTMENTS — no Copy a design",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {ADJUSTMENTS_ENABLED && (\n      <>\n      <div style={labelStyle}>Copy a design</div>",
+          "      {true && (\n      <>\n      <div style={labelStyle}>Copy a design</div>"
+        ]
+      ]
+    },
+    "custom-palette-back": {
+      "undoes": "1 ADJUSTMENTS — no Create custom palette",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        {ADJUSTMENTS_ENABLED && (\n        <>\n        <button\n          type=\"button\"\n          onClick={props.onCreateCustomPalette}",
+          "        {true && (\n        <>\n        <button\n          type=\"button\"\n          onClick={props.onCreateCustomPalette}"
+        ]
+      ]
+    },
+    "custom-row-actions": {
+      "undoes": "1 ADJUSTMENTS — a custom palette row's edit and delete are drawn only behind the switch",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        {ADJUSTMENTS_ENABLED && isCustom && (",
+          "        {isCustom && ("
+        ]
+      ]
+    },
+    "palette-designer-mounted": {
+      "undoes": "1 ADJUSTMENTS — the palette designer is mounted only behind the switch",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      {ADJUSTMENTS_ENABLED && (\n      <PaletteDesigner",
+          "      {(\n      <PaletteDesigner"
+        ]
+      ]
+    },
+    "headings-presets-back": {
+      "undoes": "1 ADJUSTMENTS — no heading style and no style presets",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {ADJUSTMENTS_ENABLED && (\n      <>\n      <div style={labelStyle}>Headings</div>",
+          "      {true && (\n      <>\n      <div style={labelStyle}>Headings</div>"
+        ]
+      ]
+    },
+    "weight-italic-lh-back": {
+      "undoes": "1 ADJUSTMENTS — Typography shows only each level's size",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "            {ADJUSTMENTS_ENABLED && (\n            <>\n            <select",
+          "            {true && (\n            <>\n            <select"
+        ]
+      ]
+    },
+    "text-editor-back": {
+      "undoes": "1 ADJUSTMENTS — a text block's Edit tab has no font controls or second text box",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        ADJUSTMENTS_ENABLED ? (\n          <TextBlockEditor",
+          "        true ? (\n          <TextBlockEditor"
+        ]
+      ]
+    },
+    "text-level-size": {
+      "undoes": "1 ADJUSTMENTS — the line names the level's size in points",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "  const line = (LEVEL_NOTE[type] ?? LEVEL_NOTE.text!).replace('{pt}', String(Math.round(unitsToPt(styleLevel.size))));",
+          "  const line = (LEVEL_NOTE[type] ?? LEVEL_NOTE.text!).replace('{pt}', String(Math.round(styleLevel.size)));"
+        ]
+      ]
+    },
+    "logo-adjust-back": {
+      "undoes": "1 ADJUSTMENTS — a logo's Edit tab has no stretch or crop hint",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        ADJUSTMENTS_ENABLED ? (\n          <>\n            <ImageFitToggle",
+          "        true ? (\n          <>\n            <ImageFitToggle"
+        ]
+      ]
+    },
+    "logo-note-another": {
+      "undoes": "1 ADJUSTMENTS — an empty logo's note asks to choose one, not another (review round 1, R1-06)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "button to choose {sb.imageSrc ? 'another' : 'one'}.",
+          "button to choose another."
+        ]
+      ]
+    },
+    "image-stretch-back": {
+      "undoes": "1 ADJUSTMENTS — an image's Edit tab has no Stretch to fit block",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "          {ADJUSTMENTS_ENABLED && <ImageFitToggle block={sb} onUpdateBlock={props.onUpdateBlock} />}",
+          "          {<ImageFitToggle block={sb} onUpdateBlock={props.onUpdateBlock} />}"
+        ]
+      ]
+    },
+    "crop-hint-back": {
+      "undoes": "1 ADJUSTMENTS — an image's Edit tab has no crop hint",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "          {ADJUSTMENTS_ENABLED && <CropHint />}",
+          "          {<CropHint />}"
+        ]
+      ]
+    },
+    "caption-position-back": {
+      "undoes": "1 ADJUSTMENTS — no caption position buttons or spacing",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {ADJUSTMENTS_ENABLED && (\n      <>\n      <div style={{ fontSize: 13, color: '#8a8a95' }}>Caption position</div>",
+          "      {true && (\n      <>\n      <div style={{ fontSize: 13, color: '#8a8a95' }}>Caption position</div>"
+        ]
+      ]
+    },
+    "show-caption-gone": {
+      "undoes": "1 ADJUSTMENTS — Show caption instead of the position buttons",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {!ADJUSTMENTS_ENABLED && (\n        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c8cad0', cursor: 'pointer' }}>",
+          "      {false && (\n        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#c8cad0', cursor: 'pointer' }}>"
+        ]
+      ]
+    },
+    "show-caption-default": {
+      "undoes": "1 ADJUSTMENTS — a caption with no stored position counts as shown (on top)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "  const shown = (block.captionPosition ?? 'top') !== 'none';",
+          "  const shown = (block.captionPosition ?? 'none') !== 'none';"
+        ]
+      ]
+    },
+    "show-caption-top": {
+      "undoes": "1 ADJUSTMENTS — Show caption brings the caption back on top",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "onUpdateBlock(block.id, { captionPosition: e.target.checked ? 'top' : 'none' })",
+          "onUpdateBlock(block.id, { captionPosition: e.target.checked ? 'bottom' : 'none' })"
+        ]
+      ]
+    },
+    "format-note-back": {
+      "undoes": "1 ADJUSTMENTS — no ✨ Format button",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {ADJUSTMENTS_ENABLED && (\n      <>\n      <p style={{ fontSize: 13, color: '#8a8a95', margin: 0, lineHeight: 1.5 }}>\n        Longer footnote",
+          "      {true && (\n      <>\n      <p style={{ fontSize: 13, color: '#8a8a95', margin: 0, lineHeight: 1.5 }}>\n        Longer footnote"
+        ]
+      ]
+    },
+    "borders-back": {
+      "undoes": "1 ADJUSTMENTS — no table borders",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {ADJUSTMENTS_ENABLED && (\n      <>\n      <CustomBorderMockup",
+          "      {true && (\n      <>\n      <CustomBorderMockup"
+        ]
+      ]
+    },
+    "table-tips-back": {
+      "undoes": "1 ADJUSTMENTS — the table tips name no hidden control",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        {ADJUSTMENTS_ENABLED && <li>↔️ Drag column borders to resize.</li>}",
+          "        {<li>↔️ Drag column borders to resize.</li>}"
+        ]
+      ]
+    },
+    "citation-menu-back": {
+      "undoes": "1 ADJUSTMENTS — no citation style menu",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {ADJUSTMENTS_ENABLED && (\n      <>\n      <div style={{ ...labelStyle, marginTop: 28 }}>Display</div>",
+          "      {true && (\n      <>\n      <div style={{ ...labelStyle, marginTop: 28 }}>Display</div>"
+        ]
+      ]
+    },
+    "refs-paste-copy": {
+      "undoes": "1 ADJUSTMENTS — the paste help names no numbering style",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        {ADJUSTMENTS_ENABLED\n          ? ', and the Vancouver and IEEE styles",
+          "        {true\n          ? ', and the Vancouver and IEEE styles"
+        ]
+      ]
+    },
+    "insert-table-desc": {
+      "undoes": "1 ADJUSTMENTS — Insert › Table names no border presets",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "ADJUSTMENTS_ENABLED ? 'Data table with border presets' : 'Data table, APA three-line style'",
+          "'Data table with border presets'"
+        ]
+      ]
+    },
+    "strike-back": {
+      "undoes": "1 ADJUSTMENTS — no strikethrough in the format bar",
+      "edits": [
+        [
+          "src/poster/FloatingFormatToolbar.tsx",
+          "      {ADJUSTMENTS_ENABLED && cmdButton('S', 'strikeThrough'",
+          "      {cmdButton('S', 'strikeThrough'"
+        ]
+      ]
+    },
+    "indent-colours-back": {
+      "undoes": "1 ADJUSTMENTS — no indent, highlight or colour in the format bar",
+      "edits": [
+        [
+          "src/poster/FloatingFormatToolbar.tsx",
+          "        {ADJUSTMENTS_ENABLED && (\n          <>\n            {cmdButton('⇥'",
+          "        {true && (\n          <>\n            {cmdButton('⇥'"
+        ]
+      ]
+    },
+    "scan-back": {
+      "undoes": "1 ADJUSTMENTS — no Scan image in the Figure tab",
+      "edits": [
+        [
+          "src/poster/ReadabilityPanel.tsx",
+          "      {isImage && ADJUSTMENTS_ENABLED && (",
+          "      {isImage && ("
+        ]
+      ]
+    },
+    "profile-presets-back": {
+      "undoes": "1 ADJUSTMENTS — the profile has no style presets row",
+      "edits": [
+        [
+          "src/pages/Profile.tsx",
+          "          {ADJUSTMENTS_ENABLED && (\n          <div className=\"flex items-start justify-between py-2 gap-3\">",
+          "          {true && (\n          <div className=\"flex items-start justify-between py-2 gap-3\">"
+        ]
+      ]
+    },
+    "preset-modal-mounted": {
+      "undoes": "1 ADJUSTMENTS — the presets dialog is mounted only behind the switch",
+      "edits": [
+        [
+          "src/pages/Profile.tsx",
+          "      {ADJUSTMENTS_ENABLED && (\n        <PresetEditModal",
+          "      {(\n        <PresetEditModal"
+        ]
+      ]
+    },
+    "tour-refs-style": {
+      "undoes": "1 ADJUSTMENTS — the tour's references step names no style",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "    body: ADJUSTMENTS_ENABLED\n      ? 'Import .bib",
+          "    body: true\n      ? 'Import .bib"
+        ]
+      ]
+    },
+    "about-design-card": {
+      "undoes": "1 ADJUSTMENTS — the about page has no Copy a design card",
+      "edits": [
+        [
+          "src/i18n/about.ts",
+          "    ...(ADJUSTMENTS_ENABLED\n      ? [",
+          "    ...(true\n      ? [",
+          2
+        ]
+      ]
+    },
+    "landing-citation-styles": {
+      "undoes": "1 ADJUSTMENTS — the landing hero names no citation styles",
+      "edits": [
+        [
+          "src/i18n/landing.ts",
+          "    'the BibTeX reference formatting',",
+          "    'the BibTeX citation styles',"
+        ]
+      ]
+    },
+    "about-crawler-styles": {
+      "undoes": "1 ADJUSTMENTS — the about crawler copy names APA 7 only",
+      "edits": [
+        [
+          "src/seo/routes.json",
+          "Postr reads BibTeX and RIS files and formats the imported references in APA 7.",
+          "Postr reads BibTeX and RIS files and formats the reference list in APA 7, Vancouver, IEEE or Harvard style."
+        ]
+      ]
+    },
+    "guidelines-back": {
+      "undoes": "1 EXTRAS — no guidelines panel",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      {EDITOR_EXTRAS_ENABLED && (\n      <>\n      {/* Animated guidelines wrapper",
+          "      {true && (\n      <>\n      {/* Animated guidelines wrapper"
+        ]
+      ]
+    },
+    "guidelines-toggle-back": {
+      "undoes": "1 EXTRAS — no button that opens the guidelines panel",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      {EDITOR_EXTRAS_ENABLED && !guidelinesOpen && !mobileShare && (",
+          "      {!guidelinesOpen && !mobileShare && ("
+        ]
+      ]
+    },
+    "duplicate-back": {
+      "undoes": "1 EXTRAS — no Duplicate inside the editor",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "        {EDITOR_EXTRAS_ENABLED && !props.readOnly && props.onDuplicatePoster && (",
+          "        {!props.readOnly && props.onDuplicatePoster && ("
+        ]
+      ]
+    },
+    "staples-back": {
+      "undoes": "1 EXTRAS — no Staples help in the export tab",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "      {EDITOR_EXTRAS_ENABLED && (\n        <>\n          <div style={labelStyle}>🏪 Print at Staples</div>",
+          "      {true && (\n        <>\n          <div style={labelStyle}>🏪 Print at Staples</div>"
+        ]
+      ]
+    },
+    "layout-hint-staples": {
+      "undoes": "1 EXTRAS — the layout tab's export hint names no Staples",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "              : ' save a PDF or export to PowerPoint.'}",
+          "              : ' save PDF, or print at Staples.'}"
+        ]
+      ]
+    },
+    "layout-hint-wording": {
+      "undoes": "1 EXTRAS — the layout tab's export hint is one list naming PowerPoint, not \"to preview, or save PDF\" (review round 1, R1-06)",
+      "edits": [
+        [
+          "src/poster/Sidebar.tsx",
+          "              : ' save a PDF or export to PowerPoint.'}",
+          "              : ' or save PDF.'}"
+        ]
+      ]
+    },
+    "staples-modal-mounted": {
+      "undoes": "1 EXTRAS — the Staples dialog is mounted only behind the switch",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      {EDITOR_EXTRAS_ENABLED && (\n      <StaplesPrintModal",
+          "      {(\n      <StaplesPrintModal"
+        ]
+      ]
+    },
+    "profile-checklists-back": {
+      "undoes": "1 EXTRAS — the profile has no checklist templates row",
+      "edits": [
+        [
+          "src/pages/Profile.tsx",
+          "          {EDITOR_EXTRAS_ENABLED && (\n          <div className=\"py-2 border-t border-[#1f1f2e]\">",
+          "          {true && (\n          <div className=\"py-2 border-t border-[#1f1f2e]\">"
+        ]
+      ]
+    },
+    "tour-guidelines-step": {
+      "undoes": "1 EXTRAS — the tour has no guidelines step",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "  ...(EDITOR_EXTRAS_ENABLED\n    ? [{",
+          "  ...(true\n    ? [{"
+        ]
+      ]
+    },
+    "tour-export-staples": {
+      "undoes": "1 EXTRAS — the tour's export step names no Staples",
+      "edits": [
+        [
+          "src/components/OnboardingTour.tsx",
+          "  ...(EDITOR_EXTRAS_ENABLED ? ['email the PDF to Staples for kiosk printing'] : []),",
+          "  ...(true ? ['email the PDF to Staples for kiosk printing'] : []),"
+        ]
+      ]
+    },
+    "landing-checklist": {
+      "undoes": "1 EXTRAS — the landing writing card names no checklist or word targets",
+      "edits": [
+        [
+          "src/i18n/landing.ts",
+          "  writingBody: 'Each template section opens with a short prompt that never prints.',",
+          "  writingBody: 'Follow section prompts, word targets, and a poster-ready checklist.',"
+        ]
+      ]
+    },
+    "about-guidelines": {
+      "undoes": "1 EXTRAS — the about templates card names no guidelines panel",
+      "edits": [
+        [
+          "src/i18n/about.ts",
+          "Eight palettes, six of them named for a discipline, and the sheet takes any size from 10 to 100 inches.",
+          "Eight palettes, six of them named for a discipline. The poster guidelines panel lists board sizes for APA, SfN, ECNP and four more meetings, and the sheet takes any size from 10 to 100 inches."
+        ]
+      ]
+    },
+    "title-text-back": {
+      "undoes": "4 — a new poster's title starts empty",
+      "edits": [
+        [
+          "src/poster/templates.ts",
+          "      content: partial.content ?? '',",
+          "      content: partial.content ?? (type === 'title' ? 'Your Poster Title' : ''),"
+        ]
+      ]
+    },
+    "guidance-as-text": {
+      "undoes": "4 — a template text block's guidance is its prompt, not its text",
+      "edits": [
+        [
+          "src/poster/templates.ts",
+          "prompt: 'Background and research question. Provide context, motivation, and the gap your work addresses.' }",
+          "content: 'Background and research question. Provide context, motivation, and the gap your work addresses.' }"
+        ]
+      ]
+    },
+    "prompt-not-carried": {
+      "undoes": "4 — the block keeps its template prompt",
+      "edits": [
+        [
+          "src/poster/templates.ts",
+          "      ...(partial.prompt ? { prompt: partial.prompt } : {}),\n",
+          ""
+        ]
+      ]
+    },
+    "sample-numbers-back": {
+      "undoes": "4 — the sample table's made-up results become empty cells",
+      "edits": [
+        [
+          "src/poster/templates.ts",
+          "          cells: ['Measure', 'M (SD)', '𝑝', '', '', '', '', '', '', '', '', ''],",
+          "          cells: ['Measure', 'M (SD)', '𝑝', 'DV 1', '4.2 (0.8)', '< .01', 'DV 2', '3.1 (1.1)', '.03', 'DV 3', '2.8 (0.6)', '.12'],"
+        ]
+      ]
+    },
+    "table-prompt-gone": {
+      "undoes": "4 — the sample table has a prompt",
+      "edits": [
+        [
+          "src/poster/templates.ts",
+          "        prompt: TABLE_PROMPT,\n",
+          ""
+        ]
+      ]
+    },
+    "insert-text-back": {
+      "undoes": "4 — Insert › Text and Heading start empty",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "      // to store \"Section Title\" or \"Enter your text here.\", to be deleted.\n      content: '',",
+          "      // to store \"Section Title\" or \"Enter your text here.\", to be deleted.\n      content: type === 'heading' ? 'Section Title' : type === 'text' ? 'Enter your text here.' : '',"
+        ]
+      ]
+    },
+    "title-prompt-word": {
+      "undoes": "4 — the title's prompt is \"Poster title\"",
+      "edits": [
+        [
+          "src/poster/startingText.ts",
+          "  title: 'Poster title',",
+          "  title: 'Poster Title',"
+        ]
+      ]
+    },
+    "block-prompt-ignored": {
+      "undoes": "4 — a block shows its own prompt",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "            placeholder={b.prompt ?? DEFAULT_PROMPTS.text}",
+          "            placeholder={DEFAULT_PROMPTS.text}"
+        ]
+      ]
+    },
+    "data-empty-gone": {
+      "undoes": "4 — an empty block is marked for its prompt",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "        data-empty={placeholder && empty ? '' : undefined}",
+          "        data-empty={undefined}"
+        ]
+      ]
+    },
+    "lone-br-not-empty": {
+      "undoes": "4 — a lone <br> left by the browser counts as empty",
+      "edits": [
+        [
+          "src/poster/startingText.ts",
+          "  plainText(html) === '' && !/<(li|img|table)\\b/i.test(html ?? '');",
+          "  (html ?? '').trim() === '';"
+        ]
+      ]
+    },
+    "table-prompt-cell": {
+      "undoes": "4 — the table's prompt sits in its first body cell",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "placeholder={r === 1 && c === 0 ? bodyPrompt : undefined}",
+          "placeholder={r === 0 && c === 0 ? bodyPrompt : undefined}"
+        ]
+      ]
+    },
+    "table-prompt-stays": {
+      "undoes": "4 — the table's prompt goes once a body cell holds text",
+      "edits": [
+        [
+          "src/poster/startingText.ts",
+          "  return t.cells.slice(t.cols).every((c) => isBlankHtml(c)) ? b.prompt : undefined;",
+          "  return b.prompt;"
+        ]
+      ]
+    },
+    "table-cell-empty-gone": {
+      "undoes": "4 — the table's prompt cell is marked empty",
+      "edits": [
+        [
+          "src/poster/TableCellEditor.tsx",
+          "      data-empty={placeholder && empty ? '' : undefined}",
+          "      data-empty={undefined}"
+        ]
+      ]
+    },
+    "issue-empty-gone": {
+      "undoes": "4 — Issues lists an empty heading or text block",
+      "edits": [
+        [
+          "src/poster/startingText.ts",
+          "      if (isBlankHtml(b.content)) {",
+          "      if (false) {"
+        ]
+      ]
+    },
+    "issue-template-gone": {
+      "undoes": "4 — Issues lists a block still holding template text",
+      "edits": [
+        [
+          "src/poster/startingText.ts",
+          "      } else if (isStartingText(b.content)) {",
+          "      } else if (false) {"
+        ]
+      ]
+    },
+    "issue-old-insert": {
+      "undoes": "4 — Insert's old strings count as template text (older posters)",
+      "edits": [
+        [
+          "src/poster/startingText.ts",
+          "export const OLD_INSERT_TEXTS = ['Enter your text here.', 'Section Title'] as const;",
+          "export const OLD_INSERT_TEXTS = [] as const;"
+        ]
+      ]
+    },
+    "issue-template-prompts": {
+      "undoes": "4 — the template prompts count as template text (older posters)",
+      "edits": [
+        [
+          "src/poster/startingText.ts",
+          "    for (const b of t.build(48, 36)) if (b.type === 'text' && b.prompt) out.add(b.prompt);",
+          "    void t;"
+        ]
+      ]
+    },
+    "issue-sample-gone": {
+      "undoes": "4 — Issues lists a table still holding the sample",
+      "edits": [
+        [
+          "src/poster/startingText.ts",
+          "    } else if (b.type === 'table' && isSampleTable(b)) {",
+          "    } else if (false) {"
+        ]
+      ]
+    },
+    "issue-sample-info": {
+      "undoes": "4 — the sample table is a warning",
+      "edits": [
+        [
+          "src/poster/startingText.ts",
+          "      out.push({ id: `sample-table-${b.id}`, severity: 'warning',",
+          "      out.push({ id: `sample-table-${b.id}`, severity: 'info',"
+        ]
+      ]
+    },
+    "issues-not-added": {
+      "undoes": "4 — the editor adds the starting-text rows to Issues",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    out.push(...startingTextIssues(doc.blocks));\n",
+          ""
+        ]
+      ]
+    },
+    "css-empty-selector": {
+      "undoes": "4 — the prompt rule reads data-empty, not :empty (a lone <br>)",
+      "expect": "survive",
+      "why": "jsdom applies no stylesheet; simplify-check T1 reads the prompt drawn after Chromium leaves a lone <br> (claim T5)",
+      "browser": {
+        "harness": "scripts/simplify-check.mjs",
+        "scenarios": [
+          "T1-new-poster"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          "#poster-canvas [data-placeholder][data-empty]:not(:focus)::before {",
+          "#poster-canvas [data-placeholder]:empty:not(:focus)::before {"
+        ]
+      ]
+    },
+    "css-no-content": {
+      "undoes": "4 — the prompt rule draws the prompt",
+      "expect": "survive",
+      "why": "jsdom applies no stylesheet; simplify-check T1 reads the prompt drawn and painted (claims T5, T5i, T6)",
+      "browser": {
+        "harness": "scripts/simplify-check.mjs",
+        "scenarios": [
+          "T1-new-poster"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          "  content: attr(data-placeholder);\n  color: inherit;",
+          "  color: inherit;"
+        ]
+      ]
+    },
+    "css-focus-kept": {
+      "undoes": "4 — the prompt goes while the caret is in the block",
+      "expect": "survive",
+      "why": "jsdom applies no stylesheet; simplify-check T1 reads the prompt with the caret in the block (claim T5f)",
+      "browser": {
+        "harness": "scripts/simplify-check.mjs",
+        "scenarios": [
+          "T1-new-poster"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          "#poster-canvas [data-placeholder][data-empty]:not(:focus)::before {",
+          "#poster-canvas [data-placeholder][data-empty]::before {"
+        ]
+      ]
+    },
+    "css-not-canvas-only": {
+      "undoes": "4 — the prompt rule draws on the canvas only, so Preview shows no prompts (§3.1 rule 6; review round 1, R1-01)",
+      "expect": "survive",
+      "why": "jsdom applies no stylesheet; simplify-check T13 reads the prompts drawn and painted in Export › Preview (claims T13, T13i), and T1 the canvas's (T5, T6)",
+      "browser": {
+        "harness": "scripts/simplify-check.mjs",
+        "scenarios": [
+          "T13-preview"
+        ]
+      },
+      "edits": [
+        [
+          "src/index.css",
+          "#poster-canvas [data-placeholder][data-empty]:not(:focus)::before {",
+          "[data-placeholder][data-empty]:not(:focus)::before {"
+        ]
+      ]
+    },
+    "scan-negated-guard": {
+      "undoes": "1 — copyScan guards the false branch of a !FLAG condition",
+      "edits": [
+        [
+          "src/test/copyScan.ts",
+          "      visit(node.whenFalse, withFlags(guards, negatedFlag(node.condition)));",
+          "      visit(node.whenFalse, guards);"
+        ]
+      ]
+    },
+    "scan-self-closing-element": {
+      "undoes": "1 — copyScan keeps self-closing component elements",
+      "edits": [
+        [
+          "src/test/copyScan.ts",
+          "      if (tag) add(node, tag, guards, 'element');\n      ts.forEachChild(node, (child) => visit(child, guards));",
+          "      ts.forEachChild(node, (child) => visit(child, guards));"
+        ]
+      ]
+    },
+    "scan-component-name": {
+      "undoes": "1 — copyScan names the enclosing component",
+      "edits": [
+        [
+          "src/test/copyScan.ts",
+          "      component = fn;\n",
+          ""
+        ]
+      ]
+    }
+  }
+}

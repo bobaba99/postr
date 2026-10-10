@@ -111,7 +111,7 @@
       "edits": [
         [
           "src/i18n/landing.ts",
-          "  exportsBody: 'Import and edit a PowerPoint, then export an editable one. PowerPoint exports are paid.',\n",
+          "  exportsBody: 'Export an editable PowerPoint file. PowerPoint exports are paid.',\n",
           "  exportsBody: 'Import, edit, and export PowerPoint, or continue in LaTeX.',\n"
         ]
       ]

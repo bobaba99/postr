@@ -26,6 +26,14 @@ Detail: `docs/legal/quebec-law-25.md` (internal, not legal advice) and record 24
   under PIPEDA; US adequacy only for Data Privacy Framework companies) and whether
   Vercel's approximate location counts as "locating" under s. 8.1.
 
+- **The legal pages still describe hidden features (record 29, not blocking).** The
+  privacy policy says what import, Copy a design, Scan image and the Staples print
+  helper send "if you use" them. All four are hidden since 2026-10-07
+  (`config/features.ts`), so nothing there is untrue, only about features a visitor
+  cannot reach. The Terms §5.2 (EN and FR) also gives "reading the PDFs and images you
+  import" as an example of what the licence covers (record 29's review round 1).
+  Counsel or you: leave it while they may return, or trim it.
+
 ## 2. Things only you can do
 
 - **Stripe Dashboard text.** Product names and descriptions shown on Stripe Checkout
@@ -87,7 +95,27 @@ Under your rule that only unclear or blocking legal issues come back to you:
   alignment buttons removed, table typing folded in). Its open questions will be added
   here when its review rounds finish.
 
+- **Record 29 (the minimal editor), your decisions D3 and D4 as built:** a grey
+  prompt goes while the caret is in its block (as PowerPoint's "Click to add text"),
+  so it never sits beside the caret; a caption's "Show caption" brings it back on top
+  (the stored left, right or bottom is kept until you untick it); the sample table
+  keeps its header row (Measure, M (SD), 𝑝) and shows "Type or paste" in its first
+  body cell (a longer prompt made the table run into the heading below it); the
+  tour's export step says "Save as PDF or export an editable PowerPoint file (paid)."
+  The landing page now names "the BibTeX reference formatting" and no longer "the
+  conference size lookups"; the About page lost its import and "Borrow a look you
+  like" cards and the custom-palette, guidelines and citation-style sentences (each
+  comes back with its switch).
+
 ## 4. Later list items that will want your opinion
+
+- From record 29: the closed poster's "Download a copy" still saves a `.postr` file,
+  which the app cannot import while import is hidden; keep it as the way out, or
+  offer the PDF instead.
+- From record 29: a new poster's Issues tab now shows 8 where it showed 4, because
+  each of the template's four empty text blocks adds "Empty block: type in it or
+  delete it." (a suggestion, as bounded-designs §3.12 asks). If that number on a
+  poster just made is unwelcome, the tab could count warnings and errors only.
 
 Detail: `docs/stress-test/PLAN.md` (Later list).
 
