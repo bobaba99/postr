@@ -1047,45 +1047,45 @@ flowchart LR
 - [ ] hidden file input (filled image) — `<input type="file" accept="image/*">` — `blocks.tsx:398` — upload → Supabase Storage (`uploadPosterImage`) or base64 fallback
 - [ ] `+ Upload figure` (empty-image click target) — div button — `blocks.tsx:404-434` — clicks hidden file input
 - [ ] hidden file input (empty image) — `<input type="file" accept="image/*">` — `blocks.tsx:433`
-- [ ] table cell editor — `TableCellEditor` (one per cell, `poster/TableCellEditor.tsx`) — `blocks.tsx:1069-1100` — edits cell HTML → `updateCell`; writes the cell only when the stored value changes from outside, so typing keeps its order (it used `dangerouslySetInnerHTML`, rewritten on every keystroke: "abc" typed became "cba"); its typing joins the one undo history by word under `cell:<block id>:<index>` (fix 12); its typing is stored through `sanitizeTyped` (`sanitizeHtml.ts`), so the line Enter starts, which the browser puts in a `<div>`, is stored as a `<br>` (fix 27: it stored the `<div>` as typed, and the PowerPoint file wrote it out as text)
-- [ ] `Drag to resize column` — column-border drag handle ×(cols−1) — `blocks.tsx:969-985` (drag `:794-825`) — pointer drag redistributes `colWidths`, live on every move and ONE undo step from pointerdown to pointerup (`holdDragStep`, `blocks.tsx:806`; fix 12, the merge review's F1: it was one step per move); on a selected table a 24 px grip on screen at every zoom (scaled back across, `UNZOOM_X`), on an unselected one 6 sheet units as before (plan item 19, `docs/fixes/19-controls-one-size.md`) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Select row ${r + 1}` / title `Select row ${r + 1} (Delete to remove)` — row selector strip ×rows — `blocks.tsx:1122-1167` — selects whole row; on a selected table a 24 px hit area ending 2 px left of the table with the 8 px band at its inner edge, one size on screen (`stripAcross`, `blocks.tsx:878-896`); unselected: 8 units, 10 units out, as before (plan item 19, `docs/fixes/19-controls-one-size.md`; where they show at all is on the Later list) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Select column ${c + 1}` / title `Select column ${c + 1} (Delete to remove)` — column selector strip ×cols — `blocks.tsx:1180-1224` — selects whole column; the same, 2 px above the table (`stripDown`) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Add row` — hover-only bottom bar button — `blocks.tsx:1150-1171` — `insertRow(data, rows-1, 'below')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Add column` — hover-only right bar button — `blocks.tsx:1174-1196` — `insertCol(data, cols-1, 'right')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] table cell editor — `TableCellEditor` (one per cell, `poster/TableCellEditor.tsx`) — `blocks.tsx:1071-1104` — edits cell HTML → `updateCell`; writes the cell only when the stored value changes from outside, so typing keeps its order (it used `dangerouslySetInnerHTML`, rewritten on every keystroke: "abc" typed became "cba"); its typing joins the one undo history by word under `cell:<block id>:<index>` (fix 12); its typing is stored through `sanitizeTyped` (`sanitizeHtml.ts`), so the line Enter starts, which the browser puts in a `<div>`, is stored as a `<br>` (fix 27: it stored the `<div>` as typed, and the PowerPoint file wrote it out as text)
+- [ ] `Drag to resize column` — column-border drag handle ×(cols−1) — `blocks.tsx:958-974` (drag `:794-825`) — pointer drag redistributes `colWidths`, live on every move and ONE undo step from pointerdown to pointerup (`holdDragStep`, `blocks.tsx:806`; fix 12, the merge review's F1: it was one step per move); on a selected table a 24 px grip on screen at every zoom (scaled back across, `UNZOOM_X`), on an unselected one 6 sheet units as before (plan item 19, `docs/fixes/19-controls-one-size.md`) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Select row ${r + 1}` / title `Select row ${r + 1} (Delete to remove)` — row selector strip ×rows — `blocks.tsx:1112-1157` — selects whole row; on a selected table a 24 px hit area ending 2 px left of the table with the 8 px band at its inner edge, one size on screen (`stripAcross`, `blocks.tsx:868-886`); unselected: 8 units, 10 units out, as before (plan item 19, `docs/fixes/19-controls-one-size.md`; where they show at all is on the Later list) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Select column ${c + 1}` / title `Select column ${c + 1} (Delete to remove)` — column selector strip ×cols — `blocks.tsx:1170-1214` — selects whole column; the same, 2 px above the table (`stripDown`) · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Add row` — hover-only bottom bar button — `blocks.tsx:1140-1161` — `insertRow(data, rows-1, 'below')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Add column` — hover-only right bar button — `blocks.tsx:1164-1186` — `insertCol(data, cols-1, 'right')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] The table's strips, column grips, "+" bars and active-cell bands carry `data-postr-editor-ui` (where shown: the strips, grips and "+" bars are hidden while `ADJUSTMENTS_ENABLED` is off, record 29): the print copy and the thumbnail drop them (`export/stripEditorChrome.ts`; record 30's review round 2, R2-F1: ⌘P with the pointer resting on a last-column cell printed the "Add column" bar)
-- [ ] right-click on cell — gesture — `blocks.tsx:974-978` — opens `TableContextMenu` at cursor
-- [ ] `Insert row above` — context-menu item — `blocks.tsx:1308` — `insertRow(r, 'above')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Insert row below` — context-menu item — `blocks.tsx:1309` — `insertRow(r, 'below')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Insert column left` — context-menu item — `blocks.tsx:1311` — `insertCol(c, 'left')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Insert column right` — context-menu item — `blocks.tsx:1312` — `insertCol(c, 'right')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Clear cell` — context-menu item — `blocks.tsx:1314` — `updateCell(r, c, '')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Delete row` — context-menu item (danger, disabled when rows ≤ 1) — `blocks.tsx:1316` — `deleteRowAt(r)`
-- [ ] `Delete column` — context-menu item (danger, disabled when cols ≤ 1) — `blocks.tsx:1317` — `deleteColAt(c)`
+- [ ] right-click on cell — gesture — `blocks.tsx:963-967` — opens `TableContextMenu` at cursor
+- [ ] `Insert row above` — context-menu item — `blocks.tsx:1298` — `insertRow(r, 'above')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Insert row below` — context-menu item — `blocks.tsx:1299` — `insertRow(r, 'below')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Insert column left` — context-menu item — `blocks.tsx:1301` — `insertCol(c, 'left')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Insert column right` — context-menu item — `blocks.tsx:1302` — `insertCol(c, 'right')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Clear cell` — context-menu item — `blocks.tsx:1304` — `updateCell(r, c, '')` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Delete row` — context-menu item (danger, disabled when rows ≤ 1) — `blocks.tsx:1306` — `deleteRowAt(r)`
+- [ ] `Delete column` — context-menu item (danger, disabled when cols ≤ 1) — `blocks.tsx:1307` — `deleteColAt(c)`
 - [ ] `Tab` / `Shift+Tab` — keyboard — `blocks.tsx:592-603` — focus next/previous cell
 - [ ] `ArrowUp/Down/Left/Right` (at content edge) — keyboard — `blocks.tsx:624-627` — move cell focus
 - [ ] `Escape` — keyboard — `blocks.tsx:629,1246-1252` — closes table context menu
 - [ ] `Delete`/`Backspace` (row/col selected) — keyboard — `blocks.tsx:689-712` — deletes selected row/column; not from a text field, nor from the Undo / Redo buttons (`blocks.tsx:700`, fix 12 review R3-F1)
 - [ ] `Delete`/`Backspace` (multi-cell range) — keyboard — `blocks.tsx:714-743` — clears all cells in range; not from a text field, nor from the Undo / Redo buttons (`blocks.tsx:727`, fix 12 review R3-F1)
-- [ ] paste TSV/CSV/HTML — clipboard — `blocks.tsx` `onPaste` (`onPasteCapture` on the whole table) — `parseTablePaste` (`tableOps.ts`) builds a new table from any paste with text (an HTML `<tr>`, else every non-empty line of the plain text, split at tabs) and replaces the old one, its column widths reset: it does not grow the table, and a single word pasted into one cell leaves a 1×1 table, which autosave stores; ⌘Z brings the table back (MEASURED, `keep-work-check.mjs` H5 in three engines, on main too; fix 27, round 2 of the restarted review, N2-F1; older than fix 27; PLAN's MVP queue, the lead's call)
-- [ ] cell drag-select — mouse drag across cells — `blocks.tsx:943-973` — rectangular range selection
-- [ ] block click — click — `blocks.tsx:1940-1957` — selects block; `Shift`/`⌘`/`Ctrl`+click = additive toggle (`blocks.tsx:1942`)
-- [ ] block drag from body — pointer drag (not image/logo) — `blocks.tsx:1958-1970` — move block
-- [ ] block right-click — gesture (non-table, non-text blocks) — `blocks.tsx:1971-1990` — opens block context menu
-- [ ] `ResizeHandles` — 8 (or 4 corner) drag handles — `blocks.tsx:2401-2408` — resize block; corners-only for contain-mode images; which of them a block draws follows its size on screen (`blockControls`, `selectionLayout.ts`; `blocks.tsx:1962-1982`, from the padding box as rendered, `selectionRoom.ts`): no edge handles along an axis under 72 px, only the bottom row (or right column) under 24 px on one axis, only the bottom-right corner under 24 px on both (plan item 19, `docs/fixes/19-controls-one-size.md`)
-- [ ] handle row (move, type label, replace, crop, delete, and rotate when below has no room) — `blocks.tsx:2413-2653` — drawn in px and scaled back by the zoom about its bottom edge (`UNZOOM`), its bottom 14 px above the block at every zoom; on a turned block it is counter-rotated about its own centre, 26 px out from the block's edge, so it stays upright and clear of the block's handles at 180° (`blocks.tsx:2448-2451`; record 19, review F1) (plan item 19, `docs/fixes/19-controls-one-size.md`); the label only from 120 px wide, replace/crop/delete hidden under 24 px on both axes; zoomed out under 35 % (`OVERVIEW_ZOOM`, measured), a row whose buttons are wider than its block on screen (`handleRowWidth`: move, delete, and an image's or logo's replace and crop, 24 px each 4 px apart: 52 px, 108 px for an image or logo) draws only the move button, no replace, crop, delete or rotate control (record 19, review F3); delete then stays on the Delete/Backspace keys and the right-click menu's `Delete` (blocks other than the table and the text-like ones); from 35 % up the row is whole however narrow the block; where the buttons are drawn the label shows only if the row has room for it
-- [ ] `Drag to move (or use arrow keys)` — circular move handle (24 px hit area, 20 px circle) — `blocks.tsx:2471-2503` — drag → move block
-- [ ] `Replace logo` / `Replace image` — circular button (image/logo only; not drawn under 35 % zoom while the row is wider than the block, review F3) — `blocks.tsx:2549-2588` — dispatches `postr:replace-block` → opens picker/file input
-- [ ] `Crop image` / `Exit crop` — circular toggle (image/logo only, `aria-pressed`; not drawn under 35 % zoom while the row is wider than the block, review F3: crop mode, once on, keeps its own Cancel / Apply bar) — `blocks.tsx:2589-2616` — toggles `CropOverlay` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Delete block` — red circular button (not drawn under 35 % zoom while the row is wider than the block, review F3) — `blocks.tsx:2620-2647` — `onDelete(b.id)`
-- [ ] `Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)` — circular rotate handle (`rotateButton`, `blocks.tsx:1985-2012`) — below the block in a box scaled back by the zoom, its 24 px hit area 14 px under the block (`blocks.tsx:2671-2715`); the last button of the handle row when below it would meet the ZoomBar or leave the visible canvas (`rotateFitsBelow`, `selectionLayout.ts`; read from the screen on each render and when the canvas resizes, `selectionRoom.ts`); none under 24 px on both axes, nor under 35 % zoom while the handle row is wider than the block (review F3) (plan item 19, `docs/fixes/19-controls-one-size.md`) — drag → rotate · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `Duplicate` `⌘D` — block context-menu item — `blocks.tsx:2614` — `onDuplicate(b.id)`
-- [ ] `Bring Forward` — block context-menu item — `blocks.tsx:2615` — `onReorder(b.id, 1)`
-- [ ] `Send Back` — block context-menu item — `blocks.tsx:2616` — `onReorder(b.id, -1)`
-- [ ] `Delete` `⌫` — block context-menu item (danger) — `blocks.tsx:2617` — `onDelete(b.id)`
-- [ ] context-menu backdrop — click-catcher overlay — `blocks.tsx:2580-2593` — dismisses block menu
-- [ ] `CropOverlay` — inline crop UI mount (image/logo, selected+cropMode) — `blocks.tsx:2198-2204,2217-2223` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] `FloatingFormatToolbar` — portal toolbar mount — `blocks.tsx:2571` — shows on text selection
+- [ ] paste into a cell — clipboard, the caret in a cell — `TableCellEditor.tsx:60` `onPaste` → `readCellPaste` (`poster/tablePaste.ts`, its rule table): an HTML `<table>` with no other text (Excel, Word, Google Sheets), or plain text with a tab or a line break (blank lines at its end aside: review round 1, R1-F2, a paragraph Chromium copied with a triple-click ends in two and emptied the cell below), is a grid, handed to the table (`onPasteGrid`, `blocks.tsx:1093` → `pasteGrid`), which fills from the focused cell across and down, grows by rows and columns to hold it (column widths kept unless columns are added, then even), and changes no cell outside the pasted area; a merged cell's text goes in its first cell and the cells it covers are written empty; each cell keeps bold, italic, underline, sub, sup and its line breaks, drops colour, highlight, font and size, and is stored as text ("<" as "&lt;"; source-code whitespace read as HTML draws it, `parsePasted`); text copied with a table (a paragraph above it) is read from the plain text instead, so nothing is dropped. Any other text goes into the cell at the caret, cleaned as a text block's paste is (`pastedHtml`, `poster/pasteClean.ts`) and with no line break at its end (an engine's interchange `<br>`, R1-F2), stored by the input event `execCommand('insertHTML')` fires. A paste with no text (an image alone) is left to the browser, as before. One undo step either way (fix 12's history: a multi-cell patch is a step of its own, a one-cell one is marked by the paste event). Fix 32 (`docs/fixes/32-table-paste.md`): the table's handler (`onPasteCapture` on the whole table, `parseTablePaste`) replaced the whole table with one built from any paste with text, so one line pasted into a 4×3 table left a 1×1 one, and a cell's text was stored as markup, so an `<img onerror>` pasted as text ran in the editor (MEASURED in Chromium, Firefox and WebKit, `scripts/table-paste-check.mjs` T1, G1–G3, X; `keep-work-check.mjs` H5; the review round's T-word-line, T-word-wrap-line, T-lines-trailing, T-triple-line, T-web-wrap-line). Not handled: a paste over a range of cells selected by dragging (no cell has the caret), comma-separated text, quoted fields in tab-separated text, formatting set by style (Google Sheets' bold), inserting rows or columns in the middle (Later)
+- [ ] cell drag-select — mouse drag across cells — `blocks.tsx:932-962` — rectangular range selection
+- [ ] block click — click — `blocks.tsx:1930-1947` — selects block; `Shift`/`⌘`/`Ctrl`+click = additive toggle (`blocks.tsx:1932`)
+- [ ] block drag from body — pointer drag (not image/logo) — `blocks.tsx:1948-1960` — move block
+- [ ] block right-click — gesture (non-table, non-text blocks) — `blocks.tsx:1961-1980` — opens block context menu
+- [ ] `ResizeHandles` — 8 (or 4 corner) drag handles — `blocks.tsx:2391-2398` — resize block; corners-only for contain-mode images; which of them a block draws follows its size on screen (`blockControls`, `selectionLayout.ts`; `blocks.tsx:1952-1972`, from the padding box as rendered, `selectionRoom.ts`): no edge handles along an axis under 72 px, only the bottom row (or right column) under 24 px on one axis, only the bottom-right corner under 24 px on both (plan item 19, `docs/fixes/19-controls-one-size.md`)
+- [ ] handle row (move, type label, replace, crop, delete, and rotate when below has no room) — `blocks.tsx:2403-2643` — drawn in px and scaled back by the zoom about its bottom edge (`UNZOOM`), its bottom 14 px above the block at every zoom; on a turned block it is counter-rotated about its own centre, 26 px out from the block's edge, so it stays upright and clear of the block's handles at 180° (`blocks.tsx:2438-2441`; record 19, review F1) (plan item 19, `docs/fixes/19-controls-one-size.md`); the label only from 120 px wide, replace/crop/delete hidden under 24 px on both axes; zoomed out under 35 % (`OVERVIEW_ZOOM`, measured), a row whose buttons are wider than its block on screen (`handleRowWidth`: move, delete, and an image's or logo's replace and crop, 24 px each 4 px apart: 52 px, 108 px for an image or logo) draws only the move button, no replace, crop, delete or rotate control (record 19, review F3); delete then stays on the Delete/Backspace keys and the right-click menu's `Delete` (blocks other than the table and the text-like ones); from 35 % up the row is whole however narrow the block; where the buttons are drawn the label shows only if the row has room for it
+- [ ] `Drag to move (or use arrow keys)` — circular move handle (24 px hit area, 20 px circle) — `blocks.tsx:2461-2493` — drag → move block
+- [ ] `Replace logo` / `Replace image` — circular button (image/logo only; not drawn under 35 % zoom while the row is wider than the block, review F3) — `blocks.tsx:2539-2578` — dispatches `postr:replace-block` → opens picker/file input
+- [ ] `Crop image` / `Exit crop` — circular toggle (image/logo only, `aria-pressed`; not drawn under 35 % zoom while the row is wider than the block, review F3: crop mode, once on, keeps its own Cancel / Apply bar) — `blocks.tsx:2579-2606` — toggles `CropOverlay` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Delete block` — red circular button (not drawn under 35 % zoom while the row is wider than the block, review F3) — `blocks.tsx:2610-2637` — `onDelete(b.id)`
+- [ ] `Drag to rotate — snaps at 0/45/90/135/180° (Shift = 15° steps)` — circular rotate handle (`rotateButton`, `blocks.tsx:1975-2002`) — below the block in a box scaled back by the zoom, its 24 px hit area 14 px under the block (`blocks.tsx:2661-2705`); the last button of the handle row when below it would meet the ZoomBar or leave the visible canvas (`rotateFitsBelow`, `selectionLayout.ts`; read from the screen on each render and when the canvas resizes, `selectionRoom.ts`); none under 24 px on both axes, nor under 35 % zoom while the handle row is wider than the block (review F3) (plan item 19, `docs/fixes/19-controls-one-size.md`) — drag → rotate · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `Duplicate` `⌘D` — block context-menu item — `blocks.tsx:2604` — `onDuplicate(b.id)`
+- [ ] `Bring Forward` — block context-menu item — `blocks.tsx:2605` — `onReorder(b.id, 1)`
+- [ ] `Send Back` — block context-menu item — `blocks.tsx:2606` — `onReorder(b.id, -1)`
+- [ ] `Delete` `⌫` — block context-menu item (danger) — `blocks.tsx:2607` — `onDelete(b.id)`
+- [ ] context-menu backdrop — click-catcher overlay — `blocks.tsx:2570-2583` — dismisses block menu
+- [ ] `CropOverlay` — inline crop UI mount (image/logo, selected+cropMode) — `blocks.tsx:2188-2194,2217-2223` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] `FloatingFormatToolbar` — portal toolbar mount — `blocks.tsx:2561` — shows on text selection
 
 **Copy**
 - [ ] "+ Logo" — placeholder label — `blocks.tsx:249`
@@ -1097,36 +1097,36 @@ flowchart LR
 - [ ] `"{file.name}" is {mb} MB — too large.\n\nImages must be under 10 MB. Try compressing the PNG/JPEG in Preview (macOS) or an online tool.` — alert() error — `blocks.tsx:118-121`
 - [ ] `Couldn't read "{file.name}". The file may be corrupted or unreadable.` — alert() error — `blocks.tsx:127-129`
 - [ ] `{caption plain-text} || 'Figure'` — img alt — `blocks.tsx:349`
-- [ ] "Add authors in sidebar →" — empty state (×2 variants) — `blocks.tsx:1355,1370`
-- [ ] " · " — institution separator — `blocks.tsx:1375,1430`
-- [ ] ", " — author separator — `blocks.tsx:1417`
-- [ ] "*Equal contribution" — footnote marker line — `blocks.tsx:1439`
-- [ ] "†Corresponding author" — footnote marker line — `blocks.tsx:1441`
-- [ ] "Add references in Refs tab →" — empty state — `blocks.tsx:1464`
-- [ ] "References" — refs-block heading — `blocks.tsx:1485`
-- [ ] `Poster made with postr.sh https://postr.sh` — injected last reference entry (rawText from `@/export/attribution.ts:276`; bold via `ACK_REFERENCE_ID` check at `blocks.tsx:1496`)
-- [ ] `Figure {N}.` / `Table {N}.` — auto caption prefix — `blocks.tsx:1627` — reading order, down each column (record 28; it was top edge then left edge, across the columns); charts share the figures' sequence in the editor and the exports; Export › Preview poster shows them too (it showed no caption before record 28)
-- [ ] `{b.type}` (e.g. "image", "table") — block-type pill on selection chrome — `blocks.tsx:2507` — only on a block 120 px wide or more on screen (plan item 19); its width, read on each render (`selectionRoom.ts`), counts in the handle row's (review F3)
-- [ ] `{rotation}°` — rotation readout in pill — `blocks.tsx:2510`
+- [ ] "Add authors in sidebar →" — empty state (×2 variants) — `blocks.tsx:1345,1370`
+- [ ] " · " — institution separator — `blocks.tsx:1365,1430`
+- [ ] ", " — author separator — `blocks.tsx:1407`
+- [ ] "*Equal contribution" — footnote marker line — `blocks.tsx:1429`
+- [ ] "†Corresponding author" — footnote marker line — `blocks.tsx:1431`
+- [ ] "Add references in Refs tab →" — empty state — `blocks.tsx:1454`
+- [ ] "References" — refs-block heading — `blocks.tsx:1475`
+- [ ] `Poster made with postr.sh https://postr.sh` — injected last reference entry (rawText from `@/export/attribution.ts:276`; bold via `ACK_REFERENCE_ID` check at `blocks.tsx:1486`)
+- [ ] `Figure {N}.` / `Table {N}.` — auto caption prefix — `blocks.tsx:1617` — reading order, down each column (record 28; it was top edge then left edge, across the columns); charts share the figures' sequence in the editor and the exports; Export › Preview poster shows them too (it showed no caption before record 28)
+- [ ] `{b.type}` (e.g. "image", "table") — block-type pill on selection chrome — `blocks.tsx:2497` — only on a block 120 px wide or more on screen (plan item 19); its width, read on each render (`selectionRoom.ts`), counts in the handle row's (review F3)
+- [ ] `{rotation}°` — rotation readout in pill — `blocks.tsx:2500`
 - [ ] "Poster title" — the title's grey prompt (`DEFAULT_PROMPTS.title`, `poster/startingText.ts`; was "Poster Title" and never drawn: no stylesheet read `data-placeholder` until record 29) — `blocks.tsx` — drawn by `index.css` on an empty, unfocused block on the canvas (`#poster-canvas`; `data-empty`, set from the stored text; a lone `<br>` counts as empty); not in Export › Preview poster (review round 1, R1-01), never printed or exported; the dashboard thumbnail, a picture of the canvas, draws it
 - [ ] "Section Heading" — a heading's grey prompt (`DEFAULT_PROMPTS.heading`) — `blocks.tsx` — as above (record 29)
 - [ ] "Type here… (type / for symbols)" — a text block's grey prompt (`DEFAULT_PROMPTS.text`), or the block's own `prompt` (a template text block's guidance sentence) — `blocks.tsx` — as above (record 29)
 - [ ] the table's prompt ("Type or paste", `TABLE_PROMPT`, `templates.ts`) — in the first body cell (`TableCellEditor` `placeholder`) while every body cell is empty (`tablePromptFor`, `startingText.ts`) — record 29
-- [ ] `{headingNumber}.` — auto heading number — `blocks.tsx:2116` — numbered in the poster's reading order (`poster/readingOrder.ts`, record 28): bands of wide blocks top to bottom, then columns left to right, each top to bottom; not the block array, so Bring Forward or a pasted heading no longer renumbers; the exports use the same function (`export/posterContent.ts`)
-- [ ] "⌘D" — shortcut hint in context menu — `blocks.tsx:2583`
-- [ ] "⌫" — shortcut hint in context menu — `blocks.tsx:2586`
-- [ ] `Cell ({r + 1}, {c + 1})` — table context-menu header — `blocks.tsx:1305`
+- [ ] `{headingNumber}.` — auto heading number — `blocks.tsx:2106` — numbered in the poster's reading order (`poster/readingOrder.ts`, record 28): bands of wide blocks top to bottom, then columns left to right, each top to bottom; not the block array, so Bring Forward or a pasted heading no longer renumbers; the exports use the same function (`export/posterContent.ts`)
+- [ ] "⌘D" — shortcut hint in context menu — `blocks.tsx:2573`
+- [ ] "⌫" — shortcut hint in context menu — `blocks.tsx:2576`
+- [ ] `Cell ({r + 1}, {c + 1})` — table context-menu header — `blocks.tsx:1295`
 
 **Graphics**
 - [ ] 1×1 transparent GIF (`PLACEHOLDER_SRC`) — img data-URI — `blocks.tsx:49-50` — fills img while `storage://` URL resolves
-- [ ] move icon (4-arrow cross) — inline-svg — `blocks.tsx:2478-2494` — move handle
-- [ ] replace icon (circular arrows) — inline-svg — `blocks.tsx:2564-2577` — replace button
-- [ ] crop icon — inline-svg — `blocks.tsx:2594-2606` — crop toggle · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] X icon — inline-svg — `blocks.tsx:2625-2637` — delete button
-- [ ] rotate icon (two chasing arrows) — inline-svg — `blocks.tsx:2001-2006` — rotate handle · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] rotate stem — css line, 1.5 × 16 px on screen (scaled back) — `blocks.tsx:2664-2683` — connects rotate handle to block, only while the rotate is below · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] active-cell row + column bands — css overlay — `blocks.tsx:868-903` — table focus guides (Excel-style)
-- [ ] affiliation `*` / `†` superscript markers — text glyphs — `blocks.tsx:1413-1414` — author line
+- [ ] move icon (4-arrow cross) — inline-svg — `blocks.tsx:2468-2484` — move handle
+- [ ] replace icon (circular arrows) — inline-svg — `blocks.tsx:2554-2567` — replace button
+- [ ] crop icon — inline-svg — `blocks.tsx:2584-2596` — crop toggle · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] X icon — inline-svg — `blocks.tsx:2615-2627` — delete button
+- [ ] rotate icon (two chasing arrows) — inline-svg — `blocks.tsx:1991-1996` — rotate handle · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] rotate stem — css line, 1.5 × 16 px on screen (scaled back) — `blocks.tsx:2654-2673` — connects rotate handle to block, only while the rotate is below · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
+- [ ] active-cell row + column bands — css overlay — `blocks.tsx:858-893` — table focus guides (Excel-style)
+- [ ] affiliation `*` / `†` superscript markers — text glyphs — `blocks.tsx:1403-1404` — author line
 
 #### `poster/boundsCheck.ts` — OOB detection (logic; produces user-visible message strings)
 
@@ -1258,7 +1258,7 @@ flowchart LR
   - "External handles (appear when selected)": "Move — top-left, purple. Drag to reposition. Required for image and logo blocks (the browser's native image-drag otherwise hijacks the pointer)."; "Rotate — bottom-center, connected by a stem. Drag in a circle around the block."; "Delete — top-right, red. One click removes the block."; "Resize — bottom-right corner of the frame. Drag to resize. When a block is rotated, resize still follows the block's local "right/down" direction." — `:893-910`
   - "Keyboard": "Nudge by 1/2 inch (one grid cell) — default respects the grid."; "Nudge by 1/10 inch — fine sub-grid adjustment."; "Delete the selected block. Backspace works too."; "Undo. ⌘⇧Z or ⌘Y to redo."; "Toggle the left sidebar (Notion-style)." — `:912-928`
   - "Rotation tricks": "Dragging the rotate handle magnetically snaps at 0° / 45° / 90° / 135° / 180° with a 4° catch radius. Loose enough that intentional 43° rotations still work."; "Hold while rotating → hard 15° steps instead of magnetic. Useful when you want every rotation to land on a clean multiple." — `:930-939`
-  - "Tables": "Move to the next cell. Shift+Tab goes backward."; "Paste rows from Excel or Word — Tabs become columns, newlines become rows. The pasted grid replaces the whole table." (the claims audit's wording, `f153cf7`; matches the paste, `keep-work-check.mjs` H5); "Right-click a cell — Custom context menu to insert or delete a row or column, or clear the cell." — `ShortcutsPanel`'s `ShortcutGroup title="Tables"`
+  - "Tables": "Move to the next cell. Shift+Tab goes backward."; "Paste rows from Excel or Word — Tabs become columns, newlines become rows. The cells fill the table from the cell you paste into, and the table grows to fit." (fix 32; matches the paste, `table-paste-check.mjs` G1–G3); "Right-click a cell — Custom context menu to insert or delete a row or column, or clear the cell." — `ShortcutsPanel`'s `ShortcutGroup title="Tables"`
   - "💡 Tip: autosave runs continuously, so you can experiment freely. The autosave pill in the top-right of the canvas shows when the latest change landed on the server." — tip box — `:953-968`
 
 **Graphics**
@@ -1382,22 +1382,22 @@ flowchart LR
 #### `poster/RichTextEditor.tsx` — contentEditable editor with slash-command symbol menu
 
 **Elements**
-- [ ] contentEditable surface — text input — `RichTextEditor.tsx:335-365` — typing → `onChange(sanitized HTML)`; placeholder via `data-placeholder`; `historyKey` (`content:<block id>`) and `surface` (canvas, or the sidebar's Content box) put it in the one undo history: an undo or redo of its text is written in even while it has focus, and the caret goes back where the change was (`useEditableHistory.ts`, fix 12); a click or a caret key ends the typing step (`:243`, `:357`; not a key released inside a composition, fix 12 review R2-F1); its paste (`:256`) is a step of its own through the paste event, which the editor's document listener notes (the input event `execCommand` fires says '' or 'insertText', fix 12 review R1-F2)
-- [ ] `/prefix` — slash-command trigger — `RichTextEditor.tsx:176-194` — opens symbol listbox at caret
-- [ ] symbol option `/{key}` (up to 8, role="option") — listbox item — `RichTextEditor.tsx:350-373` — click/mousedown inserts symbol, replacing `/prefix`
-- [ ] `Tab` / `Enter` (slash open) — keyboard — `RichTextEditor.tsx:211-218` — inserts first matching symbol
-- [ ] `Escape` (slash open) — keyboard — `RichTextEditor.tsx:206-209` — closes menu
-- [ ] `Enter` (single-line mode) — keyboard — `RichTextEditor.tsx:220-222` — swallowed (keeps one line)
+- [ ] contentEditable surface — text input — `RichTextEditor.tsx:338-368` — typing → `onChange(sanitized HTML)`; placeholder via `data-placeholder`; `historyKey` (`content:<block id>`) and `surface` (canvas, or the sidebar's Content box) put it in the one undo history: an undo or redo of its text is written in even while it has focus, and the caret goes back where the change was (`useEditableHistory.ts`, fix 12); a click or a caret key ends the typing step (`:243`, `:357`; not a key released inside a composition, fix 12 review R2-F1); its paste (`:256`) is a step of its own through the paste event, which the editor's document listener notes (the input event `execCommand` fires says '' or 'insertText', fix 12 review R1-F2)
+- [ ] `/prefix` — slash-command trigger — `RichTextEditor.tsx:179-197` — opens symbol listbox at caret
+- [ ] symbol option `/{key}` (up to 8, role="option") — listbox item — `RichTextEditor.tsx:353-376` — click/mousedown inserts symbol, replacing `/prefix`
+- [ ] `Tab` / `Enter` (slash open) — keyboard — `RichTextEditor.tsx:214-221` — inserts first matching symbol
+- [ ] `Escape` (slash open) — keyboard — `RichTextEditor.tsx:209-212` — closes menu
+- [ ] `Enter` (single-line mode) — keyboard — `RichTextEditor.tsx:223-225` — swallowed (keeps one line)
 - [ ] `Enter` (multi-line: text blocks, the Content box) — keyboard — the browser starts a new line in a `<div>` (Chromium and WebKit `…a<div>b</div>`, Firefox wraps the line before too); the commit stores it as a `<br>` (`read` → `sanitizeTyped(innerHTML, multiline)`, `sanitizeHtml.ts`), keeping every space typed; a blank line is two `<br>`; a line already ended (after a list left with Enter, after a `<br>` at its end, after a newline at its end) gets no extra `<br>` (`lineOpen`; the paste path too, the newline since fix 27's restarted review: a pasted `<p>a\n</p><p>b</p>` stored a blank line the source does not show). Shift+Enter puts a newline in the text in Chromium and Firefox (the fields are drawn `pre-wrap`; WebKit starts a `<div>` as for Enter), stored as typed; Enter after it gained a blank line once stored until fix 27's review round 2 (R2-A1, MEASURED, `keep-work-check.mjs` E12: 2.58 glyph heights while typing, 3.87 after a reload). Fix 27 (OF-01): the commit sanitized with no separator, so the words joined in the store ("ZQAZQB"), after a reload, in the dashboard's copy, the PDF and PowerPoint (MEASURED in three engines, `keep-work-check.mjs` E1–E6)
-- [ ] paste — clipboard — `RichTextEditor.tsx:238-245` — sanitized HTML insert via `execCommand('insertHTML')`
+- [ ] paste — clipboard — `RichTextEditor.tsx:266-288` — the poster's style wins (`pastedHtml` → `cleanPastedHtml` → `parsePasted` + `cleanPastedContent`, `poster/pasteClean.ts`; fix 32): bold, italic, underline, strikethrough, sub, sup, lists and line breaks kept; the source's colour and highlight (`style` attributes, `<mark>`) dropped with its font and size, on paste only (stored text keeps its colours); a style sheet, script or title on the clipboard dropped with its text (Google Sheets, Excel and Word put one there: its CSS was pasted as words); a `<b>`/`<strong>` whose style says it is not bold unwrapped (Google Docs wraps a paste in one: it drew bold), the style read by property name (`styleValue`: Word's bold `<b style='mso-bidi-font-weight:normal'>` stays bold; review round 1, R1-F1); the source markup's whitespace read as HTML draws it (a run is one space, none at a line's edges; kept inside `<pre>`, under `white-space: pre*` as Google Docs writes, and whenever the clipboard's plain text shows the HTML's text as written, as Firefox's copy of a field's own text), so a line wrapped in Word's HTML or a page Firefox copied is not a line break (R1-F3), and a Shift+Enter line or a double space copied between blocks stays (`F-text-inner-copy`); a paragraph boundary a `<br>`, or a space in a one-line field (the title, a heading); inserted via `execCommand('insertHTML')` (MEASURED before and after in three engines, `scripts/table-paste-check.mjs` C1–C5). The spaces that start a pasted line after a line break are dropped (main the same). A paragraph copied with a triple-click keeps its paragraph end (the engine's interchange `<br>`) in a text block, as before. Formatting a source sets by style (Docs' and Sheets' bold) is not kept
 
 **Copy**
-- [ ] "Tab or Enter to insert" — slash-menu footer — `RichTextEditor.tsx:374-376`
-- [ ] "Select text to format · / for symbols" — focus hint pill (portal) — `RichTextEditor.tsx:406-408`
-- [ ] `/{k}` — symbol key label per option — `RichTextEditor.tsx:370`
+- [ ] "Tab or Enter to insert" — slash-menu footer — `RichTextEditor.tsx:377-379`
+- [ ] "Select text to format · / for symbols" — focus hint pill (portal) — `RichTextEditor.tsx:409-411`
+- [ ] `/{k}` — symbol key label per option — `RichTextEditor.tsx:373`
 
 **Graphics**
-- [ ] symbol glyphs per option (from SYMBOLS, see symbols.ts) — text glyphs — `RichTextEditor.tsx:371`
+- [ ] symbol glyphs per option (from SYMBOLS, see symbols.ts) — text glyphs — `RichTextEditor.tsx:374`
 
 #### `poster/SelectionRect.tsx` — Rubber-band marquee rectangle
 
@@ -1406,7 +1406,7 @@ flowchart LR
 **Graphics**
 - [ ] dashed accent rect with translucent fill — css — `SelectionRect.tsx:18-31`
 
-#### `poster/symbols.ts` — Slash-command symbol library (constant; render site `RichTextEditor.tsx:350-373`)
+#### `poster/symbols.ts` — Slash-command symbol library (constant; render site `RichTextEditor.tsx:353-376`)
 
 **Copy** (66 entries, `symbols.ts:11-34`; rendered as `/{key}` + glyph)
 - [ ] Greek lowercase (21): alpha α, beta β, gamma γ, delta δ, epsilon ε, zeta ζ, eta η, theta θ, kappa κ, lambda λ, mu μ, nu ν, xi ξ, pi π, rho ρ, sigma σ, tau τ, phi φ, chi χ, psi ψ, omega ω — `symbols.ts:13-16`
@@ -1444,12 +1444,12 @@ flowchart LR
 #### Adjunct constants whose strings render inside this slice
 
 - [ ] `@/export/blockLock.ts:33` — "Postr is free — this credit stays on the poster." (locked-delete refusal toast; render `PosterEditor.tsx:1563,2098`)
-- [ ] `@/export/attribution.ts:42,52,276` — "Poster made with postr.sh" + "https://postr.sh" (last References entry on canvas; render `blocks.tsx:1481-1501`)
+- [ ] `@/export/attribution.ts:42,52,276` — "Poster made with postr.sh" + "https://postr.sh" (last References entry on canvas; render `blocks.tsx:1471-1491`)
 - [ ] `@/export/ackBlock.ts` — locked logo-type ack mark (`__postr_ack_mark__`, `ackMarkDataUri` image) injected onto canvas; undeletable, movable — renders as a normal LogoBlock
 
 #### Logic-only files in `poster/` (no UI)
 
-- [ ] `academicMarkdown.ts`, `ackPlacement.ts`, `autoLayout.ts`, `citations.ts` (sort-mode labels "Manual order"/"Alphabetical (first author)"/"Year (newest first)"/"Year (oldest first)" at `citations.ts:112-115` render only in sidebar Refs tab — but `sortMode` is hardcoded `'alpha'` with no user-facing toggle, see §10), `colorDistance.ts`, `colorblind.ts`, `customPalettes.ts`, `fontLoader.ts`, `logoPresets.ts` (data for `LogoPicker`, §6.13), `paletteTools.ts`, `parsers.ts`, `readability.ts` (feeds sidebar `ReadabilityPanel`), `sanitizeHtml.ts`, `slashCommand.ts`, `snap.ts`, `styleExtraction.ts`, `tableOps.ts`
+- [ ] `academicMarkdown.ts`, `ackPlacement.ts`, `autoLayout.ts`, `citations.ts` (sort-mode labels "Manual order"/"Alphabetical (first author)"/"Year (newest first)"/"Year (oldest first)" at `citations.ts:112-115` render only in sidebar Refs tab — but `sortMode` is hardcoded `'alpha'` with no user-facing toggle, see §10), `colorDistance.ts`, `colorblind.ts`, `customPalettes.ts`, `fontLoader.ts`, `logoPresets.ts` (data for `LogoPicker`, §6.13), `paletteTools.ts`, `parsers.ts`, `readability.ts` (feeds sidebar `ReadabilityPanel`), `sanitizeHtml.ts`, `pasteClean.ts` (what a paste keeps, fix 32), `slashCommand.ts`, `snap.ts`, `styleExtraction.ts`, `tableOps.ts`, `tablePaste.ts` (a paste into a cell: `readCellPaste`, `pasteGrid`, fix 32)
 
 #### Flags / dead-ish UI notes (editor core)
 
@@ -1856,7 +1856,7 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:182-1
 - [ ] "Click a text, table, or image block on the canvas to edit it here, or switch to the Insert tab to add a new one. Open the Figure tab to build a chart from your data or check figure readability." — Edit-tab empty state — `Sidebar.tsx:2777-2784`
 - [ ] "✏️ Click any cell on the canvas to type directly." — tips list item — `Sidebar.tsx:2824`
 - [ ] "🖱️ Click a row/column header strip to select the whole row or column." — tips list item — `Sidebar.tsx:2825` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
-- [ ] "📋 Pasting into a cell replaces the whole table with what you paste, so rows copied from Word, Excel, or Google Sheets come in as a new grid." — tips list item — `Sidebar.tsx` `TableTipsDropdown` (the claims audit's wording, `f153cf7`; matches the paste, `keep-work-check.mjs` H5)
+- [ ] "📋 Paste cells copied from Word, Excel, or Google Sheets into a cell: they replace the cells from that cell, across and down (a single copied cell replaces that cell's text), and the table grows to fit. Other text with no tabs or line breaks goes in at the cursor." — tips list item — `Sidebar.tsx` `TableTipsDropdown` (fix 32; review round 1, R1-F4: the sentence before said such text "goes into the cell itself", yet one copied spreadsheet cell, an HTML table, replaces the cell's text; matches the paste, `table-paste-check.mjs` T1, G1–G3, T-one-cell-html; Word, Excel and Sheets clipboard shapes, not a real copy from each: UNVERIFIED)
 - [ ] "↔️ Drag column borders to resize." — tips list item — `Sidebar.tsx:2827` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "🗑️ Select a row/column and press Delete to remove it." — tips list item — `Sidebar.tsx:2828` · **Hidden while `ADJUSTMENTS_ENABLED` is off (record 29).**
 - [ ] "⌨️ Tab / Shift+Tab to jump between cells." — tips list item — `Sidebar.tsx:2829`
@@ -1889,8 +1889,8 @@ Mounted from: imported `sidebar/FigureTab.tsx:25`, rendered `FigureTab.tsx:182-1
 - [ ] block descriptions: "Section title with auto-numbering" / "Paragraph with slash-command symbols" / "Figure or photo upload" / "Build a figure from your data" / "Data table with border presets" / "Auto-formatted from Refs tab" / "Institution or sponsor mark" — (`blocks` array `Sidebar.tsx:4069-4077`, rendered `:4107`)
 - [ ] "✨ Slash symbols" — card heading — `Sidebar.tsx:4120-4122`
 - [ ] "Inside a text block type /alpha, /beta, /leq, /pm, or stats shortcuts like /p, /SD, /df." — card body — `Sidebar.tsx:4123-4125`
-- [ ] "📋 Pasting tables" — card heading — `Sidebar.tsx:4129-4131`
-- [ ] "Copy a table from Word, Excel, or Google Sheets, add a table block, then paste into any cell — Postr will expand the grid and fill every cell for you. No need to retype." — card body — `Sidebar.tsx` `AddBlockPanel`, the card under "📋 Pasting tables" — misleading as written: the paste replaces the table with the pasted grid; in the card's own steps the new block is 3×3 and empty (`PosterEditor.tsx`), so the grid "expands" only for a paste larger than that (INSPECTED), and pasted into a filled table the paste drops the cells it does not cover (MEASURED, `keep-work-check.mjs` H5; fix 27, N2-F1 and N3-F1; the claims audit's)
+- [ ] "📋 Pasting tables" — card heading — `Sidebar.tsx:4384-4386`
+- [ ] "Copy cells from Word, Excel, or Google Sheets, click a cell of a table block, then paste — the cells fill the table from there, and it adds the rows and columns they need. No need to retype." — card body — `Sidebar.tsx` `AddBlockPanel`, the card under "📋 Pasting tables" (fix 32: the sentence it replaced, "add a table block, then paste into any cell — Postr will expand the grid and fill every cell for you", described a growing grid while the paste replaced the table; now the paste fills and grows, `table-paste-check.mjs` G1–G3)
 - [ ] "Issues" — section label (empty state) — `Sidebar.tsx:4158`
 - [ ] "✓ No issues detected. Your poster passes all automated checks — ready to export." — empty-state banner — `Sidebar.tsx:4170-4172`
 - [ ] "This tab scans for common pre-flight problems: blocks outside the canvas, columns past the bottom margin, missing authors or institutions, empty image blocks, very long titles, overlapping blocks, and references missing key fields. Issues refresh automatically as you edit." — empty-state explainer — `Sidebar.tsx:4286-4290`

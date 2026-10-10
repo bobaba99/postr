@@ -648,9 +648,14 @@ scope becomes a plan item or a question for the owner.
   between its `<li>` draws blank lines between the bullets, and PowerPoint
   writes empty paragraphs there; Google Docs' `<b style="font-weight:
   normal" id="docs-internal-guid-…">` wrapper is stored as `<b>` round the
-  whole paste (drawn bold, INSPECTED). Treat an `&nbsp;`-only paragraph as a
-  blank line, drop whitespace-only text inside `ul`/`ol` on paste, unwrap
-  that `<b>`. Also seen: the print window spaces table cells (1.0 line
+  whole paste (drawn bold, INSPECTED; **fixed by record 32**: the paste
+  unwraps a `<b>` whose style says it is not bold, drawn at the block's
+  weight, MEASURED in three engines, `table-paste-check.mjs` F-text-docs).
+  Treat an `&nbsp;`-only paragraph as a blank line. (The newlines between
+  a web list's items: **fixed by record 32's review round**, which reads a
+  paste's source whitespace as HTML draws it: stored `<ul><li>L1</li><li>
+  L2</li></ul>`, the first version `<ul><li>L1</li>\n  <li>L2</li>\n</ul>`,
+  MEASURED in jsdom, `tablePasteRules.test.ts`; the drawing not measured.) Also seen: the print window spaces table cells (1.0 line
   against 1.25 on the canvas) and lists differently, on main too.
 - **Record 27, ⌘S with a Poster name typed and left** (R3-A3, LOW; from
   the first review round 3's probe N1; on main "Version saved" over the
@@ -683,7 +688,10 @@ scope becomes a plan item or a question for the owner.
   `[["unordered","x"],["unordered",""]]`; two such items, an empty bullet
   after each). No known path stores one (INSPECTED; round 3 of the
   restarted review, N3-F3): a paste never reaches a cell (the table's paste
-  handler takes it, N2-F1 below); typed text and new cells are sanitized
+  handler takes it, N2-F1 below; since record 32 one line of text pasted
+  into a cell is inserted there, cleaned by `pasteClean.ts`, and a list
+  item copied alone comes in as `<ul><li>x</li></ul>`, no `<div>`,
+  INSPECTED); typed text and new cells are sanitized
   since fix 27; before it a typed cell stored its raw HTML, and whether a
   list can be made in a cell has not been checked. Main wrote such markup
   out as text. If wanted: inside a list item, end the item's paragraph at
@@ -1077,6 +1085,83 @@ evidence label of each.
   acts): a scripted scenario that changes a chart poster's size and
   prints at once must wait for the redraw.
 
+### Queued by record 32 (pasting into a table and into text, 2026-10-10)
+
+Record `docs/fixes/32-table-paste.md` section 10 has the detail and the
+evidence label of each.
+
+- **A stored table cell is drawn as stored HTML** (security hardening,
+  older than record 32; the lead's and the owner's call). The cell writes
+  its stored value into the page as it is (`TableCellEditor.tsx` `asIs`;
+  text blocks are drawn through `sanitizeHtml`). Before record 32 a paste
+  stored a cell's text as markup, and an `<img onerror>` pasted as text
+  ran (MEASURED in three engines, `table-paste-check.mjs` X); since, the
+  paste stores text (X 0/2 in each). A cell stored with markup before the
+  fix still runs it each time the poster opens (INSPECTED); no other path
+  in the shipped editor stores a cell's raw HTML (the importers and
+  "✨ Format table" are hidden; INSPECTED). If wanted: draw a stored cell
+  through `sanitizeTyped(value, true)`, which keeps a legacy `<div>` line
+  as a line (INSPECTED).
+- **Formatting a source sets by style is not kept on paste** (rule 3
+  keeps tags only): Google Docs' and Sheets' bold and italic are `style`
+  on a `<span>` or a `<td>`, so a bold Sheets header comes in plain
+  (MEASURED on the shape, `T-sheets-html`). If wanted: turn font-weight
+  600 or more, italic, underline and vertical-align super/sub into tags
+  before the style goes.
+- **A paste over cells selected by dragging** (out of the rule table).
+  Chromium pastes nothing (the focus is on the page); Firefox fills from
+  the cell the drag began in, WebKit from the cell it ended in, which may
+  write outside the selection (MEASURED, `table-paste-check.mjs`
+  I-drag-range: cells 3, 4, 6, 7 and 7, 8, 10, 11 for a selection of 3,
+  4, 6, 7); on main Firefox and WebKit replaced the whole table. If
+  wanted: a paste while a range is selected starts at its top-left cell.
+- **Two lines with no tab pasted into a cell make two rows** (the rule's
+  design call, the lead's default: a line break makes a grid). PowerPoint
+  keeps such text in one cell (knowledge, UNVERIFIED). The owner may
+  prefer: lines with no tab go into the cell. The review round (R1-F6,
+  INFO) adds: any tab or line break in the plain text makes a grid, also
+  for text that is not a table (a paragraph from a PDF, broken at every
+  line; a Word caption with a tab; indented code), which then overwrites
+  the cells below or to the right (one ⌘Z brings them back; MEASURED as
+  the rule says, `table-paste-check.mjs` T-lines-only, three engines); when the grid is read from the
+  plain text, the HTML's bold and italic are lost. If wanted: read a grid
+  only from an HTML table or from tab-separated rows of equal width, and
+  keep other multi-line text in the cell.
+- **One copied spreadsheet cell replaces the cell's text** (R1-F4, LOW;
+  rule 2: any HTML table is a grid). A one-cell HTML table pasted into a
+  cell replaces its text (MEASURED, `table-paste-check.mjs`
+  T-one-cell-html, three engines; one ⌘Z restores it; the reviewer's probe,
+  "Mean = " typed and then one Google Sheets cell pasted, the same,
+  UNVERIFIED by me). The table tip now says so ("a single
+  copied cell replaces that cell's text"). The owner may prefer: a one-cell
+  HTML table goes in at the caret (rule 1). PowerPoint's behaviour is
+  UNVERIFIED.
+- **A paragraph copied with a triple-click keeps its paragraph end in a
+  text block** (a trailing `<br>` from the engine's
+  `Apple-interchange-newline`; main the same; Chrome's own paste of such a
+  copy starts a new paragraph too). In a cell the line ends with no break
+  since the review round. If wanted: drop it in text blocks too.
+- **The spaces that start a pasted line after a line break are dropped**
+  (an Enter line indented with two spaces, copied from one block to
+  another; MEASURED in three engines on record 32's tree and on main,
+  `table-paste-check.mjs` F-text-inner-copy, information): the paste path
+  drops leading whitespace after a boundary (`sanitizeHtml`), so a pasted
+  indent is lost while a typed one is kept (fix 27, E9). If wanted: keep a
+  line's leading spaces when the plain text shows them.
+- **Chromium and WebKit copy a space beside a styled run as `&nbsp;`**
+  (stored "ZQTB&nbsp;<b>bold</b>&nbsp;value"; main the same), so the words
+  cannot wrap there. If wanted: turn an `&nbsp;` between words into a space
+  on paste.
+- **Plain tab-separated text with a quoted field** (a cell Excel quotes
+  because it holds a line break) is split at the line break when no HTML
+  comes with it; comma-separated text is not split into cells. Excel and
+  Sheets also put an HTML table on the clipboard, read first (knowledge,
+  UNVERIFIED).
+- **An image pasted into a cell** is left to the browser, as before: the
+  image shows in the cell but is not stored (`sanitizeTyped` drops
+  `<img>`, INSPECTED). Image paste is the next item (bounded-designs §3.3
+  B and row 3 of table A).
+
 ## LaTeX export: before it is switched back on
 
 The owner hid the LaTeX export on 2026-10-06 ("unnecessary for now"):
@@ -1275,6 +1360,10 @@ Found while fixing one item, belonging to another (details in the record named):
   claims audit). The Guidelines panel's Tables row and the table block's
   tips already say the paste replaces the whole table (the claims audit,
   `f153cf7`; round 3 of the restarted review, N3-F1).
+  **Built as record 32** (`docs/fixes/32-table-paste.md`, the lead's rule
+  table): one line of text goes into the cell at the caret; a grid fills
+  the table from the focused cell and grows it, never dropping a cell; the
+  three in-app sentences rewritten to say so.
 
 ## Checked and retired
 
@@ -1304,3 +1393,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 29 | `feat/mvp-simplify` | implemented; its one review round (a simple feature: the browser, through the user's entry points, on `simplify-frozen-1`) answered: 7 findings (2 LOW, 5 INFO); Preview no longer draws the grey prompts (R1-01: the rule is scoped to the canvas, T13), two editor sentences corrected (R1-06), Save PDF printing the editor's older hints of empty authors, image and references blocks queued above (R1-02), the rest recorded — `docs/fixes/29-mvp-simplify.md`; the owner's decisions D3 (hide import and the `.postr` backup) and D4 (the whole hide list) of 2026-10-07, charts kept (D1): three switches in `config/features.ts` (`IMPORT_ENABLED`, `ADJUSTMENTS_ENABLED`, `EDITOR_EXTRAS_ENABLED`) hide 44 controls counted where a user meets them, the tour's import and guidelines steps and the profile's two rows, with stored adjustments still drawn; new posters and new blocks start empty with grey prompts that never print or export (bounded-designs.md §5.2 items 1 and 4); Issues lists empty blocks, template text and the sample table, older posters included; the public copy (EN and FR) names no hidden control (copy inventory); queued above: "Queued by record 29" |
 | 28 | `feat/auto-arrange` | implemented, review round 1 done and corrected (a layout aid: one round, the browser through the user's entry points; 10 findings: B-R1 HIGH, B-R2 and B-R3 MEDIUM and B-R7 LOW corrected, the other LOW and INFO findings queued above; the refinement departs from the prototype and is for the lead and the owner to confirm) — `docs/fixes/28-auto-arrange.md`; the owner's approval of the prototype's function (2026-10-07, `docs/fixes/28-auto-arrange-lab.html`): ONE reading order (bands of wide blocks, then columns, then top to bottom) for heading, figure and table numbers in the editor, the preview and the exports, and Auto-Arrange choosing the cut points of that order into the poster's own columns and their widths for the lowest F = 1000·O + U + 8·moved + 2·Σ\|w − w̄\|, with every block measured on the sheet at its new width; no font change, one undo step, the area past the bottom margin in Issues; the preview's missing figure and table numbers fixed in passing; queued above: "Queued by record 28" |
 | 30 (item 5 + OF-08) | `fix/one-print-path` | implemented; reproduced from every entry in Chromium, Firefox and WebKit (Preview's print ran the title 0.32 to 0.33 in into the authors at 48 × 36 and 1.93 to 1.94 in at 36 × 48, a table printed up to 3.2 in shorter, a line broken differently; no top-bar button, no ⌘P), fixed, 0 of 69 print documents off by more than 0.05 in or broken differently in each engine (worst 0.001 in), 30 of 30 mutants killed; review round 1 (code review) answered: 7 findings, none above LOW; the print window's header no longer covers the poster in a narrow window and its first step names Firefox's "Save to PDF"; tests for ⌘P after a size change, while a dialog fades out and past a handler that stops keys; the popup-blocker claim corrected (Firefox's blocker measured: ⌘P's window opens); now 70 documents per engine, every claim 0 in Chromium and Firefox, WebKit one placeholder line (R1-X1, below); 35 of 35 mutants killed; review round 2 (a new angle: the build, the PDF pipeline, every size, editor states) answered: 7 findings, one MEDIUM (⌘P with the pointer resting on a selected table printed its hover "Add column" bar, a 0.3 in accent bar: the table's own controls now tagged and dropped from the copy and the thumbnail), the free PDF's credit mark back to its size (it printed 0.2 or 0.3 in under the sheet's scale), ⌘P's default prevented inside an input method's composition, the harness runs on the build; now 73 documents per engine, every claim 0 in Chromium and Firefox on the dev server, WebKit the same placeholder line; on the build the same in the three engines, BASE aside (two rules the CSS minifier rewrote, listed as known); 44 of 44 mutants killed; review round 3 (a re-check of the answers) answered: 2 LOW findings, both in the harness on the build, none in the product (the thirteen-size credit sweep measured the source there: it now prints from the build's own Save PDF; the two BASE rules still set the exit code: they now compare as equivalent, so the build run exits 0), each red before and green after, falsified by editing the build; on the build every claim 0 in Chromium and Firefox, WebKit the same placeholder line; 44 of 44 mutants killed and 2 new blind-spot mutants killed in the browser — `docs/fixes/30-one-print-path.md` (the MVP design doc §3.10: one print function behind Save PDF, the top bar's Save PDF, Preview's Print and ⌘P / Ctrl+P; the selection cleared first; `print-color-adjust: exact`; the print window holds the dialog's steps; the sheet laid out as the editor lays it out: its base styles restated, scaled by a transform instead of CSS zoom) |
+| 32 (MVP: pasting tables; fix 27's N2-F1) | `fix/table-paste` | implemented; its one review round (a simple feature: the browser, through the user's entry points, on `tablepaste-frozen-1`) done and corrected (6 findings: R1-F1, R1-F2 and R1-F3 MEDIUM corrected, each reproduced first with the committed instrument in the three engines and then 0; R1-F4 LOW, the table tip corrected to say a single copied cell replaces the cell's text, the behaviour queued for the owner; R1-F5 LOW, two docs corrected; R1-F6 INFO queued; the corrector's audit of its own correction found it lost a Shift+Enter line and a double space copied between blocks in Firefox, MEASURED, and corrected it); the correction is for the next lead pass, frozen copy `tablepaste-frozen-2` — `docs/fixes/32-table-paste.md` (bounded-designs.md §3.3 A, the lead's rule table, PowerPoint's behaviour): one line of text pasted into a table cell goes in at the caret; a grid (an HTML table from Excel, Word or Sheets, or text with tabs or line breaks) fills the table from the focused cell, across and down, growing it by rows and columns, no cell outside the pasted area changed, nothing dropped (merged cells keep the cells after them in their columns), one undo step; a paste into a text block or the title takes the poster's style (the source's colour and highlight dropped with its font and size; a style sheet's text and Google Docs' non-bold `<b>` wrapper dropped); a pasted cell's text stored as text. Reproduced from the user's entry with a real ⌘C/⌘V in Chromium, Firefox and WebKit (`scripts/table-paste-check.mjs`, on main: rule 1 broken in 3 of 3 scenarios, the table replaced by the grid in 12 of 12 grid scenarios, wrong in 11 (the twelfth covers the whole table from its first cell), an `<img onerror>` pasted as text ran in 2 of 2, colour or a style sheet's text kept in 4 of 5 text pastes; after: 0 in each engine, and on the production build in Chromium); after the review round: Word's own bold kept (`<b style='mso-bidi-font-weight:normal'>`: the not-bold check read any "font-weight: normal" in the style, so Word's bold was dropped in text blocks, a regression against main, and in cells), blank lines at the end of a paste no rows and rule 1's line ending with no line break (a paragraph Chromium copied with a triple-click emptied the cell below; WebKit added a blank line), a line wrapped in the clipboard's HTML source one line in cells, text blocks and the title, while text copied between blocks keeps its line breaks and spaces; the instrument's 30 scenarios 0 in each engine and on the production build in Chromium; 54 of 54 mutants killed; the three in-app sentences about pasting tables say what the paste does; queued above: "Queued by record 32" |

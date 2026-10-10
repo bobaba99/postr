@@ -112,7 +112,7 @@ Owner direction (Gavin, 2026-10-07): copy PowerPoint's controls and layout so th
 | SmartArt, Icons, WordArt, Video, Audio, Stock images | Skip | Customisation, or not relevant to posters. |
 | Symbol / Equation | Optional | Greek letters matter. Full equations are Later. |
 
-**Postr today**: `INSPECTED packages/shared/src/types/poster.ts:9-18` defines the block types: title, authors, heading, text, image, logo, table, references, chart. `INSPECTED poster/GuidelinesPanel.tsx:944-947` says Tab moves to the next cell, and that pasting rows from Excel or Word replaces the whole table. `INSPECTED poster/blocks.tsx:628-638` shows Tab in the last cell does nothing (no new row), which fits the Later decision. I did not inspect pasting an image from the clipboard onto the canvas (UNVERIFIED).
+**Postr today**: `INSPECTED packages/shared/src/types/poster.ts:9-18` defines the block types: title, authors, heading, text, image, logo, table, references, chart. `INSPECTED poster/GuidelinesPanel.tsx:945-951` says Tab moves to the next cell, and that rows pasted from Excel or Word fill the table from the cell pasted into, the table growing to fit (fix 32, `docs/fixes/32-table-paste.md`; before it, the panel said the paste replaced the whole table, which the code did). `INSPECTED poster/blocks.tsx:628-638` shows Tab in the last cell does nothing (no new row), which fits the Later decision. I did not inspect pasting an image from the clipboard onto the canvas (UNVERIFIED).
 
 ---
 

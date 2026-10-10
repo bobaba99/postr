@@ -1,0 +1,551 @@
+{
+  "tests": [
+    "src/poster/__tests__/tablePaste.test.tsx",
+    "src/poster/__tests__/tablePasteRules.test.ts",
+    "src/poster/__tests__/tableOps.test.ts",
+    "src/poster/__tests__/enterSaved.test.tsx",
+    "src/poster/__tests__/undoTextSteps.test.tsx"
+  ],
+  "mutants": {
+    "whole-table-replaced": {
+      "undoes": "rule 2 — the grid fills the table from the focused cell (before: it replaced the whole table)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "onPasteGrid={(rows) => commit(pasteGrid(data, r, c, rows))}",
+          "onPasteGrid={(rows) => commit(pasteGrid({ ...data, rows: 0, cols: 0, cells: [] }, 0, 0, rows))}"
+        ]
+      ]
+    },
+    "grid-not-committed": {
+      "undoes": "rule 2 — the grid reaches the table",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "onPasteGrid={(rows) => commit(pasteGrid(data, r, c, rows))}",
+          "onPasteGrid={() => {}}"
+        ]
+      ]
+    },
+    "grid-at-origin": {
+      "undoes": "rule 2 — the grid starts at the focused cell",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "commit(pasteGrid(data, r, c, rows))",
+          "commit(pasteGrid(data, 0, 0, rows))"
+        ]
+      ]
+    },
+    "cell-handler-gone": {
+      "undoes": "rules 1 and 2 — the cell has a paste handler",
+      "edits": [
+        [
+          "src/poster/TableCellEditor.tsx",
+          "      onPaste={onPaste}\n",
+          ""
+        ]
+      ]
+    },
+    "image-paste-taken": {
+      "undoes": "outside the rules — a paste with no text is left to the browser",
+      "edits": [
+        [
+          "src/poster/TableCellEditor.tsx",
+          "    if (!paste) return;",
+          "    if (!paste) { e.preventDefault(); return; }"
+        ]
+      ]
+    },
+    "one-line-is-grid": {
+      "undoes": "rule 1 — one line of text goes in at the caret, not over the cell",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "  if (lines.length > 1 || lines[0]!.includes('\\t')) {",
+          "  if (true) {"
+        ]
+      ]
+    },
+    "final-newline-row": {
+      "undoes": "rule 1 / 2 — a final line break does not make a row",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "  while (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();\n",
+          ""
+        ]
+      ]
+    },
+    "crlf-kept": {
+      "undoes": "rule 2 — \\r\\n and \\r end a line",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "const lines = text.split(/\\r\\n|\\r|\\n/);",
+          "const lines = text.split('\\n');"
+        ]
+      ]
+    },
+    "blank-lines-dropped": {
+      "undoes": "rule 2 — an empty line is a row (nothing dropped)",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "const lines = text.split(/\\r\\n|\\r|\\n/);",
+          "const lines = text.split(/\\r\\n|\\r|\\n/).filter((l) => l.trim());"
+        ]
+      ]
+    },
+    "tsv-unescaped": {
+      "undoes": "rule 2 — a grid's plain text is stored as text, not markup",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "lines.map((l) => l.split('\\t').map(escapeText))",
+          "lines.map((l) => l.split('\\t'))"
+        ]
+      ]
+    },
+    "no-grow-rows": {
+      "undoes": "rule 2 — the table grows by rows",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "const nextRows = Math.max(data.rows, r0 + height);",
+          "const nextRows = data.rows;"
+        ]
+      ]
+    },
+    "no-grow-cols": {
+      "undoes": "rule 2 — the table grows by columns",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "const nextCols = Math.max(data.cols, c0 + width);",
+          "const nextCols = data.cols;"
+        ]
+      ]
+    },
+    "outside-cleared": {
+      "undoes": "rule 2 — no cell outside the pasted area changes",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "cells.push(pasted ? rows[r - r0]![c - c0] ?? '' : old);",
+          "cells.push(pasted ? rows[r - r0]![c - c0] ?? '' : '');"
+        ]
+      ]
+    },
+    "widths-reset-always": {
+      "undoes": "rule 2 — column widths kept when no column is added",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "colWidths: nextCols === data.cols ? data.colWidths : null,",
+          "colWidths: null,"
+        ]
+      ]
+    },
+    "colspan-ignored": {
+      "undoes": "rule 2 — a merged cell keeps the cells after it in their columns (across)",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "const across = Math.max(1, cell.colSpan);",
+          "const across = 1;"
+        ]
+      ]
+    },
+    "rowspan-ignored": {
+      "undoes": "rule 2 — a merged cell keeps the cells after it in their columns (down)",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "const down = Math.max(1, Math.min(cell.rowSpan || rows.length - i, rows.length - i));",
+          "const down = 1;"
+        ]
+      ]
+    },
+    "rowspan-unbounded": {
+      "undoes": "rule 2 — a merge never grows the paste past its table",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "const down = Math.max(1, Math.min(cell.rowSpan || rows.length - i, rows.length - i));",
+          "const down = Math.max(1, cell.rowSpan || rows.length - i);"
+        ]
+      ]
+    },
+    "whitespace-kept": {
+      "undoes": "rules 1-3 — a run of source-code whitespace is one space, in a grid's cells and (since review round 1, R1-F3) in every paste",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "    if (!kept) text.data = text.data.replace(/[ \\t\\n\\r\\f]+/g, ' ');\n",
+          ""
+        ]
+      ]
+    },
+    "pre-collapsed": {
+      "undoes": "rules 1-3 — whitespace inside <pre> is kept",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "    if (e.tagName === 'PRE') return true;\n",
+          ""
+        ]
+      ]
+    },
+    "br-spaces-kept": {
+      "undoes": "rule 2 — no &nbsp; beside a cell's line break (plain spaces there are the shared line-edge rule's since review round 1: line-start-space-kept, line-end-space-kept, br-not-a-line-edge)",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "    .replace(/(?: |&nbsp;)*<br>(?: |&nbsp;)*/g, '<br>')\n",
+          ""
+        ]
+      ]
+    },
+    "cell-edges-kept": {
+      "undoes": "rule 2 — no space, &nbsp; or line break at a cell's edges (source whitespace, a trailing <br>)",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "    .replace(/^(?:\\s|&nbsp;|<br>)+|(?:\\s|&nbsp;|<br>)+$/g, '');",
+          "    ;"
+        ]
+      ]
+    },
+    "cell-textcontent": {
+      "undoes": "rule 2 — a cell keeps its tags and line breaks (before: textContent, raw)",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "function cellHtml(cell: HTMLTableCellElement): string {\n",
+          "function cellHtml(cell: HTMLTableCellElement): string {\n  return (cell.textContent ?? '').trim();\n"
+        ]
+      ]
+    },
+    "outside-text-dropped": {
+      "undoes": "rule 2 — text copied with a table is read from the plain text, not dropped",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "  if ((rest.textContent ?? '').trim() || tables.some((t) => (t.caption?.textContent ?? '').trim())) return null;",
+          "  if (tables.some((t) => (t.caption?.textContent ?? '').trim())) return null;"
+        ]
+      ]
+    },
+    "nested-rows-twice": {
+      "undoes": "rule 2 — a nested table belongs to its outer cell",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "Array.from(doc.querySelectorAll('table')).filter((t) => !t.parentElement?.closest('table'))",
+          "Array.from(doc.querySelectorAll('table'))"
+        ]
+      ]
+    },
+    "empty-table-grid": {
+      "undoes": "outside the rules — a table with no cells is no grid",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "  if (!cols) return null;\n",
+          ""
+        ]
+      ]
+    },
+    "colour-kept": {
+      "undoes": "rule 3 — the source's colour and highlight dropped (style attributes)",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "  copy.querySelectorAll('[style]').forEach((el) => el.removeAttribute('style'));\n",
+          ""
+        ]
+      ]
+    },
+    "mark-kept": {
+      "undoes": "rule 3 — <mark> highlight dropped",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "  copy.querySelectorAll('mark').forEach(unwrap);\n",
+          ""
+        ]
+      ]
+    },
+    "stylesheet-text-kept": {
+      "undoes": "rule 3 — a style sheet on the clipboard is not pasted as text",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "  doc.querySelectorAll(NOT_SHOWN).forEach((el) => el.remove());\n",
+          ""
+        ]
+      ]
+    },
+    "docs-bold-kept": {
+      "undoes": "rule 3 — a <b> that says it is not bold is unwrapped",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "    if (NOT_BOLD.test(styleValue(el.getAttribute('style'), 'font-weight') ?? '')) unwrap(el);",
+          "    if (false) unwrap(el);"
+        ]
+      ]
+    },
+    "bold-unwrapped-too": {
+      "undoes": "rule 3 — a <b> at 600 or 700 stays bold",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "const NOT_BOLD = /^(?:normal|lighter|[1-5]00)$/;",
+          "const NOT_BOLD = /^(?:normal|lighter|[1-7]00)$/;"
+        ]
+      ]
+    },
+    "text-path-unescaped": {
+      "undoes": "rule 3 — plain text is escaped",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "  return sanitizeHtml(escapeText(text), { blockSeparator: multiline ? '<br>' : ' ' });",
+          "  return sanitizeHtml(text, { blockSeparator: multiline ? '<br>' : ' ' });"
+        ]
+      ]
+    },
+    "rich-editor-old-path": {
+      "undoes": "rule 3 — the text block's paste goes through the cleaner",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    const clean = pastedHtml(html, text, multiline);",
+          "    const clean = sanitizeHtml(html || text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'), { blockSeparator: multiline ? '<br>' : ' ' });"
+        ]
+      ]
+    },
+    "one-line-field-breaks": {
+      "undoes": "rule 3 — a one-line field joins paragraphs with a space",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    const clean = pastedHtml(html, text, multiline);",
+          "    const clean = pastedHtml(html, text, true);"
+        ]
+      ]
+    },
+    "cell-text-uncleaned": {
+      "undoes": "rule 1 — the cell's line is cleaned as a text block's paste is",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "  const one = pastedHtml(html, lines[0]!, true).replace(/(?:<br>|\\n)+$/, '');",
+          "  const one = (html || lines[0]!).replace(/(?:<br>|\\n)+$/, '');"
+        ]
+      ]
+    },
+    "caption-dropped": {
+      "undoes": "rule 2 — a table's caption is not dropped (the plain text is read)",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "  if ((rest.textContent ?? '').trim() || tables.some((t) => (t.caption?.textContent ?? '').trim())) return null;",
+          "  if ((rest.textContent ?? '').trim()) return null;"
+        ]
+      ]
+    },
+    "trailing-blank-rows": {
+      "undoes": "review round 1, R1-F2 — blank lines at the end of the plain text are not rows (only one was dropped: a paragraph Chromium copied emptied the cell below)",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "  while (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();",
+          "  if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();"
+        ]
+      ]
+    },
+    "one-line-ends-in-break": {
+      "undoes": "review round 1, R1-F2 — rule 1's one line ends with no line break (an engine's interchange <br> gave the cell a blank line in WebKit)",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "  const one = pastedHtml(html, lines[0]!, true).replace(/(?:<br>|\\n)+$/, '');",
+          "  const one = pastedHtml(html, lines[0]!, true).replace(/(?:\\n)+$/, '');"
+        ]
+      ]
+    },
+    "style-prop-substring": {
+      "undoes": "review round 1, R1-F1 — a style property is read by its whole name (Word's mso-bidi-font-weight:normal is not font-weight: Word's bold was dropped)",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "    if (at > 0 && rule.slice(0, at).trim().toLowerCase() === prop) {",
+          "    if (at > 0 && rule.slice(0, at).trim().toLowerCase().endsWith(prop)) {"
+        ]
+      ]
+    },
+    "style-first-declaration": {
+      "undoes": "rule 3 — a style's last declaration of a property is the one that holds",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "    if (at > 0 && rule.slice(0, at).trim().toLowerCase() === prop) {",
+          "    if (value === null && at > 0 && rule.slice(0, at).trim().toLowerCase() === prop) {"
+        ]
+      ]
+    },
+    "important-not-read": {
+      "undoes": "rule 3 — a weight marked !important is still read",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "      value = rule.slice(at + 1).replace(/!\\s*important\\s*$/i, '').trim().toLowerCase();",
+          "      value = rule.slice(at + 1).trim().toLowerCase();"
+        ]
+      ]
+    },
+    "inline-white-space-ignored": {
+      "undoes": "review round 1, R1-F3 — whitespace a source keeps by its style (Google Docs' white-space: pre-wrap) is kept",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "    if (ws) return ws !== 'normal' && ws !== 'nowrap';\n",
+          ""
+        ]
+      ]
+    },
+    "nowrap-kept": {
+      "undoes": "review round 1, R1-F3 — white-space: nowrap collapses whitespace as normal does",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "    if (ws) return ws !== 'normal' && ws !== 'nowrap';",
+          "    if (ws) return ws !== 'normal';"
+        ]
+      ]
+    },
+    "line-start-space-kept": {
+      "undoes": "review round 1, R1-F3 — no source space at a line's start (beside a block or a <br>)",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "  trim(texts, (s) => s.replace(/^ /, ''));\n",
+          ""
+        ]
+      ]
+    },
+    "line-end-space-kept": {
+      "undoes": "review round 1, R1-F3 — no source space at a line's end",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "  trim([...texts].reverse(), (s) => s.replace(/ $/, ''));\n",
+          ""
+        ]
+      ]
+    },
+    "br-not-a-line-edge": {
+      "undoes": "review round 1, R1-F3 — a <br> ends a line: the space beside it is not drawn",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "|FIGCAPTION|BR)$/;",
+          "|FIGCAPTION)$/;"
+        ]
+      ]
+    },
+    "kept-whitespace-trimmed": {
+      "undoes": "review round 1, R1-F3 — kept whitespace is kept at a line's edges too",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "      if (!t.kept && atEdge) t.node.data = cut(t.node.data);",
+          "      if (atEdge) t.node.data = cut(t.node.data);"
+        ]
+      ]
+    },
+    "plain-text-whitespace-ignored": {
+      "undoes": "the corrector's audit — whitespace the plain text shows as written is kept (Firefox's copy of a field's own text is the bare text: a Shift+Enter line and a double space were lost)",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "  if (!written || !byLines(text).includes(written)) collapseSourceWhitespace(doc.body);",
+          "  collapseSourceWhitespace(doc.body);"
+        ]
+      ]
+    },
+    "written-text-no-line-ends": {
+      "undoes": "the corrector's audit — a <br> or a block's edge is a line end when the HTML's text is compared with the plain text (an Enter line's double space kept)",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "        const lineEnd = LINE_EDGE.test((child as Element).tagName) ? '\\n' : '';",
+          "        const lineEnd = '';"
+        ]
+      ]
+    },
+    "blank-lines-compared": {
+      "undoes": "the corrector's audit — blank lines are not compared (Firefox wraps each line of a field in its own block)",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "const byLines = (s: string) => s.replace(/\\r\\n?|\\t/g, '\\n').replace(/\\n+/g, '\\n').trim();",
+          "const byLines = (s: string) => s.replace(/\\r\\n?|\\t/g, '\\n').trim();"
+        ]
+      ]
+    },
+    "crlf-plain-not-read": {
+      "undoes": "the corrector's audit — the plain text's \\r\\n line ends are line ends",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "const byLines = (s: string) => s.replace(/\\r\\n?|\\t/g, '\\n').replace(/\\n+/g, '\\n').trim();",
+          "const byLines = (s: string) => s.replace(/\\t/g, '\\n').replace(/\\n+/g, '\\n').trim();"
+        ]
+      ]
+    },
+    "grid-ignores-plain-text": {
+      "undoes": "the corrector's audit — the grid path reads whitespace with the plain text too",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "  const doc = parsePasted(html, text);",
+          "  const doc = parsePasted(html);"
+        ]
+      ]
+    },
+    "one-line-ends-in-newline": {
+      "undoes": "the corrector's audit — rule 1's one line ends with no newline either (an internal copy keeps its whitespace, a trailing newline too)",
+      "edits": [
+        [
+          "src/poster/tablePaste.ts",
+          "  const one = pastedHtml(html, lines[0]!, true).replace(/(?:<br>|\\n)+$/, '');",
+          "  const one = pastedHtml(html, lines[0]!, true).replace(/(?:<br>)+$/, '');"
+        ]
+      ]
+    },
+    "text-path-ignores-plain-text": {
+      "undoes": "the corrector's audit — a text block's paste reads whitespace with the plain text",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "  if (html) return cleanPastedHtml(html, multiline, text);",
+          "  if (html) return cleanPastedHtml(html, multiline);"
+        ]
+      ]
+    },
+    "tab-not-a-cell-break": {
+      "undoes": "the corrector's audit — a tab between cells in the plain text compares as a line end (a table copied from cells drawn pre-wrap keeps its spaces)",
+      "edits": [
+        [
+          "src/poster/pasteClean.ts",
+          "const byLines = (s: string) => s.replace(/\\r\\n?|\\t/g, '\\n').replace(/\\n+/g, '\\n').trim();",
+          "const byLines = (s: string) => s.replace(/\\r\\n?/g, '\\n').replace(/\\n+/g, '\\n').trim();"
+        ]
+      ]
+    }
+  }
+}
