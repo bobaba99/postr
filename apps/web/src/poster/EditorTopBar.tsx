@@ -19,12 +19,20 @@
  * and §3.10; record docs/fixes/30-one-print-path.md): the editor's one
  * print function, the same as the Export tab's "⎙ Save PDF", Preview's
  * Print / Save PDF and ⌘P / Ctrl+P.
+ *
+ * Between them, beside Redo, [A−] Body 36 pt [A+] (`TextSizeControl`; the
+ * MVP design doc §3.7, record docs/fixes/33-text-size.md): the text size of
+ * the whole poster.
  */
-import { HistoryButtons } from './HistoryButtons';
+import { HISTORY_GROUP_WIDTH, HistoryButtons } from './HistoryButtons';
+import { TextSizeControl } from './TextSizeControl';
 import type { HistoryDirection, HistoryRunOptions } from './editorHistory';
 
 /** The bar's height, in px. The sidebar's Show button is centred in it. */
 export const TOP_BAR_HEIGHT = 44;
+
+/** The space between the History group and the text-size group, in px. */
+const TEXT_SIZE_GAP = 8;
 
 const MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
@@ -52,6 +60,8 @@ export function EditorTopBar({
       {/* Clear of the sidebar's Show button (fixed, 16–52 px from the
           left) when the sidebar is hidden. */}
       <HistoryButtons left={sidebarOpen ? 12 : 64} onRun={onRun} />
+      {/* 8 px after the History group, wherever it sits. */}
+      <TextSizeControl left={(sidebarOpen ? 12 : 64) + HISTORY_GROUP_WIDTH + TEXT_SIZE_GAP} />
       <button
         type="button"
         data-postr-topbar-print

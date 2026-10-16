@@ -2974,8 +2974,10 @@ function TextLevelNote({ type, styleLevel }: { type: Block['type']; styleLevel: 
     <div style={{ fontSize: 14, color: '#8a8a95', padding: '16px 0', lineHeight: 1.5 }}>
       <div style={{ color: '#c8cad0', fontWeight: 600 }}>{line}</div>
       <div style={{ marginTop: 6 }}>
-        Type on the poster to edit this block. Change the size in the{' '}
-        <span style={{ color: '#c8b6ff' }}>Style</span> tab, under Typography.
+        Type on the poster to edit this block. A− / A+ in the top bar change
+        the size of every text level together (title, headings, authors and
+        body); the <span style={{ color: '#c8b6ff' }}>Style</span> tab, under
+        Typography, changes one level.
       </div>
     </div>
   );

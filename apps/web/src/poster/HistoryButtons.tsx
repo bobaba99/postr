@@ -22,14 +22,40 @@ import type { HistoryDirection, HistoryRunOptions } from './editorHistory';
 
 const MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
-function button(enabled: boolean): CSSProperties {
+/** A button's side, the gap between buttons, the group's padding and border (px). */
+export const TOP_BAR_BUTTON = 28;
+export const TOP_BAR_GROUP_GAP = 2;
+export const TOP_BAR_GROUP_PAD = 3;
+export const TOP_BAR_GROUP_BORDER = 1;
+/** The History group's width: two buttons, the gap between them, its padding and border. */
+export const HISTORY_GROUP_WIDTH = 2 * TOP_BAR_BUTTON + TOP_BAR_GROUP_GAP + 2 * TOP_BAR_GROUP_PAD + 2 * TOP_BAR_GROUP_BORDER;
+
+/**
+ * A top bar group's box (the History group, and the text-size group beside
+ * it, TextSizeControl.tsx): 36 px tall with its 28 px buttons, centred in the
+ * 44 px bar.
+ */
+export const topBarGroup: CSSProperties = {
+  position: 'absolute',
+  top: 4,
+  zIndex: 10,
+  display: 'flex',
+  alignItems: 'center',
+  gap: TOP_BAR_GROUP_GAP,
+  padding: TOP_BAR_GROUP_PAD,
+  background: '#1a1a26ee',
+  border: `${TOP_BAR_GROUP_BORDER}px solid #2a2a3a`,
+  borderRadius: 7,
+};
+
+export function button(enabled: boolean): CSSProperties {
   return {
     all: 'unset',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 28,
-    height: 28,
+    width: TOP_BAR_BUTTON,
+    height: TOP_BAR_BUTTON,
     borderRadius: 5,
     color: enabled ? '#c8cad0' : '#4b4b5a',
     cursor: enabled ? 'pointer' : 'default',
@@ -67,20 +93,9 @@ export function HistoryButtons({ left, onRun }: { left: number; onRun: (dir: His
       role="group"
       aria-label="History"
       data-postr-history-buttons
-      style={{
-        // Centred in the 44 px bar: 36 px tall (28 px buttons, 3 px of
-        // padding and a 1 px border each side).
-        position: 'absolute',
-        top: 4,
-        left,
-        zIndex: 10,
-        display: 'flex',
-        gap: 2,
-        padding: 3,
-        background: '#1a1a26ee',
-        border: '1px solid #2a2a3a',
-        borderRadius: 7,
-      }}
+      // Centred in the 44 px bar: 36 px tall (28 px buttons, 3 px of
+      // padding and a 1 px border each side).
+      style={{ ...topBarGroup, left }}
     >
       <button
         type="button"

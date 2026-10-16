@@ -150,6 +150,13 @@ where you want the other way.
 - **One copied spreadsheet cell** (record 32, R1-F4): it replaces the text already in
   the cell (the table tip says so). The other way: insert it at the caret like typed
   text.
+- **A hand-set title over 216 pt (or heading over 100.8 pt) resets when the poster reopens**
+  (record 33 §10; older than A−/A+): a load-time check meant for very old posters replaces
+  any level above those caps with the default, so a big title typed in the Style tab, or
+  A+ pressed from a very small body, comes back smaller. It will be fixed to recognise only
+  the old defaults; listed because it changes what you see on reopen.
+- **The text-size label rounds** (record 33, R1-F4): a body of 47.9 pt reads "Body 48 pt"
+  and A+ then looks like it does nothing (it goes to 48). Kept: the label shows whole pt.
 - **An empty figure's "Figure N." and an empty heading's number** (record 31 §10): an
   empty figure prints "Figure 4." over blank space in the PDF, while the PowerPoint
   file leaves an empty figure out (so later figure numbers there skip one); an empty
