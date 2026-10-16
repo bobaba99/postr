@@ -22,6 +22,9 @@
  * selected with a triple-click on its first paragraph or as a whole, and a
  * real ⌘C serialises it. K1 then checks the trusted paste carried the
  * shape's marker in both types.
+ *
+ * Since record 34 (paste and drop on the canvas) the copy source, the
+ * paste watcher and the waits are exported for lib/canvasPasteScenarios.mjs.
  */
 import { sleep } from './editorHarness.mjs';
 import { MOD, blockOf, focusBlockEnd, textBlockIds } from './undoKit.mjs';
@@ -44,7 +47,7 @@ export const textOf = (html) => (html ?? '')
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
 
 /** Wait until `read()` returns something other than `was` (JSON), then let a following save land. */
-async function changedFrom(read, was, timeout = 8000) {
+export async function changedFrom(read, was, timeout = 8000) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeout) {
     if (JSON.stringify(read()) !== JSON.stringify(was)) { await sleep(900); return true; }
@@ -54,7 +57,7 @@ async function changedFrom(read, was, timeout = 8000) {
 }
 
 /** Wait until `read()` equals `want` (JSON). */
-async function becomes(read, want, timeout = 8000) {
+export async function becomes(read, want, timeout = 8000) {
   const t0 = Date.now();
   while (Date.now() - t0 < timeout) {
     if (JSON.stringify(read()) === JSON.stringify(want)) return true;
@@ -64,7 +67,7 @@ async function becomes(read, want, timeout = 8000) {
 }
 
 /** The canvas's table: per cell, its drawn text (a line break as "\n") and the drawn grid. */
-const drawnTable = (page, tableId) => page.evaluate(({ sel }) => {
+export const drawnTable = (page, tableId) => page.evaluate(({ sel }) => {
   const t = document.querySelector(`${sel} table`);
   if (!t) return null;
   const textOfEl = (el) => {
@@ -91,7 +94,7 @@ const drawnTable = (page, tableId) => page.evaluate(({ sel }) => {
  * checked. Playwright's own click is not used: it waits for the target to
  * be the hit target, and a selected block's frame can be.
  */
-async function clickToEnd(page, locator) {
+export async function clickToEnd(page, locator) {
   await locator.scrollIntoViewIfNeeded();
   const atEnd = () => page.evaluate(() => {
     const host = document.activeElement;
@@ -113,7 +116,7 @@ async function clickToEnd(page, locator) {
 }
 
 /** Record every paste that reaches the page (capture, before the app): trusted, and what it carried. */
-async function watchPastes(page) {
+export async function watchPastes(page) {
   await page.evaluate(() => {
     if (window.__zqPastes) return;
     window.__zqPastes = [];
@@ -133,7 +136,7 @@ async function watchPastes(page) {
  * harness adds (its copy event writes the payload), the way another
  * application's copy would leave it. Returns whether the copy event ran.
  */
-async function copyToClipboard(page, payload) {
+export async function copyToClipboard(page, payload) {
   await page.evaluate((p) => {
     document.activeElement?.blur?.();
     let src = document.getElementById('zq-copy-source');

@@ -17,13 +17,23 @@
  *     refresh, postDelayMs, and `patchDelays`: a queue of delays, one per
  *     PATCH in arrival order, each held before the row is written, so an
  *     earlier save can land after a later one, as two requests in flight
- *     can on the real network; fix 27);
+ *     can on the real network; fix 27; and since record 34 `uploadDelayMs`,
+ *     each poster-assets upload held that long before it is answered);
  *   - the plan the users row reports (`newState({ plan: 'term' })` for a
  *     term holder, who may export to PowerPoint; default 'free'; fix 27);
  *   - the poster_versions table (fix 27): owner-only reads, inserts and
  *     deletes, and the database's cap of 30 versions per poster
  *     (20260702000000_poster_versions.sql: the 31st insert raises P0001,
- *     which PostgREST answers with 400).
+ *     which PostgREST answers with 400);
+ *   - the poster-assets storage bucket (record 34, paste and drop of
+ *     images): an upload (storage-js's multipart POST, `x-upsert`) is kept
+ *     by path in `state.objects` and logged in `state.uploads`; the
+ *     bucket's row-level security as 20260408000500_storage.sql defines
+ *     it (a session writes and signs only under its own user id's
+ *     folder); `createSignedUrl` answers a token that names the path and
+ *     a counter, so every signing is a new URL, and the signed URL serves
+ *     the path's bytes as they are now, with Supabase's default
+ *     `cache-control: max-age=3600`.
  *
  * Nothing in the app is stubbed; only the network is faked. Use it with
  * editorHarness.mjs's startHarness (the app's own Vite server + a browser).
@@ -55,8 +65,21 @@ export function newState({ anonymous = true, expiresIn = 3600, plan = 'free' } =
     deleted: new Set(),
     rows: [], // posters table
     versions: [], // poster_versions table
-    faults: { patch: 'ok', load: 'ok', post: 'ok', signup: 'ok', refresh: 'ok', postDelayMs: 0, patchDelays: [] },
+    faults: { patch: 'ok', load: 'ok', post: 'ok', signup: 'ok', refresh: 'ok', postDelayMs: 0, patchDelays: [], uploadDelayMs: 0 },
     log: [], // every posters/auth request: {t, method, path, status, sub, keys}
+    objects: new Map(), // poster-assets: path -> { bytes, type, t }
+    uploads: [], // every upload to poster-assets: {t, path, sub, status, size, type, upsert, fromHarness}
+    // The files a harness handed the page (pasted, dropped), by name. The
+    // browser's DevTools leaves some upload bodies out of a request's
+    // postData (MEASURED, record 34: Chromium a file dropped from disk,
+    // WebKit every multipart upload), so such an upload arrives with an
+    // empty file part; the fake then keeps the harness's own copy of the
+    // file (by its name, else the one handed last) and logs `fromHarness`.
+    handedFiles: new Map(),
+    // The file handed last: the copy kept when the page names its file
+    // otherwise (an engine's clipboard file is "image.png").
+    handedLast: null,
+    signs: [], // every createSignedUrl: {t, path, sub, status}
     signups: [],
     aborted: [], errors: [], console: [],
   };
@@ -125,6 +148,36 @@ function applyFilters(rows, url) {
 }
 
 /**
+ * The file part of a multipart body (storage-js puts a Blob in a FormData
+ * under the name "" beside `cacheControl`): its bytes and type; a body that
+ * is not multipart is the file itself. Null when there is no file part.
+ */
+export function multipartFile(body, contentType) {
+  const m = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  if (!m) return body.length ? { bytes: body, type: contentType.split(';')[0] || null } : null;
+  const boundary = Buffer.from(`--${m[1] ?? m[2]}`);
+  let at = body.indexOf(boundary);
+  while (at >= 0) {
+    const start = at + boundary.length;
+    const next = body.indexOf(boundary, start);
+    if (next < 0) break;
+    const part = body.subarray(start, next);
+    const head = part.indexOf('\r\n\r\n');
+    if (head >= 0) {
+      const headers = part.subarray(0, head).toString('utf8');
+      if (/filename=/i.test(headers)) {
+        const type = /content-type:\s*([^\r\n;]+)/i.exec(headers)?.[1]?.trim() ?? null;
+        const filename = /filename="([^"]*)"/i.exec(headers)?.[1] ?? null;
+        // The part's bytes end before the CRLF that precedes the next boundary.
+        return { bytes: Buffer.from(part.subarray(head + 4, part.length - 2)), type, filename };
+      }
+    }
+    at = next;
+  }
+  return null;
+}
+
+/**
  * Install the fake backend on a browser context. `base` is the dev server.
  * `onboarding` false marks the tour done (as the frozen harness does).
  */
@@ -176,6 +229,61 @@ export async function installGuestBackend(context, state, base, { tour = false }
       return json(route, wantsObject ? row : [row], 201);
     }
     return json(route, {}, 405);
+  };
+
+  // poster-assets (record 34): uploads by path, signed URLs, the bytes
+  // served back. Row-level security as 20260408000500_storage.sql: the
+  // first folder of the path is the session's user id.
+  let signClock = 0;
+  const storageRoute = async (route, req, url, method, sub) => {
+    const p = decodeURIComponent(url.pathname);
+    const BUCKET = '/storage/v1/object/poster-assets/';
+    const SIGN = '/storage/v1/object/sign/poster-assets/';
+    const ownFolder = (path) => !!sub && path.split('/')[0] === sub;
+    if ((method === 'POST' || method === 'PUT') && p.startsWith(BUCKET)) {
+      const path = p.slice(BUCKET.length);
+      const upsert = method === 'PUT' || req.headers()['x-upsert'] === 'true';
+      const file = multipartFile(req.postDataBuffer() ?? Buffer.alloc(0), req.headers()['content-type'] ?? '');
+      const handed = file && file.bytes.length === 0
+        ? state.handedFiles.get(file.filename) ?? state.handedLast
+        : null;
+      if (handed) file.bytes = handed;
+      const entry = { t: Date.now(), path, sub, size: file?.bytes.length ?? 0, type: file?.type ?? null, upsert, fromHarness: !!handed };
+      if (!ownFolder(path)) {
+        state.uploads.push({ ...entry, status: 403 });
+        return json(route, { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' }, 403);
+      }
+      // A slow upload (record 34): the editor's state while it is out.
+      if (state.faults.uploadDelayMs) await sleep(state.faults.uploadDelayMs);
+      if (state.objects.has(path) && !upsert) {
+        state.uploads.push({ ...entry, status: 409 });
+        return json(route, { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' }, 409);
+      }
+      if (!file) {
+        state.uploads.push({ ...entry, status: 400 });
+        return json(route, { statusCode: '400', error: 'Bad Request', message: 'no file in the body' }, 400);
+      }
+      state.objects.set(path, { bytes: file.bytes, type: file.type, t: Date.now() });
+      state.uploads.push({ ...entry, status: 200 });
+      return json(route, { Key: `poster-assets/${path}`, Id: randomUUID() });
+    }
+    if (method === 'POST' && p.startsWith(SIGN)) {
+      const path = p.slice(SIGN.length);
+      if (!ownFolder(path) || !state.objects.has(path)) {
+        state.signs.push({ t: Date.now(), path, sub, status: 400 });
+        return json(route, { statusCode: '404', error: 'not_found', message: 'Object not found' }, 400);
+      }
+      signClock += 1;
+      state.signs.push({ t: Date.now(), path, sub, status: 200 });
+      return json(route, { signedURL: `/object/sign/poster-assets/${path}?token=${b64url({ url: path, n: signClock })}` });
+    }
+    if (method === 'GET' && p.startsWith(SIGN)) {
+      const path = p.slice(SIGN.length);
+      const obj = state.objects.get(path);
+      if (!obj) return json(route, { statusCode: '404', error: 'not_found', message: 'Object not found' }, 400);
+      return route.fulfill({ status: 200, contentType: obj.type || 'application/octet-stream', headers: { ...cors, 'cache-control': 'max-age=3600' }, body: obj.bytes });
+    }
+    return json(route, { error: 'not found' }, 404);
   };
 
   await context.route('**/*', (route) => {
@@ -301,7 +409,7 @@ export async function installGuestBackend(context, state, base, { tour = false }
       if (method === 'GET') return json(route, wantsObject ? null : [], wantsObject ? 406 : 200);
       return json(route, wantsObject ? {} : [], 201);
     }
-    if (p.startsWith('/storage/v1/')) return json(route, { error: 'not found' }, 404);
+    if (p.startsWith('/storage/v1/')) return storageRoute(route, req, url, method, sub);
     return json(route, {});
   });
   await context.route('http://localhost:3000/**', (route) => json(route, { success: false, error: 'mock' }, 404));
