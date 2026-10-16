@@ -9,7 +9,8 @@ import { supabase } from '@/lib/supabase';
 
 const BUCKET = 'poster-assets';
 const SIGNED_URL_TTL = 3600; // 1 hour
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
+/** The largest image file a poster takes (before encoding): the image block's upload, a paste, a drop (poster/imageFile.ts). */
+export const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
 
 /** Prefix that marks an imageSrc as a Storage path (not base64/URL). */
 export const STORAGE_PREFIX = 'storage://';

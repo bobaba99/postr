@@ -7,7 +7,7 @@
  * | HTML with a `<table>` (Excel, Word, Google Sheets), and no other text | A grid: the table's cells |
  * | Plain text with a tab or a line break (blank lines at its end aside) | A grid: a row per line, a cell per tab |
  * | Any other text | Into the cell at the caret, cleaned as a text block's paste is, with no line break at its end |
- * | No text (an image alone) | The browser's own paste, as before (image paste is a later item) |
+ * | No text (an image alone) | The browser's own paste, as before (an image into a cell is out of record 34's scope too) |
  *
  * A grid fills the table from the focused cell, left to right and down; the
  * table grows by rows and columns to hold it; no cell outside the pasted
@@ -59,8 +59,12 @@ function cellHtml(cell: HTMLTableCellElement): string {
     .replace(/^(?:\s|&nbsp;|<br>)+|(?:\s|&nbsp;|<br>)+$/g, '');
 }
 
-/** The grid of the HTML's tables, row by row; null when it has none, or text outside them. */
-function htmlGrid(html: string, text: string): string[][] | null {
+/**
+ * The grid of the HTML's tables, row by row; null when it has none, or text
+ * outside them. Also a paste on the canvas's order 2 (canvasPaste.ts, record
+ * 34): a new table block filled the same way.
+ */
+export function htmlTableGrid(html: string, text: string): string[][] | null {
   if (!/<table[\s>]/i.test(html)) return null;
   // Its whitespace read once with the cells' ancestors in place (a table's
   // own white-space style reaches its cells); a style sheet gone.
@@ -100,7 +104,7 @@ function htmlGrid(html: string, text: string): string[][] | null {
 
 /** What a paste into a cell is, by the rule table above; null when it holds no text. */
 export function readCellPaste(html: string, text: string): CellPaste | null {
-  const fromHtml = html ? htmlGrid(html, text) : null;
+  const fromHtml = html ? htmlTableGrid(html, text) : null;
   if (fromHtml) return { kind: 'grid', rows: fromHtml };
   const lines = linesOf(text);
   if (lines.length > 1 || lines[0]!.includes('\t')) {

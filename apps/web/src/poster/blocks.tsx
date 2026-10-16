@@ -47,7 +47,8 @@ import { BUTTON_MARK, HIT, ROTATE_GAP, ROW_GAP, ROW_LIFT, UNZOOM, UNZOOM_X, UNZO
 import { useSelectionRoom } from './selectionRoom';
 import { holdDragStep } from './dragStep';
 import { useStorageUrl } from '@/hooks/useStorageUrl';
-import { isStoragePath, uploadPosterImage } from '@/data/posterImages';
+import { isStoragePath } from '@/data/posterImages';
+import { IMAGE_FILE_EVENT, fittedHeight, imageFileProblem, readImageSize, storeImageFile } from './imageFile';
 import { ChartBlock } from '@/charts/ChartBlock';
 
 /** 1×1 transparent GIF. Used while a `storage://` path is still
@@ -75,67 +76,11 @@ interface LogoBlockProps {
   onUpdate: (patch: Partial<Block>) => void;
 }
 
-// =========================================================================
-// readImageFile — validated image upload helper
-// =========================================================================
-//
-// Called by both LogoBlock and ImageBlock before handing a File off
-// to FileReader. Rejects:
-//
-//   1. Anything whose MIME type doesn't start with `image/` — users
-//      occasionally drop PDFs or zip files here and the previous
-//      implementation happily stuffed them into the block as raw
-//      base64, then the `<img src>` went blank on load with no
-//      feedback.
-//   2. Files larger than MAX_BYTES (10 MB). Base64 encoding inflates
-//      ~33 %, so a 15 MB PNG becomes a 20 MB string in the poster
-//      JSONB column. Supabase enforces its own row-size limits and
-//      editors grind to a halt measuring +20 MB strings on every
-//      autosave.
-//
-// On success, calls `onLoad(dataUrl)`. On failure, pops a browser
-// alert with a human-readable reason. `alert()` is blunt but
-// matches the app's existing error-feedback pattern for other
-// file-level errors (e.g. parseBibtex) and avoids adding a new
-// toast system just for this.
-
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB pre-encoding
-
 /** Clamp a percentage to 0..49 — the four crop edges sum on each
  *  axis, and any pair summing to ≥ 100 would invert the clip. */
 function clamp(pct: number): number {
   if (!Number.isFinite(pct)) return 0;
   return Math.max(0, Math.min(49, pct));
-}
-
-function readImageFile(
-  file: File | undefined,
-  onLoad: (dataUrl: string) => void,
-) {
-  if (!file) return;
-  if (!file.type.startsWith('image/')) {
-    window.alert(
-      `"${file.name}" doesn't look like an image (got ${file.type || 'unknown type'}).\n\n` +
-        'Upload PNG, JPEG, GIF, WebP, or SVG instead.',
-    );
-    return;
-  }
-  if (file.size > MAX_IMAGE_BYTES) {
-    const mb = (file.size / 1024 / 1024).toFixed(1);
-    window.alert(
-      `"${file.name}" is ${mb} MB — too large.\n\n` +
-        'Images must be under 10 MB. Try compressing the PNG/JPEG in Preview (macOS) or an online tool.',
-    );
-    return;
-  }
-  const r = new FileReader();
-  r.onload = (ev) => onLoad(ev.target?.result as string);
-  r.onerror = () => {
-    window.alert(
-      `Couldn't read "${file.name}". The file may be corrupted or unreadable.`,
-    );
-  };
-  r.readAsDataURL(file);
 }
 
 export function LogoBlock({ block, onUpdate }: LogoBlockProps) {
@@ -305,6 +250,72 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
   // loads, we resize the block to match the natural aspect ratio;
   // any subsequent renders of the same src skip the fit.
   const autoFittedSrcRef = useRef<string | null>(null);
+  // The file last put into this block (record 34): drawn while it is
+  // stored (`src` undefined), then for as long as the block holds what it
+  // was stored as. Never stored itself: the poster only ever holds the
+  // stored image. Uploads overwrite the file at {block}.{ext}, so a new
+  // file of the same type has the same imageSrc as the one it replaces,
+  // whose signed address the browser may already have drawn and cached
+  // (bounded-designs §3.3 D, the next fix's); the preview shows the new
+  // one meanwhile.
+  const [preview, setPreview] = useState<{ url: string; src: string | undefined } | null>(null);
+  useEffect(() => {
+    const url = preview?.url;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [preview?.url]);
+  const latest = useRef(block);
+  latest.current = block;
+
+  /**
+   * Put `file` into this block: the upload's checks, then stored
+   * (imageFile.ts) and measured, then ONE update — the image, and the
+   * height its shape gives the block's width — so an upload, a Replace, a
+   * paste into the selected empty block and a drop on the block are each
+   * one undo step. It used to store a `blob:` preview address, then the
+   * storage path, then the fitted height: three undo steps, the first of
+   * which put back a revoked preview that draws nothing, and a file over
+   * 10 MB left that preview stored (record 34 section 4).
+   *
+   * Only the file put in last updates the block: one put in while another
+   * is still stored replaces it, and the earlier one, when it comes back,
+   * changes nothing (its preview was revoked when the later one's was
+   * drawn). It used to land too: an undo step of its own, and its preview
+   * revoked the later one's, so the block drew nothing until a reload
+   * (record 34 review, R34-1).
+   */
+  const putSeq = useRef(0);
+  const putFile = async (file: File) => {
+    const problem = imageFileProblem(file);
+    if (problem) {
+      window.alert(problem);
+      return;
+    }
+    const seq = (putSeq.current += 1);
+    const url = URL.createObjectURL(file);
+    setPreview({ url, src: undefined });
+    const [size, src] = await Promise.all([readImageSize(file), storeImageFile(file, userId, posterId, block.id)]);
+    if (seq !== putSeq.current) return;
+    if (!src) {
+      setPreview(null);
+      return;
+    }
+    onUpdate(size ? { imageSrc: src, h: fittedHeight(latest.current.w, size) } : { imageSrc: src });
+    setPreview({ url, src });
+  };
+  const putFileRef = useRef(putFile);
+  putFileRef.current = putFile;
+
+  // A file a paste or a drop hands this block (useCanvasPaste.ts).
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ blockId: string; file: File }>;
+      if (ce.detail?.blockId === block.id) void putFileRef.current(ce.detail.file);
+    };
+    window.addEventListener(IMAGE_FILE_EVENT, handler);
+    return () => window.removeEventListener(IMAGE_FILE_EVENT, handler);
+  }, [block.id]);
 
   // Listen for the floating Replace button on the BlockFrame. When
   // it dispatches `postr:replace-block` for this block id, open the
@@ -320,40 +331,13 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (userId && posterId) {
-      const previewUrl = URL.createObjectURL(file);
-      onUpdate({ imageSrc: previewUrl });
-
-      uploadPosterImage(userId, posterId, block.id, file).then((storageSrc) => {
-        URL.revokeObjectURL(previewUrl);
-        if (storageSrc) {
-          onUpdate({ imageSrc: storageSrc });
-        } else {
-          readImageFile(file, (dataUrl) => onUpdate({ imageSrc: dataUrl }));
-        }
-      });
-    } else {
-      readImageFile(file, (dataUrl) => onUpdate({ imageSrc: dataUrl }));
-    }
-
-    // Auto-size block to match image aspect ratio
-    const img = new Image();
-    img.onload = () => {
-      const aspect = img.naturalWidth / img.naturalHeight;
-      const newH = Math.round(block.w / aspect);
-      if (Math.abs(newH - block.h) > 2) {
-        onUpdate({ h: newH });
-      }
-    };
-    img.src = URL.createObjectURL(file);
-
     e.target.value = '';
+    if (file) void putFile(file);
   };
 
-  if (block.imageSrc) {
-    const displaySrc = pickImgSrc(resolvedSrc, block.imageSrc);
+  const showPreview = preview !== null && (preview.src === undefined || preview.src === block.imageSrc);
+  if (block.imageSrc || showPreview) {
+    const displaySrc = showPreview ? preview!.url : pickImgSrc(resolvedSrc, block.imageSrc);
     const crop = block.crop;
     const clipPath =
       crop &&
@@ -382,6 +366,9 @@ export function ImageBlock({ block, palette, onUpdate, userId, posterId }: Image
             // the placeholder GIF doesn't wrongly mark the block as
             // already-fitted before the real image loads.
             if (block.imageFit === 'fill') return;
+            // A file just put in: `putFile` gives the block its shape in
+            // the same update as the image (one undo step).
+            if (showPreview) return;
             const t = e.currentTarget;
             const nw = t.naturalWidth;
             const nh = t.naturalHeight;
@@ -912,6 +899,9 @@ export function TableBlock({ block, palette, fontFamily, styles, onUpdate, selec
       */}
       <div
         ref={tableContainerRef}
+        // Cells selected by dragging: a paste on the canvas waits, as with
+        // a caret in a cell (useCanvasPaste.ts; record 34 review, R34-3).
+        data-postr-cell-range={isMultiCellRange ? '' : undefined}
         style={{ position: 'relative', display: 'inline-block', width: '100%' }}
       >
       {/*
@@ -1867,6 +1857,12 @@ interface BlockFrameProps {
   /** For uploading images to Supabase Storage. */
   userId?: string;
   posterId?: string;
+  /**
+   * An image pasted with no text into this block's text (the title, a
+   * heading, a text block): the canvas places a new image block next to it
+   * (record 34; bounded-designs §3.3 table A row 3).
+   */
+  onPasteImage?: (id: string, file: File) => void;
 }
 
 export function BlockFrame(props: BlockFrameProps) {
@@ -1896,7 +1892,10 @@ export function BlockFrame(props: BlockFrameProps) {
     captionNumber,
     userId,
     posterId,
+    onPasteImage,
   } = props;
+  // Table A row 3 (record 34): an image pasted into this block's text goes to the canvas.
+  const pasteImageHere = onPasteImage ? (file: File) => onPasteImage(b.id, file) : undefined;
 
   // Block context menu state. Right-clicking a non-table block
   // pops a small menu with Duplicate / Bring Forward / Send
@@ -2291,6 +2290,7 @@ export function BlockFrame(props: BlockFrameProps) {
             multiline={false}
             stopPointerDown
             onSelectionChange={setSelectionInfo}
+            onPasteImage={pasteImageHere}
             style={{
               ...txtStyle,
               fontSize: st.title.size,
@@ -2334,6 +2334,7 @@ export function BlockFrame(props: BlockFrameProps) {
               multiline={false}
               stopPointerDown
               onSelectionChange={setSelectionInfo}
+              onPasteImage={pasteImageHere}
               style={{
                 fontSize: st.heading.size,
                 fontWeight: st.heading.weight,
@@ -2354,6 +2355,7 @@ export function BlockFrame(props: BlockFrameProps) {
             multiline
             stopPointerDown
             onSelectionChange={setSelectionInfo}
+            onPasteImage={pasteImageHere}
             placeholder={b.prompt ?? DEFAULT_PROMPTS.text}
             style={txtStyle}
           />

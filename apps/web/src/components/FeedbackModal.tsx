@@ -101,6 +101,12 @@ export function FeedbackModal() {
     >
       <div
         data-postr-modal-content data-state={state}
+        // A modal dialog, as the editor's own are: its shortcuts and a paste
+        // on its canvas wait while it is open (PosterEditor modalDialogOpen;
+        // record 34 review, R34-7: a paste behind it made a block).
+        role="dialog"
+        aria-modal="true"
+        aria-label="Send feedback"
         style={{
           width: '100%',
           maxWidth: 520,

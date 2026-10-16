@@ -48,6 +48,8 @@ import { EditorTopBar, TOP_BAR_HEIGHT } from './EditorTopBar';
 import { onHistoryButtons, runHistory, type HistoryDirection, type HistoryRunOptions } from './editorHistory';
 import { useEditorHistory } from './useEditorHistory';
 import { usePrintShortcut } from './usePrintShortcut';
+import { useCanvasPaste } from './useCanvasPaste';
+import { insertSize } from './canvasPaste';
 import { checkBounds, checkCollisions, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
@@ -1889,6 +1891,32 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     setTimeout(() => setJustInsertedId((id) => (id === newBlock.id ? null : id)), 700);
   };
 
+  // A paste on the canvas and files dropped on it (record 34,
+  // useCanvasPaste.ts): the new blocks go into the poster as it is when
+  // they are ready (an image waits for its upload), in one undo step, and
+  // are selected.
+  const commitPastedBlocks = (made: Block[]) => {
+    const latest = usePosterStore.getState().doc;
+    if (!made.length || !latest) return;
+    setBlocks([...latest.blocks, ...made]);
+    breakUndoCoalescing();
+    setSelectedIds(new Set(made.map((b) => b.id)));
+    const first = made[0]!.id;
+    setJustInsertedId(first);
+    setTimeout(() => setJustInsertedId((id) => (id === first ? null : id)), 700);
+  };
+  const canvasPaste = useCanvasPaste({
+    enabled: !readOnly && !previewMode && sidebarTab !== 'comments',
+    dialogOpen: modalDialogOpen,
+    canvasRef,
+    zoom,
+    sheet: { w: cW, h: cH },
+    selectedIds,
+    userId,
+    posterId,
+    commit: commitPastedBlocks,
+  });
+
   const addBlock = (type: Block['type']) => {
     // Logo is limited to ONE per poster. Multiple logos stack at
     // the top-center and their external handles collide (both
@@ -1903,8 +1931,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
         return;
       }
     }
-    const w = type === 'logo' ? 50 : 155;
-    const h = type === 'logo' ? 40 : type === 'heading' ? 22 : type === 'references' ? 120 : 140;
+    const { w, h } = insertSize(type);
     const { x, y } = findOpenSlot(w, h);
 
     commitNewBlock({
@@ -2759,6 +2786,8 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       <div
         ref={canvasRef}
         data-postr-canvas-outer
+        onDragOver={canvasPaste.onDragOver}
+        onDrop={canvasPaste.onDrop}
         onPointerDown={(e) => {
           // Only start rubber-band on direct clicks on the canvas/workspace
           // (not on blocks — those bubble with stopPropagation).
@@ -3218,6 +3247,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
                   captionNumber={captionNumbers[b.id]}
                   userId={userId ?? undefined}
                   posterId={posterId ?? undefined}
+                  onPasteImage={canvasPaste.pasteImageNextTo}
                 />
               ))}
               {selectedIds.size > 1 && (

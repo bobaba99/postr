@@ -4325,7 +4325,7 @@ function AddBlockPanel(props: {
   const blocks: Array<[Block['type'] | null, string, string]> = [
     ['heading', 'Heading', 'Section title with auto-numbering'],
     ['text', 'Text', 'Paragraph with slash-command symbols'],
-    ['image', 'Image', 'Figure or photo upload'],
+    ['image', 'Image', 'Figure or photo: upload it, or paste or drop it on the canvas'],
     [null, 'Chart', 'Build a figure from your data'],
     // Border presets are hidden (ADJUSTMENTS_ENABLED, record 29): a new
     // table is APA 3-line.
@@ -4387,7 +4387,7 @@ function AddBlockPanel(props: {
         <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
           Copy cells from <strong style={{ color: '#c8b6ff' }}>Word</strong>,{' '}
           <strong style={{ color: '#c8b6ff' }}>Excel</strong>, or{' '}
-          <strong style={{ color: '#c8b6ff' }}>Google Sheets</strong>, click a cell of a table block, then paste — the cells fill the table from there, and it adds the rows and columns they need. No need to retype.
+          <strong style={{ color: '#c8b6ff' }}>Google Sheets</strong>, click a cell of a table block, then paste — the cells fill the table from there, and it adds the rows and columns they need. Pasted on the canvas while no text is being edited, they make a new table. No need to retype.
         </div>
       </div>
     </div>

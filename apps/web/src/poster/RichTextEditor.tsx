@@ -59,6 +59,7 @@ import { SYMBOLS, filterSymbols } from './symbols';
 import { matchSlashAtCaret } from './slashCommand';
 import { htmlToPlainText, sanitizeHtml, sanitizeTyped } from './sanitizeHtml';
 import { pastedHtml } from './pasteClean';
+import { imageOnlyPaste } from './canvasPaste';
 import { isBlankHtml } from './startingText';
 
 export interface SelectionInfo {
@@ -92,6 +93,13 @@ export interface RichTextEditorProps {
   historyKey?: string;
   /** Which copy of the field this is; the focused copy keeps the caret after an undo. */
   surface?: EditorSurface;
+  /**
+   * An image file pasted with no text (bounded-designs §3.3 table A row 3,
+   * record 34): handed over instead of inserted, so the canvas places a new
+   * image block next to this text. Given by the canvas's blocks only; in
+   * any other field such a paste does nothing, as before.
+   */
+  onPasteImage?: (file: File) => void;
   /** data-* test hook */
   'data-testid'?: string;
 }
@@ -160,6 +168,7 @@ export function RichTextEditor({
   stopPointerDown,
   historyKey,
   surface = 'canvas',
+  onPasteImage,
   'data-testid': testId,
 }: RichTextEditorProps) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -265,6 +274,13 @@ export function RichTextEditor({
 
   const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
     e.preventDefault();
+    // An image and no text: a new image block beside this text (record 34);
+    // the text is left as it is. It used to insert nothing, without a word.
+    const image = onPasteImage ? imageOnlyPaste(e.clipboardData) : null;
+    if (image) {
+      onPasteImage!(image);
+      return;
+    }
     const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
     // Pasting from Word, Docs or a browser takes the text/html branch,
