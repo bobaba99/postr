@@ -1304,6 +1304,72 @@ evidence label of each.
   `<img>`, INSPECTED). Image paste is the next item (bounded-designs §3.3
   B and row 3 of table A).
 
+### Queued by record 33 (text size, 2026-10-10)
+
+Record `docs/fixes/33-text-size.md` section 10 has the detail and the
+evidence label of each.
+
+- **For the lead and the owner: a level raised by A+ past the editor's
+  load-time ceilings is reset on the next open.** The editor page replaces
+  a level above a ceiling (`pages/Editor.tsx` `normalizeStaleStyles`:
+  title 216, heading 100.8, authors and body 72 pt) with today's default
+  when it opens a poster, taking it for an old document's broken default.
+  A title of 170 pt and a heading of 80 pt set by hand, A+ to 48 pt (226.7
+  and 106.7 pt), saved and reopened, read 100.8 and 57.6 pt (MEASURED,
+  `text-size-check.mjs` RELOAD, Chromium, Firefox and WebKit). **The
+  ordinary path** (review round 1, R1-F2): the Style tab's Body field
+  typed to 12 pt, its own minimum, then one A+ (to 28 pt): title 235.2,
+  heading 134.4, authors 84 pt; reopened: 100.8, 57.6 and 36 pt, three
+  levels changed silently (MEASURED, RELOAD12, three engines). With the
+  default level sizes a body typed below 16 pt loses the heading this way,
+  below 14 pt the authors, below 13.07 pt the title; in general a level
+  passes when its ratio to the body after the press is above the
+  ceiling's: at 48 pt title 4.5 ×, heading 2.1 ×, authors 1.5 × the body;
+  at 28 pt 7.7 ×, 3.6 ×, 2.57 × (INSPECTED, arithmetic). Older than record
+  33: the Style tab's heading field takes up to 200 pt, and 110 pt typed
+  there is reset the same way. A bounded design would recognise the old
+  defaults by their own values (title 60 / heading 28 / body 18 units), or
+  keep A+ below the ceilings; changing what is reset on load is a decision
+  about older posters.
+- **A figure's caption and note move in 7.2 pt jumps, not with the body's
+  ratio**: they are `Math.round(body × 0.85)` poster units (`blocks.tsx`
+  `CaptionWrapper`, the PowerPoint writer the same), so at a body of
+  28 / 32 / 36 / 40 / 44 / 48 pt a caption is 21.6 / 28.8 / 28.8 / 36.0 /
+  36.0 / 43.2 pt (MEASURED, `text-size-check.mjs`'s ladder `captions`, the
+  templates and the welcome poster): A+ from 32 to 36 leaves captions
+  alone, 36 to 40 raises them 25 %. Older than record 33; changing the rule
+  resizes every existing poster's captions (an owner call).
+- **A+ to 48 pt runs some posters past the sheet**: the welcome poster has
+  11 overlaps, 6 blocks past the sheet and 449.3 in² past the bottom margin
+  at 48 pt (MEASURED, information; every one listed by Issues). Blocks keep
+  their place and size rules, as designed; Auto-Arrange or the user resolves
+  it. No change proposed.
+- **Two round trips end a few units in the last place off** (review round
+  1, R1-F3; MEASURED, `text-size-check.mjs` RTRELOAD and RTSTYLE, three
+  engines): on the default poster A+ twice, a reload, A− twice gives the
+  title 14 → 13.999999999999996 units (2 units in the last place) and the
+  heading 8 → 8.000000000000002 (1); A+ twice, a title typed in the Style
+  tab, A−, Undo twice, A− twice gives the same two misses. Invisible: the
+  fields read 101 / 58 / 36 / 36, the title is drawn at 100.8 pt, the label
+  reads "Body 36 pt". The anchor that makes A+ then A− exact is held in the
+  tab and replaced after a Style-tab edit; keeping past anchors would fix
+  the Undo path, storing the anchor in the poster (a schema change) the
+  reload. Optional.
+- **Near a size, the label and a button's title show the same number**
+  (R1-F4, an owner call; MEASURED): a body of 47.9 pt (typed with a decimal
+  in the Style tab) reads "Body 48 pt" with A+ "Increase text size (body
+  to 48 pt)", and a press, which scales every level (title 100.8 →
+  101.01 pt), leaves the label at "Body 48 pt"; 28.1 and 28.4 pt the same
+  with A−. Rule 1 says whole pt; showing one decimal off a whole point is
+  the alternative.
+- **The Style tab's size fields store whatever is typed** (found while
+  correcting R1-F1; older than record 33; MEASURED, a probe typing into the
+  Body field, Chromium): cleared (select all, Backspace) or a lone minus
+  sign, the field stores 0 and the body text disappears from the poster;
+  "5" stores 5 pt, below the field's own minimum of 12. Record 33 now
+  handles a body of 0 (A+ sets 28 pt, the label reads "Body – pt"); the
+  field itself is unchanged.
+
 ## LaTeX export: before it is switched back on
 
 The owner hid the LaTeX export on 2026-10-06 ("unnecessary for now"):
@@ -1540,3 +1606,4 @@ Found while fixing one item, belonging to another (details in the record named):
 | 30 (item 5 + OF-08) | `fix/one-print-path` | implemented; reproduced from every entry in Chromium, Firefox and WebKit (Preview's print ran the title 0.32 to 0.33 in into the authors at 48 × 36 and 1.93 to 1.94 in at 36 × 48, a table printed up to 3.2 in shorter, a line broken differently; no top-bar button, no ⌘P), fixed, 0 of 69 print documents off by more than 0.05 in or broken differently in each engine (worst 0.001 in), 30 of 30 mutants killed; review round 1 (code review) answered: 7 findings, none above LOW; the print window's header no longer covers the poster in a narrow window and its first step names Firefox's "Save to PDF"; tests for ⌘P after a size change, while a dialog fades out and past a handler that stops keys; the popup-blocker claim corrected (Firefox's blocker measured: ⌘P's window opens); now 70 documents per engine, every claim 0 in Chromium and Firefox, WebKit one placeholder line (R1-X1, below); 35 of 35 mutants killed; review round 2 (a new angle: the build, the PDF pipeline, every size, editor states) answered: 7 findings, one MEDIUM (⌘P with the pointer resting on a selected table printed its hover "Add column" bar, a 0.3 in accent bar: the table's own controls now tagged and dropped from the copy and the thumbnail), the free PDF's credit mark back to its size (it printed 0.2 or 0.3 in under the sheet's scale), ⌘P's default prevented inside an input method's composition, the harness runs on the build; now 73 documents per engine, every claim 0 in Chromium and Firefox on the dev server, WebKit the same placeholder line; on the build the same in the three engines, BASE aside (two rules the CSS minifier rewrote, listed as known); 44 of 44 mutants killed; review round 3 (a re-check of the answers) answered: 2 LOW findings, both in the harness on the build, none in the product (the thirteen-size credit sweep measured the source there: it now prints from the build's own Save PDF; the two BASE rules still set the exit code: they now compare as equivalent, so the build run exits 0), each red before and green after, falsified by editing the build; on the build every claim 0 in Chromium and Firefox, WebKit the same placeholder line; 44 of 44 mutants killed and 2 new blind-spot mutants killed in the browser — `docs/fixes/30-one-print-path.md` (the MVP design doc §3.10: one print function behind Save PDF, the top bar's Save PDF, Preview's Print and ⌘P / Ctrl+P; the selection cleared first; `print-color-adjust: exact`; the print window holds the dialog's steps; the sheet laid out as the editor lays it out: its base styles restated, scaled by a transform instead of CSS zoom) |
 | 31 (claims audit HIGH + record 30's placeholders) | `fix/exports-charts` | implemented; review round 1 (code review) answered: 6 findings, R1-F1 and R1-F2 MEDIUM (a scroll during the export moved a caption 5.000 in in the file; an export while a chart still drew left it out, called it "could not be drawn" and spent the pack's credit) and R1-F3, R1-F4 LOW (test gaps) corrected, 2 INFO noted; the export now waits for a chart still drawing (a redraw too, ≤ 10 s, past that nothing written or spent) and reads the page once; one sibling found and queued (the free PDF prints a chart still drawing as an empty box); 21 posters, every claim 0 in Chromium, Firefox and WebKit; 52 of 52 mutants killed; review round 2 (a new angle) answered: R2-F1 MEDIUM corrected (Preview opened, or the editor left, while the export waited wrote a paid file with 0 of 2 charts and spent the credit, MEASURED; the export now copies the charts only from a shown poster, waiting for Preview within the 10 s, and stops with nothing written or spent), R2-F2 and R2-F3 LOW doc claims corrected (fewer than 300 px per inch past about 186 sq in; an empty heading's number and an empty figure's "Figure N." still print, an owner question), 3 INFO noted; 25 posters, every claim 0 in Chromium, Firefox and WebKit; 59 of 59 mutants killed; round 3 due (a paid result) — `docs/fixes/31-exports-charts.md`; reproduced first: 0 pictures for 60 of 60 charts drawn in the editor, 57 of 57 captions absent, "References" written over an empty list on 6 of 6 posters, the editor's hints in 36 of 40 print documents (MEASURED, `pptx-export-check.mjs` and `print-path-check.mjs` HINT, Chromium); fixed: each chart block a picture of the editor's drawing at its box (300 px per printed inch, the poster's web font embedded), its caption and note as text boxes where the editor draws them, a chart not drawn left out with a note; the hints tagged `data-postr-editor-ui` so the one print function's copy drops them; the copy (Export tab, About page EN and FR) says charts become pictures; after: every claim 0 in Chromium, Firefox and WebKit (60 of 60 charts at their box within 0.001 in, pictures 0.00 % from the editor's svg, LibreOffice, Quick Look and the app's reader read them), 0 hints in every print document, WebKit's R1-X1 gone; 33 of 33 mutants killed, 2 blind spots guarded in the browser |
 | 32 (MVP: pasting tables; fix 27's N2-F1) | `fix/table-paste` | implemented; its one review round (a simple feature: the browser, through the user's entry points, on `tablepaste-frozen-1`) done and corrected (6 findings: R1-F1, R1-F2 and R1-F3 MEDIUM corrected, each reproduced first with the committed instrument in the three engines and then 0; R1-F4 LOW, the table tip corrected to say a single copied cell replaces the cell's text, the behaviour queued for the owner; R1-F5 LOW, two docs corrected; R1-F6 INFO queued; the corrector's audit of its own correction found it lost a Shift+Enter line and a double space copied between blocks in Firefox, MEASURED, and corrected it); the correction is for the next lead pass, frozen copy `tablepaste-frozen-2` — `docs/fixes/32-table-paste.md` (bounded-designs.md §3.3 A, the lead's rule table, PowerPoint's behaviour): one line of text pasted into a table cell goes in at the caret; a grid (an HTML table from Excel, Word or Sheets, or text with tabs or line breaks) fills the table from the focused cell, across and down, growing it by rows and columns, no cell outside the pasted area changed, nothing dropped (merged cells keep the cells after them in their columns), one undo step; a paste into a text block or the title takes the poster's style (the source's colour and highlight dropped with its font and size; a style sheet's text and Google Docs' non-bold `<b>` wrapper dropped); a pasted cell's text stored as text. Reproduced from the user's entry with a real ⌘C/⌘V in Chromium, Firefox and WebKit (`scripts/table-paste-check.mjs`, on main: rule 1 broken in 3 of 3 scenarios, the table replaced by the grid in 12 of 12 grid scenarios, wrong in 11 (the twelfth covers the whole table from its first cell), an `<img onerror>` pasted as text ran in 2 of 2, colour or a style sheet's text kept in 4 of 5 text pastes; after: 0 in each engine, and on the production build in Chromium); after the review round: Word's own bold kept (`<b style='mso-bidi-font-weight:normal'>`: the not-bold check read any "font-weight: normal" in the style, so Word's bold was dropped in text blocks, a regression against main, and in cells), blank lines at the end of a paste no rows and rule 1's line ending with no line break (a paragraph Chromium copied with a triple-click emptied the cell below; WebKit added a blank line), a line wrapped in the clipboard's HTML source one line in cells, text blocks and the title, while text copied between blocks keeps its line breaks and spaces; the instrument's 30 scenarios 0 in each engine and on the production build in Chromium; 54 of 54 mutants killed; the three in-app sentences about pasting tables say what the paste does; queued above: "Queued by record 32" |
+| 33 (MVP design §3.7, owner decision D2) | `fix/text-size` | implemented — `docs/fixes/33-text-size.md`; the first build's tree (on `1d5addf`) was lost before it was committed, and the build was recovered from the author's transcript onto `c67a3db` (record 33 §9: nothing re-implemented; byte-identical to the first build wherever a copy survived) with every number below measured again there; reproduced first in Chromium, Firefox and WebKit (`text-size-check.mjs`: no text-size control in the top bar; raising every level one step took the Style tab's 4 fields and 4 undo steps, the ratios drifting up to 1.01 % and a round trip ending the title at 101 pt from 100.8, MEASURED); built: [A−] Body 36 pt [A+] in the top bar between Redo and Save PDF (`poster/TextSizeControl.tsx`, rules `poster/textSize.ts`): the body steps through 28 · 32 · 36 · 40 · 44 · 48 pt, title, heading and authors keep their ratio, unrounded, every return to a size exact (`===`, from an anchor: the naive new ÷ old formula missed on 4526 of 4549 swept walks), one undo step per press, the caret kept on a mouse press, the focus kept and the selection's keys blocked on a keyboard press, disabled at the bounds with a title saying why; the Edit tab's note names it; Auto-Arrange still never changes a size; after: every claim clean in three engines (13 posters, 147 presses, 65 returns to a size all `===`; the print document and the PowerPoint file at the new sizes; the top bar without overlap at 1024 and 1280 px); 25 of 25 mutants killed, 3 blind spots guarded in the browser; a sibling found and queued for the lead and the owner (a level set large and raised with A+ past the editor's load-time ceilings is reset on the next open, older than record 33: the Style tab reaches it too, MEASURED); its one review round (a simple feature: the browser, through the user's entry points, on `textsize-frozen-1`) done and corrected (6 findings: R1-F1 MEDIUM, a body that is not a size, the Style tab's Body field cleared stores 0 and left A+ promising 28 pt and doing nothing, and R1-F5 LOW, a title stored as null written as 0 by a press, one cause, corrected: such a body counts as below every size, A+ sets it to 28 pt and leaves the other levels, the label reads "Body – pt", another level that is not a size is left alone; reproduced first with the folded-in scenarios, OBSERVED in Chromium, Firefox and WebKit, then clean; R1-F2 MEDIUM, one A+ from a body typed at 12 pt resets title, heading and authors on reopen, left to the lead and the owner, queued above with the record corrected; R1-F3 LOW, two round trips 1 to 2 units in the last place off, measured and queued; R1-F4 LOW, the label near a size, an owner call; R1-F6 INFO); after: 46 scenarios clean in each engine, 32 of 32 mutants killed, 3 blind spots guarded; the correction is for the next lead pass, frozen copy `textsize-frozen-2` |

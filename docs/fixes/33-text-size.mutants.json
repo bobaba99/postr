@@ -1,0 +1,388 @@
+{
+ "tests": [
+  "src/poster/__tests__/textSize.test.tsx",
+  "src/poster/__tests__/textSizeSweep.test.ts"
+ ],
+ "mutants": {
+  "R2-sizes-wrong": {
+   "undoes": "rule 2 — the body sizes are 28 · 32 · 36 · 40 · 44 · 48 pt (the top one changed to 50)",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "export const BODY_SIZES_PT = [28, 32, 36, 40, 44, 48] as const;",
+     "export const BODY_SIZES_PT = [28, 32, 36, 40, 44, 50] as const;"
+    ]
+   ]
+  },
+  "R2-up-skips-a-size": {
+   "undoes": "rule 2 — A+ goes to the NEXT size above (a body between sizes, 34 pt, goes to 36)",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "if (step === 'up') return BODY_SIZES_PT.find((s) => s > pt + SAME_PT) ?? null;",
+     "if (step === 'up') return BODY_SIZES_PT.find((s) => s > pt + 2) ?? null;"
+    ]
+   ]
+  },
+  "R2-down-skips-a-size": {
+   "undoes": "rule 2 — A− goes to the next size below (36 pt goes to 32)",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "if (BODY_SIZES_PT[i]! < pt - SAME_PT) return BODY_SIZES_PT[i]!;",
+     "if (BODY_SIZES_PT[i]! < pt - 4) return BODY_SIZES_PT[i]!;"
+    ]
+   ]
+  },
+  "R2-on-a-size-moves-nowhere": {
+   "undoes": "rule 2 — a body ON a size moves off it (not to itself): the comparison excludes the size it is at",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "if (step === 'up') return BODY_SIZES_PT.find((s) => s > pt + SAME_PT) ?? null;",
+     "if (step === 'up') return BODY_SIZES_PT.find((s) => s >= pt - SAME_PT) ?? null;"
+    ]
+   ]
+  },
+  "R4-no-top-bound": {
+   "undoes": "rule 4 — nothing above 48 pt: A+ disabled there",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "if (step === 'up') return BODY_SIZES_PT.find((s) => s > pt + SAME_PT) ?? null;",
+     "if (step === 'up') return BODY_SIZES_PT.find((s) => s > pt + SAME_PT) ?? pt + 4;"
+    ]
+   ]
+  },
+  "R4-no-bottom-bound": {
+   "undoes": "rule 4 — nothing below 28 pt: A− disabled there",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "  for (let i = BODY_SIZES_PT.length - 1; i >= 0; i -= 1) if (BODY_SIZES_PT[i]! < pt - SAME_PT) return BODY_SIZES_PT[i]!;\n  return null;",
+     "  for (let i = BODY_SIZES_PT.length - 1; i >= 0; i -= 1) if (BODY_SIZES_PT[i]! < pt - SAME_PT) return BODY_SIZES_PT[i]!;\n  return pt - 4;"
+    ]
+   ]
+  },
+  "R3-title-not-scaled": {
+   "undoes": "rule 3 — the title is multiplied by the body's ratio",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "    title: scaled(from.title),",
+     "    title: from.title,"
+    ]
+   ]
+  },
+  "R3-heading-not-scaled": {
+   "undoes": "rule 3 — the heading is multiplied by the body's ratio",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "    heading: scaled(from.heading),",
+     "    heading: from.heading,"
+    ]
+   ]
+  },
+  "R3-authors-not-scaled": {
+   "undoes": "rule 3 — the authors are multiplied by the body's ratio",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "    authors: scaled(from.authors),",
+     "    authors: from.authors,"
+    ]
+   ]
+  },
+  "R3-title-rounded": {
+   "undoes": "rule 3 — sizes are not rounded (the title rounded to a whole point)",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "    title: scaled(from.title),",
+     "    title: ptToUnits(Math.round(unitsToPt(scaled(from.title)))),"
+    ]
+   ]
+  },
+  "R3-other-fields-dropped": {
+   "undoes": "rule 3 — only the size changes: weight, italic, line height, colours kept",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "  title: { ...styles.title, size: next.title },",
+     "  title: { ...styles.title, weight: 400, italic: true, size: next.title },"
+    ]
+   ]
+  },
+  "R3-no-anchor": {
+   "undoes": "exact round trips — the levels come from the anchor, not from the sizes in front of the press (chained ratios)",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "  if (!anchor || !sameSizes(sizesAt(anchor, pt), now)) anchor = now;",
+     "  anchor = now;"
+    ]
+   ]
+  },
+  "R3-anchor-own-body-recomputed": {
+   "undoes": "exact round trips — at the anchor's own body the anchor itself, not a product that may be 1 ulp off",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "  if (Math.abs(unitsToPt(from.body) - pt) <= SAME_PT) return from;\n",
+     ""
+    ]
+   ]
+  },
+  "R3-anchor-kept-after-a-style-edit": {
+   "undoes": "rule 6 of the module (record 33 rule 5) — a size typed in the Style tab starts a new anchor; an anchor kept regardless brings back the old title",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "  if (!anchor || !sameSizes(sizesAt(anchor, pt), now)) anchor = now;",
+     "  if (!anchor || Math.abs(unitsToPt(anchor.body) - pt) > 100) anchor = now;"
+    ]
+   ]
+  },
+  "C-mouse-takes-the-caret": {
+   "undoes": "rule 4 — a mouse press keeps the caret in the text (mousedown cancelled)",
+   "edits": [
+    [
+     "src/poster/TextSizeControl.tsx",
+     "        onMouseDown={keepCaret}\n",
+     ""
+    ]
+   ]
+  },
+  "C-label-not-whole-pt": {
+   "undoes": "rule 1 — the label is the body in whole pt",
+   "edits": [
+    [
+     "src/poster/TextSizeControl.tsx",
+     "        Body {hasSize ? Math.round(unitsToPt(bodySize)) : '–'} pt",
+     "        Body {hasSize ? unitsToPt(bodySize).toFixed(1) : '–'} pt"
+    ]
+   ]
+  },
+  "C-presses-merge": {
+   "undoes": "rule 4 — each press is its own undo step (a coalescing key would merge quick presses)",
+   "edits": [
+    [
+     "src/poster/TextSizeControl.tsx",
+     "    if (styles) patchDoc({ styles }, null);",
+     "    if (styles) patchDoc({ styles }, 'text-size');"
+    ]
+   ]
+  },
+  "C-disabled-not-marked": {
+   "undoes": "rule 2 — at a bound the button is marked disabled",
+   "edits": [
+    [
+     "src/poster/TextSizeControl.tsx",
+     "        aria-disabled={to === null ? true : undefined}\n",
+     ""
+    ]
+   ]
+  },
+  "C-disabled-title-silent": {
+   "undoes": "rule 2 — a disabled button's title says why (names its bound)",
+   "edits": [
+    [
+     "src/poster/TextSizeControl.tsx",
+     "  if (step === 'up') return to === null ? `Largest text size: the body is ${TOP} pt or more` : `Increase text size (body to ${to} pt)`;",
+     "  if (step === 'up') return `Increase text size (body to ${to} pt)`;"
+    ],
+    [
+     "src/poster/TextSizeControl.tsx",
+     "  return hasSize ? `Smallest text size: the body is ${BOTTOM} pt or less` : `No body size: A+ sets the body to ${BOTTOM} pt`;",
+     "  return `Decrease text size (body to ${to} pt)`;"
+    ]
+   ]
+  },
+  "C-down-steps-up": {
+   "undoes": "the buttons — A− steps down, A+ up",
+   "edits": [
+    [
+     "src/poster/TextSizeControl.tsx",
+     "        onClick={press(step)}",
+     "        onClick={press('up')}"
+    ]
+   ]
+  },
+  "C-not-in-the-top-bar": {
+   "undoes": "rule 1 — the control is in the top bar",
+   "edits": [
+    [
+     "src/poster/EditorTopBar.tsx",
+     "      <TextSizeControl left={(sidebarOpen ? 12 : 64) + HISTORY_GROUP_WIDTH + TEXT_SIZE_GAP} />\n",
+     ""
+    ]
+   ]
+  },
+  "C-before-undo": {
+   "undoes": "rule 1 — between Redo and Save PDF, in the page's order too (Tab reaches Undo, Redo, A−, A+, Save PDF)",
+   "edits": [
+    [
+     "src/poster/EditorTopBar.tsx",
+     "      <HistoryButtons left={sidebarOpen ? 12 : 64} onRun={onRun} />\n      {/* 8 px after the History group, wherever it sits. */}\n      <TextSizeControl left={(sidebarOpen ? 12 : 64) + HISTORY_GROUP_WIDTH + TEXT_SIZE_GAP} />\n",
+     "      {/* 8 px after the History group, wherever it sits. */}\n      <TextSizeControl left={(sidebarOpen ? 12 : 64) + HISTORY_GROUP_WIDTH + TEXT_SIZE_GAP} />\n      <HistoryButtons left={sidebarOpen ? 12 : 64} onRun={onRun} />\n"
+    ]
+   ]
+  },
+  "K-keys-reach-the-block": {
+   "undoes": "rule 4 — keys pressed on A− / A+ are theirs: the editor's delete / nudge / duplicate keys do not act from the group",
+   "edits": [
+    [
+     "src/poster/editorHistory.ts",
+     "  if (target instanceof Element && target.closest('[data-postr-text-size]') !== null) return true;\n",
+     ""
+    ]
+   ]
+  },
+  "N-note-names-the-style-tab-only": {
+   "undoes": "rule 6 — the Edit tab's level note names A− / A+ in the top bar",
+   "edits": [
+    [
+     "src/poster/Sidebar.tsx",
+     "        Type on the poster to edit this block. A− / A+ in the top bar change\n        the size of every text level together (title, headings, authors and\n        body); the <span style={{ color: '#c8b6ff' }}>Style</span> tab, under\n        Typography, changes one level.",
+     "        Type on the poster to edit this block. Change the size in the{' '}\n        <span style={{ color: '#c8b6ff' }}>Style</span> tab, under Typography."
+    ]
+   ]
+  },
+  "L-over-the-history-group": {
+   "undoes": "rule 1 / the fit gate — the group sits 8 px after the History group, wherever it is (sidebar shown or hidden)",
+   "edits": [
+    [
+     "src/poster/EditorTopBar.tsx",
+     "      <TextSizeControl left={(sidebarOpen ? 12 : 64) + HISTORY_GROUP_WIDTH + TEXT_SIZE_GAP} />",
+     "      <TextSizeControl left={sidebarOpen ? 12 : 64} />"
+    ]
+   ],
+   "expect": "survive",
+   "why": "layout: jsdom draws no boxes, so an overlap of the two groups is invisible to vitest",
+   "browser": {
+    "harness": "scripts/text-size-check.mjs",
+    "scenarios": [
+     "fit-1024-open",
+     "fit-1280-hidden"
+    ]
+   }
+  },
+  "L-history-width-wrong": {
+   "undoes": "the fit gate — the History group's width the text-size group is placed after (derived from its buttons, gap, padding and border)",
+   "edits": [
+    [
+     "src/poster/HistoryButtons.tsx",
+     "export const HISTORY_GROUP_WIDTH = 2 * TOP_BAR_BUTTON + TOP_BAR_GROUP_GAP + 2 * TOP_BAR_GROUP_PAD + 2 * TOP_BAR_GROUP_BORDER;",
+     "export const HISTORY_GROUP_WIDTH = TOP_BAR_BUTTON;"
+    ]
+   ],
+   "expect": "survive",
+   "why": "layout: the width only places the group; jsdom draws no boxes",
+   "browser": {
+    "harness": "scripts/text-size-check.mjs",
+    "scenarios": [
+     "fit-1024-open"
+    ]
+   }
+  },
+  "L-label-wraps": {
+   "undoes": "the fit gate — the label stays on one line (the group no wider than its own content)",
+   "edits": [
+    [
+     "src/poster/TextSizeControl.tsx",
+     "          whiteSpace: 'nowrap',\n",
+     "          whiteSpace: 'normal',\n          width: 30,\n"
+    ]
+   ],
+   "expect": "survive",
+   "why": "layout: a wrapped label is a line count, which jsdom does not lay out",
+   "browser": {
+    "harness": "scripts/text-size-check.mjs",
+    "scenarios": [
+     "fit-1280-open"
+    ]
+   }
+  },
+  "Z-no-size-divides": {
+   "undoes": "row 7 (review R1-F1) — a body that is not a size has no ratio to keep: only the body is set (without the branch the press divides by it and writes Infinity into the other levels)",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "  if (!isSize(now.body)) return withSizes(styles, { ...now, body: ptToUnits(target) });\n",
+     ""
+    ]
+   ]
+  },
+  "Z-no-size-press-does-nothing": {
+   "undoes": "row 7 (review R1-F1) — A+ from a body that is not a size sets 28 pt (the first build: the title promised 28 pt and the press did nothing)",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "  if (!isSize(now.body)) return withSizes(styles, { ...now, body: ptToUnits(target) });",
+     "  if (!isSize(now.body)) return null;"
+    ]
+   ]
+  },
+  "Z-no-size-up-greyed": {
+   "undoes": "row 7 (review R1-F1) — from a body that is not a size A+ goes to 28 pt (rule 2: below every size), not greyed",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "  if (!isSize(storedBody)) return step === 'up' ? BODY_SIZES_PT[0] : null;",
+     "  if (!isSize(storedBody)) return null;"
+    ]
+   ]
+  },
+  "Z-label-shows-a-number": {
+   "undoes": "rule 1 with row 7 (review R1-F1) — a body that is not a size shows no number in the label (\"Body – pt\"), not 0, -36 or the 36 a string coerces to",
+   "edits": [
+    [
+     "src/poster/TextSizeControl.tsx",
+     "        Body {hasSize ? Math.round(unitsToPt(bodySize)) : '–'} pt",
+     "        Body {Math.round(unitsToPt(bodySize as number))} pt"
+    ]
+   ]
+  },
+  "Z-control-hidden-without-a-body": {
+   "undoes": "rule 1 (review R1-F1) — the control always shows, a body stored as null included (the first build hid it)",
+   "edits": [
+    [
+     "src/poster/TextSizeControl.tsx",
+     "  if (!hasDoc) return null;",
+     "  if (!hasDoc || bodySize == null) return null;"
+    ]
+   ]
+  },
+  "Z-no-size-down-title": {
+   "undoes": "row 7 (review R1-F1) — a greyed A− on a body that is not a size says so and what A+ does, not that the body is 28 pt or less",
+   "edits": [
+    [
+     "src/poster/TextSizeControl.tsx",
+     "  return hasSize ? `Smallest text size: the body is ${BOTTOM} pt or less` : `No body size: A+ sets the body to ${BOTTOM} pt`;",
+     "  return `Smallest text size: the body is ${BOTTOM} pt or less`;"
+    ]
+   ]
+  },
+  "Z-level-not-size-multiplied": {
+   "undoes": "row 8 (review R1-F5) — another level that is not a size is left as it is (a title of null multiplied becomes 0 and disappears)",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "  const scaled = (v: number) => (isSize(v) ? (v / from.body) * body : v);",
+     "  const scaled = (v: number) => (v / from.body) * body;"
+    ]
+   ]
+  },
+  "Z-no-size-down-steps": {
+   "undoes": "row 7 (review R1-F1) — A− from a body that is not a size does nothing (greyed); only A+ sets 28 pt",
+   "edits": [
+    [
+     "src/poster/textSize.ts",
+     "  if (!isSize(storedBody)) return step === 'up' ? BODY_SIZES_PT[0] : null;",
+     "  if (!isSize(storedBody)) return BODY_SIZES_PT[0];"
+    ]
+   ]
+  }
+ }
+}

@@ -340,6 +340,8 @@ At today's default ratios (title 2.8 × body, heading 1.6 × body), the bottom s
 
 **Out of scope:** size per block or per word; ⌘⇧> and ⌘⇧< (left doing nothing: in PowerPoint they size the selection, so binding them to the whole poster would change their meaning); sizes that follow the sheet size; enforcing the guideline on hand-set ratios.
 
+**Built as record 33 (2026-10-10, `docs/fixes/33-text-size.md`).** The control is in the top bar, between Redo and Save PDF (`poster/TextSizeControl.tsx`, rules in `poster/textSize.ts`). Two rows above do not hold as built: Auto-Arrange never presses A− (the owner's decision of 2026-10-07 on §3.5 C, record 28: font sizes never change), and the Edit tab's note for a text block keeps its record-29 form ("Body text · 36 pt, the same for all body text on this poster."), now naming A− / A+ in the top bar for every level and the Style tab for one; the four size fields stay in Style › Typography, not folded. "Sizes are not rounded, so A+ then A− returns exactly" needed more than unrounded sizes: multiplying by new ÷ old body is not exact in floating point, so the levels are computed from the sizes before the first press of a run (record 33 §6 and §7, MEASURED). Review round 1 added one row: a body that is not a size (the Style tab's Body field cleared stores 0) counts as below every size, so A+ sets it to 28 pt and leaves the other levels, and the label shows no number ("Body – pt").
+
 ### 3.8 Undo and redo
 
 **Copies** (`PPT`): Ctrl+Z and Ctrl+Y; one history for typing and objects; Undo and Redo on the Quick Access Toolbar. Mac keys ⌘Z, ⌘Y, ⌘⇧Z (`PPT?`).
