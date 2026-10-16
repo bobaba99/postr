@@ -1,0 +1,567 @@
+{
+  "tests": [
+    "src/poster/__tests__/canvasPasteEntry.test.tsx",
+    "src/poster/__tests__/canvasPasteRules.test.ts",
+    "src/poster/__tests__/tablePaste.test.tsx",
+    "src/poster/__tests__/tablePasteRules.test.ts",
+    "src/poster/__tests__/uploadOwner.test.tsx"
+  ],
+  "mutants": {
+    "no-page-paste": {
+      "undoes": "table B — the canvas listens for a paste with nothing in edit mode",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "    document.addEventListener('paste', onPaste);",
+          "    void onPaste;"
+        ]
+      ]
+    },
+    "field-paste-taken": {
+      "undoes": "table B — a paste into a field (the focused element in edit mode) is the field's own",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "if (isEditing(e.target as Element | null) || isEditing(document.activeElement) || cellRangeShown() || o.dialogOpen()) return;",
+          "if (cellRangeShown() || o.dialogOpen()) return;"
+        ]
+      ]
+    },
+    "edit-mode-misses-inputs": {
+      "undoes": "table B — an input is in edit mode",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  return tag === 'INPUT' || tag === 'TEXTAREA'",
+          "  return tag === 'TEXTAREA'"
+        ]
+      ]
+    },
+    "dialog-ignored": {
+      "undoes": "table B — nothing while a dialog asks the user something (a blind spot of the unit tests until record 34's review round: R34-7's test, the feedback dialog, now sees it; the browser's F-dialog-text and F-feedback-text too)",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "|| o.dialogOpen()) return;",
+          ") return;"
+        ]
+      ]
+    },
+    "image-before-table": {
+      "undoes": "table B order — a table (order 2) before an image (order 3)",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  const rows = html ? htmlTableGrid(html, text) : null;\n  if (rows) return { kind: 'table', rows };\n  const words = pastedWords(html, text);\n  const image = filesOf(data).find(isImageFile);\n  if (image && !words) return { kind: 'image', file: image };",
+          "  const words = pastedWords(html, text);\n  const image = filesOf(data).find(isImageFile);\n  if (image) return { kind: 'image', file: image };\n  const rows = html ? htmlTableGrid(html, text) : null;\n  if (rows) return { kind: 'table', rows };"
+        ]
+      ]
+    },
+    "image-with-text-is-image": {
+      "undoes": "order 3 — an image AND text is text (order 4)",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  if (image && !words) return { kind: 'image', file: image };",
+          "  if (image) return { kind: 'image', file: image };"
+        ]
+      ]
+    },
+    "no-table-order": {
+      "undoes": "order 2 — an HTML table makes a table block",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  if (rows) return { kind: 'table', rows };",
+          "  void rows;"
+        ]
+      ]
+    },
+    "tabs-are-a-table": {
+      "undoes": "order 4 — text with tabs is text, not a table",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  const rows = html ? htmlTableGrid(html, text) : null;",
+          "  const rows = html ? htmlTableGrid(html, text) : text.includes('\\t') ? text.split('\\n').map((l) => l.split('\\t')) : null;"
+        ]
+      ]
+    },
+    "text-not-cleaned": {
+      "undoes": "order 4 — the text is cleaned as record 32's text paste",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  const clean = sanitizeTyped(pastedHtml(html, text, true), true);",
+          "  const clean = html || text;"
+        ]
+      ]
+    },
+    "words-empty-markup": {
+      "undoes": "text is words a user would see: markup the cleaning leaves with no words (an empty bold run, a line break) is not text (replaces img-tag-is-text, whose check is gone: record 34 section 9, R34-2)",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  return (new DOMParser().parseFromString(clean, 'text/html').body.textContent ?? '').trim() ? clean : '';",
+          "  return clean;"
+        ]
+      ]
+    },
+    "words-from-plain-text": {
+      "undoes": "R34-2, table B — text is what a text paste would insert (the HTML wins), not the plain text beside an <img> fragment (replaces style-sheet-is-text, whose check is gone)",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  const words = pastedWords(html, text);",
+          "  const words = text.trim() ? text : pastedWords(html, text);"
+        ]
+      ]
+    },
+    "a3-words-from-plain-text": {
+      "undoes": "R34-2, table A row 3 — the same rule for an image pasted into text",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  if (pastedWords(data.getData('text/html') ?? '', data.getData('text/plain') ?? '')) return null;",
+          "  if ((data.getData('text/plain') ?? '').trim() || pastedWords(data.getData('text/html') ?? '', data.getData('text/plain') ?? '')) return null;"
+        ]
+      ]
+    },
+    "files-only-from-items": {
+      "undoes": "the clipboard's files — a file listed only in `files` (a drop) is read",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  if (!out.length) out.push(...Array.from(data.files ?? []));\n",
+          ""
+        ]
+      ]
+    },
+    "no-fill-of-empty-selected": {
+      "undoes": "order 3 — an EMPTY selected image block is filled instead",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "      if (only?.type === 'image' && !only.imageSrc) {",
+          "      if (false) {"
+        ]
+      ]
+    },
+    "fill-any-selected-image": {
+      "undoes": "order 3 — only an EMPTY selected image block is filled",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "      if (only?.type === 'image' && !only.imageSrc) {",
+          "      if (only?.type === 'image') {"
+        ]
+      ]
+    },
+    "size-ignores-shape": {
+      "undoes": "image checks — a new image block has the image's shape",
+      "edits": [
+        [
+          "src/poster/imageFile.ts",
+          "  if (!size) return { ...box };",
+          "  return { ...box };"
+        ]
+      ]
+    },
+    "tall-keeps-width": {
+      "undoes": "image checks — a tall image keeps the box's height",
+      "edits": [
+        [
+          "src/poster/imageFile.ts",
+          "  const w = aspect >= box.w / box.h ? box.w : Math.max(1, Math.round(box.h * aspect));",
+          "  const w = box.w;"
+        ]
+      ]
+    },
+    "fit-unrounded": {
+      "undoes": "image checks — the height is the image block's own fit (rounded), so its onLoad changes nothing",
+      "edits": [
+        [
+          "src/poster/imageFile.ts",
+          "  return Math.round(w / (size.w / size.h));",
+          "  return w / (size.w / size.h) + 3;"
+        ]
+      ]
+    },
+    "size-rule-gone": {
+      "undoes": "image checks — an image over 10 MB is refused with today's message",
+      "edits": [
+        [
+          "src/poster/imageFile.ts",
+          "  if (file.size > MAX_IMAGE_BYTES) {",
+          "  if (false) {"
+        ]
+      ]
+    },
+    "type-rule-gone": {
+      "undoes": "image checks — a file that is not an image is refused with today's message",
+      "edits": [
+        [
+          "src/poster/imageFile.ts",
+          "  if (!file.type.startsWith('image/')) {",
+          "  if (false) {"
+        ]
+      ]
+    },
+    "owner-ignored": {
+      "undoes": "the upload — through uploadPosterImage into the owner's folder",
+      "edits": [
+        [
+          "src/poster/imageFile.ts",
+          "  if (userId && posterId) {",
+          "  if (false) {"
+        ]
+      ]
+    },
+    "image-default-box": {
+      "undoes": "Insert › Image's box is the new image block's",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "    w: type === 'logo' ? 50 : 155,",
+          "    w: type === 'logo' ? 50 : type === 'image' ? 200 : 155,"
+        ]
+      ]
+    },
+    "no-snap": {
+      "undoes": "placement — snapped to the ½ in grid",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  const snap = (v: number) => Math.round(v / SNAP_GRID) * SNAP_GRID;",
+          "  const snap = (v: number) => v;"
+        ]
+      ]
+    },
+    "not-kept-on-sheet": {
+      "undoes": "placement — kept on the sheet",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  const keep = (v: number, len: number, room: number) => Math.max(0, Math.min(room - len, v));",
+          "  const keep = (v: number, _len: number, _room: number) => v;"
+        ]
+      ]
+    },
+    "view-ignored": {
+      "undoes": "placement — a paste is centred in the part of the sheet in view",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  const v = view && view.w > 0 && view.h > 0 ? view : { x: 0, y: 0, w: sheet.w, h: sheet.h };",
+          "  const v = { x: 0, y: 0, w: sheet.w, h: sheet.h };"
+        ]
+      ]
+    },
+    "view-unzoomed": {
+      "undoes": "placement — the view is read through the zoom (screen pixels over the zoom are units)",
+      "expect": "survive",
+      "browser": {
+        "harness": "scripts/canvas-paste-check.mjs",
+        "scenarios": [
+          "L-zoomed-mid"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "    return { x: (x0 - s.left) / z, y: (y0 - s.top) / z, w: (x1 - x0) / z, h: (y1 - y0) / z };",
+          "    return { x: x0 - s.left, y: y0 - s.top, w: x1 - x0, h: y1 - y0 };"
+        ]
+      ]
+    },
+    "drop-top-left": {
+      "undoes": "placement — a drop is centred on the drop point",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  return snapOnto(pt.x - size.w / 2, pt.y - size.h / 2, size, sheet);",
+          "  return snapOnto(pt.x, pt.y, size, sheet);"
+        ]
+      ]
+    },
+    "drop-unzoomed": {
+      "undoes": "placement — the drop point is read through the zoom",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "    const pt = { x: (e.clientX - s.left) / o.zoom, y: (e.clientY - s.top) / o.zoom };",
+          "    const pt = { x: e.clientX - s.left, y: e.clientY - s.top };"
+        ]
+      ]
+    },
+    "several-stacked": {
+      "undoes": "drop — each next image 1 in down and right of the last",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "snapOnto(first.x + 10 * i, first.y + 10 * i, size, sheet)",
+          "snapOnto(first.x, first.y, size, sheet)"
+        ]
+      ]
+    },
+    "next-to-always-below": {
+      "undoes": "table A row 3 — to the text's right when it fits there",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  if (right.x + size.w <= sheet.w && right.y + size.h <= sheet.h) return right;",
+          "  void right;"
+        ]
+      ]
+    },
+    "next-to-ignores-room": {
+      "undoes": "table A row 3 — below the text when its right has no room",
+      "edits": [
+        [
+          "src/poster/canvasPaste.ts",
+          "  if (right.x + size.w <= sheet.w && right.y + size.h <= sheet.h) return right;",
+          "  return right;"
+        ]
+      ]
+    },
+    "next-to-stored-height": {
+      "undoes": "table A row 3 — below the text as the canvas draws it (its stored height is not what shows)",
+      "expect": "survive",
+      "browser": {
+        "harness": "scripts/canvas-paste-check.mjs",
+        "scenarios": [
+          "A3-below"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "    const drawn: Box = { x: b.x, w: b.w, y: el?.offsetTop ?? b.y, h: el?.offsetHeight ?? b.h };",
+          "    const drawn: Box = { x: b.x, w: b.w, y: b.y, h: b.h };"
+        ]
+      ]
+    },
+    "a3-text-left-focused": {
+      "undoes": "table A row 3 — the text is left (no caret in it) once the image block is coming",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "    (document.activeElement as HTMLElement | null)?.blur?.();\n",
+          ""
+        ]
+      ]
+    },
+    "a3-not-wired": {
+      "undoes": "table A row 3 — the canvas's text blocks hand an image paste over",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "  const pasteImageHere = onPasteImage ? (file: File) => onPasteImage(b.id, file) : undefined;",
+          "  const pasteImageHere = undefined;"
+        ]
+      ]
+    },
+    "a3-text-paste-taken": {
+      "undoes": "table A row 3 — only an image with NO text is handed over; text stays the text's",
+      "edits": [
+        [
+          "src/poster/RichTextEditor.tsx",
+          "    const image = onPasteImage ? imageOnlyPaste(e.clipboardData) : null;",
+          "    const image = onPasteImage ? filesOf(e.clipboardData).find(isImageFile) ?? null : null;"
+        ],
+        [
+          "src/poster/RichTextEditor.tsx",
+          "import { imageOnlyPaste } from './canvasPaste';",
+          "import { filesOf, isImageFile } from './canvasPaste';"
+        ]
+      ]
+    },
+    "dragover-not-taken": {
+      "undoes": "drop — the dragover of files is cancelled (a browser fires drop only then)",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "    if (!ref.current.enabled || !carriesFiles(e)) return;\n    e.preventDefault();\n    e.dataTransfer.dropEffect = 'copy';",
+          "    if (!ref.current.enabled || !carriesFiles(e)) return;\n    e.dataTransfer.dropEffect = 'copy';"
+        ]
+      ]
+    },
+    "text-drag-taken": {
+      "undoes": "drop — a drag that carries no files (text, a block) is not taken",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "  const carriesFiles = (e: DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes('Files');",
+          "  const carriesFiles = (e: DragEvent) => !!e.dataTransfer;"
+        ]
+      ]
+    },
+    "drop-on-image-adds": {
+      "undoes": "drop — one image dropped on an image block replaces its image",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "    if (images.length === 1 && onBlock?.type === 'image') {",
+          "    if (false) {"
+        ]
+      ]
+    },
+    "not-image-silent": {
+      "undoes": "drop and paste — a file that is not an image is skipped with today's message",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "    if (problem) window.alert(problem);\n",
+          ""
+        ]
+      ]
+    },
+    "other-poster-gets-blocks": {
+      "undoes": "new image blocks go into the poster they were pasted into (nothing if another was opened meanwhile)",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          "    if (!stored.length || usePosterStore.getState().posterId !== posterId) return;",
+          "    if (!stored.length) return;"
+        ]
+      ]
+    },
+    "commit-per-block": {
+      "undoes": "one undo step — the new blocks go in with one setBlocks",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    setBlocks([...latest.blocks, ...made]);",
+          "    made.forEach((b, i) => setBlocks([...latest.blocks, ...made.slice(0, i + 1)]));"
+        ]
+      ]
+    },
+    "commit-not-selected": {
+      "undoes": "the new blocks are selected",
+      "edits": [
+        [
+          "src/poster/PosterEditor.tsx",
+          "    setSelectedIds(new Set(made.map((b) => b.id)));",
+          "    void made;"
+        ]
+      ]
+    },
+    "upload-two-steps": {
+      "undoes": "the image block's own upload — the image and its height in ONE update (one undo step)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "    onUpdate(size ? { imageSrc: src, h: fittedHeight(latest.current.w, size) } : { imageSrc: src });",
+          "    onUpdate({ imageSrc: src });\n    if (size) onUpdate({ h: fittedHeight(latest.current.w, size) });"
+        ]
+      ]
+    },
+    "upload-no-fit": {
+      "undoes": "the image block's own upload — the block takes the image's shape",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "    onUpdate(size ? { imageSrc: src, h: fittedHeight(latest.current.w, size) } : { imageSrc: src });",
+          "    onUpdate({ imageSrc: src });"
+        ]
+      ]
+    },
+    "preview-stored": {
+      "undoes": "the image block's own upload — the preview address is never stored",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "    setPreview({ url, src: undefined });\n",
+          "    setPreview({ url, src: undefined });\n    onUpdate({ imageSrc: url });\n"
+        ]
+      ]
+    },
+    "check-after-preview": {
+      "undoes": "the image block's own upload — the checks come before anything is shown or stored",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "    if (problem) {\n      window.alert(problem);\n      return;\n    }\n    const seq = (putSeq.current += 1);\n    const url = URL.createObjectURL(file);",
+          "    if (problem) {\n      window.alert(problem);\n      onUpdate({ imageSrc: URL.createObjectURL(file) });\n      return;\n    }\n    const seq = (putSeq.current += 1);\n    const url = URL.createObjectURL(file);"
+        ]
+      ]
+    },
+    "no-file-event": {
+      "undoes": "the image block takes a file a paste or a drop hands it",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "      if (ce.detail?.blockId === block.id) void putFileRef.current(ce.detail.file);",
+          "      void ce;"
+        ]
+      ]
+    },
+    "preview-dropped-after-store": {
+      "undoes": "the image block draws the file just put in while it holds what it was stored as (a same-path file's old signed address) (a blind spot of the unit tests until record 34's review round: R34-1's test reads what the block draws after a fill; the browser's D-on-image in Firefox still shows it)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "  const showPreview = preview !== null && (preview.src === undefined || preview.src === block.imageSrc);",
+          "  const showPreview = preview !== null && preview.src === undefined;"
+        ]
+      ]
+    },
+    "fit-on-preview": {
+      "undoes": "the image block's onLoad fit leaves a file just put in alone (its shape is in the same update)",
+      "expect": "survive",
+      "browser": {
+        "harness": "scripts/canvas-paste-check.mjs",
+        "scenarios": [
+          "UP-own-slow"
+        ]
+      },
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "            if (showPreview) return;\n",
+          ""
+        ]
+      ]
+    },
+    "put-seq-gone": {
+      "undoes": "R34-1 — only the file put into an image block last updates it; an earlier one coming back changes nothing (its preview revoked, a step of its own)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "    if (seq !== putSeq.current) return;\n",
+          ""
+        ]
+      ]
+    },
+    "cell-range-ignored": {
+      "undoes": "R34-3 — while a table shows cells selected by dragging, a paste on the canvas waits (edit mode)",
+      "edits": [
+        [
+          "src/poster/useCanvasPaste.ts",
+          " || cellRangeShown()",
+          ""
+        ]
+      ]
+    },
+    "cell-range-unmarked": {
+      "undoes": "R34-3 — the table marks cells selected by dragging (the mark the canvas reads)",
+      "edits": [
+        [
+          "src/poster/blocks.tsx",
+          "data-postr-cell-range={isMultiCellRange ? '' : undefined}",
+          "data-postr-cell-range={undefined}"
+        ]
+      ]
+    },
+    "feedback-not-modal": {
+      "undoes": "R34-7 — the feedback dialog is a modal dialog (role=dialog, aria-modal): a paste on the canvas behind it waits",
+      "edits": [
+        [
+          "src/components/FeedbackModal.tsx",
+          "        role=\"dialog\"\n        aria-modal=\"true\"\n",
+          ""
+        ]
+      ]
+    }
+  }
+}
