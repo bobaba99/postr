@@ -38,9 +38,12 @@ export const OWN_UNDO_ATTR = 'data-own-undo';
  * and the editor's delete / nudge / duplicate keys must not reach the
  * poster from there. A press from the keyboard keeps the focus on the
  * button, so the next key lands there (fix 12 review R3-F1: an arrow moved
- * the selected block and Backspace removed it, the redo lost).
+ * the selected block and Backspace removed it, the redo lost). The same for
+ * A− and A+ beside them (`TextSizeControl.tsx`, its group
+ * `data-postr-text-size`; record 33), which keep the focus the same way.
  */
 export function onHistoryButtons(target: EventTarget | null): boolean {
+  if (target instanceof Element && target.closest('[data-postr-text-size]') !== null) return true;
   return target instanceof Element && target.closest('[data-postr-history-buttons]') !== null;
 }
 
