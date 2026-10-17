@@ -8,6 +8,7 @@
  * The panel is collapsible via a bookmark-style toggle on the right edge.
  */
 import { ignoreRepeatedEnter } from './ignoreRepeatedEnter';
+import { MAC } from './selectionKeys';
 import { useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { InputModal } from '@/components/InputModal';
 
@@ -875,8 +876,9 @@ function ConferenceCard({ guideline: g, expanded, onToggle }: {
  *   2. External handles that appear when selected (move / rotate /
  *      delete) — introduced 2026-04-11 to fix the image-drag bug
  *   3. Keyboard shortcuts (arrow-key nudge, delete, grid snapping)
- *   4. Modifier tricks (Shift + arrow = fine, Shift + rotate =
- *      hard 15° steps, magnetic snap at common angles)
+ *   4. Modifier tricks (⌘ + arrow on a Mac, Ctrl + arrow elsewhere =
+ *      fine; Shift + rotate = hard 15° steps, magnetic snap at common
+ *      angles)
  *
  * Stays in sync with the implementation in blocks.tsx /
  * PosterEditor.tsx — update both when shortcuts change.
@@ -915,10 +917,16 @@ function ShortcutsPanel() {
 
       <ShortcutGroup title="Keyboard">
         <ShortcutRow label={<KeyCombo keys={['↑', '↓', '←', '→']} />} inline>
-          Nudge by <strong>1/2 inch</strong> (one grid cell) — default respects the grid.
+          Nudge by <strong>1/2 inch</strong> (one grid cell); a block on the grid stays on it.
         </ShortcutRow>
-        <ShortcutRow label={<KeyCombo keys={['Shift', '↑↓←→']} />} inline>
+        <ShortcutRow label={<KeyCombo keys={[MAC ? '⌘' : 'Ctrl', '↑↓←→']} />} inline>
           Nudge by <strong>1/10 inch</strong> — fine sub-grid adjustment.
+        </ShortcutRow>
+        <ShortcutRow label={<KeyCombo keys={[MAC ? '⌘' : 'Ctrl', 'A']} />} inline>
+          Select every block. The credit block stays out.
+        </ShortcutRow>
+        <ShortcutRow label={<KeyCombo keys={['Esc']} />} inline>
+          Leave the text you are typing in on the poster; the block stays selected. Press again to deselect.
         </ShortcutRow>
         <ShortcutRow label={<KeyCombo keys={['Delete']} />} inline>
           Delete the selected block. <KeyCombo keys={['Backspace']} /> works too.

@@ -55,6 +55,7 @@ vi.mock('@/data/thumbnails', () => ({ captureThumbnail: vi.fn(async () => null) 
 import { usePosterStore } from '@/stores/posterStore';
 import { click } from './editorKit';
 import {
+  KEYS,
   NoopResizeObserver,
   canvasEditor,
   cellEditor,
@@ -169,7 +170,7 @@ describe('R3-F1 — keys pressed on Undo or Redo are the buttons’', () => {
     renderEditor();
     await click(q('[data-block-id="im1"]'), 'block im1');
     const x0 = doc().blocks.find((b) => b.id === 'im1')!.x;
-    await press(document.body, { key: 'ArrowRight', shiftKey: true });
+    await press(document.body, KEYS.fineRight);
     expect(doc().blocks.find((b) => b.id === 'im1')!.x).toBe(x0 + 1);
   });
 });

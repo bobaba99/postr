@@ -161,7 +161,7 @@ async function enterCrop() {
 }
 
 async function nudge(id: string) {
-  await press(document.body, { key: 'ArrowRight', shiftKey: true });
+  await press(document.body, KEYS.fineRight);
   expect(block(id).x, 'precondition: the nudge moved the block').not.toBe(fixture().blocks.find((b) => b.id === id)!.x);
 }
 
@@ -318,7 +318,7 @@ describe('a drag is one undo step, from pointerdown to pointerup', () => {
     await nextTask();
     await selectBlock('im1');
     await nudge('im1');
-    await press(document.body, { key: 'ArrowRight', shiftKey: true });
+    await press(document.body, KEYS.fineRight);
     const x2 = block('im1').x;
     await press(document.body, KEYS.undo);
     expect([block('im1').x !== x2, block('im1').x !== 250], 'one ⌘Z undoes the second nudge alone').toEqual([true, true]);
