@@ -687,7 +687,7 @@ describe('5, 7, 10 — buttons, nothing shown on an empty history, 100 steps', (
     await selectBlock('b2');
     const x0 = doc().blocks.find((b) => b.id === 'b2')!.x;
     for (let i = 0; i < 60; i += 1) {
-      fireEvent.keyDown(document.body, { key: 'ArrowRight', shiftKey: true });
+      fireEvent.keyDown(document.body, KEYS.fineRight);
       await nextTask();
     }
     expect(doc().blocks.find((b) => b.id === 'b2')!.x).toBe(x0 + 60);

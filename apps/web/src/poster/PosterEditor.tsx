@@ -45,11 +45,12 @@ import { SelectionRect } from './SelectionRect';
 import { GroupFrame, groupBounds } from './GroupFrame';
 import { UndoToast } from './UndoToast';
 import { EditorTopBar, TOP_BAR_HEIGHT } from './EditorTopBar';
-import { onHistoryButtons, runHistory, type HistoryDirection, type HistoryRunOptions } from './editorHistory';
+import { dialogOpen, onHistoryButtons, runHistory, type HistoryDirection, type HistoryRunOptions } from './editorHistory';
 import { useEditorHistory } from './useEditorHistory';
 import { usePrintShortcut } from './usePrintShortcut';
 import { useCanvasPaste } from './useCanvasPaste';
-import { insertSize } from './canvasPaste';
+import { insertSize, isEditing } from './canvasPaste';
+import { MAC, selectionKeyAction, useSelectionEscape } from './selectionKeys';
 import { checkBounds, checkCollisions, type OobWarning } from './boundsCheck';
 import { GuidelinesPanel } from './GuidelinesPanel';
 import { OnboardingTour } from '@/components/OnboardingTour';
@@ -86,7 +87,7 @@ import {
 import { changesLayout, pastMarginArea } from './autoLayout';
 import { arrangeSheet } from './arrangeMeasure';
 import { numberBlocks } from './readingOrder';
-import { filterDeletable } from '@/export/blockLock';
+import { filterDeletable, isLocked } from '@/export/blockLock';
 import { LAYOUT_TEMPLATES, makeBlocks, type LayoutKey } from './templates';
 import { startingTextIssues } from './startingText';
 import { formatSheetSize, moveOntoSheet } from './resizeSheet';
@@ -551,10 +552,17 @@ function useBlockDrag(
  * (undo, redo, delete, nudge) wait until it is answered: they used to keep
  * editing the poster behind a size or template dialog, so after Cancel the
  * poster had still changed (review of fix 02, docs/fixes/02-poster-size.md).
+ *
+ * The one test of "a dialog is open" that undo, redo, ⌘P and Esc read
+ * (`editorHistory.ts` `dialogOpen`: an aria-modal dialog or the shared
+ * modal markup, one fading out not counted). Until record 36's review
+ * (R36-4) this test knew aria-modal dialogs only, so Delete, the arrows,
+ * ⌘D, ⌘A, ⌘/ and the canvas's paste still acted behind a dialog that
+ * carries the shared markup alone (the Staples dialog and the others
+ * behind record 29's switches; record 34 §9, R34-7).
  */
 function modalDialogOpen(): boolean {
-  // A dialog fading out (data-state="closing") has been answered already.
-  return document.querySelector('[role="dialog"][aria-modal="true"]:not([data-state="closing"])') !== null;
+  return dialogOpen();
 }
 
 /**
@@ -1511,13 +1519,20 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
   };
 
   const handleGroupDragEnd = () => {
-    // Commit the silent changes to the undo stack. Read from the ref
-    // rather than closed-over doc.blocks — GroupFrame's pointerup handler
-    // holds the pointerdown-time callback reference, whose closed-over
-    // doc.blocks is the PRE-drag value. Using it here would overwrite the
-    // silent in-drag updates and snap the group back to its origin.
-    setBlocks(outerBlocksRef.current);
+    // Commit the drag as ONE undo step whose undo puts every block back
+    // (OF-06, item 6; record 36): the moves were silent, so the blocks go
+    // back to where the drag started, silently, and the dragged blocks
+    // are then committed, as a single block's drag does (useBlockDrag's
+    // onUp). Committing the dragged blocks alone made the step's snapshot
+    // the dragged poster, so the first ⌘Z changed nothing. The dragged
+    // blocks are read from the store, not the closed-over doc.blocks:
+    // GroupFrame's pointerup holds the pointerdown-time callback, whose
+    // doc.blocks is the poster before the drag.
+    const origin = groupDragOrigin.current;
     groupDragOrigin.current = null;
+    const dragged = usePosterStore.getState().doc?.blocks ?? outerBlocksRef.current;
+    if (origin) storeSetBlocksSilent(origin);
+    setBlocks(dragged);
   };
 
   // Heading, figure and table numbers: the poster's ONE reading order
@@ -2131,23 +2146,23 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     setCustomPalettes(next);
   };
 
-  // Delete key + arrow-key nudge — both gated on the canvas, not
-  // on input fields. When a block is selected AND the user isn't
-  // typing:
+  // The selection's keys, like PowerPoint's (selectionKeys.ts, record 36,
+  // bounded-designs §3.4). The key rule first (K0): with the focus in a
+  // text field — an input, a textarea, a menu (SELECT) or editable text —
+  // every key is the field's. Otherwise:
   //
-  //   Arrow key         → nudge by SNAP_GRID (5 units = half-inch,
-  //                       one grid cell). Default respects grid so
-  //                       blocks stay aligned with the canvas
-  //                       overlay + other blocks that were placed
-  //                       via drag (which also snaps to SNAP_GRID).
-  //   Shift + Arrow     → nudge by 1 unit (1/10 inch) for fine
-  //                       sub-grid adjustment. Reverses the usual
-  //                       Figma/Sketch convention (fine default,
-  //                       shift for coarse) because Postr's whole
-  //                       "constraint as feature" philosophy says
-  //                       on-grid should be the easy path.
+  //   Arrow key            → move the selection ½ in (SNAP_GRID, one
+  //                          grid cell; not snapped: a block on the grid
+  //                          stays on it, one off it stays off it).
+  //   ⌘ + arrow (Mac),     → 0.1 in (PowerPoint's Ctrl + arrow on
+  //   Ctrl + arrow            Windows; ⌘ on a Mac by the same rule, record
+  //                          36 §2); any other modifier with an arrow
+  //                          does nothing to blocks.
+  //   ⌘A / Ctrl+A          → select every block but the credit mark.
+  //   Delete / Backspace   → remove the selected blocks.
+  //   ⌘D / Ctrl+D          → duplicate one block.
   //
-  //   Delete / Backspace → remove the selected block.
+  // Esc is useSelectionEscape's, below (it runs in the capture phase).
   useEffect(() => {
     // Preview is a chromeless full-screen overlay with no visible
     // selection, but the editor's DOM stays mounted beneath it. Without
@@ -2157,21 +2172,36 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     // equally invisible. Bail while previewing.
     if (previewMode) return;
     const handler = (e: KeyboardEvent) => {
-      if (selectedIds.size === 0) return;
       if (modalDialogOpen()) return;
       // Review mode: disallow destructive/structural keyboard actions
       // (delete, duplicate, nudge) so reviewers can't mutate the poster.
       if (sidebarTab === 'comments') return;
       // A key pressed on the Undo or Redo button is the button's (fix 12
-      // review R3-F1). Other controls that are not text fields still pass
-      // these keys to the selection (item 22, parked on the Later list).
+      // review R3-F1).
       if (onHistoryButtons(e.target)) return;
-      const target = document.activeElement as HTMLElement | null;
-      const isInput =
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.getAttribute('contenteditable') === 'true';
-      if (isInput) return;
+      // K0: a key pressed in a text field is the field's. The guard used to
+      // leave out SELECT, so Backspace on a focused menu deleted the
+      // selected block (OF-11, item 22; record 36).
+      if (isEditing(document.activeElement) || isEditing(e.target as Element | null)) return;
+      const action = selectionKeyAction(e, MAC);
+      if (!action) return;
+
+      // ⌘A / Ctrl+A → every block but the locked credit mark (K2).
+      if (action.kind === 'selectAll') {
+        e.preventDefault();
+        breakUndoCoalescing();
+        setSelectedIds(new Set(doc.blocks.filter((b) => !isLocked(b)).map((b) => b.id)));
+        return;
+      }
+      if (selectedIds.size === 0) return;
+
+      // An arrow chord that is not a nudge does nothing, and is cancelled
+      // so that Alt + ← (Back on Windows and Linux) or the other
+      // platform's key + ← cannot leave the editor (R36-2, record 36).
+      if (action.kind === 'arrowIgnored') {
+        e.preventDefault();
+        return;
+      }
 
       // Delete / Backspace → remove all selected blocks in one batch.
       //
@@ -2179,7 +2209,7 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       // the unlocked blocks go, the locked one stays, and the toast
       // explains the survivor. Refusing the WHOLE batch because one
       // block is locked would be the more surprising behaviour.
-      if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (action.kind === 'delete') {
         e.preventDefault();
         const outcome = filterDeletable(doc.blocks, selectedIds);
         if (outcome.refusalMessage) showToast(outcome.refusalMessage);
@@ -2190,25 +2220,15 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
       }
 
       // Cmd/Ctrl + D → duplicate (single selection only).
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'd' || e.key === 'D')) {
+      if (action.kind === 'duplicate') {
         e.preventDefault();
         if (selectedId) duplicateBlock(selectedId);
         return;
       }
 
-      // Arrow keys → nudge all selected blocks.
-      const nudge = e.shiftKey ? 1 : SNAP_GRID;
-      const arrowMap: Record<string, [number, number] | undefined> = {
-        ArrowLeft: [-nudge, 0],
-        ArrowRight: [nudge, 0],
-        ArrowUp: [0, -nudge],
-        ArrowDown: [0, nudge],
-      };
-      const delta = arrowMap[e.key];
-      if (!delta) return;
-
+      // Arrow keys → nudge all selected blocks (K3).
       e.preventDefault();
-      const [dx, dy] = delta;
+      const { dx, dy } = action;
       const nextBlocks = doc.blocks.map((blk) => {
         if (!selectedIds.has(blk.id)) return blk;
         return {
@@ -2223,6 +2243,19 @@ export function PosterEditor({ readOnly = false }: { readOnly?: boolean } = {}) 
     return () => window.removeEventListener('keydown', handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIds, doc.blocks, sidebarTab, previewMode]);
+
+  // Esc (K1, record 36): in editable text it leaves the text and keeps the
+  // block selected (PowerPoint: "Select an object when the text inside the
+  // object is selected"); anywhere else outside a field it deselects. Not
+  // in Preview or review mode; a dialog or an open menu takes Esc first.
+  useSelectionEscape(!previewMode && sidebarTab !== 'comments', {
+    leaveText: (blockId) => {
+      if (blockId && !selectedIds.has(blockId)) selectOne(blockId);
+    },
+    deselect: () => {
+      if (selectedIds.size > 0) clearSelection();
+    },
+  });
 
   // Track canvas overflow — when blocks with height:auto grow past
   // the declared canvas height, extend the scroll container to match.

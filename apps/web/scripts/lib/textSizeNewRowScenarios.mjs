@@ -9,7 +9,7 @@
  *        against the migration file's default (read here from the SQL) and
  *        today's DEFAULT_STYLES and DEFAULT_PALETTE (the app's own module);
  *        what is drawn and what the Style tab's fields read; then
- *        manual-test-flows §38's A+ once and A− once, and §40's step,
+ *        manual-test-flows §38's A+ once and A− once, and §41's step,
  *        Style › Typography › Body typed to 12 and A+ once: drawn and
  *        fields (R37-1, R37-3)
  *   new-row-emptied  a guest's first /p/new, nothing else changed, every
@@ -99,7 +99,7 @@ export async function openNewGuestPoster(h, { viewport }) {
   }
 }
 
-/** R37-1 and R37-3: what a new row holds and draws, then manual-test-flows §38's A+ and A−, and §40's Body 12 then A+, on it. */
+/** R37-1 and R37-3: what a new row holds and draws, then manual-test-flows §38's A+ and A−, and §41's Body 12 then A+, on it. */
 export async function newRowDefaults(page, ed) {
   const ins = ed.inserted.data;
   const mig = migrationDefault();

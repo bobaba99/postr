@@ -159,6 +159,8 @@ export function CropOverlay({ block, onUpdate, onClose }: CropOverlayProps) {
     <div
       ref={containerRef}
       data-postr-selection-ui="true"
+      // Esc cancels the crop (its own listener), and only that (record 36).
+      data-postr-takes-escape=""
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       style={{

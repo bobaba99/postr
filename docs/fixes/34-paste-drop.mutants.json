@@ -554,7 +554,9 @@
       ]
     },
     "feedback-not-modal": {
-      "undoes": "R34-7 — the feedback dialog is a modal dialog (role=dialog, aria-modal): a paste on the canvas behind it waits",
+      "undoes": "R34-7 — the feedback dialog is a modal dialog (role=dialog, aria-modal): a paste on the canvas behind it waits. BLIND SPOT since record 36's review round (R36-4): PosterEditor's modalDialogOpen, which the paste reads, now calls editorHistory.ts dialogOpen, which also counts the shared modal markup (data-postr-modal-content) the feedback dialog carries, so without the mark the paste still waits; the mark still tells assistive technology the dialog is modal, which no test reads",
+      "expect": "survive",
+      "unguarded": "INSPECTED: redundant for the paste since record 36's review (R36-4): the dialog's data-postr-modal-content keeps dialogOpen true without role=dialog aria-modal (TESTED: this mutant survives the 118 tests; dialog-ignored, which removes the paste's dialog check, is still killed); the mark's other readers (assistive technology, ConfirmModal's focus order over aria-modal dialogs) have no test",
       "edits": [
         [
           "src/components/FeedbackModal.tsx",

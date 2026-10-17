@@ -182,7 +182,7 @@ describe('the one history behind the one-size controls', () => {
     await zoomOutToTheFloor();
     expect(rowOf('lg1'), 'precondition: no delete button').toEqual(['Drag']);
     // A step to undo, so the button is enabled: one nudge.
-    await press(document.body, { key: 'ArrowRight', shiftKey: true });
+    await press(document.body, KEYS.fineRight);
     const at = () => doc().blocks.find((b) => b.id === 'lg1');
     const x1 = at()!.x;
     expect(selectedBlocks(), 'precondition: the logo is selected').toEqual(['lg1']);

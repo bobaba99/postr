@@ -404,6 +404,8 @@ export function RichTextEditor({
         createPortal(
           <div
             role="listbox"
+            // Esc closes the menu (handleKeyDown), and only the menu (record 36).
+            data-postr-takes-escape=""
             style={{
               position: 'fixed',
               top: slash.caretRect.bottom + 6,

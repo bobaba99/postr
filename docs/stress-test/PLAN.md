@@ -156,12 +156,19 @@ scope becomes a plan item or a question for the owner.
   the poster area gets too narrow to use; at windows 640–700 px wide its button
   covers FIT, so FIT cannot be clicked (MEASURED, 4 of 4 widths, fix 04's
   confirmer A and the ranking evidence on main).
-- **Item 22, parked by the owner (2026-09-30):** with a block selected, keys
+- **Item 22, parked by the owner (2026-09-30); fixed by record 36
+  (`docs/fixes/36-select-move.md`, 2026-10-16, the MVP design doc §3.4's
+  key rule):** with a block selected, keys
   pressed on a focused dropdown reach the poster: Backspace deletes the block
   (7 of 7) and the arrows move it (7 of 7); the Edit tab's Weight dropdown is
   the likeliest path, and ⌘Z restores the block (6 of 6) (MEASURED by the
   ranking evidence on main, 2026-09-30). The cause is one key guard, copied at
-  three places in `PosterEditor.tsx`, that covers text fields but not SELECT.
+  three places (`PosterEditor.tsx` and the table's two Delete / Backspace
+  listeners in `blocks.tsx`), that covers text fields but not SELECT; record
+  36 gives the three one test (`canvasPaste.ts` `isEditing`, which canvas
+  paste already used): Backspace, Delete, → and ⌘D on the Style tab's font
+  menu changed the poster in Chromium, Firefox and WebKit before, nothing
+  after (MEASURED, `undo-history-check.mjs` K0).
   Fix 12 (review R3-F1) keeps its new Undo and Redo buttons out of it
   (`onHistoryButtons`), and the table's two Delete / Backspace listeners
   from them too; every other control that is not a text field still passes
@@ -281,7 +288,14 @@ scope becomes a plan item or a question for the owner.
   keys' own dialog guard (`modalDialogOpen` in `PosterEditor.tsx`) has had no
   test since fix 12 moved ⌘Z out of that handler: its mutant survives the
   whole web suite (TESTED by the reviewer, 0 of 3906 tests fail). Add a test
-  that presses Delete and an arrow with the size dialog open.
+  that presses Delete and an arrow with the size dialog open. **Answered**
+  (record 36's review round, 2026-10-16): the guard's mutant
+  (`36-select-move.mutants.json` `keys-ignore-dialogs`) is killed by
+  record 36's Staples dialog test in 4 of 4 runs (TESTED); record 34's
+  R34-7 test (Delete on the feedback dialog's heading) failed with it in 3
+  of the 4. The size dialog itself
+  (`ConfirmModal`) stops every key in the capture phase, so it never
+  reaches this guard.
 - From fix 12's merge review (2026-10-07; LOW): Undo pressed while crop mode
   is open puts the crop back in the store and on the picture, but the crop
   frame and its edge handles stay where they were until Apply (MEASURED by
@@ -1305,6 +1319,73 @@ evidence label of each.
   by record 34 (bounded-designs §3.3 B and row 3 of table A); an image
   into a cell stays out of its scope too.
 
+### Queued by record 36 (select and move like PowerPoint, 2026-10-16)
+
+Record `docs/fixes/36-select-move.md` section 10 has the detail and the
+evidence label of each.
+
+- **Shift+click on an image or a logo replaces the selection** instead of
+  adding to it (MEASURED in Chromium, Firefox and WebKit,
+  `undo-history-check.mjs` `SM-I-shift-click-image`: the references block
+  selected, Shift+click on the image's frame leaves the image alone
+  selected; on the table's frame both are selected). Older than record 36
+  and outside its rule table: an image's pointerdown is left to the canvas
+  (`blocks.tsx` BlockFrame: an image moves by its handle), whose click
+  without a drag clears the selection before the image's own click adds it
+  (INSPECTED). The design doc's "Shift, ⌘ or Ctrl + click adds or removes a
+  block" holds for the other kinds.
+- **Esc does not close the block menu** (a right-click on an image, a logo
+  or the references block): it has no Esc of its own; since record 36 Esc
+  does nothing while it is open, instead of deselecting the block under it
+  (MEASURED, `SM-I-escape-block-menu`, three engines: the menu stays open).
+  The block-menu item (bounded-designs §3.4's right-click row) should close
+  it on Esc.
+- **Playwright's WebKit runs a forward Delete pressed on a focused menu as a
+  delete of the document's selection**: with text selected in a table cell
+  by a drag, Delete on the Style tab's font menu removed it ("M (SD)" →
+  "M"; MEASURED, K0t `engineEdit`), the engine's own edit, not the editor's
+  listeners (Backspace did nothing; Chromium and Firefox nothing). U-10's
+  family (open-findings.md: forward Delete on a focused Undo button); real
+  Safari UNVERIFIED (manual flow §40).
+- **A group dragged past the sheet's left or top edge shears**: the group
+  frame's move clamps each block at 0 on its own (`PosterEditor.tsx`
+  `handleGroupMove`, `Math.max(0, blk.x + dx)`), where a drag of one of the
+  selected blocks clamps the group as a whole (`useBlockDrag` `groupMinX`)
+  (INSPECTED, not measured).
+- **Decided at merge (record 36, R36-2): arrow chords that are not a nudge
+  are cancelled while a block is selected**, as main cancelled every arrow
+  then, so Alt + ← (Back on Windows and Linux) and the other platform's key
+  + ← cannot leave the editor; with nothing selected they stay the
+  browser's. MEASURED cancelled in Chromium, Firefox and WebKit
+  (`SM-I-arrow-chords-leave`). The owner may still prefer the browser's.
+- **An edit made just before leaving the editor's page may not be saved**
+  (hand to fix 27's area): a nudge followed at once by the page's own Back
+  (`history.back()`, no key; the harness opens the editor as a second
+  document, so Back unloads it) was not saved in Chromium and WebKit (0
+  saves, the fake backend read 3 s after) and was saved in Firefox (1 save)
+  (MEASURED, `SM-I-arrow-chords-leave`, record 36 §9, R36-2; the same in
+  WebKit after Ctrl + ←). The save waits 800 ms after an edit and the
+  unmount's flush does not finish when the document unloads. Whether a
+  real browser's leave warning (fix 27 arms one while a change is unsaved)
+  stops that Back is UNVERIFIED: Playwright's handling of a leave prompt on
+  a history navigation is not the browser's. In-app navigation (from the
+  dashboard) unmounts the editor without unloading the page and is not
+  this case.
+- **A held drag that ends where it started still leaves an undo step**
+  (record 36's review, the sibling of R36-1 its correction does not
+  cover): a crop edge, a table column's grip or an Edit-block slider
+  (`holdDragStep`, fix 12) pushes its step at the drag's first change, so
+  a drag out and back to the start leaves a step whose ⌘Z shows nothing
+  (INSPECTED, not measured: the three are hidden by `ADJUSTMENTS_ENABLED`).
+  Before they come back, drop a held step that changed nothing at
+  `endDragStep`. A move, resize or rotate drag and the group frame no
+  longer do this (the store's `setBlocks`, R36-1).
+- **Cleanup: one `MAC` test** (record 36's review, R36-6): the same
+  `/Mac|iPhone|iPad/` test of the platform is copied in `selectionKeys.ts`,
+  `usePrintShortcut.ts`, `EditorTopBar.tsx` and `HistoryButtons.tsx`
+  (`ConfirmModal.tsx` has its own form). Export one and import it in each
+  (INSPECTED; no behaviour changes).
+
 ### Queued by record 34 (paste and drop on the canvas, 2026-10-16)
 
 Record `docs/fixes/34-paste-drop.md` section 10 has the detail and the
@@ -1339,9 +1420,13 @@ evidence label of each.
   cell.
 - **Modal dialogs behind feature switches** (`CopyDesignModal`, the
   import modals, the publish modals, `InputModal`, `StaplesPrintModal`)
-  are not `role="dialog" aria-modal`: the canvas's paste and the editor's
-  shortcuts would act behind them. Mark each before its switch is turned
-  on (record 34 §10; the feedback dialog was marked, R34-7).
+  are not `role="dialog" aria-modal`. Since record 36's review round
+  (R36-4) the canvas's paste and the editor's shortcuts no longer act
+  behind them: the shortcuts' one dialog test (`editorHistory.ts`
+  `dialogOpen`) counts their shared modal markup (TESTED with the Staples
+  dialog, `selectMoveAdjustments.test.tsx`). The mark is still what
+  assistive technology reads: mark each before its switch is turned on
+  (record 34 §10; the feedback dialog was marked, R34-7).
 - **A file dropped outside the canvas** (the sidebar, the top bar) is the
   browser's, which may open it in the tab (not measurable under the
   harness's DevTools drops). A window-level guard that refuses file drops
@@ -1763,4 +1848,5 @@ Found while fixing one item, belonging to another (details in the record named):
 | 32 (MVP: pasting tables; fix 27's N2-F1) | `fix/table-paste` | implemented; its one review round (a simple feature: the browser, through the user's entry points, on `tablepaste-frozen-1`) done and corrected (6 findings: R1-F1, R1-F2 and R1-F3 MEDIUM corrected, each reproduced first with the committed instrument in the three engines and then 0; R1-F4 LOW, the table tip corrected to say a single copied cell replaces the cell's text, the behaviour queued for the owner; R1-F5 LOW, two docs corrected; R1-F6 INFO queued; the corrector's audit of its own correction found it lost a Shift+Enter line and a double space copied between blocks in Firefox, MEASURED, and corrected it); the correction is for the next lead pass, frozen copy `tablepaste-frozen-2` — `docs/fixes/32-table-paste.md` (bounded-designs.md §3.3 A, the lead's rule table, PowerPoint's behaviour): one line of text pasted into a table cell goes in at the caret; a grid (an HTML table from Excel, Word or Sheets, or text with tabs or line breaks) fills the table from the focused cell, across and down, growing it by rows and columns, no cell outside the pasted area changed, nothing dropped (merged cells keep the cells after them in their columns), one undo step; a paste into a text block or the title takes the poster's style (the source's colour and highlight dropped with its font and size; a style sheet's text and Google Docs' non-bold `<b>` wrapper dropped); a pasted cell's text stored as text. Reproduced from the user's entry with a real ⌘C/⌘V in Chromium, Firefox and WebKit (`scripts/table-paste-check.mjs`, on main: rule 1 broken in 3 of 3 scenarios, the table replaced by the grid in 12 of 12 grid scenarios, wrong in 11 (the twelfth covers the whole table from its first cell), an `<img onerror>` pasted as text ran in 2 of 2, colour or a style sheet's text kept in 4 of 5 text pastes; after: 0 in each engine, and on the production build in Chromium); after the review round: Word's own bold kept (`<b style='mso-bidi-font-weight:normal'>`: the not-bold check read any "font-weight: normal" in the style, so Word's bold was dropped in text blocks, a regression against main, and in cells), blank lines at the end of a paste no rows and rule 1's line ending with no line break (a paragraph Chromium copied with a triple-click emptied the cell below; WebKit added a blank line), a line wrapped in the clipboard's HTML source one line in cells, text blocks and the title, while text copied between blocks keeps its line breaks and spaces; the instrument's 30 scenarios 0 in each engine and on the production build in Chromium; 54 of 54 mutants killed; the three in-app sentences about pasting tables say what the paste does; queued above: "Queued by record 32" |
 | 33 (MVP design §3.7, owner decision D2) | `fix/text-size` | implemented — `docs/fixes/33-text-size.md`; the first build's tree (on `1d5addf`) was lost before it was committed, and the build was recovered from the author's transcript onto `c67a3db` (record 33 §9: nothing re-implemented; byte-identical to the first build wherever a copy survived) with every number below measured again there; reproduced first in Chromium, Firefox and WebKit (`text-size-check.mjs`: no text-size control in the top bar; raising every level one step took the Style tab's 4 fields and 4 undo steps, the ratios drifting up to 1.01 % and a round trip ending the title at 101 pt from 100.8, MEASURED); built: [A−] Body 36 pt [A+] in the top bar between Redo and Save PDF (`poster/TextSizeControl.tsx`, rules `poster/textSize.ts`): the body steps through 28 · 32 · 36 · 40 · 44 · 48 pt, title, heading and authors keep their ratio, unrounded, every return to a size exact (`===`, from an anchor: the naive new ÷ old formula missed on 4526 of 4549 swept walks), one undo step per press, the caret kept on a mouse press, the focus kept and the selection's keys blocked on a keyboard press, disabled at the bounds with a title saying why; the Edit tab's note names it; Auto-Arrange still never changes a size; after: every claim clean in three engines (13 posters, 147 presses, 65 returns to a size all `===`; the print document and the PowerPoint file at the new sizes; the top bar without overlap at 1024 and 1280 px); 25 of 25 mutants killed, 3 blind spots guarded in the browser; a sibling found and queued for the lead and the owner (a level set large and raised with A+ past the editor's load-time ceilings is reset on the next open, older than record 33: the Style tab reaches it too, MEASURED); its one review round (a simple feature: the browser, through the user's entry points, on `textsize-frozen-1`) done and corrected (6 findings: R1-F1 MEDIUM, a body that is not a size, the Style tab's Body field cleared stores 0 and left A+ promising 28 pt and doing nothing, and R1-F5 LOW, a title stored as null written as 0 by a press, one cause, corrected: such a body counts as below every size, A+ sets it to 28 pt and leaves the other levels, the label reads "Body – pt", another level that is not a size is left alone; reproduced first with the folded-in scenarios, OBSERVED in Chromium, Firefox and WebKit, then clean; R1-F2 MEDIUM, one A+ from a body typed at 12 pt resets title, heading and authors on reopen, left to the lead and the owner, queued above with the record corrected; R1-F3 LOW, two round trips 1 to 2 units in the last place off, measured and queued; R1-F4 LOW, the label near a size, an owner call; R1-F6 INFO); after: 46 scenarios clean in each engine, 32 of 32 mutants killed, 3 blind spots guarded; the correction is for the next lead pass, frozen copy `textsize-frozen-2` |
 | 34 (MVP: paste and drop on the canvas) | `fix/paste-drop` | implemented and reviewed (one round, a simple feature: the browser, through the user's entry points, on `pastedrop-frozen-1`; 10 findings, 2 MEDIUM, 6 LOW, 2 INFO, record §9): corrected R34-1 (a second file put into an image block while the first uploads drew nothing until a reload: only the last file now updates the block), R34-2 (an image with an `<img>` fragment and its address as text pasted nothing: "text" is now what a paste into a text block would insert), R34-3 (a dragged cell range then ⌘V made a stray block in Chromium: the canvas waits) and R34-7 (a paste behind the feedback dialog made a block: the dialog is marked modal), each reproduced first in the browser in three engines and red first in a unit test; R34-4 and R34-6 queued below; after: the instrument green in Chromium, Firefox and WebKit, 50 of 50 mutants killed, 3 of 3 blind spots guarded; the correction is in the frozen copy `pastedrop-frozen-2` — `docs/fixes/34-paste-drop.md` (bounded-designs.md §3.3 table A row 3, table B orders 2 to 5, Drop, Image checks; order 1, Postr's own copied blocks, is the next fix): ⌘V with nothing in edit mode makes a table block from an HTML table (record 32's reader), an image block from an image with no text (or fills the selected empty image block), a text block from any other text (record 32's cleaned paste), nothing otherwise, centred in the part of the sheet in view, snapped to the ½ in grid; an image pasted into a text block, a heading or the title makes an image block to its right, or below it as drawn; image files dropped on the canvas make image blocks centred on the drop point, each next 1 in down and right, and one dropped on an image block goes into it; non-images and files over 10 MB skipped with today's messages; every paste or drop one undo step; a paste into a field or with a dialog open makes nothing; a guest the same. Reproduced first from the user's entry (`scripts/canvas-paste-check.mjs`, real ⌘V where the engine allows it, trusted drops in Chromium) on a clean tree of `c67a3db` in Chromium, Firefox and WebKit: nothing happened in any row (B2 2/2, B3 7/7, B3F 1/1, B4 4/4, A3 3/3, DR 3/3, DM 1/1, DI 3/3, G 2/2; Chromium fired no `drop` at all), and the image block's own upload took three undo steps, stored a `blob:` address while the upload was out and kept a broken figure for a file over 10 MB (UP, UPB, UPX, the path a fill and a drop share, fixed with it: one update after the file is stored); after: every claim 0 in each engine and on the production build in Chromium; 43 of 43 mutants killed, 5 of 5 blind spots guarded in the browser; §3.3 D measured and left to the next fix (⌘Z after a same-type replace draws the new image); queued above: "Queued by record 34" |
+| 36 (MVP design §3.4; items 6 and 22, OF-06, OF-11) | `fix/select-move` | implemented and reviewed (one round, a simple feature: the browser, through the user's entry points, on `selectmove-frozen-1`; 6 findings, 3 LOW, 3 INFO, record §9): corrected R36-1 (a drag that changes nothing, the group's or one block's, and, found here, an arrow pressed at the sheet's edge added an empty undo step, so the next ⌘Z showed nothing: the store's `setBlocks` now adds no step for a list that changes nothing, as `updateBlock`, `patchDoc` and `removeBlock` did; K4j and K3e observed in Chromium, Firefox and WebKit before, clean after), R36-3 (four sentences, and a fifth from main, about the grid, the Mac's fine key, line references and Esc in sidebar fields, made true) and R36-4 (the keys read one test of "a dialog is open" with Esc, undo and ⌘P; record 34's R34-7 sibling); R36-2 (Alt + ← and the other platform's key + ← are the browser's while a block is selected, as the rule says; main cancelled them) is an owner question above ("Queued by record 36"), its lost-edit half handed to fix 27's area there; R36-5 and R36-6 noted; fix 12's whole harness clean in the three engines after; the correction is in the frozen copy `selectmove-frozen-2` — `docs/fixes/36-select-move.md`; the design's key rule and gestures, reproduced first in Chromium, Firefox and WebKit on main with fix 12's harness extended (`undo-history-check.mjs --only SM`, `lib/selectMoveScenarios.mjs`): Backspace, Delete, → and ⌘D on a focused menu removed, moved or copied the selected block (OF-11; the guard was copied at three places, the table's range listener cleared a dragged range too), Esc never left text or deselected, ⌘A selected nothing, ⌘ / Ctrl / Alt + arrow moved ½ in and Shift + arrow 0.1 in, one ⌘Z after a group move or resize left every block where the drag put it (OF-06); after: the three guards one test (`canvasPaste.ts` `isEditing`), Esc (`selectionKeys.ts`, in the capture phase: a dialog or a marked menu takes it first) leaves text with the block selected and otherwise deselects, ⌘A selects every block but the credit mark, ⌘ + arrow on a Mac and Ctrl + arrow elsewhere 0.1 in (Ctrl + arrow PowerPoint's finer nudge on Windows, ⌘ on a Mac by the same rule; read in Microsoft's documentation first), every other modifier with an arrow nothing, the group drag one step undone exactly and redone; every claim 0 in the three engines (the instrument reads the store from `/src`, so not on the production build), each part red in the browser on its own; fix 12's whole harness clean in the three engines, fix 34's canvas-paste-check clean in Chromium (before the correction; after it see record §8b); 25 of 25 mutants killed before the correction (after it 28 of 28, and fix 34's paste check clean in the three engines), 2 blind spots (one guarded in the browser, one unreachable and accepted); queued above: "Queued by record 36" |
 | 37 (record 33's sibling f, R1-F2) | `fix/load-size-cap` | implemented — `docs/fixes/37-load-size-cap.md`: the editor page's load-time repair (`pages/Editor.tsx` `normalizeStaleStyles`) replaced any text level above title 216, heading 100.8, authors or body 72 pt with today's default on every open, meant for posters stored before the typography calibration (979df80); the Style tab and A+ reach those sizes, so a user's own sizes were reset. Reproduced first from the user's entry in Chromium, Firefox and WebKit (`text-size-check.mjs`: a hand-set title 226.67 and heading 106.67 pt after A+, reopened 100.8 and 57.6; the Style tab's heading 110 pt, reopened 57.6; Body 12 pt then A+, 235.2 / 134.4 / 84 pt reopened 100.8 / 57.6 / 36; a title typed as 432 pt, reopened 100.8). Now an old poster is recognised by the old default's four sizes together (title 60, heading 28, authors 22, body 18 units, the posters table's first default, 853ec1c) and opens at today's defaults; every other size opens as stored; a missing level is still filled. After: the instrument clean in three engines (the old-default fixtures still repaired), 5 of 5 mutants killed; siblings measured (sheet size at the fields' bounds, palette and font kept; an emptied poster gets the template and Classic palette back, queued above); its one review round (a simple fix: the browser, through the user's entry points, the lead's, on `loadcap-frozen-1`) done: 7 findings (1 MEDIUM, 3 LOW, 3 INFO), none against the fix's code; corrected: the record's, the plan's and the checklists' sentences that took a new row for today's defaults (R37-2, R37-3 and its sibling in manual-test-flows §38, R37-4, R37-7) and §7's claim qualified (R37-5); the reviewer's probe folded into `text-size-check.mjs` as information (`new-row-defaults`, `new-row-emptied`, `old-default-strings`, `old-default-authors-absent`; after: exit 0 in three engines, 58 scenarios each); queued above: a new poster starts at the column default, title 158.4 pt (R37-1, MEDIUM, older than record 37, MEASURED in three engines; a cause of its own, for the lead) and a reload inside the autosave's window (R37-6, UNVERIFIED); the correction is in the frozen copy `loadcap-frozen-2` |
