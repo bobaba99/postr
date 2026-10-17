@@ -55,6 +55,17 @@
  *       it, or opening it from its focused toggle, leaves focus on <body>
  *       or on something invisible. The sidebar's case is INFORMATION
  *       (claim Hf-sidebar), handed on.
+ *   Hm, Hm-move, Hk, Hm-info  plan item 20 (record docs/fixes/20-focus-ring.md),
+ *       scenarios focus-* in lib/focusRingScenarios.mjs (its header has the
+ *       claims): Hm a ring on a chrome button, link, checkbox or <summary>
+ *       after a mouse click and then a key other than Tab; Hm-move a ring
+ *       where a key moved the focus after a mouse press (Esc closing a dialog
+ *       the mouse opened, Enter opening one again); Hk keyboard navigation
+ *       (Tab, Shift+Tab, keys pressed after Tab, a dialog opened and closed
+ *       from the keyboard) without a ring it draws today; Hm-info
+ *       INFORMATION, not counted (a script's focus before any input, the
+ *       tour, a selected block's move control, the paint after a click, the
+ *       modifier keys, a keyboard user's click on A+).
  *   Hh  INFORMATION, not counted in the exit code: a selected block's
  *       handle row, above a block at the top of the sheet, starts under
  *       the 24 px top ruler after Fit. Until fix 19 the row was drawn in
@@ -90,7 +101,7 @@
  *   control inside it.
  *
  * RUN (from apps/web)
- *   node scripts/fit-check.mjs [--only id,id]
+ *   node scripts/fit-check.mjs [--only id,id]   (an id ending in * is a prefix: --only 'focus-*')
  *   env PORT (default 5261), OUT_DIR, POSTR_REPO, POSTR_MUTANT (lib/editorHarness.mjs)
  *
  * EXIT 0 no claim observed and no scenario errored · 1 a claim observed ·
@@ -103,6 +114,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { RouteRedirected, SWITCH_OFF, log, openEditor, sourceFlag, startHarness, switchOffReason, switchesOff } from './lib/editorHarness.mjs';
+import { FOCUS_RING_SCENARIOS } from './lib/focusRingScenarios.mjs';
 
 const PORT = Number(process.env.PORT ?? 5261);
 const onlyArg = process.argv.find((a) => a.startsWith('--only'));
@@ -1118,8 +1130,12 @@ const NEEDS = [
   [/^tour-reopened-sidebar-step2$|^tour-export-step-/, 'IMPORT_ENABLED'],
 ];
 const needsOf = (id) => NEEDS.filter(([re]) => re.test(id)).map(([, sw]) => sw);
-const list = SCENARIOS.filter((s) => !ONLY || ONLY.includes(s.id));
-if (ONLY && list.length !== ONLY.length) fail(`unknown --only id: ${ONLY.filter((id) => !SCENARIOS.some((s) => s.id === id))}`);
+// Plan item 20's focus ring scenarios (lib/focusRingScenarios.mjs).
+SCENARIOS.push(...FOCUS_RING_SCENARIOS);
+const picks = (pattern, id) => (pattern.endsWith('*') ? id.startsWith(pattern.slice(0, -1)) : id === pattern);
+const list = SCENARIOS.filter((s) => !ONLY || ONLY.some((p) => picks(p, s.id)));
+const unknown = (ONLY ?? []).filter((p) => !SCENARIOS.some((s) => picks(p, s.id)));
+if (unknown.length) fail(`unknown --only id: ${unknown}`);
 const h = await startHarness({ name: 'fit-check', port: PORT }).catch(fail);
 const results = [];
 let errors = 0;
@@ -1186,7 +1202,7 @@ const summary = {
 fs.writeFileSync(path.join(h.out, 'results.json'), JSON.stringify({ summary, results }, null, 2));
 log(`[harness] ${JSON.stringify(summary)}`);
 log(`[harness] ${SWITCH_OFF}: ${summary.switchOff}`);
-const INFO_CLAIMS = new Set(['Hh', 'H4k-sidebar', 'Hf-sidebar']);
+const INFO_CLAIMS = new Set(['Hh', 'H4k-sidebar', 'Hf-sidebar', 'Hm-info']);
 const exit = errors ? 2
   : Object.entries(byClaim).some(([claim, c]) => !INFO_CLAIMS.has(claim) && c.observed > 0) ? 1 : 0;
 log(`[harness] exit=${exit} wrote ${path.join(h.out, 'results.json')}`);
