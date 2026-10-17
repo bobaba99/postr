@@ -28,7 +28,7 @@ import { rowOf } from './keepWorkKit.mjs';
 import { TABLE_SHAPES } from './tablePasteShapes.mjs';
 import {
   IMAGES, addedBlocks, drawnBlock, dropFiles, emptySheetPoint, eventCount, fileOf, handOver, othersChanged, paintShare, renamed,
-  settledChange, sheetUnits, storedBlocks, storedEquals, until, uploadsOf, waitPaint, watchEvents,
+  keyedName, settledChange, sheetUnits, storedBlocks, storedEquals, until, uploadsOf, waitPaint, watchEvents,
 } from './canvasPasteKit.mjs';
 import {
   caretInFirstText, carried, centred, fillViaChooser, nothingSelected, openSession, pasteNow, putOnClipboard, rightOfText, storeFirst,
@@ -100,7 +100,7 @@ async function runTwiceSameBlock(h, s, sc) {
   const fileIs = !stored ? 'none' : stored.equals(second.bytes) ? 'C' : stored.equals(first.bytes) ? 'B' : stored.equals(fileOf(IMAGES.A).bytes) ? 'A' : `${stored.length} B`;
   const ext = second.name.split('.').pop();
   const p = [];
-  if (!new RegExp(`^storage://${s.uid}/${s.id}/${img.id}\\.${ext}$`).test(blk?.imageSrc ?? '')) p.push(`imageSrc ${short(blk?.imageSrc)}`);
+  if (!new RegExp(`^storage://${s.uid}/${s.id}/${keyedName(img.id, ext)}$`).test(blk?.imageSrc ?? '')) p.push(`imageSrc ${short(blk?.imageSrc)}`);
   if (fileIs !== 'C') p.push(`the stored file is ${fileIs}, not the second file`);
   if (!drawn?.loaded) p.push(`nothing drawn (img ${JSON.stringify(drawn)})`);
   if (paintC === null || paintC < 0.5) p.push(`the second image covers ${paintC} of its box`);

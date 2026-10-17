@@ -102,6 +102,23 @@
  * address alone: a text block, R34-5), F-feedback-text (the feedback
  * dialog, R34-7), and three INFORMATION scenarios (R34-4, R34-6).
  *
+ * Since record 35 (docs/fixes/35-block-copy.md; lib/blockCopyScenarios.mjs,
+ * lib/blockCopyKit.mjs; `--only C-`): block copy, cut and paste and each
+ * image block's own file (bounded-designs §3.3 table B order 1, table C,
+ * D): claims C1 (⌘C's payload and words, read by a real ⌘V into a field the
+ * harness adds), C2 (⌘X), C3 (⌘V's copies: new ids, places, kept on the
+ * sheet), C4 (a title, authors block or user logo refused, with the toast),
+ * C5 (after a reload, in another poster, in a second tab), B1N (a payload
+ * that fails validation pastes nothing), X (an untrusted payload does no
+ * harm: no script, no unsafe markup or image source stored, no outside
+ * request), D (a pasted or cloned image has its own file), R (Replace writes
+ * a new name), DR (after a reload each block draws its own picture), DU (one
+ * ⌘Z after a same-type Replace draws the old picture), MSG, N, U, G, the
+ * guard EDIT (the caret in a text: the text's own copy) and PT (text selected
+ * in the sidebar with a block still selected: ⌘C is the browser's copy). The record 34
+ * claims about an upload's file accept both {block}.{ext} and record 35's
+ * {block}-{random}.{ext} (`keyedName`): they are about the keying.
+ *
  * INFORMATION (printed, not counted)
  *   D-on-image… after the replace, one ⌘Z: what is stored and drawn (the
  *        files are stored per block id and an upload overwrites:
@@ -170,6 +187,7 @@ import { openSignedIn } from './lib/keepWorkKit.mjs';
 import { PASTE_SCENARIOS, runPasteScenario } from './lib/canvasPasteScenarios.mjs';
 import { DROP_SCENARIOS, runDropScenario } from './lib/canvasDropScenarios.mjs';
 import { REVIEW_SCENARIOS, runReviewScenario } from './lib/canvasPasteReviewScenarios.mjs';
+import { BLOCK_SCENARIOS, runBlockScenario } from './lib/blockCopyScenarios.mjs';
 import { imageMode } from './lib/canvasPasteKit.mjs';
 
 const PORT = Number(process.env.PORT ?? 5822);
@@ -185,6 +203,7 @@ const SCENARIOS = [
   ...PASTE_SCENARIOS.map((sc) => ({ ...sc, run: (h) => runPasteScenario(h, openSignedIn, sc) })),
   ...DROP_SCENARIOS.map((sc) => ({ ...sc, run: (h) => runDropScenario(h, openSignedIn, sc) })),
   ...REVIEW_SCENARIOS.map((sc) => ({ ...sc, run: (h) => (sc.custom ? runReviewScenario(h, openSignedIn, sc) : runPasteScenario(h, openSignedIn, sc)) })),
+  ...BLOCK_SCENARIOS.map((sc) => ({ ...sc, run: (h) => runBlockScenario(h, openSignedIn, sc) })),
 ];
 
 let h;
