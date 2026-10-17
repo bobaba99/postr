@@ -17,7 +17,12 @@
  * poster saved elsewhere meanwhile, the session ended),
  * lib/keepWorkLimits.mjs (limits the fix leaves: a paste into a table
  * cell, an outage during a token refresh, a size field's draft, Enter in an
- * emptied Poster name field); helpers lib/keepWorkKit.mjs.
+ * emptied Poster name field), lib/keepWorkLeave.mjs (record 38,
+ * docs/fixes/38-save-on-leave.md: the editor left right after an edit) and
+ * lib/keepWorkLeaveRound1.mjs (its review round 1's cells),
+ * lib/keepWorkLeaveRound2.mjs and lib/keepWorkLeaveRound2Paths.mjs (its
+ * review round 2's cells), lib/keepWorkLeaveRound3.mjs (its review round
+ * 3's); helpers lib/keepWorkKit.mjs.
  *
  * CLAIMS (a claim is OBSERVED when the defect is present)
  *   E1   " ZQA", Enter, "ZQB" in a text block: the stored text has no line
@@ -122,6 +127,121 @@
  *        same with Enter in Layout › Poster name, the name unchanged (the
  *        field's button counts: "Save" there says the name is not stored).
  *        Round 2 of the restarted review, N2-F3 (fix 27, section 9)
+ *   L1   (record 38, lib/keepWorkLeave.mjs; one scenario per edit and way,
+ *        L1-<edit>-<way>) an edit made, then the editor left at once (within
+ *        a few ms of the last key or click, inside the save's 800 ms wait):
+ *        the edit is not stored 3 s later. Edits: type (a word typed), nudge
+ *        (the references block selected, →), aplus (the top bar's A+),
+ *        paste (a line pasted, a page-made paste event). Ways: close (the
+ *        tab closed, its leave dialog accepted), reload, back (the browser's
+ *        Back to the page before), link (the sidebar's "Back to My
+ *        Posters", a full page load), address (another address opened),
+ *        inapp (Back inside the app to the dashboard: the editor unmounts).
+ *        L0 the edit lost with no leave dialog; L5 (close only, where every
+ *        engine shows the dialog) no dialog while the change was unsaved
+ *   L4   the first save held 2.5 s; " ZQSA", 1 s, " ZQSB", the tab closed at
+ *        once (and the same leaving by another address, ZQSC/ZQSD): a write
+ *        without the newer word stored after one with it (an older poster
+ *        over a newer one); L4d the newer word lost with no dialog
+ *   L4s  every save held 2 s; " ZQSE", the tab close asked and the dialog
+ *        dismissed (Stay), " ZQSF" 300 ms later: ZQSF not stored 6 s later,
+ *        or a write sent while another was held (two in flight)
+ *   LF   every save fails while " ZQFR" waits; 3.5 s later the backend
+ *        accepts again and the tab is closed at once: the word not stored
+ *   LFd  the backend still failing when the tab is closed: the word lost
+ *        with no dialog
+ *   L2   a poster whose save is over the 64 KiB keepalive limit (11,000
+ *        words pasted and stored), " ZQBIG", the tab closed at once: lost
+ *        with no dialog
+ *   L3c  " ZQIC" typed, Back inside the app to the dashboard, the tab
+ *        closed at once: the word neither stored nor sent, before the
+ *        close, by a request that outlives the page (keepalive; the page's
+ *        own record of its writes, which Playwright misses when the page
+ *        closes a moment later); the editor's dialog went with it, so the
+ *        loss is silent
+ *   L3f  (record 38's review round 1, R1-1; every L3-inapp-* below goes
+ *        Back inside the app to the dashboard) every save fails while
+ *        " ZQFI" waits, Back at 3 s, the backend back 1 s later, the tab
+ *        kept: ZQFI not stored within 40 s (the editor's retries went with
+ *        it); L3fd the same, the tab closed while still failing: lost with
+ *        no dialog; L3fr closed just as the backend is back: not stored;
+ *        L3r the poster opened again from its card while still failing: its
+ *        sheet lacks the word; L3rs a word typed there, the backend back:
+ *        both not stored within 15 s; L3ro a write without the new word
+ *        applied after one with it
+ *   L3sd the first save held 3 s, " ZQRA", 1 s, " ZQRB", Back, the tab
+ *        closed 300 ms later: ZQRB lost with no dialog; L3sk the same, the
+ *        tab kept 6 s: ZQRD not stored
+ *   L4 (slow next page)  L4-slow-write-then-slow-address: the first save
+ *        held 5 s, " ZQNA", 1 s, " ZQNB", an address answering after 4 s:
+ *        older over newer (R1-2); L4-slow-write-then-204-close: the
+ *        address answers 204 (the page stays), the pill read at 8 s, the
+ *        tab closed: older over newer, L4p the pill "Saved" while ZQND is
+ *        not stored, L4q ZQND lost with no dialog at the close
+ *   L1o  the first save held 2 s, " ZQPA", 1 s, " ZQPB", 900 ms (its save
+ *        waiting), an address answering after 4 s: ZQPB written by an
+ *        ordinary request after the page began to go (R1-3)
+ *   L1t  a 100 s token refreshed by the client (40 s idle), " ZQTK", the
+ *        tab closed: not stored, or the leave's write without the token the
+ *        client holds then (R1-7, a guard)
+ *   L4 (traced, record 38's review round 2, lib/keepWorkLeaveRound2.mjs)
+ *        L4-slow-write-then-edit-<way>-traced: the first save held 2.5 s,
+ *        " ZQWC", 1 s, " ZQWD", at once each unloading way (the page's own
+ *        trace of its writes and leave events printed): older over newer
+ *        (R2-1: WebKit's Back cuts the held write before beforeunload);
+ *        L4-slow-write-then-own-save-<way>-traced: the same with ZQWF's own
+ *        save up and waiting on the held write (900 ms) when the page is
+ *        left; L4d the newer word lost with no dialog
+ *   LKa  every save held 2 s; a word, the tab close asked while its write is
+ *        out and Stay answered (LKa-stay-then-later), or the tab hidden and
+ *        shown again (LKa-hidden-then-later); 4 s; another word: its
+ *        ordinary save sent with keepalive (R2-3: the leave's ask outlived
+ *        the leave); LKe the same ask, then the token expired while the
+ *        client's refresh is out: the pill showed "Not saved" for a save
+ *        the client's own request would have waited out
+ *   LRr  the first save held 3 s, the next 4 s; " ZQRR1", 1 s, " ZQRR2", Back
+ *        inside the app; at 4 s the poster opened again from its card, its
+ *        load answered with the row as it was when the load arrived,
+ *        delivered just after the kept write is stored
+ *        (L3-inapp-reopen-race; L3-inapp-reopen-natural, the load answered
+ *        at once, its control): the sheet lacks ZQRR2; LRo the stored
+ *        poster at the end lacks it (R2-2)
+ *   LDr  every save refused (500), " ZQDL", Back inside the app, the poster
+ *        deleted from its dashboard card, saves accepted again: two or more
+ *        writes of it after the delete (L3-inapp-kept-then-delete); LDd
+ *        closing the tab then still asks to leave (R2-4)
+ *   L1s / LF / LB / L1x / L3x / LG / L2 / LH  (lib/keepWorkLeaveRound2Paths.mjs,
+ *        the round's partition of entry paths) L1s-<nudge|aplus>-<way>: the
+ *        nudge or A+ read from the stored row, so it runs on the build (L1,
+ *        L0 as above); LF-failed-then-recovered-<way> and
+ *        LF-still-failing-<way>: LF and LFd by reload, Back, a link and an
+ *        address; LB-bfcache-*: Back then Forward with bfcache on (full
+ *        Chromium; Firefox and WebKit restore no page under Playwright): LB1
+ *        a change not stored, LB2 one typed after Forward not stored with
+ *        "Saved", LBo older over newer, LBh nothing written after Forward;
+ *        L1x-expired-token-close: the token expired, the refresh held, the
+ *        tab closed: lost with no dialog (L0); L3x-expired-token-inapp: the
+ *        same, Back inside the app, the refresh answered 3 s later: not
+ *        stored within 20 s; LG-guest-*: an anonymous session (L1, L0);
+ *        L2-near-limit-<bytes>-<way>: a save of about that size, a word, at
+ *        once the way out (over the app's 61,440-byte cap only L0 counts:
+ *        the dialog is the protection, L2's rule); LH-hidden-synthetic: a
+ *        synthetic hidden tab, the word not stored 430 ms later
+ *   LW / L4-cut / L4-gap / L4-slow-past-settle  (lib/keepWorkLeaveRound3.mjs,
+ *        record 38's review round 3) LW-500-close-<ms>: the first save
+ *        answered 500 by the server (nothing stored), the tab closed <ms>
+ *        later: WL the word not stored (R3-1: a server's answer counted as
+ *        the browser's cut); LW-net-close-400 the same with no answer, past
+ *        the 200 ms; LW-500-stay-60, LW-held500-stay: WS not stored within
+ *        3 s of Stay; LW-waiting-save-500: LWw a save waiting on a write the
+ *        server answered 500 held 150 ms or more; L4-cut-then-debounce-
+ *        <close|address|back>: the held save failed to the page with no
+ *        answer while the server applies it 1.5 s later, the newer change's
+ *        own 800 ms wait firing 80 ms after the failure, the page left 130 ms
+ *        after it: L4 older over newer, L4d lost with no dialog (R3-2,
+ *        without the race); L4-gap-<d> (KEEP_WORK_GAP, e.g. 766-786): the
+ *        reviewer's WebKit sweep of the same race by the browser's Back;
+ *        L4-slow-past-settle-ps: a next page slower than the 10 s settle: L4
  *
  * INFORMATION (printed, not counted)
  *   H1   the first save held 12 s, " ZQH1", " ZQH2", ⌘S: when ZQH2 is sent,
@@ -153,10 +273,36 @@
  *   H8   Layout › Poster name emptied, Enter: the stored title before and
  *        after, what the field and its button show (older than fix 27; round
  *        3 of the restarted review measured it in Chromium)
+ *   LD-diagnostics-at-leave  saves failing, a word typed, 1.5 s later the
+ *        page goes to another address: does the diagnostics batch the
+ *        failure queued reach the API (record 38's sibling, not fixed)
+ *   L2-sizes  the PATCH body of a save of each print-path poster
+ *        (lib/printPathPosters.mjs), images as storage:// paths and as
+ *        data: URLs, against 64 KiB (record 38)
+ *   L3-inapp-kept-then-duplicate  saves refused, a word, Back inside the
+ *        app, the dashboard's Duplicate: does the copy hold the kept change
+ *        (record 38's review round 2)
+ *   L2-engine-keepalive-limit  keepalive PATCHes of N bytes from the
+ *        editor's page, one at a time, then two of 40,000 at once: which the
+ *        engine refuses (round 2)
+ *   LH-hidden-real  a second page brought to the front: does the editor's
+ *        page report hidden under this engine (round 2)
+ *   LW-net-close-60, LW-waiting-save-net  a failure with no answer 60 ms
+ *        before the tab close, and a save waiting on one: the 200 ms rule's
+ *        cost (round 3)
+ *   L4-slow-past-settle-bd  the first save held 12.5 s, past the settle:
+ *        is the older applied over the newer (the record's stated bound,
+ *        round 3, R3-4)
+ *   L3-inapp-two-kept-close  two kept changes, the tab closed: the dialog
+ *        and each poster's keepalive write (one shared quota; round 3, R3-7)
  *
  * CONTROLS (exit 2 if one fails)
  *   C1   the backend works: " ZQOK" is stored within 3 s and the pill says
  *        "Saved…"
+ *   LK   the fake backend sees a keepalive fetch the page sends at
+ *        beforeunload as the tab closes, and at pagehide as it goes to
+ *        another address (record 38); printed: whether one sent at pagehide
+ *        as the tab closes is seen (it is not, in any engine: below)
  *
  * BLIND SPOTS
  *   - The backend is a fake (lib/guestBackend.mjs); the real PostgREST and
@@ -185,7 +331,21 @@
  *   - Shift+Enter is pressed at a line's end only, and an input method's
  *     Enter is not driven (fix 12's undo-history-check drives composition).
  *   - H5's paste is a paste event carrying plain text (the system clipboard
- *     is not touched); the browser's own ⌘V is not driven.
+ *     is not touched); the browser's own ⌘V is not driven. So is L1-paste-*.
+ *   - Record 38: a request the page sends at pagehide as the tab closes is
+ *     not seen by Playwright's routes in any engine (control LK prints it:
+ *     the page's target has gone), so a tab close is measured through what
+ *     the page sends at beforeunload. A request the browser cancels before
+ *     it reaches the network is not seen at all (the leave scenarios keep
+ *     the page's own record of each poster write it makes, with or without
+ *     keepalive, in localStorage, and print it as writesMade); one the fake
+ *     has received
+ *     is applied after its hold even if the page has gone (a server that
+ *     received it). Playwright's routes answer the CORS preflight of a
+ *     cross-origin PATCH; whether an engine sends a keepalive request that
+ *     needs a preflight over the real network, and Supabase's answer to
+ *     it, are not driven. A tab hidden (visibilitychange) is not driven: a
+ *     headless page stays visible.
  *
  * RUN (from apps/web; apps/web/.env points at the fake backend)
  *   node scripts/keep-work-check.mjs [--only id,id] [--json file]
@@ -207,6 +367,11 @@ import { ENTER } from './lib/keepWorkEnter.mjs';
 import { SAVE } from './lib/keepWorkSave.mjs';
 import { ELSEWHERE } from './lib/keepWorkElsewhere.mjs';
 import { LIMITS } from './lib/keepWorkLimits.mjs';
+import { LEAVE } from './lib/keepWorkLeave.mjs';
+import { LEAVE_ROUND1 } from './lib/keepWorkLeaveRound1.mjs';
+import { LEAVE_ROUND2 } from './lib/keepWorkLeaveRound2.mjs';
+import { LEAVE_ROUND2_PATHS, closeBfBrowser } from './lib/keepWorkLeaveRound2Paths.mjs';
+import { LEAVE_ROUND3 } from './lib/keepWorkLeaveRound3.mjs';
 
 const PORT = Number(process.env.PORT ?? 5820);
 const argVal = (name) => {
@@ -216,7 +381,7 @@ const argVal = (name) => {
 };
 const ONLY = argVal('--only')?.split(',') ?? null;
 const JSON_OUT = argVal('--json');
-const SCENARIOS = [...SAVE.filter((s) => s.control), ...ENTER, ...SAVE.filter((s) => !s.control), ...ELSEWHERE, ...LIMITS];
+const SCENARIOS = [...SAVE.filter((s) => s.control), ...LEAVE.filter((s) => s.control), ...ENTER, ...SAVE.filter((s) => !s.control), ...ELSEWHERE, ...LIMITS, ...LEAVE.filter((s) => !s.control), ...LEAVE_ROUND1, ...LEAVE_ROUND2, ...LEAVE_ROUND2_PATHS, ...LEAVE_ROUND3];
 /** Scenarios allowed to make a version (K7): they press ⌘S, Save version or Restore (K9, K10 and K11 press none). */
 const MAKES_VERSIONS = /^(K[1-8]-|H1-|H4-|H6-|H7-)/;
 
@@ -253,6 +418,7 @@ try {
     }
   }
 } finally {
+  await closeBfBrowser();
   await h.stop();
 }
 results.push({ id: 'K7-no-silent-versions', how: 'versions made by scenarios that never pressed ⌘S, Save version or Restore', claims: { K7: silentVersions > 0 }, numbers: { silentVersions } });
